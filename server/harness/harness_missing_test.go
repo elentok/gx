@@ -2,6 +2,7 @@ package harness_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -40,7 +41,7 @@ func TestClaimHold_HarnessMissingHoldsTicket(t *testing.T) {
 			store, repo := t.TempDir(), testutil.TempRepo(t)
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Agent: tc.agent})
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
+			pty := rigs.NewNamedFake(runnerfake.NewRunner(), "pty")
 			opts := append([]func(*server.Config){servertest.WithRunner(pty)}, tc.options...)
 			h := servertest.StartWithStore(t, store, opts...)
 			t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
@@ -85,10 +86,10 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 		wantFrom string
 	}{
 		{"project override", func(t *testing.T, h *servertest.Harness, _, _ string) {
-			servertest.SetHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+			rigs.SetHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 		}, "the project default"},
 		{"reload", func(t *testing.T, h *servertest.Harness, path, store string) {
-			servertest.SwitchDefaultHarness(t, h, path, store, "codex")
+			rigs.SwitchDefaultHarness(t, h, path, store, "codex")
 		}, "the global default"},
 	}
 	for _, tc := range cases {
@@ -99,7 +100,7 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 			servertest.SetProjectRepo(t, store, "proj", repo)
 			path := filepath.Join(t.TempDir(), "config.json")
 			servertest.WriteConfig(t, path, store, nil)
-			pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
+			pty := rigs.NewNamedFake(runnerfake.NewRunner(), "pty")
 			h := servertest.StartWithStore(t, store, servertest.WithRunner(pty), servertest.WithConfigFile(path))
 			tc.change(t, h, path, store)
 			h.Programs.Missing("codex")

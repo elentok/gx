@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -57,7 +58,7 @@ func (f designsFixture) open(t *testing.T, epic string, isNew bool) wire.Session
 
 func sessionSnapshotOf(t *testing.T, f designsFixture, id string) wire.SessionInfo {
 	t.Helper()
-	return servertest.SessionSnapshotOf(t, f.shared(), id)
+	return rigs.SessionSnapshotOf(t, f.shared(), id)
 }
 
 func (f designsFixture) live(t *testing.T) []wire.SessionInfo {

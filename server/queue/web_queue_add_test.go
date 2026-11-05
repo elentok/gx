@@ -1,6 +1,7 @@
 package queue_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -58,7 +59,7 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 	if code, body := add("proj:epic-a", "1"); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("epic add = %d %s, want accepted", code, body)
 	}
-	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {
+	if got := rigs.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {
 		t.Errorf("queue = %v, want the one epic entry", got)
 	}
 
@@ -103,14 +104,14 @@ func TestQueue_MoveAndRemoveAcceptAnEpicAddress(t *testing.T) {
 	if res, err := h.Client.Queue.Move(t.Context(), "proj:epic-b", 1); err != nil || res.Refused {
 		t.Fatalf("move = %+v, %v; want accepted", res, err)
 	}
-	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-b", "proj:epic-a"}) {
+	if got := rigs.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-b", "proj:epic-a"}) {
 		t.Errorf("queue after move = %v", got)
 	}
 
 	if res, err := h.Client.Queue.Remove(t.Context(), "proj:epic-b"); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v; want accepted", res, err)
 	}
-	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {
+	if got := rigs.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {
 		t.Errorf("queue after remove = %v", got)
 	}
 }
@@ -126,7 +127,7 @@ func TestQueue_AddEpicAddressQueuesOneEntry(t *testing.T) {
 	if err != nil || res.Refused {
 		t.Fatalf("add = %+v, %v; want accepted", res, err)
 	}
-	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {
+	if got := rigs.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {
 		t.Errorf("queue = %v, want the one epic entry", got)
 	}
 }

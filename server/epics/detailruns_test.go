@@ -1,13 +1,13 @@
 package epics_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
@@ -35,9 +35,9 @@ func runsOf(t *testing.T, status string, evs ...runlog.Event) []wire.DetailRun {
 // log at the given minutes, and a hook on the ticket file once it is written.
 func runsWith(t *testing.T, status, extra string, answerMins []int, prep func(ticketPath string), evs ...runlog.Event) []wire.DetailRun {
 	t.Helper()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", status, extra, "A"),
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", status, extra, "A"),
 		})
 
 		withRepo(t, store)

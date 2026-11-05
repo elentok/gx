@@ -2,6 +2,7 @@ package epics_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,22 +37,22 @@ func withRepo(t *testing.T, store string) {
 }
 
 func issueWithBody(id, status, extra, title, body string) string {
-	return servertest.IssueMD(id, status, extra, title) + "\n" + body
+	return rigs.IssueMD(id, status, extra, title) + "\n" + body
 }
 
 func TestTicketDetail_LoopTicketPayload(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "", "Own blocker"),
-			"02-b.md": servertest.IssueMD("02", "done", "", "The parent"),
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "", "Own blocker"),
+			"02-b.md": rigs.IssueMD("02", "done", "", "The parent"),
 			"03-c.md": issueWithBody("03", "open", "parent: \"02\"\nblocked_by: [\"01\", \"other/06\"]\n", "The ticket",
 				"## Description\n\nDo it.\n\n## Comments\n\nA note.\n"),
-			"04-d.md": servertest.IssueMD("04", "open", "parent: \"03\"\n", "A fork"),
+			"04-d.md": rigs.IssueMD("04", "open", "parent: \"03\"\n", "A fork"),
 		})
 
-		servertest.WriteEpicFiles(t, store, "other", "---\nstatus: open\n---\n", map[string]string{
-			"06-x.md": servertest.IssueMD("06", "claimed", "", "Cross blocker"),
+		rigs.WriteEpicFiles(t, store, "other", "---\nstatus: open\n---\n", map[string]string{
+			"06-x.md": rigs.IssueMD("06", "claimed", "", "Cross blocker"),
 		})
 
 		withRepo(t, store)
@@ -82,8 +83,8 @@ func TestTicketDetail_LoopTicketPayload(t *testing.T) {
 
 func TestTicketDetail_PausedTicketCarriesReason(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
 			"01-a.md": issueWithBody("01", "paused", "pause_reason: merge-conflict\n", "A", "## Paused\n\nConflict in main.go.\n"),
 		})
 
@@ -98,8 +99,8 @@ func TestTicketDetail_PausedTicketCarriesReason(t *testing.T) {
 
 func TestTicketDetail_MapTicketHasNoStats(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n", map[string]string{
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n", map[string]string{
 			"01-q.md": issueWithBody("01", "done", "", "Which way?", "## Resolution\n\nWest.\n\n## Question\n\nWhere to?\n"),
 		})
 
@@ -117,10 +118,10 @@ func TestTicketDetail_MapTicketHasNoStats(t *testing.T) {
 
 func TestTicketDetail_CostAndContextAppearOnceMerged(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\nactual_context_window: 90000\n", "Merged"),
-			"02-b.md": servertest.IssueMD("02", "open", "", "Unmerged"),
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\nactual_context_window: 90000\n", "Merged"),
+			"02-b.md": rigs.IssueMD("02", "open", "", "Unmerged"),
 		})
 
 		withRepo(t, store)

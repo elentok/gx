@@ -1,6 +1,7 @@
 package merge_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -16,12 +17,12 @@ const (
 
 type (
 	turnRunner       = servertest.TurnRunner
-	zeroCommitPaused = servertest.ZeroCommitPaused
+	zeroCommitPaused = rigs.ZeroCommitPaused
 )
 
 const (
-	epicMergedText    = servertest.EpicMergedText
-	epicNotMergedText = servertest.EpicNotMergedText
+	epicMergedText    = rigs.EpicMergedText
+	epicNotMergedText = rigs.EpicNotMergedText
 )
 
 var (
@@ -41,13 +42,13 @@ var (
 	keepWorktree      = servertest.KeepWorktree
 	atMergeCap        = servertest.AtMergeCap
 	runnerShapes      = servertest.RunnerShapes
-	pauseZeroCommit   = servertest.PauseZeroCommit
+	pauseZeroCommit   = rigs.PauseZeroCommit
 	commitAgentWork   = servertest.CommitAgentWork
-	pausedAt          = servertest.PausedAt
-	assertPaused      = servertest.AssertPaused
-	legacyClass       = servertest.LegacyClass
-	chatRecorder      = servertest.ChatRecorder
-	waitForChat       = servertest.WaitForChat
+	pausedAt          = rigs.PausedAt
+	assertPaused      = rigs.AssertPaused
+	legacyClass       = rigs.LegacyClass
+	chatRecorder      = rigs.ChatRecorder
+	waitForChat       = rigs.WaitForChat
 	reportIteration   = servertest.ReportIteration
 )
 

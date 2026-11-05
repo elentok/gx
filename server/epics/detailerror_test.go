@@ -2,6 +2,7 @@ package epics_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,7 +20,7 @@ import (
 // ticket lookup needs.
 func writeDetailEpic(t *testing.T, store string, issues map[string]string) {
 	t.Helper()
-	servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", issues)
+	rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", issues)
 	pf := `{"name":"proj","repo":` + strconv.Quote(t.TempDir()) + `}`
 	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(pf), 0o644); err != nil {
 		t.Fatal(err)
@@ -28,7 +29,7 @@ func writeDetailEpic(t *testing.T, store string, issues map[string]string) {
 
 func TestDetailWeb_BrokenFileGivesSmallPayload(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
+	h, base := rigs.StartEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
 			"01-a.md": "---\nid: [unclosed\n---\n\n# A\n",
 		})
@@ -55,9 +56,9 @@ func TestDetailWeb_BrokenFileGivesSmallPayload(t *testing.T) {
 
 func TestDetailWeb_GraphErrorKeepsFullPayload(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
+	h, base := rigs.StartEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
-			"01-a.md": servertest.IssueMD("01", "open", "blocked_by: [\"nope\"]\n", "A"),
+			"01-a.md": rigs.IssueMD("01", "open", "blocked_by: [\"nope\"]\n", "A"),
 		})
 	})
 
@@ -79,9 +80,9 @@ func TestDetailWeb_GraphErrorKeepsFullPayload(t *testing.T) {
 
 func TestDetailWeb_UnknownAndMalformedAddressAre404(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
+	h, base := rigs.StartEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
-			"01-a.md": servertest.IssueMD("01", "open", "", "A"),
+			"01-a.md": rigs.IssueMD("01", "open", "", "A"),
 		})
 	})
 

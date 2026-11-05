@@ -1,6 +1,7 @@
 package ticketops_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,7 +18,7 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
-	h := servertest.StartOneOffsHarness(t, store)
+	h := rigs.StartOneOffsHarness(t, store)
 	start, _, _ := servertest.RegisterTurn(h)
 	merged := false
 	h.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (history.MergeOutcome, error) {

@@ -2,12 +2,12 @@ package queue_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -15,7 +15,7 @@ func TestOneOff_RemovedFileKeysAreRefusedAndNothingIsWritten(t *testing.T) {
 	t.Parallel()
 	for _, key := range []string{"commits", "base"} {
 		t.Run(key, func(t *testing.T) {
-			h, repo := servertest.StartOneOffHarness(t)
+			h, repo := rigs.StartOneOffHarness(t)
 			ctx := context.Background()
 			file := filepath.Join(t.TempDir(), "payload.md")
 			if err := os.WriteFile(file, []byte("---\n"+key+": main\n---\nbuild it\n"), 0o644); err != nil {

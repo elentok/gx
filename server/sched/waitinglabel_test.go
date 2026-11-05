@@ -3,6 +3,7 @@ package sched_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,11 +34,11 @@ func writeWaiting(t *testing.T, h *servertest.Harness, w check.Waiting) string {
 
 func waitingLabels(t *testing.T, h *servertest.Harness) (queue, detail string) {
 	t.Helper()
-	rows := servertest.QueueRows(t, h)
+	rows := rigs.QueueRows(t, h)
 	if len(rows) != 1 {
 		t.Fatalf("queue rows = %+v, want one", rows)
 	}
-	d, err := h.Client.Reads.Detail(context.Background(), servertest.QueueRowTicket)
+	d, err := h.Client.Reads.Detail(context.Background(), rigs.QueueRowTicket)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,13 +50,13 @@ func waitingLabels(t *testing.T, h *servertest.Harness) (queue, detail string) {
 
 func workingQueueRow(t *testing.T) (*servertest.Harness, string) {
 	t.Helper()
-	h, fake := servertest.StartQueueRows(t, "pty")
-	fake.SetState(servertest.ResumeLabel, agentrunner.StateWorking, "")
+	h, fake := rigs.StartQueueRows(t, "pty")
+	fake.SetState(rigs.ResumeLabel, agentrunner.StateWorking, "")
 	servertest.WaitFor(t, 10*time.Second, "a working row", func() bool {
-		rows := servertest.QueueRows(t, h)
+		rows := rigs.QueueRows(t, h)
 		return len(rows) == 1 && rows[0].Status.State == wire.SessionWorking
 	})
-	return h, servertest.QueueRows(t, h)[0].Dir
+	return h, rigs.QueueRows(t, h)[0].Dir
 }
 
 // Seam 6: the label follows a live waiting state of the claimed ticket's worktree.

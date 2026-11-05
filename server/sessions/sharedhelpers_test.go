@@ -1,6 +1,9 @@
 package sessions_test
 
-import "github.com/elentok/gx/server/servertest"
+import (
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
+)
 
 // Aliases for the servertest helpers the moved root session tests call.
 const (
@@ -8,16 +11,16 @@ const (
 	chatLine             = servertest.ChatLine
 	codexMessageLine     = servertest.CodexMessageLine
 	answerAddr           = servertest.AnswerAddr
-	answerLabel          = servertest.AnswerLabel
+	answerLabel          = rigs.AnswerLabel
 )
 
 var (
 	waitStatus         = servertest.WaitStatus
 	chatEventWithin    = servertest.ChatEventWithin
-	codexEventWithin   = servertest.CodexEventWithin
+	codexEventWithin   = rigs.CodexEventWithin
 	startBlockable     = servertest.StartBlockable
-	startAnswerEnv     = servertest.StartAnswerEnv
-	pauseEnvZeroCommit = servertest.PauseEnvZeroCommit
+	startAnswerEnv     = rigs.StartAnswerEnv
+	pauseEnvZeroCommit = rigs.PauseEnvZeroCommit
 	runsJSONHas        = servertest.RunsJSONHas
 	pauseBlocked       = servertest.PauseBlocked
 )

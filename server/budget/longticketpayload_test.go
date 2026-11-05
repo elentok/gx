@@ -2,6 +2,7 @@ package budget_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -38,9 +39,9 @@ func withRepo(t *testing.T, store string) {
 func TestLongTicketMark_ReachesTheEpicRowAndTheTicketDetail(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-		"01-a.md": servertest.IssueMD("01", "open", "long_ticket_turns: 120\n", "Marked"),
-		"02-b.md": servertest.IssueMD("02", "open", "", "Plain"),
+	rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+		"01-a.md": rigs.IssueMD("01", "open", "long_ticket_turns: 120\n", "Marked"),
+		"02-b.md": rigs.IssueMD("02", "open", "", "Plain"),
 	})
 
 	withRepo(t, store)
@@ -54,11 +55,11 @@ func TestLongTicketMark_ReachesTheEpicRowAndTheTicketDetail(t *testing.T) {
 	}
 	base := hs.WebURL
 
-	_, epic, _ := servertest.GetEpicDetail(t, h, base, "proj:work")
-	if r := servertest.RowOf(t, epic, "proj:work/01"); r.LongTicketTurns != 120 || r.LongTicketThreshold != 100 {
+	_, epic, _ := rigs.GetEpicDetail(t, h, base, "proj:work")
+	if r := rigs.RowOf(t, epic, "proj:work/01"); r.LongTicketTurns != 120 || r.LongTicketThreshold != 100 {
 		t.Errorf("marked row = %d turns, threshold %d, want 120 and 100", r.LongTicketTurns, r.LongTicketThreshold)
 	}
-	if r := servertest.RowOf(t, epic, "proj:work/02"); r.LongTicketTurns != 0 || r.LongTicketThreshold != 0 {
+	if r := rigs.RowOf(t, epic, "proj:work/02"); r.LongTicketTurns != 0 || r.LongTicketThreshold != 0 {
 		t.Errorf("plain row = %d turns, threshold %d, want none", r.LongTicketTurns, r.LongTicketThreshold)
 	}
 

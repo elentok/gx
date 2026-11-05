@@ -1,4 +1,4 @@
-package servertest
+package rigs
 
 import (
 	"testing"

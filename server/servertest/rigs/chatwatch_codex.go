@@ -1,8 +1,9 @@
-package servertest
+package rigs
 
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,7 +18,7 @@ import (
 func CodexEventWithin(evs <-chan wire.Event, t *testing.T, path, id string, d time.Duration) bool {
 	t.Helper()
 	deadline := time.After(d)
-	tick := time.NewTicker(ChatPollTestInterval)
+	tick := time.NewTicker(servertest.ChatPollTestInterval)
 	defer tick.Stop()
 	for {
 		select {
@@ -26,7 +27,7 @@ func CodexEventWithin(evs <-chan wire.Event, t *testing.T, path, id string, d ti
 				return true
 			}
 		case <-tick.C:
-			AppendLines(t, path, CodexMessageLine)
+			servertest.AppendLines(t, path, servertest.CodexMessageLine)
 		case <-deadline:
 			return false
 		}
@@ -34,11 +35,11 @@ func CodexEventWithin(evs <-chan wire.Event, t *testing.T, path, id string, d ti
 }
 
 // StoppedCodexSession is an Exited session whose meta says it ran on Codex.
-func StoppedCodexSession(t *testing.T, opts ...func(*server.Config)) (h *Harness, ctx context.Context, id, conv, dir string) {
+func StoppedCodexSession(t *testing.T, opts ...func(*server.Config)) (h *servertest.Harness, ctx context.Context, id, conv, dir string) {
 	t.Helper()
-	h, ctx, evs, id, conv := StartFakeSession(t, opts...)
-	StopFakeSession(ctx, t, h, evs, id)
-	meta := ReadMeta(t, h, id)
+	h, ctx, evs, id, conv := servertest.StartFakeSession(t, opts...)
+	servertest.StopFakeSession(ctx, t, h, evs, id)
+	meta := servertest.ReadMeta(t, h, id)
 	meta["harness"] = "codex"
 	data, err := json.Marshal(meta)
 	if err != nil {

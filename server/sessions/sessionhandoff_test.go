@@ -1,6 +1,7 @@
 package sessions_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,7 +23,7 @@ type handoffFixture struct {
 
 func startHandoff(t *testing.T, step string, opts ...func(*server.Config)) handoffFixture {
 	t.Helper()
-	s := servertest.StartHandoff(t, step, opts...)
+	s := rigs.StartHandoff(t, step, opts...)
 	d := s.DesignsFixture
 	return handoffFixture{
 		designsFixture: designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck},
@@ -30,8 +31,8 @@ func startHandoff(t *testing.T, step string, opts ...func(*server.Config)) hando
 	}
 }
 
-func (f handoffFixture) shared() servertest.HandoffFixture {
-	return servertest.HandoffFixture{DesignsFixture: f.designsFixture.shared(), Store: f.store, Cfg: f.cfg, ID: f.id, Conv: f.conv}
+func (f handoffFixture) shared() rigs.HandoffFixture {
+	return rigs.HandoffFixture{DesignsFixture: f.designsFixture.shared(), Store: f.store, Cfg: f.cfg, ID: f.id, Conv: f.conv}
 }
 
 func (f handoffFixture) continueSession(t *testing.T) {

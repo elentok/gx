@@ -2,6 +2,7 @@ package sched_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestRateLimitHold_RunKeepsSlotAndExplainsTheHold(t *testing.T) {
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "held", "")
 			servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
+			pty := rigs.NewNamedFake(runnerfake.NewRunner(), "pty")
 			h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
 				func(c *server.Config) { c.MaxAgents = 1 })
 			t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })

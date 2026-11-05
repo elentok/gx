@@ -3,6 +3,7 @@ package sessions_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"path/filepath"
 	"slices"
@@ -17,7 +18,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-var startBlockedClaimed = servertest.StartBlockedClaimed
+var startBlockedClaimed = rigs.StartBlockedClaimed
 
 func activeNeedsApproval(t *testing.T, h *servertest.Harness) bool {
 	t.Helper()

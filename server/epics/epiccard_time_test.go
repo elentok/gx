@@ -1,6 +1,7 @@
 package epics_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"strings"
 	"testing"
@@ -12,27 +13,27 @@ import (
 
 func TestEpicList_CardTimePair(t *testing.T) {
 	t.Parallel()
-	open := map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")}
-	done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
-	paused := map[string]string{"01-a.md": servertest.IssueMD("01", "paused", "pause_reason: self-reported\nclaimed_at: 2026-01-05T08:00:00Z\n", "A")}
+	open := map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")}
+	done := map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")}
+	paused := map[string]string{"01-a.md": rigs.IssueMD("01", "paused", "pause_reason: self-reported\nclaimed_at: 2026-01-05T08:00:00Z\n", "A")}
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "ready", loop, open)
-		servertest.WriteEpicFiles(t, store, "queued", loop, open)
-		servertest.WriteEpicFiles(t, store, "paused", loop, paused)
-		servertest.WriteEpicFiles(t, store, "draft", "---\nstatus: draft\ncreated_at: 2026-01-03T10:00:00Z\n---\n", open)
-		servertest.WriteEpicFiles(t, store, "noopen", loop, map[string]string{"01-a.md": servertest.IssueMD("01", "claimed", "", "A")})
-		servertest.WriteEpicFiles(t, store, "merging", "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\nstarted_at: 2026-01-02T09:00:00Z\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "", "A"),
-			"02-m.md": strings.Replace(servertest.IssueMD("02", "open", "", "M"), "type: implement", "type: merge", 1),
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "ready", loop, open)
+		rigs.WriteEpicFiles(t, store, "queued", loop, open)
+		rigs.WriteEpicFiles(t, store, "paused", loop, paused)
+		rigs.WriteEpicFiles(t, store, "draft", "---\nstatus: draft\ncreated_at: 2026-01-03T10:00:00Z\n---\n", open)
+		rigs.WriteEpicFiles(t, store, "noopen", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "claimed", "", "A")})
+		rigs.WriteEpicFiles(t, store, "merging", "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\nstarted_at: 2026-01-02T09:00:00Z\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "", "A"),
+			"02-m.md": strings.Replace(rigs.IssueMD("02", "open", "", "M"), "type: implement", "type: merge", 1),
 		})
 
-		servertest.WriteEpicFiles(t, store, "merged", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
-		servertest.WriteEpicFiles(t, store, "follow-ups", "---\nstatus: open\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "F")})
-		servertest.WriteEpicFiles(t, store, "one-offs", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "open", "", "Queued one"),
-			"02-b.md": servertest.IssueMD("02", "claimed", "claimed_at: 2026-01-04T08:00:00Z\n", "Running one"),
-			"03-c.md": servertest.IssueMD("03", "open", "", "Idle one"),
+		rigs.WriteEpicFiles(t, store, "merged", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
+		rigs.WriteEpicFiles(t, store, "follow-ups", "---\nstatus: open\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "F")})
+		rigs.WriteEpicFiles(t, store, "one-offs", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "open", "", "Queued one"),
+			"02-b.md": rigs.IssueMD("02", "claimed", "claimed_at: 2026-01-04T08:00:00Z\n", "Running one"),
+			"03-c.md": rigs.IssueMD("03", "open", "", "Idle one"),
 		})
 
 	})
@@ -45,7 +46,7 @@ func TestEpicList_CardTimePair(t *testing.T) {
 	}
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	got := map[string]wire.EpicListRow{}
-	for _, r := range servertest.GetEpicList(t, code, body).Epics {
+	for _, r := range rigs.GetEpicList(t, code, body).Epics {
 		got[r.Address] = r
 	}
 	at := func(s string) time.Time {

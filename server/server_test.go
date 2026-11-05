@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -462,7 +463,7 @@ func TestHerdr_NotProbedForRunnerWithoutHost(t *testing.T) {
 
 func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
 	t.Parallel()
-	fake := servertest.NewNamedFake(runnerfake.NewRunner(), "herdr")
+	fake := rigs.NewNamedFake(runnerfake.NewRunner(), "herdr")
 	fake.SetHealthErr(errors.New("down"))
 	h := servertest.StartWithStore(t, herdrTicketStore(t), servertest.WithRunner(fake))
 	ctx := context.Background()

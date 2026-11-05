@@ -2,6 +2,7 @@ package lifecycle_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os/exec"
 	"strings"
 	"testing"
@@ -17,7 +18,7 @@ const schedEpic = servertest.SchedEpic
 
 var (
 	commitWork = servertest.CommitWork
-	runLogOf   = servertest.RunLogOf
+	runLogOf   = rigs.RunLogOf
 	waitFor    = servertest.Await
 )
 

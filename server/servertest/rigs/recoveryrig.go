@@ -1,6 +1,7 @@
-package servertest
+package rigs
 
 import (
+	"github.com/elentok/gx/server/servertest"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -14,14 +15,14 @@ import (
 
 // StartInvestigateEnv starts a server whose ticket 01 is paused with kind and
 // whose ticket 02 is the investigate ticket forked off it.
-func StartInvestigateEnv(t *testing.T, kind events.Kind) *Harness {
+func StartInvestigateEnv(t *testing.T, kind events.Kind) *servertest.Harness {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
-	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	WriteTicketWith(t, store, "proj", "epic-a", "02", "probe", TicketOpts{Type: "investigate", Parent: "01"})
-	SetProjectRepo(t, store, "proj", repo)
-	h := StartWithStore(t, store, func(*server.Config) {})
-	RegisterTurn(h)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "probe", servertest.TicketOpts{Type: "investigate", Parent: "01"})
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(*server.Config) {})
+	servertest.RegisterTurn(h)
 	if err := h.Server.PauseAs("proj:epic-a/01", kind, "boom"); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +40,7 @@ func GitIn(t *testing.T, repo string, args ...string) string {
 }
 
 // EpicTickets loads the one epic of project proj in h's store.
-func EpicTickets(t *testing.T, h *Harness) tickets.Epic {
+func EpicTickets(t *testing.T, h *servertest.Harness) tickets.Epic {
 	t.Helper()
 	epics, err := tickets.Load(filepath.Join(h.TicketStore, "proj"))
 	if err != nil || len(epics) != 1 {

@@ -2,6 +2,7 @@ package ticketops_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ import (
 
 func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testing.T) {
 	t.Parallel()
-	h, _ := servertest.StartOneOffHarness(t)
+	h, _ := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC)
 	req := ticketwrite.RetroSubmit("proj", "epic-a", at)
@@ -63,13 +64,13 @@ func TestRunner_UnpinnedOneOffAndRetroClaimOnTheDefaultHarness(t *testing.T) {
 		store := t.TempDir()
 		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
 		fake := runnerfake.NewRunner()
-		h := servertest.StartOneOffsHarness(t, store, servertest.WithRunner(fake), func(c *server.Config) { c.AgentsDefaultHarness = "codex" })
+		h := rigs.StartOneOffsHarness(t, store, servertest.WithRunner(fake), func(c *server.Config) { c.AgentsDefaultHarness = "codex" })
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		res, err := h.Client.Queue.OneOff(ctx, req)
 		if err != nil || res.Refused {
 			t.Fatalf("%s: %+v, %v", name, res, err)
 		}
-		for label, kind := range servertest.WaitForAgentKinds(t, fake, "01") {
+		for label, kind := range rigs.WaitForAgentKinds(t, fake, "01") {
 			if kind != "codex" {
 				t.Errorf("%s: %s started as %q, want the default codex", name, label, kind)
 			}

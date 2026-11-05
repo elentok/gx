@@ -1,6 +1,7 @@
 package epics_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -30,30 +31,30 @@ func TestEpicList_MapProgress(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	mapMD := func(front string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" }
 	stepMD := func(step string) string { return mapMD("design_step: " + step + "\n") }
-	open := map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")}
-	done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+	open := map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")}
+	done := map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")}
 
 	steps := []wire.ProgressStep{
 		wire.ProgressChart, wire.ProgressResolveTickets, wire.ProgressSpec, wire.ProgressReview,
 		wire.ProgressGrillFindings, wire.ProgressCreateTickets, wire.ProgressBranch, wire.ProgressDone,
 	}
 
-	h, base := servertest.StartEpicDetail(t, func(store string) {
+	h, base := rigs.StartEpicDetail(t, func(store string) {
 		for _, s := range steps {
-			servertest.WriteEpicFiles(t, store, "m-"+string(s), stepMD(string(s)), open)
+			rigs.WriteEpicFiles(t, store, "m-"+string(s), stepMD(string(s)), open)
 		}
-		servertest.WriteEpicFiles(t, store, "m-no-field", mapMD(""), done)
-		servertest.WriteEpicFiles(t, store, "m-bad-step", stepMD("not-a-step"), open)
-		servertest.WriteEpicFiles(t, store, "m-status-done", "---\nstatus: done\nkind: map\n---\n", done)
+		rigs.WriteEpicFiles(t, store, "m-no-field", mapMD(""), done)
+		rigs.WriteEpicFiles(t, store, "m-bad-step", stepMD("not-a-step"), open)
+		rigs.WriteEpicFiles(t, store, "m-status-done", "---\nstatus: done\nkind: map\n---\n", done)
 
-		servertest.WriteEpicFiles(t, store, "m-ignored", stepMD("resolve-tickets"), open)
-		servertest.WriteEpicFiles(t, store, "m-ignored-impl", "---\nstatus: open\n---\n", open)
+		rigs.WriteEpicFiles(t, store, "m-ignored", stepMD("resolve-tickets"), open)
+		rigs.WriteEpicFiles(t, store, "m-ignored-impl", "---\nstatus: open\n---\n", open)
 		runGitIn(t, repo, "branch", "m-ignored-impl")
 		if err := os.MkdirAll(filepath.Join(repo, "docs", "specs"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		testutil.WriteFile(t, filepath.Join(repo, "docs", "specs"), "m-ignored.md", "# spec\n")
-		servertest.WriteEpicFiles(t, store, "loop", "---\nstatus: open\n---\n", open)
+		rigs.WriteEpicFiles(t, store, "loop", "---\nstatus: open\n---\n", open)
 		servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	})
 
@@ -62,7 +63,7 @@ func TestEpicList_MapProgress(t *testing.T) {
 		t.Fatalf("status %d: %s", code, body)
 	}
 	got := map[string]wire.EpicListRow{}
-	for _, r := range servertest.GetEpicList(t, code, body).Epics {
+	for _, r := range rigs.GetEpicList(t, code, body).Epics {
 		got[r.Name] = r
 	}
 

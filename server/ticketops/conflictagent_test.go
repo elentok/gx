@@ -2,6 +2,7 @@ package ticketops_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,8 +14,8 @@ import (
 )
 
 var (
-	writeProjectAgents = servertest.WriteProjectAgents
-	hasFlag            = servertest.HasFlag
+	writeProjectAgents = rigs.WriteProjectAgents
+	hasFlag            = rigs.HasFlag
 )
 
 // runToConflict launches proj:epic-a/01 whose commit conflicts with the feature

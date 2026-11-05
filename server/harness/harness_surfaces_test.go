@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,7 +84,7 @@ func TestDesignSession_StartsOnTheDefaultAtStartTime(t *testing.T) {
 	}
 	// Meta's first_prompt is cleared once typed, so it is read from the log.
 	waitPromptTyped(t, f.H, first.Session.ID, "$gx-design proj:map-a")
-	servertest.SwitchDefaultHarness(t, f.H, path, store, "claude")
+	rigs.SwitchDefaultHarness(t, f.H, path, store, "claude")
 	second := f.Open(t, "proj:map-b", false)
 	if second.Refused || second.Session == nil {
 		t.Fatalf("open map-b = %+v", second)
@@ -137,7 +138,7 @@ func startSplitRunners(t *testing.T, store string, extra ...func(*server.Config)
 	t.Helper()
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	claude, pty = runnerfake.NewRunner(), runnerfake.NewRunner()
-	cl, pt := servertest.NewNamedFake(claude, "headless"), servertest.NewNamedFake(pty, "pty")
+	cl, pt := rigs.NewNamedFake(claude, "headless"), rigs.NewNamedFake(pty, "pty")
 	path = filepath.Join(t.TempDir(), "config.json")
 	opts := append([]func(*server.Config){
 		servertest.WithRunnerFor(cl, func(name, _ string) agentrunner.Runner {
@@ -173,7 +174,7 @@ func startRetryEnv(t *testing.T, typ string, earlierClaude bool, extra ...func(*
 	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithDefaultHarness("codex")}, extra...)...)
 	servertest.RegisterTurn(h)
 	if earlierClaude {
-		servertest.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", true)
+		rigs.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", true)
 	}
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
@@ -188,12 +189,12 @@ func TestRelaunch_EarlierClaudeRunPicksTheClaudeRunner(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "one", "")
 	h, claude, pty, path := startSplitRunners(t, store)
-	servertest.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", true)
-	servertest.SwitchDefaultHarness(t, h, path, store, "codex")
+	rigs.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", true)
+	rigs.SwitchDefaultHarness(t, h, path, store, "codex")
 	if res, err := h.Client.Tickets.Relaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("relaunch: %+v, %v", res, err)
 	}
-	if k := servertest.WaitKind(t, claude, "epic-a-iter-01"); k != "claude" {
+	if k := rigs.WaitKind(t, claude, "epic-a-iter-01"); k != "claude" {
 		t.Errorf("retry started as %q, want claude", k)
 	}
 	if k := pty.Kind("epic-a-iter-01"); k != "" {
@@ -211,13 +212,13 @@ func TestInvestigateRetry_EarlierClaudeRunChecksClaudeGate(t *testing.T) {
 
 	t.Run("claude gate holds it", func(t *testing.T) {
 		t.Parallel()
-		if res := startRetryEnv(t, "implement", true, servertest.WithUsageSample(t, claudeGated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Claude usage: 98% of the 5-hour limit") {
+		if res := startRetryEnv(t, "implement", true, rigs.WithUsageSample(t, claudeGated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Claude usage: 98% of the 5-hour limit") {
 			t.Errorf("retry = %+v, want a Claude usage-limit refusal", res)
 		}
 	})
 	t.Run("codex gate does not", func(t *testing.T) {
 		t.Parallel()
-		if res := startRetryEnv(t, "implement", true, servertest.WithCodexUsageSample(t, codexGated)); res.Refused {
+		if res := startRetryEnv(t, "implement", true, rigs.WithCodexUsageSample(t, codexGated)); res.Refused {
 			t.Errorf("retry = %+v, want it let through", res)
 		}
 	})
@@ -244,7 +245,7 @@ func TestRelaunch_FollowsCodexDefaultGateAndRunner(t *testing.T) {
 		t.Run(typ+" runner", func(t *testing.T) {
 			t.Parallel()
 			_, claude, pty := setup(t)
-			if k := servertest.WaitKind(t, pty, "epic-a-iter-01"); k != "codex" {
+			if k := rigs.WaitKind(t, pty, "epic-a-iter-01"); k != "codex" {
 				t.Errorf("relaunch started as %q on pty, want codex", k)
 			}
 			if k := claude.Kind("epic-a-iter-01"); k != "" {
@@ -253,7 +254,7 @@ func TestRelaunch_FollowsCodexDefaultGateAndRunner(t *testing.T) {
 		})
 		t.Run(typ+" gate", func(t *testing.T) {
 			t.Parallel()
-			if res := startRetryEnv(t, typ, false, servertest.WithCodexUsageSample(t, gated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Codex usage: 98% of the weekly limit") {
+			if res := startRetryEnv(t, typ, false, rigs.WithCodexUsageSample(t, gated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Codex usage: 98% of the weekly limit") {
 				t.Errorf("retry = %+v, want a Codex usage-limit refusal", res)
 			}
 		})

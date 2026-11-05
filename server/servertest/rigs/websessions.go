@@ -1,8 +1,9 @@
-package servertest
+package rigs
 
 import (
 	"context"
 	"fmt"
+	"github.com/elentok/gx/server/servertest"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,20 +17,20 @@ import (
 )
 
 // StartWebDesign starts a web mux with one design session and one plain one.
-func StartWebDesign(t *testing.T) (h *Harness, base string, cookie *http.Cookie, ctx context.Context, evs <-chan wire.Event, design, plain string) {
+func StartWebDesign(t *testing.T) (h *servertest.Harness, base string, cookie *http.Cookie, ctx context.Context, evs <-chan wire.Event, design, plain string) {
 	t.Helper()
 	store := t.TempDir()
-	WriteTicket(t, store, "proj", "map", "01", "first", "")
-	WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	h = StartWithStore(t, store, WithTestHolder(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	h = servertest.StartWithStore(t, store, servertest.WithTestHolder(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	hs, err := h.Client.Handshake(context.Background())
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	base, cookie = hs.WebURL, Login(t, h.StateDir, hs.WebURL)
+	base, cookie = hs.WebURL, servertest.Login(t, h.StateDir, hs.WebURL)
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
@@ -47,7 +48,7 @@ func StartWebDesign(t *testing.T) (h *Harness, base string, cookie *http.Cookie,
 }
 
 // SessionToken is the state token of session id in the current snapshot.
-func SessionToken(ctx context.Context, t *testing.T, h *Harness, id string) string {
+func SessionToken(ctx context.Context, t *testing.T, h *servertest.Harness, id string) string {
 	t.Helper()
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
@@ -65,5 +66,5 @@ func SessionToken(ctx context.Context, t *testing.T, h *Harness, id string) stri
 // WebSessionWrite posts a session write verb with a state token.
 func WebSessionWrite(t *testing.T, base string, cookie *http.Cookie, verb, id, state string) (int, string) {
 	t.Helper()
-	return WebPostJSON(t, base+"/v1/sessions/"+verb, fmt.Sprintf(`{"id":%q,"state":%q}`, id, state), cookie, "", JSONPost(base))
+	return servertest.WebPostJSON(t, base+"/v1/sessions/"+verb, fmt.Sprintf(`{"id":%q,"state":%q}`, id, state), cookie, "", servertest.JSONPost(base))
 }

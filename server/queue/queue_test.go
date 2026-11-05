@@ -2,6 +2,7 @@ package queue_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -43,7 +44,7 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 	}
 
 	want := []string{"proj:epic-a/03", "proj:epic-a/02"}
-	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, want) {
+	if got := rigs.QueueAddresses(t, h); !reflect.DeepEqual(got, want) {
 		t.Errorf("queue = %v, want %v", got, want)
 	}
 	items, _ := h.Client.Queue.Items(ctx)
@@ -63,7 +64,7 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 	}
 
 	h.Restart(t)
-	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, want) {
+	if got := rigs.QueueAddresses(t, h); !reflect.DeepEqual(got, want) {
 		t.Errorf("queue after restart = %v, want %v", got, want)
 	}
 }
@@ -136,7 +137,7 @@ func TestQueue_Refusals(t *testing.T) {
 			t.Errorf("%s: %+v, %v; want refusal %s", c.name, res, err, c.reason)
 		}
 	}
-	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a/01"}) {
+	if got := rigs.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a/01"}) {
 		t.Errorf("refusals changed the queue: %v", got)
 	}
 }

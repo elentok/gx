@@ -3,6 +3,7 @@ package harness_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -67,12 +68,12 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 		run  func(t *testing.T, f refusalFixture) wire.SessionResult
 	}{
 		{"project override", "the project default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			servertest.SetHarness(t, f.h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+			rigs.SetHarness(t, f.h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 			f.h.Programs.Missing("codex")
 			return f.create(t, wire.CreateSessionRequest{})
 		}},
 		{"default changed by reload", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
+			rigs.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			return f.create(t, wire.CreateSessionRequest{})
 		}},
@@ -81,7 +82,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			return f.create(t, wire.CreateSessionRequest{Harness: "codex"})
 		}},
 		{"design step", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
+			rigs.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			res, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "proj:map"})
 			if err != nil {
@@ -90,7 +91,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			return res
 		}},
 		{"fix agent", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
+			rigs.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			res, err := f.h.Client.Sessions.FixAgent(f.ctx, wire.FixAgentRequest{Address: "proj:loop/01"})
 			if err != nil {
@@ -99,7 +100,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			return res.SessionResult
 		}},
 		{"investigate", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
+			rigs.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			return f.create(t, wire.CreateSessionRequest{Ticket: "proj:loop/01", Prompt: "investigate"})
 		}},
@@ -129,8 +130,8 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 	t.Parallel()
 	codexHome := t.TempDir()
-	h, ctx, id, conv, dir := servertest.StoppedCodexSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
-	servertest.WriteCodexRollout(t, codexHome, conv, dir)
+	h, ctx, id, conv, dir := rigs.StoppedCodexSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
+	rigs.WriteCodexRollout(t, codexHome, conv, dir)
 	h.Programs.Missing("codex")
 
 	res, err := h.Client.Sessions.Resume(ctx, id)
@@ -153,10 +154,10 @@ func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 // same Continue works once the harness is back.
 func TestHarnessMissing_ChartingHandoffRefusesBeforeStoppingTheOldAgent(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartHandoff(t, "chart")
-	servertest.SetMapStep(t, f.Store, "resolve-tickets")
+	f := rigs.StartHandoff(t, "chart")
+	rigs.SetMapStep(t, f.Store, "resolve-tickets")
 	before := servertest.ReadMeta(t, f.H, f.ID)
-	beforeSnap := servertest.SessionSnapshotOf(t, f.DesignsFixture, f.ID)
+	beforeSnap := rigs.SessionSnapshotOf(t, f.DesignsFixture, f.ID)
 	f.H.Programs.Missing(os.Args[0])
 
 	res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true})
@@ -169,7 +170,7 @@ func TestHarnessMissing_ChartingHandoffRefusesBeforeStoppingTheOldAgent(t *testi
 			t.Errorf("meta %s = %v, want %v kept", k, after[k], before[k])
 		}
 	}
-	afterSnap := servertest.SessionSnapshotOf(t, f.DesignsFixture, f.ID)
+	afterSnap := rigs.SessionSnapshotOf(t, f.DesignsFixture, f.ID)
 	if afterSnap.Status.State == wire.SessionExited || !reflect.DeepEqual(beforeSnap.Actionable, afterSnap.Actionable) {
 		t.Errorf("session = %+v, want it alive with actionable %+v kept", afterSnap, beforeSnap.Actionable)
 	}
@@ -230,7 +231,7 @@ func startKept(t *testing.T, label string) keptSession {
 
 func (k keptSession) switchDefault(t *testing.T, to string) {
 	t.Helper()
-	servertest.SwitchDefaultHarness(t, k.h, k.cfg, k.store, to)
+	rigs.SwitchDefaultHarness(t, k.h, k.cfg, k.store, to)
 }
 
 // A default switched to codex leaves a running Claude-format session read as
@@ -241,7 +242,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 	t.Run("chat", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "claude")
-		servertest.WriteTranscript(t, k.transcript, servertest.Reply)
+		servertest.WriteTranscript(t, k.transcript, rigs.Reply)
 		k.switchDefault(t, "codex")
 		got, err := k.h.Client.Sessions.Chat(k.ctx, k.id)
 		if err != nil || got.Unsupported || got.Unreadable || len(got.Messages) != 1 || got.Messages[0].Text != "hi" {
@@ -251,7 +252,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 	t.Run("chat watch", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "claude")
-		servertest.WriteTranscript(t, k.transcript, servertest.Reply)
+		servertest.WriteTranscript(t, k.transcript, rigs.Reply)
 		k.switchDefault(t, "codex")
 		servertest.Report(t, k.conv, agentfake.Control{State: "working"})
 		servertest.WaitSessionState(k.ctx, t, k.h, k.id, wire.SessionWorking)
@@ -262,7 +263,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 	t.Run("turn settle", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "claude")
-		servertest.WriteTranscript(t, k.transcript, servertest.Reply)
+		servertest.WriteTranscript(t, k.transcript, rigs.Reply)
 		k.switchDefault(t, "codex")
 		servertest.Report(t, k.conv, agentfake.Control{State: "done"})
 		servertest.WaitSessionState(k.ctx, t, k.h, k.id, wire.SessionIdle)
@@ -273,10 +274,10 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 	t.Run("failure detection", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "claude")
-		servertest.WriteTranscript(t, k.transcript, servertest.APIError401)
+		servertest.WriteTranscript(t, k.transcript, rigs.APIError401)
 		k.switchDefault(t, "codex")
 		servertest.Report(t, k.conv, agentfake.Control{State: "done"})
-		if got := servertest.WaitForFailure(k.ctx, t, k.h, k.id, "auth"); got.Label != "Claude login needed" {
+		if got := rigs.WaitForFailure(k.ctx, t, k.h, k.id, "auth"); got.Label != "Claude login needed" {
 			t.Errorf("failure = %+v, want the Claude login failure", got)
 		}
 	})
@@ -301,7 +302,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 		k.switchDefault(t, "claude")
 		servertest.Report(t, k.conv, agentfake.Control{State: "working"})
 		servertest.WaitSessionState(k.ctx, t, k.h, k.id, wire.SessionWorking)
-		if !servertest.CodexEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second) {
+		if !rigs.CodexEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second) {
 			t.Error("no session-chat-changed event while the rollout grew")
 		}
 	})
@@ -312,10 +313,10 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 func TestHarnessSwitch_ChartingHandoffKeepsTheSessionsKind(t *testing.T) {
 	t.Parallel()
 	cfg := filepath.Join(t.TempDir(), "config.json")
-	f := servertest.StartHandoff(t, "chart", servertest.WithConfigFile(cfg))
+	f := rigs.StartHandoff(t, "chart", servertest.WithConfigFile(cfg))
 	servertest.WriteConfig(t, cfg, f.Store, nil)
-	servertest.SwitchDefaultHarness(t, f.H, cfg, f.Store, "codex")
-	servertest.SetMapStep(t, f.Store, "resolve-tickets")
+	rigs.SwitchDefaultHarness(t, f.H, cfg, f.Store, "codex")
+	rigs.SetMapStep(t, f.Store, "resolve-tickets")
 	f.ContinueSession(t)
 	f.WantRestartedOnWorker(t)
 	if got := servertest.ReadMeta(t, f.H, f.ID)["harness"]; got != string(agentfake.HarnessKind) {

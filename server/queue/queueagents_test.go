@@ -2,6 +2,7 @@ package queue_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"slices"
 	"strings"
 	"testing"
@@ -15,15 +16,15 @@ import (
 
 func TestQueueAgentRows_PtyRunListsAWorkingRowWithoutUnreadOrActionable(t *testing.T) {
 	t.Parallel()
-	h, fake := servertest.StartQueueRows(t, "pty")
-	fake.SetState(servertest.ResumeLabel, agentrunner.StateWorking, "")
+	h, fake := rigs.StartQueueRows(t, "pty")
+	fake.SetState(rigs.ResumeLabel, agentrunner.StateWorking, "")
 
 	servertest.WaitFor(t, 10*time.Second, "a working row", func() bool {
-		rows := servertest.QueueRows(t, h)
+		rows := rigs.QueueRows(t, h)
 		return len(rows) == 1 && rows[0].Status.State == wire.SessionWorking
 	})
-	row := servertest.QueueRows(t, h)[0]
-	if row.Ticket != servertest.QueueRowTicket || row.Holder == "" || row.Unread != (wire.SessionUnread{}) || row.Actionable.Reason != "" {
+	row := rigs.QueueRows(t, h)[0]
+	if row.Ticket != rigs.QueueRowTicket || row.Holder == "" || row.Unread != (wire.SessionUnread{}) || row.Actionable.Reason != "" {
 		t.Errorf("row = %+v, want the ticket, a holder dir and no Unread or Actionable", row)
 	}
 	snap, err := h.Client.Snapshot(context.Background())
@@ -34,15 +35,15 @@ func TestQueueAgentRows_PtyRunListsAWorkingRowWithoutUnreadOrActionable(t *testi
 
 func TestQueueAgentRows_IterationsNameTheRunnerAndTheRow(t *testing.T) {
 	t.Parallel()
-	h, fake := servertest.StartQueueRows(t, "pty")
-	fake.SetState(servertest.ResumeLabel, agentrunner.StateWorking, "")
+	h, fake := rigs.StartQueueRows(t, "pty")
+	fake.SetState(rigs.ResumeLabel, agentrunner.StateWorking, "")
 
 	servertest.WaitFor(t, 10*time.Second, "a live iteration", func() bool {
 		its, err := h.Client.Reads.Iterations(context.Background())
 		return err == nil && len(its) == 1
 	})
 	its, _ := h.Client.Reads.Iterations(context.Background())
-	rows := servertest.QueueRows(t, h)
+	rows := rigs.QueueRows(t, h)
 	if its[0].Runner != "pty" || len(rows) != 1 || its[0].QueueAgent != rows[0].ID {
 		t.Errorf("iteration = %+v, Queue rows = %+v; want runner pty and the row's id", its[0], rows)
 	}
@@ -50,39 +51,39 @@ func TestQueueAgentRows_IterationsNameTheRunnerAndTheRow(t *testing.T) {
 
 func TestQueueAgentRows_HeldRunShowsRateLimited(t *testing.T) {
 	t.Parallel()
-	h, fake := servertest.StartQueueRows(t, "pty")
-	fake.SetLimitedUnknownReset(servertest.ResumeLabel)
-	fake.SetState(servertest.ResumeLabel, agentrunner.StateDone, "")
+	h, fake := rigs.StartQueueRows(t, "pty")
+	fake.SetLimitedUnknownReset(rigs.ResumeLabel)
+	fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "")
 
 	servertest.WaitFor(t, 10*time.Second, "a rate-limited row", func() bool {
-		rows := servertest.QueueRows(t, h)
+		rows := rigs.QueueRows(t, h)
 		return len(rows) == 1 && rows[0].Status.State == wire.SessionRateLimited
 	})
 }
 
 func TestQueueAgentRows_BlockedAgentKeepsItsRow(t *testing.T) {
 	t.Parallel()
-	h, fake := servertest.StartQueueRows(t, "pty")
-	fake.SetState(servertest.ResumeLabel, agentrunner.StateBlocked, "permission")
+	h, fake := rigs.StartQueueRows(t, "pty")
+	fake.SetState(rigs.ResumeLabel, agentrunner.StateBlocked, "permission")
 
 	servertest.WaitFor(t, 10*time.Second, "a blocked row", func() bool {
-		rows := servertest.QueueRows(t, h)
+		rows := rigs.QueueRows(t, h)
 		return len(rows) == 1 && rows[0].Status.State == wire.SessionBlocked
 	})
 }
 
 func TestQueueAgentRows_RowLeavesWhenTheRunFinishes(t *testing.T) {
 	t.Parallel()
-	h, fake := servertest.StartQueueRows(t, "pty")
-	servertest.WaitFor(t, 10*time.Second, "a row", func() bool { return len(servertest.QueueRows(t, h)) == 1 })
+	h, fake := rigs.StartQueueRows(t, "pty")
+	servertest.WaitFor(t, 10*time.Second, "a row", func() bool { return len(rigs.QueueRows(t, h)) == 1 })
 
-	fake.SetState(servertest.ResumeLabel, agentrunner.StateDone, "")
-	servertest.WaitFor(t, 20*time.Second, "the row to leave", func() bool { return len(servertest.QueueRows(t, h)) == 0 })
+	fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "")
+	servertest.WaitFor(t, 20*time.Second, "the row to leave", func() bool { return len(rigs.QueueRows(t, h)) == 0 })
 }
 
 func TestQueueAgentChat_LivePtyAgentServesItsChatAndScreen(t *testing.T) {
 	t.Parallel()
-	h, row, release := servertest.StartQueueChat(t, "queue agent says hi")
+	h, row, release := rigs.StartQueueChat(t, "queue agent says hi")
 	defer release()
 	ctx := context.Background()
 
@@ -100,9 +101,9 @@ func TestQueueAgentChat_LivePtyAgentServesItsChatAndScreen(t *testing.T) {
 
 func TestQueueAgentChat_GoneAgentReadsAsUnknownSession(t *testing.T) {
 	t.Parallel()
-	h, row, release := servertest.StartQueueChat(t, "bye")
+	h, row, release := rigs.StartQueueChat(t, "bye")
 	release()
-	servertest.WaitFor(t, 20*time.Second, "the row to leave", func() bool { return len(servertest.QueueRows(t, h)) == 0 })
+	servertest.WaitFor(t, 20*time.Second, "the row to leave", func() bool { return len(rigs.QueueRows(t, h)) == 0 })
 	ctx := context.Background()
 
 	if _, err := h.Client.Sessions.Chat(ctx, row.ID); err == nil || !strings.Contains(err.Error(), "404") {
@@ -115,7 +116,7 @@ func TestQueueAgentChat_GoneAgentReadsAsUnknownSession(t *testing.T) {
 
 func TestQueueAgentChat_WriteRoutesRefuseAQueueAgentAsUnknown(t *testing.T) {
 	t.Parallel()
-	h, row, release := servertest.StartQueueChat(t, "hello")
+	h, row, release := rigs.StartQueueChat(t, "hello")
 	defer release()
 	ctx := context.Background()
 
@@ -137,8 +138,8 @@ func TestQueueAgentChat_WriteRoutesRefuseAQueueAgentAsUnknown(t *testing.T) {
 func TestQueueAgentRows_HerdrAndHeadlessRunsAreAbsent(t *testing.T) {
 	t.Parallel()
 	for _, runner := range []string{"herdr", "headless"} {
-		h, _ := servertest.StartQueueRows(t, runner)
-		if rows := servertest.QueueRows(t, h); len(rows) != 0 {
+		h, _ := rigs.StartQueueRows(t, runner)
+		if rows := rigs.QueueRows(t, h); len(rows) != 0 {
 			t.Errorf("%s rows = %+v, want none", runner, rows)
 		}
 	}

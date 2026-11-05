@@ -1,7 +1,8 @@
-package servertest
+package rigs
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -19,7 +20,7 @@ import (
 
 // stopCounter counts Stop calls on the headless runner.
 type stopCounter struct {
-	*TurnRunner
+	*servertest.TurnRunner
 	stops atomic.Int32
 }
 
@@ -30,7 +31,7 @@ func (r *stopCounter) Stop(s agentrunner.Session) error {
 
 // ZeroCommitPaused is 01 paused zero-commit, its agent still alive.
 type ZeroCommitPaused struct {
-	H          *Harness
+	H          *servertest.Harness
 	Store      string
 	WtPath     string
 	TicketPath string
@@ -44,16 +45,16 @@ type ZeroCommitPaused struct {
 func PauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) ZeroCommitPaused {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
-	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	SetProjectRepo(t, store, "proj", repo)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
 	p := ZeroCommitPaused{Store: store, TicketPath: filepath.Join(store, "proj/epic-a/issues/01-first.md")}
 	if headless {
-		fake := &stopCounter{TurnRunner: NewTurnRunner(func(string, string) {})}
-		p.H = StartWithStore(t, store, append([]func(*server.Config){WithRunner(fake)}, opts...)...)
+		fake := &stopCounter{TurnRunner: servertest.NewTurnRunner(func(string, string) {})}
+		p.H = servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunner(fake)}, opts...)...)
 		if res, err := p.H.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
-		WaitStatus(t, p.TicketPath, schema.StatusLegacyAnswer)
+		servertest.WaitStatus(t, p.TicketPath, schema.StatusLegacyAnswer)
 		p.AgentGone = func() {
 			if sess, ok, _ := fake.Find("epic-a-iter-01"); ok {
 				_ = fake.Runner.Stop(sess)
@@ -62,18 +63,18 @@ func PauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 		base := fake.stops.Load()
 		p.Stops = func() int32 { return fake.stops.Load() - base }
 	} else {
-		p.H = StartWithStore(t, store, opts...)
-		p.H.OnTurn(func(turn *Turn) { turn.Transcript("done") })
+		p.H = servertest.StartWithStore(t, store, opts...)
+		p.H.OnTurn(func(turn *servertest.Turn) { turn.Transcript("done") })
 		if res, err := p.H.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
-		WaitStatus(t, p.TicketPath, schema.StatusLegacyAnswer)
-		p.AgentGone = func() { p.H.KillAgents(t, EpicA01) }
+		servertest.WaitStatus(t, p.TicketPath, schema.StatusLegacyAnswer)
+		p.AgentGone = func() { p.H.KillAgents(t, servertest.EpicA01) }
 		base := p.H.Stops()
 		p.Stops = func() int32 { return int32(p.H.Stops() - base) }
 	}
 	// The pause writes the ticket's status before its run-log event.
-	Await(t, func() bool {
+	servertest.Await(t, func() bool {
 		var ok bool
 		p.Pause, ok = runlog.LatestPauseEvent(filepath.Join(store, "proj"), "epic-a", "01")
 		return ok
@@ -115,9 +116,9 @@ func (p ZeroCommitPaused) FinishedLate(commitless bool) func(*schema.Ticket) {
 // as the history shows it.
 func (p ZeroCommitPaused) Adopted(t *testing.T) string {
 	t.Helper()
-	WaitStatus(t, p.TicketPath, schema.StatusDone)
+	servertest.WaitStatus(t, p.TicketPath, schema.StatusDone)
 	var reason string
-	Await(t, func() bool {
+	servertest.Await(t, func() bool {
 		hist, err := p.H.Client.Reads.History(context.Background(), "proj:epic-a/01")
 		if err != nil {
 			return false

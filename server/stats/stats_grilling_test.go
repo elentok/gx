@@ -2,6 +2,7 @@ package stats_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"slices"
 	"testing"
@@ -20,8 +21,8 @@ func grillItem(id string, at time.Time, q, w int) conversations.GrillingItem {
 // the conversations dir.
 func grillingStats(t *testing.T, recs []conversations.Record) (get func(query string) wire.Stats) {
 	t.Helper()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: open\n---\n", nil)
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: open\n---\n", nil)
 	})
 
 	for _, r := range recs {

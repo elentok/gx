@@ -2,6 +2,7 @@ package queue_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,7 @@ import (
 
 func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("seed queue: %+v, %v", res, err)
@@ -64,7 +65,7 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 
 func TestOneOff_NoProjectMergesInScratchAndHonoursNameAndAgent(t *testing.T) {
 	t.Parallel()
-	h, _ := servertest.StartOneOffHarness(t)
+	h, _ := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 
 	res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "anything", Cwd: t.TempDir(), Name: "my-job", Agent: "codex"})
@@ -85,7 +86,7 @@ func TestOneOff_NoProjectMergesInScratchAndHonoursNameAndAgent(t *testing.T) {
 
 func TestOneOff_ExplicitProjectBeatsCwd(t *testing.T) {
 	t.Parallel()
-	h, _ := servertest.StartOneOffHarness(t)
+	h, _ := rigs.StartOneOffHarness(t)
 	res, err := h.Client.Queue.OneOff(context.Background(), wire.OneOffRequest{Prompt: "x", Project: "proj", Cwd: t.TempDir()})
 	if err != nil || res.Refused || !strings.HasPrefix(res.Address, "proj:") {
 		t.Fatalf("one-off: %+v, %v", res, err)
@@ -94,7 +95,7 @@ func TestOneOff_ExplicitProjectBeatsCwd(t *testing.T) {
 
 func TestOneOff_RefusesEmptyPromptAndUnknownProject(t *testing.T) {
 	t.Parallel()
-	h, _ := servertest.StartOneOffHarness(t)
+	h, _ := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	if res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "  "}); err != nil || !res.Refused {
 		t.Fatalf("empty prompt: %+v, %v", res, err)
@@ -120,7 +121,7 @@ func readOneOffTicket(t *testing.T, h *servertest.Harness, addr string) string {
 
 func TestOneOff_FrontQueuesAtHead(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("seed queue: %+v, %v", res, err)
@@ -137,7 +138,7 @@ func TestOneOff_FrontQueuesAtHead(t *testing.T) {
 
 func TestOneOff_OptionsMergeInFrontmatter(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	res, err := h.Client.Queue.OneOff(context.Background(), wire.OneOffRequest{
 		Prompt: "build it", Cwd: repo,
 		BlockedBy: []string{"proj:epic-a/01"}, ExpectedContextWindow: 40000,
@@ -155,7 +156,7 @@ func TestOneOff_OptionsMergeInFrontmatter(t *testing.T) {
 
 func TestOneOff_FileTypeKeyIsIgnored(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	file := filepath.Join(t.TempDir(), "payload.md")
 	if err := os.WriteFile(file, []byte("---\ntype: implement\n---\njust a prompt\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -171,7 +172,7 @@ func TestOneOff_FileTypeKeyIsIgnored(t *testing.T) {
 
 func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	file := filepath.Join(t.TempDir(), "payload.md")
 	payload := "---\nexpected_context_window: 40000\nname: from-file\n---\nbuild it from the file\n"
@@ -224,7 +225,7 @@ func TestOneOff_AgentIsPinnedOnlyByAnExplicitChoice(t *testing.T) {
 	}
 	for _, c := range cases {
 		// A harness per case: the epic's root is queued once, by its first one-off.
-		h, repo := servertest.StartOneOffHarness(t, func(c *server.Config) { c.AgentsDefaultHarness = "codex" })
+		h, repo := rigs.StartOneOffHarness(t, func(c *server.Config) { c.AgentsDefaultHarness = "codex" })
 		c.req.Cwd = repo
 		res, err := h.Client.Queue.OneOff(ctx, c.req)
 		if err != nil || res.Refused {
@@ -252,7 +253,7 @@ func TestOneOff_AgentIsPinnedOnlyByAnExplicitChoice(t *testing.T) {
 
 func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	cases := []struct {
 		name   string
@@ -279,7 +280,7 @@ func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 
 func TestOneOff_InvalidAgentLeavesNoTicketAndRetryIsNotDuplicateLive(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	file := filepath.Join(t.TempDir(), "job.md")
 	if err := os.WriteFile(file, []byte("do the thing\n"), 0o644); err != nil {
@@ -330,7 +331,7 @@ func TestOneOff_NumbersAboveTheArchiveAndQueuesTheRootOnce(t *testing.T) {
 
 func TestOneOff_FrontMovesAQueuedRootToTheHead(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("queue epic-a: %+v, %v", res, err)
@@ -349,7 +350,7 @@ func TestOneOff_FrontMovesAQueuedRootToTheHead(t *testing.T) {
 
 func TestOneOff_RefusesBadTypes(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	for name, req := range map[string]wire.OneOffRequest{
 		"unknown type": {Prompt: "x", Cwd: repo, Type: "research"},
 		"implement":    {Prompt: "x", Cwd: repo, Type: "implement"},
@@ -363,7 +364,7 @@ func TestOneOff_RefusesBadTypes(t *testing.T) {
 
 func TestOneOff_DuplicateLiveRefusedByFileKey(t *testing.T) {
 	t.Parallel()
-	h, repo := servertest.StartOneOffHarness(t)
+	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	file := filepath.Join(dir, "payload.md")

@@ -2,6 +2,7 @@ package prompt_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"testing"
 
@@ -33,9 +34,9 @@ var (
 	endTurn                = servertest.EndTurn
 	sessionSnapshot        = servertest.SessionSnapshot
 	autoSends              = servertest.AutoSends
-	startWebDesign         = servertest.StartWebDesign
-	webSessionWrite        = servertest.WebSessionWrite
-	sessionToken           = servertest.SessionToken
+	startWebDesign         = rigs.StartWebDesign
+	webSessionWrite        = rigs.WebSessionWrite
+	sessionToken           = rigs.SessionToken
 	startFakeSession       = servertest.StartFakeSession
 	idleWithAction         = servertest.IdleWithAction
 	startFakeSessionWith   = servertest.StartFakeSessionWith
@@ -68,5 +69,5 @@ func (f designsFixture) shared() servertest.DesignsFixture {
 
 func sessionSnapshotOf(t *testing.T, f designsFixture, id string) wire.SessionInfo {
 	t.Helper()
-	return servertest.SessionSnapshotOf(t, f.shared(), id)
+	return rigs.SessionSnapshotOf(t, f.shared(), id)
 }

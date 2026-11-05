@@ -2,6 +2,7 @@ package merge_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
@@ -59,7 +60,7 @@ func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *
 func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveContributor), chat)
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveContributor), chat)
 	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -93,7 +94,7 @@ func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.Repo, "main moves on")
-	}, servertest.WithEvolve(config.EvolveContributor), chat)
+	}, rigs.WithEvolve(config.EvolveContributor), chat)
 	f.pauseRoot(t)
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
 		t.Fatalf("%q sent %d times, want once", epicNotMergedText, got)

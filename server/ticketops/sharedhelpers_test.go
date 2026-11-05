@@ -1,6 +1,9 @@
 package ticketops_test
 
-import "github.com/elentok/gx/server/servertest"
+import (
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
+)
 
 // Aliases for the shared helpers that live in servertest, so the moved tests
 // keep their short names.
@@ -8,7 +11,7 @@ const (
 	investigateAddr = servertest.InvestigateAddr
 	answerAddr      = servertest.AnswerAddr
 	optionsBlock    = servertest.OptionsBlock
-	answerLabel     = servertest.AnswerLabel
+	answerLabel     = rigs.AnswerLabel
 )
 
 type (
@@ -17,7 +20,7 @@ type (
 	herdrNamed   = servertest.HerdrNamed
 	ptyNamed     = servertest.PtyNamed
 	turnRunner   = servertest.TurnRunner
-	answerEnv    = servertest.AnswerEnv
+	answerEnv    = rigs.AnswerEnv
 )
 
 var epicA01 = servertest.EpicA01
@@ -27,27 +30,27 @@ var (
 	endedRounds             = servertest.EndedRounds
 	keepWorktree            = servertest.KeepWorktree
 	writeMuted              = servertest.WriteMuted
-	assertPaused            = servertest.AssertPaused
+	assertPaused            = rigs.AssertPaused
 	commitAgentWork         = servertest.CommitAgentWork
 	newTurnRunner           = servertest.NewTurnRunner
-	pauseZeroCommit         = servertest.PauseZeroCommit
+	pauseZeroCommit         = rigs.PauseZeroCommit
 	reportIteration         = servertest.ReportIteration
-	runLogOf                = servertest.RunLogOf
-	startDeadlock           = servertest.StartDeadlock
-	startInvestigateEnv     = servertest.StartInvestigateEnv
+	runLogOf                = rigs.RunLogOf
+	startDeadlock           = rigs.StartDeadlock
+	startInvestigateEnv     = rigs.StartInvestigateEnv
 	waitStatus              = servertest.WaitStatus
 	startWaitingRestartFake = servertest.StartWaitingRestartFake
 	pauseWithQuestion       = servertest.PauseWithQuestion
 	newRenamedFake          = servertest.NewRenamedFake
 	waitFor                 = servertest.Await
-	startAnswerEnv          = servertest.StartAnswerEnv
-	mustFind                = servertest.MustFind
-	answerEvents            = servertest.AnswerEvents
-	liveUnder               = servertest.LiveUnder
-	liveUnderOther          = servertest.LiveUnderOther
+	startAnswerEnv          = rigs.StartAnswerEnv
+	mustFind                = rigs.MustFind
+	answerEvents            = rigs.AnswerEvents
+	liveUnder               = rigs.LiveUnder
+	liveUnderOther          = rigs.LiveUnderOther
 	pausedIteration         = servertest.PausedIteration
-	stateOf                 = servertest.StateOf
-	pauseEnvZeroCommit      = servertest.PauseEnvZeroCommit
+	stateOf                 = rigs.StateOf
+	pauseEnvZeroCommit      = rigs.PauseEnvZeroCommit
 	newSchedFixture         = servertest.NewSchedFixture
 	commitWork              = servertest.CommitWork
 	atMergeCap              = servertest.AtMergeCap

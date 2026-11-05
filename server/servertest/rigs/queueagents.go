@@ -1,7 +1,8 @@
-package servertest
+package rigs
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest"
 	"slices"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ const ResumeLabel = "epic-a-iter-01"
 const QueueRowTicket = "proj:epic-a/01"
 
 // QueueRows lists the Queue rows of the session list.
-func QueueRows(t *testing.T, h *Harness) []wire.SessionInfo {
+func QueueRows(t *testing.T, h *servertest.Harness) []wire.SessionInfo {
 	t.Helper()
 	list, err := h.Client.Sessions.List(context.Background())
 	if err != nil {
@@ -42,33 +43,33 @@ func QueueRows(t *testing.T, h *Harness) []wire.SessionInfo {
 
 // StartQueueRows queues QueueRowTicket on a fake runner called runner and waits
 // for it to launch.
-func StartQueueRows(t *testing.T, runner string) (*Harness, NamedFake) {
+func StartQueueRows(t *testing.T, runner string) (*servertest.Harness, NamedFake) {
 	t.Helper()
 	store := t.TempDir()
-	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	fake := NewNamedFake(runnerfake.NewRunner(), runner)
-	h := StartWithStore(t, store, WithRunnerFor(fake, func(string, string) agentrunner.Runner { return fake }))
+	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(fake, func(string, string) agentrunner.Runner { return fake }))
 	t.Cleanup(func() { fake.SetState(ResumeLabel, agentrunner.StateDone, "") })
 	if res, err := h.Client.Queue.Add(context.Background(), QueueRowTicket, "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	WaitFor(t, 10*time.Second, "the ticket launches", func() bool { return len(fake.Prompts(ResumeLabel)) > 0 })
+	servertest.WaitFor(t, 10*time.Second, "the ticket launches", func() bool { return len(fake.Prompts(ResumeLabel)) > 0 })
 	return h, fake
 }
 
 // StartQueueChat queues the ticket on the default PTY runner and holds its
 // turn open after the agent wrote text to its transcript. The returned
 // release ends the turn.
-func StartQueueChat(t *testing.T, text string) (*Harness, wire.SessionInfo, func()) {
+func StartQueueChat(t *testing.T, text string) (*servertest.Harness, wire.SessionInfo, func()) {
 	t.Helper()
 	store := t.TempDir()
-	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
-	h := StartWithStore(t, store)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store)
 	var release func()
 	held := make(chan struct{})
-	h.OnTurn(func(turn *Turn) {
+	h.OnTurn(func(turn *servertest.Turn) {
 		turn.Transcript(text)
 		release = turn.Hold()
 		close(held)
@@ -81,6 +82,6 @@ func StartQueueChat(t *testing.T, text string) (*Harness, wire.SessionInfo, func
 	case <-time.After(30 * time.Second):
 		t.Fatal("OnTurn never ran")
 	}
-	WaitFor(t, 10*time.Second, "a Queue row", func() bool { return len(QueueRows(t, h)) == 1 })
+	servertest.WaitFor(t, 10*time.Second, "a Queue row", func() bool { return len(QueueRows(t, h)) == 1 })
 	return h, QueueRows(t, h)[0], release
 }

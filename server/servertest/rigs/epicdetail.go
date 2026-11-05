@@ -1,7 +1,8 @@
-package servertest
+package rigs
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest"
 	"net/http"
 	"testing"
 
@@ -10,9 +11,9 @@ import (
 
 // GetEpicDetail fetches /v1/epics/detail for address and returns the status
 // code, the decoded body (only on 200) and the raw body.
-func GetEpicDetail(t *testing.T, h *Harness, base, address string) (int, wire.EpicDetail, string) {
+func GetEpicDetail(t *testing.T, h *servertest.Harness, base, address string) (int, wire.EpicDetail, string) {
 	t.Helper()
-	code, body := WebDo(t, h, http.MethodGet, base+"/v1/epics/detail?address="+address)
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics/detail?address="+address)
 	var d wire.EpicDetail
 	if code == http.StatusOK {
 		if err := json.Unmarshal([]byte(body), &d); err != nil {

@@ -1,6 +1,7 @@
 package queue_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,11 +37,11 @@ func queuedAtLine(md string) string {
 
 func TestQueueAdd_StampsQueuedAtOnceAndKeepsIt(t *testing.T) {
 	t.Parallel()
-	open := map[string]string{queuedAtOpenMD: servertest.IssueMD("01", "open", "", "A")}
+	open := map[string]string{queuedAtOpenMD: rigs.IssueMD("01", "open", "", "A")}
 	var storeDir string
-	h, _ := servertest.StartEpicDetail(t, func(store string) {
+	h, _ := rigs.StartEpicDetail(t, func(store string) {
 		storeDir = store
-		servertest.WriteEpicFiles(t, store, "e", queuedAtLoop, open)
+		rigs.WriteEpicFiles(t, store, "e", queuedAtLoop, open)
 	})
 
 	if got := queuedAtLine(epicTicketMD(t, storeDir, "e")); got != "" {
@@ -66,18 +67,18 @@ func TestQueueAdd_StampsQueuedAtOnceAndKeepsIt(t *testing.T) {
 
 func TestEpicList_QueuedAtFallsBackToStartedThenMerged(t *testing.T) {
 	t.Parallel()
-	open := map[string]string{queuedAtOpenMD: servertest.IssueMD("01", "open", "", "A")}
-	done := map[string]string{queuedAtOpenMD: servertest.IssueMD("01", "done", "", "A")}
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "all", "---\nstatus: open\nqueued_at: 2026-01-01T00:00:00Z\nstarted_at: 2026-01-02T00:00:00Z\nmerged_at: 2026-01-03T00:00:00Z\n---\n", done)
-		servertest.WriteEpicFiles(t, store, "started", "---\nstatus: open\nstarted_at: 2026-01-02T00:00:00Z\nmerged_at: 2026-01-03T00:00:00Z\n---\n", done)
-		servertest.WriteEpicFiles(t, store, "merged", "---\nstatus: done\nmerged_at: 2026-01-03T00:00:00Z\n---\n", done)
-		servertest.WriteEpicFiles(t, store, "none", queuedAtLoop, open)
+	open := map[string]string{queuedAtOpenMD: rigs.IssueMD("01", "open", "", "A")}
+	done := map[string]string{queuedAtOpenMD: rigs.IssueMD("01", "done", "", "A")}
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "all", "---\nstatus: open\nqueued_at: 2026-01-01T00:00:00Z\nstarted_at: 2026-01-02T00:00:00Z\nmerged_at: 2026-01-03T00:00:00Z\n---\n", done)
+		rigs.WriteEpicFiles(t, store, "started", "---\nstatus: open\nstarted_at: 2026-01-02T00:00:00Z\nmerged_at: 2026-01-03T00:00:00Z\n---\n", done)
+		rigs.WriteEpicFiles(t, store, "merged", "---\nstatus: done\nmerged_at: 2026-01-03T00:00:00Z\n---\n", done)
+		rigs.WriteEpicFiles(t, store, "none", queuedAtLoop, open)
 	})
 
 	_ = h
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
-	list := servertest.GetEpicList(t, code, body)
+	list := rigs.GetEpicList(t, code, body)
 	want := map[string]string{
 		"proj:all":     "2026-01-01T00:00:00Z",
 		"proj:started": "2026-01-02T00:00:00Z",
@@ -93,11 +94,11 @@ func TestEpicList_QueuedAtFallsBackToStartedThenMerged(t *testing.T) {
 
 func TestQueueAdd_DraftImplEpicRefusesEpicDraftAndWritesNothing(t *testing.T) {
 	t.Parallel()
-	open := map[string]string{queuedAtOpenMD: servertest.IssueMD("01", "open", "", "A")}
+	open := map[string]string{queuedAtOpenMD: rigs.IssueMD("01", "open", "", "A")}
 	var storeDir string
-	h, _ := servertest.StartEpicDetail(t, func(store string) {
+	h, _ := rigs.StartEpicDetail(t, func(store string) {
 		storeDir = store
-		servertest.WriteEpicFiles(t, store, "feature-impl", "---\nstatus: draft\n---\n", open)
+		rigs.WriteEpicFiles(t, store, "feature-impl", "---\nstatus: draft\n---\n", open)
 	})
 
 	res, err := h.Client.Queue.Add(t.Context(), "proj:feature-impl", "")
@@ -107,7 +108,7 @@ func TestQueueAdd_DraftImplEpicRefusesEpicDraftAndWritesNothing(t *testing.T) {
 	if got := queuedAtLine(epicTicketMD(t, storeDir, "feature-impl")); got != "" {
 		t.Errorf("refused add stamped %q", got)
 	}
-	if got := servertest.QueueAddresses(t, h); len(got) != 0 {
+	if got := rigs.QueueAddresses(t, h); len(got) != 0 {
 		t.Errorf("queue = %v, want empty", got)
 	}
 }

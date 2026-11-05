@@ -1,7 +1,8 @@
-package servertest
+package rigs
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -60,11 +61,11 @@ func IssueMD(id, status, extra, title string) string {
 
 // StartEpicDetail runs setup on a fresh store, starts a harness with a web
 // listener on it, and returns the harness with its web URL.
-func StartEpicDetail(t *testing.T, setup func(store string)) (*Harness, string) {
+func StartEpicDetail(t *testing.T, setup func(store string)) (*servertest.Harness, string) {
 	t.Helper()
 	store := t.TempDir()
 	setup(store)
-	h := StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	hs, err := h.Client.Handshake(t.Context())
 	if err != nil {
 		t.Fatal(err)

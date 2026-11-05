@@ -1,6 +1,7 @@
 package sched_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
@@ -23,31 +24,31 @@ var epicA01 = servertest.EpicA01
 
 var (
 	asHeadlessRun           = servertest.AsHeadlessRun
-	assertPaused            = servertest.AssertPaused
-	chatRecorder            = servertest.ChatRecorder
+	assertPaused            = rigs.AssertPaused
+	chatRecorder            = rigs.ChatRecorder
 	commitAgentWork         = servertest.CommitAgentWork
-	newSlackHook            = servertest.NewSlackHook
+	newSlackHook            = rigs.NewSlackHook
 	pauseBlocked            = servertest.PauseBlocked
 	startBlockable          = servertest.StartBlockable
 	startTicketWrites       = servertest.StartTicketWrites
-	waitForChat             = servertest.WaitForChat
+	waitForChat             = rigs.WaitForChat
 	leaveIteration          = servertest.LeaveIteration
 	markWaiting             = servertest.MarkWaiting
 	newRenamedFake          = servertest.NewRenamedFake
 	ofType                  = servertest.OfType
-	registerLiveAgent       = servertest.RegisterLiveAgent
-	restartUnder            = servertest.RestartUnder
+	registerLiveAgent       = rigs.RegisterLiveAgent
+	restartUnder            = rigs.RestartUnder
 	runLog                  = servertest.RunLog
-	runLogOf                = servertest.RunLogOf
-	epicTickets             = servertest.EpicTickets
-	startDeadlock           = servertest.StartDeadlock
+	runLogOf                = rigs.RunLogOf
+	epicTickets             = rigs.EpicTickets
+	startDeadlock           = rigs.StartDeadlock
 	runnerShapes            = servertest.RunnerShapes
 	runsJSONHas             = servertest.RunsJSONHas
 	stampRun                = servertest.StampRun
 	startWaitingRestartFake = servertest.StartWaitingRestartFake
 	waitFor                 = servertest.Await
-	liveUnder               = servertest.LiveUnder
-	liveUnderOther          = servertest.LiveUnderOther
+	liveUnder               = rigs.LiveUnder
+	liveUnderOther          = rigs.LiveUnderOther
 	pauseWithQuestion       = servertest.PauseWithQuestion
 )
 

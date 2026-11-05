@@ -2,6 +2,7 @@ package prompt_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -85,7 +86,7 @@ func TestSessionKeys_StartingSessionRefusesKeys(t *testing.T) {
 
 func TestSessionKeys_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
-	h, row, release := servertest.StartQueueChat(t, "hello")
+	h, row, release := rigs.StartQueueChat(t, "hello")
 	defer release()
 	res, err := h.Client.Sessions.Keys(context.Background(), wire.SessionKeysRequest{ID: row.ID, Key: "Esc"})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionReadOnly {

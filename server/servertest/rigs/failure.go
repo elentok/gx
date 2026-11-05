@@ -1,7 +1,8 @@
-package servertest
+package rigs
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ const (
 )
 
 // FailureNow reads session id's failure from the list route and the chat route.
-func FailureNow(ctx context.Context, t *testing.T, h *Harness, id string) (list, chat *wire.SessionFailure) {
+func FailureNow(ctx context.Context, t *testing.T, h *servertest.Harness, id string) (list, chat *wire.SessionFailure) {
 	t.Helper()
 	sessions, err := h.Client.Sessions.List(ctx)
 	if err != nil {
@@ -34,7 +35,7 @@ func FailureNow(ctx context.Context, t *testing.T, h *Harness, id string) (list,
 
 // WaitForFailure polls until the session's failure has kind ("" for none) on
 // both routes and returns it.
-func WaitForFailure(ctx context.Context, t *testing.T, h *Harness, id, kind string) *wire.SessionFailure {
+func WaitForFailure(ctx context.Context, t *testing.T, h *servertest.Harness, id, kind string) *wire.SessionFailure {
 	t.Helper()
 	var list, chat *wire.SessionFailure
 	for {

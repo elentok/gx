@@ -2,6 +2,7 @@ package sessions_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"testing"
@@ -24,8 +25,8 @@ func TestMain(m *testing.M) {
 // Aliases for the helpers that live in servertest, so the callers here keep
 // their short names.
 const (
-	apiError401       = servertest.APIError401
-	reply             = servertest.Reply
+	apiError401       = rigs.APIError401
+	reply             = rigs.Reply
 	turnDurationLine  = servertest.TurnDurationLine
 	runEndText        = servertest.RunEndText
 	repairToken       = servertest.RepairToken
@@ -33,7 +34,7 @@ const (
 	testFlushInterval = servertest.FlushInterval
 )
 
-type slackHook = servertest.SlackHook
+type slackHook = rigs.SlackHook
 
 var (
 	report                 = servertest.Report
@@ -45,19 +46,19 @@ var (
 	startFakeSession       = servertest.StartFakeSession
 	startFakeSessionWith   = servertest.StartFakeSessionWith
 	stopFakeSession        = servertest.StopFakeSession
-	stoppedCodexSession    = servertest.StoppedCodexSession
-	writeCodexRollout      = servertest.WriteCodexRollout
+	stoppedCodexSession    = rigs.StoppedCodexSession
+	writeCodexRollout      = rigs.WriteCodexRollout
 	writeTranscript        = servertest.WriteTranscript
 	appendLines            = servertest.AppendLines
 	appendTranscript       = servertest.AppendTranscript
 	waitSessionState       = servertest.WaitSessionState
-	failureNow             = servertest.FailureNow
-	waitForFailure         = servertest.WaitForFailure
-	setMapStep             = servertest.SetMapStep
+	failureNow             = rigs.FailureNow
+	waitForFailure         = rigs.WaitForFailure
+	setMapStep             = rigs.SetMapStep
 	gitOut                 = servertest.GitOut
 	waitFor                = servertest.Await
 	reload                 = servertest.Reload
-	newSlackHook           = servertest.NewSlackHook
+	newSlackHook           = rigs.NewSlackHook
 	idleWithAction         = servertest.IdleWithAction
 	withAlerts             = servertest.WithAlerts
 	startBannerSession     = servertest.StartBannerSession
@@ -71,9 +72,9 @@ var (
 	storeWithMapStep       = servertest.StoreWithMapStep
 	writeAssistantMessage  = servertest.WriteAssistantMessage
 	clearByInput           = servertest.ClearByInput
-	startWebDesign         = servertest.StartWebDesign
-	sessionToken           = servertest.SessionToken
-	webSessionWrite        = servertest.WebSessionWrite
+	startWebDesign         = rigs.StartWebDesign
+	sessionToken           = rigs.SessionToken
+	webSessionWrite        = rigs.WebSessionWrite
 )
 
 type designsFixture struct {

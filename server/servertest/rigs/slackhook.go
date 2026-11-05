@@ -1,6 +1,7 @@
-package servertest
+package rigs
 
 import (
+	"github.com/elentok/gx/server/servertest"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +41,7 @@ func NewSlackHook(t *testing.T) *SlackHook {
 func (h *SlackHook) WaitStarted(t *testing.T) int {
 	t.Helper()
 	var i int
-	WaitFor(t, 15*time.Second, "the server started notice in chat", func() bool {
+	servertest.WaitFor(t, 15*time.Second, "the server started notice in chat", func() bool {
 		h.mu.Lock()
 		defer h.mu.Unlock()
 		i = slices.IndexFunc(h.posts, func(p string) bool { return strings.Contains(p, "server started") })
@@ -52,7 +53,7 @@ func (h *SlackHook) WaitStarted(t *testing.T) int {
 // PostsSince waits until more than from posts have arrived, then a grace
 // period for any extra one to show, and returns the posts after from.
 func (h *SlackHook) PostsSince(from int) []string {
-	Poll(15*time.Second, func() bool {
+	servertest.Poll(15*time.Second, func() bool {
 		h.mu.Lock()
 		defer h.mu.Unlock()
 		return len(h.posts) > from
@@ -62,9 +63,9 @@ func (h *SlackHook) PostsSince(from int) []string {
 }
 
 // PostsAfterAlert waits for the banner and a chat flush, then returns the posts after from.
-func (h *SlackHook) PostsAfterAlert(hs *Harness, from int) []string {
-	WaitAlerts(hs, 1)
-	time.Sleep(5 * FlushInterval) // negative wait: no event marks the chat flush, so give it a few intervals
+func (h *SlackHook) PostsAfterAlert(hs *servertest.Harness, from int) []string {
+	servertest.WaitAlerts(hs, 1)
+	time.Sleep(5 * servertest.FlushInterval) // negative wait: no event marks the chat flush, so give it a few intervals
 	return h.PostsFrom(from)
 }
 

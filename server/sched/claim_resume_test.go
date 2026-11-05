@@ -3,6 +3,7 @@ package sched_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -53,7 +54,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 		t.Fatal(err)
 	}
 
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(servertest.NewNamedFake(fake, runner)), servertest.WithEnv("CODEX_HOME="+codexHome))
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(rigs.NewNamedFake(fake, runner)), servertest.WithEnv("CODEX_HOME="+codexHome))
 	if rollout {
 		_, _, wt := worktree.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
 		meta := `{"type":"session_meta","payload":{"id":"sess-old","cwd":` + strconv.Quote(wt) + `}}` + "\n"
@@ -83,7 +84,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 			break
 		}
 	}
-	t.Cleanup(func() { fake.SetState(servertest.ResumeLabel, agentrunner.StateDone, "") })
+	t.Cleanup(func() { fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "") })
 	logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
@@ -118,7 +119,7 @@ func TestClaim_ResumesOrColdStarts(t *testing.T) {
 			fake := runnerfake.NewRunner()
 			fake.ResumeErr = c.resumeErr
 			logged := claimOpen(t, c.runner, c.agent, c.answered, c.rollout, fake)
-			if got := fake.ResumeIDs(servertest.ResumeLabel); !slices.Equal(got, c.wantIDs) {
+			if got := fake.ResumeIDs(rigs.ResumeLabel); !slices.Equal(got, c.wantIDs) {
 				t.Errorf("start attempts carried resume ids %q, want %q", got, c.wantIDs)
 			}
 			if len(logged) != 1 || logged[0].Path != c.wantPath {
@@ -127,7 +128,7 @@ func TestClaim_ResumesOrColdStarts(t *testing.T) {
 			// A cold start carries no conversation: the skill command names the ticket,
 			// and the agent reads the Handoff from it.
 			if c.wantPath == "cold-start" {
-				if got := fake.Prompts(servertest.ResumeLabel); len(got) == 0 || !strings.Contains(got[0], "proj:epic-a/01") {
+				if got := fake.Prompts(rigs.ResumeLabel); len(got) == 0 || !strings.Contains(got[0], "proj:epic-a/01") {
 					t.Errorf("cold-start prompts = %q, want the first to name the ticket", got)
 				}
 			}

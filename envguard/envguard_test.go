@@ -59,7 +59,7 @@ var allowed = map[site]entry{
 	{"sound/sound.go", ruleChildEnv}:                         {1, reasonTool},
 	{"server/servertest/fakecodex.go", ruleChildEnv}:         {1, reasonTool},
 	{"server/servertest/schedfixture.go", ruleChildEnv}:      {2, reasonTool},
-	{"server/servertest/recoveryrig.go", ruleChildEnv}:       {1, reasonTool},
+	{"server/servertest/rigs/recoveryrig.go", ruleChildEnv}:  {1, reasonTool},
 	{"server/servertest/mergehelpers.go", ruleChildEnv}:      {1, reasonTool},
 	{"server/servertest/promptsession.go", ruleEnvRead}:      {1, reasonChild},
 	{"testutil/claudeenv/claudeenv.go", ruleChildEnv}:        {1, reasonTool},

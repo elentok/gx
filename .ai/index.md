@@ -143,7 +143,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/ticketsflow` — the workflow verbs of `gx tickets`: `epic`, `publish`, `follow-up`, the ensure verbs, `verify-plan`, `calibration`, `lint-claims`, `filter-run-log` (`Commands(Deps) []*cobra.Command`, passed to `tickets.New` as extras; `Deps` = Env + `WriteFile` + lazy `CommandTree` for lint-claims)
   - `cmd/ticketsmigrate` — `gx tickets migrate` (`New`, `Deps` with no hooks of its own; `DryRunChanges` is also called by `gx restart-check`)
   - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
-- `server/` — the gx server; `server/servertest/` holds its test helpers; `server/wire/` holds the
+- `server/` — the gx server; `server/servertest/` holds its test helpers (`server/servertest/rigs/` holds the leaf scenario rigs built on them); `server/wire/` holds the
   wire types, consts and pure methods (no behaviour, no import of `server`); `server/broker/` holds
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;

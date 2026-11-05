@@ -2,6 +2,7 @@ package ticketwrite_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,7 @@ func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
 		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 		servertest.SetProjectRepo(t, store, "proj", repo)
 		h := servertest.StartWithStore(t, store)
-		servertest.RunToZeroCommitPause(t, h, "done")
+		rigs.RunToZeroCommitPause(t, h, "done")
 		// The PTY agent's session id is generated, so any non-empty one will do.
 		servertest.AssertPauseRecordsRun(t, store, events.Paused, "pty", agentrunner.Session{Label: "epic-a-iter-01"})
 	})
@@ -63,7 +64,7 @@ func TestPause_ZeroCommitLogsGxQuestion(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	servertest.RunToZeroCommitPause(t, h, "done")
+	rigs.RunToZeroCommitPause(t, h, "done")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	servertest.WaitStatus(t, path, schema.StatusLegacyAnswer)
 	assertGxQuestion(t, path, events.ZeroCommit,

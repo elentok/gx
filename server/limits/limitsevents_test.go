@@ -2,6 +2,7 @@ package limits_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -44,7 +45,7 @@ func wantLimitsEvents(t *testing.T, ch <-chan wire.Event, want int) {
 
 func TestLimitsEvent_FirstReportPublishesOne(t *testing.T) {
 	h := limitsEventHarness(t)
-	ch := servertest.EventStream(t, h)
+	ch := rigs.EventStream(t, h)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 1)
 }
@@ -52,7 +53,7 @@ func TestLimitsEvent_FirstReportPublishesOne(t *testing.T) {
 func TestLimitsEvent_ChangedPercentagePublishes(t *testing.T) {
 	h := limitsEventHarness(t)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
-	ch := servertest.EventStream(t, h)
+	ch := rigs.EventStream(t, h)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 1)
 }
@@ -60,7 +61,7 @@ func TestLimitsEvent_ChangedPercentagePublishes(t *testing.T) {
 func TestLimitsEvent_FractionOnlyChangePublishesNothing(t *testing.T) {
 	h := limitsEventHarness(t)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34.1, 4_000_000_000)})
-	ch := servertest.EventStream(t, h)
+	ch := rigs.EventStream(t, h)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34.3, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 0)
 }
@@ -77,7 +78,7 @@ func TestLimitsEvent_ConfirmOfStaleWindowPublishes(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.Restart(t)
-	ch := servertest.EventStream(t, h)
+	ch := rigs.EventStream(t, h)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 1)
 }
@@ -85,7 +86,7 @@ func TestLimitsEvent_ConfirmOfStaleWindowPublishes(t *testing.T) {
 func TestLimitsEvent_ConfirmOfFreshWindowPublishesNothing(t *testing.T) {
 	h := limitsEventHarness(t)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
-	ch := servertest.EventStream(t, h)
+	ch := rigs.EventStream(t, h)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 0)
 }
@@ -93,7 +94,7 @@ func TestLimitsEvent_ConfirmOfFreshWindowPublishesNothing(t *testing.T) {
 func TestLimitsEvent_DroppedReportPublishesNothing(t *testing.T) {
 	h := limitsEventHarness(t)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(50, 4_000_000_000)})
-	ch := servertest.EventStream(t, h)
+	ch := rigs.EventStream(t, h)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 0)
 }
@@ -101,7 +102,7 @@ func TestLimitsEvent_DroppedReportPublishesNothing(t *testing.T) {
 func TestLimitsEvent_BurstCoalescesAndTrailingPublishShowsLastValue(t *testing.T) {
 	h := limitsEventHarness(t)
 	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(1, 4_000_000_000)})
-	ch := servertest.EventStream(t, h)
+	ch := rigs.EventStream(t, h)
 	for pct := 2; pct <= 21; pct++ {
 		sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(float64(pct), 4_000_000_000)})
 	}

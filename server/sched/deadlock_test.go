@@ -2,6 +2,7 @@ package sched_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -204,7 +205,7 @@ func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
 	if child.Type != "investigate" || child.Parent != nil {
 		t.Errorf("03 = %+v, want a top-level investigate ticket", child)
 	}
-	if q := servertest.QueueAddresses(t, h); !slices.Contains(q, "proj:epic-a/03") {
+	if q := rigs.QueueAddresses(t, h); !slices.Contains(q, "proj:epic-a/03") {
 		t.Errorf("queue = %v, want 03 queued", q)
 	}
 

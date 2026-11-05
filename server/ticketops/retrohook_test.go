@@ -2,6 +2,7 @@ package ticketops_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,7 +44,7 @@ func retroFixture(t *testing.T, opts ...func(*server.Config)) *schedFixture {
 
 func TestRetroHook_SubmitsAfterTheEpicMerges(t *testing.T) {
 	t.Parallel()
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveContributor))
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveContributor))
 	if got := f.completeEpic(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
 	}
@@ -51,7 +52,7 @@ func TestRetroHook_SubmitsAfterTheEpicMerges(t *testing.T) {
 
 func TestRetroHook_NothingWhenEvolveIsOff(t *testing.T) {
 	t.Parallel()
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveOff))
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveOff))
 	if got := f.completeEpic(t); len(got) != 0 {
 		t.Errorf("retros = %v, want none", got)
 	}
@@ -59,7 +60,7 @@ func TestRetroHook_NothingWhenEvolveIsOff(t *testing.T) {
 
 func TestRetroHook_NothingWhenTheProjectOptedOut(t *testing.T) {
 	t.Parallel()
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveContributor))
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveContributor))
 	dir := filepath.Join(f.Store, "proj")
 	pf, err := config.ReadProjectFile(dir)
 	if err != nil {
@@ -77,7 +78,7 @@ func TestRetroHook_NothingWhenTheProjectOptedOut(t *testing.T) {
 
 func TestRetroHook_NothingWhenTheEpicWasAlreadyEvolved(t *testing.T) {
 	t.Parallel()
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveContributor))
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveContributor))
 	if err := tickets.StampEpicFields(filepath.Join(f.Store, "proj", schedEpic), map[string]any{"evolved_at": time.Now().UTC()}); err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +89,7 @@ func TestRetroHook_NothingWhenTheEpicWasAlreadyEvolved(t *testing.T) {
 
 func TestRetroHook_MaintainerWithoutAGxProjectSubmitsNothing(t *testing.T) {
 	t.Parallel()
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveMaintainer))
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveMaintainer))
 	if got := f.completeEpic(t); len(got) != 0 {
 		t.Errorf("retros = %v, want none", got)
 	}
@@ -96,7 +97,7 @@ func TestRetroHook_MaintainerWithoutAGxProjectSubmitsNothing(t *testing.T) {
 
 func TestRetroHook_ContributorCreatesTheOutboxProject(t *testing.T) {
 	t.Parallel()
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveContributor))
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveContributor))
 	if got := f.completeEpic(t); len(got) != 1 {
 		t.Fatalf("retros = %v, want one", got)
 	}
@@ -111,7 +112,7 @@ func TestRetroHook_ContributorCreatesTheOutboxProject(t *testing.T) {
 
 func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
 	t.Parallel()
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveMaintainer))
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveMaintainer))
 	if err := os.MkdirAll(filepath.Join(f.Store, "gx"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +131,7 @@ func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.Repo, "main moves on")
-	}, servertest.WithEvolve(config.EvolveContributor))
+	}, rigs.WithEvolve(config.EvolveContributor))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.QueueEpic(ctx, t, "01")
@@ -143,7 +144,7 @@ func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 
 func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 	t.Parallel()
-	f := retroFixture(t, servertest.WithEvolve(config.EvolveContributor))
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveContributor))
 	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -165,7 +166,7 @@ func TestRetroHook_SubmitsWhenTheMergeErrors(t *testing.T) {
 		commitWork(t, p, id)
 		// An untracked file the fast-forward would overwrite fails the merge.
 		testutil.WriteFile(t, f.Repo, "01.txt", "untracked")
-	}, servertest.WithEvolve(config.EvolveContributor))
+	}, rigs.WithEvolve(config.EvolveContributor))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.QueueEpic(ctx, t, "01")

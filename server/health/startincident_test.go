@@ -1,6 +1,7 @@
 package health_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	healthpkg "github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/servertest"
 )
 
 func TestStartIncident_MaintainerStartFilesATicketAndRemovesTheNote(t *testing.T) {
@@ -23,7 +23,7 @@ func TestStartIncident_MaintainerStartFilesATicketAndRemovesTheNote(t *testing.T
 		t.Fatal(err)
 	}
 
-	_, store := cpuSpikeServer(t, servertest.WithEvolve(config.EvolveMaintainer), func(c *server.Config) { c.StateDir = state })
+	_, store := cpuSpikeServer(t, rigs.WithEvolve(config.EvolveMaintainer), func(c *server.Config) { c.StateDir = state })
 
 	// The server files it while starting, so the ticket may land after the
 	// harness returns.

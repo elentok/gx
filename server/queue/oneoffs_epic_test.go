@@ -2,6 +2,7 @@ package queue_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"testing"
 	"time"
 
@@ -83,7 +84,7 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "claude"})
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "codex"})
 	fake := runnerfake.NewRunner()
-	h := servertest.StartOneOffsHarness(t, store, servertest.WithRunner(fake))
+	h := rigs.StartOneOffsHarness(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
@@ -91,7 +92,7 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	got := servertest.WaitForAgentKinds(t, fake, "01", "02")
+	got := rigs.WaitForAgentKinds(t, fake, "01", "02")
 	if got["one-offs-iter-01"] != "claude" || got["one-offs-iter-02"] != "codex" {
 		t.Errorf("agent kinds = %v, want 01 claude and 02 codex", got)
 	}
@@ -105,7 +106,7 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
 	fake := runnerfake.NewRunner()
-	h := servertest.StartOneOffsHarness(t, store, servertest.WithRunner(fake))
+	h := rigs.StartOneOffsHarness(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
@@ -113,7 +114,7 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	for name, kind := range servertest.WaitForAgentKinds(t, fake, "01", "02") {
+	for name, kind := range rigs.WaitForAgentKinds(t, fake, "01", "02") {
 		if kind != "codex" {
 			t.Errorf("%s started as %q, want the queue item's codex", name, kind)
 		}

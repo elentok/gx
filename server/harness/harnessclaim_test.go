@@ -2,6 +2,7 @@ package harness_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"path/filepath"
 	"testing"
 
@@ -36,13 +37,13 @@ func TestHarnessClaim_WaitingTicketFollowsDefaultAtClaimTime(t *testing.T) {
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	if k := servertest.WaitKind(t, fake, "epic-a-iter-01"); k != "claude" {
+	if k := rigs.WaitKind(t, fake, "epic-a-iter-01"); k != "claude" {
 		t.Fatalf("first ticket started as %q, want claude", k)
 	}
 
-	servertest.SwitchDefaultHarness(t, h, path, store, "codex")
+	rigs.SwitchDefaultHarness(t, h, path, store, "codex")
 	fake.SetState("epic-a-iter-01", agentrunner.StateDone, "")
-	if k := servertest.WaitKind(t, fake, "epic-a-iter-02"); k != "codex" {
+	if k := rigs.WaitKind(t, fake, "epic-a-iter-02"); k != "codex" {
 		t.Errorf("waiting ticket started as %q, want codex", k)
 	}
 	if k := fake.Kind("epic-a-iter-01"); k != "claude" {
@@ -60,11 +61,11 @@ func TestHarnessClaim_UnpinnedTicketTypesClaimOnTheDefault(t *testing.T) {
 			store := t.TempDir()
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Type: typ})
 			h, fake, path := startHarnessClaim(t, store)
-			servertest.SwitchDefaultHarness(t, h, path, store, "codex")
+			rigs.SwitchDefaultHarness(t, h, path, store, "codex")
 			if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", ""); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
-			if k := servertest.WaitKind(t, fake, "epic-a-iter-01"); k != "codex" {
+			if k := rigs.WaitKind(t, fake, "epic-a-iter-01"); k != "codex" {
 				t.Errorf("%s ticket started as %q, want codex", typ, k)
 			}
 		})
@@ -91,12 +92,12 @@ func TestHarnessClaim_RelaunchKeepsEarlierRunHarness(t *testing.T) {
 			store := t.TempDir()
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Agent: tc.ticketAgent})
 			h, fake, path := startHarnessClaim(t, store)
-			servertest.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", tc.transcript)
-			servertest.SwitchDefaultHarness(t, h, path, store, "codex")
+			rigs.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", tc.transcript)
+			rigs.SwitchDefaultHarness(t, h, path, store, "codex")
 			if res, err := h.Client.Tickets.Relaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
 				t.Fatalf("relaunch: %+v, %v", res, err)
 			}
-			if k := servertest.WaitKind(t, fake, "epic-a-iter-01"); k != tc.want {
+			if k := rigs.WaitKind(t, fake, "epic-a-iter-01"); k != tc.want {
 				t.Errorf("relaunch started as %q, want %q", k, tc.want)
 			}
 		})

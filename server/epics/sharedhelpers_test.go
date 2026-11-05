@@ -1,12 +1,15 @@
 package epics_test
 
-import "github.com/elentok/gx/server/servertest"
+import (
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
+)
 
 // Short names for the helpers that live in servertest because the root
 // package's tests use them too.
 const (
-	epicMergedText    = servertest.EpicMergedText
-	epicNotMergedText = servertest.EpicNotMergedText
+	epicMergedText    = rigs.EpicMergedText
+	epicNotMergedText = rigs.EpicNotMergedText
 	answerAddr        = servertest.AnswerAddr
 	optionsBlock      = servertest.OptionsBlock
 	runEndText        = servertest.RunEndText
@@ -25,7 +28,7 @@ var (
 	startDesignsIn          = servertest.StartDesignsIn
 	startAdvancing          = servertest.StartAdvancing
 	endTurn                 = servertest.EndTurn
-	startBlockedClaimed     = servertest.StartBlockedClaimed
+	startBlockedClaimed     = rigs.StartBlockedClaimed
 	startWaitingRestartFake = servertest.StartWaitingRestartFake
 	pauseWithQuestion       = servertest.PauseWithQuestion
 	storeWithMapStep        = servertest.StoreWithMapStep
@@ -34,8 +37,8 @@ var (
 	writeCompleteEpic       = servertest.WriteCompleteEpic
 	atMergeCap              = servertest.AtMergeCap
 	runGitIn                = servertest.RunGitIn
-	chatRecorder            = servertest.ChatRecorder
-	waitForChat             = servertest.WaitForChat
+	chatRecorder            = rigs.ChatRecorder
+	waitForChat             = rigs.WaitForChat
 	waitFor                 = servertest.Await
 	waitUntil               = servertest.WaitUntil
 	waitForSession          = servertest.WaitForSession

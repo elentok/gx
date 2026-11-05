@@ -1,6 +1,7 @@
 package epics_test
 
 import (
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"testing"
 
@@ -14,34 +15,34 @@ func TestEpicDetail_MapProgress(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	mapMD := func(front, body string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" + body }
-	done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+	done := map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")}
 	findings := "\n## Review findings\n\n- [x] a\n- [x] b\n- [ ] c\n- [ ] d\n- [ ] e\n"
 	checked := "\n## Review findings\n\n- [x] a\n"
 
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "m-chart", mapMD("design_step: chart\n", ""), done)
-		servertest.WriteEpicFiles(t, store, "m-claimed", mapMD("design_step: resolve-tickets\n", ""), map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "", "A"),
-			"02-b.md": servertest.IssueMD("02", "claimed", "", "B"),
-			"03-c.md": servertest.IssueMD("03", "open", "blocked_by: [\"02\"]\n", "C"),
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "m-chart", mapMD("design_step: chart\n", ""), done)
+		rigs.WriteEpicFiles(t, store, "m-claimed", mapMD("design_step: resolve-tickets\n", ""), map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "", "A"),
+			"02-b.md": rigs.IssueMD("02", "claimed", "", "B"),
+			"03-c.md": rigs.IssueMD("03", "open", "blocked_by: [\"02\"]\n", "C"),
 		})
 
-		servertest.WriteEpicFiles(t, store, "m-frontier", mapMD("design_step: resolve-tickets\n", ""), map[string]string{
-			"01-a.md": servertest.IssueMD("01", "open", "", "A"),
-			"02-b.md": servertest.IssueMD("02", "open", "blocked_by: [\"01\"]\n", "B"),
+		rigs.WriteEpicFiles(t, store, "m-frontier", mapMD("design_step: resolve-tickets\n", ""), map[string]string{
+			"01-a.md": rigs.IssueMD("01", "open", "", "A"),
+			"02-b.md": rigs.IssueMD("02", "open", "blocked_by: [\"01\"]\n", "B"),
 		})
 
-		servertest.WriteEpicFiles(t, store, "m-fog", mapMD("design_step: resolve-tickets\n", "\n## Not yet specified\n\n- the schema\n"), done)
-		servertest.WriteEpicFiles(t, store, "m-grill", mapMD("design_step: grill-findings\n", findings), done)
-		servertest.WriteEpicFiles(t, store, "m-create", mapMD("design_step: create-tickets\n", checked), done)
-		servertest.WriteEpicFiles(t, store, "m-create-impl", "---\nstatus: draft\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "open", "", "A"),
-			"02-b.md": servertest.IssueMD("02", "open", "", "B"),
+		rigs.WriteEpicFiles(t, store, "m-fog", mapMD("design_step: resolve-tickets\n", "\n## Not yet specified\n\n- the schema\n"), done)
+		rigs.WriteEpicFiles(t, store, "m-grill", mapMD("design_step: grill-findings\n", findings), done)
+		rigs.WriteEpicFiles(t, store, "m-create", mapMD("design_step: create-tickets\n", checked), done)
+		rigs.WriteEpicFiles(t, store, "m-create-impl", "---\nstatus: draft\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "open", "", "A"),
+			"02-b.md": rigs.IssueMD("02", "open", "", "B"),
 		})
 
-		servertest.WriteEpicFiles(t, store, "m-back", mapMD("design_step: resolve-tickets\n", checked), map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "", "A"),
-			"02-b.md": servertest.IssueMD("02", "open", "", "B"),
+		rigs.WriteEpicFiles(t, store, "m-back", mapMD("design_step: resolve-tickets\n", checked), map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "", "A"),
+			"02-b.md": rigs.IssueMD("02", "open", "", "B"),
 		})
 
 		servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
@@ -120,9 +121,9 @@ func TestEpicDetail_MapProgress(t *testing.T) {
 
 func TestEpicDetail_LoopEpicReportsDraft(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "draft-loop", "---\nstatus: draft\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
-		servertest.WriteEpicFiles(t, store, "open-loop", "---\nstatus: open\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "draft-loop", "---\nstatus: draft\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteEpicFiles(t, store, "open-loop", "---\nstatus: open\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
 	})
 
 	for epic, want := range map[string]bool{"draft-loop": true, "open-loop": false} {

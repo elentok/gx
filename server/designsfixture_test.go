@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"testing"
 
@@ -39,5 +40,5 @@ func (f designsFixture) shared() servertest.DesignsFixture {
 
 func sessionSnapshotOf(t *testing.T, f designsFixture, id string) wire.SessionInfo {
 	t.Helper()
-	return servertest.SessionSnapshotOf(t, f.shared(), id)
+	return rigs.SessionSnapshotOf(t, f.shared(), id)
 }

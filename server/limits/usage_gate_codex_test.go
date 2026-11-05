@@ -2,6 +2,7 @@ package limits_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"strings"
 	"testing"
 	"time"
@@ -14,7 +15,7 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-var withCodexUsageSample = servertest.WithCodexUsageSample
+var withCodexUsageSample = rigs.WithCodexUsageSample
 
 func TestUsageOverride_NoHarnessLiftsTheDefaultHarness(t *testing.T) {
 	t.Parallel()
@@ -34,7 +35,7 @@ func TestUsageGate_CodexSampleHoldsCodexClaimsOnlyAndItsOverrideLiftsThem(t *tes
 		servertest.WriteTicket(t, store, "proj", epic, "01", epic, "")
 	}
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
+	pty := rigs.NewNamedFake(runnerfake.NewRunner(), "pty")
 	resets := time.Now().Add(time.Hour).Truncate(time.Second)
 	rec := nativerunner.UsageRecord{SeenAt: time.Now(), SevenDay: &nativerunner.UsageWindow{UsedPercentage: 98, ResetsAt: resets.Unix(), Name: "weekly"}}
 	h := servertest.StartWithStore(t, store,

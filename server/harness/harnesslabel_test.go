@@ -2,6 +2,7 @@ package harness_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"testing"
 	"time"
 
@@ -14,11 +15,11 @@ import (
 // the snapshot; both must agree.
 func labelsOf(t *testing.T, h *servertest.Harness, base, epic, address string) wire.HarnessLabel {
 	t.Helper()
-	code, d, body := servertest.GetEpicDetail(t, h, base, epic)
+	code, d, body := rigs.GetEpicDetail(t, h, base, epic)
 	if code != 200 {
 		t.Fatalf("detail status %d: %s", code, body)
 	}
-	fromDetail := servertest.RowOf(t, d, address).HarnessLabel
+	fromDetail := rigs.RowOf(t, d, address).HarnessLabel
 	snap, err := h.Client.Snapshot(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -37,21 +38,21 @@ func labelsOf(t *testing.T, h *servertest.Harness, base, epic, address string) w
 
 func TestHarnessLabel_WaitingNotes(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "open", "", "A"),
-			"02-b.md": servertest.IssueMD("02", "open", "agent: codex\n", "B"),
-			"03-c.md": servertest.IssueMD("03", "open", "", "C"),
-			"04-d.md": servertest.IssueMD("04", "open", "agent: codex\n", "D"),
-			"05-e.md": servertest.IssueMD("05", "open", "", "E"),
-			"06-f.md": servertest.IssueMD("06", "done", "", "F"),
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "open", "", "A"),
+			"02-b.md": rigs.IssueMD("02", "open", "agent: codex\n", "B"),
+			"03-c.md": rigs.IssueMD("03", "open", "", "C"),
+			"04-d.md": rigs.IssueMD("04", "open", "agent: codex\n", "D"),
+			"05-e.md": rigs.IssueMD("05", "open", "", "E"),
+			"06-f.md": rigs.IssueMD("06", "done", "", "F"),
 		})
 
 	})
 
-	servertest.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "03", "sess-3", true)
-	servertest.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "04", "sess-4", true)
-	servertest.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "05", "sess-5", false)
+	rigs.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "03", "sess-3", true)
+	rigs.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "04", "sess-4", true)
+	rigs.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "05", "sess-5", false)
 	ctx := context.Background()
 	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
@@ -76,9 +77,9 @@ func TestHarnessLabel_WaitingNotes(t *testing.T) {
 
 func TestHarnessLabel_QueueItemAgentPins(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(store string) {
-		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "open", "", "A"),
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "open", "", "A"),
 		})
 
 	})
@@ -108,7 +109,7 @@ func TestHarnessLabel_RunningRowCarriesTheRunsConfig(t *testing.T) {
 	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	servertest.WaitKind(t, fake, "epic-a-iter-01")
+	rigs.WaitKind(t, fake, "epic-a-iter-01")
 	var got wire.HarnessLabel
 	servertest.WaitFor(t, 10*time.Second, "running label", func() bool {
 		got = labelsOf(t, h, hs.WebURL, "proj:epic-a", "proj:epic-a/01")

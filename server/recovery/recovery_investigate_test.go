@@ -2,6 +2,7 @@ package recovery_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,7 +42,7 @@ func TestRecovery_UnmatchedPauseForksAQueuedInvestigateChildAndNeverRecurses(t *
 		t.Fatalf("pause: %v", err)
 	}
 	waitFor(t, func() bool {
-		return len(servertest.QueueAddresses(t, h)) > 0 && servertest.QueueAddresses(t, h)[0] == "proj:epic-a/01a"
+		return len(rigs.QueueAddresses(t, h)) > 0 && rigs.QueueAddresses(t, h)[0] == "proj:epic-a/01a"
 	})
 
 	epic := epicTickets(t, h)
@@ -168,7 +169,7 @@ func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := startR3(t)
-			servertest.RunToZeroCommitPause(t, h, tc.last)
+			rigs.RunToZeroCommitPause(t, h, tc.last)
 			waitFor(t, func() bool {
 				for _, tk := range epicTickets(t, h).Tickets {
 					if tk.Identifier == "01a" && tk.Type == "investigate" {
@@ -185,7 +186,7 @@ func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testing.T) {
 	t.Parallel()
 	h := startR3(t)
-	servertest.RunToZeroCommitPause(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
+	rigs.RunToZeroCommitPause(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
 	dir := filepath.Join(h.TicketStore, "proj")
 	waitFor(t, func() bool {
 		log, _, _ := runlog.ReadEvents(dir, "epic-a")

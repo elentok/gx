@@ -1,6 +1,7 @@
-package servertest
+package rigs
 
 import (
+	"github.com/elentok/gx/server/servertest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,7 @@ import (
 // (an iteration-started event with a session). With transcript set it also
 // writes the session's transcript under the harness's HOME, as a run that got
 // as far as its first prompt does; without it the run died before that.
-func SeedEarlierClaudeRun(t *testing.T, h *Harness, store, project, epic, id, session string, withTranscript bool) {
+func SeedEarlierClaudeRun(t *testing.T, h *servertest.Harness, store, project, epic, id, session string, withTranscript bool) {
 	t.Helper()
 	const cwd = "/work/earlier-run"
 	err := runlog.AppendEvent(filepath.Join(store, project), epic, runlog.Event{

@@ -1,8 +1,9 @@
-package servertest
+package rigs
 
 import (
 	"context"
 	"fmt"
+	"github.com/elentok/gx/server/servertest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -28,7 +29,7 @@ const AnswerLabel = "epic-a-iter-01"
 
 // AnswerEnv is a server with ticket 01 of epic-a and one live fake session.
 type AnswerEnv struct {
-	H      *Harness
+	H      *servertest.Harness
 	Fake   *runnerfake.Runner
 	Ticket string
 }
@@ -38,14 +39,14 @@ type AnswerEnv struct {
 func StartAnswerEnv(t *testing.T, wrap func(*runnerfake.Runner) agentrunner.Runner, opts ...func(*server.Config)) AnswerEnv {
 	t.Helper()
 	store := t.TempDir()
-	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	SetProjectRepo(t, store, "proj", t.TempDir())
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
 	fake := runnerfake.NewRunner()
 	var runner agentrunner.Runner = fake
 	if wrap != nil {
 		runner = wrap(fake)
 	}
-	h := StartWithStore(t, store, append([]func(*server.Config){WithRunner(runner)}, opts...)...)
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunner(runner)}, opts...)...)
 	if _, err := fake.Start(agentrunner.StartOptions{Label: AnswerLabel, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +84,7 @@ func MustFind(t *testing.T, r *runnerfake.Runner) agentrunner.Session {
 // returns the state token of its question.
 func PauseEnvZeroCommit(t *testing.T, e AnswerEnv) string {
 	t.Helper()
-	if err := e.H.Server.PauseAs(AnswerAddr, events.ZeroCommit, "no commits"); err != nil {
+	if err := e.H.Server.PauseAs(servertest.AnswerAddr, events.ZeroCommit, "no commits"); err != nil {
 		t.Fatal(err)
 	}
 	return StateOf(t, e.Ticket)
@@ -129,7 +130,7 @@ func logEventsOfType(t *testing.T, ticketPath string, typ string) []tickets.LogE
 }
 
 // RegisterLiveAgent makes the fake herdr report agent p1 as idle.
-func RegisterLiveAgent(h *Harness) {
+func RegisterLiveAgent(h *servertest.Harness) {
 	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": 1}}
 	for _, verb := range []string{"get", "wait"} {
 		h.Herdr.Register("agent", verb, func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
@@ -144,12 +145,12 @@ func RegisterLiveAgent(h *Harness) {
 // RestartUnder leaves an iteration whose handle names savedRunner ("" keeps
 // the herdr handle), then restarts a server configured with configured, whose
 // RunnerFor builds only the runners in others. It returns the ticket path.
-func RestartUnder(t *testing.T, savedRunner string, configured agentrunner.Runner, others map[string]agentrunner.Runner, opts ...func(*server.Config)) (*Harness, string) {
+func RestartUnder(t *testing.T, savedRunner string, configured agentrunner.Runner, others map[string]agentrunner.Runner, opts ...func(*server.Config)) (*servertest.Harness, string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
-	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	SetProjectRepo(t, store, "proj", repo)
-	h := StartWithStore(t, store, append([]func(*server.Config){WithRunnerFor(configured, func(name, _ string) agentrunner.Runner {
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunnerFor(configured, func(name, _ string) agentrunner.Runner {
 		if name == configured.Name() {
 			return configured
 		}
@@ -162,16 +163,16 @@ func RestartUnder(t *testing.T, savedRunner string, configured agentrunner.Runne
 	for _, r := range others {
 		h.DropAgentsAtCleanup(r)
 	}
-	_, ticketPath := LeaveIteration(t, h, store, repo, "herdr")
+	_, ticketPath := servertest.LeaveIteration(t, h, store, repo, "herdr")
 	if savedRunner != "" {
-		AsHeadlessRun(t, h)
+		servertest.AsHeadlessRun(t, h)
 		setSavedRunner(t, h, savedRunner)
 	}
 	h.Restart(t)
 	return h, ticketPath
 }
 
-func setSavedRunner(t *testing.T, h *Harness, name string) {
+func setSavedRunner(t *testing.T, h *servertest.Harness, name string) {
 	t.Helper()
 	path := filepath.Join(h.StateDir, "runs.json")
 	data, err := os.ReadFile(path)
@@ -187,13 +188,13 @@ func setSavedRunner(t *testing.T, h *Harness, name string) {
 // LiveUnderOther restarts a server configured with runner "b" over a live,
 // working run that runner "a" started. It returns the harness, a's fake and
 // the ticket path.
-func LiveUnderOther(t *testing.T, opts ...func(*server.Config)) (*Harness, RenamedFake, string) {
+func LiveUnderOther(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, servertest.RenamedFake, string) {
 	t.Helper()
-	return LiveUnder(t, NewRenamedFake("a", nativerunner.VerdictLive), opts...)
+	return LiveUnder(t, servertest.NewRenamedFake("a", nativerunner.VerdictLive), opts...)
 }
 
 // LiveUnder is LiveUnderOther with the run's runner given as own.
-func LiveUnder(t *testing.T, own RenamedFake, opts ...func(*server.Config)) (*Harness, RenamedFake, string) {
+func LiveUnder(t *testing.T, own servertest.RenamedFake, opts ...func(*server.Config)) (*servertest.Harness, servertest.RenamedFake, string) {
 	t.Helper()
 	own.IDs = func(string) (string, string) { return "p1", "sess" }
 	own.PromptState = agentrunner.StateWorking
@@ -201,8 +202,8 @@ func LiveUnder(t *testing.T, own RenamedFake, opts ...func(*server.Config)) (*Ha
 		t.Fatal(err)
 	}
 	own.SetState(AnswerLabel, agentrunner.StateWorking, "")
-	h, ticketPath := RestartUnder(t, own.Name(), NewRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{own.Name(): own}, opts...)
-	if !Poll(10*time.Second, func() bool {
+	h, ticketPath := RestartUnder(t, own.Name(), servertest.NewRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{own.Name(): own}, opts...)
+	if !servertest.Poll(10*time.Second, func() bool {
 		return slices.ContainsFunc(h.Server.Runs(), func(r runs.Run) bool { return r.Runner == own.Name() })
 	}) {
 		t.Fatalf("run not reclaimed under %s: %+v", own.Name(), h.Server.Runs())

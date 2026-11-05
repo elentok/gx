@@ -2,6 +2,7 @@ package stats_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"math"
 	"net/http"
 	"slices"
@@ -37,29 +38,29 @@ func statsFixture(t *testing.T) (get func(query string) wire.Stats) {
 	t.Helper()
 	loop := "---\nstatus: open\n---\n"
 	return statsStore(t, func(store string) {
-		servertest.WriteProjectEpic(t, store, "proj", "loop", loop, map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "done_at: "+statsStamp(1)+"\n", "A"),
-			"02-b.md": servertest.IssueMD("02", "done", "done_at: "+statsStamp(1)+"\n", "B"),
-			"03-c.md": servertest.IssueMD("03", "done", "", "C"),
-			"04-d.md": servertest.IssueMD("04", "open", "", "D"),
-			"05-e.md": servertest.IssueMD("05", "done", "done_at: "+statsStamp(100)+"\n", "E"),
+		rigs.WriteProjectEpic(t, store, "proj", "loop", loop, map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(1)+"\n", "A"),
+			"02-b.md": rigs.IssueMD("02", "done", "done_at: "+statsStamp(1)+"\n", "B"),
+			"03-c.md": rigs.IssueMD("03", "done", "", "C"),
+			"04-d.md": rigs.IssueMD("04", "open", "", "D"),
+			"05-e.md": rigs.IssueMD("05", "done", "done_at: "+statsStamp(100)+"\n", "E"),
 		})
-		servertest.WriteProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "done_at: "+statsStamp(1)+"\n", "A"),
+		rigs.WriteProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(1)+"\n", "A"),
 		})
 		// 01:00 local on day 3 is still day 4 in UTC.
 		local := statsNoon(3).Add(-11 * time.Hour).UTC().Format(time.RFC3339)
-		servertest.WriteProjectEpic(t, store, "proj", "zone", loop, map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "done_at: "+local+"\n", "A"),
+		rigs.WriteProjectEpic(t, store, "proj", "zone", loop, map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+local+"\n", "A"),
 		})
-		servertest.WriteProjectEpic(t, store, "proj", "merged", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "done_at: "+statsStamp(2)+"\n", "A"),
+		rigs.WriteProjectEpic(t, store, "proj", "merged", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(2)+"\n", "A"),
 		})
-		servertest.WriteProjectEpic(t, store, "proj", ".archive/old", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "done_at: "+statsStamp(2)+"\n", "A"),
+		rigs.WriteProjectEpic(t, store, "proj", ".archive/old", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(2)+"\n", "A"),
 		})
-		servertest.WriteProjectEpic(t, store, "other", "loop", loop, map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "done_at: "+statsStamp(1)+"\n", "A"),
+		rigs.WriteProjectEpic(t, store, "other", "loop", loop, map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(1)+"\n", "A"),
 		})
 	})
 }
@@ -68,7 +69,7 @@ func statsFixture(t *testing.T) (get func(query string) wire.Stats) {
 // away from UTC, so a UTC-day bucket would disagree with the local one.
 func statsStore(t *testing.T, setup func(store string)) (get func(query string) wire.Stats) {
 	t.Helper()
-	h, base := servertest.StartEpicDetail(t, setup)
+	h, base := rigs.StartEpicDetail(t, setup)
 	return func(query string) wire.Stats {
 		t.Helper()
 		code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/stats"+query)
@@ -120,9 +121,9 @@ func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {
 		// A done map carries the merged_at copied from its impl epic.
-		servertest.WriteProjectEpic(t, store, "proj", "feat", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(3)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
-		servertest.WriteProjectEpic(t, store, "proj", "feat-impl", "---\nstatus: done\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
-		servertest.WriteProjectEpic(t, store, "proj", "open-map", "---\nkind: map\nstatus: open\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "feat", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(3)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "feat-impl", "---\nstatus: done\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "open-map", "---\nkind: map\nstatus: open\n---\n", nil)
 	})("?range=30")
 	for _, c := range []struct {
 		name   string
@@ -183,9 +184,9 @@ func TestStats_NeedsTheWebCookie(t *testing.T) {
 func TestStats_LinesOfCodeLandOnTheMergeDay(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {
-		servertest.WriteProjectEpic(t, store, "proj", "a", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 120\nlines_removed: 30\n---\n", nil)
-		servertest.WriteProjectEpic(t, store, "proj", "b", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 5\nlines_removed: 1\n---\n", nil)
-		servertest.WriteProjectEpic(t, store, "proj", "unmerged", "---\nstatus: open\nlines_added: 999\nlines_removed: 999\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "a", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 120\nlines_removed: 30\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "b", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 5\nlines_removed: 1\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "unmerged", "---\nstatus: open\nlines_added: 999\nlines_removed: 999\n---\n", nil)
 	})("?range=30")
 	if got := statsAt(t, s, s.Throughput.LinesAdded, 2); got != 125 {
 		t.Errorf("lines added on day 2 = %d, want 125", got)
@@ -202,21 +203,21 @@ func TestStats_FollowUpsCountByOriginalAddress(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {
 		created := func(n int) string { return "created_at: " + statsStamp(n) + "\n" }
-		servertest.WriteProjectEpic(t, store, "proj", "follow-ups", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "open", created(1), "A"),
-			"02-b.md": servertest.IssueMD("02", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "B"),
-			"03-c.md": servertest.IssueMD("03", "cancelled", created(2)+"cancelled_at: "+statsStamp(1)+"\n", "C"),
+		rigs.WriteProjectEpic(t, store, "proj", "follow-ups", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "open", created(1), "A"),
+			"02-b.md": rigs.IssueMD("02", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "B"),
+			"03-c.md": rigs.IssueMD("03", "cancelled", created(2)+"cancelled_at: "+statsStamp(1)+"\n", "C"),
 		})
-		servertest.WriteProjectEpic(t, store, "proj", "follow-ups-archived", "---\nstatus: open\n---\n", map[string]string{
-			"10-j.md": servertest.IssueMD("10", "cancelled", "original_address: proj:follow-ups/10\n"+created(2)+"cancelled_at: "+statsStamp(1)+"\n", "J"),
-			"12-l.md": servertest.IssueMD("12", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "L"),
+		rigs.WriteProjectEpic(t, store, "proj", "follow-ups-archived", "---\nstatus: open\n---\n", map[string]string{
+			"10-j.md": rigs.IssueMD("10", "cancelled", "original_address: proj:follow-ups/10\n"+created(2)+"cancelled_at: "+statsStamp(1)+"\n", "J"),
+			"12-l.md": rigs.IssueMD("12", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "L"),
 		})
-		servertest.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
 			// moved into another epic: counts by where it began.
-			"09-i.md": servertest.IssueMD("09", "done", "original_address: proj:follow-ups/09\n"+created(1)+"done_at: "+statsStamp(0)+"\n", "I"),
+			"09-i.md": rigs.IssueMD("09", "done", "original_address: proj:follow-ups/09\n"+created(1)+"done_at: "+statsStamp(0)+"\n", "I"),
 			// a move alone does not finish it.
-			"11-k.md": servertest.IssueMD("11", "open", "original_address: proj:follow-ups/11\n"+created(1), "K"),
-			"13-m.md": servertest.IssueMD("13", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "M"),
+			"11-k.md": rigs.IssueMD("11", "open", "original_address: proj:follow-ups/11\n"+created(1), "K"),
+			"13-m.md": rigs.IssueMD("13", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "M"),
 		})
 	})("?range=30")
 	for _, c := range []struct {
@@ -246,11 +247,11 @@ func TestStats_WaitingForDesignCountsOpenMapDays(t *testing.T) {
 		return md + "---\n"
 	}
 	s := statsStore(t, func(store string) {
-		servertest.WriteProjectEpic(t, store, "proj", "draft", mapMD("draft", 10, -1), nil)
-		servertest.WriteProjectEpic(t, store, "proj", "open", mapMD("open", 5, -1), nil)
-		servertest.WriteProjectEpic(t, store, "proj", "done", mapMD("done", 8, 4), nil)
-		servertest.WriteProjectEpic(t, store, "proj", "old", mapMD("open", 100, -1), nil)
-		servertest.WriteProjectEpic(t, store, "proj", "not-a-map", "---\nstatus: open\ncreated_at: "+statsStamp(5)+"\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "draft", mapMD("draft", 10, -1), nil)
+		rigs.WriteProjectEpic(t, store, "proj", "open", mapMD("open", 5, -1), nil)
+		rigs.WriteProjectEpic(t, store, "proj", "done", mapMD("done", 8, 4), nil)
+		rigs.WriteProjectEpic(t, store, "proj", "old", mapMD("open", 100, -1), nil)
+		rigs.WriteProjectEpic(t, store, "proj", "not-a-map", "---\nstatus: open\ncreated_at: "+statsStamp(5)+"\n---\n", nil)
 	})("?range=30")
 	// old always; open from day 5; done from day 8 until it completes on day 4.
 	for day, want := range map[int]int{9: 1, 8: 2, 6: 2, 5: 3, 4: 2, 0: 2} {
@@ -282,7 +283,7 @@ func costGroupOf(t *testing.T, s wire.Stats, name string) wire.StatsCostGroup {
 
 func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
 	t.Parallel()
-	h, base := servertest.StartEpicDetail(t, func(string) {})
+	h, base := rigs.StartEpicDetail(t, func(string) {})
 	today := time.Now().Format("2006-01-02")
 	add := func(project, group, harness string, tokens int64, dollars float64) {
 		t.Helper()
@@ -349,17 +350,17 @@ func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
 	}
 	done := func(day int) string { return "done_at: " + statsStamp(day) + "\n" }
 	s := statsStore(t, func(store string) {
-		servertest.WriteProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(2)+"\n"+stamp(100, "1.0")+"---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", done(3)+stamp(30, "0.3"), "A"),
-			"02-b.md": servertest.IssueMD("02", "done", done(2)+stamp(20, "0.2"), "B"),
+		rigs.WriteProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(2)+"\n"+stamp(100, "1.0")+"---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", done(3)+stamp(30, "0.3"), "A"),
+			"02-b.md": rigs.IssueMD("02", "done", done(2)+stamp(20, "0.2"), "B"),
 		})
-		servertest.WriteProjectEpic(t, store, "proj", "old-map", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(8)+"\n---\n", nil)
-		servertest.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", done(4)+stamp(100, "1.0"), "A"),
-			"02-b.md": servertest.IssueMD("02", "done", done(4), "B"),
-			"03-c.md": servertest.IssueMD("03", "done", done(5), "C"),
-			"04-d.md": servertest.IssueMD("04", "cancelled", "cancelled_at: "+statsStamp(6)+"\n", "D"),
-			"05-e.md": servertest.IssueMD("05", "done", done(7)+stamp(0, "0"), "E"),
+		rigs.WriteProjectEpic(t, store, "proj", "old-map", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(8)+"\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", done(4)+stamp(100, "1.0"), "A"),
+			"02-b.md": rigs.IssueMD("02", "done", done(4), "B"),
+			"03-c.md": rigs.IssueMD("03", "done", done(5), "C"),
+			"04-d.md": rigs.IssueMD("04", "cancelled", "cancelled_at: "+statsStamp(6)+"\n", "D"),
+			"05-e.md": rigs.IssueMD("05", "done", done(7)+stamp(0, "0"), "E"),
 		})
 	})("?range=30")
 	design, queue := costGroupOf(t, s, tokenledger.GroupDesign), costGroupOf(t, s, tokenledger.GroupQueue)
@@ -402,16 +403,16 @@ func TestStats_FrictionLandsOnTheStampDayAndSplitsReasons(t *testing.T) {
 		for i, r := range reasons {
 			pauses += "    " + r + ": " + strconv.Itoa(10-i) + "\n"
 		}
-		servertest.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", done(2)+frictionYAML("  pauses_by_reason:\n"+pauses+
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", done(2)+frictionYAML("  pauses_by_reason:\n"+pauses+
 				"  run_events:\n    conflict_hit: 2\n  pause_endings:\n    web: 3\n    tui: 1\n    cli: 1\n    gx: 4\n    unknown: 1\n"+
 				"  person_pause_secs: [10, 30, 50, 70]\n"), "A"),
 
-			"02-b.md": servertest.IssueMD("02", "cancelled", "cancelled_at: "+statsStamp(3)+"\n"+
+			"02-b.md": rigs.IssueMD("02", "cancelled", "cancelled_at: "+statsStamp(3)+"\n"+
 				frictionYAML("  pauses_by_reason:\n    f: 1\n"), "B"),
 
-			"03-c.md": servertest.IssueMD("03", "done", done(2), "C"),
-			"04-d.md": servertest.IssueMD("04", "done", done(100)+frictionYAML("  pauses_by_reason:\n    z: 9\n"), "D"),
+			"03-c.md": rigs.IssueMD("03", "done", done(2), "C"),
+			"04-d.md": rigs.IssueMD("04", "done", done(100)+frictionYAML("  pauses_by_reason:\n    z: 9\n"), "D"),
 		})
 	})("?range=30")
 	f := s.Friction
@@ -442,11 +443,11 @@ func TestStats_FrictionLandsOnTheStampDayAndSplitsReasons(t *testing.T) {
 func TestStats_FrictionWithoutPersonEndingsHasNoHeadlines(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {
-		servertest.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": servertest.IssueMD("01", "done", "done_at: "+statsStamp(1)+"\n"+
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(1)+"\n"+
 				frictionYAML("  pause_endings:\n    gx: 2\n"), "A"),
 
-			"02-b.md": servertest.IssueMD("02", "done", "done_at: "+statsStamp(1)+"\n", "B"),
+			"02-b.md": rigs.IssueMD("02", "done", "done_at: "+statsStamp(1)+"\n", "B"),
 		})
 	})("?range=30")
 	if s.Friction.WebShare != nil || s.Friction.MedianResumeSec != nil {

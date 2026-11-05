@@ -2,6 +2,7 @@ package harness_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"strings"
 	"testing"
 	"time"
@@ -29,9 +30,9 @@ func TestLaunchRunner_CodexRunsOnPtyUnlessHerdrIsConfigured(t *testing.T) {
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "codex one", "")
 			servertest.WriteTicket(t, store, "proj", "epic-b", "01", "claude one", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			fakes := map[string]servertest.NamedFake{}
+			fakes := map[string]rigs.NamedFake{}
 			for _, name := range []string{"pty", "headless", "herdr"} {
-				fakes[name] = servertest.NewNamedFake(runnerfake.NewRunner(), name)
+				fakes[name] = rigs.NewNamedFake(runnerfake.NewRunner(), name)
 			}
 			configured := fakes[tc.configured]
 			h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(configured, func(name, _ string) agentrunner.Runner {

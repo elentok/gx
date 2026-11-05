@@ -2,6 +2,7 @@ package budget_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"sync"
 	"testing"
 	"time"
@@ -67,7 +68,7 @@ func (f *budgetEventFixture) spend(total float64) {
 
 func (f *budgetEventFixture) stream(t *testing.T) <-chan wire.Event {
 	t.Helper()
-	return servertest.EventStream(t, f.h)
+	return rigs.EventStream(t, f.h)
 }
 
 // budgetEvents counts the budget-changed events on ch until it is quiet.

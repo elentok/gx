@@ -1,6 +1,7 @@
-package servertest
+package rigs
 
 import (
+	"github.com/elentok/gx/server/servertest"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +34,7 @@ func ChatRecorder(t *testing.T) (opt func(*server.Config), count func(s string) 
 	}))
 	t.Cleanup(hook.Close)
 	opt = func(c *server.Config) {
-		c.Chat = notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: FlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
 	}
 	count = func(s string) int {
 		mu.Lock()
@@ -45,6 +46,6 @@ func ChatRecorder(t *testing.T) (opt func(*server.Config), count func(s string) 
 
 // WaitForChat polls until s was sent, and reports how often.
 func WaitForChat(count func(string) int, s string) int {
-	Poll(10*time.Second, func() bool { return count(s) > 0 })
+	servertest.Poll(10*time.Second, func() bool { return count(s) > 0 })
 	return count(s)
 }
