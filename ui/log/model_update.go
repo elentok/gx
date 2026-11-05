@@ -41,7 +41,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return
 		}
 		var originCmd tea.Cmd
-		model, originCmd = model.withSyncedDetailOrigin()
+		occluded := model.ModalOpen() || model.help.IsOpen || model.rebase.confirm.isOpen()
+		model.splitPane, originCmd = model.withSyncedDetailOrigin(occluded)
 		if originCmd != nil {
 			cmd = tea.Batch(cmd, originCmd)
 			next = model
@@ -137,7 +138,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		m.ready = true
 		m.help, childCmd = m.help.Update(msg)
 		var splitCmd tea.Cmd
-		m, splitCmd = m.syncSplitSize()
+		m.splitPane, m.listPanel, splitCmd = m.syncSplitSize(m.width, m.height, m.listPanel)
 		return m, tea.Batch(childCmd, splitCmd)
 	case tea.FocusMsg:
 		if m.rebase.didStash {
@@ -168,7 +169,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		logPrefix := m.keys.Prefix()
 		logHasPrefix := len(logPrefix) > 0
 		if key == "h" && m.split.IsSplit() && m.split.IsDetailFocused() && (m.commitDetail.IsFileTreeFocused() || m.commitDetail.IsHeaderFocused()) {
-			return m.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEsc})
+			m.splitPane, m.listPanel, cmd = m.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEsc}, m.listPanel)
+			return m, cmd
 		}
 		if (key == "esc" || key == "q") && !m.split.IsCollapsed() {
 			if m.split.IsDetailFocused() && m.commitDetail.HasInternalFocus() {
@@ -176,11 +178,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 				m.commitDetail = updated.(commit.Model)
 				return m, detailCmd
 			}
-			return m.routeKeyToSplit(msg)
+			m.splitPane, m.listPanel, cmd = m.routeKeyToSplit(msg, m.listPanel)
+			return m, cmd
 		}
 		if key == "f" && !m.split.IsCollapsed() {
 			// Fullscreen toggle has priority over detail routing when split is active.
-			return m.routeKeyToSplit(msg)
+			m.splitPane, m.listPanel, cmd = m.routeKeyToSplit(msg, m.listPanel)
+			return m, cmd
 		}
 
 		// The "t"-prefixed chord (tg toggle-graph, to toggle-orientation, t,esc

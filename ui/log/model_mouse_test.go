@@ -44,14 +44,14 @@ func setupSplitWithDetail(t *testing.T) Model {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 250
 	m.height = 24
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 
 	m.listPanel = m.listPanel.WithRows(commitRows(30))
-	m = m.withSyncedListSize()
+	m.listPanel = m.withSyncedListSize(m.listPanel)
 
 	return m
 }
@@ -86,8 +86,8 @@ func TestClickOnDetailPaneFocusesItAndRoutesWheelToCommitDetail(t *testing.T) {
 
 	// Enter split mode (mirrors model_split_test.go's approach).
 	m.split, _ = m.split.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = m.withSyncedListSize()
-	m = m.withSyncedDetailSize()
+	m.listPanel = m.withSyncedListSize(m.listPanel)
+	m.splitPane = m.withSyncedDetailSize()
 	// esc once to hand focus back to the list, so the click is what moves it.
 	m.split = m.split.SetDetailFocused(false)
 
@@ -239,8 +239,8 @@ func TestWheelStillScrollsListWhenDetailNotFocused(t *testing.T) {
 	m = next.(Model)
 
 	m.split, _ = m.split.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = m.withSyncedListSize()
-	m = m.withSyncedDetailSize()
+	m.listPanel = m.withSyncedListSize(m.listPanel)
+	m.splitPane = m.withSyncedDetailSize()
 	m.split = m.split.SetDetailFocused(false)
 
 	prevOffset := m.listPanel.list.Offset()

@@ -22,8 +22,8 @@ func TestEscFromListInSplitCollapsesAndResizesListPanel(t *testing.T) {
 	// Enter split mode by simulating the same transition openSelected uses:
 	// drive the split container directly (no real git repo needed here).
 	m.split, _ = m.split.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = m.withSyncedListSize()
-	m = m.withSyncedDetailSize()
+	m.listPanel = m.withSyncedListSize(m.listPanel)
+	m.splitPane = m.withSyncedDetailSize()
 
 	if !m.split.IsSplit() {
 		t.Fatal("expected split mode after enter")

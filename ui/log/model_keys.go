@@ -108,19 +108,19 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingDown:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.Navigate(1)
-		m, selCmd := m.handleSelectionChange(prevRef)
+		m, selCmd := m.followSelection(prevRef)
 		return m, selCmd
 	case bindingUp:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.Navigate(-1)
-		m, selCmd := m.handleSelectionChange(prevRef)
+		m, selCmd := m.followSelection(prevRef)
 		return m, selCmd
 	case bindingOpen:
 		return m.openSelected()
 	case bindingBottom:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.SetSelected(len(m.listPanel.Rows()) - 1)
-		m, selCmd := m.handleSelectionChange(prevRef)
+		m, selCmd := m.followSelection(prevRef)
 		return m, selCmd
 	case bindingReload:
 		m.refreshing = true
@@ -128,7 +128,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingTop:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.SetSelected(0)
-		m, selCmd := m.handleSelectionChange(prevRef)
+		m, selCmd := m.followSelection(prevRef)
 		return m, selCmd
 	case bindingGotoHead:
 		if m.startRef != "HEAD" {
@@ -173,12 +173,12 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingPageDown:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.ScrollPage(list.DefaultScroll)
-		m, selCmd := m.handleSelectionChange(prevRef)
+		m, selCmd := m.followSelection(prevRef)
 		return m, selCmd
 	case bindingPageUp:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.ScrollPage(-list.DefaultScroll)
-		m, selCmd := m.handleSelectionChange(prevRef)
+		m, selCmd := m.followSelection(prevRef)
 		return m, selCmd
 	case bindingRebaseInteractive:
 		return m, m.rebase.start(m.worktreeRoot, m.settings.Terminal, m.listPanel.Rows(), m.listPanel.Selected())
@@ -189,7 +189,9 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(notify.Progress("filter", "clearing filter..."), m.cmdReload())
 		}
 		// No active filter: f toggles fullscreen in the split view.
-		return m.routeKeyToSplit(tea.KeyPressMsg{Code: 'f', Text: "f"})
+		var cmd tea.Cmd
+		m.splitPane, m.listPanel, cmd = m.routeKeyToSplit(tea.KeyPressMsg{Code: 'f', Text: "f"}, m.listPanel)
+		return m, cmd
 	case bindingYankHash:
 		return m, m.yankCommitHash()
 	case bindingYankSubject:
@@ -204,8 +206,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingToggleOrientation:
 		var cmd tea.Cmd
 		m.split, cmd = m.split.ToggleOrientation()
-		m = m.withSyncedDetailSize()
-		m = m.withSyncedListSize()
+		m.splitPane = m.withSyncedDetailSize()
+		m.listPanel = m.withSyncedListSize(m.listPanel)
 		return m, cmd
 	}
 	return m, nil

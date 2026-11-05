@@ -4,9 +4,17 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/pushstate"
+	"github.com/elentok/gx/ui/splitview"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+// splitPane owns the split container and the commit detail panel it hosts.
+// The list panel stays on Model; methods that resize it take and return it.
+type splitPane struct {
+	split        splitview.Model
+	commitDetail commit.Model
+}
 
 // selectedPushState computes the push/pull state of the currently selected
 // commit row, for display in the commit detail header.
@@ -19,105 +27,117 @@ func (m Model) selectedPushState() pushstate.PushState {
 	return pushstate.CommitPushState(rows[cursor].class, m.branchDiverged)
 }
 
-// withSyncedDetailSize resizes commitDetail to match the current split layout.
-func (m Model) withSyncedDetailSize() Model {
-	dw, dh := m.split.DetailSize()
-	if dw > 0 && dh > 0 {
-		updated, _ := m.commitDetail.Update(tea.WindowSizeMsg{Width: dw, Height: dh})
-		m.commitDetail = updated.(commit.Model)
-	}
-	return m
+// followSelection updates the detail panel after the list cursor moved from
+// prevRef.
+func (m Model) followSelection(prevRef string) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.splitPane, cmd = m.handleSelectionChange(prevRef, m.SelectedRef(), m.selectedPushState())
+	return m, cmd
 }
 
-// withSyncedListSize resizes listPanel to match the current split layout.
-func (m Model) withSyncedListSize() Model {
-	lw, lh := m.split.ListSize()
-	if lw > 0 && lh > 0 {
-		updated, _ := m.listPanel.Update(tea.WindowSizeMsg{Width: lw, Height: lh})
-		m.listPanel = updated.(listPanel)
+// withSyncedDetailSize resizes commitDetail to match the current split layout.
+func (p splitPane) withSyncedDetailSize() splitPane {
+	dw, dh := p.split.DetailSize()
+	if dw > 0 && dh > 0 {
+		updated, _ := p.commitDetail.Update(tea.WindowSizeMsg{Width: dw, Height: dh})
+		p.commitDetail = updated.(commit.Model)
 	}
-	return m
+	return p
+}
+
+// withSyncedListSize resizes the list panel to match the current split layout.
+func (p splitPane) withSyncedListSize(lp listPanel) listPanel {
+	lw, lh := p.split.ListSize()
+	if lw > 0 && lh > 0 {
+		updated, _ := lp.Update(tea.WindowSizeMsg{Width: lw, Height: lh})
+		lp = updated.(listPanel)
+	}
+	return lp
 }
 
 // syncSplitSize informs the split container of the current window dimensions
 // and resizes both panels accordingly.
-func (m Model) syncSplitSize() (Model, tea.Cmd) {
-	if m.width == 0 || m.height == 0 {
-		return m, nil
+func (p splitPane) syncSplitSize(width, height int, lp listPanel) (splitPane, listPanel, tea.Cmd) {
+	if width == 0 || height == 0 {
+		return p, lp, nil
 	}
 	var cmd tea.Cmd
-	m.split, cmd = m.split.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-	m = m.withSyncedDetailSize()
-	m = m.withSyncedListSize()
-	return m, cmd
+	p.split, cmd = p.split.Update(tea.WindowSizeMsg{Width: width, Height: height})
+	p = p.withSyncedDetailSize()
+	lp = p.withSyncedListSize(lp)
+	return p, lp, cmd
 }
 
 // routeKeyToSplit forwards a key event to the split container and syncs the
-// detail panel size afterwards. Returns the updated model and any commands.
-func (m Model) routeKeyToSplit(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+// panel sizes afterwards.
+func (p splitPane) routeKeyToSplit(msg tea.KeyPressMsg, lp listPanel) (splitPane, listPanel, tea.Cmd) {
 	var cmd tea.Cmd
-	m.split, cmd = m.split.Update(msg)
-	m = m.withSyncedDetailSize()
-	m = m.withSyncedListSize()
-	return m, cmd
+	p.split, cmd = p.split.Update(msg)
+	p = p.withSyncedDetailSize()
+	lp = p.withSyncedListSize(lp)
+	return p, lp, cmd
 }
 
 // handleSelectionChange updates the commit detail panel when the list cursor
 // moves while in Split mode. prevRef is the ref before the navigation. The ref
 // swap is an image-diff disrupting event (ADR 0010), so the WithRef disrupt
 // command is returned for the caller to batch.
-func (m Model) handleSelectionChange(prevRef string) (Model, tea.Cmd) {
-	newRef := m.SelectedRef()
-	m.split = m.split.WithListRef(newRef)
-	if m.split.IsSplit() && newRef != prevRef && newRef != "" {
+func (p splitPane) handleSelectionChange(prevRef, newRef string, ps pushstate.PushState) (splitPane, tea.Cmd) {
+	p.split = p.split.WithListRef(newRef)
+	if p.split.IsSplit() && newRef != prevRef && newRef != "" {
 		var cmd tea.Cmd
-		m.commitDetail, cmd = m.commitDetail.WithRef(newRef)
-		m.commitDetail = m.commitDetail.WithPushState(m.selectedPushState())
-		m = m.withSyncedDetailSize()
-		return m, cmd
+		p.commitDetail, cmd = p.commitDetail.WithRef(newRef)
+		p.commitDetail = p.commitDetail.WithPushState(ps)
+		p = p.withSyncedDetailSize()
+		return p, cmd
 	}
-	return m, nil
+	return p, nil
 }
 
 // OnPageDeactivated is called by the app shell when the user switches away from
 // the log tab. It clears any active image-diff overlay in the detail panel so it
 // doesn't float over the next tab (ADR 0010).
-func (m Model) OnPageDeactivated() tea.Cmd {
-	return m.commitDetail.OnDeactivate()
+func (p splitPane) OnPageDeactivated() tea.Cmd {
+	return p.commitDetail.OnDeactivate()
 }
 
 // withSyncedDetailOrigin pushes the detail panel's absolute screen origin (and
 // visibility) into commitDetail so its image-diff kitty overlay lands where the
-// panel is composed (ADR 0010). The detail is treated as not visible whenever a
-// log-level modal is open, since a centered modal occludes it. WithScreenOrigin
-// no-ops when nothing changed, so this is cheap to call after every Update.
-func (m Model) withSyncedDetailOrigin() (Model, tea.Cmd) {
-	col, row, visible := m.split.DetailOrigin()
-	visible = visible && !m.ModalOpen() && !m.help.IsOpen && !m.rebase.confirm.isOpen()
+// panel is composed (ADR 0010). occluded is true whenever a log-level modal is
+// open, since a centered modal hides the detail. WithScreenOrigin no-ops when
+// nothing changed, so this is cheap to call after every Update.
+func (p splitPane) withSyncedDetailOrigin(occluded bool) (splitPane, tea.Cmd) {
+	col, row, visible := p.split.DetailOrigin()
 	var cmd tea.Cmd
-	m.commitDetail, cmd = m.commitDetail.WithScreenOrigin(col, ui.ChromeRows+row, visible)
-	return m, cmd
+	p.commitDetail, cmd = p.commitDetail.WithScreenOrigin(col, ui.ChromeRows+row, visible && !occluded)
+	return p, cmd
 }
 
-// listWidth returns the pixel width available to the log list panel, taking
-// the split layout into account.
-func (m Model) listWidth() int {
-	if m.split.IsSplit() {
-		lw, _ := m.split.ListSize()
+// listWidth returns the width available to the log list panel, taking the
+// split layout into account. fallback is the full window width.
+func (p splitPane) listWidth(fallback int) int {
+	if p.split.IsSplit() {
+		lw, _ := p.split.ListSize()
 		if lw > 0 {
 			return lw
 		}
 	}
-	return m.width
+	return fallback
 }
 
-// listHeight returns the pixel height available to the log list panel.
-func (m Model) listHeight() int {
-	if m.split.IsSplit() {
-		_, lh := m.split.ListSize()
+// listHeight returns the height available to the log list panel. fallback is
+// the full window height.
+func (p splitPane) listHeight(fallback int) int {
+	if p.split.IsSplit() {
+		_, lh := p.split.ListSize()
 		if lh > 0 {
 			return lh
 		}
 	}
-	return m.height
+	return fallback
+}
+
+// listActive reports whether the log list pane has focus inside a split.
+func (p splitPane) listActive() bool {
+	return p.split.IsSplit() && p.split.IsListFocused()
 }

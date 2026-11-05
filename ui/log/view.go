@@ -2,7 +2,6 @@ package log
 
 import (
 	"fmt"
-	"image/color"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -26,7 +25,7 @@ func (m Model) View() tea.View {
 	}
 
 	panel := m.listPanel.
-		WithContainerFocus(m.isLogPaneActive()).
+		WithContainerFocus(m.listActive()).
 		WithSidebarMode(m.split.IsSplit()).
 		WithHints(m.buildHints())
 
@@ -35,14 +34,14 @@ func (m Model) View() tea.View {
 		overlayW := m.searchOverlayWidth()
 		m.search.SetWidth(overlayW)
 		overlay := m.search.View()
-		lh := m.listHeight()
+		lh := m.listHeight(m.height)
 		y := m.settings.InputModalBottom.ResolveY(lh, lipgloss.Height(overlay))
-		listOut = ui.OverlayBottomCenter(listOut, overlay, m.listWidth(), y)
+		listOut = ui.OverlayBottomCenter(listOut, overlay, m.listWidth(m.width), y)
 	}
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
 		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
 		if len(hints) > 0 {
-			listOut = ui.OverlayBottomRight(listOut, ui.RenderChordOverlay(prefix[0], hints), m.listWidth(), m.listHeight())
+			listOut = ui.OverlayBottomRight(listOut, ui.RenderChordOverlay(prefix[0], hints), m.listWidth(m.width), m.listHeight(m.height))
 		}
 	}
 
@@ -51,10 +50,10 @@ func (m Model) View() tea.View {
 	if m.split.IsSplit() {
 		detailContent := m.commitDetail.WithContainerFocus(m.split.IsDetailFocused()).View().Content
 		if m.split.EffectiveOrientation() == splitview.Vertical {
-			seam := ui.RenderSeamColumn(m.listHeight(), ui.SeamColor)
+			seam := ui.RenderSeamColumn(m.listHeight(m.height), ui.SeamColor)
 			out = lipgloss.JoinHorizontal(lipgloss.Top, listOut, seam, detailContent)
 		} else {
-			seam := ui.RenderSeamRow(m.listWidth(), ui.SeamColor)
+			seam := ui.RenderSeamRow(m.listWidth(m.width), ui.SeamColor)
 			out = lipgloss.JoinVertical(lipgloss.Left, listOut, seam, detailContent)
 		}
 	} else {
@@ -78,24 +77,6 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.commitInfo.render(m.width, m.height), m.width, m.height)
 	}
 	return ui.NewMainView(out)
-}
-
-func (m Model) logPaneTitleColor() color.Color {
-	if m.isLogPaneActive() {
-		return ui.ColorOrange
-	}
-	return ui.ColorBlue
-}
-
-func (m Model) logPaneBorderColor() color.Color {
-	if m.isLogPaneActive() {
-		return ui.ColorOrange
-	}
-	return ui.ColorBorder
-}
-
-func (m Model) isLogPaneActive() bool {
-	return m.split.IsSplit() && m.split.IsListFocused()
 }
 
 func (m Model) frameRightTitle() string {

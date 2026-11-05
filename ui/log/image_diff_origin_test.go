@@ -9,7 +9,7 @@ import (
 func TestDetailImageDiffOriginIncludesChromeRows(t *testing.T) {
 	t.Parallel()
 	m := setupSplitWithDetail(t)
-	m, _ = m.withSyncedDetailOrigin()
+	m.splitPane, _ = m.withSyncedDetailOrigin(false)
 
 	col, row, visible := m.split.DetailOrigin()
 	if !visible {

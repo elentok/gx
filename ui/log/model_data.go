@@ -188,11 +188,11 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 	var splitCmd tea.Cmd
 	m.split, splitCmd = m.split.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	// Sync both panel sizes now that the layout changed.
-	m = m.withSyncedListSize()
+	m.listPanel = m.withSyncedListSize(m.listPanel)
 	// Load the commit into the detail panel.
 	var refCmd tea.Cmd
 	m.commitDetail, refCmd = m.commitDetail.WithRef(ref)
 	m.commitDetail = m.commitDetail.WithPushState(pushstate.CommitPushState(selected.class, m.branchDiverged))
-	m = m.withSyncedDetailSize()
+	m.splitPane = m.withSyncedDetailSize()
 	return m, tea.Batch(splitCmd, refCmd)
 }

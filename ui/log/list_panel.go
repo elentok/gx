@@ -195,6 +195,16 @@ func (m listPanel) frameBorderColor() color.Color {
 	return ui.ColorBorder
 }
 
+// logPaneTitleColor is the title color the panel gets inside the given split.
+func (m listPanel) logPaneTitleColor(p splitPane) color.Color {
+	return m.WithContainerFocus(p.listActive()).frameTitleColor()
+}
+
+// logPaneBorderColor is the border color the panel gets inside the given split.
+func (m listPanel) logPaneBorderColor(p splitPane) color.Color {
+	return m.WithContainerFocus(p.listActive()).frameBorderColor()
+}
+
 func (m listPanel) visibleLines() []string {
 	if len(m.rows) == 0 {
 		return []string{ui.StyleMuted.Render("no commits")}

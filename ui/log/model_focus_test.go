@@ -20,7 +20,7 @@ func TestEnterOnCommitInCollapsedExpandsToSplit(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 
 	// Row 1 is the first real commit (row 0 is pseudo-line).
 	m.listPanel = m.listPanel.SetSelected(1)
@@ -46,7 +46,7 @@ func TestLOnCommitInCollapsedExpandsToSplit(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 	if !m.split.IsCollapsed() {
 		t.Fatal("expected Collapsed initially")
@@ -73,7 +73,7 @@ func TestLFromLogPanelFocusesOpenDetail(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -105,7 +105,7 @@ func TestEscFromDetailReturnsFocusToList(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	// Expand to split.
@@ -134,7 +134,7 @@ func TestQFromDetailReturnsFocusToList(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -165,7 +165,7 @@ func TestHFromDetailFileTreeReturnsFocusToList(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -199,7 +199,7 @@ func TestHFromDetailHeaderReturnsFocusToList(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -237,7 +237,7 @@ func TestEscFromDetailInternalFocusStepsBackWithoutMovingToList(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	// Open split view.
@@ -274,7 +274,7 @@ func TestQFromDetailInternalFocusStepsBackWithoutMovingToList(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -304,7 +304,7 @@ func TestEscFromListWhileSplitCollapses(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	// Expand to split.
@@ -329,7 +329,7 @@ func TestQFromListWhileSplitCollapses(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -349,15 +349,15 @@ func TestQFromListWhileSplitCollapses(t *testing.T) {
 
 func TestLogPaneFrameColorTracksSplitFocus(t *testing.T) {
 	m := newTestModel()
-	if m.logPaneBorderColor() != ui.ColorBorder {
+	if m.listPanel.logPaneBorderColor(m.splitPane) != ui.ColorBorder {
 		t.Fatal("expected collapsed log frame to use default border")
 	}
-	if m.logPaneTitleColor() != ui.ColorBlue {
+	if m.listPanel.logPaneTitleColor(m.splitPane) != ui.ColorBlue {
 		t.Fatal("expected collapsed log frame to use default title color")
 	}
 
 	m.split = splitview.NewSplit(m.listPanel, m.commitDetail)
-	if m.logPaneBorderColor() != ui.ColorOrange {
+	if m.listPanel.logPaneBorderColor(m.splitPane) != ui.ColorOrange {
 		t.Fatal("expected log frame orange while split list is focused")
 	}
 
@@ -365,12 +365,12 @@ func TestLogPaneFrameColorTracksSplitFocus(t *testing.T) {
 	if !m.split.IsDetailFocused() {
 		t.Fatal("expected detail focused")
 	}
-	if m.logPaneBorderColor() != ui.ColorBorder {
+	if m.listPanel.logPaneBorderColor(m.splitPane) != ui.ColorBorder {
 		t.Fatal("expected log frame inactive while detail is focused")
 	}
 
 	m.split, _ = m.split.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
-	if m.logPaneBorderColor() != ui.ColorOrange {
+	if m.listPanel.logPaneBorderColor(m.splitPane) != ui.ColorOrange {
 		t.Fatal("expected log frame orange after focus returns to list")
 	}
 }
@@ -379,7 +379,7 @@ func TestFKeyTogglesFullscreenList(t *testing.T) {
 	m := newTestModel()
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.WithRows([]row{
 		{kind: rowPseudoStatus},
 		{kind: rowCommit, commit: git.LogEntry{FullHash: "abc", Subject: "c1"}},
@@ -404,7 +404,7 @@ func TestFKeyOnDetailFocusedTogglesFullscreenDetail(t *testing.T) {
 	m := newTestModelDefault(repo, "", settings)
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.listPanel = m.listPanel.SetSelected(1)
 
 	// Expand to split (detail focused).
@@ -429,7 +429,7 @@ func TestToChordTogglesOrientation(t *testing.T) {
 	m := newTestModel()
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 
 	// Press "t" then "o" to toggle orientation.
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
@@ -447,7 +447,7 @@ func TestTKeyWithSearchFocusedAppendsToQueryNotChord(t *testing.T) {
 	m := newTestModel()
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 	m.search.Start("")
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
@@ -465,7 +465,7 @@ func TestTChordStillWorksWhenSearchNotFocused(t *testing.T) {
 	m := newTestModel()
 	m.width = 200
 	m.height = 40
-	m, _ = m.syncSplitSize()
+	m.splitPane, m.listPanel, _ = m.syncSplitSize(m.width, m.height, m.listPanel)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)

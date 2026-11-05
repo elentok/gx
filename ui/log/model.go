@@ -81,9 +81,8 @@ type Model struct {
 
 	rebase rebaseFlow
 
-	// Split view state.
-	split        splitview.Model
-	commitDetail commit.Model
+	// Split view state (embedded so m.split / m.commitDetail keep working).
+	splitPane
 
 	// Worktree status for the pseudo-log-line.
 	statusLoaded    bool
@@ -108,6 +107,7 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 	m.git = gitops.New()
 	m.listPanel = newListPanel()
 	m.commitDetail = commit.NewModel(worktreeRoot, "HEAD", "", settings, keys.Manager{})
+	// split must be built after commitDetail (it holds copies of both panels).
 	m.split = splitview.New(m.listPanel, m.commitDetail)
 	return m
 }
