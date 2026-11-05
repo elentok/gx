@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/list"
+	"github.com/elentok/gx/ui/pushstate"
 )
 
 const logFlashDuration = 2 * time.Second
@@ -254,7 +255,7 @@ func (m listPanel) renderRow(r row, selected bool, width int) []string {
 // (graph, push/pull state, subject) and an indented metadata line below it
 // (hash, date, author, decoration badges).
 func (m listPanel) renderCommitRow(r row) []string {
-	state := ui.CommitPushState(r.class, m.hints.branchDiverged)
+	state := pushstate.CommitPushState(r.class, m.hints.branchDiverged)
 	date := ui.RelativeTimeCompact(r.commit.Date)
 	cols := make([]ui.FixedColumn, 0, 2)
 	if m.hints.showGraph {

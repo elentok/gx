@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/pushstate"
 )
 
 var (
@@ -334,15 +335,15 @@ func (m Model) renderFacetLine(facets pr.Facets) string {
 }
 
 // markerPushState renders a marker as a PushState-style {Icon, Label, Style}
-// value, following ui/pushstate.go's convention for compact status icons.
-func markerPushState(icons ui.IconSet, marker pr.Marker) ui.PushState {
+// value, following ui/pushstate's convention for compact status icons.
+func markerPushState(icons ui.IconSet, marker pr.Marker) pushstate.PushState {
 	switch marker {
 	case pr.MarkerGreen:
-		return ui.PushState{Icon: icons.MarkerReady, Label: "ready to merge", Style: markerReadyStyle}
+		return pushstate.PushState{Icon: icons.MarkerReady, Label: "ready to merge", Style: markerReadyStyle}
 	case pr.MarkerRed:
-		return ui.PushState{Icon: icons.MarkerBlocked, Label: "blocked on you", Style: markerBlockedStyle}
+		return pushstate.PushState{Icon: icons.MarkerBlocked, Label: "blocked on you", Style: markerBlockedStyle}
 	default:
-		return ui.PushState{Icon: icons.MarkerWaiting, Label: "waiting on others", Style: markerWaitingStyle}
+		return pushstate.PushState{Icon: icons.MarkerWaiting, Label: "waiting on others", Style: markerWaitingStyle}
 	}
 }
 

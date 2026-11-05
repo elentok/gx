@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/pushstate"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -191,7 +192,7 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 	// Load the commit into the detail panel.
 	var refCmd tea.Cmd
 	m.commitDetail, refCmd = m.commitDetail.WithRef(ref)
-	m.commitDetail = m.commitDetail.WithPushState(ui.CommitPushState(selected.class, m.branchDiverged))
+	m.commitDetail = m.commitDetail.WithPushState(pushstate.CommitPushState(selected.class, m.branchDiverged))
 	m = m.withSyncedDetailSize()
 	return m, tea.Batch(splitCmd, refCmd)
 }

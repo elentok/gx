@@ -1,15 +1,16 @@
-package ui
+package pushstate
 
 import (
 	"charm.land/lipgloss/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 )
 
 var (
-	PushStatePushedStyle     = lipgloss.NewStyle().Foreground(ColorGreen)
-	PushStateUnpushedStyle   = lipgloss.NewStyle().Foreground(ColorOrange)
-	PushStateDivergedStyle   = lipgloss.NewStyle().Foreground(ColorRed)
-	PushStateRemoteOnlyStyle = lipgloss.NewStyle().Foreground(ColorMauve)
+	PushStatePushedStyle     = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	PushStateUnpushedStyle   = lipgloss.NewStyle().Foreground(ui.ColorOrange)
+	PushStateDivergedStyle   = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	PushStateRemoteOnlyStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 )
 
 // PushState describes a commit's push/pull relationship to its upstream: an

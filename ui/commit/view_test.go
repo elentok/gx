@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/pushstate"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -122,7 +123,7 @@ func TestHeaderLines_PushStateColorsSubjectAndAddsLabel(t *testing.T) {
 	m := Model{
 		details:   git.CommitDetails{Subject: "fix bug", AuthorName: "Dave"},
 		width:     80,
-		pushState: ui.CommitPushState(git.BranchHistoryLocalOnly, false),
+		pushState: pushstate.CommitPushState(git.BranchHistoryLocalOnly, false),
 	}
 	lines := m.headerLines()
 	stripped := ansi.Strip(lines[0])

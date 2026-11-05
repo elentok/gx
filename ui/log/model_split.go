@@ -3,19 +3,20 @@ package log
 import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/pushstate"
 
 	tea "charm.land/bubbletea/v2"
 )
 
 // selectedPushState computes the push/pull state of the currently selected
 // commit row, for display in the commit detail header.
-func (m Model) selectedPushState() ui.PushState {
+func (m Model) selectedPushState() pushstate.PushState {
 	rows := m.listPanel.Rows()
 	cursor := m.listPanel.Selected()
 	if cursor < 0 || cursor >= len(rows) || rows[cursor].kind != rowCommit {
-		return ui.PushState{}
+		return pushstate.PushState{}
 	}
-	return ui.CommitPushState(rows[cursor].class, m.branchDiverged)
+	return pushstate.CommitPushState(rows[cursor].class, m.branchDiverged)
 }
 
 // withSyncedDetailSize resizes commitDetail to match the current split layout.

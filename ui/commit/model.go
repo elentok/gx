@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/pushstate"
 	"github.com/elentok/gx/ui/refrules"
 	"github.com/elentok/gx/ui/tree"
 
@@ -37,7 +38,7 @@ type Model struct {
 	details      git.CommitDetails
 	trunk        string // empty while unresolved, so no badge is coloured as trunk
 	headerOffset int
-	pushState    ui.PushState
+	pushState    pushstate.PushState
 	err          error
 
 	// compiledRefRules/compiledHideRefs sort and filter decoration badges the
@@ -167,7 +168,7 @@ func (m Model) WithScreenOrigin(col, row int, visible bool) (Model, tea.Cmd) {
 // commit subject in the header. Callers that track branch history against an
 // upstream (the log/stash split containers) compute this per selection change,
 // since a single ref lookup can't classify a commit's push state in isolation.
-func (m Model) WithPushState(state ui.PushState) Model {
+func (m Model) WithPushState(state pushstate.PushState) Model {
 	m.pushState = state
 	return m
 }

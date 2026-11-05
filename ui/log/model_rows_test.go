@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/pushstate"
 )
 
 func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
@@ -50,25 +51,25 @@ func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
 }
 
 func TestRenderCommitRowUsesBranchHistoryColors(t *testing.T) {
-	local := ui.CommitPushState(git.BranchHistoryLocalOnly, false).Style.Render("local only")
+	local := pushstate.CommitPushState(git.BranchHistoryLocalOnly, false).Style.Render("local only")
 	if ansi.Strip(local) != "local only" || local == "local only" {
 		t.Fatalf("expected local-only subject to be colorized, got %q", local)
 	}
 
-	remote := ui.CommitPushState(git.BranchHistoryRemoteOnly, false).Style.Render("remote only")
+	remote := pushstate.CommitPushState(git.BranchHistoryRemoteOnly, false).Style.Render("remote only")
 	if ansi.Strip(remote) != "remote only" || remote == "remote only" {
 		t.Fatalf("expected remote-only subject to be colorized, got %q", remote)
 	}
 
-	shared := ui.CommitPushState(git.BranchHistoryShared, false).Style.Render("shared")
+	shared := pushstate.CommitPushState(git.BranchHistoryShared, false).Style.Render("shared")
 	if ansi.Strip(shared) != "shared" || shared == "shared" {
 		t.Fatalf("expected shared subject to be colorized, got %q", shared)
 	}
 }
 
 func TestRenderCommitRowUsesDivergedLocalColor(t *testing.T) {
-	normal := ui.CommitPushState(git.BranchHistoryLocalOnly, false).Style.Render("local only")
-	diverged := ui.CommitPushState(git.BranchHistoryLocalOnly, true).Style.Render("local only")
+	normal := pushstate.CommitPushState(git.BranchHistoryLocalOnly, false).Style.Render("local only")
+	diverged := pushstate.CommitPushState(git.BranchHistoryLocalOnly, true).Style.Render("local only")
 	if normal == diverged {
 		t.Fatalf("expected diverged local style to differ from normal local style")
 	}
