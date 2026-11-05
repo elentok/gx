@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -43,7 +43,7 @@ func newFinishFixture(t *testing.T) *finishFixture {
 // record appends a check record for the worktree's current tree.
 func (f *finishFixture) record(t *testing.T, exit int, kindFilter string, failed ...string) {
 	t.Helper()
-	tree, err := git.TreeID(f.wt)
+	tree, err := history.TreeID(f.wt)
 	if err != nil {
 		t.Fatal(err)
 	}

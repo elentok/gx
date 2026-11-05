@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -28,14 +29,14 @@ func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *t
 	}
 	f.H.Server.Rescan()
 	var inFlight, overlapped atomic.Int32
-	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (history.MergeOutcome, error) {
 		if inFlight.Add(1) > 1 {
 			overlapped.Add(1)
 		}
 		defer inFlight.Add(-1)
 		// Negative wait: hold the merge long enough for the other epic to try its own meanwhile.
 		time.Sleep(500 * time.Millisecond)
-		return git.MergeBranchInto(repo, wts, branch, target)
+		return history.MergeBranchInto(repo, wts, branch, target)
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -86,9 +87,9 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 			t.Error(err)
 		}
 	}, chat)
-	f.H.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (history.MergeOutcome, error) {
 		t.Error("merge core called for an already merged epic")
-		return git.MergeOutcome{}, errors.New("unexpected")
+		return history.MergeOutcome{}, errors.New("unexpected")
 	})
 	main := f.Git(t, "rev-parse", "main")
 
@@ -115,11 +116,11 @@ func TestTrunkLock_TrunkMovedBeforeTheFFPausesNeedsRebaseNotMergeFailed(t *testi
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
-	f.H.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (history.MergeOutcome, error) {
 		// Git's ff check passed, then trunk moved and the ff itself failed.
 		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.Repo, "main moves on")
-		return git.MergeOutcome{}, errors.New("cannot lock ref 'refs/heads/main'")
+		return history.MergeOutcome{}, errors.New("cannot lock ref 'refs/heads/main'")
 	})
 
 	ev := f.pauseRoot(t)

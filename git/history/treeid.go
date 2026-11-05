@@ -1,9 +1,10 @@
-package git
+package history
 
 import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/internal/run"
 )
 
@@ -17,8 +18,8 @@ func TreeID(dir string) (string, error) {
 		return "", err
 	}
 	defer os.RemoveAll(tmp)
-	env := append(NonInteractiveEnv(), "GIT_INDEX_FILE="+filepath.Join(tmp, "index"))
-	if _, err := RevParse(dir, "HEAD"); err == nil {
+	env := append(run.NonInteractiveEnv(), "GIT_INDEX_FILE="+filepath.Join(tmp, "index"))
+	if _, err := git.RevParse(dir, "HEAD"); err == nil {
 		if _, _, err := run.WithEnv(dir, env, []string{"read-tree", "HEAD"}); err != nil {
 			return "", err
 		}

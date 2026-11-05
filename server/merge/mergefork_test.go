@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -163,11 +164,11 @@ func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
 	// Trunk moves between each merge ticket's finish and its merge: moving it
 	// inside the agent's turn would fail the finish check instead.
 	var merges atomic.Int32
-	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (history.MergeOutcome, error) {
 		if n := merges.Add(1); n > 1 {
 			moveMain(t, f.Repo, fmt.Sprint("land-", n))
 		}
-		return git.MergeBranchInto(repo, wts, branch, target)
+		return history.MergeBranchInto(repo, wts, branch, target)
 	})
 
 	ev := f.pauseRoot(t)

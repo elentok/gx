@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/gocachegate"
 )
 
@@ -186,7 +187,7 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 
 	// Outside a git repo both stay empty.
 	branch, _ := git.CurrentBranch(dir)
-	treeID, _ := git.TreeID(dir)
+	treeID, _ := history.TreeID(dir)
 
 	hang := hangLimit(tool, o.Env)
 	run := func() ([]byte, int, error) {

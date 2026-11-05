@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
@@ -32,7 +33,7 @@ func (s *Reconciler) RemoveMergedWorktreeSettled(project, epic string) {
 }
 
 // SetMergeInto swaps the merge core a root merge calls. For tests.
-func (s *Merger) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error)) {
+func (s *Merger) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (history.MergeOutcome, error)) {
 	s.mergeInto = f
 }
 

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/brief"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 )
 
 // Exit codes of a run.
@@ -165,7 +165,7 @@ func Run(opts Options) (Result, error) {
 		}
 	}
 	// The tree after format ran is the one the other kinds check.
-	if r.treeID, err = git.TreeID(root); err != nil {
+	if r.treeID, err = history.TreeID(root); err != nil {
 		r.treeErr = err.Error()
 	}
 	for i, k := range ordered {

@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
@@ -46,7 +47,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		return nil
 	}
 	branch := ralphloop.IterationBranch(epic, string(ticket.ID))
-	wt := git.WorktreePathForBranch(branch, worktrees)
+	wt := history.WorktreePathForBranch(branch, worktrees)
 	if wt == "" {
 		return nil
 	}
@@ -59,7 +60,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		return nil
 	}
 
-	tree, err := git.TreeID(wt)
+	tree, err := history.TreeID(wt)
 	if err != nil {
 		return fmt.Errorf("%s: reading the tree of %s: %w", ticketLabel(path), wt, err)
 	}

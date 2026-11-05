@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
@@ -85,7 +86,7 @@ func PauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.WtPath = git.WorktreePathForBranch("ralph-loop/epic-a-item-01", wts); p.WtPath == "" {
+	if p.WtPath = history.WorktreePathForBranch("ralph-loop/epic-a-item-01", wts); p.WtPath == "" {
 		t.Fatalf("no iteration worktree in %+v", wts)
 	}
 	return p

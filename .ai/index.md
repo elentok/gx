@@ -200,6 +200,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 - `git/` — git operations
   - `git/internal/run` — runs git children (`Run`, `RunWith`, `RunRaw`, `RunError`) and the `Exec`/`AllowFail` helpers; `git` re-exports the public names
   - `git/stage` — staging, unstaging, patch apply, delta/commit diffs, `StagedFiles`; imports `git`, never the reverse
+  - `git/history` — fast-forward merge (`MergeBranchInto`, `MergeFastForward`) and `TreeID`; imports `git`, never the reverse
   - `git/pr` — GitHub pull requests via `gh` (list open/closed, comments, facets, PR URLs); imports `git`, never the reverse
 - `ui/...` — TUI (`ui/app` is the root model; one package per tab or component)
 - `e2e/` — end-to-end tests (slow, CI only)

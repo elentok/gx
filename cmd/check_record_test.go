@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -53,7 +54,7 @@ func TestCheck_RecordHasEveryField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tree, err := git.TreeID(repo)
+	tree, err := history.TreeID(repo)
 	if err != nil {
 		t.Fatal(err)
 	}

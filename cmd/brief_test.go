@@ -14,7 +14,7 @@ import (
 
 	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/testutil"
 )
@@ -175,7 +175,7 @@ func TestBrief_IndexInRepoCarriesBranchTreeAndCheckRun(t *testing.T) {
 	if err := json.Unmarshal([]byte(indexLines(t, data)[0]), &e); err != nil {
 		t.Fatal(err)
 	}
-	tree, err := git.TreeID(repo)
+	tree, err := history.TreeID(repo)
 	if err != nil {
 		t.Fatal(err)
 	}

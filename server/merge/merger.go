@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
@@ -40,7 +41,7 @@ type Merger struct {
 
 	mergeTargets mergeTargetCache
 	projectRepos projectRepoCache
-	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
+	mergeInto    func(git.Repo, []git.Worktree, string, string) (history.MergeOutcome, error) // swapped in tests
 }
 
 // NewMerger builds a Merger from d; New wires it to the other two.
@@ -49,7 +50,7 @@ func NewMerger(d Deps, rec *Reconciler, landing *Landing) *Merger {
 		host: d.Host, log: d.Log, cfg: d.Dirs, idx: d.Idx, projects: d.Projects, queue: d.Queue,
 		oneOffs: d.OneOffs, events: d.Events, writer: d.Writer, chat: d.Chat, registry: d.Registry,
 		guards: d.Guards, settings: d.Settings, rec: rec, landing: landing,
-		mergeInto: git.MergeBranchInto,
+		mergeInto: history.MergeBranchInto,
 	}
 }
 

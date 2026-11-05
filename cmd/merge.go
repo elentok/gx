@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -43,7 +44,7 @@ func runMerge(dirs config.Dirs, cwd, branchArg string, jsonOut bool, w io.Writer
 
 	branch := resolveMergeBranch(branchArg, worktrees)
 
-	outcome, err := git.MergeBranchInto(*repo, worktrees, branch, repo.Trunk)
+	outcome, err := history.MergeBranchInto(*repo, worktrees, branch, repo.Trunk)
 	if err != nil {
 		return err
 	}

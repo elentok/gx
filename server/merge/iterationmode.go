@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
@@ -94,7 +95,7 @@ func checkoutDirFor(repoDir, target string) (git.Repo, string, error) {
 	if err != nil {
 		return git.Repo{}, "", err
 	}
-	dir := git.CheckoutDirForBranch(info.Repo, worktrees, target)
+	dir := history.CheckoutDirForBranch(info.Repo, worktrees, target)
 	if dir == "" {
 		return git.Repo{}, "", fmt.Errorf("no checkout of %s", target)
 	}

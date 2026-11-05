@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -19,9 +20,9 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	h := servertest.StartOneOffsHarness(t, store)
 	start, _, _ := servertest.RegisterTurn(h)
 	merged := false
-	h.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
+	h.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (history.MergeOutcome, error) {
 		merged = true
-		return git.MergeOutcome{}, nil
+		return history.MergeOutcome{}, nil
 	})
 	epicMD := filepath.Join(store, "proj", queue.OneOffsEpic, "ticket.md")
 	before, err := os.ReadFile(epicMD)

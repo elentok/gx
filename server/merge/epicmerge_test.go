@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -421,11 +422,11 @@ func raceTrunk(t *testing.T, f *forkFixture) {
 	t.Helper()
 	gitOut(t, f.featureWorktree(t), "rebase", "-q", "main")
 	var merges atomic.Int32
-	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (history.MergeOutcome, error) {
 		if merges.Add(1) == 1 {
 			moveMain(t, f.Repo, "race")
 		}
-		return git.MergeBranchInto(repo, wts, branch, target)
+		return history.MergeBranchInto(repo, wts, branch, target)
 	})
 }
 
@@ -536,11 +537,11 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 	evs := completedUnmerged(ctx, t, f.schedFixture)
 	// Trunk moves once more before the manual ticket's merge, so a retry follows it.
 	var merges atomic.Int32
-	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (history.MergeOutcome, error) {
 		if merges.Add(1) == 1 {
 			moveMain(t, f.Repo, "manual-merge")
 		}
-		return git.MergeBranchInto(repo, wts, branch, target)
+		return history.MergeBranchInto(repo, wts, branch, target)
 	})
 
 	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)

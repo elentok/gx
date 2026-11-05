@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -54,7 +55,7 @@ func (s *Landing) landWithRestore(repoRoot, dir, epic, target, snapshot, merged 
 	if err := git.SetAside(dir, files); err != nil {
 		return ref, now, false, fmt.Errorf("set aside %s: %w (backup %s)", listFiles(files), err, ref)
 	}
-	ok, err := git.MergeFastForward(dir, epic)
+	ok, err := history.MergeFastForward(dir, epic)
 	if err != nil || !ok {
 		if rerr := git.RestoreFromTree(dir, snapshot, files); rerr != nil {
 			s.log.Warn(failLog, "epic", epic, "backup", ref, "err", rerr)

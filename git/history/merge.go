@@ -1,8 +1,10 @@
-package git
+package history
 
 import (
 	"errors"
 	"fmt"
+
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/internal/run"
 )
 
@@ -24,12 +26,12 @@ type MergeOutcome struct {
 // merge runs there so the working tree follows. Otherwise the ref is moved
 // directly: merging in the root would advance whatever branch it has checked
 // out instead.
-func MergeBranchInto(repo Repo, worktrees []Worktree, branch, target string) (MergeOutcome, error) {
+func MergeBranchInto(repo git.Repo, worktrees []git.Worktree, branch, target string) (MergeOutcome, error) {
 	if target == "" {
-		return MergeOutcome{}, ErrTrunkNotResolved
+		return MergeOutcome{}, git.ErrTrunkNotResolved
 	}
-	targetSHA, err := RevParse(repo.Root, "refs/heads/"+target)
-	if errors.Is(err, ErrRefNotFound) {
+	targetSHA, err := git.RevParse(repo.Root, "refs/heads/"+target)
+	if errors.Is(err, git.ErrRefNotFound) {
 		return MergeOutcome{}, fmt.Errorf("target branch %q does not exist", target)
 	}
 	if err != nil {
@@ -53,14 +55,14 @@ func MergeBranchInto(repo Repo, worktrees []Worktree, branch, target string) (Me
 
 // CheckoutDirForBranch returns the working tree that has branch checked out:
 // a linked worktree, else a non-bare root whose HEAD is branch, else "".
-func CheckoutDirForBranch(repo Repo, worktrees []Worktree, branch string) string {
+func CheckoutDirForBranch(repo git.Repo, worktrees []git.Worktree, branch string) string {
 	if dir := WorktreePathForBranch(branch, worktrees); dir != "" {
 		return dir
 	}
 	if repo.IsBare {
 		return ""
 	}
-	if head, err := CurrentBranch(repo.Root); err == nil && head == branch {
+	if head, err := git.CurrentBranch(repo.Root); err == nil && head == branch {
 		return repo.Root
 	}
 	return ""
@@ -71,11 +73,11 @@ func CheckoutDirForBranch(repo Repo, worktrees []Worktree, branch string) string
 // branch. Passing oldSHA to update-ref makes a concurrent move of target fail
 // instead of being overwritten.
 func fastForwardRef(dir, target, oldSHA, branch string) (ok bool, err error) {
-	ancestor, err := IsAncestor(dir, oldSHA, branch)
+	ancestor, err := git.IsAncestor(dir, oldSHA, branch)
 	if err != nil || !ancestor {
 		return false, err
 	}
-	newSHA, err := RevParse(dir, branch)
+	newSHA, err := git.RevParse(dir, branch)
 	if err != nil {
 		return false, err
 	}
@@ -87,7 +89,7 @@ func fastForwardRef(dir, target, oldSHA, branch string) (ok bool, err error) {
 
 // WorktreePathForBranch returns the path of the worktree checked out to
 // branch, or "" when there is none.
-func WorktreePathForBranch(branch string, worktrees []Worktree) string {
+func WorktreePathForBranch(branch string, worktrees []git.Worktree) string {
 	for _, wt := range worktrees {
 		if wt.Branch == branch {
 			return wt.Path
@@ -103,7 +105,7 @@ func WorktreePathForBranch(branch string, worktrees []Worktree) string {
 // than by matching merge stderr, since git localizes that text under
 // non-English LC_ALL/LANG. Any other failure is returned as err.
 func MergeFastForward(dir, branch string) (ok bool, err error) {
-	ancestor, err := IsAncestor(dir, "HEAD", branch)
+	ancestor, err := git.IsAncestor(dir, "HEAD", branch)
 	if err != nil {
 		return false, err
 	}

@@ -1,12 +1,22 @@
-package git_test
+package history_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 )
+
+func TestMergeBranchInto_RefusesEmptyTarget(t *testing.T) {
+	t.Parallel()
+	repo := git.Repo{Root: testutil.TempRepo(t)}
+	if _, err := history.MergeBranchInto(repo, nil, "main", ""); !errors.Is(err, git.ErrTrunkNotResolved) {
+		t.Errorf("err = %v, want %v", err, git.ErrTrunkNotResolved)
+	}
+}
 
 func TestMergeFastForward_Clean(t *testing.T) {
 	t.Parallel()
@@ -17,7 +27,7 @@ func TestMergeFastForward_Clean(t *testing.T) {
 	testutil.CommitAll(t, dir, "add feature.txt")
 	testutil.MustGitExported(t, dir, "checkout", "main")
 
-	ok, err := git.MergeFastForward(dir, "feature")
+	ok, err := history.MergeFastForward(dir, "feature")
 	if err != nil {
 		t.Fatalf("MergeFastForward: %v", err)
 	}
@@ -37,7 +47,7 @@ func TestMergeFastForward_Diverged(t *testing.T) {
 	testutil.WriteFile(t, dir, "main-only.txt", "diverge\n")
 	testutil.CommitAll(t, dir, "add main-only.txt")
 
-	ok, err := git.MergeFastForward(dir, "feature")
+	ok, err := history.MergeFastForward(dir, "feature")
 	if err != nil {
 		t.Fatalf("MergeFastForward: %v", err)
 	}
@@ -63,7 +73,7 @@ func TestMergeFastForward_DivergedNonEnglishLocale(t *testing.T) {
 	t.Setenv("LC_ALL", "de_DE.UTF-8")
 	t.Setenv("LANG", "de_DE.UTF-8")
 
-	ok, err := git.MergeFastForward(dir, "feature")
+	ok, err := history.MergeFastForward(dir, "feature")
 	if err != nil {
 		t.Fatalf("MergeFastForward: %v", err)
 	}
@@ -97,7 +107,7 @@ func TestMergeBranchInto_MissingTargetRefused(t *testing.T) {
 	featureAhead(t, dir, "main")
 	mainBefore := mustRevParse(t, dir, "main")
 
-	_, err := git.MergeBranchInto(git.Repo{Root: dir}, nil, "feature", "develop")
+	_, err := history.MergeBranchInto(git.Repo{Root: dir}, nil, "feature", "develop")
 	if err == nil || !strings.Contains(err.Error(), `"develop" does not exist`) {
 		t.Fatalf("MergeBranchInto() err = %v, want a missing-target error", err)
 	}
@@ -113,7 +123,7 @@ func TestMergeBranchInto_TargetCheckedOutInWorktree(t *testing.T) {
 	worktrees := []git.Worktree{{Path: repoDir, Branch: "main"}, {Path: wtDir, Branch: "develop"}}
 	mainBefore := mustRevParse(t, repoDir, "main")
 
-	out, err := git.MergeBranchInto(git.Repo{Root: repoDir}, worktrees, "feature", "develop")
+	out, err := history.MergeBranchInto(git.Repo{Root: repoDir}, worktrees, "feature", "develop")
 	if err != nil || !out.Merged {
 		t.Fatalf("MergeBranchInto() = %+v, %v; want merged", out, err)
 	}
@@ -130,7 +140,7 @@ func TestMergeBranchInto_TargetIsRootHead(t *testing.T) {
 	dir := testutil.TempRepo(t)
 	featureAhead(t, dir, "main")
 
-	out, err := git.MergeBranchInto(git.Repo{Root: dir}, nil, "feature", "main")
+	out, err := history.MergeBranchInto(git.Repo{Root: dir}, nil, "feature", "main")
 	if err != nil || !out.Merged {
 		t.Fatalf("MergeBranchInto() = %+v, %v; want merged", out, err)
 	}
@@ -147,7 +157,7 @@ func TestMergeBranchInto_TargetNotCheckedOutAdvancesRefOnly(t *testing.T) {
 	featureAhead(t, dir, "main")
 	mainBefore := mustRevParse(t, dir, "main")
 
-	out, err := git.MergeBranchInto(git.Repo{Root: dir}, nil, "feature", "develop")
+	out, err := history.MergeBranchInto(git.Repo{Root: dir}, nil, "feature", "develop")
 	if err != nil || !out.Merged {
 		t.Fatalf("MergeBranchInto() = %+v, %v; want merged", out, err)
 	}
@@ -172,7 +182,7 @@ func TestMergeBranchInto_DivergedTargetNeedsRebase(t *testing.T) {
 	testutil.MustGitExported(t, dir, "checkout", "main")
 	developBefore := mustRevParse(t, dir, "develop")
 
-	out, err := git.MergeBranchInto(git.Repo{Root: dir}, nil, "feature", "develop")
+	out, err := history.MergeBranchInto(git.Repo{Root: dir}, nil, "feature", "develop")
 	if err != nil {
 		t.Fatalf("MergeBranchInto: %v", err)
 	}
@@ -197,7 +207,7 @@ func TestMergeFastForward_HardFailure(t *testing.T) {
 	testutil.MustGitExported(t, dir, "checkout", "main")
 	testutil.WriteFile(t, dir, "conflict.txt", "untracked local content\n")
 
-	ok, err := git.MergeFastForward(dir, "feature")
+	ok, err := history.MergeFastForward(dir, "feature")
 	if ok {
 		t.Error("MergeFastForward() ok = true, want false for a real failure")
 	}
