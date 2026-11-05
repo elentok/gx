@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"encoding/json"
@@ -15,11 +15,7 @@ import (
 func TestRunClaudeStatusline_ValidInput(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":1234,"used_percentage":51.2},"rate_limits":{"five_hour":{"used_percentage":11.4},"seven_day":{"used_percentage":72.8}},"model":{"display_name":"Claude Sonnet"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"context_window":{"total_input_tokens":1234,"used_percentage":51.2},"rate_limits":{"five_hour":{"used_percentage":11.4},"seven_day":{"used_percentage":72.8}},"model":{"display_name":"Claude Sonnet"}}`)
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -50,14 +46,10 @@ func TestRunClaudeStatusline_RateLimitResets(t *testing.T) {
 	weekReset := time.Now().AddDate(0, 0, 3)
 
 	out := &strings.Builder{}
-	d := deps{
-		stdin: strings.NewReader(fmt.Sprintf(
-			`{"context_window":{"total_input_tokens":1234,"used_percentage":51.2},"rate_limits":{"five_hour":{"used_percentage":11.4,"resets_at":%d},"seven_day":{"used_percentage":72.8,"resets_at":%d}},"model":{"display_name":"Claude Sonnet"}}`,
-			fiveHourReset.Unix(), weekReset.Unix(),
-		)),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, fmt.Sprintf(
+		`{"context_window":{"total_input_tokens":1234,"used_percentage":51.2},"rate_limits":{"five_hour":{"used_percentage":11.4,"resets_at":%d},"seven_day":{"used_percentage":72.8,"resets_at":%d}},"model":{"display_name":"Claude Sonnet"}}`,
+		fiveHourReset.Unix(), weekReset.Unix(),
+	))
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -77,11 +69,7 @@ func TestRunClaudeStatusline_RateLimitResets(t *testing.T) {
 func TestRunClaudeStatusline_MissingResetsAtDegradesSilently(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"rate_limits":{"five_hour":{"used_percentage":11},"seven_day":{"used_percentage":72}},"model":{"display_name":"Claude"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"rate_limits":{"five_hour":{"used_percentage":11},"seven_day":{"used_percentage":72}},"model":{"display_name":"Claude"}}`)
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -100,11 +88,7 @@ func TestRunClaudeStatusline_MissingResetsAtDegradesSilently(t *testing.T) {
 
 func TestRunClaudeStatusline_RemoteControlActive(t *testing.T) {
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"},"remote":{"session_id":"abc123"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"model":{"display_name":"Claude"},"remote":{"session_id":"abc123"}}`)
 
 	if err := runClaudeStatusline(d, true, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -116,11 +100,7 @@ func TestRunClaudeStatusline_RemoteControlActive(t *testing.T) {
 
 func TestRunClaudeStatusline_RemoteControlInactive(t *testing.T) {
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"model":{"display_name":"Claude"}}`)
 
 	if err := runClaudeStatusline(d, true, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -133,11 +113,7 @@ func TestRunClaudeStatusline_RemoteControlInactive(t *testing.T) {
 func TestRunClaudeStatusline_TokensBelowThreshold(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":999,"used_percentage":1},"rate_limits":{"five_hour":{"used_percentage":2},"seven_day":{"used_percentage":3}},"model":{"display_name":"Claude"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"context_window":{"total_input_tokens":999,"used_percentage":1},"rate_limits":{"five_hour":{"used_percentage":2},"seven_day":{"used_percentage":3}},"model":{"display_name":"Claude"}}`)
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -150,11 +126,7 @@ func TestRunClaudeStatusline_TokensBelowThreshold(t *testing.T) {
 func TestRunClaudeStatusline_InvalidFields(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"NaN?","used_percentage":"oops"},"rate_limits":{"five_hour":{},"seven_day":{"used_percentage":88}},"model":{"display_name":9}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"context_window":{"total_input_tokens":"NaN?","used_percentage":"oops"},"rate_limits":{"five_hour":{},"seven_day":{"used_percentage":88}},"model":{"display_name":9}}`)
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -179,11 +151,7 @@ func TestRunClaudeStatusline_InvalidFields(t *testing.T) {
 func TestRunClaudeStatusline_RejectsNonFiniteNumbers(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"NaN","used_percentage":"Infinity"},"rate_limits":{"five_hour":{"used_percentage":10},"seven_day":{"used_percentage":20}},"model":{"display_name":"Claude"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"context_window":{"total_input_tokens":"NaN","used_percentage":"Infinity"},"rate_limits":{"five_hour":{"used_percentage":10},"seven_day":{"used_percentage":20}},"model":{"display_name":"Claude"}}`)
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -203,11 +171,7 @@ func TestRunClaudeStatusline_RejectsNonFiniteNumbers(t *testing.T) {
 func TestRunClaudeStatusline_SilentSkipsInvalid(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"bad"},"rate_limits":{"five_hour":{"used_percentage":10}},"model":{"display_name":"Claude"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"context_window":{"total_input_tokens":"bad"},"rate_limits":{"five_hour":{"used_percentage":10}},"model":{"display_name":"Claude"}}`)
 
 	if err := runClaudeStatusline(d, true, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -227,11 +191,7 @@ func TestRunClaudeStatusline_SilentSkipsInvalid(t *testing.T) {
 func TestRunClaudeStatusline_MalformedJSON(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"model":`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"model":`)
 
 	if err := runClaudeStatusline(d, false, false); err == nil {
 		t.Fatal("expected error")
@@ -244,11 +204,7 @@ func TestRunClaudeStatusline_MalformedJSON(t *testing.T) {
 func TestRunClaudeStatusline_Demo(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"model":"ignored"}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"model":"ignored"}`)
 
 	if err := runClaudeStatusline(d, false, true); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -341,7 +297,7 @@ func TestContextProgressValue_FullOnlyAtHundred(t *testing.T) {
 func TestCurrentWorktreeSegment_PresentWhenBranchMatchesWorktree(t *testing.T) {
 	t.Parallel()
 	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature-a")
-	d := deps{getwd: func() (string, error) { return filepath.Join(outer, "feature-a"), nil }}
+	d := getwdDeps(filepath.Join(outer, "feature-a"))
 
 	got := currentWorktreeSegment(d)
 	if !strings.Contains(got, "feature-a") {
@@ -358,7 +314,7 @@ func TestCurrentWorktreeSegment_PresentWithBranchWhenDiffers(t *testing.T) {
 	wtDir := filepath.Join(outer, "feature-b")
 	testutil.MustGitExported(t, wtDir, "checkout", "-b", "other-branch")
 
-	d := deps{getwd: func() (string, error) { return wtDir, nil }}
+	d := getwdDeps(wtDir)
 
 	got := currentWorktreeSegment(d)
 	if !strings.Contains(got, "feature-b") || !strings.Contains(got, "other-branch") {
@@ -371,7 +327,7 @@ func TestCurrentWorktreeSegment_PresentWithBranchWhenDiffers(t *testing.T) {
 
 func TestCurrentWorktreeSegment_OmittedOutsideGit(t *testing.T) {
 	t.Parallel()
-	d := deps{getwd: func() (string, error) { return t.TempDir(), nil }}
+	d := getwdDeps(t.TempDir())
 
 	if got := currentWorktreeSegment(d); got != "" {
 		t.Fatalf("expected empty segment outside a git worktree, got %q", got)
@@ -382,7 +338,7 @@ func TestCurrentWorktreeSegment_TruncatesLongNames(t *testing.T) {
 	t.Parallel()
 	longName := "a-worktree-name-that-is-far-too-long-to-fit"
 	outer := testutil.TempDotBareRepoWithWorktrees(t, longName)
-	d := deps{getwd: func() (string, error) { return filepath.Join(outer, longName), nil }}
+	d := getwdDeps(filepath.Join(outer, longName))
 
 	got := currentWorktreeSegment(d)
 	if !strings.Contains(got, "…") {
@@ -431,11 +387,7 @@ func TestVimModeSegment(t *testing.T) {
 func TestRunClaudeStatusline_IncludesVimModeSegment(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"},"vim":{"mode":"INSERT"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"model":{"display_name":"Claude"},"vim":{"mode":"INSERT"}}`)
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -448,11 +400,7 @@ func TestRunClaudeStatusline_IncludesVimModeSegment(t *testing.T) {
 func TestRunClaudeStatusline_OmitsVimModeSegmentWhenAbsent(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := payloadDeps(t, out, `{"model":{"display_name":"Claude"}}`)
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
@@ -466,11 +414,8 @@ func TestRunClaudeStatusline_IncludesWorktreeSegment(t *testing.T) {
 	t.Parallel()
 	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature-c")
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"}}`),
-		stdout: out,
-		getwd:  func() (string, error) { return filepath.Join(outer, "feature-c"), nil },
-	}
+	d := payloadDeps(t, out, `{"model":{"display_name":"Claude"}}`)
+	d.Getwd = func() (string, error) { return filepath.Join(outer, "feature-c"), nil }
 
 	if err := runClaudeStatusline(d, false, false); err != nil {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)

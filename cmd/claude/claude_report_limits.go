@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func reportLimits(ctx context.Context, dial func() (*apiclient.Client, error), p
 	return res, true, nil
 }
 
-func newClaudeReportLimitsCmd(d deps) *cobra.Command {
+func newClaudeReportLimitsCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "report-limits",
@@ -62,7 +62,7 @@ func newClaudeReportLimitsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runReportLimits(d.dial(), c, payload, jsonOut)
+			return runReportLimits(d.Dial(), c, payload, jsonOut)
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")

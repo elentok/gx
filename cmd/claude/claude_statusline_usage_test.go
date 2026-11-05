@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -19,11 +20,11 @@ const usagePayload = `{"model":{"display_name":"Claude"},"rate_limits":{"five_ho
 func runStatuslineCmd(t *testing.T, payload string, args ...string) (string, error) {
 	t.Helper()
 	out := &strings.Builder{}
-	d := deps{
-		stdin:  strings.NewReader(payload),
-		stdout: out,
-		getwd:  func() (string, error) { return "/nonexistent", nil },
-	}
+	d := Deps{Env: cmdbase.Env{
+		Stdin:  strings.NewReader(payload),
+		Stdout: out,
+		Getwd:  func() (string, error) { return "/nonexistent", nil },
+	}}
 	cmd := newClaudeStatuslineCmd(d)
 	cmd.SetArgs(args)
 	cmd.SilenceUsage, cmd.SilenceErrors = true, true

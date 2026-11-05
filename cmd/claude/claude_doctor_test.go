@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/claudedoctor"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner"
 )
@@ -33,7 +34,8 @@ func TestRunClaudeDoctor_DefaultRunnerFollowsConfig(t *testing.T) {
 	}
 	for _, tc := range cases {
 		out := &strings.Builder{}
-		d := deps{stdout: out, stderr: &strings.Builder{}, loadConfig: configWithAgentRunner(tc.agentRunner)}
+		d := testDeps(out, &strings.Builder{})
+		d.LoadConfig = configWithAgentRunner(tc.agentRunner)
 		if err := runClaudeDoctor(d, claudeDoctorOptions{table: table}, fixtureDoctorSource(t), ""); err != nil {
 			t.Fatalf("agent-runner %s: %v", tc.agentRunner, err)
 		}
@@ -51,7 +53,8 @@ func TestRunClaudeDoctor_DefaultRunnerFollowsConfig(t *testing.T) {
 func TestRunClaudeDoctor_ExplicitRunnerHasNoRunnerHeader(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{stdout: out, stderr: &strings.Builder{}, loadConfig: configWithAgentRunner("pty")}
+	d := testDeps(out, &strings.Builder{})
+	d.LoadConfig = configWithAgentRunner("pty")
 	if err := runClaudeDoctor(d, claudeDoctorOptions{runner: "headless", table: claudedoctor.Table[:1]}, fixtureDoctorSource(t), ""); err != nil {
 		t.Fatalf("runClaudeDoctor: %v", err)
 	}
@@ -63,7 +66,8 @@ func TestRunClaudeDoctor_ExplicitRunnerHasNoRunnerHeader(t *testing.T) {
 func TestRunClaudeDoctor_DefaultedRunnerJSONIsUnchanged(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{stdout: out, stderr: &strings.Builder{}, loadConfig: configWithAgentRunner("pty")}
+	d := testDeps(out, &strings.Builder{})
+	d.LoadConfig = configWithAgentRunner("pty")
 	opts := claudeDoctorOptions{json: true, table: claudedoctor.Table[:1]}
 	if err := runClaudeDoctor(d, opts, fixtureDoctorSource(t), ""); err != nil {
 		t.Fatalf("runClaudeDoctor: %v", err)
@@ -85,7 +89,7 @@ func fixtureDoctorSource(t *testing.T) claudedoctor.Source {
 func TestRunClaudeDoctor_PrintsHeaderAndResultLines(t *testing.T) {
 	t.Parallel()
 	out, errOut := &strings.Builder{}, &strings.Builder{}
-	d := deps{stdout: out, stderr: errOut}
+	d := testDeps(out, errOut)
 
 	err := runClaudeDoctor(d, claudeDoctorOptions{runner: "headless"}, fixtureDoctorSource(t), "")
 	if err != nil {
@@ -107,11 +111,11 @@ func TestRunClaudeDoctor_PrintsHeaderAndResultLines(t *testing.T) {
 func TestRunClaudeDoctor_FailExitsOne(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{stdout: out, stderr: &strings.Builder{}}
+	d := testDeps(out, &strings.Builder{})
 	src := claudedoctor.Source{Live: true, ClaudeVersion: "1.0.0"}
 
 	err := runClaudeDoctor(d, claudeDoctorOptions{runner: "headless"}, src, "")
-	var exitErr *ExitError
+	var exitErr *cmdbase.ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 1 {
 		t.Fatalf("err = %v, want ExitError{1}", err)
 	}
@@ -123,7 +127,7 @@ func TestRunClaudeDoctor_FailExitsOne(t *testing.T) {
 func TestRunClaudeDoctor_JSON(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{stdout: out, stderr: &strings.Builder{}}
+	d := testDeps(out, &strings.Builder{})
 
 	opts := claudeDoctorOptions{runner: "headless", json: true, table: claudedoctor.Table[:1]}
 	if err := runClaudeDoctor(d, opts, fixtureDoctorSource(t), ""); err != nil {
@@ -147,7 +151,7 @@ func TestRunClaudeDoctor_JSON(t *testing.T) {
 func TestRunClaudeDoctor_JSONIsEmptyArrayForRunnerWithoutChecks(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{stdout: out, stderr: &strings.Builder{}}
+	d := testDeps(out, &strings.Builder{})
 
 	opts := claudeDoctorOptions{runner: "pty", json: true, table: claudedoctor.Table[:1]}
 	if err := runClaudeDoctor(d, opts, fixtureDoctorSource(t), ""); err != nil {
@@ -161,7 +165,7 @@ func TestRunClaudeDoctor_JSONIsEmptyArrayForRunnerWithoutChecks(t *testing.T) {
 func TestRunClaudeDoctor_WarnsWhenLiveClaudeIsNewerThanFixtures(t *testing.T) {
 	t.Parallel()
 	errOut := &strings.Builder{}
-	d := deps{stdout: &strings.Builder{}, stderr: errOut}
+	d := testDeps(&strings.Builder{}, errOut)
 	src := claudedoctor.Source{Live: true, ClaudeVersion: "2.1.400"}
 
 	opts := claudeDoctorOptions{runner: "headless", table: claudedoctor.Table[:1]}
@@ -175,7 +179,7 @@ func TestRunClaudeDoctor_WarnsWhenLiveClaudeIsNewerThanFixtures(t *testing.T) {
 
 func TestRunClaudeDoctor_RejectsUnknownRunner(t *testing.T) {
 	t.Parallel()
-	d := deps{stdout: &strings.Builder{}, stderr: &strings.Builder{}}
+	d := testDeps(&strings.Builder{}, &strings.Builder{})
 	for _, runner := range []string{"herdr", "auto", "bogus"} {
 		if err := runClaudeDoctor(d, claudeDoctorOptions{runner: runner}, claudedoctor.Source{}, ""); err == nil {
 			t.Errorf("--runner %s: expected an error", runner)

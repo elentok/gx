@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"bufio"
@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-func newClaudeSessionPathCmd(d deps) *cobra.Command {
+func newClaudeSessionPathCmd(d Deps) *cobra.Command {
 	var grepPattern string
 
 	cmd := &cobra.Command{
@@ -35,8 +35,8 @@ stdout in that case.`,
 // directory (the caller usually doesn't know the slugified cwd Path/PathIn
 // need) and either prints its path or, with grepPattern set, filters its
 // lines.
-func runClaudeSessionPath(d deps, sessionID, grepPattern string) error {
-	home, err := d.userHomeDir()
+func runClaudeSessionPath(d Deps, sessionID, grepPattern string) error {
+	home, err := d.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("resolve home directory: %w", err)
 	}
@@ -50,14 +50,14 @@ func runClaudeSessionPath(d deps, sessionID, grepPattern string) error {
 	}
 	if len(matches) > 1 {
 		for _, m := range matches {
-			fmt.Fprintln(d.stderr, m)
+			fmt.Fprintln(d.Stderr, m)
 		}
 		return fmt.Errorf("session %s matched %d transcripts, expected exactly one", sessionID, len(matches))
 	}
 
 	path := matches[0]
 	if grepPattern == "" {
-		fmt.Fprintln(d.stdout, path)
+		fmt.Fprintln(d.Stdout, path)
 		return nil
 	}
 
@@ -66,7 +66,7 @@ func runClaudeSessionPath(d deps, sessionID, grepPattern string) error {
 		return err
 	}
 	for _, line := range lines {
-		fmt.Fprintln(d.stdout, line)
+		fmt.Fprintln(d.Stdout, line)
 	}
 	return nil
 }

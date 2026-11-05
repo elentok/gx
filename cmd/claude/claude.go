@@ -1,4 +1,6 @@
-package cmd
+// Package claude is `gx claude` (statusline, history, session-path, doctor,
+// report-limits).
+package claude
 
 import (
 	"bytes"
@@ -8,10 +10,19 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ui/history"
 )
 
-func newClaudeCmd(d deps) *cobra.Command {
+// Deps is the runtime context of `gx claude`.
+type Deps struct {
+	cmdbase.Env
+	// UserHomeDir resolves the home directory that holds ~/.claude.
+	UserHomeDir func() (string, error)
+}
+
+// New returns `gx claude`.
+func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "claude",
 		Short: "Claude Code integration (statusline, history, doctor)",
@@ -24,13 +35,13 @@ func newClaudeCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func newClaudeHistoryCmd(d deps) *cobra.Command {
+func newClaudeHistoryCmd(d Deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "history",
 		Short: "browse Claude Code session history across all projects",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			home, err := d.dirs().Home()
+			home, err := d.Dirs().Home()
 			if err != nil {
 				return err
 			}
@@ -45,13 +56,13 @@ const statuslineReportTimeout = 500 * time.Millisecond
 
 // reportStatuslineLimits is best effort: the hook never starts the server and
 // never retries, so every error is dropped.
-func reportStatuslineLimits(d deps, payload []byte) {
+func reportStatuslineLimits(d Deps, payload []byte) {
 	ctx, cancel := context.WithTimeout(context.Background(), statuslineReportTimeout)
 	defer cancel()
-	_, _, _ = reportLimits(ctx, d.dial(), payload)
+	_, _, _ = reportLimits(ctx, d.Dial(), payload)
 }
 
-func newClaudeStatuslineCmd(d deps) *cobra.Command {
+func newClaudeStatuslineCmd(d Deps) *cobra.Command {
 	var silent, demo, install bool
 	var agentDir string
 
@@ -67,7 +78,7 @@ func newClaudeStatuslineCmd(d deps) *cobra.Command {
 				return runClaudeStatusline(d, silent, demo)
 			}
 			var payload bytes.Buffer
-			d.stdin = io.TeeReader(d.stdin, &payload)
+			d.Stdin = io.TeeReader(d.Stdin, &payload)
 			err := runClaudeStatusline(d, silent, demo)
 			// Neither a failed record write nor a failed report changes the
 			// line or the exit code.

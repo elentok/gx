@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"encoding/json"

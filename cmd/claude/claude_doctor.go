@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/claudedoctor"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/nativerunner"
 )
 
@@ -26,7 +27,7 @@ type claudeDoctorOptions struct {
 	table []claudedoctor.Check
 }
 
-func newClaudeDoctorCmd(d deps) *cobra.Command {
+func newClaudeDoctorCmd(d Deps) *cobra.Command {
 	var opts claudeDoctorOptions
 
 	cmd := &cobra.Command{
@@ -153,10 +154,10 @@ func defaultDoctorRunner(agentRunner string) (runner, header string) {
 	}
 }
 
-func runClaudeDoctor(d deps, opts claudeDoctorOptions, src claudedoctor.Source, fixtureVersion string) error {
+func runClaudeDoctor(d Deps, opts claudeDoctorOptions, src claudedoctor.Source, fixtureVersion string) error {
 	var runnerHeader string
 	if opts.runner == "" {
-		cfg, err := d.loadConfig()
+		cfg, err := d.LoadConfig()
 		if err != nil {
 			return err
 		}
@@ -166,7 +167,7 @@ func runClaudeDoctor(d deps, opts claudeDoctorOptions, src claudedoctor.Source, 
 		return fmt.Errorf("unknown --runner %q (want headless or pty)", opts.runner)
 	}
 	if src.Live && claudedoctor.NewerThanFixtures(src.ClaudeVersion, fixtureVersion) {
-		fmt.Fprintf(d.stderr, "warning: claude %s is newer than the test fixtures (%s); refresh them with --record\n", src.ClaudeVersion, fixtureVersion)
+		fmt.Fprintf(d.Stderr, "warning: claude %s is newer than the test fixtures (%s); refresh them with --record\n", src.ClaudeVersion, fixtureVersion)
 	}
 
 	table := opts.table
@@ -183,24 +184,24 @@ func runClaudeDoctor(d deps, opts claudeDoctorOptions, src claudedoctor.Source, 
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(d.stdout, string(data))
+		fmt.Fprintln(d.Stdout, string(data))
 	} else {
 		if runnerHeader != "" {
-			fmt.Fprintln(d.stdout, runnerHeader)
+			fmt.Fprintln(d.Stdout, runnerHeader)
 		}
 		version := src.ClaudeVersion
 		if version == "" {
 			version = "unknown"
 		}
-		fmt.Fprintf(d.stdout, "claude %s (MinClaudeVersion %s)\n", version, nativerunner.MinClaudeVersion)
+		fmt.Fprintf(d.Stdout, "claude %s (MinClaudeVersion %s)\n", version, nativerunner.MinClaudeVersion)
 		for _, r := range results {
-			fmt.Fprintf(d.stdout, "%s %s - %s\n", r.Status, r.Name, r.Detail)
+			fmt.Fprintf(d.Stdout, "%s %s - %s\n", r.Status, r.Name, r.Detail)
 		}
 	}
 
 	for _, r := range results {
 		if r.Status == claudedoctor.Fail {
-			return &ExitError{Code: 1}
+			return &cmdbase.ExitError{Code: 1}
 		}
 	}
 	return nil

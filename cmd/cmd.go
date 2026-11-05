@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/cmd/brief"
 	"github.com/elentok/gx/cmd/check"
+	claudecmd "github.com/elentok/gx/cmd/claude"
 	"github.com/elentok/gx/cmd/cmdbase"
 	codexcmd "github.com/elentok/gx/cmd/codex"
 	configcmd "github.com/elentok/gx/cmd/config"
@@ -111,6 +112,12 @@ func (d deps) configDeps() configcmd.Deps {
 	s := d.config
 	s.Env = d.base()
 	return s
+}
+
+// claudeDeps is the `gx claude` hook joined with the shared env. userHomeDir
+// stays in root deps because `gx evolve` also reads it.
+func (d deps) claudeDeps() claudecmd.Deps {
+	return claudecmd.Deps{Env: d.base(), UserHomeDir: d.userHomeDir}
 }
 
 // codexDeps is the `gx codex` hook joined with the shared env.
@@ -230,7 +237,7 @@ Run without a command to open the status UI.`,
 		newAgentCmd(d),
 		newAgentsCmd(d),
 		newDesignsCmd(d),
-		newClaudeCmd(d),
+		claudecmd.New(d.claudeDeps()),
 		codexcmd.New(d.codexDeps()),
 		newWorktreesCmd(d),
 		newPushCmd(d),

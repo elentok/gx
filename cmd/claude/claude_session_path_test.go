@@ -1,36 +1,28 @@
-package cmd
+package claude
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
-func writeSessionFixture(t *testing.T, home, projectSlug, sessionID string, lines []string) string {
-	t.Helper()
-	dir := filepath.Join(home, ".claude", "projects", projectSlug)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	path := filepath.Join(dir, sessionID+".jsonl")
-	content := strings.Join(lines, "\n")
-	if len(lines) > 0 {
-		content += "\n"
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write fixture: %v", err)
-	}
-	return path
+// homeDeps is a Deps whose home directory is home.
+func homeDeps(stdout, stderr *strings.Builder, home string) Deps {
+	d := testDeps(stdout, stderr)
+	d.UserHomeDir = func() (string, error) { return home, nil }
+	return d
 }
 
 func TestRunClaudeSessionPath_PrintsMatchingPath(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
-	path := writeSessionFixture(t, home, "-Users-david-dev-proj", "abc123", []string{`{"type":"user"}`})
+	path := cmdtest.WriteSessionFixture(t, home, "-Users-david-dev-proj", "abc123", []string{`{"type":"user"}`})
 
 	out := &strings.Builder{}
-	d := deps{stdout: out, userHomeDir: func() (string, error) { return home, nil }}
+	d := homeDeps(out, nil, home)
 
 	if err := runClaudeSessionPath(d, "abc123", ""); err != nil {
 		t.Fatalf("runClaudeSessionPath: %v", err)
@@ -44,7 +36,7 @@ func TestRunClaudeSessionPath_NoMatchIsError(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
 	out := &strings.Builder{}
-	d := deps{stdout: out, userHomeDir: func() (string, error) { return home, nil }}
+	d := homeDeps(out, nil, home)
 
 	err := runClaudeSessionPath(d, "missing-id", "")
 	if err == nil {
@@ -55,12 +47,12 @@ func TestRunClaudeSessionPath_NoMatchIsError(t *testing.T) {
 func TestRunClaudeSessionPath_MultipleMatchesPrintsAllAndErrors(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
-	p1 := writeSessionFixture(t, home, "-Users-david-dev-proj1", "dup-id", []string{`{"type":"user"}`})
-	p2 := writeSessionFixture(t, home, "-Users-david-dev-proj2", "dup-id", []string{`{"type":"user"}`})
+	p1 := cmdtest.WriteSessionFixture(t, home, "-Users-david-dev-proj1", "dup-id", []string{`{"type":"user"}`})
+	p2 := cmdtest.WriteSessionFixture(t, home, "-Users-david-dev-proj2", "dup-id", []string{`{"type":"user"}`})
 
 	out := &strings.Builder{}
 	errOut := &strings.Builder{}
-	d := deps{stdout: out, stderr: errOut, userHomeDir: func() (string, error) { return home, nil }}
+	d := homeDeps(out, errOut, home)
 
 	err := runClaudeSessionPath(d, "dup-id", "")
 	if err == nil {
@@ -77,14 +69,14 @@ func TestRunClaudeSessionPath_MultipleMatchesPrintsAllAndErrors(t *testing.T) {
 func TestRunClaudeSessionPath_GrepFiltersLines(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
-	writeSessionFixture(t, home, "-Users-david-dev-proj", "grep-id", []string{
+	cmdtest.WriteSessionFixture(t, home, "-Users-david-dev-proj", "grep-id", []string{
 		`{"type":"user","text":"hello world"}`,
 		`{"type":"assistant","text":"unrelated line"}`,
 		`{"type":"user","text":"Hello again"}`,
 	})
 
 	out := &strings.Builder{}
-	d := deps{stdout: out, userHomeDir: func() (string, error) { return home, nil }}
+	d := homeDeps(out, nil, home)
 
 	if err := runClaudeSessionPath(d, "grep-id", "hello"); err != nil {
 		t.Fatalf("runClaudeSessionPath: %v", err)

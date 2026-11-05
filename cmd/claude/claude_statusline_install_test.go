@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ func TestInstallClaudeStatusline_MissingFileWritesCanonical(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
 	out := &strings.Builder{}
-	d := deps{stdout: out, userHomeDir: func() (string, error) { return home, nil }}
+	d := homeDeps(out, nil, home)
 
 	if err := installClaudeStatusline(d); err != nil {
 		t.Fatalf("installClaudeStatusline: %v", err)
@@ -57,7 +57,7 @@ func TestInstallClaudeStatusline_PreservesOtherSettings(t *testing.T) {
 		t.Fatalf("write existing settings: %v", err)
 	}
 
-	d := deps{stdout: &strings.Builder{}, userHomeDir: func() (string, error) { return home, nil }}
+	d := homeDeps(&strings.Builder{}, nil, home)
 	if err := installClaudeStatusline(d); err != nil {
 		t.Fatalf("installClaudeStatusline: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestInstallClaudeStatusline_PreservesOtherSettings(t *testing.T) {
 func TestInstallClaudeStatusline_IdempotentAcrossRuns(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
-	d := deps{stdout: &strings.Builder{}, userHomeDir: func() (string, error) { return home, nil }}
+	d := homeDeps(&strings.Builder{}, nil, home)
 
 	if err := installClaudeStatusline(d); err != nil {
 		t.Fatalf("installClaudeStatusline (1st run): %v", err)

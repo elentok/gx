@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"encoding/json"
@@ -67,10 +67,10 @@ type statusLineData struct {
 }
 
 // runClaudeStatusline reads a Claude Code statusLine-hook JSON payload from
-// d.stdin and prints the rendered status line to d.stdout. silent omits
+// d.Stdin and prints the rendered status line to d.Stdout. silent omits
 // missing/invalid fields instead of rendering an error segment; demo prints
 // sample output instead of reading stdin.
-func runClaudeStatusline(d deps, silent, demo bool) error {
+func runClaudeStatusline(d Deps, silent, demo bool) error {
 	worktreeSeg := currentWorktreeSegment(d)
 
 	if demo {
@@ -88,19 +88,19 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 			{120000, 60, false, "INSERT"},
 			{50000, 10, true, "REPLACE"},
 		} {
-			fmt.Fprintln(d.stdout, statusLineFromValues("TheModel", row.tokens, float64(row.percent), 12, 34, fiveHourResetsAt, weekResetsAt, worktreeSeg, row.remote, row.vimMode))
+			fmt.Fprintln(d.Stdout, statusLineFromValues("TheModel", row.tokens, float64(row.percent), 12, 34, fiveHourResetsAt, weekResetsAt, worktreeSeg, row.remote, row.vimMode))
 		}
 		return nil
 	}
 
-	data, err := io.ReadAll(d.stdin)
+	data, err := io.ReadAll(d.Stdin)
 	if err != nil {
 		return fmt.Errorf("read stdin: %w", err)
 	}
 
 	var payload statusLineData
 	if err := json.Unmarshal(data, &payload); err != nil {
-		fmt.Fprintf(d.stdout, "%s\n", claudeErrorStyle.Render("error: malformed JSON input"))
+		fmt.Fprintf(d.Stdout, "%s\n", claudeErrorStyle.Render("error: malformed JSON input"))
 		return fmt.Errorf("parse JSON: %w", err)
 	}
 
@@ -117,7 +117,7 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 	remoteSeg := remoteControlSegment(payload.Remote != nil)
 	vimSeg := vimModeSegment(payload.Vim.Mode)
 
-	fmt.Fprintln(d.stdout, statusLineFromParts(rawTokens, modelText, tokensText, ctxText, fiveText, weekText, fiveResetText, weekResetText, worktreeSeg, remoteSeg, vimSeg))
+	fmt.Fprintln(d.Stdout, statusLineFromParts(rawTokens, modelText, tokensText, ctxText, fiveText, weekText, fiveResetText, weekResetText, worktreeSeg, remoteSeg, vimSeg))
 	return nil
 }
 
@@ -410,8 +410,8 @@ func tokenIcon(tokens float64) string {
 // the current directory. Any lookup failure (not in a git worktree, git
 // commands unavailable, etc.) resolves to "" so the caller omits the segment
 // entirely rather than rendering an error.
-func currentWorktreeSegment(d deps) string {
-	cwd, err := d.getwd()
+func currentWorktreeSegment(d Deps) string {
+	cwd, err := d.Getwd()
 	if err != nil {
 		return ""
 	}

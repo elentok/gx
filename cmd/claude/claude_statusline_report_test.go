@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"encoding/json"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server/wire"
 )
@@ -84,12 +85,12 @@ func (rs *reportServer) count() int {
 
 func runStatuslineWith(t *testing.T, out *syncBuilder, dial func() (*apiclient.Client, error), payload string, args ...string) error {
 	t.Helper()
-	d := deps{
-		stdin:        strings.NewReader(payload),
-		stdout:       out,
-		getwd:        func() (string, error) { return "/nonexistent", nil },
-		serverClient: dial,
-	}
+	d := Deps{Env: cmdbase.Env{
+		Stdin:     strings.NewReader(payload),
+		Stdout:    out,
+		Getwd:     func() (string, error) { return "/nonexistent", nil },
+		NewClient: dial,
+	}}
 	cmd := newClaudeStatuslineCmd(d)
 	cmd.SetArgs(args)
 	cmd.SilenceUsage, cmd.SilenceErrors = true, true

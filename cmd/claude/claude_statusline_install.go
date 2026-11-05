@@ -1,4 +1,4 @@
-package cmd
+package claude
 
 import (
 	"encoding/json"
@@ -17,8 +17,8 @@ const claudeStatusLineCommand = "gx claude statusline"
 // installClaudeStatusline idempotently sets ~/.claude/settings.json's
 // "statusLine" entry to run claudeStatusLineCommand, preserving every other
 // top-level key already in that file.
-func installClaudeStatusline(d deps) error {
-	home, err := d.userHomeDir()
+func installClaudeStatusline(d Deps) error {
+	home, err := d.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("resolve home directory: %w", err)
 	}
@@ -47,7 +47,7 @@ func installClaudeStatusline(d deps) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 
-	fmt.Fprintf(d.stdout, "Installed statusLine into %s\n", path)
+	fmt.Fprintf(d.Stdout, "Installed statusLine into %s\n", path)
 	return nil
 }
 

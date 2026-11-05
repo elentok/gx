@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -20,7 +21,7 @@ func writeHomelessTranscript(t *testing.T, id string, input int) {
 	home := envValue(envFor(t), "HOME")
 	line := `{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":` +
 		strconv.Itoa(input) + `,"output_tokens":10}}}`
-	writeSessionFixture(t, home, "-gone-worktree-"+id, id, []string{line})
+	cmdtest.WriteSessionFixture(t, home, "-gone-worktree-"+id, id, []string{line})
 	if matches, _ := transcript.FindByID(home, id); len(matches) != 1 {
 		t.Fatalf("transcript for %s not found", id)
 	}
