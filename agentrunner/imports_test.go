@@ -14,6 +14,7 @@ import (
 var herdrImporters = []string{
 	"github.com/elentok/gx/agentrunner/herdrrunner",
 	"github.com/elentok/gx/cmd",
+	"github.com/elentok/gx/cmd/doctor",
 	"github.com/elentok/gx/ralphloop/deps",
 	"github.com/elentok/gx/runnerbuild",
 	"github.com/elentok/gx/server/sched",

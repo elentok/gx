@@ -1,10 +1,12 @@
-package cmd
+package doctor
 
 import (
 	"bytes"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
@@ -29,17 +31,19 @@ func TestDoctor_CheckGhostty(t *testing.T) {
 			t.Parallel()
 			var stdout bytes.Buffer
 			probed := false
-			d := deps{
-				stdout: &stdout,
-				stderr: bytes.NewBuffer(nil),
-				goos:   "darwin",
-				getenv: func(key string) string { return tt.vars[key] },
-				probeGhostty: func() error {
+			d := Deps{
+				Env: cmdbase.Env{
+					Stdout: &stdout,
+					Stderr: bytes.NewBuffer(nil),
+					Getenv: func(key string) string { return tt.vars[key] },
+				},
+				GOOS: "darwin",
+				ProbeGhostty: func() error {
 					probed = true
 					return tt.probeErr
 				},
 			}
-			err := execute([]string{"doctor", "--check-ghostty"}, d)
+			err := cmdtest.Run(t, d.Env, []string{"doctor", "--check-ghostty"}, New(d))
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
 			}

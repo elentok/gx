@@ -1,4 +1,4 @@
-package cmd
+package doctor
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
@@ -44,19 +46,25 @@ func setupDotBareForCmd(t *testing.T) (outerDir string) {
 	return outerDir
 }
 
+// runDoctor executes `gx doctor args...` with d.
+func runDoctorCmd(t *testing.T, d Deps, args ...string) error {
+	t.Helper()
+	return cmdtest.Run(t, d.Env, append([]string{"doctor"}, args...), New(d))
+}
+
 func TestDoctor_NoIssues(t *testing.T) {
 	t.Parallel()
 	outerDir := setupDotBareForCmd(t)
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return outerDir, nil },
-	}
+	d := Deps{Env: cmdbase.Env{
+		Env:    cmdtest.EnvFor(t),
+		Stdout: &stdout,
+		Stderr: bytes.NewBuffer(nil),
+		Getwd:  func() (string, error) { return outerDir, nil },
+	}}
 
-	if err := execute([]string{"doctor"}, d); err != nil {
+	if err := runDoctorCmd(t, d); err != nil {
 		t.Fatalf("doctor: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "No issues found") {
@@ -69,12 +77,12 @@ func TestDoctor_PrintsRuntimeTerminalInfo(t *testing.T) {
 	outerDir := setupDotBareForCmd(t)
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return outerDir, nil },
-		getenv: func(key string) string {
+	d := Deps{Env: cmdbase.Env{
+		Env:    cmdtest.EnvFor(t),
+		Stdout: &stdout,
+		Stderr: bytes.NewBuffer(nil),
+		Getwd:  func() (string, error) { return outerDir, nil },
+		Getenv: func(key string) string {
 			switch key {
 			case "KITTY_LISTEN_ON":
 				return "unix:/tmp/mykitty-70704"
@@ -86,9 +94,9 @@ func TestDoctor_PrintsRuntimeTerminalInfo(t *testing.T) {
 				return ""
 			}
 		},
-	}
+	}}
 
-	if err := execute([]string{"doctor"}, d); err != nil {
+	if err := runDoctorCmd(t, d); err != nil {
 		t.Fatalf("doctor: %v", err)
 	}
 	out := stdout.String()
@@ -108,15 +116,15 @@ func TestDoctor_PauseWaitsForEnter(t *testing.T) {
 	outerDir := setupDotBareForCmd(t)
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdin:  strings.NewReader("\n"),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return outerDir, nil },
-	}
+	d := Deps{Env: cmdbase.Env{
+		Env:    cmdtest.EnvFor(t),
+		Stdin:  strings.NewReader("\n"),
+		Stdout: &stdout,
+		Stderr: bytes.NewBuffer(nil),
+		Getwd:  func() (string, error) { return outerDir, nil },
+	}}
 
-	if err := execute([]string{"doctor", "--pause"}, d); err != nil {
+	if err := runDoctorCmd(t, d, "--pause"); err != nil {
 		t.Fatalf("doctor --pause: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "Press Enter to exit...") {
@@ -126,12 +134,12 @@ func TestDoctor_PauseWaitsForEnter(t *testing.T) {
 
 func TestDoctor_UnknownFlag(t *testing.T) {
 	t.Parallel()
-	d := deps{
-		env:   envFor(t),
-		getwd: func() (string, error) { return "", errors.New("should not be called") },
-	}
+	d := Deps{Env: cmdbase.Env{
+		Env:   cmdtest.EnvFor(t),
+		Getwd: func() (string, error) { return "", errors.New("should not be called") },
+	}}
 
-	err := execute([]string{"doctor", "--wat"}, d)
+	err := runDoctorCmd(t, d, "--wat")
 	if err == nil {
 		t.Fatal("expected error for unknown flag")
 	}
@@ -151,14 +159,14 @@ func TestDoctor_ReportsIssue(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return outerDir, nil },
-	}
+	d := Deps{Env: cmdbase.Env{
+		Env:    cmdtest.EnvFor(t),
+		Stdout: &stdout,
+		Stderr: bytes.NewBuffer(nil),
+		Getwd:  func() (string, error) { return outerDir, nil },
+	}}
 
-	if err := execute([]string{"doctor"}, d); err != nil {
+	if err := runDoctorCmd(t, d); err != nil {
 		t.Fatalf("doctor: %v", err)
 	}
 	out := stdout.String()
@@ -180,15 +188,17 @@ func TestDoctor_Fix_AppliesWhenConfirmed(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:          envFor(t),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return outerDir, nil },
-		confirmForce: func(string) (bool, error) { return true, nil },
+	d := Deps{
+		Env: cmdbase.Env{
+			Env:    cmdtest.EnvFor(t),
+			Stdout: &stdout,
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return outerDir, nil },
+		},
+		ConfirmForce: func(string) (bool, error) { return true, nil },
 	}
 
-	if err := execute([]string{"doctor", "--fix"}, d); err != nil {
+	if err := runDoctorCmd(t, d, "--fix"); err != nil {
 		t.Fatalf("doctor --fix: %v", err)
 	}
 
@@ -208,18 +218,20 @@ func TestDoctor_CheckBlockedForm_Pass(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	var gotTarget string
-	d := deps{
-		env:    envFor(t),
-		stdin:  strings.NewReader("\n"),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		explainAgent: func(target string) (herdr.AgentExplainResult, error) {
+	d := Deps{
+		Env: cmdbase.Env{
+			Env:    cmdtest.EnvFor(t),
+			Stdin:  strings.NewReader("\n"),
+			Stdout: &stdout,
+			Stderr: bytes.NewBuffer(nil),
+		},
+		ExplainAgent: func(target string) (herdr.AgentExplainResult, error) {
 			gotTarget = target
 			return herdr.AgentExplainResult{State: "blocked", MatchedRuleID: "live_blocked_form"}, nil
 		},
 	}
 
-	if err := execute([]string{"doctor", "--check-blocked-form", "iter-01"}, d); err != nil {
+	if err := runDoctorCmd(t, d, "--check-blocked-form", "iter-01"); err != nil {
 		t.Fatalf("doctor --check-blocked-form: %v", err)
 	}
 	if gotTarget != "iter-01" {
@@ -233,17 +245,19 @@ func TestDoctor_CheckBlockedForm_Pass(t *testing.T) {
 func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdin:  strings.NewReader("\n"),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		explainAgent: func(target string) (herdr.AgentExplainResult, error) {
+	d := Deps{
+		Env: cmdbase.Env{
+			Env:    cmdtest.EnvFor(t),
+			Stdin:  strings.NewReader("\n"),
+			Stdout: &stdout,
+			Stderr: bytes.NewBuffer(nil),
+		},
+		ExplainAgent: func(target string) (herdr.AgentExplainResult, error) {
 			return herdr.AgentExplainResult{State: "idle", MatchedRuleID: "live_prompt_box"}, nil
 		},
 	}
 
-	err := execute([]string{"doctor", "--check-blocked-form", "iter-01"}, d)
+	err := runDoctorCmd(t, d, "--check-blocked-form", "iter-01")
 	if err == nil {
 		t.Fatal("expected error for mismatched rule")
 	}
@@ -255,9 +269,9 @@ func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
 func TestDoctor_Help_SaysBlockedFormIsHerdrOnly(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
-	d := deps{env: envFor(t), stdout: &stdout, stderr: &stdout}
+	d := Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t), Stdout: &stdout, Stderr: &stdout}}
 
-	if err := execute([]string{"doctor", "--help"}, d); err != nil {
+	if err := runDoctorCmd(t, d, "--help"); err != nil {
 		t.Fatalf("doctor --help: %v", err)
 	}
 	out := strings.Join(strings.Fields(stdout.String()), " ")
@@ -270,12 +284,12 @@ func TestDoctor_Help_SaysBlockedFormIsHerdrOnly(t *testing.T) {
 
 func TestDoctor_CheckBlockedForm_RequiresTarget(t *testing.T) {
 	t.Parallel()
-	d := deps{
-		env:   envFor(t),
-		getwd: func() (string, error) { return "", errors.New("should not be called") },
-	}
+	d := Deps{Env: cmdbase.Env{
+		Env:   cmdtest.EnvFor(t),
+		Getwd: func() (string, error) { return "", errors.New("should not be called") },
+	}}
 
-	err := execute([]string{"doctor", "--check-blocked-form"}, d)
+	err := runDoctorCmd(t, d, "--check-blocked-form")
 	if err == nil {
 		t.Fatal("expected error for missing target")
 	}
@@ -295,15 +309,17 @@ func TestDoctor_Fix_SkipsWhenDeclined(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:          envFor(t),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return outerDir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
+	d := Deps{
+		Env: cmdbase.Env{
+			Env:    cmdtest.EnvFor(t),
+			Stdout: &stdout,
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return outerDir, nil },
+		},
+		ConfirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := execute([]string{"doctor", "--fix"}, d); err != nil {
+	if err := runDoctorCmd(t, d, "--fix"); err != nil {
 		t.Fatalf("doctor --fix: %v", err)
 	}
 
@@ -322,22 +338,24 @@ func TestDoctor_ReportsMissingTrunkWithoutFixing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	registerWithTrunk(t, repo.Root, "develop")
-	projectFile := filepath.Join(envValue(envFor(t), "XDG_DATA_HOME"), "gx", "tickets", "p", "project.json")
+	cmdtest.RegisterWithTrunk(t, repo.Root, "develop")
+	projectFile := filepath.Join(cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME"), "gx", "tickets", "p", "project.json")
 	before, err := os.ReadFile(projectFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:          envFor(t),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return outerDir, nil },
-		confirmForce: func(string) (bool, error) { t.Fatal("trunk check must not offer a fix"); return false, nil },
+	d := Deps{
+		Env: cmdbase.Env{
+			Env:    cmdtest.EnvFor(t),
+			Stdout: &stdout,
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return outerDir, nil },
+		},
+		ConfirmForce: func(string) (bool, error) { t.Fatal("trunk check must not offer a fix"); return false, nil },
 	}
-	if err := execute([]string{"doctor", "--fix"}, d); err != nil {
+	if err := runDoctorCmd(t, d, "--fix"); err != nil {
 		t.Fatalf("doctor: %v", err)
 	}
 
@@ -362,16 +380,16 @@ func TestDoctor_HealthyTrunkReportsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	registerWithTrunk(t, repo.Root, "main")
+	cmdtest.RegisterWithTrunk(t, repo.Root, "main")
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return outerDir, nil },
-	}
-	if err := execute([]string{"doctor"}, d); err != nil {
+	d := Deps{Env: cmdbase.Env{
+		Env:    cmdtest.EnvFor(t),
+		Stdout: &stdout,
+		Stderr: bytes.NewBuffer(nil),
+		Getwd:  func() (string, error) { return outerDir, nil },
+	}}
+	if err := runDoctorCmd(t, d); err != nil {
 		t.Fatalf("doctor: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "No issues found") {

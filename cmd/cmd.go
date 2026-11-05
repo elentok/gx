@@ -10,17 +10,16 @@ import (
 	"github.com/elentok/gx/cmd/brief"
 	"github.com/elentok/gx/cmd/check"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/doctor"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/transcript"
 	"github.com/elentok/gx/ui/nav"
-	"github.com/elentok/gx/ui/terminalrun"
 
 	"github.com/spf13/cobra"
 )
@@ -66,9 +65,10 @@ type deps struct {
 	readSessionHarness func(sessionID string) (string, error)
 	// skills holds the `gx skills` hooks (its Env is unset; skillsDeps fills
 	// it). `gx server start` also reads them until it moves out of root.
-	skills       skillscmd.Deps
-	explainAgent func(target string) (herdr.AgentExplainResult, error)
-	probeGhostty func() error
+	skills skillscmd.Deps
+	// doctor holds the `gx doctor` hooks (its Env, ConfirmForce and GOOS are
+	// unset; doctorDeps fills them).
+	doctor doctor.Deps
 	// serverClient dials the server; nil means the real one (tests inject a fake).
 	serverClient func() (*apiclient.Client, error)
 	// env is the process environment every config dir is resolved from.
@@ -90,6 +90,15 @@ func (d deps) base() cmdbase.Env {
 func (d deps) skillsDeps() skillscmd.Deps {
 	s := d.skills
 	s.Env = d.base()
+	return s
+}
+
+// doctorDeps is the `gx doctor` hooks joined with the shared env.
+func (d deps) doctorDeps() doctor.Deps {
+	s := d.doctor
+	s.Env = d.base()
+	s.ConfirmForce = d.confirmForce
+	s.GOOS = d.goos
 	return s
 }
 
@@ -142,8 +151,7 @@ func defaultDeps() deps {
 		readAutoAdvance:    func(sessionID string) (bool, error) { return readServerAutoAdvance(dirs, sessionID) },
 		readSessionHarness: func(sessionID string) (string, error) { return readServerHarness(dirs, sessionID) },
 		skills:             skillscmd.DefaultDeps(dirs, roots.CodexHome),
-		explainAgent:       herdr.AgentExplain,
-		probeGhostty:       terminalrun.ProbeGhostty,
+		doctor:             doctor.DefaultDeps(),
 	}
 }
 
@@ -236,7 +244,7 @@ Run without a command to open the status UI.`,
 		term.New(term.Deps{Env: d.base(), GOOS: d.goos}),
 		brief.New(brief.Deps{Env: d.base(), CacheGate: brief.DefaultDeps().CacheGate}),
 		check.New(check.Deps{Env: d.base()}),
-		newDoctorCmd(d),
+		doctor.New(d.doctorDeps()),
 		newVersionCmd(d),
 		newRestartCheckCmd(d),
 	)

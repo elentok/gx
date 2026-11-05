@@ -1,4 +1,6 @@
-package cmd
+// Package doctor is `gx doctor`: check the repo for common configuration
+// issues.
+package doctor
 
 import (
 	"bufio"
@@ -8,6 +10,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -17,7 +22,52 @@ import (
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
-func runDoctor(args []string, d deps) error {
+// Deps is the runtime context of `gx doctor`.
+type Deps struct {
+	cmdbase.Env
+	// ExplainAgent reads herdr's pane recognition; nil means herdr.AgentExplain.
+	ExplainAgent func(target string) (herdr.AgentExplainResult, error)
+	// ProbeGhostty is the Ghostty AppleScript probe; nil means the real one.
+	ProbeGhostty func() error
+	// ConfirmForce asks before applying a fix.
+	ConfirmForce func(prompt string) (bool, error)
+	// GOOS feeds terminal detection (Ghostty is macOS-only).
+	GOOS string
+}
+
+// DefaultDeps returns the production hooks; the caller sets Env, ConfirmForce
+// and GOOS.
+func DefaultDeps() Deps {
+	return Deps{
+		ExplainAgent: herdr.AgentExplain,
+		ProbeGhostty: terminalrun.ProbeGhostty,
+	}
+}
+
+// New builds the `gx doctor` command.
+func New(d Deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "doctor [--fix] [--pause] [--check-blocked-form <target>] [--check-ghostty]",
+		Short: "check the repo for common configuration issues",
+		Long: `Check the repo for common configuration issues.
+
+--check-ghostty runs instead of the repo checks and probes Ghostty's AppleScript
+interface. It may show a macOS Automation prompt.
+
+--check-blocked-form <target> checks herdr only: it reads herdr's blocked-pane
+recognition. For a PTY agent run "gx claude doctor" instead.`,
+		// runDoctor does its own flag parsing, so cobra never sees --help.
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+				return cmd.Help()
+			}
+			return runDoctor(args, d)
+		},
+	}
+}
+
+func runDoctor(args []string, d Deps) error {
 	var fix bool
 	var pause bool
 	var blockedFormTarget string
@@ -45,19 +95,19 @@ func runDoctor(args []string, d deps) error {
 		return runDoctorBlockedFormCheck(blockedFormTarget, d)
 	}
 
-	getenv := d.getenv
+	getenv := d.Getenv
 	if getenv == nil {
 		getenv = os.Getenv
 	}
 	if checkGhostty {
 		return runDoctorGhosttyCheck(d, getenv)
 	}
-	stdin := d.stdin
+	stdin := d.Stdin
 	if stdin == nil {
 		stdin = os.Stdin
 	}
 
-	cwd, err := d.getwd()
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -79,58 +129,58 @@ func runDoctor(args []string, d deps) error {
 	// A broken repo can't resolve its project, so the trunk check would only
 	// repeat the repair issue above.
 	if findErr == nil {
-		if issue := checkTrunk(d.dirs(), cwd, repo.Root); issue != nil {
+		if issue := checkTrunk(d.Dirs(), cwd, repo.Root); issue != nil {
 			issues = append(issues, *issue)
 		}
 	}
 
-	printDoctorRuntime(d.stdout, getenv, d.goos)
+	printDoctorRuntime(d.Stdout, getenv, d.GOOS)
 
 	if len(issues) == 0 {
-		fmt.Fprintln(d.stdout, "No issues found.")
+		fmt.Fprintln(d.Stdout, "No issues found.")
 		if pause {
-			pauseDoctor(d.stdout, stdin)
+			pauseDoctor(d.Stdout, stdin)
 		}
 		return nil
 	}
 
 	for i, issue := range issues {
-		fmt.Fprintf(d.stdout, "[%d/%d] %s\n", i+1, len(issues), issue.Description)
+		fmt.Fprintf(d.Stdout, "[%d/%d] %s\n", i+1, len(issues), issue.Description)
 
 		if !issue.CanFix() {
-			fmt.Fprintln(d.stdout, "  No automatic fix available.")
-			fmt.Fprintln(d.stdout)
+			fmt.Fprintln(d.Stdout, "  No automatic fix available.")
+			fmt.Fprintln(d.Stdout)
 			continue
 		}
 
 		if !fix {
-			fmt.Fprintf(d.stdout, "  Fix: %s\n", issue.FixDescription)
-			fmt.Fprintln(d.stdout)
+			fmt.Fprintf(d.Stdout, "  Fix: %s\n", issue.FixDescription)
+			fmt.Fprintln(d.Stdout)
 			continue
 		}
 
-		confirmed, err := d.confirmForce(issue.FixDescription + "?")
+		confirmed, err := d.ConfirmForce(issue.FixDescription + "?")
 		if err != nil {
 			return err
 		}
 		if confirmed {
 			if err := issue.Fix(); err != nil {
-				fmt.Fprintf(d.stderr, "  error: %v\n", err)
+				fmt.Fprintf(d.Stderr, "  error: %v\n", err)
 			} else {
-				fmt.Fprintln(d.stdout, "  Fixed.")
+				fmt.Fprintln(d.Stdout, "  Fixed.")
 			}
 		} else {
-			fmt.Fprintln(d.stdout, "  Skipped.")
+			fmt.Fprintln(d.Stdout, "  Skipped.")
 		}
-		fmt.Fprintln(d.stdout)
+		fmt.Fprintln(d.Stdout)
 	}
 
 	if !fix {
-		fmt.Fprintln(d.stdout, "Run 'gx doctor --fix' to apply fixes.")
+		fmt.Fprintln(d.Stdout, "Run 'gx doctor --fix' to apply fixes.")
 	}
 
 	if pause {
-		pauseDoctor(d.stdout, stdin)
+		pauseDoctor(d.Stdout, stdin)
 	}
 
 	return nil
@@ -144,20 +194,20 @@ func runDoctor(args []string, d deps) error {
 // full procedure and what to do on failure. It only runs when
 // --check-blocked-form is passed explicitly, so it never fires (or fails) in
 // a headless `gx doctor` invocation.
-func runDoctorBlockedFormCheck(target string, d deps) error {
-	stdin := d.stdin
+func runDoctorBlockedFormCheck(target string, d Deps) error {
+	stdin := d.Stdin
 	if stdin == nil {
 		stdin = os.Stdin
 	}
-	explainAgent := d.explainAgent
+	explainAgent := d.ExplainAgent
 	if explainAgent == nil {
 		explainAgent = herdr.AgentExplain
 	}
 
-	fmt.Fprintln(d.stdout, "Interactive check: blocked-form detection")
-	fmt.Fprintf(d.stdout, "In pane %q, drive the agent into a form the orchestrator gate must\n", target)
-	fmt.Fprintln(d.stdout, "recognize as blocked (see docs/runbooks/blocked-form-regression-check.md).")
-	fmt.Fprint(d.stdout, "Once the prompt is showing, press Enter...")
+	fmt.Fprintln(d.Stdout, "Interactive check: blocked-form detection")
+	fmt.Fprintf(d.Stdout, "In pane %q, drive the agent into a form the orchestrator gate must\n", target)
+	fmt.Fprintln(d.Stdout, "recognize as blocked (see docs/runbooks/blocked-form-regression-check.md).")
+	fmt.Fprint(d.Stdout, "Once the prompt is showing, press Enter...")
 	_, _ = bufio.NewReader(stdin).ReadString('\n')
 
 	result, err := explainAgent(target)
@@ -166,41 +216,41 @@ func runDoctorBlockedFormCheck(target string, d deps) error {
 	}
 
 	if result.State != "blocked" || result.MatchedRuleID != "live_blocked_form" {
-		fmt.Fprintf(d.stdout, "FAIL: herdr matched rule %q (state %q); want \"live_blocked_form\" (state \"blocked\").\n", result.MatchedRuleID, result.State)
-		fmt.Fprintln(d.stdout, "See docs/runbooks/blocked-form-regression-check.md for what to do next.")
+		fmt.Fprintf(d.Stdout, "FAIL: herdr matched rule %q (state %q); want \"live_blocked_form\" (state \"blocked\").\n", result.MatchedRuleID, result.State)
+		fmt.Fprintln(d.Stdout, "See docs/runbooks/blocked-form-regression-check.md for what to do next.")
 		return fmt.Errorf("blocked-form check failed: matched rule %q, not live_blocked_form", result.MatchedRuleID)
 	}
 
-	fmt.Fprintln(d.stdout, "PASS: herdr matched live_blocked_form.")
+	fmt.Fprintln(d.Stdout, "PASS: herdr matched live_blocked_form.")
 	return nil
 }
 
 // runDoctorGhosttyCheck is the opt-in Ghostty AppleScript probe. It is never
 // part of plain `gx doctor` because the probe may show a macOS Automation
 // prompt.
-func runDoctorGhosttyCheck(d deps, getenv func(string) string) error {
-	terminal := ui.DetectTerminalFor(getenv, d.goos)
+func runDoctorGhosttyCheck(d Deps, getenv func(string) string) error {
+	terminal := ui.DetectTerminalFor(getenv, d.GOOS)
 	if terminal != ui.TerminalGhostty {
 		label := terminal.String()
 		if label == "" {
 			label = "plain"
 		}
-		fmt.Fprintf(d.stdout, "SKIP: terminal is %s, not ghostty\n", label)
+		fmt.Fprintf(d.Stdout, "SKIP: terminal is %s, not ghostty\n", label)
 		return nil
 	}
 	if err := terminalrun.CheckGhosttySplits(getenv("TERM_PROGRAM_VERSION")); err != nil {
-		fmt.Fprintf(d.stdout, "FAIL: %v\n", err)
+		fmt.Fprintf(d.Stdout, "FAIL: %v\n", err)
 		return fmt.Errorf("ghostty check failed: %w", err)
 	}
-	probe := d.probeGhostty
+	probe := d.ProbeGhostty
 	if probe == nil {
 		probe = terminalrun.ProbeGhostty
 	}
 	if err := probe(); err != nil {
-		fmt.Fprintf(d.stdout, "FAIL: %v\n", err)
+		fmt.Fprintf(d.Stdout, "FAIL: %v\n", err)
 		return fmt.Errorf("ghostty check failed: %w", err)
 	}
-	fmt.Fprintln(d.stdout, "PASS: Ghostty AppleScript reachable")
+	fmt.Fprintln(d.Stdout, "PASS: Ghostty AppleScript reachable")
 	return nil
 }
 
