@@ -299,6 +299,26 @@ func (l *Ledger) Day(day string) ([]Row, error) {
 	return out, nil
 }
 
+// Range returns the buckets of every day from..to inclusive, sorted by day,
+// project, group, harness, plus the first rebuilt and first live days, all from
+// one locked read.
+func (l *Ledger) Range(from, to string) (rows []Row, firstRebuilt, firstLive string, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.refresh(); err != nil {
+		return nil, "", "", err
+	}
+	for k, r := range l.buckets {
+		if k.Day >= from && k.Day <= to {
+			rows = append(rows, r)
+		}
+	}
+	slices.SortFunc(rows, func(a, b Row) int {
+		return strings.Compare(rowSortKey(a.Key), rowSortKey(b.Key))
+	})
+	return rows, l.data.FirstRebuiltDay, l.data.FirstLiveDay, nil
+}
+
 // FirstLiveDay is the day of the first live write, or "".
 func (l *Ledger) FirstLiveDay() (string, error) {
 	l.mu.Lock()

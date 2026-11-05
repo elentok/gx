@@ -3,6 +3,7 @@ package tokenledger
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -33,6 +34,26 @@ func mustDay(t *testing.T, l *Ledger, day string) []Row {
 		t.Fatal(err)
 	}
 	return rows
+}
+
+func TestTokenLedgerRangeMatchesDays(t *testing.T) {
+	l := openAt(t, t.TempDir(), "2026-05-12")
+	for _, day := range []string{"2026-05-09", "2026-05-10", "2026-05-11", "2026-05-12"} {
+		if err := l.Add(Delta{Key: key(day, "gx", GroupQueue, "claude"), Tokens: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, _, firstLive, err := l.Range("2026-05-10", "2026-05-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := append(mustDay(t, l, "2026-05-10"), mustDay(t, l, "2026-05-11")...)
+	if !reflect.DeepEqual(rows, want) || len(rows) != 2 {
+		t.Fatalf("Range rows = %v, want %v", rows, want)
+	}
+	if firstLive != "2026-05-12" {
+		t.Fatalf("firstLive = %q", firstLive)
+	}
 }
 
 func TestTokenLedgerBucketKeySplits(t *testing.T) {

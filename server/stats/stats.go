@@ -18,9 +18,7 @@ import (
 
 // Ledger is the token ledger as the cost chart reads it.
 type Ledger interface {
-	Day(day string) ([]tokenledger.Row, error)
-	FirstRebuiltDay() (string, error)
-	FirstLiveDay() (string, error)
+	Range(from, to string) (rows []tokenledger.Row, firstRebuilt, firstLive string, err error)
 }
 
 // Burns gives the limit-burn series.

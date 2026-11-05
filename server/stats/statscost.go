@@ -1,6 +1,8 @@
 package stats
 
 import (
+	"slices"
+
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tokenledger"
@@ -40,19 +42,13 @@ type costLedger struct {
 // readCostLedger reads the in-memory ledger for the window's days. It never
 // reads transcripts.
 func (s *Stats) readCostLedger(win limits.StatsWindow) (costLedger, error) {
+	labels := win.Labels()
+	if len(labels) == 0 {
+		return costLedger{}, nil
+	}
 	var out costLedger
-	for _, day := range win.Labels() {
-		rows, err := s.Tokens.Day(day)
-		if err != nil {
-			return out, err
-		}
-		out.Rows = append(out.Rows, rows...)
-	}
 	var err error
-	if out.FirstRebuilt, err = s.Tokens.FirstRebuiltDay(); err != nil {
-		return out, err
-	}
-	out.FirstLive, err = s.Tokens.FirstLiveDay()
+	out.Rows, out.FirstRebuilt, out.FirstLive, err = s.Tokens.Range(slices.Min(labels), slices.Max(labels))
 	return out, err
 }
 
