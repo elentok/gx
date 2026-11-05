@@ -225,6 +225,44 @@ func TestDenySession_HonouredWhenHookDeniesAndNothingIsWritten(t *testing.T) {
 	}
 }
 
+func TestImagePasteSession_AttachesThePixelUnderADataDirWithASpace(t *testing.T) {
+	env, id, _ := fakecodexEnv(t)
+	d := NewDrivers(env)
+	d.Timeout = 30 * time.Second
+	d.DataDir = filepath.Join(t.TempDir(), "data dir")
+	d.afterPrompt = driveTurn(t, id, agentfake.Control{Action: agentfake.ActionFinish})
+	rec, err := d.Session(ImagePasteSession)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail, ok := checkImagePasteAttach(Input{Recording: rec}); !ok {
+		t.Fatalf("image-paste-attach = %q, want pass", detail)
+	}
+	data := string(rec.Rollouts[0].Data)
+	_, rest, _ := strings.Cut(data, `path=\"`)
+	path, _, _ := strings.Cut(rest, `\"`)
+	if path == "" || strings.ContainsAny(path, " \t") {
+		t.Errorf("pasted path %q, want plain no-space ASCII", path)
+	}
+}
+
+func TestImageSlashSession_RecordsANoteAndNeverErrors(t *testing.T) {
+	env, _, _ := fakecodexEnv(t)
+	d := NewDrivers(env)
+	d.Timeout = 30 * time.Second
+	rec, err := d.Session(ImageSlashSession)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rec.Note, "/status") {
+		t.Errorf("Note = %q, want the slash outcome", rec.Note)
+	}
+	rec, err = NewDrivers(nil).Session(ImageSlashSession)
+	if err != nil || !strings.HasPrefix(rec.Note, "could not run") {
+		t.Errorf("no codex: rec.Note=%q err=%v, want a note and no error", rec.Note, err)
+	}
+}
+
 func TestDenySession_NotHonouredWhenPermissionNeverAsked(t *testing.T) {
 	env, id, _ := fakecodexEnv(t)
 	d := NewDrivers(env)

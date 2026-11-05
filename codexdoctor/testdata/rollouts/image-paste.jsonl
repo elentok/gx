@@ -1,0 +1,3 @@
+{"timestamp":"2026-11-06T09:00:00.000Z","ordinal":0,"type":"session_meta","payload":{"id":"01a18e7d-0000-7000-a000-000000000001","timestamp":"2026-11-06T09:00:00.000Z","cwd":"/tmp/gx-doctor-image","cli_version":"0.166.0","source":"cli"}}
+{"timestamp":"2026-11-06T09:00:05.000Z","ordinal":1,"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<image name=[Image #1] path=\"/tmp/gx-doctor-image/pixel.png\">"},{"type":"input_image","image_url":"data:image/png;base64,AA==","detail":"high"},{"type":"input_text","text":"</image>"},{"type":"input_text","text":"[Image #1] Reply with the word done."}]}}
+{"timestamp":"2026-11-06T09:00:08.000Z","ordinal":2,"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}

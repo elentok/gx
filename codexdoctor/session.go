@@ -25,7 +25,20 @@ const (
 	sessionTimeout = 3 * time.Minute
 	// settle lets the last frames and hook runs land after task_complete.
 	settle = 300 * time.Millisecond
+	// slashWait lets the composer redraw after a slash command.
+	slashWait = 2 * time.Second
 )
+
+// ptyTempDir is a fresh dir under DataDir (or the temp dir) for one session.
+func (d *Drivers) ptyTempDir() (string, error) {
+	if d.DataDir == "" {
+		return tempDir("gx-doctor-pty-")
+	}
+	if err := os.MkdirAll(d.DataDir, 0o700); err != nil {
+		return "", err
+	}
+	return os.MkdirTemp(d.DataDir, "gx-doctor-pty-")
+}
 
 // Drivers runs the canned live sessions against the codex found on Env's PATH.
 // Each session runs once, however many checks read it. Credentials are copied
@@ -41,11 +54,18 @@ type Drivers struct {
 	// drive a fake Codex that does not act on a prompt by itself.
 	afterPrompt func(codexHome string)
 
-	launch, turn, deny, commit func() (Recording, error)
+	// DataDir is where PTY sessions keep their throwaway CODEX_HOME; "" means
+	// the system temp dir. It may hold a space: the pasted image path never
+	// lives under it.
+	DataDir string
+
+	launch, turn, deny, commit, imagePaste, imageSlash func() (Recording, error)
 }
 
 func NewDrivers(env []string) *Drivers {
 	d := &Drivers{Env: env, Timeout: sessionTimeout}
+	d.imagePaste = sync.OnceValues(d.runImagePaste)
+	d.imageSlash = sync.OnceValues(d.runImageSlash)
 	d.launch = sync.OnceValues(d.runLaunch)
 	d.turn = sync.OnceValues(d.runTurn)
 	d.deny = sync.OnceValues(d.runDeny)
@@ -67,6 +87,10 @@ func (d *Drivers) Session(name string) (Recording, error) {
 		return d.commit()
 	case LiveRolloutsSession:
 		return d.liveRollouts()
+	case ImagePasteSession:
+		return d.imagePaste()
+	case ImageSlashSession:
+		return d.imageSlash()
 	}
 	return Recording{}, ErrNoSession
 }
@@ -127,6 +151,68 @@ func (d *Drivers) runTurn() (Recording, error) {
 	}
 	defer os.RemoveAll(cwd)
 	return d.runPTY(ptySpec{cwd: cwd, prompt: "Run the shell command `echo gx-doctor`, then reply with the word done."})
+}
+
+// onePixelPNG is a valid 1x1 PNG.
+var onePixelPNG = []byte{
+	0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 'I', 'H', 'D', 'R', 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0x1f, 0x15, 0xc4, 0x89,
+	0, 0, 0, 0x0d, 'I', 'D', 'A', 'T', 0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0xf0, 0x1f, 0, 0x05, 0, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d,
+	0, 0, 0, 0, 'I', 'E', 'N', 'D', 0xae, 0x42, 0x60, 0x82,
+}
+
+// writePixel writes the tiny PNG under a fresh temp dir and returns its path.
+// Codex takes exactly one plain path per paste, so a path with a space is an
+// error here rather than a silent plain-text paste.
+func writePixel() (path string, cleanup func(), err error) {
+	dir, err := tempDir("gx-doctor-image-")
+	if err != nil {
+		return "", nil, err
+	}
+	path = filepath.Join(dir, "pixel.png")
+	if strings.ContainsAny(path, " \t\r\n") {
+		os.RemoveAll(dir)
+		return "", nil, fmt.Errorf("image path %q holds whitespace", path)
+	}
+	if err := os.WriteFile(path, onePixelPNG, 0o600); err != nil {
+		os.RemoveAll(dir)
+		return "", nil, err
+	}
+	return path, func() { os.RemoveAll(dir) }, nil
+}
+
+func (d *Drivers) runImagePaste() (Recording, error) {
+	cwd, err := tempDir("gx-doctor-image-cwd-")
+	if err != nil {
+		return Recording{}, err
+	}
+	defer os.RemoveAll(cwd)
+	pixel, cleanup, err := writePixel()
+	if err != nil {
+		return Recording{}, err
+	}
+	defer cleanup()
+	return d.runPTY(ptySpec{cwd: cwd, images: []string{pixel}, prompt: "Reply with the word done."})
+}
+
+// runImageSlash is record-only: it pastes images, runs a slash command and
+// notes what the composer did with the chips. It never returns an error, so
+// the Warn check cannot become a failure.
+func (d *Drivers) runImageSlash() (Recording, error) {
+	cwd, err := tempDir("gx-doctor-image-cwd-")
+	if err != nil {
+		return Recording{Note: "could not run: " + err.Error()}, nil
+	}
+	defer os.RemoveAll(cwd)
+	pixel, cleanup, err := writePixel()
+	if err != nil {
+		return Recording{Note: "could not run: " + err.Error()}, nil
+	}
+	defer cleanup()
+	rec, err := d.runPTY(ptySpec{cwd: cwd, images: []string{pixel}, prompt: "/status", recordOnly: true})
+	if err != nil {
+		return Recording{Note: "could not run: " + err.Error()}, nil
+	}
+	return rec, nil
 }
 
 // runDeny asks for a write outside the writable roots; the recording hook
@@ -214,6 +300,11 @@ type ptySpec struct {
 	// trust lists extra dirs to trust; a linked worktree's trust is the main repo's.
 	trust  []string
 	prompt string
+	// images are pasted, one bracketed paste each, before the prompt is typed.
+	images []string
+	// recordOnly sends the prompt and notes what the composer showed after it,
+	// instead of waiting for a finished turn.
+	recordOnly bool
 	// deny makes the recording hook deny every PermissionRequest.
 	deny bool
 }
@@ -226,7 +317,7 @@ func (d *Drivers) runPTY(spec ptySpec) (Recording, error) {
 	if err != nil {
 		return Recording{}, err
 	}
-	tmp, err := tempDir("gx-doctor-pty-")
+	tmp, err := d.ptyTempDir()
 	if err != nil {
 		return Recording{}, err
 	}
@@ -299,15 +390,34 @@ func (d *Drivers) runPTY(spec ptySpec) (Recording, error) {
 	case <-timeout:
 		return Recording{}, errors.New("codex never reported idle")
 	}
+	for _, img := range spec.images {
+		if _, err := io.WriteString(ptmx, "\x1b[200~"+img+"\x1b[201~"); err != nil {
+			return Recording{}, err
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 	if _, err := io.WriteString(ptmx, spec.prompt); err != nil {
 		return Recording{}, err
 	}
 	time.Sleep(200 * time.Millisecond)
+	framesBefore := len(rec.snapshot())
 	if _, err := io.WriteString(ptmx, "\r"); err != nil {
 		return Recording{}, err
 	}
 	if d.afterPrompt != nil {
 		go d.afterPrompt(codexHome)
+	}
+	if spec.recordOnly {
+		time.Sleep(slashWait)
+		var after bytes.Buffer
+		for _, f := range rec.snapshot()[framesBefore:] {
+			after.Write(f.Data)
+		}
+		note := "image chips cleared after " + spec.prompt
+		if bytes.Contains(after.Bytes(), []byte("[Image #")) {
+			note = "image chips kept after " + spec.prompt
+		}
+		return Recording{Frames: rec.snapshot(), Note: note}, nil
 	}
 
 	var rollouts []Rollout

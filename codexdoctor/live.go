@@ -2,6 +2,7 @@ package codexdoctor
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -131,6 +132,57 @@ func checkRolloutReader(in Input) (string, bool) {
 		}
 	}
 	return fmt.Sprintf("%d live rollouts read by both readers", len(in.Rollouts)), true
+}
+
+// imagePasteOption is the composer setting that turns pasting an image path
+// into an attached image. Codex 0.166.0 has no such key in its config schema,
+// so only an explicit `false` is a failure; absent means the default.
+const imagePasteOption = "image_paste_enabled"
+
+func checkImagePasteOption(in Input) (string, bool) {
+	data, err := os.ReadFile(filepath.Join(sessionlookup.RootsFrom(in.Env).CodexHome, "config.toml"))
+	if err == nil {
+		for line := range strings.SplitSeq(string(data), "\n") {
+			key, value, ok := strings.Cut(line, "=")
+			if ok && strings.TrimSpace(key) == imagePasteOption && strings.TrimSpace(value) == "false" {
+				return "config.toml sets " + imagePasteOption + " = false: pasted image paths stay plain text", false
+			}
+		}
+	}
+	return imagePasteOption + " is on", true
+}
+
+// checkImagePasteAttach wants the wrapper Codex writes around a pasted image:
+// its `[Image #1]` name, the path, and the closing tag.
+func checkImagePasteAttach(in Input) (string, bool) {
+	for _, r := range in.Rollouts {
+		var open, closed bool
+		for line := range bytes.SplitSeq(r.Data, []byte("\n")) {
+			var item struct {
+				Payload struct {
+					Content []struct {
+						Text string `json:"text"`
+					} `json:"content"`
+				} `json:"payload"`
+			}
+			if json.Unmarshal(line, &item) != nil {
+				continue
+			}
+			for _, c := range item.Payload.Content {
+				open = open || strings.HasPrefix(c.Text, `<image name=[Image #1] path=`)
+				closed = closed || c.Text == `</image>`
+			}
+		}
+		if open && closed {
+			return "the paste became [Image #1] with an <image> wrapper in " + r.Name, true
+		}
+	}
+	return "no <image name=[Image #1] ...> wrapper in the rollout: the pasted path was not attached", false
+}
+
+// checkImagePasteSlash only reports: a Warn check never fails the doctor.
+func checkImagePasteSlash(in Input) (string, bool) {
+	return in.Note, strings.HasPrefix(in.Note, "image chips kept")
 }
 
 // The spawn model keys were found with `strings` on the 0.166.0 binary's

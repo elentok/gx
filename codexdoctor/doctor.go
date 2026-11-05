@@ -62,6 +62,8 @@ type Recording struct {
 	Launch Launch
 	// Probe is the commit attempted from a Codex shell call.
 	Probe Probe
+	// Note is what a record-only session saw, or why it could not run.
+	Note string
 }
 
 // Frame is one chunk of PTY output, T seconds after the session started.
@@ -122,6 +124,8 @@ const (
 	DenySession         = "deny"
 	CommitSession       = "commit"
 	LiveRolloutsSession = "live-rollouts"
+	ImagePasteSession   = "image-paste"
+	ImageSlashSession   = "image-slash"
 )
 
 // Table is the doctor's check list, in run order.
@@ -134,6 +138,9 @@ var Table = []Check{
 	{Name: "permission-deny", Mode: Live, Session: DenySession, DependsOn: []string{"codex-version"}, Run: checkPermissionDeny},
 	{Name: "probe-commit", Mode: Live, Session: CommitSession, DependsOn: []string{"codex-version"}, Run: checkProbeCommit},
 	{Name: "rollout-reader", Mode: Live, Session: LiveRolloutsSession, DependsOn: []string{"codex-version"}, Run: checkRolloutReader},
+	{Name: "image-paste-option", Mode: Live, DependsOn: []string{"codex-version"}, Run: checkImagePasteOption},
+	{Name: "image-paste-attach", Mode: Live, Session: ImagePasteSession, DependsOn: []string{"codex-version"}, Run: checkImagePasteAttach},
+	{Name: "image-paste-slash", Mode: Live, Warn: true, Session: ImageSlashSession, DependsOn: []string{"codex-version"}, Run: checkImagePasteSlash},
 	{Name: "spawn-model-fields", Mode: Live, Warn: true, Run: checkSpawnModelFields},
 	{Name: "managed-rules", Mode: Live, Warn: true, Run: checkManagedRules},
 }

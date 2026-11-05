@@ -114,6 +114,44 @@ func TestRolloutReader(t *testing.T) {
 	}
 }
 
+func TestImagePasteOption(t *testing.T) {
+	t.Parallel()
+	r := runOne(t, "image-paste-option", Recording{}, codexHome(t, "image_paste_enabled = false\n", false))
+	if r.Status != Fail || !strings.Contains(r.Detail, "image_paste_enabled") {
+		t.Fatalf("off: %+v", r)
+	}
+	for name, env := range map[string][]string{
+		"on":     codexHome(t, "image_paste_enabled = true\n", false),
+		"absent": codexHome(t, "", false),
+	} {
+		if r := runOne(t, "image-paste-option", Recording{}, env); r.Status != Pass {
+			t.Fatalf("%s: %+v", name, r)
+		}
+	}
+}
+
+func TestImagePasteAttach(t *testing.T) {
+	t.Parallel()
+	good := fixtureRollout(t, "image-paste.jsonl")
+	if r := runOne(t, "image-paste-attach", Recording{Rollouts: []Rollout{{Name: "x", Data: good}}}, nil); r.Status != Pass {
+		t.Fatalf("with wrapper: %+v", r)
+	}
+	plain := fixtureRollout(t, "plain-turn.jsonl")
+	if r := runOne(t, "image-paste-attach", Recording{Rollouts: []Rollout{{Name: "x", Data: plain}}}, nil); r.Status != Fail {
+		t.Fatalf("without wrapper: %+v", r)
+	}
+}
+
+func TestImagePasteSlash_NeverFails(t *testing.T) {
+	t.Parallel()
+	for _, note := range []string{"image chips kept after /status", "image chips cleared after /status", "could not run: boom"} {
+		r := runOne(t, "image-paste-slash", Recording{Note: note}, nil)
+		if r.Status == Fail || r.Detail != note {
+			t.Errorf("%q: %+v", note, r)
+		}
+	}
+}
+
 func TestLiveChecksDependOnCodexVersion(t *testing.T) {
 	t.Parallel()
 	for _, c := range Table {
