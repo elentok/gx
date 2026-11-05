@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 
 	"github.com/elentok/gx/apiclient"
@@ -12,6 +10,7 @@ import (
 	"github.com/elentok/gx/cmd/brief"
 	"github.com/elentok/gx/cmd/check"
 	"github.com/elentok/gx/cmd/cmdbase"
+	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
@@ -19,7 +18,6 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/sessionlookup"
-	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/terminalrun"
@@ -66,16 +64,11 @@ type deps struct {
 	readAutoAdvance func(sessionID string) (bool, error)
 	// readSessionHarness reads a gx session's harness name from the server.
 	readSessionHarness func(sessionID string) (string, error)
-	skillsAgentRoots   func() ([]string, error)
-	skillsManifestPath func() (string, error)
-	// skillsStatusPath is where `gx server start` records a skill install
-	// problem for the server to show.
-	skillsStatusPath func() (string, error)
-	skillsBackupDir  func() (string, error)
-	// skillsCodexHome is $CODEX_HOME; nil skips the duplicate-skill warning.
-	skillsCodexHome func() string
-	explainAgent    func(target string) (herdr.AgentExplainResult, error)
-	probeGhostty    func() error
+	// skills holds the `gx skills` hooks (its Env is unset; skillsDeps fills
+	// it). `gx server start` also reads them until it moves out of root.
+	skills       skillscmd.Deps
+	explainAgent func(target string) (herdr.AgentExplainResult, error)
+	probeGhostty func() error
 	// serverClient dials the server; nil means the real one (tests inject a fake).
 	serverClient func() (*apiclient.Client, error)
 	// env is the process environment every config dir is resolved from.
@@ -91,6 +84,13 @@ func (d deps) base() cmdbase.Env {
 		Stdin: d.stdin, Stdout: d.stdout, Stderr: d.stderr, Getwd: d.getwd,
 		Env: d.env, Getenv: d.getenv, LoadConfig: d.loadConfig, NewClient: d.serverClient,
 	}
+}
+
+// skillsDeps is the `gx skills` hooks joined with the shared env.
+func (d deps) skillsDeps() skillscmd.Deps {
+	s := d.skills
+	s.Env = d.base()
+	return s
 }
 
 // dirs resolves the config, data and state directories from the deps env.
@@ -141,47 +141,10 @@ func defaultDeps() deps {
 		},
 		readAutoAdvance:    func(sessionID string) (bool, error) { return readServerAutoAdvance(dirs, sessionID) },
 		readSessionHarness: func(sessionID string) (string, error) { return readServerHarness(dirs, sessionID) },
-		skillsAgentRoots:   func() ([]string, error) { return defaultSkillsAgentRoots(dirs) },
-		skillsManifestPath: func() (string, error) { return defaultSkillsManifestPath(dirs) },
-		skillsStatusPath:   func() (string, error) { return defaultSkillsStatusPath(dirs) },
-		skillsBackupDir: func() (string, error) {
-			base, err := dirs.DataDir()
-			if err != nil {
-				return "", err
-			}
-			return filepath.Join(base, "skills-backups"), nil
-		},
-		skillsCodexHome: func() string { return roots.CodexHome },
-		explainAgent:    herdr.AgentExplain,
-		probeGhostty:    terminalrun.ProbeGhostty,
+		skills:             skillscmd.DefaultDeps(dirs, roots.CodexHome),
+		explainAgent:       herdr.AgentExplain,
+		probeGhostty:       terminalrun.ProbeGhostty,
 	}
-}
-
-// defaultSkillsAgentRoots resolves gx's canonical skill bundle's two install
-// targets under the real user's home directory: Claude Code's user skill
-// discovery root and Codex's user skill discovery root.
-func defaultSkillsAgentRoots(dirs config.Dirs) ([]string, error) {
-	home, err := dirs.Home()
-	if err != nil {
-		return nil, fmt.Errorf("resolve user home dir: %w", err)
-	}
-	return []string{skills.ClaudeSkillsRoot(home), skills.CodexSkillsRoot(home)}, nil
-}
-
-func defaultSkillsManifestPath(dirs config.Dirs) (string, error) {
-	base, err := dirs.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve user config dir: %w", err)
-	}
-	return skills.ManifestPath(base, skills.BundleID), nil
-}
-
-func defaultSkillsStatusPath(dirs config.Dirs) (string, error) {
-	stateDir, err := dirs.StateDir()
-	if err != nil {
-		return "", err
-	}
-	return skills.StatusPath(stateDir), nil
 }
 
 // Execute runs gx with the provided arguments.
@@ -263,7 +226,7 @@ Run without a command to open the status UI.`,
 		newViModeCmd(d),
 		newMergeCmd(d),
 		newCleanupCmd(d),
-		newSkillsCmd(d),
+		skillscmd.New(d.skillsDeps()),
 		newConfigCmd(d),
 		newBumpCmd(d),
 		newNotifyCmd(d),

@@ -1,4 +1,4 @@
-package cmd
+package skills_test
 
 import (
 	"bytes"
@@ -7,22 +7,23 @@ import (
 	"strings"
 	"testing"
 
+	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/testutil"
 )
 
-func statusPathOf(t *testing.T, d deps) string {
+func statusPathOf(t *testing.T, d skillscmd.Deps) string {
 	t.Helper()
-	path, err := d.skillsStatusPath()
+	path, err := d.StatusPath()
 	if err != nil {
-		t.Fatalf("skillsStatusPath: %v", err)
+		t.Fatalf("StatusPath: %v", err)
 	}
 	return path
 }
 
-func manifestOf(t *testing.T, d deps) skills.Manifest {
+func manifestOf(t *testing.T, d skillscmd.Deps) skills.Manifest {
 	t.Helper()
-	path, _ := d.skillsManifestPath()
+	path, _ := d.ManifestPath()
 	m, err := skills.Load(path)
 	if err != nil {
 		t.Fatalf("Load manifest: %v", err)
@@ -36,7 +37,7 @@ func TestRefreshSkills_NoManifestInstallsManagedCopies(t *testing.T) {
 	d := fakeSkillsDeps(t, &out)
 	claudeRoot, _ := agentRootsOf(t, d)
 
-	refreshSkills(d, &out)
+	skillscmd.Refresh(d, &out)
 
 	if _, err := os.Stat(filepath.Join(claudeRoot, "gx.md")); err != nil {
 		t.Errorf("gx.md not installed: %v", err)
@@ -56,10 +57,10 @@ func TestRefreshSkills_UpToDateSaysSo(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
 	d := fakeSkillsDeps(t, &out)
-	refreshSkills(d, &out)
+	skillscmd.Refresh(d, &out)
 	out.Reset()
 
-	refreshSkills(d, &out)
+	skillscmd.Refresh(d, &out)
 
 	if out.String() != "skills: up to date\n" {
 		t.Errorf("output = %q, want %q", out.String(), "skills: up to date\n")
@@ -73,7 +74,7 @@ func TestRefreshSkills_DevInstallRelinksFromSameCheckout(t *testing.T) {
 	bundleDir := writeDevBundle(t, repo)
 	d := fakeSkillsDevDeps(t, &out, repo)
 	claudeRoot, _ := agentRootsOf(t, d)
-	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+	if err := run(t, d, "install", "--dev"); err != nil {
 		t.Fatalf("skills install --dev: %v", err)
 	}
 	link := filepath.Join(claudeRoot, "gx-implement")
@@ -81,10 +82,10 @@ func TestRefreshSkills_DevInstallRelinksFromSameCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The start runs from anywhere, not from the checkout.
-	d.getwd = func() (string, error) { return t.TempDir(), nil }
+	d.Getwd = func() (string, error) { return t.TempDir(), nil }
 	out.Reset()
 
-	refreshSkills(d, &out)
+	skillscmd.Refresh(d, &out)
 
 	target, err := os.Readlink(link)
 	if err != nil {
@@ -107,7 +108,7 @@ func TestRefreshSkills_MissingDevCheckoutWarnsAndLeavesSkills(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	writeDevBundle(t, repo)
 	d := fakeSkillsDevDeps(t, &out, repo)
-	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+	if err := run(t, d, "install", "--dev"); err != nil {
 		t.Fatalf("skills install --dev: %v", err)
 	}
 	before := manifestOf(t, d)
@@ -116,7 +117,7 @@ func TestRefreshSkills_MissingDevCheckoutWarnsAndLeavesSkills(t *testing.T) {
 	}
 	out.Reset()
 
-	refreshSkills(d, &out)
+	skillscmd.Refresh(d, &out)
 
 	if !strings.Contains(out.String(), "warning: skills: dev checkout "+repo+" is gone") {
 		t.Errorf("output = %q, want a missing-checkout warning", out.String())
@@ -139,7 +140,7 @@ func TestRefreshSkills_ConflictRecordsProblemAndCleanInstallClearsIt(t *testing.
 	}
 	testutil.WriteFile(t, claudeRoot, "gx.md", "not gx's")
 
-	refreshSkills(d, &out)
+	skillscmd.Refresh(d, &out)
 
 	conflicted := filepath.Join(claudeRoot, "gx.md")
 	if !strings.Contains(out.String(), "warning: skills: install refused") || !strings.Contains(out.String(), conflicted) {
@@ -150,7 +151,7 @@ func TestRefreshSkills_ConflictRecordsProblemAndCleanInstallClearsIt(t *testing.
 		t.Errorf("recorded problem = %q, want the path and the fix", problem)
 	}
 
-	if err := execute([]string{"skills", "install", "--force-all"}, d); err != nil {
+	if err := run(t, d, "install", "--force-all"); err != nil {
 		t.Fatalf("skills install --force-all: %v", err)
 	}
 	if p := skills.ReadProblem(statusPathOf(t, d)); p != "" {
@@ -165,8 +166,8 @@ func TestRefreshSkills_MigratesV1AndKeepsServerWarningOnConflict(t *testing.T) {
 			repo := testutil.TempRepo(t)
 			bundle := writeDevBundle(t, repo)
 			d := fakeSkillsDevDeps(t, &out, repo)
-			roots, _ := d.skillsAgentRoots()
-			manifest, _ := d.skillsManifestPath()
+			roots, _ := d.AgentRoots()
+			manifest, _ := d.ManifestPath()
 			rels, err := skills.BundleFiles()
 			if err != nil {
 				t.Fatal(err)
@@ -198,8 +199,8 @@ func TestRefreshSkills_MigratesV1AndKeepsServerWarningOnConflict(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			d.getwd = func() (string, error) { t.Fatal("startup used invocation checkout"); return "", nil }
-			refreshSkills(d, &out)
+			d.Getwd = func() (string, error) { t.Fatal("startup used invocation checkout"); return "", nil }
+			skillscmd.Refresh(d, &out)
 			if conflict {
 				after, err := os.ReadFile(manifest)
 				if err != nil {

@@ -1,19 +1,84 @@
-package cmd
+// Package skills is `gx skills install|uninstall`, plus Refresh for
+// `gx server start`.
+package skills
 
 import (
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/skills"
 
 	"github.com/spf13/cobra"
 )
 
-func newSkillsCmd(d deps) *cobra.Command {
+// Deps is the runtime context of `gx skills`.
+type Deps struct {
+	cmdbase.Env
+	AgentRoots   func() ([]string, error)
+	ManifestPath func() (string, error)
+	// StatusPath is where `gx server start` records a skill install problem
+	// for the server to show.
+	StatusPath func() (string, error)
+	// BackupDir is optional; nil installs without a backup directory.
+	BackupDir func() (string, error)
+	// CodexHome is $CODEX_HOME; nil skips the duplicate-skill warning.
+	CodexHome func() string
+}
+
+// DefaultDeps wires the production skill locations for the given env and
+// $CODEX_HOME. Env is left for the caller to fill in.
+func DefaultDeps(dirs config.Dirs, codexHome string) Deps {
+	return Deps{
+		AgentRoots:   func() ([]string, error) { return defaultAgentRoots(dirs) },
+		ManifestPath: func() (string, error) { return defaultManifestPath(dirs) },
+		StatusPath:   func() (string, error) { return defaultStatusPath(dirs) },
+		BackupDir: func() (string, error) {
+			base, err := dirs.DataDir()
+			if err != nil {
+				return "", err
+			}
+			return filepath.Join(base, "skills-backups"), nil
+		},
+		CodexHome: func() string { return codexHome },
+	}
+}
+
+// defaultAgentRoots resolves gx's canonical skill bundle's two install
+// targets under the real user's home directory: Claude Code's user skill
+// discovery root and Codex's user skill discovery root.
+func defaultAgentRoots(dirs config.Dirs) ([]string, error) {
+	home, err := dirs.Home()
+	if err != nil {
+		return nil, fmt.Errorf("resolve user home dir: %w", err)
+	}
+	return []string{skills.ClaudeSkillsRoot(home), skills.CodexSkillsRoot(home)}, nil
+}
+
+func defaultManifestPath(dirs config.Dirs) (string, error) {
+	base, err := dirs.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user config dir: %w", err)
+	}
+	return skills.ManifestPath(base, skills.BundleID), nil
+}
+
+func defaultStatusPath(dirs config.Dirs) (string, error) {
+	stateDir, err := dirs.StateDir()
+	if err != nil {
+		return "", err
+	}
+	return skills.StatusPath(stateDir), nil
+}
+
+// New builds the `gx skills` command.
+func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "skills",
 		Short: "install or remove gx's built-in agent skill bundle",
@@ -22,7 +87,7 @@ func newSkillsCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func newSkillsInstallCmd(d deps) *cobra.Command {
+func newSkillsInstallCmd(d Deps) *cobra.Command {
 	var force []string
 	var forceAll bool
 	var dev bool
@@ -55,7 +120,7 @@ func newSkillsInstallCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func newSkillsUninstallCmd(d deps) *cobra.Command {
+func newSkillsUninstallCmd(d Deps) *cobra.Command {
 	var force []string
 	cmd := &cobra.Command{
 		Use:   "uninstall",
@@ -72,8 +137,8 @@ func newSkillsUninstallCmd(d deps) *cobra.Command {
 
 // clearSkillsProblem drops the problem the last `gx server start` recorded,
 // so the web UI stops showing it once a manual install succeeds.
-func clearSkillsProblem(d deps) {
-	if path, err := d.skillsStatusPath(); err == nil {
+func clearSkillsProblem(d Deps) {
+	if path, err := d.StatusPath(); err == nil {
 		_ = skills.WriteProblem(path, "")
 	}
 }
@@ -84,7 +149,7 @@ func clearSkillsProblem(d deps) {
 // (already up to date), or conflicted. A conflict aborts the entire install
 // (see skills.Install), so every non-conflicted target is reported skipped
 // rather than the status it would have received on a clean run.
-func runSkillsInstall(d deps, force skills.ForcePolicy, out io.Writer) error {
+func runSkillsInstall(d Deps, force skills.ForcePolicy, out io.Writer) error {
 	tmpDir, err := os.MkdirTemp("", "gx-skills-bundle-*")
 	if err != nil {
 		return fmt.Errorf("create scratch dir for bundle extraction: %w", err)
@@ -106,8 +171,8 @@ func runSkillsInstall(d deps, force skills.ForcePolicy, out io.Writer) error {
 // from the running binary's location, so it works the same from a nested
 // subdirectory or a linked worktree; runSkillsInstallDev refuses to change
 // anything if that repository doesn't contain gx's skill bundle.
-func runSkillsInstallDev(d deps, force skills.ForcePolicy, out io.Writer) error {
-	cwd, err := d.getwd()
+func runSkillsInstallDev(d Deps, force skills.ForcePolicy, out io.Writer) error {
+	cwd, err := d.Getwd()
 	if err != nil {
 		return fmt.Errorf("resolve working directory: %w", err)
 	}
@@ -139,7 +204,7 @@ func resolveDevRoot(dir string) (string, error) {
 
 // installSkills runs a single skill install, reporting per-target results
 // and turning a conflict into an actionable error message.
-func installSkills(d deps, force skills.ForcePolicy, out io.Writer, source string, sources []skills.SourceFile, mode skills.InstallMode) error {
+func installSkills(d Deps, force skills.ForcePolicy, out io.Writer, source string, sources []skills.SourceFile, mode skills.InstallMode) error {
 	targets, installErr := installSkillTargets(d, force, source, sources, mode)
 	printTargetReport(out, targets, installErr == nil)
 	if installErr == nil {
@@ -155,18 +220,18 @@ func installSkills(d deps, force skills.ForcePolicy, out io.Writer, source strin
 
 // installSkillTargets runs a single skill install and returns its per-target
 // report without printing it.
-func installSkillTargets(d deps, force skills.ForcePolicy, source string, sources []skills.SourceFile, mode skills.InstallMode) ([]skills.Target, error) {
-	roots, err := d.skillsAgentRoots()
+func installSkillTargets(d Deps, force skills.ForcePolicy, source string, sources []skills.SourceFile, mode skills.InstallMode) ([]skills.Target, error) {
+	roots, err := d.AgentRoots()
 	if err != nil {
 		return nil, err
 	}
-	manifestPath, err := d.skillsManifestPath()
+	manifestPath, err := d.ManifestPath()
 	if err != nil {
 		return nil, err
 	}
 	backupDir := ""
-	if d.skillsBackupDir != nil {
-		backupDir, err = d.skillsBackupDir()
+	if d.BackupDir != nil {
+		backupDir, err = d.BackupDir()
 		if err != nil {
 			return nil, err
 		}
@@ -181,17 +246,17 @@ func installSkillTargets(d deps, force skills.ForcePolicy, source string, source
 	})
 }
 
-// refreshSkills reinstalls gx's skill bundle the way it was last installed:
+// Refresh reinstalls gx's skill bundle the way it was last installed:
 // dev symlinks from the same checkout, else managed copies (also when it was
 // never installed). It never forces and never fails its caller: a problem is
 // printed and recorded for the server to show, and a clean install clears
 // the record.
-func refreshSkills(d deps, out io.Writer) {
-	problem := refreshSkillsProblem(d, out)
+func Refresh(d Deps, out io.Writer) {
+	problem := refreshProblem(d, out)
 	if problem != "" {
 		fmt.Fprintf(out, "warning: skills: %s\n", problem)
 	}
-	path, err := d.skillsStatusPath()
+	path, err := d.StatusPath()
 	if err == nil {
 		err = skills.WriteProblem(path, problem)
 	}
@@ -200,8 +265,8 @@ func refreshSkills(d deps, out io.Writer) {
 	}
 }
 
-func refreshSkillsProblem(d deps, out io.Writer) string {
-	manifestPath, err := d.skillsManifestPath()
+func refreshProblem(d Deps, out io.Writer) string {
+	manifestPath, err := d.ManifestPath()
 	if err != nil {
 		return err.Error()
 	}
@@ -246,11 +311,11 @@ func refreshSkillsProblem(d deps, out io.Writer) string {
 // warnCodexHomeDuplicates prints a warning for each gx skill that also sits
 // under $CODEX_HOME/skills. It is informational only: it never fails the
 // install, never deletes, and is not recorded as a server problem.
-func warnCodexHomeDuplicates(d deps, out io.Writer, sources []skills.SourceFile) {
-	if d.skillsCodexHome == nil {
+func warnCodexHomeDuplicates(d Deps, out io.Writer, sources []skills.SourceFile) {
+	if d.CodexHome == nil {
 		return
 	}
-	for _, path := range skills.CodexHomeDuplicates(d.skillsCodexHome(), sources) {
+	for _, path := range skills.CodexHomeDuplicates(d.CodexHome(), sources) {
 		fmt.Fprintf(out, "warning: skills: %s duplicates a gx skill installed under ~/.agents/skills; Codex would find the skill twice\n", path)
 	}
 }
@@ -296,16 +361,16 @@ func summarizeTargets(targets []skills.Target) string {
 // it's locally modified and force didn't authorize its removal). Uninstall
 // never aborts on conflict, so the targets it returns always match what
 // actually happened.
-func runSkillsUninstall(d deps, force []string, out io.Writer) error {
-	manifestPath, err := d.skillsManifestPath()
+func runSkillsUninstall(d Deps, force []string, out io.Writer) error {
+	manifestPath, err := d.ManifestPath()
 	if err != nil {
 		return err
 	}
 	forcePolicy := skills.NewForcePolicy(force...)
 
 	backupDir := ""
-	if d.skillsBackupDir != nil {
-		backupDir, err = d.skillsBackupDir()
+	if d.BackupDir != nil {
+		backupDir, err = d.BackupDir()
 		if err != nil {
 			return err
 		}

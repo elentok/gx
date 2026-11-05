@@ -1,4 +1,4 @@
-package cmd
+package skills_test
 
 import (
 	"bytes"
@@ -7,42 +7,53 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
+	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/testutil"
 )
 
-// fakeSkillsDeps builds a deps whose skills roots and manifest path are fake
+// fakeSkillsDeps builds a Deps whose skills roots and manifest path are fake
 // user locations under t.TempDir(), so tests never touch a real home
 // directory - the "fake user locations" test seam ticket 05 calls for.
-func fakeSkillsDeps(t *testing.T, stdout *bytes.Buffer) deps {
+func fakeSkillsDeps(t *testing.T, stdout *bytes.Buffer) skillscmd.Deps {
 	t.Helper()
 	claudeRoot := filepath.Join(t.TempDir(), "claude-skills")
 	codexRoot := filepath.Join(t.TempDir(), "codex-skills")
 	manifestPath := filepath.Join(t.TempDir(), "manifest.json")
 	statusPath := filepath.Join(t.TempDir(), "skills-install.json")
 
-	return deps{
-		stdout: stdout,
-		stderr: bytes.NewBuffer(nil),
-		skillsAgentRoots: func() ([]string, error) {
+	return skillscmd.Deps{
+		Env: cmdbase.Env{
+			Stdout: stdout,
+			Stderr: bytes.NewBuffer(nil),
+		},
+		AgentRoots: func() ([]string, error) {
 			return []string{claudeRoot, codexRoot}, nil
 		},
-		skillsManifestPath: func() (string, error) {
+		ManifestPath: func() (string, error) {
 			return manifestPath, nil
 		},
-		skillsStatusPath: func() (string, error) {
+		StatusPath: func() (string, error) {
 			return statusPath, nil
 		},
 	}
 }
 
-// fakeSkillsDevDeps is fakeSkillsDeps with getwd faked to cwd, the seam
+// fakeSkillsDevDeps is fakeSkillsDeps with Getwd faked to cwd, the seam
 // runSkillsInstallDev uses to resolve the invoking git checkout.
-func fakeSkillsDevDeps(t *testing.T, stdout *bytes.Buffer, cwd string) deps {
+func fakeSkillsDevDeps(t *testing.T, stdout *bytes.Buffer, cwd string) skillscmd.Deps {
 	t.Helper()
 	d := fakeSkillsDeps(t, stdout)
-	d.getwd = func() (string, error) { return cwd, nil }
+	d.Getwd = func() (string, error) { return cwd, nil }
 	return d
+}
+
+// run executes `gx skills <args>` against d.
+func run(t *testing.T, d skillscmd.Deps, args ...string) error {
+	t.Helper()
+	return cmdtest.Run(t, d.Env, append([]string{"skills"}, args...), skillscmd.New(d))
 }
 
 // writeDevBundle writes a fake copy of gx's skill bundle - the same
@@ -69,11 +80,11 @@ func writeDevBundle(t *testing.T, root string) string {
 	return bundleDir
 }
 
-func agentRootsOf(t *testing.T, d deps) (claude, codex string) {
+func agentRootsOf(t *testing.T, d skillscmd.Deps) (claude, codex string) {
 	t.Helper()
-	roots, err := d.skillsAgentRoots()
+	roots, err := d.AgentRoots()
 	if err != nil {
-		t.Fatalf("skillsAgentRoots: %v", err)
+		t.Fatalf("AgentRoots: %v", err)
 	}
 	return roots[0], roots[1]
 }
@@ -84,7 +95,7 @@ func TestExecute_SkillsInstall_CopiesBundleIntoBothAgentRoots(t *testing.T) {
 	d := fakeSkillsDeps(t, &stdout)
 	claudeRoot, codexRoot := agentRootsOf(t, d)
 
-	if err := execute([]string{"skills", "install"}, d); err != nil {
+	if err := run(t, d, "install"); err != nil {
 		t.Fatalf("execute skills install: %v", err)
 	}
 
@@ -105,7 +116,7 @@ func TestExecute_SkillsInstall_CopiesBundleIntoBothAgentRoots(t *testing.T) {
 	}
 }
 
-func codexHomeWithDuplicate(t *testing.T, d *deps, withDup bool) string {
+func codexHomeWithDuplicate(t *testing.T, d *skillscmd.Deps, withDup bool) string {
 	t.Helper()
 	home := t.TempDir()
 	dup := filepath.Join(home, "skills", "gx-design")
@@ -114,7 +125,7 @@ func codexHomeWithDuplicate(t *testing.T, d *deps, withDup bool) string {
 			t.Fatal(err)
 		}
 	}
-	d.skillsCodexHome = func() string { return home }
+	d.CodexHome = func() string { return home }
 	return dup
 }
 
@@ -124,7 +135,7 @@ func TestExecute_SkillsInstall_WarnsAboutCodexHomeDuplicate(t *testing.T) {
 	d := fakeSkillsDeps(t, &stdout)
 	dup := codexHomeWithDuplicate(t, &d, true)
 
-	if err := execute([]string{"skills", "install"}, d); err != nil {
+	if err := run(t, d, "install"); err != nil {
 		t.Fatalf("install must not fail on a duplicate: %v", err)
 	}
 
@@ -143,7 +154,7 @@ func TestExecute_SkillsInstall_NoWarningWithoutDuplicate(t *testing.T) {
 	d := fakeSkillsDeps(t, &stdout)
 	codexHomeWithDuplicate(t, &d, false)
 
-	if err := execute([]string{"skills", "install"}, d); err != nil {
+	if err := run(t, d, "install"); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(stdout.String(), "warning:") {
@@ -157,7 +168,7 @@ func TestRefreshSkills_WarnsAboutCodexHomeDuplicateWithoutRecordingProblem(t *te
 	d := fakeSkillsDeps(t, &out)
 	dup := codexHomeWithDuplicate(t, &d, true)
 
-	refreshSkills(d, &out)
+	skillscmd.Refresh(d, &out)
 
 	if !strings.Contains(out.String(), "warning: skills: "+dup) {
 		t.Errorf("output = %q, want a duplicate warning", out.String())
@@ -172,12 +183,12 @@ func TestExecute_SkillsInstall_ReinstallReportsSkipped(t *testing.T) {
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 
-	if err := execute([]string{"skills", "install"}, d); err != nil {
+	if err := run(t, d, "install"); err != nil {
 		t.Fatalf("first install: %v", err)
 	}
 
 	stdout.Reset()
-	if err := execute([]string{"skills", "install"}, d); err != nil {
+	if err := run(t, d, "install"); err != nil {
 		t.Fatalf("second install: %v", err)
 	}
 
@@ -203,7 +214,7 @@ func TestExecute_SkillsInstall_ConflictedPathBlocksInstallAndReportsConflict(t *
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	err := execute([]string{"skills", "install"}, d)
+	err := run(t, d, "install")
 	if err == nil {
 		t.Fatal("expected error from unrelated collision")
 	}
@@ -233,7 +244,7 @@ func TestExecute_SkillsInstall_ForceOverridesConflict(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	if err := execute([]string{"skills", "install", "--force", "gx.md"}, d); err != nil {
+	if err := run(t, d, "install", "--force", "gx.md"); err != nil {
 		t.Fatalf("execute skills install --force: %v", err)
 	}
 
@@ -251,7 +262,7 @@ func TestExecute_SkillsUninstall_NotInstalledPrintsMessageAndSucceeds(t *testing
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 
-	if err := execute([]string{"skills", "uninstall"}, d); err != nil {
+	if err := run(t, d, "uninstall"); err != nil {
 		t.Fatalf("execute skills uninstall: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "not installed") {
@@ -265,12 +276,12 @@ func TestExecute_SkillsUninstall_RemovesInstalledBundle(t *testing.T) {
 	d := fakeSkillsDeps(t, &stdout)
 	claudeRoot, codexRoot := agentRootsOf(t, d)
 
-	if err := execute([]string{"skills", "install"}, d); err != nil {
+	if err := run(t, d, "install"); err != nil {
 		t.Fatalf("install: %v", err)
 	}
 
 	stdout.Reset()
-	if err := execute([]string{"skills", "uninstall"}, d); err != nil {
+	if err := run(t, d, "uninstall"); err != nil {
 		t.Fatalf("execute skills uninstall: %v", err)
 	}
 
@@ -285,7 +296,7 @@ func TestExecute_SkillsUninstall_RemovesInstalledBundle(t *testing.T) {
 		t.Errorf("expected output to report removed targets, got: %q", out)
 	}
 
-	manifestPath, _ := d.skillsManifestPath()
+	manifestPath, _ := d.ManifestPath()
 	if _, err := skills.Load(manifestPath); err == nil {
 		t.Error("expected manifest to be removed after full uninstall")
 	}
@@ -297,7 +308,7 @@ func TestExecute_SkillsUninstall_PreservesLocallyModifiedFileAsConflicted(t *tes
 	d := fakeSkillsDeps(t, &stdout)
 	claudeRoot, _ := agentRootsOf(t, d)
 
-	if err := execute([]string{"skills", "install"}, d); err != nil {
+	if err := run(t, d, "install"); err != nil {
 		t.Fatalf("install: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(claudeRoot, "gx.md"), []byte("locally edited"), 0644); err != nil {
@@ -305,7 +316,7 @@ func TestExecute_SkillsUninstall_PreservesLocallyModifiedFileAsConflicted(t *tes
 	}
 
 	stdout.Reset()
-	if err := execute([]string{"skills", "uninstall"}, d); err != nil {
+	if err := run(t, d, "uninstall"); err != nil {
 		t.Fatalf("execute skills uninstall: %v", err)
 	}
 
@@ -329,7 +340,7 @@ func TestExecute_SkillsInstallDev_SymlinksCurrentCheckoutIntoBothAgentRoots(t *t
 	d := fakeSkillsDevDeps(t, &stdout, repo)
 	claudeRoot, codexRoot := agentRootsOf(t, d)
 
-	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+	if err := run(t, d, "install", "--dev"); err != nil {
 		t.Fatalf("execute skills install --dev: %v", err)
 	}
 
@@ -361,7 +372,7 @@ func TestExecute_SkillsInstallDev_ResolvesGitRootFromNestedWorkingDirectory(t *t
 	d := fakeSkillsDevDeps(t, &stdout, nested)
 	claudeRoot, _ := agentRootsOf(t, d)
 
-	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+	if err := run(t, d, "install", "--dev"); err != nil {
 		t.Fatalf("execute skills install --dev: %v", err)
 	}
 
@@ -384,7 +395,7 @@ func TestExecute_SkillsInstallDev_ResolvesLinkedWorktreeRootNotBareRoot(t *testi
 	d := fakeSkillsDevDeps(t, &stdout, wtDir)
 	claudeRoot, _ := agentRootsOf(t, d)
 
-	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+	if err := run(t, d, "install", "--dev"); err != nil {
 		t.Fatalf("execute skills install --dev: %v", err)
 	}
 
@@ -405,12 +416,12 @@ func TestExecute_SkillsInstallDev_ReinstallFromSameCheckoutIsIdempotent(t *testi
 	writeDevBundle(t, repo)
 	d := fakeSkillsDevDeps(t, &stdout, repo)
 
-	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+	if err := run(t, d, "install", "--dev"); err != nil {
 		t.Fatalf("first install --dev: %v", err)
 	}
 
 	stdout.Reset()
-	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+	if err := run(t, d, "install", "--dev"); err != nil {
 		t.Fatalf("second install --dev: %v", err)
 	}
 
@@ -431,17 +442,17 @@ func TestExecute_SkillsInstallDev_DifferentCheckoutDetectsChangedLinkTargetInste
 	dA := fakeSkillsDevDeps(t, &stdout, repoA)
 	claudeRoot, _ := agentRootsOf(t, dA)
 
-	if err := execute([]string{"skills", "install", "--dev"}, dA); err != nil {
+	if err := run(t, dA, "install", "--dev"); err != nil {
 		t.Fatalf("install from repoA: %v", err)
 	}
 
 	repoB := testutil.TempRepo(t)
 	writeDevBundle(t, repoB)
 	dB := dA
-	dB.getwd = func() (string, error) { return repoB, nil }
+	dB.Getwd = func() (string, error) { return repoB, nil }
 
 	stdout.Reset()
-	err := execute([]string{"skills", "install", "--dev"}, dB)
+	err := run(t, dB, "install", "--dev")
 	if err == nil {
 		t.Fatal("expected error installing --dev from a different checkout without --force")
 	}
@@ -466,12 +477,12 @@ func TestExecute_SkillsInstall_SwitchingBetweenProdAndDevRequiresForce(t *testin
 	writeDevBundle(t, repo)
 	d := fakeSkillsDevDeps(t, &stdout, repo)
 
-	if err := execute([]string{"skills", "install"}, d); err != nil {
+	if err := run(t, d, "install"); err != nil {
 		t.Fatalf("prod install: %v", err)
 	}
 
 	stdout.Reset()
-	err := execute([]string{"skills", "install", "--dev"}, d)
+	err := run(t, d, "install", "--dev")
 	if err == nil {
 		t.Fatal("expected switching to --dev without --force to conflict")
 	}
@@ -486,10 +497,10 @@ func TestExecute_SkillsInstallDev_RefusesCheckoutMissingBundle(t *testing.T) {
 	repo := testutil.TempRepo(t) // no skills/ directory written
 	d := fakeSkillsDevDeps(t, &stdout, repo)
 
-	if err := execute([]string{"skills", "install", "--dev"}, d); err == nil {
+	if err := run(t, d, "install", "--dev"); err == nil {
 		t.Fatal("expected error for checkout missing gx's skill bundle")
 	}
-	manifestPath, _ := d.skillsManifestPath()
+	manifestPath, _ := d.ManifestPath()
 	if _, err := skills.Load(manifestPath); err == nil {
 		t.Error("expected no manifest to be written for a refused dev install")
 	}

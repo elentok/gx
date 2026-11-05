@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
@@ -595,7 +596,7 @@ func runServerStartCmd(ctx context.Context, d deps, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	refreshSkills(d, w)
+	skillscmd.Refresh(d.skillsDeps(), w)
 	c, err := cmdbase.ServerClient(dirs)
 	if err != nil {
 		return err
