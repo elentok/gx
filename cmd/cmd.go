@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/cmd/brief"
 	"github.com/elentok/gx/cmd/check"
 	"github.com/elentok/gx/cmd/cmdbase"
+	configcmd "github.com/elentok/gx/cmd/config"
 	"github.com/elentok/gx/cmd/doctor"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
@@ -49,7 +50,6 @@ type deps struct {
 	runTab               func(nav.TabID) error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
-	initConfig           func() (string, error)
 	loadConfig           func() (config.Config, error)
 	getenv               func(string) string
 	goos                 string
@@ -69,6 +69,9 @@ type deps struct {
 	// doctor holds the `gx doctor` hooks (its Env, ConfirmForce and GOOS are
 	// unset; doctorDeps fills them).
 	doctor doctor.Deps
+	// config holds the `gx config` and `gx notify` hooks (its Env is unset;
+	// configDeps fills it).
+	config configcmd.Deps
 	// serverClient dials the server; nil means the real one (tests inject a fake).
 	serverClient func() (*apiclient.Client, error)
 	// env is the process environment every config dir is resolved from.
@@ -102,6 +105,13 @@ func (d deps) doctorDeps() doctor.Deps {
 	return s
 }
 
+// configDeps is the `gx config` and `gx notify` hooks joined with the shared env.
+func (d deps) configDeps() configcmd.Deps {
+	s := d.config
+	s.Env = d.base()
+	return s
+}
+
 // dirs resolves the config, data and state directories from the deps env.
 func (d deps) dirs() config.Dirs { return d.base().Dirs() }
 
@@ -130,13 +140,12 @@ func defaultDeps() deps {
 		runPRs:               func(allRepos bool) error { return runPRs(dirs, allRepos) },
 		runTab:               func(tab nav.TabID) error { return runTab(dirs, tab) },
 		choosePushDivergence: choosePushDivergence,
-		initConfig:           dirs.Init,
 		loadConfig:           dirs.Load,
 		getenv:               os.Getenv,
 		goos:                 runtime.GOOS,
 		userHomeDir:          dirs.Home,
 		runEditor: func(editor, path string, in io.Reader, out, errOut io.Writer) error {
-			return runEditorCommand(env, editor, path, in, out, errOut)
+			return cmdbase.RunEditorCommand(env, editor, path, in, out, errOut)
 		},
 		stdinIsTerminal: func() bool { return isTerminalFile(os.Stdin) },
 		readClaudeOccupancy: func(cwd, sessionID string) (int, bool, error) {
@@ -152,6 +161,7 @@ func defaultDeps() deps {
 		readSessionHarness: func(sessionID string) (string, error) { return readServerHarness(dirs, sessionID) },
 		skills:             skillscmd.DefaultDeps(dirs, roots.CodexHome),
 		doctor:             doctor.DefaultDeps(),
+		config:             configcmd.DefaultDeps(dirs, env),
 	}
 }
 
@@ -235,9 +245,9 @@ Run without a command to open the status UI.`,
 		newMergeCmd(d),
 		newCleanupCmd(d),
 		skillscmd.New(d.skillsDeps()),
-		newConfigCmd(d),
+		configcmd.New(d.configDeps()),
 		newBumpCmd(d),
-		newNotifyCmd(d),
+		configcmd.NewNotify(d.configDeps()),
 		newStashifyCmd(d),
 		newRunCmd(d),
 		newAgentHolderCmd(),

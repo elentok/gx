@@ -537,48 +537,6 @@ func newCleanupCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func newConfigCmd(d deps) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "manage gx configuration",
-	}
-	cmd.AddCommand(
-		&cobra.Command{
-			Use:   "edit",
-			Short: "open the config file in $EDITOR (creates it if missing)",
-			Args:  cobra.NoArgs,
-			RunE: func(_ *cobra.Command, _ []string) error {
-				return runEditConfig(d)
-			},
-		},
-		&cobra.Command{
-			Use:   "show",
-			Short: "print the effective (merged) config as JSON",
-			Args:  cobra.NoArgs,
-			RunE: func(_ *cobra.Command, _ []string) error {
-				return runConfigShow(d)
-			},
-		},
-		&cobra.Command{
-			Use:   "defaults",
-			Short: "print the built-in default config as JSON",
-			Args:  cobra.NoArgs,
-			RunE: func(_ *cobra.Command, _ []string) error {
-				return runConfigDefaults(d)
-			},
-		},
-		&cobra.Command{
-			Use:   "test-notifications",
-			Short: "send a test message to every configured notification service",
-			Args:  cobra.NoArgs,
-			RunE: func(_ *cobra.Command, _ []string) error {
-				return runConfigTestNotifications(d)
-			},
-		},
-	)
-	return cmd
-}
-
 func newBumpCmd(d deps) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
@@ -616,26 +574,6 @@ func newRunCmd(d deps) *cobra.Command {
 			return runRun(args, d)
 		},
 	}
-}
-
-func newNotifyCmd(d deps) *cobra.Command {
-	var enable, disable, project string
-	var status, testBatch bool
-
-	cmd := &cobra.Command{
-		Use:   "notify [message]",
-		Short: "send a message via configured Telegram/Slack notifications",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return runNotify(args, enable, disable, project, status, testBatch, d)
-		},
-	}
-	cmd.Flags().StringVar(&enable, "enable", "", "clear the manual mute for every destination of a transport (telegram/slack)")
-	cmd.Flags().StringVar(&disable, "disable", "", "trip the manual mute for every destination of a transport (telegram/slack)")
-	cmd.Flags().StringVar(&project, "project", "", "with --enable/--disable: only that project's destination")
-	cmd.Flags().BoolVar(&status, "status", false, "report per-destination mute state, its projects and muted tickets")
-	cmd.Flags().BoolVar(&testBatch, "test-batch", false, "send a fixed 2-message batch through the same join a real flush uses, to reproduce/verify the batch-separator escaping bug live")
-	return cmd
 }
 
 func newVersionCmd(d deps) *cobra.Command {
