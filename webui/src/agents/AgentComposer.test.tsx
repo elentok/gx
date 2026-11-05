@@ -209,3 +209,36 @@ test("the narrow layout ignores the key", async () => {
   await new Promise((r) => setTimeout(r, 20));
   expect(post).not.toHaveBeenCalled();
 });
+
+const uploads = vi.hoisted(() => ({ upload: vi.fn() }));
+vi.mock("../design/sessionImages", () => ({
+  uploadSessionImage: uploads.upload,
+  deleteSessionImage: vi.fn(async () => ({})),
+  sessionImageUrl: (_s: string, id: string) => `/img/${id}`,
+}));
+
+const pngFile = () =>
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", { type: "image/png" });
+
+test("Add image works while the session is busy and Send stays off until the upload is ready", async () => {
+  let finish: (id: string) => void = () => undefined;
+  uploads.upload.mockReturnValueOnce(new Promise<string>((r) => (finish = r)));
+  render({ s: session("running") });
+  fireEvent.change(box(), { target: { value: "hi" } });
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
+  await screen.findByLabelText("Uploading");
+  expect(screen.getByText("0 failed · 1 uploading")).toBeTruthy();
+  expect((send() as HTMLButtonElement).disabled).toBe(true);
+  finish("i1");
+  await screen.findByText("1 of 10 images");
+  expect(screen.getByRole("button", { name: "Remove image" })).toBeTruthy();
+});
+
+test("Send stays off while an image failed", async () => {
+  uploads.upload.mockRejectedValueOnce(new Error("Upload failed"));
+  render();
+  fireEvent.change(box(), { target: { value: "hi" } });
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
+  await screen.findByText("Upload failed, tap to retry");
+  expect((send() as HTMLButtonElement).disabled).toBe(true);
+});

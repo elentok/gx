@@ -1,5 +1,7 @@
 import { Box, Spinner } from "@chakra-ui/react";
 import { codexSkillHint } from "../design/chat";
+import { ComposerImages } from "../design/ComposerImages";
+import { useComposerImages } from "../design/useComposerImages";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import type { PostPrompt } from "../design/prompt";
 import { usePromptSend } from "../design/usePromptSend";
@@ -31,6 +33,7 @@ export function AgentComposer({
 }) {
   const wide = useWide();
   const [text, setText] = useComposerDraft(session.id);
+  const images = useComposerImages(session.id);
   const { send, enabled, pending, refusal, error } = usePromptSend({
     session,
     lastMessage,
@@ -75,25 +78,30 @@ export function AgentComposer({
       role="form"
       aria-label="Composer"
     >
-      <Box display="flex" gap="2" alignItems="stretch">
-        <Box flex="1">
-          <ExpandableTextField
-            rows={3}
-            label="Message"
-            title={`Message to ${session.name || session.id}`}
-            placeholder={`Message ${session.name || session.id}`}
-            value={text}
-            onChange={setText}
-            onSubmit={onSubmit}
-            note={line ?? null}
-            completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
-          />
-        </Box>
-        <Button h="auto" disabled={!enabled || text.trim() === ""} onClick={sendText}>
-          {pending && <Spinner size="sm" />}
-          Send
-        </Button>
-      </Box>
+      <ComposerImages
+        state={images}
+        send={
+          <Button
+            disabled={!enabled || text.trim() === "" || images.uploading > 0 || images.failed > 0}
+            onClick={sendText}
+          >
+            {pending && <Spinner size="sm" />}
+            Send
+          </Button>
+        }
+      >
+        <ExpandableTextField
+          rows={3}
+          label="Message"
+          title={`Message to ${session.name || session.id}`}
+          placeholder={`Message ${session.name || session.id}`}
+          value={text}
+          onChange={setText}
+          onSubmit={onSubmit}
+          note={line ?? null}
+          completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
+        />
+      </ComposerImages>
     </Box>
   );
 }
