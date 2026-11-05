@@ -3,7 +3,9 @@ package evolve
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/brief"
@@ -34,7 +36,8 @@ type SlowerRow struct {
 type FlakeRow struct {
 	Test       string `json:"test"`
 	FailingRun string `json:"failing_run"`
-	// PassingRun is the passing `gx check` run id, or the passing brief log.
+	// PassingRun is the passing `gx check` run id, or the passing brief
+	// run, named by its log's base name without the extension.
 	PassingRun string `json:"passing_run"`
 	TreeID     string `json:"tree_id"`
 }
@@ -190,7 +193,7 @@ func laterPass(later []check.Record, index []brief.IndexEntry, rec check.Record,
 			continue
 		}
 		if slices.Contains(e.Tests, test) && !slices.Contains(e.Failed, test) {
-			return e.Log
+			return strings.TrimSuffix(filepath.Base(e.Log), ".log")
 		}
 	}
 	return ""

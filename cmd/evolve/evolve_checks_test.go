@@ -139,14 +139,14 @@ func TestEvolveInputs_FlakeRow(t *testing.T) {
 			writeJSONL(t, filepath.Join(data, "check", "proj.jsonl"), []check.Record{failing})
 			writeJSONL(t, filepath.Join(data, "brief", "index.jsonl"), []brief.IndexEntry{{
 				Time: claimBase.Add(time.Minute).Format(time.RFC3339), TreeID: tc.passTree,
-				Tests: []string{"pkg.TestX"}, Log: "/logs/pass.log"}})
+				Tests: []string{"pkg.TestX"}, Log: "/logs/20261102T045650.985000000-go-test.log"}})
 			table := inputsTable(t, f)
 			if len(table.Flakes) != tc.want {
 				t.Fatalf("flakes = %+v, want %d", table.Flakes, tc.want)
 			}
 			if tc.want == 1 {
 				got := table.Flakes[0]
-				if got.Test != "pkg.TestX" || got.FailingRun != "r1" || got.PassingRun != "/logs/pass.log" || got.TreeID != "t1" {
+				if got.Test != "pkg.TestX" || got.FailingRun != "r1" || got.PassingRun != "20261102T045650.985000000-go-test" || got.TreeID != "t1" {
 					t.Errorf("flake = %+v", got)
 				}
 			}
