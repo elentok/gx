@@ -11,19 +11,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-func writeFile(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if issuesDir := filepath.Dir(path); filepath.Base(issuesDir) == "issues" {
-		testutil.EnsureEpicTicketMD(t, filepath.Dir(issuesDir))
-	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestLoad_MissingScratchDirReturnsEmpty(t *testing.T) {
 	epics, err := Load(filepath.Join(t.TempDir(), "does-not-exist"))
 	if err != nil {
