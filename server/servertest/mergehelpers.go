@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -76,6 +77,40 @@ func KeepWorktree(t *testing.T, repo, epic, id string) string {
 func CommitAgentWork(t *testing.T, wtPath string) {
 	testutil.WriteFile(t, wtPath, "agent.txt", "work")
 	testutil.CommitAll(t, wtPath, "agent work")
+}
+
+// PutRunIn registers a run of address in root on a session that no longer
+// exists, with the harness's configured runner.
+func (h *Harness) PutRunIn(address, root, cwd string, launching bool) {
+	h.Server.Registry().PutRunIn(address, root, cwd, h.cfg.Runner.Name(), launching)
+}
+
+// RetroFixture is a one-ticket epic whose agent commits work; a submitted
+// retro launches too, but it is commitless and commits nothing.
+func RetroFixture(t *testing.T, opts ...func(*server.Config)) *SchedFixture {
+	t.Helper()
+	return NewSchedFixture(t, map[string]TicketOpts{"01": {}}, func(_ *SchedFixture, p *Turn, id string) {
+		if strings.Contains(p.Address, ":one-offs/") {
+			return
+		}
+		CommitWork(t, p, id)
+	}, opts...)
+}
+
+// RetrosAfter waits for the one retro the hook submits after a root event: the
+// submit follows the pause/fail event, so the glob is polled.
+func (f *SchedFixture) RetrosAfter(t *testing.T) []string {
+	t.Helper()
+	var retros []string
+	Poll(10*time.Second, func() bool {
+		var err error
+		retros, err = filepath.Glob(filepath.Join(f.Store, "proj", tickets.OneOffsEpic, "issues", "*-evolve-"+SchedEpic+"-*.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(retros) > 0
+	})
+	return retros
 }
 
 // RunnerShapes runs test once per runner shape: pty and headless.

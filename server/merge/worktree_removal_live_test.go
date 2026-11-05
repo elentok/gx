@@ -1,4 +1,4 @@
-package server_test
+package merge_test
 
 import (
 	"context"
@@ -53,7 +53,7 @@ func TestWorktreeRemoval_LiveSessionKeepsTheWorktreeUntilItStops(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForSession(ctx, t, f.H, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
-	f.H.Server.RemoveMergedWorktree("proj", schedEpic)
+	f.H.Server.Reconciler().RemoveMergedWorktreeSettled("proj", schedEpic)
 	f.settle(t)
 	f.assertWorktreeRemoved(t)
 }
@@ -101,7 +101,7 @@ func TestWorktreeRemoval_LiveRunInTheWorktreeKeepsItAndNamesTheRun(t *testing.T)
 	}
 	f.stampMergedByHand(t)
 
-	f.H.Server.RemoveMergedWorktree("proj", schedEpic)
+	f.H.Server.Reconciler().RemoveMergedWorktreeSettled("proj", schedEpic)
 
 	waitUntil(t, "the kept line", func() bool {
 		return strings.Contains(f.serverLog(t), "kept merged epic's feature worktree")
@@ -118,7 +118,7 @@ func TestWorktreeRemoval_StoppedRunStillRegisteredDoesNotKeepTheWorktree(t *test
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	completedUnmerged(ctx, t, f)
-	f.H.Server.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, f.featureWorktree(t), false)
+	f.H.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, f.featureWorktree(t), false)
 
 	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
@@ -133,7 +133,7 @@ func TestWorktreeRemoval_RunWithoutCwdKeepsTheWorktreeOfItsEpic(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	completedUnmerged(ctx, t, f)
-	f.H.Server.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, "", true)
+	f.H.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, "", true)
 
 	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
@@ -152,7 +152,7 @@ func TestWorktreeRemoval_RunInASiblingWorktreeDoesNotKeepTheWorktree(t *testing.
 	// Named to share the feature worktree's prefix, so only whole path elements tell them apart.
 	sibling := f.featureWorktree(t) + "-iter"
 	f.Git(t, "worktree", "add", "-q", "--detach", sibling)
-	f.H.Server.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, sibling, true)
+	f.H.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, sibling, true)
 
 	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)

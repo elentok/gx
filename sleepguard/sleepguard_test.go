@@ -80,18 +80,18 @@ var allowed = map[string]int{
 	"server/disk/diskhealth_test.go":                  1, // negative wait: failed readings never leave the waiting state
 	"server/disk/diskhold_test.go":                    3,
 	"server/disk/diskwatch_test.go":                   3,
-	"server/handmerged_test.go":                       1,
+	"server/merge/handmerged_test.go":                 1,
 	"server/headless_block_reclaim_test.go":           2,
 	"server/health/healthprocs_test.go":               4,
-	"server/latefinish_test.go":                       1,
+	"server/merge/latefinish_test.go":                 1,
 	"server/limits/limithistory_codex_test.go":        2, // settle wait for the event coalescer; received-at has second granularity
 	"server/map_done_test.go":                         1,
-	"server/merge_finish_test.go":                     1,
-	"server/mergedecide_test.go":                      3,
-	"server/mergefork_test.go":                        1,
+	"server/merge/merge_finish_test.go":               1,
+	"server/merge/mergedecide_test.go":                3,
+	"server/merge/mergefork_test.go":                  1,
 	"server/migrate_gate_test.go":                     1, // negative wait: a gate that leaks would have acted by now
 	"server/projects/migrate_test.go":                 1, // negative wait: a step that ignored the gate would have run by now
-	"server/missingtrunk_test.go":                     2,
+	"server/merge/missingtrunk_test.go":               2,
 	"server/queue/oneoffsweep_test.go":                2,
 	"server/queue/pause_test.go":                      1,
 	"server/reclaim_waiting_test.go":                  1,
@@ -118,9 +118,9 @@ var allowed = map[string]int{
 	"server/sessions_firstprompt_launch_test.go":      1, // negative wait: a resend would come within a few ResendEvery
 	"server/sessions_firstprompt_test.go":             3,
 	"server/limits/tokenpoll_test.go":                 2, // poll loop with a deadline; negative wait: no poll while a migration is held
-	"server/trunkconflict_claim_test.go":              1,
+	"server/merge/trunkconflict_claim_test.go":        1,
 	"server/servertest/ptyrunner_test.go":             3, // negative waits: a wrong reap or kill would come within a few polls
-	"server/trunklock_test.go":                        1,
+	"server/merge/trunklock_test.go":                  1,
 	"server/unavailable_test.go":                      1,
 	"storecommit/storecommit_test.go":                 3,
 	"testutil/agentfake/harness_test.go":              1,

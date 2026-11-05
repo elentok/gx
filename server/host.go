@@ -24,6 +24,8 @@ func (s *Server) Merger() *merge.Merger { return s.merger }
 
 func (s *Server) Reconciler() *merge.Reconciler { return s.rec }
 
+func (s *Server) Landing() *merge.Landing { return s.landing }
+
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recovery.RecoverAsync(f) }
 
 func (s *Server) EpicState(root queue.RootRef, e tickets.Epic) wire.EpicState {

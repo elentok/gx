@@ -35,13 +35,7 @@ func (f *schedFixture) completeEpic(t *testing.T) []string {
 
 func retroFixture(t *testing.T, opts ...func(*server.Config)) *schedFixture {
 	t.Helper()
-	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
-		// A submitted retro launches too; it is commitless, so it commits nothing.
-		if strings.Contains(p.Address, ":one-offs/") {
-			return
-		}
-		commitWork(t, p, id)
-	}, opts...)
+	return &schedFixture{servertest.RetroFixture(t, opts...)}
 }
 
 func TestRetroHook_SubmitsAfterTheEpicMerges(t *testing.T) {
@@ -124,22 +118,6 @@ func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
 	}
 }
 
-// retrosAfter waits for the one retro the hook submits after a root event: the
-// submit follows the pause/fail event, so the glob is polled.
-func (f *schedFixture) retrosAfter(t *testing.T) []string {
-	t.Helper()
-	var retros []string
-	servertest.Poll(10*time.Second, func() bool {
-		var err error
-		retros, err = filepath.Glob(filepath.Join(f.Store, "proj", queue.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return len(retros) > 0
-	})
-	return retros
-}
-
 func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
@@ -155,7 +133,7 @@ func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
-	if got := f.retrosAfter(t); len(got) != 1 {
+	if got := f.RetrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
 	}
 }
@@ -169,7 +147,7 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	if got := f.retrosAfter(t); len(got) != 1 {
+	if got := f.RetrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
 	}
 }
@@ -190,7 +168,7 @@ func TestRetroHook_SubmitsWhenTheMergeErrors(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
-	if got := f.retrosAfter(t); len(got) != 1 {
+	if got := f.RetrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
 	}
 }

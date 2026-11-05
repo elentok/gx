@@ -1,4 +1,4 @@
-package server_test
+package merge_test
 
 import (
 	"context"
@@ -198,7 +198,7 @@ func TestWorktreeRemoval_QueuedRootKeepsTheWorktree(t *testing.T) {
 	f.assertRootQueued(t)
 	f.stampMergedByHand(t)
 
-	f.H.Server.RemoveMergedWorktree("proj", schedEpic)
+	f.H.Server.Reconciler().RemoveMergedWorktreeSettled("proj", schedEpic)
 
 	f.settle(t)
 	f.assertFeatureKept(t, "the removal")
@@ -214,7 +214,7 @@ func TestWorktreeRemoval_OpenTicketKeepsTheWorktree(t *testing.T) {
 	servertest.WriteTicketWith(t, f.Store, "proj", schedEpic, "02", "late", servertest.TicketOpts{})
 	f.stampMergedByHand(t)
 
-	f.H.Server.RemoveMergedWorktree("proj", schedEpic)
+	f.H.Server.Reconciler().RemoveMergedWorktreeSettled("proj", schedEpic)
 
 	f.settle(t)
 	f.assertFeatureKept(t, "the removal")
@@ -228,7 +228,7 @@ func TestWorktreeRemoval_OneOffsRootKeepsItsWorktree(t *testing.T) {
 	f.Git(t, "branch", "oneoffs-branch")
 	f.Git(t, "worktree", "add", "-q", wt, "oneoffs-branch")
 
-	f.H.Server.RemoveMergedWorktree("proj", queue.OneOffsEpic)
+	f.H.Server.Reconciler().RemoveMergedWorktreeSettled("proj", queue.OneOffsEpic)
 
 	f.settle(t)
 	if _, err := os.Stat(wt); err != nil {

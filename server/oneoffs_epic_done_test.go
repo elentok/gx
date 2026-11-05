@@ -10,9 +10,6 @@ import (
 	"github.com/elentok/gx/server/servertest"
 )
 
-// Stays in the root: SetMergeInto and CompleteRootIfDone are export_test.go
-// seams on *server.Server, which server/queue tests cannot see.
-//
 // The one-offs epic is a standing inbox: with every ticket done it is not
 // stamped, merged or retro'd.
 func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
@@ -31,7 +28,7 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Server.CompleteRootIfDone("proj:one-offs/01"); err != nil {
+	if err := h.Server.Merger().CompleteRootOf("proj:one-offs/01"); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.ReadFile(epicMD)

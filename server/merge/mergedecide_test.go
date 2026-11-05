@@ -1,4 +1,4 @@
-package server_test
+package merge_test
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 		t.Fatalf("%q sent %d times, want once", epicNotMergedText, got)
 	}
 
-	if err := f.H.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
+	if err := f.H.Server.Merger().CompleteRootOf("proj:" + schedEpic + "/01"); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
@@ -78,7 +78,7 @@ func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 	if got := count(epicNotMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicNotMergedText, got)
 	}
-	if got := f.retrosAfter(t); len(got) != 1 {
+	if got := f.RetrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
 	}
 }
@@ -103,7 +103,7 @@ func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.Subscribe(ctx, t)
-	if err := f.H.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
+	if err := f.H.Server.Merger().CompleteRootOf("proj:" + schedEpic + "/01"); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
@@ -118,7 +118,7 @@ func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 	if got := count(epicNotMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicNotMergedText, got)
 	}
-	if got := f.retrosAfter(t); len(got) != 1 {
+	if got := f.RetrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
 	}
 }

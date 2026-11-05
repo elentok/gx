@@ -1,4 +1,4 @@
-package server_test
+package merge_test
 
 import (
 	"context"
@@ -116,7 +116,7 @@ func TestTrunkConflict_PruneKeepsAnOldRefOfAnOpenTicket(t *testing.T) {
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 	late := time.Now().Add(90 * 24 * time.Hour)
 
-	f.H.Server.PruneBackups(f.Repo, late)
+	f.H.Server.Landing().PruneBackups(f.Repo, late)
 	if refs := f.backupRefs(t); len(refs) != 1 {
 		t.Fatalf("backup refs = %v, want the open ticket's ref kept", refs)
 	}
@@ -126,7 +126,7 @@ func TestTrunkConflict_PruneKeepsAnOldRefOfAnOpenTicket(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	f.H.Server.PruneBackups(f.Repo, late)
+	f.H.Server.Landing().PruneBackups(f.Repo, late)
 	if refs := f.backupRefs(t); len(refs) != 0 {
 		t.Errorf("backup refs = %v, want the old ref pruned once the ticket is done", refs)
 	}

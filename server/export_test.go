@@ -1,16 +1,11 @@
 package server
 
 import (
-	"errors"
 	"io/fs"
 	"net/http"
 	"time"
 
-	"github.com/elentok/gx/server/queue"
-
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 )
 
 // ServeAsset is serveAsset over a fake build, so a test can name hashed assets
@@ -47,9 +42,6 @@ func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairRes
 	return s.repairResume(req, repairCtx{origin: origin})
 }
 
-// PruneBackups runs the backup-ref prune as of now.
-func (s *Server) PruneBackups(repoRoot string, now time.Time) { s.landing.PruneBackups(repoRoot, now) }
-
 // SetShutdownRecorder makes Serve report each shutdown step to rec; nil clears it.
 func SetShutdownRecorder(rec func(step string)) {
 	if rec == nil {
@@ -64,30 +56,3 @@ func (s *Server) ClaimNext() { s.claimNext() }
 
 // PauseStuckFinishedClaims runs one finished-claim watchdog pass as of now.
 func (s *Server) PauseStuckFinishedClaims(now time.Time) { s.pauseStuckFinishedClaims(now) }
-
-// CompleteRootIfDone runs the all-done check of address's root as if its
-// iteration had just settled.
-func (s *Server) CompleteRootIfDone(address string) error {
-	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
-	if err != nil {
-		return err
-	}
-	_, t, ok := s.FreshTicket(addr)
-	if !ok {
-		return errors.New("no ticket " + address)
-	}
-	s.merger.CompleteRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
-	return nil
-}
-
-// RemoveMergedWorktree starts the post-merge worktree removal the way stampEpic
-// does, on the settle group.
-func (s *Server) RemoveMergedWorktree(project, epic string) {
-	root := queue.RootRef{Project: project, Epic: epic}
-	s.guards.GoSettle(func() { s.rec.RemoveMergedWorktree(root) })
-}
-
-// PutRunIn is Registry.PutRunIn on the configured runner.
-func (s *Server) PutRunIn(address, root, cwd string, launching bool) {
-	s.registry.PutRunIn(address, root, cwd, s.cfg.Runner.Name(), launching)
-}
