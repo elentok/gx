@@ -1,4 +1,4 @@
-package ralphloop
+package merge
 
 import (
 	"fmt"
@@ -75,7 +75,8 @@ type MergeResult struct {
 	MetricsStamped bool
 }
 
-func mergeDepsFor(d deps.Deps) MergeDeps {
+// MergeDepsOf narrows d to what a merging needs.
+func MergeDepsOf(d deps.Deps) MergeDeps {
 	return MergeDeps{
 		RevParse:             d.RevParse,
 		IsAncestor:           d.IsAncestor,
@@ -83,13 +84,13 @@ func mergeDepsFor(d deps.Deps) MergeDeps {
 		CherryPickRange:      d.CherryPickRange,
 		CherryPickInProgress: d.CherryPickInProgress,
 		AppendTrailers:       d.AppendTrailers,
-		MergedTickets:        mergedTickets,
+		MergedTickets:        MergedTickets,
 		SessionHomes:         d.SessionHomes,
 	}
 }
 
 // MergeTicket merges lp.SourceRange onto the feature branch: an already-applied
-// check (see alreadyApplied), the pick, then stampMerged. A conflict is a
+// check (see alreadyApplied), the pick, then StampMerged. A conflict is a
 // result, never an error.
 func MergeTicket(d MergeDeps, lp MergeParams) (MergeResult, error) {
 	outcome, err := pickRange(d, lp)
@@ -110,7 +111,7 @@ func MergeTicket(d MergeDeps, lp MergeParams) (MergeResult, error) {
 	case Conflicted:
 		return MergeResult{Outcome: Conflicted, TrailerValue: mergeTrailerValue(lp)}, nil
 	}
-	return stampMerged(d, lp)
+	return StampMerged(d, lp)
 }
 
 // pickRange runs the already-applied ladder, then the cherry-pick core. It
@@ -133,17 +134,17 @@ func pickRange(d MergeDeps, lp MergeParams) (MergeOutcome, error) {
 	return Merged, nil
 }
 
-// ambiguousMergeError is a ticket whose trailer is on the feature branch while
+// AmbiguousMergeError is a ticket whose trailer is on the feature branch while
 // neither its recorded SHA nor its patches are: something merged under its
 // name, but nothing proves it was these commits. Its Error is the pause reason.
-type ambiguousMergeError struct {
+type AmbiguousMergeError struct {
 	TicketID      string
 	FeatureBranch string
 	RecordedSHA   string
 	SourceRange   SourceRange
 }
 
-func (e *ambiguousMergeError) Error() string {
+func (e *AmbiguousMergeError) Error() string {
 	recorded := e.RecordedSHA
 	if recorded == "" {
 		recorded = "none"
@@ -153,7 +154,7 @@ func (e *ambiguousMergeError) Error() string {
 }
 
 // alreadyApplied is the evidence ladder: recorded-SHA reachability, then
-// patch-equivalence. A ticket trailer with neither is an ambiguousMergeError,
+// patch-equivalence. A ticket trailer with neither is an AmbiguousMergeError,
 // not proof: a re-resolved conflict and a different commit reusing the ticket
 // trailer look the same, and picking again could merge it twice. An unreadable
 // trailer history is inconclusive, not an error: the pick itself still guards
@@ -179,7 +180,7 @@ func alreadyApplied(d MergeDeps, lp MergeParams) (bool, error) {
 	if err != nil || !merged[lp.TicketID] {
 		return false, nil
 	}
-	return false, &ambiguousMergeError{TicketID: lp.TicketID, FeatureBranch: lp.FeatureBranch, RecordedSHA: lp.RecordedSHA, SourceRange: lp.SourceRange}
+	return false, &AmbiguousMergeError{TicketID: lp.TicketID, FeatureBranch: lp.FeatureBranch, RecordedSHA: lp.RecordedSHA, SourceRange: lp.SourceRange}
 }
 
 // stampAppliedMetrics fills in the ticket's frontmatter metrics when commits
@@ -243,33 +244,35 @@ func cherryPickCore(d MergeDeps, lp MergeParams) (conflicted bool, err error) {
 
 // mergeTrailerValue is the ticket's canonical address, so identity survives a
 // retarget; a ticket outside the tracker layout has none and keeps the legacy
-// <featureBranch>/<id> form (mergedTickets reads both).
+// <featureBranch>/<id> form (MergedTickets reads both).
 func mergeTrailerValue(lp MergeParams) string {
 	if a, ok := tickets.AddressOfPath(lp.TicketPath, lp.TicketID); ok {
 		return a.String()
 	}
-	return ticketTrailerValue(lp.FeatureBranch, lp.TicketID)
+	return TicketTrailerValue(lp.FeatureBranch, lp.TicketID)
 }
 
-// stampMerged writes the merging session's metrics into the ticket's
+// StampMerged writes the merging session's metrics into the ticket's
 // frontmatter, then stamps the ticket trailer — plus the metrics trailers when
 // a session was recoverable — in a single amend, and resolves the merged SHA.
-// Metrics are omitted, never fabricated, when no session is recoverable.
-func stampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
+// Metrics are omitted, never fabricated, when no session is recoverable. It is
+// also the stamping half of MergeTicket, for a resolved conflict
+// (`merge --continue`).
+func StampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
 	m, hasMetrics, err := metrics.WriteMergedMetrics(d.SessionHomes, lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
 		return MergeResult{}, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}
 
 	trailerValue := mergeTrailerValue(lp)
-	trailers := []history.Trailer{{Key: ticketTrailerKey, Value: trailerValue}}
+	trailers := []history.Trailer{{Key: TicketTrailerKey, Value: trailerValue}}
 	if hasMetrics {
 		trailers = append(trailers,
-			history.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(m.ContextWindow)},
-			history.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(m.ElapsedSeconds) + "s"},
+			history.Trailer{Key: TokensTrailerKey, Value: strconv.Itoa(m.ContextWindow)},
+			history.Trailer{Key: ElapsedTrailerKey, Value: strconv.Itoa(m.ElapsedSeconds) + "s"},
 		)
 		if m.CostStamped {
-			trailers = append(trailers, history.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(m.Cost)})
+			trailers = append(trailers, history.Trailer{Key: CostTrailerKey, Value: tickets.FormatCost(m.Cost)})
 		}
 	}
 	if err := d.AppendTrailers(lp.FeatureWorktree, trailers...); err != nil {

@@ -10,7 +10,7 @@ import (
 	"sort"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -94,7 +94,7 @@ func (i *Index) locks(w http.ResponseWriter, _ *http.Request) {
 		}
 		for _, issues := range epicDirs {
 			epicDir := filepath.Dir(issues)
-			owner, err := ralphloop.ReadMergeLock(epicDir)
+			owner, err := merge.ReadMergeLock(epicDir)
 			if err != nil || owner == nil {
 				continue
 			}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -32,7 +32,7 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := ralphloop.AcquireMergeLockFor(filepath.Join(projectDir, "epic-a"), "epic-a", "01"); err != nil {
+	if err := merge.AcquireMergeLockFor(filepath.Join(projectDir, "epic-a"), "epic-a", "01"); err != nil {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store)

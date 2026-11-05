@@ -1,4 +1,4 @@
-package ralphloop
+package merge
 
 import (
 	"path/filepath"
@@ -7,27 +7,20 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
 )
-
-// addressTrailerValue is the trailer a ticket in writeEpic's layout merges with.
-func addressTrailerValue(scratchDir, epicName, id string) string {
-	a, _ := tickets.AddressOfPath(filepath.Join(scratchDir, epicName, "issues", id+"-x.md"), id)
-	return a.String()
-}
 
 func TestMergeTicket_TicketInTrackerLayout_StampsCanonicalAddress(t *testing.T) {
 	dir, lp := mergeFixture(t, false)
 	lp.TicketPath = filepath.Join(t.TempDir(), "proj", "main", "issues", "03-x.md")
 
-	res, err := MergeTicket(mergeDepsFor(fakes.TestDeps()), lp)
+	res, err := MergeTicket(MergeDepsOf(fakes.TestDeps()), lp)
 	if err != nil {
 		t.Fatalf("MergeTicket: %v", err)
 	}
 	if want := "proj:main/03"; res.TrailerValue != want {
 		t.Errorf("TrailerValue = %q, want %q", res.TrailerValue, want)
 	}
-	if found, err := history.TrailerCommitExists(dir, "HEAD", ticketTrailerKey, "proj:main/03"); err != nil || !found {
+	if found, err := history.TrailerCommitExists(dir, "HEAD", TicketTrailerKey, "proj:main/03"); err != nil || !found {
 		t.Errorf("merged commit missing address trailer (found=%v err=%v)", found, err)
 	}
 }
@@ -43,16 +36,16 @@ func TestMergedTickets_ReadsOldAndNewTrailerForms(t *testing.T) {
 	} {
 		testutil.WriteFile(t, dir, "f.txt", value)
 		testutil.CommitAll(t, dir, "c"+string(rune('a'+i)))
-		if err := history.AppendTrailer(dir, ticketTrailerKey, value); err != nil {
+		if err := history.AppendTrailer(dir, TicketTrailerKey, value); err != nil {
 			t.Fatalf("AppendTrailer: %v", err)
 		}
 	}
 
-	got, err := mergedTickets(dir, "main")
+	got, err := MergedTickets(dir, "main")
 	if err != nil {
-		t.Fatalf("mergedTickets: %v", err)
+		t.Fatalf("MergedTickets: %v", err)
 	}
 	if len(got) != 2 || !got["01"] || !got["02"] {
-		t.Errorf("mergedTickets = %v, want exactly 01 and 02", got)
+		t.Errorf("MergedTickets = %v, want exactly 01 and 02", got)
 	}
 }

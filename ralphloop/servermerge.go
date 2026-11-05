@@ -264,16 +264,6 @@ func latestPauseReason(scratchDir, epic, ticket string) string {
 	return ev.Reason
 }
 
-// LatestMergedSHA is the SHA of the ticket's most recent cherry-pick, "" when
-// none was logged.
-func LatestMergedSHA(scratchDir, epic, ticket string) string {
-	evs, _, err := runlog.ReadEvents(scratchDir, epic)
-	if err != nil {
-		return ""
-	}
-	return latestCherryPickedSHA(evs, ticket)
-}
-
 // runnerName names d's runner, "" when it has none.
 func runnerName(d deps.Deps) string {
 	if d.Runner == nil {

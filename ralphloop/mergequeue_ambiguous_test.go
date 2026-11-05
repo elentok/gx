@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -33,7 +34,7 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 	testutil.CommitAll(t, repo, "the real work")
 	gitIn(t, repo, "checkout", "epic")
 	testutil.WriteFile(t, repo, "other.txt", "something else\n")
-	testutil.CommitAll(t, repo, "something else\n\n"+ticketTrailerKey+": "+ticketTrailerValue("epic", "01"))
+	testutil.CommitAll(t, repo, "something else\n\n"+merge.TicketTrailerKey+": "+merge.TicketTrailerValue("epic", "01"))
 
 	d := fakes.TestDeps()
 	d.Runner = runnerfake.NewRunner()

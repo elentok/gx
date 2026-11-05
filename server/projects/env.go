@@ -14,8 +14,8 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -105,7 +105,7 @@ func (p *Registry) MergeLockDir(epicPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return ralphloop.MergeLockDirIn(stateDir, epicPath)
+	return merge.MergeLockDirIn(stateDir, epicPath)
 }
 
 // typing is the typing rules for the claude sessions this server runs, reading

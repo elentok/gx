@@ -1,4 +1,4 @@
-package ralphloop
+package merge
 
 import (
 	"errors"
@@ -19,7 +19,7 @@ func TestCherryPickCore_CleanPick_NotConflicted(t *testing.T) {
 	tip, _ := git.RevParse(dir, "HEAD")
 	testutil.MustGitExported(t, dir, "checkout", "main")
 
-	conflicted, err := cherryPickCore(mergeDepsFor(fakes.TestDeps()), MergeParams{FeatureWorktree: dir, FeatureBranch: "main", SourceRange: SourceRange{Base: base, Tip: tip}})
+	conflicted, err := cherryPickCore(MergeDepsOf(fakes.TestDeps()), MergeParams{FeatureWorktree: dir, FeatureBranch: "main", SourceRange: SourceRange{Base: base, Tip: tip}})
 	if err != nil || conflicted {
 		t.Fatalf("cherryPickCore = (%v, %v), want (false, nil)", conflicted, err)
 	}
@@ -36,7 +36,7 @@ func TestCherryPickCore_Conflict_LeavesSequencerInProgress(t *testing.T) {
 	testutil.WriteFile(t, dir, "shared.txt", "main\n")
 	testutil.CommitAll(t, dir, "main shared")
 
-	conflicted, err := cherryPickCore(mergeDepsFor(fakes.TestDeps()), MergeParams{FeatureWorktree: dir, FeatureBranch: "main", SourceRange: SourceRange{Base: base, Tip: tip}})
+	conflicted, err := cherryPickCore(MergeDepsOf(fakes.TestDeps()), MergeParams{FeatureWorktree: dir, FeatureBranch: "main", SourceRange: SourceRange{Base: base, Tip: tip}})
 	if err != nil || !conflicted {
 		t.Fatalf("cherryPickCore = (%v, %v), want (true, nil)", conflicted, err)
 	}
@@ -50,7 +50,7 @@ func TestCherryPickCore_NonConflictFailure_ReturnsError(t *testing.T) {
 	d.CherryPickRange = func(dir, from, to string) error { return errors.New("boom") }
 	d.CherryPickInProgress = func(dir string) (bool, error) { return false, nil }
 
-	conflicted, err := cherryPickCore(mergeDepsFor(d), MergeParams{FeatureBranch: "main", SourceRange: SourceRange{Base: "b", Tip: "t"}})
+	conflicted, err := cherryPickCore(MergeDepsOf(d), MergeParams{FeatureBranch: "main", SourceRange: SourceRange{Base: "b", Tip: "t"}})
 	if err == nil || conflicted {
 		t.Fatalf("cherryPickCore = (%v, %v), want (false, error)", conflicted, err)
 	}

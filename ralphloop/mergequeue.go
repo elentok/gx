@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
@@ -20,10 +21,13 @@ import (
 // it deferred; a var so tests can shorten it.
 var mergeDeferRetryInterval = 2 * time.Second
 
+// errMergeDeferred means a merge must wait: a human's conflict is pending.
+var errMergeDeferred = errors.New("merge deferred")
+
 // mergeLockDirFor is where an epic's merge lock and marker live, under d's lock
 // state dir.
 func mergeLockDirFor(d deps.Deps, scratchDir, epic string) (string, error) {
-	return MergeLockDirIn(d.MergeLockStateDir, filepath.Join(scratchDir, epic))
+	return merge.MergeLockDirIn(d.MergeLockStateDir, filepath.Join(scratchDir, epic))
 }
 
 // mergeJob is the in-memory handoff from a build goroutine to the merge-queue
@@ -108,7 +112,7 @@ func (lp mergeQueueParams) iterationParamsFor(job mergeJob) iterationParams {
 func logMergeDeferred(d deps.Deps, p iterationParams) {
 	reason := "merge lock held or conflict pending"
 	if dir, err := mergeLockDirFor(d, p.ScratchDir, p.FeatureBranch); err == nil {
-		if owner, err := ReadMergeLock(dir); err == nil && owner != nil {
+		if owner, err := merge.ReadMergeLock(dir); err == nil && owner != nil {
 			reason = "merge lock held by " + owner.Describe()
 		}
 	}
@@ -131,13 +135,13 @@ func mergeOne(d deps.Deps, lp mergeQueueParams, job mergeJob) outcome {
 	// The pre-pick HEAD lets a restart finish this merging if gx stops
 	// after git does (see recoverInterruptedMerging).
 	head, _ := d.RevParse(p.FeatureWorktree, "HEAD")
-	if err := AcquireMergeLockAt(lockDir, p.FeatureBranch, job.ticket.Identifier, head); err != nil {
-		if errors.Is(err, ErrMergeLocked) {
+	if err := merge.AcquireMergeLockAt(lockDir, p.FeatureBranch, job.ticket.Identifier, head); err != nil {
+		if errors.Is(err, merge.ErrMergeLocked) {
 			return outcome{ticket: job.ticket, mergeDeferred: true}
 		}
 		return outcome{ticket: job.ticket, err: fmt.Errorf("taking merge lock: %w", err)}
 	}
-	defer ReleaseMergeLock(lockDir)
+	defer merge.ReleaseMergeLock(lockDir)
 
 	mergedSHA, err := mergeCherryPick(d, p, job.base, job.branch, job.sessionID, job.pane)
 	if err != nil {
@@ -152,7 +156,7 @@ func mergeOne(d deps.Deps, lp mergeQueueParams, job mergeJob) outcome {
 			// retry — not a failure of this merge itself.
 			return outcome{ticket: job.ticket, pausedOnChild: true, childReason: err.Error()}
 		}
-		var amb *ambiguousMergeError
+		var amb *merge.AmbiguousMergeError
 		if errors.As(err, &amb) {
 			// Paused, not failed: callers then see it via the pause check / the ticket.
 			if _, perr := ticketops.PauseTicket(p.Sink, ticketops.PauseRequest{

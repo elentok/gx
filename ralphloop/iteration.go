@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
 
@@ -506,9 +507,9 @@ func finishCleanup(d deps.Deps, repoDir, featureWorktree, path, branch string, s
 // resolution agent hasn't launched yet at that point). On resolution it
 // returns that agent's distinct session so mergeCherryPick can emit
 // conflict-resolved with the final post-trailer SHA. The returned result is
-// Merged (stamped) or AlreadyApplied, never Conflicted.
-func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, branch, sessionID, pane string) (res MergeResult, resolutionSessionID string, resultErr error) {
-	ld, lp := mergeDepsFor(d), mergeParamsFor(p, base, branch, sessionID)
+// merge.Merged (stamped) or merge.AlreadyApplied, never merge.Conflicted.
+func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, branch, sessionID, pane string) (res merge.MergeResult, resolutionSessionID string, resultErr error) {
+	ld, lp := merge.MergeDepsOf(d), mergeParamsFor(p, base, branch, sessionID)
 	p.Sink.CherryPickStarted(p.Ticket.Identifier)
 
 	// A previous invocation may have died after starting a cherry-pick but
@@ -525,52 +526,52 @@ func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, bran
 	// corruption this guard exists to prevent. Reattach to it instead.
 	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
-		return MergeResult{}, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+		return merge.MergeResult{}, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 	}
 	if inProgress {
 		liveSession, found, err := findLiveConflictResolutionTab(d, p)
 		if err != nil {
-			return MergeResult{}, "", err
+			return merge.MergeResult{}, "", err
 		}
 		if found {
 			resolutionSessionID, err := reattachLiveConflictResolver(d, p, liveSession)
 			if err != nil {
-				return MergeResult{}, "", err
+				return merge.MergeResult{}, "", err
 			}
-			res, err := stampMerged(ld, lp)
+			res, err := merge.StampMerged(ld, lp)
 			return res, resolutionSessionID, err
 		}
 		// A merge marker means the sequencer state is a human's pending
 		// conflict, not crash debris: aborting would discard their work.
 		lockDir, err := mergeLockDirFor(d, p.ScratchDir, p.FeatureBranch)
 		if err != nil {
-			return MergeResult{}, "", err
+			return merge.MergeResult{}, "", err
 		}
-		marker, err := ReadMergeMarker(lockDir)
+		marker, err := merge.ReadMergeMarker(lockDir)
 		if err != nil {
-			return MergeResult{}, "", fmt.Errorf("reading merge marker: %w", err)
+			return merge.MergeResult{}, "", fmt.Errorf("reading merge marker: %w", err)
 		}
 		if marker != nil {
-			return MergeResult{}, "", errMergeDeferred
+			return merge.MergeResult{}, "", errMergeDeferred
 		}
 		// Only gx's own debris is lossless to abort: a pick of some iteration
 		// branch's commit. Anything else is a person's work in progress.
 		if foreign, sha := foreignCherryPick(d, p); foreign {
-			return MergeResult{}, "", fmt.Errorf("the feature worktree %s has a cherry-pick of %s in progress that gx did not start; finish or abort it, then merge again", p.FeatureWorktree, sha)
+			return merge.MergeResult{}, "", fmt.Errorf("the feature worktree %s has a cherry-pick of %s in progress that gx did not start; finish or abort it, then merge again", p.FeatureWorktree, sha)
 		}
 		if err := d.AbortCherryPick(p.FeatureWorktree); err != nil {
-			return MergeResult{}, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+			return merge.MergeResult{}, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 		}
 	}
 
 	// MergeTicket recognizes an iteration whose patch concurrent work already
 	// made redundant (git would stop that as an empty cherry-pick and leave
 	// sequencer state behind) before touching the worktree.
-	res, err = MergeTicket(ld, lp)
+	res, err = merge.MergeTicket(ld, lp)
 	if err != nil {
-		return MergeResult{}, "", err
+		return merge.MergeResult{}, "", err
 	}
-	if res.Outcome != Conflicted {
+	if res.Outcome != merge.Conflicted {
 		return res, "", nil
 	}
 	// This call now owns the active sequencer state. Always clean it up on
@@ -600,10 +601,10 @@ func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, bran
 	// already means the cherry-pick sequence is genuinely clear.
 	resolutionSessionID, err = resolveCherryPickConflict(d, p)
 	if err != nil {
-		return MergeResult{}, "", err
+		return merge.MergeResult{}, "", err
 	}
 
-	res, err = stampMerged(ld, lp)
+	res, err = merge.StampMerged(ld, lp)
 	return res, resolutionSessionID, err
 }
 
@@ -636,19 +637,19 @@ func foreignCherryPick(d deps.Deps, p iterationParams) (foreign bool, sha string
 
 // mergeParamsFor maps an iteration's merging onto MergeParams. The recorded SHA
 // (ladder rung one) is best-effort: an unreadable run log just skips that rung.
-func mergeParamsFor(p iterationParams, base, branch, sessionID string) MergeParams {
+func mergeParamsFor(p iterationParams, base, branch, sessionID string) merge.MergeParams {
 	recorded := ""
 	if events, ok, err := runlog.ReadEvents(p.ScratchDir, p.FeatureBranch); err == nil && ok {
-		recorded = latestCherryPickedSHA(events, p.Ticket.Identifier)
+		recorded = merge.LatestCherryPickedSHA(events, p.Ticket.Identifier)
 	}
-	return MergeParams{
+	return merge.MergeParams{
 		FeatureWorktree: p.FeatureWorktree,
 		FeatureBranch:   p.FeatureBranch,
 		TicketID:        p.Ticket.Identifier,
 		TicketPath:      p.Ticket.Path,
-		SourceRange:     SourceRange{Base: base, Tip: branch},
+		SourceRange:     merge.SourceRange{Base: base, Tip: branch},
 		RecordedSHA:     recorded,
-		Session: MergeSession{
+		Session: merge.MergeSession{
 			Agent: p.Agent,
 			Cwd:   worktree.IterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier),
 			ID:    sessionID,

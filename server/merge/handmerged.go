@@ -2,6 +2,7 @@ package merge
 
 import (
 	"github.com/elentok/gx/ralphloop"
+	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -84,7 +85,7 @@ func (s *Reconciler) stampMerged(root queue.RootRef, e tickets.Epic, repo, targe
 	if merged, err := s.mergedProbe(repo, "refs/heads/"+e.Name, target); err != nil || !merged {
 		return false
 	}
-	added, deleted, err := ralphloop.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
+	added, deleted, err := rlmerge.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
 	s.merger.stampMergedEpic(root, e, added, deleted, err)
 	s.merger.StampEpic(root, e.Path, "merged_at")
 	s.log.Info("epic merged outside the server", "root", root, "target", target)

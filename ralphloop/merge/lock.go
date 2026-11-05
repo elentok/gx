@@ -1,4 +1,4 @@
-package ralphloop
+package merge
 
 import (
 	"encoding/json"
@@ -34,9 +34,6 @@ func MergeLockDirIn(stateDir, epicPath string) (string, error) {
 // ErrMergeLocked is returned when the merge lock is already held. Its reason code
 // in the recovery JSON envelope is "merge_locked".
 var ErrMergeLocked = errors.New("merge lock is held")
-
-// errMergeDeferred means a merge must wait: a human's conflict is pending.
-var errMergeDeferred = errors.New("merge deferred")
 
 // MergeMarker records a conflict a merge left behind, so a human's pending
 // resolution can be told apart from stale crash state.

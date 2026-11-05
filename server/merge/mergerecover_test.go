@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server"
@@ -25,14 +25,14 @@ func orphanMergeLock(t *testing.T, h *servertest.Harness, store string) string {
 	t.Helper()
 	// The lock root is the server's config's, not the process's.
 	stateDir := filepath.Join(h.Env("XDG_STATE_HOME"), "gx")
-	dir, err := ralphloop.MergeLockDirIn(stateDir, filepath.Join(store, "proj", "epic-a"))
+	dir, err := rlmerge.MergeLockDirIn(stateDir, filepath.Join(store, "proj", "epic-a"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	owner, _ := json.Marshal(ralphloop.MergeLockOwner{PID: 2147483646, Time: time.Now().UTC(), Epic: "epic-a", Ticket: "01"})
+	owner, _ := json.Marshal(rlmerge.MergeLockOwner{PID: 2147483646, Time: time.Now().UTC(), Epic: "epic-a", Ticket: "01"})
 	if err := os.WriteFile(filepath.Join(dir, "land.lock"), owner, 0o644); err != nil {
 		t.Fatal(err)
 	}

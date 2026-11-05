@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/worktree"
@@ -246,7 +247,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 	if mode.Feature {
 		outcome = "closed merge"
 	} else if ahead > 0 {
-		sha = ralphloop.LatestMergedSHA(lf.dir, addr.Epic, addr.ID)
+		sha = rlmerge.LatestMergedSHA(lf.dir, addr.Epic, addr.ID)
 		outcome = "merged " + sha
 	}
 	s.host.LogEvent(addr, runlog.Event{

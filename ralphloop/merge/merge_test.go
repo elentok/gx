@@ -1,4 +1,4 @@
-package ralphloop
+package merge
 
 import (
 	"errors"
@@ -56,20 +56,20 @@ func headMessage(t *testing.T, dir string) string {
 func TestMergeTicket_Merged_StampsTrailerScopedByFeatureBranch(t *testing.T) {
 	dir, lp := mergeFixture(t, false)
 
-	res, err := MergeTicket(mergeDepsFor(fakes.TestDeps()), lp)
+	res, err := MergeTicket(MergeDepsOf(fakes.TestDeps()), lp)
 	if err != nil {
 		t.Fatalf("MergeTicket: %v", err)
 	}
 	if res.Outcome != Merged {
 		t.Fatalf("outcome = %q, want %q", res.Outcome, Merged)
 	}
-	if want := ticketTrailerValue("main", "03"); res.TrailerValue != want {
+	if want := TicketTrailerValue("main", "03"); res.TrailerValue != want {
 		t.Errorf("TrailerValue = %q, want %q", res.TrailerValue, want)
 	}
 	if head, _ := git.RevParse(dir, "HEAD"); res.SHA != head {
 		t.Errorf("SHA = %q, want HEAD %q", res.SHA, head)
 	}
-	if !strings.Contains(headMessage(t, dir), ticketTrailerKey+": main/03") {
+	if !strings.Contains(headMessage(t, dir), TicketTrailerKey+": main/03") {
 		t.Errorf("HEAD message lacks scoped trailer:\n%s", headMessage(t, dir))
 	}
 }
@@ -77,21 +77,21 @@ func TestMergeTicket_Merged_StampsTrailerScopedByFeatureBranch(t *testing.T) {
 func TestMergeTicket_NoRecoverableSession_OmitsMetrics(t *testing.T) {
 	dir, lp := mergeFixture(t, false)
 
-	res, err := MergeTicket(mergeDepsFor(fakes.TestDeps()), lp)
+	res, err := MergeTicket(MergeDepsOf(fakes.TestDeps()), lp)
 	if err != nil {
 		t.Fatalf("MergeTicket: %v", err)
 	}
 	if res.MetricsStamped {
 		t.Error("MetricsStamped = true with no session, want false")
 	}
-	if msg := headMessage(t, dir); strings.Contains(msg, tokensTrailerKey) || strings.Contains(msg, elapsedTrailerKey) {
+	if msg := headMessage(t, dir); strings.Contains(msg, TokensTrailerKey) || strings.Contains(msg, ElapsedTrailerKey) {
 		t.Errorf("metrics trailers fabricated without a session:\n%s", msg)
 	}
 }
 
 func TestMergeTicket_SecondCall_IsAlreadyAppliedWithoutRestamp(t *testing.T) {
 	dir, lp := mergeFixture(t, false)
-	d := mergeDepsFor(fakes.TestDeps())
+	d := MergeDepsOf(fakes.TestDeps())
 
 	first, err := MergeTicket(d, lp)
 	if err != nil || first.Outcome != Merged {
@@ -117,13 +117,13 @@ func TestMergeTicket_SecondCall_IsAlreadyAppliedWithoutRestamp(t *testing.T) {
 func TestMergeTicket_TrailerOnly_IsAmbiguousNamingTheSHAs(t *testing.T) {
 	_, lp := mergeFixture(t, false)
 	lp.RecordedSHA = "recorded"
-	d := mergeDepsFor(fakes.TestDeps())
+	d := MergeDepsOf(fakes.TestDeps())
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return false, nil }
 	d.MergedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
 
 	res, err := MergeTicket(d, lp)
-	var amb *ambiguousMergeError
+	var amb *AmbiguousMergeError
 	if !errors.As(err, &amb) {
 		t.Fatalf("MergeTicket = (%+v, %v), want an ambiguous-merge error", res, err)
 	}
@@ -136,7 +136,7 @@ func TestMergeTicket_TrailerOnly_IsAmbiguousNamingTheSHAs(t *testing.T) {
 
 func TestMergeTicket_TrailerOnlyWithoutRecordedSHA_SaysNone(t *testing.T) {
 	_, lp := mergeFixture(t, false)
-	d := mergeDepsFor(fakes.TestDeps())
+	d := MergeDepsOf(fakes.TestDeps())
 	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return false, nil }
 	d.MergedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
 
@@ -149,7 +149,7 @@ func TestMergeTicket_TrailerOnlyWithoutRecordedSHA_SaysNone(t *testing.T) {
 func TestMergeTicket_RecordedSHARung_DetectsAlreadyApplied(t *testing.T) {
 	_, lp := mergeFixture(t, false)
 	lp.RecordedSHA = "recorded"
-	d := mergeDepsFor(fakes.TestDeps())
+	d := MergeDepsOf(fakes.TestDeps())
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return ancestor == "recorded", nil }
 
 	res, err := MergeTicket(d, lp)
@@ -166,7 +166,7 @@ func TestMergeTicket_RangeAlreadyOnFeatureBranch_IsAlreadyApplied(t *testing.T) 
 	dir, lp := mergeFixture(t, false)
 	testutil.MustGitExported(t, dir, "merge", "--ff-only", lp.SourceRange.Tip)
 
-	res, err := MergeTicket(mergeDepsFor(fakes.TestDeps()), lp)
+	res, err := MergeTicket(MergeDepsOf(fakes.TestDeps()), lp)
 	if err != nil || res.Outcome != AlreadyApplied {
 		t.Fatalf("MergeTicket = (%+v, %v), want AlreadyApplied", res, err)
 	}
@@ -178,7 +178,7 @@ func TestMergeTicket_RangeAlreadyOnFeatureBranch_IsAlreadyApplied(t *testing.T) 
 func TestMergeTicket_Conflict_IsAResultNotAnError(t *testing.T) {
 	dir, lp := mergeFixture(t, true)
 
-	res, err := MergeTicket(mergeDepsFor(fakes.TestDeps()), lp)
+	res, err := MergeTicket(MergeDepsOf(fakes.TestDeps()), lp)
 	if err != nil {
 		t.Fatalf("MergeTicket error = %v, want nil on conflict", err)
 	}
@@ -196,7 +196,7 @@ func appliedSessionFixture(t *testing.T, cost string) (lp MergeParams, d MergeDe
 	t.Helper()
 	home := t.TempDir()
 	_, lp = mergeFixture(t, false)
-	d = mergeDepsFor(fakes.TestDeps())
+	d = MergeDepsOf(fakes.TestDeps())
 	d.SessionHomes = metrics.SessionHomes{Claude: home}
 	if res, err := MergeTicket(d, lp); err != nil || res.Outcome != Merged {
 		t.Fatalf("first MergeTicket = (%+v, %v), want Merged", res, err)

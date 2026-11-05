@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -413,16 +414,16 @@ func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	lockDir := mustMergeLockDir(t, scratchDir, "epic")
-	if err := AcquireMergeLock(lockDir); err != nil {
+	if err := merge.AcquireMergeLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
+	t.Cleanup(func() { _ = merge.ReleaseMergeLock(lockDir) })
 	d, _, _ := fakes.FakeDeps()
 	var sleeps int
 	d.Sleep = func(time.Duration) {
 		sleeps++
 		if sleeps == 3 {
-			_ = ReleaseMergeLock(lockDir)
+			_ = merge.ReleaseMergeLock(lockDir)
 		}
 	}
 	p := iterationParams{FeatureBranch: "epic", ScratchDir: scratchDir, Gate: NewGate(), Sink: runlog.NoopEventSink{}}
@@ -459,10 +460,10 @@ func TestMergeBuilt_LockHeld_DefersThenMergesOnceReleased(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
 	lockDir := mustMergeLockDir(t, scratchDir, "epic")
-	if err := AcquireMergeLock(lockDir); err != nil {
+	if err := merge.AcquireMergeLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
+	t.Cleanup(func() { _ = merge.ReleaseMergeLock(lockDir) })
 	d, _, _ := fakes.FakeDeps()
 	picks := 0
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
@@ -475,7 +476,7 @@ func TestMergeBuilt_LockHeld_DefersThenMergesOnceReleased(t *testing.T) {
 			t.Errorf("CherryPickRange calls = %d while the lock was held, want 0", picks)
 		}
 		if n == 3 {
-			if err := ReleaseMergeLock(lockDir); err != nil {
+			if err := merge.ReleaseMergeLock(lockDir); err != nil {
 				t.Error(err)
 			}
 		}
@@ -498,7 +499,7 @@ func TestMergeBuilt_MergeMarkerPresent_SkipsStaleAbort(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
 	lockDir := mustMergeLockDir(t, scratchDir, "epic")
-	if err := WriteMergeMarker(lockDir, MergeMarker{Epic: "epic", Ticket: "01"}); err != nil {
+	if err := merge.WriteMergeMarker(lockDir, merge.MergeMarker{Epic: "epic", Ticket: "01"}); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ := fakes.FakeDeps()
@@ -516,7 +517,7 @@ func TestMergeBuilt_MergeMarkerPresent_SkipsStaleAbort(t *testing.T) {
 		}
 		if n == 3 {
 			inProgress = false
-			if err := ClearMerge(lockDir); err != nil {
+			if err := merge.ClearMerge(lockDir); err != nil {
 				t.Error(err)
 			}
 		}
@@ -535,16 +536,16 @@ func TestMergeBuilt_LockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
 	lockDir := mustMergeLockDir(t, scratchDir, "epic")
-	if err := AcquireMergeLock(lockDir); err != nil {
+	if err := merge.AcquireMergeLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
+	t.Cleanup(func() { _ = merge.ReleaseMergeLock(lockDir) })
 	d, _, _ := fakes.FakeDeps()
 
 	const holds = 20
 	_, retries := driveDeferredMerge(t, d, scratchDir, path, func(n int) {
 		if n == holds {
-			if err := ReleaseMergeLock(lockDir); err != nil {
+			if err := merge.ReleaseMergeLock(lockDir); err != nil {
 				t.Error(err)
 			}
 		}

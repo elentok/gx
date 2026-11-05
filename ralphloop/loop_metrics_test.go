@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
@@ -210,20 +211,20 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 
 	wantTokens := strconv.Itoa(ticket.ActualContextWindow)
 	wantElapsed := strconv.Itoa(ticket.ElapsedTime) + "s"
-	if found, err := history.TrailerCommitExists(repoDir, "HEAD", tokensTrailerKey, wantTokens); err != nil {
-		t.Fatalf("TrailerCommitExists(%s): %v", tokensTrailerKey, err)
+	if found, err := history.TrailerCommitExists(repoDir, "HEAD", merge.TokensTrailerKey, wantTokens); err != nil {
+		t.Fatalf("TrailerCommitExists(%s): %v", merge.TokensTrailerKey, err)
 	} else if !found {
-		t.Errorf("merged commit missing %s: %s trailer", tokensTrailerKey, wantTokens)
+		t.Errorf("merged commit missing %s: %s trailer", merge.TokensTrailerKey, wantTokens)
 	}
-	if found, err := history.TrailerCommitExists(repoDir, "HEAD", elapsedTrailerKey, wantElapsed); err != nil {
-		t.Fatalf("TrailerCommitExists(%s): %v", elapsedTrailerKey, err)
+	if found, err := history.TrailerCommitExists(repoDir, "HEAD", merge.ElapsedTrailerKey, wantElapsed); err != nil {
+		t.Fatalf("TrailerCommitExists(%s): %v", merge.ElapsedTrailerKey, err)
 	} else if !found {
-		t.Errorf("merged commit missing %s: %s trailer", elapsedTrailerKey, wantElapsed)
+		t.Errorf("merged commit missing %s: %s trailer", merge.ElapsedTrailerKey, wantElapsed)
 	}
-	if found, err := history.TrailerCommitExists(repoDir, "HEAD", ticketTrailerKey, addressTrailerValue(scratchDir, "epic", "01")); err != nil {
-		t.Fatalf("TrailerCommitExists(%s): %v", ticketTrailerKey, err)
+	if found, err := history.TrailerCommitExists(repoDir, "HEAD", merge.TicketTrailerKey, addressTrailerValue(scratchDir, "epic", "01")); err != nil {
+		t.Fatalf("TrailerCommitExists(%s): %v", merge.TicketTrailerKey, err)
 	} else if !found {
-		t.Errorf("merged commit missing %s trailer", ticketTrailerKey)
+		t.Errorf("merged commit missing %s trailer", merge.TicketTrailerKey)
 	}
 }
 

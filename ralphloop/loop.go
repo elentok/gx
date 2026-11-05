@@ -6,35 +6,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// ticketTrailerKey is the commit-message trailer mergeCherryPick stamps onto
-// every merged commit (see Deps.AppendTrailer) and verify's last-resort
-// fallback searches for (Deps.TrailerCommitExists).
-const ticketTrailerKey = "Ralph-Loop-Ticket"
-
-// TicketTrailerKey is ticketTrailerKey for the repair verbs.
-const TicketTrailerKey = ticketTrailerKey
-
-// tokensTrailerKey and elapsedTrailerKey are the commit-message trailers
-// mergeCherryPick stamps alongside ticketTrailerKey whenever the merging
-// session's own metrics are available (see writeMergedMetrics) — the same
-// actual_context_window/elapsed_time values written to the ticket's
-// frontmatter, surfaced on the merged commit too.
-const (
-	tokensTrailerKey  = "Ralph-Loop-Tokens"
-	elapsedTrailerKey = "Ralph-Loop-Elapsed"
-	costTrailerKey    = "Ralph-Loop-Cost"
-)
-
-// ticketTrailerValue builds ticketTrailerKey's value, scoped to epicName: a
-// bare ticket identifier repeats across every epic (each restarts numbering
-// from 01), and TrailerCommitExists searches the whole repo history, not just
-// commits under this epic. An unscoped value can match a same-numbered
-// ticket from a completely unrelated epic merged long ago, misreporting a
-// genuinely unmerged ticket as already present.
-func ticketTrailerValue(epicName, identifier string) string {
-	return epicName + "/" + identifier
-}
-
 // ticketAddress is the canonical "project:epic/NN" address of the ticket
 // file at ticketPath (<root>/<epic>/issues/NN-<slug>.md), the only form
 // iteration prompts hand to agents.

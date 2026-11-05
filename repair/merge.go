@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/worktree"
@@ -71,7 +71,7 @@ func Merge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 
 	if parsed.FinishedCommitless() {
 		// No commits to land: closing it is only the done write.
-		if err := recordLanded(in.EpicPath, epic, in.Source, t, parsed.Status, ralphloop.MergeResult{}, ralphloop.MergeSession{}); err != nil {
+		if err := recordLanded(in.EpicPath, epic, in.Source, t, parsed.Status, merge.MergeResult{}, merge.MergeSession{}); err != nil {
 			return MergeResult{}, "", err
 		}
 		return MergeResult{Outcome: "closed commitless"}, fmt.Sprintf("%s: closed commitless", EpicTicketLabel(in.EpicPath, in.ID)), nil
@@ -90,15 +90,15 @@ func Merge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 		return MergeResult{}, "", err
 	}
 
-	lockDir, err := ralphloop.MergeLockDirIn(d.MergeLockStateDir, in.EpicPath)
+	lockDir, err := merge.MergeLockDirIn(d.MergeLockStateDir, in.EpicPath)
 	if err != nil {
 		return MergeResult{}, "", err
 	}
 	if err := preflightMerge(lockDir, epic, in.ID, featurePath, d); err != nil {
 		return MergeResult{}, "", err
 	}
-	if err := ralphloop.AcquireMergeLockFor(lockDir, epic, in.ID); err != nil {
-		if errors.Is(err, ralphloop.ErrMergeLocked) {
+	if err := merge.AcquireMergeLockFor(lockDir, epic, in.ID); err != nil {
+		if errors.Is(err, merge.ErrMergeLocked) {
 			return MergeResult{}, "", mergeLockedRefusal(lockDir, in.EpicPath, in.ID)
 		}
 		return MergeResult{}, "", err
@@ -108,7 +108,7 @@ func Merge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 		// A conflict keeps the lock: it must outlive this process until a
 		// --continue or --abort clears it.
 		if !conflicted {
-			_ = ralphloop.ReleaseMergeLock(lockDir)
+			_ = merge.ReleaseMergeLock(lockDir)
 		}
 	}()
 
@@ -116,8 +116,8 @@ func Merge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 	if err != nil {
 		return MergeResult{}, "", fmt.Errorf("resolving %s HEAD: %w", epic, err)
 	}
-	session, recorded := ralphloop.RecoverMergeSession(filepath.Dir(filepath.Clean(in.EpicPath)), epic, t.Identifier)
-	res, err := ralphloop.MergeTicket(ralphloop.MergeDepsOf(d), ralphloop.MergeParams{
+	session, recorded := merge.RecoverMergeSession(filepath.Dir(filepath.Clean(in.EpicPath)), epic, t.Identifier)
+	res, err := merge.MergeTicket(merge.MergeDepsOf(d), merge.MergeParams{
 		FeatureWorktree: featurePath,
 		FeatureBranch:   epic,
 		TicketID:        t.Identifier,
@@ -131,10 +131,10 @@ func Merge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 	}
 
 	out := MergeResult{Outcome: jsonOutcome(res.Outcome), SHA: res.SHA, TrailerValue: res.TrailerValue, MetricsStamped: res.MetricsStamped}
-	if res.Outcome == ralphloop.Conflicted {
+	if res.Outcome == merge.Conflicted {
 		conflicted = true
-		marker := ralphloop.MergeMarker{Epic: epic, Ticket: in.ID, SourceRange: rng.Base + ".." + rng.Tip, PrePickHead: prePickHead}
-		if err := ralphloop.WriteMergeMarker(lockDir, marker); err != nil {
+		marker := merge.MergeMarker{Epic: epic, Ticket: in.ID, SourceRange: rng.Base + ".." + rng.Tip, PrePickHead: prePickHead}
+		if err := merge.WriteMergeMarker(lockDir, marker); err != nil {
 			return MergeResult{}, "", fmt.Errorf("writing land marker: %w", err)
 		}
 		return out, fmt.Sprintf("%s: conflict landing %s; resolve it in %s, then --continue or --abort", EpicTicketLabel(in.EpicPath, in.ID), marker.SourceRange, featurePath), nil
@@ -150,7 +150,7 @@ func Merge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 // lock, how to clear it.
 func mergeLockedRefusal(lockDir, epicPath, id string) *RefusalError {
 	msg := "another land is in progress (land lock is held)"
-	owner, err := ralphloop.OrphanMergeLock(lockDir)
+	owner, err := merge.OrphanMergeLock(lockDir)
 	if err == nil && owner != nil {
 		msg = fmt.Sprintf("land lock is held by %s with no conflict pending; if that land crashed, clear it with `gx server tickets merge %s --abort`", owner.Describe(), EpicTicketLabel(epicPath, id))
 	}
@@ -160,7 +160,7 @@ func mergeLockedRefusal(lockDir, epicPath, id string) *RefusalError {
 // abortOrphanLock clears a lock that has no marker. It refuses while the
 // owner is still running, since that is a live land, not a crash leftover.
 func abortOrphanLock(epicPath, lockDir, id string) (MergeResult, string, error) {
-	owner, err := ralphloop.ReadMergeLock(lockDir)
+	owner, err := merge.ReadMergeLock(lockDir)
 	if err != nil {
 		return MergeResult{}, "", err
 	}
@@ -170,7 +170,7 @@ func abortOrphanLock(epicPath, lockDir, id string) (MergeResult, string, error) 
 	if owner.Alive() {
 		return MergeResult{}, "", &RefusalError{Reason: ReasonMergeLocked, Message: fmt.Sprintf("land lock is held by running %s; wait for it to finish", owner.Describe())}
 	}
-	if err := ralphloop.ReleaseMergeLock(lockDir); err != nil {
+	if err := merge.ReleaseMergeLock(lockDir); err != nil {
 		return MergeResult{}, "", fmt.Errorf("clearing land lock: %w", err)
 	}
 	return MergeResult{Outcome: "unlocked"}, fmt.Sprintf("%s: cleared stale land lock held by %s", EpicTicketLabel(epicPath, id), owner.Describe()), nil
@@ -179,7 +179,7 @@ func abortOrphanLock(epicPath, lockDir, id string) (MergeResult, string, error) 
 // recordLanded writes status: done (unless already) and the manual-merge event
 // through the pause path. The ticket's open Pause round ends first, so a crash
 // between the two leaves a closed round on a paused ticket, not an open one on a done ticket.
-func recordLanded(epicPath, epic, source string, t tickets.Ticket, status schema.Status, res ralphloop.MergeResult, session ralphloop.MergeSession) error {
+func recordLanded(epicPath, epic, source string, t tickets.Ticket, status schema.Status, res merge.MergeResult, session merge.MergeSession) error {
 	if err := tickets.EndOpenRound(t.Path, source, tickets.HowManualMerge, "manual-merge"); err != nil {
 		return fmt.Errorf("end pause round of %s: %w", t.Identifier, err)
 	}
@@ -210,11 +210,11 @@ func resolveMerge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 		return MergeResult{}, "", err
 	}
 	epic := filepath.Base(filepath.Clean(in.EpicPath))
-	lockDir, err := ralphloop.MergeLockDirIn(d.MergeLockStateDir, in.EpicPath)
+	lockDir, err := merge.MergeLockDirIn(d.MergeLockStateDir, in.EpicPath)
 	if err != nil {
 		return MergeResult{}, "", err
 	}
-	marker, err := ralphloop.ReadMergeMarker(lockDir)
+	marker, err := merge.ReadMergeMarker(lockDir)
 	if err != nil {
 		return MergeResult{}, "", err
 	}
@@ -239,7 +239,7 @@ func resolveMerge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 				return MergeResult{}, "", fmt.Errorf("aborting cherry-pick: %w", err)
 			}
 		}
-		if err := ralphloop.ClearMerge(lockDir); err != nil {
+		if err := merge.ClearMerge(lockDir); err != nil {
 			return MergeResult{}, "", fmt.Errorf("clearing land marker: %w", err)
 		}
 		return MergeResult{Outcome: "aborted"}, fmt.Sprintf("%s: merge aborted", EpicTicketLabel(in.EpicPath, in.ID)), nil
@@ -262,7 +262,7 @@ func resolveMerge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 	if ok, err := d.IsAncestor(featurePath, marker.PrePickHead, head); err != nil || !ok {
 		return MergeResult{}, "", &RefusalError{Reason: ReasonMergeSuperseded, Message: fmt.Sprintf("%s no longer descends from the pre-conflict head %s; the conflicted pick for ticket %s is gone (run --abort, then merge again)", epic, marker.PrePickHead, in.ID)}
 	}
-	if others, err := d.TrailerMap(featurePath, marker.PrePickHead+"..HEAD", ralphloop.TicketTrailerKey); err != nil {
+	if others, err := d.TrailerMap(featurePath, marker.PrePickHead+"..HEAD", merge.TicketTrailerKey); err != nil {
 		return MergeResult{}, "", fmt.Errorf("reading landings since the conflict on %s: %w", epic, err)
 	} else if len(others) > 0 {
 		return MergeResult{}, "", &RefusalError{Reason: ReasonMergeSuperseded, Message: fmt.Sprintf("other tickets merged into %s since the conflict; the conflicted pick for ticket %s is gone (run --abort, then merge again)", epic, in.ID)}
@@ -272,8 +272,8 @@ func resolveMerge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 	if err != nil {
 		return MergeResult{}, "", err
 	}
-	session, _ := ralphloop.RecoverMergeSession(filepath.Dir(filepath.Clean(in.EpicPath)), epic, t.Identifier)
-	res, err := ralphloop.StampMerged(ralphloop.MergeDepsOf(d), ralphloop.MergeParams{
+	session, _ := merge.RecoverMergeSession(filepath.Dir(filepath.Clean(in.EpicPath)), epic, t.Identifier)
+	res, err := merge.StampMerged(merge.MergeDepsOf(d), merge.MergeParams{
 		FeatureWorktree: featurePath,
 		FeatureBranch:   epic,
 		TicketID:        t.Identifier,
@@ -286,7 +286,7 @@ func resolveMerge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 	if err := recordLanded(in.EpicPath, epic, in.Source, t, parsed.Status, res, session); err != nil {
 		return MergeResult{}, "", err
 	}
-	if err := ralphloop.ClearMerge(lockDir); err != nil {
+	if err := merge.ClearMerge(lockDir); err != nil {
 		return MergeResult{}, "", fmt.Errorf("clearing land marker: %w", err)
 	}
 	out := MergeResult{Outcome: jsonOutcome(res.Outcome), SHA: res.SHA, TrailerValue: res.TrailerValue, MetricsStamped: res.MetricsStamped}
@@ -354,19 +354,19 @@ func checkRecoverable(d deps.Deps, featurePath, epic, identifier string) error {
 
 // mergeSourceRange is --from/--to when given, else the iteration branch's
 // commits since its merge-base with the feature branch.
-func mergeSourceRange(in MergeInput, d deps.Deps, featurePath, epic, identifier string) (ralphloop.SourceRange, error) {
+func mergeSourceRange(in MergeInput, d deps.Deps, featurePath, epic, identifier string) (merge.SourceRange, error) {
 	if in.From != "" {
-		return ralphloop.SourceRange{Base: in.From, Tip: in.To}, nil
+		return merge.SourceRange{Base: in.From, Tip: in.To}, nil
 	}
 	branch := worktree.IterationBranch(epic, identifier)
 	if _, err := d.RevParse(featurePath, branch); err != nil {
-		return ralphloop.SourceRange{}, &RefusalError{Reason: ReasonIterationBranchMissing, Message: fmt.Sprintf("no iteration branch %s; commits not recoverable (--from/--to can still land an explicit range)", branch)}
+		return merge.SourceRange{}, &RefusalError{Reason: ReasonIterationBranchMissing, Message: fmt.Sprintf("no iteration branch %s; commits not recoverable (--from/--to can still land an explicit range)", branch)}
 	}
 	base, err := d.MergeBase(featurePath, branch, epic)
 	if err != nil {
-		return ralphloop.SourceRange{}, fmt.Errorf("resolving merge-base of %s and %s: %w", branch, epic, err)
+		return merge.SourceRange{}, fmt.Errorf("resolving merge-base of %s and %s: %w", branch, epic, err)
 	}
-	return ralphloop.SourceRange{Base: base, Tip: branch}, nil
+	return merge.SourceRange{Base: base, Tip: branch}, nil
 }
 
 // preflightMerge is the three-way marker/cherry-pick check.
@@ -375,24 +375,24 @@ func preflightMerge(lockDir, epic, id, featurePath string, d deps.Deps) error {
 	if err != nil {
 		return fmt.Errorf("checking cherry-pick state: %w", err)
 	}
-	verdict, err := ralphloop.MergePreflight(lockDir, epic, id, inProgress)
+	verdict, err := merge.MergePreflight(lockDir, epic, id, inProgress)
 	if err != nil {
 		return err
 	}
 	switch verdict {
-	case ralphloop.MergeConflictPending:
+	case merge.MergeConflictPending:
 		return &RefusalError{Reason: ReasonMergeConflictPending, Message: fmt.Sprintf("a conflicted merge of ticket %s is pending; resolve it, then --continue or --abort", id)}
-	case ralphloop.MergeOtherTicket:
+	case merge.MergeOtherTicket:
 		return &RefusalError{Reason: ReasonMergeBlocked, Message: "a conflicted merge of a different ticket is pending; finish or abort it first"}
-	case ralphloop.MergeUnknownPick:
+	case merge.MergeUnknownPick:
 		return &RefusalError{Reason: ReasonMergeBlocked, Message: "a cherry-pick is in progress on the feature branch with no merge marker; refusing to trample it"}
 	}
 	return nil
 }
 
 // jsonOutcome maps the Go outcome to the spec's kebab-case JSON vocabulary.
-func jsonOutcome(o ralphloop.MergeOutcome) string {
-	if o == ralphloop.AlreadyApplied {
+func jsonOutcome(o merge.MergeOutcome) string {
+	if o == merge.AlreadyApplied {
 		return "already-applied"
 	}
 	return string(o)

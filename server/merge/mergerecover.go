@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop"
+	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/repair"
@@ -42,11 +43,11 @@ func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 	if err != nil {
 		return err
 	}
-	owner, err := ralphloop.OrphanMergeLock(lockDir)
+	owner, err := rlmerge.OrphanMergeLock(lockDir)
 	if err != nil || owner == nil || owner.Alive() {
 		return err
 	}
-	if err := ralphloop.ReleaseMergeLock(lockDir); err != nil {
+	if err := rlmerge.ReleaseMergeLock(lockDir); err != nil {
 		return fmt.Errorf("clearing orphan merge lock: %w", err)
 	}
 	s.log.Info("cleared orphan merge lock", "epic", epicPath, "owner", owner.Describe())
@@ -82,7 +83,7 @@ func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 	s.log.Info("verified interrupted merge", "ticket", addr, "merging", v.Merging, "evidence", v.Evidence)
 	switch v.Merging {
 	case ralphloop.MergingMerged:
-		ev := runlog.Event{Outcome: string(ralphloop.Merged), SHA: v.SHA}
+		ev := runlog.Event{Outcome: string(rlmerge.Merged), SHA: v.SHA}
 		if err := tickets.EndOpenRound(t.Path, tickets.SourceGx, tickets.HowManualMerge, "manual-merge"); err != nil {
 			return fmt.Errorf("end pause round of %s: %w", addr, err)
 		}

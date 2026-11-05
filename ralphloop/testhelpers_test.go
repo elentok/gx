@@ -2,11 +2,18 @@ package ralphloop
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/tickets"
 )
+
+// addressTrailerValue is the trailer a ticket in writeEpic's layout merges with.
+func addressTrailerValue(scratchDir, epicName, id string) string {
+	a, _ := tickets.AddressOfPath(filepath.Join(scratchDir, epicName, "issues", id+"-x.md"), id)
+	return a.String()
+}
 
 // ticketAddr is the address iteration prompts name for ticket id in the
 // fixture epic under scratchDir.

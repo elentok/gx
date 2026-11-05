@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/testutil"
@@ -245,8 +246,8 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cherryPickWithConflictResolution: %v", err)
 	}
-	if res.Outcome != Merged {
-		t.Errorf("outcome = %q, want %q", res.Outcome, Merged)
+	if res.Outcome != merge.Merged {
+		t.Errorf("outcome = %q, want %q", res.Outcome, merge.Merged)
 	}
 	if gotResolutionSessionID != resolutionSessionID {
 		t.Errorf("resolution session = %q, want %q", gotResolutionSessionID, resolutionSessionID)

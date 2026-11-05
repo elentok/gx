@@ -96,7 +96,7 @@ var allowed = map[string]allowance{
 	"server/wire/mergerecover.go":           allow("persisted event kind land-rolled-back", "land"),
 	"server/ticketops/repair.go":            allow("hidden unpark verb and the persisted unpark answer choice", "park"),
 	"cmd/server_repair.go":                  allow("hidden unpark verb alias", "park"),
-	"ralphloop/mergelock.go":                allow("on-disk land-locks state dir; renaming would orphan live locks", "land"),
+	"ralphloop/merge/lock.go":               allow("on-disk land-locks state dir; renaming would orphan live locks", "land"),
 	"ralphloop/notify/notification_text.go": allow("chat headlines \"needs answer\" and \"needs repair\"", "needsanswer", "needsrepair"),
 	"ralphloop/waitforfinish_recovery.go":   allow("comment names the legacy Needs Answer heading", "needsanswer"),
 	"webui/src/generated/server.ts":         allow("generated from the wire fields above", "park", "needsanswer"),

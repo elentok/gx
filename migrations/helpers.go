@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
@@ -198,7 +198,7 @@ func epicTrailerLinesUnder(dirs config.Dirs, root string) func(tickets.Epic) (in
 				ref = trunk
 			}
 		}
-		added, removed, err := ralphloop.EpicTrailerLines(repoRoot, ref, e.Name)
+		added, removed, err := merge.EpicTrailerLines(repoRoot, ref, e.Name)
 		return added, removed, err == nil, err
 	}
 }

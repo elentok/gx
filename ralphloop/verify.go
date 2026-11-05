@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
@@ -132,7 +133,7 @@ func VerifyEpic(vd VerifyDeps, p VerifyParams) ([]TicketVerification, error) {
 
 	mergedFn := vd.MergedTickets
 	if mergedFn == nil {
-		mergedFn = mergedTickets
+		mergedFn = merge.MergedTickets
 	}
 	merged, mergedErr := mergedFn(p.FeatureWorktree, p.Epic)
 
@@ -175,7 +176,7 @@ func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t t
 		return v
 	}
 
-	sha := latestCherryPickedSHA(events, t.Identifier)
+	sha := merge.LatestCherryPickedSHA(events, t.Identifier)
 	present := false
 	if sha != "" {
 		ok, err := vd.IsAncestor(paths.FeatureWorktree, sha, featureBranch)

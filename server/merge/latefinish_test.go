@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -23,7 +23,7 @@ func TestLateFinish_MergesLateCommit(t *testing.T) {
 		commitAgentWork(t, p.WtPath)
 		p.Report(t, p.FinishedLate(false))
 		reason := p.Adopted(t)
-		sha := ralphloop.LatestMergedSHA(filepath.Join(p.Store, "proj"), "epic-a", "01")
+		sha := rlmerge.LatestMergedSHA(filepath.Join(p.Store, "proj"), "epic-a", "01")
 		if sha == "" || !strings.Contains(reason, "merged "+sha) || !strings.Contains(reason, "paused "+pausedAt(p)) {
 			t.Errorf("reason = %q, want paused %s and merged %q", reason, pausedAt(p), sha)
 		}
