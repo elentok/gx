@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -49,7 +50,7 @@ type MergeDeps struct {
 	AppendTrailers       func(dir string, trailers ...history.Trailer) error
 	MergedTickets        func(dir, featureBranch string) (map[string]bool, error)
 	// SessionHomes are where the merging session's transcripts are read from.
-	SessionHomes SessionHomes
+	SessionHomes metrics.SessionHomes
 }
 
 // MergeParams describes one ticket merging onto FeatureBranch.
@@ -200,7 +201,7 @@ func stampAppliedMetrics(d MergeDeps, lp MergeParams) (bool, error) {
 	if t.TotalTokens != nil {
 		return false, nil
 	}
-	_, ok, err := writeMergedMetrics(d.SessionHomes, lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+	_, ok, err := metrics.WriteMergedMetrics(d.SessionHomes, lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
 		return false, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}
@@ -254,7 +255,7 @@ func mergeTrailerValue(lp MergeParams) string {
 // a session was recoverable — in a single amend, and resolves the merged SHA.
 // Metrics are omitted, never fabricated, when no session is recoverable.
 func stampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
-	m, hasMetrics, err := writeMergedMetrics(d.SessionHomes, lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+	m, hasMetrics, err := metrics.WriteMergedMetrics(d.SessionHomes, lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
 		return MergeResult{}, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}
@@ -263,11 +264,11 @@ func stampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
 	trailers := []history.Trailer{{Key: ticketTrailerKey, Value: trailerValue}}
 	if hasMetrics {
 		trailers = append(trailers,
-			history.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(m.contextWindow)},
-			history.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(m.elapsedSeconds) + "s"},
+			history.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(m.ContextWindow)},
+			history.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(m.ElapsedSeconds) + "s"},
 		)
-		if m.costStamped {
-			trailers = append(trailers, history.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(m.cost)})
+		if m.CostStamped {
+			trailers = append(trailers, history.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(m.Cost)})
 		}
 	}
 	if err := d.AppendTrailers(lp.FeatureWorktree, trailers...); err != nil {

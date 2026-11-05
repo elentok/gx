@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/broker"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -215,7 +216,7 @@ func iterationCostIn(env []string) func(wire.IterationInfo) (float64, bool) {
 		if it.Session == "" {
 			return 0, false
 		}
-		cost, ok, err := ralphloop.SessionCost(harness.LookupEnv(env, "HOME"), it.Worktree, it.Session)
+		cost, ok, err := metrics.SessionCost(harness.LookupEnv(env, "HOME"), it.Worktree, it.Session)
 		return cost, ok && err == nil
 	}
 }

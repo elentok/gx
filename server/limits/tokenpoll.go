@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
@@ -52,7 +53,7 @@ type InteractiveSession struct {
 }
 
 // TokenReader reads a session's cumulative tokens and dollars.
-type TokenReader func(ref ralphloop.SessionRef) (tokens int64, cost float64, err error)
+type TokenReader func(ref metrics.SessionRef) (tokens int64, cost float64, err error)
 
 // transcriptSig is what an idle session keeps unchanged: its transcript's size
 // and mtime, and those of its subagent transcripts.
@@ -77,18 +78,18 @@ type tokenSession struct {
 	project string
 	group   string
 	harness string
-	ref     ralphloop.SessionRef
+	ref     metrics.SessionRef
 	path    string // transcript or rollout whose change means new usage
 }
 
-func (l *Limits) readTokens(ref ralphloop.SessionRef) (int64, float64, error) {
+func (l *Limits) readTokens(ref metrics.SessionRef) (int64, float64, error) {
 	if f := l.tokenPoll.read; f != nil {
 		return f(ref)
 	}
-	var homes ralphloop.SessionHomes
+	var homes metrics.SessionHomes
 	homes.Claude, _ = l.projects.EnvHome()
 	homes.Codex, _ = l.projects.CodexHome()
-	return ralphloop.SessionsTotals(homes, []ralphloop.SessionRef{ref})
+	return metrics.SessionsTotals(homes, []metrics.SessionRef{ref})
 }
 
 // tokenSessionOf resolves address's live iteration session, false when it has
@@ -121,7 +122,7 @@ func (l *Limits) tokenSessionOf(address string) (tokenSession, bool) {
 			return tokenSession{}, false
 		}
 		ts.harness, ts.path = string(harness.Codex), path
-		ts.ref = ralphloop.SessionRef{Agent: agent.AgentCodex, Cwd: worktree, SessionID: id}
+		ts.ref = metrics.SessionRef{Agent: agent.AgentCodex, Cwd: worktree, SessionID: id}
 	} else {
 		it, ok := l.tokenHost.BudgetIteration(address)
 		home, err := l.projects.EnvHome()
@@ -129,7 +130,7 @@ func (l *Limits) tokenSessionOf(address string) (tokenSession, bool) {
 			return tokenSession{}, false
 		}
 		ts.harness, ts.path = string(harness.Claude), transcript.PathIn(home, it.Worktree, it.Session)
-		ts.ref = ralphloop.SessionRef{Agent: agent.AgentClaude, Cwd: it.Worktree, SessionID: it.Session}
+		ts.ref = metrics.SessionRef{Agent: agent.AgentClaude, Cwd: it.Worktree, SessionID: it.Session}
 	}
 	ts.key = address + "@" + ts.ref.SessionID
 	return ts, true
@@ -241,7 +242,7 @@ func (l *Limits) interactiveTokenSession(m InteractiveSession) (tokenSession, bo
 		key:     "session/" + m.ID + "@" + m.ConversationID,
 		project: m.Project,
 		harness: m.Harness,
-		ref:     ralphloop.SessionRef{Agent: agent.AgentFor(m.Harness), Cwd: m.Dir, SessionID: m.ConversationID},
+		ref:     metrics.SessionRef{Agent: agent.AgentFor(m.Harness), Cwd: m.Dir, SessionID: m.ConversationID},
 	}
 	if agentrunner.Kind(m.Harness) == harness.Codex {
 		home, err := l.projects.CodexHome()

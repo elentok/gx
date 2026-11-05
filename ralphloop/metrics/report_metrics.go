@@ -1,9 +1,8 @@
-package ralphloop
+package metrics
 
 import (
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmigrate"
@@ -291,7 +291,7 @@ func readAgentSessionStats(homes SessionHomes, key sessionKey) (sessionStats, er
 	}, nil
 }
 
-// writeMergedMetrics reads sessionID's own transcript — the same
+// WriteMergedMetrics reads sessionID's own transcript — the same
 // readAgentSessionStats call `gx ralph-loop report` uses, just invoked at
 // merge-time instead of report-time — and, if its stats are available, writes
 // its peak context occupancy and wall-clock duration into ticketPath's
@@ -307,7 +307,7 @@ func readAgentSessionStats(homes SessionHomes, key sessionKey) (sessionStats, er
 // plus sessionID, independent of whether sessionID's own transcript was
 // readable: all-or-nothing, so one unreadable session leaves total_tokens and
 // actual_cost unstamped. A ticket with no session stamps zero.
-func writeMergedMetrics(homes SessionHomes, agentKind agent.AgentKind, cwd, sessionID, ticketPath string) (m mergedMetrics, ok bool, err error) {
+func WriteMergedMetrics(homes SessionHomes, agentKind agent.AgentKind, cwd, sessionID, ticketPath string) (m MergedMetrics, ok bool, err error) {
 	// A read error is treated like a transcript that is not there yet: the
 	// no-op case above.
 	stats, err := readAgentSessionStats(homes, sessionKey{agent: agentKind, cwd: cwd, sessionID: sessionID})
@@ -317,23 +317,23 @@ func writeMergedMetrics(homes SessionHomes, agentKind agent.AgentKind, cwd, sess
 	current, err := schema.ParseTicket(ticketPath)
 	if err != nil {
 		if !stats.ok {
-			return mergedMetrics{}, false, nil
+			return MergedMetrics{}, false, nil
 		}
-		return mergedMetrics{}, false, err
+		return MergedMetrics{}, false, err
 	}
 	sum, totalsErr := collectTicketTotals(homes, agentKind, cwd, sessionID, ticketPath, current)
 	if !stats.ok && totalsErr != nil {
-		return mergedMetrics{}, false, nil
+		return MergedMetrics{}, false, nil
 	}
-	m = mergedMetrics{cost: sum.cost, costStamped: totalsErr == nil}
+	m = MergedMetrics{Cost: sum.cost, CostStamped: totalsErr == nil}
 	if stats.ok {
-		m.contextWindow = stats.peakOccupancy
-		m.elapsedSeconds = int(stats.end.Sub(stats.start).Seconds())
+		m.ContextWindow = stats.peakOccupancy
+		m.ElapsedSeconds = int(stats.end.Sub(stats.start).Seconds())
 	}
 	err = ticketops.UpdateTicket(ticketPath, func(t *schema.Ticket) {
 		if stats.ok {
-			t.ActualContextWindow = m.contextWindow
-			t.ElapsedTime = m.elapsedSeconds
+			t.ActualContextWindow = m.ContextWindow
+			t.ElapsedTime = m.ElapsedSeconds
 			// A resumed session reuses its id, so a repeat in session_ids marks
 			// one whose first call can carry old history. A server-launched
 			// resume is recorded once (recordLiveSession dedups) and is not seen.
@@ -342,7 +342,7 @@ func writeMergedMetrics(homes SessionHomes, agentKind agent.AgentKind, cwd, sess
 				t.PrefixTokens = stats.firstOccupancy
 			}
 		}
-		if m.costStamped {
+		if m.CostStamped {
 			total := sum.tokens
 			t.TotalTokens = &total
 			t.ActualCost = sum.cost
@@ -350,7 +350,7 @@ func writeMergedMetrics(homes SessionHomes, agentKind agent.AgentKind, cwd, sess
 		}
 	})
 	if err != nil {
-		return mergedMetrics{}, false, err
+		return MergedMetrics{}, false, err
 	}
 	return m, stats.ok, nil
 }
@@ -381,12 +381,12 @@ func collectTicketTotals(homes SessionHomes, agentKind agent.AgentKind, cwd, ses
 	return sum, nil
 }
 
-// mergedMetrics are the figures writeMergedMetrics stamped. cost is the sum over
-// every session and is only meaningful when costStamped.
-type mergedMetrics struct {
-	contextWindow, elapsedSeconds int
-	cost                          float64
-	costStamped                   bool
+// MergedMetrics are the figures WriteMergedMetrics stamped. Cost is the sum over
+// every session and is only meaningful when CostStamped.
+type MergedMetrics struct {
+	ContextWindow, ElapsedSeconds int
+	Cost                          float64
+	CostStamped                   bool
 }
 
 // recordedConversationTotals sums the saved totals of the interactive

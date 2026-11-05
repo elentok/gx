@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
 
 	"github.com/elentok/gx/tickets"
@@ -354,7 +355,7 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 	if !ok {
 		return ticketops.MarkDone(p.Ticket.Path)
 	}
-	if _, _, err := writeMergedMetrics(d.SessionHomes, agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
+	if _, _, err := metrics.WriteMergedMetrics(d.SessionHomes, agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
 		return fmt.Errorf("writing merged metrics for ticket %s: %w", p.Ticket.Identifier, err)
 	}
 	return markDoneWithCompactions(d, agent, p.Ticket.Path, sessionCwd, sessionID)
@@ -388,19 +389,19 @@ func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent ag
 // their existing zero value rather than failing the finish, since the ticket
 // is already done and these fields are a display convenience, not a
 // precondition for closing it.
-func stampCommitlessMetrics(homes SessionHomes, p iterationParams, cwd, sessionID string) {
+func stampCommitlessMetrics(homes metrics.SessionHomes, p iterationParams, cwd, sessionID string) {
 	if sessionID != "" {
-		writeMergedMetrics(homes, p.Agent, cwd, sessionID, p.Ticket.Path)
+		metrics.WriteMergedMetrics(homes, p.Agent, cwd, sessionID, p.Ticket.Path)
 		return
 	}
 	sid, sessionCwd, agent, ok := recoverIterationSession(p)
 	if !ok {
 		// No session to recover: still stamp the ticket's own session_ids
 		// (zero when it has none).
-		writeMergedMetrics(homes, p.Agent, "", "", p.Ticket.Path)
+		metrics.WriteMergedMetrics(homes, p.Agent, "", "", p.Ticket.Path)
 		return
 	}
-	writeMergedMetrics(homes, agent, sessionCwd, sid, p.Ticket.Path)
+	metrics.WriteMergedMetrics(homes, agent, sessionCwd, sid, p.Ticket.Path)
 }
 
 // mergeCherryPick cherry-picks base..branch onto the feature branch (resolving

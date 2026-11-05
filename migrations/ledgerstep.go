@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
 )
@@ -25,7 +25,7 @@ type Pass struct {
 	noProjectDone atomic.Bool
 
 	scanOnce sync.Once
-	claude   []ralphloop.SessionDay
+	claude   []metrics.SessionDay
 	codex    []codexsession.DayUsage
 	scanErr  error
 }
@@ -41,9 +41,9 @@ func (p *Pass) claimNoProject() bool {
 
 // scan reads every transcript once per pass, so a pass over many projects does
 // not rescan them for each one.
-func (p *Pass) scan(home string) ([]ralphloop.SessionDay, []codexsession.DayUsage, error) {
-	read := func() (c []ralphloop.SessionDay, x []codexsession.DayUsage, err error) {
-		if c, err = ralphloop.ClaudeSessionDays(home, time.Local); err != nil {
+func (p *Pass) scan(home string) ([]metrics.SessionDay, []codexsession.DayUsage, error) {
+	read := func() (c []metrics.SessionDay, x []codexsession.DayUsage, err error) {
+		if c, err = metrics.ClaudeSessionDays(home, time.Local); err != nil {
 			return nil, nil, err
 		}
 		x, err = codexsession.SessionDaysIn(filepath.Join(home, ".codex"), time.Local)
@@ -115,7 +115,7 @@ func rebuildLedger(e Env) ([]tickets.MigrationChange, error) {
 
 // ledgerRows sums the per-day deltas of the project's sessions into ledger
 // rows. The sessions that belong to no project are included when noProject.
-func ledgerRows(attr Attributions, project string, noProject bool, claude []ralphloop.SessionDay, codex []codexsession.DayUsage) []tokenledger.Row {
+func ledgerRows(attr Attributions, project string, noProject bool, claude []metrics.SessionDay, codex []codexsession.DayUsage) []tokenledger.Row {
 	sums := map[tokenledger.Key]tokenledger.Row{}
 	add := func(id, day, h string, tokens int64, dollars float64) {
 		at := attr.Of(id)

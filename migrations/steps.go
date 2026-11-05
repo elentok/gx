@@ -3,7 +3,7 @@ package migrations
 import (
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketmigrate"
 )
@@ -24,7 +24,7 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		totals := func(ids []string) (int64, float64, error) { return ralphloop.SessionIDsTotals(home, ids) }
+		totals := func(ids []string) (int64, float64, error) { return metrics.SessionIDsTotals(home, ids) }
 		return ticketmigrate.BackfillTicketTotals(e.Root, totals, conflictSessionsUnder(e.LookupRoot))
 	}})
 	Default.Register(Step{Name: "backfill-friction", Run: func(e Env) ([]tickets.MigrationChange, error) {

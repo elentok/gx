@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -29,7 +30,7 @@ func compactedMergingFixture(t *testing.T, home, cwd, sessionID string) (d Deps,
 		[3]any{"claude-sonnet-5", 1000, 69000},
 	)
 	d, _, _ = fakeDeps()
-	d.SessionHomes = SessionHomes{Claude: home}
+	d.SessionHomes = metrics.SessionHomes{Claude: home}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) { return 70000, true, nil }
 	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 1, true, nil }
 	return d, 130000
@@ -122,7 +123,7 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 	)
 
 	d, _, _ := fakeDeps()
-	d.SessionHomes = SessionHomes{Claude: home}
+	d.SessionHomes = metrics.SessionHomes{Claude: home}
 	p := iterationParams{
 		WorktreeDir:     "/fake/worktrees",
 		FeatureWorktree: "/fake/feature",
@@ -177,7 +178,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 
 	d, _, _ := fakeDeps()
-	d.SessionHomes = SessionHomes{Claude: home}
+	d.SessionHomes = metrics.SessionHomes{Claude: home}
 	d.AppendTrailers = history.AppendTrailers
 	d.RevParse = git.RevParse
 
@@ -250,7 +251,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 		ScratchDir:  scratchDir,
 	}
 
-	stampCommitlessMetrics(SessionHomes{Claude: home}, p, cwd, sessionID)
+	stampCommitlessMetrics(metrics.SessionHomes{Claude: home}, p, cwd, sessionID)
 
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
@@ -288,7 +289,7 @@ func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutErr
 		ScratchDir:    scratchDir,
 	}
 
-	stampCommitlessMetrics(SessionHomes{Claude: home}, p, iterationWorktreePath("/fake/worktrees", "epic", "01"), "")
+	stampCommitlessMetrics(metrics.SessionHomes{Claude: home}, p, iterationWorktreePath("/fake/worktrees", "epic", "01"), "")
 
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {

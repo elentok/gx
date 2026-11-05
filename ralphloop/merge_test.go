@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/tickets/schema"
 
 	"github.com/elentok/gx/git"
@@ -194,7 +195,7 @@ func appliedSessionFixture(t *testing.T, cost string) (lp MergeParams, d MergeDe
 	home := t.TempDir()
 	_, lp = mergeFixture(t, false)
 	d = mergeDepsFor(testDeps())
-	d.SessionHomes = SessionHomes{Claude: home}
+	d.SessionHomes = metrics.SessionHomes{Claude: home}
 	if res, err := MergeTicket(d, lp); err != nil || res.Outcome != Merged {
 		t.Fatalf("first MergeTicket = (%+v, %v), want Merged", res, err)
 	}

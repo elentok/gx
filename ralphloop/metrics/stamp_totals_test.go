@@ -1,4 +1,4 @@
-package ralphloop
+package metrics
 
 import (
 	"path/filepath"
@@ -23,7 +23,7 @@ func stampTotalsFixture(t *testing.T, sessionIDs string) (ticketPath, cwd string
 	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: implement\nsession_ids: " + sessionIDs + "\n---\n# A\n",
 	})
-	return filepath.Join(scratchDir, "epic", "issues", "01-a.md"), iterationWorktreePath("/fake/worktrees", "epic", "01"), homes
+	return filepath.Join(scratchDir, "epic", "issues", "01-a.md"), filepath.Join("/fake/worktrees", "epic-01"), homes
 }
 
 func TestWriteMergedMetrics_StampsTokensAndCostOverEverySession(t *testing.T) {
@@ -39,17 +39,17 @@ func TestWriteMergedMetrics_StampsTokensAndCostOverEverySession(t *testing.T) {
 		t.Fatalf("SessionsTotals: %v", err)
 	}
 
-	m, ok, err := writeMergedMetrics(homes, agent.AgentClaude, cwd, "sess-2", ticketPath)
+	m, ok, err := WriteMergedMetrics(homes, agent.AgentClaude, cwd, "sess-2", ticketPath)
 	if err != nil || !ok {
-		t.Fatalf("writeMergedMetrics = %v, %v", ok, err)
+		t.Fatalf("WriteMergedMetrics = %v, %v", ok, err)
 	}
 
 	got := fixture.MustParse(t, ticketPath)
 	if got.TotalTokens == nil || *got.TotalTokens != wantTokens {
 		t.Errorf("TotalTokens = %v, want %d", got.TotalTokens, wantTokens)
 	}
-	if got.ActualCost != wantCost || m.cost != wantCost || !m.costStamped {
-		t.Errorf("ActualCost = %v, returned %v (stamped %v), want %v", got.ActualCost, m.cost, m.costStamped, wantCost)
+	if got.ActualCost != wantCost || m.Cost != wantCost || !m.CostStamped {
+		t.Errorf("ActualCost = %v, returned %v (stamped %v), want %v", got.ActualCost, m.Cost, m.CostStamped, wantCost)
 	}
 	if got.HadCodex {
 		t.Error("HadCodex = true for an all-Claude ticket")
@@ -77,7 +77,7 @@ func TestWriteMergedMetrics_PrefixTokens(t *testing.T) {
 				turns = [][3]any{{"claude-sonnet-5", 0, 0}}
 			}
 			fixture.WriteFakeTranscript(t, homes.Claude, cwd, "sess-1", start, turns...)
-			if _, _, err := writeMergedMetrics(homes, agent.AgentClaude, cwd, "sess-1", ticketPath); err != nil {
+			if _, _, err := WriteMergedMetrics(homes, agent.AgentClaude, cwd, "sess-1", ticketPath); err != nil {
 				t.Fatal(err)
 			}
 			if got := fixture.MustParse(t, ticketPath).PrefixTokens; got != c.want {
@@ -93,7 +93,7 @@ func TestWriteMergedMetrics_PrefixTokens_FromThePeakSession(t *testing.T) {
 	fixture.WriteFakeTranscript(t, homes.Claude, cwd, "sess-1", start, [3]any{"claude-sonnet-5", 10000, 0})
 	fixture.WriteFakeTranscript(t, homes.Claude, cwd, "sess-2", start, [3]any{"claude-sonnet-5", 45000, 0}, [3]any{"claude-sonnet-5", 90000, 0})
 
-	if _, _, err := writeMergedMetrics(homes, agent.AgentClaude, cwd, "sess-2", ticketPath); err != nil {
+	if _, _, err := WriteMergedMetrics(homes, agent.AgentClaude, cwd, "sess-2", ticketPath); err != nil {
 		t.Fatal(err)
 	}
 	if got := fixture.MustParse(t, ticketPath).PrefixTokens; got != 45000 {
@@ -110,7 +110,7 @@ func TestWriteMergedMetrics_CodexStampsPrefixTokensFromFirstTokenCount(t *testin
 	if err := fixture.WriteCodexUsageLine(rollout, 1, 500, 7000); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := writeMergedMetrics(homes, agent.AgentCodex, cwd, "sess-codex", ticketPath); err != nil {
+	if _, _, err := WriteMergedMetrics(homes, agent.AgentCodex, cwd, "sess-codex", ticketPath); err != nil {
 		t.Fatal(err)
 	}
 	if got := fixture.MustParse(t, ticketPath).PrefixTokens; got != 500 {
@@ -124,14 +124,14 @@ func TestWriteMergedMetrics_UnreadableSession_LeavesTicketUnstamped(t *testing.T
 	fixture.WriteFakeTranscript(t, homes.Claude, cwd, "sess-1", start, [3]any{"claude-sonnet-5", 1000, 0})
 	fixture.WriteFakeTranscript(t, homes.Claude, cwd, "sess-2", start, [3]any{"claude-sonnet-5", 2000, 5000})
 
-	m, ok, err := writeMergedMetrics(homes, agent.AgentClaude, cwd, "sess-2", ticketPath)
+	m, ok, err := WriteMergedMetrics(homes, agent.AgentClaude, cwd, "sess-2", ticketPath)
 	if err != nil || !ok {
-		t.Fatalf("writeMergedMetrics = %v, %v", ok, err)
+		t.Fatalf("WriteMergedMetrics = %v, %v", ok, err)
 	}
 
 	got := fixture.MustParse(t, ticketPath)
-	if got.TotalTokens != nil || got.ActualCost != 0 || m.costStamped {
-		t.Errorf("TotalTokens = %v, ActualCost = %v, costStamped = %v; want none stamped", got.TotalTokens, got.ActualCost, m.costStamped)
+	if got.TotalTokens != nil || got.ActualCost != 0 || m.CostStamped {
+		t.Errorf("TotalTokens = %v, ActualCost = %v, costStamped = %v; want none stamped", got.TotalTokens, got.ActualCost, m.CostStamped)
 	}
 	if got.ActualContextWindow == 0 {
 		t.Error("ActualContextWindow = 0, want the merging session's peak still stamped")
@@ -162,8 +162,8 @@ func TestWriteMergedMetrics_RecordedConversation_AddsToStamp(t *testing.T) {
 	}
 	recordConversation(t, ticketPath, &conversations.Totals{TotalTokens: 300, Cost: 0.5})
 
-	if _, _, err := writeMergedMetrics(homes, agent.AgentClaude, cwd, "sess-1", ticketPath); err != nil {
-		t.Fatalf("writeMergedMetrics: %v", err)
+	if _, _, err := WriteMergedMetrics(homes, agent.AgentClaude, cwd, "sess-1", ticketPath); err != nil {
+		t.Fatalf("WriteMergedMetrics: %v", err)
 	}
 
 	got := fixture.MustParse(t, ticketPath)
@@ -177,14 +177,14 @@ func TestWriteMergedMetrics_RecordedConversationWithoutTotals_LeavesTicketUnstam
 	fixture.WriteFakeTranscript(t, homes.Claude, cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-5", 1000, 0})
 	recordConversation(t, ticketPath, nil)
 
-	m, _, err := writeMergedMetrics(homes, agent.AgentClaude, cwd, "sess-1", ticketPath)
+	m, _, err := WriteMergedMetrics(homes, agent.AgentClaude, cwd, "sess-1", ticketPath)
 	if err != nil {
-		t.Fatalf("writeMergedMetrics: %v", err)
+		t.Fatalf("WriteMergedMetrics: %v", err)
 	}
 
 	got := fixture.MustParse(t, ticketPath)
-	if got.TotalTokens != nil || got.ActualCost != 0 || m.costStamped {
-		t.Errorf("TotalTokens = %v, ActualCost = %v, costStamped = %v; want none stamped", got.TotalTokens, got.ActualCost, m.costStamped)
+	if got.TotalTokens != nil || got.ActualCost != 0 || m.CostStamped {
+		t.Errorf("TotalTokens = %v, ActualCost = %v, costStamped = %v; want none stamped", got.TotalTokens, got.ActualCost, m.CostStamped)
 	}
 }
 
@@ -204,8 +204,8 @@ func TestWriteMergedMetrics_MixedCodexTicket_StampsClaudeCostAndMarker(t *testin
 		t.Fatal(err)
 	}
 
-	if _, _, err := writeMergedMetrics(homes, agent.AgentCodex, cwd, "sess-codex", ticketPath); err != nil {
-		t.Fatalf("writeMergedMetrics: %v", err)
+	if _, _, err := WriteMergedMetrics(homes, agent.AgentCodex, cwd, "sess-codex", ticketPath); err != nil {
+		t.Fatalf("WriteMergedMetrics: %v", err)
 	}
 
 	got := fixture.MustParse(t, ticketPath)
@@ -217,38 +217,5 @@ func TestWriteMergedMetrics_MixedCodexTicket_StampsClaudeCostAndMarker(t *testin
 	}
 	if !got.HadCodex {
 		t.Error("HadCodex = false, want the Codex marker")
-	}
-}
-
-func TestStampCommitlessMetrics_NoSession_StampsZero(t *testing.T) {
-	ticketPath, cwd, homes := stampTotalsFixture(t, "[]")
-	p := iterationParams{WorktreeDir: "/fake/worktrees", FeatureBranch: "epic", Agent: agent.AgentClaude,
-		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: filepath.Dir(filepath.Dir(filepath.Dir(ticketPath)))}
-
-	stampCommitlessMetrics(homes, p, cwd, "")
-
-	got := fixture.MustParse(t, ticketPath)
-	if got.TotalTokens == nil || *got.TotalTokens != 0 || got.ActualCost != 0 || got.HadCodex {
-		t.Errorf("TotalTokens = %v, ActualCost = %v, HadCodex = %v; want a zero stamp", got.TotalTokens, got.ActualCost, got.HadCodex)
-	}
-}
-
-func TestStampCommitlessMetrics_AllCodex_StampsTokensZeroCostAndMarker(t *testing.T) {
-	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-codex]")
-	rollout := filepath.Join(homes.Codex, "sessions", "rollout-sess-codex.jsonl")
-	if err := fixture.WriteCodexSessionMeta(rollout, 0, "sess-codex", cwd); err != nil {
-		t.Fatal(err)
-	}
-	if err := fixture.WriteCodexUsageLine(rollout, 1, 500, 7000); err != nil {
-		t.Fatal(err)
-	}
-	p := iterationParams{WorktreeDir: "/fake/worktrees", Agent: agent.AgentCodex,
-		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}}
-
-	stampCommitlessMetrics(homes, p, cwd, "sess-codex")
-
-	got := fixture.MustParse(t, ticketPath)
-	if got.TotalTokens == nil || *got.TotalTokens != 7000 || got.ActualCost != 0 || !got.HadCodex {
-		t.Errorf("TotalTokens = %v, ActualCost = %v, HadCodex = %v; want 7000, 0, true", got.TotalTokens, got.ActualCost, got.HadCodex)
 	}
 }

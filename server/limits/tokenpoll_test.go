@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -60,7 +61,7 @@ func newTokenFixture(t *testing.T, epic string, opts ...func(*server.Config)) *t
 // nudged pane of a paused ticket.
 func (f *tokenFixture) live(t *testing.T) {
 	t.Helper()
-	f.h.Server.Limits().SetTokensOf(func(ralphloop.SessionRef) (int64, float64, error) {
+	f.h.Server.Limits().SetTokensOf(func(metrics.SessionRef) (int64, float64, error) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.reads++
@@ -350,7 +351,7 @@ func newSessionFixture(t *testing.T) *sessionFixture {
 		t.Fatal(err)
 	}
 	f := &sessionFixture{h: h, totals: map[string]int64{}}
-	h.Server.Limits().SetTokensOf(func(ref ralphloop.SessionRef) (int64, float64, error) {
+	h.Server.Limits().SetTokensOf(func(ref metrics.SessionRef) (int64, float64, error) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		return f.totals[ref.SessionID], 0, nil
@@ -517,7 +518,7 @@ func TestTokenPoll_WaitsForMigrations(t *testing.T) {
 		return nil, nil
 	}})
 	f.h.Restart(t)
-	f.h.Server.Limits().SetTokensOf(func(ralphloop.SessionRef) (int64, float64, error) {
+	f.h.Server.Limits().SetTokensOf(func(metrics.SessionRef) (int64, float64, error) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.reads++

@@ -9,8 +9,8 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/grillround"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/metrics"
 )
 
 // Host is what the Recorder needs from the root: the harness homes and whether
@@ -66,7 +66,7 @@ func (r *Recorder) SaveTotals(s Session, conversation string) {
 		return
 	}
 	codexHome, _ := r.Host.CodexHome()
-	tokens, cost, err := ralphloop.SessionsTotals(ralphloop.SessionHomes{Claude: home, Codex: codexHome}, []ralphloop.SessionRef{{Agent: agent, Cwd: s.Dir, SessionID: conversation}})
+	tokens, cost, err := metrics.SessionsTotals(metrics.SessionHomes{Claude: home, Codex: codexHome}, []metrics.SessionRef{{Agent: agent, Cwd: s.Dir, SessionID: conversation}})
 	if err != nil {
 		r.Log.Warn("read conversation totals", "session", s.ID, "conversation", conversation, "err", err)
 		return

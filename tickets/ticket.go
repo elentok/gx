@@ -47,7 +47,7 @@ type Ticket struct {
 	Body     string // raw markdown after the leading metadata lines, unmodified
 
 	// ActualContextWindow and ElapsedTime are the finish-time metrics
-	// ralphloop/report_metrics.go stamps into a done
+	// ralphloop/metrics/report_metrics.go stamps into a done
 	// ticket's frontmatter. Both zero for a ticket that's never run, or one
 	// finished before metrics existed (report.go's readSessionStats found
 	// nothing to stamp).
