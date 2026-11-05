@@ -50,7 +50,7 @@ func (m QueueModel) View() tea.View {
 	if m.harnessPicker.open {
 		content = ui.OverlayCenter(content, m.harnessPickerView(), m.width, m.height)
 	}
-	if m.watch.open {
+	if m.watch.IsOpen() {
 		content = ui.OverlayCenter(content, m.watch.View(), m.width, m.height)
 	}
 	if m.help.IsOpen {

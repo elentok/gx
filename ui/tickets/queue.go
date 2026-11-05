@@ -86,7 +86,7 @@ type QueueModel struct {
 
 	// menus is the Tickets tab's row menu plus the Queue group.
 	menus        rowMenus
-	watch        watchModal
+	watch        rowactions.WatchModal
 	runningEpics map[string]bool
 	paused       bool
 
@@ -274,10 +274,10 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseMotion(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
-	case watchLoadedMsg:
+	case rowactions.WatchLoadedMsg:
 		m.watch = m.watch.Open(msg, m.width, m.height)
-		return m, m.watch.tick()
-	case watchStepMsg:
+		return m, m.watch.Tick()
+	case rowactions.WatchStepMsg:
 		var cmd tea.Cmd
 		m.watch, cmd = m.watch.Step(msg)
 		return m, cmd
@@ -293,7 +293,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help, cmd = m.help.Update(msg)
 			return m, cmd
 		}
-		if m.watch.open {
+		if m.watch.IsOpen() {
 			var cmd tea.Cmd
 			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
@@ -332,7 +332,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.menus.menu, cmd = m.menus.menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 			return m, cmd
 		}
-		if m.watch.open {
+		if m.watch.IsOpen() {
 			return m, nil
 		}
 		if m.confirm.IsOpen {

@@ -249,17 +249,17 @@ func TestQueueTicketMenu_TranscriptResolvesAnAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, ok := openQueueTranscript(t, store, "gx:alpha/01").(watchLoadedMsg)
-	if !ok || !strings.Contains(ansi.Strip(strings.Join(msg.lines, "\n")), "hello from the agent") {
+	msg, ok := openQueueTranscript(t, store, "gx:alpha/01").(rowactions.WatchLoadedMsg)
+	if !ok || !strings.Contains(ansi.Strip(strings.Join(msg.Lines(), "\n")), "hello from the agent") {
 		t.Errorf("msg = %#v, want the transcript of the address's ticket file", msg)
 	}
 }
 
 func TestQueueTicketMenu_TranscriptAcceptsAFilePath(t *testing.T) {
 	fakeSessionLookup(t, map[string]string{"s1": "hello from the agent"})
-	path := writeTranscriptTicket(t, "session_ids:\n  - s1\n")
+	path := tickettest.WriteTranscriptTicket(t, "session_ids:\n  - s1\n")
 
-	if _, ok := openQueueTranscript(t, t.TempDir(), path).(watchLoadedMsg); !ok {
+	if _, ok := openQueueTranscript(t, t.TempDir(), path).(rowactions.WatchLoadedMsg); !ok {
 		t.Error("a file-shaped Path did not open its transcript")
 	}
 }

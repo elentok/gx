@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"fmt"
@@ -17,19 +17,19 @@ import (
 	"github.com/elentok/gx/ui/tickets/preview"
 )
 
-// actionTranscript opens the ticket's latest session in the Watch agent
+// ActionTranscript opens the ticket's latest session in the Watch agent
 // modal. Offered on every row; dispatched by the menu handlers, which know
 // the modal's width.
-const actionTranscript = "transcript"
+const ActionTranscript = "transcript"
 
-// lookupSession is a package-level seam so tests can fake the session lookup.
-var lookupSession = func(dirs config.Dirs, agentDir, id string) (sessionlookup.Session, error) {
+// LookupSession is a package-level seam so tests can fake the session lookup.
+var LookupSession = func(dirs config.Dirs, agentDir, id string) (sessionlookup.Session, error) {
 	return sessionlookup.Lookup(sessionlookup.RootsFrom(dirs.Environ()), agentDir, id)
 }
 
-// cmdTranscript renders the latest of file's session_ids as markdown.
+// CmdTranscript renders the latest of file's session_ids as markdown.
 // address ("" or unparseable skips it) locates the native agent dir.
-func cmdTranscript(dirs config.Dirs, file, address string, width int) tea.Cmd {
+func CmdTranscript(dirs config.Dirs, file, address string, width int) tea.Cmd {
 	return cmdTranscriptAt(dirs, file, address, width, -1)
 }
 
@@ -50,14 +50,14 @@ func cmdTranscriptAt(dirs config.Dirs, file, address string, width, index int) t
 			index = n - 1
 		}
 		id := t.SessionIDs[index]
-		s, err := lookupSession(dirs, nativeAgentDir(dirs, address), id)
+		s, err := LookupSession(dirs, nativeAgentDir(dirs, address), id)
 		if err != nil {
 			return notify.Error("transcript: " + err.Error())()
 		}
 		if s.Source == sessionlookup.Missing {
 			return notify.Warning("no transcript found for session " + id)()
 		}
-		md := preview.RenderMarkdown(s.Markdown, watchContentWidth(width))
+		md := preview.RenderMarkdown(s.Markdown, WatchContentWidth(width))
 		step := func(delta int) tea.Cmd {
 			next := index + delta
 			if next < 0 || next >= n {
@@ -66,7 +66,7 @@ func cmdTranscriptAt(dirs config.Dirs, file, address string, width, index int) t
 			return cmdTranscriptAt(dirs, file, address, width, next)
 		}
 		title := fmt.Sprintf("Transcript %s · session %d/%d", id, index+1, n)
-		return watchLoadedMsg{title: title, lines: strings.Split(md, "\n"), step: step}
+		return WatchLoadedMsg{title: title, lines: strings.Split(md, "\n"), step: step}
 	}
 }
 

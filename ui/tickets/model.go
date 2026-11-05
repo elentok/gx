@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
@@ -88,7 +89,7 @@ type Model struct {
 	menus rowMenus
 
 	// watch backs the Watch agent modal (watch_agent.go).
-	watch watchModal
+	watch rowactions.WatchModal
 
 	// serverAPI feeds vm (server_mode.go); nil keeps the tab reading the
 	// store for good.
@@ -155,7 +156,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.menus.menu.IsOpen || m.confirm.IsOpen || m.watch.open
+	return m.help.IsOpen || m.menus.menu.IsOpen || m.confirm.IsOpen || m.watch.IsOpen()
 }
 
 func (m Model) Init() tea.Cmd {
@@ -239,10 +240,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 
-	case watchLoadedMsg:
+	case rowactions.WatchLoadedMsg:
 		m.watch = m.watch.Open(msg, m.width, m.height)
-		return m, m.watch.tick()
-	case watchStepMsg:
+		return m, m.watch.Tick()
+	case rowactions.WatchStepMsg:
 		var cmd tea.Cmd
 		m.watch, cmd = m.watch.Step(msg)
 		return m, cmd
@@ -262,7 +263,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help, cmd = m.help.Update(msg)
 			return m, cmd
 		}
-		if m.watch.open {
+		if m.watch.IsOpen() {
 			var cmd tea.Cmd
 			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
@@ -286,7 +287,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.menus.menu, cmd = m.menus.menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 			return m, cmd
 		}
-		if m.watch.open {
+		if m.watch.IsOpen() {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -478,7 +479,7 @@ func (m Model) View() tea.View {
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
-	if m.watch.open {
+	if m.watch.IsOpen() {
 		content = ui.OverlayCenter(content, m.watch.View(), m.width, m.height)
 	}
 	if m.help.IsOpen {

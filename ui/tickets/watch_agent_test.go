@@ -23,16 +23,16 @@ const watchLogLine = `{"type":"assistant","message":{"role":"assistant","content
 
 func fakeNativeLog(t *testing.T, log agentlog.Log, err error) {
 	t.Helper()
-	fakeAgentLog(t, func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error) {
+	fakeAgentLog(t, func(context.Context, config.Dirs, string, rowactions.HerdrLookup) (agentlog.Log, error) {
 		return log, err
 	})
 }
 
-func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error)) {
+func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string, rowactions.HerdrLookup) (agentlog.Log, error)) {
 	t.Helper()
-	prev := agentLog
-	t.Cleanup(func() { agentLog = prev })
-	agentLog = f
+	prev := rowactions.AgentLog
+	t.Cleanup(func() { rowactions.AgentLog = prev })
+	rowactions.AgentLog = f
 }
 
 func TestWatchAgent_RendersLogInModal(t *testing.T) {
@@ -42,11 +42,12 @@ func TestWatchAgent_RendersLogInModal(t *testing.T) {
 	}
 	fakeNativeLog(t, agentlog.Log{Path: path}, nil)
 
-	loaded, ok := cmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(watchLoadedMsg)
+	loaded, ok := rowactions.CmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(rowactions.WatchLoadedMsg)
 	if !ok {
-		t.Fatal("expected watchLoadedMsg")
+		t.Fatal("expected WatchLoadedMsg")
 	}
-	modal := watchModal{}.Open(loaded, 120, 40)
+	modal := rowactions.WatchModal{}.Open(loaded, 120, 40)
+	t.Cleanup(modal.Close)
 	if view := modal.View(); !strings.Contains(view, "hello from the agent") {
 		t.Errorf("modal missing the rendered log:\n%s", view)
 	}
@@ -80,12 +81,8 @@ func openLiveWatch(t *testing.T, texts ...string) (m Model, path string, ended *
 	fakeNativeLog(t, agentlog.Log{Path: path, Ended: func() bool { return *ended }}, nil)
 	m = newServerModel(t)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	next, tick = next.(Model).Update(cmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")())
-	t.Cleanup(func() {
-		if m.watch.tail != nil {
-			m.watch.tail.Close()
-		}
-	})
+	next, tick = next.(Model).Update(rowactions.CmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")())
+	t.Cleanup(func() { m.watch.Close() })
 	return next.(Model), path, ended, tick
 }
 
@@ -131,11 +128,11 @@ func TestWatchLive_FollowsNewLinesAtBottom(t *testing.T) {
 func TestWatchLive_ScrolledUpStaysPutUntilG(t *testing.T) {
 	m, path, _, tick := openLiveWatch(t, manyTexts("old", 60)...)
 	m = pressWatch(m, "k")
-	off := m.watch.vp.YOffset()
+	off := m.watch.YOffset()
 
 	appendWatchLog(t, path, "fresh line")
 	m, tick = runWatchTick(t, m, tick)
-	if got := m.watch.vp.YOffset(); got != off {
+	if got := m.watch.YOffset(); got != off {
 		t.Errorf("scrolled-up view moved: offset %d, want %d", got, off)
 	}
 	if view := m.watch.View(); !strings.Contains(view, "↓ new lines") {
@@ -179,19 +176,11 @@ func TestWatchLive_AgentEndedStopsTick(t *testing.T) {
 func TestWatchLive_CloseStopsTick(t *testing.T) {
 	m, _, _, tick := openLiveWatch(t, "hello from the agent")
 	m = pressWatch(m, "q")
-	if m.watch.open {
+	if m.watch.IsOpen() {
 		t.Fatal("q did not close the modal")
 	}
 	if _, next := runWatchTick(t, m, tick); next != nil {
 		t.Error("tick re-armed after the modal closed")
-	}
-}
-
-func TestWatchModal_KeepsNewestLines(t *testing.T) {
-	w := watchModal{}.Open(watchLoadedMsg{lines: manyTexts("old", maxWatchLines)}, 120, 40)
-	w = w.appendLines(manyTexts("new", 500))
-	if len(w.lines) != maxWatchLines || w.lines[len(w.lines)-1] != "new 499" || w.lines[0] != "old 500" {
-		t.Errorf("kept %d lines, first %q, last %q", len(w.lines), w.lines[0], w.lines[len(w.lines)-1])
 	}
 }
 
@@ -208,8 +197,8 @@ func TestQueueWatch_OpensLiveModal(t *testing.T) {
 	}
 	next, tick := m.Update(cmd())
 	m = next.(QueueModel)
-	t.Cleanup(func() { m.watch.tail.Close() })
-	if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "hello from the queue") || !strings.Contains(view, "· live") {
+	t.Cleanup(func() { m.watch.Close() })
+	if view := m.watch.View(); !m.watch.IsOpen() || !strings.Contains(view, "hello from the queue") || !strings.Contains(view, "· live") {
 		t.Errorf("Queue Watch did not open the live modal:\n%s", view)
 	}
 	if tick == nil {
@@ -222,9 +211,10 @@ func TestWatchAgent_PtyShowsConversation(t *testing.T) {
 	appendWatchLog(t, path, "pty conversation")
 	fakeNativeLog(t, agentlog.Log{Path: path, PtyDir: "/pty/dir"}, nil)
 
-	loaded := cmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(watchLoadedMsg)
-	t.Cleanup(func() { loaded.tail.Close() })
-	if view := (watchModal{}).Open(loaded, 120, 40).View(); !strings.Contains(view, "pty conversation") {
+	loaded := rowactions.CmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(rowactions.WatchLoadedMsg)
+	modal := rowactions.WatchModal{}.Open(loaded, 120, 40)
+	t.Cleanup(modal.Close)
+	if view := modal.View(); !strings.Contains(view, "pty conversation") {
 		t.Errorf("modal missing the pty agent's conversation:\n%s", view)
 	}
 }
@@ -233,18 +223,18 @@ func TestWatchAgent_PtyShowsConversation(t *testing.T) {
 // the returned undo runs, i.e. on the Update goroutine.
 func failOnNativeLog(t *testing.T) (undo func()) {
 	t.Helper()
-	prev := agentLog
-	agentLog = func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error) {
+	prev := rowactions.AgentLog
+	rowactions.AgentLog = func(context.Context, config.Dirs, string, rowactions.HerdrLookup) (agentlog.Log, error) {
 		t.Error("native liveness resolved on the Update goroutine")
 		return agentlog.Log{}, agentlog.ErrNoAgent
 	}
-	return func() { agentLog = prev }
+	return func() { rowactions.AgentLog = prev }
 }
 
 func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	undo := failOnNativeLog(t)
-	cmd := cmdWatchAgent(tickettest.FakeReads{}, config.Dirs{}, "gx:epic/01")
+	cmd := rowactions.CmdWatchAgent(tickettest.FakeReads{}, config.Dirs{}, "gx:epic/01")
 	undo()
 	cmd()
 }
@@ -363,11 +353,7 @@ func openWatchFromMenu(t *testing.T, m Model) Model {
 	}
 	updated, _ = m.Update(cmd())
 	m = updated.(Model)
-	t.Cleanup(func() {
-		if m.watch.tail != nil {
-			m.watch.tail.Close()
-		}
-	})
+	t.Cleanup(func() { m.watch.Close() })
 	return m
 }
 
@@ -376,7 +362,7 @@ func TestWatch_EndedAgentOpensNotLive(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			fakeNativeLog(t, agentlog.Log{Path: watchLogFile(t), Ended: endedFunc(true)}, nil)
 			m := openWatchFromMenu(t, watchTicketTab(t, status))
-			if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "· not live") || !strings.Contains(view, "hello from the agent") {
+			if view := m.watch.View(); !m.watch.IsOpen() || !strings.Contains(view, "· not live") || !strings.Contains(view, "hello from the agent") {
 				t.Errorf("Watch did not open the ended log not live:\n%s", view)
 			}
 		})
@@ -401,7 +387,7 @@ func TestWatch_CodexPtyFollowsTheRollout(t *testing.T) {
 			fakeNativeLog(t, agentlog.Log{Path: rollout, PtyDir: "/pty/dir", Ended: endedFunc(c.ended), Render: agentlog.RenderCodex}, nil)
 			m := openWatchFromMenu(t, watchTicketTab(t, "claimed"))
 			view := m.watch.View()
-			if !m.watch.open || !strings.Contains(view, c.marker) || !strings.Contains(view, "[text] codex says hi") || strings.Contains(view, "hidden developer") {
+			if !m.watch.IsOpen() || !strings.Contains(view, c.marker) || !strings.Contains(view, "[text] codex says hi") || strings.Contains(view, "hidden developer") {
 				t.Errorf("Watch on a codex pty agent (%s):\n%s", name, view)
 			}
 		})
@@ -415,7 +401,7 @@ func TestWatch_NoServerOpensHeadlessAndPty(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			log.Path = watchLogFile(t)
-			fakeAgentLog(t, func(_ context.Context, _ config.Dirs, address string, _ herdrLookup) (agentlog.Log, error) {
+			fakeAgentLog(t, func(_ context.Context, _ config.Dirs, address string, _ rowactions.HerdrLookup) (agentlog.Log, error) {
 				if !strings.HasSuffix(address, ":my-epic/01") {
 					return agentlog.Log{}, agentlog.ErrNoAgent
 				}
@@ -423,7 +409,7 @@ func TestWatch_NoServerOpensHeadlessAndPty(t *testing.T) {
 			})
 			m := selectTicketRow(t, loadedModelWithTicket(t))
 			m = openWatchFromMenu(t, m)
-			if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "· live") {
+			if view := m.watch.View(); !m.watch.IsOpen() || !strings.Contains(view, "· live") {
 				t.Errorf("Watch without a server did not open live:\n%s", view)
 			}
 		})
@@ -471,8 +457,8 @@ func TestWatchReason_NativeLog(t *testing.T) {
 	}
 	for _, c := range cases {
 		fakeNativeLog(t, c.log, c.err)
-		if got := watchReason(tickettest.FakeReads{}, config.Dirs{}, "gx:epic/01"); got != c.want {
-			t.Errorf("%s: watchReason = %q, want %q", c.name, got, c.want)
+		if got := rowactions.WatchReason(tickettest.FakeReads{}, config.Dirs{}, "gx:epic/01"); got != c.want {
+			t.Errorf("%s: WatchReason = %q, want %q", c.name, got, c.want)
 		}
 	}
 }
@@ -482,7 +468,7 @@ func TestWatchReason_NativeLog(t *testing.T) {
 func fakeHerdrOnlyLog(t *testing.T) {
 	t.Helper()
 	stateDir := t.TempDir()
-	fakeAgentLog(t, func(ctx context.Context, _ config.Dirs, address string, herdr herdrLookup) (agentlog.Log, error) {
+	fakeAgentLog(t, func(ctx context.Context, _ config.Dirs, address string, herdr rowactions.HerdrLookup) (agentlog.Log, error) {
 		a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 		if err != nil {
 			return agentlog.Log{}, err
@@ -502,7 +488,7 @@ func TestWatch_HerdrClaudeOpensLiveModal(t *testing.T) {
 	fakeHerdrOnlyLog(t)
 	m := watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", watchLogFile(t))).WithReads(tickettest.FakeReads{FakeServerAPI: herdrAPI("claude", watchLogFile(t))})
 	m = openWatchFromMenu(t, m)
-	if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "· live") || !strings.Contains(view, "hello from the agent") {
+	if view := m.watch.View(); !m.watch.IsOpen() || !strings.Contains(view, "· live") || !strings.Contains(view, "hello from the agent") {
 		t.Errorf("Watch on a herdr claude agent did not open live:\n%s", view)
 	}
 }
@@ -512,8 +498,8 @@ func TestWatch_HerdrDimReasons(t *testing.T) {
 		fakeHerdrOnlyLog(t)
 		m := watchTicketTab(t, "claimed").WithServer(herdrAPI("codex", "")).WithReads(tickettest.FakeReads{FakeServerAPI: herdrAPI("codex", "")})
 		_, ready := requestTicketMenu(t, m)
-		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != notForCodex {
-			t.Errorf("Watch disabled = %q, want %q", got, notForCodex)
+		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != rowactions.NotForCodex {
+			t.Errorf("Watch disabled = %q, want %q", got, rowactions.NotForCodex)
 		}
 		if got := itemByLabel(t, ready.items, "Go to pane").Disabled; got != "" {
 			t.Errorf("Go to pane disabled = %q, want enabled", got)

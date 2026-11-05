@@ -390,7 +390,7 @@ func TestTicketMenuItems_ArchivedKeepsReadActions(t *testing.T) {
 		ticket:   tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseSpinning},
 		archived: true,
 	})
-	reads := []string{actionWatch, actionTranscript, actionYankSummary, actionYankFilePath}
+	reads := []string{rowactions.ActionWatch, rowactions.ActionTranscript, actionYankSummary, actionYankFilePath}
 	for _, e := range ticketMenuEdits {
 		reads = append(reads, e.action)
 	}

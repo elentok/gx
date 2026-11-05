@@ -33,12 +33,12 @@ func dispatchMenuAction(api tabapi.ServerAPI, admin tabapi.AdminAPI, reads tabap
 		return rowactions.StartSessionCmd(sessions, settings.TicketStore, result.Path)
 	case rowactions.ActionInvestigate:
 		return rowactions.InvestigateCmd(api, sessions, result.Path)
-	case actionTranscript:
+	case rowactions.ActionTranscript:
 		file, address := rowactions.ResolveTicketPath(settings.TicketStore, result.Path)
-		return cmdTranscript(settings.Dirs, file, address, width)
-	case actionWatch:
-		return cmdWatchAgent(reads, settings.Dirs, agentAddress(result.Path, result.TicketID))
-	case actionGoToPane:
+		return rowactions.CmdTranscript(settings.Dirs, file, address, width)
+	case rowactions.ActionWatch:
+		return rowactions.CmdWatchAgent(reads, settings.Dirs, rowactions.AgentAddress(result.Path, result.TicketID))
+	case rowactions.ActionGoToPane:
 		return rowactions.CmdServerFocusPane(reads, result.Path)
 	}
 	return nil

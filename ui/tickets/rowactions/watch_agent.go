@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"context"
@@ -18,27 +18,26 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
-	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
-// actionWatch opens an agent's conversation in the Watch modal, for every
-// runner; actionGoToPane jumps to a herdr agent's pane. Handled by
-// dispatchMenuAction.
+// ActionWatch opens an agent's conversation in the Watch modal, for every
+// runner; ActionGoToPane jumps to a herdr agent's pane. Handled by the menu
+// dispatcher.
 const (
-	actionWatch    = "watch"
-	actionGoToPane = "go-to-pane"
+	ActionWatch    = "watch"
+	ActionGoToPane = "go-to-pane"
 )
 
 // maxWatchLines bounds the modal to the log's tail so a long run can't stall
 // the Update goroutine.
 const maxWatchLines = 2000
 
-// herdrLookup finds a live herdr iteration by full ticket address.
-type herdrLookup = func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error)
+// HerdrLookup finds a live herdr iteration by full ticket address.
+type HerdrLookup = func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error)
 
-// agentLog is a package-level seam so tests can fake the agent log.
-var agentLog = func(ctx context.Context, dirs config.Dirs, address string, herdr herdrLookup) (agentlog.Log, error) {
+// AgentLog is a package-level seam so tests can fake the agent log.
+var AgentLog = func(ctx context.Context, dirs config.Dirs, address string, herdr HerdrLookup) (agentlog.Log, error) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return agentlog.Log{}, err
@@ -52,12 +51,12 @@ var agentLog = func(ctx context.Context, dirs config.Dirs, address string, herdr
 }
 
 // errServerDown marks a herdr lookup whose server didn't answer.
-var errServerDown = errors.New(rowactions.ServerNotRunning)
+var errServerDown = errors.New(ServerNotRunning)
 
 // serverHerdrLookup looks an address up in the server's iterations read. Nil
 // without a server: only the server knows herdr iterations, so herdr isn't in
 // play and an agentless ticket reads as having no agent log.
-func serverHerdrLookup(api tabapi.ReadsAPI) herdrLookup {
+func serverHerdrLookup(api tabapi.ReadsAPI) HerdrLookup {
 	if api == nil {
 		return nil
 	}
@@ -75,30 +74,31 @@ func serverHerdrLookup(api tabapi.ReadsAPI) herdrLookup {
 	}
 }
 
-// agentAddress is the address the log lookup takes for a row's Path: already
+// AgentAddress is the address the log lookup takes for a row's Path: already
 // an address in server mode, a ticket file while the tab reads disk.
-func agentAddress(path, id string) string {
+func AgentAddress(path, id string) string {
 	if a, ok := tickets.AddressOfPath(path, id); ok {
 		return a.String()
 	}
 	return path
 }
 
-const notForCodex = "not supported for codex"
+// NotForCodex is the reason Watch is dim for a codex agent.
+const NotForCodex = "not supported for codex"
 
-// watchReason is why Watch can't open address's agent log, empty when it
+// WatchReason is why Watch can't open address's agent log, empty when it
 // can, whether the agent still runs or has ended.
-func watchReason(api tabapi.ReadsAPI, dirs config.Dirs, address string) string {
-	log, err := agentLog(context.Background(), dirs, address, serverHerdrLookup(api))
+func WatchReason(api tabapi.ReadsAPI, dirs config.Dirs, address string) string {
+	log, err := AgentLog(context.Background(), dirs, address, serverHerdrLookup(api))
 	switch {
 	case err == nil && !log.Pruned:
 		return ""
 	case errors.Is(err, agentlog.ErrUnsupported):
-		return notForCodex
+		return NotForCodex
 	case errors.Is(err, errServerDown):
-		return rowactions.ServerNotRunning
+		return ServerNotRunning
 	}
-	return rowactions.NoAgentLog
+	return NoAgentLog
 }
 
 // watchTickInterval matches `gx server agents watch`'s follow interval.
@@ -122,8 +122,8 @@ const (
 	watchEnded
 )
 
-// watchLoadedMsg carries the rendered log a Watch or Transcript action read.
-type watchLoadedMsg struct {
+// WatchLoadedMsg carries the rendered log a Watch or Transcript action read.
+type WatchLoadedMsg struct {
 	title string
 	lines []string
 	// step, when set, loads the content delta away (`[` -1, `]` +1), or
@@ -135,8 +135,11 @@ type watchLoadedMsg struct {
 	tail *agentlog.Tail
 }
 
-// watchStepMsg carries one tick's step of a live modal's tail.
-type watchStepMsg struct {
+// Lines is the rendered log the message carries.
+func (m WatchLoadedMsg) Lines() []string { return m.lines }
+
+// WatchStepMsg carries one tick's step of a live modal's tail.
+type WatchStepMsg struct {
 	gen   int64
 	tail  *agentlog.Tail
 	lines []string
@@ -144,10 +147,10 @@ type watchStepMsg struct {
 	err   error
 }
 
-// watchModal is the open Watch agent modal: a scrollable view of the agent's
+// WatchModal is the open Watch agent modal: a scrollable view of the agent's
 // rendered log, opened at the newest line. A live one follows new lines while
 // at the bottom.
-type watchModal struct {
+type WatchModal struct {
 	open     bool
 	title    string
 	step     func(delta int) tea.Cmd
@@ -159,36 +162,50 @@ type watchModal struct {
 	vp       viewport.Model
 }
 
-// Open replaces the modal with msg's content; tick starts a live one's
+// IsOpen reports whether the modal is showing.
+func (w WatchModal) IsOpen() bool { return w.open }
+
+// YOffset is how far the modal is scrolled from the top.
+func (w WatchModal) YOffset() int { return w.vp.YOffset() }
+
+// Close releases the live tail, if any. Tests use it for cleanup; the app
+// closes the tail in Step.
+func (w WatchModal) Close() {
+	if w.tail != nil {
+		w.tail.Close()
+	}
+}
+
+// Open replaces the modal with msg's content; Tick starts a live one's
 // follow.
-func (w watchModal) Open(msg watchLoadedMsg, width, height int) watchModal {
+func (w WatchModal) Open(msg WatchLoadedMsg, width, height int) WatchModal {
 	vpH := max(height-10, 3)
-	vp := viewport.New(viewport.WithWidth(watchContentWidth(width)), viewport.WithHeight(vpH))
+	vp := viewport.New(viewport.WithWidth(WatchContentWidth(width)), viewport.WithHeight(vpH))
 	vp.SetContent(strings.Join(msg.lines, "\n"))
 	vp.GotoBottom()
-	w = watchModal{open: true, title: msg.title, step: msg.step, state: msg.state, tail: msg.tail, lines: msg.lines, vp: vp}
+	w = WatchModal{open: true, title: msg.title, step: msg.step, state: msg.state, tail: msg.tail, lines: msg.lines, vp: vp}
 	if w.tail != nil {
 		w.gen = watchGen.Add(1)
 	}
 	return w
 }
 
-// tick arms the next step of a live modal's tail, or nil when nothing follows.
+// Tick arms the next step of a live modal's tail, or nil when nothing follows.
 // The step runs in the Cmd since Ended may probe the agent's process.
-func (w watchModal) tick() tea.Cmd {
+func (w WatchModal) Tick() tea.Cmd {
 	if w.tail == nil {
 		return nil
 	}
 	gen, tail := w.gen, w.tail
 	return tea.Tick(watchTickInterval, func(time.Time) tea.Msg {
 		lines, ended, err := tail.Step()
-		return watchStepMsg{gen: gen, tail: tail, lines: lines, ended: ended, err: err}
+		return WatchStepMsg{gen: gen, tail: tail, lines: lines, ended: ended, err: err}
 	})
 }
 
 // Step applies a tick's lines and re-arms the tick until the log ends. The
 // tail is closed here, never on close, so it isn't closed under a running step.
-func (w watchModal) Step(msg watchStepMsg) (watchModal, tea.Cmd) {
+func (w WatchModal) Step(msg WatchStepMsg) (WatchModal, tea.Cmd) {
 	if !w.open || msg.gen != w.gen || msg.err != nil || msg.ended {
 		msg.tail.Close()
 	}
@@ -204,12 +221,12 @@ func (w watchModal) Step(msg watchStepMsg) (watchModal, tea.Cmd) {
 		w.state, w.tail = watchEnded, nil
 		return w, nil
 	}
-	return w, w.tick()
+	return w, w.Tick()
 }
 
 // appendLines adds lines, keeping the newest maxWatchLines: at the bottom it
 // follows them, scrolled up it stays on the same lines and marks new ones.
-func (w watchModal) appendLines(lines []string) watchModal {
+func (w WatchModal) appendLines(lines []string) WatchModal {
 	if len(lines) == 0 {
 		return w
 	}
@@ -227,12 +244,12 @@ func (w watchModal) appendLines(lines []string) watchModal {
 	return w
 }
 
-// watchContentWidth is the modal's content width on a width-wide screen.
-func watchContentWidth(width int) int {
+// WatchContentWidth is the modal's content width on a width-wide screen.
+func WatchContentWidth(width int) int {
 	return min(max(width*2/3, 40), 120) - 2
 }
 
-func (w watchModal) Update(msg tea.KeyPressMsg) (watchModal, tea.Cmd) {
+func (w WatchModal) Update(msg tea.KeyPressMsg) (WatchModal, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "enter", "q":
 		w.open = false
@@ -259,7 +276,7 @@ func (w watchModal) Update(msg tea.KeyPressMsg) (watchModal, tea.Cmd) {
 	return w, nil
 }
 
-func (w watchModal) View() string {
+func (w WatchModal) View() string {
 	title := w.title
 	switch w.state {
 	case watchNotLiveAtOpen:
@@ -279,17 +296,17 @@ func (w watchModal) View() string {
 	return components.RenderOutputModal(title, w.vp.View(), hint, ui.ColorBorder, ui.ColorGreen, ui.ColorGray, w.vp.Width())
 }
 
-// cmdWatchAgent opens address's agent log live, rendered with the same
+// CmdWatchAgent opens address's agent log live, rendered with the same
 // renderer and tail stepper as `gx server agents watch`. A pty or herdr
 // agent's log is its conversation transcript, not its terminal screen. The
 // tail stays on this run's log, so a later resumed run is not followed.
-func cmdWatchAgent(api tabapi.ReadsAPI, dirs config.Dirs, address string) tea.Cmd {
+func CmdWatchAgent(api tabapi.ReadsAPI, dirs config.Dirs, address string) tea.Cmd {
 	return func() tea.Msg {
-		log, err := agentLog(context.Background(), dirs, address, serverHerdrLookup(api))
+		log, err := AgentLog(context.Background(), dirs, address, serverHerdrLookup(api))
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
 		}
-		msg := watchLoadedMsg{title: "Agent " + address, state: watchLive}
+		msg := WatchLoadedMsg{title: "Agent " + address, state: watchLive}
 		tail, err := agentlog.OpenTail(log, nil)
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()

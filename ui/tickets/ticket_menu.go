@@ -144,21 +144,21 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[rowactions.TicketTar
 		// ticket keeps its Unmute.
 		suggest(unmute, pick("Unmute & Reopen", "", rowactions.ActionUnmuteReopen, contextmenu.Server,
 			firstReason(in.serverReason, reasonIf(!unmute, firstReason(finished, notMuted))))),
-		pick("Watch", "", actionWatch, contextmenu.Agent, in.watchReason),
-		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""),
+		pick("Watch", "", rowactions.ActionWatch, contextmenu.Agent, in.watchReason),
+		pick("Transcript", "", rowactions.ActionTranscript, contextmenu.Agent, ""),
 		suggest(rowactions.InvestigateSuggested(in.rendered),
 			pick("Investigate", "", rowactions.ActionInvestigate, contextmenu.Agent, "")))
 	switch {
 	case in.queueAgent != "":
 		// A PTY pane is the Agents tab's live panel, so herdr being down is moot.
-		it := pick("Go to pane", "", actionGoToPane, contextmenu.Agent, reasonIf(!in.ptyLive, holderGoneText))
+		it := pick("Go to pane", "", rowactions.ActionGoToPane, contextmenu.Agent, reasonIf(!in.ptyLive, holderGoneText))
 		if it.Disabled == "" {
 			id := in.queueAgent
 			it.Run = func(rowactions.TicketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } }
 		}
 		items = append(items, it)
 	case in.paneLive:
-		items = append(items, pick("Go to pane", "", actionGoToPane, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
+		items = append(items, pick("Go to pane", "", rowactions.ActionGoToPane, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
 	}
 
 	if in.onQueue {
@@ -178,7 +178,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[rowactions.TicketTar
 // archivedAllowed reports whether an item reads rather than writes, so an
 // archived row keeps it. Edits open an archived file read-only.
 func archivedAllowed(group contextmenu.Group, action string) bool {
-	return group == contextmenu.EditCopy || action == actionWatch || action == actionTranscript
+	return group == contextmenu.EditCopy || action == rowactions.ActionWatch || action == rowactions.ActionTranscript
 }
 
 const (
@@ -287,7 +287,7 @@ func cmdTicketMenu(api tabapi.ReadsAPI, dirs config.Dirs, in ticketMenuInput) te
 		if live && it.QueueAgent != "" {
 			in.queueAgent, in.ptyLive = it.QueueAgent, true
 		}
-		in.watchReason = watchReason(api, dirs, agentAddress(address, target.TicketID))
+		in.watchReason = rowactions.WatchReason(api, dirs, rowactions.AgentAddress(address, target.TicketID))
 		var err error
 		in.detail, err = rowactions.TicketDetail(api, address)
 		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in), detailErr: err}
