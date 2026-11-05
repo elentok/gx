@@ -1,4 +1,4 @@
-package cmd
+package check
 
 import (
 	"strings"
@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 )
 
 func TestCheck_FullTestRunWaitsForTheLock(t *testing.T) {
 	repo, data := registeredCheckRepo(t, `{"lint":"true","test":{"full":"true","limits":{"suite":"300ms"}}}`)
-	stateDir, err := config.DirsFrom(envFor(t)).StateDir()
+	stateDir, err := config.DirsFrom(cmdtest.EnvFor(t)).StateDir()
 	if err != nil {
 		t.Fatal(err)
 	}

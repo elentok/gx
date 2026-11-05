@@ -1,4 +1,4 @@
-package cmd
+package check
 
 import (
 	"os"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
@@ -22,11 +23,11 @@ import (
 func registeredCheckRepo(t *testing.T, checksJSON string) (repo, data string) {
 	t.Helper()
 	repo = testutil.TempRepo(t)
-	registerWithTrunk(t, repo, "main")
+	cmdtest.RegisterWithTrunk(t, repo, "main")
 	testutil.Mkdir(t, filepath.Join(repo, ".gx"))
 	testutil.WriteFile(t, repo, ".gx/checks.json", checksJSON)
 	testutil.CommitAll(t, repo, "checks")
-	return repo, filepath.Join(envValue(envFor(t), "XDG_DATA_HOME"), "gx")
+	return repo, filepath.Join(cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME"), "gx")
 }
 
 func kindRecord(t *testing.T, rec check.Record, kind string) check.KindRecord {
@@ -175,7 +176,7 @@ func TestCheck_BriefCalledByConfiguredCommandNamesFailingTests(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the gx binary")
 	}
-	prependPath(t, sharedGx(t))
+	cmdtest.PrependPath(t, cmdtest.SharedGx(t))
 	repo, data := registeredCheckRepo(t, `{"test":"gx brief go-test ./..."}`)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) {}\nfunc TestB(t *testing.T) { t.Fail() }\n")
@@ -202,7 +203,7 @@ func TestCheck_HangLimitKillsHungTestAndNamesIt(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the gx binary")
 	}
-	prependPath(t, sharedGx(t))
+	cmdtest.PrependPath(t, cmdtest.SharedGx(t))
 	repo, _ := registeredCheckRepo(t, `{"test":{"full":"gx brief go-test -timeout=60s ./...","limits":{"hang":"2s"}}}`)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestStuck(t *testing.T) { select {} }\n")
@@ -221,7 +222,7 @@ func TestCheck_HangLimitKillsHungTestAndNamesIt(t *testing.T) {
 // slowTestRepo has one Go test that sleeps 1.2s, checked under checksJSON.
 func slowTestRepo(t *testing.T, checksJSON string) (repo, data string) {
 	t.Helper()
-	prependPath(t, sharedGx(t))
+	cmdtest.PrependPath(t, cmdtest.SharedGx(t))
 	repo, data = registeredCheckRepo(t, checksJSON)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport (\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestSlow(t *testing.T) { time.Sleep(1200 * time.Millisecond) }\n")
@@ -331,7 +332,7 @@ func TestCheck_SlowTestRerunNodeTools(t *testing.T) {
 		},
 	} {
 		t.Run(c.tool, func(t *testing.T) {
-			prependPath(t, sharedGx(t))
+			cmdtest.PrependPath(t, cmdtest.SharedGx(t))
 			repo, data := registeredCheckRepo(t, `{"test":{"full":"gx brief -C webui `+c.tool+`","limits":{"slow":{"`+c.tool+`":"1s"},"suite":"1m"}}}`)
 			testutil.WriteFile(t, repo, "webui/e2e/playwright.config.ts", "")
 			testutil.WriteFile(t, repo, "webui/dist/index.html", "")

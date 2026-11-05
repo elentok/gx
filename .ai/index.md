@@ -124,6 +124,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/cmdbase` — what every command package shares: `Env`, `ExitError`, provenance and JSON output, server-client helpers
   - `cmd/cmdtest` — test plumbing for the cmd packages (imports `testing`): `EnvFor`/`TempEnv`, `Main`/`MainWithGx` for TestMain, `Run` (mini root), `SetWaitHook`, ticket-store/git/server fixtures (`fixtures.go`: `IsolateTicketStore`, `AddProject`, `WriteTicketFile`, `MergeTestRepo`, `ShortTempDir`, ...)
   - `cmd/brief` — `gx brief` (`New`, `Deps` with the `go-clean-cache` gate hooks)
+  - `cmd/check` — `gx check` (`New`, `Deps` with the `LoadAvg` hook)
   - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
 - `server/` — the gx server; `server/servertest/` holds its test helpers; `server/wire/` holds the
   wire types, consts and pure methods (no behaviour, no import of `server`); `server/broker/` holds

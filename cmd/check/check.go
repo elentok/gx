@@ -1,4 +1,5 @@
-package cmd
+// Package check is `gx check`, a thin wrapper over the check package.
+package check
 
 import (
 	"encoding/json"
@@ -9,11 +10,20 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
 )
 
-func newCheckCmd(d deps) *cobra.Command {
+// Deps is what `gx check` reads from its surroundings.
+type Deps struct {
+	cmdbase.Env
+	// LoadAvg reads the 1-minute load average; nil reads the machine.
+	LoadAvg func() float64
+}
+
+// New builds the `check` command.
+func New(d Deps) *cobra.Command {
 	var staged, full bool
 	var since, kinds string
 	cmd := &cobra.Command{
@@ -57,10 +67,10 @@ Exit 0 pass, 1 fail, 2 gx could not run, 3 no applicable checks.`,
 // check failed".
 func checkUsageError(c *cobra.Command, msg string) error {
 	fmt.Fprintf(c.OutOrStdout(), "check: %s\n", msg)
-	return &ExitError{Code: check.ExitCantRun}
+	return &cmdbase.ExitError{Code: check.ExitCantRun}
 }
 
-func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) error {
+func runCheck(c *cobra.Command, d Deps, staged, full bool, since, kinds string) error {
 	opts := check.Options{}
 	modes := 0
 	if staged {
@@ -81,25 +91,25 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 	if kinds != "" {
 		opts.Kinds = strings.Split(kinds, ",")
 	}
-	dir, err := d.getwd()
+	dir, err := d.Getwd()
 	if err != nil {
 		return err
 	}
 	opts.Dir = dir
-	opts.Env = d.env
+	opts.Env = d.Env.Env
 	opts.Wait = c.ErrOrStderr()
-	opts.LoadAvg = d.loadAvg
-	if opts.DataDir, err = d.dirs().DataDir(); err != nil {
+	opts.LoadAvg = d.LoadAvg
+	if opts.DataDir, err = d.Dirs().DataDir(); err != nil {
 		return err
 	}
-	if opts.StateDir, err = d.dirs().StateDir(); err != nil {
+	if opts.StateDir, err = d.Dirs().StateDir(); err != nil {
 		return err
 	}
-	opts.ProjectChecks = func() (json.RawMessage, error) { return projectChecks(d.dirs(), dir) }
-	if cfg, err := d.dirs().Load(); err == nil {
+	opts.ProjectChecks = func() (json.RawMessage, error) { return projectChecks(d.Dirs(), dir) }
+	if cfg, err := d.Dirs().Load(); err == nil {
 		opts.TicketStore = cfg.TicketStore.Path
 	}
-	opts.ProjectFor = func(dir string) string { return check.ProjectForDirs(d.dirs(), dir) }
+	opts.ProjectFor = func(dir string) string { return check.ProjectForDirs(d.Dirs(), dir) }
 
 	res, err := check.Run(opts)
 	if err != nil {
@@ -107,7 +117,7 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 	}
 	fmt.Fprint(c.OutOrStdout(), res.Render())
 	if res.Exit != check.ExitPass {
-		return &ExitError{Code: res.Exit}
+		return &cmdbase.ExitError{Code: res.Exit}
 	}
 	return nil
 }

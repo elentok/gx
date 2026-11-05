@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/cmd/brief"
+	"github.com/elentok/gx/cmd/check"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
@@ -37,12 +38,10 @@ type LogOptions struct {
 type ExitError = cmdbase.ExitError
 
 type deps struct {
-	stdin  io.Reader
-	stdout io.Writer
-	stderr io.Writer
-	getwd  func() (string, error)
-	// loadAvg reads the 1-minute load average for `gx check`; nil reads the machine.
-	loadAvg              func() float64
+	stdin                io.Reader
+	stdout               io.Writer
+	stderr               io.Writer
+	getwd                func() (string, error)
 	runWorktrees         func(string) error
 	runStatus            func(string) error
 	runLog               func(LogOptions) error
@@ -272,7 +271,7 @@ Run without a command to open the status UI.`,
 		newAgentHolderCmd(),
 		newTermCmd(d),
 		brief.New(brief.Deps{Env: d.base(), CacheGate: brief.DefaultDeps().CacheGate}),
-		newCheckCmd(d),
+		check.New(check.Deps{Env: d.base()}),
 		newDoctorCmd(d),
 		newVersionCmd(d),
 		newRestartCheckCmd(d),

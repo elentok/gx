@@ -1,4 +1,4 @@
-package cmd
+package check
 
 import (
 	"bytes"
@@ -8,11 +8,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 )
 
-// runCheckCmd drives `gx check` through the root command and returns stdout
-// and the exit code.
+// runCheckCmd drives `gx check` through a mini root and returns stdout and
+// the exit code.
 func runCheckCmd(t *testing.T, cwd string, args ...string) (string, int) {
 	t.Helper()
 	return runCheckCmdLoad(t, nil, cwd, args...)
@@ -21,13 +23,14 @@ func runCheckCmd(t *testing.T, cwd string, args ...string) (string, int) {
 // runCheckCmdLoad is runCheckCmd with the load average injected.
 func runCheckCmdLoad(t *testing.T, loadAvg func() float64, cwd string, args ...string) (string, int) {
 	t.Helper()
-	root := newRootCmd(deps{getwd: func() (string, error) { return cwd, nil }, env: envFor(t), loadAvg: loadAvg})
 	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetErr(&out)
-	root.SetArgs(append([]string{"check"}, args...))
-	err := root.Execute()
-	var ee *ExitError
+	env := cmdbase.Env{
+		Stdout: &out, Stderr: &out,
+		Getwd: func() (string, error) { return cwd, nil },
+		Env:   cmdtest.EnvFor(t),
+	}
+	err := cmdtest.Run(t, env, append([]string{"check"}, args...), New(Deps{Env: env, LoadAvg: loadAvg}))
+	var ee *cmdbase.ExitError
 	if errors.As(err, &ee) {
 		return out.String(), ee.Code
 	}
@@ -168,7 +171,7 @@ func TestCheck_ChangedPairMissingSkipsUntilFull(t *testing.T) {
 
 func TestCheck_ProjectJSONFallbackAndRepoFileWins(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	projectDir := registerWithTrunk(t, repo, "main")
+	projectDir := cmdtest.RegisterWithTrunk(t, repo, "main")
 	testutil.WriteFile(t, projectDir, "project.json",
 		`{"name":"p","repo":"`+repo+`","trunk":"main","checks":{"test":"echo from-project"}}`)
 

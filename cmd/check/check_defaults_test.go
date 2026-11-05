@@ -1,4 +1,4 @@
-package cmd
+package check
 
 import (
 	"os"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -33,7 +34,7 @@ func fakeTools(t *testing.T, body map[string]string, names ...string) (logPath s
 			t.Fatal(err)
 		}
 	}
-	setEnvFor(t, "PATH", bin)
+	cmdtest.SetEnvFor(t, "PATH", bin)
 	return logPath
 }
 
