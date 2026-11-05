@@ -374,11 +374,10 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj-b", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.MaxAgents = 2
-		// The fake's finish wait times out at once, so only real-time pacing
-		// keeps the agents from exhausting their finish budget mid-test.
-		c.Sleep = time.Sleep
 	})
-	// No OnTurn: the prompt starts no turn, so started agents keep their slot.
+	// A held turn keeps each started agent working, so it keeps its slot
+	// without the test depending on prompt grace timing.
+	h.OnTurn(func(turn *servertest.Turn) { turn.Hold() })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
