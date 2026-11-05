@@ -130,6 +130,10 @@ type Ticket struct {
 	// a successfully-read file.
 	ReadErr string
 
+	// Sum is SumBytes of the file content this ticket was parsed from, so a
+	// cached load carries it without another read. Empty when ReadErr is set.
+	Sum string
+
 	// GraphErr is set when the ticket parsed fine on its own but its Parent
 	// edge is invalid in the context of the whole epic — dangling, or closing
 	// a cycle (see Epic.ValidateParentGraph). The loader drops the edge and

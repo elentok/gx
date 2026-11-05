@@ -1,6 +1,8 @@
 package tickets
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -147,6 +149,12 @@ func loadTicketCached(path string, number int, identifier, title string, isMap b
 	return ticket
 }
 
+// SumBytes fingerprints a ticket file's bytes.
+func SumBytes(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
+}
+
 func cloneTicket(t Ticket) Ticket {
 	t.BlockedBy = slices.Clone(t.BlockedBy)
 	t.Mutes = slices.Clone(t.Mutes)
@@ -170,6 +178,8 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 		ticket.ReadErr = err.Error()
 		return ticket
 	}
+
+	ticket.Sum = SumBytes(raw)
 
 	parse := schema.ParseTicketFromRaw
 	if isMap {

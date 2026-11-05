@@ -3,8 +3,6 @@
 package index
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -260,8 +258,7 @@ func ticketInfo(project, epic string, t tickets.Ticket) indexedTicket {
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)
 	}
-	sum, _ := FileSum(t.Path)
-	return indexedTicket{TicketInfo: info, agent: t.Agent, sum: sum}
+	return indexedTicket{TicketInfo: info, agent: t.Agent, sum: t.Sum}
 }
 
 // FileSum fingerprints a ticket file's bytes. An unreadable file has no sum,
@@ -271,8 +268,7 @@ func FileSum(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	h := sha256.Sum256(data)
-	return hex.EncodeToString(h[:]), nil
+	return tickets.SumBytes(data), nil
 }
 
 // SumOf is the fingerprint the index holds for addr.

@@ -459,6 +459,27 @@ func TestLoad_SkipsReadingUnchangedTicketFiles(t *testing.T) {
 	}
 }
 
+func TestLoad_CachedTicketCarriesContentSum(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cache-epic", "issues", "01-first.md")
+	content := "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n"
+	writeFile(t, path, content)
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range 2 {
+		epics, err := Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := epics[0].Tickets[0].Sum, SumBytes([]byte(content)); got != want || got == "" {
+			t.Fatalf("load %d: Sum=%q, want %q", i, got, want)
+		}
+	}
+}
+
 func TestLoad_DoesNotTrustRecentlyModifiedTicketFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cache-epic", "issues", "01-first.md")
