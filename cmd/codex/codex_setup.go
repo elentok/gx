@@ -1,4 +1,4 @@
-package cmd
+package codex
 
 import (
 	"github.com/spf13/cobra"
@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/sessionlookup"
 )
 
-func newCodexSetupCmd(d deps) *cobra.Command {
+func newCodexSetupCmd(d Deps) *cobra.Command {
 	var yes bool
 	var codexHome string
 
@@ -22,14 +22,14 @@ git cherry-pick). Shows the changes first and asks before writing.`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if codexHome == "" {
-				codexHome = sessionlookup.RootsFrom(d.env).CodexHome
+				codexHome = sessionlookup.RootsFrom(d.Env.Env).CodexHome
 			}
 			return codexsetup.Run(codexsetup.Options{
 				CodexHome:   codexHome,
 				Yes:         yes,
-				Interactive: cmdbase.IsTerminal(d.stdinIsTerminal),
-				In:          d.stdin,
-				Out:         d.stdout,
+				Interactive: cmdbase.IsTerminal(d.StdinIsTerminal),
+				In:          d.Stdin,
+				Out:         d.Stdout,
 			})
 		},
 	}

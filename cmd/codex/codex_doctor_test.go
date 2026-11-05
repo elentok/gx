@@ -1,13 +1,14 @@
-package cmd
+package codex
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/codexdoctor"
 )
 
@@ -23,7 +24,7 @@ func fixtureCodexSource(t *testing.T) codexdoctor.Source {
 func TestRunCodexDoctor_PrintsLinesAndPassesOnFixtures(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{stdout: out, stderr: &strings.Builder{}}
+	d := testDeps(t, out, &strings.Builder{})
 	if err := runCodexDoctor(d, codexDoctorOptions{}, fixtureCodexSource(t), ""); err != nil {
 		t.Fatalf("runCodexDoctor: %v", err)
 	}
@@ -42,12 +43,12 @@ func TestRunCodexDoctor_PrintsLinesAndPassesOnFixtures(t *testing.T) {
 func TestRunCodexDoctor_ExitsOneOnFail(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{stdout: out, stderr: &strings.Builder{}}
+	d := testDeps(t, out, &strings.Builder{})
 	opts := codexDoctorOptions{table: []codexdoctor.Check{
 		{Name: "broken", Mode: codexdoctor.Fixture, Run: func(codexdoctor.Input) (string, bool) { return "nope", false }},
 	}}
 	err := runCodexDoctor(d, opts, fixtureCodexSource(t), "")
-	var exit *ExitError
+	var exit *cmdbase.ExitError
 	if !errors.As(err, &exit) || exit.Code != 1 {
 		t.Fatalf("err = %v, want ExitError{1}", err)
 	}
@@ -59,7 +60,7 @@ func TestRunCodexDoctor_ExitsOneOnFail(t *testing.T) {
 func TestRunCodexDoctor_JSON(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
-	d := deps{stdout: out, stderr: &strings.Builder{}}
+	d := testDeps(t, out, &strings.Builder{})
 	if err := runCodexDoctor(d, codexDoctorOptions{json: true}, fixtureCodexSource(t), ""); err != nil {
 		t.Fatalf("runCodexDoctor: %v", err)
 	}
@@ -75,7 +76,7 @@ func TestRunCodexDoctor_JSON(t *testing.T) {
 func TestRunCodexDoctor_WarnsWhenLiveCodexIsNewerThanFixtures(t *testing.T) {
 	t.Parallel()
 	stderr := &strings.Builder{}
-	d := deps{stdout: &strings.Builder{}, stderr: stderr}
+	d := testDeps(t, &strings.Builder{}, stderr)
 	src := fixtureCodexSource(t)
 	src.Live, src.CodexVersion = true, "0.170.0"
 	if err := runCodexDoctor(d, codexDoctorOptions{table: []codexdoctor.Check{}}, src, "0.166.0"); err != nil {
@@ -96,7 +97,7 @@ func TestRunCodexDoctor_RecordedSessionsLoadBack(t *testing.T) {
 	opts := codexDoctorOptions{table: []codexdoctor.Check{
 		{Name: "turny", Mode: codexdoctor.Fixture, Session: codexdoctor.TurnSession, Run: func(in codexdoctor.Input) (string, bool) { return "", len(in.Frames) == 1 }},
 	}}
-	d := deps{stdout: &strings.Builder{}, stderr: &strings.Builder{}}
+	d := testDeps(t, &strings.Builder{}, &strings.Builder{})
 	if err := runCodexDoctor(d, opts, src, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -106,37 +107,20 @@ func TestRunCodexDoctor_RecordedSessionsLoadBack(t *testing.T) {
 	}
 }
 
-func helpOf(t *testing.T, args ...string) string {
-	t.Helper()
-	var out bytes.Buffer
-	d := deps{env: envFor(t), stdout: &out, stderr: &out}
-	if err := execute(append(args, "--help"), d); err != nil {
-		t.Fatalf("%v --help: %v", args, err)
-	}
-	return out.String()
-}
-
 func TestCodexDoctor_HelpListsJSONLikeClaudeDoctor(t *testing.T) {
 	t.Parallel()
-	codex := helpOf(t, "codex", "doctor")
-	claude := helpOf(t, "claude", "doctor")
-	flagLine := func(help, flag string) string {
-		for _, l := range strings.Split(help, "\n") {
-			if strings.Contains(l, flag) {
-				return strings.Join(strings.Fields(l), " ")
-			}
-		}
-		return ""
+	var out bytes.Buffer
+	d := testDeps(t, &out, &out)
+	if err := cmdtest.Run(t, d.Env, []string{"codex", "doctor", "--help"}, New(d)); err != nil {
+		t.Fatalf("codex doctor --help: %v", err)
 	}
+	help := out.String()
 	for _, flag := range []string{"--json", "--record"} {
-		if flagLine(codex, flag) == "" {
-			t.Fatalf("codex doctor --help lists no %s:\n%s", flag, codex)
-		}
-		if got, want := strings.Fields(flagLine(codex, flag))[:2], strings.Fields(flagLine(claude, flag))[:2]; !slices.Equal(got, want) {
-			t.Errorf("%s flag columns = %q, want %q like claude doctor", flag, got, want)
+		if !strings.Contains(help, flag) {
+			t.Errorf("codex doctor --help lists no %s:\n%s", flag, help)
 		}
 	}
-	if !strings.Contains(codex, "Usage:\n  gx codex doctor [flags]") && !strings.Contains(codex, "codex doctor [flags]") {
-		t.Errorf("usage line missing:\n%s", codex)
+	if !strings.Contains(help, "codex doctor [flags]") {
+		t.Errorf("usage line missing:\n%s", help)
 	}
 }

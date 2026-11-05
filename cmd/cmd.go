@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/cmd/brief"
 	"github.com/elentok/gx/cmd/check"
 	"github.com/elentok/gx/cmd/cmdbase"
+	codexcmd "github.com/elentok/gx/cmd/codex"
 	configcmd "github.com/elentok/gx/cmd/config"
 	"github.com/elentok/gx/cmd/doctor"
 	skillscmd "github.com/elentok/gx/cmd/skills"
@@ -110,6 +111,11 @@ func (d deps) configDeps() configcmd.Deps {
 	s := d.config
 	s.Env = d.base()
 	return s
+}
+
+// codexDeps is the `gx codex` hook joined with the shared env.
+func (d deps) codexDeps() codexcmd.Deps {
+	return codexcmd.Deps{Env: d.base(), StdinIsTerminal: d.stdinIsTerminal}
 }
 
 // dirs resolves the config, data and state directories from the deps env.
@@ -225,7 +231,7 @@ Run without a command to open the status UI.`,
 		newAgentsCmd(d),
 		newDesignsCmd(d),
 		newClaudeCmd(d),
-		newCodexCmd(d),
+		codexcmd.New(d.codexDeps()),
 		newWorktreesCmd(d),
 		newPushCmd(d),
 		newStatusCmd(d),

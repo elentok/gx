@@ -126,6 +126,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/brief` — `gx brief` (`New`, `Deps` with the `go-clean-cache` gate hooks)
   - `cmd/check` — `gx check` (`New`, `Deps` with the `LoadAvg` hook)
   - `cmd/config` — `gx config` and `gx notify` (`New`, `NewNotify`, `Deps` with the `InitConfig` and `RunEditor` hooks, `DefaultDeps`); `cmdbase.RunEditorCommand` is the shared editor runner
+  - `cmd/codex` — `gx codex` doctor and setup (`New`, `Deps` with the `StdinIsTerminal` hook)
   - `cmd/doctor` — `gx doctor` (`New`, `Deps` with the `ExplainAgent`, `ProbeGhostty`, `ConfirmForce` and `GOOS` hooks, `DefaultDeps`)
   - `cmd/skills` — `gx skills install|uninstall` (`New`, `Deps` with the `skills*` hooks, `DefaultDeps`, `Refresh` for `gx server start`)
   - `cmd/term` — `gx term` (`New`, `Deps` with the `GOOS` field)
