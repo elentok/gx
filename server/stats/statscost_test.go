@@ -43,12 +43,14 @@ func TestStatsCostSource(t *testing.T) {
 		{
 			name: "rebuilt then live, empty days are zero",
 			in: costSourceInput{
-				Days:         days,
-				FirstRebuilt: "d2",
-				FirstLive:    "d4",
-				Rows: []tokenledger.Row{
-					costRow("d2", "p", "Queue", "claude", 10, 0.1),
-					costRow("d4", "p", "Queue", "claude", 40, 0.4),
+				Days: days,
+				costLedger: costLedger{
+					FirstRebuilt: "d2",
+					FirstLive:    "d4",
+					Rows: []tokenledger.Row{
+						costRow("d2", "p", "Queue", "claude", 10, 0.1),
+						costRow("d4", "p", "Queue", "claude", 40, 0.4),
+					},
 				},
 				Impl: stampSeries(stamped, stamped, stamped, stamped, stamped),
 			},
@@ -60,10 +62,12 @@ func TestStatsCostSource(t *testing.T) {
 		{
 			name: "live only: days before it fall back to stamps",
 			in: costSourceInput{
-				Days:      days,
-				FirstLive: "d3",
-				Rows:      []tokenledger.Row{costRow("d3", "p", "Design", "claude", 7, 0.07)},
-				Design:    stampSeries(unstamped, costDay{}, costDay{}, costDay{}, costDay{}),
+				Days: days,
+				costLedger: costLedger{
+					FirstLive: "d3",
+					Rows:      []tokenledger.Row{costRow("d3", "p", "Design", "claude", 7, 0.07)},
+				},
+				Design: stampSeries(unstamped, costDay{}, costDay{}, costDay{}, costDay{}),
 			},
 			source: []string{"stamp", "stamp", "live", "live", "live"},
 			queue:  []float64{0, 0, 0, 0, 0},
@@ -72,8 +76,8 @@ func TestStatsCostSource(t *testing.T) {
 		{
 			name: "rebuilt with no live day runs to the end",
 			in: costSourceInput{
-				Days:         days,
-				FirstRebuilt: "d4",
+				Days:       days,
+				costLedger: costLedger{FirstRebuilt: "d4"},
 			},
 			source: []string{"stamp", "stamp", "stamp", "rebuilt", "rebuilt"},
 			queue:  []float64{0, 0, 0, 0, 0},
@@ -82,9 +86,8 @@ func TestStatsCostSource(t *testing.T) {
 		{
 			name: "live wins when first rebuilt day is after first live day",
 			in: costSourceInput{
-				Days:         days,
-				FirstRebuilt: "d5",
-				FirstLive:    "d2",
+				Days:       days,
+				costLedger: costLedger{FirstRebuilt: "d5", FirstLive: "d2"},
 			},
 			source: []string{"stamp", "live", "live", "live", "live"},
 			queue:  []float64{0, 0, 0, 0, 0},
@@ -93,10 +96,12 @@ func TestStatsCostSource(t *testing.T) {
 		{
 			name: "stamp rows are ignored on stamp days",
 			in: costSourceInput{
-				Days:      days,
-				FirstLive: "d5",
-				Rows:      []tokenledger.Row{costRow("d1", "p", "Queue", "claude", 999, 9)},
-				Impl:      stampSeries(stamped),
+				Days: days,
+				costLedger: costLedger{
+					FirstLive: "d5",
+					Rows:      []tokenledger.Row{costRow("d1", "p", "Queue", "claude", 999, 9)},
+				},
+				Impl: stampSeries(stamped),
 			},
 			source: []string{"stamp", "stamp", "stamp", "stamp", "live"},
 			queue:  []float64{100, 0, 0, 0, 0},
@@ -139,12 +144,14 @@ func TestStatsCostSource(t *testing.T) {
 
 func TestStatsCostSourceHarnessSplitAndTotals(t *testing.T) {
 	got := pickCostSource(costSourceInput{
-		Days:      []string{"d1"},
-		FirstLive: "d1",
-		Rows: []tokenledger.Row{
-			costRow("d1", "p", "Queue", "claude", 10, 1.5),
-			costRow("d1", "p", "Queue", "codex", 5, 0),
-			costRow("d1", "q", "Queue", "claude", 20, 2),
+		Days: []string{"d1"},
+		costLedger: costLedger{
+			FirstLive: "d1",
+			Rows: []tokenledger.Row{
+				costRow("d1", "p", "Queue", "claude", 10, 1.5),
+				costRow("d1", "p", "Queue", "codex", 5, 0),
+				costRow("d1", "q", "Queue", "claude", 20, 2),
+			},
 		},
 		Design: costSeries{{}},
 		Impl:   costSeries{{}},
@@ -181,7 +188,7 @@ func TestStatsCostSourceProjectFilter(t *testing.T) {
 	}
 	for _, tc := range tests {
 		got := pickCostSource(costSourceInput{
-			Days: []string{"d1"}, FirstLive: "d1", Rows: rows, Project: tc.project,
+			Days: []string{"d1"}, costLedger: costLedger{FirstLive: "d1", Rows: rows}, Project: tc.project,
 			Design: costSeries{{}}, Impl: costSeries{{}},
 		})
 		a := got[0].Groups["Queue"].Tokens

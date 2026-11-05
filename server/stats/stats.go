@@ -72,7 +72,7 @@ func (s *Stats) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now().In(time.Local)
-	led, err := s.costLedger(limits.NewStatsWindow(n, now))
+	led, err := s.readCostLedger(limits.NewStatsWindow(n, now))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

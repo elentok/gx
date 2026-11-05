@@ -65,7 +65,7 @@ func buildStats(all []ticketmigrate.StoreEpic, n int, project string, now time.T
 	}
 	b.friction.fill(&out.Friction)
 	out.Cost = statsCostOf(pickCostSource(costSourceInput{
-		Days: out.Days, Rows: led.Rows, FirstRebuilt: led.FirstRebuilt, FirstLive: led.FirstLive,
+		costLedger: led, Days: out.Days,
 		Design: b.design, Impl: b.impl, Project: project,
 	}))
 	return out

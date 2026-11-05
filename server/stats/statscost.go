@@ -16,10 +16,8 @@ const (
 // costSourceInput is everything pickCostSource needs. Days are local-day labels
 // in tokenledger.DayLayout, oldest first; Design and Impl have one entry per day.
 type costSourceInput struct {
+	costLedger
 	Days         []string
-	Rows         []tokenledger.Row
-	FirstRebuilt string // "" when the ledger has no rebuilt day
-	FirstLive    string // "" when the ledger has no live day
 	Design, Impl costSeries
 	Project      string // "" is All projects, the only filter that sees "no project"
 }
@@ -32,15 +30,16 @@ type groupCost struct {
 }
 
 // costLedger is the ledger as the stats build reads it: the rows of the
-// range's days and the two boundary days.
+// range's days and the two boundary days. FirstRebuilt and FirstLive are ""
+// when the ledger has no rebuilt or live day.
 type costLedger struct {
 	Rows                    []tokenledger.Row
 	FirstRebuilt, FirstLive string
 }
 
-// costLedger reads the in-memory ledger for the window's days. It never reads
-// transcripts.
-func (s *Stats) costLedger(win limits.StatsWindow) (costLedger, error) {
+// readCostLedger reads the in-memory ledger for the window's days. It never
+// reads transcripts.
+func (s *Stats) readCostLedger(win limits.StatsWindow) (costLedger, error) {
 	var out costLedger
 	for _, day := range win.Labels() {
 		rows, err := s.Tokens.Day(day)
