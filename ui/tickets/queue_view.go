@@ -31,10 +31,10 @@ func (m QueueModel) View() tea.View {
 		m.rows.queueTree.SetEntries(m.rows.buildQueueEntriesCached(m.rowsEnv()))
 	}
 	sidebarW, previewW := m.preview.PanelWidths(m.width)
-	sidebarH, previewH := m.preview.PanelHeights(m.width, m.contentHeight())
+	sidebarH, previewH := m.preview.PanelHeights(m.width, m.layout().contentHeight())
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, m.header().queueHeaderTitle(), "", m.queueBody(m.queueBodyWidth()), m.preview.Focus == preview.FocusSidebar, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.header().queueHeaderTitle(), "", m.queueBody(m.layout().bodyWidth()), m.preview.Focus == preview.FocusSidebar, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
 		previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, ui.ColorBlue, nil, false,
@@ -102,7 +102,7 @@ func (m QueueModel) queueBody(width int) []string {
 	}
 
 	finished := hdr.finishedLines()
-	treeH := m.queueViewportHeight() - len(lines) - len(finished)
+	treeH := m.layout().viewportHeight() - len(lines) - len(finished)
 	lines = append(lines, m.rows.queueTree.RenderLines(treeH+2, m.rows.queueRenderOpts(m.rowsEnv(), width))...)
 	return append(lines, finished...)
 }

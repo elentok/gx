@@ -49,7 +49,7 @@ func (m *Model) refreshHover(msg tea.Msg) {
 // the tree holds no rows.
 func (m QueueModel) queueHoverTarget(msg tea.MouseMotionMsg) (int, bool) {
 	mouse := msg.Mouse()
-	rect := m.queueTreeRect()
+	rect := m.layout().treeRect()
 	if m.ModalOpen() || !rect.Contains(mouse.X, mouse.Y) {
 		return -1, false
 	}
@@ -58,17 +58,4 @@ func (m QueueModel) queueHoverTarget(msg tea.MouseMotionMsg) (int, bool) {
 
 func (m QueueModel) HoverChanges(msg tea.MouseMotionMsg) bool {
 	return m.rows.queueTree.SetHoveredIndex(m.queueHoverTarget(msg))
-}
-
-func (m QueueModel) handleQueueMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
-	m.rows.queueTree.SetHoveredIndex(m.queueHoverTarget(msg))
-	return m, nil
-}
-
-func (m *QueueModel) refreshQueueHover(msg tea.Msg) {
-	if wheel, ok := msg.(tea.MouseWheelMsg); ok {
-		m.rows.queueTree.SetHoveredIndex(m.queueHoverTarget(tea.MouseMotionMsg(wheel)))
-	} else if m.ModalOpen() {
-		m.rows.queueTree.SetHoveredIndex(0, false)
-	}
 }

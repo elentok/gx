@@ -473,3 +473,19 @@ func epicWaves(epic tickets.Epic, candidates map[string]bool, maxParallel int) (
 	}
 	return schedule.PlanWaves(epic, scope, maxParallel)
 }
+
+// selectFocusEpic selects the header of the epic at address (its Path) once the
+// rows hold it, and returns the address still waiting: "" when done, address
+// itself when the next delivery has to try again.
+func (r *queueRows) selectFocusEpic(address string) string {
+	if address == "" {
+		return ""
+	}
+	for i, e := range r.queueTree.Entries() {
+		if e.Value.kind == nodeEpicName && e.Value.epic.Path == address {
+			r.queueTree.SetSelectedIndex(i)
+			return ""
+		}
+	}
+	return address
+}

@@ -137,7 +137,7 @@ func TestQueueModelHoverScrollFollowsCursorNotFocus(t *testing.T) {
 		m := queueModelForHoverScroll(t)
 		m.preview.Focus = preview.FocusSidebar
 
-		px, _, _, _ := m.previewRect()
+		px := m.layout().previewRect().X
 		updated, _ := m.Update(tea.MouseWheelMsg{X: px + 1, Y: 1, Button: tea.MouseWheelDown})
 		m = updated.(QueueModel)
 
@@ -167,7 +167,7 @@ func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
 	treeBefore := m.rows.queueTree.ScrollOffset()
 	previewBefore := m.preview.VP.YOffset()
 
-	px, _, _, _ := m.previewRect()
+	px := m.layout().previewRect().X
 	updated, _ := m.Update(tea.MouseWheelMsg{X: px + 1, Y: 1, Button: tea.MouseWheelDown})
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown})
@@ -323,7 +323,7 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 	}
 	rowY := func(entryIdx int) int { return 1 + queueHeaderReservedLines + entryIdx }
 	start := m.rows.queueTree.SelectedIndex()
-	px, py, _, _ := m.preview.Rect(m.width, m.contentHeight())
+	px, py := m.layout().previewRect().X, m.layout().previewRect().Y
 
 	for name, click := range map[string]tea.MouseClickMsg{
 		"preview": {Button: tea.MouseRight, X: px, Y: py},
@@ -383,7 +383,7 @@ func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.
 	// Idle -> running with no WindowSizeMsg in between: the reserved slot's
 	// height (and thus SetVisibleHeight/the mouse-click offset) must not
 	// change.
-	m.server.runningEpics =map[string]bool{"alpha": true}
+	m.server.runningEpics = map[string]bool{"alpha": true}
 
 	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: rowY})
 	m = updated.(QueueModel)
@@ -407,7 +407,7 @@ func TestQueueModelClickInsidePreviewBoundsFocusesIt(t *testing.T) {
 		t.Fatalf("expected initial focus on sidebar, got focus=%v", m.preview.Focus)
 	}
 
-	px, py, _, _ := m.previewRect()
+	px, py := m.layout().previewRect().X, m.layout().previewRect().Y
 	updated, _ := m.Update(tea.MouseClickMsg{X: px + 1, Y: py + 1, Button: tea.MouseLeft})
 	m = updated.(QueueModel)
 

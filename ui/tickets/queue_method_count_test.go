@@ -47,7 +47,8 @@ func methodCounts(t *testing.T) map[string]int {
 
 func TestQueueModelSplitMethodCounts(t *testing.T) {
 	counts := methodCounts(t)
-	for typ, limit := range map[string]int{"queueHeader": 16, "queueRows": 22} {
+	limits := map[string]int{"queueHeader": 16, "queueRows": 22, "QueueModel": 50, "queueServer": 12}
+	for typ, limit := range limits {
 		if got := counts[typ]; got == 0 || got > limit {
 			t.Errorf("%s has %d methods, want 1..%d", typ, got, limit)
 		}

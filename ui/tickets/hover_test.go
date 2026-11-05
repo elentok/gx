@@ -73,7 +73,7 @@ func queueHoverFixture(t *testing.T) hoverFixture {
 		model:    m,
 		selected: m.rows.queueTree.SelectedIndex(),
 		other:    other,
-		outside:  m.queuePreviewRect(),
+		outside:  m.layout().previewRect(),
 		rowY:     func(entry int) int { return 1 + queueHeaderReservedLines + entry },
 		state: func(tm tea.Model) (int, int, bool) {
 			tree := tm.(QueueModel).rows.queueTree

@@ -71,7 +71,7 @@ func TestQueueModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 	if !m.preview.Hidden {
 		t.Fatal("expected \"tv\" to hide the preview")
 	}
-	if r := m.queueTreeRect(); r.W != 120 {
+	if r := m.layout().treeRect(); r.W != 120 {
 		t.Fatalf("expected list to fill the full width, got %d", r.W)
 	}
 	if strings.Contains(m.View().Content, "Preview") {

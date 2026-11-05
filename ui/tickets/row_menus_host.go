@@ -161,27 +161,6 @@ func (m QueueModel) selectedQueuePath() string {
 	return r.ticket.Path
 }
 
-func (m QueueModel) handleTicketMenuReady(msg rowactions.TicketReadyMsg) (QueueModel, tea.Cmd) {
-	cmd := m.menus.HandleReady(msg, queueMenuTab{m})
-	return m, cmd
-}
-
-func (m QueueModel) handleTicketMenuPick(msg rowactions.TicketPickMsg) (tea.Model, tea.Cmd) {
-	res := m.menus.HandleTicketPick(msg, queueMenuTab{m})
-	if res.Approve {
-		return m.handleServerApproveKey()
-	}
-	return m, res.Cmd
-}
-
-func (m QueueModel) handleQueueEpicMenuPick(msg rowactions.EpicPickMsg) (tea.Model, tea.Cmd) {
-	return m, m.menus.HandleEpicPick(msg, queueMenuTab{m})
-}
-
-func (m QueueModel) rowHasSuggestedActions(epic tickets.Epic, ticket tickets.Ticket) bool {
-	return m.menus.HasSuggestedActions(m.menuEnv(), epic, ticket, false)
-}
-
 // selectedQueueEpic is the selected epic header's epic; ok is false off one.
 func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
 	entries := m.rows.queueTree.Entries()

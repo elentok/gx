@@ -65,7 +65,7 @@ func (m *QueueModel) syncQueuePreviewViewport() {
 		return
 	}
 	_, previewW := preview.SplitPanelWidth(m.width)
-	_, previewH := preview.SplitPanelHeight(m.width, m.contentHeight())
+	_, previewH := preview.SplitPanelHeight(m.width, m.layout().contentHeight())
 	width, ht := preview.InnerSize(previewW, previewH)
 	contentW := max(width-preview.ScrollbarGutter, 1)
 	m.preview.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContentKey(), m.queuePreviewContent)

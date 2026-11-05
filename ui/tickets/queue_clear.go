@@ -1,21 +1,8 @@
 package tickets
 
 import (
-	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
-
-func (m QueueModel) handleQueueConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
-	next, cmd, _ := m.confirm.Update(msg)
-	m.confirm = next
-	return m, cmd
-}
-
-func (m QueueModel) handleQueueConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
-	next, cmd, _ := m.confirm.UpdateMouse(msg, m.width, m.width, m.height)
-	m.confirm = next
-	return m, cmd
-}
 
 // checkedPaths lists every currently checked ticket path, for the "C" clear
 // keymap's confirmation prompt and its accepted clear-all.

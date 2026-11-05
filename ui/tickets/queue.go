@@ -91,11 +91,11 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		}
 	})
 	return QueueModel{
-		now:              time.Now,
-		worktreeRoot:     worktreeRoot,
-		settings:         settings,
-		editor:           rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
-		rows:             newQueueRows(queueTree),
+		now:          time.Now,
+		worktreeRoot: worktreeRoot,
+		settings:     settings,
+		editor:       rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
+		rows:         newQueueRows(queueTree),
 		server: queueServer{
 			live:         map[string]map[string]rowfmt.LiveTicketState{},
 			runningEpics: map[string]bool{},
@@ -137,7 +137,13 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if nm.menus.Pending != nm.selectedQueuePath() {
 		nm.menus.Pending = ""
 	}
-	nm.refreshQueueHover(msg)
+	// An open modal clears the hover, and a wheel scroll moves other rows under
+	// the still cursor.
+	if wheel, ok := msg.(tea.MouseWheelMsg); ok {
+		nm.rows.queueTree.SetHoveredIndex(nm.queueHoverTarget(tea.MouseMotionMsg(wheel)))
+	} else if nm.ModalOpen() {
+		nm.rows.queueTree.SetHoveredIndex(0, false)
+	}
 	nm.syncQueuePreviewViewport()
 	return nm, cmd
 }
@@ -176,7 +182,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// The epic header layout depends on the width (see buildQueueEntries).
 			m.rows.queueTree.SetEntries(m.rows.buildQueueEntriesCached(m.rowsEnv()))
 		}
-		m.rows.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
+		m.rows.queueTree.SetVisibleHeight(m.layout().viewportHeight() - queueHeaderReservedLines)
 		return m, nil
 	case queueSpinnerRestartMsg:
 		// The tick chain dies while the tab is hidden, so a claim that arrived
@@ -190,7 +196,12 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(m.implementSpinner.Tick, tick)
 	case spinner.TickMsg:
-		return m.handleQueueSpinnerTick(msg)
+		if len(m.server.runningEpics) == 0 {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.implementSpinner, cmd = m.implementSpinner.Update(msg)
+		return m, cmd
 	case finishedTickMsg:
 		if msg.gen != m.server.finishedGen {
 			return m, nil
@@ -203,7 +214,8 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleQueueMouseWheel(msg)
 	case tea.MouseMotionMsg:
-		return m.handleQueueMouseMotion(msg)
+		m.rows.queueTree.SetHoveredIndex(m.queueHoverTarget(msg))
+		return m, nil
 	case rowactions.EditFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 	case rowactions.WatchLoadedMsg:
@@ -214,11 +226,16 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.watch, cmd = m.watch.Step(msg)
 		return m, cmd
 	case rowactions.TicketReadyMsg:
-		return m.handleTicketMenuReady(msg)
+		cmd := m.menus.HandleReady(msg, queueMenuTab{m})
+		return m, cmd
 	case rowactions.TicketPickMsg:
-		return m.handleTicketMenuPick(msg)
+		res := m.menus.HandleTicketPick(msg, queueMenuTab{m})
+		if res.Approve {
+			return m.handleServerApproveKey()
+		}
+		return m, res.Cmd
 	case rowactions.EpicPickMsg:
-		return m.handleQueueEpicMenuPick(msg)
+		return m, m.menus.HandleEpicPick(msg, queueMenuTab{m})
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd
@@ -236,7 +253,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		if m.confirm.IsOpen {
-			return m.handleQueueConfirmUpdate(msg)
+			var cmd tea.Cmd
+			m.confirm, cmd, _ = m.confirm.Update(msg)
+			return m, cmd
 		}
 		if m.harnessPicker.open {
 			var cmd tea.Cmd
@@ -270,7 +289,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
-			return m.handleQueueConfirmMouseUpdate(msg)
+			var cmd tea.Cmd
+			m.confirm, cmd, _ = m.confirm.UpdateMouse(msg, m.width, m.width, m.height)
+			return m, cmd
 		}
 		if m.harnessPicker.open {
 			return m, nil
@@ -278,15 +299,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseClick(msg)
 	}
 	return m, nil
-}
-
-func (m QueueModel) handleQueueSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
-	if len(m.server.runningEpics) == 0 {
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.implementSpinner, cmd = m.implementSpinner.Update(msg)
-	return m, cmd
 }
 
 // handleQueueMouseWheel scrolls whichever of the tree/preview panes the
@@ -299,7 +311,7 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 		return m, nil
 	}
 	mouse := msg.Mouse()
-	idx, ok := ui.HoverHitTest(mouse.X, mouse.Y, m.queueTreeRect(), m.queuePreviewRect())
+	idx, ok := ui.HoverHitTest(mouse.X, mouse.Y, m.layout().treeRect(), m.layout().previewRect())
 	if !ok {
 		return m, nil
 	}
@@ -310,33 +322,6 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 	}
 	m.rows.queueTree.ScrollViewport(dir * ui.WheelScrollLines)
 	return m, nil
-}
-
-// queueTreeRect returns the queue tree panel's absolute on-screen bounds,
-// mirroring previewRect's layout math (same splitPanelWidth/splitPanelHeight
-// call) for the Queue tab's own panel pair.
-func (m QueueModel) queueTreeRect() ui.Rect {
-	sidebarW, _ := m.preview.PanelWidths(m.width)
-	sidebarH, _ := m.preview.PanelHeights(m.width, m.contentHeight())
-	return ui.Rect{X: 0, Y: 0, W: sidebarW, H: sidebarH}
-}
-
-// queuePreviewRect wraps the shared previewRect in a ui.Rect for
-// HoverHitTest.
-func (m QueueModel) queuePreviewRect() ui.Rect {
-	x, y, w, h := m.previewRect()
-	return ui.Rect{X: x, Y: y, W: w, H: h}
-}
-
-// contentHeight mirrors Model.contentHeight for the Queue tab's own layout.
-func (m QueueModel) contentHeight() int {
-	return max(m.height, 1)
-}
-
-// previewRect returns the preview panel's absolute on-screen bounds,
-// mirroring Model.previewRect for the Queue tab's own layout.
-func (m QueueModel) previewRect() (x, y, w, h int) {
-	return m.preview.Rect(m.width, m.contentHeight())
 }
 
 // handleQueueMouseClick selects the row under the click without triggering
@@ -350,7 +335,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 	if mouse.Button != tea.MouseLeft && mouse.Button != tea.MouseRight {
 		return m, nil
 	}
-	if m.preview.InPreview(mouse, m.width, m.contentHeight()) {
+	if m.preview.InPreview(mouse, m.width, m.layout().contentHeight()) {
 		if mouse.Button == tea.MouseLeft {
 			m.preview.FocusPreviewPane()
 		}
@@ -382,22 +367,6 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		m.rows.queueTree.SetSelectedIndex(idx)
 	}
 	return m, nil
-}
-
-// ticketPathFor resolves an epicName/identifier pair (the registry's
-// addressing scheme) to the ticket's file path (the queue store's key).
-func (m QueueModel) ticketPathFor(epicName, identifier string) (string, bool) {
-	for _, epic := range m.rows.epics {
-		if epic.Name != epicName {
-			continue
-		}
-		for _, t := range epic.Tickets {
-			if t.Identifier == identifier {
-				return t.Path, true
-			}
-		}
-	}
-	return "", false
 }
 
 // bindingQueueToggleHideDone is the Queue tab's "tc" chord (ticket 09),
@@ -507,7 +476,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, notify.Info(label)
 		case bindingQueueTogglePreview:
 			m.preview.Toggle()
-			m.rows.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
+			m.rows.queueTree.SetVisibleHeight(m.layout().viewportHeight() - queueHeaderReservedLines)
 		case bindingQueueEditInPlace:
 			return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 		case bindingQueueEditHSplit:
@@ -610,10 +579,6 @@ type checkedEpicPlan struct {
 	ordered   bool
 }
 
-func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
-	return checkedEpicPlansFor(m.rows.epics, m.rows.checked, m.rows.checkOrder)
-}
-
 func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrder map[string]uint64) []checkedEpicPlan {
 	plans := make([]checkedEpicPlan, 0, len(epics))
 	for _, epic := range epics {
@@ -665,7 +630,7 @@ func (m QueueModel) header() queueHeader {
 		checkedCount: len(m.rows.checked),
 	}
 	if m.server.serverAPI == nil {
-		h.checkedPlans = len(m.checkedEpicPlans())
+		h.checkedPlans = len(checkedEpicPlansFor(m.rows.epics, m.rows.checked, m.rows.checkOrder))
 	}
 	return h
 }
@@ -675,13 +640,15 @@ func (m QueueModel) rowsEnv() queueRowsEnv {
 	return queueRowsEnv{
 		header:        m.header(),
 		maxParallel:   m.settings.MaxConcurrentTicketsPerEpic(),
-		labelWidth:    m.queueLabelWidth(),
+		labelWidth:    m.layout().labelWidth(),
 		harnessLabels: m.server.harnessLabels,
 		waitingLabels: m.server.waitingLabels,
 		codexRows:     m.server.codexRows,
 		hasQuery:      m.search.HasQuery(),
 		sidebarActive: m.preview.Focus == preview.FocusSidebar,
-		suggested:     m.rowHasSuggestedActions,
+		suggested: func(epic tickets.Epic, ticket tickets.Ticket) bool {
+			return m.menus.HasSuggestedActions(m.menuEnv(), epic, ticket, false)
+		},
 	}
 }
 
@@ -691,39 +658,12 @@ func (m QueueModel) rowsEnv() queueRowsEnv {
 func (m *QueueModel) clampSelected() {
 	m.rows.queueTree.SetEntries(m.rows.buildQueueEntries(m.rowsEnv()))
 	m.rows.queueTree.SkipUnselectable(1)
-	m.selectFocusEpic()
+	m.focusEpic = m.rows.selectFocusEpic(m.focusEpic)
 }
 
 // WithFocusEpic makes the tab select the header of the epic at address as
 // soon as its rows arrive.
 func (m QueueModel) WithFocusEpic(address string) QueueModel {
-	m.focusEpic = address
-	m.selectFocusEpic()
+	m.focusEpic = m.rows.selectFocusEpic(address)
 	return m
-}
-
-// selectFocusEpic selects the focus epic's header once the rows hold it; until
-// then the request waits for the next delivery. The address is the epic's Path.
-func (m *QueueModel) selectFocusEpic() {
-	if m.focusEpic == "" {
-		return
-	}
-	for i, e := range m.rows.queueTree.Entries() {
-		if e.Value.kind == nodeEpicName && e.Value.epic.Path == m.focusEpic {
-			m.rows.queueTree.SetSelectedIndex(i)
-			m.focusEpic = ""
-			return
-		}
-	}
-}
-
-// queueViewportHeight is the queue panel's visible body line count, matching
-// ui.RenderPanel's own bodyH math (PaddingY: 0, minus the header row) — see
-// View()'s split sizing — so the windowing done here lines up with what
-// RenderPanel actually paints. Splits its height the same way View() does
-// (splitPanelHeight), since a stacked (narrow-terminal) layout shares the
-// available height with the preview pane below it.
-func (m QueueModel) queueViewportHeight() int {
-	sidebarH, _ := m.preview.PanelHeights(m.width, m.contentHeight())
-	return max(sidebarH-1, 0)
 }
