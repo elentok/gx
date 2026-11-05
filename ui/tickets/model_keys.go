@@ -101,7 +101,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if match == nil {
 			return m, nil // chord in progress
 		}
-		if cmd, blocked := m.server.keyGuard(match.ID); blocked {
+		if cmd, blocked := m.keyGuard(match.ID); blocked {
 			return m, cmd
 		}
 		if archivedBlockedBindings[match.ID] {

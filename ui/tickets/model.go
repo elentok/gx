@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowactions"
+	"github.com/elentok/gx/ui/tickets/serverlink"
 	"github.com/elentok/gx/ui/tickets/sidebar"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
@@ -56,7 +57,7 @@ type Model struct {
 	watch rowactions.WatchModal
 
 	// server owns the server link, snapshot and project scope (server_mode.go).
-	server   serverBinding
+	server   serverlink.Binding
 	admin    tabapi.AdminAPI
 	sessions tabapi.SessionsAPI
 	tickets  tabapi.TicketsAPI
@@ -149,7 +150,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case epicsLoadedMsg:
-		if !m.server.readsDisk() {
+		if !m.server.ReadsDisk() {
 			// A disk read that outlived down mode must not overwrite stream rows.
 			return m, nil
 		}

@@ -19,9 +19,9 @@ func sidebarEnvFor(m Model) sidebar.Env {
 		Icons:       m.icons(),
 		Active:      m.preview.Focus == preview.FocusSidebar,
 		Loaded:      m.loaded,
-		OlderServer: m.server.older,
+		OlderServer: m.server.Older,
 		SessionMarker: func(address string) string {
-			for _, s := range m.server.vm.Sessions {
+			for _, s := range m.server.VM.Sessions {
 				if s.Ticket == address && s.Status.State != wire.SessionExited {
 					return " " + sessionMarkerStyle.Render(m.icons().SessionLive)
 				}
@@ -32,7 +32,7 @@ func sidebarEnvFor(m Model) sidebar.Env {
 			return m.menus.HasSuggestedActions(m.menuEnv(), epic, ticket, archived)
 		},
 		PendingText: func(ticketPath string) (string, bool) {
-			p, ok := m.server.vm.PendingRowFor(ticketPath)
+			p, ok := m.server.VM.PendingRowFor(ticketPath)
 			if !ok {
 				return "", false
 			}

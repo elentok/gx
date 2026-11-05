@@ -3,6 +3,9 @@ package tickets
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/queue"
@@ -21,10 +24,9 @@ func showQueueIfAdded(added int, toast tea.Cmd) tea.Cmd {
 }
 
 // WithServer connects the tab: rows come from the state the app shell
-// delivers (WithServerState). Without it the tab reads the store itself
-// (server_refresh.go).
+// delivers (WithServerState). Without it the tab reads the store itself.
 func (m Model) WithServer(api tabapi.ServerAPI) Model {
-	m.server.api = api
+	m.server.API = api
 	return m
 }
 
@@ -66,7 +68,7 @@ func (m Model) WithReads(r tabapi.ReadsAPI) Model {
 // showing "loading…". While the tab reads the store itself (server down) the
 // shell's state is stale and ignored; the crossing into down loads from disk.
 func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea.Model, tea.Cmd) {
-	apply, loadDisk := m.server.receive(st, link)
+	apply, loadDisk := m.server.Receive(st, link)
 	if loadDisk {
 		return m, cmdLoadDisk(m.scratchDir())
 	}
@@ -85,65 +87,13 @@ func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea
 // WithCwdProject scopes the tab to the registered project the TUI started in;
 // "" means the cwd is not a registered project, so the tab shows all.
 func (m Model) WithCwdProject(name string) Model {
-	m.server.scope.CwdProject = name
+	m.server.Scope.CwdProject = name
 	return m
-}
-
-// serverBinding is the tab's link to the server: the client, the last
-// delivered snapshot and the project scope applied to it.
-type serverBinding struct {
-	// api feeds vm; nil keeps the tab reading the store for good.
-	api tabapi.ServerAPI
-	// link is the link half of the last WithServerState delivery; nothing else
-	// writes it.
-	link tabapi.ServerLink
-	// older: the last snapshot came from a server without rendered status; the
-	// tab shows tabapi.OlderServerNotice and no tickets.
-	older bool
-	vm    viewmodel.State
-	// scope is which projects the tab shows; owned by the tab, so no snapshot
-	// or event can reset it.
-	scope viewmodel.Scope
-}
-
-// receive takes a WithServerState delivery. apply reports that vm changed and
-// the rows need rebuilding; loadDisk that the link just crossed into down, so
-// the tab must load from the store. While the tab reads the store itself the
-// shell's state is stale and ignored.
-func (s *serverBinding) receive(st *viewmodel.State, link tabapi.ServerLink) (apply, loadDisk bool) {
-	wasDown := s.link == tabapi.ServerLinkDown
-	s.link = link
-	if s.readsDisk() {
-		s.older = false
-		return false, link == tabapi.ServerLinkDown && !wasDown
-	}
-	if st == nil {
-		return false, false
-	}
-	s.vm = *st
-	s.older = st.OlderServer()
-	if s.older {
-		s.vm = viewmodel.State{}
-	}
-	return true, false
-}
-
-// toggleScope flips between the cwd project and all projects. ok is false when
-// the cwd is no registered project; msg is the toast text either way.
-func (s *serverBinding) toggleScope() (msg string, ok bool) {
-	if s.scope.CwdProject == "" {
-		return s.scope.UnregisteredHint(), false
-	}
-	s.scope = s.scope.Toggle()
-	if s.scope.AllProjects {
-		return "all projects", true
-	}
-	return "project: " + s.scope.CwdProject, true
 }
 
 // toggleProjectScope is "tp".
 func (m Model) toggleProjectScope() (tea.Model, tea.Cmd) {
-	msg, ok := m.server.toggleScope()
+	msg, ok := m.server.ToggleScope()
 	if !ok {
 		return m, notify.Info(msg)
 	}
@@ -169,7 +119,57 @@ func updateServer(msg tea.Msg) (cmd tea.Cmd, ok bool) {
 }
 
 func (m Model) applyServerRows() Model {
-	m.sidebar.Epics = tabapi.EpicsFromViewModel(m.server.vm, m.server.scope)
+	m.sidebar.Epics = m.server.Epics()
 	m.clampSelected()
 	return m
+}
+
+// serverBlockedBindings lists every binding that needs a writable server. A
+// new server-backed binding needs an entry here — nothing else enforces that.
+var serverBlockedBindings = map[keys.BindingID]bool{
+	bindingTicketsFinishAndPause: true,
+}
+
+// keyGuard is the shared no-op check for server-backed keys: blocked
+// reports whether the caller should return cmd (a toast with the reason).
+func (m Model) keyGuard(id keys.BindingID) (cmd tea.Cmd, blocked bool) {
+	if !serverBlockedBindings[id] {
+		return nil, false
+	}
+	return m.server.DisabledToast()
+}
+
+// handleServerFinishAndPauseKey is "D" in server mode, an alias of Finish and pause kept
+// for one release: stop the server handing out new work; running tickets finish.
+func (m Model) handleServerFinishAndPauseKey() (tea.Model, tea.Cmd) {
+	m.confirm = m.confirm.Open(confirm.Options{
+		Prompt:    queue.FinishAndPausePrompt,
+		AcceptCmd: queue.CmdServerQueueMode("queue paused", m.queue.Pause),
+	})
+	return m, nil
+}
+
+// The Tickets tab's rows come from the server's event stream while it is
+// reachable. While it is down — or the tab has no client at all — the tab reads
+// the store, reloading when the app shell (which runs the store watch) says the
+// store changed and when the tab is activated.
+
+// OnPageActivated catches the tab up with the store: hidden tabs are not told
+// about changes made while the server was down.
+func (m Model) OnPageActivated() tea.Cmd {
+	if !m.server.ReadsDisk() {
+		return nil
+	}
+	return cmdLoadDisk(m.scratchDir())
+}
+
+// cmdLoadDisk reads `.scratch/` directly: the down-mode loader. A missing
+// directory reads as zero epics, and an unreadable `.archive` as nothing
+// archived.
+func cmdLoadDisk(scratchDir string) tea.Cmd {
+	return func() tea.Msg {
+		epics, err := tickets.Load(scratchDir)
+		archivedEpicCount, _ := tickets.CountArchivedEpics(scratchDir)
+		return epicsLoadedMsg{epics: epics, err: err, archivedEpicCount: archivedEpicCount}
+	}
 }

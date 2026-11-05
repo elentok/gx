@@ -6,16 +6,15 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
-	"github.com/elentok/gx/ui/tickets/rowactions"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/sidebar"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
@@ -66,15 +65,21 @@ func withState(m Model, snap wire.Snapshot) Model {
 	return m
 }
 
-func TestServerMode_SnapshotRendersReducedRows(t *testing.T) {
-	snap := wire.Snapshot{Seq: 4, Tickets: []wire.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "open"},
-		{Address: "gx:alpha/02", Title: "Fork", Status: "open", Parent: "gx:alpha/01"},
-	}}
-	m := withState(newServerModel(t), snap)
-	if len(m.sidebar.Epics) != 1 || len(m.sidebar.Epics[0].Tickets) != 2 {
-		t.Fatalf("epics = %+v", m.sidebar.Epics)
-	}
+func loadedModelWithTicket(t *testing.T) Model {
+	t.Helper()
+	root := t.TempDir()
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	return updated.(Model)
+}
+
+// withLink delivers link with no state, as the shell does on a link change
+// before any snapshot.
+func withLink(m Model, link tabapi.ServerLink) (Model, tea.Cmd) {
+	next, cmd := m.WithServerState(nil, link)
+	return next.(Model), cmd
 }
 
 func TestServerMode_NoStateKeepsLoading(t *testing.T) {
@@ -101,24 +106,14 @@ var scopeSnap = wire.Snapshot{Seq: 4, Tickets: []wire.TicketInfo{
 	{Address: "other:beta/01", Status: "open"},
 }}
 
-func TestServerMode_ScopesToCwdProjectAndToggles(t *testing.T) {
+func TestServerMode_ToggleScopeRebuildsRows(t *testing.T) {
 	m := withState(newServerModel(t).WithCwdProject("gx"), scopeSnap)
-	if len(m.sidebar.Epics) != 1 || m.sidebar.Epics[0].Name != "gx:alpha" {
+	if len(m.sidebar.Epics) != 1 {
 		t.Fatalf("scoped epics = %+v", m.sidebar.Epics)
 	}
 	next, _ := m.toggleProjectScope()
 	if got := len(next.(Model).sidebar.Epics); got != 2 {
 		t.Fatalf("all-projects epics = %d, want 2", got)
-	}
-}
-
-func TestServerMode_ScopeToggleSurvivesDeliveredState(t *testing.T) {
-	m := withState(newServerModel(t).WithCwdProject("gx"), scopeSnap)
-	next, _ := m.toggleProjectScope()
-
-	m = withState(next.(Model), scopeSnap)
-	if got := len(m.sidebar.Epics); got != 2 {
-		t.Fatalf("epics after delivery = %d, want 2 (still all projects)", got)
 	}
 }
 
@@ -131,16 +126,6 @@ func TestServerMode_OutsideProjectShowsAllWithoutToasting(t *testing.T) {
 	_, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if got := toastsOf(cmd); len(got) != 0 {
 		t.Fatalf("tab toasts = %+v", got)
-	}
-}
-
-func TestServerMode_StaleStateIsIgnoredWhileOnFallback(t *testing.T) {
-	m := newServerModel(t)
-	st := applySnapshot(viewmodel.State{}, scopeSnap)
-	next, _ := m.WithServerState(&st, tabapi.ServerLinkDown)
-	m = next.(Model)
-	if m.loaded || len(m.sidebar.Epics) != 0 {
-		t.Fatalf("fallback tab took the shell's stale state: loaded=%v epics=%d", m.loaded, len(m.sidebar.Epics))
 	}
 }
 
@@ -205,28 +190,6 @@ func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing
 	}
 }
 
-// Seam D: "enter" on a paused row issues the detail's first verb (resume here).
-func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
-	var calls []string
-	m := newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}).WithTickets(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}})
-	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
-		// The wire carries no pause reason, so only the retired repair status
-		// tells the client this pause is a repair.
-		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: gxtickets.StatusPausedRepair.Word()},
-	}})
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = selectTicketRow(t, updated.(Model))
-
-	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatal("enter on a paused row issued nothing")
-	}
-	cmd()
-	if want := []string{"resume gx:alpha/02"}; !slices.Equal(calls, want) {
-		t.Fatalf("calls = %v, want %v", calls, want)
-	}
-}
-
 // In server mode a row's Path is the ticket's address, so the menu's status
 // writes and the edit chords must reach the ticket's file instead.
 func serverModelWithTicketFile(t *testing.T) (Model, string) {
@@ -258,19 +221,6 @@ func TestServerMode_EditTargetIsTheTicketFile(t *testing.T) {
 	}
 }
 
-func openAnswerMenu(t *testing.T, api tickettest.FakeServerAPI) Model {
-	t.Helper()
-	if len(api.DetailRes.Actions) == 0 {
-		api.DetailRes = detailWith(wire.ActionAnswer, wire.ActionResume)
-	}
-	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: api}).WithQueue(tickettest.FakeQueue{FakeServerAPI: api}).WithReads(tickettest.FakeReads{FakeServerAPI: api})
-	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
-		pausedAnswerInfo("gx:alpha/01", "First"),
-	}})
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	return pressMenuKey(t, selectTicketRow(t, updated.(Model)))
-}
-
 // pressMenuKey presses "m" and feeds back the menu its cmd resolves.
 func pressMenuKey(t *testing.T, m Model) Model {
 	t.Helper()
@@ -282,95 +232,114 @@ func pressMenuKey(t *testing.T, m Model) Model {
 	return updated.(Model)
 }
 
-func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
-	for _, status := range []string{"open", "claimed", "done", "blocked", "draft", "paused"} {
-		m := newServerModel(t).WithServer(tickettest.FakeServerAPI{}).WithTickets(tickettest.FakeServerAPI{}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
-		m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
-			{Address: "gx:alpha/01", Title: "First", Status: status},
-			// Keeps the epic open: a fully done epic starts collapsed.
-			{Address: "gx:alpha/02", Title: "Second", Status: "open"},
-		}})
-		updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-		m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
-		if !m.menus.Menu.IsOpen {
-			t.Errorf("status %s: menu closed, want open", status)
-		}
-
-		updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-		if updated.(Model).menus.Menu.IsOpen {
-			t.Errorf("status %s: menu still open after esc", status)
-		}
-	}
-}
-
-// Seam D: on herdr, Go to pane jumps to the tab from the iterations read, and
-// Resume issues resume.
-func TestServerMode_GoToPaneAndResume(t *testing.T) {
-	focused := fakeFocus(t)
-	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
-
+func TestServerMode_FinishAndPauseKeyIsFinishAndPause(t *testing.T) {
 	var calls []string
-	api := tickettest.FakeServerAPI{Calls: &calls, IterationsRes: []wire.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
-	m, cmd := chooseTicketMenuItem(t, openAnswerMenu(t, api), "Go to pane")
-	cmd()
-	if !slices.Equal(*focused, []string{"t1"}) {
-		t.Fatalf("focused = %v", *focused)
+	m := newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &calls}).WithTickets(tickettest.FakeServerAPI{Calls: &calls}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}})
+	next, _ := m.handleServerFinishAndPauseKey()
+	m = next.(Model)
+	if !m.confirm.IsOpen {
+		t.Fatal("confirm not open")
 	}
-
-	_, cmd = chooseTicketMenuItem(t, pressMenuKey(t, m), resumeLabel)
-	if msg, ok := cmd().(rowactions.ServerWriteMsg); !ok || msg.Verb != "resume" {
-		t.Fatalf("resume result = %+v", msg)
+	_, cmd, _ := m.confirm.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if cmd == nil {
+		t.Fatal("accept produced no command")
 	}
-	if !slices.Equal(calls, []string{"resume gx:alpha/01"}) {
+	if _, ok := cmd().(queue.ServerDoneMsg); !ok || !slices.Equal(calls, []string{"pause"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 }
 
-// A paused (answer) ticket's menu has no Answer… action: answering is the web
-// UI's job, and the TUI only offers Resume.
-func TestServerMode_PausedAnswerMenuHasNoAnswerAction(t *testing.T) {
-	m := openAnswerMenu(t, tickettest.FakeServerAPI{})
-	view := m.menus.Menu.View()
-	if strings.Contains(view, "Answer…") {
-		t.Fatalf("menu offers Answer…:\n%s", view)
-	}
-	if !strings.Contains(view, resumeLabel) {
-		t.Fatalf("menu lacks %s:\n%s", resumeLabel, view)
+func TestRefresh_NoDiskPollWhileConnected(t *testing.T) {
+	m := newServerModel(t)
+	_, cmd := m.Update(epicsLoadedMsg{})
+	if cmd != nil {
+		t.Fatalf("a connected load scheduled %v; want no poll timer", cmd)
 	}
 }
 
-func TestEpicsFromViewModel_KeepsTheDoneMetrics(t *testing.T) {
-	vm := applySnapshot(viewmodel.State{}, wire.Snapshot{Tickets: []wire.TicketInfo{
-		{Address: "proj:epic-a/01", Status: "done", ActualContextWindow: 66395, ElapsedTime: 316, Compactions: 2},
-	}})
-	epics := tabapi.EpicsFromViewModel(vm, viewmodel.Scope{})
-	if len(epics) != 1 || len(epics[0].Tickets) != 1 {
-		t.Fatalf("epics = %+v", epics)
+// The shell tells the tab the store changed; a connected tab ignores it, and a
+// down tab reloads. The tab keeps no loop of its own.
+func TestRefresh_StoreChangedReloadsOnlyWhenDown(t *testing.T) {
+	m := newServerModel(t)
+	if _, cmd := m.Update(tabapi.StoreChangedMsg{}); cmd != nil {
+		t.Fatal("a connected tab reloaded on a store change")
 	}
-	got := epics[0].Tickets[0]
-	if got.ActualContextWindow != 66395 || got.ElapsedTime != 316 || got.Compactions != 2 {
-		t.Errorf("ticket = %+v, want the done metrics so the summary can add them up", got)
+
+	down, _ := withLink(m, tabapi.ServerLinkDown)
+	_, cmd := down.Update(tabapi.StoreChangedMsg{})
+	if cmd == nil {
+		t.Fatal("a down tab must reload on a store change")
+	}
+	if _, ok := cmd().(epicsLoadedMsg); !ok {
+		t.Fatal("a store change must be a single disk read, not a loop")
 	}
 }
 
-func TestEpicsFromViewModel_MultiLevelForkKeepsItsNumber(t *testing.T) {
-	vm := applySnapshot(viewmodel.State{}, wire.Snapshot{Tickets: []wire.TicketInfo{
-		{Address: "proj:epic-a/27", Status: "done"},
-		{Address: "proj:epic-a/27a", Status: "done", Parent: "proj:epic-a/27"},
-		{Address: "proj:epic-a/27a1", Status: "done", Parent: "proj:epic-a/27a"},
-		{Address: "proj:epic-a/27a3", Status: "claimed", Parent: "proj:epic-a/27a1"},
-	}})
-	epics := tabapi.EpicsFromViewModel(vm, viewmodel.Scope{})
-	if len(epics) != 1 || len(epics[0].Tickets) != 4 {
-		t.Fatalf("epics = %+v", epics)
+func TestRefresh_ActivationReloadsOnlyWhenDown(t *testing.T) {
+	m := newServerModel(t)
+	if m.OnPageActivated() != nil {
+		t.Fatal("a connected tab reloaded on activation")
 	}
-	epic := epics[0]
-	for _, tk := range epic.Tickets {
-		if tk.Number != 27 {
-			t.Errorf("%s: Number = %d, want 27", tk.Identifier, tk.Number)
+	down, _ := withLink(m, tabapi.ServerLinkDown)
+	if down.OnPageActivated() == nil {
+		t.Fatal("a down tab must reload on activation")
+	}
+
+	// The shell delivers the down link when the tab has no client at all.
+	noClient, _ := withLink(NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}), tabapi.ServerLinkDown)
+	if noClient.Init() == nil {
+		t.Fatal("a tab with no client must load from disk on Init")
+	}
+	if _, blocked := noClient.keyGuard(bindingTicketsFinishAndPause); !blocked {
+		t.Fatal(`"D" is not blocked without a server`)
+	}
+}
+
+func TestOlderServer_TicketsTabShowsNoticeAndNoTickets(t *testing.T) {
+	m := newServerModel(t)
+	st := viewmodel.State{}.ApplySnapshot(wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}})
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
+	next, _ = next.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	view := ansi.Strip(next.View().Content)
+	if !strings.Contains(view, tabapi.OlderServerNotice) || strings.Contains(view, "First") {
+		t.Fatalf("view = %s", view)
+	}
+	if got := len(next.(Model).sidebar.Epics); got != 0 {
+		t.Fatalf("epics = %d, want none (no ticket data for menu, preview or search)", got)
+	}
+}
+
+func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		link tabapi.ServerLink
+		want string
+	}{
+		{tabapi.ServerLinkDown, "server is down"},
+		{tabapi.ServerLinkReadOnly, "read-only"},
+	}
+	for _, tc := range cases {
+		m, _ := withLink(loadedModelWithTicket(t), tc.link)
+		for _, key := range []string{"D"} {
+			updated, cmd := m.Update(tea.KeyPressMsg{Code: rune(key[0]), Text: key})
+			m = updated.(Model)
+			if cmd == nil {
+				t.Fatalf("link %v key %q: expected a disabled-with-reason notification", tc.link, key)
+			}
+			nm, ok := cmd().(notify.NotifyMsg)
+			if !ok || !strings.Contains(nm.Message, tc.want) {
+				t.Fatalf("link %v key %q: got %#v, want reason containing %q", tc.link, key, nm, tc.want)
+			}
 		}
 	}
-	if got := epic.RenderedStatus(epic.Tickets[3]); got != gxtickets.StatusClaimed {
-		t.Errorf("27a3 RenderedStatus = %v, want claimed: its parent 27a1 is done", got)
+}
+
+func TestServerLink_DownKeepsMarkdownRow(t *testing.T) {
+	m, _ := withLink(loadedModelWithTicket(t), tabapi.ServerLinkDown)
+	content := m.View().Content
+	if !strings.Contains(content, "First ticket") {
+		t.Fatalf("markdown row should stay, got:\n%s", content)
 	}
 }

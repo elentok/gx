@@ -17,8 +17,8 @@ type modelMenuTab struct{ m Model }
 
 func (m Model) menuEnv() rowactions.Env {
 	return rowactions.Env{
-		ServerAPI: m.server.api, Admin: m.admin, Reads: m.reads, Sessions: m.sessions,
-		Tickets: m.tickets, Queue: m.queue, Link: m.server.link, Settings: m.settings,
+		ServerAPI: m.server.API, Admin: m.admin, Reads: m.reads, Sessions: m.sessions,
+		Tickets: m.tickets, Queue: m.queue, Link: m.server.Link, Settings: m.settings,
 		Width: m.width, WorktreeRoot: m.worktreeRoot,
 	}
 }
@@ -31,7 +31,7 @@ func (t modelMenuTab) EditFile(s terminalrun.SplitType) tea.Cmd { return t.m.cmd
 
 func (t modelMenuTab) Selection() rowactions.Selection {
 	m := t.m
-	vm := m.server.vm
+	vm := m.server.VM
 	r, ok := m.sidebar.SelectedRow()
 	if !ok {
 		return rowactions.Selection{}
