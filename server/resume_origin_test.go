@@ -11,15 +11,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-func endedRounds(t *testing.T, ticketPath string) []tickets.PauseRound {
-	t.Helper()
-	evs, err := tickets.ReadLog(ticketPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return tickets.AllRounds(evs)
-}
-
 func TestResume_ZeroCommitEndsTheRoundWithTheClientsSource(t *testing.T) {
 	t.Parallel()
 	for name, origin := range map[string]string{"cli": wire.OriginCLI, "tui": wire.OriginTUI} {

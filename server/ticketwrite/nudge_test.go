@@ -1,9 +1,8 @@
-package server_test
+package ticketwrite_test
 
 import (
 	"context"
 	"errors"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,26 +11,15 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
-
-func claimTicket(t *testing.T, store, epic, id, file string) {
-	t.Helper()
-	path := filepath.Join(store, "proj", epic, "issues", file)
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), "status: open", "status: claimed", 1)), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	claimTicket(t, store, "epic-a", "01", "01-first.md")
+	servertest.ClaimTicket(t, store, "epic-a", "01", "01-first.md")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
 	fake := runnerfake.NewRunner()
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
@@ -75,7 +63,7 @@ func TestNudge_NotReadyRefuses(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	claimTicket(t, store, "epic-a", "01", "01-first.md")
+	servertest.ClaimTicket(t, store, "epic-a", "01", "01-first.md")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
 	fake := runnerfake.NewRunner()
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))

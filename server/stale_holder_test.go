@@ -3,7 +3,6 @@ package server_test
 import (
 	"fmt"
 	"github.com/elentok/gx/server/wire"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -16,8 +15,6 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-const holderLabel = "epic-a-iter-01"
-
 // spyWithHolder is a fake runner whose launch label is already held by a
 // session in state.
 func spyWithHolder(t *testing.T, state agentrunner.State) (*launchSpy, agentrunner.Session) {
@@ -29,25 +26,6 @@ func spyWithHolder(t *testing.T, state agentrunner.State) (*launchSpy, agentrunn
 	}
 	spy.SetState(holderLabel, state, "")
 	return spy, holder
-}
-
-func runLog(t *testing.T, h *servertest.Harness) []ralphloop.Event {
-	t.Helper()
-	logged, _, err := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return logged
-}
-
-func ofType(logged []ralphloop.Event, typ events.Type) []ralphloop.Event {
-	var out []ralphloop.Event
-	for _, ev := range logged {
-		if ev.Type == string(typ) {
-			out = append(out, ev)
-		}
-	}
-	return out
 }
 
 func TestLaunch_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {

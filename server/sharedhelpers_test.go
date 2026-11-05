@@ -13,9 +13,15 @@ const (
 	turnDurationLine     = servertest.TurnDurationLine
 	runEndText           = servertest.RunEndText
 	repairToken          = servertest.RepairToken
+	holderLabel          = servertest.HolderLabel
 )
 
-type slackHook = servertest.SlackHook
+type (
+	slackHook  = servertest.SlackHook
+	herdrNamed = servertest.HerdrNamed
+	codexNamed = servertest.CodexNamed
+	ptyNamed   = servertest.PtyNamed
+)
 
 var (
 	report                 = servertest.Report
@@ -58,4 +64,13 @@ var (
 	startWebDesign         = servertest.StartWebDesign
 	sessionToken           = servertest.SessionToken
 	webSessionWrite        = servertest.WebSessionWrite
+	startTicketWrites      = servertest.StartTicketWrites
+	startBlockable         = servertest.StartBlockable
+	runsJSONHas            = servertest.RunsJSONHas
+	claimTicket            = servertest.ClaimTicket
+	gateDwell              = servertest.GateDwell
+	startWithLeftover      = servertest.StartWithLeftover
+	endedRounds            = servertest.EndedRounds
+	runLog                 = servertest.RunLog
+	ofType                 = servertest.OfType
 )

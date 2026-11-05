@@ -39,7 +39,7 @@ var allowed = map[string]int{
 	"nativerunner/pty_codex_test.go":                  2, // poll loops with a deadline
 	"nativerunner/pty_launch_test.go":                 1, // negative wait: the launch must still be waiting for delivery when cancelled
 	"nativerunner/pty_codexapproval_test.go":          2, // poll loops with a deadline
-	"server/blocked_pause_test.go":                    3, // negative waits: no pause before the dwell ends, after a re-check, or on a usage limit
+	"server/ticketwrite/blocked_pause_test.go":        3, // negative waits: no pause before the dwell ends, after a re-check, or on a usage limit
 	"server/budget/extrausage_internal_test.go":       2, // poll loop with a deadline; negative wait: no second notice is sent
 	"server/servertest/longticket_test.go":            1, // a delayed transcript write
 	"server/health/startincident_test.go":             2, // poll loops with a deadline

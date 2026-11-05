@@ -1,8 +1,7 @@
-package server_test
+package ticketwrite_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,7 +11,8 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -22,16 +22,16 @@ func TestBlockedPause_AgentErrorPausesWithItsTextAndOffersRetry(t *testing.T) {
 	t.Parallel()
 	for _, runner := range []string{"pty", "codex"} {
 		t.Run(runner, func(t *testing.T) {
-			h, ticketPath, turn := startBlockable(t, runner)
+			h, ticketPath, turn := servertest.StartBlockable(t, runner)
 			turn.SetErrored("epic-a-iter-01", "model gone")
-			waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+			servertest.WaitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 
-			d, err := h.Client.Detail(context.Background(), answerAddr)
+			d, err := h.Client.Detail(context.Background(), "proj:epic-a/01")
 			if err != nil || !slices.Contains(d.Actions, wire.ActionRetry) {
 				t.Errorf("actions = %v, %v; want Retry offered", d.Actions, err)
 			}
 			var reason string
-			waitFor(t, func() bool {
+			servertest.Await(t, func() bool {
 				log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 				for _, ev := range log {
 					if events.Type(ev.Type) == events.Paused && ev.Kind == string(events.BlockedPane) {
@@ -47,40 +47,23 @@ func TestBlockedPause_AgentErrorPausesWithItsTextAndOffersRetry(t *testing.T) {
 	}
 }
 
-// gateDwell returns a Config option that holds the 15-second dwell until the
-// returned release is called, so "under 15 seconds" is not a timing race.
-func gateDwell() (func(*server.Config), func()) {
-	gate := make(chan struct{})
-	opt := func(c *server.Config) {
-		pace := c.Sleep
-		c.Sleep = func(d time.Duration) {
-			if d == 15*time.Second {
-				<-gate
-				return
-			}
-			pace(d)
-		}
-	}
-	return opt, func() { close(gate) }
-}
-
 // A block still there when the 15-second dwell ends pauses the ticket and the
 // reason names the buttons the web offers; one that clears inside it pauses
 // nothing.
 func TestBlockedPause_PTYDwellPausesOnlyIfStillBlocked(t *testing.T) {
 	t.Parallel()
 	t.Run("still blocked", func(t *testing.T) {
-		gate, release := gateDwell()
-		h, ticketPath, turn := startBlockable(t, "pty", gate)
+		gate, release := servertest.GateDwell()
+		h, ticketPath, turn := servertest.StartBlockable(t, "pty", gate)
 		turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
 		time.Sleep(200 * time.Millisecond) // negative wait: the dwell has not ended
 		if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status != schema.StatusClaimed {
 			t.Fatalf("ticket = %+v, %v; want claimed before the dwell ends", tk.Status, err)
 		}
 		release()
-		waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+		servertest.WaitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 		var reason string
-		waitFor(t, func() bool {
+		servertest.Await(t, func() bool {
 			log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 			for _, ev := range log {
 				if events.Type(ev.Type) == events.Paused && ev.Kind == string(events.BlockedPane) {
@@ -96,8 +79,8 @@ func TestBlockedPause_PTYDwellPausesOnlyIfStillBlocked(t *testing.T) {
 		}
 	})
 	t.Run("clears inside the dwell", func(t *testing.T) {
-		gate, release := gateDwell()
-		_, ticketPath, turn := startBlockable(t, "pty", gate)
+		gate, release := servertest.GateDwell()
+		_, ticketPath, turn := servertest.StartBlockable(t, "pty", gate)
 		turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
 		turn.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
 		release()
@@ -113,10 +96,10 @@ func TestBlockedPause_PTYDwellPausesOnlyIfStillBlocked(t *testing.T) {
 // state, so the ticket never pauses.
 func TestBlockedPause_UsageLimitErrorHoldsInsteadOfPausing(t *testing.T) {
 	t.Parallel()
-	h, ticketPath, turn := startBlockable(t, "pty")
+	h, ticketPath, turn := servertest.StartBlockable(t, "pty")
 	turn.SetRateLimit("epic-a-iter-01", time.Now().Add(time.Hour))
 	turn.SetErrored("epic-a-iter-01", "You've hit your usage limit.")
-	waitFor(t, func() bool {
+	servertest.Await(t, func() bool {
 		ex, err := h.Client.Explain(context.Background(), "proj:epic-a/01")
 		return err == nil && strings.HasPrefix(ex.Verdict, "rate-limited: resets")
 	})
@@ -134,14 +117,14 @@ func TestBlockedPause_LiftsWhenAgentLeavesBlocked(t *testing.T) {
 	for _, runner := range []string{"herdr", "pty", "codex"} {
 		for name, state := range exits {
 			t.Run(runner+"/"+name, func(t *testing.T) {
-				h, ticketPath, turn := startBlockable(t, runner)
+				h, ticketPath, turn := servertest.StartBlockable(t, runner)
 				turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
-				waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
-				waitFor(t, func() bool { return runsJSONHas(h, `"waiting_since"`) })
+				servertest.WaitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+				servertest.Await(t, func() bool { return servertest.RunsJSONHas(h, `"waiting_since"`) })
 
 				turn.SetState("epic-a-iter-01", state, "")
-				waitStatus(t, ticketPath, schema.StatusClaimed)
-				waitFor(t, func() bool { return !runsJSONHas(h, `"waiting_since"`) })
+				servertest.WaitStatus(t, ticketPath, schema.StatusClaimed)
+				servertest.Await(t, func() bool { return !servertest.RunsJSONHas(h, `"waiting_since"`) })
 				if _, ok, err := turn.Find("epic-a-iter-01"); err != nil || !ok {
 					t.Errorf("session not live: ok=%v err=%v", ok, err)
 				}

@@ -13,16 +13,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// herdrNamed is a turnRunner that answers to "herdr", so its runs are herdr-hosted.
-type herdrNamed struct{ *turnRunner }
-
-func (herdrNamed) Name() string { return "herdr" }
-
-// codexNamed is a turnRunner on a native runner, hosting a Codex agent.
-type codexNamed struct{ *turnRunner }
-
-func (codexNamed) Name() string { return "headless" }
-
 // An ask from a herdr-hosted Claude or Codex run cannot be answered live:
 // the ticket pauses, the session closes and the run leaves the registry.
 func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
@@ -31,8 +21,8 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 		name, agent string
 		wrap        func(*turnRunner) agentrunner.Runner
 	}{
-		{"herdr claude", "claude", func(r *turnRunner) agentrunner.Runner { return herdrNamed{r} }},
-		{"herdr codex", "codex", func(r *turnRunner) agentrunner.Runner { return herdrNamed{r} }},
+		{"herdr claude", "claude", func(r *turnRunner) agentrunner.Runner { return herdrNamed{TurnRunner: r} }},
+		{"herdr codex", "codex", func(r *turnRunner) agentrunner.Runner { return herdrNamed{TurnRunner: r} }},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -68,7 +58,7 @@ func TestAsk_NativeAgentStaysAliveWaiting(t *testing.T) {
 		wrap        func(*turnRunner) agentrunner.Runner
 	}{
 		{"claude", "claude", func(r *turnRunner) agentrunner.Runner { return r }},
-		{"codex on pty", "codex", func(r *turnRunner) agentrunner.Runner { return ptyNamed{r} }},
+		{"codex on pty", "codex", func(r *turnRunner) agentrunner.Runner { return ptyNamed{TurnRunner: r} }},
 	} {
 		t.Run(c.name, func(t *testing.T) { testAskStaysAlive(t, c.agent, c.wrap) })
 	}

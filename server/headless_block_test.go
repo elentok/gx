@@ -6,45 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// startBlockable starts proj:epic-a/01 on a runner named runnerName whose agent
-// keeps working until the test blocks it, and returns once the session is live.
-func startBlockable(t *testing.T, runnerName string, opts ...func(*server.Config)) (*servertest.Harness, string, *turnRunner) {
-	t.Helper()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	ticketPath := store + "/proj/epic-a/issues/01-first.md"
-	turn := newTurnRunner(func(_, _ string) {})
-	turn.PromptState = agentrunner.StateWorking
-	var fake agentrunner.Runner = codexNamed{turn}
-	switch runnerName {
-	case "herdr":
-		fake = herdrNamed{turn}
-	case "pty":
-		fake = ptyNamed{turn}
-	}
-	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunner(fake)}, opts...)...)
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
-		t.Fatalf("add: %+v, %v", res, err)
-	}
-	waitFor(t, func() bool { _, ok, _ := turn.Find("epic-a-iter-01"); return ok })
-	// A block raised while the launch still waits for the session to be ready fails
-	// the launch instead of pausing the ticket.
-	servertest.WaitFor(t, time.Minute, "the launch finishes", func() bool {
-		return len(h.Server.Runs()) == 1 && h.Server.Budget().LaunchingRuns() == 0
-	})
-	return h, ticketPath, turn
-}
 
 func TestHeadlessBlock_PausesAtOnce(t *testing.T) {
 	t.Parallel()
@@ -92,11 +59,6 @@ func TestHeadlessBlock_PausesAtOnce(t *testing.T) {
 		})
 	}
 }
-
-// ptyNamed is a turnRunner that answers to "pty", so its runs are pty-hosted.
-type ptyNamed struct{ *turnRunner }
-
-func (ptyNamed) Name() string { return "pty" }
 
 // A herdr or pty hosted agent that stays blocked past the dwell is paused by
 // the server wait loop, like a headless one.
@@ -147,11 +109,6 @@ func pauseBlocked(t *testing.T) (*servertest.Harness, string, *turnRunner) {
 	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 	waitFor(t, func() bool { return runsJSONHas(h, `"waiting_since"`) })
 	return h, ticketPath, turn
-}
-
-func runsJSONHas(h *servertest.Harness, s string) bool {
-	data, _ := os.ReadFile(filepath.Join(h.StateDir, "runs.json"))
-	return strings.Contains(string(data), s)
 }
 
 func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {
