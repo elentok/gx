@@ -19,7 +19,7 @@ func openEpicMenuOn(t *testing.T, m Model, name string) Model {
 	selectEpicRow(t, &m, name)
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	m = updated.(Model)
-	if !m.ticketMenu.IsOpen {
+	if !m.menus.menu.IsOpen {
 		t.Fatalf("m on epic %s opened no menu", name)
 	}
 	return m

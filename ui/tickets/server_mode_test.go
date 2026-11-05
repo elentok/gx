@@ -303,12 +303,12 @@ func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 		}})
 		updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 		m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
-		if !m.ticketMenu.IsOpen {
+		if !m.menus.menu.IsOpen {
 			t.Errorf("status %s: menu closed, want open", status)
 		}
 
 		updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-		if updated.(Model).ticketMenu.IsOpen {
+		if updated.(Model).menus.menu.IsOpen {
 			t.Errorf("status %s: menu still open after esc", status)
 		}
 	}
@@ -341,7 +341,7 @@ func TestServerMode_GoToPaneAndResume(t *testing.T) {
 // UI's job, and the TUI only offers Resume.
 func TestServerMode_PausedAnswerMenuHasNoAnswerAction(t *testing.T) {
 	m := openAnswerMenu(t, tickettest.FakeServerAPI{})
-	view := m.ticketMenu.View()
+	view := m.menus.menu.View()
 	if strings.Contains(view, "Answer…") {
 		t.Fatalf("menu offers Answer…:\n%s", view)
 	}

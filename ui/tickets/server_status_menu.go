@@ -122,21 +122,6 @@ func (msg serverWriteMsg) toast() tea.Cmd {
 	return notify.Success(msg.verb + " done")
 }
 
-// handleServerResumeEnter is "enter" on a paused row in server mode: it runs
-// the first verb of the ticket's detail.actions. handled is false for any other
-// row so "enter" keeps its usual meaning.
-func (m Model) handleServerResumeEnter() (cmd tea.Cmd, handled bool) {
-	r, ok := m.selectedRow()
-	if m.serverAPI == nil || !ok || r.isEpic() {
-		return nil, false
-	}
-	ticket := m.epicAt(r).Tickets[r.ticketIdx]
-	if !isRepairPause(ticket) {
-		return nil, false
-	}
-	return cmdRunFirstAction(m.admin, m.reads, m.tickets, ticket.Path), true
-}
-
 // cmdRunFirstAction reads the ticket's detail and runs its first action; with
 // none it does nothing.
 func cmdRunFirstAction(admin tabapi.AdminAPI, reads tabapi.ReadsAPI, tix tabapi.TicketsAPI, address string) tea.Cmd {

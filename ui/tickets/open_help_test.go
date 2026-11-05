@@ -58,7 +58,7 @@ func TestOpenHelp_TicketsEndsPreviewSearch(t *testing.T) {
 func TestOpenHelp_TicketsIgnoredWhileModalOpen(t *testing.T) {
 	t.Parallel()
 	m := NewModel(t.TempDir(), ui.Settings{}, keys.New(nil))
-	m.ticketMenu = m.ticketMenu.Open(ticketTarget{}, "", nil)
+	m.menus.menu = m.menus.menu.Open(ticketTarget{}, "", nil)
 	updated, _ := m.Update(nav.OpenHelp()())
 	if updated.(Model).help.IsOpen {
 		t.Fatal("OpenHelp opened help over the context menu")
@@ -88,7 +88,7 @@ func TestOpenHelp_QueueOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
 func TestOpenHelp_QueueIgnoredWhileTicketMenuOpen(t *testing.T) {
 	t.Parallel()
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.Manager{})
-	m.ticketMenu.IsOpen = true
+	m.menus.menu.IsOpen = true
 	if !m.ModalOpen() {
 		t.Fatal("the ticket menu does not count as a modal")
 	}

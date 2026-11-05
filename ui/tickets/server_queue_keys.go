@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -96,14 +95,6 @@ func (m QueueModel) handleServerDeleteKey() (tea.Model, tea.Cmd) {
 	prompt := fmt.Sprintf("Delete %s %s and every queued ticket it blocks?", row.ticket.DisplayNumber(), row.ticket.Title)
 	m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: m.cmdServerRemove([]string{row.ticket.Path})})
 	return m, nil
-}
-
-// proposedRemedyHeading is the ticket section the server writes when a
-// high-authority recovery proposes a remedy (server/recovery.go).
-const proposedRemedyHeading = "Proposed Remedy"
-
-func hasPendingProposal(body string) bool {
-	return schema.Section(body, proposedRemedyHeading) != ""
 }
 
 // handleServerApproveKey is "A" in server mode: run the selected ticket's

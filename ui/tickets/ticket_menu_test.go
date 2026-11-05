@@ -41,7 +41,7 @@ func requestTicketMenu(t *testing.T, m Model) (Model, ticketMenuReadyMsg) {
 // dim.
 func chooseTicketMenuItem(t *testing.T, m Model, label string) (Model, tea.Cmd) {
 	t.Helper()
-	if !m.ticketMenu.IsOpen {
+	if !m.menus.menu.IsOpen {
 		t.Fatal("context menu is not open")
 	}
 	updated := tea.Model(m)
@@ -67,7 +67,7 @@ func itemByLabel(t *testing.T, items []contextmenu.Item[ticketTarget], label str
 
 // menuHasReason reports whether an item of the open menu is dim for reason.
 func menuHasReason(m Model, reason string) bool {
-	return slices.ContainsFunc(m.ticketMenu.Items(), func(it contextmenu.Item[ticketTarget]) bool { return it.Disabled == reason })
+	return slices.ContainsFunc(m.menus.menu.Items(), func(it contextmenu.Item[ticketTarget]) bool { return it.Disabled == reason })
 }
 
 func itemLabels(items []contextmenu.Item[ticketTarget]) []string {
@@ -96,7 +96,7 @@ func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
 
-	view := m.ticketMenu.View()
+	view := m.menus.menu.View()
 	for _, want := range []string{"Suggested", "Status", "Server", `Ticket "First"`, resumeLabel, "Set draft", "Pause", "Transcript"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("menu view lacks %q:\n%s", want, view)
@@ -116,7 +116,7 @@ func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	if !slices.Equal(calls, []string{"pause gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
 	}
-	if m.ticketMenu.IsOpen {
+	if m.menus.menu.IsOpen {
 		t.Error("menu still open after a pick")
 	}
 }
@@ -216,7 +216,7 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 				if cmd != nil {
 					t.Errorf("%s issued a cmd", label)
 				}
-				if !next.ticketMenu.IsOpen {
+				if !next.menus.menu.IsOpen {
 					t.Errorf("%s closed the menu", label)
 				}
 			}
@@ -317,7 +317,7 @@ func stubTicketEditor(t *testing.T) *[]string {
 func TestTicketMenu_AgentAndEditCopyGroups(t *testing.T) {
 	m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
 	m = pressMenuKey(t, m)
-	view := m.ticketMenu.View()
+	view := m.menus.menu.View()
 	for _, want := range []string{"Agent", "Edit/copy", "Watch", "Transcript", "Investigate",
 		"Edit file (vsplit)", "e v", "Yank epic - ticket", "y y", "Yank file path", "y f"} {
 		if !strings.Contains(view, want) {

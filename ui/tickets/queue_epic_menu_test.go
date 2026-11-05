@@ -32,7 +32,7 @@ func pressQueueMenuKey(t *testing.T, m QueueModel) QueueModel {
 	t.Helper()
 	next, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	m = next.(QueueModel)
-	if !m.ticketMenu.IsOpen {
+	if !m.menus.menu.IsOpen {
 		t.Fatal("m on the epic header opened no menu")
 	}
 	return m
@@ -41,7 +41,7 @@ func pressQueueMenuKey(t *testing.T, m QueueModel) QueueModel {
 func TestQueueEpicMenu_HeaderOpensTheFullEpicMenu(t *testing.T) {
 	m := pressQueueMenuKey(t, queueOnEpicHeader(t, tickettest.FakeServerAPI{Calls: &[]string{}}))
 
-	view := m.ticketMenu.View()
+	view := m.menus.menu.View()
 	items := epicMenuItems(epicMenuInput{epic: m.epics[0]})
 	if len(items) == 0 {
 		t.Fatal("epic menu has no items")

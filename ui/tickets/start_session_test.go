@@ -19,7 +19,7 @@ import (
 )
 
 func menuHasStartSession(m Model) bool {
-	return m.ticketMenu.IsOpen && strings.Contains(m.ticketMenu.View(), startSessionLabel)
+	return m.menus.menu.IsOpen && strings.Contains(m.menus.menu.View(), startSessionLabel)
 }
 
 func selectTicketByAddress(t *testing.T, m *Model, address string) {

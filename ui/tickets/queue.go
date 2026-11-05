@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
-	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -84,13 +83,11 @@ type QueueModel struct {
 	// render even when nothing changed.
 	entriesCache *queueEntriesCache
 
-	// ticketMenu and ticketMenuPending mirror the Tickets tab's own (see
-	// queue_ticket_menu.go).
-	ticketMenu        contextmenu.Menu[ticketTarget]
-	ticketMenuPending string
-	watch             watchModal
-	runningEpics      map[string]bool
-	paused            bool
+	// menus is the Tickets tab's row menu plus the Queue group.
+	menus        rowMenus
+	watch        watchModal
+	runningEpics map[string]bool
+	paused       bool
 
 	// search backs "/"-triggered filtering over buildQueueEntries, mirroring
 	// the Tickets tab's own m.search (see ui/tickets/search.go).
@@ -165,6 +162,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		implementSpinner: sp,
 		runningEpics:     map[string]bool{},
 		confirm:          confirm.New(),
+		menus:            rowMenus{onQueue: true},
 		search:           search.NewModel(),
 		keys:             km,
 		queueTree:        queueTree,
@@ -208,8 +206,8 @@ type queueSpinnerRestartMsg struct{}
 func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(QueueModel)
-	if nm.ticketMenuPending != nm.selectedQueuePath() {
-		nm.ticketMenuPending = ""
+	if nm.menus.pending != nm.selectedQueuePath() {
+		nm.menus.pending = ""
 	}
 	nm.refreshQueueHover(msg)
 	nm.syncQueuePreviewViewport()
@@ -299,9 +297,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
 		}
-		if m.ticketMenu.IsOpen {
+		if m.menus.menu.IsOpen {
 			var cmd tea.Cmd
-			m.ticketMenu, cmd = m.ticketMenu.Update(msg)
+			m.menus.menu, cmd = m.menus.menu.Update(msg)
 			return m, cmd
 		}
 		if m.confirm.IsOpen {
@@ -311,7 +309,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateHarnessPickerKey(msg)
 		}
 		if msg.String() == "esc" {
-			m.ticketMenuPending = ""
+			m.menus.pending = ""
 		}
 		if m.preview.Focus == preview.FocusPreview {
 			return m.handleQueuePreviewKey(msg)
@@ -328,9 +326,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleQueueKey(msg)
 	case tea.MouseClickMsg:
-		if m.ticketMenu.IsOpen {
+		if m.menus.menu.IsOpen {
 			var cmd tea.Cmd
-			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
+			m.menus.menu, cmd = m.menus.menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 			return m, cmd
 		}
 		if m.watch.open {

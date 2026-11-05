@@ -42,8 +42,8 @@ func (m QueueModel) View() tea.View {
 
 	content := m.preview.JoinPanels(m.width, sidebarW, sidebarH, queueView, previewView)
 
-	if m.ticketMenu.IsOpen {
-		content = m.ticketMenu.Overlay(content, m.menuAnchor(), m.width, m.height)
+	if m.menus.menu.IsOpen {
+		content = m.menus.menu.Overlay(content, m.menuAnchor(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}

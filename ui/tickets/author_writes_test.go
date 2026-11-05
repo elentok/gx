@@ -20,7 +20,7 @@ import (
 // applyStatus runs the status write and returns the toast it produced, if any.
 func applyStatus(t *testing.T, m Model, status schema.Status) string {
 	t.Helper()
-	_, cmd := m.applyStatusChange(status)
+	_, cmd := m.handleTicketMenuPick(ticketMenuPickMsg{target: ticketTarget{address: m.selectedTicketPath()}, status: status})
 	if cmd == nil {
 		t.Fatal("status change issued nothing")
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
-	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
@@ -140,21 +139,6 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 	return items
 }
 
-// openEpicMenu opens the Context menu on epic. Nothing in it needs liveness,
-// so it opens at once.
-func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
-	m.ticketMenu = openEpicContextMenu(m.ticketMenu, epicMenuInput{
-		epic:         epic,
-		branch:       epic.MergeTarget,
-		queueable:    epicQueueable(epic, m.vm.Queue),
-		serverReason: serverReason(m.serverAPI, m.link),
-		archived:     archived,
-		session:      epicSession(m.vm.Sessions, epic.Path),
-		actions:      epicSummaryActions(m.vm.Epics, epic.Name),
-	})
-	return m
-}
-
 // epicSummaryActions is the Actions of the summary for address, nil when the
 // server sent none.
 func epicSummaryActions(sums []wire.EpicSummary, address string) []string {
@@ -171,36 +155,6 @@ func openEpicContextMenu(menu contextmenu.Menu[ticketTarget], in epicMenuInput) 
 	// session want; Path is what the selection is matched against.
 	target := ticketTarget{address: in.epic.Path, epicName: in.epic.Name}
 	return menu.Open(target, fmt.Sprintf("Epic %q", in.epic.Name), epicMenuItems(in))
-}
-
-// selectedEpic is the selected epic row's epic; ok is false off an epic row.
-func (m Model) selectedEpic() (tickets.Epic, bool) {
-	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() {
-		return tickets.Epic{}, false
-	}
-	return m.epicAt(r), true
-}
-
-// handleEpicMenuPick runs a pick only while its epic is still the selected
-// row; the edit and yank picks work on the selection.
-func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
-	epic, ok := m.selectedEpic()
-	if !ok || epic.Path != msg.target.address {
-		return m, nil
-	}
-	if msg.status != "" {
-		return m, cmdApplyEpicStatus(m.tickets, m.settings.TicketStore, epic, msg.status)
-	}
-	switch msg.action {
-	case actionQueueEpic:
-		return m, cmdQueueEpic(m.queue, epic.Path)
-	case actionEditEpic:
-		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
-	case actionYankEpic:
-		return m, m.yankTicketSummary()
-	}
-	return m, dispatchMenuAction(m.serverAPI, m.admin, m.reads, m.sessions, m.tickets, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }
 
 // queueWhy is the reason Add epic to queue is dim, or "" when it applies.

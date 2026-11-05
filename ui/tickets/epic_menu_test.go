@@ -88,7 +88,7 @@ func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = openEpicMenuOn(t, updated.(Model), "gx:alpha")
-	if view := m.ticketMenu.View(); !strings.Contains(view, "Merge into main") {
+	if view := m.menus.menu.View(); !strings.Contains(view, "Merge into main") {
 		t.Errorf("view lacks %q:\n%s", "Merge into main", view)
 	}
 	if !menuHasReason(m, "already draft") {

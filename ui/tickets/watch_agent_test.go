@@ -256,14 +256,14 @@ func TestMenuKey_ResolvesLivenessInCmd(t *testing.T) {
 	undo := failOnNativeLog(t)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	undo()
-	if updated.(Model).ticketMenu.IsOpen {
+	if updated.(Model).menus.menu.IsOpen {
 		t.Fatal("menu opened before liveness resolved")
 	}
 	if cmd == nil {
 		t.Fatal("m issued no cmd")
 	}
 	updated, _ = updated.(Model).Update(cmd())
-	if !updated.(Model).ticketMenu.IsOpen {
+	if !updated.(Model).menus.menu.IsOpen {
 		t.Error("menu closed after liveness resolved, want open")
 	}
 }
@@ -295,7 +295,7 @@ func TestMenuReady_DroppedWhenStale(t *testing.T) {
 			m, ready := requestMenu(t)
 			updated, _ := m.Update(key)
 			updated, _ = updated.(Model).Update(ready)
-			if updated.(Model).ticketMenu.IsOpen {
+			if updated.(Model).menus.menu.IsOpen {
 				t.Error("stale ready message opened the menu")
 			}
 		})
@@ -307,7 +307,7 @@ func TestMenuReady_DroppedAfterLeavingAndReturning(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	updated, _ = updated.(Model).Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	updated, _ = updated.(Model).Update(ready)
-	if updated.(Model).ticketMenu.IsOpen {
+	if updated.(Model).menus.menu.IsOpen {
 		t.Error("ready message opened the menu after the selection moved away")
 	}
 }
@@ -317,7 +317,7 @@ func TestMenuReady_DeliveredOnce(t *testing.T) {
 	updated, _ := m.Update(ready)
 	updated, _ = updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	updated, _ = updated.(Model).Update(ready)
-	if updated.(Model).ticketMenu.IsOpen {
+	if updated.(Model).menus.menu.IsOpen {
 		t.Error("a second delivery of the same ready message reopened the menu")
 	}
 }

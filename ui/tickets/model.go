@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
-	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -85,12 +84,8 @@ type Model struct {
 
 	confirm confirm.Model
 
-	// ticketMenu is the "m"-triggered Context menu on a ticket row (see
-	// ticket_menu.go) or an epic row (epic_menu.go).
-	ticketMenu contextmenu.Menu[ticketTarget]
-	// ticketMenuPending is the ticket path "m" is resolving the menu for;
-	// Esc or moving the selection forgets it, so a late result is dropped.
-	ticketMenuPending string
+	// menus is the "m"-triggered Context menu on a ticket or epic row.
+	menus rowMenus
 
 	// watch backs the Watch agent modal (watch_agent.go).
 	watch watchModal
@@ -149,7 +144,7 @@ func (m Model) KeyManager() keys.Manager { return m.keys }
 // shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
 // duck-type) stay routed to the search query instead of switching tabs.
 func (m Model) InputFocused() bool {
-	if m.help.InputFocused() || m.ticketMenu.IsOpen {
+	if m.help.InputFocused() || m.menus.menu.IsOpen {
 		return true
 	}
 	_, ok := m.activeInputSearch()
@@ -160,7 +155,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.ticketMenu.IsOpen || m.confirm.IsOpen || m.watch.open
+	return m.help.IsOpen || m.menus.menu.IsOpen || m.confirm.IsOpen || m.watch.open
 }
 
 func (m Model) Init() tea.Cmd {
@@ -177,8 +172,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(Model)
-	if nm.ticketMenuPending != nm.selectedTicketPath() {
-		nm.ticketMenuPending = ""
+	if nm.menus.pending != nm.selectedTicketPath() {
+		nm.menus.pending = ""
 	}
 	nm.refreshHover(msg)
 	nm.syncPreviewViewport()
@@ -272,23 +267,23 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
 		}
-		if m.ticketMenu.IsOpen {
+		if m.menus.menu.IsOpen {
 			var cmd tea.Cmd
-			m.ticketMenu, cmd = m.ticketMenu.Update(msg)
+			m.menus.menu, cmd = m.menus.menu.Update(msg)
 			return m, cmd
 		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
 		}
 		if msg.String() == "esc" {
-			m.ticketMenuPending = ""
+			m.menus.pending = ""
 		}
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
-		if m.ticketMenu.IsOpen {
+		if m.menus.menu.IsOpen {
 			var cmd tea.Cmd
-			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
+			m.menus.menu, cmd = m.menus.menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 			return m, cmd
 		}
 		if m.watch.open {
@@ -478,8 +473,8 @@ func (m Model) View() tea.View {
 		return newHoverView("\n  Initializing…")
 	}
 	content := m.normalView()
-	if m.ticketMenu.IsOpen {
-		content = m.ticketMenu.Overlay(content, m.menuAnchor(), m.width, m.height)
+	if m.menus.menu.IsOpen {
+		content = m.menus.menu.Overlay(content, m.menuAnchor(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}

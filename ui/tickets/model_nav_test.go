@@ -149,9 +149,9 @@ func TestModel_RightClickOpensContextMenu(t *testing.T) {
 	} {
 		updated, cmd := m.Update(click)
 		got := updated.(Model)
-		if got.sidebarTree.SelectedIndex() != 2 || got.ticketMenu.IsOpen || got.ticketMenuPending != "" || cmd != nil {
+		if got.sidebarTree.SelectedIndex() != 2 || got.menus.menu.IsOpen || got.menus.pending != "" || cmd != nil {
 			t.Errorf("%s: expected a right click to do nothing, got selection=%d menuOpen=%v pending=%q cmd=%v",
-				name, got.sidebarTree.SelectedIndex(), got.ticketMenu.IsOpen, got.ticketMenuPending, cmd != nil)
+				name, got.sidebarTree.SelectedIndex(), got.menus.menu.IsOpen, got.menus.pending, cmd != nil)
 		}
 	}
 
@@ -160,14 +160,14 @@ func TestModel_RightClickOpensContextMenu(t *testing.T) {
 	if m.sidebarTree.SelectedIndex() != 3 {
 		t.Fatalf("expected right click to select entry 3, got %d", m.sidebarTree.SelectedIndex())
 	}
-	if want := tickettest.TicketPath(root, "my-epic", "02-second-ticket.md"); m.ticketMenuPending != want || cmd == nil {
-		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.ticketMenuPending, cmd != nil)
+	if want := tickettest.TicketPath(root, "my-epic", "02-second-ticket.md"); m.menus.pending != want || cmd == nil {
+		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.menus.pending, cmd != nil)
 	}
 
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, X: 0, Y: epicLine + 1})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 1 || !m.ticketMenu.IsOpen || !strings.Contains(m.ticketMenu.View(), "Add epic to queue") {
-		t.Fatalf("expected the epic menu open on entry 1, got selection=%d view:\n%s", m.sidebarTree.SelectedIndex(), m.ticketMenu.View())
+	if m.sidebarTree.SelectedIndex() != 1 || !m.menus.menu.IsOpen || !strings.Contains(m.menus.menu.View(), "Add epic to queue") {
+		t.Fatalf("expected the epic menu open on entry 1, got selection=%d view:\n%s", m.sidebarTree.SelectedIndex(), m.menus.menu.View())
 	}
 }
 

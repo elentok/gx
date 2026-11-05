@@ -40,7 +40,7 @@ func openQueueMenu(t *testing.T, m QueueModel) QueueModel {
 	m, ready := requestQueueMenu(t, m)
 	updated, _ := m.Update(ready)
 	m = updated.(QueueModel)
-	if !m.ticketMenu.IsOpen {
+	if !m.menus.menu.IsOpen {
 		t.Fatal("context menu did not open")
 	}
 	return m
@@ -102,7 +102,7 @@ func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) 
 	if !slices.Equal(calls, []string{"resume gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
 	}
-	if m.ticketMenu.IsOpen {
+	if m.menus.menu.IsOpen {
 		t.Error("menu still open after a pick")
 	}
 }
@@ -210,7 +210,7 @@ func TestQueueTicketMenu_StaleLivenessOpensNothing(t *testing.T) {
 			m, ready := requestQueueMenu(t, m)
 			m = stale(m)
 			updated, _ := m.Update(ready)
-			if updated.(QueueModel).ticketMenu.IsOpen {
+			if updated.(QueueModel).menus.menu.IsOpen {
 				t.Error("a stale liveness result opened the menu")
 			}
 		})

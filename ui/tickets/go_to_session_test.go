@@ -57,14 +57,14 @@ func TestGoToSession_EpicMenuMatchesEpicOrAnyTicketSession(t *testing.T) {
 	} {
 		m := goToSessionModel(t, "open", wire.SessionInfo{ID: "s1", Ticket: tc.ticket})
 		m = openEpicMenuOn(t, m, "gx:map")
-		if got := m.ticketMenu.IsOpen && menuViewHas(m, goToSessionLabel); got != tc.want {
+		if got := m.menus.menu.IsOpen && menuViewHas(m, goToSessionLabel); got != tc.want {
 			t.Errorf("%s: go to session offered = %v, want %v", tc.name, got, tc.want)
 		}
 	}
 }
 
 func menuViewHas(m Model, label string) bool {
-	return strings.Contains(m.ticketMenu.View(), label)
+	return strings.Contains(m.menus.menu.View(), label)
 }
 
 func TestGoToSession_TicketMenuMatching(t *testing.T) {

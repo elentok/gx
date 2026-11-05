@@ -14,24 +14,13 @@ import (
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
-// applyStatusChange writes status to the selected row's ticket through
-// schema.UpdateTicket, mirroring `gx tickets set`'s own guards (cmd/
-// tickets_set.go) for the two transitions that can otherwise corrupt
-// scheduling state: refusing status=open on an empty body, and status=done
-// while blocked_by is still unresolved. Unlike the CLI's --force, the menu
-// has no override for the done guard — a person hand-closing a blocked
-// ticket from the TUI is exactly the silent-assertion this ticket exists to
-// prevent.
-func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
-	r, ok := m.selectedRow()
-	if !ok || r.isEpic() {
-		return m, nil
-	}
-	epic := m.epicAt(r)
-	return m, statusChangeCmd(m.tickets, m.settings.TicketStore, epic, epic.Tickets[r.ticketIdx], status)
-}
-
-// statusChangeCmd is applyStatusChange's guarded write for any tab's row.
+// statusChangeCmd writes status to a row's ticket through schema.UpdateTicket,
+// mirroring `gx tickets set`'s own guards (cmd/tickets_set.go) for the two
+// transitions that can otherwise corrupt scheduling state: refusing
+// status=open on an empty body, and status=done while blocked_by is still
+// unresolved. Unlike the CLI's --force, the menu has no override for the done
+// guard — a person hand-closing a blocked ticket from the TUI is exactly the
+// silent-assertion this ticket exists to prevent.
 func statusChangeCmd(tix tabapi.TicketsAPI, store string, epic tickets.Epic, ticket tickets.Ticket, status schema.Status) tea.Cmd {
 	file, address := resolveTicketPath(store, ticket.Path)
 
@@ -94,14 +83,4 @@ func cmdApplyTicketStatus(tix tabapi.TicketsAPI, file, address string, status sc
 		}
 		return statusChangedMsg{}
 	}
-}
-
-// handleStatusChanged applies statusChangedMsg. Up mode does nothing: the
-// store watch turns the file write into a ticket-changed event. Down mode has
-// no stream, so it reloads from disk.
-func (m Model) handleStatusChanged() (tea.Model, tea.Cmd) {
-	if m.readsDisk() {
-		return m, m.cmdLoadDisk()
-	}
-	return m, nil
 }
