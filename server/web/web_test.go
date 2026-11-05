@@ -1,4 +1,4 @@
-package webhttp_test
+package web_test
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/webhttp"
+	"github.com/elentok/gx/server/web"
 )
 
 // noRedirect lets a test see the redirect itself instead of its target.
@@ -149,7 +149,7 @@ func TestWeb_ServesIndexOnlyAtRoot(t *testing.T) {
 
 func TestServeAsset_CacheHeaders(t *testing.T) {
 	t.Parallel()
-	handler := webhttp.ServeAsset(fstest.MapFS{
+	handler := web.ServeAsset(fstest.MapFS{
 		"index.html":              {Data: []byte("<!doctype html>")},
 		"apple-touch-icon.png":    {Data: []byte("png")},
 		"assets/index-AbC123.js":  {Data: []byte("js")},

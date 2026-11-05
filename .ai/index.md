@@ -100,8 +100,8 @@ A new route needs all of these. A missing one fails a test, not the build:
 - `routeTable` in `server/server.go`.
 - A CLI verb: `routeVerbs` in `cmd/server_parity_test.go` plus the command itself
   (`TestRouteTableHasCLIVerbs`).
-- The web mux in `server/web.go` when the browser calls it (`webWrites` for writes).
-- The allowlist in `TestWeb_EverythingElseIs404` (`server/web_test.go`).
+- The web mux in `server/web/web.go` when the browser calls it (`webWrites` for writes).
+- The allowlist in `TestWeb_EverythingElseIs404` (`server/web/web_test.go`).
 
 Server tests: build fixtures with `servertest.WriteTicketWith` (`server/servertest/store.go`)
 instead of hand-written helpers. A web test that needs a project repo also needs
@@ -126,6 +126,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   wire types, consts and pure methods (no behaviour, no import of `server`); `server/broker/` holds
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
+  `server/web/` holds the web listener: bind, the login-gated mux, static and dev proxy, the
+  CLI-facing web calls and the stream bookkeeping (the root implements `Host`);
   `server/webauth/` holds web login: the login store (password, TOTP, devices, setup code, rate
   limits), the cookie gate (`Gate`) and the login routes (imports `webtls` and `wire`; the root
   implements `Host`; `cmd` and `testutil/gxfixture` import it too);

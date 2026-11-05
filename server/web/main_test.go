@@ -1,4 +1,4 @@
-package webhttp_test
+package web_test
 
 import (
 	"os"

@@ -50,8 +50,8 @@ import (
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
+	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/webauth"
-	"github.com/elentok/gx/server/webhttp"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
@@ -103,7 +103,7 @@ type Server struct {
 	tcp      net.Listener // nil unless Config.TCPAddr is set
 	http     *http.Server
 	tcpHTTP  *http.Server // the socket's routes behind refuseBrowsers
-	web      *webhttp.Web // the web listener; off unless Config.WebAddr is set and bound
+	web      *web.Web     // the web listener; off unless Config.WebAddr is set and bound
 	logf     *lifecycle.RotatingFile
 	log      *slog.Logger
 	idx      *index.Index

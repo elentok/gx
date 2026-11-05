@@ -1,7 +1,7 @@
-// Package webhttp is the web listener: it binds, serves the web mux behind the
+// Package web is the web listener: it binds, serves the web mux behind the
 // login gate and answers the CLI's web calls. The root server supplies what it
 // cannot own through Host.
-package webhttp
+package web
 
 import (
 	"context"
