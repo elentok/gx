@@ -41,12 +41,15 @@ type Limits struct {
 	Slow  SlowLimits
 }
 
-// SlowLimits is the per-test slow limit for each test tool.
-type SlowLimits struct {
-	Go, Vitest, Playwright time.Duration
-}
+// SlowLimits is the per-test slow limit by brief tool name; a tool that is
+// absent has no limit.
+type SlowLimits map[string]time.Duration
 
-var slowTools = []string{"go", "vitest", "playwright"}
+// slowToolAliases maps the tool names a config spells to brief tool names.
+var slowToolAliases = map[string]string{"go": "go-test", "vitest": "vitest", "playwright": "playwright"}
+
+// kindTest is the check kind that runs tests, the only one with limits.
+const kindTest = "test"
 
 func parseLimits(raw json.RawMessage) (Limits, error) {
 	var m map[string]json.RawMessage
@@ -77,29 +80,31 @@ func parseSlow(raw json.RawMessage) (SlowLimits, error) {
 	if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
 		var m map[string]json.RawMessage
 		if err := json.Unmarshal(raw, &m); err != nil {
-			return SlowLimits{}, fmt.Errorf("limits.slow: %v", err)
+			return nil, fmt.Errorf("limits.slow: %v", err)
 		}
-		var s SlowLimits
+		s := SlowLimits{}
 		for _, tool := range slices.Sorted(maps.Keys(m)) {
 			d, err := parseDuration("slow."+tool, m[tool])
 			if err != nil {
-				return SlowLimits{}, err
+				return nil, err
 			}
-			switch tool {
-			case "go":
-				s.Go = d
-			case "vitest":
-				s.Vitest = d
-			case "playwright":
-				s.Playwright = d
-			default:
-				return SlowLimits{}, fmt.Errorf("limits.slow: unknown tool %q (want %s)", tool, strings.Join(slowTools, ", "))
+			name, ok := slowToolAliases[tool]
+			if !ok {
+				return nil, fmt.Errorf("limits.slow: unknown tool %q (want %s)", tool, strings.Join(slices.Sorted(maps.Keys(slowToolAliases)), ", "))
 			}
+			s[name] = d
 		}
 		return s, nil
 	}
 	d, err := parseDuration("slow", raw)
-	return SlowLimits{Go: d, Vitest: d, Playwright: d}, err
+	if err != nil {
+		return nil, err
+	}
+	s := SlowLimits{}
+	for _, name := range slowToolAliases {
+		s[name] = d
+	}
+	return s, nil
 }
 
 func parseDuration(key string, raw json.RawMessage) (time.Duration, error) {

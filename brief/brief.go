@@ -45,7 +45,37 @@ type Tool interface {
 	// NarrowArgs returns the caller's args changed to run only the named test
 	// (without its package), or nil when the tool cannot narrow to one test.
 	NarrowArgs(args []string, test string) []string
+	// SplitTestName splits a test's index name (a key of Outcome.TestDurations)
+	// into its location and test name; the test is empty when the tool does
+	// not name tests that way.
+	SplitTestName(name string) (loc, test string)
 }
+
+// tools lists the wrapped tools by name.
+var tools = map[string]Tool{}
+
+func init() {
+	for _, t := range []Tool{GoTest{}, GoBuild{}, GoVet{}, Vitest{}, Tsc{}, Playwright{}} {
+		tools[t.Name()] = t
+	}
+}
+
+// ToolByName finds a wrapped tool by its subcommand name.
+func ToolByName(name string) (Tool, bool) {
+	t, ok := tools[name]
+	return t, ok
+}
+
+// splitByRe splits name with a two-group regexp; no match gives an empty test.
+func splitByRe(re *regexp.Regexp, name string) (loc, test string) {
+	if m := re.FindStringSubmatch(name); m != nil {
+		return m[1], m[2]
+	}
+	return "", ""
+}
+
+// noSplit is for the tools that report no per-test names.
+func noSplit(string) (string, string) { return "", "" }
 
 // Invocation is the command a tool plans to run.
 type Invocation struct {

@@ -26,17 +26,6 @@ type Deps struct {
 // DefaultDeps is the production wiring: the zero value of every hook.
 func DefaultDeps() Deps { return Deps{} }
 
-// briefTools lists the wrapped tools by subcommand name.
-var briefTools = map[string]brief.Tool{
-	"go-test":  brief.GoTest{},
-	"go-build": brief.GoBuild{},
-	"go-vet":   brief.GoVet{},
-	"vitest":   brief.Vitest{},
-	"tsc":      brief.Tsc{},
-
-	"playwright": brief.Playwright{},
-}
-
 const goCleanCache = "go-clean-cache"
 
 // New builds the `brief` command.
@@ -106,7 +95,7 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" {
 		return c.Help()
 	}
-	tool, ok := briefTools[args[0]]
+	tool, ok := brief.ToolByName(args[0])
 	if !ok && args[0] != "conflicts" && args[0] != goCleanCache {
 		// conflicts and go-clean-cache are not brief.Tools: they keep no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))

@@ -207,6 +207,12 @@ func (Vitest) NarrowArgs(args []string, test string) []string {
 	return append(re, "-t", "^"+regexp.QuoteMeta(test)+"$")
 }
 
+// nodeTestNameRe splits a node tool's test name: its location is a file, so it
+// ends at the extension.
+var nodeTestNameRe = regexp.MustCompile(`^(.*?\.[cm]?[jt]sx?)\.(.+)$`)
+
+func (Vitest) SplitTestName(name string) (string, string) { return splitByRe(nodeTestNameRe, name) }
+
 // Tsc wraps `tsc`.
 type Tsc struct{}
 
@@ -297,3 +303,5 @@ func (Tsc) Parse(out []byte, exit int) Outcome {
 func (Tsc) RerunArgs([]string, []Unit) []string { return nil }
 
 func (Tsc) NarrowArgs([]string, string) []string { return nil }
+
+func (Tsc) SplitTestName(name string) (string, string) { return noSplit(name) }

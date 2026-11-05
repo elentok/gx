@@ -222,6 +222,12 @@ func (GoTest) RerunArgs(args []string, failures []Unit) []string {
 	return withRunPattern(args, "^("+strings.Join(names, "|")+")$")
 }
 
+// goTestNameRe: a Go package path can hold dots, so the test name is found by
+// its prefix.
+var goTestNameRe = regexp.MustCompile(`^(.*?)\.((?:Test|Fuzz|Example|Benchmark).*)$`)
+
+func (GoTest) SplitTestName(name string) (string, string) { return splitByRe(goTestNameRe, name) }
+
 // NarrowArgs runs one test; a subtest name `Top/sub` gets one anchored
 // pattern per level, as -run splits its pattern on slashes.
 func (GoTest) NarrowArgs(args []string, test string) []string {

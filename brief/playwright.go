@@ -244,6 +244,10 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 // RerunArgs is nil: a name filter would have to be rebuilt as a -g regex.
 func (Playwright) RerunArgs([]string, []Unit) []string { return nil }
 
+func (Playwright) SplitTestName(name string) (string, string) {
+	return splitByRe(nodeTestNameRe, name)
+}
+
 // NarrowArgs runs one test. Bare flow numbers become a -g first, then every
 // -g is replaced. The pattern ends at the title with `$` but has no `^`: see
 // flowNumbersToGrep for what -g is matched against.

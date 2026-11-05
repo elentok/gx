@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -126,7 +125,7 @@ func Run(opts Options) (Result, error) {
 	// Only a full run of the test kind locks. The lock is taken before started
 	// is read, so the wait is not part of any duration.
 	var lock *FullLock
-	if opts.Mode == ModeFull && opts.StateDir != "" && slices.Contains(kinds, "test") && !cfg["test"].Off {
+	if opts.Mode == ModeFull && opts.StateDir != "" && slices.Contains(kinds, kindTest) && !cfg[kindTest].Off {
 		if lock, err = AcquireFullLock(opts.StateDir, root, opts.Wait); err != nil {
 			return Result{}, err
 		}
@@ -213,7 +212,7 @@ func (r *runner) childEnv(kind string) []string {
 	if kind != "" {
 		env = append(env, brief.EnvCheckKind+"="+kind)
 	}
-	if hang := r.cfg[kind].Limits.Hang; kind == "test" && hang > 0 {
+	if hang := r.cfg[kind].Limits.Hang; kind == kindTest && hang > 0 {
 		env = append(env, brief.EnvCheckHang+"="+hang.String())
 	}
 	return env
@@ -282,28 +281,16 @@ func (r *runner) runKind(kind string) KindResult {
 		}
 	} else {
 		for _, batch := range expandBatches(cmd, r.files, r.limit) {
-			sh := exec.Command("sh", "-c", batch)
-			sh.Dir = r.root
-			sh.Env = r.childEnv(kind)
-			sh.Stdout, sh.Stderr = logFile, logFile
-			if err := sh.Run(); err != nil {
-				res.Status = StatusFail
-			}
+			r.runShell(kind, batch, logFile, &res)
 		}
 	}
 	if r.mode != ModeFull {
 		for _, cmd := range c.Always {
-			sh := exec.Command("sh", "-c", cmd)
-			sh.Dir = r.root
-			sh.Env = r.childEnv(kind)
-			sh.Stdout, sh.Stderr = logFile, logFile
-			if err := sh.Run(); err != nil {
-				res.Status = StatusFail
-			}
+			r.runShell(kind, cmd, logFile, &res)
 		}
 	}
 	res.Duration = time.Since(start)
-	if kind == "test" {
+	if kind == kindTest {
 		r.enforceSlow(&res, c.Limits.Slow)
 		if r.mode == ModeFull {
 			r.enforceSuite(&res, c.Limits.Suite)
@@ -318,23 +305,22 @@ func (r *runner) runKind(kind string) KindResult {
 	return res
 }
 
-// limitFor is the slow limit of a brief tool name; zero means no limit.
-func (s SlowLimits) limitFor(tool string) time.Duration {
-	switch tool {
-	case "go-test":
-		return s.Go
-	case "vitest":
-		return s.Vitest
-	case "playwright":
-		return s.Playwright
+// runShell runs one configured command, appending its output to the kind's log,
+// and fails the kind when it exits non-zero.
+func (r *runner) runShell(kind, cmd string, logFile io.Writer, res *KindResult) {
+	sh := exec.Command("sh", "-c", cmd)
+	sh.Dir = r.root
+	sh.Env = r.childEnv(kind)
+	sh.Stdout, sh.Stderr = logFile, logFile
+	if err := sh.Run(); err != nil {
+		res.Status = StatusFail
 	}
-	return 0
 }
 
 // enforceSlow fails the kind when a test timed by a `gx brief` call of this run
 // took longer than its tool's slow limit.
 func (r *runner) enforceSlow(res *KindResult, slow SlowLimits) {
-	if slow == (SlowLimits{}) {
+	if len(slow) == 0 {
 		return
 	}
 	lines, err := brief.ReadIndex(r.dataDir)
@@ -343,7 +329,7 @@ func (r *runner) enforceSlow(res *KindResult, slow SlowLimits) {
 	}
 	var msgs []string
 	for _, l := range lines {
-		limit := slow.limitFor(l.Tool)
+		limit := slow[l.Tool]
 		if l.CheckRun != r.runID || l.CheckKind != res.Kind || limit <= 0 {
 			continue
 		}
@@ -375,17 +361,6 @@ func (r *runner) enforceSlow(res *KindResult, slow SlowLimits) {
 // (so the soak skips it like the run's own lines), a kind no result reads.
 const rerunKindSuffix = "-rerun"
 
-// testNameRes split a test's index name into location and test name, per tool.
-// A Go package path can hold dots, so its test name is found by prefix; a node
-// tool's location is a file, so it ends at the extension.
-var testNameRes = map[string]*regexp.Regexp{
-	"go-test":    regexp.MustCompile(`^(.*?)\.((?:Test|Fuzz|Example|Benchmark).*)$`),
-	"vitest":     nodeTestNameRe,
-	"playwright": nodeTestNameRe,
-}
-
-var nodeTestNameRe = regexp.MustCompile(`^(.*?\.[cm]?[jt]sx?)\.(.+)$`)
-
 // rerunUnderLimit runs one slow test of a `gx brief` call again, alone, when
 // the machine is under high load, and reports whether it then passed under
 // limit. Without high load, or for a tool that cannot narrow, it reports false.
@@ -393,23 +368,15 @@ func (r *runner) rerunUnderLimit(l brief.IndexEntry, name string, limit time.Dur
 	if !highLoad(r.loadAvg()) {
 		return false
 	}
-	var tool brief.Tool
-	switch l.Tool {
-	case "go-test":
-		tool = brief.GoTest{}
-	case "vitest":
-		tool = brief.Vitest{}
-	case "playwright":
-		tool = brief.Playwright{}
-	}
-	if tool == nil {
+	tool, ok := brief.ToolByName(l.Tool)
+	if !ok {
 		return false
 	}
-	m := testNameRes[l.Tool].FindStringSubmatch(name)
-	if m == nil {
+	_, test := tool.SplitTestName(name)
+	if test == "" {
 		return false
 	}
-	args := tool.NarrowArgs(l.Args, m[2])
+	args := tool.NarrowArgs(l.Args, test)
 	if args == nil {
 		return false
 	}

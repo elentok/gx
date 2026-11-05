@@ -61,6 +61,35 @@ func TestGoTestNarrowArgs(t *testing.T) {
 	}
 }
 
+func TestSplitTestName(t *testing.T) {
+	for _, c := range []struct {
+		tool      Tool
+		name      string
+		loc, test string
+	}{
+		{GoTest{}, "github.com/a/b.c.TestX/sub", "github.com/a/b.c", "TestX/sub"},
+		{GoTest{}, "no tests here", "", ""},
+		{Vitest{}, "src/a.test.ts.suite a", "src/a.test.ts", "suite a"},
+		{Playwright{}, "disk.e2e.ts.1. Send", "disk.e2e.ts", "1. Send"},
+		{Tsc{}, "src/a.ts.x", "", ""},
+	} {
+		if loc, test := c.tool.SplitTestName(c.name); loc != c.loc || test != c.test {
+			t.Errorf("%s %q: got (%q, %q), want (%q, %q)", c.tool.Name(), c.name, loc, test, c.loc, c.test)
+		}
+	}
+}
+
+func TestToolByName(t *testing.T) {
+	for _, name := range []string{"go-test", "go-build", "go-vet", "vitest", "tsc", "playwright"} {
+		if tool, ok := ToolByName(name); !ok || tool.Name() != name {
+			t.Errorf("ToolByName(%q) = %v, %v", name, tool, ok)
+		}
+	}
+	if _, ok := ToolByName("go"); ok {
+		t.Error("ToolByName(go) found a tool; only brief names resolve")
+	}
+}
+
 func TestNodeNarrowArgs(t *testing.T) {
 	for _, c := range []struct {
 		name string

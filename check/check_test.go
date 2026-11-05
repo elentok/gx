@@ -87,8 +87,8 @@ func TestRepoChecksLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := time.Second
-	want := Limits{Suite: 10 * time.Minute, Hang: 60 * s, Slow: SlowLimits{Go: 20 * s, Vitest: 20 * s, Playwright: 45 * s}}
-	if got := cfg["test"].Limits; got != want {
+	want := Limits{Suite: 10 * time.Minute, Hang: 60 * s, Slow: SlowLimits{"go-test": 20 * s, "vitest": 20 * s, "playwright": 45 * s}}
+	if got := cfg["test"].Limits; !reflect.DeepEqual(got, want) {
 		t.Errorf("limits = %+v, want %+v", got, want)
 	}
 }
@@ -100,9 +100,9 @@ func TestParseConfigLimits(t *testing.T) {
 		want     Limits
 	}{
 		{"slow string", `{"test":{"full":"t","limits":{"suite":"4m","slow":"20s","hang":"60s"}}}`,
-			Limits{Suite: 4 * time.Minute, Hang: 60 * s, Slow: SlowLimits{Go: 20 * s, Vitest: 20 * s, Playwright: 20 * s}}},
+			Limits{Suite: 4 * time.Minute, Hang: 60 * s, Slow: SlowLimits{"go-test": 20 * s, "vitest": 20 * s, "playwright": 20 * s}}},
 		{"slow map", `{"test":{"full":"t","limits":{"slow":{"go":"5s","vitest":"7s"}}}}`,
-			Limits{Slow: SlowLimits{Go: 5 * s, Vitest: 7 * s}}},
+			Limits{Slow: SlowLimits{"go-test": 5 * s, "vitest": 7 * s}}},
 		{"empty limits", `{"test":{"full":"t","limits":{}}}`, Limits{}},
 		{"no limits", `{"test":{"full":"t"}}`, Limits{}},
 		{"plain string", `{"test":"t"}`, Limits{}},
@@ -113,7 +113,7 @@ func TestParseConfigLimits(t *testing.T) {
 			t.Errorf("%s: %v", c.name, err)
 			continue
 		}
-		if got := cfg["test"].Limits; got != c.want {
+		if got := cfg["test"].Limits; !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: limits = %+v, want %+v", c.name, got, c.want)
 		}
 	}

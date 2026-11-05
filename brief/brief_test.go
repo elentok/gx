@@ -23,9 +23,10 @@ func (s shellTool) Name() string {
 func (s shellTool) Plan(_ []string, dir string, args []string) (Invocation, error) {
 	return Invocation{Bin: "sh", Argv: []string{"-c", s.script}}, nil
 }
-func (shellTool) Parse(out []byte, exit int) Outcome   { return Outcome{Units: 1, Summary: "1 thing"} }
-func (shellTool) RerunArgs([]string, []Unit) []string  { return nil }
-func (shellTool) NarrowArgs([]string, string) []string { return nil }
+func (shellTool) Parse(out []byte, exit int) Outcome    { return Outcome{Units: 1, Summary: "1 thing"} }
+func (shellTool) RerunArgs([]string, []Unit) []string   { return nil }
+func (shellTool) NarrowArgs([]string, string) []string  { return nil }
+func (shellTool) SplitTestName(string) (string, string) { return "", "" }
 
 func TestCreateLog_SameStemTwiceGetsDistinctFiles(t *testing.T) {
 	dir := t.TempDir()
