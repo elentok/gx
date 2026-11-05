@@ -188,7 +188,7 @@ func TestHandMerged_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
 	var mu sync.Mutex
 	var probed []string
-	h.Server.SetMergedProbe(func(_, ancestor, _ string) (bool, error) {
+	h.Server.Reconciler().SetMergedProbe(func(_, ancestor, _ string) (bool, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		probed = append(probed, ancestor)

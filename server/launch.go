@@ -86,7 +86,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 			Env:             agentEnv(s.settings.Load().TabEnv, t, ticket, agent),
 			ResumeSessionID: resumeID,
 		}, srvrecovery.LaunchPrompt(agent, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
-			s.logEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
+			s.LogEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 		})
 	}
 	session, err := start()
@@ -106,14 +106,14 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 			if serr := deps.Runner.Stop(h.Session); serr != nil {
 				s.log.Warn("close stale holder", "ticket", ticket.String(), "pane", h.ID, "err", serr)
 			} else {
-				s.logEvent(ticket, ralphloop.Event{Type: string(events.StalePaneClosed), Label: label, Pane: h.ID, Cwd: h.cwd, Reason: string(h.State)})
+				s.LogEvent(ticket, ralphloop.Event{Type: string(events.StalePaneClosed), Label: label, Pane: h.ID, Cwd: h.cwd, Reason: string(h.State)})
 				session, err = start()
 			}
 		}
 	}
 	if errors.Is(err, agentrunner.ErrLabelTaken) {
 		taken := &nameTakenError{reason: s.labelHolder(deps.Runner, ticket, label, err).describe(), err: err}
-		s.logEvent(ticket, ralphloop.Event{Type: string(events.LaunchFailed), Kind: string(events.AgentNameTaken), Label: label, Reason: taken.Error()})
+		s.LogEvent(ticket, ralphloop.Event{Type: string(events.LaunchFailed), Kind: string(events.AgentNameTaken), Label: label, Reason: taken.Error()})
 		return runs.Run{}, taken
 	}
 	if err != nil {
@@ -123,7 +123,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	if resumeID != "" {
 		path = "resumed"
 	}
-	s.logEvent(ticket, ralphloop.Event{
+	s.LogEvent(ticket, ralphloop.Event{
 		Type: string(events.IterationStarted), Agent: agent, Label: label, Cwd: cwd,
 		AgentSession: session.SessionID, Path: path, TargetTip: one.TargetTip,
 	})
@@ -160,8 +160,8 @@ func answeredSession(t tickets.Ticket) string {
 	return st.SessionIDs[len(st.SessionIDs)-1]
 }
 
-// logEvent appends ev to ticket's run log, best effort.
-func (s *Server) logEvent(ticket tickets.Address, ev ralphloop.Event) {
+// LogEvent appends ev to ticket's run log, best effort.
+func (s *Server) LogEvent(ticket tickets.Address, ev ralphloop.Event) {
 	dir, err := s.projects.Dir(ticket.Project)
 	if err != nil {
 		return

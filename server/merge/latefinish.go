@@ -1,4 +1,4 @@
-package server
+package merge
 
 import (
 	"fmt"
@@ -18,10 +18,10 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// adoptablePause reports whether a late finish can adopt a pause with this
+// AdoptablePause reports whether a late finish can adopt a pause with this
 // reason: a zero-commit one, or a merge agent's unreported stop. A reason
 // implies its class, so the reason alone decides.
-func adoptablePause(status schema.Status, reason schema.PauseReason) bool {
+func AdoptablePause(status schema.Status, reason schema.PauseReason) bool {
 	return status == schema.StatusPaused && (reason == schema.PauseZeroCommit || reason == schema.PauseMergeUnreported)
 }
 
@@ -100,7 +100,7 @@ func (s *Reconciler) ScanLateFinishes() {
 		epics, _ := s.idx.EpicsOf(dir)
 		for _, e := range epics {
 			for _, t := range e.Tickets {
-				if !adoptablePause(schema.Status(t.Status), t.PauseReason) {
+				if !AdoptablePause(schema.Status(t.Status), t.PauseReason) {
 					continue
 				}
 				addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(e.Path), ID: t.Identifier}
@@ -117,13 +117,19 @@ func (s *Reconciler) ScanLateFinishes() {
 	}
 }
 
+// HasLateFinish reports whether lateFinishOf finds a late finish for the ticket.
+func HasLateFinish(dir string, addr tickets.Address, path string) bool {
+	_, ok := lateFinishOf(dir, addr, path)
+	return ok
+}
+
 // lateFinishOf reports whether the ticket is untouched since its latest pause,
 // an adoptable one, and its agent reported finished after that pause. Only
 // status and pause kind are compared: a person who resumed, reset or re-paused
 // it changed one of them.
 func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bool) {
 	t, err := schema.ParseTicket(path)
-	if err != nil || !adoptablePause(t.Status, t.PauseReason) || t.IterationStatus != schema.IterationStatusFinished {
+	if err != nil || !AdoptablePause(t.Status, t.PauseReason) || t.IterationStatus != schema.IterationStatusFinished {
 		return lateFinish{}, false
 	}
 	pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID)
@@ -161,7 +167,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 		return false
 	}
 	base, _ := git.MergeBase(worktree, branch, addr.Epic)
-	one, wt, mode, err := s.host.resolveRun(runs.TrackedRun{Run: run, Repo: repo, Base: base, TicketPath: lf.path})
+	one, wt, mode, err := s.host.ResolveRun(runs.TrackedRun{Run: run, Repo: repo, Base: base, TicketPath: lf.path})
 	if err != nil {
 		s.log.Warn("late finish", "ticket", addr, "err", err)
 		return false
@@ -172,7 +178,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 	}
 	deps := s.projects.DepsWith(runner)
 	ahead := 0
-	if !mode.commitless && !mode.Feature {
+	if !mode.Commitless && !mode.Feature {
 		if ahead, err = deps.CommitsAhead(wt.Path, wt.Base(), wt.Branch); err != nil || (ahead == 0 && !lf.commitless) {
 			return false
 		}
@@ -220,7 +226,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 		s.log.Warn("late finish: close question", "ticket", addr, "err", err)
 		return false
 	}
-	out, err := mode.finish(deps, one, wt, pane)
+	out, err := mode.Finish(deps, one, wt, pane)
 	if err != nil {
 		if perr := s.writer.Pause(lf.dir, addr, lf.path, events.IterationError, err.Error(), run); perr != nil {
 			s.log.Warn("late finish: pause failed finish", "ticket", addr, "err", perr)
@@ -240,7 +246,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 		sha = ralphloop.LatestMergedSHA(lf.dir, addr.Epic, addr.ID)
 		outcome = "merged " + sha
 	}
-	s.host.logEvent(addr, ralphloop.Event{
+	s.host.LogEvent(addr, ralphloop.Event{
 		Type: string(events.LateFinishAdopted), SHA: sha,
 		Reason: fmt.Sprintf("paused %s, finished %s; %s",
 			lf.pause.Time.UTC().Format(time.RFC3339), lf.finishedAt.UTC().Format(time.RFC3339), outcome),

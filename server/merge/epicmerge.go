@@ -1,4 +1,4 @@
-package server
+package merge
 
 import (
 	"cmp"
@@ -213,9 +213,6 @@ func (s *Merger) EpicMergeTarget(a tickets.Address) string {
 	}
 	return target
 }
-
-// gitIsAncestor is swapped in tests to count git calls.
-var gitIsAncestor = git.IsAncestor
 
 // mergeTargetCache holds each epic's last merge target. Errors aren't stored,
 // so a failing resolve retries on the next snapshot.

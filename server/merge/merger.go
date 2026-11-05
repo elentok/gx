@@ -1,4 +1,4 @@
-package server
+package merge
 
 import (
 	"log/slog"
@@ -43,12 +43,12 @@ type Merger struct {
 	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
 }
 
-func newMerger(s *Server) *Merger {
-	d := s.mergeDeps()
+// NewMerger builds a Merger from d; New wires it to the other two.
+func NewMerger(d Deps, rec *Reconciler, landing *Landing) *Merger {
 	return &Merger{
 		host: d.Host, log: d.Log, cfg: d.Dirs, idx: d.Idx, projects: d.Projects, queue: d.Queue,
 		oneOffs: d.OneOffs, events: d.Events, writer: d.Writer, chat: d.Chat, registry: d.Registry,
-		guards: d.Guards, settings: d.Settings, rec: s.rec, landing: s.landing,
+		guards: d.Guards, settings: d.Settings, rec: rec, landing: landing,
 		mergeInto: git.MergeBranchInto,
 	}
 }
@@ -71,6 +71,6 @@ func (s *Merger) EpicRefs(project string, epics []tickets.Epic, epic, repo strin
 	if i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == epic }); i >= 0 && len(epics[i].Tickets) > 0 {
 		root = lowestTicket(epics[i])
 	}
-	base, target, err = s.host.rootRefs(project, epics, epic, root, repo)
+	base, target, err = s.host.RootRefs(project, epics, epic, root, repo)
 	return root, base, target, err
 }

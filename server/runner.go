@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -177,7 +178,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 	if _, held := s.disks.FreshHeldDisk(addr.Project); held {
 		return false, nil
 	}
-	if _, missing := s.rec.trunkMissing.Get(addr.Project); missing {
+	if _, missing := s.rec.TrunkMissing.Get(addr.Project); missing {
 		return false, nil
 	}
 	if _, blocked := s.rec.MigrationBlock(addr.Project); blocked {
@@ -236,11 +237,10 @@ func (s *Server) parentAwaitsAdoption(dir string, addr tickets.Address, e ticket
 		return false
 	}
 	for _, p := range e.Tickets {
-		if p.Identifier != *t.Parent || !adoptablePause(schema.Status(p.Status), p.PauseReason) {
+		if p.Identifier != *t.Parent || !merge.AdoptablePause(schema.Status(p.Status), p.PauseReason) {
 			continue
 		}
-		_, ok := lateFinishOf(dir, tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: p.Identifier}, p.Path)
-		return ok
+		return merge.HasLateFinish(dir, tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: p.Identifier}, p.Path)
 	}
 	return false
 }
@@ -313,8 +313,8 @@ func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t ti
 		one.ResumeSessionID = answered
 	}
 	mode := s.landing.IterationModeFor(ticket, t)
-	if mode.commitless && mode.scratchDir == "" {
-		if mode.ref, err = s.commitlessRef(ticket, t, repo, epics); err != nil {
+	if mode.Commitless && mode.ScratchDir == "" {
+		if mode.Ref, err = s.commitlessRef(ticket, t, repo, epics); err != nil {
 			return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
 		}
 	}
@@ -402,12 +402,15 @@ func (s *Server) mergingOnMerged(project string) bool {
 	return pf.LandingPolicy() == config.LandingOnLanded
 }
 
-// rootRefs is where a root's feature branch starts (base: the claim base and
+// gitIsAncestor is swapped in tests to count git calls.
+var gitIsAncestor = git.IsAncestor
+
+// RootRefs is where a root's feature branch starts (base: the claim base and
 // the commitless ref) and where it merges (target). Trunk is read on every
 // call, so a merging uses the trunk current then; nothing records it at claim.
 // An explicit base: moves only the start; a derived stacked root also merges
 // on its blocker's branch until that branch reaches trunk.
-func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (base, target string, err error) {
+func (s *Server) RootRefs(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (base, target string, err error) {
 	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return "", "", err
@@ -434,8 +437,8 @@ func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t t
 	return ref, ref, nil
 }
 
-// mergeTarget is the target of the root epic addr belongs to.
-func (s *Server) mergeTarget(addr tickets.Address) (string, error) {
+// MergeTarget is the target of the root epic addr belongs to.
+func (s *Server) MergeTarget(addr tickets.Address) (string, error) {
 	dir, repo, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return "", err
@@ -450,7 +453,7 @@ func (s *Server) mergeTarget(addr tickets.Address) (string, error) {
 
 // mergeTargetTip is the SHA addr's merge target points at now.
 func (s *Server) mergeTargetTip(addr tickets.Address, repo string) (string, error) {
-	target, err := s.mergeTarget(addr)
+	target, err := s.MergeTarget(addr)
 	if err != nil {
 		return "", err
 	}
@@ -487,7 +490,7 @@ func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo stri
 	if ref, ok := srvrecovery.InvestigateRef(repo, addr, t, epics); ok && t.Type == string(schema.TypeInvestigate) {
 		return ref, nil
 	}
-	ref, _, err := s.rootRefs(addr.Project, epics, addr.Epic, t, repo)
+	ref, _, err := s.RootRefs(addr.Project, epics, addr.Epic, t, repo)
 	return ref, err
 }
 
@@ -495,17 +498,17 @@ func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo stri
 // in it. A launch that fails takes that back out so a retry starts clean.
 // prepared sees the worktree before the agent starts.
 func (s *Server) prepareAndLaunch(
-	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode IterationMode,
+	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode merge.IterationMode,
 	prepared func(ralphloop.IterationWorktree),
 ) (runs.Run, ralphloop.IterationWorktree, error) {
-	wt, err := mode.prepare(deps, *one)
+	wt, err := mode.Prepare(deps, *one)
 	if err != nil {
 		return runs.Run{}, ralphloop.IterationWorktree{}, err
 	}
 	prepared(wt)
 	run, err := s.launch(deps, ticket, *one, wt.Path)
 	if err != nil {
-		if derr := mode.discard(deps, *one, wt); derr != nil {
+		if derr := mode.Discard(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
 		}
 		return runs.Run{}, ralphloop.IterationWorktree{}, err
@@ -568,7 +571,7 @@ func (s *Server) watchBlocked(r agentrunner.Runner, sess agentrunner.Session, ad
 type runContext struct {
 	deps       ralphloop.Deps
 	root       queue.RootRef
-	mode       IterationMode
+	mode       merge.IterationMode
 	one        ralphloop.OneIteration
 	wt         ralphloop.IterationWorktree
 	run        runs.Run
@@ -632,7 +635,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		defer s.guards.Merges.End()
 		one.Model, one.Effort = s.projects.RunAgentConfig(addr.Project, one.Agent, run)
 		one.KeepAskedAgent = !s.cfg.DropAskedAgent && keepsAskedAgent(run)
-		out, err = mode.finish(deps, one, wt, run.Session.ID)
+		out, err = mode.Finish(deps, one, wt, run.Session.ID)
 		// The finish path wrote the merge or the pause; the store watch is only a hint.
 		s.idx.Rescan()
 	}
@@ -666,8 +669,8 @@ func (s *Server) settleRun(rc runContext, err error) {
 	s.oneOffs.NotifyResult(addr, one.Ticket.Path)
 	s.notifyDone(addr, one.Ticket.Path)
 	s.recovery.FileFollowUp(addr, one.Ticket.Path)
-	if mode.afterDone != nil {
-		mode.afterDone()
+	if mode.AfterDone != nil {
+		mode.AfterDone()
 	}
 	s.merger.CompleteRootIfDone(root, one)
 }

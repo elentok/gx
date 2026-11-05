@@ -28,7 +28,7 @@ func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *t
 	}
 	f.H.Server.Rescan()
 	var inFlight, overlapped atomic.Int32
-	f.H.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
 		if inFlight.Add(1) > 1 {
 			overlapped.Add(1)
 		}
@@ -86,7 +86,7 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 			t.Error(err)
 		}
 	}, chat)
-	f.H.Server.SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
 		t.Error("merge core called for an already merged epic")
 		return git.MergeOutcome{}, errors.New("unexpected")
 	})
@@ -115,7 +115,7 @@ func TestTrunkLock_TrunkMovedBeforeTheFFPausesNeedsRebaseNotMergeFailed(t *testi
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
-	f.H.Server.SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
+	f.H.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
 		// Git's ff check passed, then trunk moved and the ff itself failed.
 		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.Repo, "main moves on")

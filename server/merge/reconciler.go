@@ -1,4 +1,4 @@
-package server
+package merge
 
 import (
 	"log/slog"
@@ -41,12 +41,12 @@ type Reconciler struct {
 
 	defectScan   sync.Mutex
 	lateFinishes inFlight
-	trunkMissing missingTrunks
+	TrunkMissing missingTrunks
 	mergedProbe  func(repo, ancestor, descendant string) (bool, error) // the poll-time ancestry check; swapped in tests
 }
 
-func newReconciler(s *Server) *Reconciler {
-	d := s.mergeDeps()
+// NewReconciler builds a Reconciler from d; New sets its merger.
+func NewReconciler(d Deps) *Reconciler {
 	return &Reconciler{
 		host: d.Host, log: d.Log, cfg: d.Dirs, idx: d.Idx, projects: d.Projects, queue: d.Queue,
 		events: d.Events, writer: d.Writer, chat: d.Chat, settings: d.Settings, harness: d.Harness,
@@ -54,3 +54,7 @@ func newReconciler(s *Server) *Reconciler {
 		mergedProbe: git.IsAncestor,
 	}
 }
+
+// GiveSessions hands over the session manager, which the root builds after the
+// Reconciler.
+func (r *Reconciler) GiveSessions(m *sessions.Manager) { r.sessions = m }

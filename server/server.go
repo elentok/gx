@@ -38,6 +38,7 @@ import (
 	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/limits"
+	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/settings"
@@ -147,11 +148,11 @@ type Server struct {
 	pauseHold ticketwrite.RecoveryHold
 	recovery  *srvrecovery.Recovery
 	// rec repairs merge state at startup and on each rescan.
-	rec *Reconciler
+	rec *merge.Reconciler
 	// landing lands over a dirty trunk and handles trunk conflicts.
-	landing *Landing
+	landing *merge.Landing
 	// merger merges epics and recovers merges a crash cut short.
-	merger      *Merger
+	merger      *merge.Merger
 	designSteps sync.Map // map address -> design step at the last rescan
 	deadlocks   deadlocks
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
@@ -368,11 +369,7 @@ func New(cfg Config) (*Server, error) {
 	s.writer = newTicketWriter(s)
 	s.recovery = newRecovery(s)
 	// Built once the fields they copy are set; they and rec reach each other through s.
-	s.rec = newReconciler(s)
-	s.landing = newLanding(s)
-	s.merger = newMerger(s)
-	s.landing.merger = s.merger
-	s.rec.merger = s.merger
+	s.rec, s.landing, s.merger = merge.New(s.mergeDeps())
 	s.settings.Init(settings.Options{
 		ConfigPath: cfg.ConfigPath,
 		Startup: settings.Startup{
@@ -436,7 +433,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
 	s.sessions = newManager(s)
-	s.rec.sessions = s.sessions
+	s.rec.GiveSessions(s.sessions)
 	s.resumer = newResumer(s)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished

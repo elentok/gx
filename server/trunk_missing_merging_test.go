@@ -44,7 +44,7 @@ func TestTrunkMissingAtMerging_TicketMergesOnItsRootAndTheRootPauses(t *testing.
 	if waitForChat(chatCount, "the trunk branch is missing: project") == 0 {
 		t.Errorf("no root pause with reason trunk-missing reached chat")
 	}
-	if slices.Contains(f.H.Server.LockedTrunks(), "") {
+	if slices.Contains(f.H.Server.Merger().LockedTrunks(), "") {
 		t.Errorf("a merge locked on an empty target")
 	}
 }
@@ -57,7 +57,7 @@ func TestTrunkMissingAtMerging_AutoMergeOffIsNotPaused(t *testing.T) {
 	if body := servertest.ReadFile(t, f.TicketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket not done:\n%s", body)
 	}
-	if slices.Contains(f.H.Server.LockedTrunks(), "") {
+	if slices.Contains(f.H.Server.Merger().LockedTrunks(), "") {
 		t.Errorf("a merge locked on an empty target")
 	}
 }

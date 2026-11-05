@@ -1,4 +1,4 @@
-package server
+package merge
 
 import (
 	"fmt"
@@ -57,7 +57,7 @@ func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 	if err != nil {
 		return err
 	}
-	run, err := repair.DefaultVerifyRun(epicPath, repo, s.host.hostingDeps(tickets.Address{Project: project, Epic: filepath.Base(epicPath), ID: owner.Ticket}).Runner)
+	run, err := repair.DefaultVerifyRun(epicPath, repo, s.host.HostingDeps(tickets.Address{Project: project, Epic: filepath.Base(epicPath), ID: owner.Ticket}).Runner)
 	if err != nil {
 		return err
 	}

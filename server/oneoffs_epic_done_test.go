@@ -22,7 +22,7 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	h := servertest.StartOneOffsHarness(t, store)
 	start, _, _ := servertest.RegisterTurn(h)
 	merged := false
-	h.Server.SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
+	h.Server.Merger().SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
 		merged = true
 		return git.MergeOutcome{}, nil
 	})

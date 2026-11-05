@@ -29,7 +29,7 @@ func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *
 		commitWork(t, p, epic)
 		launched <- p.Address
 	})
-	release, err := h.Server.HoldTrunkLock("proj", "main")
+	release, err := h.Server.Merger().HoldTrunkLock("proj", "main")
 	if err != nil {
 		t.Fatal(err)
 	}

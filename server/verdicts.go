@@ -98,7 +98,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 		ex.Verdict = wire.VerdictNotQueued
 		return ex
 	}
-	if reason, missing := s.rec.trunkMissing.Get(addr.Project); missing {
+	if reason, missing := s.rec.TrunkMissing.Get(addr.Project); missing {
 		ex.Verdict, ex.Reason = wire.VerdictTrunkMissing, reason
 		return ex
 	}
@@ -184,7 +184,7 @@ func (s *Server) explainQueued(addr tickets.Address, epicsOf func(project string
 	if err != nil {
 		// An unreadable project.json also fails the load; the Queue tab still
 		// says why the project stopped.
-		if reason, missing := s.rec.trunkMissing.Get(addr.Project); missing {
+		if reason, missing := s.rec.TrunkMissing.Get(addr.Project); missing {
 			return wire.Explanation{Address: addr.String(), Verdict: wire.VerdictTrunkMissing, Reason: reason}, nil
 		}
 		return wire.Explanation{}, err

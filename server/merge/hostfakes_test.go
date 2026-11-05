@@ -1,4 +1,4 @@
-package server
+package merge
 
 import (
 	"testing"
@@ -13,7 +13,7 @@ type fakeLandingHost struct {
 	fresh  tickets.Ticket
 }
 
-func (f fakeLandingHost) mergeTarget(tickets.Address) (string, error) { return f.target, nil }
+func (f fakeLandingHost) MergeTarget(tickets.Address) (string, error) { return f.target, nil }
 func (f fakeLandingHost) FreshTicket(tickets.Address) (tickets.Epic, tickets.Ticket, bool) {
 	return tickets.Epic{}, f.fresh, true
 }
@@ -32,10 +32,10 @@ type fakeMergerHost struct {
 	base, target string
 }
 
-func (f fakeMergerHost) rootRefs(string, []tickets.Epic, string, tickets.Ticket, string) (string, string, error) {
+func (f fakeMergerHost) RootRefs(string, []tickets.Epic, string, tickets.Ticket, string) (string, string, error) {
 	return f.base, f.target, nil
 }
-func (f fakeMergerHost) hostingDeps(tickets.Address) ralphloop.Deps { return ralphloop.Deps{} }
+func (f fakeMergerHost) HostingDeps(tickets.Address) ralphloop.Deps { return ralphloop.Deps{} }
 
 func TestMergerEpicRefsAsksHostForRefs(t *testing.T) {
 	m := &Merger{host: fakeMergerHost{base: "a", target: "b"}}

@@ -1,4 +1,4 @@
-package server
+package merge
 
 import (
 	"fmt"
@@ -71,7 +71,7 @@ func (m *missingTrunks) Get(project string) (string, bool) {
 // after a fix must not announce a stale "trunk found".
 func (s *Reconciler) CheckTrunks() {
 	seen := map[string]bool{}
-	defer s.trunkMissing.keepOnly(seen)
+	defer s.TrunkMissing.keepOnly(seen)
 	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || seen[addr.Project] {
@@ -80,7 +80,7 @@ func (s *Reconciler) CheckTrunks() {
 		seen[addr.Project] = true
 		reason, missing := s.trunkProblem(addr.Project)
 		if !missing {
-			if s.trunkMissing.clear(addr.Project) {
+			if s.TrunkMissing.clear(addr.Project) {
 				s.log.Info("trunk found", "project", addr.Project)
 				s.events.PublishEvent(wire.Event{Type: wire.EventTrunkFound, Address: addr.Project, Level: wire.EventLevelSuccess, Message: "trunk found, claiming resumes"})
 				s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkFound, Emoji: "🌳", Title: "project " + addr.Project + ": trunk found",
@@ -94,7 +94,7 @@ func (s *Reconciler) CheckTrunks() {
 
 // enterTrunkMissing puts project in Missing trunk, announcing only the entry.
 func (s *Reconciler) enterTrunkMissing(project, reason string) {
-	if !s.trunkMissing.set(project, reason) {
+	if !s.TrunkMissing.set(project, reason) {
 		return
 	}
 	s.log.Warn("trunk missing", "project", project, "reason", reason)

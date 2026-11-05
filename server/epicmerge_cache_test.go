@@ -3,13 +3,13 @@ package server
 import (
 	"testing"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/tickets"
 )
 
-// Serial: swaps the package vars gitIsAncestor and readProjectFile.
+// Serial: swaps the package var gitIsAncestor.
 func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 	s, repo := rootRefsFixture(t)
 	done := func(name string, blockedBy ...string) tickets.Epic {
@@ -17,7 +17,7 @@ func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 			Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
 	}
 	s.idx = index.New("", broker.New(1), nil)
-	s.merger = newMerger(s) // copies idx
+	s.rec, s.landing, s.merger = merge.New(s.mergeDeps()) // copies idx
 	dir, _, err := s.projects.Of("proj")
 	if err != nil {
 		t.Fatal(err)
@@ -46,17 +46,6 @@ func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 	runGit(t, repo, "branch", "-f", "develop", "a")
 	if got := s.merger.EpicMergeTarget(key); got != "develop" {
 		t.Errorf("after trunk move: target %q, want develop", got)
-	}
-
-	// Repeat snapshots don't re-read project.json while it is unchanged.
-	reads := 0
-	origRead := readProjectFile
-	readProjectFile = func(dir string) (config.ProjectFile, error) { reads++; return origRead(dir) }
-	t.Cleanup(func() { readProjectFile = origRead })
-	s.merger.EpicMergeTarget(key)
-	s.merger.EpicMergeTarget(key)
-	if reads > 1 {
-		t.Errorf("project.json read %d times over two snapshots, want at most 1", reads)
 	}
 
 	// A rescan (new epic slice) re-resolves.

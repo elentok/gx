@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -31,16 +30,6 @@ func (s *Server) LiveDesignSessionID(epicAddr, excludeID string) string {
 // RebaseDesign is rebaseDesign: the skip note, or "" when it rebased.
 func (s *Server) RebaseDesign(project, epic, worktree, excludeID string) string {
 	return s.rebaseDesign(project, epic, worktree, excludeID)
-}
-
-// SetMergeInto swaps the merge core a root merge calls.
-func (s *Server) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error)) {
-	s.merger.mergeInto = f
-}
-
-// SetMergedProbe swaps the poll-time ancestry check.
-func (s *Server) SetMergedProbe(f func(repo, ancestor, descendant string) (bool, error)) {
-	s.rec.mergedProbe = f
 }
 
 // ResumeAsWeb is the resume the web mux serves: it needs a state token.
@@ -76,16 +65,6 @@ func (s *Server) ClaimNext() { s.claimNext() }
 // PauseStuckFinishedClaims runs one finished-claim watchdog pass as of now.
 func (s *Server) PauseStuckFinishedClaims(now time.Time) { s.pauseStuckFinishedClaims(now) }
 
-// HoldTrunkLock takes the project's trunk lock the way a merge does, until
-// release runs.
-func (s *Server) HoldTrunkLock(project, trunk string) (release func(), err error) {
-	_, repo, err := s.projects.Of(project)
-	if err != nil {
-		return nil, err
-	}
-	return s.guards.Trunks.Lock(repo, trunk), nil
-}
-
 // CompleteRootIfDone runs the all-done check of address's root as if its
 // iteration had just settled.
 func (s *Server) CompleteRootIfDone(address string) error {
@@ -111,9 +90,4 @@ func (s *Server) RemoveMergedWorktree(project, epic string) {
 // PutRunIn is Registry.PutRunIn on the configured runner.
 func (s *Server) PutRunIn(address, root, cwd string, launching bool) {
 	s.registry.PutRunIn(address, root, cwd, s.cfg.Runner.Name(), launching)
-}
-
-// LockedTrunks lists the trunks any merge has locked so far, in any repo.
-func (s *Server) LockedTrunks() []string {
-	return s.guards.Trunks.Locked()
 }

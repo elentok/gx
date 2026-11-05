@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -36,7 +37,7 @@ func rootRefsFixture(t *testing.T) (*Server, string) {
 		t.Fatal(err)
 	}
 	s := withProjects(&Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))})
-	s.merger = newMerger(s)
+	s.rec, s.landing, s.merger = merge.New(s.mergeDeps())
 	return s, repo
 }
 
@@ -76,7 +77,7 @@ func TestRootRefs(t *testing.T) {
 				runGit(t, repo, "branch", "-f", "develop", "a")
 			}
 			e := tc.epics[len(tc.epics)-1]
-			base, target, err := s.rootRefs("proj", tc.epics, e.Name, e.Tickets[0], repo)
+			base, target, err := s.RootRefs("proj", tc.epics, e.Name, e.Tickets[0], repo)
 			if err != nil || base != tc.wantBase || target != tc.wantMerge {
 				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantMerge)
 			}
@@ -101,7 +102,7 @@ func TestRootRefs_MergedBlockerWithDeletedBranchTargetsTrunk(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			dependent := tickets.Epic{Name: "b", Tickets: []tickets.Ticket{tc.dependent}}
-			base, target, err := s.rootRefs("proj", append(tc.epics, dependent), "b", tc.dependent, repo)
+			base, target, err := s.RootRefs("proj", append(tc.epics, dependent), "b", tc.dependent, repo)
 			if err != nil || base != tc.wantBase || target != tc.wantMerge {
 				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantMerge)
 			}
@@ -170,11 +171,11 @@ func TestRootRefs_MissingTrunkFailsOnlyARootTargetingTrunk(t *testing.T) {
 	runGit(t, repo, "branch", "-D", "develop")
 	blocker := tickets.Epic{Name: "a", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
 	stacked := tickets.Epic{Name: "b", BlockedBy: []string{"a/01"}, Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open"}}}
-	if base, target, err := s.rootRefs("proj", []tickets.Epic{blocker, stacked}, "b", stacked.Tickets[0], repo); err != nil || base != "a" || target != "a" {
+	if base, target, err := s.RootRefs("proj", []tickets.Epic{blocker, stacked}, "b", stacked.Tickets[0], repo); err != nil || base != "a" || target != "a" {
 		t.Errorf("stacked root = (%q, %q, %v), want (a, a)", base, target, err)
 	}
 	var missing *tickets.ErrTrunkMissing
-	if _, _, err := s.rootRefs("proj", []tickets.Epic{blocker}, "a", blocker.Tickets[0], repo); !errors.As(err, &missing) {
+	if _, _, err := s.RootRefs("proj", []tickets.Epic{blocker}, "a", blocker.Tickets[0], repo); !errors.As(err, &missing) {
 		t.Errorf("top-level root err = %v, want ErrTrunkMissing", err)
 	}
 }

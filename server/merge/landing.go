@@ -1,4 +1,4 @@
-package server
+package merge
 
 import (
 	"log/slog"
@@ -27,8 +27,8 @@ type Landing struct {
 	merger   *Merger
 }
 
-func newLanding(s *Server) *Landing {
-	d := s.mergeDeps()
+// NewLanding builds a Landing from d; New sets its merger.
+func NewLanding(d Deps) *Landing {
 	return &Landing{
 		host: d.Host, log: d.Log, cfg: d.Dirs, idx: d.Idx, projects: d.Projects,
 		events: d.Events, writer: d.Writer, guards: d.Guards,

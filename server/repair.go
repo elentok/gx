@@ -142,7 +142,7 @@ func (s *Server) repairMerge(req wire.RepairRequest, rc repairCtx) (wire.RepairR
 	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
 		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Source: rc.origin, Cwd: cwd,
-	}, s.hostingDeps(epicTicketAddress(epicPath, id)))
+	}, s.HostingDeps(epicTicketAddress(epicPath, id)))
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -234,17 +234,17 @@ func (s *Server) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Rep
 	res, err := repair.StartOver(repair.StartOverInput{
 		EpicPath: epicPath, ID: id, Reason: req.Reason, Force: req.Force,
 		DeleteBranch: deleteBranch, Source: rc.origin, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
-	}, s.hostingDeps(epicTicketAddress(epicPath, id)))
+	}, s.HostingDeps(epicTicketAddress(epicPath, id)))
 	if err != nil {
 		return repairRefusal(err), nil
 	}
 	return repairOK(res)
 }
 
-// hostingDeps talks to the runner hosting addr's iteration, so start-over and
+// HostingDeps talks to the runner hosting addr's iteration, so start-over and
 // merge see (and close) the agent where it actually runs. A direct repair has
 // no server runner, so there is no agent to ask and the defaults stand.
-func (s *Server) hostingDeps(addr tickets.Address) ralphloop.Deps {
+func (s *Server) HostingDeps(addr tickets.Address) ralphloop.Deps {
 	if s.cfg.Runner == nil {
 		return s.projects.DefaultDeps()
 	}
@@ -577,7 +577,7 @@ func (s *Server) repairVerify(req wire.RepairRequest, _ repairCtx) (wire.RepairR
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	run, err := repair.DefaultVerifyRun(epicPath, cwd, s.hostingDeps(epicTicketAddress(epicPath, id)).Runner)
+	run, err := repair.DefaultVerifyRun(epicPath, cwd, s.HostingDeps(epicTicketAddress(epicPath, id)).Runner)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
