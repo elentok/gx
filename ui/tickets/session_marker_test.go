@@ -26,13 +26,13 @@ func sessionMarkerModel(t *testing.T, nerdFont bool, sessions ...wire.SessionInf
 
 func renderedTicketRow(t *testing.T, m Model, address string) string {
 	t.Helper()
-	for i, e := range m.sidebarTree.Entries() {
+	for i, e := range m.sidebar.tree.Entries() {
 		if e.Value.kind != nodeTicket {
 			continue
 		}
 		r, _ := rowFromEntry(e)
-		if m.epicAt(r).Tickets[r.ticketIdx].Path == address {
-			return strings.Join(m.renderTicketRow(m.epicAt(r), r, i), "\n")
+		if m.sidebar.epicAt(r).Tickets[r.ticketIdx].Path == address {
+			return strings.Join(m.sidebar.renderTicketRow(sidebarEnvFor(m), m.sidebar.epicAt(r), r, i), "\n")
 		}
 	}
 	t.Fatalf("no ticket row %q", address)
@@ -50,7 +50,7 @@ func TestSessionMarker_LiveLinkedSessionMarksItsRow(t *testing.T) {
 		if got := renderedTicketRow(t, m, "gx:map/02"); strings.Contains(got, marker) {
 			t.Errorf("nerdFont=%v: unlinked row %q shows marker", nerdFont, got)
 		}
-		if got := m.renderEpicRow(m.epics[0]); strings.Contains(got, marker) {
+		if got := m.sidebar.renderEpicRow(sidebarEnvFor(m), m.sidebar.epics[0]); strings.Contains(got, marker) {
 			t.Errorf("nerdFont=%v: epic row %q shows marker for a ticket's session", nerdFont, got)
 		}
 	}
@@ -59,7 +59,7 @@ func TestSessionMarker_LiveLinkedSessionMarksItsRow(t *testing.T) {
 func TestSessionMarker_LiveSessionOnEpicMarksEpicRow(t *testing.T) {
 	marker := ui.Icons(false).SessionLive
 	m := sessionMarkerModel(t, false, wire.SessionInfo{ID: "a", Ticket: "gx:map", Status: wire.SessionStatus{State: wire.SessionIdle}})
-	if got := m.renderEpicRow(m.epics[0]); !strings.Contains(got, marker) {
+	if got := m.sidebar.renderEpicRow(sidebarEnvFor(m), m.sidebar.epics[0]); !strings.Contains(got, marker) {
 		t.Errorf("epic row %q lacks marker %q", got, marker)
 	}
 }
@@ -87,7 +87,7 @@ func TestSessionMarker_ExitedSessionMarksNothing(t *testing.T) {
 	if got := renderedTicketRow(t, m, "gx:map/01"); strings.Contains(got, marker) {
 		t.Errorf("row %q shows marker for an exited session", got)
 	}
-	if got := m.renderEpicRow(m.epics[0]); strings.Contains(got, marker) {
+	if got := m.sidebar.renderEpicRow(sidebarEnvFor(m), m.sidebar.epics[0]); strings.Contains(got, marker) {
 		t.Errorf("epic row %q shows marker for an exited session", got)
 	}
 }

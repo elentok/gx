@@ -19,7 +19,6 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowactions"
-	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
@@ -41,43 +40,9 @@ type Model struct {
 	ready  bool // true once the first WindowSizeMsg has been received
 
 	loaded bool
-	epics  []tickets.Epic
-	// archivedEpics holds the Archived section's tickets.Epic data (ticket
-	// 04's lazy load populates it) — deliberately separate from m.epics so
-	// epicsLoadedMsg's wholesale replacement of m.epics on every load/
-	// auto-refresh tick never wipes it. archivedEpicCount is the cheap
-	// up-front count (see cmdLoad) that arrives on every load regardless of
-	// whether archivedEpics itself has been populated yet.
-	archivedEpics     []tickets.Epic
-	archivedEpicCount int
-	// archivedLazy drives the Archived section's on-expand load (ticket 04):
-	// Expand() returns the load command the first time the section is
-	// expanded, Deliver feeds the result back in, and SetCount (called on
-	// every epicsLoadedMsg) auto-invalidates the cache if the archive's count
-	// changed since it was loaded.
-	archivedLazy tree.LazySection[tickets.Epic]
-
-	// sidebarTree owns the sidebar's selection/scroll/collapse state (ticket
-	// 02e1): a tree.Model[sidebarNode] built from buildSidebarEntries,
-	// replacing the former m.selected/m.scrollOffset/m.collapsedEpics/
-	// m.collapsedTickets fields.
-	sidebarTree tree.Model[sidebarNode]
-	// explicitCollapsed is the sidebar's durable collapse state (ticket 02
-	// collapse-state layering): only ever written to by the user's own
-	// expand/collapse/toggle keypresses (see handleSidebarTreeKey), never by
-	// a declared default or the transient search-match override. Every
-	// rebuild re-derives m.sidebarTree's actual collapse map fresh from this
-	// plus epics/search state (deriveCollapsedSidebar, via
-	// refreshSidebarCollapse) — this map itself is never overwritten by that
-	// derived result, so a default or override can never calcify into a
-	// permanent entry.
-	explicitCollapsed map[string]bool
-	// hideDone is the "tc" chord's toggle (ticket 08): when set, done tickets
-	// are excluded from buildSidebarEntries()/sidebarBody() navigation and
-	// rendering. Epic done/total header counts read epic.Tickets directly
-	// (renderEpicRow), so they're unaffected by this filter.
-	hideDone bool
-	search   search.Model
+	// sidebar owns the epic rows and the sidebar tree's state (sidebar.go).
+	sidebar sidebar
+	search  search.Model
 
 	// preview backs the preview panel's own focus/scroll/search state
 	// (see preview_focus.go and model_preview_focus.go).
@@ -116,26 +81,17 @@ type Model struct {
 // modal alongside the tab's own bindings, mirroring ui/prs's NewModelWithScope.
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
 	km := newTicketsManager()
-	sidebarTree := tree.NewModel[sidebarNode]()
-	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
-		return n.kind != nodeLoading && n.kind != nodeLoadError
-	})
-	scratchDir := tabapi.ScratchDir(settings.TicketStore, worktreeRoot)
-	archivedLazy := tree.NewLazySection(0, func() ([]tickets.Epic, error) {
-		return tickets.LoadArchived(scratchDir)
-	})
+	sb := newSidebar(tabapi.ScratchDir(settings.TicketStore, worktreeRoot))
 	return Model{
-		worktreeRoot:      worktreeRoot,
-		settings:          settings,
-		editor:            rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
-		keys:              km,
-		sidebarTree:       sidebarTree,
-		help:              help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys), settings.About),
-		search:            search.NewModel(),
-		preview:           preview.NewPane(),
-		confirm:           confirm.New(),
-		explicitCollapsed: map[string]bool{},
-		archivedLazy:      archivedLazy,
+		worktreeRoot: worktreeRoot,
+		settings:     settings,
+		editor:       rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
+		keys:         km,
+		sidebar:      sb,
+		help:         help.NewModel(help.BuildSections(km, *sb.tree.Keys(), extraKeys), settings.About),
+		search:       search.NewModel(),
+		preview:      preview.NewPane(),
+		confirm:      confirm.New(),
 	}
 }
 
@@ -205,7 +161,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
-		m.sidebarTree.SetVisibleHeight(m.sidebarViewportHeight())
+		m.sidebar.tree.SetVisibleHeight(m.sidebarViewportHeight())
 		return m, nil
 
 	case epicsLoadedMsg:
@@ -215,15 +171,15 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		firstLoad := !m.loaded
 		m.loaded = true
-		m.epics = msg.epics
-		m.archivedEpicCount = msg.archivedEpicCount
-		m.archivedLazy.SetCount(msg.archivedEpicCount)
+		m.sidebar.epics = msg.epics
+		m.sidebar.archivedEpicCount = msg.archivedEpicCount
+		m.sidebar.archivedLazy.SetCount(msg.archivedEpicCount)
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
 		}
 		m.clampSelected()
 		if firstLoad {
-			m.selectFirstEpic()
+			m.sidebar.selectFirstEpic()
 		}
 		if msg.err != nil {
 			return m, notify.Error("load .scratch/: " + msg.err.Error())
@@ -231,8 +187,8 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tree.LazyResultMsg[tickets.Epic]:
-		if m.archivedLazy.Deliver(msg) {
-			m.archivedEpics = m.archivedLazy.Rows()
+		if m.sidebar.archivedLazy.Deliver(msg) {
+			m.sidebar.archivedEpics = m.sidebar.archivedLazy.Rows()
 			m.clampSelected()
 		}
 		return m, nil
@@ -306,7 +262,8 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouseWheel(msg)
 
 	case tea.MouseMotionMsg:
-		return m.handleMouseMotion(msg)
+		m.sidebar.tree.SetHoveredIndex(m.hoverTarget(msg))
+		return m, nil
 
 	case rowactions.StatusChangedMsg:
 		return m.handleStatusChanged()
@@ -314,39 +271,19 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// clampSelected rebuilds the sidebar tree's entries from the current
-// epics/hideDone/collapse state, e.g. after a collapse hides the rows below
-// the selection — SetEntries re-clamps selection to the new entry count.
-// An empty-section placeholder is a real tree.Entry row but must never hold
-// the cursor, so every rebuild (including the very first, off of
-// tree.NewModel's zero-value selection at index 0) nudges off one if the
-// rebuilt entries left the selection sitting on one.
+// clampSelected rebuilds the sidebar's entries (see sidebar.clampSelected).
 func (m *Model) clampSelected() {
-	m.refreshSidebarCollapse()
-	m.sidebarTree.SetEntries(m.buildSidebarEntries())
-	m.sidebarTree.SkipUnselectable(1)
+	m.sidebar.clampSelected(sidebarEnvFor(*m))
 }
 
-// selectFirstEpic puts the cursor on the first epic row, so a freshly loaded
-// tab opens on an epic rather than on the section header above it.
-func (m *Model) selectFirstEpic() {
-	for i, e := range m.sidebarTree.Entries() {
-		if e.Value.kind == nodeEpic {
-			m.sidebarTree.SetSelectedIndex(i)
-			return
-		}
+// afterSidebarToggle runs the sidebar's post-toggle bookkeeping, then re-runs
+// the search so its matches follow the new collapse state.
+func (m *Model) afterSidebarToggle(toggledID string, cmd tea.Cmd) tea.Cmd {
+	cmd = m.sidebar.afterToggle(sidebarEnvFor(*m), toggledID, cmd)
+	if m.search.HasQuery() {
+		m.recomputeSearchMatches()
 	}
-}
-
-// refreshSidebarCollapse re-derives m.sidebarTree's collapse map fresh from
-// m.explicitCollapsed/m.epics/m.search's query (deriveCollapsedSidebar) and
-// hands it to m.sidebarTree — every rebuild path funnels through here (or
-// through recomputeSearchMatches, which does the same) so the sidebar's
-// three collapse-state read sites (buildSidebarEntries, the section-header
-// glyph, isCollapsed/renderEpicRow) always read through the one map that
-// was actually handed to the tree.
-func (m *Model) refreshSidebarCollapse() {
-	m.sidebarTree.SetCollapsedIDs(deriveCollapsedSidebar(m.explicitCollapsed, m.epics, m.archivedEpics, m.search.Query()))
+	return cmd
 }
 
 // sidebarViewportHeight is the sidebar body's visible line count, matching
@@ -355,30 +292,6 @@ func (m *Model) refreshSidebarCollapse() {
 func (m Model) sidebarViewportHeight() int {
 	sidebarH, _ := m.splitHeight(m.contentHeight())
 	return max(sidebarH-1, 0)
-}
-
-// sidebarBody renders the sidebar panel's body lines. m.sidebarTree.Entries()
-// is empty before the first epicsLoadedMsg arrives, and also after a load
-// with no epics at all (empty sections are hidden), so RenderOpts.EmptyLine
-// covers the pre-load "loading…" state and the zero-epics-after-load
-// "no .scratch/ directory found" message keeps its own short-circuit ahead
-// of the RenderLines call. That short-circuit only
-// applies when there's truly nothing to show: a non-zero archivedEpicCount
-// means the Archived section (ticket 04) still has something to render, so
-// an empty active `.scratch/` alone must not suppress the whole tree.
-func (m Model) sidebarBody(sidebarViewportH, width int) []string {
-	if m.olderServer {
-		return []string{ui.StyleWarning.Render("  " + tabapi.OlderServerNotice)}
-	}
-	if m.loaded && len(m.epics) == 0 && m.archivedEpicCount == 0 {
-		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
-	}
-	// RenderLines' own height param is an outer-panel height, from which it
-	// subtracts 2 internally (see ui/tree/render.go) — the same convention
-	// ui/status and ui/commit's own tree.Model callers already rely on. +2
-	// here cancels that back out so it renders exactly sidebarViewportH body
-	// rows, matching what the (headerless) sidebar panel actually has room for.
-	return m.sidebarTree.RenderLines(sidebarViewportH+2, m.sidebarRenderOpts(width))
 }
 
 // handleSidebarMouseClick selects the sidebar row under a left click,
@@ -412,24 +325,15 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	}
 	bodyLine := mouse.Y - 1
 	if mouse.Button == tea.MouseRight {
-		idx, ok := m.sidebarTree.EntryAtBodyLine(bodyLine)
-		if !ok {
-			return m, nil
-		}
-		if _, ok := rowFromEntry(m.sidebarTree.Entries()[idx]); !ok {
+		if !m.sidebar.selectRowAt(bodyLine) {
 			return m, nil
 		}
 		m.preview.Focus = preview.FocusSidebar
-		m.sidebarTree.SetSelectedIndex(idx)
 		return m.handleSuggestedActionsKey()
 	}
 	m.preview.Focus = preview.FocusSidebar
-	if idx, ok := m.sidebarTree.EntryAtBodyLine(bodyLine); ok {
-		entry := m.sidebarTree.Entries()[idx]
-		if rowfmt.OnTreeIcon(mouse.X, entry, 0, m.icons()) && m.sidebarTree.ToggleEntry(idx) {
-			return m, m.afterSidebarToggle(entry.ID, nil)
-		}
-		m.sidebarTree.SetSelectedIndex(idx)
+	if id, toggled := m.sidebar.clickAt(mouse.X, bodyLine, m.icons()); toggled {
+		return m, m.afterSidebarToggle(id, nil)
 	}
 	return m, nil
 }
@@ -447,22 +351,12 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if idx == 0 {
-		return m.handleSidebarMouseWheel(msg)
+		m.sidebar.scrollWheel(msg)
+		return m, nil
 	}
 	var cmd tea.Cmd
 	m.preview.VP, cmd = m.preview.VP.Update(msg)
 	return m, cmd
-}
-
-// handleSidebarMouseWheel scrolls the sidebar viewport without moving
-// selection, mirroring QueueModel.handleQueueMouseWheel.
-func (m Model) handleSidebarMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	dir, ok := ui.WheelDirection(msg)
-	if !ok {
-		return m, nil
-	}
-	m.sidebarTree.ScrollViewport(dir * ui.WheelScrollLines)
-	return m, nil
 }
 
 func (m Model) scratchDir() string {
@@ -523,13 +417,13 @@ func (m Model) normalView() string {
 	sidebarH, previewH := m.splitHeight(h)
 
 	sidebarViewportH := m.sidebarViewportHeight()
-	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarBody(sidebarViewportH, sidebarW-2), m.preview.Focus == preview.FocusSidebar, true)
-	previewView := m.renderPanel(previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, false)
+	sidebarView := renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebar.body(sidebarEnvFor(m), sidebarViewportH, sidebarW-2), m.preview.Focus == preview.FocusSidebar, true)
+	previewView := renderPanel(previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, false)
 
 	return m.preview.JoinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)
 }
 
-func (m Model) renderPanel(width, height int, title, rightTitle string, lines []string, active, sidebar bool) string {
+func renderPanel(width, height int, title, rightTitle string, lines []string, active, sidebar bool) string {
 	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, ui.ColorBlue, nil, sidebar))
 }
 

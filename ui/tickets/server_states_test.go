@@ -32,7 +32,7 @@ func TestOlderServer_TicketsTabShowsNoticeAndNoTickets(t *testing.T) {
 	if !strings.Contains(view, tabapi.OlderServerNotice) || strings.Contains(view, "First") {
 		t.Fatalf("view = %s", view)
 	}
-	if got := len(next.(Model).epics); got != 0 {
+	if got := len(next.(Model).sidebar.epics); got != 0 {
 		t.Fatalf("epics = %d, want none (no ticket data for menu, preview or search)", got)
 	}
 }

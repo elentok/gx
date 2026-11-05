@@ -63,7 +63,7 @@ func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithMergeDim(t *testing.T)
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	if got := epicSection(m.epics[0]); got != sectionMerged {
+	if got := epicSection(m.sidebar.epics[0]); got != sectionMerged {
 		t.Fatalf("section = %v, want sectionMerged", got)
 	}
 	setCollapsedSection(&m, sectionMerged, false)

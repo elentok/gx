@@ -24,7 +24,7 @@ func TestEpicSection_MapsSplitByDoneTicket(t *testing.T) {
 		"gx:cancelled": sectionOpenMaps,
 		"gx:fresh":     sectionOpenMaps,
 	}
-	for _, e := range m.epics {
+	for _, e := range m.sidebar.epics {
 		if got := epicSection(e); got != want[e.Path] {
 			t.Errorf("%s: section = %v, want %v", e.Path, got, want[e.Path])
 		}

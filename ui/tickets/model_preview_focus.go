@@ -15,7 +15,7 @@ import (
 // the same row" (keep the scroll position) from "selection moved" (reset it
 // to the top).
 func (m Model) previewSelectionKey() string {
-	r, ok := m.selectedRow()
+	r, ok := m.sidebar.selectedRow()
 	if !ok {
 		return ""
 	}
@@ -50,15 +50,15 @@ func (m *Model) syncPreviewViewport() {
 // body. The second and third return values are the pause-section scroll
 // target line index and whether one exists — always false for an epic row.
 func (m Model) previewContent(width int) (string, int, bool) {
-	r, ok := m.selectedRow()
+	r, ok := m.sidebar.selectedRow()
 	if !ok {
 		return ui.StyleDim.Render("  no ticket selected"), 0, false
 	}
+	epic := m.sidebar.epicAt(r)
 	if r.isEpic() {
-		return preview.EpicContent(preview.WithEpicTicketMD(m.epicAt(r)), width), 0, false
+		return preview.EpicContent(preview.WithEpicTicketMD(epic), width), 0, false
 	}
 
-	epic := m.epicAt(r)
 	t := epic.Tickets[r.ticketIdx]
 	return preview.RenderTicket(epic, t, width)
 }

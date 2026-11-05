@@ -134,16 +134,21 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsFinishAndPause:
 			return m.handleServerFinishAndPauseKey()
 		case bindingTicketsToggleHideDone:
-			m.toggleHideDone()
+			// Hiding done tickets can shrink the tree out from under the cursor.
+			m.sidebar.hideDone = !m.sidebar.hideDone
+			if m.search.HasQuery() {
+				m.recomputeSearchMatches()
+			}
+			m.clampSelected()
 		case bindingTicketsToggleProjectScope:
 			return m.toggleProjectScope()
 		case bindingTicketsTogglePreview:
 			m.preview.Toggle()
-			m.sidebarTree.SetVisibleHeight(m.sidebarViewportHeight())
+			m.sidebar.tree.SetVisibleHeight(m.sidebarViewportHeight())
 		case bindingTicketsSelectFirst:
-			m.selectFirstRow()
+			m.sidebar.selectFirstRow()
 		case bindingTicketsSelectLast:
-			m.selectLastRow()
+			m.sidebar.selectLastRow()
 		case bindingTicketsPreviewBottom:
 			m.preview.VP.GotoBottom()
 		case bindingTicketsSuggestedActions:
@@ -173,17 +178,17 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	selectedID := ""
-	if entries := m.sidebarTree.Entries(); len(entries) > 0 {
-		if idx := m.sidebarTree.SelectedIndex(); idx >= 0 && idx < len(entries) {
+	if entries := m.sidebar.tree.Entries(); len(entries) > 0 {
+		if idx := m.sidebar.tree.SelectedIndex(); idx >= 0 && idx < len(entries) {
 			selectedID = entries[idx].ID
 		}
 	}
-	next, cmd, result := m.sidebarTree.Update(msg)
+	next, cmd, result := m.sidebar.tree.Update(msg)
 	if result.ExpandNoop {
 		m.preview.FocusPreviewPane()
 		return m, cmd
 	}
-	m.sidebarTree = next
+	m.sidebar.tree = next
 	if result.RebuildRequested {
 		cmd = m.afterSidebarToggle(selectedID, cmd)
 	}
@@ -196,33 +201,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// afterSidebarToggle is the bookkeeping owed after the sidebar tree flipped
-// the collapse state of entry toggledID, whether by key or by a click on its
-// icon. It returns cmd, plus the Archived section's load when that section
-// was just expanded.
-func (m *Model) afterSidebarToggle(toggledID string, cmd tea.Cmd) tea.Cmd {
-	// Record only toggledID's own resulting value into the durable
-	// explicit map — never the whole CollapsedIDs() map, which would
-	// reintroduce the read-back-and-write-back loop (ticket 02) that
-	// made every declared default/search override permanent.
-	if toggledID != "" {
-		if m.explicitCollapsed == nil {
-			m.explicitCollapsed = map[string]bool{}
-		}
-		m.explicitCollapsed[toggledID] = m.sidebarTree.CollapsedIDs()[toggledID]
-	}
-	if toggledID == sidebarSectionID(sectionArchived) && !m.sidebarTree.CollapsedIDs()[toggledID] && m.archivedEpicCount > 0 {
-		if expandCmd := m.archivedLazy.Expand(); expandCmd != nil {
-			cmd = tea.Batch(cmd, expandCmd)
-		}
-	}
-	m.clampSelected()
-	if m.search.HasQuery() {
-		m.recomputeSearchMatches()
-	}
-	return cmd
-}
-
 // archivedReadOnlyGuard is the mutating keybindings' shared no-op check:
 // tickets/epics sourced from the (ticket 04) Archived section live outside
 // the active tracker as a plain filesystem move under .scratch/.archive/, so
@@ -230,62 +208,9 @@ func (m *Model) afterSidebarToggle(toggledID string, cmd tea.Cmd) tea.Cmd {
 // write to or navigate away from them. blocked reports whether the caller
 // should stop and return cmd unchanged instead of running its handler.
 func (m Model) archivedReadOnlyGuard() (cmd tea.Cmd, blocked bool) {
-	r, ok := m.selectedRow()
+	r, ok := m.sidebar.selectedRow()
 	if !ok || !r.archived {
 		return nil, false
 	}
 	return notify.Info("read-only: this ticket is archived"), true
-}
-
-// selectFirstRow/selectLastRow implement "gg"/"G": jump the sidebar
-// selection to the first/last row, leaving focus on the sidebar.
-func (m *Model) selectFirstRow() {
-	if len(m.sidebarTree.Entries()) == 0 {
-		return
-	}
-	m.sidebarTree.SetSelectedIndex(0)
-	m.sidebarTree.SkipUnselectable(1)
-}
-
-func (m *Model) selectLastRow() {
-	n := len(m.sidebarTree.Entries())
-	if n == 0 {
-		return
-	}
-	m.sidebarTree.SetSelectedIndex(n - 1)
-	m.sidebarTree.SkipUnselectable(-1)
-}
-
-// toggleHideDone flips the "tc" hide-complete filter and rebuilds the
-// sidebar tree, since hiding done tickets can shrink it out from under the
-// current cursor position.
-func (m *Model) toggleHideDone() {
-	m.hideDone = !m.hideDone
-	if m.search.HasQuery() {
-		m.recomputeSearchMatches()
-	}
-	m.clampSelected()
-}
-
-// selectedRow returns the row currently under the selection, if any. A
-// nodeSection selection reports false (rowFromEntry) — section rows are
-// cursor-reachable but have no row representation (not checkable, no
-// epic/ticket to preview). A Model built without going through clampSelected
-// (e.g. a test constructing Model{epics: ...} directly, never routing it
-// through a WindowSizeMsg/epicsLoadedMsg) has an empty sidebarTree — that's
-// not "nothing selected", it's "entries were never built", so it falls back
-// to the first epic rather than reporting no selection at all.
-func (m Model) selectedRow() (row, bool) {
-	entries := m.sidebarTree.Entries()
-	if len(entries) == 0 {
-		if len(m.epics) == 0 {
-			return row{}, false
-		}
-		return row{epicIdx: 0, ticketIdx: -1}, true
-	}
-	idx := m.sidebarTree.SelectedIndex()
-	if idx < 0 || idx >= len(entries) {
-		return row{}, false
-	}
-	return rowFromEntry(entries[idx])
 }

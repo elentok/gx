@@ -34,19 +34,19 @@ func ticketsHoverFixture(t *testing.T) hoverFixture {
 	m = updated.(Model)
 	px, py, pw, ph := m.previewRect()
 	other := -1
-	for i, e := range m.sidebarTree.Entries() {
-		if _, ok := rowFromEntry(e); ok && i != m.sidebarTree.SelectedIndex() {
+	for i, e := range m.sidebar.tree.Entries() {
+		if _, ok := rowFromEntry(e); ok && i != m.sidebar.tree.SelectedIndex() {
 			other = i
 		}
 	}
 	return hoverFixture{
 		model:    m,
-		selected: m.sidebarTree.SelectedIndex(),
+		selected: m.sidebar.tree.SelectedIndex(),
 		other:    other,
 		outside:  ui.Rect{X: px, Y: py, W: pw, H: ph},
 		rowY:     func(entry int) int { return entry + 1 },
 		state: func(tm tea.Model) (int, int, bool) {
-			tree := tm.(Model).sidebarTree
+			tree := tm.(Model).sidebar.tree
 			hovered, ok := tree.HoveredIndex()
 			return tree.SelectedIndex(), hovered, ok
 		},

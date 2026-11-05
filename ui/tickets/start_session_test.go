@@ -25,10 +25,10 @@ func menuHasStartSession(m Model) bool {
 
 func selectTicketByAddress(t *testing.T, m *Model, address string) {
 	t.Helper()
-	for i, e := range m.sidebarTree.Entries() {
+	for i, e := range m.sidebar.tree.Entries() {
 		r := e.Value
-		if r.kind == nodeTicket && !r.archived && m.epics[r.epicIdx].Tickets[r.ticketIdx].Path == address {
-			m.sidebarTree.SetSelectedIndex(i)
+		if r.kind == nodeTicket && !r.archived && m.sidebar.epics[r.epicIdx].Tickets[r.ticketIdx].Path == address {
+			m.sidebar.tree.SetSelectedIndex(i)
 			return
 		}
 	}

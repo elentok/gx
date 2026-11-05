@@ -31,7 +31,7 @@ func TestAuthorWrites_OpenAndDraftWriteTheStoreFileAndPingTheServer(t *testing.T
 	var calls []string
 	m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{Calls: &calls}, false)
 	// The served File points elsewhere: the write must follow the address.
-	m.epics[0].Tickets[0].File = filepath.Join(t.TempDir(), "stale.md")
+	m.sidebar.epics[0].Tickets[0].File = filepath.Join(t.TempDir(), "stale.md")
 
 	if toast := applyStatus(t, m, schema.StatusOpen); toast != "" || tickettest.ReadStatus(t, file) != "open" {
 		t.Fatalf("open: toast %q, status %q", toast, tickettest.ReadStatus(t, file))
@@ -66,8 +66,8 @@ func TestAuthorWrites_DoneOnlyOnMapEpics(t *testing.T) {
 
 func TestAuthorWrites_DoneRefusedWhileBlocked(t *testing.T) {
 	m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, true)
-	m.epics[0].Tickets = append(m.epics[0].Tickets, gxtickets.Ticket{Identifier: "19", Number: 19, Path: "gx:alpha/19", Status: "open"})
-	m.epics[0].Tickets[0].BlockedBy = []string{"19"}
+	m.sidebar.epics[0].Tickets = append(m.sidebar.epics[0].Tickets, gxtickets.Ticket{Identifier: "19", Number: 19, Path: "gx:alpha/19", Status: "open"})
+	m.sidebar.epics[0].Tickets[0].BlockedBy = []string{"19"}
 	if toast := applyStatus(t, m, schema.StatusDone); !strings.Contains(toast, "unresolved blocked_by") || tickettest.ReadStatus(t, file) != "draft" {
 		t.Errorf("toast %q, status %q", toast, tickettest.ReadStatus(t, file))
 	}

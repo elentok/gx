@@ -10,13 +10,13 @@ import (
 // row.
 func selectTicketRow(t *testing.T, m Model) Model {
 	t.Helper()
-	for i, e := range m.sidebarTree.Entries() {
+	for i, e := range m.sidebar.tree.Entries() {
 		if e.Value.kind == nodeTicket {
-			m.sidebarTree.SetSelectedIndex(i)
+			m.sidebar.tree.SetSelectedIndex(i)
 			break
 		}
 	}
-	if r, ok := m.selectedRow(); !ok || r.isEpic() {
+	if r, ok := m.sidebar.selectedRow(); !ok || r.isEpic() {
 		t.Fatalf("expected selection on a ticket row, got row=%+v ok=%v", r, ok)
 	}
 	return m

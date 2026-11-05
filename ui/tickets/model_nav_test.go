@@ -28,23 +28,23 @@ func TestModel_NavigationCanSelectSectionHeaders(t *testing.T) {
 	m = updated.(Model)
 
 	// Selection starts on open-epic, the first epic row.
-	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "open-epic" {
+	r, ok := m.sidebar.selectedRow()
+	if !ok || !r.isEpic() || m.sidebar.epics[r.epicIdx].Name != "open-epic" {
 		t.Fatalf("expected initial selection on open-epic, got row=%+v ok=%v", r, ok)
 	}
 
 	// Moving up reaches the "Open epics" header, which reports ok=false.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	m = updated.(Model)
-	if _, ok := m.selectedRow(); ok {
+	if _, ok := m.sidebar.selectedRow(); ok {
 		t.Fatalf("expected moving up from open-epic to land on the Open header (ok=false)")
 	}
 
 	// Moving down lands back on open-epic, a real selectable row.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	r, ok = m.selectedRow()
-	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "open-epic" {
+	r, ok = m.sidebar.selectedRow()
+	if !ok || !r.isEpic() || m.sidebar.epics[r.epicIdx].Name != "open-epic" {
 		t.Fatalf("expected selection on open-epic after moving off the header, got row=%+v ok=%v", r, ok)
 	}
 
@@ -53,20 +53,20 @@ func TestModel_NavigationCanSelectSectionHeaders(t *testing.T) {
 	// section) — landing back on a header reports ok=false again.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if r, ok := m.selectedRow(); !ok || r.isEpic() {
+	if r, ok := m.sidebar.selectedRow(); !ok || r.isEpic() {
 		t.Fatalf("expected selection on open-epic's ticket, got row=%+v ok=%v", r, ok)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if _, ok := m.selectedRow(); ok {
+	if _, ok := m.sidebar.selectedRow(); ok {
 		t.Fatalf("expected selection to land on the Closed header (ok=false)")
 	}
 
 	// Moving back up returns to the ticket row, not the header.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	m = updated.(Model)
-	if r, ok := m.selectedRow(); !ok || r.isEpic() {
+	if r, ok := m.sidebar.selectedRow(); !ok || r.isEpic() {
 		t.Fatalf("expected moving up from the Closed header to land back on open-epic's ticket, got row=%+v ok=%v", r, ok)
 	}
 }
@@ -92,17 +92,17 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 3 {
-		t.Fatalf("expected selection at entry 3 after two downs, got %d", m.sidebarTree.SelectedIndex())
+	if m.sidebar.tree.SelectedIndex() != 3 {
+		t.Fatalf("expected selection at entry 3 after two downs, got %d", m.sidebar.tree.SelectedIndex())
 	}
 	line := selectedSidebarLine(t, m)
 
 	// Entry 1 (the epic) is the reset baseline below.
-	m.sidebarTree.SetSelectedIndex(1)
+	m.sidebar.tree.SetSelectedIndex(1)
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: 0, Y: line + 1})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 3 {
-		t.Fatalf("expected click to select entry 3, got %d", m.sidebarTree.SelectedIndex())
+	if m.sidebar.tree.SelectedIndex() != 3 {
+		t.Fatalf("expected click to select entry 3, got %d", m.sidebar.tree.SelectedIndex())
 	}
 	if m.confirm.IsOpen {
 		t.Fatalf("expected click-to-select to not open the confirm modal")
@@ -110,11 +110,11 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 
 	// A click landing on the preview panel (past the sidebar's width) is a no-op.
 	sidebarW, _ := m.splitWidth()
-	m.sidebarTree.SetSelectedIndex(1)
+	m.sidebar.tree.SetSelectedIndex(1)
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: sidebarW, Y: line + 1})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 1 {
-		t.Fatalf("expected click on the preview panel to leave selection at entry 1, got %d", m.sidebarTree.SelectedIndex())
+	if m.sidebar.tree.SelectedIndex() != 1 {
+		t.Fatalf("expected click on the preview panel to leave selection at entry 1, got %d", m.sidebar.tree.SelectedIndex())
 	}
 
 }
@@ -135,11 +135,11 @@ func TestModel_RightClickOpensContextMenu(t *testing.T) {
 
 	// Entry 0 is the "Open epics" header, 1 the epic, 2/3 its tickets.
 	lineOf := func(idx int) int {
-		m.sidebarTree.SetSelectedIndex(idx)
+		m.sidebar.tree.SetSelectedIndex(idx)
 		return selectedSidebarLine(t, m)
 	}
 	headerLine, epicLine, ticketLine := lineOf(0), lineOf(1), lineOf(3)
-	m.sidebarTree.SetSelectedIndex(2)
+	m.sidebar.tree.SetSelectedIndex(2)
 
 	sidebarW, _ := m.splitWidth()
 	for name, click := range map[string]tea.MouseClickMsg{
@@ -149,16 +149,16 @@ func TestModel_RightClickOpensContextMenu(t *testing.T) {
 	} {
 		updated, cmd := m.Update(click)
 		got := updated.(Model)
-		if got.sidebarTree.SelectedIndex() != 2 || got.menus.Menu.IsOpen || got.menus.Pending != "" || cmd != nil {
+		if got.sidebar.tree.SelectedIndex() != 2 || got.menus.Menu.IsOpen || got.menus.Pending != "" || cmd != nil {
 			t.Errorf("%s: expected a right click to do nothing, got selection=%d menuOpen=%v pending=%q cmd=%v",
-				name, got.sidebarTree.SelectedIndex(), got.menus.Menu.IsOpen, got.menus.Pending, cmd != nil)
+				name, got.sidebar.tree.SelectedIndex(), got.menus.Menu.IsOpen, got.menus.Pending, cmd != nil)
 		}
 	}
 
 	updated, cmd := m.Update(tea.MouseClickMsg{Button: tea.MouseRight, X: 0, Y: ticketLine + 1})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 3 {
-		t.Fatalf("expected right click to select entry 3, got %d", m.sidebarTree.SelectedIndex())
+	if m.sidebar.tree.SelectedIndex() != 3 {
+		t.Fatalf("expected right click to select entry 3, got %d", m.sidebar.tree.SelectedIndex())
 	}
 	if want := tickettest.TicketPath(root, "my-epic", "02-second-ticket.md"); m.menus.Pending != want || cmd == nil {
 		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.menus.Pending, cmd != nil)
@@ -166,8 +166,8 @@ func TestModel_RightClickOpensContextMenu(t *testing.T) {
 
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, X: 0, Y: epicLine + 1})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 1 || !m.menus.Menu.IsOpen || !strings.Contains(m.menus.Menu.View(), "Add epic to queue") {
-		t.Fatalf("expected the epic menu open on entry 1, got selection=%d view:\n%s", m.sidebarTree.SelectedIndex(), m.menus.Menu.View())
+	if m.sidebar.tree.SelectedIndex() != 1 || !m.menus.Menu.IsOpen || !strings.Contains(m.menus.Menu.View(), "Add epic to queue") {
+		t.Fatalf("expected the epic menu open on entry 1, got selection=%d view:\n%s", m.sidebar.tree.SelectedIndex(), m.menus.Menu.View())
 	}
 }
 
@@ -279,8 +279,8 @@ func TestModel_NavigationSkipsCollapsedEpicTickets(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
-	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "epic-b" {
+	r, ok := m.sidebar.selectedRow()
+	if !ok || !r.isEpic() || m.sidebar.epics[r.epicIdx].Name != "epic-b" {
 		t.Fatalf("expected selection to land on epic-b after collapsing epic-a, got row=%+v ok=%v", r, ok)
 	}
 }

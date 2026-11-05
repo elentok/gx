@@ -10,11 +10,11 @@ import (
 // yankTicketSummary implements the Tickets tab's "yy" chord: copies the
 // selected ticket's epic/id/title to the clipboard, or an epic row's name.
 func (m Model) yankTicketSummary() tea.Cmd {
-	r, ok := m.selectedRow()
+	r, ok := m.sidebar.selectedRow()
 	if !ok {
 		return notify.Warning("nothing selected")
 	}
-	epic := m.epicAt(r)
+	epic := m.sidebar.epicAt(r)
 	if r.isEpic() {
 		return m.editor.Yank(epic.Name, "epic")
 	}

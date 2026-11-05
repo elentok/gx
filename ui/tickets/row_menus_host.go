@@ -3,7 +3,6 @@ package tickets
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/rowactions"
@@ -32,11 +31,11 @@ func (t modelMenuTab) EditFile(s terminalrun.SplitType) tea.Cmd { return t.m.cmd
 
 func (t modelMenuTab) Selection() rowactions.Selection {
 	m := t.m
-	r, ok := m.selectedRow()
+	r, ok := m.sidebar.selectedRow()
 	if !ok {
 		return rowactions.Selection{}
 	}
-	epic := m.epicAt(r)
+	epic := m.sidebar.epicAt(r)
 	if r.isEpic() {
 		return rowactions.Selection{
 			OK: true, IsEpic: true, Epic: epic, Archived: r.archived,
@@ -76,10 +75,6 @@ func (m Model) handleServerResumeEnter() (cmd tea.Cmd, handled bool) {
 	return rowactions.ResumeEnter(modelMenuTab{m})
 }
 
-func (m Model) rowHasSuggestedActions(epic tickets.Epic, ticket tickets.Ticket, archived bool) bool {
-	return m.menus.HasSuggestedActions(m.menuEnv(), epic, ticket, archived)
-}
-
 // selectedTicketPath is the selected ticket row's path, or "" off a ticket.
 func (m Model) selectedTicketPath() string {
 	return modelMenuTab{m}.Selection().TicketPath()
@@ -88,7 +83,7 @@ func (m Model) selectedTicketPath() string {
 // menuAnchor is the selected sidebar row on screen, under the panel's
 // header line, for the Context menu to open next to.
 func (m Model) menuAnchor() contextmenu.Anchor {
-	line, h, ok := m.sidebarTree.SelectedBodyLine()
+	line, h, ok := m.sidebar.tree.SelectedBodyLine()
 	if !ok {
 		return contextmenu.Anchor{}
 	}

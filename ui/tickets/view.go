@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -22,7 +23,64 @@ var (
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 )
 
-// sidebarRenderOpts builds the tree.RenderOpts m.sidebarTree.RenderLines
+// sidebarEnvFor snapshots what the sidebar reads from the rest of the tab.
+func sidebarEnvFor(m Model) sidebarEnv {
+	return sidebarEnv{
+		query:       m.search.Query(),
+		hasQuery:    m.search.HasQuery(),
+		icons:       m.icons(),
+		active:      m.preview.Focus == preview.FocusSidebar,
+		loaded:      m.loaded,
+		olderServer: m.olderServer,
+		sessionMarker: func(address string) string {
+			for _, s := range m.vm.Sessions {
+				if s.Ticket == address && s.Status.State != wire.SessionExited {
+					return " " + sessionMarkerStyle.Render(m.icons().SessionLive)
+				}
+			}
+			return ""
+		},
+		hasSuggestedActions: func(epic tickets.Epic, ticket tickets.Ticket, archived bool) bool {
+			return m.menus.HasSuggestedActions(m.menuEnv(), epic, ticket, archived)
+		},
+		pendingText: func(ticketPath string) (string, bool) {
+			p, ok := m.vm.PendingRowFor(ticketPath)
+			if !ok {
+				return "", false
+			}
+			if p.Reason != "" {
+				return p.Verdict + ": " + p.Reason, true
+			}
+			return p.Verdict, true
+		},
+	}
+}
+
+// body renders the sidebar panel's body lines. The tree's entries are empty
+// before the first epicsLoadedMsg arrives, and also after a load with no
+// epics at all (empty sections are hidden), so RenderOpts.EmptyLine covers the
+// pre-load "loading…" state and the zero-epics-after-load "no .scratch/
+// directory found" message keeps its own short-circuit ahead of the
+// RenderLines call. That short-circuit only applies when there's truly nothing
+// to show: a non-zero archivedEpicCount means the Archived section (ticket 04)
+// still has something to render, so an empty active `.scratch/` alone must not
+// suppress the whole tree.
+func (s sidebar) body(env sidebarEnv, viewportH, width int) []string {
+	if env.olderServer {
+		return []string{ui.StyleWarning.Render("  " + tabapi.OlderServerNotice)}
+	}
+	if env.loaded && len(s.epics) == 0 && s.archivedEpicCount == 0 {
+		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
+	}
+	// RenderLines' own height param is an outer-panel height, from which it
+	// subtracts 2 internally (see ui/tree/render.go) — the same convention
+	// ui/status and ui/commit's own tree.Model callers already rely on. +2
+	// here cancels that back out so it renders exactly viewportH body
+	// rows, matching what the (headerless) sidebar panel actually has room for.
+	return s.tree.RenderLines(viewportH+2, s.renderOpts(env, width))
+}
+
+// renderOpts builds the tree.RenderOpts s.tree.RenderLines
 // renders through: every physical row (section header, empty-section
 // placeholder, epic, ticket) is a real tree.Entry, dispatched on
 // entry.Value.kind by Label alone (Icon/MetaText/RowColor/Faint stay
@@ -33,10 +91,10 @@ var (
 // behaves the same as single-worktree: it just interleaves every worktree's
 // epics into this one grouping, each epic row labeled with its worktree
 // (renderEpicRow).
-func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
-	groups := groupEpicIndexesBySection(m.epics)
+func (s sidebar) renderOpts(env sidebarEnv, width int) tree.RenderOpts[sidebarNode] {
+	groups := groupEpicIndexesBySection(s.epics)
 
-	entries := m.sidebarTree.Entries()
+	entries := s.tree.Entries()
 	idxByID := make(map[string]int, len(entries))
 	for i, e := range entries {
 		idxByID[e.ID] = i
@@ -44,31 +102,31 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 
 	return tree.RenderOpts[sidebarNode]{
 		AccentColor: ui.ColorBlue,
-		Active:      m.preview.Focus == preview.FocusSidebar,
+		Active:      env.active,
 		Width:       width,
 		EmptyLine:   ui.StyleDim.Render("  loading…"),
 		Label: func(entry tree.Entry[sidebarNode]) string {
 			switch entry.Value.kind {
 			case nodeSection:
-				glyph := m.icons().TriangleExpanded
-				if m.sidebarTree.CollapsedIDs()[entry.ID] {
-					glyph = m.icons().TriangleCollapsed
+				glyph := env.icons.TriangleExpanded
+				if s.tree.CollapsedIDs()[entry.ID] {
+					glyph = env.icons.TriangleCollapsed
 				}
 				n := len(groups[entry.Value.section])
 				if entry.Value.section == sectionArchived {
-					n = m.archivedEpicCount
+					n = s.archivedEpicCount
 				}
 				return fmt.Sprintf("%s %s", glyph, sectionHeaderStyle.Render(fmt.Sprintf("%s (%d)", sectionLabel(entry.Value.section), n)))
 			case nodeLoading:
 				return ui.StyleDim.Render("loading…")
 			case nodeLoadError:
-				return ui.StyleError.Render("failed to load: " + m.archivedLazy.Err().Error())
+				return ui.StyleError.Render("failed to load: " + s.archivedLazy.Err().Error())
 			case nodeEpic:
 				r, _ := rowFromEntry(entry)
-				return m.renderEpicRow(m.epicAt(r))
+				return s.renderEpicRow(env, s.epicAt(r))
 			default: // nodeTicket
 				r, _ := rowFromEntry(entry)
-				return m.renderTicketRow(m.epicAt(r), r, idxByID[entry.ID])[0]
+				return s.renderTicketRow(env, s.epicAt(r), r, idxByID[entry.ID])[0]
 			}
 		},
 	}
@@ -93,12 +151,12 @@ func sectionLabel(section sidebarSection) string {
 	}
 }
 
-func (m Model) renderEpicRow(epic tickets.Epic) string {
-	glyph := m.icons().TriangleExpanded
-	if m.isCollapsed(epic) {
-		glyph = m.icons().TriangleCollapsed
+func (s sidebar) renderEpicRow(env sidebarEnv, epic tickets.Epic) string {
+	glyph := env.icons.TriangleExpanded
+	if s.isCollapsed(epic) {
+		glyph = env.icons.TriangleCollapsed
 	}
-	line := fmt.Sprintf("%s %s%s (%d done / %d)", glyph, epic.Name, m.sessionMarker(epic.Name), epic.DoneCount(), epic.TotalCount())
+	line := fmt.Sprintf("%s %s%s (%d done / %d)", glyph, epic.Name, env.sessionMarker(epic.Name), epic.DoneCount(), epic.TotalCount())
 	// Dimming tracks "every ticket done", not the current collapse toggle —
 	// a fully-done epic stays dimmed even if manually expanded, and a
 	// manually-collapsed in-progress epic doesn't borrow its dimming.
@@ -128,26 +186,27 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 // (every branch renders exactly one physical line); the []string return
 // keeps the multi-line-row seam open for a future ticket without another
 // signature change at every call site.
-func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
+func (s sidebar) renderTicketRow(env sidebarEnv, epic tickets.Epic, r row, rowIdx int) []string {
+	icons := env.icons
 	t := epic.Tickets[r.ticketIdx]
 	status := rowfmt.TicketStatus(epic, t)
 
-	triangle := strings.Repeat(" ", rowfmt.TriangleColumnWidth(m.icons())) + " "
+	triangle := strings.Repeat(" ", rowfmt.TriangleColumnWidth(icons)) + " "
 	if r.hasChildren {
-		glyph := m.icons().TriangleExpanded
+		glyph := icons.TriangleExpanded
 		if !r.expanded {
-			glyph = m.icons().TriangleCollapsed
+			glyph = icons.TriangleCollapsed
 		}
 		triangle = glyph + " "
 	}
 
-	icon, style := rowfmt.StatusIconAndStyle(m.icons(), status)
+	icon, style := rowfmt.StatusIconAndStyle(icons, status)
 
-	matched, _ := m.searchMatch(rowIdx)
-	searchDim := m.search.HasQuery() && !matched
+	matched, _ := s.tree.SearchMatch(rowIdx)
+	searchDim := env.hasQuery && !matched
 	doneDim := status.Terminal()
 
-	title := rowfmt.RowTitle(m.icons(), t)
+	title := rowfmt.RowTitle(icons, t)
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
@@ -164,14 +223,14 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	}
 
 	line := triangle + style.Render(icon)
-	if m.rowHasSuggestedActions(epic, t, r.archived) {
+	if env.hasSuggestedActions(epic, t, r.archived) {
 		badgeStyle := rowfmt.SuggestedActionBadgeStyle
 		if searchDim {
 			badgeStyle = ui.StyleDim
 		}
-		line += " " + badgeStyle.Render(m.icons().SuggestedAction)
+		line += " " + badgeStyle.Render(icons.SuggestedAction)
 	}
-	line += " " + titleStyle.Render(title) + m.sessionMarker(t.Path)
+	line += " " + titleStyle.Render(title) + env.sessionMarker(t.Path)
 	if suffix := rowfmt.BlockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := rowfmt.BlockedBySuffixStyle
 		if searchDim {
@@ -187,17 +246,6 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		return []string{rowfmt.AppendRowMetrics(line, metrics, ui.StyleDim)}
 	}
 	return []string{rowfmt.AppendRowMetrics(line, metrics, style)}
-}
-
-// sessionMarker is " <glyph>" when a live interactive session's Session
-// ticket is address, so nobody starts a second session on it; "" otherwise.
-func (m Model) sessionMarker(address string) string {
-	for _, s := range m.vm.Sessions {
-		if s.Ticket == address && s.Status.State != wire.SessionExited {
-			return " " + sessionMarkerStyle.Render(m.icons().SessionLive)
-		}
-	}
-	return ""
 }
 
 func (m Model) icons() ui.IconSet {

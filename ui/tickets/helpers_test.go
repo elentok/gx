@@ -18,9 +18,9 @@ func deliverLoad(t *testing.T, m Model) Model {
 // expandOpenEpics explicitly expands every open epic, so a test about rows
 // inside an epic can see them without its own expand step.
 func expandOpenEpics(m *Model) {
-	for _, e := range m.epics {
+	for _, e := range m.sidebar.epics {
 		if !e.AllDone() {
-			m.explicitCollapsed[e.Path] = false
+			m.sidebar.explicitCollapsed[e.Path] = false
 		}
 	}
 	m.clampSelected()
@@ -55,12 +55,12 @@ func deliverCmd(t *testing.T, m Model, cmd tea.Cmd) Model {
 
 func findEpic(t *testing.T, m Model, name string) tickets.Epic {
 	t.Helper()
-	return m.epics[indexOfEpic(t, m, name)]
+	return m.sidebar.epics[indexOfEpic(t, m, name)]
 }
 
 func indexOfEpic(t *testing.T, m Model, name string) int {
 	t.Helper()
-	for i, e := range m.epics {
+	for i, e := range m.sidebar.epics {
 		if e.Name == name {
 			return i
 		}
@@ -70,15 +70,15 @@ func indexOfEpic(t *testing.T, m Model, name string) int {
 }
 
 // setCollapsedEpic mirrors a user's explicit toggle keypress: write directly
-// into m.explicitCollapsed (never m.sidebarTree's own map, which
+// into m.sidebar.explicitCollapsed (never m.sidebar.tree's own map, which
 // clampSelected/refreshSidebarCollapse now overwrites from explicit state on
 // every rebuild), then clampSelected to rebuild entries so a caller's
 // subsequent Entries()/selectedRow() call sees the change.
 func setCollapsedEpic(m *Model, epicIdx int, collapsed bool) {
-	if m.explicitCollapsed == nil {
-		m.explicitCollapsed = map[string]bool{}
+	if m.sidebar.explicitCollapsed == nil {
+		m.sidebar.explicitCollapsed = map[string]bool{}
 	}
-	m.explicitCollapsed[m.epics[epicIdx].Path] = collapsed
+	m.sidebar.explicitCollapsed[m.sidebar.epics[epicIdx].Path] = collapsed
 	m.clampSelected()
 }
 
@@ -86,10 +86,10 @@ func setCollapsedEpic(m *Model, epicIdx int, collapsed bool) {
 // (e.g. expanding the Closed section, which now starts collapsed by
 // default, so a test can see its epics/tickets).
 func setCollapsedSection(m *Model, section sidebarSection, collapsed bool) {
-	if m.explicitCollapsed == nil {
-		m.explicitCollapsed = map[string]bool{}
+	if m.sidebar.explicitCollapsed == nil {
+		m.sidebar.explicitCollapsed = map[string]bool{}
 	}
-	m.explicitCollapsed[sidebarSectionID(section)] = collapsed
+	m.sidebar.explicitCollapsed[sidebarSectionID(section)] = collapsed
 	m.clampSelected()
 }
 
@@ -99,14 +99,14 @@ func setCollapsedSection(m *Model, section sidebarSection, collapsed bool) {
 // entry's index — no more header/placeholder line-counting.
 func selectedSidebarLine(t *testing.T, m Model) int {
 	t.Helper()
-	return m.sidebarTree.SelectedIndex()
+	return m.sidebar.tree.SelectedIndex()
 }
 
 // visibleRows mirrors the old m.visibleRows(): every cursor-reachable sidebar
 // row (epics + tickets), section-header entries excluded.
 func visibleRows(m Model) []row {
 	var rows []row
-	for _, e := range m.sidebarTree.Entries() {
+	for _, e := range m.sidebar.tree.Entries() {
 		if r, ok := rowFromEntry(e); ok {
 			rows = append(rows, r)
 		}
@@ -118,7 +118,7 @@ func visibleRows(m Model) []row {
 // section's own header row.
 func archivedSectionHeaderIndex(t *testing.T, m Model) int {
 	t.Helper()
-	for i, e := range m.sidebarTree.Entries() {
+	for i, e := range m.sidebar.tree.Entries() {
 		if e.ID == sidebarSectionID(sectionArchived) {
 			return i
 		}

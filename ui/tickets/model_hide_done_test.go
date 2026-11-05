@@ -116,14 +116,14 @@ func TestModel_UnrelatedTAndCSequencesUnaffectedByHideDoneChord(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected 'et' to still launch the edit-tab command")
 	}
-	if m.hideDone {
+	if m.sidebar.hideDone {
 		t.Fatalf("expected 'et' to leave hideDone untouched")
 	}
 
 	// A bare "c" (no preceding "t") must not toggle hideDone either.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(Model)
-	if m.hideDone {
+	if m.sidebar.hideDone {
 		t.Fatalf("expected a bare 'c' to leave hideDone untouched")
 	}
 }

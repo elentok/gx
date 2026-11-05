@@ -1,18 +1,13 @@
 package tickets
 
 import (
-	"strings"
-
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowactions"
-	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
-	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -92,7 +87,7 @@ func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea
 	}
 	m = m.applyServerRows()
 	if firstLoad {
-		m.selectFirstEpic()
+		m.sidebar.selectFirstEpic()
 	}
 	return m, nil
 }
@@ -135,30 +130,8 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// pendingSubtext is a queued ticket row's explain verdict, indented under the
-// row's title. ok is false for any entry that isn't a queued ticket.
-func (m Model) pendingSubtext(entry tree.Entry[sidebarNode]) (string, bool) {
-	if entry.Value.kind != nodeTicket {
-		return "", false
-	}
-	r, _ := rowFromEntry(entry)
-	t := m.epicAt(r).Tickets[r.ticketIdx]
-	p, ok := m.vm.PendingRowFor(t.Path)
-	if !ok {
-		return "", false
-	}
-	text := p.Verdict
-	if p.Reason != "" {
-		text += ": " + p.Reason
-	}
-	icons := m.icons()
-	icon, _ := rowfmt.StatusIconAndStyle(icons, rowfmt.TicketStatus(m.epicAt(r), t))
-	width := rowfmt.TriangleColumnWidth(icons) + 1 + lipgloss.Width(icon) + 1
-	return strings.Repeat(" ", width) + rowfmt.BlockedBySuffixStyle.Render(rowfmt.Ellipsize(text, rowfmt.PauseReasonMaxRunes, icons.Ellipsis)), true
-}
-
 func (m Model) applyServerRows() Model {
-	m.epics = tabapi.EpicsFromViewModel(m.vm, m.scope)
+	m.sidebar.epics = tabapi.EpicsFromViewModel(m.vm, m.scope)
 	m.clampSelected()
 	return m
 }

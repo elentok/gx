@@ -31,7 +31,7 @@ func TestFinishAndPauseKeyListedAsFinishAndPauseQueue(t *testing.T) {
 // 04's epicCollapseDefaults).
 func selectArchivedTicketRow(t *testing.T, m Model) Model {
 	t.Helper()
-	m.sidebarTree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	m.sidebar.tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(Model)
 	m = deliverCmd(t, m, cmd)
@@ -43,7 +43,7 @@ func selectArchivedTicketRow(t *testing.T, m Model) Model {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
-	r, ok := m.selectedRow()
+	r, ok := m.sidebar.selectedRow()
 	if !ok || r.isEpic() || !r.archived {
 		t.Fatalf("expected selection on archived ticket row, got row=%+v ok=%v", r, ok)
 	}
@@ -65,7 +65,7 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 	m = updated.(Model)
 
 	m = selectArchivedTicketRow(t, m)
-	selectionBefore, _ := m.selectedRow()
+	selectionBefore, _ := m.sidebar.selectedRow()
 
 	presses := []tea.KeyPressMsg{
 		{Code: 'D', Text: "D"},
@@ -80,7 +80,7 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 		if !ok || nm.Kind != notify.KindInfo || !strings.Contains(nm.Message, "archived") {
 			t.Fatalf("press %q: expected archived info notification, got %#v (ok=%v)", press.Text, nm, ok)
 		}
-		selectionAfter, ok := m.selectedRow()
+		selectionAfter, ok := m.sidebar.selectedRow()
 		if !ok || selectionAfter != selectionBefore {
 			t.Fatalf("press %q moved selection away from archived row: before=%+v after=%+v ok=%v", press.Text, selectionBefore, selectionAfter, ok)
 		}
@@ -101,7 +101,7 @@ func TestModel_ReadOnlyKeysStillWorkOnArchivedRow(t *testing.T) {
 	m = updated.(Model)
 
 	m = selectArchivedTicketRow(t, m)
-	selectionBefore, _ := m.selectedRow()
+	selectionBefore, _ := m.sidebar.selectedRow()
 
 	// Edit-in-editor ("ee") must still resolve and launch, exactly as for a
 	// non-archived row.
@@ -123,16 +123,16 @@ func TestModel_ReadOnlyKeysStillWorkOnArchivedRow(t *testing.T) {
 	}
 
 	// Hide-done toggle still flips.
-	hideDoneBefore := m.hideDone
+	hideDoneBefore := m.sidebar.hideDone
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(Model)
-	if m.hideDone == hideDoneBefore {
+	if m.sidebar.hideDone == hideDoneBefore {
 		t.Fatalf("expected hide-done toggle to flip on an archived row")
 	}
 
-	selectionAfter, ok := m.selectedRow()
+	selectionAfter, ok := m.sidebar.selectedRow()
 	if !ok || selectionAfter.ticketIdx != selectionBefore.ticketIdx || !selectionAfter.archived {
 		t.Fatalf("expected selection to remain on the archived ticket row, before=%+v after=%+v", selectionBefore, selectionAfter)
 	}

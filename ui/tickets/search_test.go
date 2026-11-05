@@ -76,11 +76,11 @@ func TestSearch_NonMatchesAreDimmed(t *testing.T) {
 
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
 
-	epic := m.epics[0]
+	epic := m.sidebar.epics[0]
 	// Entries: 0 = "Open epics" section header, 1 = the epic, 2/3 = its two
-	// tickets — matching m.sidebarTree.Entries()' actual indices.
-	matchedLine := m.renderTicketRow(epic, row{ticketIdx: 0}, 2)[0] // "first ticket" row
-	nonMatchedLine := m.renderTicketRow(epic, row{ticketIdx: 1}, 3)[0]
+	// tickets — matching m.sidebar.tree.Entries()' actual indices.
+	matchedLine := m.sidebar.renderTicketRow(sidebarEnvFor(m), epic, row{ticketIdx: 0}, 2)[0] // "first ticket" row
+	nonMatchedLine := m.sidebar.renderTicketRow(sidebarEnvFor(m), epic, row{ticketIdx: 1}, 3)[0]
 
 	if strings.Contains(matchedLine, dimPrefix) {
 		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)
@@ -152,14 +152,14 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	closedEpic := m.epics[0]
+	closedEpic := m.sidebar.epics[0]
 	if !closedEpic.AllDone() {
 		t.Fatalf("expected closed-epic to be all-done in this fixture")
 	}
 	// The epic itself also defaults to collapsed (ticket 02), but that's
 	// moot here since it's nested inside the collapsed Closed section root
 	// and stays unreachable until the section expands regardless.
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	if !m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to start collapsed by default")
 	}
 
@@ -169,7 +169,7 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	if m.search.MatchesCount() != 1 {
 		t.Fatalf("expected one match for ticket inside collapsed epic, got %d", m.search.MatchesCount())
 	}
-	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	if m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected matching ticket's Closed section to auto-expand")
 	}
 
@@ -177,12 +177,12 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a match at position 0")
 	}
-	entries := m.sidebarTree.Entries()
+	entries := m.sidebar.tree.Entries()
 	if match.DataIndex < 0 || match.DataIndex >= len(entries) {
 		t.Fatalf("match DataIndex %d out of range of %d sidebar entries", match.DataIndex, len(entries))
 	}
 	r, ok := rowFromEntry(entries[match.DataIndex])
-	if !ok || r.isEpic() || m.epics[r.epicIdx].Tickets[r.ticketIdx].Title != "Hidden gem" {
+	if !ok || r.isEpic() || m.sidebar.epics[r.epicIdx].Tickets[r.ticketIdx].Title != "Hidden gem" {
 		t.Fatalf("expected match to point at the hidden-gem ticket row, got row %+v ok=%v", r, ok)
 	}
 }
@@ -204,7 +204,7 @@ func TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic(t *testing.
 	m = updated.(Model)
 
 	closedEpicIdx := -1
-	for i, e := range m.epics {
+	for i, e := range m.sidebar.epics {
 		if e.AllDone() {
 			closedEpicIdx = i
 		}
@@ -217,10 +217,10 @@ func TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic(t *testing.
 	// below exercise the explicit-beats-search-override path, not just the
 	// declared default.
 	setCollapsedEpic(&m, closedEpicIdx, true)
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	if !m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to start collapsed by default")
 	}
-	if !m.sidebarTree.CollapsedIDs()[m.epics[closedEpicIdx].Path] {
+	if !m.sidebar.tree.CollapsedIDs()[m.sidebar.epics[closedEpicIdx].Path] {
 		t.Fatalf("expected closed-epic to be individually collapsed")
 	}
 
@@ -230,10 +230,10 @@ func TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic(t *testing.
 	if m.search.MatchesCount() != 0 {
 		t.Fatalf("expected no visible matches for a ticket inside a manually-collapsed epic, got %d", m.search.MatchesCount())
 	}
-	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	if m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to auto-expand")
 	}
-	if !m.sidebarTree.CollapsedIDs()[m.epics[closedEpicIdx].Path] {
+	if !m.sidebar.tree.CollapsedIDs()[m.sidebar.epics[closedEpicIdx].Path] {
 		t.Fatalf("expected the manually-collapsed epic to stay collapsed despite the search match")
 	}
 }
@@ -249,7 +249,7 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	if !m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to start collapsed by default")
 	}
 
@@ -259,7 +259,7 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	if m.search.MatchesCount() != 0 {
 		t.Fatalf("expected zero matches, got %d", m.search.MatchesCount())
 	}
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	if !m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected non-matching search to leave collapse state unchanged")
 	}
 }
@@ -285,7 +285,7 @@ func TestSearch_SidebarHighlightsMatchExactlyOnce(t *testing.T) {
 		t.Fatalf("expected exactly one match, got %d", m.search.MatchesCount())
 	}
 
-	lines := m.sidebarBody(20, 80)
+	lines := m.sidebar.body(sidebarEnvFor(m), 20, 80)
 	var matchLine string
 	for _, l := range lines {
 		if strings.Contains(ansi.Strip(l), "First ticket") {
@@ -325,18 +325,18 @@ func TestSearch_NAndShiftNCycleMatches(t *testing.T) {
 	m.search.DismissAndKeepResults()
 	m.search.SetCursor(0)
 	if match, ok := m.search.Match(0); ok {
-		m.sidebarTree.SetSelectedIndex(match.DataIndex)
+		m.sidebar.tree.SetSelectedIndex(match.DataIndex)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if match, ok := m.search.Match(1); !ok || m.sidebarTree.SelectedIndex() != match.DataIndex {
+	if match, ok := m.search.Match(1); !ok || m.sidebar.tree.SelectedIndex() != match.DataIndex {
 		t.Fatalf("expected n to move selection to next match")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N', Mod: tea.ModShift})
 	m = updated.(Model)
-	if match, ok := m.search.Match(0); !ok || m.sidebarTree.SelectedIndex() != match.DataIndex {
+	if match, ok := m.search.Match(0); !ok || m.sidebar.tree.SelectedIndex() != match.DataIndex {
 		t.Fatalf("expected shift+n to move selection back to previous match")
 	}
 }
@@ -359,21 +359,21 @@ func TestSearch_MatchesEpicRowsInRowOrderWithTickets(t *testing.T) {
 	if m.search.MatchesCount() != 2 {
 		t.Fatalf("expected the epic row and one ticket to match, got %d", m.search.MatchesCount())
 	}
-	entries := m.sidebarTree.Entries()
+	entries := m.sidebar.tree.Entries()
 	first, _ := m.search.Match(0)
 	second, _ := m.search.Match(1)
 	if first.DataIndex >= second.DataIndex {
 		t.Fatalf("expected matches in row order, got %d then %d", first.DataIndex, second.DataIndex)
 	}
-	if e := entries[first.DataIndex].Value; e.kind != nodeEpic || m.epics[e.epicIdx].Name != "widget-queue" {
+	if e := entries[first.DataIndex].Value; e.kind != nodeEpic || m.sidebar.epics[e.epicIdx].Name != "widget-queue" {
 		t.Fatalf("expected first match to be the widget-queue epic row, got %+v", e)
 	}
-	if e := entries[second.DataIndex].Value; e.kind != nodeTicket || m.epics[e.epicIdx].Tickets[e.ticketIdx].Title != "Widget polish" {
+	if e := entries[second.DataIndex].Value; e.kind != nodeTicket || m.sidebar.epics[e.epicIdx].Tickets[e.ticketIdx].Title != "Widget polish" {
 		t.Fatalf("expected second match to be the widget-polish ticket row, got %+v", e)
 	}
 
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
-	if line := m.renderEpicRow(m.epics[entries[first.DataIndex].Value.epicIdx]); strings.Contains(line, dimPrefix) {
+	if line := m.sidebar.renderEpicRow(sidebarEnvFor(m), m.sidebar.epics[entries[first.DataIndex].Value.epicIdx]); strings.Contains(line, dimPrefix) {
 		t.Fatalf("expected matched epic row undimmed, got: %q", line)
 	}
 }
@@ -395,14 +395,14 @@ func TestSearch_EpicMatchExpandsClosedSectionButNotTheEpic(t *testing.T) {
 	if m.search.MatchesCount() != 1 {
 		t.Fatalf("expected the closed epic row to match, got %d", m.search.MatchesCount())
 	}
-	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	if m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected the Closed section to auto-expand for an epic match")
 	}
-	closed := m.epics[0]
+	closed := m.sidebar.epics[0]
 	if closed.Name != "closed-epic" {
 		t.Fatalf("expected closed-epic at index 0, got %q", closed.Name)
 	}
-	if !m.sidebarTree.CollapsedIDs()[closed.Path] {
+	if !m.sidebar.tree.CollapsedIDs()[closed.Path] {
 		t.Fatalf("expected an epic-only match to leave the epic itself collapsed")
 	}
 }

@@ -42,13 +42,13 @@ func TestNewModel_StartsWithEveryEpicCollapsedAndCursorOnFirstEpic(t *testing.T)
 
 	m := deliverLoadDefaults(t, NewModel(root, ui.Settings{}, keys.New(nil)))
 
-	for _, e := range m.sidebarTree.Entries() {
+	for _, e := range m.sidebar.tree.Entries() {
 		if e.Value.kind == nodeTicket {
 			t.Fatalf("expected no ticket rows at startup, got entry %q", e.ID)
 		}
 	}
-	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "alpha" {
+	r, ok := m.sidebar.selectedRow()
+	if !ok || !r.isEpic() || m.sidebar.epics[r.epicIdx].Name != "alpha" {
 		t.Fatalf("expected cursor on the first epic row, got row=%+v ok=%v", r, ok)
 	}
 }
@@ -157,10 +157,10 @@ func TestModel_TicketRows_NestsInvestigateChildUnderOneOff(t *testing.T) {
 		{Number: 1, Identifier: "01", Path: "01", Status: string(schema.StatusPaused), PauseReason: schema.PauseBlockedPane, Type: "prompt"},
 		{Number: 2, Identifier: "02", Path: "02", Status: "open", Type: "investigate", Parent: &parent},
 	}}
-	m := Model{epics: []tickets.Epic{epic}}
+	m := Model{sidebar: sidebar{epics: []tickets.Epic{epic}}}
 
 	var rows []row
-	for _, e := range m.buildSidebarEntries() {
+	for _, e := range m.sidebar.buildSidebarEntries(sidebarEnvFor(m)) {
 		if e.Value.kind != nodeTicket {
 			continue
 		}
@@ -182,11 +182,11 @@ func TestModel_TicketRows_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *te
 		{Number: 3, Identifier: "03", Path: "03", Status: "open", Parent: &parent02},
 		{Number: 4, Identifier: "04", Path: "04", Status: "open"},
 	}}
-	m := Model{epics: []tickets.Epic{epic}}
+	m := Model{sidebar: sidebar{epics: []tickets.Epic{epic}}}
 
 	ticketRows := func() []row {
 		var rows []row
-		for _, e := range m.buildSidebarEntries() {
+		for _, e := range m.sidebar.buildSidebarEntries(sidebarEnvFor(m)) {
 			if e.Value.kind != nodeTicket || e.Value.epicIdx != 0 {
 				continue
 			}
@@ -217,7 +217,7 @@ func TestModel_TicketRows_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *te
 		t.Fatalf("expected ticket 01 to report hasChildren+expanded, got %+v", rows[0])
 	}
 
-	m.sidebarTree.SetCollapsedIDs(map[string]bool{"01": true})
+	m.sidebar.tree.SetCollapsedIDs(map[string]bool{"01": true})
 	rows = ticketRows()
 	wantAfterCollapse := []string{"01", "04"}
 	if len(rows) != len(wantAfterCollapse) {
@@ -235,12 +235,12 @@ func TestModel_TicketRows_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *te
 
 // TestModel_EpicAt_ResolvesActiveRowAgainstEpics covers ticket 03's accessor
 // for the common case: a row with archived=false (the default, matching
-// every row buildSidebarEntries produces today) resolves against m.epics.
+// every row buildSidebarEntries produces today) resolves against m.sidebar.epics.
 func TestModel_EpicAt_ResolvesActiveRowAgainstEpics(t *testing.T) {
 	t.Parallel()
-	m := Model{epics: []tickets.Epic{{Name: "active-epic"}}}
+	m := Model{sidebar: sidebar{epics: []tickets.Epic{{Name: "active-epic"}}}}
 
-	got := m.epicAt(row{epicIdx: 0})
+	got := m.sidebar.epicAt(row{epicIdx: 0})
 
 	if got.Name != "active-epic" {
 		t.Fatalf("epicAt() = %+v, want epic named active-epic", got)
@@ -249,16 +249,18 @@ func TestModel_EpicAt_ResolvesActiveRowAgainstEpics(t *testing.T) {
 
 // TestModel_EpicAt_ResolvesArchivedRowAgainstArchivedEpics covers the other
 // half: a row with archived=true resolves against m.archivedEpics instead of
-// m.epics, even when both slices are populated and share the same index —
+// m.sidebar.epics, even when both slices are populated and share the same index —
 // the origin flag, not epicIdx alone, decides which slice wins.
 func TestModel_EpicAt_ResolvesArchivedRowAgainstArchivedEpics(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		epics:         []tickets.Epic{{Name: "active-epic"}},
-		archivedEpics: []tickets.Epic{{Name: "archived-epic"}},
+		sidebar: sidebar{
+			epics:         []tickets.Epic{{Name: "active-epic"}},
+			archivedEpics: []tickets.Epic{{Name: "archived-epic"}},
+		},
 	}
 
-	got := m.epicAt(row{epicIdx: 0, archived: true})
+	got := m.sidebar.epicAt(row{epicIdx: 0, archived: true})
 
 	if got.Name != "archived-epic" {
 		t.Fatalf("epicAt() = %+v, want epic named archived-epic", got)
