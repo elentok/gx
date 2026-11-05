@@ -181,6 +181,22 @@ func describeInstallFailure(ctx context.Context, dir string, command []string, o
 // installTimeout is the budget all installs of one InstallDeps call share.
 const installTimeout = 5 * time.Minute
 
+// maxConcurrentInstalls caps installs server-wide: tickets launching together
+// each ran a full install at once and saturated the CPU.
+const maxConcurrentInstalls = 2
+
+var installSlots = make(chan struct{}, maxConcurrentInstalls)
+
+// CapInstalls makes install wait for one of the shared install slots. The slot
+// is held per call, outside any worktree lock the caller takes.
+func CapInstalls(install func(path, logDir string) ([]string, error)) func(path, logDir string) ([]string, error) {
+	return func(path, logDir string) ([]string, error) {
+		installSlots <- struct{}{}
+		defer func() { <-installSlots }()
+		return install(path, logDir)
+	}
+}
+
 // installTailBytes caps how much of a failed install's output reaches the error.
 const installTailBytes = 2000
 

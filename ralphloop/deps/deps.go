@@ -293,9 +293,9 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		TrailerMap:           history.TrailerMap,
 		RebaseOntoOrAbort:    rebaseOntoOrAbort,
 		WorktreeExists:       worktreeExists,
-		InstallDeps: func(path, logDir string) ([]string, error) {
+		InstallDeps: CapInstalls(func(path, logDir string) ([]string, error) {
 			return installDependenciesWithin(path, overrides.Path, logDir, installTimeout)
-		},
+		}),
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			path, found := transcriptPath(overrides.Home, cwd, sessionID)
 			if !found {

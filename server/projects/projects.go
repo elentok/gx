@@ -149,15 +149,15 @@ func (p *Registry) WorktreeDir(project string) string {
 
 // DepsWith is the default deps talking to runner.
 func (p *Registry) DepsWith(runner agentrunner.Runner) deps.Deps {
-	deps := p.DefaultDeps()
-	deps.Runner = runner
+	d := p.DefaultDeps()
+	d.Runner = runner
 	if p.cfg().Sleep != nil {
-		deps.Sleep = p.cfg().Sleep
+		d.Sleep = p.cfg().Sleep
 	}
 	if p.cfg().InstallDeps != nil {
-		deps.InstallDeps = p.cfg().InstallDeps
+		d.InstallDeps = deps.CapInstalls(p.cfg().InstallDeps)
 	}
-	return deps
+	return d
 }
 
 // ChatOverride is the project's own notification block from project.json, nil
