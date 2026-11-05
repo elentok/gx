@@ -55,7 +55,7 @@ export function PageHeader({
         <Box
           data-testid="page-header-line"
           mt="2px"
-          color="fg.muted"
+          color="text.dim"
           fontSize={wide ? "15px" : "14px"}
           whiteSpace="nowrap"
           overflow="hidden"
@@ -78,7 +78,7 @@ export function PageHeader({
         h1
       )}
       {meta ? (
-        <Box data-testid="page-header-meta" mt="10px" pt="8px" borderTopWidth="1px" borderColor="border.muted">
+        <Box data-testid="page-header-meta" mt="10px" pt="8px" borderTopWidth="1px" borderColor="hairline">
           {meta}
         </Box>
       ) : null}

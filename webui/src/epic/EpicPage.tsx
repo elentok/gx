@@ -154,7 +154,7 @@ function EpicBar({
           alignItems="center"
           gap="2"
           w={wide ? undefined : "full"}
-          css={wide ? undefined : { "& button": { height: "44px" } }}
+          css={wide ? undefined : { "& button": { height: "44px", flex: "1" } }}
         >
           {partner && (
             <Button tone="muted" emphasis="secondary" onClick={() => navigate(epicHref(partner).slice(1))}>
