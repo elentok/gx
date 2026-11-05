@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
@@ -64,9 +65,9 @@ func (s *Server) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.Epi
 			n.More = []wire.CardAction{{Kind: wire.CardActionMerge, Label: schema.VerbMergeAgain.Label(), Target: root.String()}}
 		}
 		return n, true
-	case state == wire.EpicListPaused && epicStateOf(e) == epicCycle:
+	case state == wire.EpicListPaused && epics.StateOf(e) == epics.StateCycle:
 		return needsYou{
-			Pill: PillDeadlocked, Reason: cycleReason(root, e), Since: fallback,
+			Pill: PillDeadlocked, Reason: epics.CycleReason(root, e), Since: fallback,
 			Action: wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: root.String()},
 		}, true
 	case state == wire.EpicListAwaitingMerge && !s.merger.AutoFFMerge(root.Project):
@@ -110,7 +111,7 @@ func (s *Server) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Tick
 	status := e.RenderedStatus(t)
 	label := t.DisplayNumber() + " " + t.Title
 	switch {
-	case isPaused(e, t) && status != tickets.StatusDraft:
+	case epics.IsPaused(e, t) && status != tickets.StatusDraft:
 		evs := queue.ReadLogLenient(t)
 		n := needsYou{
 			Pill: PillPaused, Reason: label + ": " + tickets.PauseDetail(e, t),

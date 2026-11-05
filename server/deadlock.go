@@ -1,13 +1,12 @@
 package server
 
 import (
-	"slices"
-	"strings"
 	"sync"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
 )
@@ -39,64 +38,14 @@ func (d *deadlocks) leave(root queue.RootRef) {
 	delete(d.roots, root)
 }
 
-// isPaused is tickets.Epic.IsPaused, the rule shared with ralph-loop and the
-// Queue tab, except that map epics hold no work, so none of their tickets are.
-func isPaused(e tickets.Epic, t tickets.Ticket) bool {
-	return !e.IsMap && e.IsPaused(t)
-}
-
-// epicState is how far e can move.
-type epicState int
-
-const (
-	// epicDone: no work remains (also every map epic, which holds none).
-	epicDone epicState = iota
-	// epicRunnable: a ticket is open or claimed, so the run can proceed.
-	epicRunnable
-	// epicPaused: nothing runnable, and a person can clear what remains.
-	epicPaused
-	// epicCycle: nothing runnable and nothing a person can clear, only blocked
-	// tickets.
-	epicCycle
-)
-
-// epicStateOf is the server's one rule for an epic's state; the deadlock check and
-// the epic summary both derive from it. A status it does not recognize counts as
-// paused, never as a cycle: a person has to look at it.
-func epicStateOf(e tickets.Epic) epicState {
-	if e.IsMap {
-		return epicDone
-	}
-	state := epicDone
-	for _, t := range e.Tickets {
-		status := e.RenderedStatus(t)
-		if status.Paused() {
-			state = epicPaused
-			continue
-		}
-		switch status {
-		case tickets.StatusOpen, tickets.StatusClaimed:
-			return epicRunnable
-		case tickets.StatusDone, tickets.StatusCancelled:
-		case tickets.StatusBlocked, tickets.StatusWaitingForChildren:
-			if state == epicDone {
-				state = epicCycle
-			}
-		default:
-			state = epicPaused
-		}
-	}
-	return state
-}
-
 // deadlockKind says how e is deadlocked: nothing schedulable and nothing
 // running while work remains. Paused tickets make it all-paused, since a person
 // can clear them; none makes it a blocked cycle.
 func deadlockKind(e tickets.Epic) (events.Kind, bool) {
-	switch epicStateOf(e) {
-	case epicPaused:
+	switch epics.StateOf(e) {
+	case epics.StatePaused:
 		return events.AllPaused, true
-	case epicCycle:
+	case epics.StateCycle:
 		return events.BlockedCycle, true
 	}
 	return "", false
@@ -106,54 +55,9 @@ func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 // a blocked cycle each waiting ticket with what it waits on.
 func deadlockReason(root queue.RootRef, e tickets.Epic, kind events.Kind) string {
 	if kind == events.AllPaused {
-		return pausedReason(root, e)
+		return epics.PausedReason(root, e)
 	}
-	return cycleReason(root, e)
-}
-
-func ticketAddr(root queue.RootRef, t tickets.Ticket) string {
-	return root.String() + "/" + t.Identifier
-}
-
-func pausedTickets(e tickets.Epic) []tickets.Ticket {
-	var out []tickets.Ticket
-	for _, t := range e.Tickets {
-		if isPaused(e, t) {
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
-func pausedReason(root queue.RootRef, e tickets.Epic) string {
-	var parts []string
-	for _, t := range pausedTickets(e) {
-		parts = append(parts, ticketAddr(root, t))
-	}
-	return "every remaining ticket is paused: " + strings.Join(parts, ", ")
-}
-
-func cycleReason(root queue.RootRef, e tickets.Epic) string {
-	ctx := tickets.AddressContext{Project: root.Project, Epic: root.Epic}
-	var parts []string
-	for _, t := range e.Tickets {
-		if e.RenderedStatus(t) != tickets.StatusBlocked {
-			continue
-		}
-		waits := slices.Clone(e.UnresolvedBlockers(t))
-		if !e.ParentDone(t) {
-			waits = append(waits, *t.Parent)
-		}
-		var on []string
-		for _, b := range waits {
-			if a, err := tickets.ParseAddress(b, ctx); err == nil {
-				b = a.String()
-			}
-			on = append(on, b)
-		}
-		parts = append(parts, ticketAddr(root, t)+" waits on "+strings.Join(on, ", "))
-	}
-	return strings.Join(parts, "; ")
+	return epics.CycleReason(root, e)
 }
 
 // checkDeadlock logs deadlocked when root's epic enters deadlock and starts its
@@ -168,7 +72,7 @@ func (s *Server) checkDeadlock(root queue.RootRef, projectDir string, e tickets.
 		return
 	}
 	reason := deadlockReason(root, e, kind)
-	if kind == events.AllPaused && e.AllAwaitAnswer(pausedTickets(e)) {
+	if kind == events.AllPaused && e.AllAwaitAnswer(epics.PausedTickets(e)) {
 		ev := ralphloop.Event{Type: string(events.WaitingForAnswer), Reason: reason}
 		if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
 			s.log.Warn("cannot record waiting-for-answer", "root", root, "err", err)
