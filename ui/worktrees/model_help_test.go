@@ -31,11 +31,12 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 		t.Fatalf("expected no command when opening help")
 	}
 	m = updated.(Model)
-	if m.mode != modeHelp {
-		t.Fatalf("expected modeHelp after ?, got %v", m.mode)
+	hm, ok := m.modal.(helpModal)
+	if !ok {
+		t.Fatalf("expected help modal after ?, got %T", m.modal)
 	}
-	if m.helpModel.Viewport.Width() == 0 || m.helpModel.Viewport.Height() == 0 {
-		t.Fatalf("expected initialized help viewport, got %dx%d", m.helpModel.Viewport.Width(), m.helpModel.Viewport.Height())
+	if hm.model.Viewport.Width() == 0 || hm.model.Viewport.Height() == 0 {
+		t.Fatalf("expected initialized help viewport, got %dx%d", hm.model.Viewport.Width(), hm.model.Viewport.Height())
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})

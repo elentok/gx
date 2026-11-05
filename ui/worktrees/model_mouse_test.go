@@ -114,8 +114,8 @@ func TestMouseWheelWithHelpOpenScrollsHelpNotTableOrPreview(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '?', Text: "?"})
 	m = updated.(Model)
-	if m.mode != modeHelp {
-		t.Fatalf("expected modeHelp after '?', got %v", m.mode)
+	if _, ok := m.modal.(helpModal); !ok {
+		t.Fatalf("expected help modal after '?', got %T", m.modal)
 	}
 
 	prevCursor := m.table.Cursor()
@@ -130,7 +130,8 @@ func TestMouseWheelWithHelpOpenScrollsHelpNotTableOrPreview(t *testing.T) {
 	if m.viewport.YOffset() != prevOffset {
 		t.Fatalf("expected details preview scroll unchanged while help is open, before=%d after=%d", prevOffset, m.viewport.YOffset())
 	}
-	if m.helpModel.Viewport.YOffset() == 0 {
+	hm := m.modal.(helpModal)
+	if hm.model.Viewport.YOffset() == 0 {
 		t.Fatal("expected wheel-down to scroll the help modal while it's open")
 	}
 }
@@ -157,7 +158,8 @@ func TestMouseWheelWithLogsOpenScrollsLogsNotTableOrPreview(t *testing.T) {
 	if m.viewport.YOffset() != prevOffset {
 		t.Fatalf("expected details preview scroll unchanged while logs modal is open, before=%d after=%d", prevOffset, m.viewport.YOffset())
 	}
-	if m.logsViewport.YOffset() == 0 {
+	lm := m.modal.(logsModal)
+	if lm.viewport.YOffset() == 0 {
 		t.Fatal("expected wheel-down to scroll the logs modal while it's open")
 	}
 }
@@ -179,7 +181,8 @@ func TestMouseWheelWithErrorOpenScrollsErrorNotTableOrPreview(t *testing.T) {
 	if m.viewport.YOffset() != prevOffset {
 		t.Fatalf("expected details preview scroll unchanged while error modal is open, before=%d after=%d", prevOffset, m.viewport.YOffset())
 	}
-	if m.errorViewport.YOffset() == 0 {
+	em := m.modal.(errorModal)
+	if em.viewport.YOffset() == 0 {
 		t.Fatal("expected wheel-down to scroll the error modal while it's open")
 	}
 }

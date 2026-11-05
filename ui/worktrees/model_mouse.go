@@ -11,19 +11,10 @@ import (
 // hit-test. A hit on neither (a seam, a border) or a pane with nothing to
 // scroll no-ops.
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	if next, cmd, handled := m.helpModel.Forward(msg); handled {
-		m.helpModel = next
-		return m, cmd
-	}
-	if m.mode == modeLogs {
-		var cmd tea.Cmd
-		m.logsViewport, cmd = m.logsViewport.Update(msg)
-		return m, cmd
-	}
-	if m.mode == modeError {
-		var cmd tea.Cmd
-		m.errorViewport, cmd = m.errorViewport.Update(msg)
-		return m, cmd
+	if m.modal != nil {
+		if next, cmd, ok := m.updateModal(msg); ok {
+			return next, cmd
+		}
 	}
 
 	dir, ok := ui.WheelDirection(msg)

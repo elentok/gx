@@ -29,24 +29,14 @@ func (m Model) View() tea.View {
 
 		if m.confirm.IsOpen {
 			content = ui.OverlayCenter(bg, m.confirmModalView(), m.width, m.height)
+		} else if m.modal != nil {
+			content = ui.OverlayCenter(bg, m.modal.View(m.width, m.height), m.width, m.height)
 		} else {
 			switch m.mode {
-			case modeCredentialPrompt:
-				content = ui.OverlayCenter(bg, m.credentialModalView(), m.width, m.height)
-			case modePushDiverged:
-				content = ui.OverlayCenter(bg, m.pushDivergedModalView(), m.width, m.height)
-			case modeError:
-				content = ui.OverlayCenter(bg, m.errorModalView(), m.width, m.height)
 			case modeDeleteProgress:
 				content = ui.OverlayCenter(bg, m.deleteProgressModalView(), m.width, m.height)
-			case modeLogs:
-				content = ui.OverlayCenter(bg, m.logsModalView(), m.width, m.height)
-			case modeHelp:
-				content = ui.OverlayCenter(bg, m.helpModalView(), m.width, m.height)
 			case modeYank:
 				content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
-			case modeTerminalMenu:
-				content = ui.OverlayCenter(bg, m.terminalMenuModalView(), m.width, m.height)
 			case modeRename, modeClone, modeNew, modeNewAndOpen:
 				overlay := m.textInputOverlayView()
 				y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))

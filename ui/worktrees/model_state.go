@@ -3,7 +3,6 @@ package worktrees
 import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	keymgr "github.com/elentok/gx/ui/keys"
@@ -30,12 +29,6 @@ const (
 	modeYank
 	modePaste
 	modeSearch
-	modeError
-	modeLogs
-	modePushDiverged
-	modeCredentialPrompt
-	modeHelp
-	modeTerminalMenu
 	modeDeleteProgress
 )
 
@@ -80,20 +73,14 @@ type Model struct {
 	pull   pull.Model
 	pullWT *git.Worktree // worktree being pulled, set when pull.Open is called
 
-	mode                 mode
-	textInput            textinput.Model // shared by rename and clone modes
-	credentialPromptText string
-	errorViewport        viewport.Model
-	helpModel            help.Model
-	jobRunner            *components.CommandRunner
-	jobKind              promptableJobKind
-	jobWorktree          *git.Worktree
-	jobLog               *cmdoutput.CommandOutputLog
-	jobStashed           bool
+	mode      mode
+	modal     modal           // nil in normal mode
+	textInput textinput.Model // shared by rename and clone modes
+	helpModel help.Model      // closed template; each open copies it into a helpModal
+	jobs      jobs
 
 	lastJobLog   string
 	lastJobLabel string
-	logsViewport viewport.Model
 
 	confirm confirm.Model
 
@@ -102,10 +89,6 @@ type Model struct {
 	deleteSteps    []components.Step // one per worktree in the batch, for the progress modal
 	deleteResults  []deleteResultMsg // accumulated results from the batch
 
-	pushDivergence   *git.PushDivergence
-	pushDivergenceWT *git.Worktree
-	pushMenu         components.MenuState
-
 	yankLoading   bool
 	yankSource    git.Worktree
 	yankChecklist components.Checklist
@@ -113,10 +96,6 @@ type Model struct {
 
 	keyManager keymgr.Manager
 	search     search.Model
-
-	openTargetName string
-	openTargetPath string
-	terminalMenu   components.MenuState
 
 	help help.Model
 

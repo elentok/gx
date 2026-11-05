@@ -30,8 +30,8 @@ func TestOpenHelpOpensHelp(t *testing.T) {
 
 	updated, _ := m.Update(nav.OpenHelp()())
 	m = updated.(Model)
-	if m.mode != modeHelp || !m.helpModel.IsOpen {
-		t.Fatalf("expected help open, got mode %v", m.mode)
+	if hm, ok := m.modal.(helpModal); !ok || !hm.model.IsOpen {
+		t.Fatalf("expected help open, got modal %T", m.modal)
 	}
 }
 
@@ -46,8 +46,8 @@ func TestOpenHelpFromSearchTypesNothing(t *testing.T) {
 
 	updated, _ = m.Update(nav.OpenHelp()())
 	m = updated.(Model)
-	if m.mode != modeHelp || !m.helpModel.IsOpen {
-		t.Fatalf("expected help open, got mode %v", m.mode)
+	if hm, ok := m.modal.(helpModal); !ok || !hm.model.IsOpen {
+		t.Fatalf("expected help open, got modal %T", m.modal)
 	}
 	if got := m.search.Query(); got != "" {
 		t.Fatalf("search query = %q, want empty", got)
@@ -61,7 +61,7 @@ func TestOpenHelpWithModalOpenDoesNothing(t *testing.T) {
 
 	updated, _ := m.Update(nav.OpenHelp()())
 	m = updated.(Model)
-	if m.mode == modeHelp || m.helpModel.IsOpen {
+	if m.modal != nil {
 		t.Fatal("expected help to stay closed while a modal is open")
 	}
 
@@ -69,7 +69,7 @@ func TestOpenHelpWithModalOpenDoesNothing(t *testing.T) {
 	m.mode = modeRename
 	updated, _ = m.Update(nav.OpenHelp()())
 	m = updated.(Model)
-	if m.mode != modeRename || m.helpModel.IsOpen {
+	if m.mode != modeRename || m.modal != nil {
 		t.Fatalf("expected rename dialog kept, got mode %v", m.mode)
 	}
 }

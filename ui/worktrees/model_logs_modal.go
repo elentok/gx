@@ -8,7 +8,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// enterLogsMode switches the model into logs mode to display the last job output.
+// logsModal shows the last job's output in a scrollable viewport.
+type logsModal struct {
+	viewport viewport.Model
+	label    string
+	log      string
+}
+
+// enterLogsMode opens the logs modal on the last job output.
 func (m Model) enterLogsMode() Model {
 	vpW := m.width * 2 / 3
 	if vpW < 40 {
@@ -23,37 +30,42 @@ func (m Model) enterLogsMode() Model {
 	}
 	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
 	vp.SetContent(m.lastJobLog)
-	m.logsViewport = vp
-	m.mode = modeLogs
-	return m
+	return m.openModal(logsModal{viewport: vp, label: m.lastJobLabel, log: m.lastJobLog})
 }
 
-// handleLogsKey scrolls the logs viewport or dismisses it.
-func (m Model) handleLogsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "enter", "q":
-		m.mode = modeNormal
-		return m, nil
+// Update scrolls the logs viewport or dismisses it.
+func (l logsModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "esc", "enter", "q":
+			return l, nil, modalResult{close: true}
+		}
+	case tea.MouseWheelMsg:
+	default:
+		return l, nil, modalResult{unhandled: true}
 	}
 	var cmd tea.Cmd
-	m.logsViewport, cmd = m.logsViewport.Update(msg)
-	return m, cmd
+	l.viewport, cmd = l.viewport.Update(msg)
+	return l, cmd, modalResult{}
 }
 
-// logsModalView renders a centred modal with the last job's output.
-func (m Model) logsModalView() string {
-	content := m.lastJobLog
+func (l logsModal) InputFocused() bool { return false }
+
+// View renders a centred modal with the last job's output.
+func (l logsModal) View(_, _ int) string {
+	content := l.log
 	if content == "" {
 		content = ui.StyleDim.Render("(" + ui.MessageNoOutput() + ")")
 	}
-	m.logsViewport.SetContent(content)
+	l.viewport.SetContent(content)
 	return components.RenderOutputModal(
-		m.lastJobLabel,
-		m.logsViewport.View(),
+		l.label,
+		l.viewport.View(),
 		ui.HintDismiss(),
 		ui.ColorBorder,
 		ui.ColorGreen,
 		ui.ColorGray,
-		m.logsViewport.Width(),
+		l.viewport.Width(),
 	)
 }

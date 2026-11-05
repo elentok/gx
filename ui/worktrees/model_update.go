@@ -21,9 +21,9 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) InputFocused() bool {
 	return m.mode == modeRename || m.mode == modeClone || m.mode == modeNew ||
-		m.mode == modeNewAndOpen || m.mode == modeCredentialPrompt || m.mode == modeSearch ||
-		m.mode == modeTerminalMenu || m.mode == modePushDiverged ||
-		m.pull.InputFocused() || m.helpModel.InputFocused()
+		m.mode == modeNewAndOpen || m.mode == modeSearch ||
+		(m.modal != nil && m.modal.InputFocused()) ||
+		m.pull.InputFocused()
 }
 
 func (m Model) ModalOpen() bool {
@@ -51,8 +51,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m, nil
 
 	case tea.PasteMsg:
+		if m.modal != nil {
+			if next, cmd, ok := m.updateModal(msg); ok {
+				return next, cmd
+			}
+		}
 		switch m.mode {
-		case modeCredentialPrompt, modeRename, modeClone, modeNew, modeNewAndOpen:
+		case modeRename, modeClone, modeNew, modeNewAndOpen:
 			var cmd tea.Cmd
 			m.textInput, cmd = m.textInput.Update(msg)
 			return m, cmd
@@ -79,31 +84,23 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
 		}
+		if m.modal != nil {
+			next, cmd, _ := m.updateModal(msg)
+			return next, cmd
+		}
 		switch m.mode {
-		case modeError:
-			return m.handleErrorKey(msg)
-		case modeHelp:
-			return m.handleHelpKey(msg)
-		case modeCredentialPrompt:
-			return m.handleCredentialKey(msg)
 		case modeRename:
 			return m.handleRenameKey(msg)
 		case modeClone:
 			return m.handleCloneKey(msg)
 		case modeNew, modeNewAndOpen:
 			return m.handleNewKey(msg)
-		case modeTerminalMenu:
-			return m.handleTerminalMenuKey(msg)
 		case modeYank:
 			return m.handleYankKey(msg)
 		case modePaste:
 			return m.handlePasteModeKey(msg)
 		case modeSearch:
 			return m.handleSearchKey(msg)
-		case modeLogs:
-			return m.handleLogsKey(msg)
-		case modePushDiverged:
-			return m.handlePushDivergedKey(msg)
 		case modeDeleteProgress:
 			return m, nil
 		}
@@ -177,22 +174,17 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		runner := components.NewCommandRunnerWithPolicy(msg.wt.Path, "git", components.CredentialPolicyPrompt, args...)
 		runner.Start()
 		log := cmdoutput.CommandOutputLogFrom(msg.initialLog)
-		w := msg.wt
-		m.jobRunner = runner
-		m.jobKind = msg.kind
-		m.jobWorktree = &w
-		m.jobLog = log
-		m.jobStashed = msg.stashed
+		m.jobs.start(runner, msg.kind, msg.wt, log, msg.stashed)
 		m.spinnerActive = true
 		m.spinnerLabel = promptableJobLabel(msg.kind, msg.wt)
 		return m, m.spinner.Tick
 
 	case spinner.TickMsg:
-		if m.jobRunner != nil {
-			if prompt, ok := m.jobRunner.Prompt(); ok && m.mode != modeCredentialPrompt {
+		if m.jobs.running() {
+			if prompt, ok := m.jobs.runner.Prompt(); ok && !m.credentialOpen() {
 				m = m.enterCredentialPrompt(prompt)
 			}
-			if err, done := m.jobRunner.Result(); done {
+			if err, done := m.jobs.runner.Result(); done {
 				return m.finishPromptableJob(err)
 			}
 		}

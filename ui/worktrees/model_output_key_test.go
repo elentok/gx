@@ -77,8 +77,8 @@ func TestGOOpensLogsMode(t *testing.T) {
 		t.Fatalf("go should not launch command")
 	}
 	m = updated.(Model)
-	if m.mode != modeLogs {
-		t.Fatalf("expected go to open logs mode, got mode=%v", m.mode)
+	if _, ok := m.modal.(logsModal); !ok {
+		t.Fatalf("expected go to open logs modal, got %T", m.modal)
 	}
 }
 
@@ -207,7 +207,7 @@ func TestOHidesTerminalMenuWhenHerdrUnavailable(t *testing.T) {
 	m.table.SetRows(m.buildRows())
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
-	if got := updated.(Model).mode; got == modeTerminalMenu {
+	if _, ok := updated.(Model).modal.(terminalMenu); ok {
 		t.Fatalf("o entered the terminal menu with herdr unavailable")
 	}
 }
@@ -264,11 +264,12 @@ func TestGhosttyTerminalMenuActionsUseSplitShell(t *testing.T) {
 	}
 	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalGhostty}, keymgr.Manager{})
 	m = m.enterTerminalMenuFor("main", filepath.Join(repoDir, "main"))
-	if len(m.terminalMenu.Items) != 3 {
-		t.Fatalf("expected 3 ghostty items, got %d", len(m.terminalMenu.Items))
+	tm := m.modal.(terminalMenu)
+	if len(tm.menu.Items) != 3 {
+		t.Fatalf("expected 3 ghostty items, got %d", len(tm.menu.Items))
 	}
 	for _, action := range []string{"hsplit", "vsplit", "tab"} {
-		_, cmd := m.executeTerminalAction(action)
+		cmd := tm.action(action)
 		if cmd == nil {
 			t.Errorf("%s: expected a command", action)
 		}
@@ -294,8 +295,8 @@ func TestOEntersTerminalMenuMode(t *testing.T) {
 		t.Fatalf("o should not launch command")
 	}
 	m = updated.(Model)
-	if m.mode != modeTerminalMenu {
-		t.Fatalf("expected o to enter terminal menu mode, got mode=%v", m.mode)
+	if _, ok := m.modal.(terminalMenu); !ok {
+		t.Fatalf("expected o to open the terminal menu, got %T", m.modal)
 	}
 	if !m.InputFocused() {
 		t.Fatalf("terminal menu must report InputFocused so the shell passes printable keys to its filter")
@@ -306,7 +307,8 @@ func TestOEntersTerminalMenuMode(t *testing.T) {
 		t.Fatalf("s should filter the menu, not launch a session")
 	}
 	m = updated.(Model)
-	if m.mode != modeTerminalMenu || m.terminalMenu.Filter != "s" {
-		t.Fatalf("expected s to filter the open menu, got mode=%v filter=%q", m.mode, m.terminalMenu.Filter)
+	tm, ok := m.modal.(terminalMenu)
+	if !ok || tm.menu.Filter != "s" {
+		t.Fatalf("expected s to filter the open menu, got modal=%T", m.modal)
 	}
 }

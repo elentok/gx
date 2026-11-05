@@ -13,64 +13,62 @@ import (
 	humanize "github.com/dustin/go-humanize"
 )
 
-func (m Model) enterPushDivergedMode(wt git.Worktree, div *git.PushDivergence) Model {
-	m.mode = modePushDiverged
-	m.pushDivergence = div
-	w := wt
-	m.pushDivergenceWT = &w
-	m.pushMenu = components.MenuState{
-		Items: []components.MenuItem{
-			{Label: "Rebase", Value: "rebase"},
-			{Label: "Push --force", Value: "force"},
-			{Label: "Abort", Value: "abort"},
-		},
-		Cursor: 0,
-	}
-	return m
+// pushDivergedModal asks how to resolve a push that the remote has diverged from.
+type pushDivergedModal struct {
+	divergence *git.PushDivergence
+	wt         git.Worktree
+	menu       components.MenuState
+	// log is the last job output, handed on to the follow-up command.
+	log string
 }
 
-func (m Model) handlePushDivergedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if m.pushDivergence == nil || m.pushDivergenceWT == nil {
-		m.mode = modeNormal
-		return m, nil
-	}
-	wt := *m.pushDivergenceWT
-	div := m.pushDivergence
+func (m Model) enterPushDivergedMode(wt git.Worktree, div *git.PushDivergence) Model {
+	return m.openModal(pushDivergedModal{
+		divergence: div,
+		wt:         wt,
+		log:        m.lastJobLog,
+		menu: components.MenuState{
+			Items: []components.MenuItem{
+				{Label: "Rebase", Value: "rebase"},
+				{Label: "Push --force", Value: "force"},
+				{Label: "Abort", Value: "abort"},
+			},
+			Cursor: 0,
+		},
+	})
+}
 
-	next, decided, accepted, handled := components.UpdateMenu(msg, m.pushMenu)
-	if !handled {
-		return m, nil
+func (p pushDivergedModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+	key, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return p, nil, modalResult{unhandled: true}
 	}
-	m.pushMenu = next
+	next, decided, accepted, handled := components.UpdateMenu(key, p.menu)
+	if !handled {
+		return p, nil, modalResult{}
+	}
+	p.menu = next
 	if !decided {
-		return m, nil
+		return p, nil, modalResult{}
 	}
 	if !accepted {
-		m.mode = modeNormal
-		return m, notify.Info(ui.MessageAborted("push"))
+		return p, notify.Info(ui.MessageAborted("push")), modalResult{close: true}
 	}
-	item, _ := m.pushMenu.Selected()
-	choice := item.Value
-	switch choice {
+	item, _ := p.menu.Selected()
+	switch item.Value {
 	case "rebase":
-		m.mode = modeNormal
-		m.spinnerActive = true
-		m.spinnerLabel = "Rebasing " + wt.Name + "..."
-		return m, tea.Batch(cmdRebaseRef(wt, div.Upstream, m.lastJobLog), m.spinner.Tick)
+		return p, cmdRebaseRef(p.wt, p.divergence.Upstream, p.log), modalResult{close: true, spinner: "Rebasing " + p.wt.Name + "..."}
 	case "force":
-		m.mode = modeNormal
-		return m, cmdStartPromptableJob(promptableJobForcePush, wt, m.lastJobLog, false)
+		return p, cmdStartPromptableJob(promptableJobForcePush, p.wt, p.log, false), modalResult{close: true}
 	default:
-		m.mode = modeNormal
-		return m, notify.Info(ui.MessageAborted("push"))
+		return p, notify.Info(ui.MessageAborted("push")), modalResult{close: true}
 	}
 }
 
-func (m Model) pushDivergedModalView() string {
-	if m.pushDivergence == nil {
-		return ""
-	}
-	d := m.pushDivergence
+func (p pushDivergedModal) InputFocused() bool { return true }
+
+func (p pushDivergedModal) View(_, _ int) string {
+	d := p.divergence
 	prompt := fmt.Sprintf(
 		"Branch %s has diverged from the remote branch:\n\nLast local commit: %s\n  %s %s\n\nLast remote commit: %s\n  %s %s",
 		d.Branch,
@@ -84,7 +82,7 @@ func (m Model) pushDivergedModalView() string {
 	return components.RenderMenuModal(
 		"Push Diverged",
 		prompt,
-		m.pushMenu,
+		p.menu,
 		"",
 		ui.ColorBorder,
 		ui.ColorBorder,

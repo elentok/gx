@@ -9,7 +9,14 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// showError switches the model into error mode with a scrollable viewport.
+// errorModal shows an error in a scrollable viewport.
+type errorModal struct {
+	viewport viewport.Model
+	// hasLog is true when the last job left output the "o" key can open.
+	hasLog bool
+}
+
+// showError opens the error modal.
 func (m Model) showError(errMsg string) Model {
 	vpW := m.width * 2 / 3
 	if vpW < 40 {
@@ -24,44 +31,49 @@ func (m Model) showError(errMsg string) Model {
 	}
 	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
 	vp.SetContent(errMsg)
-	m.errorViewport = vp
-	m.mode = modeError
-	return m
+	return m.openModal(errorModal{viewport: vp, hasLog: m.lastJobLog != ""})
 }
 
-// handleErrorKey scrolls the error viewport or dismisses it.
-func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "enter", "q":
-		m.mode = modeNormal
-		return m, nil
-	case "o":
-		if m.lastJobLog != "" {
-			return m.enterLogsMode(), nil
+// Update scrolls the error viewport or dismisses it.
+func (e errorModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "esc", "enter", "q":
+			return e, nil, modalResult{close: true}
+		case "o":
+			if e.hasLog {
+				return e, nil, modalResult{openLogs: true}
+			}
 		}
+	case tea.MouseWheelMsg:
+	default:
+		return e, nil, modalResult{unhandled: true}
 	}
 	var cmd tea.Cmd
-	m.errorViewport, cmd = m.errorViewport.Update(msg)
-	return m, cmd
+	e.viewport, cmd = e.viewport.Update(msg)
+	return e, cmd, modalResult{}
 }
 
-func (m Model) errorHint() string {
+func (e errorModal) InputFocused() bool { return false }
+
+func (e errorModal) hint() string {
 	hint := "esc / enter / q  dismiss"
-	if m.lastJobLog != "" {
+	if e.hasLog {
 		hint = ui.JoinStatus(hint, ui.StyleTitle.Render("go")+" "+ui.StyleHint.Render("view output"))
 	}
 	return ui.StyleDim.Render(hint)
 }
 
-// errorModalView renders a centred modal with the error text.
-func (m Model) errorModalView() string {
+// View renders a centred modal with the error text.
+func (e errorModal) View(_, _ int) string {
 	return components.RenderOutputModal(
 		"Error",
-		m.errorViewport.View(),
-		ansi.Strip(m.errorHint()),
+		e.viewport.View(),
+		ansi.Strip(e.hint()),
 		ui.ColorRed,
 		ui.ColorRed,
 		ui.ColorGray,
-		m.errorViewport.Width(),
+		e.viewport.Width(),
 	)
 }

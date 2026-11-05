@@ -36,35 +36,57 @@ func (m Model) herdrTerminalDown() bool {
 	return m.settings.Terminal == ui.TerminalHerdr && m.settings.HerdrUnavailable
 }
 
-func (m Model) enterTerminalMenuFor(name, path string) Model {
-	m.mode = modeTerminalMenu
-	m.openTargetName = name
-	m.openTargetPath = path
-	m.terminalMenu = components.MenuState{
-		Items:  terminalMenuItems(m.settings.Terminal),
-		Cursor: 0,
-	}
-	return m
+// terminalMenu offers the ways to open a worktree in the terminal.
+type terminalMenu struct {
+	menu     components.MenuState
+	name     string
+	path     string
+	title    string
+	terminal ui.Terminal
+	repoName string
+	aliases  map[string]string
 }
 
-func (m Model) handleTerminalMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	newState, done, selected, handled := components.UpdateMenu(msg, m.terminalMenu)
-	m.terminalMenu = newState
+func (m Model) enterTerminalMenuFor(name, path string) Model {
+	title := "Open in Terminal"
+	if wt := m.cursorWorktree(); wt != nil {
+		title = "Open: " + wt.Name
+	}
+	return m.openModal(terminalMenu{
+		menu: components.MenuState{
+			Items:  terminalMenuItems(m.settings.Terminal),
+			Cursor: 0,
+		},
+		name:     name,
+		path:     path,
+		title:    title,
+		terminal: m.settings.Terminal,
+		repoName: filepath.Base(m.repo.LinkedWorktreeDir()),
+		aliases:  m.settings.NameAliases,
+	})
+}
+
+func (t terminalMenu) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+	key, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return t, nil, modalResult{unhandled: true}
+	}
+	newState, done, selected, handled := components.UpdateMenu(key, t.menu)
+	t.menu = newState
 	if !handled || !done {
-		return m, nil
+		return t, nil, modalResult{}
 	}
 	if selected {
-		item, _ := m.terminalMenu.Selected()
-		return m.executeTerminalAction(item.Value)
+		item, _ := t.menu.Selected()
+		return t, t.action(item.Value), modalResult{close: true}
 	}
-	m.mode = modeNormal
-	return m, nil
+	return t, nil, modalResult{close: true}
 }
 
-func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
-	m.mode = modeNormal
-	name := m.openTargetName
-	path := m.openTargetPath
+func (t terminalMenu) InputFocused() bool { return true }
+
+func (t terminalMenu) action(action string) tea.Cmd {
+	name, path := t.name, t.path
 
 	shell := os.Getenv("SHELL")
 	if shell == "" {
@@ -72,70 +94,63 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 	}
 	done := func(err error, _ string) tea.Msg { return launch.TerminalResultMsg{Err: err} }
 
-	switch m.settings.Terminal {
+	switch t.terminal {
 	case ui.TerminalTmux:
 		switch action {
 		case "session":
-			return m, launch.TmuxNewSession(name, path)
+			return launch.TmuxNewSession(name, path)
 		case "hsplit":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.HSplit, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.HSplit, shell, done)
 		case "vsplit":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.VSplit, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.VSplit, shell, done)
 		case "tab":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.Tab, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.Tab, shell, done)
 		}
 	case ui.TerminalKittyRemote:
-		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
-		sessName := launch.SessionNameFor(repoName, name, m.settings.NameAliases)
+		sessName := launch.SessionNameFor(t.repoName, name, t.aliases)
 		switch action {
 		case "session":
-			return m, launch.KittySession(sessName, path)
+			return launch.KittySession(sessName, path)
 		case "hsplit":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.HSplit, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.HSplit, shell, done)
 		case "vsplit":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.VSplit, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.VSplit, shell, done)
 		case "tab":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.Tab, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.Tab, shell, done)
 		}
 	case ui.TerminalHerdr:
-		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
-		sessName := launch.SessionNameFor(repoName, name, m.settings.NameAliases)
+		sessName := launch.SessionNameFor(t.repoName, name, t.aliases)
 		switch action {
 		case "session":
-			return m, launch.HerdrSession(sessName, path)
+			return launch.HerdrSession(sessName, path)
 		case "hsplit":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.HSplit, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.HSplit, shell, done)
 		case "vsplit":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.VSplit, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.VSplit, shell, done)
 		case "tab":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.Tab, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.Tab, shell, done)
 		}
 	case ui.TerminalGhostty:
 		switch action {
 		case "hsplit":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.HSplit, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.HSplit, shell, done)
 		case "vsplit":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.VSplit, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.VSplit, shell, done)
 		case "tab":
-			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.Tab, shell, done)
+			return terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.Tab, shell, done)
 		}
 	case ui.TerminalKitty:
-		return m, notify.Info("enable kitty remote control for this to work")
+		return notify.Info("enable kitty remote control for this to work")
 	default:
-		return m, notify.Info(moreOptionsInfo)
+		return notify.Info(moreOptionsInfo)
 	}
-	return m, nil
+	return nil
 }
 
-func (m Model) terminalMenuModalView() string {
-	wt := m.cursorWorktree()
-	title := "Open in Terminal"
-	if wt != nil {
-		title = "Open: " + wt.Name
-	}
+func (t terminalMenu) View(_, _ int) string {
 	return components.RenderMenuModal(
-		title, "",
-		m.terminalMenu,
+		t.title, "",
+		t.menu,
 		"",
 		ui.ColorBorder, ui.ColorBlue, ui.ColorSubtle, ui.ColorText,
 		40,

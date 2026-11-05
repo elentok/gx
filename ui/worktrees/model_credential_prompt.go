@@ -22,41 +22,61 @@ func newCredentialInput(secret bool) textinput.Model {
 	return ti
 }
 
-func (m Model) enterCredentialPrompt(prompt components.CredentialPrompt) Model {
-	m.mode = modeCredentialPrompt
-	m.textInput = newCredentialInput(prompt.Kind == components.PromptKindSecret)
-	m.credentialPromptText = prompt.Text
-	return m
+// credentialModal asks the user for a credential a running job is waiting on.
+type credentialModal struct {
+	input  textinput.Model
+	text   string
+	runner *components.CommandRunner
 }
 
-func (m Model) handleCredentialKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		if m.jobRunner != nil {
-			m.jobRunner.Cancel()
+func (m Model) enterCredentialPrompt(prompt components.CredentialPrompt) Model {
+	return m.openModal(credentialModal{
+		input:  newCredentialInput(prompt.Kind == components.PromptKindSecret),
+		text:   prompt.Text,
+		runner: m.jobs.runner,
+	})
+}
+
+// credentialOpen reports whether the credential modal is the open modal.
+func (m Model) credentialOpen() bool {
+	_, ok := m.modal.(credentialModal)
+	return ok
+}
+
+func (c credentialModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "esc":
+			if c.runner != nil {
+				c.runner.Cancel()
+			}
+			return c, nil, modalResult{close: true}
+		case "enter":
+			if c.runner != nil {
+				_ = c.runner.SubmitPromptInput(c.input.Value())
+			}
+			return c, nil, modalResult{close: true}
 		}
-		m.mode = modeNormal
-		return m, nil
-	case "enter":
-		if m.jobRunner != nil {
-			_ = m.jobRunner.SubmitPromptInput(m.textInput.Value())
-		}
-		m.mode = modeNormal
-		return m, nil
+	case tea.PasteMsg:
+	default:
+		return c, nil, modalResult{unhandled: true}
 	}
 	var cmd tea.Cmd
-	m.textInput, cmd = m.textInput.Update(msg)
-	return m, cmd
+	c.input, cmd = c.input.Update(msg)
+	return c, cmd, modalResult{}
 }
 
-func (m Model) credentialModalView() string {
-	input := m.textInput.View()
+func (c credentialModal) InputFocused() bool { return true }
+
+func (c credentialModal) View(_, _ int) string {
+	input := c.input.View()
 	if input == "" {
 		input = " "
 	}
 	return components.RenderInputModal(
 		"Credential Required",
-		m.credentialPromptText,
+		c.text,
 		input,
 		ui.HintSubmitCancel(),
 		ui.ColorBorder,
@@ -67,23 +87,16 @@ func (m Model) credentialModalView() string {
 }
 
 func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
-	if m.jobRunner == nil || m.jobWorktree == nil || m.jobLog == nil {
+	done, ok := m.jobs.finish(m.repo)
+	if !ok {
 		m.spinnerActive = false
+		m.modal = nil
 		m.mode = modeNormal
 		return m, nil
 	}
 
-	wt := *m.jobWorktree
-	args := promptableJobArgs(m.repo, m.jobKind, wt)
-	output := m.jobRunner.Output()
-	m.jobLog.AppendCommand("git", args, output)
-	log := m.jobLog.String()
-	kind := m.jobKind
-
-	m.jobRunner = nil
-	m.jobWorktree = nil
-	m.jobLog = nil
-	m.jobStashed = false
+	wt, kind, output, log := done.wt, done.kind, done.output, done.log
+	m.modal = nil
 	m.mode = modeNormal
 	m.spinnerActive = false
 	m.lastJobLog = log

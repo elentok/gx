@@ -59,6 +59,7 @@ func (m Model) applyConfirmResult(next confirm.Model, cmd tea.Cmd, result confir
 	m.confirm = next
 	if result.Done {
 		m.mode = modeNormal
+		m.modal = nil
 		if result.Accepted && result.SpinnerLabel != "" {
 			m.spinnerActive = true
 			m.spinnerLabel = result.SpinnerLabel

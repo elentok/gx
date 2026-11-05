@@ -80,8 +80,8 @@ func TestUpdate_RenameResultMsg_Error(t *testing.T) {
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(renameResultMsg{err: errTest})
 	next := updated.(Model)
-	if next.mode != modeError {
-		t.Errorf("expected modeError after rename error, got %v", next.mode)
+	if _, ok := next.modal.(errorModal); !ok {
+		t.Errorf("expected error modal after rename error, got %T", next.modal)
 	}
 }
 
@@ -90,8 +90,8 @@ func TestUpdate_CloneResultMsg_Error(t *testing.T) {
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(cloneResultMsg{err: errTest})
 	next := updated.(Model)
-	if next.mode != modeError {
-		t.Errorf("expected modeError after clone error, got %v", next.mode)
+	if _, ok := next.modal.(errorModal); !ok {
+		t.Errorf("expected error modal after clone error, got %T", next.modal)
 	}
 }
 
@@ -100,8 +100,8 @@ func TestUpdate_NewResultMsg_Error(t *testing.T) {
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(newResultMsg{err: errTest})
 	next := updated.(Model)
-	if next.mode != modeError {
-		t.Errorf("expected modeError after new error, got %v", next.mode)
+	if _, ok := next.modal.(errorModal); !ok {
+		t.Errorf("expected error modal after new error, got %T", next.modal)
 	}
 }
 
