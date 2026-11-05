@@ -98,7 +98,8 @@ var allowed = map[string]int{
 	"server/ratelimit_claim_hold_test.go":             1, // negative wait: a claim would show within a few ticks
 	"server/ratelimit_hold_run_test.go":               1, // negative wait: a launch would show within a few ticks
 	"server/recovery_notify_test.go":                  4,
-	"server/recovery_test.go":                         7,
+	"server/recovery_investigate_test.go":             1,
+	"server/recovery_gates_test.go":                   6,
 	"server/retry_prompt_test.go":                     1, // negative wait: no second interrupt or prompt follows the retry
 	"server/runner_test.go":                           1,
 	"server/server_notify_test.go":                    1,
