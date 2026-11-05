@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"bytes"
@@ -312,11 +312,11 @@ func TestAgentLinkAndStep_IgnoreTheClaudeSessionVariable(t *testing.T) {
 	for _, args := range [][]string{{"agent", "link", "auth/03"}, {"agent", "step", "spec"}} {
 		var out bytes.Buffer
 		d := agentTestDeps(&out, nil)
-		d.serverClient = func() (*apiclient.Client, error) {
+		d.NewClient = func() (*apiclient.Client, error) {
 			t.Errorf("%v: a Claude variable alone reached the server", args)
 			return nil, errors.New("unexpected dial")
 		}
-		if err := execute(args, d); err != nil || !strings.Contains(out.String(), "not in a gx session") {
+		if err := execute(t, args, d); err != nil || !strings.Contains(out.String(), "not in a gx session") {
 			t.Errorf("%v = %q, %v; want the outside-a-session note", args, out.String(), err)
 		}
 	}

@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/spf13/cobra"
 )
 
@@ -122,7 +123,7 @@ func newAgentGuardBashCmd() *cobra.Command {
 				return nil
 			}
 			fmt.Fprintln(c.ErrOrStderr(), reason)
-			return &ExitError{Code: guardBashExitCode}
+			return &cmdbase.ExitError{Code: guardBashExitCode}
 		},
 	}
 	cmd.Flags().StringVar(&harnessName, "harness", agentClaude, `the harness running the hook: "claude" or "codex"`)
@@ -140,7 +141,7 @@ func newAgentGuardQuestionCmd() *cobra.Command {
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
 			fmt.Fprintln(c.ErrOrStderr(), "Do not use request_user_input. To ask a person, run `gx tickets ask <addr> --body -` (a `## Question` and a `## Handoff` section on stdin), then end your turn.")
-			return &ExitError{Code: guardBashExitCode}
+			return &cmdbase.ExitError{Code: guardBashExitCode}
 		},
 	}
 }

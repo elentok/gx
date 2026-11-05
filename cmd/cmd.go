@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
+	agentcmd "github.com/elentok/gx/cmd/agent"
 	"github.com/elentok/gx/cmd/brief"
 	"github.com/elentok/gx/cmd/check"
 	claudecmd "github.com/elentok/gx/cmd/claude"
@@ -19,12 +20,10 @@ import (
 	"github.com/elentok/gx/cmd/serverapi"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
-	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/sessionlookup"
-	"github.com/elentok/gx/transcript"
 	"github.com/elentok/gx/ui/nav"
 
 	"github.com/spf13/cobra"
@@ -60,13 +59,9 @@ type deps struct {
 	goos                 string
 	userHomeDir          func() (string, error)
 	stdinIsTerminal      func() bool
-	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
-	verifyCodexSession   func(cwd, sessionID string) (ok bool, err error)
-	readCodexContext     func(cwd, sessionID string) (tokens int, ok bool, err error)
-	// readAutoAdvance reads a gx session's auto-advance switch from the server.
-	readAutoAdvance func(sessionID string) (bool, error)
-	// readSessionHarness reads a gx session's harness name from the server.
-	readSessionHarness func(sessionID string) (string, error)
+	// agent holds the `gx agent`, `gx agents` and `gx designs` hooks (its Env
+	// and OpenTab are unset; agentDeps fills them).
+	agent agentcmd.Deps
 	// skills holds the `gx skills` hooks (its Env is unset; skillsDeps fills
 	// it). `gx server start` also reads them until it moves out of root.
 	skills skillscmd.Deps
@@ -135,6 +130,15 @@ func (d deps) projectDeps() project.Deps {
 	return s
 }
 
+// agentDeps is the `gx agent`, `gx agents` and `gx designs` hooks joined with
+// the shared env. runTab stays in root deps because `gx tickets` also uses it.
+func (d deps) agentDeps() agentcmd.Deps {
+	s := d.agent
+	s.Env = d.base()
+	s.OpenTab = d.runTab
+	return s
+}
+
 // serverapiDeps is the `gx server` API verbs' hook joined with the shared env.
 // stdinIsTerminal stays in root deps because other commands read it too.
 func (d deps) serverapiDeps() serverapi.Deps {
@@ -174,20 +178,10 @@ func defaultDeps() deps {
 		goos:                 runtime.GOOS,
 		userHomeDir:          dirs.Home,
 		stdinIsTerminal:      func() bool { return isTerminalFile(os.Stdin) },
-		readClaudeOccupancy: func(cwd, sessionID string) (int, bool, error) {
-			return transcript.LastAssistantOccupancyIn(roots.Home, cwd, sessionID)
-		},
-		verifyCodexSession: func(cwd, sessionID string) (bool, error) {
-			return codexsession.VerifyIdentityIn(roots.CodexHome, cwd, sessionID)
-		},
-		readCodexContext: func(cwd, sessionID string) (int, bool, error) {
-			return codexsession.LastContextTokensIn(roots.CodexHome, cwd, sessionID)
-		},
-		readAutoAdvance:    func(sessionID string) (bool, error) { return readServerAutoAdvance(dirs, sessionID) },
-		readSessionHarness: func(sessionID string) (string, error) { return readServerHarness(dirs, sessionID) },
-		skills:             skillscmd.DefaultDeps(dirs, roots.CodexHome),
-		doctor:             doctor.DefaultDeps(),
-		config:             configcmd.DefaultDeps(dirs, env),
+		agent:                agentcmd.DefaultDeps(dirs, roots),
+		skills:               skillscmd.DefaultDeps(dirs, roots.CodexHome),
+		doctor:               doctor.DefaultDeps(),
+		config:               configcmd.DefaultDeps(dirs, env),
 	}
 }
 
@@ -247,9 +241,9 @@ Run without a command to open the status UI.`,
 	root.SetVersionTemplate("gx {{.Version}}\n")
 
 	root.AddCommand(
-		newAgentCmd(d),
-		newAgentsCmd(d),
-		newDesignsCmd(d),
+		agentcmd.New(d.agentDeps()),
+		agentcmd.NewAgents(d.agentDeps()),
+		agentcmd.NewDesigns(d.agentDeps()),
 		claudecmd.New(d.claudeDeps()),
 		codexcmd.New(d.codexDeps()),
 		newWorktreesCmd(d),
@@ -276,7 +270,7 @@ Run without a command to open the status UI.`,
 		configcmd.NewNotify(d.configDeps()),
 		newStashifyCmd(d),
 		newRunCmd(d),
-		newAgentHolderCmd(),
+		agentcmd.NewHolder(),
 		term.New(term.Deps{Env: d.base(), GOOS: d.goos}),
 		brief.New(brief.Deps{Env: d.base(), CacheGate: brief.DefaultDeps().CacheGate}),
 		check.New(check.Deps{Env: d.base()}),

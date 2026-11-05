@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"bytes"
@@ -10,9 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server/wire"
-
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -34,7 +35,7 @@ func TestDesignsOpenCmd_UsageErrors(t *testing.T) {
 		"project without idea": {"fresh", "--project", "proj"},
 		"new with new design":  {"fresh", "--new", "--idea", "x", "--project", "proj"},
 	} {
-		cmd := newDesignsOpenCmd(deps{env: envFor(t)})
+		cmd := newDesignsOpenCmd(Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t)}})
 		cmd.SetArgs(args)
 		cmd.SilenceUsage, cmd.SilenceErrors = true, true
 		if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "--") {

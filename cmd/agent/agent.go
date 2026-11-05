@@ -1,12 +1,18 @@
-package cmd
+package agent
 
 import (
 	"errors"
 	"fmt"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/sessionlookup"
+	"github.com/elentok/gx/transcript"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +24,40 @@ const (
 	codexThreadEnvVar   = "CODEX_THREAD_ID"
 )
 
-func newAgentCmd(d deps) *cobra.Command {
+// Deps is the runtime context of every command in this package.
+type Deps struct {
+	cmdbase.Env
+	// OpenTab opens the TUI on a tab; root passes its own runner so this
+	// package does not import the TUI.
+	OpenTab             func(nav.TabID) error
+	ReadClaudeOccupancy func(cwd, sessionID string) (occupancy int, ok bool, err error)
+	VerifyCodexSession  func(cwd, sessionID string) (ok bool, err error)
+	ReadCodexContext    func(cwd, sessionID string) (tokens int, ok bool, err error)
+	// ReadAutoAdvance reads a gx session's auto-advance switch from the server.
+	ReadAutoAdvance func(sessionID string) (bool, error)
+	// ReadSessionHarness reads a gx session's harness name from the server.
+	ReadSessionHarness func(sessionID string) (string, error)
+}
+
+// DefaultDeps wires the production hooks. Env and OpenTab are the caller's.
+func DefaultDeps(dirs config.Dirs, roots sessionlookup.Roots) Deps {
+	return Deps{
+		ReadClaudeOccupancy: func(cwd, sessionID string) (int, bool, error) {
+			return transcript.LastAssistantOccupancyIn(roots.Home, cwd, sessionID)
+		},
+		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
+			return codexsession.VerifyIdentityIn(roots.CodexHome, cwd, sessionID)
+		},
+		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
+			return codexsession.LastContextTokensIn(roots.CodexHome, cwd, sessionID)
+		},
+		ReadAutoAdvance:    func(sessionID string) (bool, error) { return readServerAutoAdvance(dirs, sessionID) },
+		ReadSessionHarness: func(sessionID string) (string, error) { return readServerHarness(dirs, sessionID) },
+	}
+}
+
+// New builds `gx agent`.
+func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "agent",
 		Short: "agent-neutral inspection of the running coding-agent session",
@@ -27,7 +66,8 @@ func newAgentCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func newAgentHolderCmd() *cobra.Command {
+// NewHolder builds the hidden `gx agent-holder`.
+func NewHolder() *cobra.Command {
 	var dir, kind string
 	var opts holder.HolderOptions
 	cmd := &cobra.Command{
@@ -53,7 +93,7 @@ func newAgentHolderCmd() *cobra.Command {
 	return cmd
 }
 
-func newAgentContextWindowCmd(d deps) *cobra.Command {
+func newAgentContextWindowCmd(d Deps) *cobra.Command {
 	var agent, session, cwd, fits string
 
 	cmd := &cobra.Command{
@@ -90,14 +130,14 @@ type agentCandidate struct {
 // set, only that provider is considered (its session id from --session or
 // its own env var); otherwise every provider whose env var is non-empty is a
 // candidate, so the caller can tell "none", "one", and "both" apart.
-func detectAgentCandidates(d deps, agent, session string) ([]agentCandidate, error) {
+func detectAgentCandidates(d Deps, agent, session string) ([]agentCandidate, error) {
 	if agent != "" {
 		if agent != agentClaude && agent != agentCodex {
 			return nil, fmt.Errorf(`invalid --agent %q: want "claude" or "codex"`, agent)
 		}
 		sessionID := session
 		if sessionID == "" {
-			sessionID = d.getenv(envVarFor(agent))
+			sessionID = d.Getenv(envVarFor(agent))
 		}
 		if sessionID == "" {
 			return nil, fmt.Errorf("no session id for --agent %s: pass --session or set %s", agent, envVarFor(agent))
@@ -110,10 +150,10 @@ func detectAgentCandidates(d deps, agent, session string) ([]agentCandidate, err
 	}
 
 	var candidates []agentCandidate
-	if id := d.getenv(claudeSessionEnvVar); id != "" {
+	if id := d.Getenv(claudeSessionEnvVar); id != "" {
 		candidates = append(candidates, agentCandidate{agentClaude, id})
 	}
-	if id := d.getenv(codexThreadEnvVar); id != "" {
+	if id := d.Getenv(codexThreadEnvVar); id != "" {
 		candidates = append(candidates, agentCandidate{agentCodex, id})
 	}
 	return candidates, nil
@@ -129,11 +169,11 @@ func envVarFor(agent string) string {
 // runAgentContextWindow resolves the active agent session (auto-detected via
 // env vars, or pinned via the --agent/--session/--cwd overrides), verifies
 // it belongs to cwd, and returns its current context-occupancy token count.
-func runAgentContextWindow(d deps, agent, session, cwdOverride string) (int, error) {
+func runAgentContextWindow(d Deps, agent, session, cwdOverride string) (int, error) {
 	cwd := cwdOverride
 	if cwd == "" {
 		var err error
-		cwd, err = d.getwd()
+		cwd, err = d.Getwd()
 		if err != nil {
 			return 0, err
 		}
@@ -173,12 +213,12 @@ var errCodexNoUsage = errors.New("no context usage yet")
 
 // pickByGXSession settles both-variables-set by the harness of the gx session
 // the command runs in. Without GX_AGENT_SESSION it keeps the ambiguity.
-func pickByGXSession(d deps, candidates []agentCandidate) ([]agentCandidate, error) {
-	id := d.getenv(holder.AgentSessionEnv)
-	if id == "" || d.readSessionHarness == nil {
+func pickByGXSession(d Deps, candidates []agentCandidate) ([]agentCandidate, error) {
+	id := d.Getenv(holder.AgentSessionEnv)
+	if id == "" || d.ReadSessionHarness == nil {
 		return candidates, nil
 	}
-	name, err := d.readSessionHarness(id)
+	name, err := d.ReadSessionHarness(id)
 	if err != nil {
 		return nil, err
 	}
@@ -194,8 +234,8 @@ func pickByGXSession(d deps, candidates []agentCandidate) ([]agentCandidate, err
 	return candidates, nil
 }
 
-func readClaudeContextWindow(d deps, cwd, sessionID string) (int, error) {
-	occupancy, ok, err := d.readClaudeOccupancy(cwd, sessionID)
+func readClaudeContextWindow(d Deps, cwd, sessionID string) (int, error) {
+	occupancy, ok, err := d.ReadClaudeOccupancy(cwd, sessionID)
 	if err != nil {
 		return 0, fmt.Errorf("reading claude session %s: %w", sessionID, err)
 	}
@@ -205,15 +245,15 @@ func readClaudeContextWindow(d deps, cwd, sessionID string) (int, error) {
 	return occupancy, nil
 }
 
-func readCodexContextWindow(d deps, cwd, sessionID string) (int, error) {
-	verified, err := d.verifyCodexSession(cwd, sessionID)
+func readCodexContextWindow(d Deps, cwd, sessionID string) (int, error) {
+	verified, err := d.VerifyCodexSession(cwd, sessionID)
 	if err != nil {
 		return 0, fmt.Errorf("verifying codex session %s: %w", sessionID, err)
 	}
 	if !verified {
 		return 0, fmt.Errorf("no codex session %s found for %s", sessionID, cwd)
 	}
-	tokens, ok, err := d.readCodexContext(cwd, sessionID)
+	tokens, ok, err := d.ReadCodexContext(cwd, sessionID)
 	if err != nil {
 		return 0, fmt.Errorf("reading codex session %s: %w", sessionID, err)
 	}

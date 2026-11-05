@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"bytes"
@@ -15,9 +15,9 @@ func runAgentModelCmd(t *testing.T, cfg config.Config, env map[string]string, cw
 	t.Helper()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, env)
-	d.getwd = func() (string, error) { return cwd, nil }
-	d.loadConfig = func() (config.Config, error) { return cfg, nil }
-	if err := execute([]string{"agent", "model", tier}, d); err != nil {
+	d.Getwd = func() (string, error) { return cwd, nil }
+	d.LoadConfig = func() (config.Config, error) { return cfg, nil }
+	if err := execute(t, []string{"agent", "model", tier}, d); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	return stdout.String()
@@ -121,8 +121,8 @@ func TestAgentModel_UnknownTierFails(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, nil)
-	d.loadConfig = func() (config.Config, error) { return config.Default(), nil }
-	if err := execute([]string{"agent", "model", "huge"}, d); err == nil {
+	d.LoadConfig = func() (config.Config, error) { return config.Default(), nil }
+	if err := execute(t, []string{"agent", "model", "huge"}, d); err == nil {
 		t.Error("want an error for an unknown tier")
 	}
 }

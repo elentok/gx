@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"bytes"
@@ -12,14 +12,14 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-func TestAgentsPrompt_JSON(t *testing.T) {
+func TestAgentsAutoAdvance_JSON(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	created, err := h.Client.Sessions.Create(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || created.Session == nil {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
 	var out bytes.Buffer
-	if err := runAgentsPrompt(context.Background(), h.Client, &out, true, wire.SessionPromptRequest{ID: created.Session.ID, Continue: true}); err != nil {
+	if err := runAgentsAutoAdvance(context.Background(), h.Client, &out, true, created.Session.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	var res wire.SessionResult
@@ -27,6 +27,6 @@ func TestAgentsPrompt_JSON(t *testing.T) {
 		t.Fatalf("output %q: %v", out.String(), err)
 	}
 	if !res.Refused || res.Reason != wire.ReasonSessionNotDesign {
-		t.Errorf("prompt = %+v, want %s", res, wire.ReasonSessionNotDesign)
+		t.Errorf("auto-advance off = %+v, want %s", res, wire.ReasonSessionNotDesign)
 	}
 }

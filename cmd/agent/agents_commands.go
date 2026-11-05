@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 )
 
-func newAgentsCommandsCmd(d deps) *cobra.Command {
+func newAgentsCommandsCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	var kind, project, dir string
 	cmd := &cobra.Command{
@@ -27,7 +27,7 @@ func newAgentsCommandsCmd(d deps) *cobra.Command {
 			if (id == "") == (project == "") {
 				return fmt.Errorf("give either a session or --project with --dir")
 			}
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}

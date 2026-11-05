@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"context"
@@ -18,14 +18,14 @@ func runAgentsFix(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOu
 	return printSessionResult(w, jsonOut, res.SessionResult, err)
 }
 
-func newAgentsFixCmd(d deps) *cobra.Command {
+func newAgentsFixCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "fix <project:epic/NN>",
 		Short: "start an agent that investigates a ticket paused for repair",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}

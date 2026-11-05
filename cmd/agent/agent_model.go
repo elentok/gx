@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newAgentModelCmd(d deps) *cobra.Command {
+func newAgentModelCmd(d Deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "model <light|worker|strongest>",
 		Short: "print the model (and Codex effort) configured for the current agent's tier",
@@ -43,16 +43,16 @@ func tierNames() []string {
 	return names
 }
 
-func runAgentModel(d deps, out io.Writer, tierName string) error {
+func runAgentModel(d Deps, out io.Writer, tierName string) error {
 	tier := agent.Tier(tierName)
 	if !tier.Valid() {
 		return fmt.Errorf("unknown tier %q (want light, worker or strongest)", tierName)
 	}
-	cfg, err := d.loadConfig()
+	cfg, err := d.LoadConfig()
 	if err != nil {
 		return err
 	}
-	if cwd, err := d.getwd(); err == nil {
+	if cwd, err := d.Getwd(); err == nil {
 		if projectDir, err := tickets.RootIn(cfg.TicketStore.Path, cwd); err == nil {
 			if pf, err := config.ReadProjectFile(projectDir); err == nil {
 				cfg = cfg.WithProject(pf)
@@ -74,17 +74,17 @@ func runAgentModel(d deps, out io.Writer, tierName string) error {
 // currentAgent is the agent the caller runs under: its gx server session's
 // harness, else GX_AGENT, else Claude. A session the server cannot tell us
 // about falls through to the next source.
-func currentAgent(d deps) agent.AgentKind {
-	if id := d.getenv(holder.AgentSessionEnv); id != "" {
+func currentAgent(d Deps) agent.AgentKind {
+	if id := d.Getenv(holder.AgentSessionEnv); id != "" {
 		if h, ok := sessionHarness(d, id); ok {
 			return agent.AgentFor(h)
 		}
 	}
-	return agent.AgentFor(d.getenv(projects.AgentEnv))
+	return agent.AgentFor(d.Getenv(projects.AgentEnv))
 }
 
-func sessionHarness(d deps, id string) (string, bool) {
-	cl, err := d.dial()()
+func sessionHarness(d Deps, id string) (string, bool) {
+	cl, err := d.Dial()()
 	if err != nil {
 		return "", false
 	}

@@ -31,7 +31,7 @@ var allowed = map[string]int{
 	"cmd/brief/brief_cleancache_test.go":                   1, // negative wait: go clean does not run while a build holds the gate
 	"cmd/brief/brief_test.go":                              2, // poll loop with a deadline waiting on the fake go; a fixture test source that is slow on purpose
 	"cmd/check/check_record_test.go":                       3, // fixture test sources that are slow on purpose, run by a child go test
-	"cmd/agent_permission_request_test.go":                 3, // one poll loop with a deadline; negative waits: no request is filed; a stale decision is ignored
+	"cmd/agent/agent_permission_request_test.go":           3, // one poll loop with a deadline; negative waits: no request is filed; a stale decision is ignored
 	"cmd/brief/brief_retention_test.go":                    1,
 	"codexdoctor/session_test.go":                          1, // poll loop with a deadline waiting on the rollout
 	"codexsetup/setup_test.go":                             1, // negative wait: a rerun leaves the files' mtimes alone

@@ -132,6 +132,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/skills` — `gx skills install|uninstall` (`New`, `Deps` with the `skills*` hooks, `DefaultDeps`, `Refresh` for `gx server start`)
   - `cmd/term` — `gx term` (`New`, `Deps` with the `GOOS` field)
   - `cmd/limits` — `gx budget`, `gx usage`, `gx afk`, `gx vimode` (`New`, `NewUsage`, `NewAFK`, `NewViMode`, `Deps` with no hooks of its own; `BudgetLine` is called by `gx server status`)
+  - `cmd/agent` — `gx agent`, `gx agents`, `gx designs` and the hidden `agent-holder` (`New`, `NewAgents`, `NewDesigns`, `NewHolder`; `Deps` with the `OpenTab`, `ReadClaudeOccupancy`, `VerifyCodexSession`, `ReadCodexContext`, `ReadAutoAdvance` and `ReadSessionHarness` hooks; `DefaultDeps`)
   - `cmd/project` — `gx project` (`New`, `Deps` with the `RunEditor` and `StdinIsTerminal` hooks, `DefaultDeps`)
   - `cmd/serverapi` — the `gx server` verbs that only call the server API (`Commands`, `Deps` with the `StdinIsTerminal` hook for the web password prompt; `DecideOneOff` is called by `gx evolve`; also `NewAskCmd` and `NewAnswerCmd`, the `gx tickets ask|answer` verbs root registers)
   - `cmd/ticketsmigrate` — `gx tickets migrate` (`New`, `Deps` with no hooks of its own; `DryRunChanges` is also called by `gx restart-check`)

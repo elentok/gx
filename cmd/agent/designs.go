@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"context"
@@ -14,9 +14,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newDesignsCmd is `gx designs`: the Designs, the sessions that run gx-design
+// NewDesigns is `gx designs`: the Designs, the sessions that run gx-design
 // on a map epic.
-func newDesignsCmd(d deps) *cobra.Command {
+func NewDesigns(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "designs", Short: "map epics' design sessions owned by the server", Args: cobra.NoArgs}
 	cmd.AddCommand(newDesignsOpenCmd(d), newDesignsDeleteCmd(d), newDesignsWorktreeCmd(d))
 	return cmd
@@ -57,14 +57,14 @@ func runDesignsWorktree(ctx context.Context, cl *apiclient.Client, w io.Writer, 
 	return err
 }
 
-func newDesignsWorktreeCmd(d deps) *cobra.Command {
+func newDesignsWorktreeCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "worktree <project:epic>",
 		Short: "print the map's design worktree, made and rebased onto trunk if needed (the trunk checkout after Branch)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -85,14 +85,14 @@ func runDesignsDelete(ctx context.Context, cl *apiclient.Client, w io.Writer, js
 	return printSessionResult(w, jsonOut, res, err)
 }
 
-func newDesignsDeleteCmd(d deps) *cobra.Command {
+func newDesignsDeleteCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "delete <project:epic>",
 		Short: "delete an uncharted design: a map with no Destination, no tickets and no live session",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -132,7 +132,7 @@ func designOpenRequest(arg, idea, project string, fresh bool) (wire.DesignOpenRe
 	return req, nil
 }
 
-func newDesignsOpenCmd(d deps) *cobra.Command {
+func newDesignsOpenCmd(d Deps) *cobra.Command {
 	var jsonOut, fresh bool
 	var idea, project string
 	cmd := &cobra.Command{
@@ -144,7 +144,7 @@ func newDesignsOpenCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}

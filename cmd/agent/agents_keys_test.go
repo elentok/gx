@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ func TestAgentsKeys_NeedsExactlyOneInput(t *testing.T) {
 		"both": {"s1", "--key", "Esc", "--text", "x"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := newAgentsKeysCmd(deps{})
+			c := newAgentsKeysCmd(Deps{})
 			c.SetArgs(args)
 			c.SetOut(&bytes.Buffer{})
 			c.SetErr(&bytes.Buffer{})

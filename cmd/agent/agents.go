@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"context"
@@ -18,12 +18,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newAgentsCmd is `gx agents`: the server's interactive sessions. With no
+// NewAgents is `gx agents`: the server's interactive sessions. With no
 // subcommand it opens the TUI on the Agents tab.
-func newAgentsCmd(d deps) *cobra.Command {
+func NewAgents(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error { return d.runTab(nav.TabAgents) }}
-	cmd.AddCommand(newAgentsCreateCmd(d.dial()), newAgentsListCmd(d), newAgentsChatCmd(d), newAgentsScreenCmd(d), newAgentsCommandsCmd(d), newAgentsPermissionCmd(d), newAgentsKeysCmd(d),
+		RunE: func(*cobra.Command, []string) error { return d.OpenTab(nav.TabAgents) }}
+	cmd.AddCommand(newAgentsCreateCmd(d.Dial()), newAgentsListCmd(d), newAgentsChatCmd(d), newAgentsScreenCmd(d), newAgentsCommandsCmd(d), newAgentsPermissionCmd(d), newAgentsKeysCmd(d),
 		newAgentsSessionCmd(d, "stop", "end a live session's agent (it stays, Exited)", (*apiclient.Sessions).Stop),
 		newAgentsSessionCmd(d, "interrupt", "end a Working session's current turn (the session stays)", (*apiclient.Sessions).Interrupt),
 		newAgentsSessionCmd(d, "remove", "delete an Exited session", (*apiclient.Sessions).Remove),
@@ -36,7 +36,7 @@ func newAgentsCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func newAgentsAutoAdvanceCmd(d deps) *cobra.Command {
+func newAgentsAutoAdvanceCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:       "auto-advance <id> <on|off>",
@@ -44,7 +44,7 @@ func newAgentsAutoAdvanceCmd(d deps) *cobra.Command {
 		Args:      cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 		ValidArgs: []string{"on", "off"},
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -78,7 +78,7 @@ func runAgentsPrompt(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 	})
 }
 
-func newAgentsPromptCmd(d deps) *cobra.Command {
+func newAgentsPromptCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	var req wire.SessionPromptRequest
 	cmd := &cobra.Command{
@@ -86,7 +86,7 @@ func newAgentsPromptCmd(d deps) *cobra.Command {
 		Short: "type text into an Idle Claude session",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -100,7 +100,7 @@ func newAgentsPromptCmd(d deps) *cobra.Command {
 
 // newAgentActionableCmd is `gx agent actionable`: the calling agent marks its
 // own session Actionable.
-func newAgentActionableCmd(d deps) *cobra.Command {
+func newAgentActionableCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	var action []string
 	cmd := &cobra.Command{
@@ -113,7 +113,7 @@ func newAgentActionableCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			return runAgentActionable(ctx, d.dial(), c.OutOrStdout(), jsonOut, req)
+			return runAgentActionable(ctx, d.Dial(), c.OutOrStdout(), jsonOut, req)
 		},
 	}
 	cmd.Flags().StringArrayVar(&action, "send", nil, "a prompt the Action sends; repeat for more, in order")
@@ -131,7 +131,7 @@ func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, e
 
 // newAgentLinkCmd is `gx agent link`: the calling agent sets its own
 // session's Session ticket.
-func newAgentLinkCmd(d deps) *cobra.Command {
+func newAgentLinkCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "link <ticket-address>",
@@ -143,7 +143,7 @@ func newAgentLinkCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			return runAgentLink(ctx, d.dial(), c.OutOrStdout(), jsonOut, req)
+			return runAgentLink(ctx, d.Dial(), c.OutOrStdout(), jsonOut, req)
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
@@ -160,7 +160,7 @@ func runAgentLink(ctx context.Context, client func() (*apiclient.Client, error),
 
 // newAgentStepCmd is `gx agent step`: the calling agent reports the Design
 // step it is running.
-func newAgentStepCmd(d deps) *cobra.Command {
+func newAgentStepCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	var title string
 	cmd := &cobra.Command{
@@ -173,7 +173,7 @@ func newAgentStepCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			return runAgentStep(ctx, d.dial(), c.OutOrStdout(), jsonOut, req)
+			return runAgentStep(ctx, d.Dial(), c.OutOrStdout(), jsonOut, req)
 		},
 	}
 	cmd.Flags().StringVar(&title, "title", "", "the ticket's title, during Resolve tickets")
@@ -208,7 +208,7 @@ func runAgentSelfWrite(ctx context.Context, client func() (*apiclient.Client, er
 	return printSessionResult(w, jsonOut, res, err)
 }
 
-func newAgentsReportFocusCmd(d deps) *cobra.Command {
+func newAgentsReportFocusCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	var req wire.FocusReport
 	cmd := &cobra.Command{
@@ -216,7 +216,7 @@ func newAgentsReportFocusCmd(d deps) *cobra.Command {
 		Short: "report a TUI's terminal focus and the session on screen (counts while the client's event stream is open)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -285,14 +285,14 @@ func newAgentsCreateCmd(client func() (*apiclient.Client, error)) *cobra.Command
 type sessionWriteFunc func(*apiclient.Sessions, context.Context, string) (wire.SessionResult, error)
 
 // newAgentsSessionCmd is a session write that takes only the session's id.
-func newAgentsSessionCmd(d deps, verb, short string, write sessionWriteFunc) *cobra.Command {
+func newAgentsSessionCmd(d Deps, verb, short string, write sessionWriteFunc) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   verb + " <id>",
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -350,14 +350,14 @@ func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err e
 	return err
 }
 
-func newAgentsChatCmd(d deps) *cobra.Command {
+func newAgentsChatCmd(d Deps) *cobra.Command {
 	var jsonOut, archive bool
 	cmd := &cobra.Command{
 		Use:   "chat <session>",
 		Short: "show a session's chat: the visible messages of its newest conversation",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -392,14 +392,14 @@ func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 	return nil
 }
 
-func newAgentsScreenCmd(d deps) *cobra.Command {
+func newAgentsScreenCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "screen <session>",
 		Short: "show a session's screen as plain text rows",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -429,14 +429,14 @@ func runAgentsSessionScreen(ctx context.Context, cl *apiclient.Client, w io.Writ
 	return nil
 }
 
-func newAgentsListCmd(d deps) *cobra.Command {
+func newAgentsListCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "list interactive sessions",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}

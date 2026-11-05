@@ -1,10 +1,12 @@
-package cmd
+package agent
 
 import (
 	"bytes"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdbase"
 )
 
 func TestGuardBashCommand(t *testing.T) {
@@ -62,7 +64,7 @@ func TestAgentGuardBash_CodexHarness(t *testing.T) {
 		return stderr.String(), err
 	}
 	stderr, err := run(`{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"sed -i s/a/b/ x.go"}}`)
-	var exitErr *ExitError
+	var exitErr *cmdbase.ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != guardBashExitCode {
 		t.Fatalf("err = %v, want ExitError{%d}", err, guardBashExitCode)
 	}
@@ -85,7 +87,7 @@ func TestAgentGuardQuestion_Blocks(t *testing.T) {
 	var stderr bytes.Buffer
 	c.SetIn(strings.NewReader(`{"hook_event_name":"PreToolUse","tool_name":"request_user_input","tool_input":{}}`))
 	c.SetErr(&stderr)
-	var exitErr *ExitError
+	var exitErr *cmdbase.ExitError
 	if err := c.Execute(); !errors.As(err, &exitErr) || exitErr.Code != guardBashExitCode {
 		t.Fatalf("err = %v, want ExitError{%d}", err, guardBashExitCode)
 	}
@@ -106,7 +108,7 @@ func TestAgentGuardBash_ExitCodes(t *testing.T) {
 	}
 
 	stderr, err := run(`{"tool_input":{"command":"sed -i s/a/b/ x.go"}}`)
-	var exitErr *ExitError
+	var exitErr *cmdbase.ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != guardBashExitCode {
 		t.Fatalf("err = %v, want ExitError{%d}", err, guardBashExitCode)
 	}

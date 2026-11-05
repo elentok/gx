@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"context"
@@ -31,19 +31,19 @@ var stepGrowth = map[tickets.DesignStep]int{
 // runAgentFits prints the used tokens, the step's growth and the ceiling, and
 // returns an ExitError{1} when the step would not stay under the ceiling.
 // Any other error means the caller should treat the answer as "stop".
-func runAgentFits(d deps, out io.Writer, agentKind, session, cwd, stepName string) error {
+func runAgentFits(d Deps, out io.Writer, agentKind, session, cwd, stepName string) error {
 	step, ok := tickets.ParseDesignStep(stepName)
 	if !ok {
 		return tickets.CheckDesignStep(stepName)
 	}
-	if id := d.getenv(holder.AgentSessionEnv); id != "" {
-		on, err := d.readAutoAdvance(id)
+	if id := d.Getenv(holder.AgentSessionEnv); id != "" {
+		on, err := d.ReadAutoAdvance(id)
 		if err != nil {
 			return err
 		}
 		if !on {
 			fmt.Fprintln(out, "auto-advance is off")
-			return &ExitError{Code: 1}
+			return &cmdbase.ExitError{Code: 1}
 		}
 	}
 	used, err := runAgentContextWindow(d, agentKind, session, cwd)
@@ -59,7 +59,7 @@ func runAgentFits(d deps, out io.Writer, agentKind, session, cwd, stepName strin
 	fmt.Fprintf(out, "used=%d growth=%d ceiling=%d\n", used, growth, ceiling)
 	// A session that has used nothing always fits: stopping cannot save any context.
 	if step != tickets.StepDone && used > 0 && used+growth >= ceiling {
-		return &ExitError{Code: 1}
+		return &cmdbase.ExitError{Code: 1}
 	}
 	return nil
 }

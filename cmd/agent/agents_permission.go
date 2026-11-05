@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"fmt"
@@ -9,14 +9,14 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 )
 
-func newAgentsPermissionCmd(d deps) *cobra.Command {
+func newAgentsPermissionCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "permission <session>",
 		Short: "show the permission dialog a blocked session waits on",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}

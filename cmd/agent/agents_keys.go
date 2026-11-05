@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 )
 
-func newAgentsKeysCmd(d deps) *cobra.Command {
+func newAgentsKeysCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	req := wire.SessionKeysRequest{}
 	cmd := &cobra.Command{
@@ -23,7 +23,7 @@ func newAgentsKeysCmd(d deps) *cobra.Command {
 			if (req.Key == "") == (req.Text == "") {
 				return fmt.Errorf("give exactly one of --key or --text")
 			}
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}

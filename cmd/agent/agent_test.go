@@ -1,25 +1,36 @@
-package cmd
+package agent
 
 import (
 	"bytes"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
-func agentTestDeps(stdout *bytes.Buffer, env map[string]string) deps {
-	return deps{
-		stdout: stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/repo", nil },
-		getenv: func(key string) string { return env[key] },
-		readClaudeOccupancy: func(cwd, sessionID string) (int, bool, error) {
+// execute runs the package's commands under a mini root, like the real one.
+func execute(t *testing.T, args []string, d Deps) error {
+	t.Helper()
+	return cmdtest.Run(t, d.Env, args, New(d), NewAgents(d), NewDesigns(d), NewHolder())
+}
+
+func agentTestDeps(stdout *bytes.Buffer, env map[string]string) Deps {
+	return Deps{
+		Env: cmdbase.Env{
+			Stdout: stdout,
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return "/repo", nil },
+			Getenv: func(key string) string { return env[key] },
+		},
+		ReadClaudeOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 0, false, errors.New("readClaudeOccupancy not stubbed")
 		},
-		verifyCodexSession: func(cwd, sessionID string) (bool, error) {
+		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
 			return false, errors.New("verifyCodexSession not stubbed")
 		},
-		readCodexContext: func(cwd, sessionID string) (int, bool, error) {
+		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
 			return 0, false, errors.New("readCodexContext not stubbed")
 		},
 	}
@@ -29,14 +40,14 @@ func TestExecute_AgentContextWindow_ClaudeSessionDetected(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1"})
-	d.readClaudeOccupancy = func(cwd, sessionID string) (int, bool, error) {
+	d.ReadClaudeOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		if cwd != "/repo" || sessionID != "sess-1" {
 			t.Errorf("readClaudeOccupancy(%q, %q), want (/repo, sess-1)", cwd, sessionID)
 		}
 		return 12345, true, nil
 	}
 
-	if err := execute([]string{"agent", "context-window"}, d); err != nil {
+	if err := execute(t, []string{"agent", "context-window"}, d); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if got := strings.TrimSpace(stdout.String()); got != "12345" {
@@ -48,14 +59,14 @@ func TestExecute_AgentContextWindow_CodexSessionDetected(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{"CODEX_THREAD_ID": "thread-1"})
-	d.verifyCodexSession = func(cwd, sessionID string) (bool, error) {
+	d.VerifyCodexSession = func(cwd, sessionID string) (bool, error) {
 		return cwd == "/repo" && sessionID == "thread-1", nil
 	}
-	d.readCodexContext = func(cwd, sessionID string) (int, bool, error) {
+	d.ReadCodexContext = func(cwd, sessionID string) (int, bool, error) {
 		return 999, true, nil
 	}
 
-	if err := execute([]string{"agent", "context-window"}, d); err != nil {
+	if err := execute(t, []string{"agent", "context-window"}, d); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if got := strings.TrimSpace(stdout.String()); got != "999" {
@@ -68,7 +79,7 @@ func TestExecute_AgentContextWindow_NeitherProviderFails(t *testing.T) {
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{})
 
-	err := execute([]string{"agent", "context-window"}, d)
+	err := execute(t, []string{"agent", "context-window"}, d)
 	if err == nil {
 		t.Fatal("expected error when no session env var is set, got nil")
 	}
@@ -85,7 +96,7 @@ func TestExecute_AgentContextWindow_BothProvidersAmbiguous(t *testing.T) {
 		"CODEX_THREAD_ID":        "thread-1",
 	})
 
-	err := execute([]string{"agent", "context-window"}, d)
+	err := execute(t, []string{"agent", "context-window"}, d)
 	if err == nil {
 		t.Fatal("expected error when both provider env vars are set, got nil")
 	}
@@ -98,11 +109,11 @@ func TestExecute_AgentContextWindow_IdentityMismatchFails(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1"})
-	d.readClaudeOccupancy = func(cwd, sessionID string) (int, bool, error) {
+	d.ReadClaudeOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 0, false, nil
 	}
 
-	err := execute([]string{"agent", "context-window"}, d)
+	err := execute(t, []string{"agent", "context-window"}, d)
 	if err == nil {
 		t.Fatal("expected error when the session's transcript can't be found, got nil")
 	}
@@ -115,11 +126,11 @@ func TestExecute_AgentContextWindow_CodexIdentityMismatchFails(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{"CODEX_THREAD_ID": "thread-1"})
-	d.verifyCodexSession = func(cwd, sessionID string) (bool, error) {
+	d.VerifyCodexSession = func(cwd, sessionID string) (bool, error) {
 		return false, nil
 	}
 
-	err := execute([]string{"agent", "context-window"}, d)
+	err := execute(t, []string{"agent", "context-window"}, d)
 	if err == nil {
 		t.Fatal("expected error when codex identity doesn't verify, got nil")
 	}
@@ -134,14 +145,14 @@ func TestExecute_AgentContextWindow_ExplicitOverridesSkipEnv(t *testing.T) {
 	// Env vars point at a different session than the explicit override, to
 	// prove the override wins rather than falling back to auto-detection.
 	d := agentTestDeps(&stdout, map[string]string{"CLAUDE_CODE_SESSION_ID": "env-session"})
-	d.readClaudeOccupancy = func(cwd, sessionID string) (int, bool, error) {
+	d.ReadClaudeOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		if cwd != "/other" || sessionID != "explicit-session" {
 			t.Errorf("readClaudeOccupancy(%q, %q), want (/other, explicit-session)", cwd, sessionID)
 		}
 		return 42, true, nil
 	}
 
-	err := execute([]string{
+	err := execute(t, []string{
 		"agent", "context-window",
 		"--agent", "claude",
 		"--session", "explicit-session",
@@ -160,7 +171,7 @@ func TestExecute_AgentContextWindow_SessionWithoutAgentFails(t *testing.T) {
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{})
 
-	err := execute([]string{"agent", "context-window", "--session", "sess-1"}, d)
+	err := execute(t, []string{"agent", "context-window", "--session", "sess-1"}, d)
 	if err == nil {
 		t.Fatal("expected error for --session without --agent, got nil")
 	}
@@ -174,7 +185,7 @@ func TestExecute_AgentContextWindow_InvalidAgentFails(t *testing.T) {
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{})
 
-	err := execute([]string{"agent", "context-window", "--agent", "bogus"}, d)
+	err := execute(t, []string{"agent", "context-window", "--agent", "bogus"}, d)
 	if err == nil {
 		t.Fatal("expected error for an unknown --agent value, got nil")
 	}
