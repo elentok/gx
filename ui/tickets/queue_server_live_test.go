@@ -63,13 +63,13 @@ func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, her
 func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
 	m, cmd := loadedServerQueue(t, "claimed")
 
-	if !m.runningEpics["gx:alpha"] {
-		t.Fatalf("runningEpics = %v, want gx:alpha running", m.runningEpics)
+	if !m.server.runningEpics["gx:alpha"] {
+		t.Fatalf("runningEpics = %v, want gx:alpha running", m.server.runningEpics)
 	}
 	if got := m.header().queueRunState(); got != queueRunRunning {
 		t.Errorf("queueRunState = %v, want running", got)
 	}
-	live, ok := m.live["gx:alpha"]["01"]
+	live, ok := m.server.live["gx:alpha"]["01"]
 	if !ok || !live.Running || live.StartedAt.IsZero() {
 		t.Errorf("live[01] = %+v, want running with a start time", live)
 	}
@@ -93,7 +93,7 @@ func TestQueueServerMode_RunningHeaderCountsFromSnapshot(t *testing.T) {
 
 func TestQueueServerMode_RunningHeaderDropsCountWithoutTickets(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
-	m.runningEpics = map[string]bool{"gx:missing": true}
+	m.server.runningEpics = map[string]bool{"gx:missing": true}
 
 	got := m.header().queueHeaderTitle()
 	if strings.Contains(got, "of 0 done") || !strings.HasPrefix(got, "Queue · ") || !strings.Contains(got, "implementing...") {
@@ -119,9 +119,9 @@ func TestQueueServerMode_EnterNeverStartsInProcessRun(t *testing.T) {
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	nm := next.(QueueModel)
 
-	if len(nm.runningEpics) != 0 || nm.confirm.IsOpen {
+	if len(nm.server.runningEpics) != 0 || nm.confirm.IsOpen {
 		t.Errorf("enter opened an in-process run: running=%v confirm=%v",
-			nm.runningEpics, nm.confirm.IsOpen)
+			nm.server.runningEpics, nm.confirm.IsOpen)
 	}
 	_ = cmd
 }
@@ -130,7 +130,7 @@ func TestQueueServerMode_TimerCountsFromServerClaimTime(t *testing.T) {
 	claimed := time.Now().Add(-10 * time.Minute)
 	m, _ := loadedServerQueueWith(t, "claimed", claimed, false)
 
-	if got := m.live["gx:alpha"]["01"].StartedAt; !got.Equal(claimed) {
+	if got := m.server.live["gx:alpha"]["01"].StartedAt; !got.Equal(claimed) {
 		t.Errorf("startedAt = %v, want the server's claim time %v", got, claimed)
 	}
 }
@@ -181,11 +181,11 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 			Type: "conflict-resolution", Parent: "gx:alpha/01"},
 	}}, []wire.QueueItem{{Address: "gx:alpha/01"}})
 
-	child := m.live["gx:alpha"]["01a"]
+	child := m.server.live["gx:alpha"]["01a"]
 	if !child.Running || child.Phase != rowfmt.LivePhaseResolvingConflicts {
 		t.Errorf("live[01a] = %+v, want running and resolving conflicts", child)
 	}
-	parent := m.live["gx:alpha"]["01"]
+	parent := m.server.live["gx:alpha"]["01"]
 	if !parent.Running || parent.WaitingOn != "01a" {
 		t.Errorf("live[01] = %+v, want running and waiting on 01a", parent)
 	}
@@ -201,7 +201,7 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 		{Address: "gx:alpha/02", Title: "Merge alpha", Status: "claimed", Type: "merge", ClaimedAt: time.Now()},
 	}}, []wire.QueueItem{{Address: "gx:alpha/02"}})
 
-	live := m.live["gx:alpha"]["02"]
+	live := m.server.live["gx:alpha"]["02"]
 	if !live.Running || live.Phase != rowfmt.LivePhaseMerging {
 		t.Errorf("live[02] = %+v, want running and merging", live)
 	}
@@ -234,8 +234,8 @@ func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
 func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) {
 	m, _ := loadedServerQueueWith(t, "claimed", time.Time{}, false)
 
-	if len(m.runningEpics) != 0 {
-		t.Errorf("runningEpics = %v, want none: the server has no run for the claimed ticket", m.runningEpics)
+	if len(m.server.runningEpics) != 0 {
+		t.Errorf("runningEpics = %v, want none: the server has no run for the claimed ticket", m.server.runningEpics)
 	}
 	if got := m.header().queueRunState(); got != queueRunIdle {
 		t.Errorf("queueRunState = %v, want idle", got)
@@ -245,8 +245,8 @@ func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) 
 // A later delivery replaces the rows with no reload: a claim shows up running.
 func TestQueueServerMode_NewDeliveryUpdatesRunningStateWithoutReload(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
-	if len(m.runningEpics) != 0 {
-		t.Fatalf("runningEpics = %v, want idle before the claim", m.runningEpics)
+	if len(m.server.runningEpics) != 0 {
+		t.Fatalf("runningEpics = %v, want idle before the claim", m.server.runningEpics)
 	}
 
 	m, cmd := deliverQueueTo(m, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
@@ -254,8 +254,8 @@ func TestQueueServerMode_NewDeliveryUpdatesRunningStateWithoutReload(t *testing.
 		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
 	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 
-	if !m.runningEpics["gx:alpha"] || cmd == nil {
-		t.Errorf("runningEpics = %v, cmd = %v, want running with a spinner tick", m.runningEpics, cmd)
+	if !m.server.runningEpics["gx:alpha"] || cmd == nil {
+		t.Errorf("runningEpics = %v, cmd = %v, want running with a spinner tick", m.server.runningEpics, cmd)
 	}
 }
 
@@ -276,14 +276,14 @@ func TestQueueServerMode_ActivationRestartsSpinner(t *testing.T) {
 
 func TestQueueServerMode_PausedFollowsDeliveredMode(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
-	if m.paused {
+	if m.server.paused {
 		t.Fatal("paused before any mode change")
 	}
 
 	st := viewmodel.State{Seq: 1, Loaded: true, Mode: wire.QueueModePaused}
 	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 
-	if !next.(QueueModel).paused {
+	if !next.(QueueModel).server.paused {
 		t.Error("paused = false after a delivered paused mode")
 	}
 }

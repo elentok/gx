@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -62,7 +64,7 @@ func TestQueueWholeEpic_DeleteIsNotOfferedOnNonItemRow(t *testing.T) {
 		}
 	}
 
-	next, _ := m.handleServerDeleteKey()
+	next, _ := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	if next.(QueueModel).confirm.IsOpen {
 		t.Error("delete opened a confirm on a ticket that is not a queue item")
 	}

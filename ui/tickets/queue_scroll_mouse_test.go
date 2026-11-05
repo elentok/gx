@@ -383,7 +383,7 @@ func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.
 	// Idle -> running with no WindowSizeMsg in between: the reserved slot's
 	// height (and thus SetVisibleHeight/the mouse-click offset) must not
 	// change.
-	m.runningEpics = map[string]bool{"alpha": true}
+	m.server.runningEpics =map[string]bool{"alpha": true}
 
 	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: rowY})
 	m = updated.(QueueModel)

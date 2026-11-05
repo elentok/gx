@@ -80,7 +80,7 @@ func TestDefaultHarness_ProjectPickerFollowGlobalSendsEmptyHarness(t *testing.T)
 	if it, _ := m.harnessPicker.menu.Selected(); it.Value != "codex" {
 		t.Fatalf("cursor starts on %q, want the override codex", it.Value)
 	}
-	if view := m.harnessPickerView(); !strings.Contains(view, "gx") {
+	if view := m.harnessPicker.view(m.width); !strings.Contains(view, "gx") {
 		t.Fatalf("picker is not titled with the project:\n%s", view)
 	}
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyUp})

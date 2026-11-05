@@ -31,7 +31,7 @@ func TestEpicBarFillFollowsStateColour(t *testing.T) {
 func TestQueueHeaderPausedLineFollowsRunningCount(t *testing.T) {
 	t.Parallel()
 	m := NewQueueModel("", ui.Settings{}, keys.Manager{})
-	m.paused = true
+	m.server.paused = true
 	cases := []struct {
 		active []wire.SummaryTicket
 		want   string
@@ -41,7 +41,7 @@ func TestQueueHeaderPausedLineFollowsRunningCount(t *testing.T) {
 		{[]wire.SummaryTicket{{Address: "p:e/01"}, {Address: "p:e/02"}, {Address: "p:e/03"}}, "Paused. 3 tickets still running."},
 	}
 	for _, tc := range cases {
-		m.summaries = map[string]wire.EpicSummary{"p:e": {Active: tc.active}}
+		m.server.summaries =map[string]wire.EpicSummary{"p:e": {Active: tc.active}}
 		lines := m.header().queueHeaderBodyLines()
 		if got := ansi.Strip(lines[0]); got != tc.want {
 			t.Errorf("header = %q, want %q", got, tc.want)
@@ -199,13 +199,13 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 func TestQueueHeaderCostSuffixFormats(t *testing.T) {
 	root := t.TempDir()
 	budgetOff := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), map[string]bool{}))
-	budgetOff.serverBudget.Total = 42.3
+	budgetOff.server.serverBudget.Total = 42.3
 	if got, want := budgetOff.header().queueHeaderCostSuffix(), "today $42.30"; got != want {
 		t.Fatalf("budget disabled: queueHeaderCostSuffix() = %q, want bare %q", got, want)
 	}
 
 	withBudget := budgetOff
-	withBudget.serverBudget = wire.BudgetStatus{Total: 50, SoftLimit: 100}
+	withBudget.server.serverBudget = wire.BudgetStatus{Total: 50, SoftLimit: 100}
 	if got, want := withBudget.header().queueHeaderCostSuffix(), "today $50.00 of $100.00"; got != want {
 		t.Fatalf("soft limit set: queueHeaderCostSuffix() = %q, want %q", got, want)
 	}
@@ -445,8 +445,8 @@ func TestEpicStatusRowAgentTimeIncludesLiveRunningTicket(t *testing.T) {
 	t.Parallel()
 	started := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.Manager{})
-	m.runningEpics = map[string]bool{"alpha": true}
-	m.live = map[string]map[string]rowfmt.LiveTicketState{"alpha": {"02": {Running: true, StartedAt: started.Add(30 * time.Minute)}}}
+	m.server.runningEpics =map[string]bool{"alpha": true}
+	m.server.live =map[string]map[string]rowfmt.LiveTicketState{"alpha": {"02": {Running: true, StartedAt: started.Add(30 * time.Minute)}}}
 	epic := tickets.Epic{Name: "alpha", StartedAt: started, Tickets: []tickets.Ticket{
 		{Identifier: "01", Status: "done", ElapsedTime: 600}, {Identifier: "02", Status: "claimed"}}}
 

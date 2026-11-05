@@ -100,9 +100,9 @@ func goldenQueueState(m QueueModel, snap wire.Snapshot, queue []wire.QueueItem, 
 // setGoldenLive stamps the live row's token count, the one live field the
 // state delivery does not carry.
 func setGoldenLive(m QueueModel, epic, id string, tokens int) QueueModel {
-	l := m.live[epic][id]
+	l := m.server.live[epic][id]
 	l.Tokens = tokens
-	m.live[epic][id] = l
+	m.server.live[epic][id] = l
 	return m
 }
 

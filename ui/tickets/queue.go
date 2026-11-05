@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -9,7 +8,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
@@ -32,32 +30,8 @@ type QueueModel struct {
 	worktreeRoot string
 	settings     ui.Settings
 	editor       rowactions.Editor
-	// live is epicName -> ticket identifier -> running state, derived from the
-	// delivered state (syncServerRunState), so the Queue tab's rows render the
-	// running spinner+phase presentation (rowfmt.RenderLiveTicketRow).
-	live map[string]map[string]rowfmt.LiveTicketState
-	// summaries and herdrDown come from the delivered state: the server's
-	// summary of each queued epic by epic name, and whether the server can
-	// launch agents.
-	summaries map[string]wire.EpicSummary
-	// harnessLabels is the snapshot's row label by ticket address.
-	harnessLabels map[string]string
-	// waitingLabels is the Queue agent rows' check-lock label by ticket address.
-	waitingLabels map[string]string
-	// codexRows marks the snapshot tickets whose label says codex, by address.
-	codexRows map[string]bool
-	herdrDown bool
-	// herdrText names the tickets waiting on herdr; empty falls back to the
-	// generic banner.
-	herdrText string
-	// finished is the snapshot's Recently finished list. finishedGen numbers the
-	// refresh tick chain: each page activation starts a new chain and the older
-	// chain's pending tick is ignored.
-	finished    []wire.FinishedEpic
-	finishedGen int
-	// serverBudget is the last snapshot's budget: the header's spend and the
-	// root rows' cost in server mode.
-	serverBudget     wire.BudgetStatus
+	// server is the delivered state and the link it came over (queue_server_live.go).
+	server           queueServer
 	implementSpinner spinner.Model
 
 	width, height int
@@ -69,10 +43,8 @@ type QueueModel struct {
 	rows queueRows
 
 	// menus is the Tickets tab's row menu plus the Queue group.
-	menus        rowactions.Menus
-	watch        rowactions.WatchModal
-	runningEpics map[string]bool
-	paused       bool
+	menus rowactions.Menus
+	watch rowactions.WatchModal
 
 	// search backs "/"-triggered filtering over buildQueueEntries, mirroring
 	// the Tickets tab's own m.search (see ui/tickets/search.go).
@@ -98,19 +70,9 @@ type QueueModel struct {
 	// handleQueuePreviewKey in queue_preview.go).
 	preview preview.Pane
 
-	// serverAPI/serverStart/link back the server-down banner (see
-	// queue_server_down.go). link is only ever set by WithServerState; a tab
-	// with no client is delivered ServerLinkDown, so it shows the banner too.
-	serverAPI   tabapi.ServerAPI
-	admin       tabapi.AdminAPI
-	sessions    tabapi.SessionsAPI
-	tickets     tabapi.TicketsAPI
-	queue       tabapi.QueueAPI
-	reads       tabapi.ReadsAPI
-	serverStart func(context.Context) error
-	link        tabapi.ServerLink
-	// olderServer: see Model.olderServer.
-	olderServer bool
+	// srv holds the sub-clients the server-mode keys call (server_queue_keys.go).
+	srv      serverKeys
+	sessions tabapi.SessionsAPI
 	// focusEpic is the address of an epic to select when its rows arrive.
 	focusEpic string
 }
@@ -134,9 +96,11 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		settings:         settings,
 		editor:           rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
 		rows:             newQueueRows(queueTree),
-		live:             map[string]map[string]rowfmt.LiveTicketState{},
+		server: queueServer{
+			live:         map[string]map[string]rowfmt.LiveTicketState{},
+			runningEpics: map[string]bool{},
+		},
 		implementSpinner: sp,
-		runningEpics:     map[string]bool{},
 		confirm:          confirm.New(),
 		menus:            rowactions.Menus{OnQueue: true},
 		search:           search.NewModel(),
@@ -158,16 +122,6 @@ type finishedTickMsg struct{ gen int }
 
 func finishedTick(gen int) tea.Cmd {
 	return tea.Tick(finishedRefreshInterval, func(time.Time) tea.Msg { return finishedTickMsg{gen: gen} })
-}
-
-// restartFinishedTick starts a new refresh chain, orphaning the old one, or
-// returns nil when there is no finished entry to refresh.
-func (m *QueueModel) restartFinishedTick() tea.Cmd {
-	m.finishedGen++
-	if len(m.finished) == 0 {
-		return nil
-	}
-	return finishedTick(m.finishedGen)
 }
 
 // queueSpinnerRestartMsg restarts the running spinner on page activation.
@@ -199,14 +153,18 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help.Open(m.width, m.height)
 		return m, cmd
 	}
-	if next, cmd, ok := m.updateServerDown(msg); ok {
-		return next, cmd
+	if cmd, ok := m.server.updateDown(msg); ok {
+		return m, cmd
 	}
-	if next, cmd, ok := m.updateServerKeys(msg); ok {
-		return next, cmd
+	if cmd, open, ok := m.srv.update(msg, m.server.paused); ok {
+		if open != nil {
+			m.confirm = m.confirm.Open(*open)
+		}
+		return m, cmd
 	}
-	if next, cmd, ok := m.updateDefaultHarness(msg); ok {
-		return next, cmd
+	if picker, cmd, ok := m.harnessPicker.update(msg, m.rows.projectFilter); ok {
+		m.harnessPicker = picker
+		return m, cmd
 	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -225,18 +183,19 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// meanwhile would otherwise show no spinner.
 		// The finished-time refresh chain dies the same way, so activation
 		// starts a new one and orphans any tick still pending from the old one.
-		tick := m.restartFinishedTick()
-		if len(m.runningEpics) == 0 {
+		var tick tea.Cmd
+		m.server, tick = m.server.restartFinishedTick()
+		if len(m.server.runningEpics) == 0 {
 			return m, tick
 		}
 		return m, tea.Batch(m.implementSpinner.Tick, tick)
 	case spinner.TickMsg:
 		return m.handleQueueSpinnerTick(msg)
 	case finishedTickMsg:
-		if msg.gen != m.finishedGen {
+		if msg.gen != m.server.finishedGen {
 			return m, nil
 		}
-		return m, finishedTick(m.finishedGen)
+		return m, finishedTick(m.server.finishedGen)
 	case tea.MouseWheelMsg:
 		if next, cmd, handled := m.help.Forward(msg); handled {
 			m.help = next
@@ -280,7 +239,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleQueueConfirmUpdate(msg)
 		}
 		if m.harnessPicker.open {
-			return m.updateHarnessPickerKey(msg)
+			var cmd tea.Cmd
+			m.harnessPicker, cmd = m.harnessPicker.updateKey(msg, m.srv.admin)
+			return m, cmd
 		}
 		if msg.String() == "esc" {
 			m.menus.Pending = ""
@@ -320,7 +281,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m QueueModel) handleQueueSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
-	if len(m.runningEpics) == 0 {
+	if len(m.server.runningEpics) == 0 {
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -534,7 +495,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.rows.hideComplete = !m.rows.hideComplete
 			m.clampSelected()
 		case bindingQueueCycleProject:
-			if m.serverAPI == nil {
+			if m.server.serverAPI == nil {
 				return m, nil
 			}
 			m.rows.projectFilter = nextProject(m.rows.epics, m.rows.projectFilter)
@@ -570,35 +531,44 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueReload:
 			// The shell owns the connection and the snapshot; it hands the result
 			// back as state.
-			if m.serverDown() {
+			if m.server.down() {
 				return m, cmdProbeRequested
 			}
 			return m, func() tea.Msg { return tabapi.ResnapshotRequestedMsg{} }
 		case bindingQueuePauseResume:
-			if m.serverAPI != nil {
-				return m.handleServerPauseKey()
+			if m.server.serverAPI != nil {
+				return m, m.srv.cmdPause()
 			}
 		case bindingQueueClearChecked:
-			if paths := m.checkedPaths(); len(paths) > 0 && m.serverAPI != nil {
-				return m.handleServerClearKey(fmt.Sprintf("Dequeue all %d ticket(s)?", len(paths)), paths)
+			if paths := m.checkedPaths(); len(paths) > 0 && m.server.serverAPI != nil {
+				m.confirm = m.confirm.Open(m.srv.clearConfirm(fmt.Sprintf("Dequeue all %d ticket(s)?", len(paths)), paths))
 			}
 		case bindingQueueClearDoneChecked:
-			if paths := m.doneCheckedPaths(); len(paths) > 0 && m.serverAPI != nil {
-				return m.handleServerClearKey(fmt.Sprintf("Dequeue %d completed ticket(s)?", len(paths)), paths)
+			if paths := m.doneCheckedPaths(); len(paths) > 0 && m.server.serverAPI != nil {
+				m.confirm = m.confirm.Open(m.srv.clearConfirm(fmt.Sprintf("Dequeue %d completed ticket(s)?", len(paths)), paths))
 			}
 		case bindingQueueDelete:
-			if m.serverAPI == nil {
+			if m.server.serverAPI == nil {
 				return m, notify.Warning(rowactions.ServerNotRunning)
 			}
-			return m.handleServerDeleteKey()
+			row, ok := m.selectedQueueRow()
+			if !ok {
+				return m, nil
+			}
+			if !m.rows.checked[row.ticket.Path] {
+				return m, notify.Info(row.ticket.DisplayNumber() + " is not a queue item")
+			}
+			m.confirm = m.confirm.Open(m.srv.deleteConfirm(row.ticket))
 		case bindingQueueTicketMenu:
 			return m.handleQueueTicketMenuKey()
 		case bindingQueueApprove:
 			return m.handleServerApproveKey()
 		case bindingQueueDefaultHarness:
-			return m.handleDefaultHarnessKey()
+			return m, m.harnessPicker.readCmd(m.server, m.srv.admin)
 		case bindingQueueStartServer:
-			return m.openServerStartConfirm(), nil
+			if opts, ok := m.server.startConfirm(); ok {
+				m.confirm = m.confirm.Open(opts)
+			}
 		}
 		return m, nil
 	}
@@ -680,21 +650,21 @@ func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrd
 func (m QueueModel) header() queueHeader {
 	h := queueHeader{
 		icons:        m.icons(),
-		summaries:    m.summaries,
-		runningEpics: m.runningEpics,
-		live:         m.live,
-		paused:       m.paused,
-		serverDown:   m.serverDown(),
-		hasServer:    m.serverAPI != nil,
-		herdrDown:    m.herdrDown,
-		herdrText:    m.herdrText,
-		budget:       m.serverBudget,
-		finished:     m.finished,
+		summaries:    m.server.summaries,
+		runningEpics: m.server.runningEpics,
+		live:         m.server.live,
+		paused:       m.server.paused,
+		serverDown:   m.server.down(),
+		hasServer:    m.server.serverAPI != nil,
+		herdrDown:    m.server.herdrDown,
+		herdrText:    m.server.herdrText,
+		budget:       m.server.serverBudget,
+		finished:     m.server.finished,
 		spinner:      m.implementSpinner,
 		now:          m.now,
 		checkedCount: len(m.rows.checked),
 	}
-	if m.serverAPI == nil {
+	if m.server.serverAPI == nil {
 		h.checkedPlans = len(m.checkedEpicPlans())
 	}
 	return h
@@ -706,9 +676,9 @@ func (m QueueModel) rowsEnv() queueRowsEnv {
 		header:        m.header(),
 		maxParallel:   m.settings.MaxConcurrentTicketsPerEpic(),
 		labelWidth:    m.queueLabelWidth(),
-		harnessLabels: m.harnessLabels,
-		waitingLabels: m.waitingLabels,
-		codexRows:     m.codexRows,
+		harnessLabels: m.server.harnessLabels,
+		waitingLabels: m.server.waitingLabels,
+		codexRows:     m.server.codexRows,
 		hasQuery:      m.search.HasQuery(),
 		sidebarActive: m.preview.Focus == preview.FocusSidebar,
 		suggested:     m.rowHasSuggestedActions,

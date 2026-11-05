@@ -92,7 +92,7 @@ func TestQueueServerKeys_PauseResumeOverrideReachVerbs(t *testing.T) {
 	} {
 		var calls []string
 		m := newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls, BudgetRes: tc.budget})
-		m.paused = tc.paused
+		m.server.paused = tc.paused
 		m = accept(t, pressQueue(t, m, 'p'))
 		if !slices.Equal(calls, []string{tc.want}) {
 			t.Errorf("%s: calls = %v", tc.name, calls)
@@ -144,7 +144,7 @@ func TestQueueServerKeys_DequeueAndDelete(t *testing.T) {
 func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
 	api := tickettest.FakeServerAPI{RemoveRes: wire.QueueResult{Refused: true, Reason: wire.ReasonTicketLive, Message: "gx:alpha/01 has a live iteration"}}
 	m := newMaintenanceQueue(t, api)
-	msg := m.cmdServerRemove([]string{"gx:alpha/01"})()
+	msg := m.srv.cmdRemove([]string{"gx:alpha/01"})()
 	got := msg.(serverRemovedMsg)
 	if got.removed != 0 || !strings.Contains(got.problem, "live iteration") {
 		t.Fatalf("got %+v", got)

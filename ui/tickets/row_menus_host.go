@@ -28,8 +28,8 @@ func (m Model) menuEnv() rowactions.Env {
 
 func (m QueueModel) menuEnv() rowactions.Env {
 	return rowactions.Env{
-		ServerAPI: m.serverAPI, Admin: m.admin, Reads: m.reads, Sessions: m.sessions,
-		Tickets: m.tickets, Queue: m.queue, Link: m.link, Settings: m.settings,
+		ServerAPI: m.server.serverAPI, Admin: m.srv.admin, Reads: m.srv.reads, Sessions: m.sessions,
+		Tickets: m.srv.tickets, Queue: m.srv.queue, Link: m.server.link, Settings: m.settings,
 		Width: m.width, WorktreeRoot: m.worktreeRoot,
 	}
 }
@@ -75,7 +75,7 @@ func (t queueMenuTab) Selection() rowactions.Selection {
 		return rowactions.Selection{
 			OK: true, IsEpic: true, Epic: epic,
 			Queueable: rowactions.EpicQueueable(epic, m.checkedPaths()),
-			Actions:   m.summaries[epic.Name].Actions,
+			Actions:   m.server.summaries[epic.Name].Actions,
 		}
 	}
 	r, ok := m.selectedQueueRow()

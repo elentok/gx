@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/rowactions"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // harnessPicker is the Queue tab's "Default harness..." modal. project is ""
@@ -33,30 +34,31 @@ type defaultHarnessWroteMsg struct {
 	err error
 }
 
-func (m QueueModel) handleDefaultHarnessKey() (tea.Model, tea.Cmd) {
-	if m.serverAPI == nil || m.admin == nil || m.serverDown() {
-		return m, notify.Warning(rowactions.ServerNotRunning)
+// readCmd is the "H" key: read the server's Default harness, or warn when the
+// server cannot be reached.
+func (harnessPicker) readCmd(server queueServer, admin tabapi.AdminAPI) tea.Cmd {
+	if server.serverAPI == nil || admin == nil || server.down() {
+		return notify.Warning(rowactions.ServerNotRunning)
 	}
-	admin := m.admin
-	return m, func() tea.Msg {
+	return func() tea.Msg {
 		st, err := admin.DefaultHarness(context.Background())
 		return defaultHarnessReadMsg{status: st, err: err}
 	}
 }
 
-// openHarnessPicker builds the picker for the project filter, with the cursor
-// on the value in effect for that scope.
-func (m QueueModel) openHarnessPicker(st wire.DefaultHarnessStatus) QueueModel {
+// opened builds the picker for the project filter, with the cursor on the value
+// in effect for that scope.
+func (harnessPicker) opened(st wire.DefaultHarnessStatus, projectFilter string) harnessPicker {
 	items := []components.MenuItem{
 		{Label: "Claude", Value: "claude"},
 		{Label: "Codex", Value: "codex"},
 	}
 	current := st.Default
-	if m.rows.projectFilter != "" {
+	if projectFilter != "" {
 		items = append([]components.MenuItem{{Label: "Follow global", Value: ""}}, items...)
 		current = ""
 		for _, p := range st.Projects {
-			if p.Project == m.rows.projectFilter {
+			if p.Project == projectFilter {
 				current = p.Harness
 			}
 		}
@@ -67,60 +69,58 @@ func (m QueueModel) openHarnessPicker(st wire.DefaultHarnessStatus) QueueModel {
 			cursor = i
 		}
 	}
-	m.harnessPicker = harnessPicker{
+	return harnessPicker{
 		open:    true,
-		project: m.rows.projectFilter,
+		project: projectFilter,
 		menu:    components.MenuState{Items: items, Cursor: cursor},
 	}
-	return m
 }
 
-func (m QueueModel) updateHarnessPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	next, decided, accepted, handled := components.UpdateMenu(msg, m.harnessPicker.menu)
+func (p harnessPicker) updateKey(msg tea.KeyPressMsg, admin tabapi.AdminAPI) (harnessPicker, tea.Cmd) {
+	next, decided, accepted, handled := components.UpdateMenu(msg, p.menu)
 	if !handled {
-		return m, nil
+		return p, nil
 	}
-	m.harnessPicker.menu = next
+	p.menu = next
 	if !decided {
-		return m, nil
+		return p, nil
 	}
-	m.harnessPicker.open = false
+	p.open = false
 	item, ok := next.Selected()
 	if !accepted || !ok {
-		return m, nil
+		return p, nil
 	}
 	req := wire.SetDefaultHarnessRequest{Scope: "global", Harness: item.Value}
-	if m.harnessPicker.project != "" {
-		req = wire.SetDefaultHarnessRequest{Scope: "project", Project: m.harnessPicker.project, Harness: item.Value}
+	if p.project != "" {
+		req = wire.SetDefaultHarnessRequest{Scope: "project", Project: p.project, Harness: item.Value}
 	}
-	admin := m.admin
-	return m, func() tea.Msg {
+	return p, func() tea.Msg {
 		res, err := admin.SetDefaultHarness(context.Background(), req)
 		return defaultHarnessWroteMsg{res: res, err: err}
 	}
 }
 
-// updateDefaultHarness handles the picker's read and write results; ok is false
-// for any other msg.
-func (m QueueModel) updateDefaultHarness(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
+// update handles the picker's read and write results; ok is false for any other
+// msg.
+func (p harnessPicker) update(msg tea.Msg, projectFilter string) (harnessPicker, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case defaultHarnessReadMsg:
 		if msg.err != nil {
-			return m, harnessErrorToast("default harness: ", msg.err), true
+			return p, harnessErrorToast("default harness: ", msg.err), true
 		}
-		return m.openHarnessPicker(msg.status), nil, true
+		return p.opened(msg.status, projectFilter), nil, true
 	case defaultHarnessWroteMsg:
 		switch {
 		case msg.err != nil:
-			return m, harnessErrorToast("", msg.err), true
+			return p, harnessErrorToast("", msg.err), true
 		case msg.res.Refused:
-			return m, notify.Error("refused: " + msg.res.Message), true
+			return p, notify.Error("refused: " + msg.res.Message), true
 		case msg.res.Notice != "":
-			return m, notify.Success(msg.res.Notice), true
+			return p, notify.Success(msg.res.Notice), true
 		}
-		return m, notify.Success("default harness unchanged"), true
+		return p, notify.Success("default harness unchanged"), true
 	}
-	return m, nil, false
+	return p, nil, false
 }
 
 func harnessErrorToast(prefix string, err error) tea.Cmd {
@@ -130,14 +130,14 @@ func harnessErrorToast(prefix string, err error) tea.Cmd {
 	return notify.Error(prefix + err.Error())
 }
 
-func (m QueueModel) harnessPickerView() string {
+func (p harnessPicker) view(width int) string {
 	title, prompt := "Default harness", "All projects"
-	if p := m.harnessPicker.project; p != "" {
-		title, prompt = p, "Default harness"
+	if p.project != "" {
+		title, prompt = p.project, "Default harness"
 	}
 	return components.RenderMenuModal(
-		title, ui.StyleDim.Render(prompt), m.harnessPicker.menu, "",
+		title, ui.StyleDim.Render(prompt), p.menu, "",
 		ui.ColorBlue, ui.ColorBlue, ui.ColorSubtle, ui.ColorGreen,
-		max(40, m.width/3),
+		max(40, width/3),
 	)
 }

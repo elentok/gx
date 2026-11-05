@@ -17,7 +17,7 @@ func TestQueueViewGolden_TwoEpicsWithHeaderLines(t *testing.T) {
 		{Address: "gx:beta/01", Title: "Other", Status: "open"},
 	}}
 	m := goldenQueueState(goldenQueue(t), snap, []wire.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:beta/01"}}, goldenNow)
-	m.serverBudget = wire.BudgetStatus{Total: 12.5, SoftLimit: 50}
+	m.server.serverBudget =wire.BudgetStatus{Total: 12.5, SoftLimit: 50}
 	assertGolden(t, "queue_two_epics_header", m.View().Content)
 }
 

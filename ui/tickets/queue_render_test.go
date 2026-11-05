@@ -114,12 +114,12 @@ func leadingWhitespace(s string) string {
 func TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow(t *testing.T) {
 	t.Parallel()
 	var m QueueModel
-	m.runningEpics = map[string]bool{"epic": true}
+	m.server.runningEpics =map[string]bool{"epic": true}
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Normal ticket", Status: "open"},
 		{Identifier: "02", Title: "Running ticket", Status: "claimed"},
 	}}
-	m.live = map[string]map[string]rowfmt.LiveTicketState{
+	m.server.live =map[string]map[string]rowfmt.LiveTicketState{
 		"epic": {"02": {Running: true, Label: "iter-01"}},
 	}
 

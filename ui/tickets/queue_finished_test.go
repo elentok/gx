@@ -51,7 +51,7 @@ func TestQueueFinished_TickRerendersRelativeTime(t *testing.T) {
 	m = next.(QueueModel)
 
 	m.now = func() time.Time { return now.Add(time.Hour) }
-	next, cmd := m.Update(finishedTickMsg{gen: m.finishedGen})
+	next, cmd := m.Update(finishedTickMsg{gen: m.server.finishedGen})
 	m = next.(QueueModel)
 
 	if cmd == nil {
@@ -73,7 +73,7 @@ func TestQueueFinished_NoTickChainWhileHidden(t *testing.T) {
 	m = next.(QueueModel)
 
 	// A tick from the chain before the latest activation ends the old chain.
-	if _, cmd := m.Update(finishedTickMsg{gen: m.finishedGen - 1}); cmd != nil {
+	if _, cmd := m.Update(finishedTickMsg{gen: m.server.finishedGen - 1}); cmd != nil {
 		t.Error("stale tick re-armed itself")
 	}
 }

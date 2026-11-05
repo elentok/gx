@@ -51,7 +51,7 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}})
 	next, _ = m.WithServerState(&st, tabapi.ServerLinkUp)
-	if next.(QueueModel).serverDown() {
+	if next.(QueueModel).server.down() {
 		t.Fatal("still down after an up delivery")
 	}
 	if view := ansi.Strip(next.(QueueModel).View().Content); !strings.Contains(view, "First") {

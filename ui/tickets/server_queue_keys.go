@@ -7,9 +7,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/rowactions"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // serverDoneMsg reports a finished server write: ok is the success toast, and a
@@ -55,8 +57,18 @@ func serverPauseActionFor(b wire.BudgetStatus, paused bool) serverPauseAction {
 	return serverActionPause
 }
 
-func (m QueueModel) cmdServerRemove(addrs []string) tea.Cmd {
-	api := m.queue
+// serverKeys is the server-mode writes behind the Queue tab's keys: the
+// sub-clients they call and the confirmations they open. Each method returns the
+// confirm.Options (or command) for the tab to open, so it never touches the tab.
+type serverKeys struct {
+	queue   tabapi.QueueAPI
+	admin   tabapi.AdminAPI
+	tickets tabapi.TicketsAPI
+	reads   tabapi.ReadsAPI
+}
+
+func (k serverKeys) cmdRemove(addrs []string) tea.Cmd {
+	api := k.queue
 	return func() tea.Msg {
 		out := serverRemovedMsg{}
 		for _, addr := range addrs {
@@ -76,39 +88,40 @@ func (m QueueModel) cmdServerRemove(addrs []string) tea.Cmd {
 	}
 }
 
-// handleServerClearKey is "c"/"C" in server mode: dequeue the given tickets.
-func (m QueueModel) handleServerClearKey(prompt string, addrs []string) (tea.Model, tea.Cmd) {
-	m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: m.cmdServerRemove(addrs)})
-	return m, nil
+// clearConfirm is "c"/"C" in server mode: dequeue the given tickets.
+func (k serverKeys) clearConfirm(prompt string, addrs []string) confirm.Options {
+	return confirm.Options{Prompt: prompt, AcceptCmd: k.cmdRemove(addrs)}
 }
 
-// handleServerDeleteKey is "x" in server mode. Delete is queue-only: the server
+// deleteConfirm is "x" in server mode. Delete is queue-only: the server
 // removes the entry and its queued descendants, and refuses with ticket-live
 // while an iteration runs (cancel is a status change, not a delete).
-func (m QueueModel) handleServerDeleteKey() (tea.Model, tea.Cmd) {
-	row, ok := m.selectedQueueRow()
-	if !ok {
-		return m, nil
+func (k serverKeys) deleteConfirm(t tickets.Ticket) confirm.Options {
+	prompt := fmt.Sprintf("Delete %s %s and every queued ticket it blocks?", t.DisplayNumber(), t.Title)
+	return confirm.Options{Prompt: prompt, AcceptCmd: k.cmdRemove([]string{t.Path})}
+}
+
+// handleServerApproveKey is "A" in server mode, and the Approve entry of the
+// ticket menu: confirm the selected ticket's pending recovery proposal.
+func (m QueueModel) handleServerApproveKey() (tea.Model, tea.Cmd) {
+	if row, ok := m.selectedQueueRow(); ok {
+		if opts, ok := m.srv.approveConfirm(row.ticket); ok {
+			m.confirm = m.confirm.Open(opts)
+		}
 	}
-	if !m.rows.checked[row.ticket.Path] {
-		return m, notify.Info(row.ticket.DisplayNumber() + " is not a queue item")
-	}
-	prompt := fmt.Sprintf("Delete %s %s and every queued ticket it blocks?", row.ticket.DisplayNumber(), row.ticket.Title)
-	m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: m.cmdServerRemove([]string{row.ticket.Path})})
 	return m, nil
 }
 
-// handleServerApproveKey is "A" in server mode: run the selected ticket's
-// pending recovery proposal. The server still refuses a stale or already-run
-// proposal, and the refusal becomes the toast.
-func (m QueueModel) handleServerApproveKey() (tea.Model, tea.Cmd) {
-	row, ok := m.selectedQueueRow()
-	if m.tickets == nil || !ok || !rowactions.HasPendingProposal(row.ticket.Body) {
-		return m, nil
+// approveConfirm is "A" in server mode: run the ticket's pending recovery
+// proposal. The server still refuses a stale or already-run proposal, and the
+// refusal becomes the toast. ok is false when there is nothing to approve.
+func (k serverKeys) approveConfirm(t tickets.Ticket) (opts confirm.Options, ok bool) {
+	if k.tickets == nil || !rowactions.HasPendingProposal(t.Body) {
+		return confirm.Options{}, false
 	}
-	api, addr := m.tickets, row.ticket.Path
-	prompt := fmt.Sprintf("Run the recovery proposal for %s %s?", row.ticket.DisplayNumber(), row.ticket.Title)
-	m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: func() tea.Msg {
+	api, addr := k.tickets, t.Path
+	prompt := fmt.Sprintf("Run the recovery proposal for %s %s?", t.DisplayNumber(), t.Title)
+	return confirm.Options{Prompt: prompt, AcceptCmd: func() tea.Msg {
 		res, err := api.Approve(context.Background(), addr)
 		switch {
 		case err != nil:
@@ -117,25 +130,24 @@ func (m QueueModel) handleServerApproveKey() (tea.Model, tea.Cmd) {
 			return serverDoneMsg{problem: res.Message}
 		}
 		return serverDoneMsg{ok: "approved " + addr}
-	}})
-	return m, nil
+	}}, true
 }
 
-// handleServerPauseKey is "p" in server mode: read the budget, then offer the
-// matching action.
-func (m QueueModel) handleServerPauseKey() (tea.Model, tea.Cmd) {
-	api := m.reads
-	return m, func() tea.Msg {
+// cmdPause is "p" in server mode: read the budget, then offer the matching
+// action (see pauseConfirm).
+func (k serverKeys) cmdPause() tea.Cmd {
+	api := k.reads
+	return func() tea.Msg {
 		b, err := api.Budget(context.Background())
 		return serverPauseStateMsg{budget: b, err: err}
 	}
 }
 
-func (m QueueModel) openServerPauseConfirm(b wire.BudgetStatus) QueueModel {
-	admin, queue := m.admin, m.queue
+func (k serverKeys) pauseConfirm(b wire.BudgetStatus, paused bool) confirm.Options {
+	admin, queue := k.admin, k.queue
 	var prompt string
 	var accept tea.Cmd
-	switch serverPauseActionFor(b, m.paused) {
+	switch serverPauseActionFor(b, paused) {
 	case serverActionOverride:
 		prompt = fmt.Sprintf("Budget limit reached ($%.2f spent). Override and resume?", b.Total)
 		accept = func() tea.Msg {
@@ -155,8 +167,7 @@ func (m QueueModel) openServerPauseConfirm(b wire.BudgetStatus) QueueModel {
 		prompt = finishAndPausePrompt
 		accept = cmdServerQueueMode("queue paused", queue.Pause)
 	}
-	m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: accept})
-	return m
+	return confirm.Options{Prompt: prompt, AcceptCmd: accept}
 }
 
 func cmdServerQueueMode(ok string, verb func(context.Context) (wire.QueueResult, error)) tea.Cmd {
@@ -172,32 +183,33 @@ func cmdServerQueueMode(ok string, verb func(context.Context) (wire.QueueResult,
 	}
 }
 
-// updateServerKeys handles the Queue tab's server-key results; ok is false for
-// any other msg.
-func (m QueueModel) updateServerKeys(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
+// update handles the Queue tab's server-key results; ok is false for any other
+// msg. A non-nil open is a confirmation for the tab to show.
+func (k serverKeys) update(msg tea.Msg, paused bool) (cmd tea.Cmd, open *confirm.Options, ok bool) {
 	switch msg := msg.(type) {
 	case serverPauseStateMsg:
 		if msg.err != nil {
-			return m, notify.Error("budget: " + msg.err.Error()), true
+			return notify.Error("budget: " + msg.err.Error()), nil, true
 		}
-		return m.openServerPauseConfirm(msg.budget), nil, true
+		opts := k.pauseConfirm(msg.budget, paused)
+		return nil, &opts, true
 	case serverDoneMsg:
 		if msg.problem != "" {
-			return m, notify.Error("refused: " + msg.problem), true
+			return notify.Error("refused: " + msg.problem), nil, true
 		}
-		return m, notify.Success(msg.ok), true
+		return notify.Success(msg.ok), nil, true
 	case rowactions.ServerWriteMsg:
-		return m, msg.Toast(), true
+		return msg.Toast(), nil, true
 	case rowactions.EpicQueuedMsg:
-		return m, msg.Toast(), true
+		return msg.Toast(), nil, true
 	case serverRemovedMsg:
 		note := notify.Success(fmt.Sprintf("removed %d ticket(s) from the queue", msg.removed))
 		if msg.problem != "" {
 			note = notify.Error(fmt.Sprintf("removed %d, stopped at %s", msg.removed, msg.problem))
 		}
-		return m, note, true
+		return note, nil, true
 	}
-	return m, nil, false
+	return nil, nil, false
 }
 
 // handleServerFinishAndPauseKey is "D" in server mode, an alias of Finish and pause kept
