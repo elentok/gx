@@ -107,11 +107,11 @@ func (m Model) renderWorktreesPanel(width, height int, title string, lines []str
 func (m Model) headerStatus(avail int, bg color.Color) string {
 	dim := ui.StyleDim.Background(bg)
 	var fixed, text string
-	paste, pasting := m.modal.(pasteModal)
+	paste, pasting := m.modal.(modal.Paste)
 	switch {
 	case pasting:
 		fixed = ui.RenderChip("PASTE", ui.ColorBlue)
-		text = fmt.Sprintf("%d files from %s", len(paste.clipboard.Files), paste.clipboard.SrcName)
+		text = fmt.Sprintf("%d files from %s", len(paste.Clipboard().Files), paste.Clipboard().SrcName)
 	case m.spinnerActive:
 		fixed = dim.Render(strings.TrimSpace(m.spinner.View()))
 		text = m.spinnerLabel

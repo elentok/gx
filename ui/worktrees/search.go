@@ -1,28 +1,16 @@
 package worktrees
 
 import (
-	"strings"
-
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 	uisearch "github.com/elentok/gx/ui/search"
 )
 
-// searchModal is the incremental worktree search. It owns the query and match
-// state; moving the table to a match is the page's job, so each state change
-// that needs it comes back as an apply.
-type searchModal struct {
-	model uisearch.Model
-}
-
 // enterSearchMode opens the search modal with an empty query. Model.search is
 // the closed template each open copies.
 func (m Model) enterSearchMode() Model {
-	s := m.search
-	s.Start("")
-	return m.openModal(searchModal{model: s})
+	return m.openModal(modal.NewSearch(m.search))
 }
 
 // exitSearchMode closes the search modal and clears its highlights.
@@ -34,98 +22,23 @@ func (m Model) exitSearchMode() Model {
 
 // searchQuery is the open search's query, empty when no search is open.
 func (m Model) searchQuery() string {
-	if s, ok := m.modal.(searchModal); ok {
-		return s.model.Query()
+	if s, ok := m.modal.(modal.Search); ok {
+		return s.Query()
 	}
 	return ""
-}
-
-func (searchModal) BottomAnchored() {}
-
-func (searchModal) InputFocused() bool { return true }
-
-// View renders the search input overlay.
-func (s searchModal) View(width, _ int) string {
-	s.model.SetWidth(min(uisearch.DESIRED_WIDTH, width*80/100))
-	return s.model.View()
-}
-
-// Update closes on esc/enter, steps through matches on ctrl+n/ctrl+p, and
-// feeds every other key to the search input.
-func (s searchModal) Update(msg tea.Msg) (modal.Modal, tea.Cmd, modal.Result) {
-	switch msg := msg.(type) {
-	case tea.PasteMsg:
-		s.model.Start(msg.Content)
-		return s, nil, modal.Result{Action: modal.SearchQueryChanged{}}
-	case tea.KeyPressMsg:
-		return s.updateKey(msg)
-	}
-	return s, nil, modal.Result{Unhandled: true}
-}
-
-func (s searchModal) updateKey(msg tea.KeyPressMsg) (modal.Modal, tea.Cmd, modal.Result) {
-	switch msg.String() {
-	case "esc", "enter":
-		return s, nil, modal.Result{Close: true, Action: modal.SearchClosed{}}
-	case "ctrl+n":
-		if n := s.model.MatchesCount(); n > 0 {
-			return s.stepTo((s.model.Cursor() + 1) % n)
-		}
-		return s, nil, modal.Result{}
-	case "ctrl+p":
-		if n := s.model.MatchesCount(); n > 0 {
-			return s.stepTo((s.model.Cursor() - 1 + n) % n)
-		}
-		return s, nil, modal.Result{}
-	}
-
-	next, cmd, result := s.model.Update(msg)
-	s.model = next
-	if !result.Handled {
-		return s, nil, modal.Result{}
-	}
-	if result.QueryChanged {
-		return s, nil, modal.Result{Action: modal.SearchQueryChanged{}}
-	}
-	if result.CursorChanged {
-		return s, nil, modal.Result{Action: modal.SearchCursorMoved{}}
-	}
-	return s, cmd, modal.Result{}
-}
-
-func (s searchModal) stepTo(idx int) (modal.Modal, tea.Cmd, modal.Result) {
-	s.model.SetCursor(idx)
-	return s, nil, modal.Result{Action: modal.SearchCursorMoved{}}
-}
-
-func computeSearchMatches(worktrees []git.Worktree, query string) []uisearch.Match {
-	q := strings.ToLower(strings.TrimSpace(query))
-	if q == "" {
-		return nil
-	}
-	matches := make([]uisearch.Match, 0)
-	for i, wt := range worktrees {
-		if strings.Contains(strings.ToLower(wt.Name), q) || strings.Contains(strings.ToLower(wt.Branch), q) {
-			matches = append(matches, uisearch.Match{DataIndex: i})
-		}
-	}
-	return matches
 }
 
 // updateSearchMatches recomputes the open search's matches and jumps to the
 // current one.
 func (m Model) updateSearchMatches() (Model, tea.Cmd) {
-	s, ok := m.modal.(searchModal)
+	s, ok := m.modal.(modal.Search)
 	if !ok {
 		return m, nil
 	}
-	matches := computeSearchMatches(m.worktrees, s.model.Query())
-	s.model.SetMatches(matches)
+	s = s.Recompute(m.worktrees)
 	m.modal = s
-	if len(matches) > 0 {
-		if match, ok := s.model.Match(s.model.Cursor()); ok {
-			return m.jumpToSearchMatch(match)
-		}
+	if match, ok := s.CurrentMatch(); ok {
+		return m.jumpToSearchMatch(match)
 	}
 	m.table.SetRows(m.buildRows())
 	return m, nil
@@ -133,8 +46,8 @@ func (m Model) updateSearchMatches() (Model, tea.Cmd) {
 
 // jumpToCurrentMatch moves the table to the open search's current match.
 func (m Model) jumpToCurrentMatch() (Model, tea.Cmd) {
-	if s, ok := m.modal.(searchModal); ok {
-		if match, ok := s.model.Match(s.model.Cursor()); ok {
+	if s, ok := m.modal.(modal.Search); ok {
+		if match, ok := s.CurrentMatch(); ok {
 			return m.jumpToSearchMatch(match)
 		}
 	}

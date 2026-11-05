@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/worktrees/launch"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -88,15 +89,15 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case startBatchDeleteMsg:
 		return m.enterDeleteProgress(msg.worktrees)
 
-	case deleteResultMsg:
-		if d, ok := m.modal.(deleteProgress); ok {
+	case modal.DeleteResultMsg:
+		if d, ok := m.modal.(modal.DeleteProgress); ok {
 			return m.handleDeleteProgressResult(d, msg)
 		}
 		m.spinnerActive = false
-		if msg.err != nil {
-			return m.showError(msg.err.Error()), nil
+		if msg.Err != nil {
+			return m.showError(msg.Err.Error()), nil
 		}
-		return m, tea.Batch(notify.Info(fmt.Sprintf("deleted worktree %s", msg.name)), cmdLoadWorktrees(m.repo, m.settings.TicketStore))
+		return m, tea.Batch(notify.Info(fmt.Sprintf("deleted worktree %s", msg.Name)), cmdLoadWorktrees(m.repo, m.settings.TicketStore))
 
 	case renameResultMsg:
 		if msg.err != nil {
@@ -132,16 +133,14 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m, nil
 
 	case yankDataMsg:
-		y, ok := m.modal.(yankModal)
-		if !ok || msg.worktreePath != y.source.Path {
+		y, ok := m.modal.(modal.Yank)
+		if !ok || msg.worktreePath != y.Source().Path {
 			return m, nil
 		}
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		y.loading = false
-		y.checklist = components.NewChecklist(changesToChecklistItems(msg.changes))
-		m.modal = y
+		m.modal = y.Loaded(changesToChecklistItems(msg.changes))
 		return m, nil
 
 	case promptableJobStartMsg:
@@ -163,13 +162,12 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 				return m.finishPromptableJob(err)
 			}
 		}
-		d, deleting := m.modal.(deleteProgress)
+		d, deleting := m.modal.(modal.DeleteProgress)
 		if m.spinnerActive || m.previewLoading || deleting {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			if deleting {
-				d.spinnerFrame = m.spinner.View()
-				m.modal = d
+				m.modal = d.SetSpinnerFrame(m.spinner.View())
 			}
 			if m.previewLoading {
 				m.viewport.SetContent(m.previewContent())

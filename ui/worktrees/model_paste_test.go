@@ -52,7 +52,7 @@ func TestPasteMsgUpdatesSearchQuery(t *testing.T) {
 	if got := m.searchQuery(); got != "bug" {
 		t.Fatalf("search query after paste = %q, want %q", got, "bug")
 	}
-	if got := m.modal.(searchModal).model.Matches(); len(got) != 1 || got[0].DataIndex != 1 {
+	if got := m.modal.(modal.Search).Matches(); len(got) != 1 || got[0].DataIndex != 1 {
 		t.Fatalf("search matches after paste = %v, want [{Index:1}]", got)
 	}
 }

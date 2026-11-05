@@ -60,7 +60,7 @@ type Model struct {
 	confirm confirm.Model
 
 	keyManager keymgr.Manager
-	search     search.Model // closed template; each open copies it into a searchModal
+	search     search.Model // closed template; each open copies it into a modal.Search
 
 	help help.Model
 
@@ -102,7 +102,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Setti
 		loading:            true,
 		confirm:            confirm.New(),
 		pull:               pull.New(),
-		helpModel:          help.NewModel(append(help.BuildSections(km, extraKeys), pasteModeHelpSection()), settings.About),
+		helpModel:          help.NewModel(append(help.BuildSections(km, extraKeys), modal.PasteModeHelpSection()), settings.About),
 		keyManager:         km,
 		search:             search.NewModel(),
 		spinner:            sp,

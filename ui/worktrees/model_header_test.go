@@ -32,7 +32,7 @@ func worktreesHeader(m Model) string {
 }
 
 func withPaste(m Model) Model {
-	m.modal = pasteModal{clipboard: modal.Clipboard{SrcName: "feat-x", Files: []string{"a", "b", "c"}}}
+	m.modal = modal.NewPaste(modal.Clipboard{SrcName: "feat-x", Files: []string{"a", "b", "c"}})
 	return m
 }
 
@@ -139,16 +139,14 @@ func TestWorktreesViewHasNoFooterRow(t *testing.T) {
 func TestEnteringPasteModeNotifiesTheKeys(t *testing.T) {
 	t.Parallel()
 	m := headerTestModel(120)
-	m.modal = yankModal{
-		source:    git.Worktree{Name: "feat-x", Path: "/tmp/feat-x"},
-		checklist: components.Checklist{Items: []components.Item{{Label: "a", Value: "a", Checked: true}}},
-	}
+	m.modal = modal.NewYank(git.Worktree{Name: "feat-x", Path: "/tmp/feat-x"}).
+		Loaded([]components.Item{{Label: "a", Value: "a", Checked: true}})
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if got := updated.(Model).modal; got == nil {
 		t.Fatal("modal = nil, want pasteModal")
-	} else if _, ok := got.(pasteModal); !ok {
-		t.Fatalf("modal = %T, want pasteModal", got)
+	} else if _, ok := got.(modal.Paste); !ok {
+		t.Fatalf("modal = %T, want modal.Paste", got)
 	}
 	if cmd == nil {
 		t.Fatal("expected a notification command")

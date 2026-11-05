@@ -61,7 +61,7 @@ func TestInputFocused_TrueInNewMode(t *testing.T) {
 func TestInputFocused_TrueInSearchMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.modal = searchModal{}
+	m.modal = modal.Search{}
 	if !m.InputFocused() {
 		t.Error("expected InputFocused=true with search open")
 	}
