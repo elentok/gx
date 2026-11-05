@@ -3,15 +3,11 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"path/filepath"
-	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
-	"github.com/elentok/gx/cmd/gitops"
 	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/cmd/ticketsmigrate"
-	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/nav"
 
 	"github.com/spf13/cobra"
@@ -49,128 +45,6 @@ func newEpicScopedCmd(d deps, use, short string, run func(epicPath string, args 
 	}
 }
 
-func newWorktreesCmd(d deps) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "worktrees",
-		Aliases: []string{"wt"},
-		Short:   "open the worktree UI",
-		Args:    cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return d.runWorktrees("")
-		},
-	}
-	cmd.AddCommand(gitops.WorktreeCommands(d.gitopsDeps())...)
-	return cmd
-}
-
-func newStatusCmd(d deps) *cobra.Command {
-	return &cobra.Command{
-		Use:     "status [path]",
-		Aliases: []string{"s"},
-		Short:   "open the status UI",
-		RunE: func(_ *cobra.Command, args []string) error {
-			if len(args) > 1 {
-				return fmt.Errorf("usage: gx status|s [path]")
-			}
-			target := ""
-			if len(args) == 1 {
-				target = args[0]
-			}
-			return d.runStatus(target)
-		},
-	}
-}
-
-func newLogCmd(d deps) *cobra.Command {
-	var file string
-	cmd := &cobra.Command{
-		Use:   "log [hash-or-ref]",
-		Short: "open the log UI",
-		RunE: func(_ *cobra.Command, args []string) error {
-			if len(args) > 1 {
-				return fmt.Errorf("usage: gx log [hash-or-ref]")
-			}
-			ref := ""
-			if len(args) == 1 {
-				ref = args[0]
-			}
-			resolved, err := resolveLogFile(d, file)
-			if err != nil {
-				return err
-			}
-			return d.runLog(LogOptions{Ref: ref, File: resolved})
-		},
-	}
-	cmd.Flags().StringVarP(&file, "file", "f", "", "open the log pre-filtered to a file (follows renames)")
-	_ = cmd.MarkFlagFilename("file")
-	return cmd
-}
-
-// resolveLogFile turns a user-supplied -f path (cwd-relative or absolute) into
-// the repo-relative form the log filter expects. Empty input stays empty so a
-// plain `gx log` needs no repo lookup. Paths outside the worktree are rejected.
-func resolveLogFile(d deps, file string) (string, error) {
-	if strings.TrimSpace(file) == "" {
-		return "", nil
-	}
-	cwd, err := d.getwd()
-	if err != nil {
-		return "", err
-	}
-	root, err := stage.WorktreeRoot(cwd)
-	if err != nil {
-		return "", err
-	}
-	// git reports the canonical (symlink-resolved) root; align cwd so the two
-	// share a prefix before computing the repo-relative path.
-	if canon, e := filepath.EvalSymlinks(cwd); e == nil {
-		cwd = canon
-	}
-	return stage.RepoRelativePath(cwd, file, root)
-}
-
-func newShowCmd(d deps) *cobra.Command {
-	return &cobra.Command{
-		Use:   "show [hash-or-ref]",
-		Short: "open the commit UI",
-		RunE: func(_ *cobra.Command, args []string) error {
-			if len(args) > 1 {
-				return fmt.Errorf("usage: gx show [hash-or-ref]")
-			}
-			ref := ""
-			if len(args) == 1 {
-				ref = args[0]
-			}
-			return d.runShow(ref)
-		},
-	}
-}
-
-func newStashCmd(d deps) *cobra.Command {
-	return &cobra.Command{
-		Use:   "stash",
-		Short: "open the stash UI",
-		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return d.runStash()
-		},
-	}
-}
-
-func newPRsCmd(d deps) *cobra.Command {
-	var allRepos bool
-	cmd := &cobra.Command{
-		Use:   "prs",
-		Short: "open the PRs UI",
-		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return d.runPRs(allRepos)
-		},
-	}
-	cmd.Flags().BoolVar(&allRepos, "all", false, "show outgoing PRs across all repos, not just the current one")
-	return cmd
-}
-
 func newTicketsCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "tickets",
@@ -178,7 +52,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 		Short:   "open the tickets UI",
 		Args:    cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return d.runTab(nav.TabTickets)
+			return d.tui.RunTab(nav.TabTickets)
 		},
 	}
 	var validateAll bool

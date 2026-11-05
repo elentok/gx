@@ -1,4 +1,4 @@
-package cmd
+package tui
 
 import (
 	"context"
@@ -262,8 +262,8 @@ func runPRs(dirs config.Dirs, allRepos bool) error {
 	return runApp(dirs, m, cfg)
 }
 
-// runTab opens the TUI on tab (`gx tickets`, `gx agents`).
-func runTab(dirs config.Dirs, tab nav.TabID) error {
+// RunTab opens the TUI on tab (`gx tickets`, `gx agents`).
+func RunTab(dirs config.Dirs, tab nav.TabID) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err

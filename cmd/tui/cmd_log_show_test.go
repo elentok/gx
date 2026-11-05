@@ -1,4 +1,4 @@
-package cmd
+package tui
 
 import (
 	"bytes"
@@ -6,22 +6,23 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 )
 
 func TestExecute_LogDispatchesToRunLog(t *testing.T) {
 	t.Parallel()
 	var got LogOptions
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		runLog: func(opts LogOptions) error {
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
+		RunLog: func(opts LogOptions) error {
 			got = opts
 			return nil
 		},
 	}
 
-	if err := execute([]string{"log", "HEAD~2"}, d); err != nil {
+	if err := cmdtest.Run(t, d.Env, []string{"log", "HEAD~2"}, NewLog(d)); err != nil {
 		t.Fatalf("execute log: %v", err)
 	}
 	if got.Ref != "HEAD~2" {
@@ -35,15 +36,14 @@ func TestExecute_LogDispatchesToRunLog(t *testing.T) {
 func TestExecute_RunLog_DispatchesWithRef(t *testing.T) {
 	t.Parallel()
 	var got LogOptions
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		runLog: func(opts LogOptions) error {
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
+		RunLog: func(opts LogOptions) error {
 			got = opts
 			return nil
 		},
 	}
-	if err := execute([]string{"log", "abc123"}, d); err != nil {
+	if err := cmdtest.Run(t, d.Env, []string{"log", "abc123"}, NewLog(d)); err != nil {
 		t.Fatalf("execute log abc123: %v", err)
 	}
 	if got.Ref != "abc123" {
@@ -68,16 +68,18 @@ func TestExecute_LogFileFlag(t *testing.T) {
 			t.Parallel()
 			repoDir := testutil.TempRepo(t)
 			var got LogOptions
-			d := deps{
-				stdout: bytes.NewBuffer(nil),
-				stderr: bytes.NewBuffer(nil),
-				getwd:  func() (string, error) { return repoDir, nil },
-				runLog: func(opts LogOptions) error {
+			d := Deps{
+				Env: cmdbase.Env{
+					Stdout: bytes.NewBuffer(nil),
+					Stderr: bytes.NewBuffer(nil),
+					Getwd:  func() (string, error) { return repoDir, nil },
+				},
+				RunLog: func(opts LogOptions) error {
 					got = opts
 					return nil
 				},
 			}
-			if err := execute(tc.args, d); err != nil {
+			if err := cmdtest.Run(t, d.Env, tc.args, NewLog(d)); err != nil {
 				t.Fatalf("execute %v: %v", tc.args, err)
 			}
 			if got.Ref != tc.wantRef {
@@ -98,16 +100,18 @@ func TestExecute_LogFileResolvesFromSubdir(t *testing.T) {
 		t.Fatalf("mkdir sub: %v", err)
 	}
 	var got LogOptions
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return subDir, nil },
-		runLog: func(opts LogOptions) error {
+	d := Deps{
+		Env: cmdbase.Env{
+			Stdout: bytes.NewBuffer(nil),
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return subDir, nil },
+		},
+		RunLog: func(opts LogOptions) error {
 			got = opts
 			return nil
 		},
 	}
-	if err := execute([]string{"log", "-f", "file.txt"}, d); err != nil {
+	if err := cmdtest.Run(t, d.Env, []string{"log", "-f", "file.txt"}, NewLog(d)); err != nil {
 		t.Fatalf("execute log -f file.txt: %v", err)
 	}
 	if got.File != "sub/file.txt" {
@@ -118,16 +122,18 @@ func TestExecute_LogFileResolvesFromSubdir(t *testing.T) {
 func TestExecute_LogFileRejectsEscape(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return repoDir, nil },
-		runLog: func(LogOptions) error {
+	d := Deps{
+		Env: cmdbase.Env{
+			Stdout: bytes.NewBuffer(nil),
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return repoDir, nil },
+		},
+		RunLog: func(LogOptions) error {
 			t.Fatal("runLog should not be called when the path escapes the repo")
 			return nil
 		},
 	}
-	err := execute([]string{"log", "-f", "../outside.txt"}, d)
+	err := cmdtest.Run(t, d.Env, []string{"log", "-f", "../outside.txt"}, NewLog(d))
 	if err == nil {
 		t.Fatal("expected error for path escaping the repo root")
 	}
@@ -136,15 +142,14 @@ func TestExecute_LogFileRejectsEscape(t *testing.T) {
 func TestExecute_RunShow_DispatchesWithRef(t *testing.T) {
 	t.Parallel()
 	var got string
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		runShow: func(ref string) error {
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
+		RunShow: func(ref string) error {
 			got = ref
 			return nil
 		},
 	}
-	if err := execute([]string{"show", "HEAD"}, d); err != nil {
+	if err := cmdtest.Run(t, d.Env, []string{"show", "HEAD"}, NewShow(d)); err != nil {
 		t.Fatalf("execute show HEAD: %v", err)
 	}
 	if got != "HEAD" {
@@ -155,15 +160,14 @@ func TestExecute_RunShow_DispatchesWithRef(t *testing.T) {
 func TestExecute_RunShow_NoRef(t *testing.T) {
 	t.Parallel()
 	var got string
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		runShow: func(ref string) error {
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
+		RunShow: func(ref string) error {
 			got = ref
 			return nil
 		},
 	}
-	if err := execute([]string{"show"}, d); err != nil {
+	if err := cmdtest.Run(t, d.Env, []string{"show"}, NewShow(d)); err != nil {
 		t.Fatalf("execute show: %v", err)
 	}
 	if got != "" {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/tui"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
 )
@@ -15,10 +16,10 @@ func TestExecute_AgentsOpensTheAgentsTab(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runTab: func(tab nav.TabID) error {
+		tui: tui.Deps{RunTab: func(tab nav.TabID) error {
 			tabs = append(tabs, tab)
 			return nil
-		},
+		}},
 	}
 
 	if err := execute([]string{"agents"}, d); err != nil {
@@ -36,11 +37,11 @@ func TestExecute_PRsDispatchesToRunPRs(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runPRs: func(allRepos bool) error {
+		tui: tui.Deps{RunPRs: func(allRepos bool) error {
 			called++
 			gotAllRepos = allRepos
 			return nil
-		},
+		}},
 	}
 
 	if err := execute([]string{"prs"}, d); err != nil {
@@ -61,11 +62,11 @@ func TestExecute_PRsAllFlagDispatchesAllRepos(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runPRs: func(allRepos bool) error {
+		tui: tui.Deps{RunPRs: func(allRepos bool) error {
 			called++
 			gotAllRepos = allRepos
 			return nil
-		},
+		}},
 	}
 
 	if err := execute([]string{"prs", "--all"}, d); err != nil {
@@ -85,13 +86,13 @@ func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runTab: func(tab nav.TabID) error {
+		tui: tui.Deps{RunTab: func(tab nav.TabID) error {
 			if tab != nav.TabTickets {
 				t.Errorf("tab = %s, want tickets", tab)
 			}
 			called++
 			return nil
-		},
+		}},
 	}
 
 	if err := execute([]string{"tickets"}, d); err != nil {
@@ -108,13 +109,13 @@ func TestExecute_TicketsAliasTk(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runTab: func(tab nav.TabID) error {
+		tui: tui.Deps{RunTab: func(tab nav.TabID) error {
 			if tab != nav.TabTickets {
 				t.Errorf("tab = %s, want tickets", tab)
 			}
 			called++
 			return nil
-		},
+		}},
 	}
 
 	if err := execute([]string{"tk"}, d); err != nil {
@@ -132,10 +133,10 @@ func TestExecute_DefaultRunsStatus(t *testing.T) {
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return testutil.TempRepo(t), nil },
-		runStatus: func(_ string) error {
+		tui: tui.Deps{RunStatus: func(_ string) error {
 			called++
 			return nil
-		},
+		}},
 	}
 
 	if err := execute(nil, d); err != nil {
@@ -155,13 +156,15 @@ func TestExecute_DefaultFromBareRootRunsWorktrees(t *testing.T) {
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return bareRoot, nil },
-		runStatus: func(_ string) error {
-			statusCalled++
-			return nil
-		},
-		runWorktrees: func(_ string) error {
-			worktreesCalled++
-			return nil
+		tui: tui.Deps{
+			RunStatus: func(_ string) error {
+				statusCalled++
+				return nil
+			},
+			RunWorktrees: func(_ string) error {
+				worktreesCalled++
+				return nil
+			},
 		},
 	}
 
@@ -182,10 +185,10 @@ func TestExecute_WorktreesAliases(t *testing.T) {
 			d := deps{
 				stdout: bytes.NewBuffer(nil),
 				stderr: bytes.NewBuffer(nil),
-				runWorktrees: func(_ string) error {
+				tui: tui.Deps{RunWorktrees: func(_ string) error {
 					called++
 					return nil
-				},
+				}},
 			}
 			if err := execute(args, d); err != nil {
 				t.Fatalf("execute: %v", err)
@@ -200,9 +203,9 @@ func TestExecute_WorktreesAliases(t *testing.T) {
 func TestExecute_UnknownCommand(t *testing.T) {
 	t.Parallel()
 	d := deps{
-		stdout:       bytes.NewBuffer(nil),
-		stderr:       bytes.NewBuffer(nil),
-		runWorktrees: func(_ string) error { return nil },
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		tui:    tui.Deps{RunWorktrees: func(_ string) error { return nil }},
 	}
 	err := execute([]string{"nope"}, d)
 	if err == nil {

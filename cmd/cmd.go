@@ -23,22 +23,14 @@ import (
 	"github.com/elentok/gx/cmd/serverctl"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
+	"github.com/elentok/gx/cmd/tui"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/sessionlookup"
-	"github.com/elentok/gx/ui/nav"
 
 	"github.com/spf13/cobra"
 )
-
-// LogOptions configures how the log UI opens. Ref is an optional starting
-// commit-ish; File, when set, is a repo-relative path the log is pre-filtered
-// to (equivalent to the status "gh" mapping; follows renames).
-type LogOptions struct {
-	Ref  string
-	File string
-}
 
 // ExitError is the one alias root keeps, so main.go needs no import of cmdbase.
 type ExitError = cmdbase.ExitError
@@ -48,19 +40,15 @@ type deps struct {
 	stdout          io.Writer
 	stderr          io.Writer
 	getwd           func() (string, error)
-	runWorktrees    func(string) error
-	runStatus       func(string) error
-	runLog          func(LogOptions) error
-	runShow         func(string) error
-	runStash        func() error
-	runPRs          func(allRepos bool) error
-	runTab          func(nav.TabID) error
 	confirmForce    func(string) (bool, error)
 	loadConfig      func() (config.Config, error)
 	getenv          func(string) string
 	goos            string
 	userHomeDir     func() (string, error)
 	stdinIsTerminal func() bool
+	// tui holds the hooks that open the full-screen UIs (its Env is unset;
+	// tuiDeps fills it). `gx tickets` and `gx agents` read RunTab too.
+	tui tui.Deps
 	// agent holds the `gx agent`, `gx agents` and `gx designs` hooks (its Env
 	// and OpenTab are unset; agentDeps fills them).
 	agent agentcmd.Deps
@@ -132,12 +120,19 @@ func (d deps) projectDeps() project.Deps {
 	return s
 }
 
+// tuiDeps is the full-screen launchers' hooks joined with the shared env.
+func (d deps) tuiDeps() tui.Deps {
+	s := d.tui
+	s.Env = d.base()
+	return s
+}
+
 // agentDeps is the `gx agent`, `gx agents` and `gx designs` hooks joined with
-// the shared env. runTab stays in root deps because `gx tickets` also uses it.
+// the shared env. RunTab stays in the tui deps because `gx tickets` also uses it.
 func (d deps) agentDeps() agentcmd.Deps {
 	s := d.agent
 	s.Env = d.base()
-	s.OpenTab = d.runTab
+	s.OpenTab = d.tui.RunTab
 	return s
 }
 
@@ -187,13 +182,7 @@ func defaultDeps() deps {
 		confirmForce: func(prompt string) (bool, error) {
 			return confirm.RunWithNerd(prompt, cfg.UseNerdFontIcons)
 		},
-		runWorktrees:    func(target string) error { return runWorktrees(dirs, target) },
-		runStatus:       func(target string) error { return runStatus(dirs, target) },
-		runLog:          func(opts LogOptions) error { return runLog(dirs, opts) },
-		runShow:         func(ref string) error { return runShow(dirs, ref) },
-		runStash:        func() error { return runStash(dirs) },
-		runPRs:          func(allRepos bool) error { return runPRs(dirs, allRepos) },
-		runTab:          func(tab nav.TabID) error { return runTab(dirs, tab) },
+		tui:             tui.DefaultDeps(dirs),
 		loadConfig:      dirs.Load,
 		getenv:          os.Getenv,
 		goos:            runtime.GOOS,
@@ -253,10 +242,10 @@ Run without a command to open the status UI.`,
 			// so open the worktree UI — that's the management view for this layout.
 			if cwd, err := d.getwd(); err == nil {
 				if info, err := git.IdentifyDir(cwd); err == nil && info.Repo.IsBare && info.WorktreeRoot == "" {
-					return d.runWorktrees("")
+					return d.tui.RunWorktrees("")
 				}
 			}
-			return d.runStatus("")
+			return d.tui.RunStatus("")
 		},
 	}
 	root.SetVersionTemplate("gx {{.Version}}\n")
@@ -267,13 +256,13 @@ Run without a command to open the status UI.`,
 		agentcmd.NewDesigns(d.agentDeps()),
 		claudecmd.New(d.claudeDeps()),
 		codexcmd.New(d.codexDeps()),
-		newWorktreesCmd(d),
+		tui.NewWorktrees(d.tuiDeps(), gitops.WorktreeCommands(d.gitopsDeps())...),
 		gitops.NewPush(d.gitopsDeps()),
-		newStatusCmd(d),
-		newLogCmd(d),
-		newShowCmd(d),
-		newStashCmd(d),
-		newPRsCmd(d),
+		tui.NewStatus(d.tuiDeps()),
+		tui.NewLog(d.tuiDeps()),
+		tui.NewShow(d.tuiDeps()),
+		tui.NewStash(d.tuiDeps()),
+		tui.NewPRs(d.tuiDeps()),
 		newTicketsCmd(d),
 		serverctl.New(d.serverctlDeps(), serverapi.Commands(d.serverapiDeps())...),
 		newRecoveryCmd(d),

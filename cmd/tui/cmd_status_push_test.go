@@ -1,9 +1,12 @@
-package cmd
+package tui
 
 import (
 	"bytes"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 func TestExecute_RunsStatus(t *testing.T) {
@@ -12,16 +15,15 @@ func TestExecute_RunsStatus(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			called := 0
-			d := deps{
-				stdout: bytes.NewBuffer(nil),
-				stderr: bytes.NewBuffer(nil),
-				runStatus: func(string) error {
+			d := Deps{
+				Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
+				RunStatus: func(string) error {
 					called++
 					return nil
 				},
 			}
 
-			if err := execute([]string{name}, d); err != nil {
+			if err := cmdtest.Run(t, d.Env, []string{name}, NewStatus(d)); err != nil {
 				t.Fatalf("execute %s: %v", name, err)
 			}
 			if called != 1 {
@@ -44,16 +46,15 @@ func TestExecute_RunsStatusWithPath(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			var got string
-			d := deps{
-				stdout: bytes.NewBuffer(nil),
-				stderr: bytes.NewBuffer(nil),
-				runStatus: func(path string) error {
+			d := Deps{
+				Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
+				RunStatus: func(path string) error {
 					got = path
 					return nil
 				},
 			}
 
-			if err := execute(tc.args, d); err != nil {
+			if err := cmdtest.Run(t, d.Env, tc.args, NewStatus(d)); err != nil {
 				t.Fatalf("execute %v: %v", tc.args, err)
 			}
 			if got != tc.want {

@@ -1,4 +1,4 @@
-package cmd
+package tui
 
 import (
 	"testing"
@@ -6,8 +6,6 @@ import (
 	"github.com/elentok/gx/config"
 )
 
-// TestSettingsFromConfigIncludesExecutionQueueLimits stays in root until `tui`
-// takes settingsFromConfig (cmd/ui.go).
 func TestSettingsFromConfigIncludesExecutionQueueLimits(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
