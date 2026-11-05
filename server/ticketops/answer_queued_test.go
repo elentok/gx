@@ -3,10 +3,10 @@ package ticketops_test
 import (
 	"io"
 	"log/slog"
-	"net/http"
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -34,9 +35,9 @@ func (l *launchFake) BudgetRefusal() (wire.QueueResult, bool) {
 	return *l.budget, true
 }
 
-func (l *launchFake) PromptsOnRetry(string) bool { return false }
+func (l *launchFake) HostingDeps(tickets.Address) ralphloop.Deps { return ralphloop.Deps{} }
 
-func (l *launchFake) RepairResume(bool) http.HandlerFunc { return nil }
+func (l *launchFake) CompleteMergedRoot(tickets.Address) {}
 
 func (l *launchFake) ResettleWaiting(t runs.TrackedRun) error {
 	l.mu.Lock()

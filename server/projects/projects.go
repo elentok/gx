@@ -121,6 +121,17 @@ func (p *Registry) Epics(project string) ([]tickets.Epic, error) {
 	return nil, &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: "no project " + project}
 }
 
+// MergingOnMerged reports whether the project uses the on-merged merging policy.
+// An unreadable project file falls back to the default policy.
+func (p *Registry) MergingOnMerged(project string) bool {
+	dir, err := p.Dir(project)
+	if err != nil {
+		return true
+	}
+	pf, _ := config.ReadProjectFile(dir)
+	return pf.LandingPolicy() == config.LandingOnLanded
+}
+
 // WorktreeDir is where the project's repo keeps its linked worktrees.
 func (p *Registry) WorktreeDir(project string) string {
 	pf, err := config.ReadProjectFile(filepath.Join(p.cfg().TicketStore, project))

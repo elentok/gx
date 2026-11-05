@@ -283,7 +283,7 @@ func TestRunner_AFinishThatErrorsPausesTheTicketStuckAndFreesTheRoot(t *testing.
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	// The agent's turn wrecks its own worktree, so the finish cannot read it.
-	fake := newTurnRunner(func(_, cwd string) {
+	fake := servertest.NewTurnRunner(func(_, cwd string) {
 		if err := os.RemoveAll(cwd); err != nil {
 			t.Error(err)
 		}

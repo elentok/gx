@@ -1,4 +1,4 @@
-package server_test
+package ticketops_test
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 func webResume(t *testing.T, h *servertest.Harness, req wire.RepairRequest) wire.RepairResult {
 	t.Helper()
 	req.Address = answerAddr
-	res, err := h.Server.ResumeAsWeb(req)
+	res, err := h.Server.TicketOps().ResumeAsWeb(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestWebResume_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	state := stateOf(t, path)
 	req := wire.RepairRequest{Address: "proj:epic-a/03", State: state, Base: "99"}
 
-	res, err := h.Server.ResumeAsWeb(req)
+	res, err := h.Server.TicketOps().ResumeAsWeb(req)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonBadBase {
 		t.Fatalf("resume with a foreign base = %+v, %v; want refusal %s", res, err, wire.ReasonBadBase)
 	}
@@ -225,7 +225,7 @@ func TestWebResume_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	}
 
 	req.Base = "02"
-	if res, err := h.Server.ResumeAsWeb(req); err != nil || res.Refused {
+	if res, err := h.Server.TicketOps().ResumeAsWeb(req); err != nil || res.Refused {
 		t.Fatalf("resume with a competing base = %+v, %v", res, err)
 	}
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusOpen || tk.Base != "02" {
@@ -297,7 +297,7 @@ func TestWebResume_AFailedReopenLeavesNoAnswerAndTheNextResumeWorks(t *testing.T
 	}
 	defer restore()
 
-	if res, err := e.H.Server.ResumeAsWeb(wire.RepairRequest{Address: answerAddr, State: state}); err == nil && !res.Refused {
+	if res, err := e.H.Server.TicketOps().ResumeAsWeb(wire.RepairRequest{Address: answerAddr, State: state}); err == nil && !res.Refused {
 		t.Fatalf("resume = %+v; want a failure", res)
 	}
 	restore()
@@ -325,7 +325,7 @@ func TestWebResume_AnUnreadableLogIsAnErrorNotStale(t *testing.T) {
 	}
 	defer os.Chmod(logPath, 0o644)
 
-	res, err := e.H.Server.ResumeAsWeb(wire.RepairRequest{Address: answerAddr, State: state})
+	res, err := e.H.Server.TicketOps().ResumeAsWeb(wire.RepairRequest{Address: answerAddr, State: state})
 	if err == nil {
 		t.Fatalf("resume = %+v; want an error", res)
 	}

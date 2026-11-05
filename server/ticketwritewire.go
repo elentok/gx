@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -47,7 +48,7 @@ func (h ticketWriteHost) StopRun(run runs.Run) error {
 }
 
 func (h ticketWriteHost) TakeTierOverride(ticketPath string) ralphloop.Tier {
-	return takeTierOverride(ticketPath)
+	return ticketops.TakeTierOverride(ticketPath)
 }
 
 func (h ticketWriteHost) HerdrHolds(r agentrunner.Runner) (string, bool) { return h.s.herdrHolds(r) }

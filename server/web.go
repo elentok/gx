@@ -157,12 +157,8 @@ func (s *Server) webHandler() http.Handler {
 // read-only GETs, each with the handler the web mux uses: the web variants
 // require a state token. There is deliberately no withdraw or undo route.
 var webWrites = map[string]func(*Server) http.HandlerFunc{
-	"POST /v1/tickets/resume":     func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
-	"POST /v1/tickets/unpark":     func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
-	"POST /v1/tickets/merge":      func(s *Server) http.HandlerFunc { return repairWriteWeb(s.mergeInQueue) },
-	"POST /v1/tickets/start-over": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.startOverInQueue) },
-	"POST /v1/restart":            func(s *Server) http.HandlerFunc { return s.restartWrite },
-	"POST /v1/client-errors":      func(s *Server) http.HandlerFunc { return s.clientErrorReport },
+	"POST /v1/restart":       func(s *Server) http.HandlerFunc { return s.restartWrite },
+	"POST /v1/client-errors": func(s *Server) http.HandlerFunc { return s.clientErrorReport },
 }
 
 func (s *Server) webNow() time.Time {

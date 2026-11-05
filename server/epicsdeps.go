@@ -1,6 +1,9 @@
 package server
 
-import "github.com/elentok/gx/server/epics"
+import (
+	"github.com/elentok/gx/server/epics"
+	"github.com/elentok/gx/tickets"
+)
 
 // epicsDeps wires the epic read models to the root. The helpers that stay up
 // are bound late, so a test that swaps a Server member is still seen.
@@ -23,7 +26,7 @@ func (s *Server) epicsDeps() epics.Deps {
 		AutoFFMerge:       func(project string) bool { return s.merger.AutoFFMerge(project) },
 		CheckWaitingLabel: s.CheckWaitingLabel,
 		AgentGone:         func(address string) (bool, error) { return s.ops.AgentGone(address) },
-		AmbiguousBlockers: s.ambiguousBlockers,
+		AmbiguousBlockers: func(addr tickets.Address) []string { return s.ops.AmbiguousBlockers(addr) },
 		DesignUncharted:   s.designs.Uncharted,
 	}
 }

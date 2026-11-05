@@ -391,17 +391,6 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	return ref, ref + "@" + sha, leaf, nil
 }
 
-// mergingOnMerged reports whether the project uses the on-merged merging policy.
-// An unreadable project file falls back to the default policy.
-func (s *Server) mergingOnMerged(project string) bool {
-	dir, err := s.projects.Dir(project)
-	if err != nil {
-		return true
-	}
-	pf, _ := config.ReadProjectFile(dir)
-	return pf.LandingPolicy() == config.LandingOnLanded
-}
-
 // gitIsAncestor is swapped in tests to count git calls.
 var gitIsAncestor = git.IsAncestor
 
@@ -416,7 +405,7 @@ func (s *Server) RootRefs(project string, epics []tickets.Epic, epic string, t t
 		return "", "", err
 	}
 	trunk, trunkErr := tickets.Trunk(dir, repo)
-	derived, err := tickets.DeriveRootBase(project, epics, epic, t, s.mergingOnMerged(project))
+	derived, err := tickets.DeriveRootBase(project, epics, epic, t, s.projects.MergingOnMerged(project))
 	if err != nil {
 		return "", "", err
 	}

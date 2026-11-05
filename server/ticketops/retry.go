@@ -16,7 +16,7 @@ import (
 // relaunches.
 func (o *Ops) Retry(web bool) http.HandlerFunc {
 	relaunch := queue.HandlerAs(web, o.d.Writer.Relaunch)
-	resume := o.d.Launch.RepairResume(web)
+	resume := o.ResumeHandler(web)
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -27,7 +27,7 @@ func (o *Ops) Retry(web bool) http.HandlerFunc {
 		var req struct {
 			Address string `json:"address"`
 		}
-		if json.Unmarshal(body, &req) == nil && (web || r.Header.Get(wire.InvestigateHeader) == "") && o.d.Launch.PromptsOnRetry(req.Address) {
+		if json.Unmarshal(body, &req) == nil && (web || r.Header.Get(wire.InvestigateHeader) == "") && o.PromptsOnRetry(req.Address) {
 			resume(w, r)
 			return
 		}

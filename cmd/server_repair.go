@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -80,7 +80,7 @@ func directRepair(dirs config.Dirs, verb string, req wire.RepairRequest) (wire.R
 	if err != nil {
 		return wire.RepairResult{}, err
 	}
-	return server.RunRepairDirect(cfg.TicketStore.Path, verb, req)
+	return ticketops.RunRepairDirect(cfg.TicketStore.Path, verb, req)
 }
 
 // runServerRepair never starts the server. The repair verbs are the only

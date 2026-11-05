@@ -45,4 +45,7 @@ var (
 	answerEvents            = servertest.AnswerEvents
 	liveUnder               = servertest.LiveUnder
 	liveUnderOther          = servertest.LiveUnderOther
+	pausedIteration         = servertest.PausedIteration
+	stateOf                 = servertest.StateOf
+	pauseEnvZeroCommit      = servertest.PauseEnvZeroCommit
 )

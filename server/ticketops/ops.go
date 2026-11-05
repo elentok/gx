@@ -4,8 +4,8 @@ package ticketops
 
 import (
 	"log/slog"
-	"net/http"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 )
 
 // Launch is what the operations need of the run loop in the root.
@@ -23,25 +24,28 @@ type Launch interface {
 	BudgetRefusal() (wire.QueueResult, bool)
 	// ResettleWaiting ends a run's wait for an answer and settles it.
 	ResettleWaiting(t runs.TrackedRun) error
-	// PromptsOnRetry reports whether a retry of address prompts its live
-	// agent instead of relaunching.
-	PromptsOnRetry(address string) bool
-	// RepairResume is the resume dispatch a prompting retry goes through.
-	RepairResume(web bool) http.HandlerFunc
+	// HostingDeps talks to the runner hosting addr's iteration, so start-over
+	// and merge see (and close) the agent where it actually runs.
+	HostingDeps(addr tickets.Address) ralphloop.Deps
+	// CompleteMergedRoot completes addr's queued root as if its iteration had
+	// settled, once a merge of that ticket landed. A root not queued is left alone.
+	CompleteMergedRoot(addr tickets.Address)
 }
 
 // Deps is what New needs.
 type Deps struct {
-	Log      *slog.Logger
-	Writer   *ticketwrite.Writer
-	Harness  *harnesschoice.Harness
-	Registry *runs.Registry
-	Index    *index.Index
-	Events   *broker.Broker
-	Epics    *epics.Epics
-	Projects *projects.Registry
-	Rec      *merge.Reconciler
-	Launch   Launch
+	Writer      *ticketwrite.Writer
+	Harness     *harnesschoice.Harness
+	Registry    *runs.Registry
+	Index       *index.Index
+	Events      *broker.Broker
+	Epics       *epics.Epics
+	Rec         *merge.Reconciler
+	Landing     *merge.Landing
+	Projects    *projects.Registry
+	Log         *slog.Logger
+	TicketStore string
+	Launch      Launch
 }
 
 // Ops makes the ticket operations.

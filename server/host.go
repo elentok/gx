@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -26,6 +27,9 @@ func (s *Server) Merger() *merge.Merger { return s.merger }
 func (s *Server) Reconciler() *merge.Reconciler { return s.rec }
 
 func (s *Server) Landing() *merge.Landing { return s.landing }
+
+// TicketOps gives tests the ticket operations (ResumeAs, ResumeAsWeb, ...).
+func (s *Server) TicketOps() *ticketops.Ops { return s.ops }
 
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recovery.RecoverAsync(f) }
 

@@ -14,8 +14,8 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/repair"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -68,7 +68,7 @@ func TestServerRepair_RunsDirectlyWhenNoServerRunning(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	direct := func(verb string, req wire.RepairRequest) (wire.RepairResult, error) {
-		return server.RunRepairDirect(store, verb, req)
+		return ticketops.RunRepairDirect(store, verb, req)
 	}
 	req := wire.RepairRequest{Address: "proj:epic-a/01"}
 

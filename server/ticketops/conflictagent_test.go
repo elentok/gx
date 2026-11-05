@@ -1,4 +1,4 @@
-package server_test
+package ticketops_test
 
 import (
 	"context"
@@ -12,10 +12,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-type turnRunner = servertest.TurnRunner
-
 var (
-	newTurnRunner      = servertest.NewTurnRunner
 	writeProjectAgents = servertest.WriteProjectAgents
 	hasFlag            = servertest.HasFlag
 )

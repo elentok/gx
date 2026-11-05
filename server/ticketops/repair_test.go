@@ -1,4 +1,4 @@
-package server_test
+package ticketops_test
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 func TestWebStartOver_EmptyReasonRefusalNamesNoCLIFlag(t *testing.T) {
 	t.Parallel()
 	h, _ := pausedIteration(t, string(events.ZeroCommit), true)
-	res, err := h.Server.StartOverAsWeb(wire.RepairRequest{Address: "proj:epic-a/01", State: "tok"})
+	res, err := h.Server.TicketOps().StartOverAsWeb(wire.RepairRequest{Address: "proj:epic-a/01", State: "tok"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonReasonRequired {
 		t.Fatalf("start-over = %+v, %v; want %s refusal", res, err, repair.ReasonReasonRequired)
 	}

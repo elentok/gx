@@ -1,17 +1,21 @@
-package server
+package ticketops
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/ticketwrite"
 
 	"github.com/elentok/gx/agentrunner"
@@ -52,23 +56,42 @@ var retryPrompts = map[schema.PauseReason]string{
 		"Finish the work.",
 }
 
+// directLaunch is the Launch of a repair run without a server. It has no
+// runner, so only the default deps are answered; the queue-bound methods are
+// never reached because a direct run uses the verbs without their queue half.
+type directLaunch struct {
+	Launch
+	projects *projects.Registry
+}
+
+func (l directLaunch) HostingDeps(tickets.Address) ralphloop.Deps { return l.projects.DefaultDeps() }
+
+// directBack is the projects.RegistryBack of a repair run without a server.
+type directBack struct{}
+
+func (directBack) SessionFinished(agentrunner.Session) bool { return false }
+func (directBack) BusyAddresses() []string                  { return nil }
+
 // RunRepairDirect runs a repair verb without a server, for the CLI's
 // server-down fallback. The verbs take the merge lock themselves, so a live
 // server and a direct run still exclude each other.
 func RunRepairDirect(ticketStore, verb string, req wire.RepairRequest) (wire.RepairResult, error) {
-	s := &Server{cfg: Config{TicketStore: ticketStore}}
-	s.settings.Store(&Settings{})
-	s.initProjects()
+	env := func() projects.Env { return projects.Env{TicketStore: ticketStore} }
+	set := &settings.Holder{}
+	set.Store(&settings.Settings{})
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	reg := projects.NewRegistry(env, log, nil, set, nil, directBack{})
+	o := New(Deps{TicketStore: ticketStore, Projects: reg, Log: log, Launch: directLaunch{projects: reg}})
 	var do func(wire.RepairRequest, repairCtx) (wire.RepairResult, error)
 	switch verb {
 	case "merge":
-		do = s.repairMerge
+		do = o.repairMerge
 	case "start-over":
-		do = s.repairStartOver
+		do = o.repairStartOver
 	case "resume", "unpark":
-		do = s.repairResume
+		do = o.repairResume
 	case "verify":
-		do = s.repairVerify
+		do = o.repairVerify
 	default:
 		return wire.RepairResult{}, fmt.Errorf("unknown repair verb %q", verb)
 	}
@@ -76,6 +99,26 @@ func RunRepairDirect(ticketStore, verb string, req wire.RepairRequest) (wire.Rep
 	res.Via = wire.ViaDirect
 	return res, err
 }
+
+// ResumeAsWeb is the resume the web mux serves: it needs a state token. For tests.
+func (o *Ops) ResumeAsWeb(req wire.RepairRequest) (wire.RepairResult, error) {
+	return o.repairResume(req, repairCtx{RequireState: true, origin: wire.OriginWeb})
+}
+
+// StartOverAsWeb is the start-over the web mux serves. For tests.
+func (o *Ops) StartOverAsWeb(req wire.RepairRequest) (wire.RepairResult, error) {
+	return o.repairStartOver(req, repairCtx{RequireState: true, origin: wire.OriginWeb})
+}
+
+// ResumeAs is the resume a client of the given origin sends over the socket.
+// For tests.
+func (o *Ops) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairResult, error) {
+	return o.repairResume(req, repairCtx{origin: origin})
+}
+
+// ResumeHandler is the resume route's handler, for the retry route that
+// prompts a live agent instead of relaunching.
+func (o *Ops) ResumeHandler(web bool) http.HandlerFunc { return repairWriteAs(web, o.repairResume) }
 
 func repairRefusal(err error) wire.RepairResult {
 	reason := repair.ReasonError
@@ -94,7 +137,7 @@ func repairOK(v any) (wire.RepairResult, error) {
 // epicTarget resolves a request's address to the epic's directory and the
 // ticket id (empty for an epic-only address) and the directory the verb runs
 // in: the caller's, else the project's repo (preferProject flips that order).
-func (s *Server) epicTarget(req wire.RepairRequest, needID, preferProject bool) (epicPath, id, cwd string, err error) {
+func (o *Ops) epicTarget(req wire.RepairRequest, needID, preferProject bool) (epicPath, id, cwd string, err error) {
 	raw, id, hasID := strings.Cut(req.Address, "/")
 	if hasID || needID {
 		a, perr := tickets.ParseAddress(req.Address, tickets.AddressContext{})
@@ -107,7 +150,7 @@ func (s *Server) epicTarget(req wire.RepairRequest, needID, preferProject bool) 
 	if !ok || project == "" || epic == "" {
 		return "", "", "", &repair.RefusalError{Reason: wire.ReasonInvalidAddress, Message: fmt.Sprintf("%q is not an epic address (want project:epic)", raw)}
 	}
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(o.d.TicketStore)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -117,7 +160,7 @@ func (s *Server) epicTarget(req wire.RepairRequest, needID, preferProject bool) 
 		}
 		cwd = req.Cwd
 		if cwd == "" || preferProject {
-			if _, repo, err := s.projects.Of(project); err == nil {
+			if _, repo, err := o.d.Projects.Of(project); err == nil {
 				cwd = repo
 			}
 		}
@@ -126,11 +169,11 @@ func (s *Server) epicTarget(req wire.RepairRequest, needID, preferProject bool) 
 	return "", "", "", &repair.RefusalError{Reason: wire.ReasonUnknownTicket, Message: "no project " + project + " in the ticket store"}
 }
 
-func (s *Server) repairMerge(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
+func (o *Ops) repairMerge(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
 	if repair.IsGuardedBranch(req.Branch) {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonRalphLoopCwd, Message: fmt.Sprintf("refusing to merge from a ralph-loop/* working directory (%s); run from outside the iteration worktree", req.Branch)}), nil
 	}
-	epicPath, id, cwd, err := s.epicTarget(req, true, true)
+	epicPath, id, cwd, err := o.epicTarget(req, true, true)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -142,7 +185,7 @@ func (s *Server) repairMerge(req wire.RepairRequest, rc repairCtx) (wire.RepairR
 	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
 		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Source: rc.origin, Cwd: cwd,
-	}, s.HostingDeps(epicTicketAddress(epicPath, id)))
+	}, o.d.Launch.HostingDeps(epicTicketAddress(epicPath, id)))
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -152,43 +195,31 @@ func (s *Server) repairMerge(req wire.RepairRequest, rc repairCtx) (wire.RepairR
 // mergeInQueue is the server's merge. A ticket of a queued root may be the
 // one a merging paused, so once it merges the root completes as if its
 // iteration had settled. A direct merge has no queue.
-func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
+func (o *Ops) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
 	addr, err := tickets.ParseAddress(req.Address, tickets.AddressContext{})
 	if err != nil {
-		return s.repairMerge(req, rc)
+		return o.repairMerge(req, rc)
 	}
-	res, err := s.repairMerge(req, rc)
+	res, err := o.repairMerge(req, rc)
 	if err != nil || res.Refused {
 		return res, err
 	}
-	if err := s.cancelInvestigateUnlessSelf(req, rc); err != nil {
+	if err := o.cancelInvestigateUnlessSelf(req, rc); err != nil {
 		return wire.RepairResult{}, err
 	}
-	if !s.queue.RootQueued(queue.RootOf(addr)) {
-		return res, nil
-	}
-	if _, t, ok := s.FreshTicket(addr); ok && s.guards.Merges.Begin() {
-		defer s.guards.Merges.End()
-		s.merger.CompleteRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
-	}
+	o.d.Launch.CompleteMergedRoot(addr)
 	return res, nil
-}
-
-// FreshTicket loads addr's ticket, and its epic, straight from disk.
-// It is the root's harness.Host method.
-func (s *Server) FreshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket, bool) {
-	return s.writer.FreshTicket(addr)
 }
 
 // startOverInQueue is the server's start-over: a person's, so it also cancels
 // the ticket's open investigate child. A direct start-over has no server to
 // stop an agent.
-func (s *Server) startOverInQueue(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
-	res, err := s.repairStartOver(req, rc)
+func (o *Ops) startOverInQueue(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
+	res, err := o.repairStartOver(req, rc)
 	if err != nil || res.Refused {
 		return res, err
 	}
-	if err := s.cancelInvestigateUnlessSelf(req, rc); err != nil {
+	if err := o.cancelInvestigateUnlessSelf(req, rc); err != nil {
 		return wire.RepairResult{}, err
 	}
 	return res, nil
@@ -196,19 +227,19 @@ func (s *Server) startOverInQueue(req wire.RepairRequest, rc repairCtx) (wire.Re
 
 // cancelInvestigateUnlessSelf cancels the ticket's investigate child, except
 // when that investigate agent is the caller.
-func (s *Server) cancelInvestigateUnlessSelf(req wire.RepairRequest, rc repairCtx) error {
+func (o *Ops) cancelInvestigateUnlessSelf(req wire.RepairRequest, rc repairCtx) error {
 	if rc.investigator != "" {
 		return nil
 	}
-	return s.ops.CancelInvestigateOf(req.Address, rc.origin)
+	return o.CancelInvestigateOf(req.Address, rc.origin)
 }
 
-func (s *Server) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
+func (o *Ops) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
 	// The web has no --reason flag to name; the CLI refusal text stays in repair.
 	if rc.RequireState && strings.TrimSpace(req.Reason) == "" {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "a reason is required to start over"}), nil
 	}
-	epicPath, id, cwd, err := s.epicTarget(req, true, false)
+	epicPath, id, cwd, err := o.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -219,7 +250,7 @@ func (s *Server) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Rep
 	}
 	if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil && t.Type == string(schema.TypeTrunkConflict) {
 		addr := tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
-		res, err := s.landing.StartOverTrunkConflict(req, rc.origin, addr, t)
+		res, err := o.d.Landing.StartOverTrunkConflict(req, rc.origin, addr, t)
 		var refusal *repair.RefusalError
 		if errors.As(err, &refusal) {
 			return repairRefusal(refusal), nil
@@ -234,32 +265,19 @@ func (s *Server) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Rep
 	res, err := repair.StartOver(repair.StartOverInput{
 		EpicPath: epicPath, ID: id, Reason: req.Reason, Force: req.Force,
 		DeleteBranch: deleteBranch, Source: rc.origin, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
-	}, s.HostingDeps(epicTicketAddress(epicPath, id)))
+	}, o.d.Launch.HostingDeps(epicTicketAddress(epicPath, id)))
 	if err != nil {
 		return repairRefusal(err), nil
 	}
 	return repairOK(res)
 }
 
-// HostingDeps talks to the runner hosting addr's iteration, so start-over and
-// merge see (and close) the agent where it actually runs. A direct repair has
-// no server runner, so there is no agent to ask and the defaults stand.
-func (s *Server) HostingDeps(addr tickets.Address) ralphloop.Deps {
-	if s.cfg.Runner == nil {
-		return s.projects.DefaultDeps()
-	}
-	// An unavailable runner is nil, which reports no session, as for an
-	// unreachable host.
-	runner, _ := s.harness.IterationRunner(addr)
-	return s.projects.DepsWith(runner)
-}
-
 func epicTicketAddress(epicPath, id string) tickets.Address {
 	return tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
 }
 
-func (s *Server) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
-	epicPath, id, _, err := s.epicTarget(req, true, false)
+func (o *Ops) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
+	epicPath, id, _, err := o.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -292,23 +310,23 @@ func (s *Server) repairResume(req wire.RepairRequest, rc repairCtx) (wire.Repair
 		}
 	}
 	if req.Base != "" {
-		if blockers := s.ambiguousBlockers(addr); !slices.Contains(blockers, req.Base) {
+		if blockers := o.AmbiguousBlockers(addr); !slices.Contains(blockers, req.Base) {
 			msg := fmt.Sprintf("base %q is not one of the competing blockers (%s)", req.Base, strings.Join(blockers, ", "))
 			return repairRefusal(&repair.RefusalError{Reason: wire.ReasonBadBase, Message: msg}), nil
 		}
 	}
-	if s.rec.AdoptFirst(dir, addr, t.Path) {
+	if o.d.Rec.AdoptFirst(dir, addr, t.Path) {
 		res := repair.ResumeResult{Ticket: id, Status: repair.ResumeAdopted}
 		if zeroCommit {
 			res.Message = repair.MessageAdopted
 		}
 		return repairOK(res)
 	}
-	if res, refused, err := s.resumeSelfReported(epicPath, id, rc.origin); refused || err != nil {
+	if res, refused, err := o.resumeSelfReported(epicPath, id, rc.origin); refused || err != nil {
 		return res, err
 	}
 	if prompt, ok := retryPrompts[tk.PauseReason]; paused && ok {
-		prompted, err := s.promptLiveAgent(dir, addr, prompt)
+		prompted, err := o.promptLiveAgent(dir, addr, prompt)
 		if err != nil {
 			return repairRefusal(err), nil
 		}
@@ -318,9 +336,9 @@ func (s *Server) repairResume(req wire.RepairRequest, rc repairCtx) (wire.Repair
 			}
 			ev := ralphloop.Event{Type: string(events.PausePrompted), Ticket: id, Address: addr.String(), Text: prompt}
 			if err := ralphloop.AppendEvent(dir, addr.Epic, ev); err != nil {
-				s.log.Warn("logging pause prompt", "ticket", addr.String(), "err", err)
+				o.d.Log.Warn("logging pause prompt", "ticket", addr.String(), "err", err)
 			}
-			s.log.Info("prompted the live agent of a paused ticket", "ticket", addr.String(), "origin", rc.origin)
+			o.d.Log.Info("prompted the live agent of a paused ticket", "ticket", addr.String(), "origin", rc.origin)
 			return repairOK(repair.ResumeResult{Ticket: id, Status: repair.ResumePrompted, Message: repair.MessagePrompted})
 		}
 	}
@@ -372,9 +390,9 @@ func clearTierOverride(ticketPath, tier string) {
 	}
 }
 
-// takeTierOverride returns the ticket's one-time tier and clears it, so only
+// TakeTierOverride returns the ticket's one-time tier and clears it, so only
 // the launch that reads it runs on it. An unreadable ticket has none.
-func takeTierOverride(ticketPath string) ralphloop.Tier {
+func TakeTierOverride(ticketPath string) ralphloop.Tier {
 	var tier string
 	err := schema.UpdateTicketWithBody(ticketPath, func(t *schema.Ticket, _ *string) {
 		tier, t.TierOverride = t.TierOverride, ""
@@ -446,10 +464,10 @@ func resumeAnswered(ticketPath, id string, req wire.RepairRequest, origin string
 	return repair.ResumeResult{Ticket: id, Status: "open"}, nil, nil
 }
 
-// ambiguousBlockers lists the blockers a ticket paused on an ambiguous base
+// AmbiguousBlockers lists the blockers a ticket paused on an ambiguous base
 // has to choose between, recomputed from the epics; none when it is not ambiguous.
-func (s *Server) ambiguousBlockers(addr tickets.Address) []string {
-	dir, err := s.projects.Dir(addr.Project)
+func (o *Ops) AmbiguousBlockers(addr tickets.Address) []string {
+	dir, err := o.d.Projects.Dir(addr.Project)
 	if err != nil {
 		return nil
 	}
@@ -469,7 +487,7 @@ func (s *Server) ambiguousBlockers(addr tickets.Address) []string {
 			if _, err := tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); errors.As(err, &amb) {
 				return amb.Blockers
 			}
-			if _, err := tickets.DeriveRootBase(addr.Project, epics, addr.Epic, t, s.mergingOnMerged(addr.Project)); errors.As(err, &amb) {
+			if _, err := tickets.DeriveRootBase(addr.Project, epics, addr.Epic, t, o.d.Projects.MergingOnMerged(addr.Project)); errors.As(err, &amb) {
 				return amb.Blockers
 			}
 		}
@@ -477,10 +495,36 @@ func (s *Server) ambiguousBlockers(addr tickets.Address) []string {
 	return nil
 }
 
+// PromptsOnRetry reports whether a retry of address prompts its live agent
+// instead of relaunching.
+func (o *Ops) PromptsOnRetry(address string) bool {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return false
+	}
+	_, t, ok := o.d.Writer.FreshTicket(addr)
+	if !ok {
+		return false
+	}
+	tk, err := schema.ParseTicket(t.Path)
+	if err != nil || !tk.PausedAsking() {
+		return false
+	}
+	if _, ok := retryPrompts[tk.PauseReason]; !ok {
+		return false
+	}
+	dir, err := o.d.Projects.Dir(addr.Project)
+	if err != nil {
+		return false
+	}
+	_, _, live, err := o.iterationSession(dir, addr)
+	return err == nil && live
+}
+
 // promptLiveAgent sends text to the iteration's agent when it is still
 // running, and reports whether it did. A direct run has no runner and finds none.
-func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) (bool, error) {
-	runner, sess, ok, err := s.iterationSession(dir, addr)
+func (o *Ops) promptLiveAgent(dir string, addr tickets.Address, text string) (bool, error) {
+	runner, sess, ok, err := o.iterationSession(dir, addr)
 	if err != nil || !ok {
 		return false, err
 	}
@@ -496,17 +540,17 @@ func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) 
 }
 
 // iterationSession finds the iteration's agent session, if it is still running.
-func (s *Server) iterationSession(dir string, addr tickets.Address) (agentrunner.Runner, agentrunner.Session, bool, error) {
-	if s.registry == nil {
+func (o *Ops) iterationSession(dir string, addr tickets.Address) (agentrunner.Runner, agentrunner.Session, bool, error) {
+	if o.d.Registry == nil {
 		return nil, agentrunner.Session{}, false, nil
 	}
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.projects.WorktreeDir(addr.Project))
-	runner := s.harness.RunnerFor(addr.Project)
+	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, o.d.Projects.WorktreeDir(addr.Project))
+	runner := o.d.Harness.RunnerFor(addr.Project)
 	if pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID); ok {
 		if pause.Label != "" {
 			label = pause.Label
 		}
-		if r := s.harness.RunnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
+		if r := o.d.Harness.RunnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
 			runner = r
 		}
 	}
@@ -522,7 +566,7 @@ func (s *Server) iterationSession(dir string, addr tickets.Address) (agentrunner
 // agent's question is closed before the status moves on. Other tickets and kinds
 // pass through untouched. A direct run has no runner to ask and reads every
 // agent as gone, since no server is running to wait on an answer.
-func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairResult, bool, error) {
+func (o *Ops) resumeSelfReported(epicPath, id, origin string) (wire.RepairResult, bool, error) {
 	_, t, err := repair.FindEpicTicket(epicPath, id)
 	if err != nil {
 		return wire.RepairResult{}, false, nil
@@ -534,11 +578,11 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 	selfReported := tk.PauseReason == schema.PauseSelfReported
 	dir := filepath.Dir(epicPath)
 	address := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}.String()
-	if !selfReported && !s.writer.WaitsOnBlockedPause(tk, address) {
+	if !selfReported && !o.d.Writer.WaitsOnBlockedPause(tk, address) {
 		return wire.RepairResult{}, false, nil
 	}
-	if s.registry != nil {
-		gone, err := s.ops.AgentGone(address)
+	if o.d.Registry != nil {
+		gone, err := o.AgentGone(address)
 		if err != nil {
 			return wire.RepairResult{}, false, err
 		}
@@ -546,7 +590,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 			// A PTY or herdr run has no approvable card for a question menu, so
 			// Retry is the way out: end the pause, interrupt, and let the caller
 			// send the retry prompt.
-			interrupted, err := s.writer.RetryBlocked(address)
+			interrupted, err := o.d.Writer.RetryBlocked(address)
 			if errors.Is(err, agentrunner.ErrNotReady) {
 				return repairRefusal(&repair.RefusalError{Reason: wire.ReasonAgentNotReady, Message: err.Error()}), true, nil
 			}
@@ -561,7 +605,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 			}
 			return repairRefusal(&repair.RefusalError{Reason: wire.ReasonAgentWaiting, Message: msg}), true, nil
 		}
-		s.registry.Delete(address)
+		o.d.Registry.Delete(address)
 	}
 	if !selfReported {
 		return wire.RepairResult{}, false, nil
@@ -572,16 +616,16 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 	return wire.RepairResult{}, false, nil
 }
 
-func (s *Server) repairVerify(req wire.RepairRequest, _ repairCtx) (wire.RepairResult, error) {
-	epicPath, id, cwd, err := s.epicTarget(req, false, false)
+func (o *Ops) repairVerify(req wire.RepairRequest, _ repairCtx) (wire.RepairResult, error) {
+	epicPath, id, cwd, err := o.epicTarget(req, false, false)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	run, err := repair.DefaultVerifyRun(epicPath, cwd, s.HostingDeps(epicTicketAddress(epicPath, id)).Runner)
+	run, err := repair.DefaultVerifyRun(epicPath, cwd, o.d.Launch.HostingDeps(epicTicketAddress(epicPath, id)).Runner)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	if run.MergeLockStateDir, err = s.projects.LockStateDir(); err != nil {
+	if run.MergeLockStateDir, err = o.d.Projects.LockStateDir(); err != nil {
 		return repairRefusal(err), nil
 	}
 	run.ID = id
@@ -615,7 +659,7 @@ func repairWriteAs(web bool, do func(wire.RepairRequest, repairCtx) (wire.Repair
 			rc.investigator = r.Header.Get(wire.InvestigateHeader)
 		}
 		if web && req.State == "" {
-			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: wire.ReasonStale, Message: "a state token is required; review the current pause"}))
+			wire.WriteJSON(w, repairRefusal(&repair.RefusalError{Reason: wire.ReasonStale, Message: "a state token is required; review the current pause"}))
 			return
 		}
 		res, err := do(req, rc)
@@ -623,6 +667,6 @@ func repairWriteAs(web bool, do func(wire.RepairRequest, repairCtx) (wire.Repair
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, res)
+		wire.WriteJSON(w, res)
 	}
 }

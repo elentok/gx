@@ -17,13 +17,13 @@ func TestHeadlessBlock_PausesAtOnce(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name  string
-		block func(*turnRunner)
+		block func(*servertest.TurnRunner)
 		want  []string
 	}{
-		{"permission request", func(r *turnRunner) {
+		{"permission request", func(r *servertest.TurnRunner) {
 			r.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "r1", Tool: "Bash", Input: []byte(`{"command":"ls"}`)})
 		}, []string{"Bash", `"command":"ls"`, "gx server agents answer"}},
-		{"bare requires_action", func(r *turnRunner) {
+		{"bare requires_action", func(r *servertest.TurnRunner) {
 			r.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
 		}, []string{"waiting on a prompt", "gx server agents interrupt"}},
 	}
@@ -102,7 +102,7 @@ func TestHeadlessBlock_AnswerOnClaimedLeavesStatus(t *testing.T) {
 
 // pauseBlocked blocks the session of a headless run on a permission request
 // and returns once the ticket is paused and the run waits.
-func pauseBlocked(t *testing.T) (*servertest.Harness, string, *turnRunner) {
+func pauseBlocked(t *testing.T) (*servertest.Harness, string, *servertest.TurnRunner) {
 	t.Helper()
 	h, ticketPath, turn := startBlockable(t, "headless")
 	turn.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "r1", Tool: "Bash", Input: []byte(`{"command":"ls"}`)})
@@ -141,16 +141,24 @@ func TestHeadlessBlock_PausesAgainAfterAnswer(t *testing.T) {
 // Every way out of blocked clears the pause the same way.
 func TestHeadlessBlock_AnyExitReturnsToClaimed(t *testing.T) {
 	t.Parallel()
-	exits := map[string]func(*servertest.Harness, *turnRunner){
-		"interrupt": func(h *servertest.Harness, _ *turnRunner) {
+	exits := map[string]func(*servertest.Harness, *servertest.TurnRunner){
+		"interrupt": func(h *servertest.Harness, _ *servertest.TurnRunner) {
 			if res, err := h.Client.AgentInterrupt(context.Background(), answerAddr); err != nil || res.Refused {
 				t.Errorf("interrupt = %+v, %v", res, err)
 			}
 		},
-		"cancel request": func(_ *servertest.Harness, r *turnRunner) { r.SetState("epic-a-iter-01", agentrunner.StateWorking, "") },
-		"running":        func(_ *servertest.Harness, r *turnRunner) { r.SetState("epic-a-iter-01", agentrunner.StateWorking, "") },
-		"idle":           func(_ *servertest.Harness, r *turnRunner) { r.SetState("epic-a-iter-01", agentrunner.StateIdle, "") },
-		"result":         func(_ *servertest.Harness, r *turnRunner) { r.SetState("epic-a-iter-01", agentrunner.StateDone, "") },
+		"cancel request": func(_ *servertest.Harness, r *servertest.TurnRunner) {
+			r.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
+		},
+		"running": func(_ *servertest.Harness, r *servertest.TurnRunner) {
+			r.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
+		},
+		"idle": func(_ *servertest.Harness, r *servertest.TurnRunner) {
+			r.SetState("epic-a-iter-01", agentrunner.StateIdle, "")
+		},
+		"result": func(_ *servertest.Harness, r *servertest.TurnRunner) {
+			r.SetState("epic-a-iter-01", agentrunner.StateDone, "")
+		},
 	}
 	for name, exit := range exits {
 		t.Run(name, func(t *testing.T) {
@@ -169,7 +177,7 @@ func TestHeadlessBlock_ResumeRefusedWhileLiveAllowedOnceGone(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
 	req := wire.RepairRequest{Address: answerAddr}
-	res, err := h.Server.ResumeAs(req, wire.OriginCLI)
+	res, err := h.Server.TicketOps().ResumeAs(req, wire.OriginCLI)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentWaiting || !strings.Contains(res.Message, "gx server agents answer") {
 		t.Fatalf("resume live = %+v, %v; want %s naming the answer verb", res, err, wire.ReasonAgentWaiting)
 	}
@@ -180,7 +188,7 @@ func TestHeadlessBlock_ResumeRefusedWhileLiveAllowedOnceGone(t *testing.T) {
 	if err := turn.Stop(sess); err != nil {
 		t.Fatal(err)
 	}
-	res, err = h.Server.ResumeAs(req, wire.OriginCLI)
+	res, err = h.Server.TicketOps().ResumeAs(req, wire.OriginCLI)
 	if err != nil || res.Refused {
 		t.Fatalf("resume gone = %+v, %v", res, err)
 	}
