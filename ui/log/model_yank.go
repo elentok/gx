@@ -2,13 +2,11 @@ package log
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/clip"
+	"github.com/elentok/gx/ui/commitops"
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
-
-var logClipboardWrite = clip.Write
 
 func (m Model) selectedCommit() (git.LogEntry, bool) {
 	rows := m.listPanel.Rows()
@@ -24,25 +22,13 @@ func (m Model) selectedCommit() (git.LogEntry, bool) {
 }
 
 func (m Model) yankCommitHash() tea.Cmd {
-	commit, ok := m.selectedCommit()
-	if !ok {
-		return notify.Warning("no commit selected")
-	}
-	if err := logClipboardWrite(commit.FullHash); err != nil {
-		return notify.Error("clipboard copy failed: " + err.Error())
-	}
-	return notify.Info("yanked commit hash")
+	commit, _ := m.selectedCommit()
+	return commitops.YankHash(commit.FullHash)
 }
 
 func (m Model) yankCommitSubject() tea.Cmd {
-	commit, ok := m.selectedCommit()
-	if !ok {
-		return notify.Warning("no commit selected")
-	}
-	if err := logClipboardWrite(commit.Subject); err != nil {
-		return notify.Error("clipboard copy failed: " + err.Error())
-	}
-	return notify.Info("yanked commit subject")
+	commit, _ := m.selectedCommit()
+	return commitops.YankSubject(commit.Subject)
 }
 
 func (m Model) yankCommitMessage() tea.Cmd {
@@ -57,13 +43,6 @@ func (m Model) yankCommitMessage() tea.Cmd {
 		if err != nil {
 			return notify.Error("failed to load commit: " + err.Error())()
 		}
-		commitMsg := details.Subject
-		if details.Body != "" {
-			commitMsg = commitMsg + "\n\n" + details.Body
-		}
-		if err := logClipboardWrite(commitMsg); err != nil {
-			return notify.Error("clipboard copy failed: " + err.Error())()
-		}
-		return notify.Info("yanked commit message")()
+		return commitops.YankMessage(details.Subject, details.Body)()
 	}
 }

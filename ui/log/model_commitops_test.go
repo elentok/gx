@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/reword"
 )
 
 func TestCmdFetchRewordDetails_EmptyRows(t *testing.T) {
@@ -74,31 +75,24 @@ func TestHandleRewordDetails_WithData(t *testing.T) {
 		hash:    hash,
 		subject: "initial",
 		body:    "",
-		pushed:  false,
 	})
 	// cmd may be nil (if CmdOpenEditor fails in test env) or non-nil — just ensure no panic
 	_ = cmd
 }
 
-func TestHandleRewordEditorDone_Error(t *testing.T) {
+func TestHandleCommitOpsUpdate_EditorError(t *testing.T) {
 	m := newTestModel()
-	_, cmd := m.handleRewordEditorDone(errors.New("editor crashed"))
+	_, cmd := m.handleCommitOpsUpdate(reword.EditorFinishedMsg{Err: errors.New("editor crashed")})
 	if cmd == nil {
-		t.Fatal("expected non-nil error cmd from handleRewordEditorDone")
+		t.Fatal("expected non-nil error cmd from editor failure")
 	}
 }
 
-func TestHandleRewordDone_Error(t *testing.T) {
+func TestHandleCommitOpsUpdate_GenericMsgDoesNotCrash(t *testing.T) {
 	m := newTestModel()
-	_, cmd := m.handleRewordDone(errors.New("reword failed"))
-	if cmd == nil {
-		t.Fatal("expected non-nil error cmd from handleRewordDone")
+	updated, cmd := m.handleCommitOpsUpdate(git.LogEntry{})
+	if cmd != nil {
+		t.Error("expected nil cmd when no flow is open")
 	}
-}
-
-func TestHandleRewordRunningUpdate_ForwardsMsgToReword(t *testing.T) {
-	m := newTestModel()
-	// Without reword running, a generic message should not crash
-	updated, _ := m.handleRewordRunningUpdate(git.LogEntry{})
 	_ = updated
 }

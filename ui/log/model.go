@@ -8,12 +8,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/amend"
 	"github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/commitops"
 	"github.com/elentok/gx/ui/gitops"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/reword"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/splitview"
 )
@@ -66,10 +65,8 @@ type Model struct {
 	branchDiverged bool
 	trunkProblem   string // last trunk resolver error shown as a warning
 
-	amendConfirm amend.Model
-	git          gitops.Model
-
-	reword reword.Model
+	commitOps commitops.Model
+	git       gitops.Model
 
 	commitInfoOpen    bool
 	commitInfoDetails git.CommitDetails
@@ -110,9 +107,8 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 		search:           search.NewModel(),
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys(), extraKeys), settings.About)
-	m.amendConfirm = amend.New()
+	m.commitOps = commitops.New()
 	m.git = gitops.New()
-	m.reword = reword.New()
 	m.listPanel = newListPanel()
 	m.commitDetail = commit.NewModel(worktreeRoot, "HEAD", "", settings, keys.Manager{})
 	m.split = splitview.New(m.listPanel, m.commitDetail)
@@ -155,8 +151,7 @@ func (m Model) InputFocused() bool {
 }
 
 func (m Model) ModalOpen() bool {
-	return m.amendConfirm.IsOpen || m.git.IsOpen() ||
-		m.reword.IsOpen || m.commitInfoOpen
+	return m.commitOps.IsOpen() || m.git.IsOpen() || m.commitInfoOpen
 }
 
 func normalizedRef(ref string) string {

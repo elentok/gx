@@ -62,17 +62,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	if m.rebaseConfirm.isOpen() {
 		return m.handleRebaseConfirmUpdate(msg)
 	}
-	// Delegate all messages to amend.Model while it's open.
-	if m.amendConfirm.IsOpen {
-		return m.handleAmendUpdate(msg)
+	// Delegate all messages to the amend/reword flow while it's open.
+	if m.commitOps.IsOpen() {
+		return m.handleCommitOpsUpdate(msg)
 	}
 	// Delegate all messages to the bump/push/pull modal while one is open.
 	if m.git.ActionOpen() {
 		return m.handleGitopsUpdate(msg)
-	}
-	// Delegate all messages to reword.Model while it's running.
-	if m.reword.IsOpen {
-		return m.handleRewordRunningUpdate(msg)
 	}
 	// Delegate key events to the commit-info popup while it's open, so esc/i
 	// close it instead of falling through to list navigation.
@@ -122,7 +118,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case commitInfoMsg:
 		return m.handleCommitInfo(msg)
 	case reword.EditorFinishedMsg:
-		return m.handleRewordEditorDone(msg.Err)
+		return m.handleCommitOpsUpdate(msg)
 	case rebaseFinishedMsg:
 		return m.handleRebaseFinished(msg)
 	case rebaseStashMsg:

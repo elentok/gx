@@ -35,7 +35,7 @@ type Result struct {
 	Kind       Kind
 	Done       bool
 	Err        error
-	NewSubject string // reword: subject of the rewritten commit
+	NewSubject string // subject of the amended or rewritten commit
 }
 
 // Model holds the amend and reword modals.
@@ -96,7 +96,7 @@ func (m Model) Update(root string, msg tea.Msg) (Model, tea.Cmd, Result) {
 		if r.Err != nil {
 			return m, notify.Error("Amend failed: " + r.Err.Error()), Result{Kind: KindAmend, Done: true, Err: r.Err}
 		}
-		return m, cmd, Result{Kind: KindAmend, Done: true}
+		return m, cmd, Result{Kind: KindAmend, Done: true, NewSubject: m.amend.Subject}
 	}
 	if m.reword.IsOpen {
 		next, cmd, r := m.reword.Update(msg)

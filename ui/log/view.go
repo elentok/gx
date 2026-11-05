@@ -64,18 +64,13 @@ func (m Model) View() tea.View {
 	if m.rebaseConfirm.isOpen() {
 		out = ui.OverlayCenter(out, m.rebaseConfirmView(m.width), m.width, m.height)
 	}
-	if m.amendConfirm.IsOpen {
-		out = ui.OverlayCenter(out, m.amendConfirm.View(m.width), m.width, m.height)
-	}
 	if view, ok := m.git.ViewAction(m.width); ok {
 		out = ui.OverlayCenter(out, view, m.width, m.height)
 	}
 	if m.git.OutputOpen() {
 		out = ui.OverlayCenter(out, m.git.ViewOutput(), m.width, m.height)
 	}
-	if m.reword.IsOpen {
-		out = ui.OverlayCenter(out, m.reword.View(m.width), m.width, m.height)
-	}
+	out = m.commitOps.Overlay(out, m.width, m.height)
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}
