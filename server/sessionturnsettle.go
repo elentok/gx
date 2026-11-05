@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 	"os"
@@ -16,7 +17,7 @@ const turnSettlePoll = 50 * time.Millisecond
 // markTurn records the transcript of a session that just went idle. A session
 // whose harness has no chat, or no transcript yet, is not marked.
 func (s *Server) markTurn(dir, id string) (chat.TurnMark, bool) {
-	meta, err := readSessionMeta(dir)
+	meta, err := sessions.ReadMeta(dir)
 	if err != nil || !s.settings.Load().HasChatReader(meta.Harness) {
 		return chat.TurnMark{}, false
 	}
@@ -50,7 +51,7 @@ wait:
 		select {
 		case <-cancel:
 			return
-		case <-s.sessions.watches.stop:
+		case <-s.sessions.Watches.Stop:
 			return
 		case <-deadline.C:
 			break wait

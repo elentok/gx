@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 )
@@ -10,7 +11,7 @@ import (
 type chatSource struct{ s *Server }
 
 // chatMeta is the part of a session's meta the chat reads.
-func chatMeta(m sessionMeta) chat.Meta {
+func chatMeta(m sessions.Meta) chat.Meta {
 	return chat.Meta{
 		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket,
 		ConversationID: m.ConversationID, Model: m.Model, Effort: m.Effort,
@@ -29,26 +30,26 @@ func (c chatSource) ReadableSession(id string) (string, chat.Meta, wire.SessionR
 }
 
 func (c chatSource) ReadMeta(dir string) (chat.Meta, error) {
-	m, err := readSessionMeta(dir)
+	m, err := sessions.ReadMeta(dir)
 	return chatMeta(m), err
 }
 
 func (c chatSource) CheckProjectDir(project, dir string) (*wire.SessionResult, error) {
-	return c.s.sessions.checkProjectDir(project, dir)
+	return c.s.sessions.CheckProjectDir(project, dir)
 }
 
 func (c chatSource) DesignFinal(ticket string) bool { return c.s.designFinal(ticket) }
 func (c chatSource) NoteFailure(id string)          { c.s.noteFailure(id) }
-func (c chatSource) Stopped() <-chan struct{}       { return c.s.sessions.watches.stop }
+func (c chatSource) Stopped() <-chan struct{}       { return c.s.sessions.Watches.Stop }
 func (c chatSource) CodexHome() (string, error)     { return c.s.projects.CodexHome() }
 func (c chatSource) Publish(event, id string)       { c.s.events.Publish(event, id) }
 func (c chatSource) HasChatReader(h string) bool    { return c.s.settings.Load().HasChatReader(h) }
 
 // SessionInfo is m.info() plus the failure that needs a transcript read, the
 // reported model and the running countdown.
-func (s *Server) SessionInfo(m sessionMeta) wire.SessionInfo {
+func (s *Server) SessionInfo(m sessions.Meta) wire.SessionInfo {
 	cm := chatMeta(m)
-	info := m.info()
+	info := m.Info()
 	info.Model = s.sessionChat.ReportedModel(cm)
 	info.ModelSwitched = chat.ModelSwitched(m.Model, info.Model)
 	if m.Harness == string(harness.Codex) {

@@ -1,17 +1,17 @@
-package server
+package sessions
 
 import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/conversations"
 )
 
-// sweepDesignCounts counts every Design conversation record, of either
+// SweepDesignCounts counts every Design conversation record, of either
 // harness, that has no counts yet, so a session that never ended cleanly (a
 // crash, or an exit while the server was down) still gets them. Records saved
 // before the Design flag existed are Design when their ticket is on a map
 // epic. A record whose transcript or rollout is missing stays uncounted; a
 // later end recounts and replaces.
-func (mg *Manager) sweepDesignCounts() {
+func (mg *Manager) SweepDesignCounts() {
 	recs, err := conversations.List(mg.cfg.ConversationsDir)
 	if err != nil {
 		mg.log.Warn("sweep conversation counts", "err", err)
@@ -21,7 +21,7 @@ func (mg *Manager) sweepDesignCounts() {
 		if r.Grilling != nil {
 			continue
 		}
-		if !r.Design && !(r.Ticket != "" && mg.onMapEpic(r.Ticket)) {
+		if !r.Design && !(r.Ticket != "" && mg.OnMapEpic(r.Ticket)) {
 			continue
 		}
 		if err := mg.recountGrilling(agentrunner.Kind(r.Harness), r.ID, r.Dir); err != nil {

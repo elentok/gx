@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"context"
@@ -25,17 +25,17 @@ import (
 type sessionWatches struct {
 	mu      sync.Mutex
 	stopped bool
-	stop    chan struct{}
+	Stop    chan struct{}
 	running sync.WaitGroup
-	// metaMu serializes the watches' meta read-modify-writes.
-	metaMu sync.Mutex
+	// MetaMu serializes the watches' meta read-modify-writes.
+	MetaMu sync.Mutex
 }
 
-func newSessionWatches() *sessionWatches {
-	return &sessionWatches{stop: make(chan struct{})}
+func NewSessionWatches() *sessionWatches {
+	return &sessionWatches{Stop: make(chan struct{})}
 }
 
-func (w *sessionWatches) start(watch func()) {
+func (w *sessionWatches) Start(watch func()) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.stopped {
@@ -48,12 +48,12 @@ func (w *sessionWatches) start(watch func()) {
 	}()
 }
 
-// context is cancelled when the watches stop. release frees it early.
-func (w *sessionWatches) context() (ctx context.Context, release context.CancelFunc) {
+// Context is cancelled when the watches stop. release frees it early.
+func (w *sessionWatches) Context() (ctx context.Context, release context.CancelFunc) {
 	ctx, release = context.WithCancel(context.Background())
 	go func() {
 		select {
-		case <-w.stop:
+		case <-w.Stop:
 			release()
 		case <-ctx.Done():
 		}
@@ -61,22 +61,22 @@ func (w *sessionWatches) context() (ctx context.Context, release context.CancelF
 	return ctx, release
 }
 
-func (w *sessionWatches) isStopped() bool {
+func (w *sessionWatches) IsStopped() bool {
 	select {
-	case <-w.stop:
+	case <-w.Stop:
 		return true
 	default:
 		return false
 	}
 }
 
-// close ends every watch, which records nothing for its stream's end, and
+// Close ends every watch, which records nothing for its stream's end, and
 // waits for them.
-func (w *sessionWatches) close() {
+func (w *sessionWatches) Close() {
 	w.mu.Lock()
 	if !w.stopped {
 		w.stopped = true
-		close(w.stop)
+		close(w.Stop)
 	}
 	w.mu.Unlock()
 	w.running.Wait()
@@ -89,18 +89,18 @@ func (w *sessionWatches) close() {
 // session that may already be mid-turn, so only an idle-to-busy edge it sees
 // makes a turn Live; a watch from launch sees every turn start.
 func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, reconnect bool) {
-	update := func(change func(*sessionMeta) bool) {
-		mg.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool { return m.Run == run && change(m) })
+	update := func(change func(*Meta) bool) {
+		mg.UpdateSessionMetaOrWarn(dir, id, func(m *Meta) bool { return m.Run == run && change(m) })
 	}
 	recordExit := func(exit string) {
 		if time.Now().Before(crashUntil) {
 			exit = wire.SessionExitCrashed
 		}
-		update(func(m *sessionMeta) bool { return mg.recordSessionExit(m, exit) })
+		update(func(m *Meta) bool { return mg.recordSessionExit(m, exit) })
 	}
 	stream, err := mg.openSessionWatch(dir)
 	if err != nil {
-		if !mg.watches.isStopped() {
+		if !mg.Watches.IsStopped() {
 			mg.log.Warn("session watch", "session", id, "err", err)
 			recordExit(savedSessionExit(dir))
 		}
@@ -110,7 +110,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 	defer close(done)
 	go func() {
 		select {
-		case <-mg.watches.stop:
+		case <-mg.Watches.Stop:
 		case <-done:
 		}
 		_ = stream.Close()
@@ -132,14 +132,14 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 	for {
 		msg, err := stream.Next()
 		if err != nil {
-			if !mg.watches.isStopped() {
+			if !mg.Watches.IsStopped() {
 				recordExit(savedSessionExit(dir))
 			}
 			return
 		}
 		switch msg.Type {
 		case nativerunner.StreamStatus:
-			st := sessionStatusOf(msg.Status)
+			st := SessionStatusOf(msg.Status)
 			var prompt, signal string
 			var design chat.DesignRef
 			idleEdge := false
@@ -154,17 +154,17 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 			}
 			seenBusy = busy && (seenBusy || sawIdle)
 			sawIdle = !busy
-			update(func(m *sessionMeta) bool {
+			update(func(m *Meta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
 				if m.Status.State == wire.SessionExited {
 					return false
 				}
 				changed := false
-				if prev := m.info().Status; prev != st {
+				if prev := m.Info().Status; prev != st {
 					if raisesUnread(prev.State, st.State, msg.Status.Cancelled) {
 						mg.raiseUnread(m)
-						mg.triggerBanner(m.ID, unreadSound(st.State), "")
+						mg.TriggerBanner(m.ID, unreadSound(st.State), "")
 					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
@@ -198,7 +198,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 				return changed
 			})
 			first.NoteState(st.State)
-			mg.noteFailure(id)
+			mg.NoteFailure(id)
 			poll.SetActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
 			// Marked before the Design check reads the transcript.
 			mark, marked := chat.TurnMark{}, false
@@ -212,7 +212,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 				endSettle()
 				cancel := make(chan struct{})
 				settle = cancel
-				mg.watches.start(func() { mg.prompter.SettleTurn(dir, id, mark, design, cancel) })
+				mg.Watches.Start(func() { mg.prompter.SettleTurn(dir, id, mark, design, cancel) })
 			}
 			if prompt != "" {
 				first.Start(signal, prompt)
@@ -222,7 +222,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 			// Typing during a countdown stops only the countdown: the run-end
 			// Continue stays raised.
 			stopped := mg.prompter.CancelAutoAdvance(id, "Auto-advance stopped: you typed")
-			update(func(m *sessionMeta) bool {
+			update(func(m *Meta) bool {
 				changed := m.AutoSends != 0
 				m.AutoSends = 0
 				if stopped || m.Actionable.GxRaised {
@@ -241,7 +241,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 
 // typeSessionPrompt sends Enter on its own, so the harness reads the prompt
 // as typed rather than as a paste ending in a newline.
-func typeSessionPrompt(dir, prompt string) error {
+func TypeSessionPrompt(dir, prompt string) error {
 	c, err := nativerunner.DialHolder(dir)
 	if err == nil {
 		err = c.TypeText(prompt)
@@ -308,7 +308,7 @@ func (mg *Manager) dialNewHolder(dir string) (*nativerunner.HolderClient, error)
 			return nil, err
 		}
 		select {
-		case <-mg.watches.stop:
+		case <-mg.Watches.Stop:
 			return nil, err
 		case <-time.After(20 * time.Millisecond):
 		}
@@ -317,7 +317,7 @@ func (mg *Manager) dialNewHolder(dir string) (*nativerunner.HolderClient, error)
 
 // recordSessionExit records the first exit seen and drops an untyped first
 // prompt; a stopped session exits clean whatever the signal left as its code.
-func (mg *Manager) recordSessionExit(m *sessionMeta, exit string) bool {
+func (mg *Manager) recordSessionExit(m *Meta, exit string) bool {
 	if m.Status.State == wire.SessionExited {
 		return false
 	}
@@ -327,7 +327,7 @@ func (mg *Manager) recordSessionExit(m *sessionMeta, exit string) bool {
 		mg.raiseUnread(m)
 		// A Done Design exiting cleanly is expected: no banner.
 		if exit != wire.SessionExitClean || !mg.designDone(*m) {
-			mg.triggerBanner(m.ID, sound.Done, "")
+			mg.TriggerBanner(m.ID, sound.Done, "")
 		}
 	}
 	mg.saveConversationTotals(*m, m.ConversationID)
@@ -355,7 +355,7 @@ func raisesUnread(from, to string, cancelled bool) bool {
 }
 
 // raiseUnread sets m's Unread unless a focused TUI has it on screen.
-func (mg *Manager) raiseUnread(m *sessionMeta) {
+func (mg *Manager) raiseUnread(m *Meta) {
 	if !mg.focus.onScreen(m.ID) {
 		m.Unread.Unread = true
 	}
@@ -363,7 +363,7 @@ func (mg *Manager) raiseUnread(m *sessionMeta) {
 
 // sessionWrite adapts a session verb to a POST handler. Refusals are results,
 // so they answer 200.
-func sessionWrite(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+func SessionWrite(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 	return sessionWriteAs(nil, do)
 }
 

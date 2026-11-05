@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"context"
@@ -20,7 +20,7 @@ type logPruner interface {
 }
 
 // reattacher adopts the agent a previous server launched.
-type reattacher interface {
+type Reattacher interface {
 	Reattach(label string) (agentrunner.Session, nativerunner.Verdict, error)
 }
 
@@ -31,8 +31,8 @@ func (mg *Manager) logRetention() time.Duration {
 	return nativerunner.DefaultLogRetention
 }
 
-// keepPruned prunes agent logs daily; Serve already pruned once at start.
-func (mg *Manager) keepPruned(ctx context.Context) {
+// KeepPruned prunes agent logs daily; Serve already pruned once at start.
+func (mg *Manager) KeepPruned(ctx context.Context) {
 	ticker := time.NewTicker(pruneInterval)
 	defer ticker.Stop()
 	for {
@@ -40,16 +40,16 @@ func (mg *Manager) keepPruned(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case now := <-ticker.C:
-			mg.pruneAgentLogs(now)
+			mg.PruneAgentLogs(now)
 		}
 	}
 }
 
-// pruneAgentLogs removes expired logs of every project's agent directories,
+// PruneAgentLogs removes expired logs of every project's agent directories,
 // whatever runner is configured: the headless runner walks the agents root and
 // prunes each directory by the runner its meta.json names. A paused ticket's
 // logs stay: a person may still need them.
-func (mg *Manager) pruneAgentLogs(now time.Time) {
+func (mg *Manager) PruneAgentLogs(now time.Time) {
 	dirs, err := tickets.ProjectDirs(mg.cfg.TicketStore)
 	if err != nil {
 		mg.log.Warn("prune agent logs", "err", err)

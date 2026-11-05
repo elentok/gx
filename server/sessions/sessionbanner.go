@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-const defaultSessionBannerDelay = time.Second
+const DefaultSessionBannerDelay = time.Second
 
 // termBundleIDs maps a TUI's TERM_PROGRAM to the app a banner click activates.
 var termBundleIDs = map[string]string{
@@ -37,9 +37,9 @@ type bannerTrigger struct {
 	reason string
 }
 
-// triggerBanner schedules the session's banner, or merges into the one
+// TriggerBanner schedules the session's banner, or merges into the one
 // already waiting: attention beats done, and a reason replaces none.
-func (mg *Manager) triggerBanner(id string, snd sound.Name, reason string) {
+func (mg *Manager) TriggerBanner(id string, snd sound.Name, reason string) {
 	b := &mg.banners
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -57,22 +57,22 @@ func (mg *Manager) triggerBanner(id string, snd sound.Name, reason string) {
 	}
 	b.pending[id] = &bannerTrigger{sound: snd, reason: reason}
 	// Waits as a session watch, so close drops the banner and doesn't wait out the delay.
-	mg.watches.start(func() {
+	mg.Watches.Start(func() {
 		delay := time.NewTimer(mg.cfg.SessionBannerDelay)
 		defer delay.Stop()
 		select {
 		case <-delay.C:
 			mg.fireBanner(id)
-		case <-mg.watches.stop:
+		case <-mg.Watches.Stop:
 		}
 	})
 }
 
-// noteFailure triggers a banner when the session's failure is a new kind, and
+// NoteFailure triggers a banner when the session's failure is a new kind, and
 // forgets it once the failure clears so a later one banners again. Auth and
 // stalled come from the transcript, not the status, so they carry their label
 // as the reason; a status failure already has its banner text.
-func (mg *Manager) noteFailure(id string) {
+func (mg *Manager) NoteFailure(id string) {
 	_, m, res, err := mg.SessionDir(id)
 	if res.Refused || err != nil {
 		return
@@ -105,12 +105,12 @@ func (mg *Manager) noteFailure(id string) {
 	if kind == wire.FailureKindEnded && mg.designDone(m) {
 		return
 	}
-	mg.triggerBanner(id, sound.Attention, reason)
+	mg.TriggerBanner(id, sound.Attention, reason)
 }
 
 // designDone reports whether the session is a Design whose map's Progress is Done.
 // mapProgress stays a root function; it moves with the map code.
-func (mg *Manager) designDone(m sessionMeta) bool {
+func (mg *Manager) designDone(m Meta) bool {
 	if !m.Design || m.Ticket == "" {
 		return false
 	}
@@ -136,7 +136,7 @@ func (mg *Manager) designDone(m sessionMeta) bool {
 
 // designLink is the Design page of a Design session, without the token; empty
 // when the web listener is off or the session is not a Design.
-func (mg *Manager) designLink(m sessionMeta) string {
+func (mg *Manager) designLink(m Meta) string {
 	base := mg.host.WebURL()
 	if base == "" || !m.Design || m.Ticket == "" {
 		return ""
@@ -155,14 +155,14 @@ func (mg *Manager) fireBanner(id string) {
 	delete(b.pending, id)
 	b.mu.Unlock()
 	afk, onScreen := mg.afk.IsOn(), mg.focus.onScreen(id)
-	if mg.watches.isStopped() || mg.focus.webOnScreen(id) || (onScreen && !afk) {
+	if mg.Watches.IsStopped() || mg.focus.webOnScreen(id) || (onScreen && !afk) {
 		return
 	}
 	_, m, res, err := mg.SessionDir(id)
 	if res.Refused || err != nil {
 		return
 	}
-	info := m.info()
+	info := m.Info()
 	if quiet := info.Status.State == wire.SessionWorking || info.Status.State == wire.SessionStarting; quiet && m.Actionable.Reason == "" && t.reason == "" {
 		return
 	}
@@ -187,7 +187,7 @@ func (mg *Manager) fireBanner(id string) {
 		mg.sendSessionBanner(info, title, body, link)
 	}
 	if set.AgentsSounds.Enabled {
-		mg.watches.start(func() { mg.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
+		mg.Watches.Start(func() { mg.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
 	}
 }
 

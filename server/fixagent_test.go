@@ -11,8 +11,8 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/migratefail"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -197,7 +197,7 @@ func TestFixAgent_ProjectStartsOnFailedMigration(t *testing.T) {
 		t.Fatalf("fix = %+v", res)
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
-	if meta["dir"] != f.repo || meta["name"] != server.FixAgentName("proj") || meta["tier"] != "strongest" {
+	if meta["dir"] != f.repo || meta["name"] != sessions.FixAgentName("proj") || meta["tier"] != "strongest" {
 		t.Errorf("meta = %v", meta)
 	}
 	prompt, _ := meta["first_prompt"].(string)

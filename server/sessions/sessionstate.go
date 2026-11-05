@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"fmt"
@@ -14,32 +14,32 @@ func SessionStateToken(s wire.SessionInfo) string {
 	return fmt.Sprintf("%s:%s:%d", s.ID, s.Status.State, s.StatusChangedAt.UnixNano())
 }
 
-// sessionWriteDesignWeb is sessionWrite for the web mux: only a design session,
+// SessionWriteDesignWeb is sessionWrite for the web mux: only a design session,
 // and only with the state token of the session the page saw.
-func (mg *Manager) sessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-	return sessionWriteAs(mg.checkDesignWrite, do)
+func (mg *Manager) SessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+	return sessionWriteAs(mg.CheckDesignWrite, do)
 }
 
-// checkDesignWrite returns the refusal for a web write on a session that is not
+// CheckDesignWrite returns the refusal for a web write on a session that is not
 // a design session or whose state moved since the page saw it.
-func (mg *Manager) checkDesignWrite(req wire.SessionRequest) (wire.SessionResult, error) {
+func (mg *Manager) CheckDesignWrite(req wire.SessionRequest) (wire.SessionResult, error) {
 	_, meta, res, err := mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	if !meta.Design {
-		return sessionRefusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+		return Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
-	if req.State != SessionStateToken(meta.info()) {
-		return sessionRefusal(wire.ReasonStale, "the session changed; review its current state"), nil
+	if req.State != SessionStateToken(meta.Info()) {
+		return Refusal(wire.ReasonStale, "the session changed; review its current state"), nil
 	}
 	return wire.SessionResult{}, nil
 }
 
-// sessionWriteAgentWeb is sessionWrite for a web stop or remove: any session
+// SessionWriteAgentWeb is sessionWrite for a web stop or remove: any session
 // except a Queue agent, which ralph-loop drives, and only with the state token
 // of the session the page saw.
-func (mg *Manager) sessionWriteAgentWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+func (mg *Manager) SessionWriteAgentWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 	return sessionWriteAs(mg.checkAgentWrite, do)
 }
 
@@ -50,11 +50,11 @@ func (mg *Manager) checkAgentWrite(req wire.SessionRequest) (wire.SessionResult,
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if meta.info().Queue {
-		return sessionRefusal(wire.ReasonSessionQueue, fmt.Sprintf("session %s is a Queue agent; ralph-loop drives it", req.ID)), nil
+	if meta.Info().Queue {
+		return Refusal(wire.ReasonSessionQueue, fmt.Sprintf("session %s is a Queue agent; ralph-loop drives it", req.ID)), nil
 	}
-	if req.State != SessionStateToken(meta.info()) {
-		return sessionRefusal(wire.ReasonStale, "the session changed; review its current state"), nil
+	if req.State != SessionStateToken(meta.Info()) {
+		return Refusal(wire.ReasonStale, "the session changed; review its current state"), nil
 	}
 	return wire.SessionResult{}, nil
 }

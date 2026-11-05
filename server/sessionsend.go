@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/sessions"
 	"path/filepath"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ func (s *Server) sendPrompt(dir, text string) {
 // through, so the person doesn't see a stale stop on a session that runs.
 func (s *Server) clearSendFailed(dir string) {
 	id := filepath.Base(dir)
-	s.sessions.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
+	s.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		if !m.Actionable.GxRaised || !strings.HasPrefix(m.Actionable.Reason, sendFailedPrefix) {
 			return false
 		}

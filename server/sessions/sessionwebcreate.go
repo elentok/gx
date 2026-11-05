@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"encoding/json"
@@ -27,15 +27,15 @@ type WebCreateSessionRequest struct {
 	Tier ralphloop.Tier `json:"tier,omitempty"`
 }
 
-// sessionCreateWeb is sessionCreateWrite for the web mux. A body with any
+// SessionCreateWeb is sessionCreateWrite for the web mux. A body with any
 // other field is refused, not dropped.
-func (mg *Manager) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
+func (mg *Manager) SessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 	var req WebCreateSessionRequest
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	var res wire.SessionResult
 	if err := dec.Decode(&req); err != nil {
-		res = sessionRefusal(wire.ReasonSessionBadRequest, err.Error())
+		res = Refusal(wire.ReasonSessionBadRequest, err.Error())
 	} else {
 		var err error
 		if res, err = mg.createWebSession(req); err != nil {
@@ -46,23 +46,23 @@ func (mg *Manager) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 	wire.WriteJSON(w, res)
 }
 
-// checkProjectDir returns a refusal when project is not configured or a
+// CheckProjectDir returns a refusal when project is not configured or a
 // non-empty dir is neither its root nor one of its worktrees; nil means ok.
-func (mg *Manager) checkProjectDir(project, dir string) (*wire.SessionResult, error) {
+func (mg *Manager) CheckProjectDir(project, dir string) (*wire.SessionResult, error) {
 	list, err := mg.projects.ListWorktrees()
 	if err != nil {
 		return nil, err
 	}
 	i := slices.IndexFunc(list, func(p wire.ProjectWorktrees) bool { return p.Project == project })
 	if i < 0 {
-		res := sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %q is not configured", project))
+		res := Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %q is not configured", project))
 		return &res, nil
 	}
 	if dir != "" {
 		clean := filepath.Clean(dir)
 		known := filepath.Clean(list[i].Root) == clean || slices.ContainsFunc(list[i].Worktrees, func(wt string) bool { return filepath.Clean(wt) == clean })
 		if !known {
-			res := sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("dir %s is not the root or a worktree of %s", dir, project))
+			res := Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("dir %s is not the root or a worktree of %s", dir, project))
 			return &res, nil
 		}
 	}
@@ -74,19 +74,19 @@ func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionRe
 	if refusal != nil {
 		return *refusal, nil
 	}
-	refusal, err := mg.checkProjectDir(req.Project, req.Dir)
+	refusal, err := mg.CheckProjectDir(req.Project, req.Dir)
 	if err != nil {
 		return wire.SessionResult{}, err
 	}
 	if refusal != nil {
 		return *refusal, nil
 	}
-	return mg.createSession(wire.CreateSessionRequest{
+	return mg.CreateSession(wire.CreateSessionRequest{
 		Project:  req.Project,
 		Dir:      req.Dir,
 		Worktree: req.Worktree,
 		Name:     req.Name,
 		Prompt:   prompt,
 		Tier:     req.Tier,
-	}, sessionCtx{})
+	}, SessionCtx{})
 }

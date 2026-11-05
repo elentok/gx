@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"cmp"
@@ -12,19 +12,19 @@ import (
 // sessionCtx is what the server's own callers set on a session create that the
 // body does not carry. It travels beside the CreateSessionRequest, never
 // inside it.
-type sessionCtx struct {
+type SessionCtx struct {
 	// design marks the session Design although Ticket has no map epic yet.
 	design bool
 	// remoteControl is the --remote-control name, saved in the meta so resumes
 	// keep it whatever the setting says by then.
 	remoteControl string
-	// launchDesign marks a launch by a design path (Start design, New Design):
+	// LaunchDesign marks a launch by a design path (Start design, New Design):
 	// the tier follows the map's step, and the meta saves LaunchDesign.
-	launchDesign bool
+	LaunchDesign bool
 }
 
 // sessionMeta is what a session's state dir records about it.
-type sessionMeta struct {
+type Meta struct {
 	ID      string `json:"id"`
 	Harness string `json:"harness"`
 	Project string `json:"project"`
@@ -96,7 +96,18 @@ type sessionMeta struct {
 	RebaseNote string `json:"rebase_note,omitempty"`
 }
 
-func (m sessionMeta) info() wire.SessionInfo {
+// CanAutoAdvance is the one rule for whether the session's raised Actionable
+// may be sent by the server: the switch is on, it is a derived Continue (not a
+// grilling round, not agent- or gx-raised), the session waits for the person,
+// whatever its harness. Call sites add their own conditions: the
+// detector needs a live turn and the cap, the switch needs no countdown running.
+func (m Meta) CanAutoAdvance() bool {
+	a := m.Actionable
+	return !m.AutoAdvanceOff && a.Derived && !a.Grilling && len(a.Action) > 0 &&
+		m.Status.Promptable()
+}
+
+func (m Meta) Info() wire.SessionInfo {
 	info := wire.SessionInfo{
 		ID:              m.ID,
 		Name:            m.Name,

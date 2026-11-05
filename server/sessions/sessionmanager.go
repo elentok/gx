@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"log/slog"
@@ -33,7 +33,7 @@ type SessionsConfig struct {
 
 // Host is what the Manager and the Resumer need from the rest of the root.
 type Host interface {
-	SessionInfo(m sessionMeta) wire.SessionInfo
+	SessionInfo(m Meta) wire.SessionInfo
 	WebURL() string
 	FindTicket(address string) (queue.TicketRef, bool, error)
 	MigrationFailures() []wire.MigrationFailure
@@ -51,13 +51,13 @@ type Manager struct {
 	idx      *index.Index
 	// chat reads the sessions' transcripts for the watch loop.
 	chat  *chat.Chat
-	focus *focusReports
+	focus *FocusReports
 	afk   *queue.AFK
 	// alerts sends the AFK chat alert of a banner.
 	alerts  *ralphloop.ServerChat
 	banners sessionBanners
 	host    Host
-	watches *sessionWatches
+	Watches *sessionWatches
 	// prompter is the prompt, turn and auto-advance side the watch loop calls.
 	prompter Prompter
 	// designs is the design cleanup the remove path calls back.
@@ -66,11 +66,47 @@ type Manager struct {
 	rollouts codexRollouts
 }
 
+// ManagerDeps is what the root hands NewManager. Each field is the Manager
+// field of the same name; the watches are made by NewManager.
+type ManagerDeps struct {
+	Cfg      SessionsConfig
+	Log      *slog.Logger
+	Events   *broker.Broker
+	Projects *projects.Registry
+	Settings *settings.Holder
+	Harness  *harnesschoice.Harness
+	Idx      *index.Index
+	Chat     *chat.Chat
+	Focus    *FocusReports
+	AFK      *queue.AFK
+	Alerts   *ralphloop.ServerChat
+	Host     Host
+	Prompter Prompter
+	Designs  designCleaner
+	Rollouts codexRollouts
+}
+
+// NewManager builds the Manager from d.
+func NewManager(d ManagerDeps) *Manager {
+	return &Manager{
+		cfg: d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
+		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
+		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, host: d.Host,
+		Watches: NewSessionWatches(), prompter: d.Prompter,
+		designs: d.Designs, rollouts: d.Rollouts,
+	}
+}
+
 // Resumer brings sessions back: resume, restore, auto-resume, handoff, link,
 // step and the fix agent.
 type Resumer struct {
 	mg   *Manager
 	host Host
+}
+
+// NewResumer builds the Resumer over mg.
+func NewResumer(mg *Manager, host Host) *Resumer {
+	return &Resumer{mg: mg, host: host}
 }
 
 // Prompter is what the session watch loop needs from the prompt, turn and

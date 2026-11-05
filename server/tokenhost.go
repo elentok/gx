@@ -19,7 +19,7 @@ func (h tokenHost) BudgetIteration(address string) (wire.IterationInfo, bool) {
 func (h tokenHost) MigrationsDone() <-chan struct{} { return h.s.migrator.Done() }
 
 func (h tokenHost) Sessions() ([]limits.InteractiveSession, error) {
-	metas, err := h.s.sessions.listSessionMetas()
+	metas, err := h.s.sessions.ListSessionMetas()
 	if err != nil {
 		return nil, err
 	}

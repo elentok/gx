@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"github.com/elentok/gx/server/sessions"
 	"net/http"
 	"slices"
 	"time"
@@ -188,8 +189,8 @@ func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wi
 		row.Asking, row.Question = true, open.Summary
 	}
 	if status == tickets.StatusPausedRepair {
-		row.State = repairState(evs, t.PausedClass())
-		row.FixPrompt = fixAgentPrompt(s.projects.LaunchHarness(root.Project), row.Address, t)
+		row.State = sessions.RepairState(evs, t.PausedClass())
+		row.FixPrompt = sessions.FixAgentPrompt(s.projects.LaunchHarness(root.Project), row.Address, t)
 	}
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()

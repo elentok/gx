@@ -1,11 +1,11 @@
-package server
+package sessions
 
 import "testing"
 
 func TestUpdateSessionMeta_UnreadableMetaIsAnError(t *testing.T) {
 	t.Parallel()
-	mg := &Manager{watches: newSessionWatches()}
-	err := mg.updateSessionMeta(t.TempDir(), "abcdef", func(*sessionMeta) bool {
+	mg := &Manager{Watches: NewSessionWatches()}
+	err := mg.UpdateSessionMeta(t.TempDir(), "abcdef", func(*Meta) bool {
 		t.Error("change ran on an unreadable meta")
 		return false
 	})

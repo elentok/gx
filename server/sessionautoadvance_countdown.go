@@ -90,14 +90,14 @@ func (s *Server) startAutoAdvance(id string) bool {
 		return false
 	}
 	c := s.autoAdvances.begin(id, time.Now().Add(delay))
-	s.sessions.watches.start(func() {
+	s.sessions.Watches.Start(func() {
 		timer := time.NewTimer(delay)
 		defer timer.Stop()
 		select {
 		case <-timer.C:
 		case <-c.cancel:
 			return
-		case <-s.sessions.watches.stop:
+		case <-s.sessions.Watches.Stop:
 			return
 		}
 		if !s.autoAdvances.finish(id, c) {
@@ -128,7 +128,7 @@ func (s *Server) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionRe
 		return res, err
 	}
 	s.cancelAutoAdvance(req.ID, "Auto-advance cancelled")
-	info := meta.info()
+	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
 }
 
@@ -136,7 +136,7 @@ func (s *Server) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionRe
 // with the switch on.
 func (s *Server) sendAutoAdvance(id string) {
 	_, meta, res, err := s.sessions.SessionDir(id)
-	if res.Refused || err != nil || !meta.canAutoAdvance() {
+	if res.Refused || err != nil || !meta.CanAutoAdvance() {
 		return
 	}
 	if res, err := s.sendSessionAction(wire.SessionRequest{ID: id}, true); err != nil || res.Refused {

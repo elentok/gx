@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"path/filepath"
@@ -13,32 +13,32 @@ import (
 	"github.com/elentok/gx/ralphloop"
 )
 
-// startContinue runs a design Continue's action in the background: the
+// StartContinue runs a design Continue's action in the background: the
 // charting handoff when the session is due one, else the typed prompts. The
 // caller holds metaMu; the work runs after it lets go.
-func (rs *Resumer) startContinue(dir string, meta sessionMeta, label string, action []string) {
+func (rs *Resumer) StartContinue(dir string, meta Meta, label string, action []string) {
 	if rs.chartingHandoffDue(meta, action) {
-		rs.mg.watches.start(func() { rs.chartingHandoff(dir, meta.ID) })
+		rs.mg.Watches.Start(func() { rs.chartingHandoff(dir, meta.ID) })
 		return
 	}
-	rs.mg.watches.start(func() { rs.mg.prompter.SendAction(dir, label, action) })
+	rs.mg.Watches.Start(func() { rs.mg.prompter.SendAction(dir, label, action) })
 }
 
 // chartingHandoffDue reports whether action is the design Continue of a
 // strongest-tier session that gx launched for the design, on a map past
 // charting. Only a harness with a chat reader restarts, as only it has a design Continue.
-func (rs *Resumer) chartingHandoffDue(meta sessionMeta, action []string) bool {
+func (rs *Resumer) chartingHandoffDue(meta Meta, action []string) bool {
 	return meta.LaunchDesign && meta.Design &&
 		rs.mg.settings.Load().HasChatReader(meta.Harness) &&
 		meta.Tier == ralphloop.TierStrongest &&
 		slices.Equal(action, chat.DesignContinueAction(meta.Ticket, meta.Harness)) &&
-		rs.mg.designLaunchTier(meta.Ticket) == ralphloop.TierWorker
+		rs.mg.DesignLaunchTier(meta.Ticket) == ralphloop.TierWorker
 }
 
-// handoffRefusal is why a Continue of action must not start: it is a charting
+// HandoffRefusal is why a Continue of action must not start: it is a charting
 // handoff whose worker-tier harness is not on PATH. It runs before the run-end
 // line is cleared and the old agent stopped, so the session stays as it was.
-func (rs *Resumer) handoffRefusal(meta sessionMeta, action []string) (wire.SessionResult, bool) {
+func (rs *Resumer) HandoffRefusal(meta Meta, action []string) (wire.SessionResult, bool) {
 	if !rs.chartingHandoffDue(meta, action) {
 		return wire.SessionResult{}, false
 	}
@@ -46,7 +46,7 @@ func (rs *Resumer) handoffRefusal(meta sessionMeta, action []string) (wire.Sessi
 	if msg == "" {
 		return wire.SessionResult{}, false
 	}
-	return sessionRefusal(wire.ReasonSessionHarnessMissing, msg), true
+	return Refusal(wire.ReasonSessionHarnessMissing, msg), true
 }
 
 // chartingHandoff ends the session's strongest-tier conversation and starts a
@@ -67,9 +67,9 @@ func (rs *Resumer) chartingHandoff(dir, id string) {
 			waitForFile(filepath.Join(dir, nativerunner.ExitCodeFile), sessionStopTimeout)
 		}
 	}
-	rs.mg.watches.metaMu.Lock()
-	defer rs.mg.watches.metaMu.Unlock()
-	meta, err := readSessionMeta(dir)
+	rs.mg.Watches.MetaMu.Lock()
+	defer rs.mg.Watches.MetaMu.Unlock()
+	meta, err := ReadMeta(dir)
 	if err != nil {
 		rs.mg.log.Warn("handoff: read meta", "session", id, "err", err)
 		return
@@ -83,14 +83,14 @@ func (rs *Resumer) chartingHandoff(dir, id string) {
 // beginHandoff bumps the run and returns the conversation being ended. It
 // reports false when the session ended in the meantime.
 func (rs *Resumer) beginHandoff(dir, id string) (string, bool) {
-	rs.mg.watches.metaMu.Lock()
-	defer rs.mg.watches.metaMu.Unlock()
-	meta, err := readSessionMeta(dir)
+	rs.mg.Watches.MetaMu.Lock()
+	defer rs.mg.Watches.MetaMu.Unlock()
+	meta, err := ReadMeta(dir)
 	if err != nil || meta.Status.State == wire.SessionExited {
 		return "", false
 	}
 	meta.Run++
-	if err := writeSessionMeta(dir, meta); err != nil {
+	if err := WriteMeta(dir, meta); err != nil {
 		rs.mg.log.Warn("handoff: save meta", "session", id, "err", err)
 		return "", false
 	}
@@ -99,7 +99,7 @@ func (rs *Resumer) beginHandoff(dir, id string) (string, bool) {
 
 // restartOnWorker ends the old conversation like an agent exit, records a new
 // one and launches it under the worker tier. The caller holds metaMu.
-func (rs *Resumer) restartOnWorker(dir string, meta *sessionMeta, old string) error {
+func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
 	rs.mg.saveConversationTotals(*meta, old)
 	conv, err := nativerunner.NewUUID()
 	if err != nil {
@@ -120,7 +120,7 @@ func (rs *Resumer) restartOnWorker(dir string, meta *sessionMeta, old string) er
 		return err
 	}
 	id, run := meta.ID, meta.Run
-	rs.mg.watches.start(func() { rs.mg.watchSession(dir, id, run, time.Time{}, false) })
+	rs.mg.Watches.Start(func() { rs.mg.watchSession(dir, id, run, time.Time{}, false) })
 	rs.mg.events.Publish(wire.EventSessionChanged, id)
 	return nil
 }

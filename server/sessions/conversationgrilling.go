@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"github.com/elentok/gx/agentrunner"
@@ -28,7 +28,7 @@ func (mg *Manager) recountGrilling(kind agentrunner.Kind, conversation, dir stri
 
 // saveConversationGrilling counts the Grilling rounds of the ended Design
 // conversation onto its record. Any non-Codex harness reads as Claude.
-func (mg *Manager) saveConversationGrilling(m sessionMeta, conversation string) {
+func (mg *Manager) saveConversationGrilling(m Meta, conversation string) {
 	if err := mg.recountGrilling(agentrunner.Kind(m.Harness), conversation, m.Dir); err != nil {
 		mg.log.Warn("count conversation grilling", "session", m.ID, "conversation", conversation, "err", err)
 	}

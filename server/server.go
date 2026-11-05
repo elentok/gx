@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/sessions"
 	"io"
 	"log/slog"
 	"net"
@@ -164,10 +165,10 @@ type Server struct {
 	nudges       nudgeLimiter
 	trunkMissing missingTrunks
 	// sessions creates, stops and watches the sessions; resumer brings them back.
-	sessions    *Manager
-	resumer     *Resumer
+	sessions    *sessions.Manager
+	resumer     *sessions.Resumer
 	designOpens sync.Map // epic address -> *sync.Mutex, serializing designs open
-	focus       *focusReports
+	focus       *sessions.FocusReports
 	unblockMu   sync.Mutex // makes leaving a headless block happen once, whoever sees it first
 }
 
@@ -190,7 +191,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.ProcessSource = syshealth.DefaultProcess()
 	}
 	if cfg.SessionBannerDelay == 0 {
-		cfg.SessionBannerDelay = defaultSessionBannerDelay
+		cfg.SessionBannerDelay = sessions.DefaultSessionBannerDelay
 	}
 	if cfg.ChatPollInterval == 0 {
 		cfg.ChatPollInterval = chat.DefaultPollInterval
@@ -333,7 +334,7 @@ func New(cfg Config) (*Server, error) {
 		events:      events,
 		guards:      runs.NewGuards(),
 
-		focus: newFocusReports(),
+		focus: sessions.NewFocusReports(),
 	}
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
@@ -408,7 +409,7 @@ func New(cfg Config) (*Server, error) {
 			ProcessShareWindow: cfg.ProcessShareWindow, ProcessCutoff: cfg.ProcessCutoff, ProcessWaitCap: cfg.ProcessWaitCap,
 		},
 		Settings: &s.settings, Projects: s.projects, Events: events, Disks: s.disks, OneOffs: s.oneOffs,
-		Registry: s.registry, Harness: s.harness, Sessions: sessionMetas{}, Log: log,
+		Registry: s.registry, Harness: s.harness, Sessions: sessions.SessionMetas{}, Log: log,
 	})
 	s.limits = limits.New(limits.Deps{
 		Config: limits.Config{
@@ -507,23 +508,35 @@ var routeTable = []struct {
 	// Interactive sessions; /v1/agents/* is the loop agents'.
 	{"GET /v1/sessions", (*Server).sessionsRead},
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
-	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.sessions.stopSession)(w, r) }},
-	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.sessions.removeSession)(w, r) }},
-	{"POST /v1/sessions/mark-read", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.markSessionRead)(w, r) }},
+	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) {
+		sessions.SessionWrite(s.sessions.StopSession)(w, r)
+	}},
+	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) {
+		sessions.SessionWrite(s.sessions.RemoveSession)(w, r)
+	}},
+	{"POST /v1/sessions/mark-read", func(s *Server, w http.ResponseWriter, r *http.Request) {
+		sessions.SessionWrite(s.markSessionRead)(w, r)
+	}},
 	{"POST /v1/sessions/focus", (*Server).sessionFocusWrite},
-	{"POST /v1/sessions/show", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.focusSession)(w, r) }},
+	{"POST /v1/sessions/show", func(s *Server, w http.ResponseWriter, r *http.Request) { sessions.SessionWrite(s.focusSession)(w, r) }},
 	{"POST /v1/sessions/actionable", (*Server).sessionActionableWrite},
 	{"POST /v1/sessions/link", (*Server).sessionLinkWrite},
 	{"POST /v1/sessions/step", (*Server).sessionStepWrite},
-	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.runSessionAction)(w, r) }},
-	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.resumer.resumeSession)(w, r) }},
+	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) {
+		sessions.SessionWrite(s.runSessionAction)(w, r)
+	}},
+	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) {
+		sessions.SessionWrite(s.resumer.ResumeSession)(w, r)
+	}},
 	{"POST /v1/sessions/prompt", (*Server).sessionPromptWrite},
 	{"POST /v1/sessions/keys", (*Server).sessionKeysWrite},
 	{"POST /v1/sessions/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) {
-		sessionWrite(s.sessions.interruptSession)(w, r)
+		sessions.SessionWrite(s.sessions.InterruptSession)(w, r)
 	}},
 	{"POST /v1/sessions/auto-advance", (*Server).sessionAutoAdvanceWrite},
-	{"POST /v1/sessions/auto-advance/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.cancelAutoAdvanceRoute)(w, r) }},
+	{"POST /v1/sessions/auto-advance/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) {
+		sessions.SessionWrite(s.cancelAutoAdvanceRoute)(w, r)
+	}},
 	{"POST /v1/designs/open", (*Server).designOpenWrite},
 	{"POST /v1/designs/delete", (*Server).designDeleteWrite},
 	{"POST /v1/designs/worktree", (*Server).designWorktreeWrite},
@@ -639,8 +652,8 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 		defer untrack()
 	}
 	if client := r.URL.Query().Get("client"); client != "" {
-		s.focus.connect(client)
-		defer s.focus.disconnect(client)
+		s.focus.Connect(client)
+		defer s.focus.Disconnect(client)
 	}
 	flusher, _ := w.(http.Flusher)
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -709,7 +722,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.settings.StartConfigWatch(freshCtx)
 	// Before the socket serves, so a session created at startup is never
 	// taken for one whose holder died while the server was down.
-	s.resumer.restoreSessions()
+	s.resumer.RestoreSessions()
 	errc := make(chan error, 3)
 	lns := []net.Listener{s.ln}
 	go func() { errc <- s.http.Serve(s.ln) }()
@@ -752,7 +765,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	claimDone := make(chan struct{})
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
 	pruneDone := make(chan struct{})
-	go func() { defer close(pruneDone); s.sessions.keepPruned(freshCtx) }()
+	go func() { defer close(pruneDone); s.sessions.KeepPruned(freshCtx) }()
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.budget.KeepPolled(freshCtx) }()
 	tokensDone := make(chan struct{})
@@ -770,7 +783,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	usageDone := make(chan struct{})
 	go func() { defer close(usageDone); s.limits.Run(freshCtx) }()
 	sweepDone := make(chan struct{})
-	go func() { defer close(sweepDone); s.sessions.sweepDesignCounts() }()
+	go func() { defer close(sweepDone); s.sessions.SweepDesignCounts() }()
 	s.health.FileStartIncident(time.Now())
 	var err error
 	select {
@@ -795,7 +808,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	recordShutdown("budget-events-stop")
 	s.budget.StopEvents()
 	recordShutdown("session-watches-close")
-	s.sessions.watches.close()
+	s.sessions.Watches.Close()
 	for _, w := range []struct {
 		name string
 		done chan struct{}

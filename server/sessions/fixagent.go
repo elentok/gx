@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"cmp"
@@ -17,12 +17,12 @@ import (
 )
 
 func fixAgentRefusal(reason, msg string) wire.FixAgentResult {
-	return wire.FixAgentResult{SessionResult: sessionRefusal(reason, msg)}
+	return wire.FixAgentResult{SessionResult: Refusal(reason, msg)}
 }
 
 // repairState is the web state token of a ticket paused for repair: the answerState
 // of its latest round's question (zero when it has none) and its pause class.
-func repairState(evs []tickets.LogEvent, class schema.PauseClass) string {
+func RepairState(evs []tickets.LogEvent, class schema.PauseClass) string {
 	var q tickets.LogEvent
 	if rounds := tickets.Rounds(evs); len(rounds) > 0 {
 		q = rounds[len(rounds)-1].Question
@@ -30,12 +30,12 @@ func repairState(evs []tickets.LogEvent, class schema.PauseClass) string {
 	return queue.AnswerState(q, class)
 }
 
-func (rs *Resumer) fixAgentWrite(w http.ResponseWriter, r *http.Request) {
+func (rs *Resumer) FixAgentWrite(w http.ResponseWriter, r *http.Request) {
 	rs.fixAgentHandler(false)(w, r)
 }
 
-// fixAgentWeb is fixAgentWrite for the web mux: the request needs a state token.
-func (rs *Resumer) fixAgentWeb() http.HandlerFunc { return rs.fixAgentHandler(true) }
+// FixAgentWeb is fixAgentWrite for the web mux: the request needs a state token.
+func (rs *Resumer) FixAgentWeb() http.HandlerFunc { return rs.fixAgentHandler(true) }
 
 func (rs *Resumer) fixAgentHandler(web bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +63,7 @@ func FixAgentName(addr string) string {
 
 // fixAgentPrompt is the prompt the fix agent starts from; a pause label
 // follows the colon, none leaves the sentence at the state name.
-func fixAgentPrompt(agent, addr string, t tickets.Ticket) string {
+func FixAgentPrompt(agent, addr string, t tickets.Ticket) string {
 	state := "paused for repair"
 	switch t.RawStatus() {
 	case tickets.StatusPausedAnswer:
@@ -109,7 +109,7 @@ func (rs *Resumer) startFixProjectAgent(project string) (wire.FixAgentResult, er
 		Prompt:     fixProjectPrompt(rs.mg.projects.LaunchHarness(project), *failure),
 		Tier:       ralphloop.TierStrongest,
 	}
-	res, err := rs.mg.createSession(cs, sessionCtx{})
+	res, err := rs.mg.CreateSession(cs, SessionCtx{})
 	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
 		return fixAgentRefusal(wire.ReasonSessionNameTaken, "an agent is already fixing "+project), nil
 	}
@@ -151,7 +151,7 @@ func (rs *Resumer) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAg
 	} else if st := ref.Epic.RenderedStatus(t); st != tickets.StatusPausedAnswer && st != tickets.StatusPausedRepair && st != tickets.StatusError {
 		return fixAgentRefusal(wire.ReasonFixNotRepair, fmt.Sprintf("%s is not paused or in error", addr)), nil
 	}
-	if web && req.State != repairState(queue.ReadLogLenient(t), t.PausedClass()) {
+	if web && req.State != RepairState(queue.ReadLogLenient(t), t.PausedClass()) {
 		return fixAgentRefusal(wire.ReasonStale, "the pause changed; review the current one"), nil
 	}
 	checkout := tickets.TrunkCheckout(rs.mg.cfg.TicketStore, ref.Addr.Project)
@@ -164,15 +164,15 @@ func (rs *Resumer) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAg
 		Dir:        checkout,
 		Name:       FixAgentName(addr),
 		UniqueName: true,
-		Prompt:     fixAgentPrompt(rs.mg.projects.LaunchHarness(ref.Addr.Project), addr, t),
+		Prompt:     FixAgentPrompt(rs.mg.projects.LaunchHarness(ref.Addr.Project), addr, t),
 		Tier:       ralphloop.TierStrongest,
 	}
 	remote := settings.AgentsFixAgentRemoteControl && rs.mg.projects.LaunchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
-	var sc sessionCtx
+	var sc SessionCtx
 	if remote {
 		sc.remoteControl = addr
 	}
-	res, err := rs.mg.createSession(cs, sc)
+	res, err := rs.mg.CreateSession(cs, sc)
 	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
 		return fixAgentRefusal(wire.ReasonSessionNameTaken, "an agent is already fixing "+addr), nil
 	}

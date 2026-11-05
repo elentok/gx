@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -55,7 +56,7 @@ func sessionToken(ctx context.Context, t *testing.T, h *servertest.Harness, id s
 	}
 	for _, s := range snap.Sessions {
 		if s.ID == id {
-			return server.SessionStateToken(s)
+			return sessions.SessionStateToken(s)
 		}
 	}
 	t.Fatalf("no session %s", id)

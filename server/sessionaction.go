@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -24,20 +25,20 @@ func (s *Server) runSessionAction(req wire.SessionRequest) (wire.SessionResult, 
 // itself, which the runaway guard counts. Any other send is the person's input
 // and resets that count.
 func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.SessionResult, error) {
-	s.sessions.watches.metaMu.Lock()
-	defer s.sessions.watches.metaMu.Unlock()
+	s.sessions.Watches.MetaMu.Lock()
+	defer s.sessions.Watches.MetaMu.Unlock()
 	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if st := meta.info().Status; !st.Promptable() {
-		return sessionRefusal(wire.ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
+	if st := meta.Info().Status; !st.Promptable() {
+		return sessions.Refusal(wire.ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
 	}
 	action := meta.Actionable.Action
 	if len(action) == 0 {
-		return sessionRefusal(wire.ReasonSessionNoAction, fmt.Sprintf("session %s has no action", req.ID)), nil
+		return sessions.Refusal(wire.ReasonSessionNoAction, fmt.Sprintf("session %s has no action", req.ID)), nil
 	}
-	if res, refused := s.resumer.handoffRefusal(meta, action); refused {
+	if res, refused := s.resumer.HandoffRefusal(meta, action); refused {
 		return res, nil
 	}
 	meta.Actionable = wire.SessionActionable{}
@@ -47,12 +48,12 @@ func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 		s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you ran the action")
 		meta.AutoSends = 0
 	}
-	if err := writeSessionMeta(dir, meta); err != nil {
+	if err := sessions.WriteMeta(dir, meta); err != nil {
 		return wire.SessionResult{}, err
 	}
 	s.events.Publish(wire.EventSessionChanged, req.ID)
-	s.resumer.startContinue(dir, meta, "Action", action)
-	info := meta.info()
+	s.resumer.StartContinue(dir, meta, "Action", action)
+	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
 }
 
@@ -186,7 +187,7 @@ func (r *actionRun) typeStep(i int, prompt string) error {
 	r.convChanged = false
 	before, _ := inputState(r.holder)
 	r.s.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", promptHead(prompt), "input_before", before)
-	if err := typeSessionPrompt(r.dir, prompt); err != nil {
+	if err := sessions.TypeSessionPrompt(r.dir, prompt); err != nil {
 		return err
 	}
 	if r.onTyped != nil {
@@ -255,7 +256,7 @@ func (r *actionRun) waitForStep(slash bool) (string, error) {
 // rather than wait on a person who may never come.
 func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal string, err error) {
 	select {
-	case <-r.s.sessions.watches.stop:
+	case <-r.s.sessions.Watches.Stop:
 		return false, "", errServerStopping
 	case <-r.cancel:
 		return false, signalPersonInput, nil
@@ -347,7 +348,7 @@ func (r *actionRun) apply(msg nativerunner.WatchMessage, ok bool) error {
 		r.personTyped = true
 	}
 	if msg.Type == nativerunner.StreamStatus {
-		st := sessionStatusOf(msg.Status)
+		st := sessions.SessionStatusOf(msg.Status)
 		r.state, r.background = st.State, st.Background
 		log := r.s.log.With("session", filepath.Base(r.dir))
 		if id := msg.ConversationID; id != "" && id != r.convID {

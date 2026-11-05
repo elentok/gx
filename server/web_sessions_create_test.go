@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -44,7 +44,7 @@ func TestWebSessionCreate_StartsASessionInTheProjectRoot(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	root := f.projectRoot(t)
-	body, _ := json.Marshal(server.WebCreateSessionRequest{Project: "proj", Dir: root, Name: "chat", Prompt: "hello"})
+	body, _ := json.Marshal(sessions.WebCreateSessionRequest{Project: "proj", Dir: root, Name: "chat", Prompt: "hello"})
 	code, res := f.webCreate(t, string(body))
 	if code != http.StatusOK || res.Refused || res.Session == nil {
 		t.Fatalf("create = %d %+v", code, res)

@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-func (rs *Resumer) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
+func (rs *Resumer) SessionLinkWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.LinkSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -34,7 +34,7 @@ func (rs *Resumer) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
 // epic Chart has not written yet.
 func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult, error) {
 	if req.Ticket == "" {
-		return sessionRefusal(wire.ReasonSessionBadRequest, "a link needs a ticket address"), nil
+		return Refusal(wire.ReasonSessionBadRequest, "a link needs a ticket address"), nil
 	}
 	dir, meta, res, err := rs.mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
@@ -44,12 +44,12 @@ func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult,
 	if !strings.Contains(ticket, ":") {
 		ticket = meta.Project + ":" + ticket
 	}
-	design := rs.mg.onMapEpic(ticket)
+	design := rs.mg.OnMapEpic(ticket)
 	var info wire.SessionInfo
-	if err := rs.mg.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := rs.mg.UpdateSessionMeta(dir, req.ID, func(m *Meta) bool {
 		m.Ticket, m.Design = ticket, m.Design || design
 		rs.mg.recordConversation(*m)
-		info = m.info()
+		info = m.Info()
 		return true
 	}); err != nil {
 		return wire.SessionResult{}, err
@@ -57,7 +57,7 @@ func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult,
 	return wire.SessionResult{Session: &info}, nil
 }
 
-func (rs *Resumer) sessionStepWrite(w http.ResponseWriter, r *http.Request) {
+func (rs *Resumer) SessionStepWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.ReportStepRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -75,19 +75,19 @@ func (rs *Resumer) sessionStepWrite(w http.ResponseWriter, r *http.Request) {
 // replacing any earlier report.
 func (rs *Resumer) reportSessionStep(req wire.ReportStepRequest) (wire.SessionResult, error) {
 	if req.Step == "" {
-		return sessionRefusal(wire.ReasonSessionBadRequest, "a step report needs a step"), nil
+		return Refusal(wire.ReasonSessionBadRequest, "a step report needs a step"), nil
 	}
 	dir, meta, res, err := rs.mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	if meta.Status.State == wire.SessionExited {
-		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
+		return Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
 	}
 	var info wire.SessionInfo
-	if err := rs.mg.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := rs.mg.UpdateSessionMeta(dir, req.ID, func(m *Meta) bool {
 		m.ReportedStep, m.ReportedTitle = req.Step, req.Title
-		info = m.info()
+		info = m.Info()
 		return true
 	}); err != nil {
 		return wire.SessionResult{}, err
@@ -120,10 +120,10 @@ func (mg *Manager) epicDir(address string) (dir string, ok bool, err error) {
 	return filepath.Join(projectDir, epic), true, nil
 }
 
-// designLaunchTier is the tier of a design-launched session on the map behind
+// DesignLaunchTier is the tier of a design-launched session on the map behind
 // address: strongest while charting or while the destination is unconfirmed,
 // worker at every later step. An unreadable map charts.
-func (mg *Manager) designLaunchTier(address string) ralphloop.Tier {
+func (mg *Manager) DesignLaunchTier(address string) ralphloop.Tier {
 	dir, ok, err := mg.epicDir(address)
 	if err != nil || !ok {
 		return ralphloop.TierStrongest
@@ -135,9 +135,9 @@ func (mg *Manager) designLaunchTier(address string) ralphloop.Tier {
 	return ralphloop.TierWorker
 }
 
-// onMapEpic reports whether address ("project:epic" or "project:epic/NN")
+// OnMapEpic reports whether address ("project:epic" or "project:epic/NN")
 // is on a map epic; an unknown project or epic is not.
-func (mg *Manager) onMapEpic(address string) bool {
+func (mg *Manager) OnMapEpic(address string) bool {
 	dir, ok, err := mg.epicDir(address)
 	return err == nil && ok && tickets.IsMapEpic(dir)
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/sessions"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -53,7 +54,7 @@ func TestLastAssistantText_ReadsACodexRollout(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
-	meta := sessionMeta{Harness: "codex", ConversationID: "conv"}
+	meta := sessions.Meta{Harness: "codex", ConversationID: "conv"}
 
 	text, ok := s.lastAssistantText("s1", meta)
 	if !ok {
@@ -82,7 +83,7 @@ func TestLastAssistantText_CodexTurnKeepsARoundFromAnEarlierMessage(t *testing.T
 	}
 	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
 
-	text, ok := s.lastAssistantText("s1", sessionMeta{Harness: "codex", ConversationID: "conv"})
+	text, ok := s.lastAssistantText("s1", sessions.Meta{Harness: "codex", ConversationID: "conv"})
 	if !ok || !grillround.HasMarker(text) || strings.Contains(text, "old turn") {
 		t.Errorf("text = %q, ok %v; want the last turn's round", text, ok)
 	}
@@ -114,7 +115,7 @@ func replyWithModel(model string) string {
 func TestSessionInfoModel_ReportedBeatsSavedAndNewestReplyWins(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"), replyWithModel("claude-sonnet-5-5"))
-	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "sonnet", Effort: "high"}
+	meta := sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "sonnet", Effort: "high"}
 	info := s.SessionInfo(meta)
 	if info.Model != "claude-sonnet-5-5" || info.Tier != "worker" || info.Effort != "high" {
 		t.Errorf("tier/model/effort = %q/%q/%q, want worker/claude-sonnet-5-5/high", info.Tier, info.Model, info.Effort)
@@ -124,7 +125,7 @@ func TestSessionInfoModel_ReportedBeatsSavedAndNewestReplyWins(t *testing.T) {
 func TestSessionInfoModel_TierAloneUntilFirstReply(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`)
-	info := s.SessionInfo(sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "light"})
+	info := s.SessionInfo(sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "light"})
 	if info.Tier != "light" || info.Model != "" {
 		t.Errorf("tier/model = %q/%q, want light and no model", info.Tier, info.Model)
 	}
@@ -132,7 +133,7 @@ func TestSessionInfoModel_TierAloneUntilFirstReply(t *testing.T) {
 
 func TestSessionInfoModel_OldMetaShowsTheReportedModelOnceItReplies(t *testing.T) {
 	t.Parallel()
-	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
+	meta := sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
 	replied := modelTestServer(t, "/work/proj", replyWithModel("claude-sonnet-5-5")).SessionInfo(meta)
 	if replied.Model != "claude-sonnet-5-5" || replied.Tier != "" || replied.Effort != "" {
 		t.Errorf("tier/model/effort = %q/%q/%q, want no tier or effort and claude-sonnet-5-5", replied.Tier, replied.Model, replied.Effort)
@@ -146,7 +147,7 @@ func TestSessionInfoModel_OldMetaShowsTheReportedModelOnceItReplies(t *testing.T
 func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"))
-	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
+	meta := sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
 	if got := s.SessionInfo(meta).Model; got != "claude-opus-5-5" {
 		t.Fatalf("model = %q, want claude-opus-5-5", got)
 	}
@@ -172,7 +173,7 @@ func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
 func TestSessionInfoModel_CodexKeepsSavedValues(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"))
-	info := s.SessionInfo(sessionMeta{Harness: "codex", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "gpt-5", Effort: "low"})
+	info := s.SessionInfo(sessions.Meta{Harness: "codex", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "gpt-5", Effort: "low"})
 	if info.Model != "gpt-5" || info.Effort != "low" || info.ModelSwitched {
 		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-5/low/false", info.Model, info.Effort, info.ModelSwitched)
 	}
@@ -192,7 +193,7 @@ func TestSessionInfoModel_CodexReadsTheNewestRolloutTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := withChat(withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}))
-	info := s.SessionInfo(sessionMeta{Harness: "codex", ConversationID: "conv", Tier: "worker", Model: "gpt-6.1-sol", Effort: "low"})
+	info := s.SessionInfo(sessions.Meta{Harness: "codex", ConversationID: "conv", Tier: "worker", Model: "gpt-6.1-sol", Effort: "low"})
 	if info.Model != "gpt-6.1-terra" || info.Effort != "high" || !info.ModelSwitched {
 		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-6.1-terra/high/true", info.Model, info.Effort, info.ModelSwitched)
 	}
@@ -200,8 +201,8 @@ func TestSessionInfoModel_CodexReadsTheNewestRolloutTurn(t *testing.T) {
 
 func TestSessionInfoModel_ModelSwitchedNote(t *testing.T) {
 	t.Parallel()
-	meta := func(model string) sessionMeta {
-		return sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: model}
+	meta := func(model string) sessions.Meta {
+		return sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: model}
 	}
 	for name, tc := range map[string]struct {
 		launched string
@@ -255,7 +256,7 @@ func TestFixAgentPrompt_TypesTheSessionsPrefix(t *testing.T) {
 		"claude": "/gx-investigate gx:e/01 is in error",
 		"codex":  "$gx-investigate gx:e/01 is in error",
 	} {
-		if got := fixAgentPrompt(agent, "gx:e/01", tk); got != want {
+		if got := sessions.FixAgentPrompt(agent, "gx:e/01", tk); got != want {
 			t.Errorf("%s prompt = %q, want %q", agent, got, want)
 		}
 	}

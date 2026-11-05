@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -92,7 +93,7 @@ func (s *Server) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) e
 	if err != nil {
 		return err
 	}
-	re, ok := runner.(reattacher)
+	re, ok := runner.(sessions.Reattacher)
 	if !ok {
 		return fmt.Errorf("%w: runner %s cannot reattach", errHandleMismatch, t.Runner)
 	}

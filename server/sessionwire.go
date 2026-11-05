@@ -1,46 +1,46 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 )
 
 // newManager copies the fields it needs from s at call time, so s must have
 // them set (projects, harness and sessionChat come late in New).
-func newManager(s *Server) *Manager {
-	return &Manager{
-		cfg: SessionsConfig{
+func newManager(s *Server) *sessions.Manager {
+	return sessions.NewManager(sessions.ManagerDeps{
+		Cfg: sessions.SessionsConfig{
 			SessionsDir: s.cfg.SessionsDir, ConversationsDir: s.cfg.ConversationsDir,
 			TicketStore: s.cfg.TicketStore, Env: s.cfg.Env, Holder: s.cfg.Holder,
 			Notifier: s.cfg.Notifier, Player: s.cfg.Player,
 			SessionBannerDelay: s.cfg.SessionBannerDelay, SessionExitCleanupDelay: s.cfg.SessionExitCleanupDelay,
 		},
-		log:      s.log,
-		events:   s.events,
-		projects: s.projects,
-		settings: &s.settings,
-		harness:  s.harness,
-		idx:      s.idx,
-		chat:     s.sessionChat,
-		focus:    s.focus,
-		afk:      s.afk,
-		alerts:   s.chat,
-		host:     s,
-		watches:  newSessionWatches(),
-		prompter: serverPrompter{s},
-		designs:  s,
-		rollouts: s,
-	}
+		Log:      s.log,
+		Events:   s.events,
+		Projects: s.projects,
+		Settings: &s.settings,
+		Harness:  s.harness,
+		Idx:      s.idx,
+		Chat:     s.sessionChat,
+		Focus:    s.focus,
+		AFK:      s.afk,
+		Alerts:   s.chat,
+		Host:     s,
+		Prompter: serverPrompter{s},
+		Designs:  s,
+		Rollouts: s,
+	})
 }
 
 // newResumer needs s.sessions set.
-func newResumer(s *Server) *Resumer {
-	return &Resumer{mg: s.sessions, host: s}
+func newResumer(s *Server) *sessions.Resumer {
+	return sessions.NewResumer(s.sessions, s)
 }
 
 // serverPrompter is the root's Prompter.
 type serverPrompter struct{ s *Server }
 
-func (p serverPrompter) NewFirstPrompt(dir, id string, run int) FirstPrompt {
+func (p serverPrompter) NewFirstPrompt(dir, id string, run int) sessions.FirstPrompt {
 	return p.s.newFirstPrompt(dir, id, run)
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
@@ -49,17 +50,17 @@ func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
 // sessions only: it types /clear and /gx-design. It skips the draft guard:
 // gx.follow-ups/07 tracks that.
 func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wire.SessionResult, error) {
-	s.sessions.watches.metaMu.Lock()
-	defer s.sessions.watches.metaMu.Unlock()
+	s.sessions.Watches.MetaMu.Lock()
+	defer s.sessions.Watches.MetaMu.Unlock()
 	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	if req.Continue && !meta.Design {
-		return sessionRefusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if !s.settings.Load().HasChatReader(meta.Harness) {
-		return sessionRefusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
+		return sessions.Refusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
 	text, refusal := wire.ValidatePromptText(req.Text, "text")
 	if !req.Continue {
@@ -67,7 +68,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 			return *refusal, nil
 		}
 		if text == "" {
-			return sessionRefusal(wire.ReasonEmptyPrompt, "text to type is required"), nil
+			return sessions.Refusal(wire.ReasonEmptyPrompt, "text to type is required"), nil
 		}
 	}
 	if source == promptSourceWeb {
@@ -76,11 +77,11 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 			return wire.SessionResult{}, err
 		}
 		if last != req.LastMessage {
-			return sessionRefusal(wire.ReasonStale, "the conversation moved; review it first"), nil
+			return sessions.Refusal(wire.ReasonStale, "the conversation moved; review it first"), nil
 		}
 	}
-	if st := meta.info().Status; !st.Promptable() {
-		return sessionRefusal(wire.ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
+	if st := meta.Info().Status; !st.Promptable() {
+		return sessions.Refusal(wire.ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
 	}
 	ev := ralphloop.Event{
 		Time: time.Now(), Type: string(events.SessionPrompted),
@@ -90,28 +91,28 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 		// The server builds the slash commands, so the prefix rule stays closed
 		// to the page.
 		action := chat.DesignContinueAction(meta.Ticket, meta.Harness)
-		if res, refused := s.resumer.handoffRefusal(meta, action); refused {
+		if res, refused := s.resumer.HandoffRefusal(meta, action); refused {
 			return res, nil
 		}
 		s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you continued")
 		meta.Actionable = wire.SessionActionable{}
 		meta.AutoSends = 0
-		if err := writeSessionMeta(dir, meta); err != nil {
+		if err := sessions.WriteMeta(dir, meta); err != nil {
 			return wire.SessionResult{}, err
 		}
 		s.events.Publish(wire.EventSessionChanged, req.ID)
-		s.resumer.startContinue(dir, meta, "Continue", action)
+		s.resumer.StartContinue(dir, meta, "Continue", action)
 		ev.Action = "continue"
 		for _, a := range action {
 			ev.Bytes += len(a)
 		}
 	} else {
-		s.sessions.watches.start(func() { s.sendPrompt(dir, text) })
+		s.sessions.Watches.Start(func() { s.sendPrompt(dir, text) })
 		if name, ok := renameCommandArg(text); ok && name != meta.Name {
 			// The harness renames itself, but a typed name never follows the
 			// terminal title, so the Agents tab would keep the old one.
 			meta.Name, meta.AutoName = name, false
-			if err := writeSessionMeta(dir, meta); err != nil {
+			if err := sessions.WriteMeta(dir, meta); err != nil {
 				return wire.SessionResult{}, err
 			}
 			s.events.Publish(wire.EventSessionChanged, req.ID)
@@ -123,14 +124,14 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if err := ralphloop.AppendServerEvent(s.cfg.TicketStore, ev); err != nil {
 		s.log.Warn("logging session prompt", "session", req.ID, "err", err)
 	}
-	info := meta.info()
+	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
 }
 
 // notePersonTyped records a person's input on a session: it stops a running
 // auto-advance countdown, resets the auto-send count and clears a derived
 // Continue. The caller holds metaMu.
-func (s *Server) notePersonTyped(dir string, meta sessionMeta, why string) error {
+func (s *Server) notePersonTyped(dir string, meta sessions.Meta, why string) error {
 	stopped := s.cancelAutoAdvance(meta.ID, why)
 	changed := meta.AutoSends != 0
 	meta.AutoSends = 0
@@ -141,7 +142,7 @@ func (s *Server) notePersonTyped(dir string, meta sessionMeta, why string) error
 	if !changed {
 		return nil
 	}
-	if err := writeSessionMeta(dir, meta); err != nil {
+	if err := sessions.WriteMeta(dir, meta); err != nil {
 		return err
 	}
 	s.events.Publish(wire.EventSessionChanged, meta.ID)
@@ -150,7 +151,7 @@ func (s *Server) notePersonTyped(dir string, meta sessionMeta, why string) error
 
 // lastChatMessageID is the id of the newest visible message of the session's
 // chat, or "" with none.
-func (s *Server) lastChatMessageID(id string, meta sessionMeta) (string, error) {
+func (s *Server) lastChatMessageID(id string, meta sessions.Meta) (string, error) {
 	path, kind, ok := s.sessionChat.Transcript(id, chatMeta(meta))
 	if !ok {
 		return "", nil

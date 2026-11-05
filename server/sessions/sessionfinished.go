@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"path/filepath"

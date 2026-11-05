@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"cmp"
@@ -10,7 +10,7 @@ import (
 )
 
 // focusReports holds the latest report of each connected TUI.
-type focusReports struct {
+type FocusReports struct {
 	mu sync.Mutex
 	// streams counts each client's open event streams; a reconnect can
 	// overlap the stream it replaces.
@@ -23,18 +23,18 @@ type focusReports struct {
 	lastTerm string
 }
 
-func newFocusReports() *focusReports {
-	return &focusReports{streams: map[string]int{}, reports: map[string]wire.FocusReport{}}
+func NewFocusReports() *FocusReports {
+	return &FocusReports{streams: map[string]int{}, reports: map[string]wire.FocusReport{}}
 }
 
-func (f *focusReports) connect(client string) {
+func (f *FocusReports) Connect(client string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.streams[client]++
 }
 
-// disconnect drops the client's report with its last stream.
-func (f *focusReports) disconnect(client string) {
+// Disconnect drops the client's report with its last stream.
+func (f *FocusReports) Disconnect(client string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.streams[client]--; f.streams[client] > 0 {
@@ -45,7 +45,7 @@ func (f *focusReports) disconnect(client string) {
 }
 
 // report saves r, reporting false when its client has no open stream.
-func (f *focusReports) report(r wire.FocusReport) bool {
+func (f *FocusReports) report(r wire.FocusReport) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.streams[r.Client] == 0 {
@@ -62,7 +62,7 @@ func (f *focusReports) report(r wire.FocusReport) bool {
 
 // focusedClient is the most recently focused TUI, or empty when it has
 // disconnected.
-func (f *focusReports) focusedClient() string {
+func (f *FocusReports) focusedClient() string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if _, connected := f.reports[f.lastFocused]; !connected {
@@ -73,7 +73,7 @@ func (f *focusReports) focusedClient() string {
 
 // clickTarget is the terminal of the most recently focused TUI and whether
 // that TUI is still connected.
-func (f *focusReports) clickTarget() (termProgram string, connected bool) {
+func (f *FocusReports) clickTarget() (termProgram string, connected bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	_, connected = f.reports[f.lastFocused]
@@ -81,16 +81,16 @@ func (f *focusReports) clickTarget() (termProgram string, connected bool) {
 }
 
 // onScreen reports whether a focused TUI or web tab has the session on screen.
-func (f *focusReports) onScreen(session string) bool {
+func (f *FocusReports) onScreen(session string) bool {
 	return f.anyFocused(session, false)
 }
 
 // webOnScreen reports whether a visible web tab has the session on screen.
-func (f *focusReports) webOnScreen(session string) bool {
+func (f *FocusReports) webOnScreen(session string) bool {
 	return f.anyFocused(session, true)
 }
 
-func (f *focusReports) anyFocused(session string, webOnly bool) bool {
+func (f *FocusReports) anyFocused(session string, webOnly bool) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, r := range f.reports {
@@ -101,13 +101,13 @@ func (f *focusReports) anyFocused(session string, webOnly bool) bool {
 	return false
 }
 
-func (mg *Manager) sessionFocusWrite(w http.ResponseWriter, r *http.Request) {
+func (mg *Manager) SessionFocusWrite(w http.ResponseWriter, r *http.Request) {
 	mg.focusWrite(w, r, false)
 }
 
-// sessionFocusWriteWeb is sessionFocusWrite for the web mux: the report is a
+// SessionFocusWriteWeb is sessionFocusWrite for the web mux: the report is a
 // web tab's.
-func (mg *Manager) sessionFocusWriteWeb(w http.ResponseWriter, r *http.Request) {
+func (mg *Manager) SessionFocusWriteWeb(w http.ResponseWriter, r *http.Request) {
 	mg.focusWrite(w, r, true)
 }
 
@@ -130,7 +130,7 @@ func (mg *Manager) focusWrite(w http.ResponseWriter, r *http.Request, web bool) 
 // reads it.
 func (mg *Manager) reportFocus(req wire.FocusReport) (wire.SessionResult, error) {
 	if req.Client == "" {
-		return sessionRefusal(wire.ReasonSessionBadRequest, "a focus report needs a client"), nil
+		return Refusal(wire.ReasonSessionBadRequest, "a focus report needs a client"), nil
 	}
 	if req.Session != "" {
 		if _, _, res, err := mg.SessionDir(req.Session); res.Refused || err != nil {
@@ -138,23 +138,23 @@ func (mg *Manager) reportFocus(req wire.FocusReport) (wire.SessionResult, error)
 		}
 	}
 	if !mg.focus.report(req) {
-		return sessionRefusal(wire.ReasonFocusNotConnected, "client "+req.Client+" has no open event stream"), nil
+		return Refusal(wire.ReasonFocusNotConnected, "client "+req.Client+" has no open event stream"), nil
 	}
 	if !req.Focused || req.Session == "" {
 		return wire.SessionResult{}, nil
 	}
-	return mg.markSessionRead(wire.SessionRequest{ID: req.Session})
+	return mg.MarkSessionRead(wire.SessionRequest{ID: req.Session})
 }
 
-// focusSession asks the most recently focused TUI to show the session. With no
+// FocusSession asks the most recently focused TUI to show the session. With no
 // TUI connected it does nothing: the banner click has already brought the
 // terminal forward.
-func (mg *Manager) focusSession(req wire.SessionRequest) (wire.SessionResult, error) {
+func (mg *Manager) FocusSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	_, meta, res, err := mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	info := meta.info()
+	info := meta.Info()
 	client := mg.focus.focusedClient()
 	if client != "" {
 		mg.events.PublishEvent(wire.Event{Type: wire.EventSessionFocus, Address: req.ID, Client: client})
@@ -162,17 +162,17 @@ func (mg *Manager) focusSession(req wire.SessionRequest) (wire.SessionResult, er
 	return wire.SessionResult{Session: &info, Client: client}, nil
 }
 
-// markSessionRead clears the session's Unread.
-func (mg *Manager) markSessionRead(req wire.SessionRequest) (wire.SessionResult, error) {
+// MarkSessionRead clears the session's Unread.
+func (mg *Manager) MarkSessionRead(req wire.SessionRequest) (wire.SessionResult, error) {
 	dir, _, res, err := mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	var info wire.SessionInfo
-	if err := mg.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := mg.UpdateSessionMeta(dir, req.ID, func(m *Meta) bool {
 		changed := m.Unread != wire.SessionUnread{}
 		m.Unread = wire.SessionUnread{}
-		info = m.info()
+		info = m.Info()
 		return changed
 	}); err != nil {
 		return wire.SessionResult{}, err

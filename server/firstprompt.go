@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/sessions"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -105,7 +106,7 @@ func (f *firstPrompt) Stop() { f.clock.stop() }
 // Starting at the deadline.
 func (f *firstPrompt) startTimedOut() {
 	var prompt string
-	f.s.sessions.updateSessionMetaOrWarn(f.dir, f.id, func(m *sessionMeta) bool {
+	f.s.sessions.UpdateSessionMetaOrWarn(f.dir, f.id, func(m *sessions.Meta) bool {
 		starting := m.Status.State == "" || m.Status.State == wire.SessionStarting
 		if m.Run != f.run || m.FirstPrompt == "" || !starting {
 			return false
@@ -226,7 +227,7 @@ func (f *firstPrompt) markTyped() {
 // person's input.
 func (f *firstPrompt) Start(signal, prompt string) {
 	f.log.Info("first prompt ready", "signal", signal, "len", len(prompt), "head", promptHead(prompt))
-	f.s.sessions.watches.start(func() {
+	f.s.sessions.Watches.Start(func() {
 		err := f.deliver(prompt)
 		switch {
 		case errors.Is(err, errNudgeCancelled):
@@ -271,7 +272,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 		f.log.Debug("first prompt nudge", "decision", string(d))
 	}
 	err = claudeui.PromptWithNudge(p, prompt, caps, time.Time{}, time.Now, report)
-	if f.s.sessions.watches.isStopped() && err != nil {
+	if f.s.sessions.Watches.IsStopped() && err != nil {
 		return nil
 	}
 	return err
@@ -312,7 +313,7 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 // transcript, resending while it did not. Other harnesses write no such
 // transcript, so they keep the unchecked send.
 func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
-	meta, err := readSessionMeta(f.dir)
+	meta, err := sessions.ReadMeta(f.dir)
 	if err != nil || (meta.Harness != "" && meta.Harness != string(harness.Claude)) {
 		return nil
 	}
@@ -352,7 +353,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 			select {
 			case <-f.cancel:
 				return errNudgeCancelled
-			case <-f.s.sessions.watches.stop:
+			case <-f.s.sessions.Watches.Stop:
 				return errServerStopping
 			default:
 			}
@@ -367,7 +368,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 	go func() {
 		select {
 		case <-f.cancel:
-		case <-f.s.sessions.watches.stop:
+		case <-f.s.sessions.Watches.Stop:
 		case <-ctx.Done():
 		}
 		stop()
@@ -478,7 +479,7 @@ func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {
 			return true, nil
 		case <-p.f.cancel:
 			return false, errNudgeCancelled
-		case <-p.f.s.sessions.watches.stop:
+		case <-p.f.s.sessions.Watches.Stop:
 			return false, errors.New("server stopping")
 		case <-deadline:
 			return false, nil

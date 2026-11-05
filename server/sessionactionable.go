@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
@@ -35,19 +36,19 @@ func (s *Server) sessionActionableWrite(w http.ResponseWriter, r *http.Request) 
 // earlier one.
 func (s *Server) markSessionActionable(req wire.MarkActionableRequest) (wire.SessionResult, error) {
 	if req.Reason == "" {
-		return sessionRefusal(wire.ReasonSessionBadRequest, "an actionable needs a reason"), nil
+		return sessions.Refusal(wire.ReasonSessionBadRequest, "an actionable needs a reason"), nil
 	}
 	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	if meta.Status.State == wire.SessionExited {
-		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
+		return sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
 	}
 	var info wire.SessionInfo
-	if err := s.sessions.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := s.sessions.UpdateSessionMeta(dir, req.ID, func(m *sessions.Meta) bool {
 		m.Actionable = wire.SessionActionable{Reason: req.Reason, Action: req.Action}
-		info = m.info()
+		info = m.Info()
 		return true
 	}); err != nil {
 		return wire.SessionResult{}, err
@@ -88,7 +89,7 @@ func (s *Server) designFinal(ticket string) bool {
 
 // lastAssistantText reads the session's last assistant message from its claude
 // transcript, or from its codex rollout.
-func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
+func (s *Server) lastAssistantText(id string, meta sessions.Meta) (string, bool) {
 	if meta.Harness == string(harness.Codex) {
 		text, ok, err := s.projects.LastCodexText(meta.ConversationID)
 		if err != nil {
@@ -112,9 +113,9 @@ func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
 // and clears a derived one it no longer matches. A GxRaised one is never
 // touched.
 func (s *Server) detectDesignActionable(dir, id string, design chat.DesignRef) {
-	meta, err := readSessionMeta(dir)
+	meta, err := sessions.ReadMeta(dir)
 	if err != nil {
-		meta = sessionMeta{}
+		meta = sessions.Meta{}
 	}
 	meta.ConversationID = design.Conversation
 	text, ok := s.lastAssistantText(id, meta)
@@ -124,7 +125,7 @@ func (s *Server) detectDesignActionable(dir, id string, design chat.DesignRef) {
 	s.fileBadRoundBlocks(id, design, text)
 	a, matched := designActionable(text, design.Ticket, meta.Harness, s.designFinal(design.Ticket))
 	outcome := actionableNone
-	s.sessions.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
+	s.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		var next wire.SessionActionable
 		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: maxAutoSends})
 		if outcome == actionableNone {
@@ -175,7 +176,7 @@ type actionablePolicy struct {
 // Actionable cur's meta should hold after a turn that matched a (or did not),
 // and what to do about it. A GxRaised one, or a session not waiting for the
 // person, is never touched.
-func decideActionable(cur sessionMeta, a wire.SessionActionable, matched bool, p actionablePolicy) (wire.SessionActionable, actionableOutcome) {
+func decideActionable(cur sessions.Meta, a wire.SessionActionable, matched bool, p actionablePolicy) (wire.SessionActionable, actionableOutcome) {
 	old := cur.Actionable
 	if !cur.Status.Promptable() || old.GxRaised {
 		return old, actionableNone
@@ -190,7 +191,7 @@ func decideActionable(cur sessionMeta, a wire.SessionActionable, matched bool, p
 		return old, actionableNone
 	}
 	cur.Actionable = a
-	if !p.Live || !cur.canAutoAdvance() {
+	if !p.Live || !cur.CanAutoAdvance() {
 		return a, actionableRaised
 	}
 	if cur.AutoSends >= p.MaxAutoSends {
@@ -204,7 +205,7 @@ func decideActionable(cur sessionMeta, a wire.SessionActionable, matched bool, p
 func (s *Server) raiseGxActionable(dir, reason string, action []string) {
 	id := filepath.Base(dir)
 	raised := false
-	s.sessions.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
+	s.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		if m.Status.State == wire.SessionExited {
 			return false
 		}

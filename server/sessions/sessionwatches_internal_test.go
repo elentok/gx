@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"testing"
@@ -9,11 +9,11 @@ import (
 // in-flight launch only if close ends it.
 func TestSessionWatches_CloseCancelsTheLaunchContext(t *testing.T) {
 	t.Parallel()
-	w := newSessionWatches()
-	ctx, release := w.context()
+	w := NewSessionWatches()
+	ctx, release := w.Context()
 	defer release()
 
-	w.close()
+	w.Close()
 
 	select {
 	case <-ctx.Done():

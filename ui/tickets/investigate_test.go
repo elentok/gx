@@ -6,7 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -29,7 +29,7 @@ func TestInvestigate_NameTakenSelectsTheExistingFixAgent(t *testing.T) {
 		fixAgent: wire.FixAgentResult{SessionResult: wire.SessionResult{Refused: true, Reason: wire.ReasonSessionNameTaken}},
 		snap: wire.Snapshot{Sessions: []wire.SessionInfo{
 			{ID: "other", Name: "alpha"},
-			{ID: "fix-1", Name: server.FixAgentName("gx:map/01")},
+			{ID: "fix-1", Name: sessions.FixAgentName("gx:map/01")},
 		}},
 	}
 

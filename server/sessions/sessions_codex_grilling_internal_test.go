@@ -1,4 +1,4 @@
-package server
+package sessions
 
 import (
 	"log/slog"
@@ -17,14 +17,14 @@ func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 	home := t.TempDir()
 	codexHome := t.TempDir()
 	root := t.TempDir()
-	m := sessionMeta{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
+	m := Meta{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
 	env := []string{"HOME=" + home, "CODEX_HOME=" + codexHome}
 	log := slog.New(slog.DiscardHandler)
 	mg := &Manager{
 		cfg:      SessionsConfig{ConversationsDir: root, Env: env},
 		log:      log,
 		projects: projects.NewRegistry(func() projects.Env { return projects.Env{Env: env} }, log, nil, &settings.Holder{}, nil, nil),
-		watches:  newSessionWatches(),
+		Watches:  NewSessionWatches(),
 	}
 	mg.recordConversation(m)
 

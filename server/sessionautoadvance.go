@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -16,7 +17,7 @@ func (s *Server) sessionAutoAdvanceWrite(w http.ResponseWriter, r *http.Request)
 // the state token of the session the page saw.
 func (s *Server) sessionAutoAdvanceWeb() http.HandlerFunc {
 	return s.sessionAutoAdvanceHandler(func(req wire.AutoAdvanceRequest) (wire.SessionResult, error) {
-		return s.sessions.checkDesignWrite(wire.SessionRequest{ID: req.ID, State: req.State})
+		return s.sessions.CheckDesignWrite(wire.SessionRequest{ID: req.ID, State: req.State})
 	})
 }
 
@@ -49,17 +50,6 @@ func (s *Server) sessionAutoAdvanceHandler(guard func(wire.AutoAdvanceRequest) (
 	}
 }
 
-// canAutoAdvance is the one rule for whether the session's raised Actionable
-// may be sent by the server: the switch is on, it is a derived Continue (not a
-// grilling round, not agent- or gx-raised), the session waits for the person,
-// whatever its harness. Call sites add their own conditions: the
-// detector needs a live turn and the cap, the switch needs no countdown running.
-func (m sessionMeta) canAutoAdvance() bool {
-	a := m.Actionable
-	return !m.AutoAdvanceOff && a.Derived && !a.Grilling && len(a.Action) > 0 &&
-		m.Status.Promptable()
-}
-
 // setAutoAdvance flips a Design session's auto-advance switch. Turning it off
 // stops a running countdown.
 func (s *Server) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult, error) {
@@ -68,15 +58,15 @@ func (s *Server) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult
 		return res, err
 	}
 	if !meta.Design {
-		return sessionRefusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	var info wire.SessionInfo
 	start := false
-	if err := s.sessions.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := s.sessions.UpdateSessionMeta(dir, req.ID, func(m *sessions.Meta) bool {
 		m.AutoAdvanceOff = req.Off
 		m.AutoSends = 0
-		start = m.canAutoAdvance() && s.autoAdvances.deadline(req.ID).IsZero()
-		info = m.info()
+		start = m.CanAutoAdvance() && s.autoAdvances.deadline(req.ID).IsZero()
+		info = m.Info()
 		return true
 	}); err != nil {
 		return wire.SessionResult{}, err
