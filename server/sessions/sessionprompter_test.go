@@ -1,4 +1,4 @@
-package server
+package sessions_test
 
 import (
 	"github.com/elentok/gx/server/sessions"
@@ -23,13 +23,12 @@ func (f fakePrompter) SendAction(_, _ string, action []string)               { f
 
 func TestStartContinue_SendsTheActionThroughThePrompter(t *testing.T) {
 	t.Parallel()
-	s := &Server{}
 	fake := fakePrompter{sent: make(chan []string, 1)}
-	s.sessions = sessions.NewManager(sessions.ManagerDeps{Prompter: fake})
-	t.Cleanup(s.sessions.Watches.Close)
+	mg := sessions.NewManager(sessions.ManagerDeps{Prompter: fake})
+	t.Cleanup(mg.Watches.Close)
 
 	action := []string{"/continue"}
-	newResumer(s).StartContinue(t.TempDir(), sessions.Meta{ID: "abcdef"}, "Continue", action)
+	sessions.NewResumer(mg, nil).StartContinue(t.TempDir(), sessions.Meta{ID: "abcdef"}, "Continue", action)
 
 	select {
 	case got := <-fake.sent:

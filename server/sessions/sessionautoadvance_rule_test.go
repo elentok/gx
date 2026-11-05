@@ -1,4 +1,4 @@
-package server
+package sessions_test
 
 import (
 	"testing"
