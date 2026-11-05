@@ -209,6 +209,22 @@ const (
 	ReasonPromptTextTooLong         = "text-too-long"
 )
 
+// Refusal reasons of POST /v1/sessions/images.
+const (
+	ReasonImageTypeNotAllowed = "image-type-not-allowed"
+	ReasonImageTooLarge       = "image-too-large"
+)
+
+// SessionImageResult is the answer of POST /v1/sessions/images. ID names the
+// saved Prompt image; Name is its file name in the session's images folder.
+type SessionImageResult struct {
+	ID      string `json:"id,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Refused bool   `json:"refused,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
 // SessionPromptRequest is the body of POST /v1/sessions/prompt. LastMessage is
 // the id of the last chat message the page saw; the web mux refuses a send once
 // the transcript has moved past it.

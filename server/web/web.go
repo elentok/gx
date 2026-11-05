@@ -184,11 +184,12 @@ func (w *Web) handler() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		routes := w.host.Routes()
 		if !w.isRead(r) {
-			if reason := checkWriteRequest(r); reason != "" {
+			route, ok := FindRoute(routes, r.Method+" "+r.URL.Path, wire.WebWrite, wire.WebPublic)
+			if reason := checkWriteRequest(r, ok && route.RawBody); reason != "" {
 				http.Error(rw, reason, http.StatusForbidden)
 				return
 			}
-			if route, ok := FindRoute(routes, r.Method+" "+r.URL.Path, wire.WebWrite, wire.WebPublic); ok {
+			if ok {
 				serveRoute(route)(rw, r)
 				return
 			}

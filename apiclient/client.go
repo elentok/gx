@@ -136,18 +136,23 @@ func (c *Client) Handshake(ctx context.Context) (wire.Handshake, error) {
 }
 
 func (c *transport) post(ctx context.Context, path string, req, res any) error {
-	if err := c.checkWrite(); err != nil {
-		return err
-	}
 	body, err := json.Marshal(req)
 	if err != nil {
+		return err
+	}
+	return c.postBody(ctx, path, "application/json", body, res)
+}
+
+// postBody posts body as is, with the given content type.
+func (c *transport) postBody(ctx context.Context, path, contentType string, body []byte, res any) error {
+	if err := c.checkWrite(); err != nil {
 		return err
 	}
 	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://gx"+path, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
-	hreq.Header.Set("Content-Type", "application/json")
+	hreq.Header.Set("Content-Type", contentType)
 	c.setOrigin(hreq)
 	resp, err := c.http.Do(hreq)
 	if err != nil {

@@ -26,6 +26,9 @@ type Route struct {
 	Handler    http.HandlerFunc // the socket mux; nil for a web-only route
 	Web        WebMode
 	WebHandler http.HandlerFunc // the web variant of a write, or nil
+	// RawBody marks a write whose body is not JSON. The web mux keeps its login
+	// and Origin checks for it and drops only the JSON content-type rule.
+	RawBody bool
 }
 
 // WriteJSON writes v as a JSON response body.

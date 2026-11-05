@@ -19,8 +19,10 @@ import (
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the
 // CSRF guard: a cross-site form post cannot set a JSON content type, and a
 // cross-site fetch cannot forge a same-host Origin. Origin and Host are
-// compared on host and port; the scheme is ignored.
-func checkWriteRequest(r *http.Request) string {
+// compared on host and port; the scheme is ignored. A rawBody route (see
+// wire.Route.RawBody) skips the content-type rule: a cross-site fetch still
+// cannot forge the Origin.
+func checkWriteRequest(r *http.Request, rawBody bool) string {
 	origin := r.Header.Get("Origin")
 	if origin == "" || origin == "null" {
 		return "missing or opaque Origin"
@@ -28,6 +30,9 @@ func checkWriteRequest(r *http.Request) string {
 	u, err := url.Parse(origin)
 	if err != nil || u.Host == "" || !strings.EqualFold(u.Host, r.Host) {
 		return "Origin does not match Host"
+	}
+	if rawBody {
+		return ""
 	}
 	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
 		return "Content-Type must be application/json"

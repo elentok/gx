@@ -3,6 +3,7 @@ package prompt
 import (
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -102,6 +103,9 @@ type Prompt struct {
 	resumer *sessions.Resumer
 
 	autoAdvances autoAdvances
+
+	// imageMu orders the numbering of a session's Prompt images.
+	imageMu sync.Mutex
 }
 
 // New builds Prompt from d.

@@ -1964,6 +1964,23 @@ export const ReasonPromptTextTooLong = "text-too-long";
  * Refusal reasons of the session prompt route, beside the session ones.
  */
 export type ReasonPrompt = typeof ReasonPromptHarnessNotSupported | typeof ReasonPromptPrefixNotAllowed | typeof ReasonPromptTextTooLong;
+export const ReasonImageTypeNotAllowed = "image-type-not-allowed";
+export const ReasonImageTooLarge = "image-too-large";
+/**
+ * Refusal reasons of POST /v1/sessions/images.
+ */
+export type ReasonImageT = typeof ReasonImageTypeNotAllowed | typeof ReasonImageTooLarge;
+/**
+ * SessionImageResult is the answer of POST /v1/sessions/images. ID names the
+ * saved Prompt image; Name is its file name in the session's images folder.
+ */
+export interface SessionImageResult {
+  id?: string;
+  name?: string;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
 /**
  * SessionPromptRequest is the body of POST /v1/sessions/prompt. LastMessage is
  * the id of the last chat message the page saw; the web mux refuses a send once

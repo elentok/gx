@@ -46,6 +46,12 @@ func Routes(get func() *Prompt) []wire.Route {
 			},
 		},
 		{
+			Pattern: "POST /v1/sessions/images",
+			Web:     wire.WebWrite,
+			RawBody: true,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().imageUploadHandler(w, r) },
+		},
+		{
 			Pattern: "POST /v1/sessions/actionable",
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().actionableWrite(w, r) },
 		},

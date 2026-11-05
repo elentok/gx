@@ -142,6 +142,14 @@ func (s *Sessions) Prompt(ctx context.Context, req wire.SessionPromptRequest) (w
 	return res, err
 }
 
+// AddImage saves one Prompt image, as its raw bytes, in a live session's
+// state folder. A refusal is a result (Refused set), not an error.
+func (s *Sessions) AddImage(ctx context.Context, id string, data []byte) (wire.SessionImageResult, error) {
+	var res wire.SessionImageResult
+	err := s.t.postBody(ctx, "/v1/sessions/images?id="+url.QueryEscape(id), "application/octet-stream", data, &res)
+	return res, err
+}
+
 // Keys sends a named key or literal text to a live session. A refusal is a
 // result (Refused set), not an error.
 func (s *Sessions) Keys(ctx context.Context, req wire.SessionKeysRequest) (wire.SessionResult, error) {

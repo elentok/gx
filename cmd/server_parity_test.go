@@ -105,6 +105,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/sessions/run-action":          "agents run-action",
 	"POST /v1/sessions/resume":              "agents resume",
 	"POST /v1/sessions/prompt":              "agents prompt",
+	"POST /v1/sessions/images":              "agents image add",
 	"POST /v1/sessions/interrupt":           "agents interrupt",
 	"POST /v1/sessions/auto-advance":        "agents auto-advance",
 	"POST /v1/sessions/auto-advance/cancel": "agents auto-advance-cancel",
