@@ -32,7 +32,7 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no ticket "+address, http.StatusNotFound)
 		return
 	}
-	ref, ok, err := s.writer.FindTicket(address)
+	ref, ok, err := s.epics.Writer.FindTicket(address)
 	switch {
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -61,14 +61,14 @@ func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	d := newTicketDetail(ref)
 	fillHeader(&d, ref, t)
 	if t.Status == schema.StatusClaimed {
-		d.WaitingLabel = s.CheckWaitingLabel(ref.Addr.String())
+		d.WaitingLabel = s.epics.CheckWaitingLabel(ref.Addr.String())
 	}
 	if t.LongTicketTurns > 0 {
-		d.LongTicketTurns, d.LongTicketThreshold = t.LongTicketTurns, s.settings.Load().LongTicketTurns
+		d.LongTicketTurns, d.LongTicketThreshold = t.LongTicketTurns, s.epics.Settings.Load().LongTicketTurns
 	}
 	if !ref.Epic.IsMap {
 		d.Stats = s.detailStats(ref)
-		_, d.HasScreen = s.sessionChat.TicketPtyDir(ref.Addr)
+		_, d.HasScreen = s.epics.Chat.TicketPtyDir(ref.Addr)
 		var writtenAt time.Time
 		if t.Status == schema.StatusCancelled {
 			writtenAt = ticketWrittenAt(ref.Ticket.Path)
@@ -77,7 +77,7 @@ func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 			return wire.TicketDetail{}, err
 		}
 	}
-	epics, err := s.projects.Epics(ref.Addr.Project)
+	epics, err := s.epics.Projects.Epics(ref.Addr.Project)
 	if err != nil {
 		return wire.TicketDetail{}, err
 	}
@@ -113,7 +113,7 @@ func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == wire.RoundAnswered
 	d.Chat = roundChat(latest)
 	if t.PausedClass() == schema.PauseClassAnswer && t.PauseReason == schema.PauseAmbiguousBase {
-		d.Bases = s.ambiguousBlockers(ref.Addr)
+		d.Bases = s.epics.AmbiguousBlockers(ref.Addr)
 	}
 	return d, nil
 }
@@ -128,7 +128,7 @@ func (s *Server) detailFor(addr string, t schema.Ticket, rounds []tickets.PauseR
 	gone := false
 	if t.PausedClass() != "" {
 		var err error
-		if gone, err = s.agentGone(addr); err != nil {
+		if gone, err = s.epics.AgentGone(addr); err != nil {
 			return nil, err
 		}
 	}
@@ -181,7 +181,7 @@ func fillHeader(d *wire.TicketDetail, ref queue.TicketRef, t schema.Ticket) {
 // A prompt the web cannot approve (a herdr-hosted agent, an unnamed dialog, a
 // tool that needs a real answer) gets a card with a hint and no request ID.
 func (s *Server) permissionCard(addr tickets.Address) (*wire.PermissionCard, error) {
-	runner, sess, ok, err := s.harness.LiveSession(addr)
+	runner, sess, ok, err := s.epics.Harness.LiveSession(addr)
 	if err != nil || !ok {
 		return nil, err
 	}

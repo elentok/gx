@@ -164,7 +164,7 @@ func runEnd(ev ralphloop.Event) string {
 
 // ticketRuns reads the ticket's run lines from its epic's run log.
 func (s *Server) ticketRuns(ref queue.TicketRef, t schema.Ticket, log []tickets.LogEvent, statusWrittenAt time.Time) ([]wire.DetailRun, error) {
-	evs, err := s.idx.ReadHistory(ref.Addr)
+	evs, err := s.epics.History.ReadHistory(ref.Addr)
 	if err != nil {
 		return nil, err
 	}

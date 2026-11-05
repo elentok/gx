@@ -27,9 +27,9 @@ type designActivity struct {
 // tickets; live means not Exited.
 func (s *Server) designActivities() map[string]designActivity {
 	out := map[string]designActivity{}
-	sessions, err := s.sessions.ListSessions()
+	sessions, err := s.epics.Sessions.ListSessions()
 	if err != nil {
-		s.log.Warn("design picker: list sessions", "err", err)
+		s.epics.Log.Warn("design picker: list sessions", "err", err)
 		return out
 	}
 	for _, info := range sessions {

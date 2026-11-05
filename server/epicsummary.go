@@ -17,8 +17,8 @@ import (
 func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 	out := []wire.EpicSummary{}
 	seen := map[queue.RootRef]bool{}
-	recoveryOf := func(addr string) string { return ticketwrite.RecoveryState(s.pauseHold.State(addr), addr, all) }
-	for _, item := range s.queue.List() {
+	recoveryOf := func(addr string) string { return ticketwrite.RecoveryState(s.epics.Pauses.State(addr), addr, all) }
+	for _, item := range s.epics.Queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil {
 			continue
@@ -28,7 +28,7 @@ func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 			continue
 		}
 		seen[root] = true
-		projEpics, err := s.projects.Epics(root.Project)
+		projEpics, err := s.epics.Projects.Epics(root.Project)
 		if err != nil {
 			continue
 		}
@@ -36,7 +36,7 @@ func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 		if i < 0 || projEpics[i].IsMap || !projEpics[i].MergedAt.IsZero() {
 			continue
 		}
-		sum := summarizeEpic(root, projEpics[i], s.registry.StartedAtOf, recoveryOf, queue.ReadLogLenient)
+		sum := summarizeEpic(root, projEpics[i], s.epics.Runs.StartedAtOf, recoveryOf, queue.ReadLogLenient)
 		for j := range sum.Active {
 			sum.Active[j].NeedsApproval = s.needsApproval(sum.Active[j].Address)
 		}

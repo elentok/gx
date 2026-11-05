@@ -61,7 +61,7 @@ func mapListState(e tickets.Epic) wire.EpicListState {
 }
 
 func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(s.epics.TicketStore)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -72,7 +72,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
 		list.Projects = append(list.Projects, project)
-		epics, err := s.projects.Epics(project)
+		epics, err := s.epics.Projects.Epics(project)
 		if err != nil {
 			continue
 		}
@@ -85,7 +85,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		}
 		list.Epics = append(list.Epics, s.projectCards(project, epics, designs, qidx)...)
 	}
-	list.RecentlyFinished = s.settings.Load().RecentlyFinished
+	list.RecentlyFinished = s.epics.Settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
 	sortCards(list.Epics, func(r wire.EpicListRow) int { return r.QueueSlot })
 	writeJSON(w, list)
@@ -185,7 +185,7 @@ func lastActivity(e tickets.Epic) time.Time {
 
 func (s *Server) epicListRow(project string, e tickets.Epic, qidx queueIndex) wire.EpicListRow {
 	root := queue.RootRef{Project: project, Epic: e.Name}
-	queued := s.queue.RootQueued(root)
+	queued := s.epics.Queue.RootQueued(root)
 	queueable := queue.EpicQueueable(e, queued)
 	row := wire.EpicListRow{
 		Address: root.String(), Project: project, Name: e.Name, Kind: wire.EpicKindLoop,
@@ -198,7 +198,7 @@ func (s *Server) epicListRow(project string, e tickets.Epic, qidx queueIndex) wi
 	if e.IsMap {
 		row.Kind = wire.EpicKindMap
 	}
-	row.State = epicListState(e, queued, queueable, epicStateFor(root, e, s.registry.StartedAtOf))
+	row.State = epicListState(e, queued, queueable, epicStateFor(root, e, s.epics.Runs.StartedAtOf))
 	if row.State == wire.EpicListMergeBlocked {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}

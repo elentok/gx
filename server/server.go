@@ -34,6 +34,7 @@ import (
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/disk"
+	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
@@ -167,6 +168,8 @@ type Server struct {
 	resumer     *sessions.Resumer
 	designOpens sync.Map // epic address -> *sync.Mutex, serializing designs open
 	focus       *sessions.FocusReports
+	// epics is everything the epic read models reach for; the one field they use.
+	epics epics.Deps
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -435,6 +438,7 @@ func New(cfg Config) (*Server, error) {
 	s.sessions = newManager(s)
 	s.rec.GiveSessions(s.sessions)
 	s.resumer = newResumer(s)
+	s.epics = s.epicsDeps()
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished
 	}

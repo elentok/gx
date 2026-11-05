@@ -13,7 +13,7 @@ import (
 func (s *Server) detailStats(ref queue.TicketRef) *wire.DetailStats {
 	t := ref.Ticket
 	st := &wire.DetailStats{Elapsed: t.ElapsedTime, Cost: t.ActualCost, HadCodex: t.HadCodex, ContextWindow: t.ActualContextWindow}
-	if at, ok := s.registry.StartedAtOf(ref.Addr.String()); ok && ref.Epic.RenderedStatus(t) == tickets.StatusClaimed {
+	if at, ok := s.epics.Runs.StartedAtOf(ref.Addr.String()); ok && ref.Epic.RenderedStatus(t) == tickets.StatusClaimed {
 		st.ClaimedAt = at
 	}
 	return st

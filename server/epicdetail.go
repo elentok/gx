@@ -32,7 +32,7 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	epics, err := s.projects.Epics(root.Project)
+	epics, err := s.epics.Projects.Epics(root.Project)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) {
 		http.Error(w, "no epic "+address, http.StatusNotFound)
@@ -62,14 +62,14 @@ func (s *Server) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tick
 	for _, other := range epics {
 		byName[other.Name] = other
 	}
-	queued := s.queue.RootQueued(root)
+	queued := s.epics.Queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
 		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
 	}
-	if deletable, err := s.designUncharted(root.String(), e); err != nil {
-		s.log.Warn("design deletable check", "epic", root.String(), "err", err)
+	if deletable, err := s.epics.DesignUncharted(root.String(), e); err != nil {
+		s.epics.Log.Warn("design deletable check", "epic", root.String(), "err", err)
 	} else {
 		d.Deletable = deletable
 	}
@@ -99,10 +99,10 @@ func (s *Server) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tick
 }
 
 func (s *Server) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
-	queued := s.queue.RootQueued(root)
+	queued := s.epics.Queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
-		State: epicStateFor(root, e, s.registry.StartedAtOf),
+		State: epicStateFor(root, e, s.epics.Runs.StartedAtOf),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
 		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
 		Draft: e.Status == string(schema.StatusDraft),
@@ -175,13 +175,13 @@ func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wi
 	row := baseRow(root, e, t, status)
 	row.Elapsed, row.Cost = t.ElapsedTime, t.ActualCost
 	if t.LongTicketTurns > 0 {
-		row.LongTicketTurns, row.LongTicketThreshold = t.LongTicketTurns, s.settings.Load().LongTicketTurns
+		row.LongTicketTurns, row.LongTicketThreshold = t.LongTicketTurns, s.epics.Settings.Load().LongTicketTurns
 	}
-	row.HarnessLabel = s.harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
+	row.HarnessLabel = s.epics.Harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if t.Parent != nil {
 		row.Parent = root.TicketAddress(*t.Parent)
 	}
-	if at, ok := s.registry.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
+	if at, ok := s.epics.Runs.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 		row.ClaimedAt = at
 	}
 	evs := queue.ReadLogLenient(t)
@@ -190,7 +190,7 @@ func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wi
 	}
 	if status == tickets.StatusPausedRepair {
 		row.State = sessions.RepairState(evs, t.PausedClass())
-		row.FixPrompt = sessions.FixAgentPrompt(s.projects.LaunchHarness(root.Project), row.Address, t)
+		row.FixPrompt = sessions.FixAgentPrompt(s.epics.Projects.LaunchHarness(root.Project), row.Address, t)
 	}
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()
