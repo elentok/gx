@@ -24,9 +24,9 @@ func TestSubsystemRoutes_Assembly(t *testing.T) {
 		{Pattern: "POST /v1/fake/plain", Handler: tagHandler("socket-plain"), Web: wire.WebWrite},
 		{Pattern: "GET /fake/public", WebHandler: tagHandler("web-public"), Web: wire.WebPublic},
 	}
-	old := subsystemRoutes
-	subsystemRoutes = func(*Server) []wire.Route { return fake }
-	t.Cleanup(func() { subsystemRoutes = old })
+	old := assembleRoutes
+	assembleRoutes = func(*Server) []wire.Route { return fake }
+	t.Cleanup(func() { assembleRoutes = old })
 
 	patterns := RoutePatterns()
 	for _, want := range []string{"GET /v1/fake/none", "GET /v1/fake/read", "POST /v1/fake/write", "POST /v1/fake/plain"} {

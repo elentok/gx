@@ -93,14 +93,12 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 
 A new route needs all of these. A missing one fails a test, not the build:
 
-- A subsystem moved out of root lists its routes in `Routes() []wire.Route` (`server/wire/route.go`:
-  pattern, socket handler, web mode, web variant) and `subsystemRoutes` in `server/routes.go` gathers
-  it. This replaces the three steps below for that subsystem. Root still has `routeTable` and
-  `webWrites` until the root cleanup ticket removes them.
-- `routeTable` in `server/server.go`.
+- The route in the owning package's `Routes() []wire.Route` (`server/wire/route.go`: pattern,
+  socket handler, web mode, web variant). `assembleRoutes` in `server/routes.go` gathers every
+  package's list; a new package is added there. Routes of no subsystem live in `rootRoutes`
+  (`server/rootroutes.go`). The web mode decides what the web mux serves.
 - A CLI verb: `routeVerbs` in `cmd/server_parity_test.go` plus the command itself
   (`TestRouteTableHasCLIVerbs`).
-- The web mux in `server/web/web.go` when the browser calls it (`webWrites` for writes).
 - The allowlist in `TestWeb_EverythingElseIs404` (`server/web/web_test.go`).
 
 Server tests: build fixtures with `servertest.WriteTicketWith` (`server/servertest/store.go`)
@@ -200,7 +198,14 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/sched/` holds the scheduling top of the lifecycle; so far the `HerdrWatch` (herdr
   availability, hold reason, banner, retry loop), the `Reclaimer` (startup reclaim of saved
   runs, `ResolveRun`, `Resume`) and the `Launcher` (`ClaimAndLaunch`, launch, `finishRun`/`settleRun`,
-  `NotifyDone`) and the `Scheduler` (the claim loop and its caps, the base and merge-target rules, gate watchdog, deadlock check, finished-claim watchdog, live iterations) and the `Explainer` (verdicts, pending rows, claim holds, check-lock label), with `Routes()` for `iterations`, `queue` and `tickets/explain`. The root implements `HerdrHost` and `ReclaimHost`; the `Scheduler` implements `LaunchHost` and the root's `Launch` hook (`LiveIteration`); the `Explainer` reads the `Scheduler` directly and the claim pass asks it for holds
+  `NotifyDone`) and the `Scheduler` (the claim loop and its caps, the base and merge-target rules, gate watchdog, deadlock check, finished-claim watchdog, live iterations) and the `Explainer` (verdicts, pending rows, claim holds, check-lock label), with `Routes()` for `iterations`, `queue` and `tickets/explain`. The root implements `HerdrHost` and `ReclaimHost`; the `Scheduler` implements `LaunchHost` and the root's `Launch` hook (`LiveIteration`); the `Explainer` reads the `Scheduler` directly and the claim pass asks it for holds;
+  `server/lifecycle/` holds the server's start, stop and restart plumbing: the state-dir lock, the
+  log file, the start-up steps, the restart check and the config-reload apply order (the root
+  implements `StartupHost` and `ReloadHost`);
+  `server/sessions/convrecord/` holds a session's conversation record: its token and cost totals
+  and Grilling round counts;
+  `server/sessions/fixagent/` holds the `/gx-investigate` fix agent for a paused ticket or a failed
+  migration (the root implements its `Host`)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail); `tickets/ticketmove` — ticket move, id allocation and ref rewriting; `tickets/ticketmigrate` — migrations and backfills (Migrate*, Backfill*, pause migration, store walk); `tickets/ticketgit` — trunk resolution, repo opening, epic spec path and iteration-branch parsing (imports `tickets`, never the reverse); `tickets/ticketspec` — publish-side code (lint-claims, manifest, verify plan, publish checks, estimates)
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners; `nativerunner/holder` — the pty holder process, its socket protocol and client (`nativerunner` imports it, never the reverse)

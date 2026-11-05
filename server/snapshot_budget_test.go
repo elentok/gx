@@ -29,7 +29,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 
 	var snap wire.Snapshot
 	rec := httptest.NewRecorder()
-	s.snapshot(rec, httptest.NewRequest("GET", "/v1/snapshot", nil))
+	rootRoutes{s}.snapshot(rec, httptest.NewRequest("GET", "/v1/snapshot", nil))
 	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {
 		t.Fatal(err)
 	}

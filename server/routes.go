@@ -26,18 +26,20 @@ import (
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
+	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 )
 
-// subsystemRoutes gathers the Routes() of every subsystem that has moved out
-// of the root. A move ticket adds its subsystem here and drops its entries
-// from routeTable, webWrites and the web read switch. It is also called with
-// a nil Server to list patterns, so the handlers must not need one yet.
+// assembleRoutes is the one route list: the root's own routes and the Routes()
+// of every subsystem. It is also called with a nil Server to list patterns, so
+// the handlers must not need one yet.
 // A var so the assembly test can swap in a fake list.
-var subsystemRoutes = func(s *Server) []wire.Route {
+var assembleRoutes = func(s *Server) []wire.Route {
 	return slices.Concat(
+		rootRoutes{s}.routes(),
+		web.Routes(func() *web.Web { return s.web }),
 		webtls.Routes(func() *x509.Certificate { return s.web.Certs().Root() }),
 		webauth.Routes(func() *webauth.Gate { return s.web.Gate() }),
 		settings.Routes(func() *settings.Holder { return s.Settings() }),

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"net/http"
 	"reflect"
 	"time"
 
@@ -37,14 +36,6 @@ func (s *Server) runningAgents() int {
 		}
 	}
 	return n
-}
-
-func restartCheckRoute(s *Server, w http.ResponseWriter, r *http.Request) {
-	s.restarter.ServeCheck(w, r)
-}
-
-func restartWriteRoute(s *Server, w http.ResponseWriter, r *http.Request) {
-	s.restarter.ServeWrite(w, r)
 }
 
 // startupHost is lifecycle.StartupHost.

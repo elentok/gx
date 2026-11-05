@@ -19,10 +19,22 @@ type OnlyRoute struct {
 	Public  bool   // served without the web login cookie
 }
 
-// onlyRoutes is the one list of web-only routes (ADR 0028). Each is also a
-// key of webWrites; a test checks the two against the socket routes.
-var onlyRoutes = []OnlyRoute{
-	{Pattern: "POST /v1/client-errors", Public: true},
+// Routes are the web listener's own endpoints: the socket's web-login admin
+// routes, and the public client-error report only the web mux serves (ADR 0028).
+func Routes(web func() *Web) []wire.Route {
+	call := func(f func(*Web, http.ResponseWriter, *http.Request)) http.HandlerFunc {
+		return func(rw http.ResponseWriter, r *http.Request) { f(web(), rw, r) }
+	}
+	return []wire.Route{
+		{Pattern: "GET /v1/web/info", Handler: call((*Web).Info)},
+		{Pattern: "POST /v1/web/new-root", Handler: call((*Web).NewRoot)},
+		{Pattern: "POST /v1/web/reset", Handler: call((*Web).Reset)},
+		{Pattern: "POST /v1/web/reset-authenticator", Handler: call((*Web).ResetAuthenticator)},
+		{Pattern: "GET /v1/web/login-list", Handler: call((*Web).LoginList)},
+		{Pattern: "POST /v1/web/login-revoke", Handler: call((*Web).LoginRevoke)},
+		{Pattern: "POST /v1/web/set-password", Handler: call((*Web).SetPassword)},
+		{Pattern: "POST /v1/client-errors", Web: wire.WebPublic, WebHandler: call((*Web).clientErrorReport)},
+	}
 }
 
 // PublicGetPatterns names every web-only "GET /path" the web mux serves.
@@ -30,9 +42,9 @@ func PublicGetPatterns(routes []wire.Route) []string {
 	return patternsOf(publicGetRoutes(routes))
 }
 
-// OnlyRoutes returns a copy of the web-only route list.
+// OnlyRoutes lists the routes the web mux serves and the socket does not.
 func OnlyRoutes(routes []wire.Route) []OnlyRoute {
-	out := slices.Clone(onlyRoutes)
+	var out []OnlyRoute
 	for _, r := range routes {
 		if r.Handler == nil && (r.Web == wire.WebWrite || r.Web == wire.WebPublic) {
 			out = append(out, OnlyRoute{Pattern: r.Pattern, Public: r.Web == wire.WebPublic})
@@ -43,11 +55,7 @@ func OnlyRoutes(routes []wire.Route) []OnlyRoute {
 
 // WritePatterns names every "METHOD /path" write the web mux serves.
 func WritePatterns(routes []wire.Route) []string {
-	out := make([]string, 0, len(webWrites))
-	for p := range webWrites {
-		out = append(out, p)
-	}
-	return append(out, patternsOf(writeRoutes(routes))...)
+	return patternsOf(writeRoutes(routes))
 }
 
 // routesWithMode returns the routes whose web mode is one of modes.
@@ -119,13 +127,7 @@ func (w *Web) isPublicRoute(r *http.Request) bool {
 	if w.isRead(r) {
 		method = http.MethodGet
 	}
-	key := method + " " + r.URL.Path
-	for _, route := range onlyRoutes {
-		if route.Public && route.Pattern == key {
-			return true
-		}
-	}
-	_, ok := FindRoute(w.host.Routes(), key, wire.WebPublic)
+	_, ok := FindRoute(w.host.Routes(), method+" "+r.URL.Path, wire.WebPublic)
 	return ok
 }
 

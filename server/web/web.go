@@ -37,10 +37,6 @@ type Config struct {
 type Host interface {
 	Settings() *settings.Settings
 	Routes() []wire.Route
-	Snapshot(http.ResponseWriter, *http.Request)
-	RestartCheckRead(http.ResponseWriter, *http.Request)
-	RestartWrite(http.ResponseWriter, *http.Request)
-	StreamEvents(http.ResponseWriter, *http.Request)
 }
 
 // Web owns the web listener and its login gate. After Bind, nothing writes its
@@ -192,12 +188,7 @@ func (w *Web) handler() http.Handler {
 				http.Error(rw, reason, http.StatusForbidden)
 				return
 			}
-			key := r.Method + " " + r.URL.Path
-			if handler, ok := webWrites[key]; ok {
-				handler(w)(rw, r)
-				return
-			}
-			if route, ok := FindRoute(routes, key, wire.WebWrite, wire.WebPublic); ok {
+			if route, ok := FindRoute(routes, r.Method+" "+r.URL.Path, wire.WebWrite, wire.WebPublic); ok {
 				serveRoute(route)(rw, r)
 				return
 			}
@@ -209,12 +200,6 @@ func (w *Web) handler() http.Handler {
 			return
 		}
 		switch {
-		case r.URL.Path == "/v1/snapshot":
-			w.host.Snapshot(rw, r)
-		case r.URL.Path == "/v1/restart/check":
-			w.host.RestartCheckRead(rw, r)
-		case r.URL.Path == "/v1/events":
-			w.host.StreamEvents(rw, r)
 		case strings.HasPrefix(r.URL.Path, "/v1/"):
 			http.NotFound(rw, r)
 		case w.dev != nil:
@@ -223,14 +208,6 @@ func (w *Web) handler() http.Handler {
 			static.ServeHTTP(rw, r)
 		}
 	})
-}
-
-// webWrites names the "METHOD /path" writes the web mux serves besides the
-// read-only GETs, each with the handler the web mux uses: the web variants
-// require a state token. There is deliberately no withdraw or undo route.
-var webWrites = map[string]func(*Web) http.HandlerFunc{
-	"POST /v1/restart":       func(w *Web) http.HandlerFunc { return w.host.RestartWrite },
-	"POST /v1/client-errors": func(w *Web) http.HandlerFunc { return w.clientErrorReport },
 }
 
 // authHost lets the web login gate ask the server what it cannot know.

@@ -4,19 +4,14 @@
 package server
 
 import (
-	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/sessions"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -24,9 +19,9 @@ import (
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/sched"
+	"github.com/elentok/gx/server/sessions"
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
-	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/osnotify"
@@ -51,13 +46,9 @@ import (
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/web"
-	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/syshealth"
-	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tokenledger"
 )
 
@@ -82,7 +73,7 @@ const DefaultTCPAddr = "127.0.0.1:7421"
 // Server owns the state-dir lock and the listening socket.
 type Server struct {
 	cfg Config
-	// routes is what the moved subsystems serve (subsystemRoutes), gathered once in New.
+	// routes is every endpoint (assembleRoutes), gathered once in New.
 	routes []wire.Route
 	// restarter serves the restart check and the restart; startup runs the steps
 	// that wait for the migrations.
@@ -436,16 +427,13 @@ func New(cfg Config) (*Server, error) {
 		h.Finished = s.sessions.SessionFinished
 	}
 	mux := http.NewServeMux()
-	for _, r := range routeTable {
-		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
-	}
 	// The rescan steps run in this order after every store scan.
 	s.idx.OnRescan(s.rec.ScanParentDefects)
 	s.idx.OnRescan(s.rec.ScanLateFinishes)
 	s.idx.OnRescan(s.oneOffs.Sweep)
 	s.idx.OnRescan(s.designs.ScanCleanups)
 	s.idx.SetReady(s.startup.MigrationsEnded)
-	s.routes = subsystemRoutes(s)
+	s.routes = assembleRoutes(s)
 	registerRoutes(mux, s.routes)
 	s.http = &http.Server{Handler: mux}
 	s.tcpHTTP = &http.Server{Handler: refuseBrowsers(mux, log)}
@@ -476,33 +464,11 @@ func New(cfg Config) (*Server, error) {
 	return s, nil
 }
 
-// routeTable is the single list of endpoints. cmd's parity test diffs it
-// against the CLI command tree, so every route needs a `--json` verb.
-var routeTable = []struct {
-	pattern string
-	handler func(*Server, http.ResponseWriter, *http.Request)
-}{
-	{"GET /v1/handshake", (*Server).handshake},
-	{"GET /v1/web/info", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.Info(w, r) }},
-	{"POST /v1/web/new-root", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.NewRoot(w, r) }},
-	{"POST /v1/web/reset", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.Reset(w, r) }},
-	{"POST /v1/web/reset-authenticator", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.ResetAuthenticator(w, r) }},
-	{"GET /v1/web/login-list", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.LoginList(w, r) }},
-	{"POST /v1/web/login-revoke", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.LoginRevoke(w, r) }},
-	{"POST /v1/web/set-password", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.SetPassword(w, r) }},
-	{"GET /v1/snapshot", (*Server).snapshot},
-	{"GET /v1/events", (*Server).streamEvents},
-	{"GET /v1/restart/check", restartCheckRoute},
-	{"POST /v1/restart", restartWriteRoute},
-}
-
-// RoutePatterns lists every registered "METHOD /path" pattern.
+// RoutePatterns lists every registered "METHOD /path" pattern. cmd's parity
+// test diffs it against the CLI command tree, so every route needs a `--json` verb.
 func RoutePatterns() []string {
-	out := make([]string, len(routeTable))
-	for i, r := range routeTable {
-		out[i] = r.pattern
-	}
-	for _, r := range subsystemRoutes(nil) {
+	var out []string
+	for _, r := range assembleRoutes(nil) {
 		if r.Handler != nil {
 			out = append(out, r.Pattern)
 		}
@@ -529,136 +495,6 @@ func (s *Server) TCPAddr() string {
 		return ""
 	}
 	return s.tcp.Addr().String()
-}
-
-func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	snap, agents := s.idx.SnapshotAgents()
-	snap.HerdrText, snap.HerdrUnavailable = s.herdr.Banner()
-	for i, t := range snap.Tickets {
-		if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
-			snap.Tickets[i].HarnessLabel = s.harness.LabelFor(addr, agents[i], cmp.Or(t.RenderedStatus, t.Status))
-		}
-		switch t.Status {
-		case string(schema.StatusClaimed):
-			snap.Tickets[i].ClaimedAt, _ = s.registry.StartedAtOf(t.Address)
-		case string(schema.StatusPaused), string(schema.StatusLegacyAnswer), string(schema.StatusLegacyRepair):
-			snap.Tickets[i].Recovery = ticketwrite.RecoveryState(s.pauseHold.State(t.Address), t.Address, snap.Tickets)
-		}
-	}
-	s.merger.FillEpicMergeTargets(snap.Tickets)
-	snap.Build = s.cfg.Build
-	snap.Instance = s.restarter.Instance()
-	snap.MigrationFailures = s.MigrationFailures()
-	snap.Migrating = s.migrator.Migrating()
-	snap.Budget = s.budget.Status(time.Now())
-	snap.ExtraUsage = s.budget.ExtraUsageOn()
-	snap.Disks = s.disks.Listed()
-	snap.Health = s.health.Current()
-	snap.Pending = s.explain.Pending()
-	snap.Epics = s.epics.EpicSummaries(snap.Tickets)
-	snap.RecentlyFinished = epics.RecentlyFinished(s.idx.Loaded(), s.settings.Load().RecentlyFinished)
-	snap.Mode = s.queue.Mode()
-	snap.AFK = s.afk.IsOn()
-	snap.ViMode = s.viMode.IsOn()
-	snap.SkillsInstallProblem = skills.ReadProblem(skills.StatusPath(s.cfg.StateDir))
-	// Checked on every snapshot: a PATH entry can vanish while the server
-	// runs, like an fnm per-shell dir once its shell exits.
-	_, nodeErr := brief.LookPath(s.cfg.Env, "node")
-	snap.NodeMissing = nodeErr != nil
-	sessions, err := s.queue.ListSessionsWithQueue()
-	if err != nil {
-		s.log.Warn("list sessions for snapshot", "err", err)
-	}
-	snap.Sessions = sessions
-	_ = json.NewEncoder(w).Encode(snap)
-}
-
-// DefaultSSEHeartbeat is how long /v1/events may sit idle before it writes a
-// comment line, so proxies and browsers do not drop a quiet stream.
-const DefaultSSEHeartbeat = 15 * time.Second
-
-// streamEvents is SSE: every event with seq > ?since, then live events until
-// the client leaves or is dropped for lagging. 410 means re-snapshot. A
-// ?client= id keeps that client's focus reports alive while the stream is.
-// An idle stream gets a ":" comment line every SSEHeartbeat.
-func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
-	var since uint64
-	if v := r.URL.Query().Get("since"); v != "" {
-		n, err := strconv.ParseUint(v, 10, 64)
-		if err != nil {
-			http.Error(w, "bad since", http.StatusBadRequest)
-			return
-		}
-		since = n
-	}
-	ch, cancel, err := s.events.Subscribe(since)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusGone)
-		return
-	}
-	defer cancel()
-	ctx := r.Context()
-	if id := webauth.LoginIDFrom(ctx); id != "" {
-		var untrack func()
-		ctx, untrack = s.web.Track(ctx, id)
-		defer untrack()
-	}
-	if client := r.URL.Query().Get("client"); client != "" {
-		s.focus.Connect(client)
-		defer s.focus.Disconnect(client)
-	}
-	flusher, _ := w.(http.Flusher)
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.WriteHeader(http.StatusOK)
-	if flusher != nil {
-		flusher.Flush()
-	}
-	interval := s.cfg.SSEHeartbeat
-	if interval <= 0 {
-		interval = DefaultSSEHeartbeat
-	}
-	beat := time.NewTicker(interval)
-	defer beat.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-beat.C:
-			if _, err := io.WriteString(w, ": heartbeat\n\n"); err != nil {
-				return
-			}
-			if flusher != nil {
-				flusher.Flush()
-			}
-		case ev, ok := <-ch:
-			if !ok {
-				return
-			}
-			data, _ := json.Marshal(ev)
-			if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", ev.Seq, ev.Type, data); err != nil {
-				return
-			}
-			if flusher != nil {
-				flusher.Flush()
-			}
-		}
-	}
-}
-
-func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.web.Err()}
-	h.HerdrText, h.HerdrUnavailable = s.herdr.Banner()
-	h.Migrating = s.migrator.Migrating()
-	if s.web.Listener() != nil {
-		var err error
-		if h.WebSetupPending, _, err = s.web.Gate().SetupState(); err != nil {
-			s.log.Error("web setup state unavailable", "err", err)
-		}
-	}
-	_ = json.NewEncoder(w).Encode(h)
 }
 
 // DefaultMergeStopTimeout is how long a stop waits for a merge in flight.
