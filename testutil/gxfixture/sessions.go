@@ -106,14 +106,22 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 		})
 	}
 	slow := strings.Contains(s.prompt, agentfake.ChatSlowMarker)
+	// A Codex fake holds its turn until a finish control, so the seeder ends it.
+	codexTurn := s.harness == "codex" && s.prompt != ""
+	sendControl := f.controlSender(id, s.harness, before, codexBefore)
 	if s.prompt != "" {
 		role := transcript.ChatRoleAgent
-		if slow {
+		if slow || codexTurn {
 			role = transcript.ChatRolePerson
 		}
 		if err := f.waitFor(id, "a "+role+" message", func(_ wire.SessionInfo, chat wire.SessionChatResponse) bool {
 			return slices.ContainsFunc(chat.Messages, func(m wire.SessionChatMessage) bool { return m.Role == role })
 		}); err != nil {
+			return err
+		}
+	}
+	if codexTurn {
+		if err := sendControl(agentfake.Control{Action: agentfake.ActionFinish}); err != nil {
 			return err
 		}
 	}
@@ -139,24 +147,6 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	control := s.control
 	if s.crash {
 		control = &agentfake.Control{Action: agentfake.ActionExit, Code: 1}
-	}
-	// The fake's control FIFO is named by Claude's session id, which gx's
-	// session id is not; the one new file is this session's.
-	sendControl := func(c agentfake.Control) error {
-		if s.harness == "codex" {
-			// The Codex fake's FIFO is named by its own id, which it logs with
-			// its argv under the Codex home.
-			fresh := slices.DeleteFunc(f.codexIDs(), func(name string) bool { return slices.Contains(codexBefore, name) })
-			if len(fresh) != 1 {
-				return fmt.Errorf("session %s: want one new codex fake, got %v", id, fresh)
-			}
-			return agentfake.SendProgramControl(fresh[0], c)
-		}
-		fresh := slices.DeleteFunc(f.controlFiles(), func(name string) bool { return slices.Contains(before, name) })
-		if len(fresh) != 1 {
-			return fmt.Errorf("session %s: want one new control file, got %v", id, fresh)
-		}
-		return agentfake.SendTUIControl(filepath.Join(f.root, "home"), strings.TrimSuffix(fresh[0], ".ctl"), c)
 	}
 	if control != nil {
 		if err := sendControl(*control); err != nil {
@@ -198,6 +188,26 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 		}
 	}
 	return nil
+}
+
+// controlSender sends a control to the fake of the session just created. The
+// fake's control FIFO is named by its own id, not gx's session id, so the one
+// new file (Claude) or new args log under the Codex home (Codex) is this session's.
+func (f sessionSeeder) controlSender(id, harness string, before, codexBefore []string) func(agentfake.Control) error {
+	return func(c agentfake.Control) error {
+		if harness == "codex" {
+			fresh := slices.DeleteFunc(f.codexIDs(), func(name string) bool { return slices.Contains(codexBefore, name) })
+			if len(fresh) != 1 {
+				return fmt.Errorf("session %s: want one new codex fake, got %v", id, fresh)
+			}
+			return agentfake.SendProgramControl(fresh[0], c)
+		}
+		fresh := slices.DeleteFunc(f.controlFiles(), func(name string) bool { return slices.Contains(before, name) })
+		if len(fresh) != 1 {
+			return fmt.Errorf("session %s: want one new control file, got %v", id, fresh)
+		}
+		return agentfake.SendTUIControl(filepath.Join(f.root, "home"), strings.TrimSuffix(fresh[0], ".ctl"), c)
+	}
 }
 
 // prompt sends text to the session. The server's status lags the fake's turn,
@@ -486,6 +496,19 @@ func codexDesignScenario() scenario {
 		design:       []string{agentfake.DesignTurnRound, agentfake.DesignTurnRunEnd},
 		openDesigns:  []string{project + ":" + mapAddr},
 	}
+}
+
+// promoteScenario is agentsScenario plus two Codex sessions with one message
+// each (a promote keeps its session busy, so each width takes one), a held Queue
+// agent and two design sessions: every kind of session the Promote to Design
+// button shows on or stays off.
+func promoteScenario() scenario {
+	sc := agentsScenario()
+	codexWithMessage := sessionSpec{project: project, harness: "codex", prompt: "hello", read: true}
+	sc.sessions = append(sc.sessions, codexWithMessage, codexWithMessage)
+	addQueueAgent(&sc)
+	addDesignAgents(&sc)
+	return sc
 }
 
 // switchedModel is the model the switched session's later replies report; it
