@@ -140,7 +140,7 @@ type attachStreamMsg struct {
 
 // attachTarget is the session the panel shows live, or "" for none.
 func (m Model) attachTarget() string {
-	if m.client == nil || m.link == tabapi.ServerLinkDown || !m.loaded || m.sessionsDir == "" || m.cursor >= len(m.sessions) {
+	if m.client == nil || m.link == tabapi.ServerLinkDown || !m.loaded || m.term.sessionsDir == "" || m.cursor >= len(m.sessions) {
 		return ""
 	}
 	if s := m.sessions[m.cursor]; s.Status.State != wire.SessionExited {
@@ -153,7 +153,7 @@ func (m Model) attachTarget() string {
 // attach of a session no longer shown and dials the one now shown.
 func (m Model) syncAttach() (Model, tea.Cmd) {
 	want := m.attachTarget()
-	if a := m.attach; a != nil && !a.closed && a.id == want && !m.redialDue(a) {
+	if a := m.attach; a != nil && !a.closed && a.id == want && !a.redialDue(m.sessions[m.cursor]) {
 		return m, nil
 	}
 	m.attach.close()
@@ -166,8 +166,8 @@ func (m Model) syncAttach() (Model, tea.Cmd) {
 
 // redialDue: a, the selected session's attach, failed and the session's
 // status has changed since it dialed.
-func (m Model) redialDue(a *attachment) bool {
-	return a.ended && !a.exited && a.err != nil && a.status != m.sessions[m.cursor].Status
+func (a *attachment) redialDue(s wire.SessionInfo) bool {
+	return a.ended && !a.exited && a.err != nil && a.status != s.Status
 }
 
 // dialAttach replaces the attach with a new dial of the selected session.
@@ -177,7 +177,7 @@ func (m Model) dialAttach(attempt int) (Model, tea.Cmd) {
 	a := &attachment{id: s.ID, status: s.Status, attempt: attempt, readOnly: s.Queue || s.Design}
 	m.attach = a
 	// A Queue agent's holder lives under the agents root, not the sessions dir.
-	dir, dial := cmp.Or(s.Holder, filepath.Join(m.sessionsDir, s.ID)), m.dial
+	dir, dial := cmp.Or(s.Holder, filepath.Join(m.term.sessionsDir, s.ID)), m.dial
 	return m, func() tea.Msg {
 		stream, snapshot, err := dial(dir)
 		return attachedMsg{a: a, stream: stream, snapshot: snapshot, err: err}
@@ -192,39 +192,45 @@ func readAttach(a *attachment) tea.Cmd {
 	}
 }
 
-func (m Model) updateAttached(msg attachedMsg) (Model, tea.Cmd) {
-	a := msg.a
-	if a != m.attach || a.closed {
+// current: msg is about a, the attach on screen, and a is still open.
+func (a *attachment) current(msgA *attachment) bool {
+	return a != nil && a == msgA && !a.closed
+}
+
+// updateAttached takes the dial's outcome; a is the attach on screen.
+func (a *attachment) updateAttached(msg attachedMsg) tea.Cmd {
+	if !a.current(msg.a) {
 		// The person moved on while the dial was in flight.
 		if msg.stream != nil {
 			_ = msg.stream.Close()
 		}
-		return m, nil
+		return nil
 	}
 	if msg.err != nil || msg.stream == nil {
 		a.ended, a.err, a.rows = true, msg.err, msg.snapshot
 		if msg.err != nil && a.status.State == wire.SessionStarting && a.attempt < maxAttachRetries {
 			a.retrying = true
-			return m, tea.Tick(attachRetryBase<<a.attempt, func(time.Time) tea.Msg { return attachRetryMsg{a: a} })
+			return tea.Tick(attachRetryBase<<a.attempt, func(time.Time) tea.Msg { return attachRetryMsg{a: a} })
 		}
-		return m, nil
+		return nil
 	}
 	a.stream = msg.stream
 	a.w = startAttachWriter(msg.stream)
-	return m, readAttach(a)
+	return readAttach(a)
 }
 
-func (m Model) updateAttachRetry(msg attachRetryMsg) (Model, tea.Cmd) {
-	if a := msg.a; a != m.attach || a.closed {
-		return m, nil
-	}
-	return m.dialAttach(msg.a.attempt + 1)
+// streamResult is what a stream message asks of the tab beyond the attach.
+type streamResult struct {
+	// Exited: the session ended, so the tab drops focus and copy mode.
+	Exited bool
+	// Copied is the text the session put on the clipboard, nil for none.
+	Copied *string
 }
 
-func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
-	a := msg.a
-	if a != m.attach || a.closed {
-		return m, nil
+// updateStream applies one stream message; a is the attach on screen.
+func (a *attachment) updateStream(msg attachStreamMsg) (streamResult, tea.Cmd) {
+	if !a.current(msg.a) {
+		return streamResult{}, nil
 	}
 	if msg.err != nil {
 		a.ended, a.err = true, msg.err
@@ -232,7 +238,7 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 		if err := a.w.failure(); err != nil {
 			a.err = err
 		}
-		return m, nil
+		return streamResult{}, nil
 	}
 	switch msg.msg.Type {
 	case holder.StreamFrame:
@@ -243,15 +249,11 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 		a.mouse = f.Mouse
 	case holder.StreamExit:
 		a.ended, a.exited = true, true
-		m.terminalFocused = false
-		// Shown until the server reports the exit and the saved last screen loads.
-		m.lastScreen = lastScreen{id: a.id, rows: a.rows}
-		m.copy = nil
-		return m, nil
+		return streamResult{Exited: true}, nil
 	case holder.StreamCopy:
-		return m, tea.Batch(m.writeCopied(msg.msg.Text), readAttach(a))
+		return streamResult{Copied: &msg.msg.Text}, readAttach(a)
 	}
-	return m, readAttach(a)
+	return streamResult{}, readAttach(a)
 }
 
 // applyFrame returns rows with the frame's changed rows written over them, or
@@ -274,19 +276,19 @@ func applyFrame(rows []string, f holder.Frame) []string {
 const maxPasteBytes = 1 << 20
 
 // sendKey types k into the attached session.
-func (m Model) sendKey(k tea.KeyPressMsg) {
-	if a := m.attach; a.live() && !a.readOnly {
+func (a *attachment) sendKey(k tea.KeyPressMsg) {
+	if a.live() && !a.readOnly {
 		a.snapToBottom()
 		key := screen.Key{Code: k.Code, Text: k.Text, Mod: k.Mod}
 		a.write(func(s AttachStream) error { return s.SendKey(key) })
 	}
 }
 
-func (m Model) sendPaste(text string) tea.Cmd {
+func (a *attachment) sendPaste(text string) tea.Cmd {
 	if len(text) > maxPasteBytes {
 		return notify.Warning("paste too large (over 1 MB), not sent")
 	}
-	if a := m.attach; a.live() && !a.readOnly {
+	if a.live() && !a.readOnly {
 		a.snapToBottom()
 		a.write(func(s AttachStream) error { return s.Paste(text) })
 	}
@@ -307,27 +309,24 @@ func (a *attachment) snapToBottom() {
 	}
 }
 
-// updateWheel handles the wheel over the panel, whichever pane has focus: a
-// child that reports the mouse gets it over its screen, as with tmux, since
-// one in the alternate screen (claude) has no scrollback; otherwise it
-// scrolls the panel's view through the holder.
-func (m Model) updateWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	dir, ok := ui.WheelDirection(msg)
-	a := m.attach
-	if !ok || !m.overPanel(msg.Mouse()) || !a.live() {
-		return m, nil
+// wheel handles the wheel over the panel, whichever pane has focus: a child
+// that reports the mouse gets it over its screen cell (x, y; inCell false off
+// the screen), as with tmux, since one in the alternate screen (claude) has no
+// scrollback; otherwise it scrolls the panel's view through the holder.
+func (a *attachment) wheel(dir, x, y int, inCell bool) {
+	if !a.live() {
+		return
 	}
 	if a.mouse && a.offset == 0 {
-		if x, y, ok := m.screenCell(msg.Mouse()); ok {
+		if inCell {
 			a.write(func(s AttachStream) error { return s.Wheel(x, y, dir > 0) })
 		}
-		return m, nil
+		return
 	}
 	// Set locally too, so wheel ticks faster than frames still add up.
 	if offset := max(0, min(a.offset-dir*ui.WheelScrollLines, a.scrollMax)); offset != a.offset {
 		a.scroll(offset)
 	}
-	return m, nil
 }
 
 // mouseButton maps a bubbletea button to the AttachMouse button, false for
@@ -345,15 +344,15 @@ func mouseButton(b tea.MouseButton) (int, bool) {
 }
 
 // forwardPress sends a click over the child's screen to a child that reports
-// the mouse, as the wheel is (see updateWheel). It reports whether the child
-// took it; a click on the border or the info rows stays with gx.
-func (m Model) forwardPress(mouse tea.Mouse) bool {
-	a := m.attach
+// the mouse, as the wheel is (see wheel). It reports whether the child took
+// it; a click on the border or the info rows stays with gx. cell maps the
+// mouse to the screen cell under it.
+func (a *attachment) forwardPress(mouse tea.Mouse, cell func(tea.Mouse) (x, y int, ok bool)) bool {
 	button, ok := mouseButton(mouse.Button)
 	if !ok || !a.live() || a.readOnly || !a.mouse || a.offset != 0 {
 		return false
 	}
-	x, y, ok := m.screenCell(mouse)
+	x, y, ok := cell(mouse)
 	if !ok {
 		return false
 	}
@@ -363,44 +362,34 @@ func (m Model) forwardPress(mouse tea.Mouse) bool {
 }
 
 // forwardMove follows a held press with the pointer, clamped to the screen so
-// the child sees the drag end where it left the panel.
-func (m Model) forwardMove(mouse tea.Mouse, kind screen.MouseKind) {
-	a := m.attach
+// the child sees the drag end where it left the panel. clamp maps the mouse
+// to the nearest screen cell.
+func (a *attachment) forwardMove(mouse tea.Mouse, kind screen.MouseKind, clamp func(tea.Mouse) (x, y int)) {
 	if !a.live() || a.held == 0 {
 		return
 	}
 	button := a.held - 1
-	ox, oy := m.screenOrigin()
-	cols, rows := m.screenSize()
-	x, y := max(0, min(mouse.X-ox, cols-1)), max(0, min(mouse.Y-oy, rows-1))
+	x, y := clamp(mouse)
 	if kind == screen.MouseRelease {
 		a.held = 0
 	}
 	a.write(func(s AttachStream) error { return s.Mouse(x, y, kind, button) })
 }
 
-func (m Model) overPanel(mouse tea.Mouse) bool {
-	left := m.width - m.mainWidth()
-	return mouse.X >= left && mouse.X < m.width && mouse.Y >= 0 && mouse.Y < m.height
-}
-
-// resizeAttach gives the session the panel's size. It runs on every focus,
-// not only on change: the pty follows the viewer that last focused or typed,
-// and another viewer may have resized it since. Typing needs no Resize, as
-// the holder claims this viewer's last size on input.
-func (m Model) resizeAttach() {
-	if a := m.attach; a.live() {
-		cols, rows := m.screenSize()
+// resize gives the session the panel's size. It runs on every focus, not only
+// on change: the pty follows the viewer that last focused or typed, and
+// another viewer may have resized it since. Typing needs no Resize, as the
+// holder claims this viewer's last size on input.
+func (a *attachment) resize(cols, rows int) {
+	if a.live() {
 		a.size = [2]int{cols, rows}
 		a.write(func(s AttachStream) error { return s.Resize(cols, rows) })
 	}
 }
 
-// syncAttachSize sends the panel's size when it changed while focused.
-func (m Model) syncAttachSize() {
-	if a := m.attach; m.terminalFocused && a.live() {
-		if cols, rows := m.screenSize(); a.size != [2]int{cols, rows} {
-			m.resizeAttach()
-		}
+// syncSize sends the panel's size when it changed.
+func (a *attachment) syncSize(cols, rows int) {
+	if a.live() && a.size != [2]int{cols, rows} {
+		a.resize(cols, rows)
 	}
 }

@@ -22,7 +22,7 @@ func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) 
 	t.Helper()
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
-	m.sessionsDir = "/sessions"
+	m.term.sessionsDir = "/sessions"
 	m.dial = h.dial
 	m.showQueue, m.showDesign = true, true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
@@ -44,7 +44,7 @@ func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) 
 func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{Dirs: config.DirsFrom([]string{"HOME=" + t.TempDir()})})
-	m.sessionsDir = "/sessions"
+	m.term.sessionsDir = "/sessions"
 	m.dial = h.dial
 	m.opened = true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})

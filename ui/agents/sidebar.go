@@ -138,7 +138,7 @@ func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	if m.copy != nil || m.ModalOpen() || m.leaderPending {
 		return m, nil
 	}
-	if m.forwardPress(mouse) {
+	if m.attach.forwardPress(mouse, m.termView().screenCell) {
 		if mouse.Button == tea.MouseLeft {
 			m.focusTerminal()
 		}

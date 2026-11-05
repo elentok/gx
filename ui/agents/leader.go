@@ -111,7 +111,7 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case m.leaderPending:
 		m.leaderPending = false
 		if isLeader || slices.Contains(m.focusSidebarKeys(), msg.String()) {
-			m.sendKey(msg)
+			m.attach.sendKey(msg)
 			return m, nil
 		}
 		return m.runLeaderAction(msg.String())
@@ -125,7 +125,7 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if a := m.attach; a.live() && a.readOnly {
 			return m, notify.Info("read-only: " + m.leaderKeys()[0] + " then i to unlock")
 		}
-		m.sendKey(msg)
+		m.attach.sendKey(msg)
 		return m, nil
 	}
 	return m.updateSidebarKey(msg)
@@ -201,7 +201,7 @@ func (m Model) toggleFocus() Model {
 		m.terminalFocused = false
 	} else if m.attachTarget() != "" {
 		m.terminalFocused = true
-		m.resizeAttach()
+		m.attach.resize(m.termView().screenSize())
 	}
 	return m
 }

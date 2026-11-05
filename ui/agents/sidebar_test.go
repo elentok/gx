@@ -292,7 +292,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 	working := []wire.SessionInfo{{ID: "w", Project: "gx", Status: wire.SessionStatus{State: wire.SessionWorking}}}
 
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
-	m.sessionsDir = "" // no attach, so a cmd can only be a tick
+	m.term.sessionsDir = "" // no attach, so a cmd can only be a tick
 	if _, cmd := m.WithServerState(&viewmodel.State{Sessions: idle}, tabapi.ServerLinkUp); cmd != nil {
 		t.Fatal("tick scheduled with no Working session")
 	}
@@ -314,7 +314,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 	}
 	offscreen = append(offscreen, working...)
 	fresh := newTestModel(&fakeSessionClient{}, ui.Settings{})
-	fresh.sessionsDir = ""
+	fresh.term.sessionsDir = ""
 	sized := update1(t, fresh, tea.WindowSizeMsg{Width: 70, Height: 10})
 	if _, cmd := sized.WithServerState(&viewmodel.State{Sessions: offscreen}, tabapi.ServerLinkUp); cmd != nil {
 		t.Fatal("tick scheduled for a Working session scrolled off screen")
@@ -324,7 +324,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 func TestJump_SpinnerTicksForAWorkingSessionWithTheSidebarHidden(t *testing.T) {
 	working := []wire.SessionInfo{{ID: "w", Name: "worker", Project: "gx", Status: wire.SessionStatus{State: wire.SessionWorking}}}
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
-	m.sessionsDir = ""
+	m.term.sessionsDir = ""
 	m.hideSidebar = true
 	m = withState(t, m, &viewmodel.State{Sessions: working}, tabapi.ServerLinkUp)
 	if m.ticking {

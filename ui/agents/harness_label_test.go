@@ -24,7 +24,7 @@ func TestTerminalTitle_ShowsHarnessLabel(t *testing.T) {
 	for _, c := range cases {
 		m := openedModel(t, &fakeSessionClient{}, "", c.s)
 		m.width = 160
-		got := ansi.Strip(m.terminalTitle(c.s, lipgloss.NewStyle()))
+		got := ansi.Strip(m.termView().terminalTitle(c.s, lipgloss.NewStyle()))
 		if !strings.Contains(got, c.want) {
 			t.Errorf("%s: title %q lacks %q", c.name, got, c.want)
 		}
@@ -35,7 +35,7 @@ func TestTerminalTitle_NarrowWidthCutsTheLabelFirst(t *testing.T) {
 	s := wire.SessionInfo{ID: "a", Project: "gx", Status: idleStatus, Harness: "codex", Tier: "strongest", Model: "gpt-6.1-sol", Effort: "high"}
 	m := openedModel(t, &fakeSessionClient{}, "", s)
 	m.width = 50
-	title := ansi.Strip(m.terminalTitle(s, lipgloss.NewStyle()))
+	title := ansi.Strip(m.termView().terminalTitle(s, lipgloss.NewStyle()))
 	if strings.Contains(title, "gpt-6.1-sol high") || !strings.Contains(title, "…") {
 		t.Errorf("label not cut at a narrow width: %q", title)
 	}

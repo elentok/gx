@@ -147,7 +147,7 @@ func TestClick_ReachesAnAgentThatReportsTheMouse(t *testing.T) {
 	m, _ = read(t, m, next)
 	fa.log = nil
 
-	ox, oy := m.screenOrigin()
+	ox, oy := m.termView().screenOrigin()
 	m = update1(t, m, tea.MouseClickMsg{X: ox + 3, Y: oy + 2, Button: tea.MouseLeft})
 	m = update1(t, m, tea.MouseMotionMsg{X: ox + 4, Y: oy + 2, Button: tea.MouseLeft})
 	m = update1(t, m, tea.MouseReleaseMsg{X: ox + 5, Y: oy + 2, Button: tea.MouseLeft})

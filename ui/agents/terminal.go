@@ -2,19 +2,11 @@ package agents
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/elentok/gx/server/wire"
 
-	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
-
-	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/agents/agentstyle"
 )
 
@@ -28,166 +20,12 @@ type lastScreen struct {
 
 type lastScreenMsg lastScreen
 
-// loadLastScreen reads the selected Exited session's last screen off disk,
-// unless it is already loaded. Only a TUI on the server's machine finds it.
-func (m Model) loadLastScreen() tea.Cmd {
-	if m.cursor >= len(m.sessions) || m.sessionsDir == "" {
-		return nil
-	}
-	s := m.sessions[m.cursor]
-	if s.Status.State != wire.SessionExited ||
-		(m.lastScreen.id == s.ID && m.lastScreen.changedAt.Equal(s.StatusChangedAt)) {
-		return nil
-	}
-	path := filepath.Join(m.sessionsDir, s.ID, holder.LastScreenFile)
-	return func() tea.Msg {
-		msg := lastScreenMsg{id: s.ID, changedAt: s.StatusChangedAt}
-		if data, err := os.ReadFile(path); err == nil {
-			msg.rows = strings.Split(strings.TrimRight(string(data), "\n"), "\n")
-		}
-		return msg
-	}
-}
-
-// terminalTitle is the left of the terminal header: status icon, name,
-// status label and Session ticket.
-func (m Model) terminalTitle(s wire.SessionInfo, titleStyle lipgloss.Style) string {
-	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	title := agentstyle.StatusIcon(s, icons, m.spinner.View()) + " " + titleStyle.Render(displayName(s)) + " " + agentstyle.StatusLabel(s)
-	rest := ""
-	if s.Ticket != "" {
-		rest += " " + agentstyle.Ticket.Render(s.Ticket)
-	}
-	title += m.harnessLabelText(s, ansi.StringWidth(title)+ansi.StringWidth(rest)) + rest
-	if a := m.attach; a != nil && a.id == s.ID && a.offset > 0 {
-		badge := fmt.Sprintf("scrolled ↑ %d", a.offset)
-		if a.newLines > 0 {
-			badge += fmt.Sprintf("  +%d new", a.newLines)
-		}
-		title += " " + agentstyle.Detail.Render(badge)
-	}
-	if m.copy != nil && m.copy.a.id == s.ID {
-		title += " " + agentstyle.Detail.Render("copy")
-	}
-	return title
-}
-
-// harnessLabelText is the session's dim ` harness · tier · model effort`,
-// cut to the header room left beside the right title (used is the width of
-// the title without it). Empty when a session has no harness or no room.
-func (m Model) harnessLabelText(s wire.SessionInfo, used int) string {
-	if s.Harness == "" {
-		return ""
-	}
-	inner := m.mainWidth() - 2
-	room := inner - ansi.StringWidth(m.terminalRightTitle(s, inner)) - used - 2
-	if room < 2 {
-		return ""
-	}
-	label := ui.HarnessLabel(s.Harness, string(s.Tier), s.Model, s.Effort, s.ModelSwitched)
-	return " " + agentstyle.Harness.Render(ansi.Truncate(label, room-1, "…"))
-}
-
-// terminalRightTitle is the AFK mark, project, dir and the time since the
-// last status change; it takes at most half the header so the title stays
-// readable. Truncation cuts the project side, never the AFK mark.
-func (m Model) terminalRightTitle(s wire.SessionInfo, width int) string {
-	afk := ""
-	if m.afk {
-		afk = " AFK ·"
-	}
-	// The leading space keeps a gap once the title is truncated against it.
-	right := " " + s.Project + "  " + agentstyle.ShortDir(m.settings.Home(), s.Dir)
-	if !s.StatusChangedAt.IsZero() {
-		right += "  for " + ui.DurationCompact(m.now().Sub(s.StatusChangedAt))
-	}
-	if w, limit := ansi.StringWidth(right), width/2-len(afk); w > limit {
-		right = ansi.TruncateLeft(right, w-limit+1, "…")
-	}
-	return afk + right
-}
-
-// terminalLines is the terminal panel body: the info row (then a blank row)
-// and the screen.
-func (m Model) terminalLines(s wire.SessionInfo) []string {
-	lines := infoLines(s, m.now())
-	live := m.attach
-	if live != nil && live.id != s.ID {
-		live = nil
-	}
-	if s.Status.State != wire.SessionExited && (live == nil || !live.exited) {
-		switch {
-		case live != nil && live.err != nil && !live.retrying:
-			return append(lines, agentstyle.Reason.Render("attach failed: "+live.err.Error()))
-		case live == nil || live.rows == nil:
-			return append(lines, ui.StyleMuted.Render("live screen not attached yet"))
-		}
-		if m.copy != nil && m.copy.a == live {
-			return append(lines, m.copyRows(live.rows)...)
-		}
-		return append(lines, live.rows...)
-	}
-	lines = append(lines, ui.StyleMuted.Render("<leader> r to resume"), "")
-	if m.lastScreen.id != s.ID {
-		return lines
-	}
-	for _, row := range m.lastScreen.rows {
-		lines = append(lines, agentstyle.LastScreen.Render(ansi.Strip(row)))
-	}
-	return lines
-}
-
-// terminalCursor is the attached session's cursor on the panel, shown only
-// while the terminal has focus, the live screen is on view and nothing covers
-// it.
-func (m Model) terminalCursor() *tea.Cursor {
-	a := m.attach
-	if !m.terminalFocused || !a.live() || a.offset > 0 || !a.cursor.Visible || m.copy != nil ||
-		m.ModalOpen() || m.leaderPending || m.selectedID() != a.id {
-		return nil
-	}
-	if cols, rows := m.screenSize(); a.cursor.X >= cols || a.cursor.Y >= rows {
-		return nil
-	}
-	x, y := m.screenOrigin()
-	return tea.NewCursor(x+a.cursor.X, y+a.cursor.Y)
-}
-
-// screenOrigin is where the session's screen starts on the page: past the
-// sidebar and seam and the panel's padding, below its header and the info
-// lines.
-func (m Model) screenOrigin() (x, y int) {
-	y = 1
-	if m.cursor < len(m.sessions) {
-		y += len(infoLines(m.sessions[m.cursor], m.now()))
-	}
-	return m.width - m.mainWidth() + 1, y
-}
-
-// screenCell is the session's screen cell under mouse; false off the screen.
-func (m Model) screenCell(mouse tea.Mouse) (x, y int, ok bool) {
-	ox, oy := m.screenOrigin()
-	cols, rows := m.screenSize()
-	x, y = mouse.X-ox, mouse.Y-oy
-	return x, y, x >= 0 && x < cols && y >= 0 && y < rows
-}
-
 // infoLines is the info row then a blank row, or none without an info row.
 func infoLines(s wire.SessionInfo, now time.Time) []string {
 	if info := infoRow(s, now); info != "" {
 		return []string{info, ""}
 	}
 	return nil
-}
-
-// screenSize is the panel's room for the session's screen: inside the border,
-// below the info lines.
-func (m Model) screenSize() (cols, rows int) {
-	cols, rows = m.mainWidth()-2, m.height-1
-	if m.cursor < len(m.sessions) {
-		rows -= len(infoLines(m.sessions[m.cursor], m.now()))
-	}
-	return max(cols, 1), max(rows, 1)
 }
 
 // infoRow is the Actionable reason with the prompts `<leader> a` would run,

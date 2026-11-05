@@ -31,7 +31,7 @@ func terminalModel(t *testing.T, s wire.SessionInfo, sessionsDir string) Model {
 	t.Helper()
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: true})
 	m.now = func() time.Time { return terminalNow }
-	m.sessionsDir = sessionsDir
+	m.term.sessionsDir = sessionsDir
 	m.hideSidebar = true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 8})
 	next, cmd := m.WithServerState(&viewmodel.State{Sessions: []wire.SessionInfo{s}}, tabapi.ServerLinkUp)

@@ -56,7 +56,7 @@ func (m Model) enterCopyMode() (tea.Model, tea.Cmd) {
 
 // copyView is the view's top line and its height in rows.
 func (m Model) copyView() (top, height int) {
-	_, height = m.screenSize()
+	_, height = m.termView().screenSize()
 	a := m.attach
 	return a.scrollBase + a.scrollMax - a.offset, height
 }
@@ -94,7 +94,7 @@ func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "h", "left":
 		c.cursor.Col = max(c.cursor.Col-1, 0)
 	case "l", "right":
-		cols, _ := m.screenSize()
+		cols, _ := m.termView().screenSize()
 		c.cursor.Col = min(c.cursor.Col+1, cols-1)
 	case "j", "down":
 		c.cursor.Line++
@@ -245,7 +245,7 @@ func (m Model) writeCopied(text string) tea.Cmd {
 func (m Model) copyRows(rows []string) []string {
 	c := m.copy
 	top, _ := m.copyView()
-	cols, _ := m.screenSize()
+	cols, _ := m.termView().screenSize()
 	var start, end holder.LinePos
 	if c.selecting {
 		start, end = c.selection()
