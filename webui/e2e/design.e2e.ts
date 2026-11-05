@@ -85,8 +85,9 @@ test.describe("9. Design progress to the end", () => {
     // The Epic page ring is the reference for the label.
     await expect(card(page, "design-epic")).toBeVisible();
     await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
+    // innerText does not wait: under load it read the ring before its label rendered.
+    await expect(ring(page)).toHaveText(/%\s*$/);
     const epicLabel = (await ring(page).innerText()).trim();
-    expect(epicLabel).toMatch(/%$/);
 
     await page.evaluate(() => (location.hash = "#/epics"));
     await openDesign(page);
