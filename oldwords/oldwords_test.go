@@ -144,8 +144,8 @@ var allowed = map[string]allowance{
 	"server/ticketops/ticketwrites_test.go":    allow("unmute demotes only the legacy Needs Repair heading", "needsrepair"),
 	"server/recovery/recovery_notify_test.go":  allow("snapshot status is the legacy wire word", "needsanswer", "needsrepair"),
 	"server/explain/reads_test.go":             allow("persisted lock kind \"land\"", "land"),
-	"server/web_test.go":                       allow("tests the hidden unpark route", "park"),
-	"server/web_allowlist_test.go":             allow("tests the hidden unpark route", "park"),
+	"server/webhttp/web_test.go":               allow("tests the hidden unpark route", "park"),
+	"server/webhttp/web_allowlist_test.go":     allow("tests the hidden unpark route", "park"),
 	"server/ticketops/resume_web_test.go":      allow("asserts the persisted unpark answer choice", "park"),
 	"server/server_notify_test.go":             allow("asserts the \"needs answer\" and \"needs repair\" headlines", "needsanswer", "needsrepair"),
 	// Documentation of the retirement and of the past.

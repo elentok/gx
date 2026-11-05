@@ -1,4 +1,4 @@
-package server_test
+package webhttp_test
 
 import (
 	"net/http"
@@ -86,7 +86,7 @@ func TestWebTLS_OnePortServesHTTPSAndRedirectsPlainHTTP(t *testing.T) {
 
 func TestWebTLS_NoConfigKeyTurnsItOff(t *testing.T) {
 	t.Parallel()
-	schema, err := os.ReadFile("../docs/config-schema.json")
+	schema, err := os.ReadFile("../../docs/config-schema.json")
 	if err != nil {
 		t.Fatal(err)
 	}
