@@ -33,7 +33,7 @@ func TestSessionAutoAdvance_FlipsTheSwitchOnADesignSession(t *testing.T) {
 		t.Error("a new session's meta records the switch; an old one has no such field")
 	}
 	for _, on := range []bool{false, true} {
-		res, err := f.H.Client.SetAutoAdvance(f.Ctx, f.ID, on)
+		res, err := f.H.Client.Sessions.SetAutoAdvance(f.Ctx, f.ID, on)
 		if err != nil || res.Refused || res.Session == nil || res.Session.AutoAdvance != on {
 			t.Fatalf("set auto-advance %v = %+v, %v", on, res, err)
 		}
@@ -54,7 +54,7 @@ func TestSessionAutoAdvance_RefusesAPlainAndAnUnknownSession(t *testing.T) {
 		{"plain", plain.Session.ID, wire.ReasonSessionNotDesign},
 		{"unknown", "nope", wire.ReasonSessionUnknown},
 	} {
-		res, err := f.H.Client.SetAutoAdvance(f.Ctx, tc.id, false)
+		res, err := f.H.Client.Sessions.SetAutoAdvance(f.Ctx, tc.id, false)
 		if err != nil || !res.Refused || res.Reason != tc.want {
 			t.Errorf("%s session = %+v, %v; want %s", tc.name, res, err, tc.want)
 		}

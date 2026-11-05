@@ -38,7 +38,7 @@ func startWebFocus(t *testing.T) *webFocus {
 	})
 	started := chat.WaitStarted(t)
 	afk := true
-	if _, err := h.Client.SetAFK(ctx, &afk); err != nil {
+	if _, err := h.Client.Sessions.SetAFK(ctx, &afk); err != nil {
 		t.Fatal(err)
 	}
 	hs, err := h.Client.Handshake(ctx)
@@ -138,7 +138,7 @@ func TestWebFocus_ClickTargetStaysOnLastFocusedTUI(t *testing.T) {
 	f.openTab(t, "web-1")
 	f.reportOnceConnected(t, "web-1", true, "")
 
-	res, err := f.h.Client.FocusSession(ctx, f.id)
+	res, err := f.h.Client.Sessions.Focus(ctx, f.id)
 	if err != nil || res.Refused || res.Client != "tui-1" {
 		t.Fatalf("focus = %+v, %v; want target tui-1", res, err)
 	}

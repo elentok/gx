@@ -56,7 +56,7 @@ func AppendTranscript(t *testing.T, path string) {
 func WaitSessionState(ctx context.Context, t *testing.T, h *Harness, id, state string) {
 	t.Helper()
 	WaitFor(t, 20*time.Second, fmt.Sprintf("session %s to reach %s", id, state), func() bool {
-		list, _ := h.Client.Sessions(ctx)
+		list, _ := h.Client.Sessions.List(ctx)
 		return slices.ContainsFunc(list, func(s wire.SessionInfo) bool { return s.ID == id && s.Status.State == state })
 	})
 }

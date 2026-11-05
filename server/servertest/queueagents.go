@@ -33,7 +33,7 @@ const QueueRowTicket = "proj:epic-a/01"
 // QueueRows lists the Queue rows of the session list.
 func QueueRows(t *testing.T, h *Harness) []wire.SessionInfo {
 	t.Helper()
-	list, err := h.Client.Sessions(context.Background())
+	list, err := h.Client.Sessions.List(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

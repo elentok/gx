@@ -64,7 +64,7 @@ func TestCreateSession_StartsHolderAndListsSession(t *testing.T) {
 		got.Harness != want.Harness || got.Ticket != want.Ticket || got.Status != want.Status {
 		t.Errorf("snapshot session = %+v, want %+v", got, want)
 	}
-	list, err := h.Client.Sessions(ctx)
+	list, err := h.Client.Sessions.List(ctx)
 	if err != nil || len(list) != 1 || list[0].ID != id {
 		t.Errorf("sessions = %+v, %v; want %s", list, err, id)
 	}
@@ -143,7 +143,7 @@ func TestCreateSession_UniqueNameIgnoresAnExitedSession(t *testing.T) {
 	}
 	id := first.Session.ID
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
-	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Stop(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
@@ -186,7 +186,7 @@ func TestCreateSession_RefusesBadRequests(t *testing.T) {
 			t.Errorf("%s: create = %+v, want refused %s", name, res, tc.reason)
 		}
 	}
-	if list, _ := h.Client.Sessions(ctx); len(list) != 0 {
+	if list, _ := h.Client.Sessions.List(ctx); len(list) != 0 {
 		t.Errorf("sessions = %+v, want none", list)
 	}
 }
@@ -264,7 +264,7 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 	dir := filepath.Join(h.SessionsDir, id)
 	waitForHolder(t, dir)
 
-	res, err := h.Client.StopSession(ctx, id)
+	res, err := h.Client.Sessions.Stop(ctx, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +282,7 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 		t.Errorf("last screen not kept: %v", err)
 	}
 
-	res, err = h.Client.StopSession(ctx, id)
+	res, err = h.Client.Sessions.Stop(ctx, id)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotLive {
 		t.Errorf("stop again = %+v, %v; want refused %s", res, err, wire.ReasonSessionNotLive)
 	}
@@ -295,7 +295,7 @@ func TestStopSession_StopsAHolderStillStarting(t *testing.T) {
 	h, ctx, _, id, _ := startFakeSession(t)
 	dir := filepath.Join(h.SessionsDir, id)
 
-	res, err := h.Client.StopSession(ctx, id)
+	res, err := h.Client.Sessions.Stop(ctx, id)
 	if err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
@@ -334,7 +334,7 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 	h, ctx, evs, id, _ := startFakeSession(t)
 	dir := filepath.Join(h.SessionsDir, id)
 
-	res, err := h.Client.RemoveSession(ctx, id)
+	res, err := h.Client.Sessions.Remove(ctx, id)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionLive {
 		t.Fatalf("remove live = %+v, %v; want refused %s", res, err, wire.ReasonSessionLive)
 	}
@@ -342,10 +342,10 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 		t.Fatalf("refused remove touched the state dir: %v", err)
 	}
 
-	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Stop(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
-	res, err = h.Client.RemoveSession(ctx, id)
+	res, err = h.Client.Sessions.Remove(ctx, id)
 	if err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
@@ -361,7 +361,7 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 		t.Errorf("snapshot sessions = %+v, want none", snap.Sessions)
 	}
 
-	res, err = h.Client.RemoveSession(ctx, id)
+	res, err = h.Client.Sessions.Remove(ctx, id)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionUnknown {
 		t.Errorf("remove gone = %+v, %v; want refused %s", res, err, wire.ReasonSessionUnknown)
 	}
@@ -477,11 +477,11 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 		return strings.Contains(string(raw), agentfake.ProgramTrustPrompt) && !screenHas(t, hc, agentfake.ProgramTrustPrompt)
 	})
 
-	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Stop(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
-	if res, err := h.Client.RemoveSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Remove(ctx, id); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
 	if _, err := os.Stat(wt); err != nil {
@@ -533,7 +533,7 @@ func TestCreateSession_RefusesBadWorktrees(t *testing.T) {
 			t.Errorf("%s: create = %+v, want refused %s", name, res, wire.ReasonSessionBadRequest)
 		}
 	}
-	if list, _ := h.Client.Sessions(ctx); len(list) != 0 {
+	if list, _ := h.Client.Sessions.List(ctx); len(list) != 0 {
 		t.Errorf("sessions = %+v, want none", list)
 	}
 }
@@ -570,7 +570,7 @@ func TestReportSessionStep_StoredWhileBusyAndClearedOnIdle(t *testing.T) {
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 
-	res, err := h.Client.ReportSessionStep(ctx, wire.ReportStepRequest{ID: id, Step: "resolve-tickets", Title: "Add the cache"})
+	res, err := h.Client.Sessions.ReportStep(ctx, wire.ReportStepRequest{ID: id, Step: "resolve-tickets", Title: "Add the cache"})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("report step = %+v, %v", res, err)
 	}
@@ -598,7 +598,7 @@ func TestReportSessionStep_Refusals(t *testing.T) {
 		"no step":         {wire.ReportStepRequest{ID: id}, wire.ReasonSessionBadRequest},
 		"unknown session": {wire.ReportStepRequest{ID: "abcdef", Step: "spec"}, wire.ReasonSessionUnknown},
 	} {
-		res, err := h.Client.ReportSessionStep(ctx, tc.req)
+		res, err := h.Client.Sessions.ReportStep(ctx, tc.req)
 		if err != nil || !res.Refused || res.Reason != tc.reason {
 			t.Errorf("%s: report = %+v, %v; want refused %s", name, res, err, tc.reason)
 		}
@@ -620,7 +620,7 @@ func TestSessionCreate_TierIsSavedAndResumeKeepsIt(t *testing.T) {
 		t.Fatalf("meta tier = %v, want strongest", tier)
 	}
 	stopFakeSession(ctx, t, h, evs, id)
-	if r, err := h.Client.ResumeSession(ctx, id); err != nil || r.Refused {
+	if r, err := h.Client.Sessions.Resume(ctx, id); err != nil || r.Refused {
 		t.Fatalf("resume = %+v, %v", r, err)
 	}
 	if tier := readMeta(t, h, id)["tier"]; tier != "strongest" {
@@ -676,7 +676,7 @@ func TestFocusSession_TargetsLastFocusedTUI(t *testing.T) {
 	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-2", Focused: true})
 	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-2"})
 
-	res, err := h.Client.FocusSession(ctx, id)
+	res, err := h.Client.Sessions.Focus(ctx, id)
 	if err != nil || res.Refused || res.Client != "tui-2" {
 		t.Fatalf("focus = %+v, %v; want target tui-2", res, err)
 	}
@@ -692,11 +692,11 @@ func TestFocusSession_NoTUISucceedsWithNoTarget(t *testing.T) {
 	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-1", Focused: true})
 	drop()
 	waitFor(t, func() bool {
-		res, err := h.Client.ReportFocus(ctx, wire.FocusReport{Client: "tui-1"})
+		res, err := h.Client.Sessions.ReportFocus(ctx, wire.FocusReport{Client: "tui-1"})
 		return err == nil && res.Reason == wire.ReasonFocusNotConnected
 	})
 
-	res, err := h.Client.FocusSession(ctx, id)
+	res, err := h.Client.Sessions.Focus(ctx, id)
 	if err != nil || res.Refused || res.Client != "" {
 		t.Fatalf("focus = %+v, %v; want success with no target", res, err)
 	}
@@ -705,7 +705,7 @@ func TestFocusSession_NoTUISucceedsWithNoTarget(t *testing.T) {
 func TestFocusSession_RefusesUnknownID(t *testing.T) {
 	t.Parallel()
 	h, ctx, _, _, _ := startFakeSession(t)
-	res, err := h.Client.FocusSession(ctx, "nope")
+	res, err := h.Client.Sessions.Focus(ctx, "nope")
 	if err != nil || res.Reason != wire.ReasonSessionUnknown {
 		t.Fatalf("focus = %+v, %v; want %s", res, err, wire.ReasonSessionUnknown)
 	}

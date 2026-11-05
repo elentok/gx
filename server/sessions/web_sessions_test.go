@@ -96,11 +96,11 @@ func TestSessions_NonWebStopAndRestoreTakeNoToken(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
-	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Stop(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
-	if res, err := h.Client.ResumeSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Resume(ctx, id); err != nil || res.Refused {
 		t.Fatalf("restore = %+v, %v", res, err)
 	}
 }

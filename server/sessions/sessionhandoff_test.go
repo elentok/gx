@@ -96,7 +96,7 @@ func TestChartingHandoff_FailedRestartExitsCrashedAndResumeWorks(t *testing.T) {
 		t.Fatalf("model after the failed restart = %v, want stale-model", model)
 	}
 	setWorkerModel(t, f.store, "sonnet")
-	res, err := f.h.Client.ResumeSession(f.ctx, f.id)
+	res, err := f.h.Client.Sessions.Resume(f.ctx, f.id)
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}

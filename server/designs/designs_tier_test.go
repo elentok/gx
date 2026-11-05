@@ -67,7 +67,7 @@ func TestLinkSession_KeepsTheLaunchTierAndSetsNoLaunchKind(t *testing.T) {
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
-	if _, err := f.h.Client.LinkSession(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "map"}); err != nil {
+	if _, err := f.h.Client.Sessions.Link(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "map"}); err != nil {
 		t.Fatal(err)
 	}
 	meta := readMeta(t, f.h, res.Session.ID)

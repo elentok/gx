@@ -38,7 +38,7 @@ func (f designsFixture) openDesignWorktree(t *testing.T, commit bool) (dir, id s
 
 func (f designsFixture) stop(t *testing.T, id string) {
 	t.Helper()
-	if _, err := f.h.Client.StopSession(f.ctx, id); err != nil {
+	if _, err := f.h.Client.Sessions.Stop(f.ctx, id); err != nil {
 		t.Fatal(err)
 	}
 }

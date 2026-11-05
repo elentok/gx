@@ -15,7 +15,7 @@ func TestAFK_ToggleSnapshotEventAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.SetAFK(ctx, nil)
+	res, err := h.Client.Sessions.SetAFK(ctx, nil)
 	if err != nil || !res.AFK {
 		t.Fatalf("toggle = %+v, %v; want on", res, err)
 	}
@@ -29,10 +29,10 @@ func TestAFK_ToggleSnapshotEventAndRestart(t *testing.T) {
 		t.Fatalf("snapshot afk after restart = %v, %v; want on", snap.AFK, err)
 	}
 	off := false
-	if res, err := h.Client.SetAFK(ctx, &off); err != nil || res.AFK {
+	if res, err := h.Client.Sessions.SetAFK(ctx, &off); err != nil || res.AFK {
 		t.Fatalf("set off = %+v, %v", res, err)
 	}
-	if res, err := h.Client.SetAFK(ctx, &off); err != nil || res.AFK {
+	if res, err := h.Client.Sessions.SetAFK(ctx, &off); err != nil || res.AFK {
 		t.Fatalf("set off again = %+v, %v; want still off", res, err)
 	}
 }

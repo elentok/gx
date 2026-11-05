@@ -70,7 +70,7 @@ func assertFailedStartEnded(ctx context.Context, t *testing.T, h *servertest.Har
 		t.Errorf("run = %v, want %v: no auto-resume", run, wantRun)
 	}
 
-	if res, err := h.Client.RemoveSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Remove(ctx, id); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
 	if _, err := os.Stat(filepath.Join(h.SessionsDir, id)); !os.IsNotExist(err) {
@@ -103,7 +103,7 @@ func TestResumeSession_FailedHolderStartEndsCrashed(t *testing.T) {
 	stopFakeSession(ctx, t, h, evs, id)
 	holder.brk(t)
 
-	if res, err := h.Client.ResumeSession(ctx, id); err == nil {
+	if res, err := h.Client.Sessions.Resume(ctx, id); err == nil {
 		t.Fatalf("resume = %+v, want an error", res)
 	}
 	assertFailedStartEnded(ctx, t, h, holder, id, 1.0)

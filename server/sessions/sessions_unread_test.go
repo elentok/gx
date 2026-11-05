@@ -91,7 +91,7 @@ func TestUnread_FocusedTUIViewingSuppressesAndClears(t *testing.T) {
 
 	dropTUI()
 	servertest.WaitFor(t, 5*time.Second, "the focus report to be refused after its stream closed", func() bool {
-		res, err := h.Client.ReportFocus(ctx, wire.FocusReport{Client: "tui-1", Focused: true})
+		res, err := h.Client.Sessions.ReportFocus(ctx, wire.FocusReport{Client: "tui-1", Focused: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -118,12 +118,12 @@ func TestReportFocus_RefusesUnknownClientOrSession(t *testing.T) {
 		"no stream":       {wire.FocusReport{Client: "tui-2", Focused: true}, wire.ReasonFocusNotConnected},
 		"unknown session": {wire.FocusReport{Client: "tui-1", Session: "abcdef"}, wire.ReasonSessionUnknown},
 	} {
-		res, err := h.Client.ReportFocus(ctx, tc.req)
+		res, err := h.Client.Sessions.ReportFocus(ctx, tc.req)
 		if err != nil || !res.Refused || res.Reason != tc.reason {
 			t.Errorf("%s: report = %+v, %v; want refused %s", name, res, err, tc.reason)
 		}
 	}
-	if res, err := h.Client.MarkSessionRead(ctx, "abcdef"); err != nil || res.Reason != wire.ReasonSessionUnknown {
+	if res, err := h.Client.Sessions.MarkRead(ctx, "abcdef"); err != nil || res.Reason != wire.ReasonSessionUnknown {
 		t.Errorf("mark read unknown = %+v, %v; want refused %s", res, err, wire.ReasonSessionUnknown)
 	}
 }
@@ -141,14 +141,14 @@ func TestMarkRead_FailedSaveIsAnError(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
-	if res, err := h.Client.MarkSessionRead(ctx, id); err == nil {
+	if res, err := h.Client.Sessions.MarkRead(ctx, id); err == nil {
 		t.Errorf("mark read with an unsavable meta = %+v, nil; want an error", res)
 	}
 }
 
 func markRead(ctx context.Context, t *testing.T, h *servertest.Harness, id string) {
 	t.Helper()
-	res, err := h.Client.MarkSessionRead(ctx, id)
+	res, err := h.Client.Sessions.MarkRead(ctx, id)
 	if err != nil || res.Refused || res.Session == nil || res.Session.Unread.Unread {
 		t.Fatalf("mark read = %+v, %v; want the session read", res, err)
 	}

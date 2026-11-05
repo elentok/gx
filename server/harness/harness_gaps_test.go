@@ -83,7 +83,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 		{"design step", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
-			res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "proj:map"})
+			res, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "proj:map"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -92,7 +92,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 		{"fix agent", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
-			res, err := f.h.Client.FixAgent(f.ctx, wire.FixAgentRequest{Address: "proj:loop/01"})
+			res, err := f.h.Client.Sessions.FixAgent(f.ctx, wire.FixAgentRequest{Address: "proj:loop/01"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -117,7 +117,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 					t.Errorf("message = %q, want it to contain %q", res.Message, want)
 				}
 			}
-			if list, err := f.h.Client.Sessions(f.ctx); err != nil || len(list) != 0 {
+			if list, err := f.h.Client.Sessions.List(f.ctx); err != nil || len(list) != 0 {
 				t.Errorf("sessions = %v, %v; want none", list, err)
 			}
 		})
@@ -133,7 +133,7 @@ func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 	servertest.WriteCodexRollout(t, codexHome, conv, dir)
 	h.Programs.Missing("codex")
 
-	res, err := h.Client.ResumeSession(ctx, id)
+	res, err := h.Client.Sessions.Resume(ctx, id)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionHarnessMissing {
 		t.Fatalf("resume = %+v, %v; want a harness-missing refusal", res, err)
 	}
@@ -142,7 +142,7 @@ func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 			t.Errorf("message = %q, want it to contain %q", res.Message, want)
 		}
 	}
-	list, err := h.Client.Sessions(ctx)
+	list, err := h.Client.Sessions.List(ctx)
 	if err != nil || len(list) != 1 || list[0].Status.State != wire.SessionExited {
 		t.Errorf("sessions = %+v, %v; want the one session still Exited", list, err)
 	}
@@ -159,7 +159,7 @@ func TestHarnessMissing_ChartingHandoffRefusesBeforeStoppingTheOldAgent(t *testi
 	beforeSnap := servertest.SessionSnapshotOf(t, f.DesignsFixture, f.ID)
 	f.H.Programs.Missing(os.Args[0])
 
-	res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true})
+	res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionHarnessMissing {
 		t.Fatalf("continue = %+v, %v; want a harness-missing refusal", res, err)
 	}
@@ -243,7 +243,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 		k := startKept(t, "claude")
 		servertest.WriteTranscript(t, k.transcript, servertest.Reply)
 		k.switchDefault(t, "codex")
-		got, err := k.h.Client.SessionChat(k.ctx, k.id)
+		got, err := k.h.Client.Sessions.Chat(k.ctx, k.id)
 		if err != nil || got.Unsupported || got.Unreadable || len(got.Messages) != 1 || got.Messages[0].Text != "hi" {
 			t.Errorf("chat = %+v, %v; want the Claude transcript's one message", got, err)
 		}
@@ -289,7 +289,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 			`{"ordinal":2,"type":"event_msg","payload":{"type":"task_complete"}}`,
 		)
 		k.switchDefault(t, "claude")
-		got, err := k.h.Client.SessionChat(k.ctx, k.id)
+		got, err := k.h.Client.Sessions.Chat(k.ctx, k.id)
 		if err != nil || got.Unsupported || got.Unreadable || len(got.Messages) != 1 || got.Messages[0].Text != "hi" {
 			t.Errorf("chat = %+v, %v; want the rollout's one message", got, err)
 		}

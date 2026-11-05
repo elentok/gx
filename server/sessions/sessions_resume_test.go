@@ -19,7 +19,7 @@ func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
 	idleWithAction(ctx, t, h, evs, id, conv, "/review")
 	stopFakeSession(ctx, t, h, evs, id)
 
-	res, err := h.Client.ResumeSession(ctx, id)
+	res, err := h.Client.Sessions.Resume(ctx, id)
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
@@ -48,7 +48,7 @@ func TestResumeSession_UsesNewestConversation(t *testing.T) {
 	waitForSession(ctx, t, h, evs, id, func(wire.SessionInfo) bool { return readMeta(t, h, id)["conversation_id"] == newer })
 	stopFakeSession(ctx, t, h, evs, id)
 
-	if res, err := h.Client.ResumeSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Resume(ctx, id); err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
 	report(t, newer, agentfake.Control{State: "working"})
@@ -62,14 +62,14 @@ func TestResumeSession_CodexNeedsItsRollout(t *testing.T) {
 	codexHome := t.TempDir()
 	h, ctx, id, conv, dir := stoppedCodexSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
 
-	res, err := h.Client.ResumeSession(ctx, id)
+	res, err := h.Client.Sessions.Resume(ctx, id)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoResume || !strings.Contains(res.Message, "rollout") {
 		t.Fatalf("resume without rollout = %+v, %v; want refused %s naming the rollout", res, err, wire.ReasonSessionNoResume)
 	}
 
 	writeCodexRollout(t, codexHome, conv, dir)
 	// Past the rollout check; a host without codex still refuses, for the missing binary.
-	res, err = h.Client.ResumeSession(ctx, id)
+	res, err = h.Client.Sessions.Resume(ctx, id)
 	if err != nil || res.Reason == wire.ReasonSessionNoResume {
 		t.Errorf("resume with rollout = %+v, %v; want it past the rollout check", res, err)
 	}
@@ -90,7 +90,7 @@ func TestResumeSession_CodexLaunchesCodexResume(t *testing.T) {
 	))
 	writeCodexRollout(t, codexHome, conv, dir)
 
-	if res, err := h.Client.ResumeSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Resume(ctx, id); err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
 	var args []string
@@ -107,7 +107,7 @@ func TestResumeSession_CodexLaunchesCodexResume(t *testing.T) {
 func TestResumeSession_Refusals(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
-	if res, err := h.Client.ResumeSession(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionLive {
+	if res, err := h.Client.Sessions.Resume(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionLive {
 		t.Errorf("resume live = %+v, %v; want refused %s", res, err, wire.ReasonSessionLive)
 	}
 
@@ -116,7 +116,7 @@ func TestResumeSession_Refusals(t *testing.T) {
 		t.Fatalf("create = %+v, %v", noResume, err)
 	}
 	stopFakeSession(ctx, t, h, evs, noResume.Session.ID)
-	if res, err := h.Client.ResumeSession(ctx, noResume.Session.ID); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoResume {
+	if res, err := h.Client.Sessions.Resume(ctx, noResume.Session.ID); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoResume {
 		t.Errorf("resume without harness resume = %+v, %v; want refused %s", res, err, wire.ReasonSessionNoResume)
 	}
 
@@ -125,7 +125,7 @@ func TestResumeSession_Refusals(t *testing.T) {
 	if err := os.RemoveAll(dir); err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.ResumeSession(ctx, id)
+	res, err := h.Client.Sessions.Resume(ctx, id)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionDirGone || res.Message != "dir is gone" {
 		t.Errorf("resume with dir gone = %+v, %v; want refused %s", res, err, wire.ReasonSessionDirGone)
 	}

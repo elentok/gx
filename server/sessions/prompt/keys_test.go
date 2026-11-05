@@ -87,7 +87,7 @@ func TestSessionKeys_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
 	h, row, release := servertest.StartQueueChat(t, "hello")
 	defer release()
-	res, err := h.Client.KeysSession(context.Background(), wire.SessionKeysRequest{ID: row.ID, Key: "Esc"})
+	res, err := h.Client.Sessions.Keys(context.Background(), wire.SessionKeysRequest{ID: row.ID, Key: "Esc"})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionReadOnly {
 		t.Errorf("keys = %+v, %v; want refusal %s", res, err, wire.ReasonSessionReadOnly)
 	}
@@ -182,7 +182,7 @@ func TestSessionKeys_GuardedSendWaitsForTheSessionToLeaveBlocked(t *testing.T) {
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
 	done := make(chan wire.SessionResult, 1)
 	go func() {
-		res, err := f.h.Client.KeysSession(f.ctx, wire.SessionKeysRequest{ID: f.id, Key: "Tab", OnlyBlocked: true})
+		res, err := f.h.Client.Sessions.Keys(f.ctx, wire.SessionKeysRequest{ID: f.id, Key: "Tab", OnlyBlocked: true})
 		if err != nil {
 			t.Error(err)
 		}
@@ -283,7 +283,7 @@ func startKeysAdvancing(t *testing.T) *grillingFixture {
 func TestSessionKeys_DesignKeyStopsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f := startKeysAdvancing(t)
-	if res, err := f.H.Client.KeysSession(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Key: "Tab"}); err != nil || res.Refused {
+	if res, err := f.H.Client.Sessions.Keys(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Key: "Tab"}); err != nil || res.Refused {
 		t.Fatalf("keys = %+v, %v", res, err)
 	}
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
@@ -301,7 +301,7 @@ func TestSessionKeys_GuardedKeyKeepsTheCountdown(t *testing.T) {
 	}
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
 	// Close dialog's Esc: whether the fake leaves Blocked on it does not matter here.
-	if _, err := f.H.Client.KeysSession(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Key: "Esc", OnlyBlocked: true}); err != nil {
+	if _, err := f.H.Client.Sessions.Keys(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Key: "Esc", OnlyBlocked: true}); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(time.Second) // negative wait: the holder wakes the session's stream within this window
@@ -313,7 +313,7 @@ func TestSessionKeys_GuardedKeyKeepsTheCountdown(t *testing.T) {
 func TestSessionKeys_GuardedRefusalKeepsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f := startKeysAdvancing(t)
-	res, err := f.H.Client.KeysSession(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Key: "Tab", OnlyBlocked: true})
+	res, err := f.H.Client.Sessions.Keys(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Key: "Tab", OnlyBlocked: true})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonNotBlocked {
 		t.Fatalf("keys = %+v, %v; want %s", res, err, wire.ReasonNotBlocked)
 	}

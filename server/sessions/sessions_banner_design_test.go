@@ -31,7 +31,7 @@ func exitDesign(t *testing.T, frontmatter string, code int) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.OpenDesign(ctx, wire.DesignOpenRequest{Epic: "proj:map"})
+	res, err := h.Client.Sessions.OpenDesign(ctx, wire.DesignOpenRequest{Epic: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("open = %+v, %v", res, err)
 	}

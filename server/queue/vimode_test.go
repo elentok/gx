@@ -18,7 +18,7 @@ func TestViMode_SetClearToggleSnapshotEventAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.SetViMode(ctx, nil)
+	res, err := h.Client.Sessions.SetViMode(ctx, nil)
 	if err != nil || !res.ViMode {
 		t.Fatalf("toggle = %+v, %v; want on", res, err)
 	}
@@ -32,17 +32,17 @@ func TestViMode_SetClearToggleSnapshotEventAndRestart(t *testing.T) {
 		t.Fatalf("snapshot vi_mode after restart = %v, %v; want on", snap.ViMode, err)
 	}
 	off := false
-	if res, err := h.Client.SetViMode(ctx, &off); err != nil || res.ViMode {
+	if res, err := h.Client.Sessions.SetViMode(ctx, &off); err != nil || res.ViMode {
 		t.Fatalf("set off = %+v, %v", res, err)
 	}
-	if res, err := h.Client.SetViMode(ctx, &off); err != nil || res.ViMode {
+	if res, err := h.Client.Sessions.SetViMode(ctx, &off); err != nil || res.ViMode {
 		t.Fatalf("set off again = %+v, %v; want still off", res, err)
 	}
 	on := true
-	if res, err := h.Client.SetViMode(ctx, &on); err != nil || !res.ViMode {
+	if res, err := h.Client.Sessions.SetViMode(ctx, &on); err != nil || !res.ViMode {
 		t.Fatalf("set on = %+v, %v", res, err)
 	}
-	if res, err := h.Client.SetViMode(ctx, nil); err != nil || res.ViMode {
+	if res, err := h.Client.Sessions.SetViMode(ctx, nil); err != nil || res.ViMode {
 		t.Fatalf("toggle from on = %+v, %v; want off", res, err)
 	}
 	h.Restart(t)
@@ -60,12 +60,12 @@ func TestViMode_OneWritePublishesOneEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	on := true
-	if _, err := h.Client.SetViMode(ctx, &on); err != nil {
+	if _, err := h.Client.Sessions.SetViMode(ctx, &on); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventViModeChanged, "")
 	// A second write is a second event: the first wait consumed exactly one.
-	if _, err := h.Client.SetViMode(ctx, nil); err != nil {
+	if _, err := h.Client.Sessions.SetViMode(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventViModeChanged, "")

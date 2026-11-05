@@ -87,7 +87,7 @@ func findServerSession(dirs config.Dirs, sessionID string) (wire.SessionInfo, er
 	if err != nil {
 		return wire.SessionInfo{}, err
 	}
-	sessions, err := cl.Sessions(context.Background())
+	sessions, err := cl.Sessions.List(context.Background())
 	if err != nil {
 		return wire.SessionInfo{}, fmt.Errorf("reading gx session %s: %w", sessionID, err)
 	}

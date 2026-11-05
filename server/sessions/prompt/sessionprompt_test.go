@@ -148,7 +148,7 @@ func TestSessionPrompt_DesignSlashCommandStopsTheCountdown(t *testing.T) {
 			writeAssistantMessage(t, f.Path, runEndText)
 			endTurn(t, f)
 			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-			res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: text})
+			res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: text})
 			if err != nil || res.Refused {
 				t.Fatalf("prompt = %+v, %v", res, err)
 			}
@@ -199,7 +199,7 @@ func TestSessionPrompt_PlainSessionAcceptsText(t *testing.T) {
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	got, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: id, Text: "hello"})
+	got, err := f.h.Client.Sessions.Prompt(f.ctx, wire.SessionPromptRequest{ID: id, Text: "hello"})
 	if err != nil || got.Refused {
 		t.Fatalf("prompt = %+v, %v; want accepted", got, err)
 	}
@@ -213,7 +213,7 @@ func TestSessionPrompt_HarnessWithoutChat(t *testing.T) {
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
-	got, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: res.Session.ID, Text: "hello"})
+	got, err := f.h.Client.Sessions.Prompt(f.ctx, wire.SessionPromptRequest{ID: res.Session.ID, Text: "hello"})
 	if err != nil || !got.Refused || got.Reason != wire.ReasonPromptHarnessNotSupported {
 		t.Errorf("prompt = %+v, %v; want %s", got, err, wire.ReasonPromptHarnessNotSupported)
 	}
@@ -265,7 +265,7 @@ func TestWebSessionPrompt_StaleWhenTheTranscriptMoved(t *testing.T) {
 
 func (f promptFixture) cont(t *testing.T) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true})
+	res, err := f.h.Client.Sessions.Prompt(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +292,7 @@ func TestSessionPrompt_ContinueRefusedOnANonDesignSession(t *testing.T) {
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
-	got, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: res.Session.ID, Continue: true})
+	got, err := f.h.Client.Sessions.Prompt(f.ctx, wire.SessionPromptRequest{ID: res.Session.ID, Continue: true})
 	if err != nil || !got.Refused || got.Reason != wire.ReasonSessionNotDesign {
 		t.Errorf("continue = %+v, %v; want %s", got, err, wire.ReasonSessionNotDesign)
 	}

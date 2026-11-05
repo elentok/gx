@@ -69,7 +69,7 @@ func OpenTUI(ctx context.Context, t *testing.T, h *Harness, client string) conte
 // ReportFocus sends a focus report and fails on a refusal.
 func ReportFocus(ctx context.Context, t *testing.T, h *Harness, r wire.FocusReport) {
 	t.Helper()
-	res, err := h.Client.ReportFocus(ctx, r)
+	res, err := h.Client.Sessions.ReportFocus(ctx, r)
 	if err != nil || res.Refused {
 		t.Fatalf("report focus = %+v, %v", res, err)
 	}
@@ -81,7 +81,7 @@ func IdleWithAction(ctx context.Context, t *testing.T, h *Harness, evs <-chan wi
 	t.Helper()
 	Report(t, conv, agentfake.Control{State: "idle"})
 	WaitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready", Action: action})
+	res, err := h.Client.Sessions.MarkActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready", Action: action})
 	if err != nil || res.Refused {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}

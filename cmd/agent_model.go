@@ -88,7 +88,7 @@ func sessionHarness(d deps, id string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	sessions, err := cl.Sessions(context.Background())
+	sessions, err := cl.Sessions.List(context.Background())
 	if err != nil {
 		return "", false
 	}

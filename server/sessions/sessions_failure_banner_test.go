@@ -170,7 +170,7 @@ func TestFailureBanner_AFKChatCarriesTheLink(t *testing.T) {
 	})
 	started := chat.WaitStarted(t)
 	afk := true
-	if _, err := f.h.Client.SetAFK(f.ctx, &afk); err != nil {
+	if _, err := f.h.Client.Sessions.SetAFK(f.ctx, &afk); err != nil {
 		t.Fatal(err)
 	}
 	f.stall(t)

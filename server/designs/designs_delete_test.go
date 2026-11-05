@@ -38,7 +38,7 @@ func startDeletable(t *testing.T) designsFixture {
 
 func (f designsFixture) del(t *testing.T, epic string) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.DeleteDesign(f.ctx, wire.DesignDeleteRequest{Epic: epic})
+	res, err := f.h.Client.Sessions.DeleteDesign(f.ctx, wire.DesignDeleteRequest{Epic: epic})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestDesignsDelete_SlugIsFreeAgain(t *testing.T) {
 	if res := f.del(t, "proj:bare"); res.Refused {
 		t.Fatalf("delete = %+v", res)
 	}
-	res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "bare", NewDesign: true, Idea: "again", Project: "proj"})
+	res, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "bare", NewDesign: true, Idea: "again", Project: "proj"})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("new design = %+v, %v", res, err)
 	}

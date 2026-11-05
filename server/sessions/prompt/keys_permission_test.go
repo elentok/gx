@@ -179,7 +179,7 @@ func TestSessionKeys_PermissionKeepsADesignCountdown(t *testing.T) {
 				t.Fatal(err)
 			}
 			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
-			res, err := f.H.Client.KeysSession(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Permission: decision})
+			res, err := f.H.Client.Sessions.Keys(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Permission: decision})
 			if err != nil || res.Refused {
 				t.Fatalf("%s = %+v, %v", decision, res, err)
 			}

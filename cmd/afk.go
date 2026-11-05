@@ -42,7 +42,7 @@ func runAFK(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool
 		v := args[0] == "on"
 		on = &v
 	}
-	res, err := cl.SetAFK(ctx, on)
+	res, err := cl.Sessions.SetAFK(ctx, on)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = wire.AFKResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}

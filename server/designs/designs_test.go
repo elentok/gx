@@ -153,7 +153,7 @@ func (f designsFixture) reopenAfterTrunkCommit(t *testing.T, file, content strin
 	t.Helper()
 	first := f.open(t, "proj:map", false)
 	dir, _ := readMeta(t, f.h, first.Session.ID)["dir"].(string)
-	if _, err := f.h.Client.StopSession(f.ctx, first.Session.ID); err != nil {
+	if _, err := f.h.Client.Sessions.Stop(f.ctx, first.Session.ID); err != nil {
 		t.Fatal(err)
 	}
 	edit(dir)
@@ -218,7 +218,7 @@ func TestLinkSession_CarriesTheRebaseNote(t *testing.T) {
 		gitOut(t, dir, "add", "c.txt")
 		gitOut(t, dir, "commit", "-m", "design change")
 	})
-	linked, err := f.h.Client.LinkSession(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "proj:map"})
+	linked, err := f.h.Client.Sessions.Link(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "proj:map"})
 	if err != nil || linked.Session == nil || linked.Session.RebaseNote != res.Session.RebaseNote || linked.Session.RebaseNote == "" {
 		t.Errorf("link = %+v, %v; want the open's note %q", linked.Session, err, res.Session.RebaseNote)
 	}
@@ -268,7 +268,7 @@ func TestDesignsOpen_ReAddsARemovedWorktreeOnTheSameBranch(t *testing.T) {
 	f := startDesigns(t)
 	first := f.open(t, "proj:map", false)
 	dir, _ := readMeta(t, f.h, first.Session.ID)["dir"].(string)
-	if _, err := f.h.Client.StopSession(f.ctx, first.Session.ID); err != nil {
+	if _, err := f.h.Client.Sessions.Stop(f.ctx, first.Session.ID); err != nil {
 		t.Fatal(err)
 	}
 	gitOut(t, dir, "commit", "--allow-empty", "-m", "design work")
@@ -329,7 +329,7 @@ func TestDesignsOpen_RefusesAnEpicNamedLikeTheDesignBranch(t *testing.T) {
 
 func (f designsFixture) worktree(t *testing.T, epic, exclude string) wire.DesignWorktreeResult {
 	t.Helper()
-	res, err := f.h.Client.DesignWorktree(f.ctx, wire.DesignWorktreeRequest{Epic: epic, ExcludeSession: exclude})
+	res, err := f.h.Client.Sessions.DesignWorktree(f.ctx, wire.DesignWorktreeRequest{Epic: epic, ExcludeSession: exclude})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,7 +489,7 @@ func TestDesignsOpen_ConcurrentCallsMakeOneSession(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "proj:map"}); err == nil && res.Session != nil {
+			if res, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "proj:map"}); err == nil && res.Session != nil {
 				ids[i] = res.Session.ID
 			}
 		}()

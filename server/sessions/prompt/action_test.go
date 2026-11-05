@@ -22,7 +22,7 @@ func TestRunAction_SendsEachPromptAfterWorkingThenIdle(t *testing.T) {
 	h, ctx, evs, id, conv := startFakeSession(t)
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
-	res, err := h.Client.RunSessionAction(ctx, id)
+	res, err := h.Client.Sessions.RunAction(ctx, id)
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
@@ -53,7 +53,7 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
@@ -81,7 +81,7 @@ func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
 	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = 200 * time.Millisecond })
 	idleWithAction(ctx, t, h, evs, id, conv, "/clear", "/gx-design X")
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
@@ -106,7 +106,7 @@ func TestRunAction_SlashStepEndsOnNewConversationWithoutWaiting(t *testing.T) {
 	h, ctx, evs, id, conv := startInputSession(t, time.Minute)
 	idleWithAction(ctx, t, h, evs, id, conv, agentfake.ProgramClearCommand, "next-step")
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"/clear\"\n\"next-step\"\n")
@@ -118,7 +118,7 @@ func TestRunAction_LocalSlashStepEndsOnSettleWithoutAnotherEnter(t *testing.T) {
 	h, ctx, evs, id, conv := startInputSession(t, settle)
 	idleWithAction(ctx, t, h, evs, id, conv, "/local", "next-step")
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"/local\"\n\"next-step\"\n")
@@ -133,7 +133,7 @@ func TestRunAction_SwallowedEnterOnSlashStepGetsOneEnter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"/local\"\n")
@@ -150,7 +150,7 @@ func TestRunAction_RealPromptStepStillNeedsATurn(t *testing.T) {
 	h, ctx, evs, id, conv := startInputSession(t, settle)
 	idleWithAction(ctx, t, h, evs, id, conv, "real-prompt", "next-step")
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"real-prompt\"\n")
@@ -171,7 +171,7 @@ func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
@@ -200,7 +200,7 @@ func TestRunAction_RefusedWhileWorkingKeepsActionable(t *testing.T) {
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 
-	res, err := h.Client.RunSessionAction(ctx, id)
+	res, err := h.Client.Sessions.RunAction(ctx, id)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotIdle {
 		t.Errorf("run while working = %+v, %v; want refused %s", res, err, wire.ReasonSessionNotIdle)
 	}
@@ -214,14 +214,14 @@ func TestRunAction_RefusedWithNoAction(t *testing.T) {
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoAction {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoAction {
 		t.Errorf("run with no actionable = %+v, %v; want refused %s", res, err, wire.ReasonSessionNoAction)
 	}
 
-	if res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready"}); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.MarkActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready"}); err != nil || res.Refused {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoAction {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoAction {
 		t.Errorf("run with no action = %+v, %v; want refused %s", res, err, wire.ReasonSessionNoAction)
 	}
 	if saved, _ := readMeta(t, h, id)["actionable"].(map[string]any); saved["reason"] != "ready" {
@@ -236,11 +236,11 @@ func TestRunAction_RunsWhileABackgroundTaskRuns(t *testing.T) {
 	h, ctx, evs, id, conv := startInputSession(t, time.Minute)
 	report(t, conv, agentfake.Control{State: "background"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.Background })
-	if res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready", Action: []string{agentfake.ProgramClearCommand, "next-step"}}); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.MarkActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready", Action: []string{agentfake.ProgramClearCommand, "next-step"}}); err != nil || res.Refused {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"/clear\"\n\"next-step\"\n")

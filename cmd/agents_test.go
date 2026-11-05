@@ -351,13 +351,13 @@ func TestAgentsStopAndRemove_JSON(t *testing.T) {
 		}
 		return res
 	}
-	if res := run((*apiclient.Client).RemoveSession); !res.Refused || res.Reason != wire.ReasonSessionLive {
+	if res := run((*apiclient.Sessions).Remove); !res.Refused || res.Reason != wire.ReasonSessionLive {
 		t.Errorf("remove live = %+v, want refused %s", res, wire.ReasonSessionLive)
 	}
-	if res := run((*apiclient.Client).StopSession); res.Refused || res.Session == nil || !res.Session.Stopped {
+	if res := run((*apiclient.Sessions).Stop); res.Refused || res.Session == nil || !res.Session.Stopped {
 		t.Errorf("stop = %+v, want the stopped session", res)
 	}
-	if res := run((*apiclient.Client).RemoveSession); res.Refused {
+	if res := run((*apiclient.Sessions).Remove); res.Refused {
 		t.Errorf("remove = %+v, want removed", res)
 	}
 }

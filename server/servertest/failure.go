@@ -16,7 +16,7 @@ const (
 // FailureNow reads session id's failure from the list route and the chat route.
 func FailureNow(ctx context.Context, t *testing.T, h *Harness, id string) (list, chat *wire.SessionFailure) {
 	t.Helper()
-	sessions, err := h.Client.Sessions(ctx)
+	sessions, err := h.Client.Sessions.List(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func FailureNow(ctx context.Context, t *testing.T, h *Harness, id string) (list,
 			list = s.Failure
 		}
 	}
-	res, err := h.Client.SessionChat(ctx, id)
+	res, err := h.Client.Sessions.Chat(ctx, id)
 	if err != nil {
 		t.Fatal(err)
 	}

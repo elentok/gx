@@ -186,7 +186,7 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 		if err := f.waitFor(id, "Unread", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool { return si.Unread.Unread }); err != nil {
 			return err
 		}
-		if res, err := apiclient.New(server.SocketPath(f.stateD)).MarkSessionRead(context.Background(), id); err != nil || res.Refused {
+		if res, err := apiclient.New(server.SocketPath(f.stateD)).Sessions.MarkRead(context.Background(), id); err != nil || res.Refused {
 			return fmt.Errorf("mark-read %s: %v (refused %v: %s)", id, err, res.Refused, res.Reason)
 		}
 	}
@@ -308,7 +308,7 @@ func (f *fixture) waitFor(id, what string, ok func(wire.SessionInfo, wire.Sessio
 	cl := apiclient.New(server.SocketPath(f.stateD))
 	for deadline := time.Now().Add(sessionWaitTimeout); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		ctx := context.Background()
-		list, err := cl.Sessions(ctx)
+		list, err := cl.Sessions.List(ctx)
 		if err != nil {
 			continue
 		}
@@ -316,7 +316,7 @@ func (f *fixture) waitFor(id, what string, ok func(wire.SessionInfo, wire.Sessio
 		if i < 0 {
 			continue
 		}
-		chat, _ := cl.SessionChat(ctx, id)
+		chat, _ := cl.Sessions.Chat(ctx, id)
 		if ok(list[i], chat) {
 			return nil
 		}

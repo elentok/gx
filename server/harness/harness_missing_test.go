@@ -150,7 +150,7 @@ func TestCreateSession_HarnessMissingRefused(t *testing.T) {
 			t.Errorf("message = %q, want it to contain %q", res.Message, want)
 		}
 	}
-	list, err := h.Client.Sessions(ctx)
+	list, err := h.Client.Sessions.List(ctx)
 	if err != nil || len(list) != 0 {
 		t.Errorf("sessions = %v, %v; want none", list, err)
 	}

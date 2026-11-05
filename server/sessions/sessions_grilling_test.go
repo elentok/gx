@@ -155,7 +155,7 @@ func TestSessionChat_NextHasNoActionAtBranch(t *testing.T) {
 	store := storeWithMapStep(t, "branch")
 	h, ctx, _, id, _, path := startGrillingSessionIn(t, "proj:map", store)
 	writeAssistantMessage(t, path, "✅ Map: branch cut. Next: implement")
-	got, err := h.Client.SessionChat(ctx, id)
+	got, err := h.Client.Sessions.Chat(ctx, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestSessionChat_StepChangeAloneRefreshesNext(t *testing.T) {
 	store := storeWithMapStep(t, "spec")
 	h, ctx, _, id, _, path := startGrillingSessionIn(t, "proj:map", store)
 	writeAssistantMessage(t, path, "✅ Map: spec drafted. Next: review")
-	got, err := h.Client.SessionChat(ctx, id)
+	got, err := h.Client.Sessions.Chat(ctx, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestSessionChat_StepChangeAloneRefreshesNext(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !servertest.Poll(10*time.Second, func() bool {
-		got, err = h.Client.SessionChat(ctx, id)
+		got, err = h.Client.Sessions.Chat(ctx, id)
 		if err != nil {
 			t.Fatal(err)
 		}

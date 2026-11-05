@@ -21,7 +21,7 @@ func StartAdvancing(t *testing.T, store string) *GrillingFixture {
 // SessionSnapshot is the fixture session's entry in the sessions list.
 func SessionSnapshot(t *testing.T, f *GrillingFixture) wire.SessionInfo {
 	t.Helper()
-	snap, err := f.H.Client.Sessions(f.Ctx)
+	snap, err := f.H.Client.Sessions.List(f.Ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func AutoSends(t *testing.T, f *GrillingFixture) int {
 // OpenNew opens a design for a new epic slug with the given idea.
 func (f DesignsFixture) OpenNew(t *testing.T, slug, idea string) wire.SessionResult {
 	t.Helper()
-	res, err := f.H.Client.OpenDesign(f.Ctx, wire.DesignOpenRequest{Epic: slug, NewDesign: true, Idea: idea, Project: "proj"})
+	res, err := f.H.Client.Sessions.OpenDesign(f.Ctx, wire.DesignOpenRequest{Epic: slug, NewDesign: true, Idea: idea, Project: "proj"})
 	if err != nil {
 		t.Fatal(err)
 	}

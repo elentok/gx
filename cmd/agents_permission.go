@@ -18,7 +18,7 @@ func newAgentsPermissionCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := cl.SessionPermission(c.Context(), args[0])
+			res, err := cl.Sessions.Permission(c.Context(), args[0])
 			if err != nil {
 				return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 			}

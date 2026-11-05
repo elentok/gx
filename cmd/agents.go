@@ -23,15 +23,15 @@ func newAgentsCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error { return d.runTab(nav.TabAgents) }}
 	cmd.AddCommand(newAgentsCreateCmd(d.dial()), newAgentsListCmd(d), newAgentsChatCmd(d), newAgentsScreenCmd(d), newAgentsCommandsCmd(d), newAgentsPermissionCmd(d), newAgentsKeysCmd(d),
-		newAgentsSessionCmd(d, "stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
-		newAgentsSessionCmd(d, "interrupt", "end a Working session's current turn (the session stays)", (*apiclient.Client).InterruptSession),
-		newAgentsSessionCmd(d, "remove", "delete an Exited session", (*apiclient.Client).RemoveSession),
-		newAgentsSessionCmd(d, "mark-read", "clear a session's Unread", (*apiclient.Client).MarkSessionRead),
-		newAgentsSessionCmd(d, "resume", "resume an Exited session's conversation", (*apiclient.Client).ResumeSession),
-		newAgentsSessionCmd(d, "run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Client).RunSessionAction),
-		newAgentsSessionCmd(d, "focus", "show a session in the most recently focused TUI", (*apiclient.Client).FocusSession),
+		newAgentsSessionCmd(d, "stop", "end a live session's agent (it stays, Exited)", (*apiclient.Sessions).Stop),
+		newAgentsSessionCmd(d, "interrupt", "end a Working session's current turn (the session stays)", (*apiclient.Sessions).Interrupt),
+		newAgentsSessionCmd(d, "remove", "delete an Exited session", (*apiclient.Sessions).Remove),
+		newAgentsSessionCmd(d, "mark-read", "clear a session's Unread", (*apiclient.Sessions).MarkRead),
+		newAgentsSessionCmd(d, "resume", "resume an Exited session's conversation", (*apiclient.Sessions).Resume),
+		newAgentsSessionCmd(d, "run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Sessions).RunAction),
+		newAgentsSessionCmd(d, "focus", "show a session in the most recently focused TUI", (*apiclient.Sessions).Focus),
 		newAgentsReportFocusCmd(d), newAgentsPromptCmd(d), newAgentsAutoAdvanceCmd(d), newAgentsFixCmd(d),
-		newAgentsSessionCmd(d, "auto-advance-cancel", "stop a design session's running auto-advance countdown", (*apiclient.Client).CancelAutoAdvance))
+		newAgentsSessionCmd(d, "auto-advance-cancel", "stop a design session's running auto-advance countdown", (*apiclient.Sessions).CancelAutoAdvance))
 	return cmd
 }
 
@@ -56,7 +56,7 @@ func newAgentsAutoAdvanceCmd(d deps) *cobra.Command {
 
 func runAgentsAutoAdvance(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string, on bool) error {
 	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
-		return cl.SetAutoAdvance(ctx, id, on)
+		return cl.Sessions.SetAutoAdvance(ctx, id, on)
 	})
 }
 
@@ -73,7 +73,7 @@ func runAgentsSessionCall(ctx context.Context, w io.Writer, jsonOut bool, call f
 // runAgentsPrompt never starts the server: a dead socket is a refusal.
 func runAgentsPrompt(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.SessionPromptRequest) error {
 	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
-		return cl.PromptSession(ctx, req)
+		return cl.Sessions.Prompt(ctx, req)
 	})
 }
 
@@ -124,7 +124,7 @@ func newAgentActionableCmd(d deps) *cobra.Command {
 // note and succeeds, so skills can call it unconditionally.
 func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req wire.MarkActionableRequest) error {
 	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "marked", func(cl *apiclient.Client) (wire.SessionResult, error) {
-		return cl.MarkSessionActionable(ctx, req)
+		return cl.Sessions.MarkActionable(ctx, req)
 	})
 }
 
@@ -153,7 +153,7 @@ func newAgentLinkCmd(d deps) *cobra.Command {
 // and succeeds, so skills can call it unconditionally.
 func runAgentLink(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req wire.LinkSessionRequest) error {
 	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "linked", func(cl *apiclient.Client) (wire.SessionResult, error) {
-		return cl.LinkSession(ctx, req)
+		return cl.Sessions.Link(ctx, req)
 	})
 }
 
@@ -184,7 +184,7 @@ func newAgentStepCmd(d deps) *cobra.Command {
 // and succeeds, so skills can call it unconditionally.
 func runAgentStep(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req wire.ReportStepRequest) error {
 	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "reported", func(cl *apiclient.Client) (wire.SessionResult, error) {
-		return cl.ReportSessionStep(ctx, req)
+		return cl.Sessions.ReportStep(ctx, req)
 	})
 }
 
@@ -223,7 +223,7 @@ func newAgentsReportFocusCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			res, err := cl.ReportFocus(ctx, req)
+			res, err := cl.Sessions.ReportFocus(ctx, req)
 			return printSessionResult(c.OutOrStdout(), jsonOut, res, err)
 		},
 	}
@@ -281,7 +281,7 @@ func newAgentsCreateCmd(client func() (*apiclient.Client, error)) *cobra.Command
 	return cmd
 }
 
-type sessionWriteFunc func(*apiclient.Client, context.Context, string) (wire.SessionResult, error)
+type sessionWriteFunc func(*apiclient.Sessions, context.Context, string) (wire.SessionResult, error)
 
 // newAgentsSessionCmd is a session write that takes only the session's id.
 func newAgentsSessionCmd(d deps, verb, short string, write sessionWriteFunc) *cobra.Command {
@@ -304,7 +304,7 @@ func newAgentsSessionCmd(d deps, verb, short string, write sessionWriteFunc) *co
 
 func runAgentsSessionWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, write sessionWriteFunc, id string) error {
 	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
-		return write(cl, ctx, id)
+		return write(cl.Sessions, ctx, id)
 	})
 }
 
@@ -372,9 +372,9 @@ func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	read := cl.SessionChat
+	read := cl.Sessions.Chat
 	if archive {
-		read = cl.SessionChatArchive
+		read = cl.Sessions.ChatArchive
 	}
 	chat, err := read(ctx, id)
 	if err != nil {
@@ -413,7 +413,7 @@ func runAgentsSessionScreen(ctx context.Context, cl *apiclient.Client, w io.Writ
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	screen, err := cl.SessionScreen(ctx, id)
+	screen, err := cl.Sessions.Screen(ctx, id)
 	if err != nil {
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
@@ -450,7 +450,7 @@ func runAgentsList(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	list, err := cl.Sessions(ctx)
+	list, err := cl.Sessions.List(ctx)
 	if err != nil {
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}

@@ -98,7 +98,7 @@ func (f PromptFixture) Keys(t *testing.T, req wire.SessionKeysRequest) wire.Sess
 	if req.ID == "" {
 		req.ID = f.ID
 	}
-	res, err := f.H.Client.KeysSession(f.Ctx, req)
+	res, err := f.H.Client.Sessions.Keys(f.Ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}

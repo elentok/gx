@@ -38,7 +38,7 @@ func TestDraft_ActionClearsTheDraftAndTypes(t *testing.T) {
 	h, ctx, evs, id, conv := startDraftSession(t, wire.CreateSessionRequest{}, "my draft")
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step")
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"first-step\"\n")
@@ -49,7 +49,7 @@ func TestDraft_ActionDraftBeforeLaterStepIsCleared(t *testing.T) {
 	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, withAlerts(true, true), servertest.WithEnv(agentfake.ProgramInputEnv+"=1"))
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"first-step\"\n")

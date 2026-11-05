@@ -86,6 +86,64 @@ func TestNegotiate_APIVersionMismatchGoesReadOnly(t *testing.T) {
 	}
 }
 
+// stopServer answers the handshake with h and /v1/sessions/stop, recording the
+// origin header of each stop request.
+func stopServer(t *testing.T, h wire.Handshake) (*apiclient.Client, *[]string) {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "gxc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	sock := filepath.Join(dir, "s.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var origins []string
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/handshake", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(h)
+	})
+	mux.HandleFunc("POST /v1/sessions/stop", func(w http.ResponseWriter, r *http.Request) {
+		origins = append(origins, r.Header.Get(wire.OriginHeader))
+		_ = json.NewEncoder(w).Encode(wire.SessionResult{})
+	})
+	srv := &http.Server{Handler: mux}
+	go srv.Serve(ln)
+	t.Cleanup(func() { srv.Close() })
+	return apiclient.New(sock), &origins
+}
+
+func TestSessions_ShareTheClientsTransport(t *testing.T) {
+	t.Run("AsTUI after New tags the sub-client's writes", func(t *testing.T) {
+		c, origins := stopServer(t, wire.Handshake{APIVersion: wire.APIVersion, Build: "b"})
+		sessions := c.Sessions
+
+		c.AsTUI()
+		if _, err := sessions.Stop(context.Background(), "s1"); err != nil {
+			t.Fatal(err)
+		}
+		if len(*origins) != 1 || (*origins)[0] != wire.OriginTUI {
+			t.Errorf("origins = %v, want [%s]", *origins, wire.OriginTUI)
+		}
+	})
+	t.Run("an API mismatch from Negotiate makes the sub-client read-only", func(t *testing.T) {
+		c, origins := stopServer(t, wire.Handshake{APIVersion: wire.APIVersion + 1, Build: "b"})
+		sessions := c.Sessions
+
+		if _, err := c.Negotiate(context.Background(), "b"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := sessions.Stop(context.Background(), "s1"); !errors.Is(err, apiclient.ErrReadOnly) {
+			t.Errorf("Stop = %v, want ErrReadOnly", err)
+		}
+		if len(*origins) != 0 {
+			t.Errorf("the server saw %d stop requests, want 0", len(*origins))
+		}
+	})
+}
+
 func TestTicketUnmute_PostsTheAddressAndReturnsTheResult(t *testing.T) {
 	dir, err := os.MkdirTemp("", "gxc")
 	if err != nil {

@@ -41,7 +41,7 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 		if err != nil || plain.Session == nil || plain.Session.Design {
 			t.Fatalf("create plain = %+v, %v; want not Design", plain.Session, err)
 		}
-		res, err := h.Client.LinkSession(ctx, wire.LinkSessionRequest{ID: plain.Session.ID, Ticket: tc.ticket})
+		res, err := h.Client.Sessions.Link(ctx, wire.LinkSessionRequest{ID: plain.Session.ID, Ticket: tc.ticket})
 		if err != nil || res.Refused || res.Session.Ticket != tc.want || res.Session.Design != tc.design {
 			t.Errorf("link %s = %+v, %v; want ticket %s, design %v", tc.ticket, res.Session, err, tc.want, tc.design)
 		}
@@ -59,7 +59,7 @@ func TestLinkSession_Refusals(t *testing.T) {
 		"no ticket":       {wire.LinkSessionRequest{ID: "abcdef"}, wire.ReasonSessionBadRequest},
 		"unknown session": {wire.LinkSessionRequest{ID: "abcdef", Ticket: "x"}, wire.ReasonSessionUnknown},
 	} {
-		res, err := h.Client.LinkSession(ctx, tc.req)
+		res, err := h.Client.Sessions.Link(ctx, tc.req)
 		if err != nil || !res.Refused || res.Reason != tc.reason {
 			t.Errorf("%s: link = %+v, %v; want refused %s", name, res, err, tc.reason)
 		}

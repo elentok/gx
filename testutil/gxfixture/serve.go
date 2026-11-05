@@ -252,7 +252,7 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 	}
 	if slices.Contains(sc.autoAdvanceOff, addr) {
 		// Not the CLI verb: its on|off arg validation rejects the session id.
-		if res, err := apiclient.New(server.SocketPath(f.stateD)).SetAutoAdvance(ctx, res.Session.ID, false); err != nil || res.Refused {
+		if res, err := apiclient.New(server.SocketPath(f.stateD)).Sessions.SetAutoAdvance(ctx, res.Session.ID, false); err != nil || res.Refused {
 			return fmt.Errorf("auto-advance off for %s: %v %+v", addr, err, res)
 		}
 	}

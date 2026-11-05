@@ -261,7 +261,7 @@ func TestSessionCommands_SessionIsServedFromItsDir(t *testing.T) {
 	if code, got, _ := f.get(t, url.Values{"session": {id}}); code != http.StatusOK || names(got)["myskill"].Name == "" {
 		t.Errorf("live session: code %d, list %+v", code, got)
 	}
-	if res, err := f.h.Client.StopSession(f.ctx, id); err != nil || res.Refused {
+	if res, err := f.h.Client.Sessions.Stop(f.ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
 	if code, got, _ := f.get(t, url.Values{"session": {id}}); code != http.StatusOK || names(got)["myskill"].Name == "" {

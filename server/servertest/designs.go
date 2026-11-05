@@ -53,7 +53,7 @@ func StartDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) De
 // Open opens (or creates, when isNew) the design session of epic.
 func (f DesignsFixture) Open(t *testing.T, epic string, isNew bool) wire.SessionResult {
 	t.Helper()
-	res, err := f.H.Client.OpenDesign(f.Ctx, wire.DesignOpenRequest{Epic: epic, New: isNew})
+	res, err := f.H.Client.Sessions.OpenDesign(f.Ctx, wire.DesignOpenRequest{Epic: epic, New: isNew})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func StartPromptSession(t *testing.T, grace time.Duration) PromptFixture {
 // Prompt sends text to the session as a prompt.
 func (f PromptFixture) Prompt(t *testing.T, text string) wire.SessionResult {
 	t.Helper()
-	res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: text})
+	res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: text})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func (f PromptFixture) Prompt(t *testing.T, text string) wire.SessionResult {
 // Fix starts the Fix agent for the ticket at address.
 func (f DesignsFixture) Fix(t *testing.T, address string) wire.FixAgentResult {
 	t.Helper()
-	res, err := f.H.Client.FixAgent(f.Ctx, wire.FixAgentRequest{Address: address})
+	res, err := f.H.Client.Sessions.FixAgent(f.Ctx, wire.FixAgentRequest{Address: address})
 	if err != nil {
 		t.Fatal(err)
 	}

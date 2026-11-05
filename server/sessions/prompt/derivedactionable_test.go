@@ -49,7 +49,7 @@ func TestDerivedActionable_PageAnswerClearsGrilling(t *testing.T) {
 	h, ctx, evs, id, conv, path := designPromptSession(t)
 	idleWith(ctx, t, h, evs, id, conv, path, grillTurn)
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Grilling })
-	res, err := h.Client.PromptSession(ctx, wire.SessionPromptRequest{ID: id, Text: "my answer"})
+	res, err := h.Client.Sessions.Prompt(ctx, wire.SessionPromptRequest{ID: id, Text: "my answer"})
 	if err != nil || res.Refused {
 		t.Fatalf("prompt = %+v, %v", res, err)
 	}
@@ -61,7 +61,7 @@ func TestDerivedActionable_RunEndAfterGrilling(t *testing.T) {
 	for name, answer := range map[string]func(*testing.T, *servertest.Harness, context.Context, string){
 		"pane input": func(t *testing.T, h *servertest.Harness, _ context.Context, id string) { clearByInput(t, h, id) },
 		"page prompt": func(t *testing.T, h *servertest.Harness, ctx context.Context, id string) {
-			if _, err := h.Client.PromptSession(ctx, wire.SessionPromptRequest{ID: id, Text: "my answer"}); err != nil {
+			if _, err := h.Client.Sessions.Prompt(ctx, wire.SessionPromptRequest{ID: id, Text: "my answer"}); err != nil {
 				t.Fatal(err)
 			}
 		},
@@ -104,7 +104,7 @@ func TestDerivedActionable_AgentRaised(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			h, ctx, evs, id, conv, path := designPromptSession(t)
-			if res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "review ready"}); err != nil || res.Refused {
+			if res, err := h.Client.Sessions.MarkActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "review ready"}); err != nil || res.Refused {
 				t.Fatalf("mark = %+v, %v", res, err)
 			}
 			idleWith(ctx, t, h, evs, id, conv, path, tc.text)

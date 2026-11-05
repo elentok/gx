@@ -69,7 +69,7 @@ func StartHandoff(t *testing.T, step string, opts ...func(*server.Config)) Hando
 
 func (f HandoffFixture) ContinueSession(t *testing.T) {
 	t.Helper()
-	res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true})
+	res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true})
 	if err != nil || res.Refused {
 		t.Fatalf("continue = %+v, %v", res, err)
 	}

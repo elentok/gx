@@ -121,7 +121,7 @@ func TestFirstPromptFailure_GxRaisedSurvivesInputAndAgentRaisedDoesNot(t *testin
 		t.Errorf("actionable = %+v after input, want the gx-raised one kept", got.Actionable)
 	}
 
-	if res, err := f.h.Client.MarkSessionActionable(f.ctx, wire.MarkActionableRequest{ID: f.id, Reason: "agent says"}); err != nil || res.Refused || res.Session.Actionable.GxRaised {
+	if res, err := f.h.Client.Sessions.MarkActionable(f.ctx, wire.MarkActionableRequest{ID: f.id, Reason: "agent says"}); err != nil || res.Refused || res.Session.Actionable.GxRaised {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
 	if err := att.SendKey(screen.Key{Code: 'y', Text: "y"}); err != nil {

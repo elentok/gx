@@ -68,7 +68,7 @@ func TestSessionConversations_ReLinkMovesTheRunningConversation(t *testing.T) {
 	newer := conv + "-cleared"
 	clearFakeSession(ctx, t, h, evs, id, conv, newer)
 
-	if res, err := h.Client.LinkSession(ctx, wire.LinkSessionRequest{ID: id, Ticket: "proj:epic/02"}); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Link(ctx, wire.LinkSessionRequest{ID: id, Ticket: "proj:epic/02"}); err != nil || res.Refused {
 		t.Fatalf("link = %+v, %v", res, err)
 	}
 	recs := recordsByID(t, h.ConversationsDir)
@@ -84,7 +84,7 @@ func TestSessionConversations_SurviveRemoveAndSkipUnlinked(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Ticket: "proj:epic/01"})
 	stopFakeSession(ctx, t, h, evs, id)
-	if res, err := h.Client.RemoveSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Remove(ctx, id); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
 	if _, err := os.Stat(filepath.Join(h.SessionsDir, id)); !os.IsNotExist(err) {

@@ -124,7 +124,7 @@ func TestSessionFailure_ARestoreCrashingWithinAMinuteIsReported(t *testing.T) {
 	if got := waitForFailure(ctx, t, h, id, "crashed"); got.Recrashed {
 		t.Fatalf("failure = %+v, want the first crash not to be a re-crash", got)
 	}
-	if res, err := h.Client.ResumeSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Resume(ctx, id); err != nil || res.Refused {
 		t.Fatalf("restore = %+v, %v", res, err)
 	}
 	waitForFailure(ctx, t, h, id, "")

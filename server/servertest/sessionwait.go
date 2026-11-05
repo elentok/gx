@@ -102,7 +102,7 @@ func StartFakeSessionWith(t *testing.T, req wire.CreateSessionRequest, opts ...f
 func StopFakeSession(ctx context.Context, t *testing.T, h *Harness, evs <-chan wire.Event, id string) {
 	t.Helper()
 	WaitForHolder(t, filepath.Join(h.SessionsDir, id))
-	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
+	if res, err := h.Client.Sessions.Stop(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
 	WaitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })

@@ -140,7 +140,7 @@ func TestFixAgent_NoTrunkCheckout(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", "loop", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", t.TempDir()) // not a git repo, so no trunk
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
-	res, err := h.Client.FixAgent(context.Background(), wire.FixAgentRequest{Address: "proj:loop/01"})
+	res, err := h.Client.Sessions.FixAgent(context.Background(), wire.FixAgentRequest{Address: "proj:loop/01"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestFixAgent_ProjectWithoutFailureIsRefused(t *testing.T) {
 
 func (f designsFixture) fixProject(t *testing.T, project string) wire.FixAgentResult {
 	t.Helper()
-	res, err := f.h.Client.FixAgent(f.ctx, wire.FixAgentRequest{Project: project})
+	res, err := f.h.Client.Sessions.FixAgent(f.ctx, wire.FixAgentRequest{Project: project})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestFixAgent_RunsOnStrongestAndResumeKeepsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.FixAgent(ctx, wire.FixAgentRequest{Address: addr})
+	res, err := h.Client.Sessions.FixAgent(ctx, wire.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("fix = %+v, %v", res, err)
 	}
@@ -276,7 +276,7 @@ func TestFixAgent_RunsOnStrongestAndResumeKeepsIt(t *testing.T) {
 	}
 	check("after start")
 	stopFakeSession(ctx, t, h, evs, id)
-	if r, err := h.Client.ResumeSession(ctx, id); err != nil || r.Refused {
+	if r, err := h.Client.Sessions.Resume(ctx, id); err != nil || r.Refused {
 		t.Fatalf("resume = %+v, %v", r, err)
 	}
 	check("after resume")

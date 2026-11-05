@@ -322,7 +322,7 @@ func serverDeps(dirs config.Dirs) *app.ServerDeps {
 	if err != nil {
 		return nil
 	}
-	return &app.ServerDeps{Client: c.AsTUI(), Build: getVersion(), Start: serverStarter(dirs, c)}
+	return &app.ServerDeps{Client: tuiClient{c.AsTUI()}, Build: getVersion(), Start: serverStarter(dirs, c)}
 }
 
 // herdrUnavailable reports herdr missing from PATH or not answering. It is

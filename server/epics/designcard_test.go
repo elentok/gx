@@ -180,7 +180,7 @@ func TestEpicList_NewDesignGoesToReadyToDesignWhenItsSessionEndsUncharted(t *tes
 	if res.Refused || res.Session == nil {
 		t.Fatalf("open = %+v", res)
 	}
-	if _, err := f.H.Client.StopSession(f.Ctx, res.Session.ID); err != nil {
+	if _, err := f.H.Client.Sessions.Stop(f.Ctx, res.Session.ID); err != nil {
 		t.Fatal(err)
 	}
 	waitForSession(f.Ctx, t, f.H, f.Evs, res.Session.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })

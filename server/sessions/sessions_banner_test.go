@@ -51,7 +51,7 @@ func TestSessionBanner_DoneThenActionableMerges(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "done"}, wire.SessionIdle)
-	res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "review the plan"})
+	res, err := h.Client.Sessions.MarkActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "review the plan"})
 	if err != nil || res.Refused {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
@@ -98,7 +98,7 @@ func TestSessionBanner_ClickFocusesThroughReportedTerminal(t *testing.T) {
 
 	dropTUI()
 	waitFor(t, func() bool {
-		res, err := h.Client.ReportFocus(ctx, wire.FocusReport{Client: "tui-1"})
+		res, err := h.Client.Sessions.ReportFocus(ctx, wire.FocusReport{Client: "tui-1"})
 		return err == nil && res.Refused
 	})
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "working"}, wire.SessionWorking)

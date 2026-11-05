@@ -20,7 +20,7 @@ func TestSessionScreen_LiveReturnsHolderRows(t *testing.T) {
 	}
 	waitForScreen(t, holder, "typed-on-screen")
 
-	res, err := h.Client.SessionScreen(ctx, id)
+	res, err := h.Client.Sessions.Screen(ctx, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestSessionScreen_ExitedReturnsSavedScreen(t *testing.T) {
 	h, ctx, evs, id, _ := startFakeSession(t)
 	dir := filepath.Join(h.SessionsDir, id)
 	waitForHolder(t, dir)
-	if _, err := h.Client.StopSession(ctx, id); err != nil {
+	if _, err := h.Client.Sessions.Stop(ctx, id); err != nil {
 		t.Fatal(err)
 	}
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
@@ -42,7 +42,7 @@ func TestSessionScreen_ExitedReturnsSavedScreen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := h.Client.SessionScreen(ctx, id)
+	res, err := h.Client.Sessions.Screen(ctx, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestSessionScreen_ExitedReturnsSavedScreen(t *testing.T) {
 func TestSessionScreen_UnknownSessionIsRefused(t *testing.T) {
 	t.Parallel()
 	h, ctx, _, _, _ := startFakeSession(t)
-	if _, err := h.Client.SessionScreen(ctx, "no-such-session"); err == nil || !strings.Contains(err.Error(), "404") {
+	if _, err := h.Client.Sessions.Screen(ctx, "no-such-session"); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("unknown session err = %v, want a 404", err)
 	}
 }

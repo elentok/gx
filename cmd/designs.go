@@ -27,7 +27,7 @@ func runDesignsWorktree(ctx context.Context, cl *apiclient.Client, w io.Writer, 
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	res, err := cl.DesignWorktree(ctx, req)
+	res, err := cl.Sessions.DesignWorktree(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = wire.DesignWorktreeResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
@@ -80,7 +80,7 @@ func runDesignsDelete(ctx context.Context, cl *apiclient.Client, w io.Writer, js
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	res, err := cl.DeleteDesign(ctx, wire.DesignDeleteRequest{Epic: epic})
+	res, err := cl.Sessions.DeleteDesign(ctx, wire.DesignDeleteRequest{Epic: epic})
 	return printSessionResult(w, jsonOut, res, err)
 }
 
@@ -107,7 +107,7 @@ func runDesignsOpen(ctx context.Context, cl *apiclient.Client, w io.Writer, json
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	res, err := cl.OpenDesign(ctx, req)
+	res, err := cl.Sessions.OpenDesign(ctx, req)
 	return printSessionResult(w, jsonOut, res, err)
 }
 

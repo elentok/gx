@@ -26,7 +26,7 @@ func startAFKSession(t *testing.T, afk bool) (*servertest.Harness, *slackHook, i
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: testFlushInterval}
 	})
 	started := chat.WaitStarted(t)
-	if _, err := h.Client.SetAFK(ctx, &afk); err != nil {
+	if _, err := h.Client.Sessions.SetAFK(ctx, &afk); err != nil {
 		t.Fatal(err)
 	}
 	return h, chat, started, gate, id, func(c agentfake.Control, state string) {

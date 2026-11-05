@@ -65,7 +65,7 @@ func TestAutoAdvance_InputAndSwitchFlipResetTheCount(t *testing.T) {
 
 func setSwitch(t *testing.T, f *grillingFixture, on bool) {
 	t.Helper()
-	if res, err := f.H.Client.SetAutoAdvance(f.Ctx, f.ID, on); err != nil || res.Refused {
+	if res, err := f.H.Client.Sessions.SetAutoAdvance(f.Ctx, f.ID, on); err != nil || res.Refused {
 		t.Fatalf("switch = %+v, %v", res, err)
 	}
 }

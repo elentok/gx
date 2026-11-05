@@ -87,12 +87,12 @@ func TestQueueAgentChat_LivePtyAgentServesItsChatAndScreen(t *testing.T) {
 	ctx := context.Background()
 
 	servertest.WaitFor(t, 10*time.Second, "the agent's message in the chat", func() bool {
-		chat, err := h.Client.SessionChat(ctx, row.ID)
+		chat, err := h.Client.Sessions.Chat(ctx, row.ID)
 		return err == nil && slices.ContainsFunc(chat.Messages, func(m wire.SessionChatMessage) bool {
 			return strings.Contains(m.Text, "queue agent says hi")
 		})
 	})
-	screen, err := h.Client.SessionScreen(ctx, row.ID)
+	screen, err := h.Client.Sessions.Screen(ctx, row.ID)
 	if err != nil || len(screen.Rows) == 0 {
 		t.Errorf("screen = %+v, %v; want the agent's rows", screen, err)
 	}
@@ -105,10 +105,10 @@ func TestQueueAgentChat_GoneAgentReadsAsUnknownSession(t *testing.T) {
 	servertest.WaitFor(t, 20*time.Second, "the row to leave", func() bool { return len(servertest.QueueRows(t, h)) == 0 })
 	ctx := context.Background()
 
-	if _, err := h.Client.SessionChat(ctx, row.ID); err == nil || !strings.Contains(err.Error(), "404") {
+	if _, err := h.Client.Sessions.Chat(ctx, row.ID); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("chat err = %v, want a 404", err)
 	}
-	if _, err := h.Client.SessionScreen(ctx, row.ID); err == nil || !strings.Contains(err.Error(), "404") {
+	if _, err := h.Client.Sessions.Screen(ctx, row.ID); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("screen err = %v, want a 404", err)
 	}
 }
@@ -120,11 +120,11 @@ func TestQueueAgentChat_WriteRoutesRefuseAQueueAgentAsUnknown(t *testing.T) {
 	ctx := context.Background()
 
 	for name, call := range map[string]func() (wire.SessionResult, error){
-		"stop":      func() (wire.SessionResult, error) { return h.Client.StopSession(ctx, row.ID) },
-		"interrupt": func() (wire.SessionResult, error) { return h.Client.InterruptSession(ctx, row.ID) },
-		"remove":    func() (wire.SessionResult, error) { return h.Client.RemoveSession(ctx, row.ID) },
+		"stop":      func() (wire.SessionResult, error) { return h.Client.Sessions.Stop(ctx, row.ID) },
+		"interrupt": func() (wire.SessionResult, error) { return h.Client.Sessions.Interrupt(ctx, row.ID) },
+		"remove":    func() (wire.SessionResult, error) { return h.Client.Sessions.Remove(ctx, row.ID) },
 		"prompt": func() (wire.SessionResult, error) {
-			return h.Client.PromptSession(ctx, wire.SessionPromptRequest{ID: row.ID, Text: "hi"})
+			return h.Client.Sessions.Prompt(ctx, wire.SessionPromptRequest{ID: row.ID, Text: "hi"})
 		},
 	} {
 		res, err := call()

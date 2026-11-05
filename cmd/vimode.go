@@ -42,7 +42,7 @@ func runViMode(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut b
 		v := args[0] == "on"
 		on = &v
 	}
-	res, err := cl.SetViMode(ctx, on)
+	res, err := cl.Sessions.SetViMode(ctx, on)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = wire.ViModeResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}

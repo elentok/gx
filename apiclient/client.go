@@ -18,12 +18,21 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-type Client struct {
+// transport is the connection state every sub-client shares. Client and its
+// sub-clients hold one pointer to it, so AsTUI, AsInvestigator and Negotiate
+// (which run after New) reach all of them.
+type transport struct {
 	http     *http.Client
 	readOnly bool
 	origin   string
 
 	investigator string
+}
+
+type Client struct {
+	*transport
+
+	Sessions *Sessions
 }
 
 // AsTUI marks the client's writes as coming from the TUI; an unmarked client
@@ -42,11 +51,11 @@ func (c *Client) AsInvestigator(addr string) *Client {
 }
 
 // setOrigin tags a write request with the client's origin.
-func (c *Client) setOrigin(r *http.Request) {
-	if c.origin != "" {
-		r.Header.Set(wire.OriginHeader, c.origin)
+func (t *transport) setOrigin(r *http.Request) {
+	if t.origin != "" {
+		r.Header.Set(wire.OriginHeader, t.origin)
 	}
-	addr := c.investigator
+	addr := t.investigator
 	if addr == "" {
 		addr = os.Getenv(wire.InvestigateEnv)
 	}
@@ -88,7 +97,11 @@ func (c *Client) Negotiate(ctx context.Context, build string) (Negotiation, erro
 
 // CheckWrite must be called before any request that mutates server state.
 func (c *Client) CheckWrite() error {
-	if c.readOnly {
+	return c.checkWrite()
+}
+
+func (t *transport) checkWrite() error {
+	if t.readOnly {
 		return ErrReadOnly
 	}
 	return nil
@@ -101,12 +114,13 @@ func IsNotRunning(err error) bool {
 
 // New returns a client for the server listening on the unix socket.
 func New(socketPath string) *Client {
-	return &Client{http: &http.Client{Transport: &http.Transport{
+	t := &transport{http: &http.Client{Transport: &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			var d net.Dialer
 			return d.DialContext(ctx, "unix", socketPath)
 		},
 	}}}
+	return &Client{transport: t, Sessions: &Sessions{t: t}}
 }
 
 // Handshake returns the server's API version and build id.
@@ -116,8 +130,8 @@ func (c *Client) Handshake(ctx context.Context) (wire.Handshake, error) {
 	return h, err
 }
 
-func (c *Client) post(ctx context.Context, path string, req, res any) error {
-	if err := c.CheckWrite(); err != nil {
+func (c *transport) post(ctx context.Context, path string, req, res any) error {
+	if err := c.checkWrite(); err != nil {
 		return err
 	}
 	body, err := json.Marshal(req)
@@ -142,7 +156,7 @@ func (c *Client) post(ctx context.Context, path string, req, res any) error {
 	return json.NewDecoder(resp.Body).Decode(res)
 }
 
-func (c *Client) get(ctx context.Context, path string, out any) error {
+func (c *transport) get(ctx context.Context, path string, out any) error {
 	// The host is ignored by the unix dialer; it only has to parse.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)
 	if err != nil {

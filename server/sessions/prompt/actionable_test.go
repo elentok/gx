@@ -43,7 +43,7 @@ func TestActionable_AgentRaisedClearsOnlyOnInput(t *testing.T) {
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 
 	action := []string{"/review", "/ship"}
-	res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "review ready", Action: action})
+	res, err := h.Client.Sessions.MarkActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "review ready", Action: action})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
@@ -69,7 +69,7 @@ func TestActionable_AgentRaisedClearsOnlyOnInput(t *testing.T) {
 	if err := att.Scroll(1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.Client.MarkSessionRead(ctx, id); err != nil {
+	if _, err := h.Client.Sessions.MarkRead(ctx, id); err != nil {
 		t.Fatal(err)
 	}
 	// A later status change orders the check after the holder saw the resize
@@ -99,7 +99,7 @@ func TestMarkActionable_Refusals(t *testing.T) {
 		"no reason":       {wire.MarkActionableRequest{ID: "abcdef"}, wire.ReasonSessionBadRequest},
 		"unknown session": {wire.MarkActionableRequest{ID: "abcdef", Reason: "x"}, wire.ReasonSessionUnknown},
 	} {
-		res, err := h.Client.MarkSessionActionable(ctx, tc.req)
+		res, err := h.Client.Sessions.MarkActionable(ctx, tc.req)
 		if err != nil || !res.Refused || res.Reason != tc.reason {
 			t.Errorf("%s: mark = %+v, %v; want refused %s", name, res, err, tc.reason)
 		}

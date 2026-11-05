@@ -49,7 +49,7 @@ func TestWorktreeRemoval_LiveSessionKeepsTheWorktreeUntilItStops(t *testing.T) {
 	f.assertFeatureKept(t, "the merge, with a live session")
 	f.assertKeptLogged(t, id)
 
-	if _, err := f.H.Client.StopSession(ctx, id); err != nil {
+	if _, err := f.H.Client.Sessions.Stop(ctx, id); err != nil {
 		t.Fatal(err)
 	}
 	waitForSession(ctx, t, f.H, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
@@ -69,7 +69,7 @@ func TestWorktreeRemoval_ExitedSessionDoesNotKeepTheWorktree(t *testing.T) {
 	}
 	completedUnmerged(ctx, t, f)
 	id := f.sessionIn(ctx, t, f.featureWorktree(t))
-	if _, err := f.H.Client.StopSession(ctx, id); err != nil {
+	if _, err := f.H.Client.Sessions.Stop(ctx, id); err != nil {
 		t.Fatal(err)
 	}
 	waitForSession(ctx, t, f.H, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })

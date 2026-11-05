@@ -128,7 +128,7 @@ func TestDesignsOpenNew_StartFailureIsOneResultWithStartError(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness("no-such-harness"), servertest.WithDefaultHarness("no-such-harness"))
-	res, err := h.Client.OpenDesign(context.Background(), wire.DesignOpenRequest{Epic: "fresh-idea", NewDesign: true, Idea: "idea", Project: "proj"})
+	res, err := h.Client.Sessions.OpenDesign(context.Background(), wire.DesignOpenRequest{Epic: "fresh-idea", NewDesign: true, Idea: "idea", Project: "proj"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestDesignsOpenNew_LinkingToItsOwnAddressKeepsDesign(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	res := f.openNew(t, "fresh-idea", "a thing")
-	linked, err := f.h.Client.LinkSession(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "fresh-idea"})
+	linked, err := f.h.Client.Sessions.Link(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "fresh-idea"})
 	if err != nil || linked.Refused || !linked.Session.Design {
 		t.Fatalf("link = %+v, %v; want Design kept", linked.Session, err)
 	}

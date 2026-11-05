@@ -36,7 +36,7 @@ func startRemoteFix(t *testing.T, on bool) (*servertest.Harness, string, func(bo
 func TestFixAgent_RemoteControlKeyOn(t *testing.T) {
 	t.Parallel()
 	h, addr, _ := startRemoteFix(t, true)
-	res, err := h.Client.FixAgent(context.Background(), wire.FixAgentRequest{Address: addr})
+	res, err := h.Client.Sessions.FixAgent(context.Background(), wire.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("fix = %+v, %v", res, err)
 	}
@@ -51,7 +51,7 @@ func TestFixAgent_RemoteControlKeyOn(t *testing.T) {
 func TestFixAgent_RemoteControlKeyOff(t *testing.T) {
 	t.Parallel()
 	h, addr, _ := startRemoteFix(t, false)
-	res, err := h.Client.FixAgent(context.Background(), wire.FixAgentRequest{Address: addr})
+	res, err := h.Client.Sessions.FixAgent(context.Background(), wire.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("fix = %+v, %v", res, err)
 	}
@@ -73,7 +73,7 @@ func TestFixAgent_ResumeKeepsRemoteControlAfterKeyOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.FixAgent(ctx, wire.FixAgentRequest{Address: addr})
+	res, err := h.Client.Sessions.FixAgent(ctx, wire.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("fix = %+v, %v", res, err)
 	}
@@ -81,7 +81,7 @@ func TestFixAgent_ResumeKeepsRemoteControlAfterKeyOff(t *testing.T) {
 	stopFakeSession(ctx, t, h, evs, id)
 	set(false)
 
-	if r, err := h.Client.ResumeSession(ctx, id); err != nil || r.Refused {
+	if r, err := h.Client.Sessions.Resume(ctx, id); err != nil || r.Refused {
 		t.Fatalf("resume = %+v, %v", r, err)
 	}
 	if got := readMeta(t, h, id)["remote_control"]; got != addr {

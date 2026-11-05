@@ -16,7 +16,7 @@ func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
 	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
 	report(t, f.Conv, agentfake.Control{State: "working"})
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
-	res, err := f.H.Client.InterruptSession(f.Ctx, f.ID)
+	res, err := f.H.Client.Sessions.Interrupt(f.Ctx, f.ID)
 	if err != nil || res.Refused {
 		t.Fatalf("interrupt = %+v, %v", res, err)
 	}
@@ -26,7 +26,7 @@ func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
 func TestSessionInterrupt_RefusesAnIdleSession(t *testing.T) {
 	t.Parallel()
 	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
-	res, err := f.H.Client.InterruptSession(f.Ctx, f.ID)
+	res, err := f.H.Client.Sessions.Interrupt(f.Ctx, f.ID)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotWorking {
 		t.Errorf("interrupt while idle = %+v, %v; want %s", res, err, wire.ReasonSessionNotWorking)
 	}

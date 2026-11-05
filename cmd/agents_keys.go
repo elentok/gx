@@ -40,6 +40,6 @@ func newAgentsKeysCmd(d deps) *cobra.Command {
 
 func runAgentsKeys(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.SessionKeysRequest) error {
 	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
-		return cl.KeysSession(ctx, req)
+		return cl.Sessions.Keys(ctx, req)
 	})
 }
