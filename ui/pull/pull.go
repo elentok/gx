@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/creds"
 )
@@ -64,7 +65,7 @@ type Model struct {
 	phase   phase
 	stashed bool
 	spinner spinner.Model
-	log     *ui.CommandOutputLog
+	log     *cmdoutput.CommandOutputLog
 	steps   []components.Step
 
 	activeRunner *components.CommandRunner
@@ -97,7 +98,7 @@ func (m *Model) Open(root string) tea.Cmd {
 	m.failErr = nil
 	m.creds = creds.New()
 	m.activeRunner = nil
-	m.log = ui.NewCommandOutputLog()
+	m.log = cmdoutput.NewCommandOutputLog()
 	m.steps = nil
 	m.IsOpen = true
 	return cmdCheckChanges(root)

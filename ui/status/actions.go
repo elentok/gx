@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 
 	"charm.land/bubbles/v2/textinput"
@@ -53,7 +54,7 @@ type stageActionRunner struct {
 	branch string
 
 	runner *components.CommandRunner
-	log    *ui.CommandOutputLog
+	log    *cmdoutput.CommandOutputLog
 	done   chan stageActionResult
 	res    stageActionResult
 	ok     bool
@@ -70,7 +71,7 @@ func newStageActionRunnerWithOutput(kind stageActionKind, root, remote, branch, 
 		remote: remote,
 		branch: branch,
 		runner: components.NewCommandRunnerWithPolicy(root, "git", components.CredentialPolicyPrompt),
-		log:    ui.CommandOutputLogFrom(initialOutput),
+		log:    cmdoutput.CommandOutputLogFrom(initialOutput),
 		done:   make(chan stageActionResult, 1),
 	}
 }

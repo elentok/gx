@@ -6,7 +6,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 )
 
@@ -15,7 +15,7 @@ func openedModel() Model {
 	m.IsOpen = true
 	m.phase = phaseChecking
 	m.root = "/fake"
-	m.log = ui.NewCommandOutputLog()
+	m.log = cmdoutput.NewCommandOutputLog()
 	return m
 }
 

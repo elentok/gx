@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -174,7 +175,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		args := promptableJobArgs(m.repo, msg.kind, msg.wt)
 		runner := components.NewCommandRunnerWithPolicy(msg.wt.Path, "git", components.CredentialPolicyPrompt, args...)
 		runner.Start()
-		log := ui.CommandOutputLogFrom(msg.initialLog)
+		log := cmdoutput.CommandOutputLogFrom(msg.initialLog)
 		w := msg.wt
 		m.jobRunner = runner
 		m.jobKind = msg.kind

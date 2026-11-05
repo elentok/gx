@@ -3,6 +3,7 @@ package worktrees
 import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	keymgr "github.com/elentok/gx/ui/keys"
@@ -87,7 +88,7 @@ type Model struct {
 	jobRunner            *components.CommandRunner
 	jobKind              promptableJobKind
 	jobWorktree          *git.Worktree
-	jobLog               *ui.CommandOutputLog
+	jobLog               *cmdoutput.CommandOutputLog
 	jobStashed           bool
 
 	lastJobLog   string

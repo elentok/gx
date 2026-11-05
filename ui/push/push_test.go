@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 )
 
@@ -180,7 +180,7 @@ func TestStepPushTag_UsesTagField(t *testing.T) {
 func newModelWithLog() Model {
 	m := New()
 	m.IsOpen = true
-	m.log = ui.NewCommandOutputLog()
+	m.log = cmdoutput.NewCommandOutputLog()
 	return m
 }
 
@@ -191,7 +191,7 @@ func (e fakeErr) Error() string { return string(e) }
 func TestPRPromptTransitionFromPushOutput(t *testing.T) {
 	m := New()
 	m.IsOpen = true
-	m.log = ui.NewCommandOutputLog()
+	m.log = cmdoutput.NewCommandOutputLog()
 	m.phase = phasePushing
 
 	next, cmd, result := m.Update(runnerDoneMsg{

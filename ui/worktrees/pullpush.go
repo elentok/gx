@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/cmdoutput"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -109,7 +110,7 @@ func cmdRebasePreflight(repo git.Repo, wt git.Worktree) tea.Cmd {
 
 func cmdRebase(repo git.Repo, wt git.Worktree, stash bool) tea.Cmd {
 	return func() tea.Msg {
-		log := ui.NewCommandOutputLog()
+		log := cmdoutput.NewCommandOutputLog()
 		stashed := false
 		if stash {
 			out, err := git.Stash(wt.Path)
@@ -128,7 +129,7 @@ func cmdRebase(repo git.Repo, wt git.Worktree, stash bool) tea.Cmd {
 func cmdRebaseRef(wt git.Worktree, ref, initialLog string) tea.Cmd {
 	return func() tea.Msg {
 		out, err := git.Rebase(wt.Path, ref)
-		log := ui.CommandOutputLogFrom(initialLog)
+		log := cmdoutput.CommandOutputLogFrom(initialLog)
 		log.AppendCommand("git", []string{"rebase", ref}, out)
 		return rebaseResultMsg{err: err, log: log.String(), stashed: false, wtPath: wt.Path}
 	}
@@ -137,7 +138,7 @@ func cmdRebaseRef(wt git.Worktree, ref, initialLog string) tea.Cmd {
 func cmdStashPop(wtPath, opLabel, initialLog string) tea.Cmd {
 	return func() tea.Msg {
 		out, err := git.StashPop(wtPath)
-		log := ui.CommandOutputLogFrom(initialLog)
+		log := cmdoutput.CommandOutputLogFrom(initialLog)
 		log.AppendCommand("git", []string{"stash", "pop"}, out)
 		return stashPopResultMsg{err: err, opLabel: opLabel, log: log.String()}
 	}

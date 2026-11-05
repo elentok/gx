@@ -10,6 +10,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/creds"
 	"github.com/elentok/gx/ui/notify"
@@ -69,7 +70,7 @@ type Model struct {
 	phase   phase
 	yes     bool
 	spinner spinner.Model
-	log     *ui.CommandOutputLog
+	log     *cmdoutput.CommandOutputLog
 	steps   []components.Step
 
 	activeRunner *components.CommandRunner
@@ -112,7 +113,7 @@ func (m *Model) OpenAtPRPrompt(prURL string) {
 	m.phase = phasePRPrompt
 	m.prURL = prURL
 	m.prYes = true
-	m.log = ui.NewCommandOutputLog()
+	m.log = cmdoutput.NewCommandOutputLog()
 }
 
 // OpenWithTag is like Open but also pushes the given tag after a successful branch push.
@@ -144,7 +145,7 @@ func (m *Model) Open(root string) error {
 	m.prYes = true
 	m.failErr = nil
 	m.creds = creds.New()
-	m.log = ui.NewCommandOutputLog()
+	m.log = cmdoutput.NewCommandOutputLog()
 	m.activeRunner = nil
 	m.steps = nil
 	m.tag = ""
