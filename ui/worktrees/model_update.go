@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/worktrees/launch"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -154,9 +155,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 
-	case terminalResultMsg:
-		if msg.err != nil {
-			return m.showError(msg.err.Error()), nil
+	case launch.TerminalResultMsg:
+		if msg.Err != nil {
+			return m.showError(msg.Err.Error()), nil
 		}
 		return m, nil
 
@@ -322,9 +323,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		m.spinnerLabel = promptableJobLabel(promptableJobPush, msg.wt)
 		return m, tea.Batch(cmdStartPromptableJob(promptableJobPush, msg.wt, msg.log, false), m.spinner.Tick)
 
-	case lazygitFinishedMsg:
-		if msg.err != nil {
-			return m.showError(msg.err.Error()), nil
+	case launch.LazygitFinishedMsg:
+		if msg.Err != nil {
+			return m.showError(msg.Err.Error()), nil
 		}
 		m.loading = true
 		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)

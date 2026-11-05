@@ -1,4 +1,4 @@
-package worktrees
+package launch
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ func sessionNamePart(name string, aliases map[string]string) string {
 	return strings.TrimPrefix(name, ".")
 }
 
-func sessionNameFor(repoName, wtName string, aliases map[string]string) string {
+func SessionNameFor(repoName, wtName string, aliases map[string]string) string {
 	name := sessionNamePart(repoName, aliases) + "-" + sessionNamePart(wtName, aliases)
 	return strings.TrimPrefix(name, ".")
 }
@@ -34,23 +34,23 @@ func kittySessionFile(name string) string {
 	return name + ".kitty-session"
 }
 
-func cmdKittySession(name, wtPath string) tea.Cmd {
+func KittySession(name, wtPath string) tea.Cmd {
 	return func() tea.Msg {
 		dir, err := kittySessionDir()
 		if err != nil {
-			return terminalResultMsg{err: err}
+			return TerminalResultMsg{Err: err}
 		}
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return terminalResultMsg{err: err}
+			return TerminalResultMsg{Err: err}
 		}
 		sessionFile := filepath.Join(dir, kittySessionFile(name))
 		if _, err := os.Stat(sessionFile); os.IsNotExist(err) {
 			content := fmt.Sprintf("cd %s\nlaunch\n", wtPath)
 			if err := os.WriteFile(sessionFile, []byte(content), 0o644); err != nil {
-				return terminalResultMsg{err: err}
+				return TerminalResultMsg{Err: err}
 			}
 		}
 		err = exec.Command("kitten", "@", "action", "goto_session", sessionFile).Run()
-		return terminalResultMsg{err: err}
+		return TerminalResultMsg{Err: err}
 	}
 }

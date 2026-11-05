@@ -81,10 +81,10 @@ var allowed = map[site]entry{
 	{"ui/reword/reword.go", ruleChildEnv}:                    {1, reasonTool},
 	{"ui/status/model_runtime.go", ruleChildEnv}:             {1, reasonTool},
 	{"ui/terminalrun/terminalrun.go", ruleChildEnv}:          {3, reasonTool},
-	{"ui/worktrees/kitty.go", ruleChildEnv}:                  {1, reasonTool},
-	{"ui/worktrees/kitty.go", ruleHomeDir}:                   {1, reasonTool},
-	{"ui/worktrees/lazygit.go", ruleChildEnv}:                {2, reasonTool},
-	{"ui/worktrees/tmux.go", ruleChildEnv}:                   {2, reasonTool},
+	{"ui/worktrees/launch/kitty.go", ruleChildEnv}:           {1, reasonTool},
+	{"ui/worktrees/launch/kitty.go", ruleHomeDir}:            {1, reasonTool},
+	{"ui/worktrees/launch/lazygit.go", ruleChildEnv}:         {2, reasonTool},
+	{"ui/worktrees/launch/tmux.go", ruleChildEnv}:            {2, reasonTool},
 }
 
 func isPathVar(key string) bool {

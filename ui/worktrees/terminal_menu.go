@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/worktrees/launch"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -69,13 +70,13 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 	if shell == "" {
 		shell = "/bin/sh"
 	}
-	done := func(err error, _ string) tea.Msg { return terminalResultMsg{err: err} }
+	done := func(err error, _ string) tea.Msg { return launch.TerminalResultMsg{Err: err} }
 
 	switch m.settings.Terminal {
 	case ui.TerminalTmux:
 		switch action {
 		case "session":
-			return m, cmdTmuxNewSession(name, path)
+			return m, launch.TmuxNewSession(name, path)
 		case "hsplit":
 			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.HSplit, shell, done)
 		case "vsplit":
@@ -85,10 +86,10 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		}
 	case ui.TerminalKittyRemote:
 		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
-		sessName := sessionNameFor(repoName, name, m.settings.NameAliases)
+		sessName := launch.SessionNameFor(repoName, name, m.settings.NameAliases)
 		switch action {
 		case "session":
-			return m, cmdKittySession(sessName, path)
+			return m, launch.KittySession(sessName, path)
 		case "hsplit":
 			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.HSplit, shell, done)
 		case "vsplit":
@@ -98,10 +99,10 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		}
 	case ui.TerminalHerdr:
 		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
-		sessName := sessionNameFor(repoName, name, m.settings.NameAliases)
+		sessName := launch.SessionNameFor(repoName, name, m.settings.NameAliases)
 		switch action {
 		case "session":
-			return m, cmdHerdrSession(sessName, path)
+			return m, launch.HerdrSession(sessName, path)
 		case "hsplit":
 			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.HSplit, shell, done)
 		case "vsplit":

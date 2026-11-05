@@ -1,4 +1,4 @@
-package worktrees
+package launch
 
 import (
 	"github.com/elentok/gx/herdr"
@@ -6,11 +6,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// cmdHerdrSession focuses the herdr workspace labeled name, creating one
+// HerdrSession focuses the herdr workspace labeled name, creating one
 // rooted at path if none exists yet.
-func cmdHerdrSession(name, path string) tea.Cmd {
+func HerdrSession(name, path string) tea.Cmd {
 	return func() tea.Msg {
 		_, err := herdr.FindOrCreateWorkspace(name, path)
-		return terminalResultMsg{err: err}
+		return TerminalResultMsg{Err: err}
 	}
 }

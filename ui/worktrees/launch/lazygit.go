@@ -1,4 +1,4 @@
-package worktrees
+package launch
 
 import (
 	"os/exec"
@@ -8,18 +8,19 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type lazygitFinishedMsg struct{ err error }
+// LazygitFinishedMsg reports lazygit exiting.
+type LazygitFinishedMsg struct{ Err error }
 
-func cmdLazygit(wt git.Worktree) tea.Cmd {
+func Lazygit(wt git.Worktree) tea.Cmd {
 	c := exec.Command("lazygit", "-p", wt.Path)
 	return tea.ExecProcess(c, func(err error) tea.Msg {
-		return lazygitFinishedMsg{err: err}
+		return LazygitFinishedMsg{Err: err}
 	})
 }
 
-func cmdLazygitLog(wt git.Worktree) tea.Cmd {
+func LazygitLog(wt git.Worktree) tea.Cmd {
 	c := exec.Command("lazygit", "-p", wt.Path, "log")
 	return tea.ExecProcess(c, func(err error) tea.Msg {
-		return lazygitFinishedMsg{err: err}
+		return LazygitFinishedMsg{Err: err}
 	})
 }

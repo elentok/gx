@@ -7,6 +7,7 @@ import (
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/worktrees/launch"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -215,7 +216,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 	case bindingLazygitLog:
 		wt := m.cursorWorktree()
 		if wt != nil {
-			return m, cmdLazygitLog(*wt)
+			return m, launch.LazygitLog(*wt)
 		}
 		return m, nil
 	case bindingOpenTerminal:
