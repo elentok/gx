@@ -33,7 +33,7 @@ func ticketsHoverFixture(t *testing.T) hoverFixture {
 	m := deliverLoad(t, NewModel(root, ui.Settings{}, keys.New(nil)))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	px, py, pw, ph := m.previewRect()
+	px, py, pw, ph := m.layout().previewRect()
 	other := -1
 	for i, e := range m.sidebar.Tree.Entries() {
 		if _, ok := sidebar.RowFromEntry(e); ok && i != m.sidebar.Tree.SelectedIndex() {

@@ -46,7 +46,7 @@ func TestAuthorWrites_OpenAndDraftWriteTheStoreFileAndPingTheServer(t *testing.T
 
 func TestAuthorWrites_WorkWithoutAServer(t *testing.T) {
 	m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
-	m.serverAPI = nil
+	m.server.api = nil
 	if toast := applyStatus(t, m, schema.StatusOpen); toast != "" || tickettest.ReadStatus(t, file) != "open" {
 		t.Fatalf("toast %q, status %q", toast, tickettest.ReadStatus(t, file))
 	}

@@ -109,7 +109,7 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 	}
 
 	// A click landing on the preview panel (past the sidebar's width) is a no-op.
-	sidebarW, _ := m.splitWidth()
+	sidebarW, _ := m.layout().splitWidth()
 	m.sidebar.Tree.SetSelectedIndex(1)
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: sidebarW, Y: line + 1})
 	m = updated.(Model)
@@ -141,7 +141,7 @@ func TestModel_RightClickOpensContextMenu(t *testing.T) {
 	headerLine, epicLine, ticketLine := lineOf(0), lineOf(1), lineOf(3)
 	m.sidebar.Tree.SetSelectedIndex(2)
 
-	sidebarW, _ := m.splitWidth()
+	sidebarW, _ := m.layout().splitWidth()
 	for name, click := range map[string]tea.MouseClickMsg{
 		"preview": {Button: tea.MouseRight, X: sidebarW, Y: ticketLine + 1},
 		"blank":   {Button: tea.MouseRight, X: 0, Y: 38},

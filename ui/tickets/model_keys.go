@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 const (
@@ -107,7 +108,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if match == nil {
 			return m, nil // chord in progress
 		}
-		if cmd, blocked := m.serverKeyGuard(match.ID); blocked {
+		if cmd, blocked := m.server.keyGuard(match.ID); blocked {
 			return m, cmd
 		}
 		if archivedBlockedBindings[match.ID] {
@@ -144,7 +145,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.toggleProjectScope()
 		case bindingTicketsTogglePreview:
 			m.preview.Toggle()
-			m.sidebar.Tree.SetVisibleHeight(m.sidebarViewportHeight())
+			m.sidebar.Tree.SetVisibleHeight(m.layout().sidebarViewportHeight())
 		case bindingTicketsSelectFirst:
 			m.sidebar.SelectFirstRow()
 		case bindingTicketsSelectLast:
@@ -173,7 +174,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// ui/tree/ops.go) — the only way ui/tickets learns which single entry
 	// just changed, short of duplicating that binding logic here.
 	if msg.String() == "enter" {
-		if cmd, handled := m.handleServerResumeEnter(); handled {
+		if cmd, handled := rowactions.ResumeEnter(modelMenuTab{m}); handled {
 			return m, cmd
 		}
 	}

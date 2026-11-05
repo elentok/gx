@@ -6,7 +6,6 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/preview"
-	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // cmdEditSelectedFile opens the selected row's underlying file for editing:
@@ -39,8 +38,4 @@ func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 		return path, true, ""
 	}
 	return epic.Tickets[r.TicketIdx].FilePath(), true, ""
-}
-
-func (m Model) handleEditFileFinished(msg rowactions.EditFileFinishedMsg) (Model, tea.Cmd) {
-	return m, m.editor.Finished(msg)
 }

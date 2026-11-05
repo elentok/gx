@@ -14,12 +14,12 @@ import (
 // Seam D: the tab reads the store only while the server is down.
 func TestRefresh_FollowsConnection(t *testing.T) {
 	m := newServerModel(t)
-	if m.readsDisk() {
+	if m.server.readsDisk() {
 		t.Fatal("connected tab reads the store")
 	}
 
 	m, cmd := withLink(m, tabapi.ServerLinkDown)
-	if !m.readsDisk() {
+	if !m.server.readsDisk() {
 		t.Fatal("down tab does not read the store")
 	}
 	if cmd == nil {
@@ -31,7 +31,7 @@ func TestRefresh_FollowsConnection(t *testing.T) {
 
 	// The shell re-snapshots on reconnect and delivers; the tab fetches nothing.
 	m, cmd = withLink(m, tabapi.ServerLinkUp)
-	if m.readsDisk() {
+	if m.server.readsDisk() {
 		t.Fatal("reconnected tab reads the store")
 	}
 	if cmd != nil {
@@ -46,10 +46,10 @@ func TestRefresh_NoClientStartsDown(t *testing.T) {
 	if m.Init() == nil {
 		t.Fatal("a tab with no client must load from disk on Init")
 	}
-	if !m.readsDisk() {
+	if !m.server.readsDisk() {
 		t.Fatal("a tab with no client does not read the store")
 	}
-	if _, blocked := m.serverKeyGuard(bindingTicketsFinishAndPause); !blocked {
+	if _, blocked := m.server.keyGuard(bindingTicketsFinishAndPause); !blocked {
 		t.Fatal(`"D" is not blocked without a server`)
 	}
 }

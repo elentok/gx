@@ -17,8 +17,8 @@ type epicsLoadedMsg struct {
 // cmdLoad reloads from wherever the rows currently come from: the server's
 // snapshot, or the store itself in down mode.
 func (m Model) cmdLoad() tea.Cmd {
-	if m.readsDisk() {
-		return m.cmdLoadDisk()
+	if m.server.readsDisk() {
+		return cmdLoadDisk(m.scratchDir())
 	}
 	return func() tea.Msg { return tabapi.ResnapshotRequestedMsg{} }
 }

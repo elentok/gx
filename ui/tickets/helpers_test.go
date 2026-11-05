@@ -31,7 +31,7 @@ func expandOpenEpics(m *Model) {
 // skips Init, whose down fallback would also start a store watch.
 func deliverLoadDefaults(t *testing.T, m Model) Model {
 	t.Helper()
-	updated, _ := m.Update(m.cmdLoadDisk()())
+	updated, _ := m.Update(cmdLoadDisk(m.scratchDir())())
 	return updated.(Model)
 }
 

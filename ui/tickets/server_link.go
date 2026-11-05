@@ -13,10 +13,10 @@ var serverBlockedBindings = map[keys.BindingID]bool{
 	bindingTicketsFinishAndPause: true,
 }
 
-// serverKeyGuard is the shared no-op check for server-backed keys: blocked
+// keyGuard is the shared no-op check for server-backed keys: blocked
 // reports whether the caller should return cmd (a toast with the reason).
-func (m Model) serverKeyGuard(id keys.BindingID) (cmd tea.Cmd, blocked bool) {
-	reason := m.link.DisabledReason()
+func (s serverBinding) keyGuard(id keys.BindingID) (cmd tea.Cmd, blocked bool) {
+	reason := s.link.DisabledReason()
 	if reason == "" || !serverBlockedBindings[id] {
 		return nil, false
 	}

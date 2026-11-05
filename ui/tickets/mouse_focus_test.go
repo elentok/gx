@@ -36,7 +36,7 @@ func TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel(t *testing.T) {
 		t.Fatalf("expected initial focus on sidebar, got focus=%v", m.preview.Focus)
 	}
 
-	px, py, _, _ := m.previewRect()
+	px, py, _, _ := m.layout().previewRect()
 	updated, _ = m.Update(tea.MouseClickMsg{X: px + 1, Y: py + 1, Button: tea.MouseLeft})
 	m = updated.(Model)
 
@@ -101,7 +101,7 @@ func TestModel_WheelOverSidebarScrollsItRegardlessOfFocus(t *testing.T) {
 	previewOffsetBefore := m.preview.VP.YOffset()
 	sidebarOffsetBefore := m.sidebar.Tree.ScrollOffset()
 
-	sx, sy, _, _ := m.sidebarRect()
+	sx, sy, _, _ := m.layout().sidebarRect()
 	updated, _ = m.Update(tea.MouseWheelMsg{X: sx + 1, Y: sy + 1, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
@@ -138,7 +138,7 @@ func TestModel_WheelOverPreviewScrollsItRegardlessOfFocus(t *testing.T) {
 	previewOffsetBefore := m.preview.VP.YOffset()
 	sidebarOffsetBefore := m.sidebar.Tree.ScrollOffset()
 
-	px, py, _, _ := m.previewRect()
+	px, py, _, _ := m.layout().previewRect()
 	updated, _ = m.Update(tea.MouseWheelMsg{X: px + 1, Y: py + 1, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
@@ -170,7 +170,7 @@ func TestModel_WheelOverPaneWithNoOverflowIsNoop(t *testing.T) {
 	previewOffsetBefore := m.preview.VP.YOffset()
 	sidebarOffsetBefore := m.sidebar.Tree.ScrollOffset()
 
-	sx, sy, _, _ := m.sidebarRect()
+	sx, sy, _, _ := m.layout().sidebarRect()
 	updated, _ = m.Update(tea.MouseWheelMsg{X: sx + 1, Y: sy + 1, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
@@ -199,7 +199,7 @@ func TestModel_MouseWheelWhileHelpOpenScrollsHelpNotPreview(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
-	px, py, _, _ := m.previewRect()
+	px, py, _, _ := m.layout().previewRect()
 	updated, _ = m.Update(tea.MouseClickMsg{X: px + 1, Y: py + 1, Button: tea.MouseLeft})
 	m = updated.(Model)
 

@@ -24,7 +24,7 @@ func showQueueIfAdded(added int, toast tea.Cmd) tea.Cmd {
 // delivers (WithServerState). Without it the tab reads the store itself
 // (server_refresh.go).
 func (m Model) WithServer(api tabapi.ServerAPI) Model {
-	m.serverAPI = api
+	m.server.api = api
 	return m
 }
 
@@ -66,25 +66,15 @@ func (m Model) WithReads(r tabapi.ReadsAPI) Model {
 // showing "loading…". While the tab reads the store itself (server down) the
 // shell's state is stale and ignored; the crossing into down loads from disk.
 func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea.Model, tea.Cmd) {
-	wasDown := m.link == tabapi.ServerLinkDown
-	m.link = link
-	if m.readsDisk() {
-		m.olderServer = false
-		if link == tabapi.ServerLinkDown && !wasDown {
-			return m, m.cmdLoadDisk()
-		}
+	apply, loadDisk := m.server.receive(st, link)
+	if loadDisk {
+		return m, cmdLoadDisk(m.scratchDir())
+	}
+	if !apply {
 		return m, nil
 	}
-	if st == nil {
-		return m, nil
-	}
-	m.vm = *st
 	firstLoad := !m.loaded
 	m.loaded = true
-	m.olderServer = st.OlderServer()
-	if m.olderServer {
-		m.vm = viewmodel.State{}
-	}
 	m = m.applyServerRows()
 	if firstLoad {
 		m.sidebar.SelectFirstEpic()
@@ -95,43 +85,91 @@ func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea
 // WithCwdProject scopes the tab to the registered project the TUI started in;
 // "" means the cwd is not a registered project, so the tab shows all.
 func (m Model) WithCwdProject(name string) Model {
-	m.scope.CwdProject = name
+	m.server.scope.CwdProject = name
 	return m
 }
 
-// toggleProjectScope is "tp": flip between the cwd project and all projects.
+// serverBinding is the tab's link to the server: the client, the last
+// delivered snapshot and the project scope applied to it.
+type serverBinding struct {
+	// api feeds vm; nil keeps the tab reading the store for good.
+	api tabapi.ServerAPI
+	// link is the link half of the last WithServerState delivery; nothing else
+	// writes it.
+	link tabapi.ServerLink
+	// older: the last snapshot came from a server without rendered status; the
+	// tab shows tabapi.OlderServerNotice and no tickets.
+	older bool
+	vm    viewmodel.State
+	// scope is which projects the tab shows; owned by the tab, so no snapshot
+	// or event can reset it.
+	scope viewmodel.Scope
+}
+
+// receive takes a WithServerState delivery. apply reports that vm changed and
+// the rows need rebuilding; loadDisk that the link just crossed into down, so
+// the tab must load from the store. While the tab reads the store itself the
+// shell's state is stale and ignored.
+func (s *serverBinding) receive(st *viewmodel.State, link tabapi.ServerLink) (apply, loadDisk bool) {
+	wasDown := s.link == tabapi.ServerLinkDown
+	s.link = link
+	if s.readsDisk() {
+		s.older = false
+		return false, link == tabapi.ServerLinkDown && !wasDown
+	}
+	if st == nil {
+		return false, false
+	}
+	s.vm = *st
+	s.older = st.OlderServer()
+	if s.older {
+		s.vm = viewmodel.State{}
+	}
+	return true, false
+}
+
+// toggleScope flips between the cwd project and all projects. ok is false when
+// the cwd is no registered project; msg is the toast text either way.
+func (s *serverBinding) toggleScope() (msg string, ok bool) {
+	if s.scope.CwdProject == "" {
+		return s.scope.UnregisteredHint(), false
+	}
+	s.scope = s.scope.Toggle()
+	if s.scope.AllProjects {
+		return "all projects", true
+	}
+	return "project: " + s.scope.CwdProject, true
+}
+
+// toggleProjectScope is "tp".
 func (m Model) toggleProjectScope() (tea.Model, tea.Cmd) {
-	if m.scope.CwdProject == "" {
-		return m, notify.Info(m.scope.UnregisteredHint())
+	msg, ok := m.server.toggleScope()
+	if !ok {
+		return m, notify.Info(msg)
 	}
-	m.scope = m.scope.Toggle()
-	label := "project: " + m.scope.CwdProject
-	if m.scope.AllProjects {
-		label = "all projects"
-	}
-	return m.applyServerRows(), notify.Info(label)
+	return m.applyServerRows(), notify.Info(msg)
 }
 
 // updateServer handles the server-mode messages; ok is false for any other msg.
-func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
+func updateServer(msg tea.Msg) (cmd tea.Cmd, ok bool) {
 	switch msg := msg.(type) {
 	case rowactions.EpicQueuedMsg:
-		return m, showQueueIfAdded(msg.Queued, msg.Toast()), true
+		return showQueueIfAdded(msg.Queued, msg.Toast()), true
 
 	case queue.ServerDoneMsg:
 		if msg.Problem != "" {
-			return m, notify.Error("refused: " + msg.Problem), true
+			return notify.Error("refused: " + msg.Problem), true
 		}
-		return m, notify.Success(msg.OK), true
+		return notify.Success(msg.OK), true
 
 	case rowactions.ServerWriteMsg:
-		return m, msg.Toast(), true
+		return msg.Toast(), true
 	}
-	return m, nil, false
+	return nil, false
 }
 
 func (m Model) applyServerRows() Model {
-	m.sidebar.Epics = tabapi.EpicsFromViewModel(m.vm, m.scope)
+	m.sidebar.Epics = tabapi.EpicsFromViewModel(m.server.vm, m.server.scope)
 	m.clampSelected()
 	return m
 }

@@ -33,8 +33,8 @@ func TestModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 		if !m.preview.Hidden {
 			t.Fatalf("width %d: expected \"tv\" to hide the preview", width)
 		}
-		if _, _, w, h := m.sidebarRect(); w != width || h != m.contentHeight() {
-			t.Fatalf("width %d: expected list to fill %dx%d, got %dx%d", width, width, m.contentHeight(), w, h)
+		if _, _, w, h := m.layout().sidebarRect(); w != width || h != m.layout().contentHeight() {
+			t.Fatalf("width %d: expected list to fill %dx%d, got %dx%d", width, width, m.layout().contentHeight(), w, h)
 		}
 		if strings.Contains(m.View().Content, "Preview") {
 			t.Fatalf("width %d: expected no preview panel while hidden", width)
@@ -46,7 +46,7 @@ func TestModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 		if m.preview.Focus != preview.FocusSidebar {
 			t.Fatalf("width %d: expected focus to stay on the list while preview hidden, got %v", width, m.preview.Focus)
 		}
-		updated, _ = m.Update(tea.MouseClickMsg{X: width - 2, Y: m.contentHeight() - 2, Button: tea.MouseLeft})
+		updated, _ = m.Update(tea.MouseClickMsg{X: width - 2, Y: m.layout().contentHeight() - 2, Button: tea.MouseLeft})
 		if updated.(Model).preview.Focus != preview.FocusSidebar {
 			t.Fatalf("width %d: expected a click to never focus the hidden preview", width)
 		}

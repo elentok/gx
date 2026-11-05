@@ -187,8 +187,8 @@ func TestTicketMenu_SetStatusWritesTheFile(t *testing.T) {
 
 func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 	for name, cut := range map[string]func(*Model){
-		"no server api": func(m *Model) { m.serverAPI = nil },
-		"link down":     func(m *Model) { m.link = tabapi.ServerLinkDown },
+		"no server api": func(m *Model) { m.server.api = nil },
+		"link down":     func(m *Model) { m.server.link = tabapi.ServerLinkDown },
 	} {
 		t.Run(name, func(t *testing.T) {
 			var calls []string
@@ -240,7 +240,7 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 
 func TestTicketMenu_ReadOnlyLinkDimsWithItsReason(t *testing.T) {
 	m, _ := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
-	m.link = tabapi.ServerLinkReadOnly
+	m.server.link = tabapi.ServerLinkReadOnly
 	_, ready := requestTicketMenu(t, m)
 	if got, want := itemByLabel(t, ready.Items, "Pause").Disabled, tabapi.ServerLinkReadOnly.DisabledReason(); got != want {
 		t.Errorf("pause disabled =%q, want %q", got, want)

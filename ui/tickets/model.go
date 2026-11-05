@@ -22,7 +22,6 @@ import (
 	"github.com/elentok/gx/ui/tickets/sidebar"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
-	"github.com/elentok/gx/viewmodel"
 )
 
 // Model is the top-level tickets tab model: an epic/ticket sidebar paired
@@ -57,24 +56,13 @@ type Model struct {
 	// watch backs the Watch agent modal (watch_agent.go).
 	watch rowactions.WatchModal
 
-	// serverAPI feeds vm (server_mode.go); nil keeps the tab reading the
-	// store for good.
-	serverAPI tabapi.ServerAPI
-	admin     tabapi.AdminAPI
-	sessions  tabapi.SessionsAPI
-	tickets   tabapi.TicketsAPI
-	queue     tabapi.QueueAPI
-	reads     tabapi.ReadsAPI
-	// link is the link half of the last WithServerState delivery; nothing else
-	// writes it (server_link.go).
-	link tabapi.ServerLink
-	// olderServer: the last snapshot came from a server without rendered
-	// status; the tab shows tabapi.OlderServerNotice and no tickets.
-	olderServer bool
-	vm          viewmodel.State
-	// scope is which projects the tab shows; owned by the tab, so no snapshot
-	// or event can reset it.
-	scope viewmodel.Scope
+	// server owns the server link, snapshot and project scope (server_mode.go).
+	server   serverBinding
+	admin    tabapi.AdminAPI
+	sessions tabapi.SessionsAPI
+	tickets  tabapi.TicketsAPI
+	queue    tabapi.QueueAPI
+	reads    tabapi.ReadsAPI
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -117,10 +105,7 @@ func (m Model) ModalOpen() bool {
 }
 
 func (m Model) Init() tea.Cmd {
-	if m.readsDisk() {
-		return m.cmdLoadDisk()
-	}
-	return nil // the app shell's stream delivers the state
+	return m.OnPageActivated() // else the app shell's stream delivers the state
 }
 
 // Update delegates to updateInner then re-syncs the preview viewport
@@ -133,7 +118,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if nm.menus.Pending != nm.selectedTicketPath() {
 		nm.menus.Pending = ""
 	}
-	nm.refreshHover(msg)
+	refreshHover(&nm, msg)
 	nm.syncPreviewViewport()
 	return nm, cmd
 }
@@ -150,23 +135,23 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help.Open(m.width, m.height)
 		return m, cmd
 	}
-	if next, cmd, ok := m.updateServer(msg); ok {
-		return next, cmd
-	}
-	if next, cmd, ok := m.updateStoreChanged(msg); ok {
-		return next, cmd
+	if cmd, ok := updateServer(msg); ok {
+		return m, cmd
 	}
 	switch msg := msg.(type) {
+	case tabapi.StoreChangedMsg:
+		return m, m.OnPageActivated()
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
-		m.sidebar.Tree.SetVisibleHeight(m.sidebarViewportHeight())
+		m.sidebar.Tree.SetVisibleHeight(m.layout().sidebarViewportHeight())
 		return m, nil
 
 	case epicsLoadedMsg:
-		if !m.readsDisk() {
+		if !m.server.readsDisk() {
 			// A disk read that outlived down mode must not overwrite stream rows.
 			return m, nil
 		}
@@ -195,7 +180,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case rowactions.EditFileFinishedMsg:
-		return m.handleEditFileFinished(msg)
+		return m, m.editor.Finished(msg)
 
 	case rowactions.WatchLoadedMsg:
 		m.watch = m.watch.Open(msg, m.width, m.height)
@@ -206,13 +191,14 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case rowactions.TicketReadyMsg:
-		return m.handleTicketMenuReady(msg)
+		cmd := m.menus.HandleReady(msg, modelMenuTab{m})
+		return m, cmd
 
 	case rowactions.TicketPickMsg:
 		return m.handleTicketMenuPick(msg)
 
 	case rowactions.EpicPickMsg:
-		return m.handleEpicMenuPick(msg)
+		return m, m.menus.HandleEpicPick(msg, modelMenuTab{m})
 
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
@@ -231,7 +217,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		if m.confirm.IsOpen {
-			return m.handleConfirmUpdate(msg)
+			var cmd tea.Cmd
+			m.confirm, cmd, _ = m.confirm.Update(msg)
+			return m, cmd
 		}
 		if msg.String() == "esc" {
 			m.menus.Pending = ""
@@ -248,7 +236,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
-			return m.handleConfirmMouseUpdate(msg)
+			var cmd tea.Cmd
+			m.confirm, cmd, _ = m.confirm.UpdateMouse(msg, m.width, m.width, m.height)
+			return m, cmd
 		}
 		if _, ok := m.activeInputSearch(); ok {
 			return m, nil
@@ -263,11 +253,13 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouseWheel(msg)
 
 	case tea.MouseMotionMsg:
-		m.sidebar.Tree.SetHoveredIndex(m.hoverTarget(msg))
+		m.sidebar.Tree.SetHoveredIndex(hoverTarget(m, msg))
 		return m, nil
 
 	case rowactions.StatusChangedMsg:
-		return m.handleStatusChanged()
+		// Up mode does nothing: the store watch turns the file write into a
+		// ticket-changed event. Down mode has no stream, so it reloads from disk.
+		return m, m.OnPageActivated()
 	}
 	return m, nil
 }
@@ -287,14 +279,6 @@ func (m *Model) afterSidebarToggle(toggledID string, cmd tea.Cmd) tea.Cmd {
 	return cmd
 }
 
-// sidebarViewportHeight is the sidebar body's visible line count, matching
-// ui.RenderPanel's own bodyH math (PaddingY: 0, minus the header row) so the
-// windowing done here lines up with what RenderPanel actually paints.
-func (m Model) sidebarViewportHeight() int {
-	sidebarH, _ := m.splitHeight(m.contentHeight())
-	return max(sidebarH-1, 0)
-}
-
 // handleSidebarMouseClick selects the sidebar row under a left click,
 // mirroring arrow-key navigation with no secondary action (no checkbox
 // toggle, no confirm). A click inside the preview panel's bounds instead
@@ -307,20 +291,21 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	if mouse.Button != tea.MouseLeft && mouse.Button != tea.MouseRight {
 		return m, nil
 	}
-	if m.preview.InPreview(mouse, m.width, m.contentHeight()) {
+	l := m.layout()
+	if m.preview.InPreview(mouse, m.width, l.contentHeight()) {
 		if mouse.Button == tea.MouseLeft {
 			m.preview.FocusPreviewPane()
 		}
 		return m, nil
 	}
-	sidebarW, _ := m.splitWidth()
-	sidebarH, _ := m.splitHeight(m.contentHeight())
-	if m.useStackedLayout() {
+	sidebarW, _ := l.splitWidth()
+	sidebarH, _ := l.splitHeight(l.contentHeight())
+	if l.useStackedLayout() {
 		if mouse.Y < 0 || mouse.Y >= sidebarH {
 			return m, nil
 		}
 	} else {
-		if mouse.X < 0 || mouse.X >= sidebarW || mouse.Y < 0 || mouse.Y >= m.contentHeight() {
+		if mouse.X < 0 || mouse.X >= sidebarW || mouse.Y < 0 || mouse.Y >= l.contentHeight() {
 			return m, nil
 		}
 	}
@@ -345,8 +330,9 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 // rects is a no-op rather than falling back to the focused pane.
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
-	sx, sy, sw, sh := m.sidebarRect()
-	px, py, pw, ph := m.previewRect()
+	l := m.layout()
+	sx, sy, sw, sh := l.sidebarRect()
+	px, py, pw, ph := l.previewRect()
 	idx, ok := ui.HoverHitTest(mouse.X, mouse.Y, ui.Rect{X: sx, Y: sy, W: sw, H: sh}, ui.Rect{X: px, Y: py, W: pw, H: ph})
 	if !ok {
 		return m, nil
@@ -381,8 +367,7 @@ func (m Model) View() tea.View {
 		content = ui.OverlayCenter(content, m.help.View(), m.width, m.height)
 	}
 	if activeSearch, ok := m.activeInputSearch(); ok {
-		overlayW := m.searchOverlayWidth()
-		activeSearch.SetWidth(overlayW)
+		activeSearch.SetWidth(m.layout().searchOverlayWidth())
 		overlay := activeSearch.View()
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		content = ui.OverlayBottomCenter(content, overlay, m.width, y)
@@ -413,11 +398,11 @@ func (m Model) activeInputSearch() (search.Model, bool) {
 // stacked on narrow terminals), matching the worktrees tab's frame-free
 // split layout.
 func (m Model) normalView() string {
-	sidebarW, previewW := m.splitWidth()
-	h := m.contentHeight()
-	sidebarH, previewH := m.splitHeight(h)
+	l := m.layout()
+	sidebarW, previewW := l.splitWidth()
+	sidebarH, previewH := l.splitHeight(l.contentHeight())
 
-	sidebarViewportH := m.sidebarViewportHeight()
+	sidebarViewportH := l.sidebarViewportHeight()
 	sidebarView := renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebar.Body(sidebarEnvFor(m), sidebarViewportH, sidebarW-2), m.preview.Focus == preview.FocusSidebar, true)
 	previewView := renderPanel(previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, false)
 
@@ -433,46 +418,4 @@ func (m Model) searchMatchStatus() string {
 		return fmt.Sprintf("%d/%d matches", m.search.Cursor()+1, m.search.MatchesCount())
 	}
 	return ""
-}
-
-func (m Model) searchOverlayWidth() int {
-	max := m.width * 80 / 100
-	if search.DESIRED_WIDTH < max {
-		return search.DESIRED_WIDTH
-	}
-	return max
-}
-
-func (m Model) useStackedLayout() bool {
-	return preview.UseStackedLayout(m.width)
-}
-
-func (m Model) splitWidth() (sidebarW, previewW int) {
-	return m.preview.PanelWidths(m.width)
-}
-
-// splitHeight divides a stacked tickets view evenly between its selection-
-// driving list and preview. Wide views remain a full-height side-by-side split.
-func (m Model) splitHeight(total int) (sidebarH, previewH int) {
-	return m.preview.PanelHeights(m.width, total)
-}
-
-// previewRect returns the preview panel's absolute on-screen bounds,
-// mirroring normalView's layout math so mouse hit-testing (click-to-focus,
-// wheel routing) stays in sync with what's actually rendered.
-func (m Model) previewRect() (x, y, w, h int) {
-	return m.preview.Rect(m.width, m.contentHeight())
-}
-
-// sidebarRect returns the sidebar panel's absolute on-screen bounds,
-// mirroring previewRect's layout math so wheel hit-testing stays in sync
-// with what's actually rendered.
-func (m Model) sidebarRect() (x, y, w, h int) {
-	sidebarW, _ := m.splitWidth()
-	sidebarH, _ := m.splitHeight(m.contentHeight())
-	return 0, 0, sidebarW, sidebarH
-}
-
-func (m Model) contentHeight() int {
-	return max(m.height, 4)
 }

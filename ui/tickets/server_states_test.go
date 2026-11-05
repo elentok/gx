@@ -66,7 +66,7 @@ func TestNoServer_TicketsShowRawStatus(t *testing.T) {
 	}
 
 	m, _ := withLink(NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}), tabapi.ServerLinkDown)
-	if !m.readsDisk() || m.olderServer {
+	if !m.server.readsDisk() || m.server.older {
 		t.Fatal("a disk-reading tab must not show the older-server notice")
 	}
 }
