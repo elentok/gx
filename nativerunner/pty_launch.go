@@ -35,7 +35,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if home == "" || (ss.kind != "" && ss.kind != harness.Claude) || !isSlashCommand(text) {
 		return p.PromptNudged(s, text, onNudge)
 	}
-	turn, err := p.awaitNotBusy(ss)
+	turn, err := p.turns().awaitNotBusy(ss)
 	if err != nil {
 		return err
 	}

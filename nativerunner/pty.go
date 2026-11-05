@@ -300,7 +300,7 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	switch claude.Status {
 	case ClaudeIdle:
 		// A running background task will wake claude again.
-		if !p.backgroundTasks(ss.session) {
+		if !p.turns().backgroundTasks(ss.session) {
 			st.State = agentrunner.StateIdle
 		}
 	case ClaudeWaiting:
@@ -437,7 +437,7 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 	if err != nil {
 		return err
 	}
-	turn, err := p.awaitNotBusy(ss)
+	turn, err := p.turns().awaitNotBusy(ss)
 	if err != nil {
 		return err
 	}
@@ -451,7 +451,7 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 		return notDelivered(err)
 	}
 	if isSlashCommand(text) {
-		err = p.promptSlash(pr, text)
+		err = p.turns().promptSlash(pr, text)
 	} else {
 		// One bare-Enter nudge and one retype, then ErrNotDelivered: herdr's caps
 		// would hold a stuck prompt for minutes before the loop hears of it.
@@ -475,73 +475,6 @@ func notDelivered(err error) error {
 // single-send rule. /compact keeps the normal path: it starts a turn.
 func isSlashCommand(text string) bool {
 	return strings.HasPrefix(text, "/") && text != "/compact"
-}
-
-// promptSlash sends a "/" command once, never nudging or retyping: most
-// commands start no turn, so a retype would run them twice. Delivered means
-// Turn moved (a working report, a new sessionId, a dialog) or claude is still
-// idle after N. A dialog command leaves the session blocked; gx never closes
-// it.
-func (p *Pty) promptSlash(pr *ptyPrompter, text string) error {
-	if err := pr.Submit(text); err != nil {
-		return err
-	}
-	started, err := pr.WaitStart(p.WaitN())
-	if err != nil || started {
-		return err
-	}
-	claude, _, program, err := pr.ss.holder.statusWithProgram()
-	if err != nil {
-		return p.died(pr.ss, err)
-	}
-	if program == "working" || (claude != nil && claude.Status == ClaudeBusy) {
-		return fmt.Errorf("%w: %q started no turn and claude is not idle", agentrunner.ErrNotDelivered, text)
-	}
-	return nil
-}
-
-// awaitNotBusy waits up to N for claude to stop being busy and returns the
-// Turn to send against. A prompt typed into a busy claude is only queued, so
-// its next idle edge would pass for delivery. A background task alone is not
-// busy.
-func (p *Pty) awaitNotBusy(ss *ptySession) (int, error) {
-	deadline := time.Now().Add(p.WaitN())
-	for {
-		resp, err := ss.holder.statusReply()
-		if err != nil {
-			return 0, p.died(ss, err)
-		}
-		claude, turn, program := resp.Claude, resp.Turn, resp.Program
-		// A watched harness (Codex) reports Background itself: working with a
-		// background terminal takes a prompt, a running turn does not.
-		if w := resp.watched(); w != nil {
-			switch {
-			// After an error the input is ready: a prompt starts the next turn.
-			case w.Status.State == harness.Blocked && w.Status.Blocked != harness.BlockedError:
-				return 0, fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, w.Status.Message)
-			case w.Status.State != harness.Working || w.Status.Background:
-				return turn, nil
-			}
-			claude, program = nil, "working"
-		}
-		// Enter on a dialog would pick its first option, allowing a permission
-		// prompt nobody answered.
-		if claude != nil && claude.Status == ClaudeWaiting {
-			return 0, fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, claude.WaitingFor)
-		}
-		// The OSC report leads the pid file by up to a poll.
-		if program != "working" && (claude == nil || claude.Status != ClaudeBusy) {
-			return turn, nil
-		}
-		if time.Now().After(deadline) {
-			return 0, fmt.Errorf("%w: busy for %s", agentrunner.ErrNotReady, p.WaitN())
-		}
-		select {
-		case <-ss.exited:
-			return 0, p.died(ss, errors.New("holder exited"))
-		case <-time.After(p.pollInterval()):
-		}
-	}
 }
 
 // Interrupt picks its key by state: Ctrl+C when busy, a lone Esc when blocked
@@ -578,7 +511,7 @@ func (p *Pty) Interrupt(s agentrunner.Session) error {
 	if err := ss.holder.SendKeys(key); err != nil {
 		return p.died(ss, err)
 	}
-	if err := p.awaitIdle(ss); err != nil {
+	if err := p.turns().awaitIdle(ss); err != nil {
 		return err
 	}
 	if w != nil {
@@ -600,34 +533,6 @@ func watchedProgram(st harness.Status) string {
 	return "idle"
 }
 
-// awaitIdle waits up to N for claude to be neither busy nor blocked.
-func (p *Pty) awaitIdle(ss *ptySession) error {
-	deadline := time.Now().Add(p.WaitN())
-	for {
-		resp, err := ss.holder.statusReply()
-		if err != nil {
-			return p.died(ss, err)
-		}
-		claude, program := resp.Claude, resp.Program
-		if w := resp.watched(); w != nil {
-			program = watchedProgram(w.Status)
-		}
-		busy := program == "working" || program == "blocked" ||
-			(program == "" && claude != nil && (claude.Status == ClaudeBusy || claude.Status == ClaudeWaiting))
-		if !busy {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("%w: not idle after %s", agentrunner.ErrNotReady, p.WaitN())
-		}
-		select {
-		case <-ss.exited:
-			return p.died(ss, errors.New("holder exited"))
-		case <-time.After(p.pollInterval()):
-		}
-	}
-}
-
 // permissionPrompt is the waitingFor of both tool permission and plan
 // approval. Their first option is "Yes", so Enter allows.
 const permissionPrompt = "permission prompt"
@@ -643,18 +548,6 @@ func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 		return p.answerer(ss).AnswerCodex(a)
 	}
 	return p.answerer(ss).AnswerClaude(a)
-}
-
-func (p *Pty) backgroundTasks(s agentrunner.Session) bool {
-	if p.BackgroundTasks != nil {
-		return p.BackgroundTasks(s)
-	}
-	p.envProbeOnce.Do(func() {
-		if home := envValue(p.Env, "HOME"); home != "" {
-			p.envProbe = claudeui.BackgroundTasks(home, time.Now)
-		}
-	})
-	return p.envProbe != nil && p.envProbe(s)
 }
 
 // envValue is the last value of key in a KEY=VALUE list, as exec resolves

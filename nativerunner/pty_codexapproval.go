@@ -38,6 +38,6 @@ func (p *Pty) answerer(ss *ptySession) holderAnswerer {
 		MarkDied:  func(err error) { p.reg.markDied(ss, err) },
 		Exited:    ss.exited,
 		Prompt:    func(text string) error { return p.Prompt(ss.session, text) },
-		AwaitIdle: func() error { return p.awaitIdle(ss) },
+		AwaitIdle: func() error { return p.turns().awaitIdle(ss) },
 	}
 }
