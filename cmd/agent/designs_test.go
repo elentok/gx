@@ -75,6 +75,72 @@ func TestDesignsOpen_NewDesignJSON(t *testing.T) {
 	}
 }
 
+func TestDesignsOpen_FailedStart(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness("no-such-harness"), servertest.WithDefaultHarness("no-such-harness"))
+	req := wire.DesignOpenRequest{Epic: "fresh-idea", NewDesign: true, Idea: "idea", Project: "proj"}
+
+	var out bytes.Buffer
+	err := runDesignsOpen(context.Background(), h.Client, &out, false, req)
+	if err == nil {
+		t.Fatal("text mode: err = nil, want non-zero exit")
+	}
+	if !strings.HasPrefix(out.String(), "proj:fresh-idea\n") || strings.Count(out.String(), "\n") < 2 {
+		t.Errorf("text output = %q, want the address then the start error", out.String())
+	}
+
+	req.Epic = "other-idea"
+	out.Reset()
+	if err := runDesignsOpen(context.Background(), h.Client, &out, true, req); err != nil {
+		t.Fatalf("json mode: %v", err)
+	}
+	var res wire.SessionResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil || !res.EpicCreated || res.StartError == "" {
+		t.Errorf("json result = %+v, %v, want epic_created and start_error", res, err)
+	}
+}
+
+func TestDesignsOpenCmd_IdeaFromStdin(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
+
+	text, err := readIdea("-", strings.NewReader("an idea from stdin"))
+	if err != nil || text != "an idea from stdin" {
+		t.Fatalf("readIdea = %q, %v", text, err)
+	}
+	if text, _ := readIdea("literal", strings.NewReader("ignored")); text != "literal" {
+		t.Errorf("literal idea = %q", text)
+	}
+
+	for name, tc := range map[string]struct {
+		slug, idea, reason string
+	}{
+		"fits":     {"stdin-idea", "an idea", ""},
+		"too long": {"long-idea", strings.Repeat("a", wire.MaxSessionPromptBytes+1), wire.ReasonPromptTextTooLong},
+	} {
+		got, err := readIdea("-", strings.NewReader(tc.idea))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req, err := designOpenRequest(tc.slug, got, "proj", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out bytes.Buffer
+		err = runDesignsOpen(context.Background(), h.Client, &out, false, req)
+		if tc.reason == "" && err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+		if tc.reason != "" && (err == nil || !strings.Contains(err.Error(), tc.reason)) {
+			t.Errorf("%s: err = %v, want refusal %q", name, err, tc.reason)
+		}
+	}
+}
+
 func TestDesignsDelete_RefusalIsAnErrorAndSuccessDeletes(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
@@ -93,8 +159,12 @@ func TestDesignsDelete_RefusalIsAnErrorAndSuccessDeletes(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), wire.ReasonDesignNotMapEpic) {
 		t.Errorf("delete of a loop epic: err = %v, want a refusal", err)
 	}
+	out.Reset()
 	if err := runDesignsDelete(context.Background(), h.Client, &out, false, "proj:bare"); err != nil {
 		t.Fatalf("delete: %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("successful delete printed %q, want nothing", out.String())
 	}
 	if _, err := os.Stat(bare); !os.IsNotExist(err) {
 		t.Errorf("epic dir still there: %v", err)
