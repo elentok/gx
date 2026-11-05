@@ -1,4 +1,4 @@
-package server_test
+package servertest
 
 import (
 	"testing"
@@ -6,15 +6,15 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// legacyClass is the pause class of an old asking / stuck label,
+// LegacyClass is the pause class of an old asking / stuck label,
 // or "" for any other status.
-func legacyClass(s schema.Status) schema.PauseClass {
+func LegacyClass(s schema.Status) schema.PauseClass {
 	return schema.Ticket{Status: s}.PausedClass()
 }
 
-// assertPaused checks a parsed ticket is paused with the given class and, when
+// AssertPaused checks a parsed ticket is paused with the given class and, when
 // reason is non-empty, the given reason.
-func assertPaused(t *testing.T, tk schema.Ticket, class schema.PauseClass, reason schema.PauseReason) {
+func AssertPaused(t *testing.T, tk schema.Ticket, class schema.PauseClass, reason schema.PauseReason) {
 	t.Helper()
 	if tk.Status != schema.StatusPaused {
 		t.Errorf("Status = %q, want %q", tk.Status, schema.StatusPaused)

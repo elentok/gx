@@ -63,22 +63,8 @@ func runnerOf(headless bool) string {
 
 func noWork(*testing.T, string) {}
 
-func commitAgentWork(t *testing.T, wtPath string) {
-	testutil.WriteFile(t, wtPath, "agent.txt", "work")
-	testutil.CommitAll(t, wtPath, "agent work")
-}
-
 func editAgentWork(t *testing.T, wtPath string) {
 	testutil.WriteFile(t, wtPath, "agent.txt", "work")
-}
-
-func runnerShapes(t *testing.T, test func(t *testing.T, headless bool)) {
-	for name, headless := range map[string]bool{"pty": false, "headless": true} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			test(t, headless)
-		})
-	}
 }
 
 // assertEmptyClaimReopened checks the reclaim gave the ticket back: open, a

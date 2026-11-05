@@ -1,11 +1,9 @@
 package server_test
 
 import (
-	"context"
 	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -28,9 +26,7 @@ func (f *schedFixture) rev(t *testing.T, ref string) string {
 
 func (f *schedFixture) runEpic(t *testing.T, wait string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	servertest.WaitForEvent(ctx, t, f.QueueEpic(ctx, t, "01"), wait, "")
+	f.RunEpic(t, wait)
 }
 
 func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {

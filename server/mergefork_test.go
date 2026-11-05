@@ -18,15 +18,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// atMergeCap adds three done merge tickets to an epic's tickets: its run has
-// used them all, so its next non-ff pauses the root instead of forking.
-func atMergeCap(opts map[string]servertest.TicketOpts) map[string]servertest.TicketOpts {
-	opts["02"] = servertest.TicketOpts{Type: "merge", Status: "done"}
-	opts["03"] = servertest.TicketOpts{Type: "merge", Status: "done"}
-	opts["04"] = servertest.TicketOpts{Type: "merge", Status: "done"}
-	return opts
-}
-
 // moveMain commits on main in repo, so a branch cut before it no longer fast-forwards.
 func moveMain(t *testing.T, repo, name string) {
 	t.Helper()

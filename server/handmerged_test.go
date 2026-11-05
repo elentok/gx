@@ -17,31 +17,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// writeCompleteEpic writes epic with one done ticket and completed_at, but no merged_at.
-func writeCompleteEpic(t *testing.T, store, epic string) {
-	t.Helper()
-	servertest.WriteTicketWith(t, store, "proj", epic, "01", "t", servertest.TicketOpts{})
-	path := filepath.Join(store, "proj", epic, "issues", "01-t.md")
-	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Replace(servertest.ReadFile(t, path), "status: open", "status: done", 1))
-	if err := tickets.StampEpicFields(filepath.Join(store, "proj", epic), map[string]any{"completed_at": time.Now().UTC()}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// commitOnBranch commits one file on a new branch, leaving main checked out.
-func commitOnBranch(t *testing.T, repo, branch string) {
-	t.Helper()
-	runGitIn(t, repo, "checkout", "-q", "-b", branch)
-	testutil.WriteFile(t, repo, branch+".txt", branch)
-	testutil.CommitAll(t, repo, "work "+branch)
-	runGitIn(t, repo, "checkout", "-q", "main")
-}
-
-func waitUntil(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	servertest.WaitFor(t, 10*time.Second, what, cond)
-}
-
 func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)

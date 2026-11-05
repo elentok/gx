@@ -95,6 +95,14 @@ func (f *SchedFixture) QueueEpic(ctx context.Context, t *testing.T, firstID stri
 	return evs
 }
 
+// RunEpic queues the epic from ticket 01 and waits for the wait event.
+func (f *SchedFixture) RunEpic(t *testing.T, wait string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	WaitForEvent(ctx, t, f.QueueEpic(ctx, t, "01"), wait, "")
+}
+
 func (f *SchedFixture) TicketFile(t *testing.T, id string) string {
 	t.Helper()
 	matches, err := filepath.Glob(filepath.Join(f.Issues, id+"-*.md"))

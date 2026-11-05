@@ -1,0 +1,157 @@
+package servertest
+
+import (
+	"context"
+	"path/filepath"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets/schema"
+)
+
+// stopCounter counts Stop calls on the headless runner.
+type stopCounter struct {
+	*TurnRunner
+	stops atomic.Int32
+}
+
+func (r *stopCounter) Stop(s agentrunner.Session) error {
+	r.stops.Add(1)
+	return r.TurnRunner.Stop(s)
+}
+
+// ZeroCommitPaused is 01 paused zero-commit, its agent still alive.
+type ZeroCommitPaused struct {
+	H          *Harness
+	Store      string
+	WtPath     string
+	TicketPath string
+	Pause      ralphloop.Event
+	// AgentGone makes the runner's Find miss the agent.
+	AgentGone func()
+	// Stops counts runner Stops from now on.
+	Stops func() int32
+}
+
+func PauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) ZeroCommitPaused {
+	t.Helper()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	SetProjectRepo(t, store, "proj", repo)
+	p := ZeroCommitPaused{Store: store, TicketPath: filepath.Join(store, "proj/epic-a/issues/01-first.md")}
+	if headless {
+		fake := &stopCounter{TurnRunner: NewTurnRunner(func(string, string) {})}
+		p.H = StartWithStore(t, store, append([]func(*server.Config){WithRunner(fake)}, opts...)...)
+		if res, err := p.H.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+			t.Fatalf("add: %+v, %v", res, err)
+		}
+		WaitStatus(t, p.TicketPath, schema.StatusLegacyAnswer)
+		p.AgentGone = func() {
+			if sess, ok, _ := fake.Find("epic-a-iter-01"); ok {
+				_ = fake.Runner.Stop(sess)
+			}
+		}
+		base := fake.stops.Load()
+		p.Stops = func() int32 { return fake.stops.Load() - base }
+	} else {
+		p.H = StartWithStore(t, store, opts...)
+		p.H.OnTurn(func(turn *Turn) { turn.Transcript("done") })
+		if res, err := p.H.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+			t.Fatalf("add: %+v, %v", res, err)
+		}
+		WaitStatus(t, p.TicketPath, schema.StatusLegacyAnswer)
+		p.AgentGone = func() { p.H.KillAgents(t, EpicA01) }
+		base := p.H.Stops()
+		p.Stops = func() int32 { return int32(p.H.Stops() - base) }
+	}
+	// The pause writes the ticket's status before its run-log event.
+	Await(t, func() bool {
+		var ok bool
+		p.Pause, ok = ralphloop.LatestPauseEvent(filepath.Join(store, "proj"), "epic-a", "01")
+		return ok
+	})
+	r, err := git.FindRepo(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wts, err := git.ListWorktrees(*r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.WtPath = git.WorktreePathForBranch("ralph-loop/epic-a-item-01", wts); p.WtPath == "" {
+		t.Fatalf("no iteration worktree in %+v", wts)
+	}
+	return p
+}
+
+// Report writes the agent's late report onto the ticket and pings a rescan.
+func (p ZeroCommitPaused) Report(t *testing.T, mutate func(*schema.Ticket)) {
+	t.Helper()
+	if err := schema.UpdateTicket(p.TicketPath, mutate); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.H.Client.TicketChanged(context.Background(), "proj:epic-a/01"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (p ZeroCommitPaused) FinishedLate(commitless bool) func(*schema.Ticket) {
+	return func(tk *schema.Ticket) {
+		tk.IterationStatus = schema.IterationStatusFinished
+		tk.IterationFinishedAt = p.Pause.Time.Add(time.Second)
+		tk.Commitless = commitless
+	}
+}
+
+// Adopted waits for 01 to be done and returns its late-finish-adopted reason
+// as the history shows it.
+func (p ZeroCommitPaused) Adopted(t *testing.T) string {
+	t.Helper()
+	WaitStatus(t, p.TicketPath, schema.StatusDone)
+	var reason string
+	Await(t, func() bool {
+		hist, err := p.H.Client.History(context.Background(), "proj:epic-a/01")
+		if err != nil {
+			return false
+		}
+		for _, e := range hist.Events {
+			if e.Type == string(events.LateFinishAdopted) {
+				reason = e.Reason
+				return true
+			}
+		}
+		return false
+	})
+	return reason
+}
+
+// StaysPaused gives a scan time to act, then checks it did not.
+func (p ZeroCommitPaused) StaysPaused(t *testing.T) {
+	t.Helper()
+	time.Sleep(200 * time.Millisecond) // negative wait: a few 50ms polls
+	tk, err := schema.ParseTicket(p.TicketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Status == schema.StatusDone {
+		t.Errorf("status = done, want left alone")
+	}
+	hist, err := p.H.Client.History(context.Background(), "proj:epic-a/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range hist.Events {
+		if e.Type == string(events.LateFinishAdopted) {
+			t.Errorf("history has %s: %s", e.Type, e.Reason)
+		}
+	}
+}
+
+func PausedAt(p ZeroCommitPaused) string { return p.Pause.Time.UTC().Format(time.RFC3339) }

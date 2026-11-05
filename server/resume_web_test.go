@@ -227,18 +227,18 @@ func TestWebResume_ZeroCommitPromptKeepsTheRoundOpenAndIsLogged(t *testing.T) {
 func TestWebResume_ZeroCommitWithALateFinishIsAdopted(t *testing.T) {
 	t.Parallel()
 	p := pauseZeroCommit(t, false)
-	state := stateOf(t, p.ticketPath)
+	state := stateOf(t, p.TicketPath)
 
 	// The agent reports a commitless finish after the pause. No rescan ping, so
 	// the resume is the one that adopts it.
-	if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(true)); err != nil {
+	if err := schema.UpdateTicket(p.TicketPath, p.FinishedLate(true)); err != nil {
 		t.Fatal(err)
 	}
-	out := resumeResult(t, webResume(t, p.h, wire.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, p.H, wire.RepairRequest{State: state}))
 	if out.Status != repair.ResumeAdopted || out.Message != repair.MessageAdopted {
 		t.Errorf("result = %+v; want adopted as done", out)
 	}
-	if tk, err := schema.ParseTicket(p.ticketPath); err != nil || tk.Status != schema.StatusDone {
+	if tk, err := schema.ParseTicket(p.TicketPath); err != nil || tk.Status != schema.StatusDone {
 		t.Errorf("ticket = %+v, %v; want done", tk, err)
 	}
 }

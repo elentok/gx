@@ -54,22 +54,6 @@ func TestCancel_WithoutAnOpenRoundWritesNoEnd(t *testing.T) {
 	}
 }
 
-// keepWorktree leaves an iteration worktree and branch for epic/id, as a paused
-// iteration does.
-func keepWorktree(t *testing.T, repo, epic, id string) string {
-	t.Helper()
-	wtDir, err := ralphloop.DefaultDeps().WorktreeDir(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := ralphloop.IterationWorktreePath(wtDir, epic, id)
-	out, err := exec.Command("git", "-C", repo, "worktree", "add", "-b", ralphloop.IterationBranch(epic, id), path).CombinedOutput()
-	if err != nil {
-		t.Fatalf("git worktree add: %v\n%s", err, out)
-	}
-	return path
-}
-
 func branchListed(t *testing.T, repo, branch string) bool {
 	t.Helper()
 	out, err := exec.Command("git", "-C", repo, "branch", "--list", branch).CombinedOutput()

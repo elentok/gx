@@ -3,7 +3,6 @@ package server_test
 import (
 	"context"
 	"errors"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -62,15 +61,6 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 		mu.Lock()
 		defer mu.Unlock()
 		return append([]mergeTurn(nil), seen...)
-	}
-}
-
-// reportIteration is the agent writing iteration_status onto its claimed ticket.
-func reportIteration(t *testing.T, path, status string) {
-	t.Helper()
-	body := strings.Replace(servertest.ReadFile(t, path), "status: claimed\n", "status: claimed\niteration_status: "+status+"\n", 1)
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Error(err)
 	}
 }
 

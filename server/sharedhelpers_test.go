@@ -42,6 +42,30 @@ var (
 	answerToken             = servertest.AnswerToken
 )
 
+const (
+	epicMergedText    = servertest.EpicMergedText
+	epicNotMergedText = servertest.EpicNotMergedText
+)
+
+type zeroCommitPaused = servertest.ZeroCommitPaused
+
+var (
+	writeCompleteEpic = servertest.WriteCompleteEpic
+	commitOnBranch    = servertest.CommitOnBranch
+	waitUntil         = servertest.WaitUntil
+	atMergeCap        = servertest.AtMergeCap
+	reportIteration   = servertest.ReportIteration
+	keepWorktree      = servertest.KeepWorktree
+	commitAgentWork   = servertest.CommitAgentWork
+	runnerShapes      = servertest.RunnerShapes
+	pauseZeroCommit   = servertest.PauseZeroCommit
+	pausedAt          = servertest.PausedAt
+	chatRecorder      = servertest.ChatRecorder
+	waitForChat       = servertest.WaitForChat
+	assertPaused      = servertest.AssertPaused
+	legacyClass       = servertest.LegacyClass
+)
+
 var (
 	newRenamedFake         = servertest.NewRenamedFake
 	startInvestigateEnv    = servertest.StartInvestigateEnv

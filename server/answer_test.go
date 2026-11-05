@@ -107,15 +107,15 @@ func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
 func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
 	t.Parallel()
 	p := pauseZeroCommit(t, false)
-	commitAgentWork(t, p.wtPath)
-	if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(false)); err != nil {
+	commitAgentWork(t, p.WtPath)
+	if err := schema.UpdateTicket(p.TicketPath, p.FinishedLate(false)); err != nil {
 		t.Fatal(err)
 	}
-	res, err := p.h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
+	res, err := p.H.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
 	if err != nil || res.Refused || res.Outcome != wire.OutcomeAdopted {
 		t.Fatalf("answer = %+v, %v; want adopted", res, err)
 	}
-	if n := answerCount(t, p.ticketPath); n != 0 {
+	if n := answerCount(t, p.TicketPath); n != 0 {
 		t.Errorf("pause.answer lines = %d, want 0", n)
 	}
 }
