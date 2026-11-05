@@ -167,8 +167,9 @@ func TestRunAction_RealPromptStepStillNeedsATurn(t *testing.T) {
 
 func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 	t.Parallel()
-	const timeout = 200 * time.Millisecond
-	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
+	// The start timeout must not fire before the test reports working, however
+	// loaded the machine is; only the blocked state may stop the Action here.
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = time.Minute })
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
 	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
@@ -183,8 +184,8 @@ func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 	time.Sleep(actionWatchSettle) // negative wait: the Action's watch only samples on a ticker; no event shows it saw Blocked
 	report(t, conv, agentfake.Control{State: "done"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	// Negative wait: a few step timeouts for a wrong send to show up.
-	time.Sleep(3 * timeout)
+	// Negative wait: a few watch samples for a wrong send to show up.
+	time.Sleep(3 * actionWatchSettle)
 	if screenHas(t, c, "second-step") {
 		t.Error("second prompt sent after the first went blocked")
 	}
