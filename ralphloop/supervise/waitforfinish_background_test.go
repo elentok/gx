@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"slices"
@@ -12,26 +12,13 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/transcript"
 )
 
-// idleBackgroundTaskDeps is the base Deps for waitForBackgroundTasks tests: a
-// pane that reports idle on every AgentWait (including confirmFinished's own
-// re-check), so readBackgroundTasks is the only thing that can hold
-// waitForFinish's conclusion open.
-func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error), sleeps *int) deps.Deps {
-	return deps.Deps{
-		Runner:              fakes.IdleRunner("iter-30"),
-		ReadBackgroundTasks: readBackgroundTasks,
-		Sleep:               func(time.Duration) { *sleeps++ },
-	}
-}
-
-func backgroundTaskGateParams(scratchDir string) supervise.LaunchParams {
-	return supervise.LaunchParams{
+func backgroundTaskGateParams(scratchDir string) LaunchParams {
+	return LaunchParams{
 		Label: "iter-30", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "30",
-		SessionCwd: "/repo/iter-30", Gate: supervise.NewGate(),
+		SessionCwd: "/repo/iter-30", Gate: NewGate(),
 		ScratchDir: scratchDir, EpicName: "epic",
 	}
 }
@@ -54,19 +41,19 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}},
 		}, nil
 	}
-	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 
-	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+	if err := WaitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("WaitForFinish: %v", err)
 	}
 	if reads != 3 {
 		t.Errorf("ReadBackgroundTasks calls = %d, want 3 (held, held, resolved)", reads)
 	}
-	// One sleep from confirmFinished's own debounce, two more pacing the
+	// One sleep from ConfirmFinished's own debounce, two more pacing the
 	// gate's re-reads while the marker stayed outstanding-fresh, plus one more
-	// from the recheck confirmFinished runs once the gate releases.
+	// from the recheck ConfirmFinished runs once the gate releases.
 	if sleeps != 4 {
-		t.Errorf("Sleep calls = %d, want 4: the gate must pace re-reads at smartZonePollMs, not spin, and recheck idle once it releases", sleeps)
+		t.Errorf("Sleep calls = %d, want 4: the gate must pace re-reads at SmartZonePollMs, not spin, and recheck idle once it releases", sleeps)
 	}
 
 	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
@@ -105,11 +92,11 @@ func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh}},
 		}, nil
 	}
-	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 	d.GateReleased = func() bool { return reads >= 2 }
 
-	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+	if err := WaitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("WaitForFinish: %v", err)
 	}
 	if reads != 2 {
 		t.Errorf("ReadBackgroundTasks calls = %d, want 2 (held, released by recovery)", reads)
@@ -136,7 +123,7 @@ func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 
 // TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough covers the ~2h cap:
 // once a held marker reads outstanding-aged-out, the gate stops holding on
-// it and waitForFinish falls through to a plain finish, logging gate-expired
+// it and WaitForFinish falls through to a plain finish, logging gate-expired
 // (never gate-released) for that marker.
 func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 	t.Parallel()
@@ -152,10 +139,10 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}},
 		}, nil
 	}
-	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 
-	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
-		t.Fatalf("waitForFinish: %v, want the aged-out marker to fall through to a plain finish", err)
+	if err := WaitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("WaitForFinish: %v, want the aged-out marker to fall through to a plain finish", err)
 	}
 
 	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
@@ -191,12 +178,12 @@ func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {
 			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh}},
 		}, nil
 	}
-	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 	p := backgroundTaskGateParams(scratchDir)
 	p.Agent = agent.AgentCodex
 
-	if err := waitForFinish(d, p, "sess-30"); err != nil {
-		t.Fatalf("waitForFinish: %v, want a plain finish", err)
+	if err := WaitForFinish(d, p, "sess-30"); err != nil {
+		t.Fatalf("WaitForFinish: %v, want a plain finish", err)
 	}
 	if reads != 0 {
 		t.Errorf("ReadBackgroundTasks calls = %d, want 0 for Codex", reads)
@@ -217,7 +204,7 @@ func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {
 // proves that one task's own notification merged, not that the agent's
 // overall turn is over — seeing the result is exactly when it's likely to
 // resume real work. If the pane is back to "working" by the time the gate
-// releases, waitForFinish must not declare the iteration done off the stale
+// releases, WaitForFinish must not declare the iteration done off the stale
 // idle signal from before the gate started holding; it must keep polling
 // until a later idle genuinely holds up.
 func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
@@ -235,23 +222,23 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 		}, nil
 	}
 	// waits: 1 = outer loop's first wait (idle); 2 = that idle's own
-	// confirmFinished recheck (still idle); 3 = the gate-release recheck this
+	// ConfirmFinished recheck (still idle); 3 = the gate-release recheck this
 	// fix adds (agent resumed work, not idle); 4 = outer loop's second wait,
 	// once the agent is genuinely done; 5 = that second idle's own
-	// confirmFinished recheck (idle; no gate re-hold since ReadBackgroundTasks
+	// ConfirmFinished recheck (idle; no gate re-hold since ReadBackgroundTasks
 	// already reports resolved).
-	r := &blipRunner{Runner: fakes.IdleRunner("iter-30"), timeoutOn: 3}
+	r := &fakes.BlipRunner{Runner: fakes.IdleRunner("iter-30"), TimeoutOn: 3}
 	d := deps.Deps{
 		Runner:              r,
 		ReadBackgroundTasks: readBackgroundTasks,
 		Sleep:               func(time.Duration) { sleeps++ },
 	}
 
-	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+	if err := WaitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("WaitForFinish: %v", err)
 	}
-	if r.waits < 4 {
-		t.Errorf("Runner.Wait calls = %d, want at least 4: the gate-release recheck finding the pane busy must send waitForFinish back around its outer poll loop", r.waits)
+	if r.Waits < 4 {
+		t.Errorf("Runner.Wait calls = %d, want at least 4: the gate-release recheck finding the pane busy must send WaitForFinish back around its outer poll loop", r.Waits)
 	}
 
 	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
@@ -287,10 +274,10 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilTheWokenTurnEnds(t *testing.T
 			AwaitingTurnEnd: reads < 3,
 		}, nil
 	}
-	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 
-	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+	if err := WaitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("WaitForFinish: %v", err)
 	}
 	if reads != 3 {
 		t.Errorf("ReadBackgroundTasks calls = %d, want 3 (awaiting, awaiting, turn ended)", reads)
@@ -300,7 +287,7 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilTheWokenTurnEnds(t *testing.T
 // TestWaitForFinish_BackgroundTaskUnreadableAndUnsupportedNeverHoldGate covers
 // the fail-open requirement: neither a transcript that failed to parse nor an
 // agent with no transcript at all (Codex, via ReadBackgroundTasks == nil at
-// the call site) is evidence, so waitForFinish must conclude on the first
+// the call site) is evidence, so WaitForFinish must conclude on the first
 // debounce-confirmed idle exactly as it would with no reader wired at all.
 func TestWaitForFinish_BackgroundTaskUnreadableAndUnsupportedNeverHoldGate(t *testing.T) {
 	t.Parallel()
@@ -312,13 +299,13 @@ func TestWaitForFinish_BackgroundTaskUnreadableAndUnsupportedNeverHoldGate(t *te
 		readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 			return transcript.BackgroundTaskReading{FileStatus: transcript.BackgroundTaskUnreadable}, nil
 		}
-		d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+		d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 
-		if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
-			t.Fatalf("waitForFinish: %v", err)
+		if err := WaitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+			t.Fatalf("WaitForFinish: %v", err)
 		}
 		if sleeps != 1 {
-			t.Errorf("Sleep calls = %d, want exactly 1 (confirmFinished's debounce only)", sleeps)
+			t.Errorf("Sleep calls = %d, want exactly 1 (ConfirmFinished's debounce only)", sleeps)
 		}
 	})
 
@@ -330,18 +317,18 @@ func TestWaitForFinish_BackgroundTaskUnreadableAndUnsupportedNeverHoldGate(t *te
 			reads++
 			return transcript.BackgroundTaskReading{FileStatus: transcript.BackgroundTaskUnsupported}, nil
 		}
-		d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+		d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 		p := backgroundTaskGateParams(scratchDir)
 		p.Agent = agent.AgentCodex
 
-		if err := waitForFinish(d, p, "sess-30"); err != nil {
-			t.Fatalf("waitForFinish: %v", err)
+		if err := WaitForFinish(d, p, "sess-30"); err != nil {
+			t.Fatalf("WaitForFinish: %v", err)
 		}
 		if reads != 0 {
-			t.Errorf("ReadBackgroundTasks calls = %d, want 0: waitForBackgroundTasks must not call it for Codex", reads)
+			t.Errorf("ReadBackgroundTasks calls = %d, want 0: WaitForBackgroundTasks must not call it for Codex", reads)
 		}
 		if sleeps != 1 {
-			t.Errorf("Sleep calls = %d, want exactly 1 (confirmFinished's debounce only)", sleeps)
+			t.Errorf("Sleep calls = %d, want exactly 1 (ConfirmFinished's debounce only)", sleeps)
 		}
 	})
 }
@@ -359,13 +346,13 @@ func TestWaitForFinish_BackgroundTaskGateAccumulatesAgainstFinishTimeoutMs(t *te
 			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh}},
 		}, nil
 	}
-	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 
 	p := backgroundTaskGateParams(scratchDir)
-	p.FinishTimeoutMs = smartZonePollMs / 2
+	p.FinishTimeoutMs = SmartZonePollMs / 2
 
-	err := waitForFinish(d, p, "sess-30")
+	err := WaitForFinish(d, p, "sess-30")
 	if err == nil || !strings.Contains(err.Error(), "timed out after") {
-		t.Fatalf("waitForFinish error = %v, want a FinishTimeoutMs timeout while the gate held", err)
+		t.Fatalf("WaitForFinish error = %v, want a FinishTimeoutMs timeout while the gate held", err)
 	}
 }

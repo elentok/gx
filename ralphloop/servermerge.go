@@ -94,14 +94,6 @@ func (o OneIteration) smartZone() int {
 	return o.SmartZone
 }
 
-// BlockedPausedError ends WaitIterationFinished when the agent blocked and the
-// ticket was paused blocked-pane. The agent is alive, waiting for a person.
-type BlockedPausedError struct{ Reason string }
-
-func (e *BlockedPausedError) Error() string {
-	return "iteration paused: agent blocked on a request: " + e.Reason
-}
-
 // StallNudgeText is the fixed text of the stall nudge.
 const StallNudgeText = "If you are waiting for a person's reply, run `gx tickets ask` now. Otherwise continue."
 
@@ -218,7 +210,7 @@ func FinishIteration(d deps.Deps, o OneIteration, w IterationWorktree, pane stri
 		Gate:            supervise.NewGate(),
 		Sink:            o.sink(),
 	}
-	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
+	sessionID := supervise.RecordLiveSession(d, w.Label, o.Ticket.Path)
 	err := finishIteration(d, p, w.Path, pane, w.base, w.Branch, sessionID)
 	var built *builtAwaitingMergeError
 	if err != nil && !errors.As(err, &built) {
@@ -273,27 +265,6 @@ func runnerName(d deps.Deps) string {
 	return d.Runner.Name()
 }
 
-// recordLiveSession reads the native session of the agent still running under
-// label and appends it to the ticket's session_ids once, as the in-process
-// loop does when it launches or reattaches an iteration. The server launches
-// without that step, so without this the finish path has no session to read
-// the closing occupancy, elapsed time and cost from and writes none of them.
-// Best-effort: "" (no live agent, no session yet) leaves the ticket as it was.
-func recordLiveSession(d deps.Deps, label, ticketPath string) string {
-	s, ok, err := d.Runner.Find(label)
-	if err != nil || !ok {
-		return ""
-	}
-	status, err := d.Runner.Status(s)
-	if err != nil || status.SessionID == "" {
-		return ""
-	}
-	if t, err := schema.ParseTicket(ticketPath); err == nil && !slices.Contains(t.SessionIDs, status.SessionID) {
-		_ = ticketops.AppendSessionID(ticketPath, status.SessionID)
-	}
-	return status.SessionID
-}
-
 // mergeDeferCap bounds how long mergeBuilt waits out a held merge lock before it
 // gives up and lets the caller pause the ticket. It outlasts a whole conflict
 // resolution (conflictResolutionTimeoutMs) by the lock holder, plus its own.
@@ -316,14 +287,14 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 	in := supervise.WatchPersonInput(d.Runner, s)
 	defer in.Close()
 	p.Input = in
-	vcap := newVerifyCap(p, p.SmartZone)
+	vcap := supervise.NewVerifyCap(p, p.SmartZone)
 	now := supervise.ClockOf(d)
 	mguard := supervise.NewModelGuard(d, p, now)
 	lguard := supervise.NewLongTicketGuard(d, p, now)
 	elapsedMs := 0
 	nudged := false
 	for {
-		st, err := d.Runner.Wait(s, waitStates, cmp.Or(d.GuardPoll, smartZonePollMs*time.Millisecond))
+		st, err := d.Runner.Wait(s, waitStates, cmp.Or(d.GuardPoll, supervise.SmartZonePollMs*time.Millisecond))
 		if err != nil {
 			if errors.Is(err, agentrunner.ErrTimeout) {
 				sessionID := ""
@@ -334,7 +305,7 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 					return err
 				}
 				lguard.Tick(d, p, sessionID)
-				if _, err := vcap.tick(d, p, sessionID); err != nil {
+				if _, err := vcap.Tick(d, p, sessionID); err != nil {
 					return err
 				}
 				continue
@@ -342,34 +313,34 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 			return err
 		}
 		// A limit holds the agent in place before any blocked pause or finish check.
-		if resetAt, limited, _, _ := runnerRateLimit(d, p); limited {
-			if err := holdRateLimit(d, o.OnRateLimit, p, waitStates, resetAt); err != nil {
+		if resetAt, limited, _, _ := supervise.RunnerRateLimit(d, p); limited {
+			if err := supervise.HoldRateLimit(d, o.OnRateLimit, p, waitStates, resetAt); err != nil {
 				return err
 			}
 			continue
 		}
 		if st.State == agentrunner.StateBlocked {
 			if o.PausesAtOnce() {
-				return pauseBlockedAtOnce(d, p, o.Ticket.Path, st)
+				return supervise.PauseBlockedAtOnce(d, p, o.Ticket.Path, st)
 			}
-			reason, paused, err := dwellThenPauseBlocked(d, p, o.Runner, recordLiveSession(d, w.Label, o.Ticket.Path))
+			reason, paused, err := supervise.DwellThenPauseBlocked(d, p, o.Runner, supervise.RecordLiveSession(d, w.Label, o.Ticket.Path))
 			if err != nil {
 				return err
 			}
 			if paused {
-				return &BlockedPausedError{Reason: reason}
+				return &supervise.BlockedPausedError{Reason: reason}
 			}
 			continue
 		}
-		confirmed, err := confirmFinished(d, in, s, until)
+		confirmed, err := supervise.ConfirmFinished(d, in, s, until)
 		if err != nil {
 			return fmt.Errorf("confirming %s finished: %w", w.Label, err)
 		}
 		if !confirmed {
 			continue
 		}
-		sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
-		confirmed, err = waitForBackgroundTasks(d, p, sessionID, until, &elapsedMs)
+		sessionID := supervise.RecordLiveSession(d, w.Label, o.Ticket.Path)
+		confirmed, err = supervise.WaitForBackgroundTasks(d, p, sessionID, until, &elapsedMs)
 		if err != nil {
 			return err
 		}
@@ -403,7 +374,7 @@ func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w It
 	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
 		return false, false, err
 	}
-	if _, err := d.Runner.Wait(s, until, finishConfirmMs*time.Millisecond); err != nil {
+	if _, err := d.Runner.Wait(s, until, supervise.FinishConfirmMs*time.Millisecond); err != nil {
 		if errors.Is(err, agentrunner.ErrTimeout) {
 			return false, true, nil
 		}

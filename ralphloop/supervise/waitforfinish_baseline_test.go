@@ -1,7 +1,8 @@
-package ralphloop
+package supervise
 
 import (
 	"errors"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 // subsequent poll report idle immediately, so the only thing that can ever end
 // the recovery is the transcript.
 func stickyBaselineDeps(
-	r *blipRunner, sleeps *int,
+	r *fakes.BlipRunner, sleeps *int,
 	readCompactions func(string, string) (int, bool, error),
 	readCompactionsAfter func(string, string, time.Time) (int, bool, error),
 ) deps.Deps {
@@ -99,8 +100,8 @@ func TestRecoverSmartZoneBreach_FastCompactionUnderAnUnavailableBaselineIsConfir
 	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
 	}
-	if r.waits != 1 || sleeps != 0 {
-		t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an already-merged boundary confirms on the first poll tick", r.waits, sleeps)
+	if r.Waits != 1 || sleeps != 0 {
+		t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an already-merged boundary confirms on the first poll tick", r.Waits, sleeps)
 	}
 }
 
@@ -172,7 +173,7 @@ func TestRecoverSmartZoneBreach_UnavailableReadsInLoopHoldGateClosed(t *testing.
 	if prompts := r.Prompts("iter-19"); len(prompts) != 1 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact] only", prompts)
 	}
-	wantSleeps := smartZoneCompactExtendedTimeoutMs / smartZonePollMs
+	wantSleeps := smartZoneCompactExtendedTimeoutMs / SmartZonePollMs
 	if sleeps != wantSleeps {
 		t.Errorf("gated sleeps = %d, want %d: failed reads must consume the extended bound, not short-circuit it", sleeps, wantSleeps)
 	}
@@ -215,8 +216,8 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		if prompts := r.Prompts("iter-19"); !recovered || len(prompts) != 2 {
 			t.Errorf("recovered = %v, prompts = %v; want the pre-gate behavior for an agent with no boundary signal", recovered, prompts)
 		}
-		if r.waits != 1 || sleeps != 0 {
-			t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an unsupported agent trusts the first idle tick", r.waits, sleeps)
+		if r.Waits != 1 || sleeps != 0 {
+			t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an unsupported agent trusts the first idle tick", r.Waits, sleeps)
 		}
 	})
 
@@ -239,7 +240,7 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		if recovered {
 			t.Error("recovered = true, want false: an unreadable rollout confirms nothing")
 		}
-		if want := smartZoneCompactExtendedTimeoutMs / smartZonePollMs; sleeps != want {
+		if want := smartZoneCompactExtendedTimeoutMs / SmartZonePollMs; sleeps != want {
 			t.Errorf("gated sleeps = %d, want %d: same extended bound as Claude", sleeps, want)
 		}
 	})

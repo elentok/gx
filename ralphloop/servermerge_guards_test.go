@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"errors"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"slices"
 	"testing"
 	"time"
@@ -27,9 +28,9 @@ type serverGuardsFixture struct {
 func serverGuardsWait(t *testing.T, ticketType, expected, ranModel string, threshold int, counts []int) serverGuardsFixture {
 	t.Helper()
 	var f serverGuardsFixture
-	r := boundGiveUpRunner(func(wait int) bool { return wait <= 3 })
+	r := fakes.BoundGiveUpRunner(func(wait int) bool { return wait <= 3 })
 	// The server's wait does not stop on blocked here, so every Wait is a poll.
-	r.finishPollsOnly = false
+	r.FinishPollsOnly = false
 	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 	if counts != nil {
 		d.ReadTurns = func(_, _ string, _ time.Time) (transcript.Turns, bool, error) {

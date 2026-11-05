@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"fmt"
@@ -6,37 +6,36 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
-	"github.com/elentok/gx/ralphloop/supervise"
 )
 
-// verifyCapMargin is how far below the smart zone a verify session is stopped,
+// VerifyCapMargin is how far below the smart zone a verify session is stopped,
 // leaving room for the cap-stop step to write its results.
-const verifyCapMargin = 20_000
+const VerifyCapMargin = 20_000
 
-// verifyCap stops a verify session once, when its context occupancy first
-// passes the smart zone minus verifyCapMargin. It sends a finish-up prompt and
+// VerifyCap stops a verify session once, when its context occupancy first
+// passes the smart zone minus VerifyCapMargin. It sends a finish-up prompt and
 // never compacts: the session wraps up by gx-verify-epic's cap-stop step.
-type verifyCap struct {
+type VerifyCap struct {
 	limit int
-	state *supervise.VerifyCapState
+	state *VerifyCapState
 }
 
-// newVerifyCap returns nil when p's pane gets no cap: a pane the launch did not
+// NewVerifyCap returns nil when p's pane gets no cap: a pane the launch did not
 // opt in by giving it a state (only the main iteration launch does; the
 // conflict-resolution pane shares the ticket's params but is not the verify
-// session), a non-verify ticket, or a smart zone of verifyCapMargin or less.
-func newVerifyCap(p supervise.LaunchParams, smartZone int) *verifyCap {
-	if p.VerifyCap == nil || !p.TicketData.IsVerify() || smartZone <= verifyCapMargin {
+// session), a non-verify ticket, or a smart zone of VerifyCapMargin or less.
+func NewVerifyCap(p LaunchParams, smartZone int) *VerifyCap {
+	if p.VerifyCap == nil || !p.TicketData.IsVerify() || smartZone <= VerifyCapMargin {
 		return nil
 	}
-	return &verifyCap{limit: smartZone - verifyCapMargin, state: p.VerifyCap}
+	return &VerifyCap{limit: smartZone - VerifyCapMargin, state: p.VerifyCap}
 }
 
 // tick, the first time the occupancy of the session sessionID passes the cap,
 // interrupts the pane and sends the finish-up prompt. stopped reports whether
 // it did, so the caller can reset its elapsed-poll-time counter. A nil receiver
 // never stops anything.
-func (c *verifyCap) tick(d deps.Deps, p supervise.LaunchParams, sessionID string) (stopped bool, err error) {
+func (c *VerifyCap) Tick(d deps.Deps, p LaunchParams, sessionID string) (stopped bool, err error) {
 	if c == nil || c.state.Fired {
 		return false, nil
 	}

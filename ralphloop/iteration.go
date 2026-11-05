@@ -61,16 +61,16 @@ func finishIteration(d deps.Deps, p iterationParams, path, pane, base, branch, s
 
 	ahead, err := iterationCommitsAhead(d, path, base, branch)
 	if err != nil || ahead == 0 {
-		// waitForFinish's own debounce (confirmFinished) already guards against
+		// supervise.WaitForFinish's own debounce (supervise.ConfirmFinished) already guards against
 		// herdr reporting the agent idle mid-turn, but a commit can still merge
 		// in the gap between that confirmation and this check (e.g. a reattached
-		// iteration, which skips waitForFinish's launch-time debounce entirely).
+		// iteration, which skips supervise.WaitForFinish's launch-time debounce entirely).
 		// The count can also fail transiently right after the pane exits (e.g.
 		// a worktree/ref momentarily unresolvable during concurrent reconcile
 		// activity) even though the agent's work already merged. Recheck once
 		// more before giving up rather than orphaning a commit — or stranding
 		// an otherwise-finished ticket — on a one-off blip.
-		d.Sleep(finishDebounceMs * time.Millisecond)
+		d.Sleep(supervise.FinishDebounceMs * time.Millisecond)
 		ahead, err = iterationCommitsAhead(d, path, base, branch)
 		if err != nil {
 			return fmt.Errorf("counting commits ahead of %s: %w", base, err)
@@ -105,7 +105,7 @@ func finishIteration(d deps.Deps, p iterationParams, path, pane, base, branch, s
 		// blocked pane all skip straight past this unchanged.
 		retried, newAhead, newSessionID, err := retryUnexecutedToolCallOnce(d, p, path, pane, base, branch, sessionID)
 		if err != nil {
-			if errors.Is(err, errBlockedPanePaused) {
+			if errors.Is(err, supervise.ErrBlockedPanePaused) {
 				return nil
 			}
 			return err
@@ -224,7 +224,7 @@ const unexecutedToolCallCorrection = "Your last turn ended with a tool call writ
 // untouched and falls straight to paused (answer), same as before this ticket.
 // A pane that reads blocked at the moment of the check gets no prompt sent
 // at all, honoring the rule that gx never types into a pane sitting on a
-// dialog it did not raise; an err wrapping errBlockedPanePaused reports the
+// dialog it did not raise; an err wrapping supervise.ErrBlockedPanePaused reports the
 // retry's own re-wait pausing after a Codex quota reset.
 func retryUnexecutedToolCallOnce(d deps.Deps, p iterationParams, path, pane, base, branch, sessionID string) (retried bool, ahead int, newSessionID string, err error) {
 	matched, err := d.ReadUnexecutedToolCall(path, sessionID)
@@ -255,12 +255,12 @@ func retryUnexecutedToolCallOnce(d deps.Deps, p iterationParams, path, pane, bas
 	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
 	launchParams.VerifyCap = p.verifyCap
 	launchParams.Session = s
-	if err := promptIdle(d, launchParams, unexecutedToolCallCorrection); err != nil {
+	if err := supervise.PromptIdle(d, launchParams, unexecutedToolCallCorrection); err != nil {
 		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
 	}
 
-	if err := waitForFinish(d, launchParams, retrySessionID); err != nil {
-		if errors.Is(err, errBlockedPanePaused) {
+	if err := supervise.WaitForFinish(d, launchParams, retrySessionID); err != nil {
+		if errors.Is(err, supervise.ErrBlockedPanePaused) {
 			return false, 0, "", err
 		}
 		return false, 0, "", fmt.Errorf("waiting for %s to finish after corrective retry: %w", label, err)
@@ -365,7 +365,7 @@ func backfillDoneMetadata(d deps.Deps, p iterationParams) error {
 }
 
 func markDoneWithCompactions(d deps.Deps, agent agent.AgentKind, path, cwd, sessionID string) error {
-	compactions, ok, err := sessionCompactions(d, agent, cwd, sessionID)
+	compactions, ok, err := supervise.SessionCompactions(d, agent, cwd, sessionID)
 	if err != nil || !ok {
 		return ticketops.MarkDone(path)
 	}
@@ -735,7 +735,7 @@ func reattachLiveConflictResolver(d deps.Deps, p iterationParams, live agentrunn
 	launchParams := p.launchAndPromptParams(label, live.ID, "", p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
 	if !supervise.AlreadyFinished(string(agent.State)) {
-		if err := waitForFinish(d, launchParams, sessionID); err != nil {
+		if err := supervise.WaitForFinish(d, launchParams, sessionID); err != nil {
 			return "", fmt.Errorf("waiting for reattached conflict-resolution agent %s to finish: %w", label, err)
 		}
 	}

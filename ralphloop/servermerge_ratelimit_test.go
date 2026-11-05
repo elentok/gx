@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"errors"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"slices"
 	"testing"
 	"time"
@@ -90,7 +91,7 @@ func TestWaitIterationFinished_RateLimitHoldsUntilResetPlusBuffer(t *testing.T) 
 	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue"}) {
 		t.Errorf("prompts = %q, want one continue and no stall nudge", got)
 	}
-	if want := []time.Duration{30*time.Second + rateLimitResetBuffer}; !slices.Equal(holdSleeps(*sleeps, 1), want) {
+	if want := []time.Duration{30*time.Second + supervise.RateLimitResetBuffer}; !slices.Equal(holdSleeps(*sleeps, 1), want) {
 		t.Errorf("sleeps = %v, want %v first", *sleeps, want)
 	}
 	if !slices.Equal(*holds, []bool{true, false}) {
@@ -112,7 +113,7 @@ func TestWaitIterationFinished_RateLimitPastResetContinuesAtOnce(t *testing.T) {
 	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue"}) {
 		t.Errorf("prompts = %q, want one continue", got)
 	}
-	if slices.Contains(*sleeps, rateLimitResetBuffer) || slices.Contains(*sleeps, rateLimitPollInterval) {
+	if slices.Contains(*sleeps, supervise.RateLimitResetBuffer) || slices.Contains(*sleeps, supervise.RateLimitPollInterval) {
 		t.Errorf("sleeps = %v, want no hold sleep", *sleeps)
 	}
 }
@@ -125,7 +126,7 @@ func TestWaitIterationFinished_RateLimitUnknownResetPollsWhileLimitedAgain(t *te
 	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue", "continue"}) {
 		t.Errorf("prompts = %q, want two continues", got)
 	}
-	if want := []time.Duration{rateLimitPollInterval, rateLimitPollInterval}; !slices.Equal(holdSleeps(*sleeps, 2), want) {
+	if want := []time.Duration{supervise.RateLimitPollInterval, supervise.RateLimitPollInterval}; !slices.Equal(holdSleeps(*sleeps, 2), want) {
 		t.Errorf("sleeps = %v, want %v first", *sleeps, want)
 	}
 }
@@ -169,7 +170,7 @@ func TestWaitIterationFinished_CodexQuotaWhileBlockedHoldsThenContinues(t *testi
 	if err := waitBlocked(t, d, one); err != nil {
 		t.Fatalf("err = %v, want nil: a Codex quota holds, it does not pause", err)
 	}
-	if (*sleeps)[0] != time.Minute+rateLimitResetBuffer {
+	if (*sleeps)[0] != time.Minute+supervise.RateLimitResetBuffer {
 		t.Errorf("sleeps = %v, want the hold sleep first", *sleeps)
 	}
 	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue"}) {
@@ -179,11 +180,11 @@ func TestWaitIterationFinished_CodexQuotaWhileBlockedHoldsThenContinues(t *testi
 
 func TestWaitIterationFinished_CodexBlockedAfterQuotaResetPausesWithoutContinue(t *testing.T) {
 	d, r, one, sleeps := codexBlockedLimitFixture(t, nil)
-	var paused *BlockedPausedError
+	var paused *supervise.BlockedPausedError
 	if err := waitBlocked(t, d, one); !errors.As(err, &paused) {
-		t.Fatalf("err = %v, want *BlockedPausedError", err)
+		t.Fatalf("err = %v, want *supervise.BlockedPausedError", err)
 	}
-	if want := []time.Duration{time.Minute + rateLimitResetBuffer, blockedDwellMs * time.Millisecond}; !slices.Equal(*sleeps, want) {
+	if want := []time.Duration{time.Minute + supervise.RateLimitResetBuffer, supervise.BlockedDwellMs * time.Millisecond}; !slices.Equal(*sleeps, want) {
 		t.Errorf("sleeps = %v, want hold then dwell", *sleeps)
 	}
 	if got := r.Prompts("iter-01"); len(got) != 0 {
@@ -203,11 +204,11 @@ func TestWaitIterationFinished_RateLimitedBlockedAgentHolds(t *testing.T) {
 		r.SetRateLimit("iter-01", time.Time{})
 	}
 	err := waitBlocked(t, d, one)
-	var paused *BlockedPausedError
+	var paused *supervise.BlockedPausedError
 	if errors.As(err, &paused) || err != nil {
 		t.Fatalf("err = %v, want nil: a limited block holds, it does not pause", err)
 	}
-	if len(*sleeps) == 0 || (*sleeps)[0] != time.Minute+rateLimitResetBuffer {
+	if len(*sleeps) == 0 || (*sleeps)[0] != time.Minute+supervise.RateLimitResetBuffer {
 		t.Errorf("sleeps = %v, want the hold sleep first", *sleeps)
 	}
 }

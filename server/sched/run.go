@@ -249,7 +249,7 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 	if l.Recovery.PauseReleasedGate(one.ScratchDir, addr, one.Ticket.Path, run) {
 		return
 	}
-	var blocked *ralphloop.BlockedPausedError
+	var blocked *supervise.BlockedPausedError
 	if errors.As(err, &blocked) {
 		// The wait already wrote the pause. The agent is alive and waits for a
 		// person: hand the run to the waiting-run machinery as a question does.

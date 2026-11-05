@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -73,7 +74,7 @@ func FinishCommitless(d deps.Deps, o OneIteration, w IterationWorktree, pane str
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
 		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(), KeepAskedAgent: o.KeepAskedAgent,
 	}
-	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
+	sessionID := supervise.RecordLiveSession(d, w.Label, o.Ticket.Path)
 	stranded, err := pauseStrandedCommits(d, p, w, pane, sessionID)
 	if err != nil {
 		return FinishOutcome{}, err

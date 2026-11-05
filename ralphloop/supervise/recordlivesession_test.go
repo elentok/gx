@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"testing"
@@ -15,8 +15,8 @@ func TestRecordLiveSession_AppendsOnceAndReturnsSession(t *testing.T) {
 	d := deps.Deps{Runner: fakes.IdleRunner("iter-01")}
 
 	for range 2 { // a reclaimed run finishes twice
-		if got := recordLiveSession(d, "iter-01", path); got != "sess-1" {
-			t.Fatalf("recordLiveSession = %q, want sess-1", got)
+		if got := RecordLiveSession(d, "iter-01", path); got != "sess-1" {
+			t.Fatalf("RecordLiveSession = %q, want sess-1", got)
 		}
 	}
 
@@ -30,8 +30,8 @@ func TestRecordLiveSession_NoLiveAgentLeavesTicketAlone(t *testing.T) {
 	path := fixture.WriteFrontmatterTicket(t, "claimed")
 	d := deps.Deps{Runner: runnerfake.NewRunner()}
 
-	if got := recordLiveSession(d, "iter-01", path); got != "" {
-		t.Errorf("recordLiveSession = %q, want empty", got)
+	if got := RecordLiveSession(d, "iter-01", path); got != "" {
+		t.Errorf("RecordLiveSession = %q, want empty", got)
 	}
 	if got := fixture.MustParse(t, path).SessionIDs; len(got) != 0 {
 		t.Errorf("SessionIDs = %v, want none", got)

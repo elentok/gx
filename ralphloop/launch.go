@@ -293,7 +293,7 @@ func reportStarted(d deps.Deps, p supervise.LaunchParams, sessionID string, seq 
 	p.LogAgentStartEvent(p.StartEvent, sessionID, seq)
 	if p.StartEvent != "" {
 		p.EventSink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane)
-		emitContextOccupancy(d, p.EventSink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
+		supervise.EmitContextOccupancy(d, p.EventSink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 }
 
@@ -316,18 +316,18 @@ func adoptedLaunch(d deps.Deps, p supervise.LaunchParams) (string, error) {
 			p.LogLifecycleEvent(p.FinishEvent, sessionID)
 			return sessionID, nil
 		}
-		if err := promptIdle(d, p, p.Prompt); err != nil {
+		if err := supervise.PromptIdle(d, p, p.Prompt); err != nil {
 			return "", fmt.Errorf("sending initial prompt to stalled adopted session: %w", err)
 		}
 	}
 	return waitLaunched(d, p, sessionID)
 }
 
-// waitLaunched is waitForFinish keeping sessionID on a blocked-pane pause,
+// waitLaunched is supervise.WaitForFinish keeping sessionID on a blocked-pane pause,
 // whose caller still records the live session.
 func waitLaunched(d deps.Deps, p supervise.LaunchParams, sessionID string) (string, error) {
-	if err := waitForFinish(d, p, sessionID); err != nil {
-		if errors.Is(err, errBlockedPanePaused) {
+	if err := supervise.WaitForFinish(d, p, sessionID); err != nil {
+		if errors.Is(err, supervise.ErrBlockedPanePaused) {
 			return sessionID, err
 		}
 		return "", err

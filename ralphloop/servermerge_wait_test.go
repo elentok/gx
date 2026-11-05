@@ -31,7 +31,7 @@ import (
 func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 	t.Parallel()
 	var sleeps, reads int
-	d := idleBackgroundTaskDeps(func(string, string) (transcript.BackgroundTaskReading, error) {
+	d := fakes.IdleBackgroundTaskDeps(func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
 		status := transcript.BackgroundTaskOutstandingFresh
 		if reads >= 3 {
@@ -55,14 +55,14 @@ func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 // not end the wait.
 func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {
 	t.Parallel()
-	r := &blipRunner{Runner: fakes.IdleRunner("iter-27"), timeoutOn: 2}
+	r := &fakes.BlipRunner{Runner: fakes.IdleRunner("iter-27"), TimeoutOn: 2}
 	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 	one := OneIteration{Agent: agent.AgentClaude}
 	if err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-27"}, agentrunner.Session{Label: "iter-27", ID: "pane-1"}); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
 	}
-	if r.waits != 4 {
-		t.Errorf("Runner.Wait calls = %d, want 4 (idle, blip, idle, confirmed)", r.waits)
+	if r.Waits != 4 {
+		t.Errorf("Runner.Wait calls = %d, want 4 (idle, blip, idle, confirmed)", r.Waits)
 	}
 }
 
@@ -316,9 +316,9 @@ func TestWaitIterationFinished_PersonInputRestartsFinishDebounce(t *testing.T) {
 	t.Parallel()
 	d, r, one, _ := stallNudgeFixture(t, "", 0)
 	var sleeps []time.Duration
-	typeDuring(&d, r, finishDebounceMs*time.Millisecond, &sleeps)
+	typeDuring(&d, r, supervise.FinishDebounceMs*time.Millisecond, &sleeps)
 	waitStallFixture(t, d, one)
-	if n := countSleeps(sleeps, finishDebounceMs*time.Millisecond); n != 2 {
+	if n := countSleeps(sleeps, supervise.FinishDebounceMs*time.Millisecond); n != 2 {
 		t.Errorf("finish debounce slept %d times, want 2 (restarted by the key)", n)
 	}
 }
@@ -331,82 +331,9 @@ func TestWaitIterationFinished_NoPersonInputKeepsTimersOnce(t *testing.T) {
 	if n := countSleeps(*sleeps, 2*time.Minute); n != 1 {
 		t.Errorf("stall delay slept %d times, want 1", n)
 	}
-	if n := countSleeps(*sleeps, finishDebounceMs*time.Millisecond); n < 1 {
+	if n := countSleeps(*sleeps, supervise.FinishDebounceMs*time.Millisecond); n < 1 {
 		t.Errorf("finish debounce never slept")
 	}
-}
-
-// blipRunner times out its timeoutOn-th Wait: a finish recheck finds the
-// agent back at work. runnerfake can't script that without a real-time
-// timeout.
-type blipRunner struct {
-	*runnerfake.Runner
-	timeoutOn int
-	// timeoutIf, when set, replaces timeoutOn: it is told each Wait's 1-based
-	// index and reports whether that Wait times out.
-	timeoutIf func(wait int) bool
-	// timeoutLabel, when set, also times out every Wait on a label it matches.
-	timeoutLabel func(label string) bool
-	// finishPollsOnly scripts only waitForFinish's own polls, told apart by
-	// also stopping on blocked: timeoutOn and timeoutIf index those alone, and
-	// every other Wait, such as recovery's compact polls, sees the fake's state.
-	finishPollsOnly bool
-	// interruptErr, when set, fails every Interrupt.
-	interruptErr error
-	// promptErr, when set, fails every Prompt without recording it.
-	promptErr error
-	// contextExhausted, when set, is the evidence of the next RateLimit call
-	// alone failing with ErrContextExhausted; later calls see the fake's state.
-	contextExhausted string
-	waits            int
-	finishPolls      int
-	interrupts       int
-}
-
-func (r *blipRunner) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
-	if evidence := r.contextExhausted; evidence != "" {
-		r.contextExhausted = ""
-		return time.Time{}, false, fmt.Errorf("%w: %s", agentrunner.ErrContextExhausted, evidence)
-	}
-	return r.Runner.RateLimit(s)
-}
-
-func (r *blipRunner) Interrupt(s agentrunner.Session) error {
-	r.interrupts++
-	if r.interruptErr != nil {
-		return r.interruptErr
-	}
-	return r.Runner.Interrupt(s)
-}
-
-func (r *blipRunner) Prompt(s agentrunner.Session, text string) error {
-	if r.promptErr != nil {
-		return r.promptErr
-	}
-	return r.Runner.Prompt(s, text)
-}
-
-func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
-	r.waits++
-	n := r.waits
-	if r.finishPollsOnly {
-		if !slices.Contains(states, agentrunner.StateBlocked) {
-			return r.Runner.Wait(s, states, timeout)
-		}
-		r.finishPolls++
-		n = r.finishPolls
-	}
-	timedOut := n == r.timeoutOn
-	if r.timeoutIf != nil {
-		timedOut = r.timeoutIf(n)
-	}
-	if r.timeoutLabel != nil && r.timeoutLabel(s.Label) {
-		timedOut = true
-	}
-	if timedOut {
-		return agentrunner.Status{State: agentrunner.StateWorking}, agentrunner.ErrTimeout
-	}
-	return r.Runner.Wait(s, states, timeout)
 }
 
 // A held merge lock is routine; mergeBuilt retries instead of failing the finish.
@@ -593,9 +520,9 @@ func waitBlocked(t *testing.T, d deps.Deps, one OneIteration) error {
 
 func TestWaitIterationFinished_HeadlessBlockedPausesAtOnce(t *testing.T) {
 	d, _, one, sleeps := blockedWaitFixture(t, agent.AgentClaude, string(agentrunner.ChoiceHeadless), nil)
-	var paused *BlockedPausedError
+	var paused *supervise.BlockedPausedError
 	if err := waitBlocked(t, d, one); !errors.As(err, &paused) {
-		t.Fatalf("err = %v, want *BlockedPausedError", err)
+		t.Fatalf("err = %v, want *supervise.BlockedPausedError", err)
 	}
 	if len(*sleeps) != 0 {
 		t.Errorf("sleeps = %v, want none", *sleeps)
@@ -617,11 +544,11 @@ func TestWaitIterationFinished_DwellingRunnersPauseOnlyIfStillBlocked(t *testing
 	for _, c := range cases {
 		t.Run(c.name+" still blocked", func(t *testing.T) {
 			d, _, one, sleeps := blockedWaitFixture(t, c.agent, c.runner, nil)
-			var paused *BlockedPausedError
+			var paused *supervise.BlockedPausedError
 			if err := waitBlocked(t, d, one); !errors.As(err, &paused) {
-				t.Fatalf("err = %v, want *BlockedPausedError", err)
+				t.Fatalf("err = %v, want *supervise.BlockedPausedError", err)
 			}
-			if !slices.Equal(*sleeps, []time.Duration{blockedDwellMs * time.Millisecond}) {
+			if !slices.Equal(*sleeps, []time.Duration{supervise.BlockedDwellMs * time.Millisecond}) {
 				t.Errorf("sleeps = %v, want one dwell", *sleeps)
 			}
 			for _, w := range c.want {
@@ -640,7 +567,7 @@ func TestWaitIterationFinished_DwellingRunnersPauseOnlyIfStillBlocked(t *testing
 			if err := waitBlocked(t, d, one); err != nil {
 				t.Fatalf("err = %v, want the wait to finish", err)
 			}
-			if len(*sleeps) == 0 || (*sleeps)[0] != blockedDwellMs*time.Millisecond {
+			if len(*sleeps) == 0 || (*sleeps)[0] != supervise.BlockedDwellMs*time.Millisecond {
 				t.Errorf("sleeps = %v, want the dwell first", *sleeps)
 			}
 		})

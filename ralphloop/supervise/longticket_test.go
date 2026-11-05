@@ -1,6 +1,7 @@
-package ralphloop
+package supervise
 
 import (
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"slices"
 	"testing"
 	"time"
@@ -12,13 +13,13 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-// runLongTicketWait runs waitForFinish through three timed-out polls, each
+// runLongTicketWait runs supervise.WaitForFinish through three timed-out polls, each
 // reading the next count, and returns the counts the alert was called with.
 func runLongTicketWait(t *testing.T, ticketType string, threshold int, counts []int, nilRead bool) []int {
 	t.Helper()
 	var fired []int
 	reads := 0
-	d := deps.Deps{Runner: boundGiveUpRunner(func(wait int) bool { return wait <= 3 }), Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: fakes.BoundGiveUpRunner(func(wait int) bool { return wait <= 3 }), Sleep: func(time.Duration) {}}
 	if !nilRead {
 		d.ReadTurns = func(_, _ string, _ time.Time) (transcript.Turns, bool, error) {
 			n := counts[min(reads, len(counts)-1)]
@@ -34,8 +35,8 @@ func runLongTicketWait(t *testing.T, ticketType string, threshold int, counts []
 	p.EpicName = "epic"
 	p.LongTicketTurns = threshold
 	p.OnLongTicket = func(turns int) { fired = append(fired, turns) }
-	if err := waitForFinish(d, p, "sess-19"); err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+	if err := WaitForFinish(d, p, "sess-19"); err != nil {
+		t.Fatalf("supervise.WaitForFinish: %v", err)
 	}
 	return fired
 }

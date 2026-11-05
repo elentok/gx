@@ -1,10 +1,9 @@
-package ralphloop
+package supervise
 
 import (
 	"errors"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -39,7 +37,7 @@ func countPrompts(prompts []string, text string) int {
 // cancellation the gate exists to prevent.
 func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 	t.Parallel()
-	r := boundGiveUpRunner(alwaysTimeout)
+	r := fakes.BoundGiveUpRunner(alwaysTimeout)
 	d := deps.Deps{
 		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
@@ -47,12 +45,12 @@ func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 		Sleep:           func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := WaitForFinish(d, boundGiveUpParams(), "sess-19")
 	if !errors.Is(err, errCompactRecoveryExhausted) {
-		t.Fatalf("waitForFinish error = %v, want one wrapping errCompactRecoveryExhausted", err)
+		t.Fatalf("WaitForFinish error = %v, want one wrapping errCompactRecoveryExhausted", err)
 	}
 	if !errors.Is(err, errCompactNeverConfirmed) {
-		t.Errorf("waitForFinish error = %v, want the underlying gated give-up preserved", err)
+		t.Errorf("WaitForFinish error = %v, want the underlying gated give-up preserved", err)
 	}
 	prompts := r.Prompts("iter-19")
 	if got := countPrompts(prompts, "/compact"); got != maxConsecutiveGatedGiveUps {
@@ -75,8 +73,8 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 	// Once compacted, every poll — the compact-completion polls and the
 	// ordinary finish poll alike — reports idle, which is the pane shape this
 	// test exists to distrust.
-	r := boundGiveUpRunner(nil)
-	r.timeoutIf = func(int) bool { return len(r.Prompts("iter-19")) == 0 }
+	r := fakes.BoundGiveUpRunner(nil)
+	r.TimeoutIf = func(int) bool { return len(r.Prompts("iter-19")) == 0 }
 	d := deps.Deps{
 		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
@@ -84,12 +82,12 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 		Sleep:           func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := WaitForFinish(d, boundGiveUpParams(), "sess-19")
 	if !errors.Is(err, errCompactRecoveryExhausted) {
-		t.Fatalf("waitForFinish error = %v, want one wrapping errCompactRecoveryExhausted, not a successful finish", err)
+		t.Fatalf("WaitForFinish error = %v, want one wrapping errCompactRecoveryExhausted, not a successful finish", err)
 	}
 	if !errors.Is(err, errCompactNeverConfirmed) {
-		t.Errorf("waitForFinish error = %v, want the underlying gated give-up preserved", err)
+		t.Errorf("WaitForFinish error = %v, want the underlying gated give-up preserved", err)
 	}
 	prompts := r.Prompts("iter-19")
 	if got := countPrompts(prompts, "/compact"); got != 1 {
@@ -106,9 +104,9 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 	t.Parallel()
 	thirdMerged := false
-	r := boundGiveUpRunner(nil)
+	r := fakes.BoundGiveUpRunner(nil)
 	compacts := func() int { return countPrompts(r.Prompts("iter-19"), "/compact") }
-	r.timeoutIf = func(int) bool {
+	r.TimeoutIf = func(int) bool {
 		// The agent wraps up on its own after the third breach, so the run
 		// must reach a normal finish rather than escalating.
 		if compacts() < 3 {
@@ -135,8 +133,8 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	if err := waitForFinish(d, boundGiveUpParams(), "sess-19"); err != nil {
-		t.Fatalf("waitForFinish: %v, want no escalation: the successful second recovery reset the counter", err)
+	if err := WaitForFinish(d, boundGiveUpParams(), "sess-19"); err != nil {
+		t.Fatalf("WaitForFinish: %v, want no escalation: the successful second recovery reset the counter", err)
 	}
 	prompts := r.Prompts("iter-19")
 	if got := countPrompts(prompts, "/compact"); got != 3 {
@@ -154,7 +152,7 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 // about whether compaction is progressing.
 func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.T) {
 	t.Parallel()
-	r := boundGiveUpRunner(alwaysTimeout)
+	r := fakes.BoundGiveUpRunner(alwaysTimeout)
 	failArmed := false
 	d := deps.Deps{
 		Runner:        r,
@@ -175,9 +173,9 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := WaitForFinish(d, boundGiveUpParams(), "sess-19")
 	if !errors.Is(err, errCompactRecoveryExhausted) {
-		t.Fatalf("waitForFinish error = %v, want escalation: the middle failure was not a recovery and must not reset the counter", err)
+		t.Fatalf("WaitForFinish error = %v, want escalation: the middle failure was not a recovery and must not reset the counter", err)
 	}
 	prompts := r.Prompts("iter-19")
 	if got := countPrompts(prompts, "/compact"); got != 3 {
@@ -194,7 +192,7 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 func TestRecoverSmartZoneBreach_FailedFinishUpPromptIsBestEffort(t *testing.T) {
 	t.Parallel()
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	var r *blipRunner
+	var r *fakes.BlipRunner
 	r = breachRunner(func(int) bool {
 		r.FailNextPrompts("iter-19", 1, errors.New("finish-up never submitted"))
 		return false
@@ -228,11 +226,11 @@ func TestRecoverSmartZoneBreach_FailedFinishUpPromptIsBestEffort(t *testing.T) {
 }
 
 // staleReadingDeps wires a Claude Deps whose transcript reports occupancy
-// tokens with the given staleness, plus the minimum needed for waitForFinish
+// tokens with the given staleness, plus the minimum needed for WaitForFinish
 // to poll: one timing-out tick, then idle.
 func staleReadingDeps(tokens int, stale bool) deps.Deps {
 	return deps.Deps{
-		Runner: boundGiveUpRunner(func(wait int) bool { return wait == 1 }),
+		Runner: fakes.BoundGiveUpRunner(func(wait int) bool { return wait == 1 }),
 		ReadOccupancyReading: func(cwd, sessionID string) (transcript.OccupancyReading, error) {
 			return transcript.OccupancyReading{
 				Usage: transcript.Usage{InputTokens: tokens},
@@ -247,43 +245,43 @@ func staleReadingDeps(tokens int, stale bool) deps.Deps {
 
 func TestWaitForFinish_StaleOccupancyAfterCompactionDoesNotRebreach(t *testing.T) {
 	t.Parallel()
-	sink := &occupancySink{}
+	sink := &fakes.OccupancySink{}
 	d := staleReadingDeps(200, true)
-	r := d.Runner.(*blipRunner)
+	r := d.Runner.(*fakes.BlipRunner)
 
 	p := boundGiveUpParams()
 	p.Sink = sink
-	err := waitForFinish(d, p, "sess-19")
+	err := WaitForFinish(d, p, "sess-19")
 	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+		t.Fatalf("WaitForFinish: %v", err)
 	}
-	if r.interrupts != 0 {
+	if r.Interrupts != 0 {
 		t.Error("pane interrupted, want the over-budget pre-compaction number treated as unknown for breach purposes")
 	}
 	if prompts := r.Prompts("iter-19"); len(prompts) != 0 {
 		t.Errorf("prompts = %v, want no second compaction", prompts)
 	}
-	if len(sink.calls) != 1 || sink.calls[0].tokens != 200 {
-		t.Errorf("ContextOccupancy calls = %+v, want the last known 200 still emitted for display", sink.calls)
+	if len(sink.Calls) != 1 || sink.Calls[0].Tokens != 200 {
+		t.Errorf("ContextOccupancy calls = %+v, want the last known 200 still emitted for display", sink.Calls)
 	}
 }
 
 func TestWaitForFinish_FreshOccupancyStillBreaches(t *testing.T) {
 	t.Parallel()
 	d := staleReadingDeps(200, false)
-	r := d.Runner.(*blipRunner)
+	r := d.Runner.(*fakes.BlipRunner)
 	// The recovery this breach starts completes normally; the breach itself is
 	// what this test is about.
 	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) {
 		return countPrompts(r.Prompts("iter-19"), "/compact"), true, nil
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := WaitForFinish(d, boundGiveUpParams(), "sess-19")
 	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+		t.Fatalf("WaitForFinish: %v", err)
 	}
-	if prompts := r.Prompts("iter-19"); r.interrupts != 1 || len(prompts) == 0 || prompts[0] != "/compact" {
-		t.Errorf("interruptions = %d, prompts = %v, want one breach recovery", r.interrupts, prompts)
+	if prompts := r.Prompts("iter-19"); r.Interrupts != 1 || len(prompts) == 0 || prompts[0] != "/compact" {
+		t.Errorf("interruptions = %d, prompts = %v, want one breach recovery", r.Interrupts, prompts)
 	}
 }
 
@@ -300,57 +298,38 @@ func TestContextOccupancy_UnaffectedByStaleness(t *testing.T) {
 		t.Fatalf("contextOccupancy() = %d, %v, %v; want the stamped/displayed value reported regardless", occupancy, ok, err)
 	}
 
-	sink := &occupancySink{}
-	emitContextOccupancy(d, sink, agent.AgentClaude, "19", "/repo/iter-19", "sess-19")
-	if len(sink.calls) != 1 || sink.calls[0].tokens != 200 {
-		t.Errorf("ContextOccupancy calls = %+v, want the iteration-started emission unaffected", sink.calls)
+	sink := &fakes.OccupancySink{}
+	EmitContextOccupancy(d, sink, agent.AgentClaude, "19", "/repo/iter-19", "sess-19")
+	if len(sink.Calls) != 1 || sink.Calls[0].Tokens != 200 {
+		t.Errorf("ContextOccupancy calls = %+v, want the iteration-started emission unaffected", sink.Calls)
 	}
-}
-
-// occupancySink is a minimal EventSink test double that only records
-// ContextOccupancy calls, embedding runlog.NoopEventSink for the rest.
-type occupancySink struct {
-	runlog.NoopEventSink
-	mu    sync.Mutex
-	calls []occupancyCall
-}
-
-type occupancyCall struct {
-	identifier string
-	tokens     int
-}
-
-func (s *occupancySink) ContextOccupancy(identifier string, tokens int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.calls = append(s.calls, occupancyCall{identifier: identifier, tokens: tokens})
 }
 
 func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 	t.Parallel()
-	sink := &occupancySink{}
-	r := &blipRunner{Runner: fakes.IdleRunner("iter-01"), timeoutIf: func(wait int) bool { return wait <= 2 }}
+	sink := &fakes.OccupancySink{}
+	r := &fakes.BlipRunner{Runner: fakes.IdleRunner("iter-01"), TimeoutIf: func(wait int) bool { return wait <= 2 }}
 	d := deps.Deps{
 		Runner: r,
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
-			return 1000 * r.waits, true, nil
+			return 1000 * r.Waits, true, nil
 		},
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, supervise.LaunchParams{
+	err := WaitForFinish(d, LaunchParams{
 		Label: "iter-01", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "01",
-		SessionCwd: "/repo/iter-01", SmartZone: 1_000_000, Gate: supervise.NewGate(), Sink: sink,
+		SessionCwd: "/repo/iter-01", SmartZone: 1_000_000, Gate: NewGate(), Sink: sink,
 	}, "sess-1")
 	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+		t.Fatalf("WaitForFinish: %v", err)
 	}
-	if len(sink.calls) != 2 {
-		t.Fatalf("ContextOccupancy calls = %+v, want 2 (one per poll timeout)", sink.calls)
+	if len(sink.Calls) != 2 {
+		t.Fatalf("ContextOccupancy calls = %+v, want 2 (one per poll timeout)", sink.Calls)
 	}
-	for i, c := range sink.calls {
-		if c.identifier != "01" {
-			t.Errorf("call %d identifier = %q, want 01", i, c.identifier)
+	for i, c := range sink.Calls {
+		if c.Identifier != "01" {
+			t.Errorf("call %d identifier = %q, want 01", i, c.Identifier)
 		}
 	}
 }
@@ -367,7 +346,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 	fake := fakes.IdleRunner("iter-01")
 	fake.PromptState = agentrunner.StateIdle
 	d := deps.Deps{
-		Runner: &blipRunner{Runner: fake, finishPollsOnly: true, timeoutIf: func(wait int) bool {
+		Runner: &fakes.BlipRunner{Runner: fake, FinishPollsOnly: true, TimeoutIf: func(wait int) bool {
 			switch wait {
 			case 1:
 				// Times out, driving the smart-zone breach branch.
@@ -384,7 +363,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 2_000_000, true, nil
 		},
-		// The first two reads are the pre-"/compact" baselines (waitForFinish's
+		// The first two reads are the pre-"/compact" baselines (WaitForFinish's
 		// own, then recoverSmartZoneBreach's own newStickyBaseline); the third
 		// is the advancement check on recovery's first poll tick, so the
 		// compaction reads as already confirmed.
@@ -398,12 +377,12 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, supervise.LaunchParams{
+	err := WaitForFinish(d, LaunchParams{
 		Label: "iter-01", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-		SmartZone: 1_000_000, Gate: supervise.NewGate(),
+		SmartZone: 1_000_000, Gate: NewGate(),
 	}, "sess-1")
 	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+		t.Fatalf("WaitForFinish: %v", err)
 	}
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
@@ -421,11 +400,11 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	r.SetRateLimitErr("iter-01", errors.New("rollout unreadable"))
 	d := deps.Deps{Runner: r}
 
-	err := waitForFinish(d, supervise.LaunchParams{
-		Label: "iter-01", Agent: agent.AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: supervise.NewGate(),
+	err := WaitForFinish(d, LaunchParams{
+		Label: "iter-01", Agent: agent.AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),
 	}, "session-1")
 	if err == nil || !strings.Contains(err.Error(), "rollout unreadable") {
-		t.Fatalf("waitForFinish error = %v, want rollout read failure", err)
+		t.Fatalf("WaitForFinish error = %v, want rollout read failure", err)
 	}
 	raw, readErr := os.ReadFile(ticketPath)
 	if readErr != nil {

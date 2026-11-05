@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"cmp"
@@ -11,29 +11,28 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 )
 
-// rateLimitPollInterval is how often holdRateLimit re-checks a pane when the
+// RateLimitPollInterval is how often HoldRateLimit re-checks a pane when the
 // reset time in its rate-limit message couldn't be parsed.
-const rateLimitPollInterval = 5 * time.Minute
+const RateLimitPollInterval = 5 * time.Minute
 
-// rateLimitResetBuffer is added past a successfully-parsed reset time so the
+// RateLimitResetBuffer is added past a successfully-parsed reset time so the
 // loop wakes just after the quota actually rolls over, not right at it.
-const rateLimitResetBuffer = 60 * time.Second
+const RateLimitResetBuffer = 60 * time.Second
 
-func codexBlocked(d deps.Deps, p supervise.LaunchParams) bool {
+func codexBlocked(d deps.Deps, p LaunchParams) bool {
 	st, err := d.Runner.Status(p.SessionOrDefault())
 	return err == nil && st.State == agentrunner.StateBlocked
 }
 
-// holdRateLimit keeps a rate-limited agent in place: no nudge, no pause kind,
-// no question ticket. It sends "continue" once the reset (plus rateLimitResetBuffer)
-// has passed, or every rateLimitPollInterval when the reset is unknown, and
+// HoldRateLimit keeps a rate-limited agent in place: no nudge, no pause kind,
+// no question ticket. It sends "continue" once the reset (plus RateLimitResetBuffer)
+// has passed, or every RateLimitPollInterval when the reset is unknown, and
 // returns when a turn ends without the runner reporting a limit. It asks the
 // runner after each turn, not the transcript alone: on PTY an idle agent's
 // transcript keeps the old error as its newest entry.
-func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time), p supervise.LaunchParams, waitStates []agentrunner.State, resetAt time.Time) error {
+func HoldRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time), p LaunchParams, waitStates []agentrunner.State, resetAt time.Time) error {
 	sessionID := ""
 	if status, err := d.Runner.Status(p.SessionOrDefault()); err == nil {
 		sessionID = status.SessionID
@@ -49,8 +48,8 @@ func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time
 			onRateLimit(true, resetAt)
 		}
 		if resetAt.IsZero() {
-			d.Sleep(rateLimitPollInterval)
-		} else if wait := resetAt.Add(cmp.Or(d.RateLimitResetBuffer, rateLimitResetBuffer)).Sub(d.Now()); wait > 0 {
+			d.Sleep(RateLimitPollInterval)
+		} else if wait := resetAt.Add(cmp.Or(d.RateLimitResetBuffer, RateLimitResetBuffer)).Sub(d.Now()); wait > 0 {
 			d.Sleep(wait)
 		}
 		// A Codex pane back on its own dialog is not waiting for "continue": that
@@ -64,7 +63,7 @@ func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time
 			}
 		}
 		for {
-			_, err := d.Runner.Wait(p.SessionOrDefault(), waitStates, smartZonePollMs*time.Millisecond)
+			_, err := d.Runner.Wait(p.SessionOrDefault(), waitStates, SmartZonePollMs*time.Millisecond)
 			if err == nil {
 				break
 			}
@@ -73,7 +72,7 @@ func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time
 			}
 		}
 		var limited bool
-		resetAt, limited, _, _ = runnerRateLimit(d, p)
+		resetAt, limited, _, _ = RunnerRateLimit(d, p)
 		if !limited {
 			break
 		}

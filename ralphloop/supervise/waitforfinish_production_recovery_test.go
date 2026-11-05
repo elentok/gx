@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"errors"
@@ -15,7 +15,6 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -31,7 +30,7 @@ import (
 // exists — fails the run.
 //
 // The compact-completion poll handler advances virtual time by one
-// smartZonePollMs tick per dispatch, which is what makes the boundary
+// SmartZonePollMs tick per dispatch, which is what makes the boundary
 // eventually merge: ClaudeCompact writes it lazily inside Status once virtual
 // time passes its compaction duration, and herdrfake's clock never moves on
 // its own. A scenario that left the clock still would never reach the boundary
@@ -101,14 +100,14 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 		until := parseUntil(argv[3:])
 		if compact.Active() {
 			// A compact-completion poll (see waitForCompactionSignal in
-			// waitforfinish.go): each dispatch models one smartZonePollMs tick
+			// waitforfinish.go): each dispatch models one SmartZonePollMs tick
 			// of the compaction actually running. Once "blocked" joined every
 			// finish poll's completion states (ticket 14), Until's shape alone
 			// no longer told this apart from the ordinary finish poll below —
 			// compact.Active() does, since only a compaction actually in
 			// flight should advance the virtual clock.
 			mu.Lock()
-			virtualTime += smartZonePollMs * time.Millisecond
+			virtualTime += SmartZonePollMs * time.Millisecond
 			mu.Unlock()
 			status, err := compact.Status()
 			if err != nil {
@@ -193,19 +192,19 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	err := waitForFinish(deps, supervise.LaunchParams{
+	err := WaitForFinish(deps, LaunchParams{
 		Label:      "iter-07",
 		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       supervise.NewGate(),
+		Gate:       NewGate(),
 		Ticket:     "07",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",
 	}, sessionID)
 	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+		t.Fatalf("WaitForFinish: %v", err)
 	}
 
 	if compactCalls != 1 {
@@ -388,22 +387,22 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	err := waitForFinish(deps, supervise.LaunchParams{
+	err := WaitForFinish(deps, LaunchParams{
 		Label:      "iter-08",
 		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       supervise.NewGate(),
+		Gate:       NewGate(),
 		Ticket:     "08",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",
 	}, sessionID)
 	if !errors.Is(err, errCompactRecoveryExhausted) {
-		t.Fatalf("waitForFinish error = %v, want one wrapping errCompactRecoveryExhausted: an idle pane whose transcript never records a boundary is not a finish", err)
+		t.Fatalf("WaitForFinish error = %v, want one wrapping errCompactRecoveryExhausted: an idle pane whose transcript never records a boundary is not a finish", err)
 	}
 	if !errors.Is(err, errCompactNeverConfirmed) {
-		t.Errorf("waitForFinish error = %v, want the underlying gated give-up preserved for the operator", err)
+		t.Errorf("WaitForFinish error = %v, want the underlying gated give-up preserved for the operator", err)
 	}
 
 	if compactCalls != 1 {

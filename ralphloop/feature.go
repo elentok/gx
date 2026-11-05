@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 
@@ -56,7 +57,7 @@ func FinishMerge(d deps.Deps, o OneIteration, w IterationWorktree, pane, target 
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
 		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(),
 	}
-	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
+	sessionID := supervise.RecordLiveSession(d, w.Label, o.Ticket.Path)
 	adopted, err := adoptAskingReport(p, w.Path, pane, sessionID)
 	if err != nil {
 		return FinishOutcome{}, err

@@ -160,10 +160,10 @@ var PlainFinishStates = []string{"idle", "done"}
 var RunnerFinishStates = []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}
 
 // AlreadyFinished reports whether status (a herdr tab's current agent_status,
-// e.g. from TabList) already matches one of waitForFinish's plain-completion
-// target states. "blocked" is deliberately excluded even though waitForFinish
+// e.g. from TabList) already matches one of WaitForFinish's plain-completion
+// target states. "blocked" is deliberately excluded even though WaitForFinish
 // treats it as a finish state of its own — a pane already sitting blocked at
-// reattach still needs waitForFinish's dwell-and-pause handling, not a bare
+// reattach still needs WaitForFinish's dwell-and-pause handling, not a bare
 // skip.
 func AlreadyFinished(status string) bool {
 	return slices.Contains(PlainFinishStates, status)

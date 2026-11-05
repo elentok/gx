@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"errors"
@@ -11,21 +11,20 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/transcript"
 )
 
-// smartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
+// SmartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
 // running iteration's context occupancy is checked against --smart-zone at
 // roughly this cadence instead of only once the agent settles.
-const smartZonePollMs = 30_000
+const SmartZonePollMs = 30_000
 
-// waitForFinishStates are the states that end one waitForFinish poll. Blocked
+// waitForFinishStates are the states that end one WaitForFinish poll. Blocked
 // is among them because it needs its own quota/pause handling.
-var waitForFinishStates = append(append([]agentrunner.State{}, supervise.RunnerFinishStates...), agentrunner.StateBlocked)
+var waitForFinishStates = append(append([]agentrunner.State{}, RunnerFinishStates...), agentrunner.StateBlocked)
 
-// finishDebounceMs is how long waitForFinish and finishIteration each pause
-// before re-checking a just-reached "finished" signal, and finishConfirmMs is
+// FinishDebounceMs is how long WaitForFinish and finishIteration each pause
+// before re-checking a just-reached "finished" signal, and FinishConfirmMs is
 // how long that recheck waits for the agent to prove it's still finished.
 // herdr's idle/done status reflects pane output settling, not a genuine
 // end-of-turn signal, so an agent that briefly stops producing output mid-turn
@@ -34,18 +33,18 @@ var waitForFinishStates = append(append([]agentrunner.State{}, supervise.RunnerF
 // mark it paused (answer) (no commits yet), and abandon the worktree/tab while the
 // agent went on to actually finish and commit — orphaning real, merged work.
 const (
-	finishDebounceMs = 3_000
-	finishConfirmMs  = 2_000
+	FinishDebounceMs = 3_000
+	FinishConfirmMs  = 2_000
 )
 
-// waitForFinish polls Pane until it reaches idle or done, checking the
+// WaitForFinish polls Pane until it reaches idle or done, checking the
 // session's current context occupancy against SmartZone on every poll tick
 // that times out rather than settling. A breach interrupts the pane
 // (Ctrl-C, not killed), then auto-recovers via recoverSmartZoneBreach
 // (compact + finish-up re-prompt) and falls back into normal polling —
 // unlike rate-limit/paused (repair) pauses, this never blocks the
 // scheduler via Gate.pause.
-func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) error {
+func WaitForFinish(d deps.Deps, p LaunchParams, sessionID string) error {
 	smartZone := p.SmartZone
 	if smartZone <= 0 {
 		smartZone = agent.DefaultSmartZone
@@ -57,12 +56,12 @@ func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) erro
 	// the blocked-pane / rate-limit / gated-give-up branches below — see its
 	// own doc comment.
 	recovery := newSmartZoneRecovery(smartZone)
-	vcap := newVerifyCap(p, smartZone)
-	now := supervise.ClockOf(d)
-	mguard := supervise.NewModelGuard(d, p, now)
-	lguard := supervise.NewLongTicketGuard(d, p, now)
+	vcap := NewVerifyCap(p, smartZone)
+	now := ClockOf(d)
+	mguard := NewModelGuard(d, p, now)
+	lguard := NewLongTicketGuard(d, p, now)
 	for {
-		pollMs := smartZonePollMs
+		pollMs := SmartZonePollMs
 		if p.FinishTimeoutMs > 0 {
 			remaining := p.FinishTimeoutMs - elapsedMs
 			if remaining <= 0 {
@@ -81,7 +80,7 @@ func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) erro
 					continue
 				}
 				if p.Agent == agent.AgentCodex {
-					_, _, evidence, limitErr := runnerRateLimit(d, p)
+					_, _, evidence, limitErr := RunnerRateLimit(d, p)
 					if limitErr != nil {
 						return fmt.Errorf("detecting %s Codex quota: %w", p.Label, limitErr)
 					}
@@ -102,7 +101,7 @@ func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) erro
 			// A read failure here is not worth failing a finish over: the
 			// ordinary finish checks below run regardless. Rate limits are
 			// not acted on here, only Codex context exhaustion.
-			_, _, evidence, _ := runnerRateLimit(d, p)
+			_, _, evidence, _ := RunnerRateLimit(d, p)
 			if p.Agent == agent.AgentCodex && evidence != "" {
 				// Wait returns at once on an idle pane, so pace the retry.
 				elapsedMs, err = recoverCodexContextExhaustionPoll(d, p, sessionID, evidence, smartZone, elapsedMs, true)
@@ -112,19 +111,19 @@ func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) erro
 				continue
 			}
 
-			confirmed, err := confirmFinished(d, nil, p.SessionOrDefault(), waitForFinishStates)
+			confirmed, err := ConfirmFinished(d, nil, p.SessionOrDefault(), waitForFinishStates)
 			if err != nil {
 				return fmt.Errorf("confirming %s finished: %w", p.Label, err)
 			}
 			if !confirmed {
 				// The agent went back to work in the debounce window (see
-				// finishDebounceMs): this was a transient idle blip, not a real
+				// FinishDebounceMs): this was a transient idle blip, not a real
 				// finish, so keep waiting instead of declaring victory early.
 				elapsedMs = 0
 				continue
 			}
 			if !recovery.pendingUnresolved(d, p, sessionID) {
-				finished, err := waitForBackgroundTasks(d, p, sessionID, waitForFinishStates, &elapsedMs)
+				finished, err := WaitForBackgroundTasks(d, p, sessionID, waitForFinishStates, &elapsedMs)
 				if err != nil {
 					return err
 				}
@@ -148,10 +147,10 @@ func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) erro
 			// maxConsecutiveGatedGiveUps reachable against a pane that answers
 			// every poll kind idle. Re-prompting instead would type into a pane
 			// that may still be compacting.
-			d.Sleep(smartZonePollMs * time.Millisecond)
-			elapsedMs += smartZonePollMs
+			d.Sleep(SmartZonePollMs * time.Millisecond)
+			elapsedMs += SmartZonePollMs
 			if !recovery.pendingUnresolved(d, p, sessionID) {
-				finished, err := waitForBackgroundTasks(d, p, sessionID, waitForFinishStates, &elapsedMs)
+				finished, err := WaitForBackgroundTasks(d, p, sessionID, waitForFinishStates, &elapsedMs)
 				if err != nil {
 					return err
 				}
@@ -173,7 +172,7 @@ func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) erro
 		elapsedMs += pollMs
 
 		if p.Agent == agent.AgentCodex {
-			_, _, evidence, checkErr := runnerRateLimit(d, p)
+			_, _, evidence, checkErr := RunnerRateLimit(d, p)
 			if checkErr != nil {
 				return fmt.Errorf("detecting %s Codex quota: %w", p.Label, checkErr)
 			}
@@ -202,12 +201,12 @@ func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) erro
 // reports that either of the first two interrupted the pane. The cap stop goes
 // first and takes the whole tick: if occupancy is also past the smart zone, the
 // next poll runs its recovery.
-func guardTick(d deps.Deps, p supervise.LaunchParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery, mguard *supervise.ModelGuard, lguard *supervise.LongTicketGuard) (acted bool, err error) {
+func guardTick(d deps.Deps, p LaunchParams, sessionID string, vcap *VerifyCap, recovery *smartZoneRecovery, mguard *ModelGuard, lguard *LongTicketGuard) (acted bool, err error) {
 	if err := mguard.Tick(d, p, sessionID); err != nil {
 		return false, err
 	}
 	lguard.Tick(d, p, sessionID)
-	if stopped, err := vcap.tick(d, p, sessionID); err != nil || stopped {
+	if stopped, err := vcap.Tick(d, p, sessionID); err != nil || stopped {
 		return stopped, err
 	}
 	return recovery.checkAndRecover(d, p, sessionID)
@@ -235,12 +234,12 @@ const smartZoneCompactExtendedTimeoutMs = 600_000
 // kept claiming the compaction was done and the transcript never agreed" — as
 // opposed to a transport error, an unconfirmed submission, or a finish-up
 // prompt that never merged, which are all equally "recovery failed" from
-// outside. waitForFinish absorbs this one and keeps polling; every other error
+// outside. WaitForFinish absorbs this one and keeps polling; every other error
 // still aborts the iteration.
 var errCompactNeverConfirmed = errors.New("compaction never confirmed by the transcript")
 
 // maxConsecutiveGatedGiveUps bounds how many gated give-ups one iteration may
-// absorb before waitForFinish stops retrying and escalates with
+// absorb before WaitForFinish stops retrying and escalates with
 // errCompactRecoveryExhausted. Absorbing them without a bound never
 // terminates: recovery gives up at the extended bound, the poll loop resets
 // its elapsed counter, occupancy is still over the smart zone, and the whole
@@ -256,7 +255,7 @@ const maxConsecutiveGatedGiveUps = 2
 
 // errCompactRecoveryExhausted marks an iteration abandoned because compaction
 // recovery kept giving up gated. It needs an operator, not another retry, which
-// is why it leaves waitForFinish as an error: that routes it through Run's
+// is why it leaves WaitForFinish as an error: that routes it through Run's
 // per-result handling (see loop.go), which persists the ticket
 // paused (repair) with this error's text as the reason. Both this message and
 // the errCompactNeverConfirmed it wraps are load-bearing there — the operator
@@ -298,13 +297,13 @@ func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
 // that distinction; the plain proactive smart-zone breach caller still treats
 // both outcomes the same way and ignores it.
 //
-// The compact-completion wait polls in smartZonePollMs ticks (via
+// The compact-completion wait polls in SmartZonePollMs ticks (via
 // waitForCompactionSignal) rather than blocking on one long Wait, so a
 // pane-status wait that times out past smartZoneCompactTimeoutMs can still be
 // confirmed successful from the transcript's compaction-boundary signal
 // instead of being misreported as a failure — see waitForCompactionSignal's
 // doc comment.
-func recoverSmartZoneBreach(d deps.Deps, p supervise.LaunchParams, sessionID, reason string, smartZone int) (bool, error) {
+func recoverSmartZoneBreach(d deps.Deps, p LaunchParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.EventSink().SmartZoneCompactStarted(p.Ticket)
 	p.LogAgentEvent(string(events.PausedSmartZone), sessionID, reason)
 
@@ -313,7 +312,7 @@ func recoverSmartZoneBreach(d deps.Deps, p supervise.LaunchParams, sessionID, re
 	err := d.Runner.Prompt(p.SessionOrDefault(), "/compact")
 	completion := compactPaneConfirmed
 	if err == nil {
-		completion, err = waitForCompactionSignal(d, p, sessionID, supervise.RunnerFinishStates, baseline)
+		completion, err = waitForCompactionSignal(d, p, sessionID, RunnerFinishStates, baseline)
 	}
 	if err != nil {
 		p.EventSink().SmartZoneRecovered(p.Ticket)
@@ -422,14 +421,14 @@ func (s compactBoundarySnapshot) gates() bool {
 // the transcript to show for it. An agent with no boundary signal at all is
 // never unresolved: there is no evidence to wait for, so nothing to withhold
 // trust for.
-func (s compactBoundarySnapshot) unresolved(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
+func (s compactBoundarySnapshot) unresolved(d deps.Deps, p LaunchParams, sessionID string) bool {
 	return s.gates() && !s.advancedPast(d, p, sessionID)
 }
 
 // advancedPast reports whether a fresh read proves a compaction boundary
 // merged since s was taken. Anything short of a confirmed, higher count —
 // including a read that fails now — is "not yet", never "close enough".
-func (s compactBoundarySnapshot) advancedPast(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
+func (s compactBoundarySnapshot) advancedPast(d deps.Deps, p LaunchParams, sessionID string) bool {
 	if s.state != compactBoundaryConfirmed {
 		return false
 	}
@@ -463,7 +462,7 @@ type stickyBaseline struct {
 // newStickyBaseline snapshots the boundary count and stamps since. Both must
 // happen before "/compact" is submitted, so that any boundary this recovery
 // causes is strictly newer than both.
-func newStickyBaseline(d deps.Deps, p supervise.LaunchParams, sessionID string) *stickyBaseline {
+func newStickyBaseline(d deps.Deps, p LaunchParams, sessionID string) *stickyBaseline {
 	now := time.Now()
 	if d.Now != nil {
 		now = d.Now()
@@ -480,7 +479,7 @@ func (b *stickyBaseline) gates() bool {
 
 // advancedPast reports whether the transcript now proves this recovery's
 // compaction merged.
-func (b *stickyBaseline) advancedPast(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
+func (b *stickyBaseline) advancedPast(d deps.Deps, p LaunchParams, sessionID string) bool {
 	switch b.snapshot.state {
 	case compactBoundaryConfirmed:
 		return b.snapshot.advancedPast(d, p, sessionID)
@@ -495,7 +494,7 @@ func (b *stickyBaseline) advancedPast(d deps.Deps, p supervise.LaunchParams, ses
 // completion is decided by failing the gate open, never by this read. A read
 // that fails proves nothing and holds the gate closed, like every other
 // unconfirmed observation.
-func (b *stickyBaseline) boundaryMergedSince(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
+func (b *stickyBaseline) boundaryMergedSince(d deps.Deps, p LaunchParams, sessionID string) bool {
 	read := compactionAfterReader(d, p.Agent)
 	if read == nil || sessionID == "" {
 		return false
@@ -524,7 +523,7 @@ const (
 	compactTimeoutConfirmed
 )
 
-// waitForCompactionSignal polls the session in smartZonePollMs ticks for one
+// waitForCompactionSignal polls the session in SmartZonePollMs ticks for one
 // of until's states instead of blocking on a single long Wait, so a
 // still-genuinely-running compact isn't indistinguishable from a stuck one
 // just because the pane-status wait timed out.
@@ -553,13 +552,13 @@ const (
 // pane's nil error in that second case would let recovery walk straight into
 // the finish-up prompt and reintroduce the bug ten minutes later.
 func waitForCompactionSignal(
-	d deps.Deps, p supervise.LaunchParams, sessionID string,
+	d deps.Deps, p LaunchParams, sessionID string,
 	until []agentrunner.State, baseline *stickyBaseline,
 ) (compactCompletion, error) {
 	gateHeld := false
 	elapsedMs := 0
 	for {
-		_, err := d.Runner.Wait(p.SessionOrDefault(), until, smartZonePollMs*time.Millisecond)
+		_, err := d.Runner.Wait(p.SessionOrDefault(), until, SmartZonePollMs*time.Millisecond)
 		if err != nil && !errors.Is(err, agentrunner.ErrTimeout) {
 			return compactPaneConfirmed, err
 		}
@@ -577,9 +576,9 @@ func waitForCompactionSignal(
 			// Pace it here instead — and only here: sleeping on both branches
 			// would double-pace the timeout path and stretch the extended bound
 			// to twice its wall-clock budget.
-			d.Sleep(smartZonePollMs * time.Millisecond)
+			d.Sleep(SmartZonePollMs * time.Millisecond)
 		}
-		elapsedMs += smartZonePollMs
+		elapsedMs += SmartZonePollMs
 
 		if err != nil && elapsedMs >= smartZoneCompactTimeoutMs && baseline.advancedPast(d, p, sessionID) {
 			if gateHeld {
@@ -599,14 +598,14 @@ func waitForCompactionSignal(
 	}
 }
 
-// confirmFinished debounces a just-reached idle/done signal on pane: it
-// pauses finishDebounceMs, then re-polls for up to finishConfirmMs to see
+// ConfirmFinished debounces a just-reached idle/done signal on pane: it
+// pauses FinishDebounceMs, then re-polls for up to FinishConfirmMs to see
 // whether the agent is still in one of until's finish states. A poll timeout
 // (the agent went back to "working" in the meantime) means the original
 // signal was a transient blip, not a real finish.
-func confirmFinished(d deps.Deps, in *supervise.PersonInput, s agentrunner.Session, until []agentrunner.State) (bool, error) {
-	in.Sleep(d, finishDebounceMs*time.Millisecond)
-	_, err := d.Runner.Wait(s, until, finishConfirmMs*time.Millisecond)
+func ConfirmFinished(d deps.Deps, in *PersonInput, s agentrunner.Session, until []agentrunner.State) (bool, error) {
+	in.Sleep(d, FinishDebounceMs*time.Millisecond)
+	_, err := d.Runner.Wait(s, until, FinishConfirmMs*time.Millisecond)
 	if err == nil {
 		return true, nil
 	}
@@ -616,11 +615,11 @@ func confirmFinished(d deps.Deps, in *supervise.PersonInput, s agentrunner.Sessi
 	return false, err
 }
 
-// waitForBackgroundTasks gates confirmFinished's conclusion on any
+// WaitForBackgroundTasks gates ConfirmFinished's conclusion on any
 // outstanding-fresh backgrounded-shell-command marker in the Claude
 // transcript: a pane that looks idle/done while a background task it started
 // is still running is not actually finished, even though herdr's own status
-// (and the finishDebounceMs re-check already applied by the caller) agree it
+// (and the FinishDebounceMs re-check already applied by the caller) agree it
 // looks so. Mirrors how compactBoundarySnapshot/stickyBaseline gate a
 // premature idle report during smart-zone recovery — an unreadable/
 // unsupported read (Codex, or any read failure) is never evidence, so it
@@ -630,18 +629,18 @@ func confirmFinished(d deps.Deps, in *supervise.PersonInput, s agentrunner.Sessi
 // completion notification merged — not that the agent's overall turn is
 // over; seeing that result is exactly when an agent is likely to resume real
 // work. So once a gate that actually held releases (or ages out), this
-// re-runs confirmFinished before reporting finished=true, the same debounced
+// re-runs ConfirmFinished before reporting finished=true, the same debounced
 // idle check the caller already trusted once before the gate started
 // holding. The returned bool tells the caller whether the pane is still
 // idle after that recheck; false means treat this like any other transient
 // idle blip and keep polling instead of declaring the iteration done.
 //
-// elapsedMs is the caller's own running total (see waitForFinish), threaded
+// elapsedMs is the caller's own running total (see WaitForFinish), threaded
 // through by pointer so time spent holding here counts against a caller-set
 // FinishTimeoutMs instead of resetting it, and it paces re-reads at
-// smartZonePollMs instead of spinning — same reasoning as
+// SmartZonePollMs instead of spinning — same reasoning as
 // waitForCompactionSignal's own pacing.
-func waitForBackgroundTasks(d deps.Deps, p supervise.LaunchParams, sessionID string, until []agentrunner.State, elapsedMs *int) (bool, error) {
+func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until []agentrunner.State, elapsedMs *int) (bool, error) {
 	if p.Agent != agent.AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
 		return true, nil
 	}
@@ -690,14 +689,14 @@ func waitForBackgroundTasks(d deps.Deps, p supervise.LaunchParams, sessionID str
 			if !gated {
 				return true, nil
 			}
-			confirmed, err := confirmFinished(d, p.Input, p.SessionOrDefault(), until)
+			confirmed, err := ConfirmFinished(d, p.Input, p.SessionOrDefault(), until)
 			if err != nil {
 				return false, fmt.Errorf("confirming %s still finished after background task gate: %w", p.Label, err)
 			}
 			return confirmed, nil
 		}
 
-		pollMs := smartZonePollMs
+		pollMs := SmartZonePollMs
 		if p.FinishTimeoutMs > 0 {
 			remaining := p.FinishTimeoutMs - *elapsedMs
 			if remaining <= 0 {
@@ -752,14 +751,14 @@ func smartZoneOccupancy(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID s
 	return occupancy, found, found, err
 }
 
-// emitContextOccupancy reads cwd/sessionID's current context occupancy and,
+// EmitContextOccupancy reads cwd/sessionID's current context occupancy and,
 // if available, reports it via sink — the one extra immediate read
 // IterationStarted/TicketReattached each trigger (see EventSink.
 // ContextOccupancy) so a consumer never shows a misleading "0 tok" for up to
-// smartZonePollMs after starting/reattaching. A missing/unreadable occupancy
+// SmartZonePollMs after starting/reattaching. A missing/unreadable occupancy
 // (occErr != nil or !ok, e.g. no session id yet) is silently skipped rather
 // than emitting a misleading zero.
-func emitContextOccupancy(d deps.Deps, sink runlog.EventSink, agentKind agent.AgentKind, identifier, cwd, sessionID string) {
+func EmitContextOccupancy(d deps.Deps, sink runlog.EventSink, agentKind agent.AgentKind, identifier, cwd, sessionID string) {
 	occupancy, ok, err := contextOccupancy(d, agentKind, cwd, sessionID)
 	if err != nil || !ok {
 		return
@@ -767,11 +766,11 @@ func emitContextOccupancy(d deps.Deps, sink runlog.EventSink, agentKind agent.Ag
 	sink.ContextOccupancy(identifier, occupancy)
 }
 
-// sessionCompactions reads how many compaction boundaries the selected
+// SessionCompactions reads how many compaction boundaries the selected
 // agent's transcript recorded. A missing observer or read failure is treated
 // as "unknown" (count 0, omitted from frontmatter) rather than blocking the
 // ticket close it's stamped alongside.
-func sessionCompactions(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID string) (int, bool, error) {
+func SessionCompactions(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID string) (int, bool, error) {
 	read := compactionReader(d, agentKind)
 	if sessionID == "" || read == nil {
 		return 0, false, nil
@@ -779,10 +778,10 @@ func sessionCompactions(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID s
 	return read(cwd, sessionID)
 }
 
-// runnerRateLimit asks the runner whether p's agent is rate limited.
+// RunnerRateLimit asks the runner whether p's agent is rate limited.
 // ErrContextExhausted is not a failure: it is returned as the evidence the
 // adapter found, with limited false and a nil err.
-func runnerRateLimit(d deps.Deps, p supervise.LaunchParams) (resetAt time.Time, limited bool, evidence string, err error) {
+func RunnerRateLimit(d deps.Deps, p LaunchParams) (resetAt time.Time, limited bool, evidence string, err error) {
 	resetAt, limited, err = d.Runner.RateLimit(p.SessionOrDefault())
 	if errors.Is(err, agentrunner.ErrContextExhausted) {
 		return time.Time{}, false, strings.TrimPrefix(err.Error(), agentrunner.ErrContextExhausted.Error()+": "), nil
@@ -796,14 +795,14 @@ func runnerRateLimit(d deps.Deps, p supervise.LaunchParams) (resetAt time.Time, 
 // fall back into ordinary polling. Without this, a recovery whose /compact or
 // finish-up prompt never merges (the agent's context is already too far gone
 // to process either) leaves the pane sitting idle post-interrupt with no
-// further evidence of what happened — waitForFinish would then read that as
+// further evidence of what happened — WaitForFinish would then read that as
 // a plain finish, and finishIteration would mark it done (if a stray commit
 // happened to merge) or generic paused (answer) (if not), losing the exhaustion
 // reason entirely. Returning an error here instead routes through the same
 // path every other iteration-level failure takes (see Run's per-result
 // handling in loop.go), which marks the ticket paused (repair) with this
 // specific reason and leaves its worktree/tab for inspection.
-func recoverOrFailCodexContextExhaustion(d deps.Deps, p supervise.LaunchParams, sessionID, evidence string, smartZone int) error {
+func recoverOrFailCodexContextExhaustion(d deps.Deps, p LaunchParams, sessionID, evidence string, smartZone int) error {
 	reason := fmt.Sprintf("Codex context exhaustion detected: %s", evidence)
 	recovered, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone)
 	if err != nil {

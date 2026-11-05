@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"encoding/json"
@@ -18,7 +18,6 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/transcript"
 	"go.uber.org/goleak"
@@ -110,7 +109,7 @@ func writeOccupancyTranscript(t *testing.T, home, cwd, sessionID string, inputTo
 // sleeping three real minutes. The pane's immediate idle report is corroborated
 // by a compaction boundary appended to the transcript as "/compact" is
 // submitted — a compaction that genuinely completed inside the three virtual
-// minutes already advanced before waitForFinish is called — since an idle
+// minutes already advanced before WaitForFinish is called — since an idle
 // report the transcript never backs up is now held by the completion gate.
 func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
@@ -205,19 +204,19 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	err := waitForFinish(deps, supervise.LaunchParams{
+	err := WaitForFinish(deps, LaunchParams{
 		Label:      "iter-05",
 		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       supervise.NewGate(),
+		Gate:       NewGate(),
 		Ticket:     "05",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",
 	}, sessionID)
 	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+		t.Fatalf("WaitForFinish: %v", err)
 	}
 
 	if compactCalls != 1 {
@@ -311,13 +310,13 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	recovered, err := recoverSmartZoneBreach(deps, supervise.LaunchParams{
+	recovered, err := recoverSmartZoneBreach(deps, LaunchParams{
 		Label:      "iter-09",
 		Agent:      agent.AgentCodex,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       supervise.NewGate(),
+		Gate:       NewGate(),
 		Ticket:     "09",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",
@@ -362,8 +361,8 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 // only compact-completion polls, i.e. those made after "/compact") at which
 // this test's fake transport finally writes the transcript's
 // compaction-boundary line. Each such dispatch is one Runner.Wait modeling
-// one smartZonePollMs (30s) tick, and waitForCompactionSignal starts at zero
-// elapsed, so the Nth dispatch corresponds to N*smartZonePollMs of elapsed
+// one SmartZonePollMs (30s) tick, and waitForCompactionSignal starts at zero
+// elapsed, so the Nth dispatch corresponds to N*SmartZonePollMs of elapsed
 // virtual time: 16 ticks merges completion at
 // 480s (8 minutes) — comfortably past smartZoneCompactTimeoutMs (5 minutes,
 // tick 10) where the transcript check first engages, and comfortably short
@@ -533,19 +532,19 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	err := waitForFinish(deps, supervise.LaunchParams{
+	err := WaitForFinish(deps, LaunchParams{
 		Label:      "iter-06",
 		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       supervise.NewGate(),
+		Gate:       NewGate(),
 		Ticket:     "06",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",
 	}, sessionID)
 	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+		t.Fatalf("WaitForFinish: %v", err)
 	}
 
 	if compactCalls != 1 {

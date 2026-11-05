@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"errors"
@@ -6,10 +6,9 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/deps"
-	"github.com/elentok/gx/ralphloop/supervise"
 )
 
-// smartZoneRecovery holds the smart-zone-breach sub-state that waitForFinish's
+// smartZoneRecovery holds the smart-zone-breach sub-state that WaitForFinish's
 // main loop carries across poll ticks: whether the just-completed recovery's
 // own side effects should be absorbed rather than mistaken for an
 // operator-raised block (see consumeJustRecovered), and the gated-give-up
@@ -32,7 +31,7 @@ type smartZoneRecovery struct {
 	justRecovered bool
 
 	// gatedGiveUps counts consecutive recoveries that ended in a gated
-	// give-up (see errCompactNeverConfirmed) within this call to waitForFinish.
+	// give-up (see errCompactNeverConfirmed) within this call to WaitForFinish.
 	gatedGiveUps int
 
 	// pending is the compaction-boundary snapshot taken just before the
@@ -62,7 +61,7 @@ func (r *smartZoneRecovery) consumeJustRecovered() bool {
 // pendingUnresolved reports whether a prior gated give-up's compaction still
 // has nothing in the transcript to show for it, i.e. a "finished" poll result
 // right now would be that same uncorroborated claim rather than a real finish.
-func (r *smartZoneRecovery) pendingUnresolved(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
+func (r *smartZoneRecovery) pendingUnresolved(d deps.Deps, p LaunchParams, sessionID string) bool {
 	return r.pending != nil && r.pending.unresolved(d, p, sessionID)
 }
 
@@ -77,8 +76,8 @@ func (r *smartZoneRecovery) recordGatedGiveUp() (exceeded bool) {
 // interruptOrRetry interrupts the pane ahead of a recovery. Interrupt refuses
 // with ErrNotReady when the pane is in a state it can't safely interrupt; that
 // is not a failure, so retry reports true and the caller skips this poll and
-// tries again on the next one. Any other error aborts waitForFinish.
-func interruptOrRetry(d deps.Deps, p supervise.LaunchParams, why string) (retry bool, err error) {
+// tries again on the next one. Any other error aborts WaitForFinish.
+func interruptOrRetry(d deps.Deps, p LaunchParams, why string) (retry bool, err error) {
 	err = d.Runner.Interrupt(p.SessionOrDefault())
 	switch {
 	case err == nil:
@@ -95,9 +94,9 @@ func interruptOrRetry(d deps.Deps, p supervise.LaunchParams, why string) (retry 
 // gated-give-up bookkeeping from its outcome. breached reports whether a
 // breach was found at all (whether or not recovery itself succeeded) — the
 // caller resets its own elapsed-poll-time counter only when breached is true.
-// A non-nil err means the caller must abort waitForFinish entirely, same as
+// A non-nil err means the caller must abort WaitForFinish entirely, same as
 // every other hard failure in the main loop.
-func (r *smartZoneRecovery) checkAndRecover(d deps.Deps, p supervise.LaunchParams, sessionID string) (breached bool, err error) {
+func (r *smartZoneRecovery) checkAndRecover(d deps.Deps, p LaunchParams, sessionID string) (breached bool, err error) {
 	occupancy, found, decidable, occErr := smartZoneOccupancy(d, p.Agent, p.SessionCwd, sessionID)
 	if occErr == nil && found {
 		p.EventSink().ContextOccupancy(p.Ticket, occupancy)

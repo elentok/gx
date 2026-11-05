@@ -1,7 +1,8 @@
-package ralphloop
+package supervise
 
 import (
 	"errors"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"testing"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -21,12 +21,12 @@ type modelGuardFixture struct {
 	scratchDir string
 }
 
-// runModelGuardWait runs waitForFinish through three timed-out polls on an
+// runModelGuardWait runs supervise.WaitForFinish through three timed-out polls on an
 // implement ticket expecting expected, reading turns from read.
 func runModelGuardWait(t *testing.T, ticketType, expected string, read func(since time.Time) (transcript.Turns, bool), tweak ...func(*deps.Deps)) modelGuardFixture {
 	t.Helper()
 	var f modelGuardFixture
-	r := boundGiveUpRunner(func(wait int) bool { return wait <= 3 })
+	r := fakes.BoundGiveUpRunner(func(wait int) bool { return wait <= 3 })
 	f.scratchDir = fixture.EpicScratchDir(t, "epic")
 	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 	if read != nil {
@@ -45,7 +45,7 @@ func runModelGuardWait(t *testing.T, ticketType, expected string, read func(sinc
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: ticketType}
 	p.ScratchDir = f.scratchDir
 	p.EpicName = "epic"
-	f.err = waitForFinish(d, p, "sess-19")
+	f.err = WaitForFinish(d, p, "sess-19")
 	return f
 }
 
@@ -71,7 +71,7 @@ func firstTurnOn(model string) func(time.Time) (transcript.Turns, bool) {
 func TestWaitForFinish_ModelMismatch_WrongModelReturnsTypedError(t *testing.T) {
 	t.Parallel()
 	f := runModelGuardWait(t, "implement", "sonnet", firstTurnOn("claude-opus-5-5"))
-	var mm *supervise.ModelMismatchError
+	var mm *ModelMismatchError
 	if !errors.As(f.err, &mm) {
 		t.Fatalf("err = %v, want *supervise.ModelMismatchError", f.err)
 	}
@@ -104,7 +104,7 @@ func TestWaitForFinish_ModelMismatch_NoTurnYetKeepsReading(t *testing.T) {
 		}
 		return transcript.Turns{Model: "claude-opus-5-5", Count: 1}, true
 	})
-	var mm *supervise.ModelMismatchError
+	var mm *ModelMismatchError
 	if !errors.As(f.err, &mm) {
 		t.Fatalf("err = %v, want *supervise.ModelMismatchError once the first turn lands", f.err)
 	}
@@ -144,7 +144,7 @@ func TestWaitForFinish_ModelMismatch_OtherTicketTypesAreUntouched(t *testing.T) 
 func TestWaitForFinish_ModelMismatchCodex(t *testing.T) {
 	t.Parallel()
 	f := runModelGuardWait(t, "implement", "gpt-5-codex", firstTurnOn("gpt-4.1"))
-	var mm *supervise.ModelMismatchError
+	var mm *ModelMismatchError
 	if !errors.As(f.err, &mm) {
 		t.Fatalf("err = %v, want *supervise.ModelMismatchError", f.err)
 	}

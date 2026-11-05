@@ -19,15 +19,15 @@ import (
 // covers ticket 02's two start-time requirements: IterationStarted must carry
 // cwd/sessionID (so a consumer can resolve the transcript itself), and one
 // extra immediate ContextOccupancy read/emit must fire right away, rather
-// than waiting up to smartZonePollMs for the first poll tick to report it.
+// than waiting up to supervise.SmartZonePollMs for the first poll tick to report it.
 func TestPromptedLaunch_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccupancy(t *testing.T) {
 	t.Parallel()
 	var started struct {
 		identifier, label, cwd, sessionID string
 	}
-	occSink := &occupancySink{}
+	occSink := &fakes.OccupancySink{}
 	sink := &recordingSinkWithArgs{
-		occupancySink: occSink,
+		OccupancySink: occSink,
 		onIterationStarted: func(ticket tickets.Ticket, label, cwd, sessionID string) {
 			started.identifier, started.label, started.cwd, started.sessionID = ticket.Identifier, label, cwd, sessionID
 		},
@@ -62,8 +62,8 @@ func TestPromptedLaunch_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccup
 	if started.identifier != "01" || started.label != "iter-01" || started.cwd != "/repo/iter-01" || started.sessionID != "sess-1" {
 		t.Errorf("IterationStarted args = %+v, want {01 iter-01 /repo/iter-01 sess-1}", started)
 	}
-	if len(occSink.calls) != 1 || occSink.calls[0].identifier != "01" || occSink.calls[0].tokens != 4200 {
-		t.Errorf("ContextOccupancy calls = %+v, want one {01 4200} for the immediate start-time read", occSink.calls)
+	if len(occSink.Calls) != 1 || occSink.Calls[0].Identifier != "01" || occSink.Calls[0].Tokens != 4200 {
+		t.Errorf("ContextOccupancy calls = %+v, want one {01 4200} for the immediate start-time read", occSink.Calls)
 	}
 }
 
@@ -76,7 +76,7 @@ func TestPromptedLaunch_CodexAdoptsSessionIDFromStatusAfterPrompt(t *testing.T) 
 	var startedSessionID string
 	var observedSessionID string
 	sink := &recordingSinkWithArgs{
-		occupancySink: &occupancySink{},
+		OccupancySink: &fakes.OccupancySink{},
 		onIterationStarted: func(_ tickets.Ticket, _, _, sessionID string) {
 			startedSessionID = sessionID
 		},
@@ -199,11 +199,11 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 	})
 }
 
-// recordingSinkWithArgs embeds occupancySink (itself embedding
+// recordingSinkWithArgs embeds fakes.OccupancySink (itself embedding
 // runlog.NoopEventSink) and additionally hooks IterationStarted, for tests that
 // need both start-time signals asserted together.
 type recordingSinkWithArgs struct {
-	*occupancySink
+	*fakes.OccupancySink
 	onIterationStarted func(ticket tickets.Ticket, label, cwd, sessionID string)
 }
 

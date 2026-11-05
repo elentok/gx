@@ -1,13 +1,38 @@
 package ralphloop
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/internal/fakes"
+	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
+	"go.uber.org/goleak"
 )
+
+// TestMain re-enters the test binary as the fake herdr helper when launched
+// under herdrfake's coordinator, and gives merge locks a state dir.
+// goleak.VerifyTestMain fails the specific leaking test at leak time instead
+// of letting a stuck goroutine surface as a multi-minute package hang.
+func TestMain(m *testing.M) {
+	herdrfake.RunHelperProcess()
+	state, err := os.MkdirTemp("", "gx-ralphloop-state")
+	if err != nil {
+		panic(err)
+	}
+	fakes.StateDir = state
+	code := m.Run()
+	os.RemoveAll(state)
+	if code == 0 {
+		if err := goleak.Find(); err != nil {
+			fmt.Fprintf(os.Stderr, "goleak: %v\n", err)
+			code = 1
+		}
+	}
+	os.Exit(code)
+}
 
 // addressTrailerValue is the trailer a ticket in writeEpic's layout merges with.
 func addressTrailerValue(scratchDir, epicName, id string) string {
@@ -34,12 +59,6 @@ func mustMergeLockDir(t *testing.T, scratchDir, epic string) string {
 		t.Fatal(err)
 	}
 	return dir
-}
-
-// withProcessEnv is the process environment with a fake herdr's entries
-// layered over it, for DepsOverrides.Env.
-func withProcessEnv(fakeEnv []string) []string {
-	return append(os.Environ(), fakeEnv...)
 }
 
 // setProcessEnv points the real process env var key at value for the rest of

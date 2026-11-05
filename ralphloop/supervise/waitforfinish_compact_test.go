@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"errors"
@@ -13,15 +13,14 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 )
 
 func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	t.Parallel()
 	ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
-	gate := supervise.NewGate()
+	gate := NewGate()
 	var observedCwd, observedSession string
-	r := &blipRunner{Runner: idlePromptRunner("iter-01", "codex-session-1"), timeoutOn: 1}
+	r := &fakes.BlipRunner{Runner: fakes.IdlePromptRunner("iter-01", "codex-session-1"), TimeoutOn: 1}
 	d := deps.Deps{
 		Runner: r,
 		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
@@ -31,7 +30,7 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, supervise.LaunchParams{
+	err := WaitForFinish(d, LaunchParams{
 		Label:      "iter-01",
 		Agent:      agent.AgentCodex,
 		Pane:       "pane-1",
@@ -42,10 +41,10 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 		Gate:       gate,
 	}, "codex-session-1")
 	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
+		t.Fatalf("WaitForFinish: %v", err)
 	}
-	if r.interrupts != 1 {
-		t.Errorf("interrupts = %d, want one before /compact", r.interrupts)
+	if r.Interrupts != 1 {
+		t.Errorf("interrupts = %d, want one before /compact", r.Interrupts)
 	}
 	if observedCwd != "/repo/iter-01" || observedSession != "codex-session-1" {
 		t.Errorf("ReadCodexContext(%q, %q), want (/repo/iter-01, codex-session-1)", observedCwd, observedSession)
@@ -207,8 +206,8 @@ func TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck(t *te
 	if !recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once the transcript confirms compaction completed")
 	}
-	if r.waits != 3 {
-		t.Errorf("Runner.Wait calls = %d, want 3: the premature idle must keep polling until the transcript confirms", r.waits)
+	if r.Waits != 3 {
+		t.Errorf("Runner.Wait calls = %d, want 3: the premature idle must keep polling until the transcript confirms", r.Waits)
 	}
 	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact, finish-up] with finish-up sent only after the fallthrough poll confirms compaction", prompts)
@@ -245,8 +244,8 @@ func TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced(t *te
 	if !recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true")
 	}
-	if r.waits != 1 || sleeps != 0 {
-		t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: a genuine immediate success must not keep polling", r.waits, sleeps)
+	if r.Waits != 1 || sleeps != 0 {
+		t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: a genuine immediate success must not keep polling", r.Waits, sleeps)
 	}
 	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
@@ -357,13 +356,13 @@ func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing
 	if prompts := r.Prompts("iter-19"); len(prompts) != 1 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact] only: the finish-up prompt cancels an in-progress compaction", prompts)
 	}
-	wantSleeps := smartZoneCompactExtendedTimeoutMs / smartZonePollMs
+	wantSleeps := smartZoneCompactExtendedTimeoutMs / SmartZonePollMs
 	if len(sleeps) != wantSleeps {
 		t.Errorf("gated sleeps = %d, want %d (one poll interval per gated tick)", len(sleeps), wantSleeps)
 	}
 	for i, s := range sleeps {
-		if s != smartZonePollMs*time.Millisecond {
-			t.Fatalf("sleep %d = %s, want %s", i, s, smartZonePollMs*time.Millisecond)
+		if s != SmartZonePollMs*time.Millisecond {
+			t.Fatalf("sleep %d = %s, want %s", i, s, SmartZonePollMs*time.Millisecond)
 		}
 	}
 }
@@ -552,9 +551,9 @@ func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
 	if len(sleeps) != 0 {
 		t.Errorf("sleeps = %v, want none: the pane wait itself consumed each tick", sleeps)
 	}
-	wantWaits := smartZoneCompactExtendedTimeoutMs / smartZonePollMs
-	if r.waits != wantWaits {
-		t.Errorf("Runner.Wait calls = %d, want %d (one poll tick per interval up to the extended bound)", r.waits, wantWaits)
+	wantWaits := smartZoneCompactExtendedTimeoutMs / SmartZonePollMs
+	if r.Waits != wantWaits {
+		t.Errorf("Runner.Wait calls = %d, want %d (one poll tick per interval up to the extended bound)", r.Waits, wantWaits)
 	}
 }
 
@@ -566,7 +565,7 @@ func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
 // must not be trusted on the pane's word.
 func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *testing.T) {
 	t.Parallel()
-	newDeps := func(r *blipRunner, readCompactions func(string, string) (int, bool, error)) deps.Deps {
+	newDeps := func(r *fakes.BlipRunner, readCompactions func(string, string) (int, bool, error)) deps.Deps {
 		return deps.Deps{
 			Runner:          r,
 			ReadCompactions: readCompactions,
@@ -602,13 +601,13 @@ func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *tes
 
 // TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling verifies the call site:
 // a gated give-up is a failed recovery, not a failed iteration, so
-// waitForFinish swallows that one error and returns to polling — and takes the
+// WaitForFinish swallows that one error and returns to polling — and takes the
 // finish once the slow compaction it gave up on finally writes its boundary.
 // Any other error around the breach path still aborts the iteration.
 func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 	t.Parallel()
 	boundaries := 0
-	r := boundGiveUpRunner(func(wait int) bool {
+	r := fakes.BoundGiveUpRunner(func(wait int) bool {
 		if wait == 1 {
 			return true
 		}
@@ -624,9 +623,9 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 		Sleep:           func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := WaitForFinish(d, boundGiveUpParams(), "sess-19")
 	if err != nil {
-		t.Fatalf("waitForFinish: %v, want the gated give-up absorbed", err)
+		t.Fatalf("WaitForFinish: %v, want the gated give-up absorbed", err)
 	}
 	if prompts := r.Prompts("iter-19"); len(prompts) != 1 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact] only: no finish-up prompt may be sent on a gated give-up", prompts)
@@ -635,8 +634,8 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 
 func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
 	t.Parallel()
-	r := boundGiveUpRunner(func(wait int) bool { return wait == 1 })
-	r.interruptErr = errors.New("pane is gone")
+	r := fakes.BoundGiveUpRunner(func(wait int) bool { return wait == 1 })
+	r.InterruptErr = errors.New("pane is gone")
 	d := deps.Deps{
 		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
@@ -644,8 +643,8 @@ func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
 		Sleep:           func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := WaitForFinish(d, boundGiveUpParams(), "sess-19")
 	if err == nil || !strings.Contains(err.Error(), "pane is gone") {
-		t.Fatalf("waitForFinish error = %v, want the transport failure propagated, not absorbed", err)
+		t.Fatalf("WaitForFinish error = %v, want the transport failure propagated, not absorbed", err)
 	}
 }
