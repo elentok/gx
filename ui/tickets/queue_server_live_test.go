@@ -66,7 +66,7 @@ func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
 	if !m.runningEpics["gx:alpha"] {
 		t.Fatalf("runningEpics = %v, want gx:alpha running", m.runningEpics)
 	}
-	if got := m.queueRunState(); got != queueRunRunning {
+	if got := m.header().queueRunState(); got != queueRunRunning {
 		t.Errorf("queueRunState = %v, want running", got)
 	}
 	live, ok := m.live["gx:alpha"]["01"]
@@ -85,7 +85,7 @@ func TestQueueServerMode_RunningHeaderCountsFromSnapshot(t *testing.T) {
 		{Address: "gx:alpha/03", Title: "Third", Status: "open"},
 	}}, []wire.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/03"}})
 
-	got := m.queueHeaderTitle()
+	got := m.header().queueHeaderTitle()
 	if !strings.HasPrefix(got, "Queue · 1 of 3 done · ") || !strings.Contains(got, "implementing...") {
 		t.Errorf("queueHeaderTitle() = %q, want \"Queue · 1 of 3 done · <spinner> implementing...\"", got)
 	}
@@ -95,7 +95,7 @@ func TestQueueServerMode_RunningHeaderDropsCountWithoutTickets(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
 	m.runningEpics = map[string]bool{"gx:missing": true}
 
-	got := m.queueHeaderTitle()
+	got := m.header().queueHeaderTitle()
 	if strings.Contains(got, "of 0 done") || !strings.HasPrefix(got, "Queue · ") || !strings.Contains(got, "implementing...") {
 		t.Errorf("queueHeaderTitle() = %q, want a running title with no count", got)
 	}
@@ -104,10 +104,10 @@ func TestQueueServerMode_RunningHeaderDropsCountWithoutTickets(t *testing.T) {
 func TestQueueServerMode_NoClaimedTicketStaysIdleWithServerCopy(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
 
-	if got := m.queueRunState(); got != queueRunIdle {
+	if got := m.header().queueRunState(); got != queueRunIdle {
 		t.Fatalf("queueRunState = %v, want idle", got)
 	}
-	body := strings.Join(m.queueHeaderBodyLines(), "\n")
+	body := strings.Join(m.header().queueHeaderBodyLines(), "\n")
 	if strings.Contains(body, "press enter") {
 		t.Errorf("idle banner %q tells the user to press enter in server mode", body)
 	}
@@ -138,7 +138,7 @@ func TestQueueServerMode_TimerCountsFromServerClaimTime(t *testing.T) {
 func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 	m, _ := loadedServerQueueWith(t, "open", time.Time{}, true)
 
-	body := strings.Join(m.queueHeaderBodyLines(), "\n")
+	body := strings.Join(m.header().queueHeaderBodyLines(), "\n")
 	if !strings.Contains(body, "herdr unavailable") {
 		t.Errorf("header body %q does not say herdr is unavailable", body)
 	}
@@ -147,7 +147,7 @@ func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 func TestQueueServerMode_HerdrDownBannerNamesWhatWaits(t *testing.T) {
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, HerdrUnavailable: true, HerdrText: "herdr is down; waiting: gx:alpha/01"}, nil)
 
-	body := strings.Join(m.queueHeaderBodyLines(), "\n")
+	body := strings.Join(m.header().queueHeaderBodyLines(), "\n")
 	if !strings.Contains(body, "waiting: gx:alpha/01") {
 		t.Errorf("header body %q does not name the waiting ticket", body)
 	}
@@ -162,7 +162,7 @@ func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
 	}}, []wire.QueueItem{{Address: "gx:alpha"}})
 
 	var shown []string
-	for _, e := range m.buildQueueEntries() {
+	for _, e := range m.rows.buildQueueEntries(m.rowsEnv()) {
 		if e.Value.kind == nodeQueueTicket {
 			shown = append(shown, e.Value.ticket.ticket.Path)
 		}
@@ -189,7 +189,7 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 	if !parent.Running || parent.WaitingOn != "01a" {
 		t.Errorf("live[01] = %+v, want running and waiting on 01a", parent)
 	}
-	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.epics[0].Tickets[0], parent, "")
+	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.rows.epics[0].Tickets[0], parent, "")
 	if suffix != "(waiting on 01a...)" {
 		t.Errorf("parent suffix = %q, want %q", suffix, "(waiting on 01a...)")
 	}
@@ -205,11 +205,11 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 	if !live.Running || live.Phase != rowfmt.LivePhaseMerging {
 		t.Errorf("live[02] = %+v, want running and merging", live)
 	}
-	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.epics[0].Tickets[1], live, "")
+	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.rows.epics[0].Tickets[1], live, "")
 	if suffix != "(merging...)" {
 		t.Errorf("suffix = %q, want %q", suffix, "(merging...)")
 	}
-	if got := m.queueHeaderTitle(); !strings.HasPrefix(got, "Queue · 1 of 2 done · ") {
+	if got := m.header().queueHeaderTitle(); !strings.HasPrefix(got, "Queue · 1 of 2 done · ") {
 		t.Errorf("queueHeaderTitle() = %q, want the merge ticket counted: \"Queue · 1 of 2 done · ...\"", got)
 	}
 }
@@ -222,7 +222,7 @@ func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
 			ExternalBlockers: []string{"epic3"}},
 	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 
-	epic := m.epics[0]
+	epic := m.rows.epics[0]
 	for i, want := range []string{"(blocked by epic2 (via epic2/b))", "(blocked by epic3)"} {
 		tk := epic.Tickets[i]
 		if got := blockedBySuffix(epic, tk, rowfmt.TicketStatus(epic, tk)); got != want {
@@ -237,7 +237,7 @@ func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) 
 	if len(m.runningEpics) != 0 {
 		t.Errorf("runningEpics = %v, want none: the server has no run for the claimed ticket", m.runningEpics)
 	}
-	if got := m.queueRunState(); got != queueRunIdle {
+	if got := m.header().queueRunState(); got != queueRunIdle {
 		t.Errorf("queueRunState = %v, want idle", got)
 	}
 }

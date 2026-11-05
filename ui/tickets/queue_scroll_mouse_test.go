@@ -34,8 +34,8 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
 	m = updated.(QueueModel)
 
-	if m.queueTree.ScrollOffset() != 0 {
-		t.Fatalf("expected no initial scroll, got offset %d", m.queueTree.ScrollOffset())
+	if m.rows.queueTree.ScrollOffset() != 0 {
+		t.Fatalf("expected no initial scroll, got offset %d", m.rows.queueTree.ScrollOffset())
 	}
 
 	// ctrl+d pages the selection (and viewport) down, twice so there's slack
@@ -44,12 +44,12 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 	// to scroll further for (it'd already be visible).
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(QueueModel)
-	if m.queueTree.ScrollOffset() == 0 {
-		t.Fatalf("expected ctrl+d to scroll the viewport down, got offset %d", m.queueTree.ScrollOffset())
+	if m.rows.queueTree.ScrollOffset() == 0 {
+		t.Fatalf("expected ctrl+d to scroll the viewport down, got offset %d", m.rows.queueTree.ScrollOffset())
 	}
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(QueueModel)
-	afterPageDown := m.queueTree.ScrollOffset()
+	afterPageDown := m.rows.queueTree.ScrollOffset()
 
 	// ctrl+u pages back up — repeated past the top so the selection (and so
 	// the viewport, via ensureQueueVisible) actually has to move rather than
@@ -58,19 +58,19 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		m = updated.(QueueModel)
 	}
-	if want := firstSelectableQueueIndex(t, m); m.queueTree.SelectedIndex() != want {
-		t.Fatalf("expected ctrl+u to page the selection back to the top (%d), got %d", want, m.queueTree.SelectedIndex())
+	if want := firstSelectableQueueIndex(t, m); m.rows.queueTree.SelectedIndex() != want {
+		t.Fatalf("expected ctrl+u to page the selection back to the top (%d), got %d", want, m.rows.queueTree.SelectedIndex())
 	}
-	if m.queueTree.ScrollOffset() >= afterPageDown {
-		t.Fatalf("expected ctrl+u to scroll the viewport back up from %d, got %d", afterPageDown, m.queueTree.ScrollOffset())
+	if m.rows.queueTree.ScrollOffset() >= afterPageDown {
+		t.Fatalf("expected ctrl+u to scroll the viewport back up from %d, got %d", afterPageDown, m.rows.queueTree.ScrollOffset())
 	}
 
 	// Mouse wheel scrolls the viewport without needing a key press.
-	before := m.queueTree.ScrollOffset()
+	before := m.rows.queueTree.ScrollOffset()
 	updated, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	m = updated.(QueueModel)
-	if m.queueTree.ScrollOffset() <= before {
-		t.Fatalf("expected mouse wheel down to increase scroll offset from %d, got %d", before, m.queueTree.ScrollOffset())
+	if m.rows.queueTree.ScrollOffset() <= before {
+		t.Fatalf("expected mouse wheel down to increase scroll offset from %d, got %d", before, m.rows.queueTree.ScrollOffset())
 	}
 }
 
@@ -100,8 +100,8 @@ func queueModelForHoverScroll(t *testing.T) QueueModel {
 	m = updated.(QueueModel)
 	m = selectFirstQueueTicketRow(t, m)
 
-	if m.queueTree.ScrollOffset() != 0 || m.preview.VP.YOffset() != 0 {
-		t.Fatalf("expected both panes to start unscrolled, got tree=%d preview=%d", m.queueTree.ScrollOffset(), m.preview.VP.YOffset())
+	if m.rows.queueTree.ScrollOffset() != 0 || m.preview.VP.YOffset() != 0 {
+		t.Fatalf("expected both panes to start unscrolled, got tree=%d preview=%d", m.rows.queueTree.ScrollOffset(), m.preview.VP.YOffset())
 	}
 	return m
 }
@@ -121,7 +121,7 @@ func TestQueueModelHoverScrollFollowsCursorNotFocus(t *testing.T) {
 		updated, _ := m.Update(tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown})
 		m = updated.(QueueModel)
 
-		if m.queueTree.ScrollOffset() == 0 {
+		if m.rows.queueTree.ScrollOffset() == 0 {
 			t.Fatalf("expected hovering the tree to scroll it")
 		}
 		if m.preview.VP.YOffset() != 0 {
@@ -144,8 +144,8 @@ func TestQueueModelHoverScrollFollowsCursorNotFocus(t *testing.T) {
 		if m.preview.VP.YOffset() == 0 {
 			t.Fatalf("expected hovering the preview to scroll it")
 		}
-		if m.queueTree.ScrollOffset() != 0 {
-			t.Fatalf("expected the tree's scroll offset to stay unchanged, got %d", m.queueTree.ScrollOffset())
+		if m.rows.queueTree.ScrollOffset() != 0 {
+			t.Fatalf("expected the tree's scroll offset to stay unchanged, got %d", m.rows.queueTree.ScrollOffset())
 		}
 		if m.preview.Focus != preview.FocusSidebar {
 			t.Fatalf("expected focus to stay on the tree, got %v", m.preview.Focus)
@@ -164,7 +164,7 @@ func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	m = selectFirstQueueTicketRow(t, m)
 
-	treeBefore := m.queueTree.ScrollOffset()
+	treeBefore := m.rows.queueTree.ScrollOffset()
 	previewBefore := m.preview.VP.YOffset()
 
 	px, _, _, _ := m.previewRect()
@@ -173,8 +173,8 @@ func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
 	updated, _ = m.Update(tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown})
 	m = updated.(QueueModel)
 
-	if m.queueTree.ScrollOffset() != treeBefore {
-		t.Fatalf("expected tree scroll offset unchanged, got %d want %d", m.queueTree.ScrollOffset(), treeBefore)
+	if m.rows.queueTree.ScrollOffset() != treeBefore {
+		t.Fatalf("expected tree scroll offset unchanged, got %d want %d", m.rows.queueTree.ScrollOffset(), treeBefore)
 	}
 	if m.preview.VP.YOffset() != previewBefore {
 		t.Fatalf("expected preview scroll offset unchanged, got %d want %d", m.preview.VP.YOffset(), previewBefore)
@@ -202,14 +202,14 @@ func TestQueueModelMouseWheelWhileHelpOpenScrollsHelpNotQueue(t *testing.T) {
 
 	m.help.Open(m.width, m.height)
 
-	prevQueueOffset := m.queueTree.ScrollOffset()
+	prevQueueOffset := m.rows.queueTree.ScrollOffset()
 	prevHelpOffset := m.help.Viewport.YOffset()
 
 	updated, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	m = updated.(QueueModel)
 
-	if m.queueTree.ScrollOffset() != prevQueueOffset {
-		t.Fatalf("expected queue tree not to scroll while help is open, before=%d after=%d", prevQueueOffset, m.queueTree.ScrollOffset())
+	if m.rows.queueTree.ScrollOffset() != prevQueueOffset {
+		t.Fatalf("expected queue tree not to scroll while help is open, before=%d after=%d", prevQueueOffset, m.rows.queueTree.ScrollOffset())
 	}
 	if m.help.Viewport.YOffset() <= prevHelpOffset {
 		t.Fatalf("expected help viewport to scroll on wheel while open, before=%d after=%d", prevHelpOffset, m.help.Viewport.YOffset())
@@ -257,8 +257,8 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 		tickettest.TicketPath(root, "alpha", "03-third.md"):  true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
-	if want := firstSelectableQueueIndex(t, m); m.queueTree.SelectedIndex() != want {
-		t.Fatalf("expected initial selection at the first selectable row (%d), got %d", want, m.queueTree.SelectedIndex())
+	if want := firstSelectableQueueIndex(t, m); m.rows.queueTree.SelectedIndex() != want {
+		t.Fatalf("expected initial selection at the first selectable row (%d), got %d", want, m.rows.queueTree.SelectedIndex())
 	}
 
 	// Ticket rows sit at whatever entry index the tree gave them, after the
@@ -267,7 +267,7 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 	// mouse.Y-1-len(queueHeaderBodyLines()), with no per-row Y offsets table
 	// anymore now every entry is exactly one line.
 	var ticketRows []int
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket {
 			ticketRows = append(ticketRows, i)
 		}
@@ -276,14 +276,14 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 		t.Fatalf("expected 3 ticket rows, got %d: %v", len(ticketRows), ticketRows)
 	}
 	rowY := func(entryIdx int) int {
-		return 1 + len(m.queueHeaderBodyLines()) + entryIdx
+		return 1 + len(m.header().queueHeaderBodyLines()) + entryIdx
 	}
 
 	// Click on the third row.
 	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: rowY(ticketRows[2])})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != ticketRows[2] {
-		t.Fatalf("expected click to select row %d, got %d", ticketRows[2], m.queueTree.SelectedIndex())
+	if m.rows.queueTree.SelectedIndex() != ticketRows[2] {
+		t.Fatalf("expected click to select row %d, got %d", ticketRows[2], m.rows.queueTree.SelectedIndex())
 	}
 	if m.confirm.IsOpen {
 		t.Fatalf("expected click-to-select to not open the confirm modal")
@@ -292,8 +292,8 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 	// A click above the body (row -1) must not crash or change selection.
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: 0})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != ticketRows[2] {
-		t.Fatalf("expected out-of-bounds click to leave selection at row %d, got %d", ticketRows[2], m.queueTree.SelectedIndex())
+	if m.rows.queueTree.SelectedIndex() != ticketRows[2] {
+		t.Fatalf("expected out-of-bounds click to leave selection at row %d, got %d", ticketRows[2], m.rows.queueTree.SelectedIndex())
 	}
 }
 
@@ -313,7 +313,7 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 
 	rowOf := map[queueNodeKind]int{}
 	var secondTicket int
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if _, seen := rowOf[e.Value.kind]; !seen {
 			rowOf[e.Value.kind] = i
 		}
@@ -322,7 +322,7 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 		}
 	}
 	rowY := func(entryIdx int) int { return 1 + queueHeaderReservedLines + entryIdx }
-	start := m.queueTree.SelectedIndex()
+	start := m.rows.queueTree.SelectedIndex()
 	px, py, _, _ := m.preview.Rect(m.width, m.contentHeight())
 
 	for name, click := range map[string]tea.MouseClickMsg{
@@ -331,16 +331,16 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 	} {
 		updated, cmd := m.Update(click)
 		got := updated.(QueueModel)
-		if got.queueTree.SelectedIndex() != start || got.menus.Menu.IsOpen || got.menus.Pending != "" || cmd != nil {
+		if got.rows.queueTree.SelectedIndex() != start || got.menus.Menu.IsOpen || got.menus.Pending != "" || cmd != nil {
 			t.Errorf("%s: expected a right click to do nothing, got selection=%d menuOpen=%v pending=%q cmd=%v",
-				name, got.queueTree.SelectedIndex(), got.menus.Menu.IsOpen, got.menus.Pending, cmd != nil)
+				name, got.rows.queueTree.SelectedIndex(), got.menus.Menu.IsOpen, got.menus.Pending, cmd != nil)
 		}
 	}
 
 	updated, cmd := m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(secondTicket)})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != secondTicket {
-		t.Fatalf("expected right click to select row %d, got %d", secondTicket, m.queueTree.SelectedIndex())
+	if m.rows.queueTree.SelectedIndex() != secondTicket {
+		t.Fatalf("expected right click to select row %d, got %d", secondTicket, m.rows.queueTree.SelectedIndex())
 	}
 	if want := tickettest.TicketPath(root, "alpha", "02-second.md"); m.menus.Pending != want || cmd == nil {
 		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.menus.Pending, cmd != nil)
@@ -348,8 +348,8 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(rowOf[nodeEpicName])})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != rowOf[nodeEpicName] || !m.menus.Menu.IsOpen || !strings.Contains(m.menus.Menu.View(), "Add epic to queue") {
-		t.Fatalf("expected the epic menu open on the epic header, got selection=%d view:\n%s", m.queueTree.SelectedIndex(), m.menus.Menu.View())
+	if m.rows.queueTree.SelectedIndex() != rowOf[nodeEpicName] || !m.menus.Menu.IsOpen || !strings.Contains(m.menus.Menu.View(), "Add epic to queue") {
+		t.Fatalf("expected the epic menu open on the epic header, got selection=%d view:\n%s", m.rows.queueTree.SelectedIndex(), m.menus.Menu.View())
 	}
 }
 
@@ -370,7 +370,7 @@ func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	var ticketRows []int
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket {
 			ticketRows = append(ticketRows, i)
 		}
@@ -387,8 +387,8 @@ func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.
 
 	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: rowY})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != ticketRows[1] {
-		t.Fatalf("expected click to select row %d after banner transition, got %d", ticketRows[1], m.queueTree.SelectedIndex())
+	if m.rows.queueTree.SelectedIndex() != ticketRows[1] {
+		t.Fatalf("expected click to select row %d after banner transition, got %d", ticketRows[1], m.rows.queueTree.SelectedIndex())
 	}
 }
 
@@ -467,20 +467,20 @@ func TestQueueModelGAndGGJumpSelectionToLastAndFirstRow(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(QueueModel)
-	last := len(m.queueTree.Entries()) - 1
+	last := len(m.rows.queueTree.Entries()) - 1
 	if last <= 0 {
 		t.Fatalf("expected more than one row in test setup, got %d", last+1)
 	}
-	if m.queueTree.SelectedIndex() != last {
-		t.Fatalf("expected 'G' to select the last row (%d), got %d", last, m.queueTree.SelectedIndex())
+	if m.rows.queueTree.SelectedIndex() != last {
+		t.Fatalf("expected 'G' to select the last row (%d), got %d", last, m.rows.queueTree.SelectedIndex())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(QueueModel)
-	if want := firstSelectableQueueIndex(t, m); m.queueTree.SelectedIndex() != want {
-		t.Fatalf("expected 'gg' to select the first selectable row (%d), got %d", want, m.queueTree.SelectedIndex())
+	if want := firstSelectableQueueIndex(t, m); m.rows.queueTree.SelectedIndex() != want {
+		t.Fatalf("expected 'gg' to select the first selectable row (%d), got %d", want, m.rows.queueTree.SelectedIndex())
 	}
 }
 
@@ -499,7 +499,7 @@ func TestQueueModelCursorSkipsFillerRowsBetweenEpics(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	var alphaTicket, betaHeader int
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		switch {
 		case e.Value.kind == nodeQueueTicket && e.Value.epic.Name == "alpha":
 			alphaTicket = i
@@ -510,12 +510,12 @@ func TestQueueModelCursorSkipsFillerRowsBetweenEpics(t *testing.T) {
 	if betaHeader <= alphaTicket+1 {
 		t.Fatalf("expected beta's separator row between alpha's ticket and beta's header, got alpha=%d beta=%d", alphaTicket, betaHeader)
 	}
-	m.queueTree.SetSelectedIndex(alphaTicket)
+	m.rows.queueTree.SetSelectedIndex(alphaTicket)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != betaHeader {
-		t.Fatalf("expected 'j' off alpha's ticket to land on beta's header (%d), got %d", betaHeader, m.queueTree.SelectedIndex())
+	if m.rows.queueTree.SelectedIndex() != betaHeader {
+		t.Fatalf("expected 'j' off alpha's ticket to land on beta's header (%d), got %d", betaHeader, m.rows.queueTree.SelectedIndex())
 	}
 }
 
@@ -544,15 +544,15 @@ func TestQueueModelPageDownLandsOnSelectableRow(t *testing.T) {
 	start := firstSelectableQueueIndex(t, m)
 	// A 7-row page (list.DefaultScroll) from alpha's header lands on beta's
 	// separator — the case this test pins.
-	entries := m.queueTree.Entries()
+	entries := m.rows.queueTree.Entries()
 	if landing := start + 7; landing >= len(entries) || isSelectableQueueKind(entries[landing].Value.kind) {
 		t.Fatalf("test setup expected ctrl+d's raw landing index (%d) to be a filler row, got %+v", landing, entries)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(QueueModel)
-	entries = m.queueTree.Entries()
-	sel := m.queueTree.SelectedIndex()
+	entries = m.rows.queueTree.Entries()
+	sel := m.rows.queueTree.SelectedIndex()
 	if sel < 0 || sel >= len(entries) || !isSelectableQueueKind(entries[sel].Value.kind) {
 		t.Fatalf("expected ctrl+d to land the selection on a selectable row, got index %d (%+v)", sel, entries)
 	}
@@ -579,23 +579,23 @@ func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	var openTicketIdx int
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket && e.Value.epic.Name == "alpha" && e.Value.ticket.ticket.Identifier == "02" {
 			openTicketIdx = i
 		}
 	}
-	m.queueTree.SetSelectedIndex(openTicketIdx)
+	m.rows.queueTree.SetSelectedIndex(openTicketIdx)
 
 	// Toggling hideComplete removes alpha's done ticket (but not its still-open
 	// sibling, so alpha's header rows stay) and rebuilds via clampSelected;
 	// the removed row shifts beta's header block one slot earlier, landing
 	// squarely where alpha's open ticket used to sit only if we'd left the
 	// selection unclamped — assert it actually lands on a ticket row.
-	m.hideComplete = true
+	m.rows.hideComplete = true
 	m.clampSelected()
 
-	entries := m.queueTree.Entries()
-	sel := m.queueTree.SelectedIndex()
+	entries := m.rows.queueTree.Entries()
+	sel := m.rows.queueTree.SelectedIndex()
 	if sel < 0 || sel >= len(entries) || !isSelectableQueueKind(entries[sel].Value.kind) {
 		t.Fatalf("expected rebuild to leave the selection on a selectable row, got index %d (%+v)", sel, entries)
 	}

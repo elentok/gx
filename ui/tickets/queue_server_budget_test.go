@@ -18,7 +18,7 @@ func loadedServerQueueWithBudget(t *testing.T, budget wire.BudgetStatus) QueueMo
 func TestQueueServerMode_HeaderShowsTodaysSpendOfLimit(t *testing.T) {
 	m := loadedServerQueueWithBudget(t, wire.BudgetStatus{Total: 12.5, SoftLimit: 50})
 
-	if got, want := m.queueHeaderTitle(), "Queue · today $12.50 of $50.00"; got != want {
+	if got, want := m.header().queueHeaderTitle(), "Queue · today $12.50 of $50.00"; got != want {
 		t.Errorf("queueHeaderTitle() = %q, want %q", got, want)
 	}
 }

@@ -183,7 +183,7 @@ func TestQueueModelNestsInvestigateChildUnderOneOff(t *testing.T) {
 	}
 }
 
-// queueTicketEntries filters m.queueTree.Entries() down to nodeQueueTicket
+// queueTicketEntries filters m.rows.queueTree.Entries() down to nodeQueueTicket
 // rows, dropping the per-epic separator/status/context/error entries
 // buildQueueEntries interleaves — the tree's own Depth/HasChildren/
 // Expanded on each Entry (not queueRow's mirrored fields, which only exist to
@@ -191,7 +191,7 @@ func TestQueueModelNestsInvestigateChildUnderOneOff(t *testing.T) {
 // against, per ticket 19's live-render-path rewrite.
 func queueTicketEntries(m QueueModel) []tree.Entry[queueNode] {
 	var out []tree.Entry[queueNode]
-	for _, e := range m.queueTree.Entries() {
+	for _, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket {
 			out = append(out, e)
 		}
@@ -202,7 +202,7 @@ func queueTicketEntries(m QueueModel) []tree.Entry[queueNode] {
 // TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse ports
 // queue_rows_test.go's TestQueueRowsForEpic_NestsChildrenAtArbitraryDepthAndRespectsCollapse
 // (ticket 19): a ticket (01) with a child (02) that itself has a child (03)
-// nests two levels deep via m.queueTree.Entries(), leaving an unrelated
+// nests two levels deep via m.rows.queueTree.Entries(), leaving an unrelated
 // ticket (04) at the top level, and collapsing the grandparent via "h" hides
 // both descendants while leaving 04 visible.
 func TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T) {
@@ -338,7 +338,7 @@ func TestQueueModelSharedNonCandidateAncestorInjectedOnce(t *testing.T) {
 // queue_rows_test.go's TestQueueRowsForEpic_DoneParentWithOpenForkChildStaysVisible
 // (ticket 19): a done parent whose fork child (Parent: ticket 03) is still
 // open must not be dropped by hideComplete's filterDoneTickets — the child
-// stays nested under its still-live parent in m.queueTree.Entries() instead
+// stays nested under its still-live parent in m.rows.queueTree.Entries() instead
 // of being reattached to the top level.
 func TestQueueModelDoneParentWithOpenForkChildStaysVisible(t *testing.T) {
 	t.Parallel()
@@ -520,7 +520,7 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 // withChecked seeds a local-mode QueueModel's checked set, standing in for
 // the queue a server load would supply.
 func withChecked(m QueueModel, checked map[string]bool) QueueModel {
-	m.checked = checked
+	m.rows.checked = checked
 	return m
 }
 
@@ -559,7 +559,7 @@ func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 // a hardcoded 0.
 func firstSelectableQueueIndex(t *testing.T, m QueueModel) int {
 	t.Helper()
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if isSelectableQueueKind(e.Value.kind) {
 			return i
 		}
@@ -575,9 +575,9 @@ func isSelectableQueueKind(kind queueNodeKind) bool {
 
 func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
 	t.Helper()
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket {
-			m.queueTree.SetSelectedIndex(i)
+			m.rows.queueTree.SetSelectedIndex(i)
 			// syncQueuePreviewViewport normally runs inside Update; moving
 			// selection directly on queueTree bypasses that, so re-run it
 			// here to keep previewVP in sync with the new selection.

@@ -23,8 +23,8 @@ func newMaintenanceQueue(t *testing.T, api tickettest.FakeServerAPI) QueueModel 
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
-	m.epics = []tickets.Epic{{Name: "gx:alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: "gx:alpha/01", Status: "open"}}}}
-	m.checked = map[string]bool{"gx:alpha/01": true}
+	m.rows.epics = []tickets.Epic{{Name: "gx:alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: "gx:alpha/01", Status: "open"}}}}
+	m.rows.checked = map[string]bool{"gx:alpha/01": true}
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
 	return m
@@ -114,7 +114,7 @@ func TestQueueServerKeys_ApproveNeedsPendingProposal(t *testing.T) {
 	} {
 		var calls []string
 		m := newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls})
-		m.epics[0].Tickets[0].Body = tc.body
+		m.rows.epics[0].Tickets[0].Body = tc.body
 		m.clampSelected()
 		m = pressQueue(t, m, 'A')
 		if tc.want != nil {

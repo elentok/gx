@@ -29,7 +29,7 @@ func runKey(t *testing.T, m QueueModel, k tea.KeyPressMsg) (QueueModel, tea.Msg)
 
 func harnessQueue(t *testing.T, api tickettest.FakeServerAPI, project string) QueueModel {
 	m := newMaintenanceQueue(t, api)
-	m.projectFilter = project
+	m.rows.projectFilter = project
 	return m
 }
 

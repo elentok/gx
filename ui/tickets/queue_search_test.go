@@ -52,7 +52,7 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
 	var ticketRows []int
 	var ticketValues []queueNode
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket {
 			ticketRows = append(ticketRows, i)
 			ticketValues = append(ticketValues, e.Value)
@@ -61,8 +61,8 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 	if len(ticketRows) != 2 {
 		t.Fatalf("expected 2 ticket rows, got %d: %v", len(ticketRows), ticketRows)
 	}
-	matchedLine := m.renderQueueTicketRow(ticketValues[0].ticket, ticketRows[0])
-	nonMatchedLine := m.renderQueueTicketRow(ticketValues[1].ticket, ticketRows[1])
+	matchedLine := m.rows.renderQueueTicketRow(m.rowsEnv(), ticketValues[0].ticket, ticketRows[0])
+	nonMatchedLine := m.rows.renderQueueTicketRow(m.rowsEnv(), ticketValues[1].ticket, ticketRows[1])
 	if strings.Contains(matchedLine, dimPrefix) {
 		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)
 	}
@@ -91,7 +91,7 @@ func TestQueueSearch_MatchesEpicHeaderRows(t *testing.T) {
 	if m.search.MatchesCount() != 2 {
 		t.Fatalf("expected the alpha epic header and its ticket to match, got %d", m.search.MatchesCount())
 	}
-	entries := m.queueTree.Entries()
+	entries := m.rows.queueTree.Entries()
 	first, _ := m.search.Match(0)
 	second, _ := m.search.Match(1)
 	if e := entries[first.DataIndex].Value; e.kind != nodeEpicName || e.epic.Name != "alpha" {

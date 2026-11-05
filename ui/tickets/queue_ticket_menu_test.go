@@ -136,7 +136,7 @@ func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 	const label = "Approve recovery proposal"
 	var calls []string
 	m := newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls})
-	m.epics[0].Tickets[0].Body = "## Proposed Remedy\n\nrun it"
+	m.rows.epics[0].Tickets[0].Body = "## Proposed Remedy\n\nrun it"
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
 	_, ready := requestQueueMenu(t, m)
@@ -151,7 +151,7 @@ func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 	}
 
 	m = newMaintenanceQueue(t, tickettest.FakeServerAPI{})
-	m.epics[0].Tickets[0].Body = "## Notes\n\nnothing"
+	m.rows.epics[0].Tickets[0].Body = "## Notes\n\nnothing"
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
 	_, ready = requestQueueMenu(t, m)
@@ -166,8 +166,8 @@ func TestQueueTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
-	m.epics = []tickets.Epic{{Name: "alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: path, Status: string(schema.StatusPaused), PauseReason: schema.PauseManual, Mutes: muted}}}}
-	m.checked = map[string]bool{path: true}
+	m.rows.epics = []tickets.Epic{{Name: "alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: path, Status: string(schema.StatusPaused), PauseReason: schema.PauseManual, Mutes: muted}}}}
+	m.rows.checked = map[string]bool{path: true}
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
 
@@ -226,8 +226,8 @@ func openQueueTranscript(t *testing.T, store, path string) tea.Msg {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
-	m.epics = []tickets.Epic{{Name: "alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: path, Status: "done"}}}}
-	m.checked = map[string]bool{path: true}
+	m.rows.epics = []tickets.Epic{{Name: "alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: path, Status: "done"}}}}
+	m.rows.checked = map[string]bool{path: true}
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
 	_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Transcript")

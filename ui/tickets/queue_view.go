@@ -22,19 +22,19 @@ func (m QueueModel) View() tea.View {
 		return newHoverView("\n  Initializing…")
 	}
 	if m.loaded {
-		// m.checked can change between Update calls with no queueEpicsLoadedMsg/
+		// The checked set can change between Update calls with no queueEpicsLoadedMsg/
 		// clampSelected in between, so this must be re-evaluated on every
 		// render rather than only on the events clampSelected's own doc
 		// comment lists. buildQueueEntriesCached (queue_rows.go) reuses the
-		// previous tree when m.checked (among its other inputs) actually
+		// previous tree when the checked set (among its other inputs) actually
 		// didn't change, rather than always rebuilding from scratch.
-		m.queueTree.SetEntries(m.buildQueueEntriesCached())
+		m.rows.queueTree.SetEntries(m.rows.buildQueueEntriesCached(m.rowsEnv()))
 	}
 	sidebarW, previewW := m.preview.PanelWidths(m.width)
 	sidebarH, previewH := m.preview.PanelHeights(m.width, m.contentHeight())
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(m.queueBodyWidth()), m.preview.Focus == preview.FocusSidebar, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.header().queueHeaderTitle(), "", m.queueBody(m.queueBodyWidth()), m.preview.Focus == preview.FocusSidebar, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
 		previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, ui.ColorBlue, nil, false,
@@ -88,8 +88,9 @@ func (m QueueModel) queueBody(width int) []string {
 		return []string{ui.StyleDim.Render("  loading…")}
 	}
 
+	hdr := m.header()
 	var lines []string
-	for _, line := range m.queueHeaderBodyLines() {
+	for _, line := range hdr.queueHeaderBodyLines() {
 		if strings.Contains(line, "\x1b") {
 			// Already carries its own ANSI styling (e.g. a rendered key hint
 			// via ui.StatusWithHints) — wrapping it in StyleHint again would
@@ -100,9 +101,9 @@ func (m QueueModel) queueBody(width int) []string {
 		lines = append(lines, "  "+ui.StyleHint.Render(line))
 	}
 
-	finished := m.finishedLines()
+	finished := hdr.finishedLines()
 	treeH := m.queueViewportHeight() - len(lines) - len(finished)
-	lines = append(lines, m.queueTree.RenderLines(treeH+2, m.queueRenderOpts(width))...)
+	lines = append(lines, m.rows.queueTree.RenderLines(treeH+2, m.rows.queueRenderOpts(m.rowsEnv(), width))...)
 	return append(lines, finished...)
 }
 
@@ -113,15 +114,16 @@ func (m QueueModel) queueBody(width int) []string {
 // level down. Header/separator/reason rows are excluded from selection via
 // SetIsSelectable/SkipUnselectable (ticket 17), mirroring the sidebar's own
 // nodeEmpty treatment.
-func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
-	entries := m.queueTree.Entries()
+func (r queueRows) queueRenderOpts(env queueRowsEnv, width int) tree.RenderOpts[queueNode] {
+	entries := r.queueTree.Entries()
 	idxByID := make(map[string]int, len(entries))
 	for i, e := range entries {
 		idxByID[e.ID] = i
 	}
+	h := env.header
 	return tree.RenderOpts[queueNode]{
 		AccentColor: ui.ColorBlue,
-		Active:      m.preview.Focus == preview.FocusSidebar,
+		Active:      env.sidebarActive,
 		Width:       width,
 		// EmptyLine is blank: the header banner's queueIdleBodyLine (queue_header.go)
 		// already covers the empty-selection case with "No selected tickets...".
@@ -131,11 +133,11 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			case nodeEpicSeparator:
 				return ""
 			case nodeEpicName:
-				_, _, fill := m.epicStatus(entry.Value.epic)
-				return epicNameLine(entry.Value.epic.Name, m.summaries[entry.Value.epic.Name], fill, entry.Value.layout, m.queueLabelWidth())
+				_, _, fill := h.epicStatus(entry.Value.epic)
+				return epicNameLine(entry.Value.epic.Name, h.summaries[entry.Value.epic.Name], fill, entry.Value.layout, env.labelWidth)
 			case nodeEpicBar:
-				_, _, fill := m.epicStatus(entry.Value.epic)
-				return epicBarLine(m.summaries[entry.Value.epic.Name], fill, entry.Value.layout)
+				_, _, fill := h.epicStatus(entry.Value.epic)
+				return epicBarLine(h.summaries[entry.Value.epic.Name], fill, entry.Value.layout)
 			case nodeEpicSpacer:
 				return ""
 			case nodeEpicStatusLine:
@@ -143,7 +145,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				// state's color — the configured limits are session-wide, so
 				// coloring one epic's slice against them would misleadingly
 				// suggest that epic alone is over budget.
-				return m.epicStatusRow(entry.Value.epic, m.queueLabelWidth())
+				return h.epicStatusRow(entry.Value.epic, env.labelWidth)
 			case nodeEpicError:
 				if stuck, ok := entry.Value.err.(*schedule.StuckPlanError); ok {
 					return "    " + rowfmt.MetricsLineStyle.Render(
@@ -153,7 +155,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				}
 				return ui.StyleError.Render("    " + entry.Value.err.Error())
 			default: // nodeQueueTicket
-				return m.renderQueueTicketRow(entry.Value.ticket, idxByID[entry.ID])
+				return r.renderQueueTicketRow(env, entry.Value.ticket, idxByID[entry.ID])
 			}
 		},
 	}
@@ -177,33 +179,35 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 // active. A paused (answer)/paused (repair) ticket's pause-reason subtext is a
 // second physical line on this same entry (queueTicketReasonLine, set as
 // Entry.Body in buildQueueEntries) rather than rendered here.
-func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
+func (rs queueRows) renderQueueTicketRow(env queueRowsEnv, r queueRow, rowIdx int) string {
 	epic, t := r.epic, r.ticket
+	h := env.header
+	icons := h.icons
 	status := rowfmt.TicketStatus(epic, t)
 	indent := " "
 
-	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
+	triangle := strings.Repeat(" ", triangleColumnWidth(icons)) + " "
 	if r.hasChildren {
-		glyph := m.icons().TriangleExpanded
+		glyph := icons.TriangleExpanded
 		if !r.expanded {
-			glyph = m.icons().TriangleCollapsed
+			glyph = icons.TriangleCollapsed
 		}
 		triangle = glyph + " "
 	}
 
-	if m.runningEpics[epic.Name] {
-		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+triangle); ok {
-				metrics := rowfmt.FormatMetricsLine(rowfmt.LiveElapsedSeconds(live), live.Tokens, 0, m.codexRows[t.Path])
-				return rowfmt.AppendRowMetrics(base, rowfmt.JoinNonEmpty(" ", rowfmt.JoinNonEmpty(" ", suffix, metrics), rowfmt.JoinNonEmpty(" ", m.harnessLabels[t.Path], m.waitingLabels[t.Path])), rowfmt.MetricsLineStyle)
+	if h.runningEpics[epic.Name] {
+		if live, ok := h.live[epic.Name][t.Identifier]; ok {
+			if base, suffix, ok := rowfmt.RenderLiveTicketRow(icons, h.spinner, t, live, indent+triangle); ok {
+				metrics := rowfmt.FormatMetricsLine(rowfmt.LiveElapsedSeconds(live), live.Tokens, 0, env.codexRows[t.Path])
+				return rowfmt.AppendRowMetrics(base, rowfmt.JoinNonEmpty(" ", rowfmt.JoinNonEmpty(" ", suffix, metrics), rowfmt.JoinNonEmpty(" ", env.harnessLabels[t.Path], env.waitingLabels[t.Path])), rowfmt.MetricsLineStyle)
 			}
 		}
 	}
 
-	icon, style := statusIconAndStyle(m.icons(), status)
+	icon, style := statusIconAndStyle(icons, status)
 
-	matched, _ := m.queueTree.SearchMatch(rowIdx)
-	searchDim := m.search.HasQuery() && !matched
+	matched, _ := rs.queueTree.SearchMatch(rowIdx)
+	searchDim := env.hasQuery && !matched
 	// nonCandidateDim marks a row injected by attachQueueAncestors (ticket
 	// 08) to keep a candidate nested under its real parent chain — it reuses
 	// statusDoneStyle's permanent grey rather than ui.StyleDim's transient
@@ -223,7 +227,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		dimStyle, dimmed = statusDoneStyle, true
 	}
 
-	title := rowfmt.RowTitle(m.icons(), t)
+	title := rowfmt.RowTitle(icons, t)
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
@@ -239,12 +243,12 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	}
 
 	line := indent + triangle + style.Render(icon)
-	if m.rowHasSuggestedActions(epic, t) {
+	if env.suggested(epic, t) {
 		badgeStyle := suggestedActionBadgeStyle
 		if dimmed {
 			badgeStyle = dimStyle
 		}
-		line += " " + badgeStyle.Render(m.icons().SuggestedAction)
+		line += " " + badgeStyle.Render(icons.SuggestedAction)
 	}
 	line += " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
@@ -254,7 +258,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	metrics := rowfmt.JoinNonEmpty(" ", m.harnessLabels[t.Path], m.waitingLabels[t.Path])
+	metrics := rowfmt.JoinNonEmpty(" ", env.harnessLabels[t.Path], env.waitingLabels[t.Path])
 	if t.ElapsedTime > 0 || t.ActualContextWindow > 0 || t.ActualCost > 0 {
 		metrics = rowfmt.JoinNonEmpty(" ", rowfmt.FormatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost, t.HadCodex), metrics)
 	}
@@ -274,20 +278,22 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 // row used to (triangle + icon + badge width, mirroring renderQueueTicketRow's
 // own column layout). ok reports false (empty line) when r's ticket isn't
 // listed in the server's Paused tickets for its epic.
-func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
+func (rs queueRows) queueTicketReasonLine(env queueRowsEnv, r queueRow) (line string, ok bool) {
 	epic, t := r.epic, r.ticket
+	icons := env.header.icons
+	paused := env.header.summaries[epic.Name].Paused
 	status := rowfmt.TicketStatus(epic, t)
-	i := slices.IndexFunc(m.summaries[epic.Name].Paused, func(p wire.SummaryTicket) bool { return p.Address == t.Path })
-	if i < 0 || m.summaries[epic.Name].Paused[i].Reason == "" {
+	i := slices.IndexFunc(paused, func(p wire.SummaryTicket) bool { return p.Address == t.Path })
+	if i < 0 || paused[i].Reason == "" {
 		return "", false
 	}
-	reason := rowfmt.Ellipsize(m.summaries[epic.Name].Paused[i].Reason, rowfmt.PauseReasonMaxRunes, m.icons().Ellipsis)
+	reason := rowfmt.Ellipsize(paused[i].Reason, rowfmt.PauseReasonMaxRunes, icons.Ellipsis)
 
-	triangleWidth := triangleColumnWidth(m.icons()) + 1
-	icon, _ := statusIconAndStyle(m.icons(), status)
+	triangleWidth := triangleColumnWidth(icons) + 1
+	icon, _ := statusIconAndStyle(icons, status)
 	badgeWidth := 0
-	if m.rowHasSuggestedActions(epic, t) {
-		badgeWidth = lipgloss.Width(m.icons().SuggestedAction) + 1
+	if env.suggested(epic, t) {
+		badgeWidth = lipgloss.Width(icons.SuggestedAction) + 1
 	}
 
 	indent := " "

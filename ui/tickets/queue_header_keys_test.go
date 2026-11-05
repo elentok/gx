@@ -30,10 +30,10 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 
 	t.Run("not started", func(t *testing.T) {
 		m := base
-		if got, want := m.queueHeaderTitle(), "Queue · today $0.00"; got != want {
+		if got, want := m.header().queueHeaderTitle(), "Queue · today $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
-		lines := m.queueHeaderBodyLines()
+		lines := m.header().queueHeaderBodyLines()
 		if len(lines) != queueHeaderReservedLines {
 			t.Fatalf("body lines = %v, want %d line(s)", lines, queueHeaderReservedLines)
 		}
@@ -53,12 +53,12 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		m := base
 		m.runningEpics = map[string]bool{"alpha": true}
 		m.summaries = map[string]wire.EpicSummary{"alpha": {State: wire.EpicStateRunning, Total: 1}}
-		got := m.queueHeaderTitle()
+		got := m.header().queueHeaderTitle()
 		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing... · today $0.00") {
 			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing... · today $0.00\"", got)
 		}
 		want := []string{""}
-		if lines := m.queueHeaderBodyLines(); !slices.Equal(lines, want) {
+		if lines := m.header().queueHeaderBodyLines(); !slices.Equal(lines, want) {
 			t.Fatalf("body lines = %v, want %v while running (reserved slot stays blank)", lines, want)
 		}
 	})
@@ -66,10 +66,10 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	t.Run("idle but globally paused", func(t *testing.T) {
 		m := base
 		m.paused = true
-		if got, want := m.queueHeaderTitle(), "Queue · today $0.00"; got != want {
+		if got, want := m.header().queueHeaderTitle(), "Queue · today $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
-		lines := m.queueHeaderBodyLines()
+		lines := m.header().queueHeaderBodyLines()
 		if len(lines) != queueHeaderReservedLines {
 			t.Fatalf("body lines = %v, want %d line(s)", lines, queueHeaderReservedLines)
 		}
@@ -82,7 +82,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	t.Run("idle with nothing selected", func(t *testing.T) {
 		emptyRoot := t.TempDir()
 		m := loadQueueModel(t, withChecked(NewQueueModel(emptyRoot, ui.Settings{}, keys.Manager{}), map[string]bool{}))
-		lines := m.queueHeaderBodyLines()
+		lines := m.header().queueHeaderBodyLines()
 		if len(lines) != queueHeaderReservedLines {
 			t.Fatalf("body lines = %v, want %d line(s)", lines, queueHeaderReservedLines)
 		}
@@ -94,7 +94,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 			t.Fatalf("body line = %q, want orange-styled %q", lines[0], wantStyled)
 		}
 
-		emptyLine := m.queueRenderOpts(80).EmptyLine
+		emptyLine := m.rows.queueRenderOpts(m.rowsEnv(), 80).EmptyLine
 		if emptyLine != "" {
 			t.Fatalf("tree EmptyLine = %q, want empty (header banner already covers no-selection case)", emptyLine)
 		}
@@ -188,15 +188,15 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	checked := map[string]bool{done: true, open: true}
 	m := selectFirstQueueTicketRow(t, loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked)))
 
-	start := m.queueTree.SelectedIndex()
+	start := m.rows.queueTree.SelectedIndex()
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(QueueModel)
-	if want := start + 1; m.queueTree.SelectedIndex() != want {
-		t.Fatalf("expected \"t\",\"j\" to still move the selection down, got %d, want %d", m.queueTree.SelectedIndex(), want)
+	if want := start + 1; m.rows.queueTree.SelectedIndex() != want {
+		t.Fatalf("expected \"t\",\"j\" to still move the selection down, got %d, want %d", m.rows.queueTree.SelectedIndex(), want)
 	}
-	if m.hideComplete {
+	if m.rows.hideComplete {
 		t.Fatal("expected \"t\" followed by an unrelated key not to toggle hideComplete")
 	}
 
@@ -204,7 +204,7 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	m = updated.(QueueModel)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	m = updated.(QueueModel)
-	if m.hideComplete {
+	if m.rows.hideComplete {
 		t.Fatal("expected \"t\" followed by an unrelated key not to toggle hideComplete")
 	}
 	if m.confirm.IsOpen {
@@ -216,7 +216,7 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(QueueModel)
-	if m.hideComplete {
+	if m.rows.hideComplete {
 		t.Fatal("expected plain \"c\" not to toggle hideComplete")
 	}
 }

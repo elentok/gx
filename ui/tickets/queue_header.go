@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -88,11 +89,35 @@ func epicStatusLine(icons ui.IconSet, sum wire.EpicSummary, spinnerGlyph string)
 	}
 }
 
+// queueHeader renders the Queue tab's header and epic status rows. It has no
+// state of its own: QueueModel.header builds it from the tab's current inputs
+// for each render, and it never reads QueueModel.
+type queueHeader struct {
+	icons        ui.IconSet
+	summaries    map[string]wire.EpicSummary
+	runningEpics map[string]bool
+	live         map[string]map[string]rowfmt.LiveTicketState
+	paused       bool
+	// serverDown, hasServer: the server link is down; a server client exists.
+	serverDown bool
+	hasServer  bool
+	herdrDown  bool
+	herdrText  string
+	budget     wire.BudgetStatus
+	finished   []wire.FinishedEpic
+	spinner    spinner.Model
+	now        func() time.Time
+	// checkedCount and checkedPlans are how many tickets are checked and how
+	// many epics they span, for the idle line.
+	checkedCount int
+	checkedPlans int
+}
+
 // epicStatus is epicStatusLine for an epic on the Queue tab, with the current
 // spinner frame filled in.
-func (m QueueModel) epicStatus(epic tickets.Epic) (icon, text string, style lipgloss.Style) {
-	glyph := strings.TrimRight(m.implementSpinner.View(), " ")
-	return epicStatusLine(m.icons(), m.summaries[epic.Name], glyph)
+func (h queueHeader) epicStatus(epic tickets.Epic) (icon, text string, style lipgloss.Style) {
+	glyph := strings.TrimRight(h.spinner.View(), " ")
+	return epicStatusLine(h.icons, h.summaries[epic.Name], glyph)
 }
 
 // epicElapsedSeconds sums the epic's tickets' done ElapsedTime, for the
@@ -158,13 +183,13 @@ func epicCounter(sum wire.EpicSummary) string {
 // epicHeaderLayoutFor picks the layout for all of epics: wide only if every
 // non-empty epic's name line fits, else narrow with the bar if its own line
 // fits, else narrow with only the counter.
-func (m QueueModel) epicHeaderLayoutFor(epics []tickets.Epic, labelW int) epicHeaderLayout {
+func (h queueHeader) epicHeaderLayoutFor(epics []tickets.Epic, labelW int) epicHeaderLayout {
 	if labelW <= 0 {
 		return epicLayoutWide
 	}
 	layout := epicLayoutWide
 	for _, epic := range epics {
-		sum := m.summaries[epic.Name]
+		sum := h.summaries[epic.Name]
 		if sum.Total == 0 {
 			continue
 		}
@@ -285,14 +310,14 @@ func epicStatusParts(epic tickets.Epic, now time.Time, live map[string]rowfmt.Li
 
 // epicStatusRow renders "Status: <icon> <state> · elapsed · agent · cost ·
 // n compact(s)", all dim except the state, zero parts hidden, cut at labelW.
-func (m QueueModel) epicStatusRow(epic tickets.Epic, labelW int) string {
-	icon, text, style := m.epicStatus(epic)
+func (h queueHeader) epicStatusRow(epic tickets.Epic, labelW int) string {
+	icon, text, style := h.epicStatus(epic)
 	line := " " + rowfmt.MetricsLineStyle.Render("Status:") + " " + style.Render(icon+" "+text)
 	var live map[string]rowfmt.LiveTicketState
-	if m.runningEpics[epic.Name] {
-		live = m.live[epic.Name]
+	if h.runningEpics[epic.Name] {
+		live = h.live[epic.Name]
 	}
-	if parts := epicStatusParts(epic, m.now(), live); len(parts) > 0 {
+	if parts := epicStatusParts(epic, h.now(), live); len(parts) > 0 {
 		line += rowfmt.MetricsLineStyle.Render(" · " + strings.Join(parts, " · "))
 	}
 	if labelW > 0 {
@@ -314,8 +339,8 @@ const (
 
 // queueRunState classifies the queue's current run state from the epics the
 // server reports running.
-func (m QueueModel) queueRunState() queueRunStateKind {
-	if len(m.runningEpics) > 0 {
+func (h queueHeader) queueRunState() queueRunStateKind {
+	if len(h.runningEpics) > 0 {
 		return queueRunRunning
 	}
 	return queueRunIdle
@@ -325,19 +350,19 @@ func (m QueueModel) queueRunState() queueRunStateKind {
 // header redesign (see .scratch/tickets-queue-batch3/issues/assets/08-header-prototype.md):
 // the title always encodes run state, and the body carries at most one
 // state-specific line instead of the old always-present banner row.
-func (m QueueModel) queueHeaderTitle() string {
-	return m.queueRunStateTitle() + " · " + m.queueHeaderCostSuffix()
+func (h queueHeader) queueHeaderTitle() string {
+	return h.queueRunStateTitle() + " · " + h.queueHeaderCostSuffix()
 }
 
 // queueRunStateTitle is queueHeaderTitle's run-state text, before ticket 10's
 // live-cost suffix is appended — split out so the suffix logic doesn't have
 // to be repeated in every switch case.
-func (m QueueModel) queueRunStateTitle() string {
-	if m.queueRunState() != queueRunRunning {
+func (h queueHeader) queueRunStateTitle() string {
+	if h.queueRunState() != queueRunRunning {
 		return "Queue"
 	}
-	glyph := strings.TrimRight(m.implementSpinner.View(), " ")
-	done, total := m.runningProgress()
+	glyph := strings.TrimRight(h.spinner.View(), " ")
+	done, total := h.runningProgress()
 	if total == 0 {
 		return fmt.Sprintf("Queue · %s implementing...", glyph)
 	}
@@ -346,8 +371,8 @@ func (m QueueModel) queueRunStateTitle() string {
 
 // runningProgress sums the done/total ticket counts of the epics the server
 // reports running.
-func (m QueueModel) runningProgress() (done, total int) {
-	for _, sum := range m.summaries {
+func (h queueHeader) runningProgress() (done, total int) {
+	for _, sum := range h.summaries {
 		if sum.State == wire.EpicStateRunning {
 			done += sum.Done
 			total += sum.Total
@@ -359,8 +384,8 @@ func (m QueueModel) runningProgress() (done, total int) {
 // queueHeaderCostSuffix renders today's server spend appended to the title
 // line: "$X of $Y" colored against the server's soft limit when one is set,
 // bare unstyled "$X" when the budget is off.
-func (m QueueModel) queueHeaderCostSuffix() string {
-	total, soft := m.serverBudget.Total, m.serverBudget.SoftLimit
+func (h queueHeader) queueHeaderCostSuffix() string {
+	total, soft := h.budget.Total, h.budget.SoftLimit
 	text := "today " + tickets.FormatCost(total)
 	style := lipgloss.NewStyle()
 	if soft > 0 {
@@ -398,24 +423,24 @@ func budgetTotalStyle(total, softLimit float64) lipgloss.Style {
 // (mirroring the pre-ticket-21 nil body); only queueRunIdle fills it with
 // contextual copy, since that's the state a person is actually looking at
 // the Queue tab wondering what to do next.
-func (m QueueModel) queueHeaderBodyLines() []string {
-	if m.serverDown() {
+func (h queueHeader) queueHeaderBodyLines() []string {
+	if h.serverDown {
 		return []string{epicStatusPausedAnswerStyle.Render(queueServerDownBanner)}
 	}
-	if m.serverAPI != nil && m.herdrDown {
+	if h.hasServer && h.herdrDown {
 		banner := queueHerdrDownBanner
-		if m.herdrText != "" {
-			banner = "herdr unavailable — " + m.herdrText
+		if h.herdrText != "" {
+			banner = "herdr unavailable — " + h.herdrText
 		}
 		return []string{epicStatusProblemStyle.Render(banner)}
 	}
-	if m.paused {
-		return []string{epicStatusProblemStyle.Render(queuePausedLine(m.runningTicketCount()))}
+	if h.paused {
+		return []string{epicStatusProblemStyle.Render(queuePausedLine(h.runningTicketCount()))}
 	}
-	if m.queueRunState() == queueRunRunning {
+	if h.queueRunState() == queueRunRunning {
 		return []string{""}
 	}
-	return []string{m.queueIdleBodyLine()}
+	return []string{h.queueIdleBodyLine()}
 }
 
 // queuePausedLine is the header text of a queue the person paused.
@@ -430,9 +455,9 @@ func queuePausedLine(running int) string {
 }
 
 // runningTicketCount is how many tickets the server holds a run for.
-func (m QueueModel) runningTicketCount() int {
+func (h queueHeader) runningTicketCount() int {
 	n := 0
-	for _, sum := range m.summaries {
+	for _, sum := range h.summaries {
 		n += len(sum.Active)
 	}
 	return n
@@ -444,14 +469,14 @@ const queueHerdrDownBanner = "herdr unavailable — the server can't start agent
 
 // queueIdleBodyLine picks the reserved slot's idle copy: a pointer back to
 // the Tickets tab when nothing is checked, otherwise where runs start from.
-func (m QueueModel) queueIdleBodyLine() string {
-	if m.serverAPI != nil {
-		if len(m.checked) == 0 {
+func (h queueHeader) queueIdleBodyLine() string {
+	if h.hasServer {
+		if h.checkedCount == 0 {
 			return epicStatusPausedAnswerStyle.Render("Queue is empty — enqueue tickets from the Tickets tab")
 		}
 		return epicStatusPausedAnswerStyle.Render("Waiting for the server to claim queued tickets")
 	}
-	if len(m.checkedEpicPlans()) == 0 {
+	if h.checkedPlans == 0 {
 		return epicStatusPausedAnswerStyle.Render("No selected tickets — go to the Tickets tab first")
 	}
 	return epicStatusPausedAnswerStyle.Render("Idle — runs start from the server")

@@ -184,8 +184,8 @@ func (m QueueModel) rowHasSuggestedActions(epic tickets.Epic, ticket tickets.Tic
 
 // selectedQueueEpic is the selected epic header's epic; ok is false off one.
 func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
-	entries := m.queueTree.Entries()
-	idx := m.queueTree.SelectedIndex()
+	entries := m.rows.queueTree.Entries()
+	idx := m.rows.queueTree.SelectedIndex()
 	if idx < 0 || idx >= len(entries) || entries[idx].Value.kind != nodeEpicName {
 		return tickets.Epic{}, false
 	}
@@ -195,7 +195,7 @@ func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
 // menuAnchor is the selected queue row on screen, under the panel's header
 // line and the queue header, for the Context menu to open next to.
 func (m QueueModel) menuAnchor() contextmenu.Anchor {
-	line, h, ok := m.queueTree.SelectedBodyLine()
+	line, h, ok := m.rows.queueTree.SelectedBodyLine()
 	if !ok {
 		return contextmenu.Anchor{}
 	}

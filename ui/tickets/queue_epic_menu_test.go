@@ -20,9 +20,9 @@ import (
 func queueOnEpicHeader(t *testing.T, api tickettest.FakeServerAPI) QueueModel {
 	t.Helper()
 	m := newMaintenanceQueue(t, api)
-	m.epics[0].Path = "gx:alpha"
+	m.rows.epics[0].Path = "gx:alpha"
 	m.clampSelected()
-	m.selectFirstRow()
+	m.rows.selectFirstRow()
 	if _, ok := m.selectedQueueEpic(); !ok {
 		t.Fatal("first selectable row is not the epic header")
 	}
@@ -65,7 +65,7 @@ func TestQueueEpicMenu_HeaderOpensTheFullEpicMenu(t *testing.T) {
 func TestQueueEpicMenu_MergeByAddress(t *testing.T) {
 	var calls []string
 	m := queueOnEpicHeader(t, tickettest.FakeServerAPI{Calls: &calls})
-	m.epics[0].Tickets[0].Status = "done"
+	m.rows.epics[0].Tickets[0].Status = "done"
 	m.clampSelected()
 
 	_, cmd := chooseQueueMenuItem(t, pressQueueMenuKey(t, m), "Merge")
@@ -109,7 +109,7 @@ func TestQueueEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T)
 func TestQueueEpicMenu_CheckedSetKeysIgnoreTheHeader(t *testing.T) {
 	var calls []string
 	m := queueOnEpicHeader(t, tickettest.FakeServerAPI{Calls: &calls})
-	m.epics[0].Tickets[0].Body = "## Proposed Remedy\n\nrun it"
+	m.rows.epics[0].Tickets[0].Body = "## Proposed Remedy\n\nrun it"
 	for _, key := range []rune{'x', 'A', ' '} {
 		if got := pressQueue(t, m, key); got.confirm.IsOpen {
 			t.Errorf("%q on the header opened a confirm", key)

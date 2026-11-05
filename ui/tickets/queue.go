@@ -32,8 +32,6 @@ type QueueModel struct {
 	worktreeRoot string
 	settings     ui.Settings
 	editor       rowactions.Editor
-	checked      map[string]bool
-	checkOrder   map[string]uint64
 	// live is epicName -> ticket identifier -> running state, derived from the
 	// delivered state (syncServerRunState), so the Queue tab's rows render the
 	// running spinner+phase presentation (rowfmt.RenderLiveTicketRow).
@@ -65,24 +63,10 @@ type QueueModel struct {
 	width, height int
 	ready         bool
 	loaded        bool
-	epics         []tickets.Epic
-	candidates    map[string]bool
 
-	// queueTree owns the Queue tab's selection/scroll/collapse state
-	// (tree.Model[queueNode], see queue_rows.go's buildQueueEntries).
-	queueTree tree.Model[queueNode]
-
-	// entriesCache memoizes buildQueueEntries' output across renders. It's a
-	// pointer so the cache survives QueueModel being copied by value on every
-	// Update: buildQueueEntries only depends on m.epics/m.checked/
-	// m.hideComplete/collapsed-IDs (see queueEntriesCache), everything else
-	// live (running-epic elapsed time, spinner frame, paused/stalled state)
-	// is read straight from the model by queueRenderOpts' Label callback at
-	// draw time, not baked into the cached entries — so reusing a cached
-	// tree when none of those four inputs changed is safe even mid-run.
-	// Cuts the CPU cost of rebuilding the full tree from scratch every
-	// render even when nothing changed.
-	entriesCache *queueEntriesCache
+	// rows is the tree builder and row renderer with the state they own (see
+	// queue_rows.go). The header is stateless: header() builds it per call.
+	rows queueRows
 
 	// menus is the Tickets tab's row menu plus the Queue group.
 	menus        rowactions.Menus
@@ -102,12 +86,6 @@ type QueueModel struct {
 	// harnessPicker is the "H" Default harness modal.
 	harnessPicker harnessPicker
 
-	// hideComplete backs the "tc" chord (ticket 09): when true,
-	// buildQueueEntries omits StatusDone tickets from the rendered row list,
-	// independent of the "c"/"C" clear keymaps (which mutate the queue store,
-	// not visibility) and independent of epicWaves' plan validation, which
-	// must keep considering hidden-but-still-queued tickets.
-	hideComplete bool
 	// keys dispatches the "tc" chord above through ui/keys.Manager so a key
 	// typed right after an unconsumed "t" falls through to its own normal
 	// action instead of being swallowed (ticket 16).
@@ -133,8 +111,6 @@ type QueueModel struct {
 	link        tabapi.ServerLink
 	// olderServer: see Model.olderServer.
 	olderServer bool
-	// projectFilter narrows the server-mode rows to one project; "" shows all.
-	projectFilter string
 	// focusEpic is the address of an epic to select when its rows arrive.
 	focusEpic string
 }
@@ -157,8 +133,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
 		editor:           rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
-		checked:          map[string]bool{},
-		checkOrder:       map[string]uint64{},
+		rows:             newQueueRows(queueTree),
 		live:             map[string]map[string]rowfmt.LiveTicketState{},
 		implementSpinner: sp,
 		runningEpics:     map[string]bool{},
@@ -166,8 +141,6 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		menus:            rowactions.Menus{OnQueue: true},
 		search:           search.NewModel(),
 		keys:             km,
-		queueTree:        queueTree,
-		entriesCache:     &queueEntriesCache{},
 		help:             help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys), settings.About),
 		preview:          preview.NewPane(),
 	}
@@ -243,9 +216,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help, _ = m.help.Update(msg)
 		if m.loaded {
 			// The epic header layout depends on the width (see buildQueueEntries).
-			m.queueTree.SetEntries(m.buildQueueEntriesCached())
+			m.rows.queueTree.SetEntries(m.rows.buildQueueEntriesCached(m.rowsEnv()))
 		}
-		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
+		m.rows.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		return m, nil
 	case queueSpinnerRestartMsg:
 		// The tick chain dies while the tab is hidden, so a claim that arrived
@@ -374,7 +347,7 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 		m.preview.VP, cmd = m.preview.VP.Update(msg)
 		return m, cmd
 	}
-	m.queueTree.ScrollViewport(dir * ui.WheelScrollLines)
+	m.rows.queueTree.ScrollViewport(dir * ui.WheelScrollLines)
 	return m, nil
 }
 
@@ -424,28 +397,28 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 	}
 	bodyLine := mouse.Y - 1 - queueHeaderReservedLines
 	if mouse.Button == tea.MouseRight {
-		idx, ok := m.queueTree.EntryAtBodyLine(bodyLine)
+		idx, ok := m.rows.queueTree.EntryAtBodyLine(bodyLine)
 		if !ok {
 			return m, nil
 		}
-		if kind := m.queueTree.Entries()[idx].Value.kind; kind != nodeQueueTicket && kind != nodeEpicName {
+		if kind := m.rows.queueTree.Entries()[idx].Value.kind; kind != nodeQueueTicket && kind != nodeEpicName {
 			return m, nil
 		}
-		m.queueTree.SetSelectedIndex(idx)
+		m.rows.queueTree.SetSelectedIndex(idx)
 		return m.handleQueueTicketMenuKey()
 	}
-	if idx, ok := m.queueTree.EntryAtBodyLine(bodyLine); ok {
-		entry := m.queueTree.Entries()[idx]
+	if idx, ok := m.rows.queueTree.EntryAtBodyLine(bodyLine); ok {
+		entry := m.rows.queueTree.Entries()[idx]
 		// Only ticket rows draw a triangle; the label's leading cell is the
 		// indent renderQueueTicketRow puts before it.
-		if entry.Value.kind == nodeQueueTicket && rowfmt.OnTreeIcon(mouse.X, entry, 1, m.icons()) && m.queueTree.ToggleEntry(idx) {
+		if entry.Value.kind == nodeQueueTicket && rowfmt.OnTreeIcon(mouse.X, entry, 1, m.icons()) && m.rows.queueTree.ToggleEntry(idx) {
 			m.clampSelected()
 			if m.search.HasQuery() {
 				m.recomputeQueueSearchMatches()
 			}
 			return m, nil
 		}
-		m.queueTree.SetSelectedIndex(idx)
+		m.rows.queueTree.SetSelectedIndex(idx)
 	}
 	return m, nil
 }
@@ -453,7 +426,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 // ticketPathFor resolves an epicName/identifier pair (the registry's
 // addressing scheme) to the ticket's file path (the queue store's key).
 func (m QueueModel) ticketPathFor(epicName, identifier string) (string, bool) {
-	for _, epic := range m.epics {
+	for _, epic := range m.rows.epics {
 		if epic.Name != epicName {
 			continue
 		}
@@ -558,22 +531,22 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.keys.Reset()
 			m.help.Open(m.width, m.height)
 		case bindingQueueToggleHideDone:
-			m.hideComplete = !m.hideComplete
+			m.rows.hideComplete = !m.rows.hideComplete
 			m.clampSelected()
 		case bindingQueueCycleProject:
 			if m.serverAPI == nil {
 				return m, nil
 			}
-			m.projectFilter = nextProject(m.epics, m.projectFilter)
+			m.rows.projectFilter = nextProject(m.rows.epics, m.rows.projectFilter)
 			m.clampSelected()
 			label := "all projects"
-			if m.projectFilter != "" {
-				label = "project: " + m.projectFilter
+			if m.rows.projectFilter != "" {
+				label = "project: " + m.rows.projectFilter
 			}
 			return m, notify.Info(label)
 		case bindingQueueTogglePreview:
 			m.preview.Toggle()
-			m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
+			m.rows.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		case bindingQueueEditInPlace:
 			return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 		case bindingQueueEditHSplit:
@@ -585,13 +558,13 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueCancelChord:
 			return m, nil
 		case bindingQueueSelectFirst:
-			m.selectFirstRow()
+			m.rows.selectFirstRow()
 		case bindingQueueYankSummary:
 			return m, m.yankQueueTicketSummary()
 		case bindingQueueYankFilePath:
 			return m, m.yankQueueTicketFilePath()
 		case bindingQueueSelectLast:
-			m.selectLastRow()
+			m.rows.selectLastRow()
 		case bindingQueuePreviewBottom:
 			m.preview.VP.GotoBottom()
 		case bindingQueueReload:
@@ -642,12 +615,12 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// pane, so leaves land on the same focus-preview outcome as an
 	// already-expanded row (the Queue tab's own choice, unlike the sidebar's
 	// leaves-are-a-no-op behavior).
-	next, cmd, result := m.queueTree.Update(msg)
+	next, cmd, result := m.rows.queueTree.Update(msg)
 	if result.ExpandNoop {
 		m.preview.FocusPreviewPane()
 		return m, cmd
 	}
-	m.queueTree = next
+	m.rows.queueTree = next
 	if result.RebuildRequested {
 		m.clampSelected()
 		if m.search.HasQuery() {
@@ -668,7 +641,7 @@ type checkedEpicPlan struct {
 }
 
 func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
-	return checkedEpicPlansFor(m.epics, m.checked, m.checkOrder)
+	return checkedEpicPlansFor(m.rows.epics, m.rows.checked, m.rows.checkOrder)
 }
 
 func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrder map[string]uint64) []checkedEpicPlan {
@@ -703,32 +676,51 @@ func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrd
 	return plans
 }
 
-// selectFirstRow/selectLastRow implement "gg"/"G": jump the queue selection
-// to the first/last row, mirroring the Tickets tab's own selectFirstRow/
-// selectLastRow (model_keys.go).
-func (m *QueueModel) selectFirstRow() {
-	if len(m.queueTree.Entries()) == 0 {
-		return
+// header builds the stateless header from the tab's current inputs.
+func (m QueueModel) header() queueHeader {
+	h := queueHeader{
+		icons:        m.icons(),
+		summaries:    m.summaries,
+		runningEpics: m.runningEpics,
+		live:         m.live,
+		paused:       m.paused,
+		serverDown:   m.serverDown(),
+		hasServer:    m.serverAPI != nil,
+		herdrDown:    m.herdrDown,
+		herdrText:    m.herdrText,
+		budget:       m.serverBudget,
+		finished:     m.finished,
+		spinner:      m.implementSpinner,
+		now:          m.now,
+		checkedCount: len(m.rows.checked),
 	}
-	m.queueTree.SetSelectedIndex(0)
-	m.queueTree.SkipUnselectable(1)
+	if m.serverAPI == nil {
+		h.checkedPlans = len(m.checkedEpicPlans())
+	}
+	return h
 }
 
-func (m *QueueModel) selectLastRow() {
-	n := len(m.queueTree.Entries())
-	if n == 0 {
-		return
+// rowsEnv gathers what queueRows reads from the rest of the tab.
+func (m QueueModel) rowsEnv() queueRowsEnv {
+	return queueRowsEnv{
+		header:        m.header(),
+		maxParallel:   m.settings.MaxConcurrentTicketsPerEpic(),
+		labelWidth:    m.queueLabelWidth(),
+		harnessLabels: m.harnessLabels,
+		waitingLabels: m.waitingLabels,
+		codexRows:     m.codexRows,
+		hasQuery:      m.search.HasQuery(),
+		sidebarActive: m.preview.Focus == preview.FocusSidebar,
+		suggested:     m.rowHasSuggestedActions,
 	}
-	m.queueTree.SetSelectedIndex(n - 1)
-	m.queueTree.SkipUnselectable(-1)
 }
 
 // clampSelected rebuilds the queue tree's entries from the current
 // epics/hideComplete/collapse state — SetEntries re-clamps selection to the
 // new entry count.
 func (m *QueueModel) clampSelected() {
-	m.queueTree.SetEntries(m.buildQueueEntries())
-	m.queueTree.SkipUnselectable(1)
+	m.rows.queueTree.SetEntries(m.rows.buildQueueEntries(m.rowsEnv()))
+	m.rows.queueTree.SkipUnselectable(1)
 	m.selectFocusEpic()
 }
 
@@ -746,9 +738,9 @@ func (m *QueueModel) selectFocusEpic() {
 	if m.focusEpic == "" {
 		return
 	}
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeEpicName && e.Value.epic.Path == m.focusEpic {
-			m.queueTree.SetSelectedIndex(i)
+			m.rows.queueTree.SetSelectedIndex(i)
 			m.focusEpic = ""
 			return
 		}

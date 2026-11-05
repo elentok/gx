@@ -21,7 +21,7 @@ func (m QueueModel) ModalOpen() bool {
 }
 
 // recomputeQueueSearchMatches rebuilds the match set against the current
-// m.queueTree.Entries() order: ticketMatchesQuery for each ticket entry, and
+// m.rows.queueTree.Entries() order: ticketMatchesQuery for each ticket entry, and
 // epicMatchesQuery for each epic header (status) row,
 // mirroring the Tickets tab's recomputeSearchMatches (search.go).
 // Separator/context/error entries never match.
@@ -30,12 +30,12 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 	q := strings.ToLower(strings.TrimSpace(rawQuery))
 	if q == "" {
 		m.search.SetMatches(nil)
-		m.queueTree.Search().SetPassiveResults("", nil)
+		m.rows.queueTree.Search().SetPassiveResults("", nil)
 		return
 	}
 
 	matches := make([]search.Match, 0)
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		matched := false
 		switch e.Value.kind {
 		case nodeQueueTicket:
@@ -48,11 +48,11 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 		}
 	}
 	m.search.SetMatches(matches)
-	// renderQueueTicketRow dims via m.queueTree.SearchMatch, which reads the
+	// renderQueueTicketRow dims via m.rows.queueTree.SearchMatch, which reads the
 	// tree's own search state (including HasQuery, keyed off its own query
 	// string) — keep it in step with m.search or every row dims as a false
 	// non-match.
-	m.queueTree.Search().SetPassiveResults(rawQuery, matches)
+	m.rows.queueTree.Search().SetPassiveResults(rawQuery, matches)
 }
 
 // jumpToCurrentQueueMatch moves the selection to the search cursor's current
@@ -62,8 +62,8 @@ func (m *QueueModel) jumpToCurrentQueueMatch() {
 	if !ok {
 		return
 	}
-	if match.DataIndex >= 0 && match.DataIndex < len(m.queueTree.Entries()) {
-		m.queueTree.SetSelectedIndex(match.DataIndex)
+	if match.DataIndex >= 0 && match.DataIndex < len(m.rows.queueTree.Entries()) {
+		m.rows.queueTree.SetSelectedIndex(match.DataIndex)
 	}
 }
 

@@ -23,7 +23,7 @@ func (m QueueModel) WithServerState(st *viewmodel.State, link tabapi.ServerLink)
 	m.olderServer = st != nil && !m.serverDown() && st.OlderServer()
 	if m.serverDown() || m.olderServer {
 		// Whatever the queue showed is stale; it refills on reconnect.
-		m.epics, m.summaries, m.finished = nil, nil, nil
+		m.rows.epics, m.summaries, m.finished = nil, nil, nil
 		m.loaded = m.loaded || m.olderServer
 		m.clampSelected()
 		return m, nil
@@ -59,11 +59,11 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 	m.finished = st.RecentlyFinished
 	m.herdrDown, m.herdrText, m.serverBudget = st.HerdrUnavailable, st.HerdrText, st.Budget
 	m.paused = st.Mode == wire.QueueModePaused
-	m.checked = make(map[string]bool, len(st.Queue))
-	m.checkOrder = make(map[string]uint64, len(st.Queue))
+	m.rows.checked = make(map[string]bool, len(st.Queue))
+	m.rows.checkOrder = make(map[string]uint64, len(st.Queue))
 	for i, addr := range st.Queue {
-		m.checked[addr] = true
-		m.checkOrder[addr] = uint64(i + 1)
+		m.rows.checked[addr] = true
+		m.rows.checkOrder[addr] = uint64(i + 1)
 	}
 	m.applyEpics(tabapi.EpicsFromViewModel(*st, viewmodel.Scope{}), true)
 	cmd := m.syncServerRunState()
@@ -82,18 +82,18 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 // the epic's own address.
 func (m *QueueModel) applyEpics(epics []gxtickets.Epic, wholeEpic bool) {
 	m.loaded = true
-	m.epics = epics
-	m.candidates = make(map[string]bool, len(m.checked))
-	for path := range m.checked {
-		m.candidates[path] = true
+	m.rows.epics = epics
+	m.rows.candidates = make(map[string]bool, len(m.rows.checked))
+	for path := range m.rows.checked {
+		m.rows.candidates[path] = true
 	}
 	for _, epic := range epics {
-		queued := m.checked[epic.Name] || slices.ContainsFunc(epic.Tickets, func(t gxtickets.Ticket) bool { return m.checked[t.Path] })
+		queued := m.rows.checked[epic.Name] || slices.ContainsFunc(epic.Tickets, func(t gxtickets.Ticket) bool { return m.rows.checked[t.Path] })
 		if !wholeEpic || !queued {
 			continue
 		}
 		for _, t := range epic.Tickets {
-			m.candidates[t.Path] = true
+			m.rows.candidates[t.Path] = true
 		}
 	}
 	if m.search.HasQuery() {
@@ -120,7 +120,7 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 	}
 	live := map[string]map[string]rowfmt.LiveTicketState{}
 	running := map[string]bool{}
-	for _, epic := range m.epics {
+	for _, epic := range m.rows.epics {
 		sum := m.summaries[epic.Name]
 		if sum.State != wire.EpicStateRunning {
 			continue

@@ -53,22 +53,22 @@ func (m QueueModel) queueHoverTarget(msg tea.MouseMotionMsg) (int, bool) {
 	if m.ModalOpen() || !rect.Contains(mouse.X, mouse.Y) {
 		return -1, false
 	}
-	return m.queueTree.EntryAtBodyLine(mouse.Y - rect.Y - 1 - queueHeaderReservedLines)
+	return m.rows.queueTree.EntryAtBodyLine(mouse.Y - rect.Y - 1 - queueHeaderReservedLines)
 }
 
 func (m QueueModel) HoverChanges(msg tea.MouseMotionMsg) bool {
-	return m.queueTree.SetHoveredIndex(m.queueHoverTarget(msg))
+	return m.rows.queueTree.SetHoveredIndex(m.queueHoverTarget(msg))
 }
 
 func (m QueueModel) handleQueueMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
-	m.queueTree.SetHoveredIndex(m.queueHoverTarget(msg))
+	m.rows.queueTree.SetHoveredIndex(m.queueHoverTarget(msg))
 	return m, nil
 }
 
 func (m *QueueModel) refreshQueueHover(msg tea.Msg) {
 	if wheel, ok := msg.(tea.MouseWheelMsg); ok {
-		m.queueTree.SetHoveredIndex(m.queueHoverTarget(tea.MouseMotionMsg(wheel)))
+		m.rows.queueTree.SetHoveredIndex(m.queueHoverTarget(tea.MouseMotionMsg(wheel)))
 	} else if m.ModalOpen() {
-		m.queueTree.SetHoveredIndex(0, false)
+		m.rows.queueTree.SetHoveredIndex(0, false)
 	}
 }

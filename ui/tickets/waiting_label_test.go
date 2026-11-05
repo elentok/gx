@@ -17,10 +17,10 @@ func TestQueueRow_WaitingLabel(t *testing.T) {
 	var m QueueModel
 	m.waitingLabels = map[string]string{"gx:epic/01": label}
 
-	if got := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0); !strings.Contains(got, label) {
+	if got := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[0]}, 0); !strings.Contains(got, label) {
 		t.Errorf("waiting row = %q, want label %q", got, label)
 	}
-	if got := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[1]}, 1); strings.Contains(got, "waiting for") {
+	if got := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[1]}, 1); strings.Contains(got, "waiting for") {
 		t.Errorf("non-waiting row = %q, want no label", got)
 	}
 }

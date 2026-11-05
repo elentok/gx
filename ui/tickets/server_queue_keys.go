@@ -90,7 +90,7 @@ func (m QueueModel) handleServerDeleteKey() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	if !m.checked[row.ticket.Path] {
+	if !m.rows.checked[row.ticket.Path] {
 		return m, notify.Info(row.ticket.DisplayNumber() + " is not a queue item")
 	}
 	prompt := fmt.Sprintf("Delete %s %s and every queued ticket it blocks?", row.ticket.DisplayNumber(), row.ticket.Title)

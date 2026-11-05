@@ -14,9 +14,9 @@ var muted = tickettest.Muted
 
 func queueWithTicket(t *testing.T, m QueueModel, reason schema.PauseReason, mutes []schema.MuteRecord) QueueModel {
 	t.Helper()
-	m.epics[0].Tickets[0].Status = string(schema.StatusPaused)
-	m.epics[0].Tickets[0].PauseReason = reason
-	m.epics[0].Tickets[0].Mutes = mutes
+	m.rows.epics[0].Tickets[0].Status = string(schema.StatusPaused)
+	m.rows.epics[0].Tickets[0].PauseReason = reason
+	m.rows.epics[0].Tickets[0].Mutes = mutes
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
 	return m

@@ -83,38 +83,107 @@ type queueEntriesCache struct {
 	entries      []tree.Entry[queueNode]
 }
 
+// queueRows is the Queue tab's tree builder and row renderer, with the state
+// they own. It takes everything else through queueRowsEnv and never reads
+// QueueModel.
+type queueRows struct {
+	// queueTree owns the selection/scroll/collapse state.
+	queueTree tree.Model[queueNode]
+	// entriesCache memoizes buildQueueEntries' output across renders. It's a
+	// pointer so the cache survives QueueModel being copied by value on every
+	// Update. buildQueueEntries only depends on epics/checked/hideComplete/
+	// collapsed-IDs (see queueEntriesCache); everything else live (running-epic
+	// elapsed time, spinner frame, paused/stalled state) is read by
+	// queueRenderOpts' Label callback at draw time, not baked into the cached
+	// entries, so reusing a cached tree when those inputs didn't change is safe
+	// even mid-run.
+	entriesCache *queueEntriesCache
+	epics        []tickets.Epic
+	checked      map[string]bool
+	checkOrder   map[string]uint64
+	candidates   map[string]bool
+	// hideComplete backs the "tc" chord: when true, buildQueueEntries omits done
+	// tickets from the rendered rows, independent of the clear keymaps (which
+	// mutate the queue store) and of epicWaves' plan validation, which must
+	// keep considering hidden-but-still-queued tickets.
+	hideComplete bool
+	// projectFilter narrows the server-mode rows to one project; "" shows all.
+	projectFilter string
+}
+
+func newQueueRows(queueTree tree.Model[queueNode]) queueRows {
+	return queueRows{
+		queueTree:    queueTree,
+		entriesCache: &queueEntriesCache{},
+		checked:      map[string]bool{},
+		checkOrder:   map[string]uint64{},
+	}
+}
+
+// queueRowsEnv is what queueRows reads from the rest of the tab.
+type queueRowsEnv struct {
+	header        queueHeader
+	maxParallel   int
+	labelWidth    int
+	harnessLabels map[string]string
+	waitingLabels map[string]string
+	codexRows     map[string]bool
+	hasQuery      bool
+	sidebarActive bool
+	suggested     func(epic tickets.Epic, t tickets.Ticket) bool
+}
+
 // buildQueueEntriesCached returns buildQueueEntries' result, reusing the
 // previous build when none of its inputs changed since the last render.
 // View() (queue_view.go) must call this on every single render, and the
 // spinner re-renders it constantly — so without this cache a running Queue tab
 // redoes the full tree rebuild (icons, labels, per-ticket wave/order
 // computation) every frame.
-func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
-	if m.entriesCache == nil {
-		return m.buildQueueEntries()
+func (r queueRows) buildQueueEntriesCached(env queueRowsEnv) []tree.Entry[queueNode] {
+	if r.entriesCache == nil {
+		return r.buildQueueEntries(env)
 	}
-	collapsed := m.queueTree.CollapsedIDs()
-	c := m.entriesCache
+	collapsed := r.queueTree.CollapsedIDs()
+	c := r.entriesCache
 	if c.entries != nil &&
-		c.hideComplete == m.hideComplete &&
-		c.project == m.projectFilter &&
-		c.labelWidth == m.queueLabelWidth() &&
-		reflect.DeepEqual(c.epics, m.epics) &&
-		reflect.DeepEqual(c.summaries, m.summaries) &&
-		reflect.DeepEqual(c.checked, m.checked) &&
+		c.hideComplete == r.hideComplete &&
+		c.project == r.projectFilter &&
+		c.labelWidth == env.labelWidth &&
+		reflect.DeepEqual(c.epics, r.epics) &&
+		reflect.DeepEqual(c.summaries, env.header.summaries) &&
+		reflect.DeepEqual(c.checked, r.checked) &&
 		reflect.DeepEqual(c.collapsed, collapsed) {
 		return c.entries
 	}
-	entries := m.buildQueueEntries()
-	c.epics = m.epics
-	c.summaries = m.summaries
-	c.checked = m.checked
-	c.hideComplete = m.hideComplete
-	c.project = m.projectFilter
-	c.labelWidth = m.queueLabelWidth()
+	entries := r.buildQueueEntries(env)
+	c.epics = r.epics
+	c.summaries = env.header.summaries
+	c.checked = r.checked
+	c.hideComplete = r.hideComplete
+	c.project = r.projectFilter
+	c.labelWidth = env.labelWidth
 	c.collapsed = collapsed
 	c.entries = entries
 	return entries
+}
+
+// selectFirstRow/selectLastRow implement "gg"/"G": jump the queue selection
+// to the first/last row.
+func (r *queueRows) selectFirstRow() {
+	if len(r.queueTree.Entries()) == 0 {
+		return
+	}
+	r.queueTree.SetSelectedIndex(0)
+	r.queueTree.SkipUnselectable(1)
+}
+
+func (r *queueRows) selectLastRow() {
+	n := len(r.queueTree.Entries())
+	if n == 0 {
+		return
+	}
+	r.queueTree.SetSelectedIndex(n - 1)
+	r.queueTree.SkipUnselectable(-1)
 }
 
 // buildQueueEntries flattens m.epics into the Queue tab's full tree.Entry
@@ -127,12 +196,12 @@ func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
 // queueNode tree entries. Called on every
 // queueEpicsLoadedMsg/hideComplete toggle/collapse mutation via
 // clampSelected.
-func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
-	candidates := m.candidates
+func (r queueRows) buildQueueEntries(env queueRowsEnv) []tree.Entry[queueNode] {
+	candidates := r.candidates
 	if candidates == nil {
-		candidates = make(map[string]bool, len(m.checked))
+		candidates = make(map[string]bool, len(r.checked))
 	}
-	for path := range m.checked {
+	for path := range r.checked {
 		candidates[path] = true
 	}
 
@@ -146,13 +215,13 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 	}
 	var shown []shownEpic
 	var shownEpics []tickets.Epic
-	for _, epic := range m.epics {
-		if m.projectFilter != "" && projectOf(epic.Name) != m.projectFilter {
+	for _, epic := range r.epics {
+		if r.projectFilter != "" && projectOf(epic.Name) != r.projectFilter {
 			continue
 		}
-		waves, planErr := epicWaves(epic, candidates, m.settings.MaxConcurrentTicketsPerEpic())
+		waves, planErr := epicWaves(epic, candidates, env.maxParallel)
 		ordered := epicRowOrder(epic, waves, candidates)
-		if m.hideComplete {
+		if r.hideComplete {
 			ordered = filterDoneTickets(epic, ordered)
 		}
 		if len(ordered) == 0 {
@@ -163,14 +232,14 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 	}
 	// Decided here, not at draw time, because the bar line is a real entry
 	// whose presence changes the tree's height; the cache keys on the width.
-	layout := m.epicHeaderLayoutFor(shownEpics, m.queueLabelWidth())
+	layout := env.header.epicHeaderLayoutFor(shownEpics, env.labelWidth)
 
 	for _, s := range shown {
 		epic, ordered, planErr := s.epic, s.ordered, s.planErr
 
 		roots = append(roots, queueNode{kind: nodeEpicSeparator, epic: epic})
 		roots = append(roots, queueNode{kind: nodeEpicName, epic: epic, layout: layout})
-		if layout != epicLayoutWide && m.summaries[epic.Name].Total > 0 {
+		if layout != epicLayoutWide && env.header.summaries[epic.Name].Total > 0 {
 			roots = append(roots, queueNode{kind: nodeEpicBar, epic: epic, layout: layout})
 		}
 		roots = append(roots, queueNode{kind: nodeEpicStatusLine, epic: epic})
@@ -208,7 +277,7 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 	// renderQueueTicketRow reads its fold triangle from (mirroring the
 	// sidebar's rowFromEntry, model_data.go, one level down). Populate it here,
 	// now that childrenOf is complete for every epic.
-	collapsed := m.queueTree.CollapsedIDs()
+	collapsed := r.queueTree.CollapsedIDs()
 	setFoldState := func(n *queueNode) {
 		if n.kind != nodeQueueTicket {
 			return
@@ -250,12 +319,12 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 		return childrenOf[n.ticket.ticket.Path]
 	}
 
-	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.queueTree.CollapsedIDs())
+	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, collapsed)
 	for i := range entries {
 		if entries[i].Value.kind != nodeQueueTicket {
 			continue
 		}
-		if line, ok := m.queueTicketReasonLine(entries[i].Value.ticket); ok {
+		if line, ok := r.queueTicketReasonLine(env, entries[i].Value.ticket); ok {
 			entries[i].Body = []string{line}
 		}
 	}

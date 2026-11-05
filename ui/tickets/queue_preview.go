@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/ui/tickets/preview"
 )
 
-// selectedQueueRow returns the queue row under m.queueTree's current
+// selectedQueueRow returns the queue row under m.rows.queueTree's current
 // selection, mirroring Model.selectedRow for the Tickets tab's sidebar.
 // false means nothing is selected — the queue is empty (nothing checked
 // yet, or every checked ticket already cleared), or the selected entry is a
@@ -19,8 +19,8 @@ import (
 // old rows()-only selection (05's "Real gap" section): those rows are left
 // selectable but read as "nothing selected" to the preview.
 func (m QueueModel) selectedQueueRow() (queueRow, bool) {
-	entries := m.queueTree.Entries()
-	idx := m.queueTree.SelectedIndex()
+	entries := m.rows.queueTree.Entries()
+	idx := m.rows.queueTree.SelectedIndex()
 	if idx < 0 || idx >= len(entries) {
 		return queueRow{}, false
 	}

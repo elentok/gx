@@ -42,7 +42,7 @@ func TestQueueHeaderPausedLineFollowsRunningCount(t *testing.T) {
 	}
 	for _, tc := range cases {
 		m.summaries = map[string]wire.EpicSummary{"p:e": {Active: tc.active}}
-		lines := m.queueHeaderBodyLines()
+		lines := m.header().queueHeaderBodyLines()
 		if got := ansi.Strip(lines[0]); got != tc.want {
 			t.Errorf("header = %q, want %q", got, tc.want)
 		}
@@ -52,7 +52,7 @@ func TestQueueHeaderPausedLineFollowsRunningCount(t *testing.T) {
 func TestQueueHeaderHasNoPausedLineWhenRunning(t *testing.T) {
 	t.Parallel()
 	m := NewQueueModel("", ui.Settings{}, keys.Manager{})
-	if got := ansi.Strip(m.queueHeaderBodyLines()[0]); strings.HasPrefix(got, "Paused.") {
+	if got := ansi.Strip(m.header().queueHeaderBodyLines()[0]); strings.HasPrefix(got, "Paused.") {
 		t.Errorf("header = %q, want no paused line while the queue runs", got)
 	}
 }
@@ -200,13 +200,13 @@ func TestQueueHeaderCostSuffixFormats(t *testing.T) {
 	root := t.TempDir()
 	budgetOff := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), map[string]bool{}))
 	budgetOff.serverBudget.Total = 42.3
-	if got, want := budgetOff.queueHeaderCostSuffix(), "today $42.30"; got != want {
+	if got, want := budgetOff.header().queueHeaderCostSuffix(), "today $42.30"; got != want {
 		t.Fatalf("budget disabled: queueHeaderCostSuffix() = %q, want bare %q", got, want)
 	}
 
 	withBudget := budgetOff
 	withBudget.serverBudget = wire.BudgetStatus{Total: 50, SoftLimit: 100}
-	if got, want := withBudget.queueHeaderCostSuffix(), "today $50.00 of $100.00"; got != want {
+	if got, want := withBudget.header().queueHeaderCostSuffix(), "today $50.00 of $100.00"; got != want {
 		t.Fatalf("soft limit set: queueHeaderCostSuffix() = %q, want %q", got, want)
 	}
 }
@@ -382,7 +382,7 @@ func TestQueueEpicHeaderHasSpacerAfterStatusLine(t *testing.T) {
 
 func statusRowAt(now time.Time, m QueueModel, epic tickets.Epic) string {
 	m.now = func() time.Time { return now }
-	return ansi.Strip(m.epicStatusRow(epic, 0))
+	return ansi.Strip(m.header().epicStatusRow(epic, 0))
 }
 
 func TestEpicStatusRowElapsedAndAgentParts(t *testing.T) {
@@ -463,7 +463,7 @@ func TestEpicStatusRowCutAtPaneEdge(t *testing.T) {
 	m.now = func() time.Time { return started.Add(time.Hour) }
 	epic := tickets.Epic{StartedAt: started, Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}}
 
-	if got := ansi.Strip(m.epicStatusRow(epic, 20)); lipgloss.Width(got) > 20 {
+	if got := ansi.Strip(m.header().epicStatusRow(epic, 20)); lipgloss.Width(got) > 20 {
 		t.Errorf("width %d > 20: %q", lipgloss.Width(got), got)
 	}
 }

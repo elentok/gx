@@ -52,11 +52,11 @@ func (m QueueModel) openHarnessPicker(st wire.DefaultHarnessStatus) QueueModel {
 		{Label: "Codex", Value: "codex"},
 	}
 	current := st.Default
-	if m.projectFilter != "" {
+	if m.rows.projectFilter != "" {
 		items = append([]components.MenuItem{{Label: "Follow global", Value: ""}}, items...)
 		current = ""
 		for _, p := range st.Projects {
-			if p.Project == m.projectFilter {
+			if p.Project == m.rows.projectFilter {
 				current = p.Harness
 			}
 		}
@@ -69,7 +69,7 @@ func (m QueueModel) openHarnessPicker(st wire.DefaultHarnessStatus) QueueModel {
 	}
 	m.harnessPicker = harnessPicker{
 		open:    true,
-		project: m.projectFilter,
+		project: m.rows.projectFilter,
 		menu:    components.MenuState{Items: items, Cursor: cursor},
 	}
 	return m

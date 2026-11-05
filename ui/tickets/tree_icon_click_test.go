@@ -63,7 +63,7 @@ func TestQueueModel_ClickOnTicketIconTogglesIt(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	parentIdx := -1
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket && e.HasChildren {
 			parentIdx = i
 			break
@@ -72,29 +72,29 @@ func TestQueueModel_ClickOnTicketIconTogglesIt(t *testing.T) {
 	if parentIdx < 0 {
 		t.Fatal("no parent ticket entry")
 	}
-	parent := m.queueTree.Entries()[parentIdx]
+	parent := m.rows.queueTree.Entries()[parentIdx]
 	iconX := rowfmt.PanelPaddingX + tree.LabelColumn(parent) + 1
-	y := 1 + len(m.queueHeaderBodyLines()) + parentIdx
-	before := len(m.queueTree.Entries())
+	y := 1 + len(m.header().queueHeaderBodyLines()) + parentIdx
+	before := len(m.rows.queueTree.Entries())
 
 	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: iconX + 10, Y: y})
 	m = updated.(QueueModel)
-	if got := len(m.queueTree.Entries()); got != before {
+	if got := len(m.rows.queueTree.Entries()); got != before {
 		t.Fatalf("click off the icon changed entries: %d -> %d", before, got)
 	}
 
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: iconX, Y: y})
 	m = updated.(QueueModel)
-	if got := len(m.queueTree.Entries()); got != before-1 {
+	if got := len(m.rows.queueTree.Entries()); got != before-1 {
 		t.Fatalf("click on icon should collapse the ticket, entries %d -> %d", before, got)
 	}
-	if m.queueTree.SelectedIndex() != parentIdx {
-		t.Fatalf("click should select the parent row %d, got %d", parentIdx, m.queueTree.SelectedIndex())
+	if m.rows.queueTree.SelectedIndex() != parentIdx {
+		t.Fatalf("click should select the parent row %d, got %d", parentIdx, m.rows.queueTree.SelectedIndex())
 	}
 
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: iconX, Y: y})
 	m = updated.(QueueModel)
-	if got := len(m.queueTree.Entries()); got != before {
+	if got := len(m.rows.queueTree.Entries()); got != before {
 		t.Fatalf("second click should re-expand, entries %d, want %d", got, before)
 	}
 }

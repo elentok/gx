@@ -25,8 +25,8 @@ func newServerQueueModel(t *testing.T, start func(context.Context) error) QueueM
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
-	m.epics = []tickets.Epic{{Name: "gx:alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: "gx:alpha/01", Status: "open"}}}}
-	m.checked = map[string]bool{"gx:alpha/01": true}
+	m.rows.epics = []tickets.Epic{{Name: "gx:alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: "gx:alpha/01", Status: "open"}}}}
+	m.rows.checked = map[string]bool{"gx:alpha/01": true}
 	m.clampSelected()
 	return m
 }
@@ -38,8 +38,8 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("the tab must not run a reconnect loop of its own")
 	}
-	if len(m.epics) != 0 {
-		t.Fatalf("rows not cleared: %+v", m.epics)
+	if len(m.rows.epics) != 0 {
+		t.Fatalf("rows not cleared: %+v", m.rows.epics)
 	}
 	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "server not running — s to start") || strings.Contains(view, "First") {
@@ -69,8 +69,8 @@ func TestQueueServerDown_StateDeliveredDownShowsOnceUp(t *testing.T) {
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/09"}})
 	next, _ := m.WithServerState(&st, tabapi.ServerLinkDown)
 	m = next.(QueueModel)
-	if len(m.epics) != 0 {
-		t.Fatalf("rows shown while down: %+v", m.epics)
+	if len(m.rows.epics) != 0 {
+		t.Fatalf("rows shown while down: %+v", m.rows.epics)
 	}
 
 	next, _ = m.WithServerState(&st, tabapi.ServerLinkUp)
@@ -116,14 +116,14 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 	}}, []wire.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}})
 
-	if want := map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}; !reflect.DeepEqual(m.checked, want) {
-		t.Errorf("checked = %v, want the server queue %v", m.checked, want)
+	if want := map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}; !reflect.DeepEqual(m.rows.checked, want) {
+		t.Errorf("checked = %v, want the server queue %v", m.rows.checked, want)
 	}
-	if m.checkOrder["gx:alpha/02"] >= m.checkOrder["gx:alpha/01"] {
-		t.Errorf("checkOrder = %v, want the server's order (02 before 01)", m.checkOrder)
+	if m.rows.checkOrder["gx:alpha/02"] >= m.rows.checkOrder["gx:alpha/01"] {
+		t.Errorf("checkOrder = %v, want the server's order (02 before 01)", m.rows.checkOrder)
 	}
-	if len(m.epics) != 1 || m.epics[0].Name != "gx:alpha" || len(m.epics[0].Tickets) != 2 {
-		t.Errorf("epics = %+v, want gx:alpha with both server tickets", m.epics)
+	if len(m.rows.epics) != 1 || m.rows.epics[0].Name != "gx:alpha" || len(m.rows.epics[0].Tickets) != 2 {
+		t.Errorf("epics = %+v, want gx:alpha with both server tickets", m.rows.epics)
 	}
 }
 
@@ -148,12 +148,12 @@ func TestQueueServerMode_ProjectInEpicHeaderAndFiltersByProject(t *testing.T) {
 		}
 	}
 
-	m.projectFilter = nextProject(m.epics, "")
+	m.rows.projectFilter = nextProject(m.rows.epics, "")
 	view = ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "01 Second") || strings.Contains(view, "01 First") {
-		t.Errorf("filter %q should show only blog:\n%s", m.projectFilter, view)
+		t.Errorf("filter %q should show only blog:\n%s", m.rows.projectFilter, view)
 	}
-	if got := nextProject(m.epics, "gx"); got != "" {
+	if got := nextProject(m.rows.epics, "gx"); got != "" {
 		t.Errorf("after the last project the filter should return to all, got %q", got)
 	}
 }
@@ -172,7 +172,7 @@ func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
 	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	m = next.(QueueModel)
 
-	entry := m.queueTree.Entries()[m.queueTree.SelectedIndex()].Value
+	entry := m.rows.queueTree.Entries()[m.rows.queueTree.SelectedIndex()].Value
 	if entry.kind != nodeEpicName || entry.epic.Path != "gx:beta" {
 		t.Fatalf("selected = %+v, want the gx:beta header", entry)
 	}

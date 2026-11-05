@@ -81,7 +81,7 @@ func TestQueueModel_PausedTicketWithChildren_ReasonRendersDirectlyUnderItself(t 
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
-	entries := m.queueTree.Entries()
+	entries := m.rows.queueTree.Entries()
 	var parent tree.Entry[queueNode]
 	parentIdx := -1
 	for i, e := range entries {

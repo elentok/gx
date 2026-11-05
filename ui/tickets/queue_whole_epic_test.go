@@ -9,7 +9,7 @@ import (
 
 func queueRowPaths(m QueueModel) []string {
 	var paths []string
-	for _, e := range m.buildQueueEntries() {
+	for _, e := range m.rows.buildQueueEntries(m.rowsEnv()) {
 		if e.Value.kind == nodeQueueTicket {
 			paths = append(paths, e.Value.ticket.ticket.Path)
 		}
@@ -46,7 +46,7 @@ func TestQueueWholeEpic_EpicWithNoQueuedItemRendersNothing(t *testing.T) {
 
 func TestQueueWholeEpic_HideCompleteHidesDoneExtraTicket(t *testing.T) {
 	m, _ := deliverQueue(t, wholeEpicSnapshot("done"), []wire.QueueItem{{Address: "gx:alpha/01"}})
-	m.hideComplete = true
+	m.rows.hideComplete = true
 
 	got := queueRowPaths(m)
 	if !slices.Equal(got, []string{"gx:alpha/01"}) {
@@ -56,9 +56,9 @@ func TestQueueWholeEpic_HideCompleteHidesDoneExtraTicket(t *testing.T) {
 
 func TestQueueWholeEpic_DeleteIsNotOfferedOnNonItemRow(t *testing.T) {
 	m, _ := deliverQueue(t, wholeEpicSnapshot("open"), []wire.QueueItem{{Address: "gx:alpha/01"}})
-	for i, e := range m.queueTree.Entries() {
+	for i, e := range m.rows.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket && e.Value.ticket.ticket.Path == "gx:alpha/02" {
-			m.queueTree.SetSelectedIndex(i)
+			m.rows.queueTree.SetSelectedIndex(i)
 		}
 	}
 

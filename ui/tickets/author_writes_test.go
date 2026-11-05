@@ -111,7 +111,7 @@ func TestQueueModel_EditTargetIsTheAddressFile(t *testing.T) {
 	file := tickettest.WriteStoreTicket(t, store, "01-first.md", "---\nid: \"01\"\nstatus: open\n---\n\nBody.\n")
 	m := newMaintenanceQueue(t, tickettest.FakeServerAPI{})
 	m.settings.TicketStore = store
-	m.epics[0].Tickets[0].File = filepath.Join(t.TempDir(), "stale.md")
+	m.rows.epics[0].Tickets[0].File = filepath.Join(t.TempDir(), "stale.md")
 
 	if got, ok := m.selectedEditTarget(); !ok || got != file {
 		t.Errorf("edit target = %q, %v, want %q", got, ok, file)
