@@ -216,7 +216,15 @@ const (
 	// ReasonImageNotFound is the delete of an image that is not in the
 	// session's folder (never saved, or already deleted).
 	ReasonImageNotFound = "image-not-found"
+	// ReasonImageSent is the delete, or a second send, of an image a prompt
+	// already pasted.
+	ReasonImageSent = "image-sent"
+	// ReasonImageTooMany is a prompt naming more than MaxPromptImages images.
+	ReasonImageTooMany = "too-many-images"
 )
+
+// MaxPromptImages caps the images one prompt may carry.
+const MaxPromptImages = 10
 
 // SessionImageRequest is the body of POST /v1/sessions/images/delete: Image is
 // the id an upload returned.
@@ -247,6 +255,9 @@ type SessionPromptRequest struct {
 	// Promote replaces Text with the gx-promote-to-design skill command. It is
 	// for a plain session only, and excludes Continue.
 	Promote bool `json:"promote,omitempty"`
+	// Images are the ids of saved Prompt images, in attach order. gx pastes
+	// each before Text. The 32 KB cap counts Text only.
+	Images []string `json:"images,omitempty"`
 }
 
 // SessionRoundOption is one choice of an options card.

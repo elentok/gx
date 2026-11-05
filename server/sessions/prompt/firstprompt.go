@@ -364,6 +364,9 @@ type holderPrompter struct {
 	io      harness.TypingIO
 	cancel  <-chan struct{}
 	onTyped func()
+	// images are pasted before the text on every Submit, so a retype after a
+	// clear attaches them again.
+	images imageSet
 }
 
 func (p *holderPrompter) cancelled() error {
@@ -379,6 +382,10 @@ func (p *holderPrompter) Submit(text string) error {
 	if err := p.cancelled(); err != nil {
 		return err
 	}
+	if err := p.images.paste(p.c); err != nil {
+		return err
+	}
+	text = p.images.withText(text)
 	if err := p.c.TypeTextBy(text, p.typing.PastesText(text)); err != nil {
 		return err
 	}

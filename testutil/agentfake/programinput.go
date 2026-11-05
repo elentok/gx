@@ -95,6 +95,7 @@ type InputBox struct {
 	Marker    string
 	Lines     []string
 	swallow   int
+	pasting   bool
 	vim       bool
 	normal    bool
 	submitted string
@@ -113,6 +114,34 @@ func NewInputBox(out io.Writer, draft string) *InputBox {
 
 func (b *InputBox) Text() string { return strings.Join(b.Lines, "\n") }
 
+// pasteMarker is the bracketed-paste marker a CSI sequence with these params
+// and final byte is, if it is one.
+func pasteMarker(params string, final byte) (string, bool) {
+	switch {
+	case final != '~':
+		return "", false
+	case params == "200":
+		return pasteStart, true
+	case params == "201":
+		return pasteEnd, true
+	}
+	return "", false
+}
+
+// Mark keeps a bracketed-paste marker in the input, so the submitted log shows
+// where each paste began and ended. Draw leaves markers off the screen.
+func (b *InputBox) Mark(marker string) {
+	b.Lines[len(b.Lines)-1] += marker
+	// A long paste would redraw the whole input once per byte; it draws once
+	// the paste ends.
+	b.pasting = marker == pasteStart
+	if !b.pasting {
+		b.Draw()
+	}
+}
+
+var pasteMarkers = strings.NewReplacer(pasteStart, "", pasteEnd, "")
+
 func (b *InputBox) Draw() {
 	var sb strings.Builder
 	sb.WriteString("\x1b[2J\x1b[H")
@@ -125,6 +154,7 @@ func (b *InputBox) Draw() {
 		sb.WriteString(b.Marker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m")
 	} else {
 		for i, line := range b.Lines {
+			line = pasteMarkers.Replace(line)
 			if i == 0 {
 				sb.WriteString(b.Marker + line)
 			} else {
@@ -177,7 +207,9 @@ func (b *InputBox) Key(k byte) (submitted string, ok bool) {
 	default:
 		return "", false
 	}
-	b.Draw()
+	if !b.pasting {
+		b.Draw()
+	}
 	return submitted, ok
 }
 

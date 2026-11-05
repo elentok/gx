@@ -265,6 +265,8 @@ type program struct {
 	// esc, osc and csi track an escape sequence on input, so the terminal's
 	// reply to the probe is not echoed as typed text.
 	esc, osc, csi bool
+	// csiParams are the bytes of the CSI sequence read so far.
+	csiParams []byte
 	// box is nil unless ProgramInputEnv is set. It takes keys once ready.
 	box        *InputBox
 	ready      bool
@@ -346,6 +348,9 @@ func (p *program) start() {
 
 func (p *program) becomeReady() {
 	p.ready = true
+	// A real claude asks for bracketed paste; gx's holder pastes bracketed only
+	// when the child has.
+	fmt.Fprint(p.out, bracketedPasteOn)
 	p.box.Draw()
 }
 
@@ -359,8 +364,15 @@ func (p *program) key(b byte) error {
 	case p.csi:
 		if b >= 0x40 && b <= 0x7e {
 			p.csi = false
+			params := string(p.csiParams)
+			p.csiParams = nil
+			if marker, ok := pasteMarker(params, b); ok && p.box != nil && p.ready {
+				p.box.Mark(marker)
+				return nil
+			}
 			return p.logNamedKey(fmt.Sprintf("<csi %c>", b))
 		}
+		p.csiParams = append(p.csiParams, b)
 		return nil
 	case p.esc:
 		p.esc, p.escC = false, nil

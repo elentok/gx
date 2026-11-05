@@ -12,8 +12,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -123,6 +125,55 @@ func findImage(sessionDir, id string) (string, bool) {
 	return "", false
 }
 
+// sentMarker is the empty file that marks an image as pasted into the session.
+// A marker beside the image keeps the image's path, which the chat shows, and
+// is not matched by imageFileName.
+func sentMarker(sessionDir, id string) string {
+	return filepath.Join(sessionDir, imagesDir, ".sent-"+id)
+}
+
+func imageSent(sessionDir, id string) bool {
+	_, err := os.Stat(sentMarker(sessionDir, id))
+	return err == nil
+}
+
+// resolveImages is the absolute paths of the saved, unsent images ids name, in
+// order, or the refusal that stops the prompt.
+func (p *Prompt) resolveImages(sessionDir string, ids []string) ([]string, *wire.SessionResult) {
+	if len(ids) > wire.MaxPromptImages {
+		r := sessions.Refusal(wire.ReasonImageTooMany, fmt.Sprintf("at most %d images per prompt", wire.MaxPromptImages))
+		return nil, &r
+	}
+	p.imageMu.Lock()
+	defer p.imageMu.Unlock()
+	paths := make([]string, 0, len(ids))
+	for _, id := range ids {
+		path, ok := findImage(sessionDir, id)
+		if !ok {
+			r := sessions.Refusal(wire.ReasonImageNotFound, fmt.Sprintf("no image %s in this session", id))
+			return nil, &r
+		}
+		if imageSent(sessionDir, id) || slices.Contains(ids[:len(paths)], id) {
+			r := sessions.Refusal(wire.ReasonImageSent, fmt.Sprintf("image %s was already sent", id))
+			return nil, &r
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
+}
+
+// markImagesSent records that ids were pasted.
+func (p *Prompt) markImagesSent(sessionDir string, ids []string) error {
+	p.imageMu.Lock()
+	defer p.imageMu.Unlock()
+	for _, id := range ids {
+		if err := os.WriteFile(sentMarker(sessionDir, id), nil, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // imageServeHandler serves GET /v1/sessions/images?session=<id>&id=<image>.
 // Any miss, in the session or the image, is a 404.
 func (p *Prompt) imageServeHandler(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +226,9 @@ func (p *Prompt) deleteSessionImage(req wire.SessionImageRequest) (wire.SessionI
 	path, ok := findImage(dir, req.Image)
 	if !ok {
 		return imageRefusal(wire.ReasonImageNotFound, fmt.Sprintf("no image %s in session %s", req.Image, req.ID)), nil
+	}
+	if imageSent(dir, req.Image) {
+		return imageRefusal(wire.ReasonImageSent, fmt.Sprintf("image %s was already sent", req.Image)), nil
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return wire.SessionImageResult{}, err

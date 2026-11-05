@@ -169,6 +169,12 @@ func (r *actionRun) ClearPersonTyped()            { r.personTyped = false }
 
 // TypeStep types one prompt and presses its Enter, without waiting.
 func (r *actionRun) TypeStep(i int, prompt string) error {
+	return r.typeStepWith(i, prompt, imageSet{})
+}
+
+// typeStepWith is TypeStep that pastes imgs after the draft check and before
+// the prompt.
+func (r *actionRun) typeStepWith(i int, prompt string, imgs imageSet) error {
 	if !r.p.projects.Typing().ReadyToType(r.p.projects.TypingIO(r.dir, r.holder, "action-step")) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}
@@ -178,7 +184,10 @@ func (r *actionRun) TypeStep(i int, prompt string) error {
 	r.convChanged = false
 	before, _ := InputState(r.holder)
 	r.p.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", PromptHead(prompt), "input_before", before)
-	if err := sessions.TypeSessionPrompt(r.dir, prompt); err != nil {
+	if err := imgs.paste(r.holder); err != nil {
+		return err
+	}
+	if err := sessions.TypeSessionPrompt(r.dir, imgs.withText(prompt)); err != nil {
 		return err
 	}
 	if r.OnTyped != nil {

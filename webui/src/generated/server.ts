@@ -1972,9 +1972,22 @@ export const ReasonImageTooLarge = "image-too-large";
  */
 export const ReasonImageNotFound = "image-not-found";
 /**
+ * ReasonImageSent is the delete, or a second send, of an image a prompt
+ * already pasted.
+ */
+export const ReasonImageSent = "image-sent";
+/**
+ * ReasonImageTooMany is a prompt naming more than MaxPromptImages images.
+ */
+export const ReasonImageTooMany = "too-many-images";
+/**
  * Refusal reasons of POST /v1/sessions/images.
  */
-export type ReasonImage = typeof ReasonImageTypeNotAllowed | typeof ReasonImageTooLarge | typeof ReasonImageNotFound;
+export type ReasonImage = typeof ReasonImageTypeNotAllowed | typeof ReasonImageTooLarge | typeof ReasonImageNotFound | typeof ReasonImageSent | typeof ReasonImageTooMany;
+/**
+ * MaxPromptImages caps the images one prompt may carry.
+ */
+export const MaxPromptImages = 10;
 /**
  * SessionImageRequest is the body of POST /v1/sessions/images/delete: Image is
  * the id an upload returned.
@@ -2012,6 +2025,10 @@ export interface SessionPromptRequest {
    * for a plain session only, and excludes Continue.
    */
   promote?: boolean;
+   * Images are the ids of saved Prompt images, in attach order. gx pastes
+   * each before Text. The 32 KB cap counts Text only.
+   */
+  images?: string[];
 }
 /**
  * SessionRoundOption is one choice of an options card.

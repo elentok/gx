@@ -72,9 +72,21 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 		if refusal != nil {
 			return *refusal, nil
 		}
-		if text == "" {
+		if text == "" && len(req.Images) == 0 {
 			return sessions.Refusal(wire.ReasonEmptyPrompt, "text to type is required"), nil
 		}
+	}
+	var imgs imageSet
+	if !req.Continue {
+		paths, refusal := p.resolveImages(dir, req.Images)
+		if refusal != nil {
+			return *refusal, nil
+		}
+		imgs = imageSet{paths: paths, done: func() {
+			if err := p.markImagesSent(dir, req.Images); err != nil {
+				p.log.Warn("marking images sent", "session", req.ID, "err", err)
+			}
+		}}
 	}
 	if source == promptSourceWeb {
 		last, err := p.lastChatMessageID(req.ID, meta)
@@ -115,7 +127,7 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 			ev.Bytes += len(a)
 		}
 	} else {
-		p.sessions.Watches.Start(func() { p.sendPrompt(dir, text) })
+		p.sessions.Watches.Start(func() { p.sendPrompt(dir, text, imgs) })
 		if name, ok := renameCommandArg(text); ok && name != meta.Name {
 			// The harness renames itself, but a typed name never follows the
 			// terminal title, so the Agents tab would keep the old one.

@@ -2,6 +2,7 @@ package prompt_test
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,6 +38,22 @@ func TestSessionPrompt_CodexIsRefusedWhileWorkingAndTypedAtIdle(t *testing.T) {
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	if res := f.prompt(t, "again"); !res.Refused || res.Reason != wire.ReasonSessionNotIdle {
 		t.Fatalf("prompt while working = %+v, want %s", res, wire.ReasonSessionNotIdle)
+	}
+}
+
+func TestSessionPrompt_CodexPastesImagesBeforeTheText(t *testing.T) {
+	t.Parallel()
+	f := startCodexPromptSession(t)
+	ids, paths := f.upload(t, 2)
+	if res := f.promptImages(t, "see these", ids...); res.Refused {
+		t.Fatalf("prompt = %+v", res)
+	}
+	// The fake Codex does not turn on bracketed paste, so the pastes arrive
+	// unmarked; the order is what this case pins. Its turn starts late, so the
+	// nudge may submit the same prompt again.
+	want := strconv.Quote(strings.Join(paths, "")+" see these") + "\n"
+	if !servertest.Poll(10*time.Second, func() bool { return strings.HasPrefix(submitted(t, f.conv), want) }) {
+		t.Fatalf("submitted = %q, want it to start with %q", submitted(t, f.conv), want)
 	}
 }
 

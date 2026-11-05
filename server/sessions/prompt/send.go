@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 const sendFailedPrefix = "Send failed: "
@@ -20,13 +21,13 @@ const sendFailedPrefix = "Send failed: "
 // turn starts, as the first prompt does: claude can swallow the Enter after a
 // paste. A send that gives up raises a gx Actionable with the text, so the
 // person can send it again.
-func (p *Prompt) sendPrompt(dir, text string) {
+func (p *Prompt) sendPrompt(dir, text string, imgs imageSet) {
 	log := p.log.With("session", filepath.Base(dir))
 	send := p.nudgePrompt
 	if isSingleSendCommand(text) {
 		send = p.typeCommandOnce
 	}
-	err := send(dir, text)
+	err := send(dir, text, imgs)
 	switch {
 	case err == nil:
 		p.clearSendFailed(dir)
@@ -64,7 +65,7 @@ func isSingleSendCommand(text string) bool {
 // typeCommandOnce types a "/" command and presses Enter once: most commands
 // start no turn, so a nudge would run them twice. A swallowed Enter leaves the
 // text in the input box.
-func (p *Prompt) typeCommandOnce(dir, text string) error {
+func (p *Prompt) typeCommandOnce(dir, text string, imgs imageSet) error {
 	run, closeRun, err := p.openActionRun(dir, RunOpts{})
 	if err != nil {
 		return err
@@ -73,10 +74,10 @@ func (p *Prompt) typeCommandOnce(dir, text string) error {
 	if err := run.CatchUp(); err != nil {
 		return err
 	}
-	return run.TypeStep(0, text)
+	return run.typeStepWith(0, text, imgs)
 }
 
-func (p *Prompt) nudgePrompt(dir, text string) error {
+func (p *Prompt) nudgePrompt(dir, text string, imgs imageSet) error {
 	run, closeRun, err := p.openActionRun(dir, RunOpts{})
 	if err != nil {
 		return err
@@ -89,11 +90,40 @@ func (p *Prompt) nudgePrompt(dir, text string) error {
 	run.ClearPersonTyped()
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(p.cfg.PromptGrace, caps.Grace)
-	pr := &runPrompter{holderPrompter: holderPrompter{c: run.Holder(), typing: p.projects.SessionTyping(dir), io: p.projects.TypingIO(dir, run.Holder(), "send-nudge")}, run: run}
+	pr := &runPrompter{holderPrompter: holderPrompter{c: run.Holder(), typing: p.projects.SessionTyping(dir), io: p.projects.TypingIO(dir, run.Holder(), "send-nudge"), images: imgs}, run: run}
 	report := func(d claudeui.NudgeDecision) {
 		p.log.Info("send nudge", "session", filepath.Base(dir), "decision", string(d))
 	}
 	return claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, report)
+}
+
+// imageSet is the Prompt images a send pastes before its text. The zero value
+// pastes nothing. done runs once the pastes succeed.
+type imageSet struct {
+	paths []string
+	done  func()
+}
+
+// paste pastes each image path as its own bracketed paste, in order.
+func (s imageSet) paste(c *holder.HolderClient) error {
+	for _, path := range s.paths {
+		if err := c.Paste(path); err != nil {
+			return err
+		}
+	}
+	if len(s.paths) > 0 && s.done != nil {
+		s.done()
+	}
+	return nil
+}
+
+// withText is the text typed after the pastes: one space separates it from
+// the last image's path.
+func (s imageSet) withText(text string) string {
+	if len(s.paths) == 0 {
+		return text
+	}
+	return " " + text
 }
 
 // runPrompter is a send's Prompter: the run's watch tells when the turn
