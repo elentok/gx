@@ -18,6 +18,9 @@ const KIND_ICONS: Record<Kind, string> = {
 const SIZES = {
   md: { px: 64, stroke: 5, font: "15px", badge: true },
   sm: { px: 52, stroke: 4, font: "13px", badge: true },
+  // The page header's ring boxes (ringSize in page/PageHeader.tsx): 56px wide, 44px on a phone.
+  header: { px: 56, stroke: 4, font: "13px", badge: true },
+  headerSm: { px: 44, stroke: 4, font: "11px", badge: true },
   compact: { px: 26, stroke: 3, font: "9px", badge: false },
 } as const;
 

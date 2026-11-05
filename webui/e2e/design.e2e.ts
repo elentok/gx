@@ -24,8 +24,8 @@ test.describe("5. Start a design session and answer a round", () => {
     await openDesign(page);
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
     await expect(page.getByRole("link", nav("Epics"))).toHaveAttribute("aria-current", "page");
-    // The charted design has no session, so its ⋯ menu would be empty and the button is absent.
-    await expect(page.getByRole("button", nav("More actions"))).toHaveCount(0);
+    // The charted design has no session, so its ⋯ menu holds only Copy design ID.
+    await expect(page.getByRole("button", nav("More actions"))).toHaveCount(1);
     await page.getByRole("button", nav("Start design session")).click();
     await expect(page.getByRole("button", nav("Start design session"))).toHaveCount(0);
 

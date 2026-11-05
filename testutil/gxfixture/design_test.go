@@ -362,6 +362,7 @@ func TestDesignModelTiersScenario_TierPerMapAndLaunchArgs(t *testing.T) {
 		"demo:tier-later":       "worker",
 		"demo:tier-unconfirmed": "strongest",
 		"demo:tier-no-step":     "strongest",
+		"plain:tier-empty":      "strongest",
 	}
 	tickets := slices.Collect(maps.Keys(want))
 	got := r.designSessions(t, tickets, func(wire.SessionInfo) bool { return true })
@@ -373,6 +374,10 @@ func TestDesignModelTiersScenario_TierPerMapAndLaunchArgs(t *testing.T) {
 	r.waitLaunchModels(t, []string{"opus", "opus", "opus", "sonnet"})
 	// The session list shows the model the fake reports on its replies.
 	r.designSessions(t, tickets, func(s wire.SessionInfo) bool {
+		if s.Ticket == "plain:tier-empty" {
+			// Launched with no model flag, the fake reports its own.
+			return s.Model == agentfake.ReportedModel && s.Effort == ""
+		}
 		return s.Model == map[string]string{"strongest": "opus", "worker": "sonnet"}[string(s.Tier)]
 	})
 	r.stop(t)

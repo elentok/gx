@@ -18,9 +18,11 @@ test.describe("72. Design actions menu", () => {
     await expect(page.getByRole("group", nav("Questions"))).toBeVisible();
 
     const trigger = (await moreActions(page).boundingBox())!;
-    expect(trigger.width).toBe(44);
-    expect(trigger.height).toBe(44);
-    await expect(moreActions(page)).toHaveCSS("border-top-width", "1px");
+    // A round ghost button: 36px on desktop, no square border at rest.
+    expect(trigger.width).toBe(36);
+    expect(trigger.height).toBe(36);
+    await expect(moreActions(page)).toHaveCSS("border-top-width", "0px");
+    await expect(moreActions(page)).toHaveCSS("border-top-left-radius", "9999px");
     // Level with the title row, not below it: the Progress sidebar starts under the header.
     const title = (await page.getByRole("heading", { level: 1 }).first().boundingBox())!;
     expect(trigger.y).toBeLessThan(title.y + title.height);
@@ -55,6 +57,28 @@ test.describe("72. Design actions menu", () => {
     await expect
       .poll(async () => (await sessionRows(fixture, "design-epic")).filter((r) => /exited/.test(r)).length)
       .toBe(1);
+  });
+});
+
+test.describe("72b. Design menu before Start", () => {
+  test("the button exists before Start and the menu holds only Copy design ID", async ({ page, start }) => {
+    await start("design");
+    await openDesign(page);
+    await moreActions(page).click();
+    const menu = actionsMenu(page);
+    await expect(menu.getByRole("menuitem")).toHaveCount(1);
+    await expect(menu.getByRole("menuitem", { name: /^Copy design ID/ })).toContainText("demo:design-epic");
+  });
+});
+
+test.describe("128. Copy ID (Design)", () => {
+  test("Copy design ID puts <project>:<name> on the clipboard", async ({ page, start, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await start("design");
+    await openDesign(page);
+    await moreActions(page).click();
+    await actionsMenu(page).getByRole("menuitem", { name: /^Copy design ID/ }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("demo:design-epic");
   });
 });
 

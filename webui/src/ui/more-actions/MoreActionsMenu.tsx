@@ -10,11 +10,17 @@ export interface MoreActionsItem {
   /** A smaller line under the label. */
   hint?: ReactNode;
   danger?: boolean;
+  /** False keeps the menu open after the pick. */
+  closeOnSelect?: boolean;
+  disabled?: boolean;
   onSelect: () => void;
 }
 
-/** A section is a group of items; the menu draws a rule between sections. */
-export type MoreActionsSection = MoreActionsItem[];
+/**
+ * A section is a group of items; the menu draws a rule between sections. A page whose rows are
+ * not plain items (a key-value block, a row with its own button) passes `{ content }` instead.
+ */
+export type MoreActionsSection = MoreActionsItem[] | { content: ReactNode };
 
 const dots = (
   <svg viewBox="0 0 20 20" aria-hidden width="20" height="20" fill="currentColor">
@@ -33,11 +39,19 @@ const opened = { ...hovered, boxShadow: "inset 0 0 0 1px var(--chakra-colors-bor
  * on a phone. The content comes in as sections so a page can add its own items.
  * `pinned` holds the button in a state, so the gallery can show hover, focus and open side by side.
  */
-export function MoreActionsMenu({ sections, pinned }: { sections: MoreActionsSection[]; pinned?: "hover" | "focus" | "open" }) {
+export function MoreActionsMenu({
+  sections,
+  pinned,
+  onClosed,
+}: {
+  sections: MoreActionsSection[];
+  pinned?: "hover" | "focus" | "open";
+  onClosed?: () => void;
+}) {
   const sheetMode = !useWide();
   const item = menuItemStyle(sheetMode);
   return (
-    <Menu.Root lazyMount unmountOnExit positioning={{ placement: "bottom-end" }}>
+    <Menu.Root lazyMount unmountOnExit positioning={{ placement: "bottom-end" }} onOpenChange={(e) => !e.open && onClosed?.()}>
       <Menu.Trigger asChild>
         {/* A phone's hit area is 44px around the 40px circle; the padding is clipped by neither. */}
         <chakra.button
@@ -73,13 +87,16 @@ export function MoreActionsMenu({ sections, pinned }: { sections: MoreActionsSec
           {...(sheetMode && { ...sheetPanel, pb: "6" })}
         >
           {sheetMode && <GrabHandle my="2" />}
-          {sections.map((items, i) => (
+          {sections.map((section, i) => (
             <Fragment key={i}>
               {i > 0 && <Box role="separator" h="1px" bg="border" my="1" />}
-              {items.map((it) => (
+              {"content" in section && section.content}
+              {Array.isArray(section) && section.map((it) => (
                 <Menu.Item
                   key={it.value}
                   value={it.value}
+                  closeOnSelect={it.closeOnSelect}
+                  disabled={it.disabled}
                   onClick={it.onSelect}
                   flexDirection="column"
                   alignItems="flex-start"

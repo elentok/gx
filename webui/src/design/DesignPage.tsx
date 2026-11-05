@@ -1,7 +1,6 @@
 import { Box, Text, chakra } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { SessionHarnessLabel } from "../agents/SessionHarnessLabel";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { EpicRing } from "../epic/EpicRing";
@@ -15,7 +14,8 @@ import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
-import { ImplLink, Progress, StepLine, StepsSheet, showsImplLink } from "./Progress";
+import { agentDetails } from "./agentDetails";
+import { ImplLink, Progress, StepLine, StepsSheet, showsImplLink, summaryLine } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { DesignActionsMenu, Failure, StartDesignButton } from "./SessionControls";
 import type { EpicListRow, SessionInfo } from "../generated/server";
@@ -47,7 +47,21 @@ interface SessionStripProps {
   deletable?: boolean;
 }
 
-// The header above the chat: switch/stop controls, a way to start again, or the first Start button.
+/** The meta bar's agent part: `<Harness> <Model> · <effort>`, without the effort on a phone. */
+function AgentLine({ session, wide }: { session: SessionInfo; wide: boolean }) {
+  const { model, effort } = agentDetails(session);
+  if (!model) return null;
+  return (
+    <Text fontFamily="mono" fontSize="12px" color="text.dim">
+      <Text as="span" color="text">
+        {model}
+      </Text>
+      {wide && effort && ` · ${effort}`}
+    </Text>
+  );
+}
+
+// The right of the title row: the failed-start message, the first Start button, and the menu.
 function SessionStrip({
   address,
   session,
@@ -61,7 +75,7 @@ function SessionStrip({
   // The reason is for the failed start only: a live session means a retry worked.
   const reason = !session || session.status.state === "exited" ? startFailure : undefined;
   return (
-    <Box display="flex" flexDirection="column" alignItems="flex-end" gap="1">
+    <Box display="flex" alignItems="center" justifyContent="flex-end" gap="3">
       <Failure>{reason ?? ""}</Failure>
       {!session && <StartDesignButton address={address} open={deps.open} />}
       <DesignActionsMenu
@@ -143,49 +157,40 @@ function DesignBody({
     seenLiveKey.current = liveKey;
     refetch();
   }, [liveKey, refetch]);
-  const ring = (size: "md" | "sm" | "compact") => <EpicRing detail={detail!} card={card} sessions={sessions} size={size} />;
+  const ring = (size: "header" | "headerSm" | "compact") => <EpicRing detail={detail!} card={card} sessions={sessions} size={size} />;
   return (
     <>
       {stepsOpen && detail && <StepsSheet detail={detail} ring={ring("compact")} onClose={() => setStepsOpen(false)} />}
-      <Box
-        mt="4"
-        mb="3"
-        display="flex"
-        alignItems="flex-start"
-        justifyContent="space-between"
-        gap="4"
-        flex="none"
-      >
-        <Box minW="0" display="flex" flexWrap="wrap" alignItems="center" columnGap="3" rowGap="2">
-          <PageHeader
-            title={name}
-            lead={
-              detail &&
-              (wide ? (
-                ring("md")
-              ) : (
-                <chakra.button type="button" aria-label="Show progress steps" aria-haspopup="dialog" cursor="pointer" onClick={() => setStepsOpen(true)}>
-                  {ring("sm")}
-                </chakra.button>
-              ))
-            }
-            heading={
-              <>
-                <JumpMenu name={name} current={address} epics={epics} />
-                {!wide && detail && <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />}
-              </>
-            }
-          />
-          {session && <SessionHarnessLabel session={session} />}
-        </Box>
-        <SessionStrip
-          address={address}
-          session={session}
-          live={live}
-          deps={deps}
-          onSelect={setSelected}
-          startFailure={startFailure}
-          deletable={detail?.deletable}
+      <Box mt="4" mb="3" flex="none">
+        <PageHeader
+          title={name}
+          ring={
+            detail &&
+            (wide ? (
+              ring("header")
+            ) : (
+              <chakra.button type="button" aria-label="Show progress steps" aria-haspopup="dialog" cursor="pointer" onClick={() => setStepsOpen(true)}>
+                {ring("headerSm")}
+              </chakra.button>
+            ))
+          }
+          heading={<JumpMenu name={name} current={address} epics={epics} />}
+          line={
+            detail &&
+            (wide ? summaryLine(detail) : <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />)
+          }
+          meta={session && <AgentLine session={session} wide={wide} />}
+          right={
+            <SessionStrip
+              address={address}
+              session={session}
+              live={live}
+              deps={deps}
+              onSelect={setSelected}
+              startFailure={startFailure}
+              deletable={detail?.deletable}
+            />
+          }
         />
       </Box>
       <Box

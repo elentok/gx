@@ -41,7 +41,11 @@ const (
 	strongestModel = "opus"
 	workerModel    = "sonnet"
 	staleProject   = "stale"
+	// plainProject sets no tiers of its own, so its design session runs the empty global one.
+	plainProject = "plain"
 )
+
+var emptyStrongest = []string{`agents.claude.strongest.model=""`, `agents.claude.strongest.effort=""`}
 
 // tierAgents is project.json's agents key: a strongest and a worker model.
 func tierAgents(worker string) string {
@@ -64,15 +68,20 @@ func designModelTiers() scenario {
 			{project, "tier-later", nil},
 			{project, "tier-unconfirmed", nil},
 			{project, "tier-no-step", nil},
+			{plainProject, "tier-empty", nil},
 		},
+		// A project cannot blank a tier its global config sets, so the global strongest tier is
+		// empty and demo, which sets its own, is the only project that has a model.
+		config:       emptyStrongest,
 		projectExtra: map[string]string{project: tierAgents(workerModel)},
 		epicMeta: map[string]string{
-			addr("tier-chart"):       mapMeta(string(tickets.StepChart)),
-			addr("tier-later"):       mapMeta(string(tickets.StepResolveTickets)),
-			addr("tier-unconfirmed"): mapMeta(string(tickets.StepResolveTickets)) + "destination_unconfirmed: true\n",
-			addr("tier-no-step"):     "status: open\nkind: map\n",
+			plainProject + ":tier-empty": mapMeta(string(tickets.StepChart)),
+			addr("tier-chart"):           mapMeta(string(tickets.StepChart)),
+			addr("tier-later"):           mapMeta(string(tickets.StepResolveTickets)),
+			addr("tier-unconfirmed"):     mapMeta(string(tickets.StepResolveTickets)) + "destination_unconfirmed: true\n",
+			addr("tier-no-step"):         "status: open\nkind: map\n",
 		},
-		openDesigns: []string{addr("tier-chart"), addr("tier-later"), addr("tier-unconfirmed"), addr("tier-no-step")},
+		openDesigns: []string{addr("tier-chart"), addr("tier-later"), addr("tier-unconfirmed"), addr("tier-no-step"), plainProject + ":tier-empty"},
 	}
 }
 

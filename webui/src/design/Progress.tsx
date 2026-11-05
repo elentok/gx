@@ -106,12 +106,18 @@ export const ImplLink = ({ address }: { address: string }) => (
 export const showsImplLink = (detail: EpicDetail) =>
   !!detail.impl_address && !!detail.steps?.some((s) => (s.step === BRANCH || s.step === DONE) && s.state !== "todo");
 
-/** "Resolve tickets · 03 Chat content (2 of 7)": the current step, and its current ticket while tickets resolve. */
-function summaryLine(steps: MapStep[], rows: EpicDetailRow[]): string {
+/**
+ * "Resolve tickets · 03 Chat content (2 of 7)": the current step, and its current ticket while tickets resolve.
+ * `short` (a phone) drops the ticket: "Resolve tickets · 2 of 7".
+ */
+export function summaryLine(detail: EpicDetail, short = false): string {
+  const steps = stepsOf(detail);
+  const { rows } = detail;
   const step = steps.find((s) => s.state === "current") ?? steps.filter((s) => s.state === "done").at(-1);
   if (!step) return "";
   const at = ticketsOf(steps, rows).findIndex((r) => r.current);
   if (at < 0) return step.label;
+  if (short) return `${step.label} · ${at + 1} of ${rows.length}`;
   return `${step.label} · ${idOf(rows[at].address)} ${rows[at].title} (${at + 1} of ${rows.length})`;
 }
 
@@ -134,7 +140,7 @@ export function StepLine({ detail, onOpen }: { detail: EpicDetail; onOpen: () =>
       textAlign="left"
     >
       <Text as="span" truncate>
-        {summaryLine(stepsOf(detail), detail.rows)}
+        {summaryLine(detail, true)}
       </Text>
       <Text as="span" aria-hidden flexShrink="0">
         ▾

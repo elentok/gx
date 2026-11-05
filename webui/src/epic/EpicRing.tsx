@@ -12,7 +12,7 @@ export function EpicRing({
   detail: EpicDetail;
   card?: EpicListRow;
   sessions: SessionInfo[];
-  size: "md" | "sm" | "compact";
+  size: "md" | "sm" | "header" | "headerSm" | "compact";
 }) {
   const r = pageRing(detail, card, sessions);
   return <ProgressRing progress={r.progress} tone={r.tone} kind={r.kind} label={size === "compact" ? "" : r.label} size={size} live={r.live} />;

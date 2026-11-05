@@ -1,10 +1,12 @@
-import { Box, chakra, Menu, Spinner, Text } from "@chakra-ui/react";
+import { Box, Menu, Spinner, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
+import { copyText } from "../clipboard";
 import { useConnectionContext } from "../connection";
 import type { DesignOpenRequest, SessionInfo } from "../generated/server";
 import { Button } from "../ui/button/Button";
-import { GrabHandle, sheetPanel } from "../ui/modal/BottomSheet";
+import { MoreActionsMenu, type MoreActionsItem, type MoreActionsSection } from "../ui/more-actions/MoreActionsMenu";
 import { useWide } from "../useWide";
+import { agentDetails } from "./agentDetails";
 import { useWrite } from "../useWrite";
 import {
   postDeleteDesign,
@@ -185,30 +187,12 @@ function LiveSessionRows({
   );
 }
 
-/** "Delete design", which asks to confirm in place before it deletes. */
-function DeleteRow({
-  item,
-  pending,
-  confirming,
-  setConfirming,
-  onDelete,
-}: {
-  item: MenuItemStyle;
-  pending: boolean;
-  confirming: boolean;
-  setConfirming: (confirming: boolean) => void;
-  onDelete: () => void;
-}) {
-  if (!confirming)
-    return (
-      <Menu.Item value="delete-design" closeOnSelect={false} onClick={() => setConfirming(true)} {...item} color="tone.paused.fg">
-        Delete design
-      </Menu.Item>
-    );
+/** The in-place confirm "Delete design" turns into before it deletes. */
+function ConfirmDelete({ pending, onKeep, onDelete }: { pending: boolean; onKeep: () => void; onDelete: () => void }) {
   return (
     <Box display="flex" alignItems="center" gap="2" px="3" py="1.5">
       <Text fontSize="sm">Delete this design?</Text>
-      <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => setConfirming(false)}>
+      <Button size="sm" emphasis="secondary" disabled={pending} onClick={onKeep}>
         Keep
       </Button>
       <Button size="sm" tone="paused" disabled={pending} onClick={onDelete}>
@@ -220,8 +204,8 @@ function DeleteRow({
 }
 
 /**
- * The header's "⋯" menu: New session, the live sessions (with 2 or more), and Delete design while it
- * can run. Renders nothing when none of them applies.
+ * The header's "⋯" menu: the Agent block, New session, the live sessions (with 2 or more), Copy design ID,
+ * and Delete design while it can run. It always renders, since Copy design ID always applies.
  */
 export function DesignActionsMenu({
   address,
@@ -248,83 +232,80 @@ export function DesignActionsMenu({
 }) {
   const { run, pending } = useDesignWrite();
   const [confirming, setConfirming] = useState(false);
-  const sheetMode = !useWide();
+  const wide = useWide();
+  const item = menuItemStyle(!wide);
   const canDelete = deletable && live.length === 0;
-  if (!shown && !canDelete) return null;
 
-  const item = menuItemStyle(sheetMode);
+  const agent = shown && agentDetails(shown);
+  const agentRows = agent
+    ? [
+        agent.tier && ["Tier", agent.tier],
+        !wide && agent.effort && ["Effort", agent.effort],
+        agent.switched && ["", "switched by hand"],
+      ].filter((row): row is string[] => !!row)
+    : [];
+  const sections: MoreActionsSection[] = [];
+  if (agentRows.length > 0) sections.push({ content: <AgentBlock rows={agentRows} /> });
+  const sessionItems: MoreActionsItem[] = [];
+  if (shown)
+    sessionItems.push({
+      value: "new-session",
+      disabled: pending,
+      label: "New session",
+      hint: shown.status.state === "exited" ? "Start a fresh session" : "Stop this session and start a fresh one",
+      onSelect: () => startNew(run, address, shown, open),
+    });
+  if (sessionItems.length > 0) sections.push(sessionItems);
+  if (shown && live.length > 1)
+    sections.push({
+      content: (
+        <LiveSessionRows
+          item={item}
+          live={live}
+          shown={shown}
+          pending={pending}
+          onSelect={onSelect}
+          onStop={(s) => run(() => stop({ id: s.id, state: stateToken(s) }))}
+        />
+      ),
+    });
+  sections.push([{ value: "copy-design-id", label: "Copy design ID", hint: address, onSelect: () => void copyText(address, null) }]);
+  if (canDelete && confirming)
+    sections.push({
+      content: (
+        <ConfirmDelete
+          pending={pending}
+          onKeep={() => setConfirming(false)}
+          onDelete={() => run(() => remove({ epic: address }), { onDone: onDeleted })}
+        />
+      ),
+    });
+  else if (canDelete)
+    (sections[sections.length - 1] as MoreActionsItem[]).push({
+      value: "delete-design",
+      label: "Delete design",
+      danger: true,
+      closeOnSelect: false,
+      onSelect: () => setConfirming(true),
+    });
+  return <MoreActionsMenu sections={sections} onClosed={() => setConfirming(false)} />;
+}
+
+/** The menu's key-value rows for what the header leaves out; a row with no key is a note. */
+function AgentBlock({ rows }: { rows: string[][] }) {
   return (
-    <Menu.Root
-      lazyMount
-      unmountOnExit
-      positioning={{ placement: "bottom-end" }}
-      onOpenChange={(e) => !e.open && setConfirming(false)}
-    >
-      <Menu.Trigger asChild>
-        <chakra.button
-          type="button"
-          aria-label="More actions"
-          cursor="pointer"
-          color="text.muted"
-          fontSize="xl"
-          lineHeight="1"
-          w="44px"
-          h="44px"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          display="inline-flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          ⋯
-        </chakra.button>
-      </Menu.Trigger>
-      <MenuFrame sheet={sheetMode}>
-        <Menu.Content
-          bg="surface.raised"
-          borderWidth="1px"
-          borderColor="border"
-          minW={sheetMode ? "64" : "340px"}
-          {...(sheetMode && { ...sheetPanel, pb: "6" })}
-        >
-          {sheetMode && <GrabHandle my="2" />}
-          {shown && (
-            <Menu.Item
-              value="new-session"
-              disabled={pending}
-              onClick={() => startNew(run, address, shown, open)}
-              flexDirection="column"
-              alignItems="flex-start"
-              {...item}
-            >
-              <Text as="span">New session</Text>
-              <Text fontSize="xs" color="text.muted">
-                {shown.status.state === "exited" ? "Start a fresh session" : "Stop this session and start a fresh one"}
-              </Text>
-            </Menu.Item>
-          )}
-          {shown && live.length > 1 && (
-            <LiveSessionRows
-              item={item}
-              live={live}
-              shown={shown}
-              pending={pending}
-              onSelect={onSelect}
-              onStop={(s) => run(() => stop({ id: s.id, state: stateToken(s) }))}
-            />
-          )}
-          {canDelete && (
-            <DeleteRow
-              item={item}
-              pending={pending}
-              confirming={confirming}
-              setConfirming={setConfirming}
-              onDelete={() => run(() => remove({ epic: address }), { onDone: onDeleted })}
-            />
-          )}
-        </Menu.Content>
-      </MenuFrame>
-    </Menu.Root>
+    <Box px="3" py="2">
+      <Text fontSize="xs" letterSpacing="wider" textTransform="uppercase" color="text.muted">
+        Agent
+      </Text>
+      {rows.map(([key, value]) => (
+        <Box key={key + value} display="flex" justifyContent="space-between" gap="4" fontSize="sm" color="text.dim">
+          {key && <span>{key}</span>}
+          <Text as="b" fontWeight="600" color="text">
+            {value}
+          </Text>
+        </Box>
+      ))}
+    </Box>
   );
 }

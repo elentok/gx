@@ -118,15 +118,56 @@ test("the Epics tab counts the other Needs-you cards from the loaded list", asyn
   expect(await screen.findByRole("link", { name: "Epics · 1 needs you" })).toBeTruthy();
 });
 
-test("the header shows the harness, tier and model of a Codex session, and nothing without a session", async () => {
+const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent;
+
+test("the meta bar shows the harness, model and effort of a Codex session, never the tier, and nothing without a session", async () => {
   render([map("a")], [session("a", { harness: "codex", tier: "worker", model: "gpt-5.3-codex", effort: "medium" })]);
-  expect(await screen.findByText("Codex GPT-5.3-Codex · medium")).toBeTruthy();
-  expect(screen.getByText("Worker")).toBeTruthy();
+  expect(await metaText()).toBe("Codex GPT-5.3-Codex · medium");
+  expect(screen.queryByText("Worker")).toBeNull();
   cleanup();
   render([map("a")], []);
   await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByText("Codex")).toBeNull();
-  expect(screen.queryByText("Claude")).toBeNull();
+  expect(screen.queryByTestId("page-header-meta")).toBeNull();
+});
+
+test("with no model the meta bar reads the harness CLI default and the effort", async () => {
+  render([map("a")], [session("a", { harness: "claude", tier: "", model: "", effort: "high" })]);
+  expect(await metaText()).toBe("Claude CLI default · high");
+});
+
+test("on a phone the meta bar drops the effort and the menu's Agent block lists Tier and Effort", () =>
+  onPhone(async () => {
+    render([map("a")], [session("a", { tier: "worker", model: "sonnet", effort: "medium" })]);
+    expect(await metaText()).toBe("Claude Sonnet");
+    await openMenu();
+    const block = within(await screen.findByText("Agent").then((n) => n.parentElement as HTMLElement));
+    expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
+    expect(block.getByText("Effort").nextSibling?.textContent).toBe("medium");
+  }));
+
+test("on desktop the Agent block lists Tier only, and a switched model adds the by-hand row", async () => {
+  render([map("a")], [session("a", { tier: "worker", model: "opus", effort: "max", model_switched: true })]);
+  await openMenu();
+  const block = within((await screen.findByText("Agent")).parentElement as HTMLElement);
+  expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
+  expect(block.queryByText("Effort")).toBeNull();
+  expect(block.getByText("switched by hand")).toBeTruthy();
+});
+
+test("Copy design ID copies the address and shows it as the subtitle, with no session", async () => {
+  const writeText = vi.fn(async () => {});
+  vi.stubGlobal("navigator", { clipboard: { writeText } });
+  try {
+    render([map("a")], [], "/d/gx:a", detailOf());
+    await openMenu();
+    const item = await screen.findByRole("menuitem", { name: /Copy design ID/ });
+    expect(item.textContent).toContain("gx:a");
+    expect(deleteItem()).toBeNull();
+    fireEvent.click(item);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:a"));
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 test("the title row holds the Design name and More actions, with no picker or state label", async () => {
@@ -163,18 +204,18 @@ test.each([
   expect(!!screen.queryByTestId("comet")).toBe(comet);
 });
 
-test("the ring leads the header at 64px, and at 52px on a phone", async () => {
+test("the ring leads the header at 56px, and at 44px on a phone", async () => {
   render([map("a")], []);
   await screen.findByText("0%");
   const title = screen.getByRole("heading", { level: 1 });
   expect(ringOf().compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 64 64");
+  expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 56 56");
   cleanup();
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   try {
     render([map("a")], []);
     await screen.findByText("0%");
-    expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 52 52");
+    expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 44 44");
   } finally {
     vi.unstubAllGlobals();
   }
@@ -302,7 +343,7 @@ test("on a phone the step line sits under the name and opens the steps sheet", (
   onPhone(async () => {
     const rows = [ticketRow("02", "Done one", { rendered_status: "done" }), ticketRow("03", "Chat content", { current: true }), ticketRow("04", "Last")];
     render([map("a")], [], "/d/gx:a", detailOf({ rows, impl_address: "gx:a-impl", ring_progress: 40 }));
-    const line = await screen.findByRole("button", { name: /^Resolve tickets · 03 Chat content \(2 of 3\)/ });
+    const line = await screen.findByRole("button", { name: /^Resolve tickets · 2 of 3/ });
     expect(screen.getByRole("heading", { level: 1 }).compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("progressbar")).toBeNull();
     expect(screen.queryByRole("region", { name: "Progress" })).toBeNull();
@@ -365,7 +406,15 @@ test("Delete design shows only for a deletable Design with no live session, foll
   cleanup();
   render([map("a")], [], "/d/gx:a", detailOf());
   await screen.findByRole("button", { name: "Start design session" });
-  expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
+  await openMenu();
+  expect(await screen.findByRole("menuitem", { name: /Copy design ID/ })).toBeTruthy();
+  expect(deleteItem()).toBeNull();
+});
+
+test("the long step line on desktop names the ticket", async () => {
+  const rows = [ticketRow("02", "Done one", { rendered_status: "done" }), ticketRow("03", "Chat content", { current: true })];
+  render([map("a")], [], "/d/gx:a", detailOf({ rows }));
+  expect((await screen.findByTestId("page-header-line")).textContent).toMatch(/^Resolve tickets · 03 Chat content \(2 of 2\)/);
 });
 
 test("the detail is fetched once on mount and once more when a session starts or exits", async () => {

@@ -198,10 +198,13 @@ test("122. Codex design run", async ({ page, start }) => {
   const fixture = await start("codex-design", { autoAdvanceDelay: "1h" });
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
 
-  // The header names the harness, the tier and the model.
-  await expect(page.getByText("Codex", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/^(Light|Worker|Strongest)$/).first()).toBeVisible();
-  await expect(page.getByText(/^\S+ · \S+$/).first()).toBeVisible();
+  // The header names the harness and the model, and never the tier; the tier is in the menu.
+  const meta = page.getByTestId("page-header-meta");
+  await expect(meta).toHaveText(/^Codex \S+ · \S+$/);
+  await expect(meta).not.toContainText(/Light|Worker|Strongest/);
+  await page.getByRole("button", nav("More actions")).click();
+  await expect(page.getByRole("menu", nav("More actions")).getByText(/^(Light|Worker|Strongest)$/)).toBeVisible();
+  await page.keyboard.press("Escape");
 
   const questions = page.getByRole("group", nav("Questions"));
   await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
