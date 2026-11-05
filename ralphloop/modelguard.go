@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -48,7 +49,7 @@ type modelGuard struct {
 // newModelGuard returns nil when the launch gets no check: a ticket that is not
 // an implement ticket, or a reader the wiring lacks. An empty expected model
 // (the tier resolved to none) is logged once and skipped.
-func newModelGuard(d Deps, p launchAndPromptParams, since time.Time) *modelGuard {
+func newModelGuard(d deps.Deps, p launchAndPromptParams, since time.Time) *modelGuard {
 	if d.ReadTurns == nil || !isImplementTicket(p) {
 		return nil
 	}
@@ -60,7 +61,7 @@ func newModelGuard(d Deps, p launchAndPromptParams, since time.Time) *modelGuard
 }
 
 // clockOf is d's clock, the wall clock when the wiring has none.
-func clockOf(d Deps) time.Time {
+func clockOf(d deps.Deps) time.Time {
 	if d.Now != nil {
 		return d.Now()
 	}
@@ -81,7 +82,7 @@ func IsImplementType(ticketType string) bool {
 // returns a *ModelMismatchError the first time they differ; once a turn has
 // been read, whatever the verdict, it never reads again. A nil receiver checks
 // nothing, and a read that fails or finds no turn yet tries again next tick.
-func (g *modelGuard) tick(d Deps, p launchAndPromptParams, sessionID string) error {
+func (g *modelGuard) tick(d deps.Deps, p launchAndPromptParams, sessionID string) error {
 	if g == nil || g.done || sessionID == "" {
 		return nil
 	}

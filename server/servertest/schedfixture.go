@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -161,7 +161,7 @@ func (f *SchedFixture) AssertMerged(t *testing.T, ids ...string) {
 // FeatureWorktree is the epic's feature worktree path.
 func (f *SchedFixture) FeatureWorktree(t *testing.T) string {
 	t.Helper()
-	wtDir, err := ralphloop.DefaultDeps().WorktreeDir(f.Repo)
+	wtDir, err := deps.DefaultDeps().WorktreeDir(f.Repo)
 	if err != nil {
 		t.Fatal(err)
 	}

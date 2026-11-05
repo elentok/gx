@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
@@ -72,7 +73,7 @@ type VerifyDeps struct {
 	MergedTickets func(dir, featureBranch string) (map[string]bool, error)
 }
 
-func (d Deps) verifyDeps() VerifyDeps {
+func verifyDepsOf(d deps.Deps) VerifyDeps {
 	vd := VerifyDeps{
 		IsAncestor:     d.IsAncestor,
 		MergeBase:      d.MergeBase,
@@ -89,9 +90,9 @@ func (d Deps) verifyDeps() VerifyDeps {
 // DefaultVerifyDeps wires VerifyDeps to the real git package and lists
 // sessions on runner (nil: leftovers unknown).
 func DefaultVerifyDeps(runner agentrunner.Runner) VerifyDeps {
-	d := DefaultDeps()
+	d := deps.DefaultDeps()
 	d.Runner = runner
-	return d.verifyDeps()
+	return verifyDepsOf(d)
 }
 
 // VerifyParams selects what VerifyEpic checks. Epic is also the feature

@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -52,7 +53,7 @@ func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {
 	t.Parallel()
 	r := &blipRunner{Runner: idleRunner("iter-27"), timeoutOn: 2}
-	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 	one := OneIteration{Agent: agent.AgentClaude}
 	if err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-27"}, agentrunner.Session{Label: "iter-27", ID: "pane-1"}); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
@@ -64,7 +65,7 @@ func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {
 
 // stallNudgeFixture is an idle agent whose ticket carries iterationStatus (""
 // for none) and the OneIteration that waits on it.
-func stallNudgeFixture(t *testing.T, iterationStatus string, delay time.Duration) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
+func stallNudgeFixture(t *testing.T, iterationStatus string, delay time.Duration) (deps.Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
 	t.Helper()
 	front := "---\nid: \"01\"\nstatus: claimed\ntype: implement\n"
 	if iterationStatus != "" {
@@ -74,7 +75,7 @@ func stallNudgeFixture(t *testing.T, iterationStatus string, delay time.Duration
 	r := idleRunner("iter-01")
 	r.PromptState = agentrunner.StateIdle
 	var sleeps []time.Duration
-	d := Deps{Runner: r, Sleep: func(d time.Duration) { sleeps = append(sleeps, d) }}
+	d := deps.Deps{Runner: r, Sleep: func(d time.Duration) { sleeps = append(sleeps, d) }}
 	one := OneIteration{
 		Agent: agent.AgentClaude, Epic: "epic", ScratchDir: scratchDir, StallNudgeDelay: delay,
 		Ticket: tickets.Ticket{Identifier: "01", Path: filepath.Join(scratchDir, "epic", "issues", "01-a.md")},
@@ -82,7 +83,7 @@ func stallNudgeFixture(t *testing.T, iterationStatus string, delay time.Duration
 	return d, r, one, &sleeps
 }
 
-func waitStallFixture(t *testing.T, d Deps, one OneIteration) {
+func waitStallFixture(t *testing.T, d deps.Deps, one OneIteration) {
 	t.Helper()
 	if err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-01"}, agentrunner.Session{Label: "iter-01", ID: "pane-1"}); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
@@ -270,7 +271,7 @@ func TestWaitIterationFinished_ZeroDelayDisablesNudge(t *testing.T) {
 
 // typeDuring makes the first sleep of dur press a key, as a person does while
 // the loop waits.
-func typeDuring(d *Deps, r *runnerfake.Runner, dur time.Duration, sleeps *[]time.Duration) {
+func typeDuring(d *deps.Deps, r *runnerfake.Runner, dur time.Duration, sleeps *[]time.Duration) {
 	typed := false
 	d.Sleep = func(got time.Duration) {
 		*sleeps = append(*sleeps, got)
@@ -438,7 +439,7 @@ func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 // driveDeferredMerge drives the fixture ticket through FinishIteration with its
 // merge deferred, calling onRetry(n) at the n-th merge retry sleep and returning
 // the outcome and how many retry sleeps there were.
-func driveDeferredMerge(t *testing.T, d Deps, scratchDir, path string, onRetry func(n int)) (FinishOutcome, int) {
+func driveDeferredMerge(t *testing.T, d deps.Deps, scratchDir, path string, onRetry func(n int)) (FinishOutcome, int) {
 	t.Helper()
 	retries := 0
 	d.Sleep = func(dur time.Duration) {
@@ -568,7 +569,7 @@ func TestMergeBuilt_LockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 
 // blockedWaitFixture is a blocked agent on the named runner; onSleep runs when
 // the loop sleeps (the dwell).
-func blockedWaitFixture(t *testing.T, agent agent.AgentKind, runner string, onSleep func(*runnerfake.Runner)) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
+func blockedWaitFixture(t *testing.T, agent agent.AgentKind, runner string, onSleep func(*runnerfake.Runner)) (deps.Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
 	t.Helper()
 	d, r, one, sleeps := stallNudgeFixture(t, "", 0)
 	one.Agent, one.Runner = agent, runner
@@ -582,7 +583,7 @@ func blockedWaitFixture(t *testing.T, agent agent.AgentKind, runner string, onSl
 	return d, r, one, sleeps
 }
 
-func waitBlocked(t *testing.T, d Deps, one OneIteration) error {
+func waitBlocked(t *testing.T, d deps.Deps, one OneIteration) error {
 	t.Helper()
 	return WaitIterationFinished(d, one, IterationWorktree{Label: "iter-01"}, agentrunner.Session{Label: "iter-01", ID: "pane-1"})
 }

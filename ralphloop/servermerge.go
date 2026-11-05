@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"slices"
@@ -143,7 +144,7 @@ func WithWorktreeLock(fn func() error) error { return withWorktreeLock(fn) }
 // PrepareIteration creates the epic's feature worktree and the ticket's
 // iteration worktree off the feature tip, and installs dependencies in the
 // iteration worktree.
-func PrepareIteration(d Deps, o OneIteration) (IterationWorktree, error) {
+func PrepareIteration(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	w, err := addIterationWorktrees(d, o)
 	if err != nil {
 		return IterationWorktree{}, err
@@ -154,7 +155,7 @@ func PrepareIteration(d Deps, o OneIteration) (IterationWorktree, error) {
 	return w, nil
 }
 
-func addIterationWorktrees(d Deps, o OneIteration) (IterationWorktree, error) {
+func addIterationWorktrees(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	wtDir, err := d.WorktreeDir(o.RepoDir)
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
@@ -190,7 +191,7 @@ func (w IterationWorktree) Base() string { return w.base }
 
 // ResumeIteration rebuilds the handle PrepareIteration made for a ticket whose
 // worktree already exists, without touching git.
-func ResumeIteration(d Deps, o OneIteration, base string) (IterationWorktree, error) {
+func ResumeIteration(d deps.Deps, o OneIteration, base string) (IterationWorktree, error) {
 	wtDir, err := d.WorktreeDir(o.RepoDir)
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
@@ -204,7 +205,7 @@ func ResumeIteration(d Deps, o OneIteration, base string) (IterationWorktree, er
 
 // DiscardIteration removes a prepared iteration's worktree and branch, for a
 // launch that failed before the agent produced anything.
-func DiscardIteration(d Deps, o OneIteration, w IterationWorktree) error {
+func DiscardIteration(d deps.Deps, o OneIteration, w IterationWorktree) error {
 	return finishCleanup(d, &worktreeLock, o.RepoDir, w.featureWorktree, w.Path, w.Branch, agentrunner.Session{}, true)
 }
 
@@ -212,7 +213,7 @@ func DiscardIteration(d Deps, o OneIteration, w IterationWorktree) error {
 // on a paused (answer) or zero-commit finish, otherwise merge the commits onto the
 // feature branch, mark the ticket done and clean up. A deferred merge (lock
 // held) is an error, like any failed finish; the caller pauses it.
-func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
+func FinishIteration(d deps.Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
 		WorkspaceID:     o.WorkspaceID,
 		RepoDir:         o.RepoDir,
@@ -291,7 +292,7 @@ func LatestMergedSHA(scratchDir, epic, ticket string) string {
 }
 
 // runnerName names d's runner, "" when it has none.
-func runnerName(d Deps) string {
+func runnerName(d deps.Deps) string {
 	if d.Runner == nil {
 		return ""
 	}
@@ -304,7 +305,7 @@ func runnerName(d Deps) string {
 // without that step, so without this the finish path has no session to read
 // the closing occupancy, elapsed time and cost from and writes none of them.
 // Best-effort: "" (no live agent, no session yet) leaves the ticket as it was.
-func recordLiveSession(d Deps, label, ticketPath string) string {
+func recordLiveSession(d deps.Deps, label, ticketPath string) string {
 	s, ok, err := d.Runner.Find(label)
 	if err != nil || !ok {
 		return ""
@@ -329,7 +330,7 @@ const mergeDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.M
 // debounced, and an outstanding backgrounded shell command in the transcript
 // keeps holding. Without this a long test run in the background reads as a
 // finish, and the ticket is paused zero-commit before the agent commits.
-func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
+func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
 	until := runnerFinishStates
 	waitStates := append(slices.Clone(until), agentrunner.StateBlocked)
 	p := launchAndPromptParams{
@@ -419,7 +420,7 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 // agent that is still idle with no open question and no finished report.
 // again tells the caller to wait for the agent to settle once more: after the
 // nudge, or because the agent went back to work during the delay.
-func nudgeIfStalled(d Deps, in *personInput, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State) (nudged, again bool, err error) {
+func nudgeIfStalled(d deps.Deps, in *personInput, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State) (nudged, again bool, err error) {
 	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
 		return false, false, err
 	}
@@ -462,7 +463,7 @@ func nudgeIfStalled(d Deps, in *personInput, o OneIteration, w IterationWorktree
 // stallNudgeText is the launch prompt again for a session whose transcript has
 // no user record (it never got its task), else the generic nudge. An unreadable
 // or missing transcript keeps the generic text.
-func stallNudgeText(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) string {
+func stallNudgeText(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) string {
 	if d.ReadHasUserRecord == nil {
 		return StallNudgeText
 	}
@@ -488,7 +489,7 @@ func agentReported(ticketPath string) (bool, error) {
 }
 
 // mergeBuilt merges a built iteration that was waiting on the merge queue.
-func mergeBuilt(d Deps, p iterationParams, built *builtAwaitingMergeError) error {
+func mergeBuilt(d deps.Deps, p iterationParams, built *builtAwaitingMergeError) error {
 	lp := mergeQueueParams{
 		WorkspaceID: p.WorkspaceID, RepoDir: p.RepoDir, WorktreeDir: p.WorktreeDir,
 		FeatureWorktree: p.FeatureWorktree, FeatureBranch: p.FeatureBranch, Agent: p.Agent,

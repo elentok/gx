@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -14,7 +15,7 @@ import (
 // the live checkout and leaves no branch. With a ref it is a detached worktree
 // at that ref; with ref "" (a project without a VCS) it is scratchDir, created
 // if missing and kept after the ticket ends.
-func PrepareCommitless(d Deps, o OneIteration, scratchDir, ref string) (IterationWorktree, error) {
+func PrepareCommitless(d deps.Deps, o OneIteration, scratchDir, ref string) (IterationWorktree, error) {
 	label := iterLabel(o.Epic, o.Ticket.Identifier)
 	if ref == "" {
 		if err := os.MkdirAll(scratchDir, 0o755); err != nil {
@@ -40,7 +41,7 @@ func PrepareCommitless(d Deps, o OneIteration, scratchDir, ref string) (Iteratio
 
 // ResumeCommitless rebuilds the handle PrepareCommitless made, for a server that
 // restarted mid-iteration. scratchDir is "" for a detached worktree.
-func ResumeCommitless(d Deps, o OneIteration, scratchDir string) (IterationWorktree, error) {
+func ResumeCommitless(d deps.Deps, o OneIteration, scratchDir string) (IterationWorktree, error) {
 	label := iterLabel(o.Epic, o.Ticket.Identifier)
 	if scratchDir != "" {
 		return IterationWorktree{Path: scratchDir, Label: label, keep: true}, nil
@@ -54,7 +55,7 @@ func ResumeCommitless(d Deps, o OneIteration, scratchDir string) (IterationWorkt
 
 // DiscardCommitless takes back what PrepareCommitless made for a launch that
 // failed. A scratch directory stays: nothing in it is the launch's to delete.
-func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
+func DiscardCommitless(d deps.Deps, o OneIteration, w IterationWorktree) error {
 	if w.keep {
 		return nil
 	}
@@ -66,7 +67,7 @@ func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
 // agent that reported finished is marked done, a paused (answer) report pauses, and
 // anything else pauses as a zero-commit finish. A finish takes the worktree
 // away; an ask keeps it and stops only the session.
-func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
+func FinishCommitless(d deps.Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
 		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(), KeepAskedAgent: o.KeepAskedAgent,
@@ -118,7 +119,7 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 // carries commits nothing else reaches: removing it would leave them dangling,
 // so the worktree stays until a person merges or drops them. A scratch directory
 // has no commits to strand.
-func pauseStrandedCommits(d Deps, p iterationParams, w IterationWorktree, pane, sessionID string) (bool, error) {
+func pauseStrandedCommits(d deps.Deps, p iterationParams, w IterationWorktree, pane, sessionID string) (bool, error) {
 	if w.keep {
 		return false, nil
 	}
@@ -145,7 +146,7 @@ func commitlessSession(w IterationWorktree, pane string) agentrunner.Session {
 	return agentrunner.Session{Label: w.Label, ID: pane}
 }
 
-func cleanupCommitless(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
+func cleanupCommitless(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
 	if !w.keep {
 		return finishCleanup(d, &worktreeLock, o.RepoDir, "", w.Path, "", s, false)
 	}

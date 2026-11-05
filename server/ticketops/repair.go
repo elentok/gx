@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -67,7 +68,7 @@ type directLaunch struct {
 	projects *projects.Registry
 }
 
-func (l directLaunch) HostingDeps(tickets.Address) ralphloop.Deps { return l.projects.DefaultDeps() }
+func (l directLaunch) HostingDeps(tickets.Address) deps.Deps { return l.projects.DefaultDeps() }
 
 // directBack is the projects.RegistryBack of a repair run without a server.
 type directBack struct{}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
@@ -46,12 +47,12 @@ type modelGuardFixture struct {
 
 // runModelGuardWait runs waitForFinish through three timed-out polls on an
 // implement ticket expecting expected, reading turns from read.
-func runModelGuardWait(t *testing.T, ticketType, expected string, read func(since time.Time) (transcript.Turns, bool), tweak ...func(*Deps)) modelGuardFixture {
+func runModelGuardWait(t *testing.T, ticketType, expected string, read func(since time.Time) (transcript.Turns, bool), tweak ...func(*deps.Deps)) modelGuardFixture {
 	t.Helper()
 	var f modelGuardFixture
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= 3 })
 	f.scratchDir = fixture.EpicScratchDir(t, "epic")
-	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 	if read != nil {
 		d.ReadTurns = func(_, _ string, since time.Time) (transcript.Turns, bool, error) {
 			f.reads++
@@ -180,7 +181,7 @@ func TestWaitForFinish_ResumedLaunch_OldTurnsOnAnotherModelDoNotPause(t *testing
 	f := runModelGuardWait(t, "implement", "sonnet", func(since time.Time) (transcript.Turns, bool) {
 		turns := transcript.CountTurns(lines, since)
 		return turns, turns.Count > 0
-	}, func(d *Deps) { d.Now = func() time.Time { return launch } })
+	}, func(d *deps.Deps) { d.Now = func() time.Time { return launch } })
 	if f.err != nil {
 		t.Fatalf("err = %v, want none: the old Opus turns predate this launch", f.err)
 	}

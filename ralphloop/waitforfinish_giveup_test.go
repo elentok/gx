@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/transcript"
@@ -37,7 +38,7 @@ func countPrompts(prompts []string, text string) int {
 func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 	t.Parallel()
 	r := boundGiveUpRunner(alwaysTimeout)
-	d := Deps{
+	d := deps.Deps{
 		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
@@ -74,7 +75,7 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 	// test exists to distrust.
 	r := boundGiveUpRunner(nil)
 	r.timeoutIf = func(int) bool { return len(r.Prompts("iter-19")) == 0 }
-	d := Deps{
+	d := deps.Deps{
 		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
@@ -116,7 +117,7 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 		thirdMerged = true
 		return false
 	}
-	d := Deps{
+	d := deps.Deps{
 		Runner:        r,
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		// Only the second compaction merges while its own recovery is watching.
@@ -153,7 +154,7 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 	t.Parallel()
 	r := boundGiveUpRunner(alwaysTimeout)
 	failArmed := false
-	d := Deps{
+	d := deps.Deps{
 		Runner:        r,
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		// The middle attempt compacts for real but its finish-up prompt fails,
@@ -196,7 +197,7 @@ func TestRecoverSmartZoneBreach_FailedFinishUpPromptIsBestEffort(t *testing.T) {
 		r.FailNextPrompts("iter-19", 1, errors.New("finish-up never submitted"))
 		return false
 	})
-	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
 	if err != nil {
@@ -227,8 +228,8 @@ func TestRecoverSmartZoneBreach_FailedFinishUpPromptIsBestEffort(t *testing.T) {
 // staleReadingDeps wires a Claude Deps whose transcript reports occupancy
 // tokens with the given staleness, plus the minimum needed for waitForFinish
 // to poll: one timing-out tick, then idle.
-func staleReadingDeps(tokens int, stale bool) Deps {
-	return Deps{
+func staleReadingDeps(tokens int, stale bool) deps.Deps {
+	return deps.Deps{
 		Runner: boundGiveUpRunner(func(wait int) bool { return wait == 1 }),
 		ReadOccupancyReading: func(cwd, sessionID string) (transcript.OccupancyReading, error) {
 			return transcript.OccupancyReading{
@@ -327,7 +328,7 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 	t.Parallel()
 	sink := &occupancySink{}
 	r := &blipRunner{Runner: idleRunner("iter-01"), timeoutIf: func(wait int) bool { return wait <= 2 }}
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 1000 * r.waits, true, nil
@@ -363,7 +364,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 	var readCompactionsCalls int
 	fake := idleRunner("iter-01")
 	fake.PromptState = agentrunner.StateIdle
-	d := Deps{
+	d := deps.Deps{
 		Runner: &blipRunner{Runner: fake, finishPollsOnly: true, timeoutIf: func(wait int) bool {
 			switch wait {
 			case 1:
@@ -416,7 +417,7 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
 	r := blockedRunner("iter-01")
 	r.SetRateLimitErr("iter-01", errors.New("rollout unreadable"))
-	d := Deps{Runner: r}
+	d := deps.Deps{Runner: r}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-01", Agent: agent.AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),

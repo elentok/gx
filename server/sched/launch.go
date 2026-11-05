@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
@@ -119,7 +120,7 @@ func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address, agentKind
 
 // launch starts one's agent in cwd. Its Codex sandbox gets one.ScratchDir, the
 // project dir where the epic's tickets live.
-func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (runs.Run, error) {
+func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (runs.Run, error) {
 	t, agentKind := one.Ticket, one.Agent
 	var extraDirs []string
 	if t.Type == string(schema.TypeEvolve) {

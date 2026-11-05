@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
@@ -23,13 +24,13 @@ func (r *installRecorder) install(path, _ string) ([]string, error) {
 	return []string{"fake install"}, r.err
 }
 
-func prepareDepsFixture(t *testing.T) (Deps, *installRecorder, OneIteration) {
+func prepareDepsFixture(t *testing.T) (deps.Deps, *installRecorder, OneIteration) {
 	t.Helper()
 	repo := t.TempDir()
 	gitIn(t, repo, "init", "-b", "main")
 	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
 	rec := &installRecorder{}
-	d := DefaultDeps()
+	d := deps.DefaultDeps()
 	d.InstallDeps = rec.install
 	wtDir := filepath.Join(t.TempDir(), "wt")
 	d.WorktreeDir = func(string) (string, error) { return wtDir, nil }
@@ -110,10 +111,10 @@ func TestResume_NeverInstalls(t *testing.T) {
 }
 
 func TestPrepare_ReturnsTheInstallErrorUnwrapped(t *testing.T) {
-	prepares := map[string]func(Deps, OneIteration) error{
-		"iteration": func(d Deps, o OneIteration) error { _, err := PrepareIteration(d, o); return err },
-		"feature":   func(d Deps, o OneIteration) error { _, err := PrepareFeature(d, o); return err },
-		"commitless": func(d Deps, o OneIteration) error {
+	prepares := map[string]func(deps.Deps, OneIteration) error{
+		"iteration": func(d deps.Deps, o OneIteration) error { _, err := PrepareIteration(d, o); return err },
+		"feature":   func(d deps.Deps, o OneIteration) error { _, err := PrepareFeature(d, o); return err },
+		"commitless": func(d deps.Deps, o OneIteration) error {
 			_, err := PrepareCommitless(d, o, "", "main")
 			return err
 		},
@@ -146,9 +147,9 @@ func TestPrepareIteration_LogsDepsInstalled(t *testing.T) {
 }
 
 func TestPrepare_RebasesAnExistingEpicBranchOntoTheBaseOnFirstAttach(t *testing.T) {
-	for name, prepare := range map[string]func(Deps, OneIteration) error{
-		"iteration": func(d Deps, o OneIteration) error { _, err := PrepareIteration(d, o); return err },
-		"feature":   func(d Deps, o OneIteration) error { _, err := PrepareFeature(d, o); return err },
+	for name, prepare := range map[string]func(deps.Deps, OneIteration) error{
+		"iteration": func(d deps.Deps, o OneIteration) error { _, err := PrepareIteration(d, o); return err },
+		"feature":   func(d deps.Deps, o OneIteration) error { _, err := PrepareFeature(d, o); return err },
 	} {
 		t.Run(name, func(t *testing.T) {
 			d, _, o := prepareDepsFixture(t)

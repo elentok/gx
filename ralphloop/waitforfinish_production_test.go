@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -60,7 +61,7 @@ func agentResult(pane, status string) (any, herdrfake.Identities, error) {
 // useFakeClock paces d's herdrrunner on hf's virtual clock, so a Runner.Wait
 // whose fake herdr wait times out ends instead of polling out a wall-clock
 // deadline.
-func useFakeClock(d Deps, hf *herdrfake.Coordinator) {
+func useFakeClock(d deps.Deps, hf *herdrfake.Coordinator) {
 	r := d.Runner.(*herdrrunner.Runner)
 	r.Now, r.Sleep = hf.Clock()
 }
@@ -197,7 +198,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	s.AdvanceVirtualTime(3 * time.Minute)
 
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	deps := testDepsWithOverrides(DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
+	deps := testDepsWithOverrides(deps.DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -304,7 +305,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 	_, fakeEnv := herdrfake.StartStateEnv(t, s)
 
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	deps := testDepsWithOverrides(DepsOverrides{Env: withProcessEnv(fakeEnv)})
+	deps := testDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
@@ -525,7 +526,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	s.AdvanceVirtualTime(8 * time.Minute)
 
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	deps := testDepsWithOverrides(DepsOverrides{Env: withProcessEnv(fakeEnv)})
+	deps := testDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }

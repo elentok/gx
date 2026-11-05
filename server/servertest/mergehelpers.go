@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -61,7 +62,7 @@ func ReportIteration(t *testing.T, path, status string) {
 // iteration does.
 func KeepWorktree(t *testing.T, repo, epic, id string) string {
 	t.Helper()
-	wtDir, err := ralphloop.DefaultDeps().WorktreeDir(repo)
+	wtDir, err := deps.DefaultDeps().WorktreeDir(repo)
 	if err != nil {
 		t.Fatal(err)
 	}

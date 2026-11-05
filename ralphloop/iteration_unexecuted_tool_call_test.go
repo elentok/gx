@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
@@ -30,7 +31,7 @@ func finishFixture(t *testing.T) (scratchDir, path string) {
 // driveIteration runs the fixture ticket through the path the server drives:
 // PrepareIteration, launch, WaitIterationFinished, FinishIteration. A finish
 // that pauses the ticket is an outcome, not an error.
-func driveIteration(t *testing.T, d Deps, scratchDir, path string, sink runlog.EventSink) FinishOutcome {
+func driveIteration(t *testing.T, d deps.Deps, scratchDir, path string, sink runlog.EventSink) FinishOutcome {
 	t.Helper()
 	one := OneIteration{
 		RepoDir: "/fake/repo", Epic: "epic", ScratchDir: scratchDir, Agent: agent.AgentClaude, Sink: sink,
@@ -57,7 +58,7 @@ func driveIteration(t *testing.T, d Deps, scratchDir, path string, sink runlog.E
 
 // retryThenMergeCommits makes CommitsAhead report zero for the finish checks
 // before the corrective retry and one commit after it.
-func retryThenMergeCommits(d *Deps) {
+func retryThenMergeCommits(d *deps.Deps) {
 	var calls int32
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		if atomic.AddInt32(&calls, 1) <= 2 {

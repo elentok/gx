@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
 
@@ -20,7 +21,7 @@ const rateLimitPollInterval = 5 * time.Minute
 // loop wakes just after the quota actually rolls over, not right at it.
 const rateLimitResetBuffer = 60 * time.Second
 
-func codexBlocked(d Deps, p launchAndPromptParams) bool {
+func codexBlocked(d deps.Deps, p launchAndPromptParams) bool {
 	st, err := d.Runner.Status(p.session())
 	return err == nil && st.State == agentrunner.StateBlocked
 }
@@ -31,7 +32,7 @@ func codexBlocked(d Deps, p launchAndPromptParams) bool {
 // returns when a turn ends without the runner reporting a limit. It asks the
 // runner after each turn, not the transcript alone: on PTY an idle agent's
 // transcript keeps the old error as its newest entry.
-func holdRateLimit(d Deps, o OneIteration, p launchAndPromptParams, waitStates []agentrunner.State, resetAt time.Time) error {
+func holdRateLimit(d deps.Deps, o OneIteration, p launchAndPromptParams, waitStates []agentrunner.State, resetAt time.Time) error {
 	sessionID := ""
 	if status, err := d.Runner.Status(p.session()); err == nil {
 		sessionID = status.SessionID

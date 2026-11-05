@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
@@ -36,7 +37,7 @@ type MergeInput struct {
 
 // Merge lands a stuck ticket's commits (or continues/aborts a conflicted land)
 // and returns the result with a human-readable summary line.
-func Merge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) {
+func Merge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 	if branch, ok := IsRalphLoopBranch(in.Getwd); ok {
 		return MergeResult{}, "", &RefusalError{Reason: ReasonRalphLoopCwd, Message: fmt.Sprintf("refusing to land from a ralph-loop/* working directory (%s); run from outside the iteration worktree", branch)}
 	}
@@ -199,7 +200,7 @@ func recordLanded(epicPath, epic, source string, t tickets.Ticket, status schema
 
 // resolveMerge finishes (--continue) or abandons (--abort) the conflict a
 // previous land left pending for in.ID.
-func resolveMerge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) {
+func resolveMerge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 	if in.From != "" || in.To != "" {
 		return MergeResult{}, "", errors.New("--from/--to cannot be combined with --continue or --abort")
 	}
@@ -293,7 +294,7 @@ func resolveMerge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) 
 
 // featureWorktree is the epic's feature worktree in cwd's repo. Without one
 // the caller is in the wrong repo, which must not read as a missing branch.
-func featureWorktree(d ralphloop.Deps, cwd, epic string) (string, error) {
+func featureWorktree(d deps.Deps, cwd, epic string) (string, error) {
 	if wtDir, err := d.WorktreeDir(cwd); err == nil {
 		featurePath := filepath.Join(wtDir, epic)
 		if _, err := d.RevParse(featurePath, "HEAD"); err == nil {
@@ -331,7 +332,7 @@ func describeStatus(t schema.Ticket) string {
 
 // checkRecoverable is verify's recoverable test: the iteration branch exists
 // and has commits past its merge-base with the feature branch.
-func checkRecoverable(d ralphloop.Deps, featurePath, epic, identifier string) error {
+func checkRecoverable(d deps.Deps, featurePath, epic, identifier string) error {
 	branch := ralphloop.IterationBranch(epic, identifier)
 	if _, err := d.RevParse(featurePath, branch); err != nil {
 		return &RefusalError{Reason: ReasonIterationBranchMissing, Message: fmt.Sprintf("no iteration branch %s; commits not recoverable", branch)}
@@ -352,7 +353,7 @@ func checkRecoverable(d ralphloop.Deps, featurePath, epic, identifier string) er
 
 // mergeSourceRange is --from/--to when given, else the iteration branch's
 // commits since its merge-base with the feature branch.
-func mergeSourceRange(in MergeInput, d ralphloop.Deps, featurePath, epic, identifier string) (ralphloop.SourceRange, error) {
+func mergeSourceRange(in MergeInput, d deps.Deps, featurePath, epic, identifier string) (ralphloop.SourceRange, error) {
 	if in.From != "" {
 		return ralphloop.SourceRange{Base: in.From, Tip: in.To}, nil
 	}
@@ -368,7 +369,7 @@ func mergeSourceRange(in MergeInput, d ralphloop.Deps, featurePath, epic, identi
 }
 
 // preflightMerge is the three-way marker/cherry-pick check.
-func preflightMerge(lockDir, epic, id, featurePath string, d ralphloop.Deps) error {
+func preflightMerge(lockDir, epic, id, featurePath string, d deps.Deps) error {
 	inProgress, err := d.CherryPickInProgress(featurePath)
 	if err != nil {
 		return fmt.Errorf("checking cherry-pick state: %w", err)

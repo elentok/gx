@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -36,7 +37,7 @@ func TestCommitlessGitOneOff_RunsDetachedAndIsGoneAfterwards(t *testing.T) {
 	gitIn(t, repo, "init", "-b", "main")
 	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
 	one := OneIteration{RepoDir: repo, Epic: "fix-it", Ticket: tickets.Ticket{Identifier: "01"}}
-	d := DefaultDeps()
+	d := deps.DefaultDeps()
 
 	wt, err := PrepareCommitless(d, one, "", "main")
 	if err != nil {
@@ -64,7 +65,7 @@ func TestCommitlessGitOneOff_RunsDetachedAndIsGoneAfterwards(t *testing.T) {
 
 // finishedCommitlessOneOff prepares a detached one-off for a ticket that has
 // reported finished, commitless.
-func finishedCommitlessOneOff(t *testing.T) (Deps, OneIteration, IterationWorktree) {
+func finishedCommitlessOneOff(t *testing.T) (deps.Deps, OneIteration, IterationWorktree) {
 	t.Helper()
 	repo := t.TempDir()
 	gitIn(t, repo, "init", "-b", "main")
@@ -74,7 +75,7 @@ func finishedCommitlessOneOff(t *testing.T) (Deps, OneIteration, IterationWorktr
 	})
 	path := fixture.TicketPath(scratchDir, "fix-it", "01-a.md")
 	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
-	d := DefaultDeps()
+	d := deps.DefaultDeps()
 	d.Runner = runnerfake.NewRunner()
 	wt, err := PrepareCommitless(d, one, "", "main")
 	if err != nil {
@@ -107,7 +108,7 @@ func TestFinishCommitless_AskOnNonKeepingRunKeepsWorktreeAndStopsSession(t *test
 	})
 	path := fixture.TicketPath(scratchDir, "fix-it", "01-a.md")
 	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
-	d := DefaultDeps()
+	d := deps.DefaultDeps()
 	runner := runnerfake.NewRunner()
 	d.Runner = runner
 	wt, err := PrepareCommitless(d, one, "", "main")
@@ -146,7 +147,7 @@ func TestFinishCommitless_AskKeepsWorktreeWhateverTheClockSays(t *testing.T) {
 	})
 	path := fixture.TicketPath(scratchDir, "fix-it", "01-a.md")
 	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
-	d := DefaultDeps()
+	d := deps.DefaultDeps()
 	d.Runner = runnerfake.NewRunner()
 	wt, err := PrepareCommitless(d, one, "", "main")
 	if err != nil {
@@ -200,7 +201,7 @@ func TestFinishCommitless_StrandedCommitsPauseAndKeepWorktree(t *testing.T) {
 func TestCommitlessScratchOneOff_KeepsItsSubdirAfterwards(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "scratch", "fix-it")
 	one := OneIteration{Epic: "fix-it", Ticket: tickets.Ticket{Identifier: "01"}}
-	d := DefaultDeps()
+	d := deps.DefaultDeps()
 
 	wt, err := PrepareCommitless(d, one, dir, "")
 	if err != nil {

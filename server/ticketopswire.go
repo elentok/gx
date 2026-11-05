@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/ticketops"
@@ -26,7 +27,7 @@ func (s *Server) FreshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket
 
 // HostingDeps talks to the runner hosting addr's iteration, so start-over and
 // merge see (and close) the agent where it actually runs.
-func (s *Server) HostingDeps(addr tickets.Address) ralphloop.Deps {
+func (s *Server) HostingDeps(addr tickets.Address) deps.Deps {
 	if s.cfg.Runner == nil {
 		return s.projects.DefaultDeps()
 	}
@@ -36,7 +37,7 @@ func (s *Server) HostingDeps(addr tickets.Address) ralphloop.Deps {
 	return s.projects.DepsWith(runner)
 }
 
-func (l ticketOpsLaunch) HostingDeps(addr tickets.Address) ralphloop.Deps {
+func (l ticketOpsLaunch) HostingDeps(addr tickets.Address) deps.Deps {
 	return l.s.HostingDeps(addr)
 }
 

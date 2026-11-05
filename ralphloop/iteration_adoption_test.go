@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"strings"
@@ -14,7 +15,7 @@ import (
 // path on every Runner wait of fakeDeps' d for label, simulating the agent's
 // own `gx tickets set --iteration-status` call during the iteration. Other
 // tickets in a multi-item run are unaffected.
-func reportIterationStatus(t *testing.T, d Deps, path, label, value string) {
+func reportIterationStatus(t *testing.T, d deps.Deps, path, label, value string) {
 	t.Helper()
 	onRunnerWait(d, func(s agentrunner.Session) {
 		if s.Label != label {

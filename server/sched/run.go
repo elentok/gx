@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/merge"
@@ -136,7 +137,7 @@ func (l *Launcher) Continue(runner agentrunner.Runner, t runs.TrackedRun, root q
 // in it. A launch that fails takes that back out so a retry starts clean.
 // prepared sees the worktree before the agent starts.
 func (l *Launcher) prepareAndLaunch(
-	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode merge.IterationMode,
+	deps deps.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode merge.IterationMode,
 	prepared func(ralphloop.IterationWorktree),
 ) (runs.Run, ralphloop.IterationWorktree, error) {
 	wt, err := mode.Prepare(deps, *one)
@@ -207,7 +208,7 @@ func (l *Launcher) watchBlocked(r agentrunner.Runner, sess agentrunner.Session, 
 
 // runContext is everything settling one claimed iteration needs.
 type runContext struct {
-	deps       ralphloop.Deps
+	deps       deps.Deps
 	root       queue.RootRef
 	mode       merge.IterationMode
 	one        ralphloop.OneIteration

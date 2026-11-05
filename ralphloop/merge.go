@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -74,7 +75,7 @@ type MergeResult struct {
 	MetricsStamped bool
 }
 
-func mergeDepsFor(d Deps) MergeDeps {
+func mergeDepsFor(d deps.Deps) MergeDeps {
 	return MergeDeps{
 		RevParse:             d.RevParse,
 		IsAncestor:           d.IsAncestor,

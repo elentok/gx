@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 )
@@ -21,7 +22,7 @@ func serverVerifyCapWait(t *testing.T, ticketType string, agent agent.AgentKind,
 	r.finishPollsOnly = false
 	scratchDir := fixture.EpicScratchDir(t, "epic")
 	read := func(string, string) (int, bool, error) { return occupancy, true, nil }
-	d := Deps{Runner: r, ReadOccupancy: read, ReadCodexContext: read, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, ReadOccupancy: read, ReadCodexContext: read, Sleep: func(time.Duration) {}}
 	one := OneIteration{
 		Agent: agent, Epic: "epic", ScratchDir: scratchDir,
 		Ticket: tickets.Ticket{Identifier: "19", Type: ticketType},

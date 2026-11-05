@@ -1,4 +1,4 @@
-package ralphloop
+package deps
 
 import (
 	"errors"
@@ -218,20 +218,6 @@ func TestDefaultDepsWithOverrides_RunnerWaitReachesRunner(t *testing.T) {
 	runner := DefaultDepsWithOverrides(DepsOverrides{RunnerWait: 7 * time.Second}).Runner.(*herdrrunner.Runner)
 	if got := runner.WaitN(); got != 7*time.Second {
 		t.Errorf("WaitN() = %v, want 7s", got)
-	}
-}
-
-func TestDefaultDepsWithOverrides_NoStateDirFailsMergeLockDir(t *testing.T) {
-	t.Parallel()
-	d := DefaultDepsWithOverrides(DepsOverrides{})
-	if _, err := d.mergeLockDir("/tickets/proj", "epic"); err == nil {
-		t.Error("mergeLockDir() with no state dir = nil error, want one")
-	}
-	state := t.TempDir()
-	d = DefaultDepsWithOverrides(DepsOverrides{StateDir: state})
-	dir, err := d.mergeLockDir("/tickets/proj", "epic")
-	if err != nil || !strings.HasPrefix(dir, state) {
-		t.Errorf("mergeLockDir() = %q, %v; want a dir under %s", dir, err, state)
 	}
 }
 

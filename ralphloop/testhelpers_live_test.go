@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
+	"github.com/elentok/gx/ralphloop/deps"
 )
 
 // readyTimer is a Deps.PauseTimer that has already fired: a pause test polls at
@@ -17,11 +18,11 @@ func readyTimer(time.Duration) <-chan time.Time {
 
 // realGitDeps wires IsAncestor/RevParse/WorktreeExists to the real git
 // package and filesystem, leaving every other Deps field faked.
-func realGitDeps() Deps {
+func realGitDeps() deps.Deps {
 	d, _, _ := fakeDeps()
 	d.IsAncestor = git.IsAncestor
 	d.RevParse = git.RevParse
-	d.WorktreeExists = worktreeExists
+	d.WorktreeExists = deps.DefaultDeps().WorktreeExists
 	d.MergeBase = git.MergeBase
 	d.PatchesApplied = history.PatchesApplied
 	d.AppendTrailers = history.AppendTrailers

@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
@@ -38,7 +39,7 @@ type ReclaimHost interface {
 	StalledNudgeDelay() time.Duration
 	FinishSink(addr tickets.Address, ticketPath string) runlog.EventSink
 	IterationModeFor(addr tickets.Address, t tickets.Ticket) merge.IterationMode
-	DefaultDeps() ralphloop.Deps
+	DefaultDeps() deps.Deps
 	Publish(event, id string)
 	// Continue hands a reclaimed run to the settle machinery: settle now when
 	// settleNow, else wait for the agent to finish first.

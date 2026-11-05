@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/transcript"
 )
@@ -43,7 +44,7 @@ const (
 // (compact + finish-up re-prompt) and falls back into normal polling —
 // unlike rate-limit/paused (repair) pauses, this never blocks the
 // scheduler via Gate.pause.
-func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
+func waitForFinish(d deps.Deps, p launchAndPromptParams, sessionID string) error {
 	smartZone := p.SmartZone
 	if smartZone <= 0 {
 		smartZone = agent.DefaultSmartZone
@@ -200,7 +201,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 // reports that either of the first two interrupted the pane. The cap stop goes
 // first and takes the whole tick: if occupancy is also past the smart zone, the
 // next poll runs its recovery.
-func guardTick(d Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery, mguard *modelGuard, lguard *longTicketGuard) (acted bool, err error) {
+func guardTick(d deps.Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery, mguard *modelGuard, lguard *longTicketGuard) (acted bool, err error) {
 	if err := mguard.tick(d, p, sessionID); err != nil {
 		return false, err
 	}
@@ -302,7 +303,7 @@ func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
 // confirmed successful from the transcript's compaction-boundary signal
 // instead of being misreported as a failure — see waitForCompactionSignal's
 // doc comment.
-func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
+func recoverSmartZoneBreach(d deps.Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(string(events.PausedSmartZone), sessionID, reason)
 
@@ -377,7 +378,7 @@ type compactBoundarySnapshot struct {
 // session exists and will be identified shortly, and calling it unsupported
 // would fail a Claude agent open — the single most likely way one merges in the
 // trust-the-pane bucket by accident.
-func readCompactBoundaries(d Deps, agentKind agent.AgentKind, cwd, sessionID string) compactBoundarySnapshot {
+func readCompactBoundaries(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID string) compactBoundarySnapshot {
 	read := compactionReader(d, agentKind)
 	if read == nil {
 		return compactBoundarySnapshot{state: compactBoundaryUnsupported}
@@ -394,7 +395,7 @@ func readCompactBoundaries(d Deps, agentKind agent.AgentKind, cwd, sessionID str
 
 // compactionReader picks the agent's own boundary-count read; nil means the
 // agent has no boundary signal wired.
-func compactionReader(d Deps, agentKind agent.AgentKind) func(cwd, sessionID string) (int, bool, error) {
+func compactionReader(d deps.Deps, agentKind agent.AgentKind) func(cwd, sessionID string) (int, bool, error) {
 	if agentKind == agent.AgentCodex {
 		return d.ReadCodexCompactions
 	}
@@ -402,7 +403,7 @@ func compactionReader(d Deps, agentKind agent.AgentKind) func(cwd, sessionID str
 }
 
 // compactionAfterReader is compactionReader for the "written since" read.
-func compactionAfterReader(d Deps, agentKind agent.AgentKind) func(cwd, sessionID string, since time.Time) (int, bool, error) {
+func compactionAfterReader(d deps.Deps, agentKind agent.AgentKind) func(cwd, sessionID string, since time.Time) (int, bool, error) {
 	if agentKind == agent.AgentCodex {
 		return d.ReadCodexCompactionsAfter
 	}
@@ -420,14 +421,14 @@ func (s compactBoundarySnapshot) gates() bool {
 // the transcript to show for it. An agent with no boundary signal at all is
 // never unresolved: there is no evidence to wait for, so nothing to withhold
 // trust for.
-func (s compactBoundarySnapshot) unresolved(d Deps, p launchAndPromptParams, sessionID string) bool {
+func (s compactBoundarySnapshot) unresolved(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
 	return s.gates() && !s.advancedPast(d, p, sessionID)
 }
 
 // advancedPast reports whether a fresh read proves a compaction boundary
 // merged since s was taken. Anything short of a confirmed, higher count —
 // including a read that fails now — is "not yet", never "close enough".
-func (s compactBoundarySnapshot) advancedPast(d Deps, p launchAndPromptParams, sessionID string) bool {
+func (s compactBoundarySnapshot) advancedPast(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
 	if s.state != compactBoundaryConfirmed {
 		return false
 	}
@@ -461,7 +462,7 @@ type stickyBaseline struct {
 // newStickyBaseline snapshots the boundary count and stamps since. Both must
 // happen before "/compact" is submitted, so that any boundary this recovery
 // causes is strictly newer than both.
-func newStickyBaseline(d Deps, p launchAndPromptParams, sessionID string) *stickyBaseline {
+func newStickyBaseline(d deps.Deps, p launchAndPromptParams, sessionID string) *stickyBaseline {
 	now := time.Now()
 	if d.Now != nil {
 		now = d.Now()
@@ -478,7 +479,7 @@ func (b *stickyBaseline) gates() bool {
 
 // advancedPast reports whether the transcript now proves this recovery's
 // compaction merged.
-func (b *stickyBaseline) advancedPast(d Deps, p launchAndPromptParams, sessionID string) bool {
+func (b *stickyBaseline) advancedPast(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
 	switch b.snapshot.state {
 	case compactBoundaryConfirmed:
 		return b.snapshot.advancedPast(d, p, sessionID)
@@ -493,7 +494,7 @@ func (b *stickyBaseline) advancedPast(d Deps, p launchAndPromptParams, sessionID
 // completion is decided by failing the gate open, never by this read. A read
 // that fails proves nothing and holds the gate closed, like every other
 // unconfirmed observation.
-func (b *stickyBaseline) boundaryMergedSince(d Deps, p launchAndPromptParams, sessionID string) bool {
+func (b *stickyBaseline) boundaryMergedSince(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
 	read := compactionAfterReader(d, p.Agent)
 	if read == nil || sessionID == "" {
 		return false
@@ -551,7 +552,7 @@ const (
 // pane's nil error in that second case would let recovery walk straight into
 // the finish-up prompt and reintroduce the bug ten minutes later.
 func waitForCompactionSignal(
-	d Deps, p launchAndPromptParams, sessionID string,
+	d deps.Deps, p launchAndPromptParams, sessionID string,
 	until []agentrunner.State, baseline *stickyBaseline,
 ) (compactCompletion, error) {
 	gateHeld := false
@@ -602,7 +603,7 @@ func waitForCompactionSignal(
 // whether the agent is still in one of until's finish states. A poll timeout
 // (the agent went back to "working" in the meantime) means the original
 // signal was a transient blip, not a real finish.
-func confirmFinished(d Deps, in *personInput, s agentrunner.Session, until []agentrunner.State) (bool, error) {
+func confirmFinished(d deps.Deps, in *personInput, s agentrunner.Session, until []agentrunner.State) (bool, error) {
 	in.sleep(d, finishDebounceMs*time.Millisecond)
 	_, err := d.Runner.Wait(s, until, finishConfirmMs*time.Millisecond)
 	if err == nil {
@@ -639,7 +640,7 @@ func confirmFinished(d Deps, in *personInput, s agentrunner.Session, until []age
 // FinishTimeoutMs instead of resetting it, and it paces re-reads at
 // smartZonePollMs instead of spinning — same reasoning as
 // waitForCompactionSignal's own pacing.
-func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, until []agentrunner.State, elapsedMs *int) (bool, error) {
+func waitForBackgroundTasks(d deps.Deps, p launchAndPromptParams, sessionID string, until []agentrunner.State, elapsedMs *int) (bool, error) {
 	if p.Agent != agent.AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
 		return true, nil
 	}
@@ -713,7 +714,7 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 // contextOccupancy reads the selected agent's own local session data. A
 // missing observer is treated like incomplete session data, keeping the
 // running iteration alive instead of falsely pausing it.
-func contextOccupancy(d Deps, agentKind agent.AgentKind, cwd, sessionID string) (int, bool, error) {
+func contextOccupancy(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID string) (int, bool, error) {
 	if sessionID == "" {
 		return 0, false, nil
 	}
@@ -738,7 +739,7 @@ func contextOccupancy(d Deps, agentKind agent.AgentKind, cwd, sessionID string) 
 // work the first recovery just asked for. Agents (Codex) and wirings without
 // the staleness-aware reader fall back to the general read, where every found
 // number is decidable.
-func smartZoneOccupancy(d Deps, agentKind agent.AgentKind, cwd, sessionID string) (occupancy int, found, decidable bool, err error) {
+func smartZoneOccupancy(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID string) (occupancy int, found, decidable bool, err error) {
 	if agentKind == agent.AgentClaude && sessionID != "" && d.ReadOccupancyReading != nil {
 		reading, err := d.ReadOccupancyReading(cwd, sessionID)
 		if err != nil {
@@ -757,7 +758,7 @@ func smartZoneOccupancy(d Deps, agentKind agent.AgentKind, cwd, sessionID string
 // smartZonePollMs after starting/reattaching. A missing/unreadable occupancy
 // (occErr != nil or !ok, e.g. no session id yet) is silently skipped rather
 // than emitting a misleading zero.
-func emitContextOccupancy(d Deps, sink runlog.EventSink, agentKind agent.AgentKind, identifier, cwd, sessionID string) {
+func emitContextOccupancy(d deps.Deps, sink runlog.EventSink, agentKind agent.AgentKind, identifier, cwd, sessionID string) {
 	occupancy, ok, err := contextOccupancy(d, agentKind, cwd, sessionID)
 	if err != nil || !ok {
 		return
@@ -769,7 +770,7 @@ func emitContextOccupancy(d Deps, sink runlog.EventSink, agentKind agent.AgentKi
 // agent's transcript recorded. A missing observer or read failure is treated
 // as "unknown" (count 0, omitted from frontmatter) rather than blocking the
 // ticket close it's stamped alongside.
-func sessionCompactions(d Deps, agentKind agent.AgentKind, cwd, sessionID string) (int, bool, error) {
+func sessionCompactions(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID string) (int, bool, error) {
 	read := compactionReader(d, agentKind)
 	if sessionID == "" || read == nil {
 		return 0, false, nil
@@ -780,7 +781,7 @@ func sessionCompactions(d Deps, agentKind agent.AgentKind, cwd, sessionID string
 // runnerRateLimit asks the runner whether p's agent is rate limited.
 // ErrContextExhausted is not a failure: it is returned as the evidence the
 // adapter found, with limited false and a nil err.
-func runnerRateLimit(d Deps, p launchAndPromptParams) (resetAt time.Time, limited bool, evidence string, err error) {
+func runnerRateLimit(d deps.Deps, p launchAndPromptParams) (resetAt time.Time, limited bool, evidence string, err error) {
 	resetAt, limited, err = d.Runner.RateLimit(p.session())
 	if errors.Is(err, agentrunner.ErrContextExhausted) {
 		return time.Time{}, false, strings.TrimPrefix(err.Error(), agentrunner.ErrContextExhausted.Error()+": "), nil
@@ -801,7 +802,7 @@ func runnerRateLimit(d Deps, p launchAndPromptParams) (resetAt time.Time, limite
 // path every other iteration-level failure takes (see Run's per-result
 // handling in loop.go), which marks the ticket paused (repair) with this
 // specific reason and leaves its worktree/tab for inspection.
-func recoverOrFailCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID, evidence string, smartZone int) error {
+func recoverOrFailCodexContextExhaustion(d deps.Deps, p launchAndPromptParams, sessionID, evidence string, smartZone int) error {
 	reason := fmt.Sprintf("Codex context exhaustion detected: %s", evidence)
 	recovered, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone)
 	if err != nil {

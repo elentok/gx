@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -28,7 +29,7 @@ func serverGuardsWait(t *testing.T, ticketType, expected, ranModel string, thres
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= 3 })
 	// The server's wait does not stop on blocked here, so every Wait is a poll.
 	r.finishPollsOnly = false
-	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 	if counts != nil {
 		d.ReadTurns = func(_, _ string, _ time.Time) (transcript.Turns, bool, error) {
 			n := counts[min(f.reads, len(counts)-1)]

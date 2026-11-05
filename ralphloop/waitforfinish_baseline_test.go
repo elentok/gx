@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 )
 
 // stickyBaselineDeps is the premature-idle pane the sticky-baseline tests
@@ -16,8 +17,8 @@ func stickyBaselineDeps(
 	r *blipRunner, sleeps *int,
 	readCompactions func(string, string) (int, bool, error),
 	readCompactionsAfter func(string, string, time.Time) (int, bool, error),
-) Deps {
-	return Deps{
+) deps.Deps {
+	return deps.Deps{
 		Runner:               r,
 		ReadCompactions:      readCompactions,
 		ReadCompactionsAfter: readCompactionsAfter,
@@ -204,7 +205,7 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		t.Parallel()
 		r := breachRunner(nil)
 		var sleeps int
-		d := Deps{Runner: r, Sleep: func(time.Duration) { sleeps++ }}
+		d := deps.Deps{Runner: r, Sleep: func(time.Duration) { sleeps++ }}
 		p := gatedBreachParams(t.TempDir())
 		p.Agent = agent.AgentCodex
 		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
@@ -223,7 +224,7 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		t.Parallel()
 		var sleeps int
 		r := breachRunner(nil)
-		d := Deps{
+		d := deps.Deps{
 			Runner:                    r,
 			ReadCodexCompactions:      missing,
 			ReadCodexCompactionsAfter: func(string, string, time.Time) (int, bool, error) { return 0, false, nil },
@@ -247,7 +248,7 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		t.Parallel()
 		var sleeps, reads int
 		r := breachRunner(nil)
-		d := Deps{
+		d := deps.Deps{
 			Runner: r,
 			ReadCodexCompactions: func(string, string) (int, bool, error) {
 				reads++

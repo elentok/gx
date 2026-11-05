@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git/history"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -29,8 +30,8 @@ func ticketAddr(scratchDir, epicName, id string) string {
 // testDeps is DefaultDeps for a test: real behavior everywhere except that a
 // pause polls at full speed rather than on the wall clock, so a test that pauses
 // unexpectedly surfaces as its own failure instead of a multi-minute wait.
-func testDeps() Deps {
-	return testDepsWithOverrides(DepsOverrides{})
+func testDeps() deps.Deps {
+	return testDepsWithOverrides(deps.DepsOverrides{})
 }
 
 // testStateDir is the state dir merge locks live under for this package's
@@ -39,7 +40,7 @@ var testStateDir string
 
 // mergeLockDir is where an epic's merge lock lives under testStateDir.
 func mergeLockDir(scratchDir, epic string) (string, error) {
-	return testDeps().mergeLockDir(scratchDir, epic)
+	return mergeLockDirFor(testDeps(), scratchDir, epic)
 }
 
 func mustMergeLockDir(t *testing.T, scratchDir, epic string) string {
@@ -54,7 +55,7 @@ func mustMergeLockDir(t *testing.T, scratchDir, epic string) string {
 // testDepsWithOverrides is testDeps with DepsOverrides applied, for tests
 // that need to isolate HOME/CODEX_HOME/PATH without mutating process env via
 // t.Setenv.
-func testDepsWithOverrides(overrides DepsOverrides) Deps {
+func testDepsWithOverrides(overrides deps.DepsOverrides) deps.Deps {
 	if overrides.StateDir == "" {
 		overrides.StateDir = testStateDir
 	}
@@ -62,7 +63,7 @@ func testDepsWithOverrides(overrides DepsOverrides) Deps {
 		// Set by fixture.SetHomeEnv for the tests that point the process HOME at a fixture.
 		overrides.Home = fixture.HomeDir()
 	}
-	d := DefaultDepsWithOverrides(overrides)
+	d := deps.DefaultDepsWithOverrides(overrides)
 	d.PauseTimer = readyTimer
 	return d
 }
@@ -100,7 +101,7 @@ func setProcessEnv(t *testing.T, key, value string) {
 // texts sent (in call order) and worktree branches removed, for assertions.
 // All fake operations are safe to call concurrently, since iterations may run
 // in parallel.
-func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
+func fakeDeps() (d deps.Deps, prompts *[]string, removedBranches *[]string) {
 	var mu sync.Mutex
 	promptsSlice := []string{}
 	removedSlice := []string{}
@@ -116,7 +117,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 	runner.Adopt = true
 	// Agents finish their turn right away.
 	runner.PromptState = agentrunner.StateDone
-	d = Deps{
+	d = deps.Deps{
 		MergeLockStateDir: testStateDir,
 		Runner:            recordingRunner{Runner: runner, record: record, hooks: &runnerHooks{}},
 		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
@@ -208,7 +209,7 @@ type runnerHooks struct {
 }
 
 // onRunnerStop runs hook whenever a session is stopped.
-func onRunnerStop(d Deps, hook func(s agentrunner.Session)) {
+func onRunnerStop(d deps.Deps, hook func(s agentrunner.Session)) {
 	h := d.Runner.(recordingRunner).hooks
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -227,7 +228,7 @@ func (r recordingRunner) Stop(s agentrunner.Session) error {
 
 // onRunnerWait runs hook before every Runner wait of fakeDeps' d, e.g. to
 // hold an agent back from finishing.
-func onRunnerWait(d Deps, hook func(s agentrunner.Session)) {
+func onRunnerWait(d deps.Deps, hook func(s agentrunner.Session)) {
 	h := d.Runner.(recordingRunner).hooks
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -246,7 +247,7 @@ func (r recordingRunner) Wait(s agentrunner.Session, states []agentrunner.State,
 
 // onRunnerStart runs hook before every Runner start of fakeDeps' d, after
 // any hooks added earlier; a hook's error fails the start.
-func onRunnerStart(d Deps, hook func(opts agentrunner.StartOptions) error) {
+func onRunnerStart(d deps.Deps, hook func(opts agentrunner.StartOptions) error) {
 	h := d.Runner.(recordingRunner).hooks
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -254,7 +255,7 @@ func onRunnerStart(d Deps, hook func(opts agentrunner.StartOptions) error) {
 }
 
 // onRunnerPrompt is onRunnerStart for prompts.
-func onRunnerPrompt(d Deps, hook func(s agentrunner.Session, text string) error) {
+func onRunnerPrompt(d deps.Deps, hook func(s agentrunner.Session, text string) error) {
 	h := d.Runner.(recordingRunner).hooks
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -290,13 +291,13 @@ func (r recordingRunner) Prompt(s agentrunner.Session, text string) error {
 }
 
 // fakeRunner is the runnerfake behind fakeDeps' Runner.
-func fakeRunner(d Deps) *runnerfake.Runner {
+func fakeRunner(d deps.Deps) *runnerfake.Runner {
 	return d.Runner.(recordingRunner).Runner
 }
 
 // hostLiveAgent hosts label's agent in fakeDeps' Runner, idle, as a restart
 // finds it still running from before the crash.
-func hostLiveAgent(t *testing.T, d Deps, label string) {
+func hostLiveAgent(t *testing.T, d deps.Deps, label string) {
 	t.Helper()
 	if _, err := fakeRunner(d).Start(agentrunner.StartOptions{Label: label, Epic: "epic"}); err != nil {
 		t.Fatalf("Start(%s): %v", label, err)
@@ -305,7 +306,7 @@ func hostLiveAgent(t *testing.T, d Deps, label string) {
 
 // hostLiveAgentWithSession is hostLiveAgent for an agent whose native session
 // id is sessionID ("" for one that has not reported any yet).
-func hostLiveAgentWithSession(t *testing.T, d Deps, label, sessionID string) {
+func hostLiveAgentWithSession(t *testing.T, d deps.Deps, label, sessionID string) {
 	t.Helper()
 	r := fakeRunner(d)
 	ids := r.IDs

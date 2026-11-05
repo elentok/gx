@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
 
@@ -15,12 +16,12 @@ import (
 func IterationBranch(epic, identifier string) string { return iterBranch(epic, identifier) }
 
 // MergeDepsOf narrows d to what a merging needs.
-func MergeDepsOf(d Deps) MergeDeps { return mergeDepsFor(d) }
+func MergeDepsOf(d deps.Deps) MergeDeps { return mergeDepsFor(d) }
 
 // FindIterationSession returns the iteration's live session, if the runner
 // knows one. An unreachable runner reports none: recovery has to keep working
 // when the host is down.
-func FindIterationSession(d Deps, epic, identifier string) (agentrunner.Session, bool) {
+func FindIterationSession(d deps.Deps, epic, identifier string) (agentrunner.Session, bool) {
 	if d.Runner == nil {
 		return agentrunner.Session{}, false
 	}
@@ -39,7 +40,7 @@ func IterationWorktreePath(worktreeDir, epic, identifier string) string {
 // RemoveIterationWorktree removes the leftover iteration worktree of
 // epic/identifier, keeping its branch (it holds commits). A missing worktree is
 // not an error.
-func RemoveIterationWorktree(d Deps, repoDir, epic, identifier string) error {
+func RemoveIterationWorktree(d deps.Deps, repoDir, epic, identifier string) error {
 	wtDir, err := d.WorktreeDir(repoDir)
 	if err != nil {
 		return fmt.Errorf("resolving worktree directory for %q: %w", repoDir, err)

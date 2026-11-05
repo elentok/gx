@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
@@ -16,7 +17,7 @@ import (
 
 // serverMergeFixture is a claimed ticket built and waiting to merge through the
 // server's mergeBuilt.
-func serverMergeFixture(t *testing.T) (Deps, iterationParams, *builtAwaitingMergeError, string) {
+func serverMergeFixture(t *testing.T) (deps.Deps, iterationParams, *builtAwaitingMergeError, string) {
 	t.Helper()
 	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",

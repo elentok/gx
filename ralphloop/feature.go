@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"cmp"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 
@@ -14,7 +15,7 @@ import (
 // PrepareFeature runs a ticket in the epic's feature worktree itself, on the
 // epic branch, with no iteration branch. A missing worktree is recreated from
 // the branch. The handle is kept, so ending the ticket only stops its agent.
-func PrepareFeature(d Deps, o OneIteration) (IterationWorktree, error) {
+func PrepareFeature(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	w, err := ResumeFeature(d, o)
 	if err != nil {
 		return IterationWorktree{}, err
@@ -30,7 +31,7 @@ func PrepareFeature(d Deps, o OneIteration) (IterationWorktree, error) {
 }
 
 // ResumeFeature rebuilds the handle PrepareFeature made, without touching git.
-func ResumeFeature(d Deps, o OneIteration) (IterationWorktree, error) {
+func ResumeFeature(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	wtDir, err := d.WorktreeDir(o.RepoDir)
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
@@ -49,7 +50,7 @@ func ResumeFeature(d Deps, o OneIteration) (IterationWorktree, error) {
 // counted; they merge with the epic's fast-forward. Anything else pauses
 // paused (repair). The feature worktree stays: the post-merge removal, once the
 // epic is merged, is the one place gx removes it.
-func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target string) (FinishOutcome, error) {
+func FinishMerge(d deps.Deps, o OneIteration, w IterationWorktree, pane, target string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
 		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(),
@@ -97,7 +98,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 
 // MergeFinishFault is why a merge ticket cannot be done and the kind it pauses
 // with, "" when it can be done.
-func MergeFinishFault(d Deps, o OneIteration, dir, target string) (events.Kind, string, error) {
+func MergeFinishFault(d deps.Deps, o OneIteration, dir, target string) (events.Kind, string, error) {
 	t, err := schema.ParseTicket(o.Ticket.Path)
 	if err != nil {
 		return "", "", fmt.Errorf("reading ticket %s for its finish check: %w", o.Ticket.Path, err)
@@ -150,7 +151,7 @@ func claimTargetTip(o OneIteration) string {
 // epic does not start from a stale tree. Callers hold the worktree lock.
 // A conflicting or failing rebase is skipped: the branch keeps its old tip and
 // the merge step rebases it later.
-func addFeatureWorktree(d Deps, o OneIteration, path string) error {
+func addFeatureWorktree(d deps.Deps, o OneIteration, path string) error {
 	exists, err := d.WorktreeExists(path)
 	if err != nil {
 		return err

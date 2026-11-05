@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -33,7 +34,7 @@ var rateLimitClock = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 // rateLimitFixture is an idle, rate-limited agent with a finished report (so the
 // stall nudge cannot fire) on a fake clock that Sleep advances.
-func rateLimitFixture(t *testing.T, limit func(r *runnerfake.Runner), onPrompt func(r *runnerfake.Runner, n int)) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration, *[]bool) {
+func rateLimitFixture(t *testing.T, limit func(r *runnerfake.Runner), onPrompt func(r *runnerfake.Runner, n int)) (deps.Deps, *runnerfake.Runner, OneIteration, *[]time.Duration, *[]bool) {
 	t.Helper()
 	d, r, one, sleeps := stallNudgeFixture(t, "finished", 2*time.Minute)
 	*sleeps = nil
@@ -131,7 +132,7 @@ func TestWaitIterationFinished_RateLimitUnknownResetPollsWhileLimitedAgain(t *te
 
 // codexBlockedLimitFixture is a blocked Codex agent on herdr with a quota
 // limit; onReset runs on the hold sleep.
-func codexBlockedLimitFixture(t *testing.T, onReset func(r *runnerfake.Runner)) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
+func codexBlockedLimitFixture(t *testing.T, onReset func(r *runnerfake.Runner)) (deps.Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
 	t.Helper()
 	d, r, one, sleeps, _ := rateLimitFixture(t, func(r *runnerfake.Runner) {
 		r.SetState("iter-01", agentrunner.StateBlocked, "Approve command?")

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -131,7 +132,7 @@ func (s *Disk) runCleanWork(work []cleanCmd) (failed string) {
 			}
 		}
 		s.log.Warn("disk cleanup command failed", "command", c.String(), "dir", c.dir, "result", code,
-			"output", ralphloop.OutputTail(out))
+			"output", deps.OutputTail(out))
 		if failed == "" {
 			failed = c.String()
 		}

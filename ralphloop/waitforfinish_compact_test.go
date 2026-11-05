@@ -9,6 +9,7 @@ import (
 
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
@@ -19,7 +20,7 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	gate := NewGate()
 	var observedCwd, observedSession string
 	r := &blipRunner{Runner: idlePromptRunner("iter-01", "codex-session-1"), timeoutOn: 1}
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
 			observedCwd, observedSession = cwd, sessionID
@@ -81,7 +82,7 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 		}
 		return true
 	})
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
@@ -135,7 +136,7 @@ func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *tes
 	t.Parallel()
 	scratchDir := fixture.EpicScratchDir(t, "epic")
 	r := breachRunner(alwaysTimeout)
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return 0, true, nil
@@ -189,7 +190,7 @@ func TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck(t *te
 		}
 		return false
 	})
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
@@ -223,7 +224,7 @@ func TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced(t *te
 	var sleeps int
 	var readCompactionsCalls int
 	r := breachRunner(nil)
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			readCompactionsCalls++
@@ -312,9 +313,9 @@ func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			d := Deps{ReadCompactions: tc.read}
+			d := deps.Deps{ReadCompactions: tc.read}
 			if tc.agent == agent.AgentCodex {
-				d = Deps{ReadCodexCompactions: tc.read}
+				d = deps.Deps{ReadCodexCompactions: tc.read}
 			}
 			got := readCompactBoundaries(d, tc.agent, "/repo/iter-19", tc.sessionID)
 			if got != tc.want {
@@ -336,7 +337,7 @@ func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing
 	scratchDir := t.TempDir()
 	var sleeps []time.Duration
 	r := breachRunner(nil)
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return 0, true, nil
@@ -380,7 +381,7 @@ func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
 		}
 		return false
 	})
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
@@ -428,7 +429,7 @@ func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 	t.Parallel()
 	scratchDir := fixture.EpicScratchDir(t, "epic")
 	compactionCount := 0
-	d := Deps{
+	d := deps.Deps{
 		Runner: breachRunner(func(wait int) bool {
 			if wait == 4 {
 				compactionCount = 1
@@ -461,7 +462,7 @@ func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing
 	t.Parallel()
 	scratchDir := fixture.EpicScratchDir(t, "epic")
 	compactionCount := 0
-	d := Deps{
+	d := deps.Deps{
 		Runner: breachRunner(func(wait int) bool {
 			if wait == 12 {
 				compactionCount = 1
@@ -495,7 +496,7 @@ func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testi
 	t.Parallel()
 	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var reads int
-	d := Deps{
+	d := deps.Deps{
 		Runner: breachRunner(nil),
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			reads++
@@ -531,7 +532,7 @@ func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
 	scratchDir := t.TempDir()
 	var sleeps []time.Duration
 	r := breachRunner(alwaysTimeout)
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return 0, true, nil
@@ -563,8 +564,8 @@ func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
 // must not be trusted on the pane's word.
 func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *testing.T) {
 	t.Parallel()
-	newDeps := func(r *blipRunner, readCompactions func(string, string) (int, bool, error)) Deps {
-		return Deps{
+	newDeps := func(r *blipRunner, readCompactions func(string, string) (int, bool, error)) deps.Deps {
+		return deps.Deps{
 			Runner:          r,
 			ReadCompactions: readCompactions,
 			Sleep:           func(time.Duration) {},
@@ -614,7 +615,7 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 		boundaries = 1
 		return false
 	})
-	d := Deps{
+	d := deps.Deps{
 		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
@@ -634,7 +635,7 @@ func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
 	t.Parallel()
 	r := boundGiveUpRunner(func(wait int) bool { return wait == 1 })
 	r.interruptErr = errors.New("pane is gone")
-	d := Deps{
+	d := deps.Deps{
 		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },

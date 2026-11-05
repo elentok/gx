@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/deps"
 )
 
 // personInput reports keys a person pressed in the agent's pane. A nil
@@ -51,7 +52,7 @@ func (in *personInput) typed() bool {
 
 // sleep waits dur, then waits it again for every key that arrived meanwhile,
 // so the wait ends a full dur after the last key.
-func (in *personInput) sleep(d Deps, dur time.Duration) {
+func (in *personInput) sleep(d deps.Deps, dur time.Duration) {
 	d.Sleep(dur)
 	for in.typed() {
 		d.Sleep(dur)

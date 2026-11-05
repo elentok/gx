@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -23,7 +24,7 @@ import (
 // compactedMergingFixture writes a transcript whose occupancy peaks before a
 // compaction and ends far lower, and wires d's live readers to report the
 // post-compaction (last) value, so a test can tell peak from last.
-func compactedMergingFixture(t *testing.T, home, cwd, sessionID string) (d Deps, peak int) {
+func compactedMergingFixture(t *testing.T, home, cwd, sessionID string) (d deps.Deps, peak int) {
 	t.Helper()
 	fixture.WriteFakeTranscript(t, home, cwd, sessionID, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		[3]any{"claude-sonnet-5", 1000, 129000},

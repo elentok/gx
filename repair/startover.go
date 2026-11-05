@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -64,7 +65,7 @@ func GitCommitSubjects(dir, base, branch string) ([]string, error) {
 
 // StartOver sends a stuck ticket back to open, keeping its commits reachable
 // under an attic ref.
-func StartOver(in StartOverInput, d ralphloop.Deps) (StartOverResult, error) {
+func StartOver(in StartOverInput, d deps.Deps) (StartOverResult, error) {
 	if strings.TrimSpace(in.Reason) == "" {
 		return StartOverResult{}, &RefusalError{Reason: ReasonReasonRequired, Message: "--reason is required"}
 	}
@@ -130,7 +131,7 @@ func closeIdleSession(r agentrunner.Runner, s agentrunner.Session, id string) er
 // (or deletes it with --delete-branch). The worktree goes first: git refuses
 // to rename a branch that is checked out. A missing worktree or branch is a
 // normal outcome.
-func clearIteration(in StartOverInput, d ralphloop.Deps, wtDir, epic, id, branch string, attic atticInfo) error {
+func clearIteration(in StartOverInput, d deps.Deps, wtDir, epic, id, branch string, attic atticInfo) error {
 	path := ralphloop.IterationWorktreePath(wtDir, epic, id)
 	if exists, err := d.WorktreeExists(path); err != nil {
 		return fmt.Errorf("checking iteration worktree: %w", err)
@@ -186,7 +187,7 @@ type atticInfo struct {
 	Subjects []string
 }
 
-func gatherAttic(in StartOverInput, d ralphloop.Deps, featurePath, epic, branch string) (atticInfo, error) {
+func gatherAttic(in StartOverInput, d deps.Deps, featurePath, epic, branch string) (atticInfo, error) {
 	tip, err := d.RevParse(featurePath, branch)
 	if errors.Is(err, git.ErrRefNotFound) {
 		return atticInfo{}, nil
@@ -210,7 +211,7 @@ func gatherAttic(in StartOverInput, d ralphloop.Deps, featurePath, epic, branch 
 
 // nextAtticRef is the first ralph-loop/attic/<epic>/<id>-<n> that does not
 // exist yet, so a second start-over never overwrites the first's attic.
-func nextAtticRef(d ralphloop.Deps, dir, epic, id string) (string, error) {
+func nextAtticRef(d deps.Deps, dir, epic, id string) (string, error) {
 	for n := 1; n < 1000; n++ {
 		ref := fmt.Sprintf("ralph-loop/attic/%s/%s-%d", epic, id, n)
 		_, err := d.RevParse(dir, ref)

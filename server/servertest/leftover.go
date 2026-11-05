@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 )
@@ -58,7 +59,7 @@ func (h *Harness) LeaveRun(t *testing.T, store, repo string, tg Target, work fun
 	if err := ticketops.Claim(tk.Path); err != nil {
 		t.Fatal(err)
 	}
-	wt, err := ralphloop.PrepareIteration(ralphloop.DefaultDeps(), ralphloop.OneIteration{
+	wt, err := ralphloop.PrepareIteration(deps.DefaultDeps(), ralphloop.OneIteration{
 		RepoDir: repo, Epic: tg.Epic, ScratchDir: store, Agent: agent.AgentClaude, Ticket: tk,
 	})
 	if err != nil {

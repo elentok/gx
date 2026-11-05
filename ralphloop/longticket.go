@@ -1,6 +1,8 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/ralphloop/deps"
+
 	"fmt"
 	"time"
 )
@@ -18,7 +20,7 @@ type longTicketGuard struct {
 
 // newLongTicketGuard returns nil when the launch gets no alert: not an
 // implement ticket, no reader, no callback, or a threshold of zero.
-func newLongTicketGuard(d Deps, p launchAndPromptParams, since time.Time) *longTicketGuard {
+func newLongTicketGuard(d deps.Deps, p launchAndPromptParams, since time.Time) *longTicketGuard {
 	if d.ReadTurns == nil || p.OnLongTicket == nil || p.LongTicketTurns <= 0 || !isImplementTicket(p) {
 		return nil
 	}
@@ -27,7 +29,7 @@ func newLongTicketGuard(d Deps, p launchAndPromptParams, since time.Time) *longT
 
 // tick reads the turn count and fires the alert the first time it reaches the
 // threshold. A nil receiver does nothing; a failed or empty read tries again.
-func (g *longTicketGuard) tick(d Deps, p launchAndPromptParams, sessionID string) {
+func (g *longTicketGuard) tick(d deps.Deps, p launchAndPromptParams, sessionID string) {
 	if g == nil || g.fired || sessionID == "" {
 		return
 	}

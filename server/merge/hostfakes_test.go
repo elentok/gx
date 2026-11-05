@@ -3,7 +3,7 @@ package merge
 import (
 	"testing"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -35,7 +35,7 @@ type fakeMergerHost struct {
 func (f fakeMergerHost) RootRefs(string, []tickets.Epic, string, tickets.Ticket, string) (string, string, error) {
 	return f.base, f.target, nil
 }
-func (f fakeMergerHost) HostingDeps(tickets.Address) ralphloop.Deps { return ralphloop.Deps{} }
+func (f fakeMergerHost) HostingDeps(tickets.Address) deps.Deps { return deps.Deps{} }
 
 func TestMergerEpicRefsAsksHostForRefs(t *testing.T) {
 	m := &Merger{host: fakeMergerHost{base: "a", target: "b"}}

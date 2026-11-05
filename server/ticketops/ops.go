@@ -5,7 +5,7 @@ package ticketops
 import (
 	"log/slog"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -26,7 +26,7 @@ type Launch interface {
 	ResettleWaiting(t runs.TrackedRun) error
 	// HostingDeps talks to the runner hosting addr's iteration, so start-over
 	// and merge see (and close) the agent where it actually runs.
-	HostingDeps(addr tickets.Address) ralphloop.Deps
+	HostingDeps(addr tickets.Address) deps.Deps
 	// CompleteMergedRoot completes addr's queued root as if its iteration had
 	// settled, once a merge of that ticket landed. A root not queued is left alone.
 	CompleteMergedRoot(addr tickets.Address)

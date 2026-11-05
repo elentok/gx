@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 )
 
 // verifyCapMargin is how far below the smart zone a verify session is stopped,
@@ -41,7 +42,7 @@ func newVerifyCap(p launchAndPromptParams, smartZone int) *verifyCap {
 // interrupts the pane and sends the finish-up prompt. stopped reports whether
 // it did, so the caller can reset its elapsed-poll-time counter. A nil receiver
 // never stops anything.
-func (c *verifyCap) tick(d Deps, p launchAndPromptParams, sessionID string) (stopped bool, err error) {
+func (c *verifyCap) tick(d deps.Deps, p launchAndPromptParams, sessionID string) (stopped bool, err error) {
 	if c == nil || c.state.fired {
 		return false, nil
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
@@ -19,7 +20,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	const failure = "■ stream disconnected before completion: Your input exceeds the context window of this model. Please adjust your input and try again."
 	scratchDir := fixture.EpicScratchDir(t, "epic")
 	r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20"), timeoutOn: 1, contextExhausted: failure}
-	d := Deps{
+	d := deps.Deps{
 		Runner: r,
 		ReadCodexContext: func(string, string) (int, bool, error) {
 			return 1_000, true, nil
@@ -56,7 +57,7 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 		Runner:           idlePromptRunner("iter-20", "codex-session-20"),
 		contextExhausted: `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`,
 	}
-	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-20", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "20",
@@ -75,7 +76,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 	const failure = "■ Codex ran out of room in the model's context window."
 	r := &blipRunner{Runner: idlePromptRunner("iter-21", "codex-session-21"), contextExhausted: failure}
 	r.FailNextPrompts("iter-21", 1, errors.New("compact never merged"))
-	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-21", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "21",
@@ -100,7 +101,7 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	const failure = `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`
 	r := &blipRunner{Runner: idlePromptRunner("iter-21", "codex-session-21"), contextExhausted: failure}
 	r.FailNextPrompts("iter-21", 1, errors.New("compact never merged"))
-	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-21", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "21",
@@ -119,7 +120,7 @@ func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfPausing
 		contextExhausted: "■ Codex ran out of room in the model's context window.",
 	}
 	r.SetState("iter-22", agentrunner.StateBlocked, "")
-	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-22", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "22", TicketPath: ticketPath,
@@ -191,7 +192,7 @@ func TestWaitForFinish_InterruptNotReadyRetriesNextPoll(t *testing.T) {
 			ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
 			r := &blipRunner{Runner: idlePromptRunner("iter-30", "codex-session-30")}
 			tc.setup(r)
-			d := Deps{Runner: &refuseFirstInterrupt{blipRunner: r, evidence: r.contextExhausted}, Sleep: func(time.Duration) {}}
+			d := deps.Deps{Runner: &refuseFirstInterrupt{blipRunner: r, evidence: r.contextExhausted}, Sleep: func(time.Duration) {}}
 			if tc.zone {
 				d.ReadCodexContext = func(string, string) (int, bool, error) { return 150001, true, nil }
 			}
@@ -216,7 +217,7 @@ func TestWaitForFinish_InterruptNotReadyRetriesNextPoll(t *testing.T) {
 func TestWaitForFinish_InterruptOtherErrorStillFails(t *testing.T) {
 	t.Parallel()
 	r := &blipRunner{Runner: idlePromptRunner("iter-31", "codex-session-31"), timeoutOn: 1, interruptErr: errors.New("pane gone")}
-	d := Deps{
+	d := deps.Deps{
 		Runner:           r,
 		ReadCodexContext: func(string, string) (int, bool, error) { return 150001, true, nil },
 		Sleep:            func(time.Duration) {},

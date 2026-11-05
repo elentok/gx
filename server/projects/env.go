@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -78,12 +79,12 @@ func (p *Registry) TranscriptPath(cwd, sessionID string) (string, error) {
 }
 
 // defaultDeps is ralphloop's default deps reading Config.Env's home dirs.
-func (p *Registry) DefaultDeps() ralphloop.Deps {
-	o := ralphloop.DepsOverrides{RunnerWait: p.cfg().RunnerWait, Finished: p.back.SessionFinished, RateLimitResetBuffer: p.cfg().RateLimitResetBuffer, GuardPoll: p.cfg().GuardPoll}
+func (p *Registry) DefaultDeps() deps.Deps {
+	o := deps.DepsOverrides{RunnerWait: p.cfg().RunnerWait, Finished: p.back.SessionFinished, RateLimitResetBuffer: p.cfg().RateLimitResetBuffer, GuardPoll: p.cfg().GuardPoll}
 	o.Home, _ = p.EnvHome()
 	o.CodexHome, _ = p.CodexHome()
 	o.StateDir, _ = p.LockStateDir()
-	return ralphloop.DefaultDepsWithOverrides(o)
+	return deps.DefaultDepsWithOverrides(o)
 }
 
 // lockStateDir is the gx state dir of Config.Env that merge locks live under.

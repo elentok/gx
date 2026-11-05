@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -159,9 +160,9 @@ func gitSubject(t *testing.T, dir, ref string) string {
 
 // realMergingDeps is realGitDeps plus the rest of merging's git operations,
 // for driving a genuine cherry-pick conflict.
-func realMergingDeps() Deps {
+func realMergingDeps() deps.Deps {
 	d := realGitDeps()
-	real := DefaultDeps()
+	real := deps.DefaultDeps()
 	d.CommitsAhead = real.CommitsAhead
 	d.CommitSubjects = real.CommitSubjects
 	d.CherryPickRange = real.CherryPickRange

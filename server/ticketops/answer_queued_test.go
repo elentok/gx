@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -35,7 +35,7 @@ func (l *launchFake) BudgetRefusal() (wire.QueueResult, bool) {
 	return *l.budget, true
 }
 
-func (l *launchFake) HostingDeps(tickets.Address) ralphloop.Deps { return ralphloop.Deps{} }
+func (l *launchFake) HostingDeps(tickets.Address) deps.Deps { return deps.Deps{} }
 
 func (l *launchFake) CompleteMergedRoot(tickets.Address) {}
 

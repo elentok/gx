@@ -5,12 +5,13 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 func TestFindIterationSession(t *testing.T) {
 	r := runnerfake.NewRunner()
-	d := Deps{Runner: r}
+	d := deps.Deps{Runner: r}
 
 	if _, ok := FindIterationSession(d, "epic", "01"); ok {
 		t.Fatal("found a session before any was started")
@@ -30,13 +31,13 @@ func TestFindIterationSession(t *testing.T) {
 }
 
 func TestFindIterationSession_NoRunnerReportsNone(t *testing.T) {
-	if _, ok := FindIterationSession(Deps{}, "epic", "01"); ok {
+	if _, ok := FindIterationSession(deps.Deps{}, "epic", "01"); ok {
 		t.Fatal("nil runner reported a session")
 	}
 }
 
 func TestFindIterationSession_Unreachable(t *testing.T) {
-	d := Deps{Runner: findErrRunner{runnerfake.NewRunner()}}
+	d := deps.Deps{Runner: findErrRunner{runnerfake.NewRunner()}}
 	if _, ok := FindIterationSession(d, "epic", "01"); ok {
 		t.Fatal("Find error reported a session")
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/projects"
@@ -115,7 +116,7 @@ func (s *Landing) projectHasNoVCS(project string) bool {
 	return pf.VCS != nil && *pf.VCS == config.VCSNone
 }
 
-func (m IterationMode) Prepare(d ralphloop.Deps, o ralphloop.OneIteration) (ralphloop.IterationWorktree, error) {
+func (m IterationMode) Prepare(d deps.Deps, o ralphloop.OneIteration) (ralphloop.IterationWorktree, error) {
 	switch {
 	case m.err != nil:
 		return ralphloop.IterationWorktree{}, m.err
@@ -127,14 +128,14 @@ func (m IterationMode) Prepare(d ralphloop.Deps, o ralphloop.OneIteration) (ralp
 	return ralphloop.PrepareIteration(d, o)
 }
 
-func (m IterationMode) Discard(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree) error {
+func (m IterationMode) Discard(d deps.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree) error {
 	if m.Commitless || m.Feature {
 		return ralphloop.DiscardCommitless(d, o, w)
 	}
 	return ralphloop.DiscardIteration(d, o, w)
 }
 
-func (m IterationMode) Finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (ralphloop.FinishOutcome, error) {
+func (m IterationMode) Finish(d deps.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (ralphloop.FinishOutcome, error) {
 	switch {
 	case m.Feature:
 		target, err := m.target()
@@ -177,7 +178,7 @@ func pauseOnMarkers(o ralphloop.OneIteration, dir string, files []string) (out r
 }
 
 // Resume rebuilds the worktree; base is the persisted base of a feature-branch run.
-func (m IterationMode) Resume(d ralphloop.Deps, o ralphloop.OneIteration, base string) (ralphloop.IterationWorktree, error) {
+func (m IterationMode) Resume(d deps.Deps, o ralphloop.OneIteration, base string) (ralphloop.IterationWorktree, error) {
 	switch {
 	case m.err != nil:
 		return ralphloop.IterationWorktree{}, m.err

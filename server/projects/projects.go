@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
@@ -147,7 +148,7 @@ func (p *Registry) WorktreeDir(project string) string {
 }
 
 // DepsWith is the default deps talking to runner.
-func (p *Registry) DepsWith(runner agentrunner.Runner) ralphloop.Deps {
+func (p *Registry) DepsWith(runner agentrunner.Runner) deps.Deps {
 	deps := p.DefaultDeps()
 	deps.Runner = runner
 	if p.cfg().Sleep != nil {

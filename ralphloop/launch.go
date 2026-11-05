@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
@@ -417,7 +418,7 @@ type launched struct {
 
 // promptedLaunch is the post-prompt half of a launch for a session started
 // and prompted through Deps.Runner, with baseline its pre-prompt Turn.
-func promptedLaunch(d Deps, p launchAndPromptParams, baseline int) (string, error) {
+func promptedLaunch(d deps.Deps, p launchAndPromptParams, baseline int) (string, error) {
 	status, err := d.Runner.Status(p.Session)
 	if err != nil {
 		log.Printf("reading %s status after initial prompt: %v", p.Label, err)
@@ -432,12 +433,12 @@ func promptedLaunch(d Deps, p launchAndPromptParams, baseline int) (string, erro
 
 // startedLaunch logs and reports a freshly prompted agent's start, with seq as
 // its stalled-since-launch baseline, then waits for it to finish.
-func startedLaunch(d Deps, p launchAndPromptParams, sessionID string, seq int) (string, error) {
+func startedLaunch(d deps.Deps, p launchAndPromptParams, sessionID string, seq int) (string, error) {
 	p.reportStarted(d, sessionID, seq)
 	return waitLaunched(d, p, sessionID)
 }
 
-func (p launchAndPromptParams) reportStarted(d Deps, sessionID string, seq int) {
+func (p launchAndPromptParams) reportStarted(d deps.Deps, sessionID string, seq int) {
 	p.logAgentStartEvent(p.StartEvent, sessionID, seq)
 	if p.StartEvent != "" {
 		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane)
@@ -450,7 +451,7 @@ func (p launchAndPromptParams) reportStarted(d Deps, sessionID string, seq int) 
 // baseline (see noActivitySinceLaunch) never got its prompt, so it gets it
 // now; an idle one that has moved is already finished; anything else is
 // waited out.
-func adoptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
+func adoptedLaunch(d deps.Deps, p launchAndPromptParams) (string, error) {
 	status, err := d.Runner.Status(p.Session)
 	if err != nil {
 		return "", fmt.Errorf("reading adopted %s status: %w", p.Label, err)
@@ -473,7 +474,7 @@ func adoptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
 
 // waitLaunched is waitForFinish keeping sessionID on a blocked-pane pause,
 // whose caller still records the live session.
-func waitLaunched(d Deps, p launchAndPromptParams, sessionID string) (string, error) {
+func waitLaunched(d deps.Deps, p launchAndPromptParams, sessionID string) (string, error) {
 	if err := waitForFinish(d, p, sessionID); err != nil {
 		if errors.Is(err, errBlockedPanePaused) {
 			return sessionID, err

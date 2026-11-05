@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
@@ -52,7 +53,7 @@ func (h reclaimHost) IterationModeFor(addr tickets.Address, t tickets.Ticket) me
 	return h.s.landing.IterationModeFor(addr, t)
 }
 
-func (h reclaimHost) DefaultDeps() ralphloop.Deps { return h.s.projects.DefaultDeps() }
+func (h reclaimHost) DefaultDeps() deps.Deps { return h.s.projects.DefaultDeps() }
 
 func (h reclaimHost) Publish(event, id string) { h.s.events.Publish(event, id) }
 

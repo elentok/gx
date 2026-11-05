@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/broker"
@@ -23,7 +24,7 @@ import (
 // plain dependency.
 type Host interface {
 	RootRefs(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (base, target string, err error)
-	HostingDeps(addr tickets.Address) ralphloop.Deps
+	HostingDeps(addr tickets.Address) deps.Deps
 	MergeTarget(addr tickets.Address) (string, error)
 	FreshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket, bool)
 	ResolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, IterationMode, error)

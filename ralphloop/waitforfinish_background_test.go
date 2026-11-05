@@ -8,6 +8,7 @@ import (
 
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/transcript"
@@ -17,8 +18,8 @@ import (
 // pane that reports idle on every AgentWait (including confirmFinished's own
 // re-check), so readBackgroundTasks is the only thing that can hold
 // waitForFinish's conclusion open.
-func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error), sleeps *int) Deps {
-	return Deps{
+func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error), sleeps *int) deps.Deps {
+	return deps.Deps{
 		Runner:              idleRunner("iter-30"),
 		ReadBackgroundTasks: readBackgroundTasks,
 		Sleep:               func(time.Duration) { *sleeps++ },
@@ -238,7 +239,7 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 	// confirmFinished recheck (idle; no gate re-hold since ReadBackgroundTasks
 	// already reports resolved).
 	r := &blipRunner{Runner: idleRunner("iter-30"), timeoutOn: 3}
-	d := Deps{
+	d := deps.Deps{
 		Runner:              r,
 		ReadBackgroundTasks: readBackgroundTasks,
 		Sleep:               func(time.Duration) { sleeps++ },

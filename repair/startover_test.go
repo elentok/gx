@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -17,7 +18,7 @@ import (
 
 // startOverFixture is a claimed ticket 01 of epic-a whose agent is live in
 // runner, with no iteration branch or worktree to clear.
-func startOverFixture(t *testing.T, state agentrunner.State) (repair.StartOverInput, ralphloop.Deps, *runnerfake.Runner, string) {
+func startOverFixture(t *testing.T, state agentrunner.State) (repair.StartOverInput, deps.Deps, *runnerfake.Runner, string) {
 	t.Helper()
 	epicPath := filepath.Join(t.TempDir(), "epic-a")
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0o755); err != nil {
@@ -33,7 +34,7 @@ func startOverFixture(t *testing.T, state agentrunner.State) (repair.StartOverIn
 		t.Fatal(err)
 	}
 	runner.SetState(label, state, "")
-	d := ralphloop.Deps{
+	d := deps.Deps{
 		Runner:         runner,
 		WorktreeDir:    func(string) (string, error) { return t.TempDir(), nil },
 		RevParse:       func(string, string) (string, error) { return "", git.ErrRefNotFound },

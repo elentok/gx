@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"strings"
@@ -18,7 +19,7 @@ import (
 // prompt, which carries different text. That pins these tests to ticket 04's
 // ordering claim: the self-report belongs to the retry's own turn, not the
 // original unexecuted-tool-call glitch that triggered the retry.
-func retryTurnSelfReport(t *testing.T, d Deps, path string, mutate func(*schema.Ticket)) {
+func retryTurnSelfReport(t *testing.T, d deps.Deps, path string, mutate func(*schema.Ticket)) {
 	t.Helper()
 	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
 		if strings.Contains(text, unexecutedToolCallCorrection) {

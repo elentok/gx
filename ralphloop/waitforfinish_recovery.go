@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"time"
 
@@ -19,7 +20,7 @@ import (
 // (a blocked or idle pane: Wait does not block there), in which case a retry
 // sleeps one poll interval and counts it. A timed-out Wait already spent its
 // interval, so it passes false.
-func recoverCodexContextExhaustionPoll(d Deps, p launchAndPromptParams, sessionID, evidence string, smartZone, elapsedMs int, paceRetry bool) (int, error) {
+func recoverCodexContextExhaustionPoll(d deps.Deps, p launchAndPromptParams, sessionID, evidence string, smartZone, elapsedMs int, paceRetry bool) (int, error) {
 	retry, err := interruptOrRetry(d, p, "Codex context exhaustion")
 	if err != nil {
 		return elapsedMs, err
@@ -42,7 +43,7 @@ func recoverCodexContextExhaustionPoll(d Deps, p launchAndPromptParams, sessionI
 // re-read: busy (the agent is already working) skips the prompt, since the
 // caller goes on to wait for the iteration to finish anyway. Any other state
 // returns the original error.
-func promptIdle(d Deps, p launchAndPromptParams, text string) error {
+func promptIdle(d deps.Deps, p launchAndPromptParams, text string) error {
 	err := d.Runner.Prompt(p.session(), text)
 	if !errors.Is(err, agentrunner.ErrNotReady) {
 		return err
@@ -93,7 +94,7 @@ var errBlockedPanePaused = errors.New("iteration paused: pane blocked on an unan
 // this repo and can silently regress on a Claude Code or herdr upgrade. See
 // docs/runbooks/blocked-form-regression-check.md for the (necessarily
 // interactive, via `gx doctor --check-blocked-form`) way to check it.
-func dwellThenPauseBlocked(d Deps, p launchAndPromptParams, runner, sessionID string) (reason string, paused bool, err error) {
+func dwellThenPauseBlocked(d deps.Deps, p launchAndPromptParams, runner, sessionID string) (reason string, paused bool, err error) {
 	d.Sleep(blockedDwellMs * time.Millisecond)
 
 	st, err := d.Runner.Status(p.session())
@@ -135,7 +136,7 @@ func errorPauseReason(label, text string) string {
 // agent whose block st the tracker reported. The reason names the tool and its
 // input, with the verb that exits that block: a permission request is answered,
 // a bare requires_action (no request to answer) is interrupted.
-func pauseBlockedAtOnce(d Deps, p launchAndPromptParams, ticketPath string, st agentrunner.Status) error {
+func pauseBlockedAtOnce(d deps.Deps, p launchAndPromptParams, ticketPath string, st agentrunner.Status) error {
 	hint := "interrupt with `gx server agents interrupt`"
 	if st.Pending != nil {
 		hint = "answer with `gx server agents answer`"

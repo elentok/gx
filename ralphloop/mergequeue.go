@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"sync"
@@ -19,9 +20,9 @@ import (
 // it deferred; a var so tests can shorten it.
 var mergeDeferRetryInterval = 2 * time.Second
 
-// mergeLockDir is where an epic's merge lock and marker live, under d's lock
+// mergeLockDirFor is where an epic's merge lock and marker live, under d's lock
 // state dir.
-func (d Deps) mergeLockDir(scratchDir, epic string) (string, error) {
+func mergeLockDirFor(d deps.Deps, scratchDir, epic string) (string, error) {
 	return MergeLockDirIn(d.MergeLockStateDir, filepath.Join(scratchDir, epic))
 }
 
@@ -106,9 +107,9 @@ func (lp mergeQueueParams) iterationParamsFor(job mergeJob) iterationParams {
 
 // logMergeDeferred records why a merge is waiting, naming the lock's owner when
 // there is one.
-func logMergeDeferred(d Deps, p iterationParams) {
+func logMergeDeferred(d deps.Deps, p iterationParams) {
 	reason := "merge lock held or conflict pending"
-	if dir, err := d.mergeLockDir(p.ScratchDir, p.FeatureBranch); err == nil {
+	if dir, err := mergeLockDirFor(d, p.ScratchDir, p.FeatureBranch); err == nil {
 		if owner, err := ReadMergeLock(dir); err == nil && owner != nil {
 			reason = "merge lock held by " + owner.Describe()
 		}
@@ -120,12 +121,12 @@ func logMergeDeferred(d Deps, p iterationParams) {
 // needed), mark done, cleanup — the same tail finishIteration ran inline
 // before the merge-queue worker existed, now serialized by this worker's own
 // single-goroutine-ness instead of featureMu.
-func mergeOne(d Deps, lp mergeQueueParams, job mergeJob) outcome {
+func mergeOne(d deps.Deps, lp mergeQueueParams, job mergeJob) outcome {
 	p := lp.iterationParamsFor(job)
 
 	// The lock is shared with the human merge command, whose conflicted merge
 	// exits still holding it. Never wait on it: pause as deferred, retry next tick.
-	lockDir, err := d.mergeLockDir(p.ScratchDir, p.FeatureBranch)
+	lockDir, err := mergeLockDirFor(d, p.ScratchDir, p.FeatureBranch)
 	if err != nil {
 		return outcome{ticket: job.ticket, err: err}
 	}
