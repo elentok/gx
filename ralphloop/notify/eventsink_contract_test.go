@@ -27,7 +27,7 @@ func TestEpicComplete_ChatSinkIsNotificationOnly(t *testing.T) {
 	before := snapshotDir(t, issuesDir)
 	sink, _ := newFakeChatSink(t, &fakes.RecordingSink{})
 	sink.scratchDir = scratchDir
-	sink.EpicComplete("epic", 1, 5)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.Close()
 	after := snapshotDir(t, issuesDir)
 

@@ -92,6 +92,18 @@ func newFakeChatSink(t *testing.T, inner runlog.EventSink) (*chatEventSink, *fak
 	return sink, transport
 }
 
+// sendTestMessage enqueues a fixed text through send, so batching, gate,
+// requeue and close tests don't depend on any run-loop event's wording.
+func sendTestMessage(sink *chatEventSink, text, kind string) {
+	sink.send(slackStyle.chatStyle.Escape(text), kind, epicSource(sink.epicName), "")
+}
+
+// sendTestTicketMessage is sendTestMessage filed under a ticket source, the
+// shape the per-source mute gate keys on.
+func sendTestTicketMessage(sink *chatEventSink, text, kind, identifier string) {
+	sink.send(slackStyle.chatStyle.Escape(text), kind, sink.resolveTicketPath(identifier), identifier)
+}
+
 // TestChatEventSink_Close_CancelsInFlightSendPromptlyInsteadOfWaitingOutBackoff
 // covers the ticket's first required seam: an in-flight sendRaw stuck
 // sleeping in sendWithRetry's backoff when Close is called must be cancelled
@@ -104,7 +116,7 @@ func TestChatEventSink_Close_CancelsInFlightSendPromptlyInsteadOfWaitingOutBacko
 		return sendResult{}, ctx.Err()
 	}
 
-	sink.EpicComplete("epic", 1, 1)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 
 	start := time.Now()
@@ -130,7 +142,7 @@ func TestChatEventSink_CloseFlush_ConsolidatedSend_RetriesOnceLikeNormalPath(t *
 		return sendResult{StatusCode: 200}, nil
 	}
 
-	sink.EpicComplete("epic", 1, 1)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.Close()
 
 	if got := attempts.Load(); got != 2 {
@@ -159,7 +171,7 @@ func TestChatEventSink_Close_WaitsForInProgressFlush_BeforeCancellingInFlight(t 
 	}
 
 	sink.startFlushLoop(5 * time.Millisecond)
-	sink.EpicComplete("epic", 1, 1)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 
 	<-hookEntered
 
@@ -198,7 +210,7 @@ func TestChatEventSink_Close_TotalShutdownDeadline_ReturnsWithinBound(t *testing
 		return sendResult{}, ctx.Err()
 	}
 
-	sink.EpicComplete("epic", 1, 1)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 
 	start := time.Now()
@@ -403,7 +415,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testin
 	sink, transport := newGateChatSink(t, scratchDir, epicName)
 
 	for range 5 {
-		sink.IterationPaused("04", "iter-04", runlog.PauseRateLimit, "rate limited")
+		sendTestTicketMessage(sink, "paused", notifyKindIterationPaused, "04")
 	}
 	sink.flush()
 
@@ -411,7 +423,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testin
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want 1 batched message (4 deduped normal sends plus 1 muting notice)", got)
 	}
-	normalText := slackStyle.iterationPausedText("iter-04", "rate limited", epicName, "04").String()
+	normalText := slackStyle.chatStyle.Escape("paused").String()
 	wantMuted := slackStyle.mutedText(epicName, "04").String()
 	want := fmt.Sprintf("%s ×4", normalText) + "\n\n---\n\n" + wantMuted
 	if got[0] != want {
@@ -465,7 +477,7 @@ func TestChatEventSink_NonTrippingSequence_SendsNormallyThroughGate(t *testing.T
 	sink, transport := newGateChatSink(t, scratchDir, epicName)
 
 	for range 3 {
-		sink.IterationPaused("07", "iter-07", runlog.PauseRateLimit, "rate limited")
+		sendTestTicketMessage(sink, "paused", notifyKindIterationPaused, "07")
 	}
 	sink.flush()
 
@@ -473,7 +485,7 @@ func TestChatEventSink_NonTrippingSequence_SendsNormallyThroughGate(t *testing.T
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 batched message deduped ×3 (no trip below threshold)", got)
 	}
-	want := fmt.Sprintf("%s ×3", slackStyle.iterationPausedText("iter-07", "rate limited", epicName, "07").String())
+	want := fmt.Sprintf("%s ×3", slackStyle.chatStyle.Escape("paused").String())
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
@@ -486,15 +498,15 @@ func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessag
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
-	sink.EpicStarted("epic", 0, 3)
-	sink.EpicComplete("epic", 1, 10)
+	sendTestMessage(sink, "started", notifyKindEpicStarted)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 
 	got := waitForSentCount(transport, 1)
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 batched message", got)
 	}
-	want := slackStyle.epicStartedText("epic", schedule.EpicCounts{}).String() + "\n\n---\n\n" + slackStyle.epicCompleteText("epic", schedule.EpicCounts{}, 1, 10, 0).String()
+	want := slackStyle.chatStyle.Escape("started").String() + "\n\n---\n\n" + slackStyle.chatStyle.Escape("done").String()
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
@@ -507,16 +519,16 @@ func TestChatEventSink_IdenticalMessages_FlushCollapsesToSingleLineWithCount(t *
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
-	sink.EpicStarted("epic", 0, 3)
-	sink.EpicStarted("epic", 0, 3)
-	sink.EpicStarted("epic", 0, 3)
+	sendTestMessage(sink, "started", notifyKindEpicStarted)
+	sendTestMessage(sink, "started", notifyKindEpicStarted)
+	sendTestMessage(sink, "started", notifyKindEpicStarted)
 	sink.flush()
 
 	got := waitForSentCount(transport, 1)
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 batched message", got)
 	}
-	want := fmt.Sprintf("%s ×3", slackStyle.epicStartedText("epic", schedule.EpicCounts{}).String())
+	want := fmt.Sprintf("%s ×3", slackStyle.chatStyle.Escape("started").String())
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
@@ -543,7 +555,7 @@ func TestChatEventSink_Close_FlushesQueuedMessageSynchronously(t *testing.T) {
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
-	sink.EpicStarted("epic", 0, 3)
+	sendTestMessage(sink, "started", notifyKindEpicStarted)
 	sink.Close()
 
 	got := transport.snapshot()
@@ -569,7 +581,7 @@ func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *t
 	// never reach the queue, which is a different code path than the one
 	// this test targets: a close-time flush finding the transport muted
 	// after the item was already queued.
-	sink.EpicStarted("epic", 0, 3)
+	sendTestMessage(sink, "started", notifyKindEpicStarted)
 
 	if err := updateNotificationStateAt(sink.gateStatePath, func(state *NotificationState) {
 		state.Transports["fake"] = TransportState{Muted: true, Reason: "auto-trip"}
@@ -611,7 +623,7 @@ func TestChatEventSink_BurstOfEventsCoalescedIntoOneFlush_CountsOneSendAgainstBu
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	for i := range globalThreshold + 5 {
-		sink.EpicStarted(fmt.Sprintf("epic-%d", i), 0, 3)
+		sendTestMessage(sink, fmt.Sprintf("started-%d", i), notifyKindEpicStarted)
 	}
 	sink.flush()
 
@@ -643,7 +655,7 @@ func TestChatEventSink_Flush_FailedSend_RequeuesItems(t *testing.T) {
 		return sendResult{}, errors.New("boom")
 	}
 
-	sink.EpicComplete("epic", 1, 1)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 	sink.inFlight.Wait()
 
@@ -711,7 +723,7 @@ func TestChatEventSink_RequeueRetryCycle_DoesNotDoubleChargeGateBudget(t *testin
 		return sendResult{}, errors.New("boom")
 	}
 
-	sink.EpicComplete("epic", 1, 1)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 	sink.inFlight.Wait()
 

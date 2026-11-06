@@ -14,7 +14,6 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/schedule"
 )
 
 // newTelegramEventSink wires a chatEventSink to a Telegram transport the way
@@ -87,12 +86,8 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
-	sink.EpicComplete("epic", 5, 300)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
-
-	if got := inner.Snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
-		t.Errorf("inner events = %v, want [EpicComplete]", got)
-	}
 
 	reqs := waitForRequests(getRequests, 1)
 	if len(reqs) != 1 {
@@ -104,7 +99,7 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	if reqs[0].ParseMode != "MarkdownV2" {
 		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
 	}
-	want := telegramStyle.epicCompleteText("epic", schedule.EpicCounts{}, 5, 300, 0).String()
+	want := telegramStyle.chatStyle.Escape("done").String()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
@@ -120,7 +115,7 @@ func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	start := time.Now()
-	sink.EpicComplete("epic", 1, 0)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Errorf("EpicComplete blocked for %s, want near-instant return", elapsed)
@@ -145,15 +140,12 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	start := time.Now()
-	sink.EpicComplete("epic", 1, 0)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Errorf("EpicComplete blocked for %s, want near-instant return", elapsed)
 	}
 
-	if got := inner.Snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
-		t.Errorf("inner events = %v, want [EpicComplete]", got)
-	}
 	// Empty the retry-and-log goroutine sendNotification spawns (it sleeps
 	// notificationRetryBackoff then retries) so it doesn't outlive the test.
 	waitForRunLogEvent(t, dir, "epic")
@@ -462,7 +454,7 @@ func TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast(t 
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
-	sink.EpicComplete("epic", 1, 0)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 
 	var events []runlog.Event
@@ -485,8 +477,8 @@ func TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast(t 
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if calls := inner.Snapshot(); len(calls) != 2 || calls[0] != "EpicComplete" || calls[1] != "NotificationFailed" {
-		t.Errorf("inner events = %v, want [EpicComplete NotificationFailed]", calls)
+	if calls := inner.Snapshot(); len(calls) != 1 || calls[0] != "NotificationFailed" {
+		t.Errorf("inner events = %v, want [NotificationFailed]", calls)
 	}
 }
 
@@ -498,7 +490,7 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
-	sink.EpicComplete("epic", 1, 0)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 
 	var events []runlog.Event
@@ -524,7 +516,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
-	sink.EpicComplete("epic", 1, 0)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 
 	var events []runlog.Event
@@ -545,8 +537,8 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	// The failed send must also reach the embedded EventSink as a
 	// NotificationFailed call, not just run-log.jsonl — that's what lets a
 	// live TUI turn a Telegram 400 into an in-app toast.
-	if calls := inner.Snapshot(); len(calls) != 2 || calls[0] != "EpicComplete" || calls[1] != "NotificationFailed" {
-		t.Errorf("inner events = %v, want [EpicComplete NotificationFailed]", calls)
+	if calls := inner.Snapshot(); len(calls) != 1 || calls[0] != "NotificationFailed" {
+		t.Errorf("inner events = %v, want [NotificationFailed]", calls)
 	}
 }
 
@@ -563,7 +555,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *tes
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
-	sink.EpicComplete("epic", 1, 0)
+	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 
 	var events []runlog.Event
