@@ -138,9 +138,6 @@ type batchedMessage struct {
 	text  chatmarkup.Text
 	kind  string
 	count int
-	// group is the header renderBatch files this message under (a project
-	// name on a server); the zero Text means ungrouped.
-	group chatmarkup.Text
 	// msg is set for a message in the new layout, nil for a legacy
 	// pre-rendered text (the cleanup ticket removes the legacy path).
 	msg *chatMessage
@@ -274,20 +271,6 @@ func (s *chatEventSink) cancelInFlight(deadline time.Time) {
 	}
 }
 
-// enqueue adds text to the queue, collapsing it into an existing entry (and
-// bumping its count) if an identical text is already queued this window —
-// the dedup ×N behavior. kind is recorded so a suppressed close-time flush
-// can name what it dropped.
-func (s *chatEventSink) enqueue(text chatmarkup.Text, kind string) {
-	s.enqueueIn(chatmarkup.Text{}, text, kind)
-}
-
-// enqueueIn is enqueue under a group header; identical texts only collapse
-// within the same group.
-func (s *chatEventSink) enqueueIn(group, text chatmarkup.Text, kind string) {
-	s.enqueueItem(batchedMessage{text: text, kind: kind, group: group})
-}
-
 // enqueueMessage queues a chatMessage without running it through the gate.
 func (s *chatEventSink) enqueueMessage(msg chatMessage) {
 	s.enqueueItem(batchedMessage{text: msg.Text(s.style.chatStyle), kind: msg.kind, msg: &msg})
@@ -298,7 +281,7 @@ func (s *chatEventSink) enqueueItem(item batchedMessage) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.queue {
-		if s.queue[i].text == item.text && s.queue[i].group == item.group {
+		if s.queue[i].text == item.text {
 			s.queue[i].count++
 			return
 		}
@@ -412,44 +395,25 @@ func (s *chatEventSink) sendFinal(text chatmarkup.Text, notifyKind string, deadl
 const batchSeparatorRaw = "---"
 
 // renderBatch joins every queued message into one send, separator lines
-// between originally-distinct messages, applying each message's ×N dedup
-// suffix through chatmarkup.Text.WithSuffix. style escapes the separator for
+// between originally-distinct messages. A deduped message shows ×N at the end
+// of its Headline (a legacy pre-rendered text gets it through
+// chatmarkup.Text.WithSuffix). style escapes the separator for
 // the target dialect — item text is already safe by the time it's queued
 // (see enqueue), but the separator is renderBatch's own literal, so it needs
 // the same treatment; chatmarkup.Join only accepts already-safe Text values,
 // so the separator physically cannot reach the wire unescaped.
-//
-// Grouped messages (see batchedMessage.group) collapse into one block per
-// group, in first-seen order: the group's header, then its messages. Ungrouped
-// messages stay one block each.
 func renderBatch(style mrkdwnStyle, items []batchedMessage) chatmarkup.Text {
-	type block struct {
-		header chatmarkup.Text
-		texts  []chatmarkup.Text
-	}
-	var blocks []*block
-	byGroup := map[chatmarkup.Text]*block{}
-	for _, it := range items {
-		text := it.text
-		if it.count > 1 {
-			text = it.text.WithSuffix(fmt.Sprintf(" ×%d", it.count), style.chatStyle)
-		}
-		b := byGroup[it.group]
-		if it.group == (chatmarkup.Text{}) || b == nil {
-			b = &block{header: it.group}
-			blocks = append(blocks, b)
-			if it.group != (chatmarkup.Text{}) {
-				byGroup[it.group] = b
-			}
-		}
-		b.texts = append(b.texts, text)
-	}
-	parts := make([]chatmarkup.Text, len(blocks))
-	blank := style.chatStyle.Escape("\n\n")
-	for i, b := range blocks {
-		parts[i] = chatmarkup.Join(blank, b.texts)
-		if b.header != (chatmarkup.Text{}) {
-			parts[i] = chatmarkup.Join(blank, []chatmarkup.Text{b.header, parts[i]})
+	parts := make([]chatmarkup.Text, len(items))
+	for i, it := range items {
+		parts[i] = it.text
+		switch {
+		case it.count <= 1:
+		case it.msg != nil:
+			m := *it.msg
+			m.repeat = it.count
+			parts[i] = m.Text(style.chatStyle)
+		default:
+			parts[i] = it.text.WithSuffix(fmt.Sprintf(" ×%d", it.count), style.chatStyle)
 		}
 	}
 	separator := style.chatStyle.Escape("\n\n" + batchSeparatorRaw + "\n\n")
@@ -541,12 +505,7 @@ func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateRes
 // delivery on its own bookkeeping succeeding, so text is still queued as if
 // the gate weren't there.
 func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIdentifier string) {
-	s.sendIn(chatmarkup.Text{}, text, notifyKind, source, ticketIdentifier)
-}
-
-// sendIn is send with the message filed under a group header in the batch.
-func (s *chatEventSink) sendIn(group, text chatmarkup.Text, notifyKind, source, ticketIdentifier string) {
-	s.sendItem(batchedMessage{text: text, kind: notifyKind, group: group}, source, ticketIdentifier)
+	s.sendItem(batchedMessage{text: text, kind: notifyKind}, source, ticketIdentifier)
 }
 
 // sendMessage is send for a chatMessage: the queue keeps the value so the
@@ -635,7 +594,7 @@ func (s *chatEventSink) requeue(items []batchedMessage) {
 		item.requeued = true
 		merged := false
 		for i := range s.queue {
-			if s.queue[i].text == item.text && s.queue[i].group == item.group {
+			if s.queue[i].text == item.text {
 				s.queue[i].count += item.count
 				merged = true
 				break

@@ -252,7 +252,7 @@ func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic
 	}
 	for _, s := range c.projectSinks(override) {
 		body := s.style.iterationFinishedText(t, project+"/"+epic, stats)
-		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindIterationFinished, t.Path, t.Identifier)
+		s.send(body, notifyKindIterationFinished, t.Path, t.Identifier)
 	}
 }
 

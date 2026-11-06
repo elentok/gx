@@ -395,6 +395,36 @@ func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessag
 	}
 }
 
+// TestChatEventSink_IdenticalChatMessages_CountLandsOnHeadlineNotProjectLine
+// pins that a deduped message shows ×N at the end of its Headline and keeps a
+// bare project line, while a distinct message stays separate.
+func TestChatEventSink_IdenticalChatMessages_CountLandsOnHeadlineNotProjectLine(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
+
+	msg := chatMessage{icon: "🔀", status: "Conflict", subject: "epic/01", lines: []string{"detail"}, project: "proj", kind: notifyKindConflictStarted}
+	other := msg
+	other.subject = "epic/02"
+	sink.sendMessage(msg, epicSource("epic"), "")
+	sink.sendMessage(msg, epicSource("epic"), "")
+	sink.sendMessage(other, epicSource("epic"), "")
+	sink.flush()
+
+	got := waitForSentCount(transport, 1)
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 batched message", got)
+	}
+	repeated := msg
+	repeated.repeat = 2
+	want := repeated.Text(slackStyle.chatStyle).String() + "\n\n---\n\n" + other.Text(slackStyle.chatStyle).String()
+	if got[0] != want {
+		t.Errorf("sent[0] = %q, want %q", got[0], want)
+	}
+	if !strings.Contains(got[0], "epic/01 ×2\n") || !strings.HasSuffix(strings.SplitN(got[0], "\n\n---", 2)[0], "proj") {
+		t.Errorf("count not on Headline with bare project line: %q", got[0])
+	}
+}
+
 // TestChatEventSink_IdenticalMessages_FlushCollapsesToSingleLineWithCount
 // pins ticket 06's dedup seam directly against enqueue/renderBatch, apart
 // from the gate-storm scenario the RepeatedEvent test also covers.

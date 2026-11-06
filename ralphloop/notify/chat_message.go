@@ -25,6 +25,9 @@ type chatMessage struct {
 	project               string
 	kind                  string
 	urgency               urgency
+	// repeat is how many identical copies a batch collapsed into this one;
+	// above 1 the Headline ends in " ×N".
+	repeat int
 }
 
 // Headline is the first line, before escaping.
@@ -35,7 +38,11 @@ func (m chatMessage) Headline() string {
 			parts = append(parts, p)
 		}
 	}
-	return strings.Join(parts, " ")
+	headline := strings.Join(parts, " ")
+	if m.repeat > 1 {
+		headline += fmt.Sprintf(" ×%d", m.repeat)
+	}
+	return headline
 }
 
 // capitalize upper-cases the first letter of s.
