@@ -29,9 +29,9 @@ func TestChatTicketsScenario_EveryProducibleKindLandsInTheCaptureFile(t *testing
 	r := start(t, "chat-tickets")
 	// Match on the ticket address and the old kind wording, not the layout.
 	want := map[string][]string{
-		"answer-question": {"ask-epic/01", "needs answer", "Which option should the fake worker take?"},
+		"answer-question": {"ask-epic/01", "Answer", "Which option should the fake worker take?"},
 		"repair-blocked":  {"menu-epic/01", "blocked-pane"},
-		"repair-fallback": {"manual-epic/01", "needs repair", "manual: the operator set this"},
+		"repair-fallback": {"manual-epic/01", "Repair", "manual: the operator set this"},
 	}
 	var got []chatcapture.Line
 	missing := func() []string {

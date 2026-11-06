@@ -5,11 +5,9 @@ import (
 	"math"
 
 	"github.com/elentok/gx/chatmarkup"
-	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 )
 
 // formatDuration renders totalSeconds as "5m32s"/"1h5m32s"/"42s", the
@@ -85,31 +83,6 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), tickets.FormatCost(stats.Cost), line,
 	)
 	return s.chatStyle.Message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
-}
-
-// ticketNeedsHumanText renders the "a machine paused this ticket for a
-// person" notification, for either class — the one chat-visible message
-// for every pause (see chatEventSink's pause-cardinality handling).
-// The answer class means no commit merged and the agent never declared the
-// zero-commit finish intentional via `gx tickets set --iteration-status
-// finished --commitless true`; the repair class means a fault (operator
-// intervention, an iteration error, a dead-on-arrival reconciliation)
-// paused it instead. status is the ticket's stored status word, old or new;
-// the class decides the headline.
-//
-//	🆘 *paused for an answer*      (answer class)
-//	🛑 *paused for repair*      (repair class)
-//
-//	{reason}
-//	{counts line}
-//	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status string, kind events.Kind, reason string, counts schedule.EpicCounts) chatmarkup.Text {
-	emoji, headline := "\U0001f198", "needs answer"
-	if (schema.Ticket{Status: schema.Status(status)}).PausedClass() != schema.PauseClassAnswer {
-		emoji, headline = "\U0001f6d1", "needs repair"
-	}
-	detail := fmt.Sprintf("%s\n%s", reason, RenderCountsLine(counts))
-	return s.chatStyle.Message(emoji, headline, "", detail, s.identityLine(epicName, identifier))
 }
 
 // conflictResolutionStartedText renders the "an agent took over a merge

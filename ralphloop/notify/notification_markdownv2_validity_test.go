@@ -1,6 +1,8 @@
 package notify
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -29,6 +31,11 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 	const adversarialTicket = "04"
 	const fractionalCost = 12.345
 
+	adversarialPath := filepath.Join(t.TempDir(), "04-x.md")
+	if err := os.WriteFile(adversarialPath, []byte("# "+adversarialTitle+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	overflowCounts := schedule.EpicCounts{
 		Done:              2,
 		PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06"},
@@ -39,8 +46,8 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 
 	cases := map[string]chatmarkup.Text{
 		"iterationFinishedText":            telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
-		"ticketNeedsHumanText/answer":      telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, string(schema.StatusLegacyAnswer), "zero-commit", "No commits merged (yet).", overflowCounts),
-		"ticketNeedsHumanText/repair":      telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, string(schema.StatusLegacyRepair), "blocked-pane", "Operator intervention required.", overflowCounts),
+		"ticketPauseMessage/answer":        ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyAnswer), "No commits merged (yet).").Text(chatmarkup.Telegram),
+		"ticketPauseMessage/repair":        ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyRepair), "Operator intervention required.").Text(chatmarkup.Telegram),
 		"epicOutcomeText":                  telegramStyle.epicOutcomeText("\U0001f389", "epic complete", adversarialEpic, overflowCounts, 5, 492, fractionalCost),
 		"mutedText":                        telegramStyle.mutedText(adversarialEpic, adversarialTicket),
 		"globallyMutedText":                telegramStyle.globallyMutedText("telegram"),

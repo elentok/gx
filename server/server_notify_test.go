@@ -254,9 +254,18 @@ func TestNotifyPause_ShowsRealStatusKindAndReason(t *testing.T) {
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
-	for _, want := range []string{"needs repair", string(events.BudgetKilled), "daily budget hard limit reached", "needs answer", string(events.AmbiguousBase), "choose a base"} {
+	for _, want := range []string{"🛑 Repair epic/01", string(events.BudgetKilled), "daily budget hard limit reached", "🙋 Answer epic/02", string(events.AmbiguousBase), "choose a base", `\np\n\n---`} {
 		if !strings.Contains(all, want) {
 			t.Errorf("chat lacks %q: %s", want, all)
+		}
+	}
+	// The recorder keeps the JSON body, so newlines are still escaped.
+	if !strings.HasSuffix(all, `\np"}`) {
+		t.Errorf("last line is not the project alone: %q", all)
+	}
+	for _, banned := range []string{"[gx]", "*p*", "needs repair", "needs answer"} {
+		if strings.Contains(all, banned) {
+			t.Errorf("chat has old-layout %q: %s", banned, all)
 		}
 	}
 	if strings.Contains(all, "iteration ended without landing") {
@@ -311,8 +320,9 @@ func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 		t.Fatalf("digests = %d, want 1: %s", n, all)
 	}
 	for _, p := range []string{"p1", "p2", "p3", "p4"} {
-		// Digest lines carry "[p]"; a live pause sits under a bold "*p*" header.
-		if strings.Count(all, "["+p+"]")+strings.Count(all, "*"+p+"*") != 1 {
+		// Digest lines carry "[p]"; a live pause ends on the bare project line
+		// (newlines are still JSON-escaped in the recorded body).
+		if strings.Count(all, "["+p+"]")+strings.Count(all, `\n`+p) != 1 {
 			t.Errorf("%s not sent exactly once: %s", p, all)
 		}
 	}

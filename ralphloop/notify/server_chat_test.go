@@ -32,7 +32,7 @@ func TestServerChat_PausesGoToTheirOwnDestinationAndSharedTargetsShareABatch(t *
 	}
 }
 
-func TestServerChat_MultiProjectBatchGroupsUnderOneHeaderPerProject(t *testing.T) {
+func TestServerChat_PausesInOneBatchEndEachWithTheirProjectLine(t *testing.T) {
 	srv, reqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
 
@@ -46,14 +46,14 @@ func TestServerChat_MultiProjectBatchGroupsUnderOneHeaderPerProject(t *testing.T
 		t.Fatalf("got %d sends, want one batch", len(got))
 	}
 	text := got[0].Text
-	if n := strings.Count(text, "*alpha*"); n != 1 {
-		t.Errorf("alpha header appears %d times, want 1:\n%s", n, text)
+	if strings.Contains(text, "*alpha*") || strings.Contains(text, "*beta*") {
+		t.Errorf("a pause has no bold project header:\n%s", text)
 	}
-	if n := strings.Count(text, "*beta*"); n != 1 {
-		t.Errorf("beta header appears %d times, want 1:\n%s", n, text)
+	if n := strings.Count(text, "\nalpha"); n != 2 {
+		t.Errorf("alpha project line appears %d times, want 2:\n%s", n, text)
 	}
-	if !(strings.Index(text, "A1") < strings.Index(text, "A2") && strings.Index(text, "A2") < strings.Index(text, "B1")) {
-		t.Errorf("alpha's pauses should sit together before beta's:\n%s", text)
+	if n := strings.Count(text, "\nbeta"); n != 1 {
+		t.Errorf("beta project line appears %d times, want 1:\n%s", n, text)
 	}
 }
 
@@ -71,15 +71,15 @@ func TestServerChat_OverrideReplacesGlobalWithoutMerging(t *testing.T) {
 	}
 }
 
-func TestServerChat_PauseShowsTheEpicCounts(t *testing.T) {
+func TestServerChat_PauseHasNoCountsLine(t *testing.T) {
 	global, globalReqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
 	c.Pause("alpha", nil, "e", "/t/1.md", "01", ticketops.PauseStatus("zero-commit"), "", "needs rebase", schedule.EpicCounts{Done: 5, Total: 7})
 	c.Close()
 
 	g := globalReqs()
-	if len(g) != 1 || !strings.Contains(g[0].Text, "5 done") || !strings.Contains(g[0].Text, "7 total") {
-		t.Errorf("got %+v, want the epic's counts and not '0 done · 0 total'", g)
+	if len(g) != 1 || strings.Contains(g[0].Text, "done") || strings.Contains(g[0].Text, "total") {
+		t.Errorf("got %+v, want a pause without a counts line", g)
 	}
 }
 

@@ -80,6 +80,19 @@ func (s Style) Message(emoji, headline, counts, detail, identity string) Text {
 	return Text{s: strings.Join(lines, "\n")}
 }
 
+// Layout assembles the Chat layout from raw fragments: the headline as plain
+// text (no emphasis in either dialect), the detail lines, then the project
+// name alone as the last line. Every fragment is escaped for the dialect.
+func (s Style) Layout(headline string, lines []string, project string) Text {
+	out := make([]string, 0, len(lines)+2)
+	out = append(out, s.escape(headline))
+	for _, l := range lines {
+		out = append(out, s.escape(l))
+	}
+	out = append(out, s.escape(project))
+	return Text{s: strings.Join(out, "\n")}
+}
+
 // Plain renders t back to unmarked, unescaped text for display contexts
 // that don't understand the dialect's markup (e.g. TUI): emphasis markers
 // are stripped first, then backslash-escapes are resolved. That order

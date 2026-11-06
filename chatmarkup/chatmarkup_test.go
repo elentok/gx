@@ -75,6 +75,18 @@ func TestStyleMessage(t *testing.T) {
 	}
 }
 
+func TestLayout(t *testing.T) {
+	headline := "🙋 Answer e/04 Fix *this* _now_ (v2)."
+	lines := []string{"detail.one"}
+	if got, want := Telegram.Layout(headline, lines, "my-proj").String(),
+		"🙋 Answer e/04 Fix \\*this\\* \\_now\\_ \\(v2\\)\\.\ndetail\\.one\nmy\\-proj"; got != want {
+		t.Errorf("Telegram Layout = %q, want %q", got, want)
+	}
+	if got, want := Slack.Layout(headline, lines, "my-proj").String(), headline+"\ndetail.one\nmy-proj"; got != want {
+		t.Errorf("Slack Layout = %q, want %q", got, want)
+	}
+}
+
 func TestStyleMessageOmitsEmptyLines(t *testing.T) {
 	text := Telegram.Message("🚀", "started", "", "", "epic")
 	want := "🚀 *started*\n\nepic"

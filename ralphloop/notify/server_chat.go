@@ -2,6 +2,7 @@ package notify
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -169,8 +170,7 @@ func (c *ServerChat) Pause(project string, override *ServerChatConfig, epic, tic
 		return
 	}
 	for _, s := range c.projectSinks(override) {
-		body := s.style.ticketNeedsHumanText(identifier, project+"/"+epic, status, kind, reason, counts)
-		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindTicketNeedsHuman, ticketPath, identifier)
+		s.sendMessage(ticketPauseMessage(project, epic, ticketPath, identifier, status, reason), ticketPath, identifier)
 	}
 }
 
@@ -205,12 +205,13 @@ func (f finishSink) TicketNeedsHuman(identifier, _, status string, kind events.K
 	if f.c == nil || identifier == f.ticketID {
 		return
 	}
-	counts := f.counts()
 	// The child's path never reaches the sink, so a mute merges on the epic.
 	source := epicSource(f.project + "/" + f.epic)
+	// The child sits beside the parent ticket: <scratch>/<epic>/issues/<id>-*.md.
+	epicDir := filepath.Dir(filepath.Dir(f.ticketPath))
+	childPath := ResolveTicketPath(filepath.Dir(epicDir), filepath.Base(epicDir), identifier)
 	for _, s := range f.c.projectSinks(f.override) {
-		body := s.style.ticketNeedsHumanText(identifier, f.project+"/"+f.epic, status, kind, reason, counts)
-		s.sendIn(s.style.chatStyle.Bold(f.project), body, notifyKindTicketNeedsHuman, source, identifier)
+		s.sendMessage(ticketPauseMessage(f.project, f.epic, childPath, identifier, status, reason), source, identifier)
 	}
 }
 

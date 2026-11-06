@@ -141,6 +141,9 @@ type batchedMessage struct {
 	// group is the header renderBatch files this message under (a project
 	// name on a server); the zero Text means ungrouped.
 	group chatmarkup.Text
+	// msg is set for a message in the new layout, nil for a legacy
+	// pre-rendered text (the cleanup ticket removes the legacy path).
+	msg *chatMessage
 	// requeued marks an entry that came back from a failed flush send (see
 	// chatEventSink.requeue) rather than a fresh enqueue — flush uses it to
 	// decide whether a retry attempt needs a new gate recordSend charge (see
@@ -282,15 +285,21 @@ func (s *chatEventSink) enqueue(text chatmarkup.Text, kind string) {
 // enqueueIn is enqueue under a group header; identical texts only collapse
 // within the same group.
 func (s *chatEventSink) enqueueIn(group, text chatmarkup.Text, kind string) {
+	s.enqueueItem(batchedMessage{text: text, kind: kind, group: group})
+}
+
+// enqueueItem queues item, collapsing it into an identical queued entry.
+func (s *chatEventSink) enqueueItem(item batchedMessage) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.queue {
-		if s.queue[i].text == text && s.queue[i].group == group {
+		if s.queue[i].text == item.text && s.queue[i].group == item.group {
 			s.queue[i].count++
 			return
 		}
 	}
-	s.queue = append(s.queue, batchedMessage{text: text, kind: kind, count: 1, group: group})
+	item.count = 1
+	s.queue = append(s.queue, item)
 }
 
 // emptyQueue empties the queue and returns what it held, so flush/closeFlush
@@ -532,16 +541,27 @@ func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIde
 
 // sendIn is send with the message filed under a group header in the batch.
 func (s *chatEventSink) sendIn(group, text chatmarkup.Text, notifyKind, source, ticketIdentifier string) {
+	s.sendItem(batchedMessage{text: text, kind: notifyKind, group: group}, source, ticketIdentifier)
+}
+
+// sendMessage is send for a chatMessage: the queue keeps the value so the
+// batcher can read its icon, Status word and urgency.
+func (s *chatEventSink) sendMessage(msg chatMessage, source, ticketIdentifier string) {
+	s.sendItem(batchedMessage{text: msg.Text(s.style.chatStyle), kind: msg.kind, msg: &msg}, source, ticketIdentifier)
+}
+
+func (s *chatEventSink) sendItem(item batchedMessage, source, ticketIdentifier string) {
+	notifyKind := item.kind
 	result, err := s.gate(notifyKind, source, false)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
-		s.enqueueIn(group, text, notifyKind)
+		s.enqueueItem(item)
 		return
 	}
 
 	switch result.Decision {
 	case Allowed:
-		s.enqueueIn(group, text, notifyKind)
+		s.enqueueItem(item)
 	case PerSourceMuted:
 		if result.EdgeTriggered {
 			s.enqueue(s.style.mutedText(s.epicName, ticketIdentifier), notifyKindMuted)
