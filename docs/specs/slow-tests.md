@@ -308,9 +308,10 @@ Speed (in order)
 1. Restore green and remove waits.
    - Fake claude (`testutil/agentfake`): gives the ready signal (delay 0 s) and the launch record
      by default. A test opts out to test the "signal missing" path. `gxfixture` and `servertest`
-     need no knobs. Product `DefaultReadyWait` stays 30 s, which is right for real claude.
-   - Launch waits follow the server context: `awaitReady` and `claudeui.CheckLaunchDelivered`
-     stop when the server context is cancelled. This is a product code change.
+     need no knobs. The launch no longer waits for a transcript or a ready signal before the
+     prompt, apart from the pty ready check in `Pty.Start`.
+   - Launch waits follow the server context: `claudeui.CheckLaunchDelivered` stops when the
+     server context is cancelled. This is a product code change.
    - The `ralphloop` Telegram hang is fixed at its cause: `Run` must stop when the watchdog fires,
      and the empty `git commit` is explained. The `hang` limit stays as the safety net.
    - A lean command scenario (about 6 sessions instead of 22) serves the 29 agent command flows.
@@ -519,7 +520,7 @@ Stories:
   countdown.
 - Removing the vi-editor flows (G6) or lowering `-race`.
 - Shipping the Playwright lint to other projects, and automating the other 10 patterns.
-- Changing product `DefaultReadyWait` or CI's PATH.
+- Changing CI's PATH.
 - Raising any limit without the person's approval.
 
 ## Further Notes

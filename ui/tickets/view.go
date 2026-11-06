@@ -36,10 +36,14 @@ func sidebarEnvFor(m Model) sidebar.Env {
 			if !ok {
 				return "", false
 			}
-			if p.Reason != "" {
-				return p.Verdict + ": " + p.Reason, true
+			label := p.Verdict
+			if label == wire.VerdictConcurrencyCap {
+				label = "Waiting for a slot"
 			}
-			return p.Verdict, true
+			if p.Reason != "" {
+				return label + ": " + p.Reason, true
+			}
+			return label, true
 		},
 	}
 }

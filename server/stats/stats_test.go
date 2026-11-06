@@ -475,6 +475,19 @@ func TestStats_LaunchCountsEachLaunchOnItsClaimDay(t *testing.T) {
 	}
 }
 
+func TestStats_LaunchExactlyAtTargetIsUnderTarget(t *testing.T) {
+	t.Parallel()
+	s := statsStore(t, func(store string) {
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(3)+"\n"+launchYAML([2]int{1, 15000}), "A"),
+			"02-b.md": rigs.IssueMD("02", "done", "done_at: "+statsStamp(3)+"\n"+launchYAML([2]int{1, 15001}), "B"),
+		})
+	})("?range=30")
+	if s.Launch.ShareUnderTgt == nil || *s.Launch.ShareUnderTgt != 0.5 {
+		t.Errorf("share under target = %v, want 0.5", s.Launch.ShareUnderTgt)
+	}
+}
+
 func TestStats_LaunchEmptyRangeIsNoData(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {

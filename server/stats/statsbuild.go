@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -290,7 +291,7 @@ func (f *frictionTally) fill(out *wire.StatsFriction) {
 
 // LaunchTargetMs is the launch-time target the under-target share counts
 // against.
-const LaunchTargetMs = 15_000
+const LaunchTargetMs = int64(events.SlowLaunch / time.Millisecond)
 
 // launchTally is the Launch section while it is being summed.
 type launchTally struct {
@@ -338,7 +339,7 @@ func (l *launchTally) fill(out *wire.StatsLaunch) {
 	out.MedianMs = &m
 	under := 0
 	for _, t := range l.totals {
-		if t < LaunchTargetMs {
+		if t <= LaunchTargetMs {
 			under++
 		}
 	}
