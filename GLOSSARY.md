@@ -1051,6 +1051,11 @@ and the jump menu. Pages render inside it. (The TUI's app shell, in **Tab Cachin
 a different thing.)
 _Avoid_: layout, chrome
 
+**Device type** — which of three layouts the web UI uses, chosen by viewport width alone: phone
+(below 640px), tablet (640 to 992px) or desktop (from 992px). A resized desktop window gets the
+type its width gives.
+_Avoid_: breakpoint, form factor
+
 ## Web workspaces
 
 **Workspace** — a named theme the person creates to group what they work on now: Designs, epics and
