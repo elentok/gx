@@ -48,10 +48,15 @@ func TestSessionPrompt_CodexPastesImagesBeforeTheText(t *testing.T) {
 	if res := f.promptImages(t, "see these", ids...); res.Refused {
 		t.Fatalf("prompt = %+v", res)
 	}
-	// The fake Codex does not turn on bracketed paste, so the pastes arrive
-	// unmarked; the order is what this case pins. Its turn starts late, so the
-	// nudge may submit the same prompt again.
-	want := strconv.Quote(strings.Join(paths, "")+" see these") + "\n"
+	// The fake Codex turns each pasted path into an "[Image #N] " chip (with its
+	// own trailing space), then the server's separator and the text follow; the
+	// order is what this case pins. Its turn starts late, so the nudge may
+	// submit the same prompt again.
+	chips := ""
+	for i := range paths {
+		chips += "[Image #" + strconv.Itoa(i+1) + "] "
+	}
+	want := strconv.Quote(chips+" see these") + "\n"
 	if !servertest.Poll(10*time.Second, func() bool { return strings.HasPrefix(submitted(t, f.conv), want) }) {
 		t.Fatalf("submitted = %q, want it to start with %q", submitted(t, f.conv), want)
 	}
