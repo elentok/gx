@@ -188,6 +188,12 @@ type Scenario struct {
 	Migrate bool
 	// MigrateHold also holds the start-up migration open until the hold file is removed.
 	MigrateHold bool
+	// FailedMigration records a failed migration for this project once the server is
+	// up (the start-up migration would clear an earlier record) and starts its
+	// project-level Fix agent. The migration hooks stay off, so the queue is not held.
+	FailedMigration string
+	// FixAgents are the ticket addresses a Fix agent is started on after the server is up.
+	FixAgents []string
 }
 
 // WebMode is how far the fixture takes the web setup and sign-in.

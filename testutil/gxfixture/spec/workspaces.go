@@ -17,9 +17,9 @@ const (
 // a held worker and a held epic in "research", a chat and the one-off agent in
 // the Default workspace, and one Epics-page card per section.
 //
-// The project-level Fix agent and the failed migration are added by the
-// scenario of the ticket that follows this one: append to Sessions and set
-// Migrate on the returned value.
+// Other holds a project-level Fix agent (a failed migration), a Fix agent on a
+// paused One-off, and the Investigate agent of another paused One-off. A Fix
+// agent on paused-epic/01 and the Investigate agent of inv-epic nest under their epics.
 func WorkspacesScenario() scenario {
 	const (
 		liveDesign = project + ":ws-design"
@@ -35,7 +35,18 @@ func WorkspacesScenario() scenario {
 			{project, "ws-impl-epic", open},
 			{project, "held-epic", open},
 			// One-off agent: a queued one-off ticket whose worker is held.
-			{project, "one-offs", []ticket{{"01", "one-off", servertest.TicketOpts{}}}},
+			{project, "one-offs", []ticket{
+				// A one-offs epic runs one ticket at a time: 01 is the Investigate agent
+				// of the paused 02, and 04 is the paused one a Fix agent is started on.
+				{"01", "one-off", servertest.TicketOpts{Type: "investigate", Parent: "02"}},
+				{"02", "one-off-paused", servertest.TicketOpts{PauseReason: "iteration-error"}},
+				{"04", "one-off-fixed", servertest.TicketOpts{PauseReason: "iteration-error"}},
+			}},
+			// An Investigate agent of an implementation epic.
+			{project, "inv-epic", []ticket{
+				{"01", "broken", servertest.TicketOpts{PauseReason: "iteration-error"}},
+				{"02", "investigate", servertest.TicketOpts{Type: "investigate", Parent: "01"}},
+			}},
 			// One card per remaining section.
 			{project, "paused-epic", []ticket{{"01", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}}}},
 			{project, "ready-epic", open},
@@ -59,8 +70,14 @@ func WorkspacesScenario() scenario {
 		OpenDesigns: []string{liveDesign},
 		Hold:        true,
 		Chat:        true,
-		Queue:       []string{implEpic, project + ":one-offs/01"},
-		Sessions:    []sessionSpec{{Project: project, Prompt: "hello", Read: true}},
+		Queue:       []string{implEpic, project + ":one-offs/01", project + ":inv-epic/02"},
+
+		// The fake agent shows no sign of taking an Investigate prompt, so the
+		// default grace would hold those agents' launch for 45 seconds.
+		PromptGrace:     "1s",
+		FailedMigration: project,
+		FixAgents:       []string{project + ":one-offs/04", project + ":paused-epic/01"},
+		Sessions:        []sessionSpec{{Project: project, Prompt: "hello", Read: true}},
 		Steps: [][]string{
 			{"server", "workspaces", "create", WorkspaceBugs},
 			{"server", "workspaces", "create", WorkspaceResearch},

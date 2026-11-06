@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/gxfixture/websignin"
 )
@@ -123,6 +124,32 @@ func (f *fixture) queueAll(ctx context.Context, sc scenario) error {
 	return nil
 }
 
+// startFixAgents starts the scenario's Fix agents through the API: one per
+// FixAgents ticket, and the project-level one for a recorded failed migration.
+func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
+	cl := apiclient.New(server.SocketPath(f.stateD))
+	reqs := make([]wire.FixAgentRequest, 0, len(sc.FixAgents)+1)
+	for _, addr := range sc.FixAgents {
+		reqs = append(reqs, wire.FixAgentRequest{Address: addr})
+	}
+	if sc.FailedMigration != "" {
+		if err := migratefail.Record(f.stateD, sc.FailedMigration, "fixture migration failed"); err != nil {
+			return fmt.Errorf("record failed migration: %w", err)
+		}
+		reqs = append(reqs, wire.FixAgentRequest{Project: sc.FailedMigration})
+	}
+	for _, req := range reqs {
+		res, err := cl.Sessions.FixAgent(ctx, req)
+		if err != nil {
+			return fmt.Errorf("fix agent %v: %w", req, err)
+		}
+		if res.Refused {
+			return fmt.Errorf("fix agent %v refused: %s", req, res.Message)
+		}
+	}
+	return nil
+}
+
 // queueAfterUsage queues the tickets that wait for the server's first usage sample.
 func (f *fixture) queueAfterUsage(sc scenario) error {
 	sampleFile := "usage-sample.json"
@@ -168,6 +195,9 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 		if out, err := f.cli(args...); err != nil {
 			return s, fmt.Errorf("gx %s: %w\n%s", strings.Join(args, " "), err, out)
 		}
+	}
+	if err := f.startFixAgents(ctx, sc); err != nil {
+		return s, err
 	}
 	if len(sc.QueueAfterUsage) > 0 {
 		if err := f.queueAfterUsage(sc); err != nil {
