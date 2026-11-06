@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -86,13 +87,13 @@ func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 		t.Fatal("no feature_worktree in the fixture JSON")
 	}
 	withFeature, _ := r.commandNames(t, "--project", "demo", "--dir", feature)
-	if !strings.Contains(strings.Join(withFeature, " "), featureSkill) {
-		t.Errorf("feature list %v misses %s", withFeature, featureSkill)
+	if !strings.Contains(strings.Join(withFeature, " "), spec.FeatureSkill) {
+		t.Errorf("feature list %v misses %s", withFeature, spec.FeatureSkill)
 	}
 	repo := strings.TrimSuffix(feature, "/.worktrees/feature")
 	without, _ := r.commandNames(t, "--project", "demo", "--dir", repo)
-	if strings.Contains(strings.Join(without, " "), featureSkill) {
-		t.Errorf("base list %v holds %s", without, featureSkill)
+	if strings.Contains(strings.Join(without, " "), spec.FeatureSkill) {
+		t.Errorf("base list %v holds %s", without, spec.FeatureSkill)
 	}
 	r.stop(t)
 }

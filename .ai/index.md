@@ -269,7 +269,11 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   isolated real `gx server` (pty runner, `fakeclaude` as `claude`) and prints JSON with `web_url`,
   socket, state dir, hold file and `log_file` (the server's stdout+stderr, which holds the cleanup
   command's output tail); SIGTERM stops it. Per-ticket worker behaviour
-  (finish/ask/fail) lives in `.agentfake-worker.json`, see `scenarios.go`. The `cache-gate` and
+  (finish/ask/fail) lives in `.agentfake-worker.json`, see `scenarios.go`. The scenario data model
+  (`Scenario`, `Epic`, `Ticket`, `SessionSpec`) and the scenario definitions that need nothing from
+  the fixture program live in the sub-package `testutil/gxfixture/spec`; `scenarios.go` keeps the
+  registry and aliases the spec types. New scenario definitions that take no `fixture` go there too
+  (the package is near the `sizeguard` limits). The `cache-gate` and
   `cache-gate-custom` scenarios (`cachegate.go`) output `gate_dir`: a fake `go` and `ps` in
   `bin/` (put it first on PATH), `go-hold` to hold a fake build, and `go-clean.log`.
 

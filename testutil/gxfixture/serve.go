@@ -50,7 +50,7 @@ func (f *fixture) startServer(ctx context.Context, sc scenario) (*runningServer,
 	if err := rs.cmd.Start(); err != nil {
 		return rs, err
 	}
-	if sc.migrate {
+	if sc.Migrate {
 		if err := f.writeServerControl(rs.cmd.Process.Pid, rs.logPath); err != nil {
 			_ = rs.cmd.Process.Kill()
 			return rs, err
@@ -75,13 +75,13 @@ func (f *fixture) loginWeb(ctx context.Context, sc scenario, rs *runningServer) 
 		return fmt.Errorf("%w\n%s", err, f.serverOutput())
 	}
 	rs.webURL = webURL
-	if sc.web != webSetupPending {
+	if sc.Web != webSetupPending {
 		if rs.in, err = websignin.Setup(f.stateD, webURL, setupCode); err != nil {
 			return fmt.Errorf("web setup: %w\n%s", err, f.serverOutput())
 		}
 		rs.password = websignin.Password
 	}
-	if sc.web == webSignedOut {
+	if sc.Web == webSignedOut {
 		rs.in.CookieName, rs.in.Cookie = "", ""
 	}
 	return nil
@@ -90,7 +90,7 @@ func (f *fixture) loginWeb(ctx context.Context, sc scenario, rs *runningServer) 
 // queueAdd queues one ticket, with its scenario agent if any, through the CLI.
 func (f *fixture) queueAdd(sc scenario, addr string) error {
 	args := []string{"server", "queue", "add", addr}
-	if agent := sc.queueAgents[addr]; agent != "" {
+	if agent := sc.QueueAgents[addr]; agent != "" {
 		args = append(args, "--agent", agent)
 	}
 	if out, err := f.cli(args...); err != nil {
@@ -100,11 +100,11 @@ func (f *fixture) queueAdd(sc scenario, addr string) error {
 }
 
 func (f *fixture) queueAll(ctx context.Context, sc scenario) error {
-	for _, addr := range sc.queue {
+	for _, addr := range sc.Queue {
 		// A held migration holds the queue verb too; it finishes once the hold is released.
-		if sc.migrateHold {
+		if sc.MigrateHold {
 			args := []string{"server", "queue", "add", addr}
-			if agent := sc.queueAgents[addr]; agent != "" {
+			if agent := sc.QueueAgents[addr]; agent != "" {
 				args = append(args, "--agent", agent)
 			}
 			cmd := exec.CommandContext(ctx, f.gx, args...)
@@ -125,7 +125,7 @@ func (f *fixture) queueAll(ctx context.Context, sc scenario) error {
 // queueAfterUsage queues the tickets that wait for the server's first usage sample.
 func (f *fixture) queueAfterUsage(sc scenario) error {
 	sampleFile := "usage-sample.json"
-	if sc.codexUsage {
+	if sc.CodexUsage {
 		sampleFile = "usage-sample-codex.json"
 	}
 	sample := filepath.Join(f.root, "state", "gx", sampleFile)
@@ -136,7 +136,7 @@ func (f *fixture) queueAfterUsage(sc scenario) error {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	for _, addr := range sc.queueAfterUsage {
+	for _, addr := range sc.QueueAfterUsage {
 		if err := f.queueAdd(sc, addr); err != nil {
 			return err
 		}
@@ -147,38 +147,38 @@ func (f *fixture) queueAfterUsage(sc scenario) error {
 // seedAfterStart seeds what needs the running server: queue, agents, sessions and designs.
 func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s seeded, err error) {
 	// The earlier run goes first so no held worker holds its slot.
-	for _, addr := range sc.ranOnClaude {
+	for _, addr := range sc.RanOnClaude {
 		if err := sessionsOf(f).seedRanOnClaude(addr); err != nil {
 			return s, err
 		}
 	}
 	// --hold freezes every worker as running until the caller removes the hold file.
-	if o.hold || sc.hold {
+	if o.hold || sc.Hold {
 		if err := os.WriteFile(f.hold, nil, 0o644); err != nil {
 			return s, err
 		}
 	}
-	if !sc.queueAfterSessions {
+	if !sc.QueueAfterSessions {
 		if err := f.queueAll(ctx, sc); err != nil {
 			return s, err
 		}
 	}
-	if len(sc.queueAfterUsage) > 0 {
+	if len(sc.QueueAfterUsage) > 0 {
 		if err := f.queueAfterUsage(sc); err != nil {
 			return s, err
 		}
 	}
-	if sc.agentProcs {
+	if sc.AgentProcs {
 		if err := f.tieAgentProcesses(ctx); err != nil {
 			return s, err
 		}
 	}
-	if sc.spend {
+	if sc.Spend {
 		if s.agentTranscript, err = f.agentTranscript(ctx); err != nil {
 			return s, err
 		}
 	}
-	if sc.checkWaiting {
+	if sc.CheckWaiting {
 		if s.checkWaitingFile, err = writeCheckWaiting(ctx, f); err != nil {
 			return s, err
 		}
@@ -186,7 +186,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 	if err := sessionsOf(f).seedSessions(sc); err != nil {
 		return s, err
 	}
-	if sc.queueAfterSessions {
+	if sc.QueueAfterSessions {
 		if err := f.queueAll(ctx, sc); err != nil {
 			return s, err
 		}
@@ -194,7 +194,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 	if err := f.seedDesigns(ctx, sc); err != nil {
 		return s, err
 	}
-	if sc.tokenPoll {
+	if sc.TokenPoll {
 		if s.transcripts, err = f.liveTranscripts(ctx); err != nil {
 			return s, err
 		}
@@ -208,14 +208,14 @@ func (f *fixture) seedDesigns(ctx context.Context, sc scenario) error {
 	// run, but linked after it: a map with a live design session makes `designs
 	// open` return that one instead of starting another.
 	plain := make(map[string]string)
-	for _, addr := range sc.linkedDesigns {
+	for _, addr := range sc.LinkedDesigns {
 		id, err := sessionsOf(f).createSession(project, filepath.Join(f.root, "repo"), "hello", "")
 		if err != nil {
 			return err
 		}
 		plain[addr] = id
 	}
-	for _, addr := range sc.openDesigns {
+	for _, addr := range sc.OpenDesigns {
 		if err := f.openDesign(ctx, sc, addr); err != nil {
 			return err
 		}
@@ -239,7 +239,7 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 	}
 	// The step moves while the opening turn still runs, so that turn's end finds the map past its
 	// step and the handoff fires. After the wait the run end would already be behind it.
-	if step, ok := sc.advanceSteps[addr]; ok {
+	if step, ok := sc.AdvanceSteps[addr]; ok {
 		if out, err := f.cli("tickets", "set", addr, "--design-step", step); err != nil {
 			return fmt.Errorf("advance %s to %s: %w\n%s", addr, step, err, out)
 		}
@@ -251,7 +251,7 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 	}); err != nil {
 		return fmt.Errorf("open design %s: %w", addr, err)
 	}
-	if slices.Contains(sc.autoAdvanceOff, addr) {
+	if slices.Contains(sc.AutoAdvanceOff, addr) {
 		// Not the CLI verb: its on|off arg validation rejects the session id.
 		if res, err := apiclient.New(server.SocketPath(f.stateD)).Sessions.SetAutoAdvance(ctx, res.Session.ID, false); err != nil || res.Refused {
 			return fmt.Errorf("auto-advance off for %s: %v %+v", addr, err, res)
@@ -296,7 +296,7 @@ func (f *fixture) waitForEnd(ctx context.Context, sc scenario, exited <-chan err
 	case err := <-exited:
 		// A migrate scenario's flow kills and starts the server itself (migrate.go);
 		// a cache-gate flow stops it to run gx brief go-clean-cache without one.
-		if sc.restart == nil && !sc.migrate && !sc.fakeGo {
+		if sc.Restart == nil && !sc.Migrate && !sc.FakeGo {
 			return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
 		}
 		f.restarted = true

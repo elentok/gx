@@ -63,11 +63,11 @@ func checkShape(sc scenario, shape string) (string, error) {
 	var def string
 	var names []string
 	switch {
-	case sc.limits:
+	case sc.Limits:
 		def, names = "fresh", limitShapeNames()
-	case sc.spend:
+	case sc.Spend:
 		def, names = "normal", spendShapeNames()
-	case sc.limitBurn:
+	case sc.LimitBurn:
 		def, names = "menu", limitseed.ShapeNames()
 	default:
 		if shape != "" {

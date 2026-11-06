@@ -16,6 +16,7 @@ import (
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -371,14 +372,14 @@ func TestDesignModelTiersScenario_TierPerMapAndLaunchArgs(t *testing.T) {
 			t.Errorf("%s tier = %q, want %q", ticket, got[ticket].Tier, tier)
 		}
 	}
-	r.waitLaunchModels(t, []string{workerModel, strongestModel, strongestModel, strongestModel})
+	r.waitLaunchModels(t, []string{spec.WorkerModel, spec.StrongestModel, spec.StrongestModel, spec.StrongestModel})
 	// The session list shows the model the fake reports on its replies.
 	r.designSessions(t, tickets, func(s wire.SessionInfo) bool {
 		if s.Ticket == "plain:tier-empty" {
 			// Launched with no model flag, the fake reports its own.
 			return s.Model == agentfake.ReportedModel && s.Effort == ""
 		}
-		return s.Model == map[string]string{"strongest": strongestModel, "worker": workerModel}[string(s.Tier)]
+		return s.Model == map[string]string{"strongest": spec.StrongestModel, "worker": spec.WorkerModel}[string(s.Tier)]
 	})
 	r.stop(t)
 }

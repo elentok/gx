@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 // The restart scenarios point the server's restart binary (GX_RESTART_BINARY) at
@@ -25,39 +25,6 @@ import (
 // Scenarios: restart-agents (a running agent), restart-projects (two projects, one
 // failing its migration), restart-launchd (the binary sits at a launchd-style path
 // other than the server's own) and restart-missing (the binary path does not exist).
-
-// restartPath is where the fake binary sits.
-type restartPath int
-
-const (
-	// restartAtDefault is <root>/restart/bin/gx.
-	restartAtDefault restartPath = iota
-	// restartAtLaunchd is <root>/launchd/bin/gx, as an installed launchd agent would name it.
-	restartAtLaunchd
-	// restartMissing names a path with no file behind it.
-	restartMissing
-)
-
-// restartSpec is a scenario's fake restart binary.
-type restartSpec struct {
-	path restartPath
-	// version is what the fake reports as the new version.
-	version string
-	// configError makes the config check fail with this message.
-	configError string
-	// failing maps a project to its dry-run error; the other projects pass.
-	failing map[string]string
-	// pending maps a project to its pending step count; the others report 0.
-	pending map[string]int
-	// old makes the binary reject restart-check, as a binary older than the command does.
-	old bool
-	// slow is how long restart-check takes, in seconds ("0.5").
-	slow string
-	// startsUp lets the restart bring the server back.
-	startsUp bool
-}
-
-const defaultNewVersion = "fixture-next"
 
 // fakeGxBody answers like gx for the two commands a restart runs. %[1]s is the
 // control dir and %[2]s the real gx.
@@ -90,23 +57,6 @@ esac
 
 func (f *fixture) restartDir() string { return filepath.Join(f.root, "restart") }
 
-// checkOutput is what the fake prints for the scenario's projects.
-func (r restartSpec) checkOutput(projects []string) wire.RestartCheckOutput {
-	version := r.version
-	if version == "" {
-		version = defaultNewVersion
-	}
-	out := wire.RestartCheckOutput{Version: version, Config: wire.RestartCheckConfig{OK: r.configError == "", Error: r.configError}}
-	for _, name := range projects {
-		p := wire.RestartCheckProject{Name: name, OK: true, Files: []string{}, Pending: r.pending[name]}
-		if msg, bad := r.failing[name]; bad {
-			p.OK, p.Error = false, msg
-		}
-		out.Projects = append(out.Projects, p)
-	}
-	return out
-}
-
 // setupRestart writes the control files and the fake binary, and points the
 // server at it. projects are the scenario's project names.
 func (f *fixture) setupRestart(r restartSpec, projects []string) error {
@@ -114,15 +64,15 @@ func (f *fixture) setupRestart(r restartSpec, projects []string) error {
 	if err := os.MkdirAll(ctl, 0o755); err != nil {
 		return err
 	}
-	check, err := json.Marshal(r.checkOutput(projects))
+	check, err := json.Marshal(r.CheckOutput(projects))
 	if err != nil {
 		return err
 	}
-	files := map[string]string{"check.json": string(check) + "\n", "slow": r.slow + "\n"}
-	if r.startsUp {
+	files := map[string]string{"check.json": string(check) + "\n", "slow": r.Slow + "\n"}
+	if r.StartsUp {
 		files["start"] = "up\n"
 	}
-	if r.old {
+	if r.Old {
 		files["old"] = "\n"
 	}
 	for name, body := range files {
@@ -131,10 +81,10 @@ func (f *fixture) setupRestart(r restartSpec, projects []string) error {
 		}
 	}
 	bin := filepath.Join(ctl, "bin", "gx")
-	switch r.path {
-	case restartAtLaunchd:
+	switch r.Path {
+	case spec.RestartAtLaunchd:
 		bin = filepath.Join(f.root, "launchd", "bin", "gx")
-	case restartMissing:
+	case spec.RestartMissing:
 		f.env = append(f.env, "GX_RESTART_BINARY="+filepath.Join(ctl, "missing", "gx"))
 		return nil
 	}

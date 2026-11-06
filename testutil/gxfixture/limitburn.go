@@ -31,22 +31,22 @@ const (
 // ticket). Their transcripts are printed (see liveTranscripts).
 func limitBurnLive() scenario {
 	return scenario{
-		limitBurn: true,
-		tokenPoll: true,
-		chat:      true,
-		hold:      true,
-		epics: []epic{
-			{project, liveQueueEpic, []ticket{{"01", "queue-held", servertest.TicketOpts{}}}},
-			{project, "one-offs", []ticket{{"01", "one-off-held", servertest.TicketOpts{}}}},
-			{project, liveMapEpic, nil},
+		LimitBurn: true,
+		TokenPoll: true,
+		Chat:      true,
+		Hold:      true,
+		Epics: []epic{
+			{Project: project, Name: liveQueueEpic, Tickets: []ticket{{ID: "01", Slug: "queue-held", Opts: servertest.TicketOpts{}}}},
+			{Project: project, Name: "one-offs", Tickets: []ticket{{ID: "01", Slug: "one-off-held", Opts: servertest.TicketOpts{}}}},
+			{Project: project, Name: liveMapEpic, Tickets: nil},
 		},
-		designSteps: map[string]string{project + ":" + liveMapEpic: string(tickets.StepResolveTickets)},
-		queue:       []string{project + ":" + liveQueueEpic, project + ":one-offs/01"},
+		DesignSteps: map[string]string{project + ":" + liveMapEpic: string(tickets.StepResolveTickets)},
+		Queue:       []string{project + ":" + liveQueueEpic, project + ":one-offs/01"},
 		// The design session is opened on the map, not linked afterwards: the
 		// token poll fixes a session's group when it first sees it.
-		designByMap: map[string][]string{project + ":" + liveMapEpic: {agentfake.DesignTurnPlain}},
-		openDesigns: []string{project + ":" + liveMapEpic},
-		sessions:    []sessionSpec{{project: project, prompt: "hello", read: true}},
+		DesignByMap: map[string][]string{project + ":" + liveMapEpic: {agentfake.DesignTurnPlain}},
+		OpenDesigns: []string{project + ":" + liveMapEpic},
+		Sessions:    []sessionSpec{{Project: project, Prompt: "hello", Read: true}},
 	}
 }
 

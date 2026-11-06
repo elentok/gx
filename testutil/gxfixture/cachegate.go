@@ -42,18 +42,18 @@ exit 0
 `
 
 // cacheGateEpics is the one epic that gives the disk a project to clean.
-var cacheGateEpics = []epic{{project, "gate-epic", []ticket{
-	{"01", "first", servertest.TicketOpts{}},
+var cacheGateEpics = []epic{{Project: project, Name: "gate-epic", Tickets: []ticket{
+	{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}},
 }}}
 
 // The cache-gate scenarios put <gate dir>/bin first on the server's PATH. A
 // flow does the same for the gx it starts.
 var (
 	// cacheGate cleans through the disk control files.
-	cacheGate = scenario{epics: cacheGateEpics, diskLow: true, fakeGo: true}
+	cacheGate = scenario{Epics: cacheGateEpics, DiskLow: true, FakeGo: true}
 	// cacheGateCustom has no project cleanup command, so a
 	// --config disk-space.cleanup-command override is the command that runs.
-	cacheGateCustom = scenario{epics: cacheGateEpics, fakeGo: true}
+	cacheGateCustom = scenario{Epics: cacheGateEpics, FakeGo: true}
 )
 
 // gateDir sits outside the project repo, so the trunk stays clean.

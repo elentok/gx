@@ -1,4 +1,4 @@
-package main
+package spec
 
 import (
 	"fmt"
@@ -11,8 +11,8 @@ import (
 	"github.com/elentok/gx/server/servertest"
 )
 
-// unitedEpics is the united scenario's epics, grouped by section.
-func unitedEpics() []epic {
+// UnitedEpics is the united scenario's epics, grouped by section.
+func UnitedEpics() []epic {
 	open := []ticket{{"01", "first", servertest.TicketOpts{}}}
 	done := []ticket{{"01", "built", servertest.TicketOpts{Status: "done"}}}
 	return []epic{
@@ -60,8 +60,8 @@ func unitedEpics() []epic {
 	}
 }
 
-// unitedMeta is the epic ticket.md frontmatter the united scenario overrides.
-func unitedMeta() map[string]string {
+// UnitedMeta is the epic ticket.md frontmatter the united scenario overrides.
+func UnitedMeta() map[string]string {
 	merged := func(day string) string {
 		return "status: open\ncompleted_at: 2026-01-" + day + "T10:00:00Z\nmerged_at: 2026-01-" + day + "T11:00:00Z\n"
 	}
@@ -71,7 +71,7 @@ func unitedMeta() map[string]string {
 	)
 	meta := map[string]string{
 		project + ":blocked-merge-epic":   "status: open\nland_block_reason: needs a rebase\n" + doneStamp,
-		project + ":dirty-trunk-epic":     dirtyTrunkMeta("a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt") + doneStamp,
+		project + ":dirty-trunk-epic":     DirtyTrunkMeta("a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt") + doneStamp,
 		project + ":awaiting-epic":        "status: open\n" + doneStamp,
 		project + ":deadlock-epic":        "status: open\nblocked_by: [\"ready-epic\"]\n",
 		project + ":draft-epic":           "status: draft\n",
@@ -92,8 +92,8 @@ func unitedMeta() map[string]string {
 	}
 	// Every epic is created; ready-epic minutes ago, relative to fixture start.
 	recent := "created_at: " + time.Now().Add(-5*time.Minute).UTC().Format(time.RFC3339) + "\n"
-	for _, e := range unitedEpics() {
-		addr := e.project + ":" + e.name
+	for _, e := range UnitedEpics() {
+		addr := e.Project + ":" + e.Name
 		created := oldCreated
 		if addr == project+":ready-epic" {
 			created = recent
@@ -106,9 +106,9 @@ func unitedMeta() map[string]string {
 	return meta
 }
 
-// dirtyTrunkMeta is the epic frontmatter of a merge paused on a dirty trunk,
+// DirtyTrunkMeta is the epic frontmatter of a merge paused on a dirty trunk,
 // with the full clashing file list stored as the server stores it.
-func dirtyTrunkMeta(files ...string) string {
+func DirtyTrunkMeta(files ...string) string {
 	reason := fmt.Sprintf("uncommitted changes on main clash with %s; commit or discard them, then merge again", strings.Join(files[:min(len(files), 5)], ", "))
 	if extra := len(files) - 5; extra > 0 {
 		reason += fmt.Sprintf(" (+%d more)", extra)
@@ -117,16 +117,16 @@ func dirtyTrunkMeta(files ...string) string {
 		"\nland_block_files: [" + strings.Join(files, ", ") + "]\n"
 }
 
-// commitOnBranch creates branch off main with one committed file and returns to main.
-func commitOnBranch(f *fixture, repo, branch, file, content string) error {
-	if err := f.git(repo, "checkout", "-b", branch); err != nil {
+// CommitOnBranch creates branch off main with one committed file and returns to main.
+func CommitOnBranch(git Git, repo, branch, file, content string) error {
+	if err := git(repo, "checkout", "-b", branch); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(repo, file), []byte(content), 0o644); err != nil {
 		return err
 	}
 	for _, args := range [][]string{{"add", file}, {"commit", "-m", branch}, {"checkout", "main"}} {
-		if err := f.git(repo, args...); err != nil {
+		if err := git(repo, args...); err != nil {
 			return err
 		}
 	}

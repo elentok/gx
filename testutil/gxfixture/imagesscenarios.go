@@ -13,17 +13,18 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/transcript"
 )
 
 // agentsImagesScenario is the agents scenario with saved images in the chat of
 // its first Claude session and its Codex session.
 func agentsImagesScenario() scenario {
-	sc := agentsScenario()
-	sc.sessions = slices.Clone(sc.sessions)
-	for i := range sc.sessions {
-		if i == 0 || sc.sessions[i].harness == "codex" {
-			sc.sessions[i].images = true
+	sc := spec.AgentsScenario()
+	sc.Sessions = slices.Clone(sc.Sessions)
+	for i := range sc.Sessions {
+		if i == 0 || sc.Sessions[i].Harness == "codex" {
+			sc.Sessions[i].Images = true
 		}
 	}
 	return sc

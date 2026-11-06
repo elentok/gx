@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 func (r *running) setRestart(t *testing.T, name, value string) {
@@ -44,8 +45,8 @@ func TestRestartScenarios_TheFakeBinaryAnswersTheCheck(t *testing.T) {
 			r := start(t, tc.scenario)
 			defer r.stop(t)
 			rep := r.restartCheck(t)
-			if rep.Status != wire.RestartCheckOK || rep.NewVersion != defaultNewVersion || !rep.Config.OK {
-				t.Fatalf("report = %+v, want ok with version %s", rep, defaultNewVersion)
+			if rep.Status != wire.RestartCheckOK || rep.NewVersion != spec.DefaultNewVersion || !rep.Config.OK {
+				t.Fatalf("report = %+v, want ok with version %s", rep, spec.DefaultNewVersion)
 			}
 			if !strings.HasSuffix(rep.Binary, tc.wantBin) {
 				t.Errorf("binary = %s, want suffix %s", rep.Binary, tc.wantBin)

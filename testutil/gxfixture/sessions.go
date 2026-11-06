@@ -19,58 +19,10 @@ import (
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/codex"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
-
-// sessionSpec is one interactive session a scenario creates once the server is
-// up, in order. A prompt makes a chat turn (the scenario turns the fake's chat
-// knob on); with the agentfake.ChatSlowMarker the turn never ends.
-type sessionSpec struct {
-	project string
-	// harness is empty for Claude.
-	harness string
-	prompt  string
-	// link is the map address the finished session is marked a design session of.
-	link string
-	// read clears the Unread the finished turn (or the crash) raised.
-	read bool
-	// actionable is the reason the session raises with `gx agent actionable`.
-	actionable string
-	// crash makes the fake exit with code 1 once the session is idle.
-	crash bool
-	// control is sent to the fake once the session settled; failure is the
-	// Failure.Kind the session must then show.
-	control *agentfake.Control
-	failure string
-	// thenPrompt is one more chat turn sent after the control, so a reply
-	// carries what the control changed.
-	thenPrompt string
-	// steps are "/" commands sent once the session is idle, in order.
-	steps []commandStep
-	// images appends the saved-image messages of agentsImagesScenario to the chat.
-	images bool
-	// rejected says the agent rejects the first prompt (see scenario.unknownSkill):
-	// the session is settled once it raises the Unknown command Actionable.
-	rejected bool
-}
-
-// commandStep is one "/" command a seeded session runs. output is the stdout
-// the Claude fake writes for it (empty for a command with no output); nil
-// sends no control, as for Codex, which writes no output. turn sends a command
-// the fake treats as a chat turn (/compact) and waits for its reply.
-type commandStep struct {
-	prompt string
-	output *string
-	turn   bool
-	// control is sent before the prompt. blocks says the command leaves the
-	// session waiting at a dialog, so the step does not wait for it to idle.
-	control *agentfake.Control
-	blocks  bool
-}
 
 const sessionWaitTimeout = 20 * time.Second
 
@@ -83,14 +35,14 @@ func sessionsOf(f *fixture) sessionSeeder { return sessionSeeder{f} }
 // seedSessions creates the scenario's sessions one at a time, each settled
 // before the next so the list keeps creation order.
 func (f sessionSeeder) seedSessions(sc scenario) error {
-	for _, s := range sc.sessions {
+	for _, s := range sc.Sessions {
 		// A Codex session cannot start while codex is off PATH, which is the
 		// state the missing-harness flows need.
-		if s.harness == "codex" && !f.codex {
+		if s.Harness == "codex" && !f.codex {
 			continue
 		}
 		if err := f.seedSession(sc, s); err != nil {
-			return fmt.Errorf("session in %s: %w", s.project, err)
+			return fmt.Errorf("session in %s: %w", s.Project, err)
 		}
 	}
 	return nil
@@ -98,20 +50,20 @@ func (f sessionSeeder) seedSessions(sc scenario) error {
 
 func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	before, codexBefore := f.controlFiles(), f.codexIDs()
-	id, err := f.createSession(s.project, f.repoDir(sc, s.project), s.prompt, s.harness)
+	id, err := f.createSession(s.Project, f.repoDir(sc, s.Project), s.Prompt, s.Harness)
 	if err != nil {
 		return err
 	}
-	if s.rejected {
+	if s.Rejected {
 		return f.waitFor(id, "an Unknown command Actionable", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
 			return si.Actionable.GxRaised && strings.Contains(si.Actionable.Reason, "Unknown command:")
 		})
 	}
-	slow := strings.Contains(s.prompt, agentfake.ChatSlowMarker)
+	slow := strings.Contains(s.Prompt, agentfake.ChatSlowMarker)
 	// A Codex fake holds its turn until a finish control, so the seeder ends it.
-	codexTurn := s.harness == "codex" && s.prompt != ""
-	sendControl := f.controlSender(id, s.harness, before, codexBefore)
-	if s.prompt != "" {
+	codexTurn := s.Harness == "codex" && s.Prompt != ""
+	sendControl := f.controlSender(id, s.Harness, before, codexBefore)
+	if s.Prompt != "" {
 		role := transcript.ChatRoleAgent
 		if slow || codexTurn {
 			role = transcript.ChatRolePerson
@@ -134,20 +86,20 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	if err := f.waitFor(id, state, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool { return si.Status.State == state }); err != nil {
 		return err
 	}
-	if s.link != "" {
-		if err := f.linkSession(id, s.link); err != nil {
+	if s.Link != "" {
+		if err := f.linkSession(id, s.Link); err != nil {
 			return err
 		}
 	}
-	if s.actionable != "" {
-		cmd := exec.Command(f.gx, "agent", "actionable", s.actionable)
+	if s.Actionable != "" {
+		cmd := exec.Command(f.gx, "agent", "actionable", s.Actionable)
 		cmd.Env = append(slices.Clone(f.env), holder.AgentSessionEnv+"="+id)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("actionable %s: %w\n%s", id, err, out)
 		}
 	}
-	control := s.control
-	if s.crash {
+	control := s.Control
+	if s.Crash {
 		control = &agentfake.Control{Action: agentfake.ActionExit, Code: 1}
 	}
 	if control != nil {
@@ -155,31 +107,31 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 			return err
 		}
 	}
-	if s.thenPrompt != "" {
-		if err := f.promptAgain(id, s.thenPrompt); err != nil {
+	if s.ThenPrompt != "" {
+		if err := f.promptAgain(id, s.ThenPrompt); err != nil {
 			return err
 		}
 	}
-	for _, st := range s.steps {
+	for _, st := range s.Steps {
 		if err := f.runCommandStep(id, st, sendControl); err != nil {
 			return err
 		}
 	}
-	if s.crash {
+	if s.Crash {
 		if err := f.waitFor(id, wire.SessionExited, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
 			return si.Status.State == wire.SessionExited
 		}); err != nil {
 			return err
 		}
 	}
-	if s.failure != "" {
-		if err := f.waitFor(id, "failure "+s.failure, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
-			return si.Failure != nil && si.Failure.Kind == s.failure
+	if s.Failure != "" {
+		if err := f.waitFor(id, "failure "+s.Failure, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
+			return si.Failure != nil && si.Failure.Kind == s.Failure
 		}); err != nil {
 			return err
 		}
 	}
-	if s.read {
+	if s.Read {
 		// The server raises Unread just after the state changes, so clearing it
 		// first would leave it raised.
 		if err := f.waitFor(id, "Unread", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool { return si.Unread.Unread }); err != nil {
@@ -189,8 +141,8 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 			return fmt.Errorf("mark-read %s: %v (refused %v: %s)", id, err, res.Refused, res.Reason)
 		}
 	}
-	if s.images {
-		return f.seedImages(id, s.harness)
+	if s.Images {
+		return f.seedImages(id, s.Harness)
 	}
 	return nil
 }
@@ -256,39 +208,39 @@ func (f sessionSeeder) promptAgain(id, text string) error {
 // runCommandStep sends one "/" command and waits until the chat shows it (and
 // its output entry, when the step has output).
 func (f sessionSeeder) runCommandStep(id string, st commandStep, sendControl func(agentfake.Control) error) error {
-	if st.turn {
-		return f.promptAgain(id, st.prompt)
+	if st.Turn {
+		return f.promptAgain(id, st.Prompt)
 	}
-	if st.output != nil {
-		if err := sendControl(agentfake.Control{Action: agentfake.ActionCommandOutput, Message: *st.output}); err != nil {
+	if st.Output != nil {
+		if err := sendControl(agentfake.Control{Action: agentfake.ActionCommandOutput, Message: *st.Output}); err != nil {
 			return err
 		}
 		// The control travels on its own FIFO; give it time to land.
 		time.Sleep(300 * time.Millisecond)
 	}
-	if st.control != nil {
-		if err := sendControl(*st.control); err != nil {
+	if st.Control != nil {
+		if err := sendControl(*st.Control); err != nil {
 			return err
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
-	if st.blocks {
-		return f.prompt(id, st.prompt)
+	if st.Blocks {
+		return f.prompt(id, st.Prompt)
 	}
 	count := func(chat wire.SessionChatResponse, kind string) int {
 		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m wire.SessionChatMessage) bool {
-			return m.Kind != kind || (kind == transcript.ChatKindCommand && m.Text != st.prompt)
+			return m.Kind != kind || (kind == transcript.ChatKindCommand && m.Text != st.Prompt)
 		}))
 	}
 	var before wire.SessionChatResponse
 	if out, err := f.cli("agents", "chat", id, "--json"); err == nil {
 		_ = json.Unmarshal(out, &before)
 	}
-	if err := f.prompt(id, st.prompt); err != nil {
+	if err := f.prompt(id, st.Prompt); err != nil {
 		return err
 	}
-	wantOutput := st.output != nil && strings.TrimSpace(*st.output) != ""
-	return f.waitFor(id, "the "+st.prompt+" entries", func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
+	wantOutput := st.Output != nil && strings.TrimSpace(*st.Output) != ""
+	return f.waitFor(id, "the "+st.Prompt+" entries", func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
 		return si.Status.State == wire.SessionIdle &&
 			count(chat, transcript.ChatKindCommand) > count(before, transcript.ChatKindCommand) &&
 			(!wantOutput || count(chat, transcript.ChatKindOutput) > count(before, transcript.ChatKindOutput))
@@ -317,7 +269,7 @@ func (f sessionSeeder) codexIDs() []string {
 
 // repoDir is the repo root the project's sessions run in.
 func (f sessionSeeder) repoDir(sc scenario, project string) string {
-	if slices.Contains(sc.ownRepos, project) {
+	if slices.Contains(sc.OwnRepos, project) {
 		return filepath.Join(f.root, project+"-repo")
 	}
 	return filepath.Join(f.root, "repo")
@@ -371,98 +323,6 @@ func (f sessionSeeder) createSession(project, dir, prompt, harness string) (stri
 	return res.Session.ID, nil
 }
 
-// agentsFailuresScenario is one Claude session per failure the Agents page
-// shows above the composer. It is not part of agentsScenario because the short
-// stall threshold would stall that scenario's Working session too.
-func agentsFailuresScenario() scenario {
-	return scenario{
-		chat:           true,
-		stallThreshold: "3s",
-		sessions: []sessionSpec{
-			{project: project, prompt: agentfake.ChatSlowMarker + " a stuck turn", failure: wire.FailureKindStalled},
-			{project: project, prompt: "hello", read: true, failure: wire.FailureKindAuth,
-				control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "authentication_error", Status: 401, Message: "Invalid API key"}},
-			{project: project, prompt: "hello", read: true, failure: wire.FailureKindRateLimit,
-				control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Status: 429, Message: "You've hit your limit · resets at 3pm"}},
-			{project: project, prompt: "hello", read: true, failure: wire.FailureKindBlocked,
-				control: &agentfake.Control{Action: agentfake.ActionBlock}},
-		},
-	}
-}
-
-// queueAgentsScenario lists one PTY Queue agent and one Design agent. The
-// ticket's worker idles in a long turn until the hold file is removed.
-func queueAgentsScenario() scenario {
-	const mapAddr = "design-epic"
-	return scenario{
-		epics: []epic{
-			{project, "queue-epic", []ticket{{"01", "held", servertest.TicketOpts{}}}},
-			{project, mapAddr, nil},
-		},
-		designSteps: map[string]string{project + ":" + mapAddr: string(tickets.StepResolveTickets)},
-		queue:       []string{project + ":queue-epic"},
-		hold:        true,
-		chat:        true,
-		sessions: []sessionSpec{
-			{project: project, prompt: "hello", link: project + ":" + mapAddr, read: true},
-		},
-	}
-}
-
-// defaultHarnessScenario is the Settings and Agents fixture for the Default
-// harness. The global default is Claude. gx overrides to Codex; demo and
-// dotfiles inherit. demo's cap of one agent keeps the second epic's ticket
-// waiting behind the held worker of the first.
-func defaultHarnessScenario() scenario {
-	const codexOverride = `,"agents":{"default-harness":"codex"}`
-	return scenario{
-		epics: []epic{
-			{project, "running-epic", []ticket{{"01", "running", servertest.TicketOpts{}}}},
-			{project, "waiting-epic", []ticket{{"01", "waiting", servertest.TicketOpts{}}}},
-			{"dotfiles", "dotfiles-epic", nil},
-			{"gx", "gx-epic", nil},
-		},
-		projectExtra: map[string]string{project: `,"max-agents":1`, "gx": codexOverride},
-		ownRepos:     []string{"dotfiles", "gx"},
-		queue:        []string{project + ":running-epic", project + ":waiting-epic"},
-		hold:         true,
-		chat:         true,
-		sessions: []sessionSpec{
-			{project: project, prompt: "hello", read: true},
-			{project: "gx", harness: "codex"},
-			{project: "dotfiles", prompt: "hello", read: true,
-				control:    &agentfake.Control{Action: agentfake.ActionModel, Model: switchedModel},
-				thenPrompt: "and again"},
-		},
-	}
-}
-
-// codexQueueScenario fills demo's two agent slots with held workers (one Codex,
-// one Claude) and leaves three tickets waiting. A queue item's agent covers its
-// whole root, so each ticket has an epic of its own.
-func codexQueueScenario() scenario {
-	addr := func(name string) string { return project + ":" + name }
-	one := func(opts servertest.TicketOpts) []ticket { return []ticket{{"01", "work", opts}} }
-	return scenario{
-		codex: true,
-		epics: []epic{
-			{project, "codex-running", one(servertest.TicketOpts{})},
-			{project, "claude-running", one(servertest.TicketOpts{})},
-			{project, "follows-default", one(servertest.TicketOpts{})},
-			{project, "pinned", one(servertest.TicketOpts{Agent: "codex"})},
-			{project, "ran-on-claude", one(servertest.TicketOpts{})},
-		},
-		projectExtra: map[string]string{project: `,"max-agents":2`},
-		hold:         true,
-		ranOnClaude:  []string{addr("ran-on-claude/01")},
-		queue: []string{
-			addr("codex-running"), addr("claude-running"),
-			addr("follows-default"), addr("pinned"), addr("ran-on-claude"),
-		},
-		queueAgents: map[string]string{addr("codex-running"): "codex", addr("claude-running"): "claude"},
-	}
-}
-
 // seedRanOnClaude leaves the ticket open with an earlier Claude run: an
 // iteration-started event in the epic's run log and a transcript for its session
 // in the fixture home, which is all server.earlierRunHarness reads. A live
@@ -487,68 +347,4 @@ func (f sessionSeeder) seedRanOnClaude(addr string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, session+".jsonl"), []byte("{}\n"), 0o644)
-}
-
-// codexDesignScenario opens a design session on a map while the global Default
-// harness is Codex, so the launch resolves to Codex.
-func codexDesignScenario() scenario {
-	const mapAddr = "design-epic"
-	return scenario{
-		codex:        true,
-		epics:        []epic{{project, mapAddr, nil}},
-		designSteps:  map[string]string{project + ":" + mapAddr: string(tickets.StepResolveTickets)},
-		projectExtra: map[string]string{project: `,"agents":{"default-harness":"codex"}`},
-		design:       []string{agentfake.DesignTurnRound, agentfake.DesignTurnRunEnd},
-		openDesigns:  []string{project + ":" + mapAddr},
-	}
-}
-
-// promoteScenario is agentsScenario plus two Codex sessions with one message
-// each (a promote keeps its session busy, so each width takes one), a held Queue
-// agent and two design sessions: every kind of session the Promote to Design
-// button shows on or stays off.
-func promoteScenario() scenario {
-	sc := agentsScenario()
-	codexWithMessage := sessionSpec{project: project, harness: "codex", prompt: "hello", read: true}
-	sc.sessions = append(sc.sessions, codexWithMessage, codexWithMessage)
-	addQueueAgent(&sc)
-	addDesignAgents(&sc)
-	return sc
-}
-
-// switchedModel is the model the switched session's later replies report; it
-// differs from the model its tier launched with.
-const switchedModel = "claude-haiku-5-5"
-
-// agentsScenario is the Agents page fixture: eight sessions in three
-// projects, one per row of the mock, and a worktree in demo.
-func agentsScenario() scenario {
-	const mapAddr = "design-epic"
-	return scenario{
-		codex:    true,
-		projects: []string{"other"},
-		epics: []epic{
-			{project, mapAddr, nil},
-			{"site", mapAddr, nil},
-		},
-		designSteps: map[string]string{
-			project + ":" + mapAddr: string(tickets.StepResolveTickets),
-			"site:" + mapAddr:       string(tickets.StepResolveTickets),
-		},
-		ownRepos: []string{"other", "site"},
-		chat:     true,
-		gitSetup: func(f *fixture, repo string) error {
-			return f.git(repo, "worktree", "add", "-b", "feature", filepath.Join(repo, ".worktrees", "feature"))
-		},
-		sessions: []sessionSpec{
-			{project: project, prompt: "hello", read: true},
-			{project: project, prompt: agentfake.ChatSlowMarker + " a long turn"},
-			{project: project, prompt: "hello", link: project + ":" + mapAddr, read: true, actionable: "needs a decision"},
-			{project: project, harness: "codex"},
-			{project: "other", prompt: "hello"},
-			{project: "other", actionable: "needs a decision"},
-			{project: "site", prompt: "hello", link: "site:" + mapAddr, read: true},
-			{project: "site", prompt: "hello", crash: true, read: true},
-		},
-	}
 }

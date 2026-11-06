@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 
 	"github.com/elentok/gx/transcript"
 )
@@ -45,8 +46,8 @@ func TestDefaultHarnessScenario_SessionsProjectsAndAWaitingTicket(t *testing.T) 
 			models = append(models, u.Model)
 		}
 	}
-	if !slices.Contains(models, switchedModel) {
-		t.Errorf("newest reply models = %v, want one session on %s", models, switchedModel)
+	if !slices.Contains(models, spec.SwitchedModel) {
+		t.Errorf("newest reply models = %v, want one session on %s", models, spec.SwitchedModel)
 	}
 
 	overrides := 0

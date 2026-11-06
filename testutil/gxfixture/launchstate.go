@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 // fakeNpmBody is the `npm ci` of the launching scenario: it marks that it
@@ -25,14 +26,14 @@ exit 1
 
 // addLockfile commits a tracked npm lockfile, so a launch installs dependencies.
 // gitSetup runs after the repo's first commit, and the worktrees branch from it.
-func addLockfile(f *fixture, repo string) error {
+func addLockfile(git spec.Git, repo string) error {
 	for name, body := range map[string]string{"package.json": "{}\n", "package-lock.json": "{}\n"} {
 		if err := os.WriteFile(filepath.Join(repo, name), []byte(body), 0o644); err != nil {
 			return err
 		}
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "add lockfile"}} {
-		if err := f.git(repo, args...); err != nil {
+		if err := git(repo, args...); err != nil {
 			return err
 		}
 	}
@@ -44,34 +45,34 @@ var (
 	// its launch stops at "installing dependencies" until <gate dir>/npm-hold is
 	// removed; then it moves on to starting the agent. npm-started marks the wait.
 	launchHeld = scenario{
-		epics:    []epic{{project, "launch-epic", []ticket{{"01", "launching", servertest.TicketOpts{}}}}},
-		queue:    []string{project + ":launch-epic"},
-		gitSetup: addLockfile,
-		fakeNpm:  true,
+		Epics:    []epic{{Project: project, Name: "launch-epic", Tickets: []ticket{{ID: "01", Slug: "launching", Opts: servertest.TicketOpts{}}}}},
+		Queue:    []string{project + ":launch-epic"},
+		GitSetup: addLockfile,
+		FakeNpm:  true,
 	}
 	// launchFail is launchHeld with an npm that fails, so the launch fails and
 	// the ticket pauses as iteration-error.
 	launchFail = scenario{
-		epics:      []epic{{project, "launch-epic", []ticket{{"01", "launching", servertest.TicketOpts{}}}}},
-		queue:      []string{project + ":launch-epic"},
-		gitSetup:   addLockfile,
-		fakeNpm:    true,
-		failingNpm: true,
+		Epics:      []epic{{Project: project, Name: "launch-epic", Tickets: []ticket{{ID: "01", Slug: "launching", Opts: servertest.TicketOpts{}}}}},
+		Queue:      []string{project + ":launch-epic"},
+		GitSetup:   addLockfile,
+		FakeNpm:    true,
+		FailingNpm: true,
 	}
 	// epicAtCap queues an epic of four independent tickets with held workers
 	// under a per-epic cap of 2, so the later tickets read "concurrency
 	// cap". The cap is in the config file at ConfigFile: a test lowers it there
 	// and runs `gx server reload-config` to get the over-cap case.
 	epicAtCap = scenario{
-		epics: []epic{{project, "cap-epic", []ticket{
-			{"01", "first", servertest.TicketOpts{}},
-			{"02", "second", servertest.TicketOpts{}},
-			{"03", "third", servertest.TicketOpts{}},
-			{"04", "fourth", servertest.TicketOpts{}},
+		Epics: []epic{{Project: project, Name: "cap-epic", Tickets: []ticket{
+			{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}},
+			{ID: "02", Slug: "second", Opts: servertest.TicketOpts{}},
+			{ID: "03", Slug: "third", Opts: servertest.TicketOpts{}},
+			{ID: "04", Slug: "fourth", Opts: servertest.TicketOpts{}},
 		}}},
-		queue:  []string{project + ":cap-epic"},
-		hold:   true,
-		config: []string{"execution-queue.max-agents-per-epic=2"},
+		Queue:  []string{project + ":cap-epic"},
+		Hold:   true,
+		Config: []string{"execution-queue.max-agents-per-epic=2"},
 	}
 )
 

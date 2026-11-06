@@ -36,7 +36,7 @@ func installBinaries(root string, o opts, sc scenario) (gxBin, binDir string, co
 	// Without the flag codex stays off PATH, which is how a host without Codex looks. A scenario that
 	// needs codex has it anyway; --hide-codex takes it off PATH once the scenario is seeded.
 	fakeCodexBin := o.fakeCodex
-	if fakeCodexBin != "" || sc.codex {
+	if fakeCodexBin != "" || sc.Codex {
 		if fakeCodexBin, err = binary(fakeCodexBin, filepath.Join(root, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex"); err != nil {
 			return "", "", false, err
 		}
@@ -78,8 +78,8 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 		}
 		f.env = append(f.env, "GX_COMMAND_LIST_AGE="+o.commandListAge)
 	}
-	if sc.commands != nil {
-		data, err := json.Marshal(sc.commands)
+	if sc.Commands != nil {
+		data, err := json.Marshal(sc.Commands)
 		if err != nil {
 			return err
 		}
@@ -91,7 +91,7 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 	}
 	stallThreshold := o.stallThreshold
 	if stallThreshold == "" {
-		stallThreshold = sc.stallThreshold
+		stallThreshold = sc.StallThreshold
 	}
 	if stallThreshold != "" {
 		if _, err := time.ParseDuration(stallThreshold); err != nil {
@@ -99,13 +99,13 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 		}
 		f.env = append(f.env, "GX_STALL_THRESHOLD="+stallThreshold)
 	}
-	if sc.dropAskedAgent {
+	if sc.DropAskedAgent {
 		f.env = append(f.env, "GX_DROP_ASKED_AGENT=1")
 	}
-	if sc.unknownSkill {
+	if sc.UnknownSkill {
 		f.env = append(f.env, agentfake.TUIUnknownSkillEnv+"=1")
 	}
-	f.env = append(f.env, sc.env...)
+	f.env = append(f.env, sc.Env...)
 	return nil
 }
 
@@ -119,27 +119,27 @@ func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
 		return err
 	}
 	// Any scenario that cleans needs the fake ps: the real one sees the `go test` running this fixture.
-	if sc.fakeGo || sc.diskLow {
+	if sc.FakeGo || sc.DiskLow {
 		if err := f.setupFakeGo(); err != nil {
 			return err
 		}
 	}
-	if sc.fakeNpm {
-		if err := f.setupFakeNpm(sc.failingNpm); err != nil {
+	if sc.FakeNpm {
+		if err := f.setupFakeNpm(sc.FailingNpm); err != nil {
 			return err
 		}
 	}
-	if sc.restart != nil {
-		if err := f.setupRestart(*sc.restart, sc.projectNames()); err != nil {
+	if sc.Restart != nil {
+		if err := f.setupRestart(*sc.Restart, sc.ProjectNames()); err != nil {
 			return err
 		}
 	}
-	if sc.migrate {
-		if err := f.setupMigrate(sc.migrateHold); err != nil {
+	if sc.Migrate {
+		if err := f.setupMigrate(sc.MigrateHold); err != nil {
 			return err
 		}
 	}
-	if err := f.writeConfig(port, sc.recentlyFinished, append(slices.Clone(sc.config), configs...)); err != nil {
+	if err := f.writeConfig(port, sc.RecentlyFinished, append(slices.Clone(sc.Config), configs...)); err != nil {
 		return err
 	}
 	if err := f.seed(sc); err != nil {
@@ -147,8 +147,8 @@ func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
 	}
 	// The server migrates on every start. The seed is already in the current
 	// shape, so only the migrate scenarios leave steps pending.
-	if !sc.migrate {
-		for _, p := range sc.projectNames() {
+	if !sc.Migrate {
+		for _, p := range sc.ProjectNames() {
 			if err := migrations.WriteFullApplied(filepath.Join(f.store, p)); err != nil {
 				return err
 			}
@@ -163,21 +163,21 @@ func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
 
 // addScenarioOutput fills the Output fields that only some scenarios have.
 func (f *fixture) addScenarioOutput(res *Output, sc scenario, transcripts map[string]string) {
-	if sc.fakeGo || sc.fakeNpm {
+	if sc.FakeGo || sc.FakeNpm {
 		res.GateDir = f.gateDir()
 	}
 	res.ConfigFile = f.configFile()
 	res.Transcripts = transcripts
-	if sc.limitBurn {
+	if sc.LimitBurn {
 		res.CodexSessionsDir = filepath.Join(f.root, "home", ".codex", "sessions")
 	}
-	if sc.restart != nil {
+	if sc.Restart != nil {
 		res.RestartDir = f.restartDir()
 	}
-	if sc.migrate {
+	if sc.Migrate {
 		res.MigrateDir = f.migrateDir()
 	}
-	if sc.commands != nil {
+	if sc.Commands != nil {
 		res.FeatureWorktree = filepath.Join(f.root, "repo", ".worktrees", "feature")
 	}
 	if cwd, err := os.Getwd(); err == nil {
@@ -189,37 +189,37 @@ func (f *fixture) addScenarioOutput(res *Output, sc scenario, transcripts map[st
 // limits, limit burn and spend data, plus the env that goes with them.
 func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 	// The running server has no test clock, so the old logins are written first.
-	if len(sc.extraLogins) > 0 {
+	if len(sc.ExtraLogins) > 0 {
 		if err := os.MkdirAll(f.stateD, 0o700); err != nil {
 			return err
 		}
 	}
-	for i, ago := range sc.extraLogins {
+	for i, ago := range sc.ExtraLogins {
 		if _, err := webauth.SeedWebLogin(f.stateD, fmt.Sprintf("gxfixture browser %d", i+1), time.Now().Add(-ago)); err != nil {
 			return fmt.Errorf("seed web login: %w", err)
 		}
 	}
 
-	if sc.limits {
+	if sc.Limits {
 		if err := f.seedLimits(shape); err != nil {
 			return fmt.Errorf("seed limits: %w", err)
 		}
 	}
-	if sc.limitBurn {
+	if sc.LimitBurn {
 		if err := f.seedLimitBurn(shape); err != nil {
 			return fmt.Errorf("seed limit burn: %w", err)
 		}
 	}
-	if sc.rateLimitFromUsage {
+	if sc.RateLimitFromUsage {
 		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s")
 	}
-	if sc.promptGrace != "" {
-		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.promptGrace)
+	if sc.PromptGrace != "" {
+		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.PromptGrace)
 	}
-	if sc.tokenPoll {
+	if sc.TokenPoll {
 		f.env = append(f.env, "GX_TOKEN_POLL_INTERVAL="+liveTokenPollInterval)
 	}
-	if sc.spend {
+	if sc.Spend {
 		if err := f.seedSpend(shape); err != nil {
 			return fmt.Errorf("seed spend: %w", err)
 		}

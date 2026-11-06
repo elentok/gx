@@ -60,7 +60,7 @@ func run(args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if sc.limitBurn && shape == "live" {
+	if sc.LimitBurn && shape == "live" {
 		sc = limitBurnLive()
 	}
 

@@ -1,4 +1,4 @@
-package main
+package spec
 
 import (
 	"encoding/json"
@@ -14,12 +14,12 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// slowProbeDelay is longer than any flow waits for a command list (flow 149
+// SlowProbeDelay is longer than any flow waits for a command list (flow 149
 // waits less).
-const slowProbeDelay = "6s"
+const SlowProbeDelay = "6s"
 
-// featureSkill is the skill only the `feature` worktree of demo holds.
-const featureSkill = "feature-only-skill"
+// FeatureSkill is the skill only the `feature` worktree of demo holds.
+const FeatureSkill = "feature-only-skill"
 
 // commandEntries is the list both fakes answer with. fakeclaude lists all of
 // it; fakecodex lists it as skills, so review-skill shows up twice there. A
@@ -50,11 +50,11 @@ func commandStepsSession() sessionSpec {
 		cost[i] = fmt.Sprintf("\x1b[1mcost line %d\x1b[0m: \x1b[32m$0.%02d\x1b[0m", i+1, i)
 	}
 	costOutput, empty := strings.Join(cost, "\n"), ""
-	return sessionSpec{project: project, prompt: "hello", read: true, steps: []commandStep{
-		{prompt: "/cost", output: &costOutput},
-		{prompt: "/model", output: &empty},
-		{prompt: "/todos", output: &empty},
-		{prompt: "/compact", turn: true},
+	return sessionSpec{Project: project, Prompt: "hello", Read: true, Steps: []commandStep{
+		{Prompt: "/cost", Output: &costOutput},
+		{Prompt: "/model", Output: &empty},
+		{Prompt: "/todos", Output: &empty},
+		{Prompt: "/compact", Turn: true},
 	}}
 }
 
@@ -65,35 +65,35 @@ func commandStepsSession() sessionSpec {
 // (addDesignAgents).
 func leanCommandSessions() []sessionSpec {
 	return []sessionSpec{
-		{project: project, prompt: "hello", read: true},
-		{project: project, prompt: "hello", read: true},
-		{project: project, prompt: "hello", read: true},
+		{Project: project, Prompt: "hello", Read: true},
+		{Project: project, Prompt: "hello", Read: true},
+		{Project: project, Prompt: "hello", Read: true},
 		commandStepsSession(),
-		{project: project, harness: "codex"},
-		{project: project, prompt: agentfake.ChatSlowMarker + " a long turn"},
-		{project: project, prompt: "hello", crash: true, read: true},
+		{Project: project, Harness: "codex"},
+		{Project: project, Prompt: agentfake.ChatSlowMarker + " a long turn"},
+		{Project: project, Prompt: "hello", Crash: true, Read: true},
 	}
 }
 
 // withCommandFakes gives sc the command-list fakes and an extra skill in the
 // feature worktree of demo. delay and fail shape the list probes.
 func withCommandFakes(sc *scenario, delay string, fail bool) {
-	sc.commands = &agentfake.ProbeConfig{Entries: commandEntries(), Delay: delay, Fail: fail}
-	base := sc.gitSetup
-	sc.gitSetup = func(f *fixture, repo string) error {
+	sc.Commands = &agentfake.ProbeConfig{Entries: commandEntries(), Delay: delay, Fail: fail}
+	base := sc.GitSetup
+	sc.GitSetup = func(git Git, repo string) error {
 		if base != nil {
-			if err := base(f, repo); err != nil {
+			if err := base(git, repo); err != nil {
 				return err
 			}
 		}
 		feature := filepath.Join(repo, ".worktrees", "feature")
 		if base == nil {
-			if err := f.git(repo, "worktree", "add", "-b", "feature", feature); err != nil {
+			if err := git(repo, "worktree", "add", "-b", "feature", feature); err != nil {
 				return err
 			}
 		}
 		layer, err := json.Marshal(agentfake.ProbeConfig{Entries: append(commandEntries(),
-			agentfake.ProbeEntry{Name: featureSkill, Description: "Only in the feature worktree"})})
+			agentfake.ProbeEntry{Name: FeatureSkill, Description: "Only in the feature worktree"})})
 		if err != nil {
 			return err
 		}
@@ -101,35 +101,35 @@ func withCommandFakes(sc *scenario, delay string, fail bool) {
 	}
 }
 
-// commandsScenario is the lean scenario of the command flows: seven sessions and
+// CommandsScenario is the lean scenario of the command flows: seven sessions and
 // the two design sessions, with no Blocked, Rate limited or Queue sessions.
-func commandsScenario(delay string, fail bool) scenario {
+func CommandsScenario(delay string, fail bool) scenario {
 	sc := scenario{
-		codex:       true,
-		chat:        true,
-		designSteps: map[string]string{},
-		sessions:    leanCommandSessions(),
+		Codex:       true,
+		Chat:        true,
+		DesignSteps: map[string]string{},
+		Sessions:    leanCommandSessions(),
 	}
 	withCommandFakes(&sc, delay, fail)
 	addDesignAgents(&sc)
 	return sc
 }
 
-// blockedScenario extends agents with the command-list fakes, three sessions
+// BlockedScenario extends agents with the command-list fakes, three sessions
 // that carry command entries and every Blocked state the key and permission
 // flows read.
-func blockedScenario() scenario {
-	sc := agentsScenario()
+func BlockedScenario() scenario {
+	sc := AgentsScenario()
 	// A key the fake ignores (flow 158) fails after this wait, not after the 45s default.
-	sc.promptGrace = "8s"
+	sc.PromptGrace = "8s"
 	withCommandFakes(&sc, "", false)
-	sc.sessions = append(sc.sessions,
+	sc.Sessions = append(sc.Sessions,
 		commandStepsSession(),
-		sessionSpec{project: project, harness: "codex", steps: []commandStep{{prompt: "/status"}}},
-		sessionSpec{project: "site", prompt: "hello", crash: true, read: true},
+		sessionSpec{Project: project, Harness: "codex", Steps: []commandStep{{Prompt: "/status"}}},
+		sessionSpec{Project: "site", Prompt: "hello", Crash: true, Read: true},
 	)
-	sc.sessions = append(sc.sessions, blockedCommandSessions()...)
-	sc.sessions = append(sc.sessions, stateCommandSessions()...)
+	sc.Sessions = append(sc.Sessions, blockedCommandSessions()...)
+	sc.Sessions = append(sc.Sessions, stateCommandSessions()...)
 	addQueueAgent(&sc)
 	addDesignAgents(&sc)
 	return sc
@@ -141,21 +141,21 @@ func blockedScenario() scenario {
 func stateCommandSessions() []sessionSpec {
 	return []sessionSpec{
 		// Only Codex reaches "Agent hit an error": Claude's status has no error kind.
-		{project: project, harness: "codex", failure: wire.FailureKindBlocked,
-			control: &agentfake.Control{Action: agentfake.ActionTaskError, Message: agentfake.CodexModelError, Error: "model_not_found"}},
-		{project: project, prompt: "hello", read: true, failure: wire.FailureKindRateLimit,
-			control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Status: 429, Message: "You've hit your limit · resets at 3pm"}},
-		{project: project, prompt: agentfake.ChatSlowMarker + " a second long turn"},
+		{Project: project, Harness: "codex", Failure: wire.FailureKindBlocked,
+			Control: &agentfake.Control{Action: agentfake.ActionTaskError, Message: agentfake.CodexModelError, Error: "model_not_found"}},
+		{Project: project, Prompt: "hello", Read: true, Failure: wire.FailureKindRateLimit,
+			Control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Status: 429, Message: "You've hit your limit · resets at 3pm"}},
+		{Project: project, Prompt: agentfake.ChatSlowMarker + " a second long turn"},
 	}
 }
 
 // addQueueAgent adds a held Queue agent.
 func addQueueAgent(sc *scenario) {
 	const queueEpic = "queue-epic"
-	sc.epics = append(sc.epics, epic{project, queueEpic, []ticket{{"01", "held", servertest.TicketOpts{}}}})
-	sc.queue = []string{project + ":" + queueEpic}
-	sc.hold = true
-	sc.queueAfterSessions = true
+	sc.Epics = append(sc.Epics, epic{project, queueEpic, []ticket{{"01", "held", servertest.TicketOpts{}}}})
+	sc.Queue = []string{project + ":" + queueEpic}
+	sc.Hold = true
+	sc.QueueAfterSessions = true
 }
 
 // addDesignAgents adds a Claude design session with auto-advance on, and a
@@ -164,12 +164,12 @@ func addQueueAgent(sc *scenario) {
 func addDesignAgents(sc *scenario) {
 	const autoMap, codexMap = "design-auto", "design-codex"
 	step := string(tickets.StepResolveTickets)
-	sc.epics = append(sc.epics, epic{project, autoMap, nil}, epic{"gx", codexMap, nil})
-	sc.designSteps[project+":"+autoMap] = step
-	sc.designSteps["gx:"+codexMap] = step
-	sc.ownRepos = append(sc.ownRepos, "gx")
-	sc.projectExtra = map[string]string{"gx": `,"agents":{"default-harness":"codex"}`}
-	sc.openDesigns = append(sc.openDesigns, project+":"+autoMap, "gx:"+codexMap)
+	sc.Epics = append(sc.Epics, epic{project, autoMap, nil}, epic{"gx", codexMap, nil})
+	sc.DesignSteps[project+":"+autoMap] = step
+	sc.DesignSteps["gx:"+codexMap] = step
+	sc.OwnRepos = append(sc.OwnRepos, "gx")
+	sc.ProjectExtra = map[string]string{"gx": `,"agents":{"default-harness":"codex"}`}
+	sc.OpenDesigns = append(sc.OpenDesigns, project+":"+autoMap, "gx:"+codexMap)
 }
 
 // blockedCommandSessions are the sessions Blocked at a dialog or a permission
@@ -184,26 +184,26 @@ func blockedCommandSessions() []sessionSpec {
 	dontAsk := agentfake.BashPermissionDialog("rg --files")
 	dontAsk[4] = "❯ 1. Yes, and don't ask again for rg commands"
 	blocked := func(s sessionSpec) sessionSpec {
-		s.failure = wire.FailureKindBlocked
+		s.Failure = wire.FailureKindBlocked
 		return s
 	}
 	codexBlock := func(c agentfake.Control) sessionSpec {
-		return blocked(sessionSpec{project: project, harness: "codex", control: &c})
+		return blocked(sessionSpec{Project: project, Harness: "codex", Control: &c})
 	}
 	return []sessionSpec{
 		// A dialog /model opened.
-		blocked(sessionSpec{project: project, prompt: "hello", read: true, steps: []commandStep{
-			{prompt: "/model", control: &agentfake.Control{Action: agentfake.ActionDialog}, blocks: true},
+		blocked(sessionSpec{Project: project, Prompt: "hello", Read: true, Steps: []commandStep{
+			{Prompt: "/model", Control: &agentfake.Control{Action: agentfake.ActionDialog}, Blocks: true},
 		}}),
-		blocked(sessionSpec{project: project, prompt: "hello", read: true,
-			control: block(agentfake.Control{Dialog: agentfake.BashPermissionDialog("rg readable-command")})}),
-		blocked(sessionSpec{project: project, prompt: "hello", read: true,
-			control: block(agentfake.Control{Dialog: []string{"▒▒▒▒ nothing gx can read ▒▒▒▒"}})}),
-		blocked(sessionSpec{project: project, prompt: "hello", read: true, control: block(agentfake.Control{Dialog: dontAsk})}),
+		blocked(sessionSpec{Project: project, Prompt: "hello", Read: true,
+			Control: block(agentfake.Control{Dialog: agentfake.BashPermissionDialog("rg readable-command")})}),
+		blocked(sessionSpec{Project: project, Prompt: "hello", Read: true,
+			Control: block(agentfake.Control{Dialog: []string{"▒▒▒▒ nothing gx can read ▒▒▒▒"}})}),
+		blocked(sessionSpec{Project: project, Prompt: "hello", Read: true, Control: block(agentfake.Control{Dialog: dontAsk})}),
 		// Enter leaves the dialog open, so Allow once never lands.
-		blocked(sessionSpec{project: project, prompt: "hello", read: true,
-			control: &agentfake.Control{Action: agentfake.ActionIgnoreAllow},
-			steps:   []commandStep{{prompt: agentfake.PermissionPromptPrefix + "rg ignores-allow", blocks: true}}}),
+		blocked(sessionSpec{Project: project, Prompt: "hello", Read: true,
+			Control: &agentfake.Control{Action: agentfake.ActionIgnoreAllow},
+			Steps:   []commandStep{{Prompt: agentfake.PermissionPromptPrefix + "rg ignores-allow", Blocks: true}}}),
 		codexBlock(agentfake.Control{Action: agentfake.ActionPermission, Command: "rg codex-hook"}),
 		codexBlock(agentfake.Control{Action: agentfake.ActionPermissionScreen, Command: "rg codex-screen"}),
 		codexBlock(agentfake.Control{Action: agentfake.ActionPermissionScreen, Dialog: []string{"▒▒▒▒ nothing gx can read ▒▒▒▒"}}),

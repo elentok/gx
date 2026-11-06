@@ -69,25 +69,25 @@ func (f *fixture) seed(sc scenario) error {
 		return err
 	}
 	holdTimeout := "30s"
-	if sc.hold {
+	if sc.Hold {
 		holdTimeout = "1h"
 	}
-	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.behaviour, Design: sc.design, DesignByMap: sc.designByMap, Chat: sc.chat, Transcript: sc.transcripts}
-	if sc.usage {
+	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.Behaviour, Design: sc.Design, DesignByMap: sc.DesignByMap, Chat: sc.Chat, Transcript: sc.Transcripts}
+	if sc.Usage {
 		resets := time.Now().Add(72 * time.Hour).Unix()
 		wcfg.Usage = &agentfake.UsageConfig{
 			FiveHour: agentfake.UsageWindow{UsedPercentage: 10, ResetsAt: resets},
 			SevenDay: agentfake.UsageWindow{UsedPercentage: 99, ResetsAt: resets},
 		}
 	}
-	if sc.rateLimitFromUsage {
+	if sc.RateLimitFromUsage {
 		// Long enough for the flow to see the hold, short enough to wait it out; the fake sets
 		// the window's reset when it hits the limit.
 		wcfg.RateLimitFromUsage = true
 		wcfg.RateLimitReset = "8s"
 		wcfg.Usage = &agentfake.UsageConfig{FiveHour: agentfake.UsageWindow{UsedPercentage: 100}}
 	}
-	if sc.codexUsage {
+	if sc.CodexUsage {
 		wcfg.CodexUsage = &agentfake.UsageWindow{UsedPercentage: 99, ResetsAt: time.Now().Add(72 * time.Hour).Unix()}
 	}
 	cfg, err := json.Marshal(wcfg)
@@ -101,7 +101,7 @@ func (f *fixture) seed(sc scenario) error {
 		if err := f.initRepo(dir); err != nil {
 			return "", err
 		}
-		if sc.chat {
+		if sc.Chat {
 			return dir, os.WriteFile(filepath.Join(dir, agentfake.WorkerConfigFile), cfg, 0o644)
 		}
 		return dir, nil
@@ -114,14 +114,14 @@ func (f *fixture) seed(sc scenario) error {
 			return err
 		}
 	}
-	if sc.gitSetup != nil {
-		if err := sc.gitSetup(f, repo); err != nil {
+	if sc.GitSetup != nil {
+		if err := sc.GitSetup(f.git, repo); err != nil {
 			return err
 		}
 	}
-	if sc.conversations != nil {
+	if sc.Conversations != nil {
 		dir := filepath.Join(f.root, "data", "gx", "conversations")
-		started, recs := sc.conversations(time.Now())
+		started, recs := sc.Conversations(time.Now())
 		if err := conversations.MarkStarted(dir, started); err != nil {
 			return err
 		}
@@ -131,23 +131,23 @@ func (f *fixture) seed(sc scenario) error {
 			}
 		}
 	}
-	for _, p := range sc.projects {
+	for _, p := range sc.Projects {
 		if err := servertest.WriteEpic(f.store, p, ""); err != nil {
 			return err
 		}
-		if !sc.noCheckConfig {
+		if !sc.NoCheckConfig {
 			body := `{"name":"` + p + `","checks":{}}`
 			if err := os.WriteFile(filepath.Join(f.store, p, "project.json"), []byte(body), 0o644); err != nil {
 				return err
 			}
 		}
-		if slices.Contains(sc.ownRepos, p) {
+		if slices.Contains(sc.OwnRepos, p) {
 			dir, err := ownRepo(p)
 			if err != nil {
 				return err
 			}
 			extra := ""
-			if !sc.noCheckConfig {
+			if !sc.NoCheckConfig {
 				extra = `,"checks":{}`
 			}
 			if err := servertest.WriteProjectRepo(f.store, p, dir, extra); err != nil {
@@ -155,60 +155,60 @@ func (f *fixture) seed(sc scenario) error {
 			}
 		}
 	}
-	for _, e := range sc.epics {
-		if err := servertest.WriteEpic(f.store, e.project, e.name); err != nil {
+	for _, e := range sc.Epics {
+		if err := servertest.WriteEpic(f.store, e.Project, e.Name); err != nil {
 			return err
 		}
-		addr := e.project + ":" + e.name
-		_, isMap := sc.designSteps[addr]
+		addr := e.Project + ":" + e.Name
+		_, isMap := sc.DesignSteps[addr]
 		if isMap {
-			ticketMD := filepath.Join(f.store, e.project, e.name, "ticket.md")
+			ticketMD := filepath.Join(f.store, e.Project, e.Name, "ticket.md")
 			if err := os.WriteFile(ticketMD, []byte("---\nstatus: open\nkind: map\n---\n"), 0o644); err != nil {
 				return err
 			}
 		}
-		if meta, ok := sc.epicMeta[addr]; ok {
-			ticketMD := filepath.Join(f.store, e.project, e.name, "ticket.md")
+		if meta, ok := sc.EpicMeta[addr]; ok {
+			ticketMD := filepath.Join(f.store, e.Project, e.Name, "ticket.md")
 			if err := os.WriteFile(ticketMD, []byte("---\n"+meta+"---\n"), 0o644); err != nil {
 				return err
 			}
 		}
-		for _, tk := range e.tickets {
-			if err := servertest.WriteTicketFile(f.store, e.project, e.name, tk.id, tk.slug, tk.opts); err != nil {
+		for _, tk := range e.Tickets {
+			if err := servertest.WriteTicketFile(f.store, e.Project, e.Name, tk.ID, tk.Slug, tk.Opts); err != nil {
 				return err
 			}
-			if tk.opts.PauseReason != "" {
-				ticketPath := filepath.Join(f.store, e.project, e.name, "issues", tk.id+"-"+tk.slug+".md")
-				if err := seedPauseRound(ticketPath, tk.opts.PauseReason, sc.recommend[addr+"/"+tk.id]); err != nil {
+			if tk.Opts.PauseReason != "" {
+				ticketPath := filepath.Join(f.store, e.Project, e.Name, "issues", tk.ID+"-"+tk.Slug+".md")
+				if err := seedPauseRound(ticketPath, tk.Opts.PauseReason, sc.Recommend[addr+"/"+tk.ID]); err != nil {
 					return err
 				}
 			}
 		}
-		extra := sc.projectExtra[e.project]
-		if sc.diskLow {
+		extra := sc.ProjectExtra[e.Project]
+		if sc.DiskLow {
 			argv, err := json.Marshal([]string{f.cleanScript()})
 			if err != nil {
 				return err
 			}
 			extra += `,"disk-space":{"cleanup-command":` + string(argv) + `}`
 		}
-		if !slices.Contains(sc.manualMerge, e.project) {
+		if !slices.Contains(sc.ManualMerge, e.Project) {
 			extra += `,"auto-ff-merge":true`
 		}
-		if !sc.noCheckConfig {
+		if !sc.NoCheckConfig {
 			extra += `,"checks":{}`
 		}
 		projectRepo := repo
-		if slices.Contains(sc.ownRepos, e.project) {
-			if projectRepo, err = ownRepo(e.project); err != nil {
+		if slices.Contains(sc.OwnRepos, e.Project) {
+			if projectRepo, err = ownRepo(e.Project); err != nil {
 				return err
 			}
 		}
-		if err := servertest.WriteProjectRepo(f.store, e.project, projectRepo, extra); err != nil {
+		if err := servertest.WriteProjectRepo(f.store, e.Project, projectRepo, extra); err != nil {
 			return err
 		}
 		if isMap {
-			if out, err := f.cli("tickets", "set", addr, "--design-step", sc.designSteps[addr]); err != nil {
+			if out, err := f.cli("tickets", "set", addr, "--design-step", sc.DesignSteps[addr]); err != nil {
 				return fmt.Errorf("set design step of %s: %w\n%s", addr, err, out)
 			}
 		}
@@ -244,10 +244,10 @@ func seedPauseRound(ticketPath, reason string, rec recommendation) error {
 	if _, err := tickets.AppendLog(ticketPath, ev); err != nil {
 		return err
 	}
-	if rec.verb == "" {
+	if rec.Verb == "" {
 		return nil
 	}
-	_, err := tickets.RecommendOpenRound(ticketPath, rec.verb, rec.diagnosis)
+	_, err := tickets.RecommendOpenRound(ticketPath, rec.Verb, rec.Diagnosis)
 	return err
 }
 
