@@ -12,10 +12,18 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// urgency is the class a chat message belongs to; the batcher reads it.
-type urgency string
+// urgency is the class a chat message belongs to, by kind and never by icon;
+// the batcher sorts by it, higher first. The zero value is information.
+type urgency int
 
-const urgencyAttention urgency = "attention"
+const (
+	urgencyInformation urgency = iota // Progress, other notices, session Done, mute and test
+	urgencyResult                     // Done, Merged, Complete, Ready
+	urgencyConflict
+	urgencyEscalated
+	urgencyAnswer // Answer, Question, session Blocked, Rate-limited, Exited
+	urgencyRepair // Repair and work-holding server notices
+)
 
 // chatMessage is one Chat message in the new layout: a plain Headline
 // "<icon> <status> <subject>", detail lines, then the project alone.
@@ -25,6 +33,9 @@ type chatMessage struct {
 	project               string
 	kind                  string
 	urgency               urgency
+	// summaryWord overrides status as the word a batch summary lists, for a
+	// message with no Status word of its own (a server notice).
+	summaryWord string
 	// repeat is how many identical copies a batch collapsed into this one;
 	// above 1 the Headline ends in " ×N".
 	repeat int
@@ -58,12 +69,12 @@ func capitalize(s string) string {
 // serverNoticeMessage is a server-level notice: an icon, the capitalized
 // phrase and the detail, with no Status word and no project line.
 func serverNoticeMessage(n ServerNotice) chatMessage {
-	msg := chatMessage{icon: n.Emoji, subject: capitalize(n.Title), kind: n.Kind}
+	msg := chatMessage{icon: n.Emoji, subject: capitalize(n.Title), kind: n.Kind, summaryWord: "Notice"}
 	if n.Detail != "" {
 		msg.lines = []string{n.Detail}
 	}
 	if n.HoldsWork {
-		msg.urgency = urgencyAttention
+		msg.urgency = urgencyRepair
 	}
 	return msg
 }
@@ -77,9 +88,10 @@ func pauseDigestMessage(lines []string) chatMessage {
 	}
 	return chatMessage{
 		icon: "🅿️", subject: fmt.Sprintf("%d %s paused while herdr was down", len(lines), noun),
-		lines:   lines,
-		kind:    notifyKindTicketNeedsHuman,
-		urgency: urgencyAttention,
+		lines:       lines,
+		kind:        notifyKindTicketNeedsHuman,
+		urgency:     urgencyRepair,
+		summaryWord: "Repair",
 	}
 }
 
@@ -115,6 +127,7 @@ func conflictStartedMessage(project, epic, ticketPath, identifier string) chatMe
 		lines:   []string{"An agent is resolving the merge conflict."},
 		project: project,
 		kind:    notifyKindConflictStarted,
+		urgency: urgencyConflict,
 	}
 }
 
@@ -126,7 +139,7 @@ func escalatedMessage(project, epic, ticketPath, identifier, failure string) cha
 		icon: "⚠️", status: "Escalated", subject: epic,
 		project: project,
 		kind:    notifyKindTicketNeedsHuman,
-		urgency: urgencyAttention,
+		urgency: urgencyEscalated,
 	}
 	if ticketPath == "" {
 		msg.lines = []string{"All tickets are paused. Automatic recovery already ran once."}
@@ -199,6 +212,7 @@ func resultMessage(project, epic, ticketPath, identifier, result string) chatMes
 		lines:   []string{result},
 		project: project,
 		kind:    notifyKindResult,
+		urgency: urgencyResult,
 	}
 }
 
@@ -239,6 +253,7 @@ func epicOutcomeMessage(project, epic string, counts schedule.EpicCounts, elapse
 		lines:   lines,
 		project: project,
 		kind:    notifyKindEpicComplete,
+		urgency: urgencyResult,
 	}
 }
 
@@ -251,11 +266,15 @@ func ticketPauseMessage(project, epic, ticketPath, identifier, status, detail st
 	if title := tickets.TicketTitle(ticketPath); title != "" {
 		subject += " " + title
 	}
+	class := urgencyRepair
+	if word == "Answer" {
+		class = urgencyAnswer
+	}
 	return chatMessage{
 		icon: icon, status: word, subject: subject,
 		lines:   []string{detail},
 		project: project,
 		kind:    notifyKindTicketNeedsHuman,
-		urgency: urgencyAttention,
+		urgency: class,
 	}
 }

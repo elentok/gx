@@ -324,6 +324,9 @@ func (c *ServerChat) SessionAlert(project string, override *ServerChatConfig, na
 		return
 	}
 	msg := chatMessage{icon: "🔔", status: status, subject: name, lines: []string{body}, project: project, kind: notifyKindSessionAlert}
+	if status != "Done" {
+		msg.urgency = urgencyAnswer // Blocked, Rate-limited, Exited
+	}
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, serverSource, "")
 	}

@@ -16,6 +16,8 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
+	"github.com/elentok/gx/ralphloop/ticketops"
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
@@ -308,7 +310,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testin
 		t.Errorf("muted project = %q, want %q", muted.project, want)
 	}
 	wantMuted := muted.Text(slackStyle.chatStyle).String()
-	want := fmt.Sprintf("%s ×4", normalText) + "\n\n---\n\n" + wantMuted
+	want := "🔇 2 updates: Muted\n\n---\n\n" + fmt.Sprintf("%s ×4", normalText) + "\n\n---\n\n" + wantMuted
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
@@ -389,9 +391,132 @@ func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessag
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 batched message", got)
 	}
-	want := slackStyle.chatStyle.Escape("started").String() + "\n\n---\n\n" + slackStyle.chatStyle.Escape("done").String()
+	want := "🔔 2 updates: \n\n---\n\n" + slackStyle.chatStyle.Escape("started").String() + "\n\n---\n\n" + slackStyle.chatStyle.Escape("done").String()
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
+	}
+}
+
+// flushMessages queues msgs on a fresh sink, flushes once and returns what
+// went out plus the transport.
+func flushMessages(t *testing.T, msgs ...chatMessage) []string {
+	t.Helper()
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
+	for i, m := range msgs {
+		sink.sendMessage(m, epicSource(sink.epicName), fmt.Sprint(i))
+	}
+	sink.flush()
+	return waitForSentCount(transport, 1)
+}
+
+func repairMsg(subject string) chatMessage {
+	return chatMessage{icon: "🛑", status: "Repair", subject: subject, kind: notifyKindTicketNeedsHuman, urgency: urgencyRepair}
+}
+
+func answerMsg(subject string) chatMessage {
+	return chatMessage{icon: "🙋", status: "Answer", subject: subject, kind: notifyKindTicketNeedsHuman, urgency: urgencyAnswer}
+}
+
+func mergedMsg(subject string) chatMessage {
+	return chatMessage{icon: "🎉", status: "Merged", subject: subject, kind: notifyKindEpicComplete, urgency: urgencyResult}
+}
+
+func TestChatEventSink_BatchSummary_IconIsMostUrgentWordsInUrgencyOrderWithCounts(t *testing.T) {
+	t.Parallel()
+	got := flushMessages(t, mergedMsg("m"), repairMsg("r1"), answerMsg("a"), repairMsg("r2"))
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want one send", got)
+	}
+	first, _, _ := strings.Cut(got[0], "\n")
+	if want := "🛑 4 updates: Repair ×2, Answer, Merged"; first != want {
+		t.Errorf("summary = %q, want %q", first, want)
+	}
+	order := []string{"🛑 Repair r1", "🛑 Repair r2", "🙋 Answer a", "🎉 Merged m"}
+	last := -1
+	for _, h := range order {
+		i := strings.Index(got[0], h)
+		if i <= last {
+			t.Errorf("%q out of urgency order in:\n%s", h, got[0])
+		}
+		last = i
+	}
+}
+
+func TestChatEventSink_BatchSummary_DedupedBurstCountsOnceAndNoticeAddsWord(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
+	for range 3 {
+		sink.enqueueMessage(repairMsg("same"))
+	}
+	sink.enqueueMessage(serverNoticeMessage(ServerNotice{Emoji: "🚀", Title: "server started"}))
+	sink.flush()
+	got := waitForSentCount(transport, 1)
+	if first, _, _ := strings.Cut(got[0], "\n"); first != "🛑 2 updates: Repair, Notice" {
+		t.Errorf("summary = %q", first)
+	}
+	if !strings.Contains(got[0], "🛑 Repair same ×3") {
+		t.Errorf("burst headline lost its count:\n%s", got[0])
+	}
+}
+
+func TestChatEventSink_BatchSummary_CutsAfterThreeWords(t *testing.T) {
+	t.Parallel()
+	conflict := chatMessage{icon: "🔀", status: "Conflict", subject: "c", urgency: urgencyConflict}
+	got := flushMessages(t, repairMsg("r"), answerMsg("a"), conflict, mergedMsg("m"))
+	if first, _, _ := strings.Cut(got[0], "\n"); first != "🛑 4 updates: Repair, Answer, Conflict, …" {
+		t.Errorf("summary = %q", first)
+	}
+}
+
+func TestChatEventSink_SingleMessageSendsNoSummary(t *testing.T) {
+	t.Parallel()
+	got := flushMessages(t, repairMsg("only"))
+	if want := repairMsg("only").Text(slackStyle.chatStyle).String(); got[0] != want {
+		t.Errorf("sent = %q, want %q", got[0], want)
+	}
+}
+
+func TestChatEventSink_BatchSummary_IsValidMarkdownV2(t *testing.T) {
+	t.Parallel()
+	items := []batchedMessage{
+		{msg: new(repairMsg("a"))},
+		{msg: new(mergedMsg("b"))},
+	}
+	text := renderBatch(telegramStyle, items).String()
+	if first, _, _ := strings.Cut(text, "\n"); first != `🛑 2 updates: Repair, Merged` {
+		t.Errorf("summary = %q", first)
+	}
+	if !strings.Contains(text, `\-\-\-`) {
+		t.Errorf("separator not escaped: %q", text)
+	}
+}
+
+func TestUrgencyRankingByKind(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name string
+		msg  chatMessage
+		want urgency
+	}{
+		{"work-holding notice", serverNoticeMessage(ServerNotice{Title: "x", HoldsWork: true}), urgencyRepair},
+		{"fault pause", ticketPauseMessage("p", "e", "", "01", ticketops.PauseStatus("spinning"), "d"), urgencyRepair},
+		{"answer pause", ticketPauseMessage("p", "e", "", "01", ticketops.PauseStatus("zero-commit"), "d"), urgencyAnswer},
+		{"escalated", escalatedMessage("p", "e", "", "01", ""), urgencyEscalated},
+		{"conflict", conflictStartedMessage("p", "e", "", "01"), urgencyConflict},
+		{"result", resultMessage("p", "e", "", "01", "r"), urgencyResult},
+		{"epic merged", epicOutcomeMessage("p", "e", schedule.EpicCounts{}, 0, 0, true), urgencyResult},
+		{"other notice", serverNoticeMessage(ServerNotice{Title: "x"}), urgencyInformation},
+	} {
+		if c.msg.urgency != c.want {
+			t.Errorf("%s: urgency = %d, want %d", c.name, c.msg.urgency, c.want)
+		}
+	}
+	if !(urgencyRepair > urgencyAnswer && urgencyAnswer > urgencyEscalated && urgencyEscalated > urgencyConflict &&
+		urgencyConflict > urgencyResult && urgencyResult > urgencyInformation) {
+		t.Error("urgency classes are not ordered repair, answer, escalated, conflict, result, information")
+	}
+	if mutedMessage("s/p/e/issues/01.md", "01").urgency != urgencyInformation || testMessage().urgency != urgencyInformation {
+		t.Error("mute and test messages are information")
 	}
 }
 
@@ -416,11 +541,12 @@ func TestChatEventSink_IdenticalChatMessages_CountLandsOnHeadlineNotProjectLine(
 	}
 	repeated := msg
 	repeated.repeat = 2
-	want := repeated.Text(slackStyle.chatStyle).String() + "\n\n---\n\n" + other.Text(slackStyle.chatStyle).String()
+	body := repeated.Text(slackStyle.chatStyle).String() + "\n\n---\n\n" + other.Text(slackStyle.chatStyle).String()
+	want := "🔀 2 updates: Conflict ×2\n\n---\n\n" + body
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
-	if !strings.Contains(got[0], "epic/01 ×2\n") || !strings.HasSuffix(strings.SplitN(got[0], "\n\n---", 2)[0], "proj") {
+	if !strings.Contains(got[0], "epic/01 ×2\n") || !strings.HasSuffix(strings.SplitN(body, "\n\n---", 2)[0], "proj") {
 		t.Errorf("count not on Headline with bare project line: %q", got[0])
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -417,7 +418,69 @@ func renderBatch(style mrkdwnStyle, items []batchedMessage) chatmarkup.Text {
 		}
 	}
 	separator := style.chatStyle.Escape("\n\n" + batchSeparatorRaw + "\n\n")
-	return chatmarkup.Join(separator, parts)
+	if len(items) < 2 {
+		return chatmarkup.Join(separator, parts)
+	}
+	order := make([]int, len(items))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool { return items[order[a]].urgency() > items[order[b]].urgency() })
+	sorted := make([]chatmarkup.Text, 0, len(items)+1)
+	sorted = append(sorted, style.chatStyle.Layout(batchSummary(items, order), nil, ""))
+	for _, i := range order {
+		sorted = append(sorted, parts[i])
+	}
+	return chatmarkup.Join(separator, sorted)
+}
+
+// urgency is the item's class; a legacy pre-rendered text is information.
+func (it batchedMessage) urgency() urgency {
+	if it.msg == nil {
+		return urgencyInformation
+	}
+	return it.msg.urgency
+}
+
+// maxSummaryWords is how many words the summary headline lists before "…".
+const maxSummaryWords = 3
+
+// batchSummary is "<icon> N updates: <words>" for items read in order (most
+// urgent first). N counts the deduped items. The words are the unique Status
+// words, each with " ×N" when N distinct items share it.
+func batchSummary(items []batchedMessage, order []int) string {
+	icon, iconSet := "🔔", false
+	var words []string
+	counts := map[string]int{}
+	for _, i := range order {
+		m := items[i].msg
+		if m == nil {
+			continue
+		}
+		if !iconSet && m.icon != "" {
+			icon, iconSet = m.icon, true
+		}
+		word := firstNonEmptyStr(m.summaryWord, m.status)
+		if word == "" {
+			continue
+		}
+		if counts[word] == 0 {
+			words = append(words, word)
+		}
+		counts[word]++
+	}
+	listed := make([]string, 0, maxSummaryWords+1)
+	for i, w := range words {
+		if i == maxSummaryWords {
+			listed = append(listed, "…")
+			break
+		}
+		if counts[w] > 1 {
+			w += fmt.Sprintf(" ×%d", counts[w])
+		}
+		listed = append(listed, w)
+	}
+	return fmt.Sprintf("%s %d updates: %s", icon, len(items), strings.Join(listed, ", "))
 }
 
 // distinctKinds returns items' notifyKinds in first-seen order, deduped —

@@ -65,11 +65,11 @@ func TestServerChat_NoticeIsIconPhraseDetailWithNoProjectLine(t *testing.T) {
 	if got, want := msg.Text(telegramStyle.chatStyle).String(), "🔌 Herdr unavailable\ngone"; got != want {
 		t.Errorf("Telegram notice = %q, want %q", got, want)
 	}
-	if msg.urgency != urgencyAttention {
-		t.Errorf("urgency = %q, a notice that holds work needs attention", msg.urgency)
+	if msg.urgency != urgencyRepair {
+		t.Errorf("urgency = %d, a notice that holds work is a repair", msg.urgency)
 	}
-	if serverNoticeMessage(ServerNotice{Emoji: "🚀", Title: "server started"}).urgency != "" {
-		t.Error("a notice that holds nothing has no urgency")
+	if serverNoticeMessage(ServerNotice{Emoji: "🚀", Title: "server started"}).urgency != urgencyInformation {
+		t.Error("a notice that holds nothing is information")
 	}
 }
 
