@@ -97,7 +97,8 @@ var allowed = map[string]int{
 	"server/merge/missingtrunk_test.go":                       2,
 	"server/queue/oneoffsweep_test.go":                        2,
 	"server/queue/pause_test.go":                              1,
-	"server/sched/reclaim_waiting_test.go":                    1,
+	"server/sched/launchtest/launch_inflight_test.go":         1, // negative wait: a claim past the cap would show within a beat
+	"server/sched/launchtest/reclaim_waiting_test.go":         1,
 	"server/sched/ratelimit_claim_hold_test.go":               1, // negative wait: a claim would show within a few ticks
 	"server/sched/ratelimit_hold_run_test.go":                 1, // negative wait: a launch would show within a few ticks
 	"server/recovery/recovery_notify_test.go":                 4,

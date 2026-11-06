@@ -118,7 +118,7 @@ func dirtyTrunkMeta(files ...string) string {
 }
 
 // commitOnBranch creates branch off main with one committed file and returns to main.
-func (f *fixture) commitOnBranch(repo, branch, file, content string) error {
+func commitOnBranch(f *fixture, repo, branch, file, content string) error {
 	if err := f.git(repo, "checkout", "-b", branch); err != nil {
 		return err
 	}

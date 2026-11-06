@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
 var muted = tickettest.Muted
@@ -20,4 +22,27 @@ func writeMenuTicketFile(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// selectTicketRow selects the first visible ticket row.
+func selectTicketRow(t *testing.T, m Model) Model {
+	t.Helper()
+	for i, e := range m.sidebar.Tree.Entries() {
+		if e.Value.Kind == sidebar.NodeTicket {
+			m.sidebar.Tree.SetSelectedIndex(i)
+			break
+		}
+	}
+	if r, ok := m.sidebar.SelectedRow(); !ok || r.IsEpic() {
+		t.Fatalf("expected selection on a ticket row, got row=%+v ok=%v", r, ok)
+	}
+	return m
+}
+
+func menuValues(menu components.MenuState) []string {
+	values := make([]string, len(menu.Items))
+	for i, item := range menu.Items {
+		values[i] = item.Value
+	}
+	return values
 }

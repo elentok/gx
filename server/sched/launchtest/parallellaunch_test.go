@@ -1,4 +1,4 @@
-package sched_test
+package launchtest_test
 
 import (
 	"fmt"

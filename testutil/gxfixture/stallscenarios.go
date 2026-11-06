@@ -7,6 +7,13 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
+// rejectedFirstPrompt is a server-launched session whose agent rejects the
+// slash first prompt as an unknown command, so the session shows a failure.
+var rejectedFirstPrompt = scenario{
+	unknownSkill: true,
+	sessions:     []sessionSpec{{project: project, prompt: "/gx-implement demo:ready-epic/01", rejected: true}},
+}
+
 // stallNudgeConfig shortens the idle wait before the server nudges a stalled agent.
 var stallNudgeConfig = []string{"execution-queue.stalled-nudge-delay=2s"}
 

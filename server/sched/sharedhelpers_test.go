@@ -47,6 +47,7 @@ var (
 	stampRun                = servertest.StampRun
 	startWaitingRestartFake = servertest.StartWaitingRestartFake
 	waitFor                 = servertest.Await
+	waitStatus              = servertest.WaitStatus
 	liveUnder               = rigs.LiveUnder
 	liveUnderOther          = rigs.LiveUnderOther
 	pauseWithQuestion       = servertest.PauseWithQuestion

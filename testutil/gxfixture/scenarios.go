@@ -455,7 +455,7 @@ var scenarios = map[string]scenario{
 			if err := f.git(repo, "worktree", "add", "-b", "paused-epic", filepath.Join(repo, ".worktrees", "paused-epic")); err != nil {
 				return err
 			}
-			return f.commitOnBranch(repo, "ralph-loop/paused-epic-item-05", "conflict.txt", "branch")
+			return commitOnBranch(f, repo, "ralph-loop/paused-epic-item-05", "conflict.txt", "branch")
 		},
 	},
 	// model-mismatch: one ticket paused because its session ran on a model other
@@ -558,7 +558,7 @@ var scenarios = map[string]scenario{
 		}}},
 		epicMeta: map[string]string{project + ":dirty-epic": dirtyTrunkMeta("same.txt")},
 		gitSetup: func(f *fixture, repo string) error {
-			if err := f.commitOnBranch(repo, "dirty-epic", "same.txt", "branch"); err != nil {
+			if err := commitOnBranch(f, repo, "dirty-epic", "same.txt", "branch"); err != nil {
 				return err
 			}
 			return os.WriteFile(filepath.Join(repo, "same.txt"), []byte("local"), 0o644)

@@ -179,7 +179,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 		}
 	}
 	if sc.checkWaiting {
-		if s.checkWaitingFile, err = f.writeCheckWaiting(ctx); err != nil {
+		if s.checkWaitingFile, err = writeCheckWaiting(ctx, f); err != nil {
 			return s, err
 		}
 	}

@@ -301,8 +301,8 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 		}
 	}
 	var snap wire.Snapshot
-	// The claim reaches the index after the watch debounce, so the first row
-	// reads claimed a moment after the cap shows up.
+	// The claim write updates the index at once, but the two rows land in
+	// separate snapshots, so wait for both.
 	servertest.WaitFor(t, 30*time.Second, "the first root claimed and the second at the cap", func() bool {
 		var err error
 		if snap, err = h.Client.Snapshot(ctx); err != nil {

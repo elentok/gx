@@ -1,4 +1,4 @@
-package sched_test
+package launchtest_test
 
 import (
 	"context"
@@ -7,11 +7,13 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestLaunchTimed_ADeliveredLaunchLogsOneEventWhoseStepsSumToTheTotal(t *testing.T) {
@@ -77,6 +79,26 @@ func TestLaunchTimed_AFailedLaunchLogsNoTiming(t *testing.T) {
 	logged := runLog(t, h)
 	if len(ofType(logged, events.LaunchFailed)) == 0 || len(ofType(logged, events.LaunchTimed)) != 0 {
 		t.Errorf("run log = %+v, want launch-failed and no launch-timed", logged)
+	}
+}
+
+// A launch the server died in is reclaimed untimed; the launch that follows is a
+// new one with its own timing.
+func TestLaunchTimed_TheReclaimOfACutOffLaunchGetsItsOwnTiming(t *testing.T) {
+	t.Parallel()
+	fake := servertest.NewHeadlessFake(nativerunner.VerdictDied)
+	h, ticketPath := restartLaunching(t, fake, nil, noWork)
+	waitStatus(t, ticketPath, schema.StatusOpen)
+	if timed := ofType(runLog(t, h), events.LaunchTimed); len(timed) != 0 {
+		t.Fatalf("launch-timed = %+v after the reclaim, want none", timed)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	if !servertest.Poll(30*time.Second, func() bool { return len(ofType(runLog(t, h), events.LaunchTimed)) == 1 }) {
+		t.Fatalf("launch-timed = %+v, want one for the new launch", ofType(runLog(t, h), events.LaunchTimed))
 	}
 }
 
