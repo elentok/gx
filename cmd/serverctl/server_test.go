@@ -8,8 +8,47 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/wire"
 )
+
+func TestChatTestHooks(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		env     map[string]string
+		want    notify.ServerChatConfig
+		wantErr string
+	}{
+		{name: "unset keeps every default"},
+		{
+			name: "valid values",
+			env: map[string]string{
+				"GX_CHAT_FLUSH_INTERVAL":    "100ms",
+				"GX_CHAT_PROGRESS_INTERVAL": "2s",
+				"GX_CHAT_TELEGRAM_BASE_URL": "http://127.0.0.1:9",
+			},
+			want: notify.ServerChatConfig{FlushInterval: 100 * time.Millisecond, ProgressInterval: 2 * time.Second, TelegramBaseURL: "http://127.0.0.1:9"},
+		},
+		{name: "bad flush interval", env: map[string]string{"GX_CHAT_FLUSH_INTERVAL": "soon"}, wantErr: "GX_CHAT_FLUSH_INTERVAL"},
+		{name: "bad progress interval", env: map[string]string{"GX_CHAT_PROGRESS_INTERVAL": "15"}, wantErr: "GX_CHAT_PROGRESS_INTERVAL"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := chatTestHooks(func(k string) string { return tt.env[k] })
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want one naming %s", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil || got != tt.want {
+				t.Fatalf("got %+v, %v; want %+v", got, err, tt.want)
+			}
+		})
+	}
+}
 
 func TestDetachedServerCmd_RunsUnderTheGivenEnv(t *testing.T) {
 	env := []string{"HOME=/h", "PATH=/p"}

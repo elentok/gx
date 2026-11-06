@@ -69,6 +69,14 @@ func (h *chatHook) waitFor(t *testing.T, want string) []string {
 // returned path. flush is the batch tick.
 func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server, string) {
 	t.Helper()
+	return reloadChatServerWith(t, notify.ServerChatConfig{SlackWebhookURL: global, FlushInterval: flush})
+}
+
+// reloadChatServerWith is reloadChatServer with the whole chat config given;
+// the gate state path is filled in.
+func reloadChatServerWith(t *testing.T, chat notify.ServerChatConfig) (*Server, string) {
+	t.Helper()
+	chat.GateStatePath = filepath.Join(t.TempDir(), "gate.json")
 	herdr := herdrfake.NewState(t)
 	herdr.Forbid() // the fake runner launches nothing, so any herdr call is stray
 	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
@@ -80,7 +88,7 @@ func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
-		Chat: notify.ServerChatConfig{SlackWebhookURL: global, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush},
+		Chat: chat,
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -155,6 +163,22 @@ func TestConfigReloadChat_UnchangedChatKeepsTheBatch(t *testing.T) {
 	s.chat.Close()
 	if got := hook.sent(); len(got) != 1 || !strings.Contains(got[0], "before-reload") || !strings.Contains(got[0], "after-reload") {
 		t.Errorf("sent %v, want one batch with both notices", got)
+	}
+}
+
+func TestConfigReloadChat_KeepsTheTestSeams(t *testing.T) {
+	t.Parallel()
+	s, path := reloadChatServerWith(t, notify.ServerChatConfig{
+		SlackWebhookURL: "http://127.0.0.1:1/old", FlushInterval: time.Hour,
+		ProgressInterval: 3 * time.Second, TelegramBaseURL: "http://127.0.0.1:2",
+	})
+	defer s.chat.Close()
+
+	writeChatConfig(t, s, path, "http://127.0.0.1:1/new", 3)
+	s.settings.Reload(settings.TriggerCommand)
+	got := s.settings.Load().Chat
+	if got.ProgressInterval != 3*time.Second || got.FlushInterval != time.Hour || got.TelegramBaseURL != "http://127.0.0.1:2" {
+		t.Errorf("chat after reload = %+v, want the seams kept", got)
 	}
 }
 

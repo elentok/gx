@@ -114,7 +114,7 @@ func reloadableSettings(old, next Settings) Settings {
 	if old.AgentsDefaultHarness != "" && agent.ValidateAgentKind(agent.AgentKind(old.AgentsDefaultHarness)) != nil {
 		next.AgentsDefaultHarness = old.AgentsDefaultHarness
 	}
-	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval
+	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval, next.Chat.ProgressInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval, old.Chat.ProgressInterval
 	return next
 }
 

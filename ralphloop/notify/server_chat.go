@@ -26,6 +26,8 @@ type ServerChatConfig struct {
 	GateStatePath string
 	// FlushInterval replaces batchFlushInterval; zero means the real one.
 	FlushInterval time.Duration
+	// ProgressInterval replaces the Progress message interval; zero means the real one.
+	ProgressInterval time.Duration
 }
 
 // ServerChat is the chat sink a server owns: one batcher and one gate per
