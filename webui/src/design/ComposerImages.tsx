@@ -77,8 +77,10 @@ function Thumb({ image, onRetry, onRemove }: { image: ComposerImage; onRetry: ()
 
 function lineText(state: State): { text: string; red: boolean } | undefined {
   if (state.error === MSG_MAX_IMAGES) return { text: MSG_MAX_IMAGES, red: true };
-  if (state.failed || state.uploading) {
-    return { text: `${state.failed} failed · ${state.uploading} uploading`, red: state.failed > 0 };
+  // Counts every failed tile, refused ones included; state.failed only counts what blocks a send.
+  const failed = state.images.filter((i) => i.state === "failed").length;
+  if (failed || state.uploading) {
+    return { text: `${failed} failed · ${state.uploading} uploading`, red: failed > 0 };
   }
   if (state.error) return { text: state.error, red: true };
   if (state.images.length) return { text: `${state.images.length} of ${MAX_IMAGES} images`, red: false };

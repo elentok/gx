@@ -110,6 +110,14 @@ test("the line reads failed and uploading, N of 10, or the max message", () => {
   expect(screen.getByText("Max 10 images")).toBeTruthy();
 });
 
+test("a refused tile counts as failed in the line and turns it red", () => {
+  const refused: ComposerImage = { key: "r", state: "failed", message: "Too large", canRetry: false };
+  render(state([ready("a"), { key: "b", state: "uploading", canRetry: false }, refused], { failed: 0 }));
+  const line = screen.getByText("1 failed · 1 uploading");
+  expect(line).toBeTruthy();
+  expect(getComputedStyle(line).color).not.toBe(getComputedStyle(document.body).color);
+});
+
 const realPng = () => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", { type: "image/png" });
 
 test("removing an image while it uploads deletes the saved file once the upload completes", async () => {
