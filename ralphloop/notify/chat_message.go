@@ -306,6 +306,26 @@ func progressMessage(project, epic string, f ProgressFacts) chatMessage {
 	}
 }
 
+// designQuestionMessage is the "a Design waits for an answer" message. The
+// Design is a map epic, so the subject is the epic name alone. An empty link
+// (web listener off) leaves its line out.
+func designQuestionMessage(project, epic, step string, round int, question, link string) chatMessage {
+	lines := []string{
+		fmt.Sprintf("Design waits at the %s step. Round %d.", step, round),
+		question,
+	}
+	if link != "" {
+		lines = append(lines, link)
+	}
+	return chatMessage{
+		icon: "❓", status: "Question", subject: epic,
+		lines:   lines,
+		project: project,
+		kind:    notifyKindDesignQuestion,
+		urgency: urgencyAnswer,
+	}
+}
+
 // ticketPauseMessage is the "a machine paused this ticket for a person"
 // message: Answer for the answer class, Repair for any fault. status is the
 // ticket's stored status word, old or new.

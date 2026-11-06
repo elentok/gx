@@ -250,6 +250,18 @@ func (c *ServerChat) Progress(project string, override *ServerChatConfig, epic s
 	}
 }
 
+// DesignQuestion tells the project's destinations that the Design epic waits
+// at step for an answer to the round's first question.
+func (c *ServerChat) DesignQuestion(project string, override *ServerChatConfig, epic, step string, round int, question, link string) {
+	if c == nil {
+		return
+	}
+	msg := designQuestionMessage(project, epic, step, round, question, link)
+	for _, s := range c.projectSinks(override) {
+		s.sendMessage(msg, epicSource(project+"/"+epic), "")
+	}
+}
+
 // notifyKindResult tags the message a successful one-off sends on request.
 const notifyKindResult = "result"
 

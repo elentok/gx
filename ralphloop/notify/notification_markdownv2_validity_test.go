@@ -51,9 +51,10 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 			Counts:  schedule.EpicCounts{Done: 3, InProgress: 1, Total: 12},
 			Running: []ProgressRunning{{Identifier: adversarialTicket, Title: adversarialTitle, ElapsedSeconds: 840}}, FinishedCount: 2, FinishedCost: fractionalCost,
 		}).Text(chatmarkup.Telegram),
-		"mutedMessage":         mutedMessage(adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
-		"globallyMutedMessage": globallyMutedMessage("telegram").Text(chatmarkup.Telegram),
-		"testMessageText":      telegramStyle.testMessageText(),
+		"designQuestionMessage": designQuestionMessage(adversarialEpic, adversarialEpic, "Q&A (step)", 2, adversarialTitle+" _under_ [x](y) `z` > #1 | ~a~ = {b} !", "http://localhost:8080/design/a_b?x=1&y=(2)").Text(chatmarkup.Telegram),
+		"mutedMessage":          mutedMessage(adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
+		"globallyMutedMessage":  globallyMutedMessage("telegram").Text(chatmarkup.Telegram),
+		"testMessageText":       telegramStyle.testMessageText(),
 	}
 
 	for name, text := range cases {

@@ -20,6 +20,7 @@ const (
 	notifyKindEpicComplete     = "epic-complete"
 	notifyKindTicketNeedsHuman = "ticket-needs-human"
 	notifyKindProgress         = "progress-update"
+	notifyKindDesignQuestion   = "design-question"
 	notifyKindConflictStarted  = "conflict-resolution-started"
 	// notifyKindMuted/notifyKindGloballyMuted tag the gate's own
 	// edge-triggered "muting this"/"globally muted" notice (see
