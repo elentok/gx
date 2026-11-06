@@ -9,6 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -344,6 +345,10 @@ func (s *Store) write(fn func() error) error {
 	if err := fn(); err != nil {
 		s.st = prev
 		return err
+	}
+	// Rescans and session exits prune on every pass; a no-op must not wake the web.
+	if reflect.DeepEqual(prev, s.st) {
+		return nil
 	}
 	if err := s.save(); err != nil {
 		s.st = prev

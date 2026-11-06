@@ -60,6 +60,9 @@ type Manager struct {
 	// Logs prunes the agent logs; Maps answers for the map epic of an address.
 	Logs *AgentLogs
 	Maps *MapEpics
+	// OnSessionGone is told the id of a session that just exited or was
+	// removed. Nil is a no-op.
+	OnSessionGone func(id string)
 	// Conv keeps the sessions' conversations on the record.
 	Conv *convrecord.Recorder
 	// prompter is the prompt, turn and auto-advance side the watch loop calls.

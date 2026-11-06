@@ -427,6 +427,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.sessions = newManager(s)
 	s.sessions.Maps.OnDesignStart = s.clearHold
+	s.sessions.OnSessionGone = s.dropSessionMember
 	s.designs.GiveSessions(s.sessions)
 	s.prompt.GiveSessions(s.sessions)
 	s.rec.GiveSessions(s.sessions)
@@ -444,6 +445,7 @@ func New(cfg Config) (*Server, error) {
 	s.idx.OnRescan(s.rec.ScanLateFinishes)
 	s.idx.OnRescan(s.oneOffs.Sweep)
 	s.idx.OnRescan(s.designs.ScanCleanups)
+	s.idx.OnRescan(s.pruneEpicMembers)
 	s.idx.SetReady(s.startup.MigrationsEnded)
 	s.routes = assembleRoutes(s)
 	registerRoutes(mux, s.routes)

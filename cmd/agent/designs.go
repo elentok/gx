@@ -150,6 +150,7 @@ func designOpenRequest(arg, idea, project string, fresh bool) (wire.DesignOpenRe
 		return req, fmt.Errorf("--new cannot be combined with --idea and --project")
 	}
 	req.NewDesign, req.Idea, req.Project = true, idea, project
+	req.FromSession = os.Getenv(holder.AgentSessionEnv)
 	return req, nil
 }
 

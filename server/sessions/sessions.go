@@ -570,8 +570,15 @@ func (mg *Manager) RemoveSession(req wire.SessionRequest) (wire.SessionResult, e
 		return wire.SessionResult{}, err
 	}
 	mg.events.Publish(wire.EventSessionChanged, req.ID)
+	mg.sessionGone(req.ID)
 	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
+}
+
+func (mg *Manager) sessionGone(id string) {
+	if mg.OnSessionGone != nil {
+		mg.OnSessionGone(id)
+	}
 }
 
 // UpdateSessionMeta applies change to the session's saved meta and, when it
@@ -579,8 +586,11 @@ func (mg *Manager) RemoveSession(req wire.SessionRequest) (wire.SessionResult, e
 // A Design session this change moved to Exited triggers the design cleanup once
 // the lock is released.
 func (mg *Manager) UpdateSessionMeta(dir, id string, change func(*Meta) bool) error {
-	meta, exitedDesign, err := mg.saveSessionMetaUpdate(dir, id, change)
-	if exitedDesign {
+	meta, exited, err := mg.saveSessionMetaUpdate(dir, id, change)
+	if exited {
+		mg.sessionGone(id)
+	}
+	if exited && meta.Design {
 		if project, epic, ok := strings.Cut(queue.EpicAddress(meta.Ticket), ":"); ok {
 			time.Sleep(mg.cfg.SessionExitCleanupDelay)
 			mg.designs.CleanupDesign(project, epic)
@@ -589,7 +599,7 @@ func (mg *Manager) UpdateSessionMeta(dir, id string, change func(*Meta) bool) er
 	return err
 }
 
-func (mg *Manager) saveSessionMetaUpdate(dir, id string, change func(*Meta) bool) (meta Meta, exitedDesign bool, err error) {
+func (mg *Manager) saveSessionMetaUpdate(dir, id string, change func(*Meta) bool) (meta Meta, exited bool, err error) {
 	mg.Watches.MetaMu.Lock()
 	defer mg.Watches.MetaMu.Unlock()
 	meta, err = ReadMeta(dir)
@@ -604,7 +614,7 @@ func (mg *Manager) saveSessionMetaUpdate(dir, id string, change func(*Meta) bool
 		return meta, false, fmt.Errorf("save session %s meta: %w", id, err)
 	}
 	mg.events.Publish(wire.EventSessionChanged, id)
-	return meta, meta.Design && !wasExited && meta.Status.State == wire.SessionExited, nil
+	return meta, !wasExited && meta.Status.State == wire.SessionExited, nil
 }
 
 // UpdateSessionMetaOrWarn is updateSessionMeta for background callers, which

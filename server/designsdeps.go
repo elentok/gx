@@ -7,7 +7,7 @@ func (s *Server) designsDeps() designs.Deps {
 	return designs.Deps{
 		Log: s.log, TicketStore: s.cfg.TicketStore, ConversationsDir: s.cfg.ConversationsDir,
 		Idx: s.idx, Projects: s.projects, Events: s.events, Guards: s.guards,
-		Chat: s.chat, WebURL: s.WebURL,
+		Chat: s.chat, WebURL: s.WebURL, Workspaces: s.workspaces,
 	}
 }
 

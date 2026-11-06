@@ -140,6 +140,41 @@ func TestDesignsOpenNew_StartFailureIsOneResultWithStartError(t *testing.T) {
 	}
 }
 
+func TestDesignsOpenNew_PromotedFromAChatStartsInItsWorkspace(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, "Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	chat, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()})
+	if err != nil || chat.Session == nil {
+		t.Fatalf("create chat = %+v, %v", chat, err)
+	}
+	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, chat.Session.ID, "Bugs"); err != nil || res.Refused {
+		t.Fatalf("move chat = %+v, %v", res, err)
+	}
+	open := func(slug, from string) {
+		t.Helper()
+		res, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: slug, NewDesign: true, Idea: "idea", Project: "proj", FromSession: from})
+		if err != nil || res.Refused {
+			t.Fatalf("open %s = %+v, %v", slug, res, err)
+		}
+	}
+	open("from-chat", chat.Session.ID)
+	open("from-nowhere", "no-such-session")
+	open("from-none", "")
+	l, err := f.h.Client.Reads.Workspaces(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The chat plus the one Design promoted from it; the other two land in Default.
+	for _, w := range l.Workspaces {
+		if want := map[string]int{"Bugs": 2}[w.Name]; w.Name == "Bugs" && w.Members != want {
+			t.Errorf("Bugs members = %d, want %d", w.Members, want)
+		}
+	}
+}
+
 func TestDesignsOpenNew_LinkingToItsOwnAddressKeepsDesign(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)

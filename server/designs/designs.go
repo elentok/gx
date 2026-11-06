@@ -466,6 +466,11 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 	if err := createMap(s.conversationsDir, dir, slug, idea); err != nil {
 		return wire.SessionResult{}, err
 	}
+	if s.workspaces != nil && req.FromSession != "" {
+		if err := s.workspaces.SetMember(addr, s.workspaces.Workspace(req.FromSession)); err != nil {
+			s.log.Warn("place promoted design in its chat's workspace", "design", addr, "err", err)
+		}
+	}
 	d, err := s.resolveDesignDir(req.Project, slug, "")
 	if err != nil {
 		return wire.SessionResult{EpicCreated: true, StartError: err.Error()}, nil

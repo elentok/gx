@@ -23,6 +23,9 @@ type DesignOpenRequest struct {
 	NewDesign bool   `json:"new_design,omitempty"`
 	Idea      string `json:"idea,omitempty"`
 	Project   string `json:"project,omitempty"`
+	// FromSession is the chat that promoted the idea; the new Design starts in
+	// its workspace. An unknown id is ignored.
+	FromSession string `json:"from_session,omitempty"`
 }
 
 // DesignWorktreeRequest is the body of POST /v1/designs/worktree. Epic is a map

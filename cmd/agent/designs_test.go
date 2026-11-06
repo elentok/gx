@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -26,6 +27,14 @@ func TestDesignOpenRequest(t *testing.T) {
 	}
 	if got, err := designOpenRequest("proj:map", "", "", true); err != nil || got != (wire.DesignOpenRequest{Epic: "proj:map", New: true}) {
 		t.Errorf("plain request = %+v, %v", got, err)
+	}
+}
+
+func TestDesignOpenRequest_SendsTheCallingSession(t *testing.T) {
+	t.Setenv(holder.AgentSessionEnv, "chat-1")
+	got, err := designOpenRequest("fresh", "an idea", "proj", false)
+	if err != nil || got.FromSession != "chat-1" {
+		t.Errorf("request = %+v, %v, want from_session chat-1", got, err)
 	}
 }
 

@@ -44,6 +44,34 @@ func (s *Server) clearHold(key string) {
 	}
 }
 
+// dropSessionMember forgets a chat's workspace when its session exits or is removed.
+func (s *Server) dropSessionMember(id string) {
+	if err := s.workspaces.Remove(id); err != nil {
+		slog.Warn("drop session workspace member", "session", id, "err", err)
+	}
+}
+
+// pruneEpicMembers drops the workspace members and holds of epics and Designs
+// that no longer exist. A finished epic still exists, so it keeps its
+// workspace. Session keys are left to dropSessionMember, and an epic of a
+// project the index does not know yet is kept.
+func (s *Server) pruneEpicMembers() {
+	err := s.workspaces.Prune(func(key string) bool {
+		project, _, ok := tickets.ParseEpicAddress(key)
+		if !ok {
+			return true
+		}
+		if _, _, known := s.idx.ProjectEpics(project); !known {
+			return true
+		}
+		_, exists := workspacesDirectory{s}.Epic(key)
+		return exists
+	})
+	if err != nil {
+		slog.Warn("prune workspace members", "err", err)
+	}
+}
+
 // Workspaces is the workspace and hold store. Tests outside the package read
 // their seams through here.
 func (s *Server) Workspaces() *workspaces.Store { return s.workspaces }

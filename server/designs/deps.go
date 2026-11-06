@@ -26,6 +26,14 @@ type Deps struct {
 	// Chat sends the Ready message; WebURL is the web listener's base URL, "" when off.
 	Chat   *notify.ServerChat
 	WebURL func() string
+	// Workspaces places a promoted Design in its chat's workspace; nil skips it.
+	Workspaces Workspaces
+}
+
+// Workspaces is the slice of the workspace store a promoted Design uses.
+type Workspaces interface {
+	Workspace(key string) string
+	SetMember(key, workspace string) error
 }
 
 // Designs opens, cleans up and deletes the Design sessions of map epics.
@@ -39,6 +47,7 @@ type Designs struct {
 	guards           *runs.Guards
 	chat             *notify.ServerChat
 	webURL           func() string
+	workspaces       Workspaces
 	// seeded: the Ready seed mark has been settled this run.
 	seeded atomic.Bool
 	// sessions comes later than Designs: the Manager calls CleanupDesign back,
@@ -56,7 +65,7 @@ func New(d Deps) *Designs {
 	return &Designs{
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
-		chat: d.Chat, webURL: d.WebURL,
+		chat: d.Chat, webURL: d.WebURL, workspaces: d.Workspaces,
 	}
 }
 
