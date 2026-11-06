@@ -230,20 +230,15 @@ func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic,
 	}
 }
 
-// EpicComplete tells the project's destinations that every ticket of epic
-// merged: "epic merged" when its branch went onto its target, "epic complete
-// (not merged)" otherwise, so chat never claims a merge that did not happen.
+// EpicComplete tells the project's destinations that every ticket of epic is
+// done: Merged when its branch went onto its target, Complete otherwise.
 func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, epic string, counts schedule.EpicCounts, elapsedSeconds int, totalCost float64, merged bool) {
 	if c == nil {
 		return
 	}
-	glyph, title := "✅", "epic complete (not merged)"
-	if merged {
-		glyph, title = "\U0001f389", "epic merged"
-	}
+	msg := epicOutcomeMessage(project, epic, counts, elapsedSeconds, totalCost, merged)
 	for _, s := range c.projectSinks(override) {
-		body := s.style.epicOutcomeText(glyph, title, project+"/"+epic, counts, counts.Done, elapsedSeconds, totalCost)
-		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindEpicComplete, epicSource(project+"/"+epic), "")
+		s.sendMessage(msg, epicSource(project+"/"+epic), "")
 	}
 }
 

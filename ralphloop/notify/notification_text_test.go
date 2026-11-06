@@ -4,9 +4,11 @@ import (
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
@@ -162,21 +164,40 @@ func TestTelegramStyle_OverflowPausedIdentifiersEscapesPlus(t *testing.T) {
 	counts := schedule.EpicCounts{Done: 2, PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06"}, Total: 8}
 	const countsLine = "2 done · 6 paused: 01, 02, 03, 04, 05, \\+1 more · 8 total"
 
-	t.Run("epicOutcomeText", func(t *testing.T) {
+	t.Run("epicOutcomeMessage", func(t *testing.T) {
 		t.Parallel()
-		got := telegramStyle.epicOutcomeText("\U0001f389", "epic complete", "ui-tree-migration", counts, 5, 492, 12.5).String()
-		want := "\U0001f389 *epic complete*\n\n" + countsLine + "\n5 ticket\\(s\\) merged in 8m12s · $12\\.50\n\\[gx\\] ui\\-tree\\-migration"
-		if got != want {
-			t.Errorf("text = %q, want %q", got, want)
+		got := epicOutcomeMessage("gx", "ui-tree-migration", counts, 492, 12.5, true).Text(chatmarkup.Telegram).String()
+		if !strings.Contains(got, countsLine) {
+			t.Errorf("text = %q, want it to carry %q", got, countsLine)
 		}
 	})
 }
 
-func TestEpicOutcomeText_CountsRecoveredPausesOnlyWhenThereAre(t *testing.T) {
-	if got := slackStyle.epicOutcomeText("g", "t", "e", schedule.EpicCounts{}, 1, 10, 0).String(); strings.Contains(got, "recovered") {
-		t.Errorf("no recoveries but text says so: %s", got)
+func TestEpicOutcomeMessage_FullLayout(t *testing.T) {
+	counts := schedule.EpicCounts{Done: 12, Total: 12, Recovered: 2}
+	merged := epicOutcomeMessage("gx", "better-epic-header-impl", counts, 12000, 41.6, true)
+	if got, want := merged.Headline(), "🎉 Merged better-epic-header-impl"; got != want {
+		t.Errorf("headline = %q, want %q", got, want)
 	}
-	if got := slackStyle.epicOutcomeText("g", "t", "e", schedule.EpicCounts{Recovered: 2}, 1, 10, 0).String(); !strings.Contains(got, "2 recovered automatically") {
-		t.Errorf("text lacks the recovered count: %s", got)
+	wantLines := []string{"12 tickets merged in 3h 20m · $41.60", "2 recovered automatically", RenderCountsLine(counts)}
+	if !slices.Equal(merged.lines, wantLines) || merged.project != "gx" {
+		t.Errorf("merged = %+v, want lines %q under project gx", merged, wantLines)
+	}
+
+	notMerged := epicOutcomeMessage("gx", "follow-ups", schedule.EpicCounts{Done: 9, Total: 9}, 3900, 12.1, false)
+	if got, want := notMerged.Headline(), "✅ Complete follow-ups"; got != want {
+		t.Errorf("headline = %q, want %q", got, want)
+	}
+	wantLines = []string{"9 tickets done in 1h 05m · $12.10", "Not merged.", RenderCountsLine(schedule.EpicCounts{Done: 9, Total: 9})}
+	if !slices.Equal(notMerged.lines, wantLines) {
+		t.Errorf("lines = %q, want %q", notMerged.lines, wantLines)
+	}
+}
+
+func TestFormatElapsed(t *testing.T) {
+	for in, want := range map[int]string{42: "42s", 492: "8m", 3900: "1h 05m", 12000: "3h 20m"} {
+		if got := formatElapsed(in); got != want {
+			t.Errorf("formatElapsed(%d) = %q, want %q", in, got, want)
+		}
 	}
 }

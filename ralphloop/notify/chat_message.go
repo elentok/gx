@@ -1,9 +1,11 @@
 package notify
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/elentok/gx/chatmarkup"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -91,6 +93,46 @@ func resultMessage(project, epic, ticketPath, identifier, result string) chatMes
 		lines:   []string{result},
 		project: project,
 		kind:    notifyKindResult,
+	}
+}
+
+// formatElapsed renders seconds as "3h 20m", "1h 05m", "8m" or "42s".
+func formatElapsed(seconds int) string {
+	h, m := seconds/3600, seconds%3600/60
+	switch {
+	case h > 0:
+		return fmt.Sprintf("%dh %02dm", h, m)
+	case m > 0:
+		return fmt.Sprintf("%dm", m)
+	}
+	return fmt.Sprintf("%ds", seconds)
+}
+
+// epicOutcomeMessage is the "every ticket of the epic is done" message:
+// Merged when its branch went onto its target, Complete otherwise, so chat
+// never claims a merge that did not happen. The counts line stays last.
+func epicOutcomeMessage(project, epic string, counts schedule.EpicCounts, elapsedSeconds int, totalCost float64, merged bool) chatMessage {
+	icon, status, verb, ending := "✅", "Complete", "done", "Not merged."
+	if merged {
+		icon, status, verb, ending = "🎉", "Merged", "merged", ""
+	}
+	noun := "tickets"
+	if counts.Done == 1 {
+		noun = "ticket"
+	}
+	lines := []string{fmt.Sprintf("%d %s %s in %s · %s", counts.Done, noun, verb, formatElapsed(elapsedSeconds), tickets.FormatCost(totalCost))}
+	if ending != "" {
+		lines = append(lines, ending)
+	}
+	if counts.Recovered > 0 {
+		lines = append(lines, fmt.Sprintf("%d recovered automatically", counts.Recovered))
+	}
+	lines = append(lines, RenderCountsLine(counts))
+	return chatMessage{
+		icon: icon, status: status, subject: epic,
+		lines:   lines,
+		project: project,
+		kind:    notifyKindEpicComplete,
 	}
 }
 

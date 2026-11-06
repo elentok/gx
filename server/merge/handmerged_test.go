@@ -76,6 +76,9 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 	if got := waitForChat(count, epicMergedText); got != 1 {
 		t.Errorf("epic merged sent %d times, want once", got)
 	}
+	if got := count("1 ticket merged in "); got != 1 {
+		t.Errorf("the merged totals line sent %d times, want once", got)
+	}
 }
 
 func TestHandMerged_StampsLinesFromTheEpicsTrailerCommits(t *testing.T) {

@@ -85,18 +85,6 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 	return s.chatStyle.Message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
 
-// epicOutcomeText is the epic-level summary under glyph and title: the full
-// queue counts line, then this run's own merged-ticket tally (a distinct
-// number from counts.Done, which may include tickets a prior run merged) and
-// totalCost, the epic-wide sum of every ticket's ActualCost.
-func (s mrkdwnStyle) epicOutcomeText(glyph, title, epicName string, counts schedule.EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
-	detail := fmt.Sprintf("%d ticket(s) merged in %s · %s", completed, formatDuration(elapsedSeconds), tickets.FormatCost(totalCost))
-	if counts.Recovered > 0 {
-		detail += fmt.Sprintf(" · %d recovered automatically", counts.Recovered)
-	}
-	return s.chatStyle.Message(glyph, title, RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
-}
-
 // mutedText renders the gate's edge-triggered per-source mute notice — the
 // one message sent on the allowed→muted transition for a ticket's storm
 // (see chatEventSink.send):

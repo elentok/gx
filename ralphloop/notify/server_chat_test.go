@@ -90,8 +90,8 @@ func TestServerChat_EpicCompleteNamesTheProjectAndTheTotals(t *testing.T) {
 	c.Close()
 
 	g := globalReqs()
-	if len(g) != 1 || !strings.Contains(g[0].Text, "\U0001f389 *epic merged*") || !strings.Contains(g[0].Text, "alpha") || !strings.Contains(g[0].Text, "7 done") {
-		t.Errorf("got %+v, want an 'epic merged' message for alpha", g)
+	if len(g) != 1 || !strings.Contains(g[0].Text, "\U0001f389 Merged e") || !strings.Contains(g[0].Text, "alpha") || !strings.Contains(g[0].Text, "7 done") || !strings.Contains(g[0].Text, "7 tickets merged in 1h 00m · $12.50") {
+		t.Errorf("got %+v, want a 'Merged' message for alpha", g)
 	}
 }
 
@@ -102,8 +102,8 @@ func TestServerChat_EpicCompleteNotMergedSaysSo(t *testing.T) {
 	c.Close()
 
 	g := globalReqs()
-	if len(g) != 1 || !strings.Contains(g[0].Text, "✅ *epic complete (not merged)*") || strings.Contains(g[0].Text, "epic merged") {
-		t.Errorf("got %+v, want an 'epic complete (not merged)' message", g)
+	if len(g) != 1 || !strings.Contains(g[0].Text, "✅ Complete e") || !strings.Contains(g[0].Text, "Not merged.") || strings.Contains(g[0].Text, "Merged") {
+		t.Errorf("got %+v, want a 'Complete' message saying not merged", g)
 	}
 }
 

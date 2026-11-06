@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	EpicMergedText    = "epic merged"
-	EpicNotMergedText = "epic complete (not merged)"
+	EpicMergedText    = "🎉 Merged "
+	EpicNotMergedText = "✅ Complete "
 )
 
 // ChatRecorder is a server option sending chat to a recording webhook, and a

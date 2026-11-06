@@ -51,7 +51,7 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 		"conflictStartedMessage":           conflictStartedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
 		"escalatedMessage/ticket":          escalatedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, "No commits merged (yet).").Text(chatmarkup.Telegram),
 		"escalatedMessage/epic":            escalatedMessage(adversarialEpic, adversarialEpic, "", "", "").Text(chatmarkup.Telegram),
-		"epicOutcomeText":                  telegramStyle.epicOutcomeText("\U0001f389", "epic complete", adversarialEpic, overflowCounts, 5, 492, fractionalCost),
+		"epicOutcomeMessage":               epicOutcomeMessage(adversarialEpic, adversarialEpic, overflowCounts, 492, fractionalCost, true).Text(chatmarkup.Telegram),
 		"mutedText":                        telegramStyle.mutedText(adversarialEpic, adversarialTicket),
 		"globallyMutedText":                telegramStyle.globallyMutedText("telegram"),
 		"testMessageText":                  telegramStyle.testMessageText(),
@@ -82,9 +82,9 @@ func TestMarkdownV2Validity_OverflowPausedIdentifiers(t *testing.T) {
 		Total:             10,
 	}
 
-	got := telegramStyle.epicOutcomeText("\U0001f389", "epic complete", "ui-tree-migration", counts, 5, 492, 12.5).String()
+	got := epicOutcomeMessage("gx", "ui-tree-migration", counts, 492, 12.5, true).Text(chatmarkup.Telegram).String()
 	if !isValidTelegramMarkdownV2(got) {
-		t.Fatalf("epicOutcomeText output %q is not valid MarkdownV2", got)
+		t.Fatalf("epicOutcomeMessage output %q is not valid MarkdownV2", got)
 	}
 	if !strings.Contains(got, `\+2 more`) {
 		t.Errorf("expected escaped overflow marker in %q", got)
