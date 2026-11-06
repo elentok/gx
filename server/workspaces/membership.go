@@ -15,6 +15,10 @@ type Directory interface {
 	Resolver
 	Epic(key string) (tickets.Epic, bool)
 	Sessions() []wire.SessionInfo
+	// RootQueued reports whether any ticket of the `project:epic` root is queued.
+	RootQueued(key string) bool
+	// StopSession ends a session.
+	StopSession(id string) error
 }
 
 // joinable refuses every key but a Design, an epic or a plain chat.

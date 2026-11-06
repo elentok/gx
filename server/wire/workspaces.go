@@ -49,6 +49,33 @@ type WorkspaceResult struct {
 	Message    string      `json:"message,omitempty"`
 }
 
+// HoldRequest holds or unholds a Design or epic. Yes confirms that holding
+// exits the Design's live sessions.
+type HoldRequest struct {
+	Epic string `json:"epic"`
+	Yes  bool   `json:"yes,omitempty"`
+}
+
+// HoldResult is a hold or unhold: the held keys after it and the sessions it
+// ended, or a refusal. A refusal for ReasonHoldLiveSessions lists the sessions
+// that need Yes in Sessions.
+type HoldResult struct {
+	Held     []string `json:"held"`
+	Sessions []string `json:"sessions,omitempty"`
+	Refused  bool     `json:"refused,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+	Message  string   `json:"message,omitempty"`
+}
+
+// Refusal reasons of hold. The queued text is asserted by the web.
+const (
+	ReasonHoldQueued       = "hold-queued"
+	ReasonHoldLiveSessions = "hold-live-sessions"
+	ReasonHoldNotHoldable  = "hold-not-holdable"
+	ReasonHoldUnknown      = "hold-unknown"
+	HoldQueuedText         = "Remove it from the queue first"
+)
+
 // Refusal reasons of the workspace writes.
 const (
 	ReasonWorkspaceBlankName    = "workspace-blank-name"

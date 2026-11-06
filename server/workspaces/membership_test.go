@@ -192,6 +192,8 @@ type fakeDir struct {
 
 func (d fakeDir) DesignExists(key string) bool { return d.designs[key] }
 func (d fakeDir) Sessions() []wire.SessionInfo { return d.sessions }
+func (d fakeDir) RootQueued(string) bool       { return false }
+func (d fakeDir) StopSession(string) error     { return nil }
 func (d fakeDir) Epic(key string) (tickets.Epic, bool) {
 	_, name, _ := tickets.ParseEpicAddress(key)
 	return tickets.Epic{Name: name, Path: filepath.Join("/store", "proj", name)}, true

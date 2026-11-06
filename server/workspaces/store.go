@@ -169,6 +169,13 @@ func (s *Store) IsHeld(key string) bool {
 	return slices.Contains(s.st.Held, s.canon(key))
 }
 
+// HeldKeys lists the held keys.
+func (s *Store) HeldKeys() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.st.Held)
+}
+
 // Create adds a workspace last.
 func (s *Store) Create(name string) error {
 	name = strings.TrimSpace(name)

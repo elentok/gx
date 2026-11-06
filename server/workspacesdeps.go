@@ -1,6 +1,9 @@
 package server
 
 import (
+	"fmt"
+
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -30,6 +33,22 @@ func (d workspacesDirectory) Epic(key string) (tickets.Epic, bool) {
 func (d workspacesDirectory) DesignExists(key string) bool {
 	e, ok := d.Epic(key)
 	return ok && e.IsMap
+}
+
+func (d workspacesDirectory) RootQueued(key string) bool {
+	root, err := queue.ParseRootRef(key)
+	return err == nil && d.s.queue.RootQueued(root)
+}
+
+func (d workspacesDirectory) StopSession(id string) error {
+	res, err := d.s.sessions.StopSession(wire.SessionRequest{ID: id})
+	if err != nil {
+		return err
+	}
+	if res.Refused {
+		return fmt.Errorf("stop session %s: %s", id, res.Message)
+	}
+	return nil
 }
 
 func (d workspacesDirectory) Sessions() []wire.SessionInfo {

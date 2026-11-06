@@ -1467,6 +1467,10 @@ export interface Snapshot {
    */
   workspaces?: Workspace[];
   /**
+   * Held are the held Design and epic keys; filled in by the handler.
+   */
+  held?: string[];
+  /**
    * Placements say where each session sits, keyed by session id; filled in by
    * the handler.
    */
@@ -2758,6 +2762,46 @@ export interface WorkspaceResult {
   reason?: string;
   message?: string;
 }
+/**
+ * HoldRequest holds or unholds a Design or epic. Yes confirms that holding
+ * exits the Design's live sessions.
+ */
+export interface HoldRequest {
+  epic: string;
+  yes?: boolean;
+}
+/**
+ * HoldResult is a hold or unhold: the held keys after it and the sessions it
+ * ended, or a refusal. A refusal for ReasonHoldLiveSessions lists the sessions
+ * that need Yes in Sessions.
+ */
+export interface HoldResult {
+  held: string[];
+  sessions?: string[];
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+/**
+ * Refusal reasons of hold. The queued text is asserted by the web.
+ */
+export const ReasonHoldQueued = "hold-queued";
+/**
+ * Refusal reasons of hold. The queued text is asserted by the web.
+ */
+export const ReasonHoldLiveSessions = "hold-live-sessions";
+/**
+ * Refusal reasons of hold. The queued text is asserted by the web.
+ */
+export const ReasonHoldNotHoldable = "hold-not-holdable";
+/**
+ * Refusal reasons of hold. The queued text is asserted by the web.
+ */
+export const ReasonHoldUnknown = "hold-unknown";
+/**
+ * Refusal reasons of hold. The queued text is asserted by the web.
+ */
+export const HoldQueuedText = "Remove it from the queue first";
 export const ReasonWorkspaceBlankName = "workspace-blank-name";
 export const ReasonWorkspaceNameTaken = "workspace-name-taken";
 export const ReasonWorkspaceUnknown = "workspace-unknown";

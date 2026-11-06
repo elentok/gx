@@ -28,5 +28,7 @@ func Commands(d Deps) []*cobra.Command {
 		newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d), newServerWebResetCmd(d),
 		newServerWebResetAuthenticatorCmd(d), newServerWebLoginsCmd(d), newServerWebRevokeCmd(d), newServerWebPasswordCmd(d),
 		newServerWorkspacesCmd(d),
+		newServerHoldCmd(d),
+		newServerUnholdCmd(d),
 	}
 }

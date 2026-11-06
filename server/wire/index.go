@@ -118,6 +118,8 @@ type Snapshot struct {
 	ViMode bool `json:"vi_mode,omitempty"`
 	// Workspaces are the ordered workspaces; filled in by the handler.
 	Workspaces []Workspace `json:"workspaces,omitempty"`
+	// Held are the held Design and epic keys; filled in by the handler.
+	Held []string `json:"held,omitempty"`
 	// Placements say where each session sits, keyed by session id; filled in by
 	// the handler.
 	Placements []SessionPlacement `json:"placements,omitempty"`
