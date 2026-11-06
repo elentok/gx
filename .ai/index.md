@@ -207,6 +207,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/epics/` holds the epic read models (ticket detail, epic list and detail, epic and design
   cards, map progress, recently finished) and the epic-state predicates, with `Routes()` for
   `tickets/detail`, `epics` and `epics/detail`. The root implements its `Deps`;
+  `server/workspaces/` holds the workspace store: ordered workspaces, membership, hold marks,
+  persisted, publishing `workspaces-changed` (a leaf; imports `broker`, `wire` and `tickets`);
   `server/designs/` holds the Design sessions (open, worktree, delete, and the cleanup the Manager
   and the rescan call back), with `Routes()` for `designs/open`, `designs/delete` and
   `designs/worktree`;
