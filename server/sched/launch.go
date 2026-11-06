@@ -140,8 +140,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	}
 	// A server stop ends the launch prompt's wait, which Serve would otherwise
 	// sit out before it can finish.
-	ctx, release := l.Sessions.Watches.Context()
-	defer release()
+	ctx := one.Context
 	start := func() (agentrunner.Session, error) {
 		return supervise.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
 			Label:           label,
@@ -156,6 +155,15 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 		})
 	}
 	session, err := start()
+	if err != nil && ctx.Err() != nil {
+		// Cut off by the stop: close what came up, and skip the cold-start retry.
+		if session.Label != "" {
+			if serr := deps.Runner.Stop(session); serr != nil {
+				l.Log.Warn("stop launch cut off by shutdown", "ticket", ticket.String(), "err", serr)
+			}
+		}
+		return runs.Run{}, err
+	}
 	if err != nil && resumeID != "" && !errors.Is(err, agentrunner.ErrLabelTaken) {
 		// The conversation may be gone or unreadable: the agent starts over
 		// from the ticket's latest round and handoff. A session that came up

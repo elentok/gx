@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
@@ -20,6 +21,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // ClaimAndLaunch writes the claim to the ticket file first, so markdown stays
@@ -122,8 +124,22 @@ func (l *Launcher) goLaunch(c *claimed) {
 	})
 }
 
-// WaitLaunches waits for the launch goroutines the claim loop started. For tests.
+// WaitLaunches waits for the launch goroutines the claim loop started. Serve
+// calls it at the stop, after the watches close cancel every launch's context.
 func (l *Launcher) WaitLaunches() { l.launching.Wait() }
+
+// handBackStopped gives a launch the server's stop cut off its claim back, as
+// reclaim does for an empty claim after a restart. Its worktree and agent are
+// already gone.
+func (l *Launcher) handBackStopped(ticket tickets.Address, ticketPath string) {
+	const reason = "server stopped during launch"
+	if err := ticketlog.StartOver(ticketPath, time.Now(), reason, ""); err != nil {
+		l.Log.Warn("hand back stopped launch", "ticket", ticket.String(), "err", err)
+		return
+	}
+	l.LogEvent(ticket, runlog.Event{Type: string(events.ClaimReopened), Ticket: ticket.ID, Address: ticket.String(), Reason: reason})
+	l.Events.Publish(wire.EventTicketChanged, ticket.String())
+}
 
 // launchClaimed is the launch half: model choice, the worktree and agent, and
 // the registry updates. It owns c's reservation and gives it back on any end
@@ -144,7 +160,11 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 		return false, nil
 	}
 	answered := c.answered
+	// Cancelled at the server's stop: it cuts the install and the prompt wait short.
+	ctx, release := l.Sessions.Watches.Context()
+	defer release()
 	one := ralphloop.OneIteration{
+		Context: ctx,
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agentKind, Ticket: t, RootBase: c.rootBase, LeafBase: c.leafBase,
 		Model: model, Effort: effort, Sink: l.Writer.FinishSink(ticket, t.Path), StallNudgeDelay: l.Host.StalledNudgeDelay(),
 	}
@@ -176,6 +196,11 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 	})
 	if err != nil {
 		l.Registry.DeleteStarted(ticketAddr, entry.StartedAt)
+		if ctx.Err() != nil {
+			// A stop is not a failure: nothing pauses and nothing is published.
+			l.handBackStopped(ticket, t.Path)
+			return false, nil
+		}
 		// Handing the claim back would make the next tick retry the same failure
 		// forever, so a person is told instead.
 		kind, reason := events.IterationError, "launch failed: "+err.Error()
@@ -190,6 +215,8 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 		l.Events.Publish(wire.EventIterationLaunchFailed, ticketAddr)
 		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
+	// The launch context ends with this function; the settle path outlives it.
+	one.Context = nil
 	l.Registry.Put(runs.TrackedRun{
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), Cwd: wt.Path, TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})

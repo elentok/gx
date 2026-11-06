@@ -619,6 +619,11 @@ func (s *Server) Serve(ctx context.Context) error {
 		recordShutdown(w.name)
 		<-w.done
 	}
+	// The watches' close cancelled every launch in flight; each rolls back, so
+	// this ends without waiting out an install. The claim loop is done, so no
+	// launch starts after it.
+	recordShutdown("wait-launches")
+	s.launcher.WaitLaunches()
 	// A watcher reload still in flight can start a countdown, so stop it after.
 	recordShutdown("config-watch-wait")
 	s.settings.WaitConfigWatch()
