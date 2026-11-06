@@ -30,8 +30,12 @@ func (f *fixture) startChatCapture(o *opts, sc scenario) (func(), error) {
 		"notifications.telegram.bot-token=123456:fake-token",
 		"notifications.telegram.chat-id=\"424242\"",
 	)
+	flush := chatFlushInterval
+	if sc.ChatFlush != "" {
+		flush = sc.ChatFlush
+	}
 	f.env = append(f.env,
-		"GX_CHAT_FLUSH_INTERVAL="+chatFlushInterval,
+		"GX_CHAT_FLUSH_INTERVAL="+flush,
 		"GX_CHAT_TELEGRAM_BASE_URL="+srv.TelegramBaseURL(),
 	)
 	return func() { _ = srv.Close() }, nil

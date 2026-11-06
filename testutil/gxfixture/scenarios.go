@@ -221,6 +221,26 @@ var scenarios = map[string]scenario{
 		Config:   []string{"budget.soft-limit=6", "budget.hard-limit=9", "budget.long-ticket-turns=1"},
 		Env:      []string{"GX_GUARD_POLL=250ms", "GX_BUDGET_KILL_GRACE=100ms"},
 	},
+	// chat-batch: chat-capture with a 5s flush interval (ChatFlush), so a test can
+	// queue several messages inside one tick. The startup messages are the server
+	// start, the session Done (AFK on, a step) and ask-epic's worker question (the
+	// answer), which comes last; a test waits for that post, then within one tick:
+	//   - repair: `gx server tickets pause <project>:manual-epic/01`,
+	//   - server notice: `r.setDisk(t, "free", "5G")` (DiskLow gives the fake disk).
+	"chat-batch": {
+		ChatCapture: true,
+		ChatFlush:   "5s",
+		Chat:        true,
+		DiskLow:     true,
+		Epics: []epic{
+			{Project: project, Name: "ask-epic", Tickets: []ticket{{ID: "01", Slug: "asks", Opts: servertest.TicketOpts{}}}},
+			{Project: project, Name: "manual-epic", Tickets: []ticket{{ID: "01", Slug: "manual", Opts: servertest.TicketOpts{}}}},
+		},
+		Queue:     []string{project + ":ask-epic"},
+		Behaviour: map[string]string{project + ":ask-epic/01": agentfake.BehaviourAsk},
+		Steps:     [][]string{{"afk", "on"}},
+		Sessions:  []sessionSpec{{Project: project, Prompt: "hello"}},
+	},
 	"rejected-first-prompt": spec.RejectedFirstPrompt,
 	"stall-vim":             spec.StallVim,
 	"stall-leaves-i":        spec.StallLeavesI,

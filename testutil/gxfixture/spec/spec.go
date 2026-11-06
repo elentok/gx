@@ -147,6 +147,9 @@ type Scenario struct {
 	// ChatCapture points the server's Slack webhook and Telegram base URL at a
 	// capture endpoint and prints the file it appends to (see chat.go).
 	ChatCapture bool
+	// ChatFlush overrides the capture's short flush interval, so a test can queue
+	// several messages inside one tick.
+	ChatFlush string
 	// Steps are gx argument lists run against the server once the queue is set,
 	// in order; the first failing one stops the fixture.
 	Steps [][]string

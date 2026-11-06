@@ -93,3 +93,28 @@ func TestChatTicketsRepairScenario_StallPauseLandsInTheCaptureFile(t *testing.T)
 		"repair-stall": {"stall-chat-epic/01", "Repair", "did not accept its prompt"},
 	})
 }
+
+func slackPosts(path string) int {
+	n := 0
+	for _, l := range captured(path) {
+		if l.Transport == "slack" {
+			n++
+		}
+	}
+	return n
+}
+
+func TestChatBatchScenario_MessagesQueuedInOneTickArriveInOnePost(t *testing.T) {
+	t.Parallel()
+	r := start(t, "chat-batch")
+	// The worker's question is the last startup message, so once its post is in
+	// the capture the next tick is a few seconds away.
+	waitForParts(t, r, map[string][]string{"answer": {"ask-epic/01", "Answer"}})
+	before := slackPosts(r.ChatCapture)
+	r.gx(t, "server", "tickets", "pause", "demo:manual-epic/01", "--reason", "set aside for the batch check")
+	r.setDisk(t, "free", "5G")
+	waitForParts(t, r, map[string][]string{"batch": {"manual-epic/01", "Repair", "low disk space"}})
+	if got := slackPosts(r.ChatCapture) - before; got != 1 {
+		t.Fatalf("%d posts after the first, want 1", got)
+	}
+}
