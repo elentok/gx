@@ -1044,6 +1044,13 @@ use and free disk space of the gx server's machine. Each icon shows a state; its
 values. The name comes from the macOS menu bar.
 _Avoid_: status area, indicators bar
 
+## Web app shell
+
+**App shell** — the part of the web UI that stays on screen across pages: the top bar, the sidebar
+and the jump menu. Pages render inside it. (The TUI's app shell, in **Tab Caching and Reload**, is
+a different thing.)
+_Avoid_: layout, chrome
+
 ## Web workspaces
 
 **Workspace** — a named theme the person creates to group what they work on now: Designs, epics and
