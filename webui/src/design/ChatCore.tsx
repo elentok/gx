@@ -8,6 +8,7 @@ import type {
   SessionChatMessage,
   SessionChatResponse,
 } from "../generated/server";
+import { ImageViewer } from "./ImageViewer";
 import { sessionImageUrl } from "./sessionImages";
 import { Markdown } from "../markdown/Markdown";
 
@@ -21,8 +22,9 @@ const KIND_NAMES: Record<string, string> = {
 
 const MAX_THUMBS = 3;
 
-// Up to three thumbnails; the rest fold into a "+N" tile on the third. The full-size view is a later ticket.
+// Up to three thumbnails; the rest fold into a "+N" tile on the third. A tap opens the full-size view at that image.
 function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sessionId: string }) {
+  const [viewing, setViewing] = useState<number>();
   const shown = images.length > MAX_THUMBS ? images.slice(0, MAX_THUMBS) : images;
   const extra = images.length - shown.length;
   const tile = { w: "100%", h: "100%", minH: "0", borderRadius: "md", overflow: "hidden", display: "block", p: "0", border: "0" };
@@ -48,6 +50,7 @@ function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sess
             aria-label={last ? `${label}, ${extra} more` : label}
             bg="surface"
             cursor="pointer"
+            onClick={() => setViewing(i)}
             position="relative"
             gridRow={shown.length >= 3 && i === 0 ? "1 / 3" : undefined}
             {...tile}
@@ -81,6 +84,9 @@ function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sess
           </Box>
         );
       })}
+      {viewing !== undefined && (
+        <ImageViewer images={images} sessionId={sessionId} start={viewing} onClose={() => setViewing(undefined)} />
+      )}
     </Box>
   );
 }

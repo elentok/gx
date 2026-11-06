@@ -831,6 +831,27 @@ test.each([
   expect(img.getAttribute("decoding")).toBe("async");
 });
 
+test("a tap on the second of three thumbnails opens the viewer at 2 of 3, Close returns to the chat", async () => {
+  renderChat([session()], okChat(chatOf([withImages(3, "look")])));
+  await screen.findByText("look");
+  fireEvent.click(within(thumbs()).getByRole("button", { name: "Image 2 of 3" }));
+  const dialog = screen.getByRole("dialog", { name: "Image" });
+  expect(within(dialog).getByText("2 of 3")).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: /Close/ }));
+  expect(screen.queryByRole("dialog", { name: "Image" })).toBeNull();
+});
+
+test("with ten images the +N tile opens the viewer and Next reaches the tenth", async () => {
+  renderChat([session()], okChat(chatOf([withImages(10, "look")])));
+  await screen.findByText("look");
+  fireEvent.click(within(thumbs()).getByRole("button", { name: "Image 3 of 10, 7 more" }));
+  const dialog = screen.getByRole("dialog", { name: "Image" });
+  for (let i = 0; i < 7; i++) fireEvent.click(within(dialog).getByRole("button", { name: /Next/ }));
+  expect(within(dialog).getByText("10 of 10")).toBeTruthy();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog", { name: "Image" })).toBeNull();
+});
+
 test("an images-only prompt draws the grid and no text", async () => {
   renderChat([session()], okChat(chatOf([withImages(2)])));
   await waitFor(() => expect(thumbs()).toBeTruthy());
