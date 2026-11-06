@@ -261,7 +261,7 @@ func TestCodex_SlashCommandWritesAUserMessageAndNoTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	chat, err := codexsession.ReadChat(f)
+	chat, err := codexsession.ReadChat(f, "")
 	if err != nil {
 		t.Fatal(err)
 	}

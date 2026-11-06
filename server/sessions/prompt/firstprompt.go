@@ -303,7 +303,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 	caps.ResendEvery = cmp.Or(f.p.cfg.LaunchProofCaps.ResendEvery, caps.ResendEvery)
 	p := claudeui.LaunchProof{
 		FirstUser: func() (string, bool, error) {
-			msgs, _, err := transcript.ReadChat(path)
+			msgs, _, err := transcript.ReadChat(path, "")
 			if err != nil {
 				return "", false, err
 			}

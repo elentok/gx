@@ -26,15 +26,15 @@ type Result struct {
 
 // Read reads a conversation of harness kind from r. Every kind but Codex
 // writes the Claude format.
-func Read(kind agentrunner.Kind, r io.Reader, opts ...transcript.ChatOption) (Result, error) {
+func Read(kind agentrunner.Kind, r io.Reader, imagesDir string) (Result, error) {
 	if kind == harness.Codex {
-		chat, err := codexsession.ReadChat(r, opts...)
+		chat, err := codexsession.ReadChat(r, imagesDir)
 		if err != nil {
 			return Result{}, err
 		}
 		return Result{Messages: chat.Messages, Unreadable: chat.Unreadable(), CodexVersion: chat.Version}, nil
 	}
-	msgs, err := transcript.ReadChatFrom(r, opts...)
+	msgs, err := transcript.ReadChatFrom(r, imagesDir)
 	return Result{Messages: msgs}, err
 }
 
@@ -43,7 +43,7 @@ const maxArchiveBytes = 256 << 20
 
 // ReadZstdFile decodes the zstd file at path in memory and reads it as Read
 // does. A corrupt file is an error; a decode stops at maxArchiveBytes.
-func ReadZstdFile(kind agentrunner.Kind, path string, opts ...transcript.ChatOption) (Result, error) {
+func ReadZstdFile(kind agentrunner.Kind, path, imagesDir string) (Result, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return Result{}, err
@@ -54,12 +54,12 @@ func ReadZstdFile(kind agentrunner.Kind, path string, opts ...transcript.ChatOpt
 		return Result{}, err
 	}
 	defer dec.Close()
-	return Read(kind, io.LimitReader(dec, maxArchiveBytes), opts...)
+	return Read(kind, io.LimitReader(dec, maxArchiveBytes), imagesDir)
 }
 
 // ReadFile is Read over the file at path. ok is false if the file doesn't
 // exist yet.
-func ReadFile(kind agentrunner.Kind, path string, opts ...transcript.ChatOption) (res Result, ok bool, err error) {
+func ReadFile(kind agentrunner.Kind, path, imagesDir string) (res Result, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -68,6 +68,6 @@ func ReadFile(kind agentrunner.Kind, path string, opts ...transcript.ChatOption)
 		return Result{}, false, err
 	}
 	defer f.Close()
-	res, err = Read(kind, f, opts...)
+	res, err = Read(kind, f, imagesDir)
 	return res, err == nil, err
 }

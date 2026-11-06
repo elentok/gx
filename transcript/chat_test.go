@@ -32,7 +32,7 @@ func TestReadChat_ShowsVisibleAndHidesTheRest(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	msgs, ok, err := ReadChat(path)
+	msgs, ok, err := ReadChat(path, "")
 	if err != nil || !ok {
 		t.Fatalf("ReadChat = %v, %v", ok, err)
 	}
@@ -70,7 +70,7 @@ func TestReadChat_CommandOutput(t *testing.T) {
 		line("c3", "<command-name>/big</command-name><command-args></command-args>"),
 		line("o3", "<local-command-stdout>"+strings.Repeat("x", MaxCommandOutputBytes+100)+"</local-command-stdout>"),
 	}
-	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n") + "\n"))
+	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n")+"\n"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,8 +92,20 @@ func TestReadChat_CommandOutput(t *testing.T) {
 	}
 }
 
+func TestForEachLine_NoLineCapAndUnterminatedLast(t *testing.T) {
+	big := strings.Repeat("x", 11<<20)
+	var got []string
+	err := ForEachLine(strings.NewReader(big+"\nlast"), func(l []byte) { got = append(got, string(l)) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{big + "\n", "last"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %d lines, lens %d/%d", len(got), len(got[0]), len(got[len(got)-1]))
+	}
+}
+
 func TestReadChat_MissingFile(t *testing.T) {
-	_, ok, err := ReadChat(filepath.Join(t.TempDir(), "none.jsonl"))
+	_, ok, err := ReadChat(filepath.Join(t.TempDir(), "none.jsonl"), "")
 	if ok || err != nil {
 		t.Fatalf("ReadChat = %v, %v", ok, err)
 	}
@@ -103,7 +115,7 @@ func TestReadChat_ToolRunKeepsOneLinePerCall(t *testing.T) {
 	lines := []string{
 		`{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls -la"}},{"type":"tool_use","name":"Read","input":{"file_path":"/x/a.go"}},{"type":"tool_use","name":"TodoWrite","input":{}}]}}`,
 	}
-	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n") + "\n"))
+	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n")+"\n"), "")
 	if err != nil || len(msgs) != 1 {
 		t.Fatalf("ReadChatFrom = %+v, %v", msgs, err)
 	}

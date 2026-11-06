@@ -127,7 +127,7 @@ func checkRolloutReader(in Input) (string, bool) {
 		if problem := CheckRollout(r.Data); problem != "" {
 			return fmt.Sprintf("%s: %s", r.Name, problem), false
 		}
-		if _, err := codexsession.ReadChat(bytes.NewReader(r.Data)); err != nil {
+		if _, err := codexsession.ReadChat(bytes.NewReader(r.Data), ""); err != nil {
 			return fmt.Sprintf("%s: codexsession cannot read it: %v", r.Name, err), false
 		}
 	}

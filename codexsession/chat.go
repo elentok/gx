@@ -1,7 +1,6 @@
 package codexsession
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -99,11 +98,9 @@ var imageOpenRE = regexp.MustCompile(`^<image\b[^>]*\bpath="([^"]*)"`)
 // ReadChat turns a rollout into the visible messages: agent text, the person's
 // prompts, folded tool runs and compactions. Reasoning, developer and injected
 // lines stay hidden and unknown lines are skipped. A message's ID is its
-// line's ordinal ("o20"), or "l<line>" when the line has none. Lines have no
-// size cap: an image line is megabytes of base64.
-func ReadChat(r io.Reader, opts ...transcript.ChatOption) (Chat, error) {
-	imagesDir := transcript.ImagesDir(opts)
-	br := bufio.NewReaderSize(r, 64*1024)
+// line's ordinal ("o20"), or "l<line>" when the line has none. imagesDir is the
+// session's images folder; "" means none.
+func ReadChat(r io.Reader, imagesDir string) (Chat, error) {
 	var chat Chat
 	var run *transcript.ChatMessage
 	flush := func() {
@@ -112,15 +109,12 @@ func ReadChat(r io.Reader, opts ...transcript.ChatOption) (Chat, error) {
 			run = nil
 		}
 	}
-	for n, eof := 1, false; !eof; n++ {
-		raw, readErr := br.ReadBytes('\n')
-		if readErr != nil && readErr != io.EOF {
-			return Chat{}, readErr
-		}
-		eof = readErr == io.EOF
+	n := 0
+	err := transcript.ForEachLine(r, func(raw []byte) {
+		n++
 		var line chatRolloutLine
 		if json.Unmarshal(raw, &line) != nil {
-			continue
+			return
 		}
 		id := fmt.Sprintf("l%d", n)
 		if line.Ordinal != nil {
@@ -180,7 +174,7 @@ func ReadChat(r io.Reader, opts ...transcript.ChatOption) (Chat, error) {
 				}
 			}
 			if len(texts) == 0 && len(images) == 0 {
-				continue
+				return
 			}
 			flush()
 			msg := transcript.ChatMessage{ID: id, Text: strings.Join(texts, "\n\n"), Images: images, At: at}
@@ -194,6 +188,9 @@ func ReadChat(r io.Reader, opts ...transcript.ChatOption) (Chat, error) {
 			}
 			chat.Messages = append(chat.Messages, msg)
 		}
+	})
+	if err != nil {
+		return Chat{}, err
 	}
 	flush()
 	return chat, nil

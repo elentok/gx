@@ -26,7 +26,7 @@ func imageMetaLine(promptID string, paths ...string) string {
 
 func readLines(t *testing.T, dir string, lines ...string) []ChatMessage {
 	t.Helper()
-	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n")+"\n"), WithImagesDir(dir))
+	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n")+"\n"), dir)
 	if err != nil {
 		t.Fatal(err)
 	}

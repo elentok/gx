@@ -13,7 +13,7 @@ import (
 
 func readFixture(t *testing.T, name string) chatreader.Result {
 	t.Helper()
-	res, ok, err := chatreader.ReadFile(harness.Codex, "testdata/"+name)
+	res, ok, err := chatreader.ReadFile(harness.Codex, "testdata/"+name, "")
 	if err != nil || !ok {
 		t.Fatalf("ReadFile(%s) = %v, %v", name, ok, err)
 	}
@@ -22,7 +22,7 @@ func readFixture(t *testing.T, name string) chatreader.Result {
 
 func readCodex(t *testing.T, lines ...string) chatreader.Result {
 	t.Helper()
-	res, err := chatreader.Read(harness.Codex, strings.NewReader(strings.Join(lines, "\n")+"\n"))
+	res, err := chatreader.Read(harness.Codex, strings.NewReader(strings.Join(lines, "\n")+"\n"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestCodex_TurnsWithoutMessagesAreUnreadable(t *testing.T) {
 func TestClaude_ReadsThroughTheDispatcher(t *testing.T) {
 	t.Parallel()
 	res, err := chatreader.Read(harness.Claude, strings.NewReader(
-		`{"type":"assistant","uuid":"a1","message":{"content":[{"type":"text","text":"hi"}]}}`+"\n"))
+		`{"type":"assistant","uuid":"a1","message":{"content":[{"type":"text","text":"hi"}]}}`+"\n"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestClaude_ImagesDirOptionReachesTheParser(t *testing.T) {
 	res, err := chatreader.Read(harness.Claude, strings.NewReader(
 		`{"type":"user","uuid":"u1","promptId":"p","message":{"content":[{"type":"text","text":"[Image #1] hi"},{"type":"image","source":{}}]}}`+"\n"+
 			`{"type":"user","isMeta":true,"promptId":"p","message":{"content":[{"type":"text","text":"[Image: source: `+path+`]"}]}}`+"\n"),
-		transcript.WithImagesDir(dir))
+		dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestClaude_ImagesDirOptionReachesTheParser(t *testing.T) {
 
 func TestReadFile_MissingFile(t *testing.T) {
 	t.Parallel()
-	if _, ok, err := chatreader.ReadFile(harness.Codex, "testdata/nope.jsonl"); ok || err != nil {
+	if _, ok, err := chatreader.ReadFile(harness.Codex, "testdata/nope.jsonl", ""); ok || err != nil {
 		t.Errorf("ok = %v, err = %v, want false, nil", ok, err)
 	}
 }

@@ -79,7 +79,7 @@ const ImagesDir = "images"
 // session's state dir, whose images folder the chat's saved images sit in.
 func Loader(kind agentrunner.Kind, ticket, sessionDir string, final bool) func(string) (Snapshot, error) {
 	return func(path string) (Snapshot, error) {
-		read, _, err := chatreader.ReadFile(kind, path, transcript.WithImagesDir(filepath.Join(sessionDir, ImagesDir)))
+		read, _, err := chatreader.ReadFile(kind, path, filepath.Join(sessionDir, ImagesDir))
 		if err != nil {
 			return Snapshot{}, err
 		}

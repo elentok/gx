@@ -111,7 +111,7 @@ func designRecord(root, project string, r conversations.Record) bool {
 // designEpic is the epic named by the first /gx-design command of the
 // transcript at path, or "" when it has none.
 func designEpic(path string) (string, error) {
-	msgs, _, err := transcript.ReadChat(path)
+	msgs, _, err := transcript.ReadChat(path, "")
 	for _, m := range msgs {
 		if m.Kind != transcript.ChatKindCommand {
 			continue

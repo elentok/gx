@@ -81,7 +81,7 @@ func (f launchFixture) transcript() string {
 
 // launchRecords counts the transcript's person messages that are the launch command.
 func (f launchFixture) launchRecords() int {
-	msgs, _, _ := transcript.ReadChat(transcript.PathIn(f.home, f.dir, f.conv))
+	msgs, _, _ := transcript.ReadChat(transcript.PathIn(f.home, f.dir, f.conv), "")
 	n := 0
 	for _, m := range msgs {
 		if m.Role == transcript.ChatRolePerson && m.Text == launchPrompt {

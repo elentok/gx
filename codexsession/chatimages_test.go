@@ -45,7 +45,7 @@ func savedPNG(t *testing.T, dir, name string) string {
 
 func readImages(t *testing.T, dir string, lines ...string) []transcript.ChatMessage {
 	t.Helper()
-	chat, err := ReadChat(strings.NewReader(strings.Join(lines, "\n")+"\n"), transcript.WithImagesDir(dir))
+	chat, err := ReadChat(strings.NewReader(strings.Join(lines, "\n")+"\n"), dir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -57,7 +57,7 @@ func (p *Registry) LastCodexText(id string) (string, bool, error) {
 	if err != nil || !ok {
 		return "", false, err
 	}
-	res, _, err := chatreader.ReadFile(harness.Codex, path)
+	res, _, err := chatreader.ReadFile(harness.Codex, path, "")
 	if err != nil {
 		return "", false, err
 	}

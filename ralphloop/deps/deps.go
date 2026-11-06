@@ -371,7 +371,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			if !found {
 				return false, false, nil
 			}
-			msgs, ok, err := transcript.ReadChat(path)
+			msgs, ok, err := transcript.ReadChat(path, "")
 			if err != nil || !ok {
 				return false, ok, err
 			}

@@ -602,7 +602,7 @@ func TestTUIClaude_CommandOutputControlWritesCaveatAndStdout(t *testing.T) {
 			if !strings.Contains(string(data), "local-command-caveat") {
 				t.Errorf("transcript lacks the caveat line: %s", data)
 			}
-			msgs, ok, err := transcript.ReadChat(path)
+			msgs, ok, err := transcript.ReadChat(path, "")
 			if err != nil || !ok {
 				t.Fatalf("ReadChat = %v, %v", ok, err)
 			}

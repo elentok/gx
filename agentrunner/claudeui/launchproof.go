@@ -65,7 +65,7 @@ func FirstUserRecord(home, sessionID string) (string, bool, error) {
 	if err != nil || len(paths) != 1 {
 		return "", false, err
 	}
-	msgs, _, err := transcript.ReadChat(paths[0])
+	msgs, _, err := transcript.ReadChat(paths[0], "")
 	if err != nil {
 		return "", false, err
 	}

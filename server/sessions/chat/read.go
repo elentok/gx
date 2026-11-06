@@ -9,7 +9,6 @@ import (
 	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/transcript"
 )
 
 // readable resolves a read's session id, or answers the refusal or error and
@@ -59,7 +58,7 @@ func (c *Chat) archiveRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no archived rollout for this session", http.StatusNotFound)
 		return
 	}
-	read, err := chatreader.ReadZstdFile(harness.Codex, path, transcript.WithImagesDir(filepath.Join(dir, ImagesDir)))
+	read, err := chatreader.ReadZstdFile(harness.Codex, path, filepath.Join(dir, ImagesDir))
 	if err != nil {
 		http.Error(w, "cannot decode the archived rollout: "+err.Error(), http.StatusUnprocessableEntity)
 		return

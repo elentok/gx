@@ -16,7 +16,7 @@ func TestReadChat_SlashAndGxMessagesAreCommands(t *testing.T) {
 		user("plan the work"),
 		user("$gx-implement x"),
 	}
-	chat, err := ReadChat(strings.NewReader(strings.Join(lines, "\n") + "\n"))
+	chat, err := ReadChat(strings.NewReader(strings.Join(lines, "\n")+"\n"), "")
 	if err != nil {
 		t.Fatal(err)
 	}

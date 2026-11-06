@@ -57,17 +57,6 @@ type ChatImage struct {
 	Placeholder bool
 }
 
-// ChatOption configures a chat read.
-type ChatOption func(*chatOptions)
-
-type chatOptions struct{ imagesDir string }
-
-// WithImagesDir sets the session's images folder, which a pasted image's source
-// path must sit in to count as a saved image.
-func WithImagesDir(dir string) ChatOption {
-	return func(o *chatOptions) { o.imagesDir = dir }
-}
-
 // TrailingAgentTexts lists the agent text messages after the person's last
 // message, newest first.
 func TrailingAgentTexts(msgs []ChatMessage) []string {
@@ -146,8 +135,10 @@ const taskNotificationPrefix = "<task-notification>"
 // lines, attachments, compact summaries, sidechains and tool results stay
 // hidden. Each run of tool calls between two visible messages folds into one
 // tools entry, and a compaction becomes a compacted entry. ok is false if the
-// file doesn't exist yet.
-func ReadChat(path string, opts ...ChatOption) (msgs []ChatMessage, ok bool, err error) {
+// file doesn't exist yet. imagesDir is the session's images folder, which a
+// pasted image's source path must sit in to count as a saved image; "" means
+// none.
+func ReadChat(path, imagesDir string) (msgs []ChatMessage, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -156,7 +147,7 @@ func ReadChat(path string, opts ...ChatOption) (msgs []ChatMessage, ok bool, err
 		return nil, false, err
 	}
 	defer f.Close()
-	msgs, err = ReadChatFrom(f, opts...)
+	msgs, err = ReadChatFrom(f, imagesDir)
 	if err != nil {
 		return nil, false, err
 	}
@@ -164,13 +155,8 @@ func ReadChat(path string, opts ...ChatOption) (msgs []ChatMessage, ok bool, err
 }
 
 // ReadChatFrom is ReadChat over an open transcript, for callers that hold the
-// bytes in memory. Lines have no size cap: an image line is megabytes of base64.
-func ReadChatFrom(r io.Reader, opts ...ChatOption) (msgs []ChatMessage, err error) {
-	var o chatOptions
-	for _, opt := range opts {
-		opt(&o)
-	}
-	br := bufio.NewReaderSize(r, 64*1024)
+// bytes in memory.
+func ReadChatFrom(r io.Reader, imagesDir string) (msgs []ChatMessage, err error) {
 	var run *ChatMessage
 	// pending is the image message whose source-path line (isMeta, same
 	// promptId) may still follow; its images start as placeholders.
@@ -184,7 +170,7 @@ func ReadChatFrom(r io.Reader, opts ...ChatOption) (msgs []ChatMessage, err erro
 	}
 	handle := func(line chatLine) {
 		if line.IsMeta && pendingIdx >= 0 && line.PromptID == pendingPrompt {
-			resolveImages(&msgs[pendingIdx], line, o.imagesDir)
+			resolveImages(&msgs[pendingIdx], line, imagesDir)
 			pendingIdx = -1
 		}
 		if line.Type == "system" && line.Subtype == compactBoundarySubtype {
@@ -208,21 +194,37 @@ func ReadChatFrom(r io.Reader, opts ...ChatOption) (msgs []ChatMessage, err erro
 			run.Calls = append(run.Calls, call.Summary())
 		}
 	}
-	for {
-		raw, readErr := br.ReadBytes('\n')
-		if readErr != nil && readErr != io.EOF {
-			return nil, readErr
-		}
+	err = ForEachLine(r, func(raw []byte) {
 		var line chatLine
 		if json.Unmarshal(bytes.TrimSpace(raw), &line) == nil {
 			handle(line)
 		}
-		if readErr == io.EOF {
-			break
-		}
+	})
+	if err != nil {
+		return nil, err
 	}
 	flush()
 	return msgs, nil
+}
+
+// ForEachLine calls fn with each line of r, newline included; a last line with
+// no newline is still delivered. Lines have no size cap on purpose: an image
+// line is megabytes of base64, which a bufio.Scanner limit would reject. fn
+// must not keep the slice.
+func ForEachLine(r io.Reader, fn func(line []byte)) error {
+	br := bufio.NewReaderSize(r, 64*1024)
+	for {
+		raw, err := br.ReadBytes('\n')
+		if len(raw) > 0 {
+			fn(raw)
+		}
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
 }
 
 // resolveImages pairs the Nth image of msg with the Nth "[Image: source: path]"
@@ -242,15 +244,6 @@ func resolveImages(msg *ChatMessage, meta chatLine, imagesDir string) {
 
 // StripImageChips removes the "[Image #N]" chips from a prompt's text.
 func StripImageChips(text string) string { return imageChipRE.ReplaceAllString(text, "") }
-
-// ImagesDir returns the images folder the options set, or "".
-func ImagesDir(opts []ChatOption) string {
-	var o chatOptions
-	for _, opt := range opts {
-		opt(&o)
-	}
-	return o.imagesDir
-}
 
 // SavedImage maps a pasted image's source path to a saved image, or to a
 // placeholder when the path is outside imagesDir or the file is gone.

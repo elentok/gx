@@ -27,7 +27,7 @@ func Recount(root string, homes Homes, kind agentrunner.Kind, id, dir string) er
 	if err != nil || !ok {
 		return err
 	}
-	res, ok, err := chatreader.ReadFile(kind, path)
+	res, ok, err := chatreader.ReadFile(kind, path, "")
 	if err != nil || !ok {
 		return err
 	}
