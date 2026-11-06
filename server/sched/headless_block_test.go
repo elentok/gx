@@ -80,7 +80,7 @@ func TestHeadlessBlock_PauseRaisesNotification(t *testing.T) {
 	_, ticketPath, turn := startBlockable(t, "headless", chat)
 	turn.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "r1", Tool: "Bash", Input: []byte(`{"command":"ls"}`)})
 	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
-	if got := waitForChat(count, "blocked-pane"); got != 1 {
+	if got := waitForChat(count, "The agent waits on a permission prompt."); got != 1 {
 		t.Errorf("blocked-pane notification sent %d times, want once", got)
 	}
 }

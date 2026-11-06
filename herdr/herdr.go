@@ -138,6 +138,12 @@ type AgentNotFoundError struct {
 	wrapped error
 }
 
+// NewAgentNotFoundError builds the error around the failure that carried it,
+// for fakes that stand in for herdr.
+func NewAgentNotFoundError(message string, cause error) *AgentNotFoundError {
+	return &AgentNotFoundError{Message: message, wrapped: cause}
+}
+
 func (e *AgentNotFoundError) Error() string { return e.wrapped.Error() }
 func (e *AgentNotFoundError) Unwrap() error { return e.wrapped }
 

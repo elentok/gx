@@ -211,6 +211,9 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 		} else if k, ok := supervise.LaunchFailureKind(err); ok {
 			kind = k
 		}
+		if kind == events.IterationError {
+			reason = markedIterationReason(err, reason)
+		}
 		if perr := l.Writer.Pause(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
 			err = errors.Join(err, fmt.Errorf("pause: %w", perr))
 		}
@@ -389,7 +392,7 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 	if err != nil {
 		l.Log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
 		// Pause it: a claimed ticket nobody is working on is stuck, not failed.
-		if perr := l.Writer.Pause(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error(), run); perr != nil {
+		if perr := l.Writer.Pause(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, markedIterationReason(err, err.Error()), run); perr != nil {
 			l.Log.Warn("pause failed finish", "ticket", ticketAddr, "err", perr)
 		}
 		l.Events.Publish(wire.EventIterationFailed, ticketAddr)

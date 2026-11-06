@@ -10,6 +10,13 @@ import "strings"
 // (kind, marker) to a sentence. Detail after the marker is free text.
 type Marker string
 
+// Markers for iteration-error pauses whose cause a typed error identifies.
+const (
+	StallNudgeMarker  Marker = "stall-nudge"
+	SessionDiedMarker Marker = "session-died"
+	HerdrLostMarker   Marker = "herdr-agent-lost"
+)
+
 // markerSep ends the marker; the detail follows it.
 const markerSep = ": "
 

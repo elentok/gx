@@ -148,7 +148,7 @@ func (r *Reclaimer) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner
 		if err != nil {
 			return err
 		}
-		return r.host.Pause(dir, addr, t.TicketPath, events.IterationError, nativerunner.ReasonAgentDied, t.Run)
+		return r.host.Pause(dir, addr, t.TicketPath, events.IterationError, events.SessionDiedMarker.Reason(nativerunner.ReasonAgentDied), t.Run)
 	}
 	one, wt, mode, err := r.Resume(t)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 const (
 	selfReportedNoQuestion = "The agent asked for help but left no question. Open the ticket to read its notes."
 	zeroCommitSentence     = "The agent finished with no commits and gave no reason."
+	stalledSentence        = "The agent did not accept its prompt."
 	blockedPaneSentence    = "The agent waits on a permission prompt. Approve or deny it on the ticket card."
 
 	// fallbackMax is the longest first line shown whole.
@@ -27,7 +28,11 @@ type markedPause struct {
 
 // markedPauses lists the marker-keyed sentences, checked before the kind-only
 // families.
-var markedPauses []markedPause
+var markedPauses = []markedPause{
+	{events.IterationError, events.StallNudgeMarker, stalledSentence},
+	{events.IterationError, events.SessionDiedMarker, "The agent session ended unexpectedly."},
+	{events.IterationError, events.HerdrLostMarker, "herdr lost track of the agent."},
+}
 
 // PauseChatDetail is the chat sentence for a pause. A self-reported pause with
 // an open question shows the agent's own summary.
@@ -51,6 +56,8 @@ func pauseSentence(ticketPath string, kind events.Kind, reason string, marked []
 			}
 		}
 		return selfReportedNoQuestion
+	case events.AgentPromptStalled:
+		return stalledSentence
 	case events.ZeroCommit:
 		return zeroCommitSentence
 	case events.BlockedPane:
