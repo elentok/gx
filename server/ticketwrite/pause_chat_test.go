@@ -42,6 +42,7 @@ func TestPauseChatDetail_Families(t *testing.T) {
 		{"stall nudge text changed", "", events.IterationError, events.StallNudgeMarker.Reason("reworded"), stalledSentence},
 		{"session died", "", events.IterationError, events.SessionDiedMarker.Reason("holder socket /tmp/x.sock timeout"), "The agent session ended unexpectedly."},
 		{"herdr lost", "", events.IterationError, events.HerdrLostMarker.Reason("herdr agent get: {\"error\":1}"), "herdr lost track of the agent."},
+		{"worktree exists", "", events.IterationError, events.WorktreeExists.Reason("launch failed: creating iteration worktree: exit 128"), "The ticket's worktree folder already exists."},
 		{"unmatched", "", events.BudgetKilled, "daily budget hard limit reached", "daily budget hard limit reached"},
 		{"empty reason", "", events.BudgetKilled, "", ""},
 		{"multi-line", "", events.AmbiguousBase, "first\nsecond", "first"},

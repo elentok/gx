@@ -32,6 +32,7 @@ var markedPauses = []markedPause{
 	{events.IterationError, events.StallNudgeMarker, stalledSentence},
 	{events.IterationError, events.SessionDiedMarker, "The agent session ended unexpectedly."},
 	{events.IterationError, events.HerdrLostMarker, "herdr lost track of the agent."},
+	{events.IterationError, events.WorktreeExists, "The ticket's worktree folder already exists."},
 }
 
 // PauseChatDetail is the chat sentence for a pause. A self-reported pause with

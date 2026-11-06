@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,6 +94,24 @@ func AddWorktree(repo Repo, newName, newPath, fromRef string) error {
 		args = append(args, fromRef)
 	}
 	_, _, err := run.Exec(repo.Root, args)
+	return markWorktreeExists(err, newPath)
+}
+
+// WorktreeExistsError is a `git worktree add` that failed because the target
+// folder already exists. A branch that is checked out elsewhere is a different
+// failure and stays a plain git error.
+type WorktreeExistsError struct{ err error }
+
+func (e *WorktreeExistsError) Error() string { return e.err.Error() }
+func (e *WorktreeExistsError) Unwrap() error { return e.err }
+
+// markWorktreeExists keys on git's "'<path>' already exists" line, which names
+// the folder; the branch variant ("a branch named 'x' already exists") does not.
+func markWorktreeExists(err error, path string) error {
+	var re *run.RunError
+	if errors.As(err, &re) && strings.Contains(re.Stderr, "fatal: '"+path+"' already exists") {
+		return &WorktreeExistsError{err: err}
+	}
 	return err
 }
 
@@ -115,7 +134,7 @@ func AddWorktreeOnBranch(repo Repo, branch, newPath string) error {
 		return err
 	}
 	_, _, err := run.Exec(repo.Root, []string{"worktree", "add", newPath, branch})
-	return err
+	return markWorktreeExists(err, newPath)
 }
 
 // worktreeExcludeEntry computes the .git/info/exclude entry for repo's

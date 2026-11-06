@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -13,7 +14,10 @@ import (
 // can word it plainly while the ticket file keeps the whole reason.
 func markedIterationReason(err error, text string) string {
 	var lost *herdr.AgentNotFoundError
+	var exists *git.WorktreeExistsError
 	switch {
+	case errors.As(err, &exists):
+		return events.WorktreeExists.Reason(text)
 	case errors.Is(err, agentrunner.ErrNotDelivered):
 		return events.StallNudgeMarker.Reason(text)
 	case errors.Is(err, agentrunner.ErrSessionDied):

@@ -15,6 +15,7 @@ const (
 	StallNudgeMarker  Marker = "stall-nudge"
 	SessionDiedMarker Marker = "session-died"
 	HerdrLostMarker   Marker = "herdr-agent-lost"
+	WorktreeExists    Marker = "worktree-exists"
 )
 
 // markerSep ends the marker; the detail follows it.

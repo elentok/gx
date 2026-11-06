@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -104,6 +105,36 @@ func TestAddWorktree(t *testing.T) {
 	}
 	if wts[0].Branch != "feature" {
 		t.Errorf("Branch = %q, want %q", wts[0].Branch, "feature")
+	}
+}
+
+func TestAddWorktree_existingFolderIsTyped(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoLight(t)
+	repo, _ := git.FindRepo(repoDir)
+	taken := filepath.Join(repoDir, "taken")
+	if err := os.MkdirAll(filepath.Join(taken, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(taken, "sub", "f"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := git.AddWorktree(*repo, "taken", taken, "main")
+	var exists *git.WorktreeExistsError
+	if !errors.As(err, &exists) {
+		t.Fatalf("AddWorktree on existing folder = %v, want *WorktreeExistsError", err)
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("reason text lost: %v", err)
+	}
+
+	// A branch that already exists is a different failure.
+	other := filepath.Join(repoDir, "other")
+	err = git.AddWorktree(*repo, "main", other, "main")
+	var again *git.WorktreeExistsError
+	if err == nil || errors.As(err, &again) {
+		t.Errorf("duplicate branch = %v, want a plain git error", err)
 	}
 }
 

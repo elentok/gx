@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server/servertest"
@@ -17,15 +18,30 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+func mustFindRepo(t *testing.T, dir string) *git.Repo {
+	t.Helper()
+	repo, err := git.FindRepo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return repo
+}
+
 // A launch that fails with a typed cause reaches Chat as one plain sentence,
 // while the ticket file keeps the full reason.
 func TestLaunchFailure_TypedCausesReachChatAsSentences(t *testing.T) {
 	t.Parallel()
+	taken := t.TempDir() // git only refuses a folder that is not empty
+	if err := os.WriteFile(filepath.Join(taken, "f"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	existsErr := git.AddWorktree(*mustFindRepo(t, testutil.TempRepo(t)), "taken", taken, "HEAD")
 	cases := []struct {
 		name     string
 		err      error
 		sentence string
 	}{
+		{"worktree exists", existsErr, "The ticket's worktree folder already exists."},
 		{"session died", agentrunner.SessionDied("holder socket /tmp/gx-holder.sock timeout"), "The agent session ended unexpectedly."},
 		{"herdr lost", herdr.NewAgentNotFoundError("agent_not_found", errors.New("herdr agent get: agent_not_found")), "herdr lost track of the agent."},
 	}
