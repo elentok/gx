@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -200,18 +200,12 @@ func (rec *Recovery) escalate(plan recoveryPlan, f recovery.Failure, reason, out
 		// A --wait on the ticket reads the hold, so it must hear the escalation.
 		rec.d.Events.Publish(wire.EventTicketChanged, f.Address)
 	}
-	why, entry, report := reason, "no match", ref.Ticket.Path
-	if outcome != "" {
-		why += ": " + outcome
+	// The entry and report stay in the run log; Chat gets the failure's pause wording only.
+	failure := ""
+	if ref.Ticket.Path != "" {
+		failure = ticketwrite.PauseChatDetail(ref.Ticket.Path, f.Kind, f.Reason)
 	}
-	if plan.matched {
-		entry = plan.entry.ID
-	}
-	if report == "" {
-		report = filepath.Join(ref.ProjectDir, ref.Addr.Epic)
-	}
-	detail := fmt.Sprintf("%s: %s\n%s\nentry: %s\nreport: %s", f.Kind, f.Reason, why, entry, report)
-	rec.d.Chat.Escalated(ref.Addr.Project, rec.d.Projects.ChatOverride(ref.Addr.Project), ref.Addr.Epic, ref.Ticket.Path, ref.Addr.ID, detail)
+	rec.d.Chat.Escalated(ref.Addr.Project, rec.d.Projects.ChatOverride(ref.Addr.Project), ref.Addr.Epic, ref.Ticket.Path, ref.Addr.ID, failure)
 }
 
 // HoldPauseForRecovery starts whatever recovery the pause gets and, when a rule

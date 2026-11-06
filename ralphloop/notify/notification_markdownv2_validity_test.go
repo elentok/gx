@@ -49,6 +49,8 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 		"ticketPauseMessage/answer":        ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyAnswer), "No commits merged (yet).").Text(chatmarkup.Telegram),
 		"ticketPauseMessage/repair":        ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyRepair), "Operator intervention required.").Text(chatmarkup.Telegram),
 		"conflictStartedMessage":           conflictStartedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
+		"escalatedMessage/ticket":          escalatedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, "No commits merged (yet).").Text(chatmarkup.Telegram),
+		"escalatedMessage/epic":            escalatedMessage(adversarialEpic, adversarialEpic, "", "", "").Text(chatmarkup.Telegram),
 		"epicOutcomeText":                  telegramStyle.epicOutcomeText("\U0001f389", "epic complete", adversarialEpic, overflowCounts, 5, 492, fractionalCost),
 		"mutedText":                        telegramStyle.mutedText(adversarialEpic, adversarialTicket),
 		"globallyMutedText":                telegramStyle.globallyMutedText("telegram"),

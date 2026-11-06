@@ -45,6 +45,28 @@ func conflictStartedMessage(project, epic, ticketPath, identifier string) chatMe
 	}
 }
 
+// escalatedMessage is the "recovery gave up" message. failure is the failure's
+// pause sentence for a ticket; an epic-level escalation (empty ticketPath)
+// has no failure line of its own.
+func escalatedMessage(project, epic, ticketPath, identifier, failure string) chatMessage {
+	msg := chatMessage{
+		icon: "⚠️", status: "Escalated", subject: epic,
+		project: project,
+		kind:    notifyKindTicketNeedsHuman,
+		urgency: urgencyAttention,
+	}
+	if ticketPath == "" {
+		msg.lines = []string{"All tickets are paused. Automatic recovery already ran once."}
+		return msg
+	}
+	msg.subject += "/" + identifier
+	if title := tickets.TicketTitle(ticketPath); title != "" {
+		msg.subject += " " + title
+	}
+	msg.lines = []string{"Automatic recovery gave up. " + failure}
+	return msg
+}
+
 // ticketPauseMessage is the "a machine paused this ticket for a person"
 // message: Answer for the answer class, Repair for any fault. status is the
 // ticket's stored status word, old or new.

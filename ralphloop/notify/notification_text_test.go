@@ -119,6 +119,32 @@ func TestTicketPauseMessage_RepairUsesDifferentWordAndIcon(t *testing.T) {
 	}
 }
 
+func TestEscalatedMessage_Layouts(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "04-fix-the-thing.md")
+	if err := os.WriteFile(path, []byte("---\nid: 04\n---\n\n# Fix the thing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		msg   chatMessage
+		style mrkdwnStyle
+		want  string
+	}{
+		"ticket telegram": {escalatedMessage("gx", "ui-tree", path, "04", "The ticket failed."), telegramStyle,
+			"⚠️ Escalated ui\\-tree/04 Fix the thing\nAutomatic recovery gave up\\. The ticket failed\\.\ngx"},
+		"ticket slack": {escalatedMessage("gx", "ui-tree", path, "04", "The ticket failed."), slackStyle,
+			"⚠️ Escalated ui-tree/04 Fix the thing\nAutomatic recovery gave up. The ticket failed.\ngx"},
+		"epic telegram": {escalatedMessage("gx", "ui-tree", "", "", ""), telegramStyle,
+			"⚠️ Escalated ui\\-tree\nAll tickets are paused\\. Automatic recovery already ran once\\.\ngx"},
+		"epic slack": {escalatedMessage("gx", "ui-tree", "", "", ""), slackStyle,
+			"⚠️ Escalated ui-tree\nAll tickets are paused. Automatic recovery already ran once.\ngx"},
+	} {
+		if got := tc.msg.Text(tc.style.chatStyle).String(); got != tc.want {
+			t.Errorf("%s: text = %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
 func TestTicketPauseMessage_TitleComesFromTicketFile(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04-fix-the-thing.md")

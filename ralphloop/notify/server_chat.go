@@ -214,9 +214,9 @@ func (f finishSink) TicketNeedsHuman(identifier, _, status string, kind events.K
 	}
 }
 
-// Escalated notifies that recovery gave a failure up to a person. detail names
-// the failure, why recovery stopped, the matched entry and the report.
-func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic, ticketPath, identifier, detail string) {
+// Escalated notifies that recovery gave a failure up to a person. failure is
+// the failure's pause sentence, empty for an epic-level escalation.
+func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic, ticketPath, identifier, failure string) {
 	if c == nil {
 		return
 	}
@@ -226,8 +226,7 @@ func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic,
 		source = epicSource(project + "/" + epic)
 	}
 	for _, s := range c.projectSinks(override) {
-		body := s.style.chatStyle.Message("⚠️", "recovery escalated", "", detail, s.style.identityLine(project+"/"+epic, identifier))
-		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindTicketNeedsHuman, source, identifier)
+		s.sendMessage(escalatedMessage(project, epic, ticketPath, identifier, failure), source, identifier)
 	}
 }
 

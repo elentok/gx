@@ -256,8 +256,8 @@ func TestRecoveryNotify_FailedRemedySendsOneMessageNamingTheEntry(t *testing.T) 
 		t.Fatal(err)
 	}
 	got := waitPauseMessages(t, sent, events.IterationError)
-	if len(got) != 1 || !strings.Contains(got[0], "TEST") || !strings.Contains(got[0], "boom") {
-		t.Fatalf("sends = %v, want one pause message naming entry TEST and the original reason", got)
+	if len(got) != 1 || !strings.Contains(got[0], "Automatic recovery gave up. boom") || strings.Contains(got[0], "TEST") {
+		t.Fatalf("sends = %v, want one escalation with the original reason and no entry id", got)
 	}
 }
 
@@ -268,8 +268,8 @@ func TestRecoveryNotify_OkRemedyThatLeavesTheTicketPausedSendsTheMessage(t *test
 		t.Fatal(err)
 	}
 	got := waitPauseMessages(t, sent, events.IterationError)
-	if len(got) != 1 || !strings.Contains(got[0], "TEST left it paused") || !strings.Contains(got[0], "boom") {
-		t.Fatalf("sends = %v, want one pause message saying TEST left it paused", got)
+	if len(got) != 1 || !strings.Contains(got[0], "Automatic recovery gave up. boom") || strings.Contains(got[0], "TEST") {
+		t.Fatalf("sends = %v, want one escalation with the original reason and no entry id", got)
 	}
 }
 
@@ -293,7 +293,7 @@ func TestRecoveryNotify_RecognizedPauseStillNotifiesAndIsNotCounted(t *testing.T
 func escalationMessages(sent []string) []string {
 	var out []string
 	for _, b := range sent {
-		if strings.Contains(b, "recovery escalated") {
+		if strings.Contains(b, "Escalated") {
 			out = append(out, b)
 		}
 	}
@@ -344,8 +344,13 @@ func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport
 			servertest.Poll(10*time.Second, func() bool { return len(escalationMessages(sent())) > 0 })
 			time.Sleep(1500 * time.Millisecond) // a wrong second message would show by now
 			got := escalationMessages(sent())
-			if len(got) != 1 || !strings.Contains(got[0], "entry: "+tc.want) || !strings.Contains(got[0], "01-first.md") {
-				t.Fatalf("sends = %v, want one escalation naming %q and the ticket's report", got, tc.want)
+			if len(got) != 1 || !strings.Contains(got[0], "Automatic recovery gave up.") {
+				t.Fatalf("sends = %v, want one escalation", got)
+			}
+			for _, leak := range []string{"entry:", "report:", "01-first.md", "TEST"} {
+				if strings.Contains(got[0], leak) {
+					t.Fatalf("escalation %q shows %q, which belongs in the run log", got[0], leak)
+				}
 			}
 		})
 	}
