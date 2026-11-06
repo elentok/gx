@@ -239,7 +239,7 @@ func (s *Disk) observe(r wire.DiskReading, probe string, projects []string, now 
 	s.publishChange(r, c)
 	if c.resumed {
 		s.chat.Notice(notify.ServerNotice{Kind: wire.NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
-			Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
+			Detail: humanize.Bytes(r.Free) + " free. Queued tickets start again."})
 		s.guards.Kick()
 	}
 	if c.startClean {

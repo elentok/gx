@@ -166,14 +166,14 @@ func (s *Disk) endClean(id, probe string, end cleanEnd) (wire.DiskReading, bool)
 
 // sendCleanNotice sends the one notice of a clean.
 func (s *Disk) sendCleanNotice(disk, outcome string, free uint64, held bool) {
-	state := "dispatch is not held"
+	state := "Dispatch is not held."
 	if held {
-		state = "dispatch is held"
+		state = "Dispatch is held."
 	}
 	title := "disk clean finished on " + disk
 	if strings.HasPrefix(outcome, "failed") {
 		title = "disk clean failed on " + disk
 	}
 	s.chat.Notice(notify.ServerNotice{Kind: NoticeDiskClean, Emoji: "🧹", Title: title,
-		Detail: outcome + "; " + humanize.Bytes(free) + " free now; " + state})
+		Detail: strings.ToUpper(outcome[:min(1, len(outcome))]) + outcome[min(1, len(outcome)):] + "; " + humanize.Bytes(free) + " free now. " + state})
 }

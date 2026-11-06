@@ -115,7 +115,7 @@ func TestDiskCleanNow_UnheldDiskKeepsDispatching(t *testing.T) {
 		t.Fatalf("result = %+v", res)
 	}
 	body := r.waitClean(t, 1)
-	if !strings.Contains(body, "dispatch is not held") {
+	if !strings.Contains(body, "Dispatch is not held.") {
 		t.Errorf("notice = %s, want not held", body)
 	}
 	if r.countBodies("Dispatch resumed") != 0 {
@@ -135,7 +135,7 @@ func TestDiskCleanNow_NoCleanupWorkOnlyReadsAgain(t *testing.T) {
 		t.Fatalf("result = %+v", res)
 	}
 	r.wantCalls(t, 0)
-	if body := r.waitClean(t, 2); !strings.Contains(body, "no cleanup command set") || strings.Contains(body, "freed") {
+	if body := r.waitClean(t, 2); !strings.Contains(body, "No cleanup command set") || strings.Contains(body, "Freed") {
 		t.Errorf("notice = %s, want no cleanup command set", body)
 	}
 }

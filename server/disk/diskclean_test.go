@@ -212,7 +212,7 @@ func TestDiskClean_CleanupOffHoldsAndSaysSo(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": noCmd}, 0, 10*gb)
 	r.setFree(3 * gb)
 	body := r.waitClean(t, 1)
-	if !strings.Contains(body, "no cleanup command set") || !strings.Contains(body, "dispatch is held") {
+	if !strings.Contains(body, "No cleanup command set") || !strings.Contains(body, "Dispatch is held.") {
 		t.Errorf("notice = %s, want no command set and held", body)
 	}
 	r.wantCalls(t, 0)
@@ -253,7 +253,7 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 	r.disksWhen(t, "still held", func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held })
 	r.clean.release()
 	body := r.waitClean(t, 1)
-	if !strings.Contains(body, "dispatch is not held") {
+	if !strings.Contains(body, "Dispatch is not held.") {
 		t.Errorf("notice = %s, want not held", body)
 	}
 	servertest.Await(t, func() bool { return len(r.start()) >= 1 })
@@ -359,8 +359,8 @@ func TestDiskClean_NoticeCarriesFreedFreeAndHoldState(t *testing.T) {
 		freed string
 		state string
 	}{
-		{"held", 4 * gb, "freed 1.0 GB; 4.0 GB free now", "dispatch is held"},
-		{"not held", 50 * gb, "freed 47 GB; 50 GB free now", "dispatch is not held"},
+		{"held", 4 * gb, "Freed 1.0 GB; 4.0 GB free now.", "Dispatch is held."},
+		{"not held", 50 * gb, "Freed 47 GB; 50 GB free now.", "Dispatch is not held."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
