@@ -78,6 +78,7 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Mode = s.queue.Mode()
 	snap.AFK = s.afk.IsOn()
 	snap.ViMode = s.viMode.IsOn()
+	snap.Workspaces = s.workspaces.Listed()
 	snap.SkillsInstallProblem = skills.ReadProblem(skills.StatusPath(s.cfg.StateDir))
 	// Checked on every snapshot: a PATH entry can vanish while the server
 	// runs, like an fnm per-shell dir once its shell exits.

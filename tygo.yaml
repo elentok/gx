@@ -24,6 +24,7 @@ packages:
       - stats.go
       - usagesummary.go
       - verdicts.go
+      - workspaces.go
     type_mappings:
       time.Time: "string"
       tickets.DesignStep: "string"

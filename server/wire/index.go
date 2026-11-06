@@ -116,6 +116,8 @@ type Snapshot struct {
 	// ViMode is set while the web UI's vi mode is on; filled in by the handler.
 	// Missing means off.
 	ViMode bool `json:"vi_mode,omitempty"`
+	// Workspaces are the ordered workspaces; filled in by the handler.
+	Workspaces []Workspace `json:"workspaces,omitempty"`
 	// SkillsInstallProblem is why the skill install `gx server start` ran
 	// last did not finish; empty when it did. Filled in by the handler.
 	SkillsInstallProblem string `json:"skills_install_problem,omitempty"`

@@ -94,6 +94,21 @@ func (s *Store) List() []string {
 	return slices.Clone(s.st.Order)
 }
 
+// Listed returns the workspaces in order with their member counts.
+func (s *Store) Listed() []wire.Workspace {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	counts := map[string]int{}
+	for _, ws := range s.st.Members {
+		counts[ws]++
+	}
+	out := make([]wire.Workspace, 0, len(s.st.Order))
+	for _, n := range s.st.Order {
+		out = append(out, wire.Workspace{Name: n, Default: n == DefaultName, Members: counts[n]})
+	}
+	return out
+}
+
 // Workspace returns the workspace a key belongs to; an unknown key is in the Default workspace.
 func (s *Store) Workspace(key string) string {
 	s.mu.Lock()

@@ -1463,6 +1463,10 @@ export interface Snapshot {
    */
   vi_mode?: boolean;
   /**
+   * Workspaces are the ordered workspaces; filled in by the handler.
+   */
+  workspaces?: Workspace[];
+  /**
    * SkillsInstallProblem is why the skill install `gx server start` ran
    * last did not finish; empty when it did. Filled in by the handler.
    */
@@ -2690,3 +2694,50 @@ export interface PendingRow {
   verdict: string;
   reason?: string;
 }
+
+//////////
+// source: workspaces.go
+
+/**
+ * EventWorkspacesChanged announces that a workspace, a membership or a hold mark changed.
+ */
+export const EventWorkspacesChanged = "workspaces-changed";
+/**
+ * Workspace is one workspace as the list and the snapshot show it.
+ */
+export interface Workspace {
+  name: string;
+  default?: boolean;
+  members: number /* int */;
+}
+/**
+ * WorkspaceList is the workspaces in order.
+ */
+export interface WorkspaceList {
+  workspaces: Workspace[];
+}
+/**
+ * WorkspaceRequest is a workspace write: Name is the workspace acted on, To the
+ * new name of a rename.
+ */
+export interface WorkspaceRequest {
+  name: string;
+  to?: string;
+}
+/**
+ * WorkspaceResult is a workspace write: the list after it, or a refusal.
+ */
+export interface WorkspaceResult {
+  workspaces?: Workspace[];
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+export const ReasonWorkspaceBlankName = "workspace-blank-name";
+export const ReasonWorkspaceNameTaken = "workspace-name-taken";
+export const ReasonWorkspaceUnknown = "workspace-unknown";
+export const ReasonWorkspaceDefaultFixed = "workspace-default-fixed";
+/**
+ * Refusal reasons of the workspace writes.
+ */
+export type ReasonWorkspace = typeof ReasonWorkspaceBlankName | typeof ReasonWorkspaceNameTaken | typeof ReasonWorkspaceUnknown | typeof ReasonWorkspaceDefaultFixed;

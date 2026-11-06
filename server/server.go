@@ -47,6 +47,7 @@ import (
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/tokenledger"
@@ -103,20 +104,21 @@ type Server struct {
 	migrator *projects.Migrator
 	checks   *projects.Checks
 
-	queue     *queue.Queue
-	afk       *queue.AFK
-	viMode    *queue.ViMode
-	oneOffs   *queue.OneOffs
-	budget    *budget.Budget
-	tokens    *tokenledger.Ledger
-	limits    *limits.Limits
-	stats     *stats.Stats
-	events    *broker.Broker
-	herdr     *sched.HerdrWatch
-	writer    *ticketwrite.Writer
-	ops       *ticketops.Ops
-	pauseHold ticketwrite.RecoveryHold
-	recovery  *srvrecovery.Recovery
+	queue      *queue.Queue
+	afk        *queue.AFK
+	viMode     *queue.ViMode
+	workspaces *workspaces.Store
+	oneOffs    *queue.OneOffs
+	budget     *budget.Budget
+	tokens     *tokenledger.Ledger
+	limits     *limits.Limits
+	stats      *stats.Stats
+	events     *broker.Broker
+	herdr      *sched.HerdrWatch
+	writer     *ticketwrite.Writer
+	ops        *ticketops.Ops
+	pauseHold  ticketwrite.RecoveryHold
+	recovery   *srvrecovery.Recovery
 	// rec repairs merge state at startup and on each rescan.
 	rec *merge.Reconciler
 	// landing lands over a dirty trunk and handles trunk conflicts.
@@ -233,6 +235,11 @@ func New(cfg Config) (*Server, error) {
 		lock.Release()
 		return nil, fmt.Errorf("load vi mode: %w", err)
 	}
+	wsStore, err := workspaces.Open(cfg.StateDir, events, nil)
+	if err != nil {
+		lock.Release()
+		return nil, fmt.Errorf("load workspaces: %w", err)
+	}
 	tokens, err := tokenledger.Open(cfg.StateDir)
 	if err != nil {
 		lock.Release()
@@ -295,9 +302,11 @@ func New(cfg Config) (*Server, error) {
 		queue:  q,
 		afk:    afk,
 		viMode: viMode,
-		tokens: tokens,
-		events: events,
-		guards: runs.NewGuards(),
+
+		workspaces: wsStore,
+		tokens:     tokens,
+		events:     events,
+		guards:     runs.NewGuards(),
 
 		focus: sessions.NewFocusReports(),
 	}
