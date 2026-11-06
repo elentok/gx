@@ -266,23 +266,17 @@ func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic
 // notifyKindResult tags the message a successful one-off sends on request.
 const notifyKindResult = "result"
 
-// maxResultRunes bounds the Result a chat message carries.
-const maxResultRunes = 1500
-
 // Result sends a one-off's ## Result, truncated, under its project. The
 // server sink has no run log of its own, so the notification-sent event is
 // written to the ticket's epic here, once per destination it was queued for.
-func (c *ServerChat) Result(project string, override *ServerChatConfig, projectDir, epic, address, result string) {
+func (c *ServerChat) Result(project string, override *ServerChatConfig, projectDir, epic, ticketPath, identifier, result string) {
 	if c == nil {
 		return
 	}
-	if r := []rune(result); len(r) > maxResultRunes {
-		result = string(r[:maxResultRunes]) + "…"
-	}
+	msg := resultMessage(project, epic, ticketPath, identifier, result)
 	for _, s := range c.projectSinks(override) {
-		body := s.style.chatStyle.Message("✅", address+" finished", "", result, s.style.identityLine("server", ""))
-		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindResult, address, "")
-		logNotificationSent(projectDir, epic, s.transport.name(), notifyKindResult, body.String())
+		s.sendMessage(msg, ticketPath, identifier)
+		logNotificationSent(projectDir, epic, s.transport.name(), notifyKindResult, msg.Text(s.style.chatStyle).String())
 	}
 }
 

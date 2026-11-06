@@ -107,6 +107,28 @@ func TestServerChat_EpicCompleteNotMergedSaysSo(t *testing.T) {
 	}
 }
 
+func TestServerChat_EmptyResultSaysNoneRecorded(t *testing.T) {
+	hook, reqs := fakeSlackServer(t, 200)
+	c := NewServerChat(ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "e"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	ticketPath := filepath.Join(dir, "e", "01-do-thing.md")
+	if err := os.WriteFile(ticketPath, []byte("# Do thing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c.Result("alpha", nil, dir, "e", ticketPath, "01", " \n")
+	c.Close()
+
+	got := reqs()
+	if len(got) != 1 || !strings.Contains(got[0].Text, "✅ Done e/01 Do thing") || !strings.Contains(got[0].Text, "No result recorded.") {
+		t.Errorf("sends = %+v, want the Done headline and 'No result recorded.'", got)
+	}
+}
+
 func TestServerChat_ResultIsTruncatedAndLogsNotificationSent(t *testing.T) {
 	hook, reqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
@@ -115,12 +137,18 @@ func TestServerChat_ResultIsTruncatedAndLogsNotificationSent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.Result("alpha", nil, dir, "e", "alpha:e/01", strings.Repeat("x", 5000))
+	ticketPath := filepath.Join(dir, "e", "01-do-thing.md")
+	if err := os.WriteFile(ticketPath, []byte("# Do thing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c.Result("alpha", nil, dir, "e", ticketPath, "01", strings.Repeat("x", 5000))
 	c.Close()
 
 	got := reqs()
-	if len(got) != 1 || !strings.Contains(got[0].Text, "alpha:e/01") || len(got[0].Text) > 3000 {
-		t.Fatalf("sends = %+v, want one truncated message naming the address", got)
+	want := strings.Repeat("x", maxResultRunes) + "…"
+	if len(got) != 1 || !strings.Contains(got[0].Text, "✅ Done e/01 Do thing") || !strings.Contains(got[0].Text, want) || strings.Contains(got[0].Text, want[:len(want)-3]+"x") {
+		t.Fatalf("sends = %+v, want one message with the Done headline and the Result cut at the limit", got)
 	}
 	evs, _, err := runlog.ReadEvents(dir, "e")
 	if err != nil {

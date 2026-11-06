@@ -1,6 +1,8 @@
 package notify
 
 import (
+	"strings"
+
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -65,6 +67,31 @@ func escalatedMessage(project, epic, ticketPath, identifier, failure string) cha
 	}
 	msg.lines = []string{"Automatic recovery gave up. " + failure}
 	return msg
+}
+
+// maxResultRunes bounds the Result a chat message carries.
+const maxResultRunes = 1500
+
+// resultMessage is a one-off's "done" message: its Result cut at
+// maxResultRunes, or a plain line when none was recorded.
+func resultMessage(project, epic, ticketPath, identifier, result string) chatMessage {
+	subject := epic + "/" + identifier
+	if title := tickets.TicketTitle(ticketPath); title != "" {
+		subject += " " + title
+	}
+	result = strings.TrimSpace(result)
+	if r := []rune(result); len(r) > maxResultRunes {
+		result = string(r[:maxResultRunes]) + "…"
+	}
+	if result == "" {
+		result = "No result recorded."
+	}
+	return chatMessage{
+		icon: "✅", status: "Done", subject: subject,
+		lines:   []string{result},
+		project: project,
+		kind:    notifyKindResult,
+	}
 }
 
 // ticketPauseMessage is the "a machine paused this ticket for a person"

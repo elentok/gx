@@ -75,7 +75,7 @@ func (rec *Recovery) FileFollowUp(addr tickets.Address, ticketPath string) {
 		rec.d.Log.Warn("follow-ups project missing, proposal goes to the escalation only", "ticket", addr.String(), "err", err)
 		if !tk.Notify {
 			dir := filepath.Dir(filepath.Dir(filepath.Dir(ticketPath)))
-			rec.d.Chat.Result(addr.Project, rec.d.Projects.ChatOverride(addr.Project), dir, addr.Epic, addr.String(), result)
+			rec.d.Chat.Result(addr.Project, rec.d.Projects.ChatOverride(addr.Project), dir, addr.Epic, ticketPath, addr.ID, result)
 		}
 		return
 	}

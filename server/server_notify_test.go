@@ -337,16 +337,7 @@ func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
 	}
 	testutil.EnsureEpicTicketMD(t, filepath.Dir(dir))
 	write := func(name string, notify bool) string {
-		tk := schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt, Notify: notify}
-		out, err := schema.MarshalTicket(tk, "\nprompt\n\n## Result\n\nthe answer is 42\n")
-		if err != nil {
-			t.Fatal(err)
-		}
-		p := filepath.Join(dir, name)
-		if err := os.WriteFile(p, out, 0o644); err != nil {
-			t.Fatal(err)
-		}
-		return p
+		return writeResultTicket(t, dir, name, notify, "the answer is 42")
 	}
 	addr := tickets.Address{Project: "scratch", Epic: "e", ID: "01"}
 
@@ -360,9 +351,51 @@ func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
 	s.oneOffs.NotifyResult(addr, write("01-loud.md", true))
 	s.chat.Close()
 	got := wait(1)
-	if len(got) != 1 || !strings.Contains(got[0], "the answer is 42") {
-		t.Fatalf("sends = %v, want the Result", got)
+	if len(got) != 1 || !strings.Contains(got[0], "✅ Done e/01 loud") || !strings.Contains(got[0], "the answer is 42") {
+		t.Fatalf("sends = %v, want the Done headline and the Result", got)
 	}
+}
+
+func TestNotifyResult_EmptyAndLongResults(t *testing.T) {
+	t.Parallel()
+	send := func(result string) string {
+		s, wait := chatServer(t, 0, 0)
+		dir := filepath.Join(s.cfg.TicketStore, "scratch", "e", "issues")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testutil.EnsureEpicTicketMD(t, filepath.Dir(dir))
+		path := writeResultTicket(t, dir, "01-loud.md", true, result)
+		s.oneOffs.NotifyResult(tickets.Address{Project: "scratch", Epic: "e", ID: "01"}, path)
+		s.chat.Close()
+		got := wait(1)
+		if len(got) != 1 {
+			t.Fatalf("sends = %v, want one", got)
+		}
+		return got[0]
+	}
+
+	if got := send(""); !strings.Contains(got, "No result recorded.") {
+		t.Errorf("empty Result sent %q, want 'No result recorded.'", got)
+	}
+	got := send(strings.Repeat("y", 1600))
+	if !strings.Contains(got, strings.Repeat("y", 1500)+"…") || strings.Contains(got, strings.Repeat("y", 1501)) {
+		t.Errorf("long Result not cut at 1500 with an ellipsis: %q", got)
+	}
+}
+
+func writeResultTicket(t *testing.T, dir, name string, notify bool, result string) string {
+	t.Helper()
+	tk := schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt, Notify: notify}
+	out, err := schema.MarshalTicket(tk, "\n# loud\n\nprompt\n\n## Result\n\n"+result+"\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, out, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
