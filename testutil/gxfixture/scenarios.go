@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
@@ -175,6 +176,24 @@ var scenarios = map[string]scenario{
 			project + ":stuck-chat-epic": string(events.AllPaused),
 		},
 		Queue: []string{"auto:merged-chat-epic", project + ":unmerged-chat-epic", project + ":stuck-chat-epic"},
+	},
+	// chat-sessions: chat-capture with AFK on (set by a step before the sessions
+	// exist) and four interactive sessions, one per session alert of the mock: Done
+	// (an idle turn), Blocked (a permission prompt), Rate-limited (a usage-limit
+	// error) and Exited (the fake crashes). None is marked read, so each state
+	// change fires the session banner, which in AFK mode also goes to Chat.
+	"chat-sessions": {
+		ChatCapture: true,
+		Chat:        true,
+		Steps:       [][]string{{"afk", "on"}},
+		Sessions: []sessionSpec{
+			{Project: project, Prompt: "hello"},
+			{Project: project, Prompt: "hello", Failure: wire.FailureKindBlocked,
+				Control: &agentfake.Control{Action: agentfake.ActionBlock}},
+			{Project: project, Prompt: "hello", Failure: wire.FailureKindRateLimit,
+				Control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Status: 429, Message: "You've hit your limit · resets at 3pm"}},
+			{Project: project, Prompt: "hello", Crash: true},
+		},
 	},
 	"rejected-first-prompt": spec.RejectedFirstPrompt,
 	"stall-vim":             spec.StallVim,

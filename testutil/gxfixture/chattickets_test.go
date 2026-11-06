@@ -75,10 +75,21 @@ func TestChatEpicsScenario_EachEpicOutcomeLandsInTheCaptureFile(t *testing.T) {
 	})
 }
 
+func TestChatSessionsScenario_EachSessionStateAlertLandsInTheCaptureFile(t *testing.T) {
+	t.Parallel()
+	r := start(t, "chat-sessions")
+	waitForParts(t, r, map[string][]string{
+		"done":         {"demo ·", "Done"},
+		"blocked":      {"demo ·", "Blocked"},
+		"rate-limited": {"demo ·", "Rate-limited"},
+		"exited":       {"demo ·", "Exited"},
+	})
+}
+
 func TestChatTicketsRepairScenario_StallPauseLandsInTheCaptureFile(t *testing.T) {
 	t.Parallel()
 	r := start(t, "chat-tickets-stall")
 	waitForParts(t, r, map[string][]string{
-		"repair-stall": {"stall-chat-epic/01", "Repair", "prompt not delivered"},
+		"repair-stall": {"stall-chat-epic/01", "Repair", "did not accept its prompt"},
 	})
 }
