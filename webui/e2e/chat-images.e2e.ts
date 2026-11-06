@@ -38,6 +38,8 @@ test("189. Send images", async ({ page, start }) => {
   await addInput(page).setInputFiles(pngs(3));
   await expect(thumbs(page)).toHaveCount(3);
   await messageBox(page).fill("three for you");
+  // Send stays off while an upload runs, so enabled means all three are ready.
+  await expect(sendButton(page)).toBeEnabled();
   await messageBox(page).press("Meta+Enter");
   await expect(thumbs(page)).toHaveCount(0);
   await expect(page.getByText("three for you")).toBeVisible();
