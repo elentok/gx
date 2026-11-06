@@ -85,17 +85,17 @@ func TestChatServerScenario_StartAndDiskNoticesLandInTheCaptureFile(t *testing.T
 	t.Parallel()
 	r := start(t, "chat-server")
 
-	waitForParts(t, r, map[string][]string{"server-started": {"server started"}})
+	waitForParts(t, r, map[string][]string{"server-started": {"Server started"}})
 
 	// Low disk: the hold starts a clean on its own, and the idle clean script
 	// frees nothing. Space returning on an ordinary reading resumes dispatch.
 	r.setDisk(t, "free", "5G")
 	waitForParts(t, r, map[string][]string{
-		"disk-low":   {"low disk space"},
-		"disk-clean": {"disk clean finished"},
+		"disk-low":   {"Low disk space"},
+		"disk-clean": {"Disk clean finished"},
 	})
 	r.setDisk(t, "free", "25G")
-	waitForParts(t, r, map[string][]string{"disk-resume": {"dispatch resumed"}})
+	waitForParts(t, r, map[string][]string{"disk-resume": {"Dispatch resumed"}})
 }
 
 func TestChatServerScenario_BudgetAndLongTicketNoticesLandInTheCaptureFile(t *testing.T) {
@@ -108,7 +108,7 @@ func TestChatServerScenario_BudgetAndLongTicketNoticesLandInTheCaptureFile(t *te
 	if !testutil.Poll(60*time.Second, 250*time.Millisecond, func() bool {
 		appendAssistantLine(t, r, 0)
 		for _, l := range captured(r.ChatCapture) {
-			if l.Transport == "slack" && strings.Contains(l.Text, "long ticket") {
+			if l.Transport == "slack" && strings.Contains(l.Text, "Long ticket") {
 				return true
 			}
 		}
@@ -119,9 +119,9 @@ func TestChatServerScenario_BudgetAndLongTicketNoticesLandInTheCaptureFile(t *te
 
 	// Spend: the ledger starts under the soft limit; each line adds $3.
 	appendMillionTokens(t, r)
-	waitForParts(t, r, map[string][]string{"budget-soft": {"budget soft limit"}})
+	waitForParts(t, r, map[string][]string{"budget-soft": {"Budget soft limit"}})
 	appendMillionTokens(t, r)
-	waitForParts(t, r, map[string][]string{"budget-hard": {"budget hard limit"}})
+	waitForParts(t, r, map[string][]string{"budget-hard": {"Budget hard limit"}})
 }
 
 func TestChatServerScenario_ProjectAndTrunkNoticesLandInTheCaptureFile(t *testing.T) {
