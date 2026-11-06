@@ -217,7 +217,7 @@ test("the Grilling section sits between Cost and effort and Friction", async () 
     .getAllByRole("region")
     .map((r) => r.getAttribute("aria-labelledby"))
     .filter((n) => n !== null);
-  expect(names).toEqual(["stats-throughput", "stats-cost", "stats-grilling", "stats-friction"]);
+  expect(names).toEqual(["stats-throughput", "stats-cost", "stats-grilling", "stats-friction", "stats-launch"]);
   expect(screen.getByText("Questions asked")).toBeTruthy();
 });
 
@@ -270,6 +270,33 @@ test("Pause endings headline is the web share with the median on the small line"
   expect(ending).toContain("63% web");
   expect(ending).toContain("median 5m to resume");
   expect(ending).not.toContain("partial");
+});
+
+test("the Launch section shows the median, share under target, per-day chart and step medians", async () => {
+  const launch = {
+    count: 4,
+    median_ms: 12500,
+    share_under_target: 0.75,
+    target_ms: 15000,
+    days: [amount(12000), amount(0, true), amount(13000)],
+    step_median_ms: { worktree: 800, agent: 9000 },
+  };
+  renderStats(async () => statsOf({}, { launch }));
+  const card = await cardText("Launch time");
+  expect(card).toContain("12.5s");
+  expect(card).toContain("75% under 15.0s");
+  expect((await cardEl("Launch time")).querySelectorAll("[data-nodata]")).toHaveLength(1);
+  const steps = (await screen.findByTestId("launch-steps")).textContent ?? "";
+  expect(steps).toContain("agent9.0s");
+  expect(steps).toContain("worktree0.8s");
+});
+
+test("the Launch section shows a dash with no launches", async () => {
+  renderStats(async () => statsOf());
+  const card = await cardText("Launch time");
+  expect(card).toContain("—");
+  expect(card).not.toContain("0.0s");
+  expect((await screen.findByTestId("launch-steps")).textContent).toContain("—");
 });
 
 test("the URL filters drive the fetch and the controls", async () => {

@@ -152,6 +152,37 @@ function Friction({ stats }: { stats: Stats }) {
   );
 }
 
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+
+function Launch({ stats }: { stats: Stats }) {
+  const { days, launch: l } = stats;
+  const steps = Object.entries(l.step_median_ms).sort(([a], [b]) => a.localeCompare(b));
+  return (
+    <Section id="stats-launch" title="Launch" tone="running">
+      <StatCard
+        title="Launch time"
+        days={days}
+        headline={l.median_ms === undefined ? "—" : seconds(l.median_ms)}
+        small={l.share_under_target === undefined ? "" : `${Math.round(l.share_under_target * 100)}% under ${seconds(l.target_ms)}`}
+        series={[{ key: "median", label: "Median (s)", tone: "running", values: amounts(l.days).map((v) => (v === null ? null : v / 1000)) }]}
+      />
+      <Box data-testid="launch-steps" display="flex" flexDirection="column" gap="1">
+        <Text fontWeight="medium">Median per step</Text>
+        {steps.length === 0 ? (
+          <Text color="text.muted">—</Text>
+        ) : (
+          steps.map(([step, ms]) => (
+            <Box key={step} display="flex" justifyContent="space-between">
+              <Text color="text.muted">{step}</Text>
+              <Text>{seconds(ms)}</Text>
+            </Box>
+          ))
+        )}
+      </Box>
+    </Section>
+  );
+}
+
 const selectProps = { fontSize: "sm", px: "2", py: "1", borderWidth: "1px", borderRadius: "md", bg: "transparent" } as const;
 
 export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats; fetchEpics?: FetchEpicList }) {
@@ -205,6 +236,7 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
           <Cost stats={stats} project={project} />
           <Grilling stats={stats} />
           <Friction stats={stats} />
+          <Launch stats={stats} />
         </>
       )}
     </DetailPage>
