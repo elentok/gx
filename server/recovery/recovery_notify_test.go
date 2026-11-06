@@ -69,10 +69,17 @@ func pauseMessages(sent []string) []string {
 	return pauseMessagesOf(sent, events.IterationError)
 }
 
+// pauseReasons is the reason each test passes to PauseAs per kind. The pause
+// sentence no longer names the kind, so messages are told apart by reason.
+var pauseReasons = map[events.Kind]string{
+	events.IterationError: "boom",
+	events.Spinning:       "paused and re-claimed",
+}
+
 func pauseMessagesOf(sent []string, kind events.Kind) []string {
 	var out []string
 	for _, b := range sent {
-		if strings.Contains(b, string(kind)) {
+		if strings.Contains(b, pauseReasons[kind]) {
 			out = append(out, b)
 		}
 	}

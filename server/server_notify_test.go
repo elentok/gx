@@ -254,7 +254,7 @@ func TestNotifyPause_ShowsRealStatusKindAndReason(t *testing.T) {
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
-	for _, want := range []string{"🛑 Repair epic/01", string(events.BudgetKilled), "daily budget hard limit reached", "🙋 Answer epic/02", string(events.AmbiguousBase), "choose a base", `\np\n\n---`} {
+	for _, want := range []string{"🛑 Repair epic/01", "daily budget hard limit reached", "🙋 Answer epic/02", "choose a base", `\np\n\n---`} {
 		if !strings.Contains(all, want) {
 			t.Errorf("chat lacks %q: %s", want, all)
 		}
@@ -294,7 +294,7 @@ func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
 	if !strings.Contains(all, summary) {
 		t.Errorf("chat lacks the question summary: %s", all)
 	}
-	if strings.Contains(all, "agent reported asking") {
+	if strings.Contains(all, "left no question") || strings.Contains(all, "agent reported asking") {
 		t.Errorf("generic reason leaked: %s", all)
 	}
 }
