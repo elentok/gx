@@ -1,16 +1,23 @@
 package queue_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -30,6 +37,77 @@ func startSweep(t *testing.T, store string) *servertest.Harness {
 	return servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 	})
+}
+
+// flakyHost fails EnsureDraftEpic (the first step of an archive) while failing is set.
+type flakyHost struct {
+	queue.Host
+	failing  atomic.Bool
+	attempts atomic.Int32
+}
+
+func (h *flakyHost) EnsureDraftEpic(path string) error {
+	h.attempts.Add(1)
+	if h.failing.Load() {
+		return errors.New("archive blocked")
+	}
+	return os.MkdirAll(filepath.Join(path, "issues"), 0o755)
+}
+
+func TestSweep_StuckOneOffBacksOffToTheCapAndWarnsOncePerTicket(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
+	var logs bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	host := &flakyHost{}
+	host.failing.Store(true)
+	o := queue.NewOneOffs(queue.OneOffsDeps{
+		Queue:       &queue.Queue{},
+		Index:       index.New(store, broker.New(16), log),
+		Registry:    &runs.Registry{},
+		Log:         log,
+		Host:        host,
+		TicketStore: store,
+	})
+
+	clock := time.Now()
+	o.SweepAt(clock)
+	if got := host.attempts.Load(); got != 1 {
+		t.Fatalf("first sweep attempts = %d, want 1", got)
+	}
+	// 1m, 2m, 4m ... 64m: the last step is clamped to the 1 hour cap.
+	for k := range 8 {
+		delay := min(time.Minute<<k, time.Hour)
+		before := host.attempts.Load()
+		o.SweepAt(clock.Add(delay - time.Second))
+		if host.attempts.Load() != before {
+			t.Fatalf("retried before the %v back-off", delay)
+		}
+		clock = clock.Add(delay)
+		o.SweepAt(clock)
+		if got := host.attempts.Load(); got != before+1 {
+			t.Fatalf("attempts after the %v back-off = %d, want %d", delay, got, before+1)
+		}
+	}
+	if n := strings.Count(logs.String(), "level=WARN"); n != 1 {
+		t.Errorf("warn lines = %d, want exactly 1:\n%s", n, logs.String())
+	}
+
+	host.failing.Store(false)
+	o.SweepAt(clock.Add(time.Hour))
+	waitForFile(t, filepath.Join(store, "proj", queue.OneOffsEpic, "issues", "01-a.md"), false)
+
+	// The back-off is cleared: a fresh failure for the same address retries after 1 minute.
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
+	host.failing.Store(true)
+	later := clock.Add(2 * time.Hour)
+	o.SweepAt(later)
+	before := host.attempts.Load()
+	o.SweepAt(later.Add(time.Minute))
+	if host.attempts.Load() != before+1 {
+		t.Errorf("a cleared back-off did not retry after 1 minute")
+	}
 }
 
 func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {

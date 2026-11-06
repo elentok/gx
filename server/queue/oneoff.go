@@ -134,7 +134,8 @@ type OneOffsDeps struct {
 // OneOffs submits, announces and archives one-off tickets.
 type OneOffs struct {
 	OneOffsDeps
-	sweepMu sync.Mutex // one archive sweep at a time; the move's own writes wake the watcher
+	sweepMu sync.Mutex               // one archive sweep at a time; the move's own writes wake the watcher
+	backoff map[string]*sweepBackoff // by ticket address, under sweepMu
 }
 
 // NewOneOffs wires the one-offs to the parts of the server they use.

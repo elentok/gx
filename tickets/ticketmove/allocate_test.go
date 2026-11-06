@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -209,6 +211,76 @@ func TestLoadLockedEpic_EmptyEpic(t *testing.T) {
 	defer unlock()
 	if epic.Name != "my-epic" {
 		t.Errorf("epic.Name = %q, want %q", epic.Name, "my-epic")
+	}
+}
+
+func TestLockEpicFile_LeftoverFileWithNoHolderIsFree(t *testing.T) {
+	epicPath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(epicPath, allocLockFileName), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	unlock, err := lockEpicFile(epicPath)
+	if err != nil {
+		t.Fatalf("lockEpicFile: %v", err)
+	}
+	unlock()
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("leftover lock file cost %v, want immediate", d)
+	}
+}
+
+func TestLockEpicFile_LiveHoldersExclude(t *testing.T) {
+	epicPath := t.TempDir()
+	unlock1, err := lockEpicFile(epicPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make(chan func(), 1)
+	go func() {
+		unlock2, err := lockEpicFile(epicPath)
+		if err != nil {
+			t.Error(err)
+			got <- func() {}
+			return
+		}
+		got <- unlock2
+	}()
+	select {
+	case <-got:
+		t.Fatal("second holder acquired while the first still held the lock")
+	case <-time.After(100 * time.Millisecond):
+	}
+	unlock1()
+	select {
+	case unlock2 := <-got:
+		unlock2()
+	case <-time.After(5 * time.Second):
+		t.Fatal("second holder never acquired after the first unlocked")
+	}
+}
+
+// A holder that dies never calls unlock; the kernel closes its descriptor,
+// which closing a held descriptor here reproduces.
+func TestLockEpicFile_DeadHolderIsReleased(t *testing.T) {
+	epicPath := t.TempDir()
+	f, err := os.OpenFile(filepath.Join(epicPath, allocLockFileName), os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	start := time.Now()
+	unlock, err := lockEpicFile(epicPath)
+	if err != nil {
+		t.Fatalf("lockEpicFile: %v", err)
+	}
+	unlock()
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("dead holder's lock cost %v, want immediate", d)
 	}
 }
 

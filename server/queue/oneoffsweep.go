@@ -15,23 +15,57 @@ import (
 // crash between a move's two writes is finished by the first rescan of the next
 // server. A ticket whose run is still tracked stays: the run's post-merging
 // steps (retro stamp, result, follow-up) still read it at its old address.
-func (o *OneOffs) Sweep() {
+func (o *OneOffs) Sweep() { o.SweepAt(time.Now()) }
+
+const (
+	sweepBackoffBase = time.Minute
+	sweepBackoffCap  = time.Hour
+)
+
+// sweepBackoff is one stuck ticket's retry state.
+type sweepBackoff struct {
+	failures int
+	retryAt  time.Time
+}
+
+// SweepAt is Sweep with the clock supplied, so a test can walk the back-off.
+// A ticket whose archive failed is retried after 1 minute, doubling up to a
+// 1 hour cap, so one stuck ticket does not cost its failure on every rescan.
+// Only the first failure logs at warn; the retries stay quiet. The state is in
+// memory and ends when the ticket archives or leaves the store.
+func (o *OneOffs) SweepAt(now time.Time) {
 	if o.TicketStore == "" {
 		return
 	}
 	o.sweepMu.Lock()
 	defer o.sweepMu.Unlock()
+	if o.backoff == nil {
+		o.backoff = map[string]*sweepBackoff{}
+	}
+	seen := map[string]bool{}
+	listed := true
+	defer func() {
+		if !listed {
+			return // a project that failed to load may still hold its stuck tickets
+		}
+		for key := range o.backoff {
+			if !seen[key] {
+				delete(o.backoff, key)
+			}
+		}
+	}()
 
 	dirs, err := tickets.ProjectDirs(o.TicketStore)
 	if err != nil {
+		listed = false
 		o.Log.Warn("sweep one-offs", "err", err)
 		return
 	}
 	moved := false
-	now := time.Now()
 	for _, dir := range dirs {
 		live, archived, err := tickets.LoadOneOffs(dir)
 		if err != nil {
+			listed = false
 			o.Log.Warn("sweep one-offs", "dir", dir, "err", err)
 			continue
 		}
@@ -43,10 +77,25 @@ func (o *OneOffs) Sweep() {
 			if _, tracked := o.Registry.Tracked(addr.String()); tracked {
 				continue
 			}
-			if err := o.archiveOneOff(dir, archived, addr, t, now); err != nil {
-				o.Log.Warn("archive one-off", "ticket", addr.String(), "err", err)
+			key := addr.String()
+			seen[key] = true
+			b := o.backoff[key]
+			if b != nil && now.Before(b.retryAt) {
 				continue
 			}
+			if err := o.archiveOneOff(dir, archived, addr, t, now); err != nil {
+				if b == nil {
+					b = &sweepBackoff{}
+					o.backoff[key] = b
+					o.Log.Warn("archive one-off", "ticket", key, "err", err)
+				} else {
+					o.Log.Debug("archive one-off retry failed", "ticket", key, "err", err)
+				}
+				b.failures++
+				b.retryAt = now.Add(min(sweepBackoffBase<<(b.failures-1), sweepBackoffCap))
+				continue
+			}
+			delete(o.backoff, key)
 			moved = true
 		}
 	}

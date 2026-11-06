@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/elentok/gx/projectlock"
@@ -42,20 +43,29 @@ func LockEpic(epicPath string) (unlock func(), err error) {
 	return func() { unlockEpic(); unlockProject() }, nil
 }
 
+// lockEpicFile takes a flock on the lock file, so the kernel drops it when the
+// holder dies and a leftover file from the old O_EXCL scheme counts as free.
+// The file is never removed on unlock: removing it would let a waiter lock an
+// unlinked inode while a newcomer creates a fresh one.
 func lockEpicFile(epicPath string) (unlock func(), err error) {
 	lockPath := filepath.Join(epicPath, allocLockFileName)
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, fmt.Errorf("acquiring allocation lock at %s: %w", lockPath, err)
+	}
 	deadline := time.Now().Add(10 * time.Second)
 
 	for {
-		f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
-			f.Close()
-			return func() { os.Remove(lockPath) }, nil
+			return func() { f.Close() }, nil
 		}
-		if !os.IsExist(err) {
+		if err != syscall.EWOULDBLOCK {
+			f.Close()
 			return nil, fmt.Errorf("acquiring allocation lock at %s: %w", lockPath, err)
 		}
 		if time.Now().After(deadline) {
+			f.Close()
 			return nil, fmt.Errorf("timed out waiting for allocation lock at %s", lockPath)
 		}
 		time.Sleep(10 * time.Millisecond)
