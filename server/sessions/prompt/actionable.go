@@ -146,7 +146,7 @@ func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 		p.sessions.TriggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", MaxAutoSends, a.Reason))
 	case actionableRaised:
 		if a.Grilling {
-			p.sessions.TriggerQuestionBanner(id, sound.Attention, a.Reason, p.designQuestion(id, meta, text))
+			p.sessions.TriggerQuestionBanner(id, sound.Attention, a.Reason, designQuestion(p.grillingRounds(id, meta), text))
 			return
 		}
 		p.sessions.TriggerBanner(id, sound.Attention, a.Reason)
@@ -155,8 +155,8 @@ func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 
 // designQuestion is the Grilling round a Design waits on: its number and the
 // round's first question.
-func (p *Prompt) designQuestion(id string, meta sessions.Meta, text string) sessions.DesignQuestion {
-	q := sessions.DesignQuestion{Round: p.grillingRounds(id, meta)}
+func designQuestion(round int, text string) sessions.DesignQuestion {
+	q := sessions.DesignQuestion{Round: round}
 	if cards := chat.RoundCards(text); len(cards) > 0 {
 		q.Text = firstLine(cards[0].Body)
 		if q.Text == "" {

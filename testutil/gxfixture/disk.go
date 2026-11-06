@@ -32,7 +32,7 @@ printf '%s\n' "$want" > "$dir/free.tmp" && mv "$dir/free.tmp" "$dir/free"
 // diskDir sits outside the project repo, so the trunk stays clean.
 func (f *fixture) diskDir() string { return filepath.Join(f.root, "disk") }
 
-func (f *fixture) cleanScript() string { return filepath.Join(f.diskDir(), "clean.sh") }
+func cleanScript(diskDir string) string { return filepath.Join(diskDir, "clean.sh") }
 
 // setupDisk gives every scenario the fake disk: the server reads its free space
 // from <disk dir>/free, which starts at plentyFree.
@@ -44,7 +44,7 @@ func (f *fixture) setupDisk() error {
 	if err := os.WriteFile(free, []byte(plentyFree+"\n"), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(f.cleanScript(), []byte(cleanScriptBody), 0o755); err != nil {
+	if err := os.WriteFile(cleanScript(f.diskDir()), []byte(cleanScriptBody), 0o755); err != nil {
 		return err
 	}
 	f.env = append(f.env, "GX_DISK_FREE_FILE="+free, "GX_DISK_WATCH_INTERVAL="+diskWatchInterval, "GX_USAGE_POLL_INTERVAL="+diskWatchInterval)

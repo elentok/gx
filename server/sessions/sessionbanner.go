@@ -187,14 +187,13 @@ func (mg *Manager) sendDesignQuestion(id string, q DesignQuestion) bool {
 		return false
 	}
 	project := m.Info().Project
-	mg.alerts.DesignQuestion(project, mg.projects.ChatOverride(project), addr.Epic, string(step), q.Round, q.Text, mg.designLink(m))
+	mg.alerts.DesignQuestion(project, mg.projects.ChatOverride(project), addr.Epic, string(step), q.Round, q.Text, designLink(mg.host.WebURL(), m))
 	return true
 }
 
 // designLink is the Design page of a Design session, without the token; empty
 // when the web listener is off or the session is not a Design.
-func (mg *Manager) designLink(m Meta) string {
-	base := mg.host.WebURL()
+func designLink(base string, m Meta) string {
 	if base == "" || !m.Design || m.Ticket == "" {
 		return ""
 	}
@@ -234,7 +233,7 @@ func (mg *Manager) fireBanner(id string) {
 	if body == "" {
 		body = sessionStatusText(info)
 	}
-	link := mg.designLink(m)
+	link := designLink(mg.host.WebURL(), m)
 	// AFK adds chat without the focus check; the banner and sound keep theirs.
 	if afk && !t.questionSent {
 		chatBody := alertReason(info, t.reason)

@@ -2,14 +2,38 @@ package sessions
 
 import (
 	"cmp"
+	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/schema"
 )
+
+// SessionFinished reports whether the ticket behind s's iteration label has
+// iteration_status finished. The label can't be parsed back to a ticket (long
+// epic names are hashed), so it is matched against every indexed ticket, and
+// the status is read from the file: the index may lag the agent's own report.
+func (mg *Manager) SessionFinished(sess agentrunner.Session) bool {
+	for _, epics := range mg.idx.AllEpics() {
+		for _, e := range epics {
+			epic := filepath.Base(e.Path)
+			for _, t := range e.Tickets {
+				if label, _, _ := worktree.IterationIdentity(epic, t.Identifier, ""); label != sess.Label {
+					continue
+				}
+				parsed, err := schema.ParseTicket(t.Path)
+				return err == nil && parsed.IterationStatus == schema.IterationStatusFinished
+			}
+		}
+	}
+	return false
+}
 
 // agentRows is the Queue's live agents, which the chat and screen reads show
 // as sessions.

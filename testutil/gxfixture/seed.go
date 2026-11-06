@@ -194,7 +194,7 @@ func (f *fixture) seed(sc scenario) error {
 		}
 		extra := sc.ProjectExtra[e.Project]
 		if sc.DiskLow {
-			argv, err := json.Marshal([]string{f.cleanScript()})
+			argv, err := json.Marshal([]string{cleanScript(f.diskDir())})
 			if err != nil {
 				return err
 			}
