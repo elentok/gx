@@ -76,6 +76,28 @@ func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
 	}
 }
 
+func TestAppendEvent_LaunchTimedRoundTrips(t *testing.T) {
+	t.Parallel()
+	dir := fixture.EpicScratchDir(t, "epic")
+	claimed := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	want := Event{
+		Type: string(eventsc.LaunchTimed), Ticket: "04", Path: "resumed", ClaimedAt: claimed, Total: 10 * time.Second,
+		WorktreeStep: time.Second, DepsStep: 2 * time.Second, AgentStep: 3 * time.Second, PromptStep: 4 * time.Second,
+	}
+	if err := AppendEvent(dir, "epic", want); err != nil {
+		t.Fatalf("AppendEvent: %v", err)
+	}
+	got, ok, err := ReadEvents(dir, "epic")
+	if err != nil || !ok || len(got) != 1 {
+		t.Fatalf("ReadEvents = %v, %v, %v; want 1 event", got, ok, err)
+	}
+	g := got[0]
+	if !g.ClaimedAt.Equal(claimed) || g.Total != want.Total || g.WorktreeStep != time.Second || g.DepsStep != 2*time.Second ||
+		g.AgentStep != 3*time.Second || g.PromptStep != 4*time.Second || g.Path != "resumed" {
+		t.Errorf("event = %+v, want %+v", g, want)
+	}
+}
+
 func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
 	t.Parallel()
 	dir := fixture.EpicScratchDir(t, "epic")

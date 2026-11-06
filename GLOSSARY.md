@@ -546,6 +546,13 @@ Tickets tab still reads markdown.
 **Launch** — the server starting an iteration: claim the ticket, create the worktree, open the
 herdr tab and start the agent. _Avoid_: spawn (retired), start (ambiguous with `gx server start`).
 
+**Launch time** — how long a **Launch** took: from the claim to the launch prompt being delivered.
+Only a launch that reaches prompt delivered has one; it is written as a `launch-timed` run-log event.
+
+**Launch step** — one of the four parts of a **Launch**, timed separately: creating the worktree,
+installing dependencies (waiting on a shared install counts), starting the agent, and sending the
+prompt. The four steps add up to the **Launch time**.
+
 **Reclaim** — the server, after a restart, taking back an iteration whose pane is still live and
 owned (found by its recorded handle). A handle that no longer matches pauses the ticket
 with reason `handle-mismatch`. Replaces **Reattach** and Re-adopt; there is no prompt. A surviving herdr pane alone

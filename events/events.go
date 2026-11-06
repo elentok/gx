@@ -77,6 +77,9 @@ const (
 const (
 	LaunchFailed Type = "launch-failed"
 	Reclaimed    Type = "reclaimed"
+	// LaunchTimed is a launch that reached prompt delivered: its claim time,
+	// total and the time in each of the four launch steps.
+	LaunchTimed Type = "launch-timed"
 	// ClaimReopened is a claim a restarted server found dead and empty, so it
 	// cleared the iteration and reopened the ticket instead of pausing it.
 	ClaimReopened Type = "claim-reopened"

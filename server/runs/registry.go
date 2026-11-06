@@ -103,6 +103,32 @@ type TrackedRun struct {
 	// LaunchStep is the launch step the run is in, "" once the launch ended.
 	// Never saved: a restart reclaims or hands back a launch.
 	LaunchStep LaunchStep `json:"-"`
+	// LaunchTimings is the time each launch step took; the open step is counted
+	// when it ends. Never saved.
+	LaunchTimings LaunchTimings `json:"-"`
+	stepSince     time.Time
+}
+
+// LaunchTimings is the time spent in each launch step. A step entered again
+// (a prompt retry) adds up.
+type LaunchTimings struct {
+	Worktree, Deps, Agent, Prompt time.Duration
+}
+
+// Total is the claim to prompt delivered time: the four steps back to back.
+func (l LaunchTimings) Total() time.Duration { return l.Worktree + l.Deps + l.Agent + l.Prompt }
+
+func (l *LaunchTimings) add(step LaunchStep, d time.Duration) {
+	switch step {
+	case StepCreatingWorktree:
+		l.Worktree += d
+	case StepInstallingDeps:
+		l.Deps += d
+	case StepStartingAgent:
+		l.Agent += d
+	case StepSendingPrompt:
+		l.Prompt += d
+	}
 }
 
 // LaunchStep names one of the four steps of a launch, in order.
@@ -517,17 +543,44 @@ func (r *Registry) SetLaunchStep(address string, step LaunchStep) bool {
 	if !ok || t.LaunchStep == step {
 		return false
 	}
-	t.LaunchStep = step
+	t.moveStep(step)
 	r.runs[address] = t
 	return true
 }
 
-// Put replaces the entry at t.Address. The launch step is in-memory state the
-// replaced entry owns, so it carries over; SetLaunchStep clears it.
+// EndLaunch ends the run's launch at prompt delivered and returns the time each
+// step took. A run with no open step (missing, or already ended) reports false.
+func (r *Registry) EndLaunch(address string) (LaunchTimings, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.runs[address]
+	if !ok || t.LaunchStep == "" {
+		return LaunchTimings{}, false
+	}
+	t.moveStep("")
+	r.runs[address] = t
+	return t.LaunchTimings, true
+}
+
+// moveStep books the time since the step began to it and enters step.
+func (t *TrackedRun) moveStep(step LaunchStep) {
+	now := time.Now()
+	since := t.stepSince
+	if since.IsZero() {
+		since = t.StartedAt
+	}
+	t.LaunchTimings.add(t.LaunchStep, now.Sub(since))
+	t.stepSince, t.LaunchStep = now, step
+}
+
+// Put replaces the entry at t.Address. The launch step and its timings are
+// in-memory state the replaced entry owns, so they carry over; SetLaunchStep
+// clears the step.
 func (r *Registry) Put(t TrackedRun) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	t.LaunchStep = r.runs[t.Address].LaunchStep
+	old := r.runs[t.Address]
+	t.LaunchStep, t.LaunchTimings, t.stepSince = old.LaunchStep, old.LaunchTimings, old.stepSince
 	r.runs[t.Address] = t
 	r.save()
 }

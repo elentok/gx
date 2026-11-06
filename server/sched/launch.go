@@ -202,6 +202,16 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 		Type: string(events.IterationStarted), Agent: agentKind, Label: label, Cwd: cwd,
 		AgentSession: session.SessionID, Path: path, TargetTip: one.TargetTip,
 	})
+	if timings, ok := l.Registry.EndLaunch(ticket.String()); ok {
+		ev := runlog.Event{
+			Type: string(events.LaunchTimed), Label: label, Path: path, Total: timings.Total(),
+			WorktreeStep: timings.Worktree, DepsStep: timings.Deps, AgentStep: timings.Agent, PromptStep: timings.Prompt,
+		}
+		if tr, found := l.Registry.Tracked(ticket.String()); found {
+			ev.ClaimedAt = tr.StartedAt
+		}
+		l.LogEvent(ticket, ev)
+	}
 	run := runs.Run{Address: ticket.String(), Agent: string(agentKind), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil
 }
