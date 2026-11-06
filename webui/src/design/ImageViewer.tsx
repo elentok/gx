@@ -24,7 +24,7 @@ export function ImageViewer({
       label="Image"
       onClose={onClose}
       data-mock-part="full-size"
-      bg="#000"
+      bg="black"
       borderColor="transparent"
       backdrop={{ p: "0" }}
       w="100%"
