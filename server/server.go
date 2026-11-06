@@ -504,7 +504,7 @@ const DefaultMergeStopTimeout = 30 * time.Second
 func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
 	s.budget.SeedNotes(time.Now())
-	s.chat.Notice(notify.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
+	s.chat.Notice(notify.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "Build " + s.cfg.Build})
 	s.budget.StartExtraUsageCheck(time.Now())
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	// Armed before the socket serves, so no save after startup goes unseen.

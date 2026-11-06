@@ -107,7 +107,7 @@ func TestServerNotices_RestartSendsOneServerLevelMessage(t *testing.T) {
 	got := wait(1)
 	cancel()
 	<-done
-	if len(got) != 1 || !strings.Contains(got[0], "Server started") {
+	if len(got) != 1 || !strings.Contains(got[0], "Server started") || !strings.Contains(got[0], "Build ") {
 		t.Fatalf("sends = %v, want one 'server started'", got)
 	}
 }
@@ -175,7 +175,7 @@ func TestServerNotices_BudgetLimitsCountSpendBeyondOverride(t *testing.T) {
 	if n := strings.Count(all, "hard limit reached"); n != 1 {
 		t.Errorf("hard notices = %d, want 1: %s", n, all)
 	}
-	for _, want := range []string{"$25.00 of $20.00", "$55.00 of $50.00"} {
+	for _, want := range []string{"$25.00 of $20.00", `$55.00 of $50.00 today\nDispatch is held.`} {
 		if !strings.Contains(all, want) {
 			t.Errorf("missing post-override detail %q: %s", want, all)
 		}
@@ -239,7 +239,7 @@ func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 	s.budget.NotifyAt(now.Add(2 * time.Minute))
 	s.chat.Close()
 	got := wait(-1)
-	if len(got) != 1 || !strings.Contains(got[0], "Daily summary") || !strings.Contains(got[0], "2026-10-06") {
+	if len(got) != 1 || !strings.Contains(got[0], "Daily summary 2026-10-06") || strings.Contains(got[0], "2026-10-06:") {
 		t.Fatalf("sends = %v, want one daily summary for 2026-10-06", got)
 	}
 }

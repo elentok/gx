@@ -80,6 +80,10 @@ func TestHerdrWatch_SyncBannerStreamsEachTransitionOnce(t *testing.T) {
 	if len(h.notices) != 2 {
 		t.Fatalf("notices = %v, want one per transition", h.notices)
 	}
+	wantNotices := []string{"herdr is not answering. Waiting: proj:epic/01", "herdr answers again."}
+	if h.notices[0] != wantNotices[0] || h.notices[1] != wantNotices[1] {
+		t.Fatalf("notices = %q, want %q", h.notices, wantNotices)
+	}
 }
 
 func TestHerdrWatch_HoldsOnlyHerdrRunners(t *testing.T) {

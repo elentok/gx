@@ -152,6 +152,13 @@ func (w *HerdrWatch) Check() {
 	}
 }
 
+// downNoticeDetail words the banner text as the chat notice reads: sentences,
+// with "not answering" for a herdr that is down.
+func downNoticeDetail(banner string) string {
+	banner = strings.Replace(banner, "herdr is down; waiting: ", "herdr is not answering. Waiting: ", 1)
+	return strings.Replace(banner, "; waiting: ", ". Waiting: ", 1)
+}
+
 // SyncBanner streams the banner appearing or going away, with a chat notice.
 // The need changes with the queue and the runs, so the claim loop calls it too.
 func (w *HerdrWatch) SyncBanner() {
@@ -161,12 +168,12 @@ func (w *HerdrWatch) SyncBanner() {
 	}
 	if show {
 		w.host.Publish(wire.EventHerdrUnavailable, "")
-		w.host.Notice(notify.ServerNotice{Kind: wire.EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text, HoldsWork: true})
+		w.host.Notice(notify.ServerNotice{Kind: wire.EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: downNoticeDetail(text), HoldsWork: true})
 		return
 	}
 	w.host.Publish(wire.EventHerdrAvailable, "")
 	if !w.IsUnavailable() {
-		w.host.Notice(notify.ServerNotice{Kind: wire.EventHerdrAvailable, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
+		w.host.Notice(notify.ServerNotice{Kind: wire.EventHerdrAvailable, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again."})
 	}
 }
 
