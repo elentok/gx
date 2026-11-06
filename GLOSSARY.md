@@ -1020,6 +1020,13 @@ line** tallies the epic states across the Queue (`done · in progress · paused 
 Zero clauses are suppressed except `done` and `total`, which always render. Counts are always
 **epic-truth** — recomputed from disk over the whole epic — never scoped to one run's own progress.
 
+**Headline** — the first line of a chat message: status icon, status word, then what it is about
+(the ticket's `epic/NN` and title, or the epic or session name when there is no ticket). A phone
+toast shows little more than this line. _Avoid_: header (the old project-name line above a message),
+title (the ticket's own title, which the headline carries).
+
+**Status word** — the one word in a headline that says what happened, e.g. Done, Merged, Answer.
+
 ## Web top bar
 
 **Tray** — the group of system health icons on the right side of the web top bar: CPU load, memory
