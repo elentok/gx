@@ -1812,6 +1812,19 @@ export interface SessionChatMessage {
    * Calls is one line per folded tool call: the tool and its command or target.
    */
   calls?: string[];
+  /**
+   * Images are the Prompt images a person message carries, in chip order.
+   */
+  images?: SessionChatImage[];
+}
+/**
+ * SessionChatImage is one image of a chat message. ID names the saved image
+ * the serve route returns; Placeholder is set instead when the file is outside
+ * the session's images folder or gone.
+ */
+export interface SessionChatImage {
+  id?: string;
+  placeholder?: boolean;
 }
 /**
  * SessionChatResponse is the visible messages of a session's newest

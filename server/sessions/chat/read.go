@@ -3,11 +3,13 @@ package chat
 import (
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/transcript"
 )
 
 // readable resolves a read's session id, or answers the refusal or error and
@@ -48,7 +50,7 @@ func (c *Chat) transcriptRead(w http.ResponseWriter, r *http.Request) {
 // a plain chat read would.
 func (c *Chat) archiveRead(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("session")
-	_, meta, ok := c.readable(w, id)
+	dir, meta, ok := c.readable(w, id)
 	if !ok {
 		return
 	}
@@ -57,7 +59,7 @@ func (c *Chat) archiveRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no archived rollout for this session", http.StatusNotFound)
 		return
 	}
-	read, err := chatreader.ReadZstdFile(harness.Codex, path)
+	read, err := chatreader.ReadZstdFile(harness.Codex, path, transcript.WithImagesDir(filepath.Join(dir, ImagesDir)))
 	if err != nil {
 		http.Error(w, "cannot decode the archived rollout: "+err.Error(), http.StatusUnprocessableEntity)
 		return
@@ -73,7 +75,7 @@ func (c *Chat) archiveRead(w http.ResponseWriter, r *http.Request) {
 
 func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("session")
-	_, meta, ok := c.readable(w, id)
+	dir, meta, ok := c.readable(w, id)
 	if !ok {
 		return
 	}
@@ -90,7 +92,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		_, out.Archived = c.codexArchive(id, meta)
 	} else {
-		snap, err := c.ReadSnapshot(path, kind, meta.Ticket)
+		snap, err := c.ReadSnapshot(path, kind, meta.Ticket, dir)
 		switch {
 		case os.IsNotExist(err): // vanished since the lookup: no chat yet
 		case err != nil:

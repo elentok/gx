@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -27,7 +28,7 @@ const (
 	// and refused with a reason instead of cut off.
 	imageBodyCap = maxImageBytes + 64<<10
 	// imagesDir is the folder of a session's Prompt images, inside its state dir.
-	imagesDir = "images"
+	imagesDir = chat.ImagesDir
 )
 
 // imageExts maps a type detected from the bytes to the saved file's extension.

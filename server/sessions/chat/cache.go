@@ -2,6 +2,7 @@ package chat
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -70,11 +71,15 @@ func (c *Cache) Read(path string, kind agentrunner.Kind, final bool, load func(s
 	return chat, nil
 }
 
+// ImagesDir is the folder of a session's Prompt images, inside its state dir.
+const ImagesDir = "images"
+
 // Loader returns the load func for a session whose design ticket is ticket;
-// final is whether its map is at a step with no Continue.
-func Loader(kind agentrunner.Kind, ticket string, final bool) func(string) (Snapshot, error) {
+// final is whether its map is at a step with no Continue. sessionDir is the
+// session's state dir, whose images folder the chat's saved images sit in.
+func Loader(kind agentrunner.Kind, ticket, sessionDir string, final bool) func(string) (Snapshot, error) {
 	return func(path string) (Snapshot, error) {
-		read, _, err := chatreader.ReadFile(kind, path)
+		read, _, err := chatreader.ReadFile(kind, path, transcript.WithImagesDir(filepath.Join(sessionDir, ImagesDir)))
 		if err != nil {
 			return Snapshot{}, err
 		}
@@ -116,7 +121,11 @@ func SnapshotOf(read chatreader.Result, kind agentrunner.Kind, ticket string, fi
 		if m.Role == transcript.ChatRoleAgent && m.Kind == transcript.ChatKindText {
 			text, _ = grillround.SplitFences(text)
 		}
-		snap.Msgs = append(snap.Msgs, wire.SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls})
+		var images []wire.SessionChatImage
+		for _, im := range m.Images {
+			images = append(images, wire.SessionChatImage{ID: im.ID, Placeholder: im.Placeholder})
+		}
+		snap.Msgs = append(snap.Msgs, wire.SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls, Images: images})
 	}
 	return snap
 }

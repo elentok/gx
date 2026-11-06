@@ -65,6 +65,16 @@ type SessionChatMessage struct {
 	LastTool  string `json:"last_tool,omitempty"`
 	// Calls is one line per folded tool call: the tool and its command or target.
 	Calls []string `json:"calls,omitempty"`
+	// Images are the Prompt images a person message carries, in chip order.
+	Images []SessionChatImage `json:"images,omitempty"`
+}
+
+// SessionChatImage is one image of a chat message. ID names the saved image
+// the serve route returns; Placeholder is set instead when the file is outside
+// the session's images folder or gone.
+type SessionChatImage struct {
+	ID          string `json:"id,omitempty"`
+	Placeholder bool   `json:"placeholder,omitempty"`
 }
 
 // SessionTranscriptResponse locates a session's conversation file. Harness

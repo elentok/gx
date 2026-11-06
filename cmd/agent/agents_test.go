@@ -81,6 +81,23 @@ func TestAgentsChat_JSON(t *testing.T) {
 	}
 }
 
+func TestAgentsChat_ListsAnImagesOnlyMessage(t *testing.T) {
+	t.Parallel()
+	imgs := []wire.SessionChatImage{{ID: "aa11"}, {Placeholder: true}}
+	for _, c := range []struct {
+		msg  wire.SessionChatMessage
+		want string
+	}{
+		{wire.SessionChatMessage{Role: "person", Kind: "prompt", Images: imgs}, "person\tprompt\t[2 images]"},
+		{wire.SessionChatMessage{Role: "person", Kind: "prompt", Text: "look", Images: imgs[:1]}, "person\tprompt\tlook [1 image]"},
+		{wire.SessionChatMessage{Role: "agent", Kind: "text", Text: "hi"}, "agent\ttext\thi"},
+	} {
+		if got := chatLine(c.msg); got != c.want {
+			t.Errorf("chatLine(%+v) = %q, want %q", c.msg, got, c.want)
+		}
+	}
+}
+
 func TestAgentsScreen_JSON(t *testing.T) {
 	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())

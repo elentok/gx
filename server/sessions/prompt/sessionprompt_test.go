@@ -263,6 +263,28 @@ func TestWebSessionPrompt_StaleWhenTheTranscriptMoved(t *testing.T) {
 	waitForSubmitted(t, f.conv, "\"SQLite\"\n")
 }
 
+func TestWebSessionPrompt_AnImagesOnlyMessageIsTheLastMessage(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	writeTranscript(t, f.transcript,
+		`{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"Which store?"}]}}`,
+		`{"type":"user","uuid":"u-p1","promptId":"p1","timestamp":"2026-01-01T10:00:01Z","message":{"content":[{"type":"text","text":"[Image #1]"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AAAA"}}]}}`,
+		`{"type":"user","isMeta":true,"promptId":"p1","message":{"content":[{"type":"text","text":"[Image: source: /elsewhere/shot.png]"}]}}`,
+	)
+	post := func(last string) string {
+		body := fmt.Sprintf(`{"id":%q,"text":"SQLite","last_message":%q}`, f.id, last)
+		_, out := servertest.WebPostJSON(t, f.base+"/v1/sessions/prompt", body, f.ck, "", servertest.JSONPost(f.base))
+		return servertest.ReasonOf(t, out)
+	}
+	if got := post("a1"); got != wire.ReasonStale {
+		t.Errorf("message before the images = %q, want stale", got)
+	}
+	if got := post("u-p1"); got != "" {
+		t.Errorf("the images-only message = %q, want sent", got)
+	}
+	waitForSubmitted(t, f.conv, "\"SQLite\"\n")
+}
+
 func (f promptFixture) cont(t *testing.T) wire.SessionResult {
 	t.Helper()
 	res, err := f.h.Client.Sessions.Prompt(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true})

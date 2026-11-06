@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ralphloop/agent"
@@ -432,11 +433,25 @@ func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 		return cmdbase.EncodeProvenance(w, chat, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	for _, m := range chat.Messages {
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", m.Role, m.Kind, m.Text); err != nil {
+		if _, err := fmt.Fprintln(w, chatLine(m)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// chatLine is one message as a tab-separated line; a message with images ends
+// in a short mark of how many, so an images-only message still shows.
+func chatLine(m wire.SessionChatMessage) string {
+	text := m.Text
+	switch n := len(m.Images); n {
+	case 0:
+	case 1:
+		text = strings.TrimSpace(text + " [1 image]")
+	default:
+		text = strings.TrimSpace(fmt.Sprintf("%s [%d images]", text, n))
+	}
+	return m.Role + "\t" + m.Kind + "\t" + text
 }
 
 func newAgentsScreenCmd(d Deps) *cobra.Command {

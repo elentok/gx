@@ -85,7 +85,7 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 		imgs = p.imageSetOf(dir, req.Images, paths)
 	}
 	if source == promptSourceWeb {
-		last, err := p.lastChatMessageID(req.ID, meta)
+		last, err := p.lastChatMessageID(req.ID, dir, meta)
 		if err != nil {
 			return wire.SessionResult{}, err
 		}
@@ -167,12 +167,12 @@ func (p *Prompt) notePersonTyped(dir string, meta sessions.Meta, why string) err
 
 // lastChatMessageID is the id of the newest visible message of the session's
 // chat, or "" with none.
-func (p *Prompt) lastChatMessageID(id string, meta sessions.Meta) (string, error) {
+func (p *Prompt) lastChatMessageID(id, dir string, meta sessions.Meta) (string, error) {
 	path, kind, ok := p.sessionChat.Transcript(id, meta.ChatMeta())
 	if !ok {
 		return "", nil
 	}
-	snap, err := p.sessionChat.ReadSnapshot(path, kind, meta.Ticket)
+	snap, err := p.sessionChat.ReadSnapshot(path, kind, meta.Ticket, dir)
 	if os.IsNotExist(err) || len(snap.Msgs) == 0 {
 		return "", nil
 	}

@@ -98,10 +98,11 @@ func New(d Deps) *Chat {
 	}
 }
 
-// ReadSnapshot reads the chat at path, as the page would see it.
-func (c *Chat) ReadSnapshot(path string, kind agentrunner.Kind, ticket string) (Snapshot, error) {
+// ReadSnapshot reads the chat at path, as the page would see it. sessionDir is
+// the session's state dir.
+func (c *Chat) ReadSnapshot(path string, kind agentrunner.Kind, ticket, sessionDir string) (Snapshot, error) {
 	final := c.src.DesignFinal(ticket)
-	return c.chats.Read(path, kind, final, Loader(kind, ticket, final))
+	return c.chats.Read(path, kind, final, Loader(kind, ticket, sessionDir, final))
 }
 
 func refuse(reason, msg string) wire.SessionResult {
