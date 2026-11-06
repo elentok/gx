@@ -107,6 +107,31 @@ func TestLoad_TitleComesFromHeading(t *testing.T) {
 	}
 }
 
+func TestTicketTitle(t *testing.T) {
+	cases := []struct {
+		name, body, want string
+	}{
+		{"heading", "# OS notifier package\n", "OS notifier package"},
+		{"id only falls back to slug", "# 07\n", "Os notifier"},
+		{"code fence comment is skipped", "```sh\n# run it\n```\n", "Os notifier"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "07-os-notifier.md")
+			writeFile(t, path, "---\nid: \"07\"\nstatus: open\ntype: implement\n---\n\n"+tc.body)
+			if got := TicketTitle(path); got != tc.want {
+				t.Errorf("TicketTitle = %q, want %q", got, tc.want)
+			}
+		})
+	}
+
+	t.Run("missing file is empty", func(t *testing.T) {
+		if got := TicketTitle(filepath.Join(t.TempDir(), "07-os-notifier.md")); got != "" {
+			t.Errorf("TicketTitle = %q, want empty", got)
+		}
+	})
+}
+
 func TestLoad_MirrorsMutes(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-ticket.md"),

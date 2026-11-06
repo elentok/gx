@@ -233,6 +233,21 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 	return ticket
 }
 
+// TicketTitle returns the Title the loader gives the ticket at ticketPath: its
+// first heading, else the humanized file name slug. It returns "" when the file
+// cannot be read, so callers can tell a missing ticket from an untitled one.
+func TicketTitle(ticketPath string) string {
+	raw, err := readTicketFile(ticketPath)
+	if err != nil {
+		return ""
+	}
+	_, identifier, title, _ := ParseTicketFilename(filepath.Base(ticketPath))
+	if heading := headingTitle(schema.ParseBody(string(raw)), identifier); heading != "" {
+		return heading
+	}
+	return title
+}
+
 // ParseTicketFilename splits a "NN[suffix]-<slug>.md" filename into its
 // numeric sort key, full identifier, and a humanized title. The optional
 // suffix supports wayfinder's split tickets (for example 10a) and, one
