@@ -43,8 +43,8 @@ type chatMessage struct {
 
 // Headline is the first line, before escaping.
 func (m chatMessage) Headline() string {
-	parts := []string{m.icon}
-	for _, p := range []string{m.status, m.subject} {
+	var parts []string
+	for _, p := range []string{m.icon, m.status, m.subject} {
 		if p != "" {
 			parts = append(parts, p)
 		}

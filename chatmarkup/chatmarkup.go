@@ -5,10 +5,7 @@
 // never by convention at the call site.
 package chatmarkup
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // Text is a platform-safe, already-escaped fragment of chat markup. Its
 // field is unexported so a value can only be constructed by calling into
@@ -22,13 +19,6 @@ type Text struct {
 // client. Reading out is unrestricted — only construction is sealed.
 func (t Text) String() string {
 	return t.s
-}
-
-// WithSuffix appends raw, escaped-on-the-way-in text to t — the batch ×N
-// dedup suffix's escaped path, replacing the raw `" ×%d"` literal callers
-// used to append directly.
-func (t Text) WithSuffix(raw string, style Style) Text {
-	return Text{s: t.s + style.escape(raw)}
 }
 
 // Style carries one platform dialect's escape rules and emphasis syntax —
@@ -49,35 +39,6 @@ type Style struct {
 // carrying the dialect-escaped equivalent out.
 func (s Style) Escape(raw string) Text {
 	return Text{s: s.escape(raw)}
-}
-
-// Bold wraps raw text in this dialect's bold emphasis syntax, escaping the
-// content first.
-func (s Style) Bold(raw string) Text {
-	return Text{s: s.boldDelim + s.escape(raw) + s.boldDelim}
-}
-
-// Italic wraps raw text in this dialect's italic emphasis syntax, escaping
-// the content first.
-func (s Style) Italic(raw string) Text {
-	return Text{s: s.italicDelim + s.escape(raw) + s.italicDelim}
-}
-
-// Message assembles the shared notification layout — emoji, bold headline,
-// a blank line, an optional counts line, an optional detail line, and
-// identity last — from raw, unescaped fragments, escaping every one of them
-// internally. This replaces the old pattern where callers were expected to
-// pre-escape counts/detail/identity themselves.
-func (s Style) Message(emoji, headline, counts, detail, identity string) Text {
-	lines := []string{fmt.Sprintf("%s %s", emoji, s.Bold(headline).s), ""}
-	if counts != "" {
-		lines = append(lines, s.escape(counts))
-	}
-	if detail != "" {
-		lines = append(lines, s.escape(detail))
-	}
-	lines = append(lines, s.escape(identity))
-	return Text{s: strings.Join(lines, "\n")}
 }
 
 // Layout assembles the Chat layout from raw fragments: the headline as plain

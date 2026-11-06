@@ -77,8 +77,8 @@ func SendSlackTestMessage(webhookURL string) error {
 // symmetry/smoke-testing the batch plumbing, not because Slack has the bug.
 func SendSlackTestBatch(webhookURL string) error {
 	items := []batchedMessage{
-		{text: slackStyle.testMessageText(), kind: "test"},
-		{text: slackStyle.testMessageText(), kind: "test"},
+		newBatchedMessage(slackStyle, testMessage()),
+		newBatchedMessage(slackStyle, testMessage()),
 	}
 	return sendSlackMessageRaw(webhookURL, renderBatch(slackStyle, items))
 }

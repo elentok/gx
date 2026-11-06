@@ -208,8 +208,8 @@ func unescapedTelegramMarkdownV2Char(text string) (string, int) {
 func TestRenderBatch_TelegramStyle_MultipleItems_SeparatorIsEscaped(t *testing.T) {
 	t.Parallel()
 	items := []batchedMessage{
-		{text: telegramStyle.testMessageText(), kind: "a"},
-		{text: telegramStyle.testMessageText(), kind: "b"},
+		newBatchedMessage(telegramStyle, testMessage()),
+		newBatchedMessage(telegramStyle, testMessage()),
 	}
 	got := renderBatch(telegramStyle, items)
 	if ch, idx := unescapedTelegramMarkdownV2Char(got.String()); idx != -1 {
@@ -235,8 +235,8 @@ func TestSendTelegramTestBatch_PostsRenderBatchOutputAsIs(t *testing.T) {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
 	want := renderBatch(telegramStyle, []batchedMessage{
-		{text: telegramStyle.testMessageText(), kind: "test"},
-		{text: telegramStyle.testMessageText(), kind: "test"},
+		newBatchedMessage(telegramStyle, testMessage()),
+		newBatchedMessage(telegramStyle, testMessage()),
 	})
 	if reqs[0].Text != want.String() {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)

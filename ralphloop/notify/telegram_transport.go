@@ -171,8 +171,8 @@ func SendTelegramTestBatch(botToken, chatID string) error {
 
 func sendTelegramTestBatch(botToken, chatID, apiBaseURL string) error {
 	items := []batchedMessage{
-		{text: telegramStyle.testMessageText(), kind: "test"},
-		{text: telegramStyle.testMessageText(), kind: "test"},
+		newBatchedMessage(telegramStyle, testMessage()),
+		newBatchedMessage(telegramStyle, testMessage()),
 	}
 	return sendTelegramRaw(botToken, chatID, apiBaseURL, renderBatch(telegramStyle, items))
 }

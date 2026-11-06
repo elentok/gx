@@ -32,34 +32,17 @@ func formatTokens(n int) string {
 	return fmt.Sprintf("%dk tok", k)
 }
 
-// mrkdwnStyle adapts the shared message templates below to a specific chat
-// platform's markup dialect via chatStyle (chatmarkup's own dialect value,
-// which every *Text function and renderBatch's batch separator routes its
-// raw fragments through — see chat_eventsink.go). gxPrefix is the raw
-// literal "[gx]" tag for both platforms; it's no longer pre-escaped, since it
-// now flows through the same chatmarkup.Style.Message boundary escape as
-// every other fragment.
+// mrkdwnStyle adapts the chat message layout to a specific chat platform's
+// markup dialect via chatStyle (chatmarkup's own dialect value, which every
+// message render and renderBatch's batch separator routes its raw fragments
+// through — see chat_eventsink.go).
 type mrkdwnStyle struct {
 	chatStyle chatmarkup.Style
-	gxPrefix  string
 }
 
-var telegramStyle = mrkdwnStyle{chatStyle: chatmarkup.Telegram, gxPrefix: "[gx]"}
+var telegramStyle = mrkdwnStyle{chatStyle: chatmarkup.Telegram}
 
-var slackStyle = mrkdwnStyle{chatStyle: chatmarkup.Slack, gxPrefix: "[gx]"}
-
-// identityLine renders the trailing "who this is about" line: the gx tag
-// plus the epic name alone, or the epic and a ticket identifier — never an
-// iteration label, so parallel epics stay attributable at a glance. The
-// result is raw, unescaped text: every *Text function hands it to
-// chatStyle.Message as the identity fragment, which escapes it there.
-func (s mrkdwnStyle) identityLine(epicName, ticketIdentifier string) string {
-	ref := epicName
-	if ticketIdentifier != "" {
-		ref = fmt.Sprintf("%s/%s", epicName, ticketIdentifier)
-	}
-	return fmt.Sprintf("%s %s", s.gxPrefix, ref)
-}
+var slackStyle = mrkdwnStyle{chatStyle: chatmarkup.Slack}
 
 // testMessageText renders the fixed message `gx config test-notifications`
 // sends to confirm a configured service is actually reachable.

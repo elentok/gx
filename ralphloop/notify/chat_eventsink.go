@@ -61,7 +61,7 @@ type sendResult struct {
 // ServerChat. style picks the markup dialect (slackStyle/telegramStyle);
 // transport picks the destination — one implementation, two configurations.
 // It overrides no EventSink method: every event passes straight through to
-// the embedded EventSink, and ServerChat sends its messages with send/sendIn.
+// the embedded EventSink, and ServerChat sends its messages with sendMessage.
 //
 // ChatEventSink is the interface chatEventSink satisfies — a named interface
 // a caller like ServerChat can assert against to close the sink's flush loop
@@ -139,8 +139,7 @@ type batchedMessage struct {
 	text  chatmarkup.Text
 	kind  string
 	count int
-	// msg is set for a message in the new layout, nil for a legacy
-	// pre-rendered text (the cleanup ticket removes the legacy path).
+	// msg is the message text was rendered from.
 	msg *chatMessage
 	// requeued marks an entry that came back from a failed flush send (see
 	// chatEventSink.requeue) rather than a fresh enqueue — flush uses it to
@@ -152,7 +151,7 @@ type batchedMessage struct {
 }
 
 // newChatEventSink wires inner to transport via style. Every chat-member
-// event's rendered text passes through the budget/mute gate (see send) and,
+// event's rendered message passes through the budget/mute gate (see sendMessage) and,
 // if allowed, is queued rather than sent immediately — a periodic flush
 // (see flush) renders every queued message as one send. newChatEventSink
 // itself does not start the flush loop (see startFlushLoop); ServerChat
@@ -274,7 +273,12 @@ func (s *chatEventSink) cancelInFlight(deadline time.Time) {
 
 // enqueueMessage queues a chatMessage without running it through the gate.
 func (s *chatEventSink) enqueueMessage(msg chatMessage) {
-	s.enqueueItem(batchedMessage{text: msg.Text(s.style.chatStyle), kind: msg.kind, msg: &msg})
+	s.enqueueItem(newBatchedMessage(s.style, msg))
+}
+
+// newBatchedMessage renders msg for style into a queue entry.
+func newBatchedMessage(style mrkdwnStyle, msg chatMessage) batchedMessage {
+	return batchedMessage{text: msg.Text(style.chatStyle), kind: msg.kind, msg: &msg}
 }
 
 // enqueueItem queues item, collapsing it into an identical queued entry.
@@ -397,8 +401,7 @@ const batchSeparatorRaw = "---"
 
 // renderBatch joins every queued message into one send, separator lines
 // between originally-distinct messages. A deduped message shows ×N at the end
-// of its Headline (a legacy pre-rendered text gets it through
-// chatmarkup.Text.WithSuffix). style escapes the separator for
+// of its Headline. style escapes the separator for
 // the target dialect — item text is already safe by the time it's queued
 // (see enqueue), but the separator is renderBatch's own literal, so it needs
 // the same treatment; chatmarkup.Join only accepts already-safe Text values,
@@ -407,14 +410,10 @@ func renderBatch(style mrkdwnStyle, items []batchedMessage) chatmarkup.Text {
 	parts := make([]chatmarkup.Text, len(items))
 	for i, it := range items {
 		parts[i] = it.text
-		switch {
-		case it.count <= 1:
-		case it.msg != nil:
+		if it.count > 1 {
 			m := *it.msg
 			m.repeat = it.count
 			parts[i] = m.Text(style.chatStyle)
-		default:
-			parts[i] = it.text.WithSuffix(fmt.Sprintf(" ×%d", it.count), style.chatStyle)
 		}
 	}
 	separator := style.chatStyle.Escape("\n\n" + batchSeparatorRaw + "\n\n")
@@ -434,11 +433,8 @@ func renderBatch(style mrkdwnStyle, items []batchedMessage) chatmarkup.Text {
 	return chatmarkup.Join(separator, sorted)
 }
 
-// urgency is the item's class; a legacy pre-rendered text is information.
+// urgency is the item's class.
 func (it batchedMessage) urgency() urgency {
-	if it.msg == nil {
-		return urgencyInformation
-	}
 	return it.msg.urgency
 }
 
@@ -454,9 +450,6 @@ func batchSummary(items []batchedMessage, order []int) string {
 	counts := map[string]int{}
 	for _, i := range order {
 		m := items[i].msg
-		if m == nil {
-			continue
-		}
 		if !iconSet && m.icon != "" {
 			icon, iconSet = m.icon, true
 		}
@@ -558,23 +551,17 @@ func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateRes
 	return notificationGateAt(s.gateStatePath, key, eventType, source, time.Now(), recordSend, s.pauseTicket)
 }
 
-// send runs (eventType, source) through the budget/mute gate before
-// queueing: allowed enqueues text as before (see flush); a trip suppresses
-// text and, if this call is the edge-triggered one, enqueues the "muting
-// this"/"globally muted" notice instead — through the same transport, so
-// the operator is told the storm was throttled rather than just going
-// silent. A gate error (e.g. source's ticket file not found/parseable)
-// fails open: the gate exists to bound a runaway storm, not to gate
-// delivery on its own bookkeeping succeeding, so text is still queued as if
-// the gate weren't there.
-func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIdentifier string) {
-	s.sendItem(batchedMessage{text: text, kind: notifyKind}, source, ticketIdentifier)
-}
-
-// sendMessage is send for a chatMessage: the queue keeps the value so the
-// batcher can read its icon, Status word and urgency.
+// sendMessage runs (kind, source) through the budget/mute gate before
+// queueing: allowed enqueues msg (see flush); a trip suppresses msg and, if
+// this call is the edge-triggered one, enqueues the "muting this"/"globally
+// muted" notice instead — through the same transport, so the operator is told
+// the storm was throttled rather than just going silent. A gate error (e.g.
+// source's ticket file not found/parseable) fails open: the gate exists to
+// bound a runaway storm, not to gate delivery on its own bookkeeping
+// succeeding, so msg is still queued as if the gate weren't there. The queue
+// keeps the value so the batcher can read its icon, Status word and urgency.
 func (s *chatEventSink) sendMessage(msg chatMessage, source, ticketIdentifier string) {
-	s.sendItem(batchedMessage{text: msg.Text(s.style.chatStyle), kind: msg.kind, msg: &msg}, source, ticketIdentifier)
+	s.sendItem(newBatchedMessage(s.style, msg), source, ticketIdentifier)
 }
 
 func (s *chatEventSink) sendItem(item batchedMessage, source, ticketIdentifier string) {

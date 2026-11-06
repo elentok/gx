@@ -100,13 +100,11 @@ func TestMarkdownV2Validity_RenderBatchWithDedupSuffix(t *testing.T) {
 	epicName := "ui-tree.migration (v2)"
 	ticket1 := tickets.Ticket{Identifier: "01", Title: "Fix (parens) - literal *asterisk*."}
 	ticket2 := tickets.Ticket{Identifier: "02", Title: "Second item: cost $1.23!"}
+	muted1 := mutedMessage(filepath.Join(epicName, "issues", ticket1.Identifier+"-x.md"), ticket1.Identifier)
+	muted2 := mutedMessage(filepath.Join(epicName, "issues", ticket2.Identifier+"-x.md"), ticket2.Identifier)
 	items := []batchedMessage{
-		{text: mutedMessage(filepath.Join(epicName, "issues", ticket1.Identifier+"-x.md"), ticket1.Identifier).Text(chatmarkup.Telegram), kind: notifyKindMuted, count: 1},
-		{
-			text:  mutedMessage(filepath.Join(epicName, "issues", ticket2.Identifier+"-x.md"), ticket2.Identifier).Text(chatmarkup.Telegram),
-			kind:  notifyKindMuted,
-			count: 3,
-		},
+		{text: muted1.Text(chatmarkup.Telegram), kind: notifyKindMuted, count: 1, msg: &muted1},
+		{text: muted2.Text(chatmarkup.Telegram), kind: notifyKindMuted, count: 3, msg: &muted2},
 	}
 
 	got := renderBatch(telegramStyle, items).String()

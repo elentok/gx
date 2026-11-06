@@ -93,13 +93,13 @@ func newFakeChatSink(t *testing.T, inner runlog.EventSink) (*chatEventSink, *fak
 // sendTestMessage enqueues a fixed text through send, so batching, gate,
 // requeue and close tests don't depend on any run-loop event's wording.
 func sendTestMessage(sink *chatEventSink, text, kind string) {
-	sink.send(slackStyle.chatStyle.Escape(text), kind, epicSource(sink.epicName), "")
+	sink.sendMessage(chatMessage{subject: text, kind: kind}, epicSource(sink.epicName), "")
 }
 
 // sendTestTicketMessage is sendTestMessage filed under a ticket source, the
 // shape the per-source mute gate keys on.
 func sendTestTicketMessage(sink *chatEventSink, text, kind, identifier string) {
-	sink.send(slackStyle.chatStyle.Escape(text), kind, ResolveTicketPath(sink.scratchDir, sink.epicName, identifier), identifier)
+	sink.sendMessage(chatMessage{subject: text, kind: kind}, ResolveTicketPath(sink.scratchDir, sink.epicName, identifier), identifier)
 }
 
 // TestChatEventSink_Close_CancelsInFlightSendPromptlyInsteadOfWaitingOutBackoff

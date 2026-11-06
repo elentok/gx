@@ -49,32 +49,6 @@ func TestFormatTokens(t *testing.T) {
 	}
 }
 
-// The shared "message" layout constructor itself moved into chatmarkup (see
-// chatmarkup_test.go's TestStyleMessage/TestStyleMessageOmitsEmptyLines) —
-// mrkdwnStyle no longer has its own copy to test directly.
-
-// TestIdentityLine_NeverCarriesTheIterationLabel documents the prohibition
-// directly: identityLine's signature has no label parameter at all, so
-// there is no way to plug one in — this test just pins what it does accept
-// (epic alone, or epic and ticket).
-func TestIdentityLine_EpicAlone(t *testing.T) {
-	t.Parallel()
-	got := slackStyle.identityLine("my-epic", "")
-	want := "[gx] my-epic"
-	if got != want {
-		t.Errorf("identityLine = %q, want %q", got, want)
-	}
-}
-
-func TestIdentityLine_EpicAndTicket(t *testing.T) {
-	t.Parallel()
-	got := slackStyle.identityLine("my-epic", "04")
-	want := "[gx] my-epic/04"
-	if got != want {
-		t.Errorf("identityLine = %q, want %q", got, want)
-	}
-}
-
 func TestTicketPauseMessage_AnswerLayout(t *testing.T) {
 	t.Parallel()
 	msg := ticketPauseMessage("gx", "ui-tree-migration", "", "04", ticketops.PauseStatus("zero-commit"), "No commits merged; marked paused.")
