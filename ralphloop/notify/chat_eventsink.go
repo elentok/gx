@@ -288,6 +288,11 @@ func (s *chatEventSink) enqueueIn(group, text chatmarkup.Text, kind string) {
 	s.enqueueItem(batchedMessage{text: text, kind: kind, group: group})
 }
 
+// enqueueMessage queues a chatMessage without running it through the gate.
+func (s *chatEventSink) enqueueMessage(msg chatMessage) {
+	s.enqueueItem(batchedMessage{text: msg.Text(s.style.chatStyle), kind: msg.kind, msg: &msg})
+}
+
 // enqueueItem queues item, collapsing it into an identical queued entry.
 func (s *chatEventSink) enqueueItem(item batchedMessage) {
 	s.mu.Lock()
@@ -564,11 +569,11 @@ func (s *chatEventSink) sendItem(item batchedMessage, source, ticketIdentifier s
 		s.enqueueItem(item)
 	case PerSourceMuted:
 		if result.EdgeTriggered {
-			s.enqueue(s.style.mutedText(s.epicName, ticketIdentifier), notifyKindMuted)
+			s.enqueueMessage(mutedMessage(source, ticketIdentifier))
 		}
 	case GloballyMuted:
 		if result.EdgeTriggered {
-			s.enqueue(s.style.globallyMutedText(s.transport.name()), notifyKindGloballyMuted)
+			s.enqueueMessage(globallyMutedMessage(s.transport.name()))
 		}
 	}
 }

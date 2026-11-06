@@ -201,3 +201,38 @@ func TestFormatElapsed(t *testing.T) {
 		}
 	}
 }
+
+func TestMutedAndTestMessages_Layout(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "store", "gx", "my-epic", "issues", "07-do-it.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("# Do it\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	muted := mutedMessage(path, "07")
+	if got, want := muted.Headline(), "🔇 Muted my-epic/07 Do it"; got != want {
+		t.Errorf("muted headline = %q, want %q", got, want)
+	}
+	if muted.project != "gx" {
+		t.Errorf("muted project = %q, want gx", muted.project)
+	}
+
+	global := globallyMutedMessage("slack")
+	if got, want := global.Headline(), "🚫 Muted all notifications"; got != want {
+		t.Errorf("global headline = %q, want %q", got, want)
+	}
+	if want := []string{"Re-enable with gx notify --enable slack"}; !slices.Equal(global.lines, want) || global.project != "" {
+		t.Errorf("global = %+v, want lines %v and no project", global, want)
+	}
+
+	test := testMessage()
+	if got, want := test.Headline(), "🔔 Test notification"; got != want {
+		t.Errorf("test headline = %q, want %q", got, want)
+	}
+	if test.project != "" || strings.Contains(test.Text(chatmarkup.Slack).String(), "[gx]") {
+		t.Errorf("test message carries a project or [gx]: %+v", test)
+	}
+}

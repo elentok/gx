@@ -300,7 +300,14 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testin
 		t.Fatalf("sent = %v, want 1 batched message (4 deduped normal sends plus 1 muting notice)", got)
 	}
 	normalText := slackStyle.chatStyle.Escape("paused").String()
-	wantMuted := slackStyle.mutedText(epicName, "04").String()
+	muted := mutedMessage(ticketPath, "04")
+	if got, want := muted.Headline(), "🔇 Muted epic/04 Ticket"; got != want {
+		t.Errorf("muted headline = %q, want %q", got, want)
+	}
+	if want := filepath.Base(scratchDir); muted.project != want {
+		t.Errorf("muted project = %q, want %q", muted.project, want)
+	}
+	wantMuted := muted.Text(slackStyle.chatStyle).String()
 	want := fmt.Sprintf("%s ×4", normalText) + "\n\n---\n\n" + wantMuted
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)

@@ -169,7 +169,10 @@ func TestExecute_ConfigTestNotifications_NoneConfiguredPrintsNoticeAndSucceeds(t
 
 func TestExecute_ConfigTestNotifications_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
 	t.Parallel()
+	var gotBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -190,6 +193,36 @@ func TestExecute_ConfigTestNotifications_SlackConfiguredSendsAndReportsSuccess(t
 	}
 	if !strings.Contains(stdout.String(), "slack: sent") {
 		t.Fatalf("expected slack success line, got: %q", stdout.String())
+	}
+	if !strings.Contains(gotBody, "Test notification") || strings.Contains(gotBody, "[gx]") {
+		t.Fatalf("test message body = %q, want the new layout without [gx]", gotBody)
+	}
+}
+
+func TestExecute_Notify_SlackMessageGoesOutExactlyAsWritten(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	d := Deps{Env: cmdbase.Env{
+		Env:    cmdtest.EnvFor(t),
+		Stdout: bytes.NewBuffer(nil),
+		Stderr: bytes.NewBuffer(nil),
+		LoadConfig: func() (gxconfig.Config, error) {
+			cfg := gxconfig.Default()
+			cfg.Notifications.Slack.WebhookURL = server.URL
+			return cfg, nil
+		},
+	}}
+	if err := run(t, d, "notify", "Deploy finished on staging"); err != nil {
+		t.Fatalf("execute notify: %v", err)
+	}
+	if want := `{"text":"Deploy finished on staging"}`; strings.TrimSpace(gotBody) != want {
+		t.Fatalf("body = %q, want %q", gotBody, want)
 	}
 }
 

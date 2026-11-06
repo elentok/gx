@@ -2,6 +2,7 @@ package notify
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -130,6 +131,43 @@ func escalatedMessage(project, epic, ticketPath, identifier, failure string) cha
 	}
 	msg.lines = []string{"Automatic recovery gave up. " + failure}
 	return msg
+}
+
+// mutedMessage is the edge-triggered per-source mute notice. source is the
+// ticket's file path (store/project/epic/issues/<file>), which is the only
+// place the server's sink can learn the epic and project from.
+func mutedMessage(source, identifier string) chatMessage {
+	issues := filepath.Dir(source)
+	epicDir := filepath.Dir(issues)
+	subject := filepath.Base(epicDir) + "/" + identifier
+	if title := tickets.TicketTitle(source); title != "" {
+		subject += " " + title
+	}
+	return chatMessage{
+		icon: "🔇", status: "Muted", subject: subject,
+		lines:   []string{"Too many messages. Muted until you re-enable it."},
+		project: filepath.Base(filepath.Dir(epicDir)),
+		kind:    notifyKindMuted,
+	}
+}
+
+// globallyMutedMessage is the final notice sent on a transport before every
+// further send on it is suppressed.
+func globallyMutedMessage(transport string) chatMessage {
+	return chatMessage{
+		icon: "🚫", subject: "Muted all notifications",
+		lines: []string{"Re-enable with gx notify --enable " + transport},
+		kind:  notifyKindGloballyMuted,
+	}
+}
+
+// testMessage is what `gx config test-notifications` sends.
+func testMessage() chatMessage {
+	return chatMessage{
+		icon: "🔔", subject: "Test notification",
+		lines: []string{"If you can see this, notifications are working."},
+		kind:  "test",
+	}
 }
 
 // maxResultRunes bounds the Result a chat message carries.

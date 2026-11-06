@@ -85,38 +85,8 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 	return s.chatStyle.Message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
 
-// mutedText renders the gate's edge-triggered per-source mute notice — the
-// one message sent on the allowed→muted transition for a ticket's storm
-// (see chatEventSink.send):
-//
-//	🔇 *muting this*
-//
-//	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) mutedText(epicName, ticketIdentifier string) chatmarkup.Text {
-	return s.chatStyle.Message("\U0001f507", "muting this", "", "", s.identityLine(epicName, ticketIdentifier))
-}
-
-// globallyMutedText renders the gate's edge-triggered global-mute notice —
-// the final message sent on transport before every further send on it is
-// suppressed until `gx notify --enable`:
-//
-//	🚫 *globally muted*
-//
-//	re-enable with `gx notify --enable {transport}`
-//	[gx]
-func (s mrkdwnStyle) globallyMutedText(transport string) chatmarkup.Text {
-	detail := fmt.Sprintf("re-enable with `gx notify --enable %s`", transport)
-	return s.chatStyle.Message("\U0001f6ab", "globally muted", "", detail, s.gxPrefix)
-}
-
 // testMessageText renders the fixed message `gx config test-notifications`
-// sends to confirm a configured service is actually reachable:
-//
-//	🔔 *test notification*
-//
-//	If you can see this, notifications are working.
-//	[gx]
+// sends to confirm a configured service is actually reachable.
 func (s mrkdwnStyle) testMessageText() chatmarkup.Text {
-	body := "If you can see this, notifications are working."
-	return s.chatStyle.Message("\U0001f514", "test notification", "", body, s.gxPrefix)
+	return testMessage().Text(s.chatStyle)
 }

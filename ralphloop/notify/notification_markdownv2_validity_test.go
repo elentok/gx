@@ -52,8 +52,8 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 		"escalatedMessage/ticket":          escalatedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, "No commits merged (yet).").Text(chatmarkup.Telegram),
 		"escalatedMessage/epic":            escalatedMessage(adversarialEpic, adversarialEpic, "", "", "").Text(chatmarkup.Telegram),
 		"epicOutcomeMessage":               epicOutcomeMessage(adversarialEpic, adversarialEpic, overflowCounts, 492, fractionalCost, true).Text(chatmarkup.Telegram),
-		"mutedText":                        telegramStyle.mutedText(adversarialEpic, adversarialTicket),
-		"globallyMutedText":                telegramStyle.globallyMutedText("telegram"),
+		"mutedMessage":                     mutedMessage(adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
+		"globallyMutedMessage":             globallyMutedMessage("telegram").Text(chatmarkup.Telegram),
 		"testMessageText":                  telegramStyle.testMessageText(),
 		"identityLine/punctuation-bearing": telegramStyle.iterationFinishedText(tickets.Ticket{Identifier: "04 (retry)", Title: "x"}, "ui-tree.migration (v2)", stats),
 	}
@@ -103,7 +103,7 @@ func TestMarkdownV2Validity_RenderBatchWithDedupSuffix(t *testing.T) {
 	ticket1 := tickets.Ticket{Identifier: "01", Title: "Fix (parens) - literal *asterisk*."}
 	ticket2 := tickets.Ticket{Identifier: "02", Title: "Second item: cost $1.23!"}
 	items := []batchedMessage{
-		{text: telegramStyle.mutedText(epicName, ticket1.Identifier), kind: notifyKindMuted, count: 1},
+		{text: mutedMessage(filepath.Join(epicName, "issues", ticket1.Identifier+"-x.md"), ticket1.Identifier).Text(chatmarkup.Telegram), kind: notifyKindMuted, count: 1},
 		{
 			text: telegramStyle.iterationFinishedText(ticket2, epicName, runlog.IterationStats{
 				ElapsedSeconds: 65, PeakContextTokens: 1500, Cost: 3.456, Completed: 1, Total: 4,
