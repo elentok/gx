@@ -1,0 +1,131 @@
+import { describe, expect, it } from "vitest";
+import {
+  CardKindDesign,
+  CardKindFollowUps,
+  CardKindImplementation,
+  CardKindOneOff,
+  SectionDesigning,
+  SectionFinished,
+  SectionImplementing,
+  SectionNeedsYou,
+  SectionOnHold,
+  type EpicListRow,
+  type SessionPlacement,
+} from "../generated/server";
+import { session } from "../agents/agentsTestKit";
+import { buildSidebar } from "./sidebarModel";
+
+const row = (address: string, over: Partial<EpicListRow>): EpicListRow =>
+  ({
+    address,
+    project: "p",
+    name: address,
+    kind: "loop",
+    state: "idle",
+    done: 1,
+    total: 4,
+    queued: false,
+    queueable: false,
+    blocked_by_epics: [],
+    workspace: "Default",
+    card_kind: CardKindImplementation,
+    section: SectionImplementing,
+    status_words: "Idle",
+    ...over,
+  }) as EpicListRow;
+
+const base = { workspace: "Default", current: "" };
+const place = (session: string, kind: string, extra: Partial<SessionPlacement> = {}): SessionPlacement => ({ session, kind, ...extra });
+
+describe("buildSidebar", () => {
+  it("makes one row per Design and epic, with a joined card as the Design row", () => {
+    const rows = [
+      row("p:a", { card_kind: CardKindDesign, section: SectionDesigning, addresses: ["p:a", "p:a-impl"] }),
+      row("p:b", {}),
+      row("p:c", { card_kind: CardKindOneOff, workspace: "" }),
+      row("p:d", { card_kind: CardKindFollowUps, workspace: "" }),
+    ];
+    const s = buildSidebar({ ...base, rows, sessions: [], placements: [] });
+    expect(s.rows.map((r) => [r.key, r.kind])).toEqual([
+      ["p:a", "design"],
+      ["p:b", "implementation"],
+    ]);
+  });
+
+  it("nests agents under their epic and expands the current one", () => {
+    const rows = [row("p:a", { addresses: ["p:a"] }), row("p:b", {})];
+    const sessions = [session("s1", "p", { name: "q", queue: true }), session("s2", "p")];
+    const placements = [place("s1", "epic", { epic: "p:a" }), place("s2", "epic", { epic: "p:b" })];
+    const s = buildSidebar({ ...base, rows, sessions, placements, current: "p:a" });
+    expect(s.rows[0].agents.map((a) => a.id)).toEqual(["s1"]);
+    expect(s.rows[0].expanded).toBe(true);
+    expect(s.rows[1].agents.map((a) => a.id)).toEqual(["s2"]);
+    expect(s.rows[1].expanded).toBeUndefined();
+  });
+
+  it("maps Needs you, Working and dimmed server words", () => {
+    const rows = [
+      row("p:a", { section: SectionNeedsYou }),
+      row("p:b", { state: "running" }),
+      row("p:c", { section: SectionFinished, status_words: "Finished" }),
+    ];
+    const s = buildSidebar({ ...base, rows, sessions: [], placements: [] });
+    expect(s.rows.map((r) => r.status)).toEqual([
+      { words: "Needs you", tone: "waiting" },
+      { words: "Working", tone: "running" },
+      { words: "Finished", tone: "muted" },
+    ]);
+  });
+
+  it("lists a held row apart, flagged held, without a number", () => {
+    const rows = [row("p:a", {}), row("p:h", { section: SectionOnHold, status_words: "Finished" })];
+    const s = buildSidebar({ ...base, rows, sessions: [], placements: [] });
+    expect(s.rows.map((r) => r.key)).toEqual(["p:a"]);
+    expect(s.held).toMatchObject([{ key: "p:h", held: true, status: { words: "Finished" } }]);
+    expect(s.held[0].number).toBeUndefined();
+  });
+
+  it("shows only the active workspace's rows and chats", () => {
+    const rows = [row("p:a", {}), row("p:x", { workspace: "Other ws" })];
+    const sessions = [session("c1", "p", { name: "mine" }), session("c2", "p", { name: "theirs" })];
+    const placements = [place("c1", "chat", { workspace: "Default" }), place("c2", "chat", { workspace: "Other ws" })];
+    const s = buildSidebar({ ...base, rows, sessions, placements });
+    expect(s.rows.map((r) => r.key)).toEqual(["p:a", "c1"]);
+  });
+
+  it("names chats, gives them no ring and maps their status", () => {
+    const sessions = [
+      session("c1", "p", { name: "talk", status: { state: "working" } }),
+      session("c2", "p", { actionable: { reason: "Pick" } }),
+    ];
+    const placements = [place("c1", "chat", { workspace: "Default" }), place("c2", "chat", { workspace: "Default" })];
+    const s = buildSidebar({ ...base, rows: [], sessions, placements });
+    expect(s.rows).toMatchObject([
+      { title: "talk", kind: "chat", status: { words: "Working", tone: "running" } },
+      { title: "c2", kind: "chat", status: { words: "Needs you", tone: "waiting" } },
+    ]);
+    expect(s.rows[0].ring).toBeUndefined();
+  });
+
+  it("numbers only own rows, 1 to 9", () => {
+    const rows = Array.from({ length: 11 }, (_, i) => row(`p:e${i}`, {}));
+    rows.push(row("p:h", { section: SectionOnHold }));
+    const sessions = [session("s1", "p", { queue: true }), session("o1", "p")];
+    const placements = [place("s1", "epic", { epic: "p:e0" }), place("o1", "other")];
+    const s = buildSidebar({ ...base, rows, sessions, placements });
+    expect(s.rows.map((r) => r.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, undefined, undefined]);
+    expect(s.rows[0].agents[0].id).toBe("s1");
+    expect("number" in s.rows[0].agents[0]).toBe(false);
+    expect(s.held[0].number).toBeUndefined();
+    expect(s.other.map((a) => a.id)).toEqual(["o1"]);
+  });
+
+  it("lists Other sessions the same in every workspace", () => {
+    const sessions = [session("o1", "p")];
+    const placements = [place("o1", "other")];
+    const a = buildSidebar({ ...base, rows: [], sessions, placements });
+    const b = buildSidebar({ ...base, workspace: "Elsewhere", rows: [], sessions, placements });
+    expect(a.other).toEqual(b.other);
+    expect(a.other).toHaveLength(1);
+  });
+});
