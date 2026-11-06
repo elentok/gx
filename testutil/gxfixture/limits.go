@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 )
 
 // limitShapes are the --shape values of a limits scenario. Each builds the
@@ -45,14 +46,7 @@ var limitShapes = map[string]func(now time.Time) wire.LimitsReport{
 	},
 }
 
-// limitWindow resets in resetsIn and was received receivedAgo before now.
-func limitWindow(now time.Time, pct float64, resetsIn, receivedAgo time.Duration) *wire.LimitWindow {
-	return &wire.LimitWindow{
-		UsedPercentage: pct,
-		ResetsAt:       now.Add(resetsIn).Unix(),
-		ReceivedAt:     now.Add(-receivedAgo).Unix(),
-	}
-}
+var limitWindow = limitseed.Window
 
 func limitShapeNames() []string {
 	names := make([]string, 0, len(limitShapes))
@@ -74,7 +68,7 @@ func checkShape(sc scenario, shape string) (string, error) {
 	case sc.spend:
 		def, names = "normal", spendShapeNames()
 	case sc.limitBurn:
-		def, names = "menu", limitBurnShapeNames()
+		def, names = "menu", limitseed.ShapeNames()
 	default:
 		if shape != "" {
 			return "", fmt.Errorf("--shape only applies to the limits, spend and limit-burn scenarios")

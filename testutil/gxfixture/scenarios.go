@@ -11,10 +11,11 @@ import (
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 	"github.com/elentok/gx/tickets"
 )
 
-const project = "demo"
+const project = limitseed.Project
 
 // oldShapeStatus is a pause status of the old shape: the strict ticket scan
 // rejects it until the migration rewrites it.

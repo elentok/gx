@@ -14,7 +14,10 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 )
+
+var localMidnight = limitseed.LocalMidnight
 
 type seededHistory struct {
 	Samples map[string][]wire.LimitSample `json:"samples"`
