@@ -149,6 +149,13 @@ func (mg *Manager) designLink(m Meta) string {
 	return base + "/#/d/" + queue.RootOf(addr).String()
 }
 
+// OpenOnScreen reports whether the person already has the session open: a
+// visible web tab always counts, a focused TUI only when AFK mode is off.
+// The banner and the Design Question share it.
+func (mg *Manager) OpenOnScreen(id string) bool {
+	return mg.focus.webOnScreen(id) || (mg.focus.onScreen(id) && !mg.afk.IsOn())
+}
+
 func (mg *Manager) fireBanner(id string) {
 	b := &mg.banners
 	b.mu.Lock()
@@ -156,7 +163,7 @@ func (mg *Manager) fireBanner(id string) {
 	delete(b.pending, id)
 	b.mu.Unlock()
 	afk, onScreen := mg.afk.IsOn(), mg.focus.onScreen(id)
-	if mg.Watches.IsStopped() || mg.focus.webOnScreen(id) || (onScreen && !afk) {
+	if mg.Watches.IsStopped() || mg.OpenOnScreen(id) {
 		return
 	}
 	_, m, res, err := mg.SessionDir(id)
