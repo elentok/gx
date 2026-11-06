@@ -37,6 +37,12 @@ describe.each([true, false])("wide=%s", (wide) => {
     expect(promoteButton().title).toBe("Working. Send turns on when the session is idle.");
   });
 
+  test("it is disabled with the exited reason for an exited session", async () => {
+    open(session("s-1", "p", { status: { state: "exited" } }));
+    expect((await findPromote()).disabled).toBe(true);
+    expect(promoteButton().title).toBe("Exited. Restore it in gx, Agents tab.");
+  });
+
   test("a click posts promote with the last message and leaves the draft alone", async () => {
     prompts.length = 0;
     stubPrompt(accepted);
