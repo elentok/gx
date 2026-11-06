@@ -92,6 +92,11 @@ const maxMarks = 10000
 // rule is that a message may be lost, never doubled, so a caller that cannot
 // tell whether the key was new should not send.
 func MarkOnce(path, key string) (bool, error) {
+	// A present key needs no lock and no rewrite: writes replace the file
+	// atomically, so an unlocked read sees a whole state.
+	if st, err := loadNotificationStateAt(path); err == nil && slices.Contains(st.Marks, key) {
+		return false, nil
+	}
 	isNew := false
 	err := UpdateNotificationState(path, func(s *NotificationState) {
 		if slices.Contains(s.Marks, key) {

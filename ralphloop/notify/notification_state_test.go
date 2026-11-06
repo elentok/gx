@@ -248,6 +248,26 @@ func TestNotificationState_MarkOnce_FirstTrueThenFalseAcrossReload(t *testing.T)
 	}
 }
 
+func TestNotificationState_MarkOnce_ExistingKeyDoesNotRewriteTheFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notifications-state.json")
+	mustMark(t, path, "k")
+	old := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if mustMark(t, path, "k") {
+		t.Fatal("an existing key should not be new")
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.ModTime().Equal(old) {
+		t.Fatalf("mtime = %v, want untouched %v", info.ModTime(), old)
+	}
+}
+
 func TestNotificationState_MarkOnce_OldFormatFileLoads(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notifications-state.json")
 	if err := os.WriteFile(path, []byte(`{"transports":{"telegram":{"muted":true,"events":null,"sends":null,"trips":null}}}`), 0644); err != nil {

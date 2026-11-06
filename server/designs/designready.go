@@ -13,37 +13,32 @@ const readySeedMark = "design-ready:seeded"
 
 func readyMark(project, implEpic string) string { return "design-ready:" + project + "/" + implEpic }
 
-// scanReady sends the Ready message for every map at Branch whose impl epic
-// exists and has no mark yet. A mark that cannot be taken sends nothing: a
-// message may be lost, never doubled. The mark, not designSteps, keeps it once
-// across restarts, as the first scan of a run treats every Design as moved.
-func (s *Designs) scanReady(dir string, epics []tickets.Epic) {
-	if !s.readySeeded() {
-		return
-	}
-	project := tickets.ProjectName(dir)
+// ticketCounts maps each epic's directory name to its ticket count.
+func ticketCounts(epics []tickets.Epic) map[string]int {
 	counts := map[string]int{}
 	for _, e := range epics {
 		counts[filepath.Base(e.Path)] = len(e.Tickets)
 	}
-	for _, e := range epics {
-		if !e.IsMap || tickets.DesignStep(tickets.LoadEpicTicketMD(e.Path).DesignStep) != tickets.StepBranch {
-			continue
-		}
-		epic := filepath.Base(e.Path)
-		impl := epic + tickets.ImplEpicSuffix
-		n, ok := counts[impl]
-		if !ok {
-			continue
-		}
-		isNew, err := s.chat.MarkOnce(readyMark(project, impl))
-		if err != nil {
-			s.log.Warn("design ready mark", "map", project+":"+epic, "err", err)
-			continue
-		}
-		if isNew {
-			s.chat.DesignReady(project, s.projects.ChatOverride(project), epic, impl, n, s.epicLink(project, impl))
-		}
+	return counts
+}
+
+// sendReady sends the Ready message for a map that just moved to Branch, when
+// its impl epic exists and has no mark yet. A mark that cannot be taken sends
+// nothing: a message may be lost, never doubled. The mark keeps it once across
+// restarts, as the first scan of a run treats every Design as moved.
+func (s *Designs) sendReady(project, epic string, counts map[string]int) {
+	impl := epic + tickets.ImplEpicSuffix
+	n, ok := counts[impl]
+	if !ok {
+		return
+	}
+	isNew, err := s.chat.MarkOnce(readyMark(project, impl))
+	if err != nil {
+		s.log.Warn("design ready mark", "map", project+":"+epic, "err", err)
+		return
+	}
+	if isNew {
+		s.chat.DesignReady(project, s.projects.ChatOverride(project), epic, impl, n, s.epicLink(project, impl))
 	}
 }
 

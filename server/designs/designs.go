@@ -179,9 +179,10 @@ func (s *Designs) ScanCleanups() {
 	if err != nil {
 		return
 	}
+	readyOK := s.readySeeded()
 	for _, dir := range dirs {
 		epics, _ := s.idx.EpicsOf(dir)
-		s.scanReady(dir, epics)
+		counts := ticketCounts(epics)
 		for _, e := range epics {
 			if !e.IsMap {
 				continue
@@ -189,6 +190,9 @@ func (s *Designs) ScanCleanups() {
 			step := tickets.DesignStep(tickets.LoadEpicTicketMD(e.Path).DesignStep)
 			project, epic := tickets.ProjectName(dir), filepath.Base(e.Path)
 			prev, _ := s.designSteps.Swap(project+":"+epic, step)
+			if prev != step && step == tickets.StepBranch && readyOK {
+				s.sendReady(project, epic, counts)
+			}
 			if prev == step || !pastBranchStep(step) {
 				continue
 			}

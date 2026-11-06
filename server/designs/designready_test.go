@@ -100,6 +100,29 @@ func TestDesignReady_ReachingBranchSendsOneReadyWithEpicCountAndLink(t *testing.
 	}
 }
 
+func TestDesignReady_ARescanWithNoStepChangeLeavesTheStateFileUntouched(t *testing.T) {
+	t.Parallel()
+	r := startReadyRig(t, "create-tickets", "")
+	r.f.setDesignStepBranch(t)
+	if got := r.hook.PostsSince(r.started); len(got) != 1 {
+		t.Fatalf("posts = %q, want one Ready", got)
+	}
+	old := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(r.gate, old, old); err != nil {
+		t.Fatal(err)
+	}
+	r.rescan(t)
+	r.rescan(t)
+	r.quiet()
+	info, err := os.Stat(r.gate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.ModTime().Equal(old) {
+		t.Errorf("state file mtime = %v, want untouched %v", info.ModTime(), old)
+	}
+}
+
 func TestDesignReady_ARestartNeverResends(t *testing.T) {
 	t.Parallel()
 	r := startReadyRig(t, "create-tickets", "")
