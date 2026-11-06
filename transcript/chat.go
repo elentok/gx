@@ -93,8 +93,6 @@ var (
 	commandOutputRE = regexp.MustCompile(`(?s)^<local-command-stdout>(.*?)</local-command-stdout>$`)
 	imageChipRE     = regexp.MustCompile(`\[Image #\d+\]`)
 	imageSourceRE   = regexp.MustCompile(`\[Image: source: ([^\]]+)\]`)
-	// savedImageNameRE is the name gx gives a saved image: img-<n>-<id><ext>.
-	savedImageNameRE = regexp.MustCompile(`^img-\d+-([0-9a-f]+)\.[A-Za-z0-9]+$`)
 )
 
 // MaxCommandOutputBytes caps one output entry; a cut entry ends with
@@ -252,14 +250,14 @@ func SavedImage(path, imagesDir string) ChatImage {
 	if imagesDir == "" || filepath.Dir(filepath.Clean(path)) != filepath.Clean(imagesDir) {
 		return placeholder
 	}
-	m := savedImageNameRE.FindStringSubmatch(filepath.Base(path))
-	if m == nil {
+	_, id, ok := ParseSavedImageName(filepath.Base(path))
+	if !ok {
 		return placeholder
 	}
 	if _, err := os.Stat(path); err != nil {
 		return placeholder
 	}
-	return ChatImage{ID: m[1]}
+	return ChatImage{ID: id}
 }
 
 func (l chatLine) at() time.Time {

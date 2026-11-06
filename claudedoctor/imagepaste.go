@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/transcript"
 )
 
 const tinyPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="
@@ -21,7 +22,7 @@ const tinyPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4n
 // imageChip is the chip claude shows in the input box for the first pasted image.
 const imageChip = "[Image #1]"
 
-// writeTinyPNG saves a 1x1 PNG as dir/images/img-<n>-doctor.png, the plain
+// writeTinyPNG saves a 1x1 PNG as dir/images/img-<n>-d0c70000.png, the plain
 // ASCII naming gx gives Prompt images; dir itself may hold a space.
 func writeTinyPNG(dir string, n int) (string, error) {
 	data, err := base64.StdEncoding.DecodeString(tinyPNGBase64)
@@ -32,7 +33,7 @@ func writeTinyPNG(dir string, n int) (string, error) {
 	if err := os.MkdirAll(imgs, 0o755); err != nil {
 		return "", err
 	}
-	path := filepath.Join(imgs, fmt.Sprintf("img-%d-doctor.png", n))
+	path := filepath.Join(imgs, transcript.SavedImageName(n, "d0c70000", ".png"))
 	return path, os.WriteFile(path, data, 0o644)
 }
 

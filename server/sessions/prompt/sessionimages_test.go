@@ -65,6 +65,20 @@ func TestSessionImage_NumbersImagesInOrder(t *testing.T) {
 	}
 }
 
+func TestSessionImage_NumberIgnoresSentMarkers(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	first := f.addImage(t, f.id, imageBytes(pngHead, 16))
+	marker := filepath.Join(f.h.SessionsDir, f.id, "images", ".sent-"+first.ID)
+	if err := os.WriteFile(marker, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second := f.addImage(t, f.id, imageBytes(pngHead, 16))
+	if second.Name[:6] != "img-2-" {
+		t.Errorf("second image = %q, want img-2-*", second.Name)
+	}
+}
+
 func TestSessionImage_RefusesOtherTypes(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)

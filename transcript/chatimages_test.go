@@ -44,8 +44,8 @@ func savedFile(t *testing.T, dir, name string) string {
 
 func TestReadChat_ImagesPairChipsWithSourcesInOrder(t *testing.T) {
 	dir := t.TempDir()
-	a := savedFile(t, dir, "img-1-aa11.png")
-	b := savedFile(t, dir, "img-2-bb22.png")
+	a := savedFile(t, dir, "img-1-aa11aa11.png")
+	b := savedFile(t, dir, "img-2-bb22bb22.png")
 	msgs := readLines(t, dir,
 		imageUserLine("p1", "[Image #1] [Image #2] name the color", 2),
 		imageMetaLine("p1", a, b),
@@ -53,26 +53,39 @@ func TestReadChat_ImagesPairChipsWithSourcesInOrder(t *testing.T) {
 	if len(msgs) != 1 || msgs[0].Text != "name the color" || msgs[0].Role != ChatRolePerson {
 		t.Fatalf("msgs = %+v", msgs)
 	}
-	if want := []ChatImage{{ID: "aa11"}, {ID: "bb22"}}; !reflect.DeepEqual(msgs[0].Images, want) {
+	if want := []ChatImage{{ID: "aa11aa11"}, {ID: "bb22bb22"}}; !reflect.DeepEqual(msgs[0].Images, want) {
 		t.Fatalf("images = %+v, want %+v", msgs[0].Images, want)
+	}
+}
+
+func TestSavedImageName_RoundTripsAndRejectsWhatTheFinderWould(t *testing.T) {
+	n, id, ok := ParseSavedImageName(SavedImageName(3, "0a1b2c3d", ".png"))
+	if !ok || n != 3 || id != "0a1b2c3d" {
+		t.Errorf("round trip = %d %q %v", n, id, ok)
+	}
+	dir := t.TempDir()
+	for _, name := range []string{"img-1-0A1B2C3D.png", "img-1-0a1b2c3d.PNG", "img-1-0a1b.png", ".sent-0a1b2c3d"} {
+		if got := SavedImage(savedFile(t, dir, name), dir); !got.Placeholder {
+			t.Errorf("%s shown as a saved image: %+v", name, got)
+		}
 	}
 }
 
 func TestReadChat_ImagesOnlyMessageIsKept(t *testing.T) {
 	dir := t.TempDir()
-	a := savedFile(t, dir, "img-1-aa11.png")
+	a := savedFile(t, dir, "img-1-aa11aa11.png")
 	msgs := readLines(t, dir, imageUserLine("p1", "[Image #1]", 1), imageMetaLine("p1", a))
-	if len(msgs) != 1 || msgs[0].Text != "" || len(msgs[0].Images) != 1 || msgs[0].Images[0].ID != "aa11" {
+	if len(msgs) != 1 || msgs[0].Text != "" || len(msgs[0].Images) != 1 || msgs[0].Images[0].ID != "aa11aa11" {
 		t.Fatalf("msgs = %+v", msgs)
 	}
 }
 
 func TestReadChat_ImagePlaceholders(t *testing.T) {
 	dir := t.TempDir()
-	outside := savedFile(t, t.TempDir(), "img-1-aa11.png")
+	outside := savedFile(t, t.TempDir(), "img-1-aa11aa11.png")
 	msgs := readLines(t, dir,
 		imageUserLine("p1", "[Image #1] [Image #2] look", 2),
-		imageMetaLine("p1", outside, filepath.Join(dir, "img-2-bb22.png")),
+		imageMetaLine("p1", outside, filepath.Join(dir, "img-2-bb22bb22.png")),
 	)
 	if len(msgs) != 1 {
 		t.Fatalf("msgs = %+v", msgs)
@@ -107,13 +120,13 @@ func TestReadChat_LineOverTenMegabytesKeepsLaterLines(t *testing.T) {
 
 func TestReadChat_ImageBeforeCompactBoundaryKeepsItsImages(t *testing.T) {
 	dir := t.TempDir()
-	a := savedFile(t, dir, "img-1-aa11.png")
+	a := savedFile(t, dir, "img-1-aa11aa11.png")
 	msgs := readLines(t, dir,
 		imageUserLine("p1", "[Image #1] x", 1),
 		imageMetaLine("p1", a),
 		`{"type":"system","subtype":"`+compactBoundarySubtype+`","uuid":"c1"}`,
 	)
-	if len(msgs) != 2 || msgs[0].Images[0].ID != "aa11" || msgs[1].Kind != ChatKindCompacted {
+	if len(msgs) != 2 || msgs[0].Images[0].ID != "aa11aa11" || msgs[1].Kind != ChatKindCompacted {
 		t.Fatalf("msgs = %+v", msgs)
 	}
 }

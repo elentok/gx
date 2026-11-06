@@ -85,7 +85,7 @@ func (f sessionSeeder) seedImages(id string, harness string) error {
 			} else {
 				saved++
 			}
-			paths[i] = filepath.Join(folder, fmt.Sprintf("img-%d-%08x%s", saved, n*100+i+1, ".png"))
+			paths[i] = filepath.Join(folder, transcript.SavedImageName(saved, fmt.Sprintf("%08x", n*100+i+1), ".png"))
 			if err := os.WriteFile(paths[i], png, 0o644); err != nil {
 				return err
 			}
