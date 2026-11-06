@@ -29,6 +29,9 @@ type TicketInfo struct {
 	// ClaimedAt is when the server launched the claimed ticket's iteration;
 	// filled in by the snapshot handler, zero while the ticket is not running.
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
+	// LaunchStep is the launch step of the claimed ticket's run; zero once the
+	// launch ended.
+	LaunchStep LaunchStep `json:"launch_step,omitzero"`
 	// Recovery is RecoveryPending or RecoveryEscalated for a paused ticket that
 	// recovery is working on or gave up on; filled in by the snapshot handler.
 	Recovery string `json:"recovery,omitempty"`

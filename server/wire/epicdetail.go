@@ -27,8 +27,9 @@ type EpicDetailRow struct {
 	Elapsed int     `json:"elapsed,omitempty"`
 	Cost    float64 `json:"cost,omitempty"`
 	// HadCodex marks a ticket with a Codex session; its Cost covers only the Claude part.
-	HadCodex  bool      `json:"had_codex,omitempty"`
-	ClaimedAt time.Time `json:"claimed_at,omitzero"`
+	HadCodex   bool       `json:"had_codex,omitempty"`
+	ClaimedAt  time.Time  `json:"claimed_at,omitzero"`
+	LaunchStep LaunchStep `json:"launch_step,omitzero"`
 	// ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
 	ClosedAt time.Time `json:"closed_at,omitzero"`
 	// Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".

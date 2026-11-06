@@ -57,6 +57,8 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 		switch t.Status {
 		case string(schema.StatusClaimed):
 			snap.Tickets[i].ClaimedAt, _ = s.registry.StartedAtOf(t.Address)
+			label, position := s.registry.LaunchStepOf(t.Address)
+			snap.Tickets[i].LaunchStep = wire.LaunchStep{Label: label, Position: position}
 		case string(schema.StatusPaused), string(schema.StatusLegacyAnswer), string(schema.StatusLegacyRepair):
 			snap.Tickets[i].Recovery = ticketwrite.RecoveryState(s.pauseHold.State(t.Address), t.Address, snap.Tickets)
 		}

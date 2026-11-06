@@ -93,6 +93,9 @@ type EpicListRow struct {
 	// Reason is the line under the status words when there is something to say.
 	Reason  string       `json:"reason,omitempty"`
 	Actions []CardAction `json:"actions,omitempty"`
+	// Verdict is VerdictConcurrencyCap on a queued epic held by a cap; Reason
+	// then names the full caps.
+	Verdict string `json:"verdict,omitempty"`
 	// StatePill and WaitingSince are set on a Needs-you card: the pill word and the
 	// start of the wait the section sorts by.
 	StatePill    string    `json:"state_pill,omitempty"`
@@ -221,8 +224,10 @@ type SummaryTicket struct {
 	Title     string    `json:"title"`
 	Status    string    `json:"status"`
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
-	Recovery  string    `json:"recovery,omitempty"`
-	Reason    string    `json:"reason,omitempty"`
+	// LaunchStep is set while an active ticket's launch runs.
+	LaunchStep LaunchStep `json:"launch_step,omitzero"`
+	Recovery   string     `json:"recovery,omitempty"`
+	Reason     string     `json:"reason,omitempty"`
 	// ReasonLabel is the plain-words label of the ticket's pause reason.
 	ReasonLabel string `json:"reason_label,omitempty"`
 	// Summary is the open question's summary line, or the pause reason without one.
@@ -253,6 +258,10 @@ type EpicSummary struct {
 	// ticket, else "Dependency deadlock" or "Merge blocked". It is empty for a
 	// Paused epic that holds only drafts.
 	Reason string `json:"reason,omitempty"`
+	// Verdict and VerdictReason are the next ready ticket's cap verdict while a
+	// cap holds the epic: VerdictConcurrencyCap and the full caps.
+	Verdict       string `json:"verdict,omitempty"`
+	VerdictReason string `json:"verdict_reason,omitempty"`
 	// More is the number of paused tickets beyond the first, whose reason Reason shows.
 	More int `json:"more,omitempty"`
 	// Detail is the cycle that deadlocks the epic, or why its merge is blocked.

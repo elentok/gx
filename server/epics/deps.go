@@ -39,9 +39,10 @@ type Writer interface {
 	FindTicket(address string) (queue.TicketRef, bool, error)
 }
 
-// Runs knows when a run started.
+// Runs knows when a run started and which launch step it is in.
 type Runs interface {
 	StartedAtOf(address string) (time.Time, bool)
+	LaunchStepOf(address string) (label string, position int)
 }
 
 // History reads a ticket's event history.
@@ -82,6 +83,9 @@ type Deps struct {
 	Pauses   Pauses
 	Sessions Sessions
 
+	// CapHeld gives the cap verdict of the epic's next ready ticket, when a cap
+	// holds it back.
+	CapHeld           func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool)
 	AutoFFMerge       func(project string) bool
 	CheckWaitingLabel func(address string) string
 	AgentGone         func(address string) (bool, error)

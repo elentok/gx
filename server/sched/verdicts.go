@@ -108,21 +108,28 @@ func (x *Explainer) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr ticke
 	}
 	// Every full cap is named, not just the first one hit.
 	var full []string
+	over := false // a cap lowered below the live count
 	rootCap := x.Scheduler.PerRootLimit(queue.RootOf(addr))
 	if n, limit := x.Registry.CountRoot(root), rootCap; n >= limit {
 		full = append(full, fmt.Sprintf("epic cap %d/%d", n, limit))
+		over = over || n > limit
 	}
 	if n, limit, atCap := x.Scheduler.ProjectAtCap(addr.Project); atCap {
 		full = append(full, fmt.Sprintf("project cap %d/%d", n, limit))
+		over = over || n > limit
 	}
 	limit, running := x.Scheduler.ConcurrencyLimit(), x.Registry.Count()
 	free := limit - running
 	if free <= 0 {
 		full = append(full, fmt.Sprintf("global cap %d/%d", running, limit))
+		over = over || running > limit
 	}
 	switch {
 	case len(full) > 0:
 		ex.Verdict, ex.Reason = wire.VerdictConcurrencyCap, strings.Join(full, ", ")
+		if over {
+			ex.Reason += " (over cap, no new starts until one ends)"
+		}
 	case frontierIndex(e, t) >= rootCap-x.Registry.CountRoot(root):
 		ex.Verdict, ex.Reason = wire.VerdictWaitingInQueue, "earlier tickets of the epic go first"
 	case ahead >= free:
@@ -131,6 +138,20 @@ func (x *Explainer) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr ticke
 		ex.Verdict = wire.VerdictEligible
 	}
 	return ex
+}
+
+// CapHeld is the cap verdict of the first claimable ticket of e, when a cap
+// holds it back. A ticket the store blocks is skipped: it is not the next ready one.
+func (x *Explainer) CapHeld(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool) {
+	for _, t := range schedule.Frontier(e) {
+		addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}
+		ex := x.verdictOf(e, t, addr)
+		if ex.Verdict == string(runlog.DecisionBlocked) {
+			continue
+		}
+		return ex, ex.Verdict == wire.VerdictConcurrencyCap
+	}
+	return wire.Explanation{}, false
 }
 
 // frontierIndex is t's place among the epic's claimable tickets, or -1.

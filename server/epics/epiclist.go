@@ -206,7 +206,9 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 	if !e.IsMap {
 		row.QueueSlot = qidx.slot(root.String())
 		decorateLoopCard(&row, row.QueueSlot)
+		row.Verdict, row.Reason = s.capLine(root, e, row.Queued)
 		if n, ok := s.loopNeedsYou(root, e, row.State); ok {
+			row.Verdict = ""
 			row.Section, row.StatePill, row.Reason, row.WaitingSince = wire.SectionNeedsYou, n.Pill, n.Reason, n.Since
 			row.Actions = append([]wire.CardAction{n.Action}, n.More...)
 		}

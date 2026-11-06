@@ -15,6 +15,7 @@ func (s *Epics) detailStats(ref queue.TicketRef) *wire.DetailStats {
 	st := &wire.DetailStats{Elapsed: t.ElapsedTime, Cost: t.ActualCost, HadCodex: t.HadCodex, ContextWindow: t.ActualContextWindow}
 	if at, ok := s.Runs.StartedAtOf(ref.Addr.String()); ok && ref.Epic.RenderedStatus(t) == tickets.StatusClaimed {
 		st.ClaimedAt = at
+		st.LaunchStep = s.launchStep(ref.Addr.String())
 	}
 	return st
 }

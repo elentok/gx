@@ -362,6 +362,37 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 	}
 }
 
+// Seam A: a cap lowered below the live count says no new start comes until a
+// run ends, once, however many caps are over.
+func TestExplain_OverCapAddsItsClauseOnce(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
+	body := fmt.Sprintf(`{"name":"proj","repo":%q,"max-agents":1}`, repo)
+	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.PollInterval = 50 * time.Millisecond
+		c.MaxAgents = 1
+	})
+	servertest.RegisterTurn(h)
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
+	h.Server.Registry().PutRun("proj:epic-c", runs.Run{Address: "proj:epic-c/00", Runner: "herdr"})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	ex, err := h.Client.Reads.Explain(ctx, "proj:epic-b/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "project cap 2/1, global cap 2/1 (over cap, no new starts until one ends)"; ex.Verdict != wire.VerdictConcurrencyCap || ex.Reason != want {
+		t.Errorf("explain = %+v, want %s: %s", ex, wire.VerdictConcurrencyCap, want)
+	}
+}
+
 // Seam A: the cap is global, so roots of different projects share it, and the
 // queue is plain FIFO across projects.
 func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {

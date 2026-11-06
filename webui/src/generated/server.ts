@@ -371,6 +371,7 @@ export interface DetailStats {
    */
   elapsed?: number /* int */;
   claimed_at?: string;
+  launch_step?: LaunchStep;
   cost?: number /* float64 */;
   had_codex?: boolean;
   context_window?: number /* int */;
@@ -545,6 +546,7 @@ export interface EpicDetailRow extends HarnessLabel {
    */
   had_codex?: boolean;
   claimed_at?: string;
+  launch_step?: LaunchStep;
   /**
    * ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
    */
@@ -827,6 +829,11 @@ export interface EpicListRow {
   reason?: string;
   actions?: CardAction[];
   /**
+   * Verdict is VerdictConcurrencyCap on a queued epic held by a cap; Reason
+   * then names the full caps.
+   */
+  verdict?: string;
+  /**
    * StatePill and WaitingSince are set on a Needs-you card: the pill word and the
    * start of the wait the section sorts by.
    */
@@ -1000,6 +1007,10 @@ export interface SummaryTicket {
   title: string;
   status: string;
   claimed_at?: string;
+  /**
+   * LaunchStep is set while an active ticket's launch runs.
+   */
+  launch_step?: LaunchStep;
   recovery?: string;
   reason?: string;
   /**
@@ -1049,6 +1060,12 @@ export interface EpicSummary {
    * Paused epic that holds only drafts.
    */
   reason?: string;
+  /**
+   * Verdict and VerdictReason are the next ready ticket's cap verdict while a
+   * cap holds the epic: VerdictConcurrencyCap and the full caps.
+   */
+  verdict?: string;
+  verdict_reason?: string;
   /**
    * More is the number of paused tickets beyond the first, whose reason Reason shows.
    */
@@ -1311,6 +1328,11 @@ export interface TicketInfo extends HarnessLabel {
    * filled in by the snapshot handler, zero while the ticket is not running.
    */
   claimed_at?: string;
+  /**
+   * LaunchStep is the launch step of the claimed ticket's run; zero once the
+   * launch ended.
+   */
+  launch_step?: LaunchStep;
   /**
    * Recovery is RecoveryPending or RecoveryEscalated for a paused ticket that
    * recovery is working on or gave up on; filled in by the snapshot handler.
@@ -2637,6 +2659,14 @@ export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reache
  * scheduler's own decision words (blocked, stalled, done, error, claimed, ...).
  */
 export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictRateLimited | typeof VerdictUsagePrefixClaude | typeof VerdictUsagePrefixCodex | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
+/**
+ * LaunchStep is the step a launching run is in: its label and its 1-based
+ * place among the four steps. The zero value means no launch runs.
+ */
+export interface LaunchStep {
+  label: string;
+  position: number /* int */;
+}
 /**
  * PendingRow is one queue entry with its explain verdict.
  */

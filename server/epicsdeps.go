@@ -2,6 +2,8 @@ package server
 
 import (
 	"github.com/elentok/gx/server/epics"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -23,6 +25,7 @@ func (s *Server) epicsDeps() epics.Deps {
 		Pauses:   &s.pauseHold,
 		Sessions: s.sessions,
 
+		CapHeld:           func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool) { return s.explain.CapHeld(root, e) },
 		AutoFFMerge:       func(project string) bool { return s.merger.AutoFFMerge(project) },
 		CheckWaitingLabel: func(address string) string { return s.explain.CheckWaitingLabel(address) },
 		AgentGone:         func(address string) (bool, error) { return s.ops.AgentGone(address) },

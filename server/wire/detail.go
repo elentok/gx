@@ -187,11 +187,12 @@ type RelatedTicket struct {
 // has no stats.
 type DetailStats struct {
 	// Elapsed is in seconds; a claimed ticket ticks on the client from ClaimedAt.
-	Elapsed       int       `json:"elapsed,omitempty"`
-	ClaimedAt     time.Time `json:"claimed_at,omitzero"`
-	Cost          float64   `json:"cost,omitempty"`
-	HadCodex      bool      `json:"had_codex,omitempty"`
-	ContextWindow int       `json:"context_window,omitempty"`
+	Elapsed       int        `json:"elapsed,omitempty"`
+	ClaimedAt     time.Time  `json:"claimed_at,omitzero"`
+	LaunchStep    LaunchStep `json:"launch_step,omitzero"`
+	Cost          float64    `json:"cost,omitempty"`
+	HadCodex      bool       `json:"had_codex,omitempty"`
+	ContextWindow int        `json:"context_window,omitempty"`
 }
 
 // Outcomes of a run line.

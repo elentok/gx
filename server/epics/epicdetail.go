@@ -184,6 +184,7 @@ func (s *Epics) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wir
 	}
 	if at, ok := s.Runs.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 		row.ClaimedAt = at
+		row.LaunchStep = s.launchStep(row.Address)
 	}
 	evs := queue.ReadLogLenient(t)
 	if open := tickets.OpenQuestion(evs); open != nil && status == tickets.StatusPausedAnswer {
