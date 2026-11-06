@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
@@ -44,6 +46,13 @@ type Index struct {
 	// onRescan and ready are set once, before KeepFresh runs.
 	onRescan []func()
 	ready    func() bool
+
+	// scan is the store read; tests swap it to count and delay scans.
+	scan func(string) ([]indexedTicket, map[string][]tickets.Epic, error)
+	// flightMu guards running and pending, the single-flight state of Refresh.
+	flightMu sync.Mutex
+	running  bool
+	pending  *flight
 }
 
 // OnRescan registers a step that runs after every store rescan, in
@@ -118,8 +127,65 @@ func (i *Index) Seed(dir string, epics []tickets.Epic) {
 // ticket-changed event per ticket that differs. Publishing happens under the
 // lock so a snapshot's seq always matches the list it carries. Unlike Rescan
 // it ignores the migration gate and runs no OnRescan step.
+//
+// Scans are single-flight: at most one runs at a time, and callers that arrive
+// meanwhile share one trailing scan that starts after they called. Scans run
+// one after another, so an older scan never installs over a newer one.
 func (i *Index) Refresh() error {
-	list, loaded, err := scanStore(i.storePath)
+	start := time.Now()
+	caller := "unknown"
+	if pc, _, _, ok := runtime.Caller(1); ok {
+		if fn := runtime.FuncForPC(pc); fn != nil {
+			caller = fn.Name()
+		}
+	}
+	err := i.refreshSingleFlight()
+	i.log.Info("Refresh", "duration", time.Since(start), "caller", caller)
+	return err
+}
+
+// flight is one scan and the callers waiting on it.
+type flight struct {
+	done chan struct{}
+	err  error
+}
+
+func (i *Index) refreshSingleFlight() error {
+	i.flightMu.Lock()
+	if i.running {
+		if i.pending == nil {
+			i.pending = &flight{done: make(chan struct{})}
+		}
+		f := i.pending
+		i.flightMu.Unlock()
+		<-f.done
+		return f.err
+	}
+	i.running = true
+	f := &flight{done: make(chan struct{})}
+	i.flightMu.Unlock()
+	own := f
+	for {
+		f.err = i.scanAndInstall()
+		close(f.done)
+		i.flightMu.Lock()
+		f = i.pending
+		i.pending = nil
+		if f == nil {
+			i.running = false
+			i.flightMu.Unlock()
+			return own.err
+		}
+		i.flightMu.Unlock()
+	}
+}
+
+func (i *Index) scanAndInstall() error {
+	scan := i.scan
+	if scan == nil {
+		scan = scanStore
+	}
+	list, loaded, err := scan(i.storePath)
 	if err != nil {
 		return err
 	}
