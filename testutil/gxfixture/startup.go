@@ -125,7 +125,7 @@ func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
 		}
 	}
 	if sc.fakeNpm {
-		if err := f.setupFakeNpm(); err != nil {
+		if err := f.setupFakeNpm(sc.failingNpm); err != nil {
 			return err
 		}
 	}

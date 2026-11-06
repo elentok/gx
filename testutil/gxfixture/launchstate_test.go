@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -32,6 +33,43 @@ func TestLaunchHeldScenario_TheTicketStaysClaimedAtInstallUntilTheHoldIsReleased
 		t.Fatal(err)
 	}
 	r.waitStatus(t, launchTicket, "done")
+}
+
+// Story 29: a failed launch pauses the ticket as iteration-error with the
+// launch error, and no surface still reads it as launching.
+func TestLaunchFailScenario_TheTicketPausesWithTheErrorAndNothingReadsLaunching(t *testing.T) {
+	t.Parallel()
+	r := start(t, "launch-fail")
+	defer r.stop(t)
+	// The status moves on from paused once recovery escalates it, so wait on the reason.
+	var d wire.TicketDetail
+	if !testutil.Poll(90*time.Second, time.Second, func() bool {
+		d = r.detail(t, launchTicket)
+		return d.PauseReason == "iteration-error"
+	}) {
+		t.Fatalf("pause reason = %q, want iteration-error", d.PauseReason)
+	}
+	if !strings.Contains(d.PauseText, "launch failed") || !strings.Contains(d.PauseText, "installing dependencies") {
+		t.Errorf("pause text = %q, want the launch error", d.PauseText)
+	}
+	if d.Stats != nil && d.Stats.LaunchStep != (wire.LaunchStep{}) {
+		t.Errorf("ticket page launch step = %+v, want none", d.Stats.LaunchStep)
+	}
+
+	var snap wire.Snapshot
+	if err := json.Unmarshal([]byte(r.gx(t, "server", "snapshot", "--json")), &snap); err != nil {
+		t.Fatal(err)
+	}
+	for _, tk := range snap.Tickets {
+		if tk.Address == launchTicket && tk.LaunchStep != (wire.LaunchStep{}) {
+			t.Errorf("queue row launch step = %+v, want none", tk.LaunchStep)
+		}
+	}
+	for _, c := range r.cardsOf(t) {
+		if c.LaunchStep != (wire.LaunchStep{}) {
+			t.Errorf("epic card %s launch step = %+v, want none", c.Name, c.LaunchStep)
+		}
+	}
 }
 
 func TestEpicAtCapScenario_TheHeldTicketIsCappedAndLoweringTheCapNamesTheOverCap(t *testing.T) {

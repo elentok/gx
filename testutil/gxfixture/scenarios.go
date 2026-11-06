@@ -117,6 +117,8 @@ type scenario struct {
 	fakeGo bool
 	// fakeNpm writes the gate dir's fake npm and holds it (see launchstate.go).
 	fakeNpm bool
+	// failingNpm makes that fake npm fail at once instead of holding.
+	failingNpm bool
 	// dropAskedAgent forces the server to clean up an asking agent, as a
 	// herdr-hosted run does (see keepworktree.go).
 	dropAskedAgent bool
@@ -244,6 +246,7 @@ var scenarios = map[string]scenario{
 	"cache-gate":            cacheGate,
 	"cache-gate-custom":     cacheGateCustom,
 	"launch-held":           launchHeld,
+	"launch-fail":           launchFail,
 	"epic-at-cap":           epicAtCap,
 	// restart-agents: a running agent on a queued epic, and a restart binary that passes its checks.
 	"restart-agents": {
