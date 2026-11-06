@@ -215,6 +215,7 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 	ticket.TotalTokens = parsed.TotalTokens
 	ticket.HadCodex = parsed.HadCodex
 	ticket.Friction = parsed.Friction
+	ticket.Launch = parsed.Launch
 	ticket.ClaimedAt = parsed.ClaimedAt
 	ticket.DoneAt = parsed.DoneAt
 	ticket.Notify = parsed.Notify
@@ -319,6 +320,7 @@ type ticketMDYAML struct {
 	ActualCost   float64                 `yaml:"actual_cost"`
 	HadCodex     bool                    `yaml:"had_codex"`
 	Friction     *schema.FrictionSummary `yaml:"friction"`
+	Launch       []schema.LaunchStamp    `yaml:"launch"`
 
 	MergeBlockKind   string   `yaml:"land_block_kind"`
 	MergeBlockReason string   `yaml:"land_block_reason"`

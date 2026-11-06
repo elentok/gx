@@ -39,6 +39,7 @@ struct schema.Ticket
   TotalTokens *int64 
   HadCodex bool 
   Friction *schema.FrictionSummary 
+  Launch []schema.LaunchStamp 
 struct tickets.Epic
   Name string 
   Path string 

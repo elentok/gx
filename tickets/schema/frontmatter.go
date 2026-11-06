@@ -55,6 +55,7 @@ type ticketYAML struct {
 	TotalTokens           *int64           `yaml:"total_tokens,omitempty"`
 	HadCodex              bool             `yaml:"had_codex,omitempty"`
 	Friction              *FrictionSummary `yaml:"friction,omitempty"`
+	Launch                []LaunchStamp    `yaml:"launch,omitempty"`
 
 	// Children is the retired field, declared here and nowhere else: the wire
 	// struct is the only place that has to recognize it (yaml.v3 silently
@@ -123,6 +124,7 @@ func (w ticketYAML) toTicket() Ticket {
 		TotalTokens:           w.TotalTokens,
 		HadCodex:              w.HadCodex,
 		Friction:              w.Friction,
+		Launch:                w.Launch,
 	}
 	if t.IterationFinishedAt.IsZero() {
 		t.IterationFinishedAt = w.LegacyFinishedAt
@@ -173,6 +175,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		TotalTokens:           t.TotalTokens,
 		HadCodex:              t.HadCodex,
 		Friction:              t.Friction,
+		Launch:                t.Launch,
 	}
 	if t.Parent != nil {
 		w.Parent = string(*t.Parent)

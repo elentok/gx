@@ -60,6 +60,11 @@ func init() {
 	Default.Register(Step{Name: "prefix-tokens", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// launch-stamp: Launch is optional and an older ticket reads as none, so
+	// there is nothing to rewrite; old launches are not reported.
+	Default.Register(Step{Name: "launch-stamp", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

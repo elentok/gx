@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -66,6 +68,75 @@ func retroServer(store string) *Writer {
 	set.Store(&settings.Settings{})
 	reg := projects.NewRegistry(func() projects.Env { return projects.Env{TicketStore: store} }, log, nil, set, nil, nil)
 	return New(Deps{Log: log, Projects: reg})
+}
+
+func launchWriter(t *testing.T) (*Writer, *runs.Registry) {
+	t.Helper()
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	reg, _, err := runs.Open(t.TempDir(), log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return New(Deps{Log: log, Registry: reg}), reg
+}
+
+// launchRun registers a run claimed at claimed and walks its launch through the
+// four steps; the registry times them, so the stamp is checked for shape.
+func launchRun(reg *runs.Registry, address string, claimed time.Time) {
+	reg.Delete(address) // Put carries a replaced entry's timings over
+	reg.Put(runs.TrackedRun{Run: runs.Run{Address: address}, StartedAt: claimed})
+	for _, step := range []runs.LaunchStep{runs.StepCreatingWorktree, runs.StepInstallingDeps, runs.StepStartingAgent, runs.StepSendingPrompt} {
+		reg.SetLaunchStep(address, step)
+	}
+	reg.EndLaunch(address)
+}
+
+func TestStampFinished_LaunchedTwiceHasTwoEntries(t *testing.T) {
+	t.Parallel()
+	_, addr, path, _ := retroFixture(t, "")
+	w, reg := launchWriter(t)
+	first := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	launchRun(reg, addr.String(), first)
+	w.stampLaunch(addr, path)
+	launchRun(reg, addr.String(), first.Add(time.Hour))
+	w.stampLaunch(addr, path)
+	launchRun(reg, addr.String(), first.Add(time.Hour))
+	w.stampLaunch(addr, path) // the same claim finished again replaces its entry
+
+	tk, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tk.Launch) != 2 {
+		t.Fatalf("launch = %+v, want two entries", tk.Launch)
+	}
+	for i, claimed := range []time.Time{first, first.Add(time.Hour)} {
+		if got := tk.Launch[i].ClaimedAt; !got.Equal(claimed) {
+			t.Errorf("entry %d claimed at %v, want %v", i, got, claimed)
+		}
+	}
+}
+
+func TestStampFinished_NoLaunchDataGetsNoStamp(t *testing.T) {
+	t.Parallel()
+	_, addr, path, _ := retroFixture(t, "")
+	w, reg := launchWriter(t)
+	w.stampLaunch(addr, path) // untracked
+	reg.Put(runs.TrackedRun{Run: runs.Run{Address: addr.String()}, StartedAt: time.Now()})
+	w.stampLaunch(addr, path) // never timed
+	reg.Delete(addr.String())
+	reg.Put(runs.TrackedRun{Run: runs.Run{Address: addr.String()}, StartedAt: time.Now()})
+	reg.SetLaunchStep(addr.String(), runs.StepSendingPrompt)
+	reg.SetLaunchStep(addr.String(), runs.StepCreatingWorktree)
+	w.stampLaunch(addr, path) // launch still open
+
+	tk, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tk.Launch) != 0 {
+		t.Errorf("launch = %+v, want none", tk.Launch)
+	}
 }
 
 func TestStampRetro_DoneStampsEvolvedAtAndTicketKeepingOtherKeys(t *testing.T) {

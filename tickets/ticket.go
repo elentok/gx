@@ -84,6 +84,8 @@ type Ticket struct {
 	TotalTokens     *int64
 	HadCodex        bool
 	Friction        *schema.FrictionSummary
+	// Launch mirrors schema.Ticket.Launch.
+	Launch []schema.LaunchStamp
 
 	// Notify mirrors schema.Ticket.Notify.
 	Notify bool

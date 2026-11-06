@@ -2,6 +2,7 @@ package ticketwrite
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,7 +33,37 @@ func RetroSubmit(project, epic string, now time.Time) wire.OneOffRequest {
 // ticket's status is written.
 func (w *Writer) StampFinished(addr tickets.Address, ticketPath string, cancelled bool) {
 	w.stampFriction(addr, ticketPath)
+	if !cancelled {
+		w.stampLaunch(addr, ticketPath)
+	}
 	w.stampRetro(addr, ticketPath, cancelled)
+}
+
+// stampLaunch appends the launch of the in-memory run record to the ticket's
+// launch stamps, so a reclaimed ticket carries one entry per launch. A run with
+// no finished launch timing (not tracked, found finished at reattach, launch
+// still open) adds nothing. Finishing the same claim twice replaces its entry.
+func (w *Writer) stampLaunch(addr tickets.Address, ticketPath string) {
+	run, ok := w.d.Registry.Tracked(addr.String())
+	if !ok || run.LaunchStep != "" || run.StartedAt.IsZero() || run.LaunchTimings.Total() == 0 {
+		return
+	}
+	lt := run.LaunchTimings
+	stamp := schema.LaunchStamp{
+		ClaimedAt:  run.StartedAt.UTC(),
+		TotalMs:    lt.Total().Milliseconds(),
+		WorktreeMs: lt.Worktree.Milliseconds(),
+		DepsMs:     lt.Deps.Milliseconds(),
+		AgentMs:    lt.Agent.Milliseconds(),
+		PromptMs:   lt.Prompt.Milliseconds(),
+	}
+	err := schema.UpdateTicket(ticketPath, func(t *schema.Ticket) {
+		t.Launch = slices.DeleteFunc(t.Launch, func(l schema.LaunchStamp) bool { return l.ClaimedAt.Equal(stamp.ClaimedAt) })
+		t.Launch = append(t.Launch, stamp)
+	})
+	if err != nil {
+		w.d.Log.Warn("stamp launch", "ticket", addr.String(), "err", err)
+	}
 }
 
 func (w *Writer) stampFriction(addr tickets.Address, ticketPath string) {

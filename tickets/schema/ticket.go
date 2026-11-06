@@ -358,6 +358,8 @@ type Ticket struct {
 	HadCodex bool
 	// Friction is the ticket's friction summary; nil until gx stamps it.
 	Friction *FrictionSummary
+	// Launch holds one stamp per timed launch of the ticket; empty until gx stamps it.
+	Launch []LaunchStamp
 }
 
 // StampCreated records when and under which address the ticket was created.

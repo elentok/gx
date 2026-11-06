@@ -46,9 +46,21 @@ func TestTicket_StatsFieldsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestTicket_LaunchRoundTrips(t *testing.T) {
+	claimed := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	want := Ticket{ID: "01", Status: StatusDone, Type: TypeImplement, Launch: []LaunchStamp{
+		{ClaimedAt: claimed, TotalMs: 1500, WorktreeMs: 100, DepsMs: 200, AgentMs: 300, PromptMs: 900},
+		{ClaimedAt: claimed.Add(time.Hour), TotalMs: 10},
+	}}
+	got, _ := roundTrip(t, want)
+	if !reflect.DeepEqual(got.Launch, want.Launch) {
+		t.Errorf("launch = %+v, want %+v", got.Launch, want.Launch)
+	}
+}
+
 func TestTicket_UnstampedWritesNoStatsFields(t *testing.T) {
 	_, out := roundTrip(t, Ticket{ID: "01", Status: StatusOpen, Type: TypeImplement})
-	for _, key := range []string{"created_at", "original_address", "cancelled_at", "total_tokens", "had_codex", "friction"} {
+	for _, key := range []string{"created_at", "original_address", "cancelled_at", "total_tokens", "had_codex", "friction", "launch"} {
 		if strings.Contains(out, key) {
 			t.Errorf("unstamped ticket wrote %s:\n%s", key, out)
 		}
