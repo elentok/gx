@@ -358,7 +358,9 @@ func TestInstallDependencies_TwoDirectories_ShareOneBudget(t *testing.T) {
 	// The first install returns at once; the second hangs until the shared budget kills it.
 	writeScriptStub(t, binDir, "npm", "if [ -e '"+marker+"' ]; then sleep 30; fi; touch '"+marker+"'")
 
-	_, err := installDependenciesWithin(context.Background(), repo, binDir, "", time.Second)
+	// The budget must outlast the first install even when parallel tests starve the CPU,
+	// or the root install times out and the error names the root instead of web.
+	_, err := installDependenciesWithin(context.Background(), repo, binDir, "", 3*time.Second)
 	want := "installing dependencies in " + filepath.Join(repo, "web") + ": npm ci: timed out after 5m"
 	if err == nil || err.Error() != want {
 		t.Fatalf("error = %v, want %q", err, want)
