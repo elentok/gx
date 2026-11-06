@@ -33,7 +33,9 @@ func startLaunchSession(t *testing.T, env ...string) launchFixture {
 
 func startLaunchSessionWith(t *testing.T, tune func(*server.Config), env ...string) launchFixture {
 	t.Helper()
-	bin, home, config := t.TempDir(), t.TempDir(), t.TempDir()
+	bin, home := t.TempDir(), t.TempDir()
+	// The fake writes its transcript under CLAUDE_CONFIG_DIR, where transcript.PathIn looks.
+	config := filepath.Join(home, ".claude")
 	exports := "export " + agentfake.TUIEnv + "=1"
 	for _, e := range env {
 		exports += " '" + e + "'"
