@@ -34,8 +34,39 @@ func launchOn(t *testing.T, r agentrunner.Runner) launchResult {
 	res.session, res.err = StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic}, "/gx-implement gx:my-epic/01",
 		func(attempt int, decision string) {
 			res.nudges = append(res.nudges, fmt.Sprintf("%d:%s", attempt, decision))
-		})
+		}, nil)
 	return res
+}
+
+// orderRunner logs each launch prompt into order and rejects the first launch prompt.
+type orderRunner struct {
+	agentrunner.Runner
+	order *[]string
+}
+
+func (o orderRunner) PromptLaunch(_ context.Context, s agentrunner.Session, text string, _ func(string)) error {
+	*o.order = append(*o.order, "prompt")
+	if len(*o.order) == 2 {
+		return agentrunner.ErrNotDelivered
+	}
+	return o.Prompt(s, text)
+}
+
+func TestStartAndPrompt_OnStarted_RunsAfterStartBeforePromptOnEachAttempt(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	var order []string
+
+	_, err := StartAndPrompt(context.Background(), orderRunner{Runner: d.Runner, order: &order},
+		agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic}, "/go", func(int, string) {},
+		func(attempt int) { order = append(order, fmt.Sprintf("started:%d", attempt)) })
+
+	if err != nil {
+		t.Fatalf("StartAndPrompt = %v", err)
+	}
+	if want := []string{"started:1", "prompt", "started:2", "prompt"}; !slices.Equal(order, want) {
+		t.Fatalf("order = %v, want %v", order, want)
+	}
 }
 
 // assertLaunchFailure checks err is a launch failure of kind.
@@ -215,7 +246,7 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 	r := fakes.FakeRunner(d)
 	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
 
-	_, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel}, "/go", func(int, string) {})
+	_, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel}, "/go", func(int, string) {}, nil)
 
 	if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "gx claude doctor") {
 		t.Errorf("StartAndPrompt = %v, want ErrMissingCapability with the doctor hint", err)

@@ -100,7 +100,20 @@ type TrackedRun struct {
 	// restart re-derives the hold from the runner's rate-limit check.
 	RateLimited    bool      `json:"-"`
 	RateLimitReset time.Time `json:"-"`
+	// LaunchStep is the launch step the run is in, "" once the launch ended.
+	// Never saved: a restart reclaims or hands back a launch.
+	LaunchStep LaunchStep `json:"-"`
 }
+
+// LaunchStep names one of the four steps of a launch, in order.
+type LaunchStep string
+
+const (
+	StepCreatingWorktree LaunchStep = "creating worktree"
+	StepInstallingDeps   LaunchStep = "installing dependencies"
+	StepStartingAgent    LaunchStep = "starting agent"
+	StepSendingPrompt    LaunchStep = "sending prompt"
+)
 
 // Registry is the server's own record of launched iterations, keyed by
 // ticket address (a root may hold several). Independent of the TUI's.
@@ -495,9 +508,26 @@ func (r *Registry) DeleteStarted(address string, startedAt time.Time) {
 	}
 }
 
+// SetLaunchStep moves the run at address to step ("" ends the launch). It
+// reports whether the step changed; a missing run is left alone.
+func (r *Registry) SetLaunchStep(address string, step LaunchStep) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.runs[address]
+	if !ok || t.LaunchStep == step {
+		return false
+	}
+	t.LaunchStep = step
+	r.runs[address] = t
+	return true
+}
+
+// Put replaces the entry at t.Address. The launch step is in-memory state the
+// replaced entry owns, so it carries over; SetLaunchStep clears it.
 func (r *Registry) Put(t TrackedRun) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	t.LaunchStep = r.runs[t.Address].LaunchStep
 	r.runs[t.Address] = t
 	r.save()
 }

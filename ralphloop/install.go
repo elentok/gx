@@ -20,9 +20,15 @@ func installDepsIn(d deps.Deps, o OneIteration, path string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if o.OnDepsStart != nil {
+		o.OnDepsStart()
+	}
 	commands, err := d.InstallDeps(ctx, path, o.ScratchDir)
 	if err != nil {
 		return err
+	}
+	if o.OnDepsDone != nil {
+		o.OnDepsDone()
 	}
 	_ = runlog.AppendEvent(o.ScratchDir, o.Epic, runlog.Event{
 		Type:   string(events.DepsInstalled),

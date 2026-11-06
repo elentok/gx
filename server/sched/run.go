@@ -91,7 +91,7 @@ func (l *Launcher) claim(root queue.RootRef, queued tickets.Address, t tickets.T
 		entry: runs.TrackedRun{
 			// The runner is named now: a reservation with none reads as herdr to the run watchers.
 			Run:  runs.Run{Address: ticketAddr, Agent: string(agentKind), Runner: l.Harness.LaunchRunner(ticket.Project, agentKind).Name()},
-			Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runs.Launching,
+			Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runs.Launching, LaunchStep: runs.StepCreatingWorktree,
 		},
 	}, nil
 }
@@ -167,6 +167,8 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 		Context: ctx,
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agentKind, Ticket: t, RootBase: c.rootBase, LeafBase: c.leafBase,
 		Model: model, Effort: effort, Sink: l.Writer.FinishSink(ticket, t.Path), StallNudgeDelay: l.Host.StalledNudgeDelay(),
+		OnDepsStart: func() { l.setLaunchStep(ticketAddr, runs.StepInstallingDeps) },
+		OnDepsDone:  func() { l.setLaunchStep(ticketAddr, runs.StepStartingAgent) },
 	}
 	deps := l.Projects.DepsWith(l.Harness.LaunchRunner(ticket.Project, agentKind))
 	deps.GateReleased = l.Registry.GateReleased(ticketAddr)
@@ -220,6 +222,7 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 	l.Registry.Put(runs.TrackedRun{
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), Cwd: wt.Path, TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})
+	l.Registry.SetLaunchStep(ticketAddr, "") // IterationStarted below makes clients re-snapshot
 	l.Events.Publish(wire.EventIterationStarted, ticketAddr)
 	l.Guards.GoSettle(func() { l.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })
 	return true, nil

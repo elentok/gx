@@ -20,7 +20,7 @@ func TestWaitIterationFinished_SessionDied_ReturnsDiedReason(t *testing.T) {
 	d, _, _ := fakes.FakeDeps()
 	r := fakes.FakeRunner(d)
 	r.DieAfterPrompt(label, agentrunner.SessionDied("claude exited (code 1)"))
-	session, err := supervise.StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: label, Epic: epic}, "/gx-implement gx:my-epic/01", func(int, string) {})
+	session, err := supervise.StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: label, Epic: epic}, "/gx-implement gx:my-epic/01", func(int, string) {}, nil)
 	if err != nil {
 		t.Fatalf("StartAndPrompt = %v", err)
 	}

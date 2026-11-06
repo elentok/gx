@@ -93,7 +93,7 @@ func TestStartAndPrompt_ServerLaunchNeverAdopts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := StartAndPrompt(context.Background(), r, opts, "/go", func(int, string) {}); !errors.Is(err, agentrunner.ErrLabelTaken) {
+	if _, err := StartAndPrompt(context.Background(), r, opts, "/go", func(int, string) {}, nil); !errors.Is(err, agentrunner.ErrLabelTaken) {
 		t.Fatalf("err = %v, want ErrLabelTaken", err)
 	}
 	if got := r.Prompts("it-01"); len(got) != 0 {

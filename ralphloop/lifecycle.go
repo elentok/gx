@@ -86,6 +86,10 @@ type OneIteration struct {
 	// Context cancels the launch's dependency install; nil means
 	// context.Background().
 	Context context.Context
+	// OnDepsStart and OnDepsDone are called around the dependency install, when
+	// the ticket has one (a scratch commitless ticket has none). Nil hears nothing.
+	OnDepsStart func()
+	OnDepsDone  func()
 	// LongTicketTurns is the assistant-turn count at which OnLongTicket is
 	// called, once per launch; zero or a nil callback means no alert.
 	LongTicketTurns int

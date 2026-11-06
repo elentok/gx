@@ -142,6 +142,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	// sit out before it can finish.
 	ctx := one.Context
 	start := func() (agentrunner.Session, error) {
+		l.setLaunchStep(ticket.String(), runs.StepStartingAgent)
 		return supervise.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
 			Label:           label,
 			Epic:            ticket.Epic,
@@ -152,7 +153,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 			ResumeSessionID: resumeID,
 		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
 			l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
-		})
+		}, func(int) { l.setLaunchStep(ticket.String(), runs.StepSendingPrompt) })
 	}
 	session, err := start()
 	if err != nil && ctx.Err() != nil {
@@ -203,6 +204,14 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	})
 	run := runs.Run{Address: ticket.String(), Agent: string(agentKind), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil
+}
+
+// setLaunchStep moves the run's launch step and tells clients to re-snapshot
+// when it changed.
+func (l *Launcher) setLaunchStep(address string, step runs.LaunchStep) {
+	if l.Registry.SetLaunchStep(address, step) {
+		l.Events.Publish(wire.EventTicketChanged, address)
+	}
 }
 
 // CodexRolloutExists reports whether Codex has a rollout for session id under

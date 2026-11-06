@@ -49,6 +49,12 @@ func LaunchFailureKind(err error) (events.Kind, bool) {
 // session (e.g. a second gx process racing the same ticket): that one is
 // returned unprompted with Adopted set, since it may be mid-turn.
 func StartAndPromptLogged(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error), onNudge func(attempt int, decision string)) (Launched, error) {
+	return startAndPrompt(ctx, r, opts, prompt, onFail, onNudge, nil)
+}
+
+// startAndPrompt is StartAndPromptLogged with onStarted, called on every
+// attempt once Start returns and before the prompt is sent.
+func startAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error), onNudge func(attempt int, decision string), onStarted func(attempt int)) (Launched, error) {
 	_, adopted, err := r.Find(opts.Label)
 	if err != nil {
 		// Not fatal: Start still runs, it just can't be an adoption.
@@ -67,6 +73,9 @@ func StartAndPromptLogged(ctx context.Context, r agentrunner.Runner, opts agentr
 		}
 		if adopted {
 			return Launched{Session: s, Adopted: true}, nil
+		}
+		if onStarted != nil {
+			onStarted(attempt)
 		}
 		status, err := r.Status(s)
 		if err != nil {
@@ -109,10 +118,10 @@ func withDoctorHint(err error) error {
 
 // StartAndPrompt is StartAndPromptLogged for callers outside the loop (the server's
 // launch): same retry on an undelivered prompt, no launch-failed events. It
-// never adopts a holder of the label (ADR 0039).
-func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onNudge func(attempt int, decision string)) (agentrunner.Session, error) {
+// never adopts a holder of the label (ADR 0039). onStarted may be nil.
+func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onNudge func(attempt int, decision string), onStarted func(attempt int)) (agentrunner.Session, error) {
 	opts.NoAdopt = true
-	l, err := StartAndPromptLogged(ctx, r, opts, prompt, func(int, events.Kind, error) {}, onNudge)
+	l, err := startAndPrompt(ctx, r, opts, prompt, func(int, events.Kind, error) {}, onNudge, onStarted)
 	return l.Session, err
 }
 
