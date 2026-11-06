@@ -127,6 +127,7 @@ type Server struct {
 
 	chat      *notify.ServerChat // never nil; sends nothing when no destination is configured
 	registry  *runs.Registry
+	progress  *sched.ProgressTimer
 	reclaimer *sched.Reclaimer
 	launcher  *sched.Launcher
 	guards    *runs.Guards
@@ -460,6 +461,9 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.scheduler.Launcher = s.launcher
 	s.reclaimer = sched.NewReclaimer(s.log, reclaimHost{s}, s.registry, savedRuns)
+	s.progress = sched.NewProgressTimer(sched.ProgressTimerDeps{
+		Registry: s.registry, Projects: s.projects, Writer: s.writer, Chat: s.chat, Interval: cfg.Chat.ProgressInterval,
+	})
 	s.herdr.Check()
 	return s, nil
 }
@@ -573,6 +577,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(usageDone); s.limits.Run(freshCtx) }()
 	sweepDone := make(chan struct{})
 	go func() { defer close(sweepDone); s.sessions.Conv.SweepDesignCounts() }()
+	progressDone := make(chan struct{})
+	go func() { defer close(progressDone); s.progress.Run(freshCtx) }()
 	s.health.FileStartIncident(time.Now())
 	var err error
 	select {
@@ -615,6 +621,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		{"wait-health", healthDone},
 		{"wait-usage", usageDone},
 		{"wait-sweep", sweepDone},
+		{"wait-progress", progressDone},
 	} {
 		recordShutdown(w.name)
 		<-w.done

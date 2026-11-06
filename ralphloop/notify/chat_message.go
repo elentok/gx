@@ -290,8 +290,10 @@ func progressMessage(project, epic string, f ProgressFacts) chatMessage {
 	if f.FinishedCount == 1 {
 		noun = "ticket"
 	}
+	if f.FinishedCount > 0 {
+		lines = append(lines, fmt.Sprintf("Finished since the last update: %d %s · %s · %s", f.FinishedCount, noun, formatElapsed(f.FinishedElapsedSeconds), tickets.FormatCost(f.FinishedCost)))
+	}
 	lines = append(lines,
-		fmt.Sprintf("Finished since the last update: %d %s · %s · %s", f.FinishedCount, noun, formatElapsed(f.FinishedElapsedSeconds), tickets.FormatCost(f.FinishedCost)),
 		fmt.Sprintf("Left: %d", max(0, f.Counts.Total-f.Counts.Done-f.Counts.InProgress)),
 		RenderCountsLine(f.Counts))
 	return chatMessage{
