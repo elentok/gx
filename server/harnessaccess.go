@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/webauth"
+	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -28,6 +30,23 @@ func (h queueHost) CheckExtraUsage(now time.Time) bool { return h.budget.CheckEx
 func (h queueHost) StampEpic(root queue.RootRef, epicPath string, keys ...string) {
 	h.merger.StampEpic(root, epicPath, keys...)
 }
+
+// ClearHold takes the hold off the epic; the store maps an `-impl` epic to its Design.
+func (h queueHost) ClearHold(root queue.RootRef) { h.clearHold(root.Project + ":" + root.Epic) }
+
+// clearHold unholds key when it is held, so an unheld key writes nothing.
+func (s *Server) clearHold(key string) {
+	if !s.workspaces.IsHeld(key) {
+		return
+	}
+	if err := s.workspaces.Unhold(key); err != nil {
+		slog.Warn("clear hold", "key", key, "err", err)
+	}
+}
+
+// Workspaces is the workspace and hold store. Tests outside the package read
+// their seams through here.
+func (s *Server) Workspaces() *workspaces.Store { return s.workspaces }
 
 // Harness is the server's harness choice. Tests outside the package read it
 // through here.

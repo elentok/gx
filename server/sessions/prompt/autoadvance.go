@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"cmp"
+	"strings"
 	"sync"
 	"time"
 
@@ -90,7 +91,7 @@ func (p *Prompt) AutoAdvanceDeadline(id string) time.Time { return p.autoAdvance
 // config.
 func (p *Prompt) StartAutoAdvance(id string) bool {
 	delay := cmp.Or(p.cfg.AutoAdvanceDelay, DefaultAutoAdvanceDelay)
-	if delay < 0 {
+	if delay < 0 || p.designHeld(id) {
 		return false
 	}
 	c := p.autoAdvances.begin(id, time.Now().Add(delay))
@@ -111,6 +112,20 @@ func (p *Prompt) StartAutoAdvance(id string) bool {
 		p.sendAutoAdvance(id)
 	})
 	return true
+}
+
+// designHeld reports whether the session is a Design session whose Design is
+// held. Holding exits those sessions, so this is the backstop.
+func (p *Prompt) designHeld(id string) bool {
+	if p.held == nil {
+		return false
+	}
+	_, meta, res, err := p.sessions.SessionDir(id)
+	if res.Refused || err != nil || !meta.Design {
+		return false
+	}
+	epic, _, _ := strings.Cut(meta.Ticket, "/")
+	return p.held(epic)
 }
 
 // CancelAutoAdvance stops the session's countdown, leaving the Continue raised,

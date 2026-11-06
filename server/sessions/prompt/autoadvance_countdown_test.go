@@ -118,6 +118,23 @@ func TestAutoAdvance_SwitchOffStartsNoCountdown(t *testing.T) {
 	}
 }
 
+func TestAutoAdvance_HeldDesignStartsNoCountdown(t *testing.T) {
+	t.Parallel()
+	f := startAdvancing(t, storeWithMapStep(t, "spec"))
+	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	// Marked directly: holding through the route would exit the session.
+	if err := f.H.Server.Workspaces().Hold("proj:map"); err != nil {
+		t.Fatal(err)
+	}
+	writeAssistantMessage(t, f.Path, runEndText)
+	endTurn(t, f)
+	got := waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
+	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
+	if got.AutoAdvanceAt != nil || screenHas(t, c, "/clear") {
+		t.Errorf("session = %+v, want no countdown and nothing sent", got)
+	}
+}
+
 // startCountdown ends a run on a session so its countdown runs over a raised Continue.
 func startCountdown(t *testing.T) (*grillingFixture, *holder.HolderClient) {
 	t.Helper()

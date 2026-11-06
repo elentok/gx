@@ -58,6 +58,8 @@ type Host interface {
 	CheckExtraUsage(now time.Time) bool
 	StampEpic(root RootRef, epicPath string, keys ...string)
 	EnsureDraftEpic(epicPath string) error
+	// ClearHold takes the hold off root's epic, and off its Design when joined.
+	ClearHold(root RootRef)
 }
 
 // QueueDeps is what a Queue needs beside its state files, handed over once the
@@ -335,8 +337,19 @@ func (q *Queue) addItem(req wire.QueueRequest) (wire.QueueResult, error) {
 	})
 	if err == nil && !res.Refused {
 		q.stampQueuedAt(target)
+		q.clearHoldOf(target.address)
 	}
 	return res, err
+}
+
+// clearHoldOf takes the hold off the epic a queued address belongs to: queueing
+// a held epic un-holds it.
+func (q *Queue) clearHoldOf(addr string) {
+	a, err := tickets.ParseQueuedAddress(addr)
+	if err != nil {
+		return
+	}
+	q.host.ClearHold(RootRef{Project: a.Project, Epic: a.Epic})
 }
 
 // stampQueuedAt records the epic's first enqueue. StampEpicFields never
@@ -386,6 +399,9 @@ func (q *Queue) Replace(req wire.QueueRequest) (wire.QueueResult, error) {
 	agents := make([]string, len(req.Items))
 	for i, it := range req.Items {
 		agents[i] = it.Agent
+		if err == nil && !res.Refused {
+			q.clearHoldOf(it.Address)
+		}
 	}
 	return q.WithExtraUsage(req.Project, agents, res, err)
 }

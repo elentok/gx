@@ -423,9 +423,10 @@ func New(cfg Config) (*Server, error) {
 			ActionStepStartTimeout: cfg.ActionStepStartTimeout, ActionSlashSettle: cfg.ActionSlashSettle,
 		},
 		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings,
-		Projects: s.projects, BadRounds: s.recovery,
+		Projects: s.projects, BadRounds: s.recovery, Held: s.workspaces.IsHeld,
 	})
 	s.sessions = newManager(s)
+	s.sessions.Maps.OnDesignStart = s.clearHold
 	s.designs.GiveSessions(s.sessions)
 	s.prompt.GiveSessions(s.sessions)
 	s.rec.GiveSessions(s.sessions)

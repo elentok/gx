@@ -25,6 +25,7 @@ func (f *fakeHost) CheckWaitingLabel(string) string           { return "" }
 func (f *fakeHost) ListSessions() ([]wire.SessionInfo, error) { return nil, nil }
 func (f *fakeHost) EnsureDraftEpic(string) error              { return nil }
 func (f *fakeHost) StampEpic(RootRef, string, ...string)      {}
+func (f *fakeHost) ClearHold(RootRef)                         {}
 func (f *fakeHost) CheckExtraUsage(time.Time) bool {
 	f.extraChecks++
 	return f.extraUsage

@@ -281,6 +281,9 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 	if err := WriteMeta(dir, *meta); err != nil {
 		return err
 	}
+	if meta.Design && meta.Ticket != "" {
+		mg.Maps.designStarted(meta.Ticket)
+	}
 	h, err := harness.Lookup(agentrunner.Kind(meta.Harness))
 	if err != nil {
 		return err

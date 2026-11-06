@@ -98,7 +98,21 @@ func (rs *Resumer) reportSessionStep(req wire.ReportStepRequest) (wire.SessionRe
 
 // MapEpics answers what the sessions need to know about the map epic behind a
 // ticket address.
-type MapEpics struct{ projects *projects.Registry }
+type MapEpics struct {
+	projects *projects.Registry
+	// OnDesignStart is told the `project:epic` key of a Design whenever one of
+	// its sessions starts or resumes (a held Design un-holds). Nil is a no-op.
+	OnDesignStart func(key string)
+}
+
+// designStarted reports a Design session start to OnDesignStart.
+func (me *MapEpics) designStarted(ticket string) {
+	if me.OnDesignStart == nil {
+		return
+	}
+	epic, _, _ := strings.Cut(ticket, "/")
+	me.OnDesignStart(epic)
+}
 
 // stampDesignStart records the first design session on the map epic behind
 // address. The stamp is write-once, so every later session leaves it.

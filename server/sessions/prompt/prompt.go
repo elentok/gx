@@ -84,6 +84,8 @@ type Deps struct {
 	Settings    *settings.Holder
 	Projects    *projects.Registry
 	BadRounds   BadRounds
+	// Held reports whether a Design (its `project:epic` key) is held. Nil is none.
+	Held func(key string) bool
 }
 
 // Prompt holds the auto-advance countdowns and the turn settling of the
@@ -96,6 +98,7 @@ type Prompt struct {
 	settings    *settings.Holder
 	projects    *projects.Registry
 	badRounds   BadRounds
+	held        func(key string) bool
 	// sessions comes later than Prompt: the Manager calls the Prompter back, so
 	// it is built after Prompt and handed over by GiveSessions.
 	sessions *sessions.Manager
@@ -112,7 +115,7 @@ type Prompt struct {
 func New(d Deps) *Prompt {
 	return &Prompt{
 		cfg: d.Cfg, log: d.Log, events: d.Events, sessionChat: d.SessionChat,
-		settings: d.Settings, projects: d.Projects, badRounds: d.BadRounds,
+		settings: d.Settings, projects: d.Projects, badRounds: d.BadRounds, held: d.Held,
 	}
 }
 
