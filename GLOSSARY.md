@@ -905,7 +905,8 @@ agents are never stopped, and the daemon applies the new value at its next sched
 `explain` names every full cap with its count (`waiting: global cap 4/4`).
 
 **No bypass** — one-offs, `scratch` jobs and `type: investigate` nodes all count against the same
-caps. `--front` sets queue position only. See ADR 0032.
+caps. `--front` sets queue position only. See ADR 0032. A Design session takes no slot: it counts
+toward no cap and shows in the Agents tab, not the Queue views.
 
 ## One-offs
 

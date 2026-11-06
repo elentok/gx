@@ -1,12 +1,16 @@
 package designs_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
@@ -285,6 +289,38 @@ func TestDesignCleanup_StepMovingToDoneStopsTheLiveDesignSession(t *testing.T) {
 	f.setDesignStep(t, "done")
 	waitFor(t, func() bool { return f.sessionExited(t, res.Session.ID) })
 	waitFor(t, func() bool { return f.designGone(t, dir) })
+}
+
+// waitNoProcess waits until the session's agent process and holder are gone.
+func (f designsFixture) waitNoProcess(t *testing.T, id string, child int) {
+	t.Helper()
+	waitFor(t, func() bool { return f.sessionExited(t, id) })
+	waitFor(t, func() bool { return errors.Is(syscall.Kill(child, 0), syscall.ESRCH) })
+	waitFor(t, func() bool {
+		_, err := holder.DialHolder(filepath.Join(f.h.SessionsDir, id))
+		return err != nil
+	})
+}
+
+// Seam: a stopped design session leaves no holder and no agent process.
+func TestDesignCleanup_StoppedDesignSessionLeavesNoProcess(t *testing.T) {
+	t.Parallel()
+	f := startDesignsAt(t, "create-tickets")
+	_, id := f.openDesignWorktree(t, true)
+	child := servertest.WaitForHolder(t, filepath.Join(f.h.SessionsDir, id)).ChildPID()
+	f.stop(t, id)
+	f.waitNoProcess(t, id, child)
+}
+
+// Seam: a design that reaches done is stopped, and its holder and agent go.
+func TestDesignCleanup_FinishedDesignSessionLeavesNoProcess(t *testing.T) {
+	t.Parallel()
+	f := startDesignsAt(t, "create-tickets")
+	_, id := f.openDesignWorktree(t, true)
+	child := servertest.WaitForHolder(t, filepath.Join(f.h.SessionsDir, id)).ChildPID()
+	gitOut(t, f.repo, "branch", "map-impl", "map-design")
+	f.setDesignStep(t, "done")
+	f.waitNoProcess(t, id, child)
 }
 
 func TestDesignCleanup_StepMovingToBranchLeavesTheLiveDesignSession(t *testing.T) {
