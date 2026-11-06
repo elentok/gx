@@ -93,7 +93,9 @@ func nodeVersion(ctx context.Context, pathEnv string) string {
 			return ""
 		}
 	}
-	out, err := exec.CommandContext(ctx, name, "--version").Output()
+	cmd := exec.CommandContext(ctx, name, "--version")
+	cmd.Env = []string{"PATH=" + pathEnv} // the binary is already resolved; --version needs nothing else
+	out, err := cmd.Output()
 	if err != nil {
 		return ""
 	}
