@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
@@ -90,6 +91,39 @@ func TestPrepareCommitless_InstallsInADetachedWorktreeButNotAScratchDir(t *testi
 	}
 	if want := []string{w.Path}; !slices.Equal(rec.paths, want) {
 		t.Errorf("installed in %v, want %v", rec.paths, want)
+	}
+}
+
+func TestPrepareIteration_WorktreeAddCompletesWhileAnotherInstallIsBlocked(t *testing.T) {
+	d, _, o := prepareDepsFixture(t)
+	entered, unblock := make(chan struct{}), make(chan struct{})
+	d.InstallDeps = func(ctx context.Context, _, _ string) ([]string, error) {
+		close(entered)
+		select {
+		case <-unblock:
+		case <-ctx.Done():
+		}
+		return nil, nil
+	}
+	done := make(chan error, 1)
+	go func() { _, err := PrepareIteration(d, o); done <- err }()
+	<-entered
+
+	second := o
+	second.Ticket.Identifier = "02"
+	added := make(chan error, 1)
+	go func() { _, err := addIterationWorktrees(d, second); added <- err }()
+	select {
+	case err := <-added:
+		if err != nil {
+			t.Fatalf("addIterationWorktrees() = %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("worktree add did not complete while another launch's install was blocked")
+	}
+	close(unblock)
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -68,7 +68,7 @@ func installDependenciesWithin(parent context.Context, path, pathEnv, logDir str
 	ctx, cancel := context.WithTimeout(parent, budget)
 	defer cancel()
 	for _, dir := range dirs {
-		command, err := installIn(ctx, dir.path, dir.lockfiles, pathEnv, logDir)
+		command, err := installIn(ctx, path, dir.path, dir.lockfiles, pathEnv, logDir)
 		if err != nil {
 			return nil, installError(dir.path, err)
 		}
@@ -112,7 +112,7 @@ func lockfileDirs(path string) ([]lockfileDir, error) {
 }
 
 // installIn chooses dir's manager and runs its install there until ctx ends.
-func installIn(ctx context.Context, dir string, lockfiles []string, pathEnv, logDir string) ([]string, error) {
+func installIn(ctx context.Context, worktree, dir string, lockfiles []string, pathEnv, logDir string) ([]string, error) {
 	packageManager, err := readPackageManager(dir)
 	if err != nil {
 		return nil, err
@@ -121,6 +121,11 @@ func installIn(ctx context.Context, dir string, lockfiles []string, pathEnv, log
 	if err != nil {
 		return nil, err
 	}
+	release, err := installFlights.acquire(ctx, installKey(ctx, worktree, dir, packageManager, pathEnv))
+	if err != nil {
+		return nil, describeInstallFailure(ctx, dir, command, nil, err, logDir)
+	}
+	defer release()
 	out, err := runInstall(ctx, dir, command, pathEnv)
 	if err != nil {
 		return nil, describeInstallFailure(ctx, dir, command, out, err, logDir)
