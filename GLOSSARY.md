@@ -1059,13 +1059,17 @@ _Avoid_: breakpoint, form factor
 ## Web workspaces
 
 **Workspace** — a named theme the person creates to group what they work on now: Designs, epics and
-agents, for example "gx bugs" or "research". An item is in at most one workspace. In the web UI this
+agents, for example "gx bugs" or "research". An item is in exactly one workspace. In the web UI this
 meaning wins. herdr's workspace (a multiplexer window, see **Session**) is the other meaning, and
 herdr support is being phased out.
 _Avoid_: group, board, project (a project is a registered repo)
 
+**Default workspace** — the workspace every new Design, epic and chat starts in, and where "Remove from
+workspace" sends an item back. It cannot be deleted. Not the repo's default branch.
+_Avoid_: Main, inbox
+
 **Active workspace** — the workspace the person is working in now. Opening an item in a workspace
-makes it active. The sidebar expands it and collapses the others.
+makes it active. The sidebar lists only its items and offers the others in a switcher.
 
 **On hold** — a mark on a Design or epic the person does not want to deal with now. A held item
 leaves the main lists. It is not the same as being in no workspace.
