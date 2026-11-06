@@ -419,6 +419,10 @@ export const touch = { hasTouch: true, isMobile: true } as const;
 /** Matches a role's accessible name exactly. */
 export const nav = (name: string) => ({ name, exact: true });
 
+/** The button that opens the app menu, and the menu it opens. */
+export const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
+export const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
+
 /** The `gx agents list` rows that mention `slug` (tab-separated, the session id first). */
 export const sessionRows = async (fixture: Fixture, slug: string) =>
   (await fixture.cli("agents", "list")).split("\n").filter((l) => l.includes(slug));

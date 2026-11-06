@@ -1,7 +1,7 @@
 import { appendFile, glob, mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { expect, test, type Fixture } from "./fixture";
+import { expect, menu, menuButton, test, type Fixture } from "./fixture";
 import type { Page } from "@playwright/test";
 
 const nowSec = () => Math.floor(Date.now() / 1000);
@@ -20,10 +20,9 @@ const report = (fixture: Fixture, body: string) =>
   fixture.cliInput(body, "claude", "statusline");
 
 const openMenu = async (page: Page) => {
-  await page.getByRole("button", { name: "Menu" }).click();
-  const menu = page.getByRole("menu");
-  await expect(menu).toBeVisible();
-  return menu;
+  await menuButton(page).click();
+  await expect(menu(page)).toBeVisible();
+  return menu(page);
 };
 
 const row = (page: Page, name: string) => page.getByRole("group", { name });
@@ -142,7 +141,7 @@ test.describe("180. Menu limit burn", () => {
   test("narrow menu fits; live updates", async ({ page, start }) => {
     const fixture = await start("limit-burn", { shape: "menu" });
     await page.setViewportSize({ width: 320, height: 700 });
-    await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
+    await expect(menuButton(page)).toBeVisible();
 
     // The widest menu (Claude + Codex) must stay inside a 320 px viewport.
     const scrollWidth = () =>

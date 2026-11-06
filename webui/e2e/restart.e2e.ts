@@ -1,5 +1,5 @@
-import { expect, nav, test } from "./fixture";
-import { dialog,expectReloaded, menu, menuButton, openDialog, passing, pidLine, restartButton, restartItem } from "./restart-helpers";
+import { expect, menu, menuButton, nav, test } from "./fixture";
+import { dialog,expectReloaded, openDialog, passing, pidLine, restartButton, restartItem } from "./restart-helpers";
 
 // Also covers 128 (the item sits between AFK and the build line, and opening it closes the menu).
 test("129. Restart server keyboard", async ({ page, start }) => {

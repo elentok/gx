@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { composer, go, messageBox, sessions } from "./agentsKit";
-import { card, expect, type Fixture, nav, test, touch } from "./fixture";
+import { card, expect, type Fixture, menu, menuButton, nav, test, touch } from "./fixture";
 
 // Most vi-editor behaviour (open keys, closers, Done, backdrop, mode text, bar, vim motions and
 // edits) is covered in vitest under src/ui/expandable-text. These flows keep what needs a real
@@ -11,11 +11,10 @@ const TOLERANCE = 1;
 // `gx vimode` changes the server; the page follows, which the menu switch shows.
 const setViMode = async (fixture: Fixture, page: Page, on: boolean) => {
   await fixture.cli("vimode", on ? "on" : "off");
-  await page.getByRole("button", nav("Menu")).click();
-  const item = page.getByRole("menu", nav("Menu")).getByRole("menuitemcheckbox", nav("Vi mode"));
-  await expect(item).toHaveAttribute("aria-checked", String(on));
-  await page.getByRole("button", nav("Menu")).click();
-  await expect(page.getByRole("menu", nav("Menu"))).toHaveCount(0);
+  await menuButton(page).click();
+  await expect(menuSwitch(page)).toHaveAttribute("aria-checked", String(on));
+  await menuButton(page).click();
+  await expect(menu(page)).toHaveCount(0);
 };
 
 type Locator = ReturnType<Page["getByRole"]>;
@@ -331,7 +330,7 @@ test.describe("126. Vi editor: layers and focus", () => {
   });
 });
 
-const menuSwitch = (page: Page) => page.getByRole("menu", nav("Menu")).getByRole("menuitemcheckbox", nav("Vi mode"));
+const menuSwitch = (page: Page) => menu(page).getByRole("menuitemcheckbox", nav("Vi mode"));
 
 test.describe("127. Vi editor: setting", () => {
   test.use({ viewport: { width: 1280, height: 900 } });
@@ -341,7 +340,7 @@ test.describe("127. Vi editor: setting", () => {
   test("flipping the setting with the editor open shows and hides vi at once", async ({ page, start }) => {
     const fixture = await start("design-working");
     await expect(card(page, "design-epic")).toBeVisible();
-    await page.getByRole("button", nav("Menu")).click();
+    await menuButton(page).click();
     const item = menuSwitch(page);
     await expect(item).toHaveAttribute("aria-checked", "false");
     await item.click();
@@ -349,11 +348,11 @@ test.describe("127. Vi editor: setting", () => {
     const second = await page.context().newPage();
     await second.goto(page.url());
     await expect(card(second, "design-epic")).toBeVisible();
-    await second.getByRole("button", nav("Menu")).click();
+    await menuButton(second).click();
     await expect(menuSwitch(second)).toHaveAttribute("aria-checked", "true");
     await second.close();
-    await page.getByRole("button", nav("Menu")).click();
-    await expect(page.getByRole("menu", nav("Menu"))).toHaveCount(0);
+    await menuButton(page).click();
+    await expect(menu(page)).toHaveCount(0);
 
     const { dialog } = await openWith(page, "hello", 2);
     const editable = dialog.getByRole("textbox", nav(`${MESSAGE} text`));

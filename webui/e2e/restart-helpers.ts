@@ -1,12 +1,10 @@
 import type { Page } from "@playwright/test";
-import { expect, nav, type Fixture } from "./fixture";
+import { expect, menu, menuButton, nav, type Fixture } from "./fixture";
 
 // Shared by the restart flows (restart.e2e.ts, restart-run.e2e.ts). They run on the restart-*
 // scenarios, whose server path is a fake gx binary that a flow steers through its control files
 // (check.json, slow, old, start, gx).
 
-export const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
-export const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
 export const restartItem = (page: Page) => menu(page).getByRole("menuitem", nav("Restart server"));
 export const dialog = (page: Page) => page.getByRole("dialog", nav("Restart server"));
 export const restartButton = (page: Page) => dialog(page).getByRole("button", { name: /^Restart( anyway)?$/ });

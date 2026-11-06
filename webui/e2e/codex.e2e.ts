@@ -1,9 +1,9 @@
 import type { Page } from "@playwright/test";
 import { created, createButton, go, newForm, promptBox, sessions } from "./agentsKit";
-import { expect, nav, test } from "./fixture";
+import { expect, menuButton, nav, test } from "./fixture";
 
 async function openAgentsSettings(page: Page) {
-  await page.getByRole("button", nav("Menu")).click();
+  await menuButton(page).click();
   await page.getByRole("menuitem", nav("Settings")).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   const row = page.getByRole("link", { name: /^Agents Default:/ });

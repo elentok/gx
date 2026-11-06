@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, section, test } from "./fixture";
+import { card, expect, menu, menuButton, nav, section, test } from "./fixture";
 
 const NEEDS_YOU = [
   "paused-epic",
@@ -13,8 +13,6 @@ const NEEDS_YOU = [
   "paused", // the one-off ticket
 ];
 
-const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
-const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
 const afkItem = (page: Page) => menu(page).getByRole("menuitemcheckbox", nav("AFK"));
 const viModeItem = (page: Page) => menu(page).getByRole("menuitemcheckbox", nav("Vi mode"));
 

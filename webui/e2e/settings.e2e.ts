@@ -1,5 +1,5 @@
 import { chromium, type Browser, type Page } from "@playwright/test";
-import { expect, nav, test, type Fixture } from "./fixture";
+import { expect, menuButton, nav, test, type Fixture } from "./fixture";
 
 /** The ids `gx server web-logins` prints, one per line, the id first. */
 const loginIds = async (fixture: Fixture) =>
@@ -8,7 +8,7 @@ const loginIds = async (fixture: Fixture) =>
 const loginRows = (page: Page) => page.locator('a[href^="#/settings/logins/"]');
 
 async function openWebLogins(page: Page) {
-  await page.getByRole("button", nav("Menu")).click();
+  await menuButton(page).click();
   await page.getByRole("menuitem", nav("Settings")).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByRole("link", { name: /^Web logins/ }).click();
@@ -29,7 +29,7 @@ async function signInElsewhere(browser: Browser, url: string, password: string, 
 const signedInPage = (other: Page) => expect(other.getByRole("heading", { name: "Sign in" })).toHaveCount(0);
 
 async function openAccountPage(page: Page, link: string) {
-  await page.getByRole("button", nav("Menu")).click();
+  await menuButton(page).click();
   await page.getByRole("menuitem", nav("Settings")).click();
   await page.getByRole("link", { name: link }).click();
 }
@@ -75,7 +75,7 @@ test("107. Sign out of this device (+111 CLI revoke)", async ({ page, start }) =
   const before = await loginIds(fixture);
   expect(before).toHaveLength(4);
 
-  await page.getByRole("button", nav("Menu")).click();
+  await menuButton(page).click();
   await page.getByRole("menuitem", nav("Settings")).click();
   await page.getByRole("button", { name: "Sign out of this device" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();

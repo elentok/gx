@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { SessionInfo } from "../src/generated/server";
-import { expect, type Fixture } from "./fixture";
+import { expect, menu, menuButton, type Fixture } from "./fixture";
 
 export const sessions = async (fixture: Fixture) => JSON.parse(await fixture.cli("agents", "list", "--json")) as SessionInfo[];
 
@@ -84,11 +84,10 @@ export const commandNames = async (page: Page) => {
 /** Turns the Vi mode setting on or off and checks the Menu shows it. */
 export async function setViMode(fixture: Fixture, page: Page, on: boolean) {
   await fixture.cli("vimode", on ? "on" : "off");
-  await page.getByRole("button", { name: "Menu", exact: true }).click();
-  const menu = page.getByRole("menu", { name: "Menu", exact: true });
-  await expect(menu.getByRole("menuitemcheckbox", { name: "Vi mode", exact: true })).toHaveAttribute("aria-checked", String(on));
-  await page.getByRole("button", { name: "Menu", exact: true }).click();
-  await expect(menu).toHaveCount(0);
+  await menuButton(page).click();
+  await expect(menu(page).getByRole("menuitemcheckbox", { name: "Vi mode", exact: true })).toHaveAttribute("aria-checked", String(on));
+  await menuButton(page).click();
+  await expect(menu(page)).toHaveCount(0);
 }
 
 export const titleButton = (page: Page) => page.getByRole("heading", { level: 1 }).getByRole("button");
