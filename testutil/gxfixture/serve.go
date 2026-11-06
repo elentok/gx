@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/server/wire"
@@ -161,6 +162,11 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 	if !sc.QueueAfterSessions {
 		if err := f.queueAll(ctx, sc); err != nil {
 			return s, err
+		}
+	}
+	for _, args := range sc.Steps {
+		if out, err := f.cli(args...); err != nil {
+			return s, fmt.Errorf("gx %s: %w\n%s", strings.Join(args, " "), err, out)
 		}
 	}
 	if len(sc.QueueAfterUsage) > 0 {

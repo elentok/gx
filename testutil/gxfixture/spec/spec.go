@@ -143,6 +143,9 @@ type Scenario struct {
 	// ChatCapture points the server's Slack webhook and Telegram base URL at a
 	// capture endpoint and prints the file it appends to (see chat.go).
 	ChatCapture bool
+	// Steps are gx argument lists run against the server once the queue is set,
+	// in order; the first failing one stops the fixture.
+	Steps [][]string
 	// Sessions are created in order once the server is up, as `gx agents create` makes them.
 	Sessions []SessionSpec
 	// Commands is what the fakes' list probes answer; nil leaves them empty.

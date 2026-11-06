@@ -1,0 +1,61 @@
+package main
+
+import (
+	"encoding/json"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/gxfixture/chatcapture"
+)
+
+// captured is every line of the capture file so far.
+func captured(path string) []chatcapture.Line {
+	data, _ := os.ReadFile(path)
+	var got []chatcapture.Line
+	for l := range strings.SplitSeq(string(data), "\n") {
+		var line chatcapture.Line
+		if json.Unmarshal([]byte(l), &line) == nil {
+			got = append(got, line)
+		}
+	}
+	return got
+}
+
+func TestChatTicketsScenario_EveryProducibleKindLandsInTheCaptureFile(t *testing.T) {
+	t.Parallel()
+	r := start(t, "chat-tickets")
+	// Match on the ticket address and the old kind wording, not the layout.
+	want := map[string][]string{
+		"answer-question": {"ask-epic/01", "needs answer", "Which option should the fake worker take?"},
+		"repair-blocked":  {"menu-epic/01", "blocked-pane"},
+		"repair-fallback": {"manual-epic/01", "needs repair", "manual: the operator set this"},
+	}
+	var got []chatcapture.Line
+	missing := func() []string {
+		got = captured(r.ChatCapture)
+		var out []string
+		for part, needles := range want {
+			found := false
+			for _, l := range got {
+				if l.Transport != "slack" {
+					continue
+				}
+				all := true
+				for _, n := range needles {
+					all = all && strings.Contains(strings.ToLower(l.Text), strings.ToLower(n))
+				}
+				found = found || all
+			}
+			if !found {
+				out = append(out, part)
+			}
+		}
+		return out
+	}
+	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool { return len(missing()) == 0 }) {
+		t.Fatalf("no capture line for %v; got %+v", missing(), got)
+	}
+}

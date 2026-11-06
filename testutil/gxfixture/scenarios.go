@@ -87,7 +87,30 @@ var scenarios = map[string]scenario{
 	},
 	// chat-capture: a server whose Slack and Telegram posts land in the `chat_capture` file
 	// (see chat.go); the base of the notification checks. CLI Telegram sends do not reach it.
-	"chat-capture":          {ChatCapture: true},
+	"chat-capture": {ChatCapture: true},
+	// chat-tickets: chat-capture plus tickets whose events make the server send
+	// ticket messages, one per mock part: answer-question (a worker asks),
+	// repair-blocked (a worker blocks on a question menu), repair-fallback (a
+	// manual pause with a long unmapped reason). Not produced yet: answer-noquestion,
+	// answer-zerocommit, conflict, done-result and the one-offs with an empty or an
+	// over-1500-character Result. The fake worker commits in a one-off, which pauses
+	// it as stranded commits instead of finishing it with a Result, so those need
+	// a fake behaviour that reports a Result; the next ticket adds them.
+	"chat-tickets": {
+		ChatCapture: true,
+		Epics: []epic{
+			{Project: project, Name: "ask-epic", Tickets: []ticket{{ID: "01", Slug: "asks", Opts: servertest.TicketOpts{}}}},
+			{Project: project, Name: "menu-epic", Tickets: []ticket{{ID: "01", Slug: "menu", Opts: servertest.TicketOpts{}}}},
+			{Project: project, Name: "manual-epic", Tickets: []ticket{{ID: "01", Slug: "manual", Opts: servertest.TicketOpts{}}}},
+		},
+		Queue: []string{project + ":ask-epic", project + ":menu-epic"},
+		Behaviour: map[string]string{
+			project + ":ask-epic/01":  agentfake.BehaviourAsk,
+			project + ":menu-epic/01": agentfake.BehaviourQuestionMenu,
+		},
+		Steps: [][]string{
+			{"server", "tickets", "pause", project + ":manual-epic/01", "--reason", "the operator set this ticket aside while the long unmapped reason explains why it has to wait for a person to look at it"}},
+	},
 	"rejected-first-prompt": spec.RejectedFirstPrompt,
 	"stall-vim":             spec.StallVim,
 	"stall-leaves-i":        spec.StallLeavesI,
