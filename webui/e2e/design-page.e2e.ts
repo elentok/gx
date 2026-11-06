@@ -27,8 +27,21 @@ test.describe("72. Design actions menu", () => {
     const title = (await page.getByRole("heading", { level: 1 }).first().boundingBox())!;
     expect(trigger.y).toBeLessThan(title.y + title.height);
 
+    // Menu button states: hover fills, Tab shows an outline, open shows a border.
+    const rest = await moreActions(page).evaluate((el) => getComputedStyle(el).backgroundColor);
+    await moreActions(page).hover();
+    await expect.poll(() => moreActions(page).evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(rest);
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect(async () => {
+      await page.keyboard.press("Tab");
+      await expect(moreActions(page)).toBeFocused({ timeout: 300 });
+    }).toPass();
+    expect(await moreActions(page).evaluate((el) => getComputedStyle(el).outlineStyle)).not.toBe("none");
+
     await moreActions(page).click();
     const menu = actionsMenu(page);
+    await expect(moreActions(page)).not.toHaveCSS("box-shadow", "none");
     await expect(menu.getByTestId("grab-handle")).toHaveCount(0);
     // The positioner places the popover after it mounts, so wait for it to leave the origin.
     await expect.poll(async () => (await menu.boundingBox())!.y).toBeGreaterThanOrEqual(trigger.y + trigger.height);
@@ -37,6 +50,23 @@ test.describe("72. Design actions menu", () => {
     expect(box.x + box.width).toBeGreaterThan(trigger.x);
 
     await expect(menu.getByText("Live sessions · 2")).toBeVisible();
+    // The Agent block reads Tier on desktop, Tier and Effort on a phone.
+    await expect(menu.getByText("Agent", { exact: true })).toBeVisible();
+    await expect(menu.getByText("Tier", { exact: true })).toBeVisible();
+    await expect(menu.getByText("Effort", { exact: true })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await page.setViewportSize({ width: 375, height: 800 });
+    await moreActions(page).click();
+    await expect(menu.getByText("Tier", { exact: true })).toBeVisible();
+    await expect(menu.getByText("Effort", { exact: true })).toBeVisible();
+    // Escape goes to the menu once focus is inside it.
+    await expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0, { timeout: 500 });
+    }).toPass();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await moreActions(page).click();
     const shown = menu.getByRole("menuitem", { name: /^design-epic/ });
     await expect(shown).toHaveAttribute("aria-current", "true");
     await expect(shown).toContainText("✓");

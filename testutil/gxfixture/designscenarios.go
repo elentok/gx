@@ -39,7 +39,7 @@ func designTwoLive() scenario {
 // the demo project, and a worker model the fake claude refuses to start with.
 const (
 	strongestModel = "opus"
-	workerModel    = "sonnet"
+	workerModel    = "claude-sonnet-5-5"
 	staleProject   = "stale"
 	// plainProject sets no tiers of its own, so its design session runs the empty global one.
 	plainProject = "plain"

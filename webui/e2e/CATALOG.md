@@ -55,6 +55,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **50. Design epic page.**
 - **Header shape:** the Design and Epic pages share the ring's and title's left edge and row at 1440px; neither scrolls sideways at 375px.
 - **Epic menu and Copy ID (Epic):** in flow 2, the ⋯ menu holds only Copy epic ID and it puts `demo:mixed-epic` on the clipboard.
+- **128. Copy ID (Design):** the Design page's ⋯ menu Copy design ID puts `demo:design-epic` on the clipboard.
 - **Epic description popover:** click, Enter and Space open the full summary and Escape closes it; at 375px it stays inside the viewport.
 - **`gx designs open` and `gx designs delete`:** open refuses an existing epic; delete removes an uncharted design and refuses a charted one.
 

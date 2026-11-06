@@ -22,7 +22,7 @@ test.describe("61. Page modes at 760px", () => {
     }).toPass();
 
     const ring = (await page.locator("[data-kind]").first().boundingBox())!;
-    expect(ring.width).toBe(64);
+    expect(ring.width).toBe(56);
     const summary = (await page.getByText(SUMMARY, nav(SUMMARY)).boundingBox())!;
     expect(summary.y).toBeLessThan(ring.y + ring.height);
 

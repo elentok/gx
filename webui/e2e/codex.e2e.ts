@@ -84,6 +84,7 @@ test("117. Default harness setting", async ({ page, start }) => {
   await expect(await menu()).toContainText(new RegExp(`Worker.*Effort.*${fresh.effort}`));
   await closeMenu();
   await label(switched);
+  await expect(page.getByText("Claude Haiku 5.5", { exact: true })).toBeVisible();
   await expect(await menu()).toContainText("switched by hand");
 });
 
@@ -104,11 +105,11 @@ test("118. Codex queue rows", async ({ page, start }) => {
     await go(page, "#/e/demo:codex-running");
     await expect(chips(page, "codex-running")).toContainText("Codex");
     // The row shows its pinned note until the worker claims it, which is slow under load.
-    await expect(chips(page, "codex-running")).toContainText("Worker", { timeout: 45_000 });
+    await expect(chips(page, "codex-running")).toHaveText("Codex GPT-6.1-Sol · Worker · medium", { timeout: 45_000 });
     // Verification 39: a running card's chip keeps its harness dot.
     await expect(chips(page, "codex-running").locator("i")).toHaveCount(1);
     await go(page, "#/e/demo:claude-running");
-    await expect(chips(page, "claude-running")).toContainText("Claude");
+    await expect(chips(page, "claude-running")).toHaveText("Claude Sonnet · Worker · medium");
     await go(page, "#/e/demo:pinned");
     await expect(chips(page, "pinned")).toContainText("Codex");
     await expect(chips(page, "pinned")).toContainText("pinned");

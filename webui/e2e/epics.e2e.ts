@@ -41,6 +41,10 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   await expect(page.getByText("2/7")).toBeVisible();
   await expect(page.getByTestId("stats-line")).toHaveText(/^Running · /, { timeout: 30_000 });
   await expect(page.getByTestId("comet")).toBeVisible();
+  // A running card's chip reads the model, tier and effort, with the harness dot.
+  const chip = page.locator("[data-chips]").first();
+  await expect(chip).toHaveText("Claude Sonnet · Worker · medium", { timeout: 45_000 });
+  await expect(chip.locator("i")).toHaveCount(1);
   // 02 then 03 merge one after the other, and every merge waits out the server's 3s finish debounce.
   await expect(page.getByText("4/7")).toBeVisible({ timeout: 120_000 });
   // The innermost block holding both the 06 link and the Answer button is its card.

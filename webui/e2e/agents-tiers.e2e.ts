@@ -55,5 +55,5 @@ test("97. Session model label follows the handoff", async ({ page, start }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const auto = (await sessions(fixture)).find((s) => s.ticket?.includes("handoff-auto"))!;
   await go(page, `#/agents/${auto.id}`);
-  await expect(page.getByText("Claude Sonnet · medium",{ exact: true })).toBeVisible();
+  await expect(page.getByText("Claude Sonnet 5.5", { exact: true })).toBeVisible();
 });
