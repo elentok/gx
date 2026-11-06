@@ -1,6 +1,8 @@
 package spec
 
 import (
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/elentok/gx/conversations"
@@ -166,6 +168,25 @@ func DesignQuestionWait() scenario {
 	sc.ChatCapture = true
 	sc.Hold = true
 	sc.DesignHold = true
+	return sc
+}
+
+// DesignBranchReadyImplTickets is how many tickets the impl epic of
+// DesignBranchReady holds.
+const DesignBranchReadyImplTickets = 3
+
+// DesignBranchReady is chat-capture with the map at create-tickets and an impl
+// epic of DesignBranchReadyImplTickets tickets. A test moves the map to branch
+// while the server runs: `gx tickets set demo:design-epic --design-step branch`.
+func DesignBranchReady() scenario {
+	sc := DesignScript(tickets.StepCreateTickets, agentfake.DesignTurnRunEnd)
+	sc.ChatCapture = true
+	sc.Epics = slices.Clone(sc.Epics)
+	impl := make([]ticket, 0, DesignBranchReadyImplTickets)
+	for i := 1; i <= DesignBranchReadyImplTickets; i++ {
+		impl = append(impl, ticket{fmt.Sprintf("%02d", i), fmt.Sprintf("build-%d", i), servertest.TicketOpts{}})
+	}
+	sc.Epics[1] = epic{project, "design-epic-impl", impl}
 	return sc
 }
 

@@ -265,6 +265,22 @@ func agentTexts(chat wire.SessionChatResponse) []string {
 	return texts
 }
 
+func TestDesignBranchReadyScenario(t *testing.T) {
+	t.Parallel()
+	r := start(t, "design-branch-ready")
+	if got := r.gx(t, "tickets", "show", "demo:design-epic"); strings.Contains(got, "branch") {
+		t.Fatalf("map starts at Branch:\n%s", got)
+	}
+	r.gx(t, "tickets", "set", "demo:design-epic", "--design-step", "branch")
+	if got := r.gx(t, "tickets", "show", "demo:design-epic"); !strings.Contains(got, "branch") {
+		t.Errorf("map not at Branch:\n%s", got)
+	}
+	if n := len(r.issueFiles(t, "demo", "design-epic-impl")); n != spec.DesignBranchReadyImplTickets {
+		t.Errorf("impl epic has %d tickets, want %d", n, spec.DesignBranchReadyImplTickets)
+	}
+	r.stop(t)
+}
+
 func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
 	t.Parallel()
 	const runEnd = "scripted run is over"

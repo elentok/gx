@@ -511,6 +511,9 @@ var scenarios = map[string]scenario{
 	"design-question-wait": spec.DesignQuestionWait(),
 	// design-branch (V4): the map is at Branch and the agent ends the run.
 	"design-branch": spec.DesignScript(tickets.StepBranch, agentfake.DesignTurnRunEnd),
+	// design-branch-ready: chat-capture, the map at create-tickets and an impl epic
+	// of three tickets; a test sets the design step to branch while the server runs.
+	"design-branch-ready": spec.DesignBranchReady(),
 	// design-error (V13): a round, then an error turn before the run-end line.
 	"design-error": spec.DesignScript(tickets.StepResolveTickets,
 		agentfake.DesignTurnRound, agentfake.DesignTurnError),
