@@ -316,15 +316,16 @@ func (c *ServerChat) Notice(n ServerNotice) {
 // AFK mode.
 const notifyKindSessionAlert = "session-alert"
 
-// SessionAlert sends an interactive session's banner, title and body as the
-// banner has them, to the project's destinations. The gate source is the
-// server's: a session has no ticket to write a mute onto.
-func (c *ServerChat) SessionAlert(project string, override *ServerChatConfig, title, body string) {
+// SessionAlert sends an interactive session's alert, "🔔 <status> <name>" with
+// the reason below and the project last, to the project's destinations. The
+// gate source is the server's: a session has no ticket to write a mute onto.
+func (c *ServerChat) SessionAlert(project string, override *ServerChatConfig, name, status, body string) {
 	if c == nil {
 		return
 	}
+	msg := chatMessage{icon: "🔔", status: status, subject: name, lines: []string{body}, project: project, kind: notifyKindSessionAlert}
 	for _, s := range c.projectSinks(override) {
-		s.send(s.style.chatStyle.Message("🔔", title, "", body, s.style.identityLine(project, "")), notifyKindSessionAlert, serverSource, "")
+		s.sendMessage(msg, serverSource, "")
 	}
 }
 

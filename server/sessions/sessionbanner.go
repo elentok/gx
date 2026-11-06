@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -173,11 +174,11 @@ func (mg *Manager) fireBanner(id string) {
 	link := mg.designLink(m)
 	// AFK adds chat without the focus check; the banner and sound keep theirs.
 	if afk {
-		chatBody := body
+		chatBody := alertReason(info, t.reason)
 		if link != "" {
 			chatBody += "\n" + link
 		}
-		mg.alerts.SessionAlert(info.Project, mg.projects.ChatOverride(info.Project), title, chatBody)
+		mg.alerts.SessionAlert(info.Project, mg.projects.ChatOverride(info.Project), info.Name, sessionStatusWord(info.Status.State), chatBody)
 	}
 	if onScreen {
 		return
@@ -210,19 +211,25 @@ func (mg *Manager) sendSessionBanner(info wire.SessionInfo, title, body, link st
 	}
 }
 
-// sessionStatusText reads like "Blocked: permission — Bash(rm -rf build)".
-func sessionStatusText(info wire.SessionInfo) string {
-	st := info.Status
+// sessionStatusWord is the Status word a state reads as; an unknown state
+// reads as itself.
+func sessionStatusWord(state string) string {
 	labels := map[string]string{
 		wire.SessionIdle:        "Done",
 		wire.SessionBlocked:     "Blocked",
 		wire.SessionRateLimited: "Rate-limited",
 		wire.SessionExited:      "Exited",
 	}
-	text := labels[st.State]
-	if text == "" {
-		text = st.State
+	if w := labels[state]; w != "" {
+		return w
 	}
+	return state
+}
+
+// sessionStatusText reads like "Blocked: permission — Bash(rm -rf build)".
+func sessionStatusText(info wire.SessionInfo) string {
+	st := info.Status
+	text := sessionStatusWord(st.State)
 	kind := st.Kind
 	if st.State == wire.SessionExited {
 		kind = info.Exit
@@ -234,6 +241,28 @@ func sessionStatusText(info wire.SessionInfo) string {
 		text += " — " + st.Message
 	}
 	return text
+}
+
+// alertReason is the line under an AFK alert's headline: the raised reason when
+// there is one, else a plain sentence for the state. A blocked session keeps its
+// kind and message, an exited one its exit kind.
+func alertReason(info wire.SessionInfo, reason string) string {
+	if reason != "" {
+		return reason
+	}
+	st := info.Status
+	switch st.State {
+	case wire.SessionIdle:
+		return "The agent finished and waits for you."
+	case wire.SessionRateLimited:
+		return "Claude hit its usage limit."
+	case wire.SessionExited:
+		if info.Exit != "" {
+			return "The session ended: " + info.Exit + "."
+		}
+		return "The session ended."
+	}
+	return strings.TrimPrefix(sessionStatusText(info), sessionStatusWord(st.State)+": ")
 }
 
 // unreadSound is the sound of an Unread raised by a move to state.

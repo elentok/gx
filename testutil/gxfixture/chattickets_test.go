@@ -79,10 +79,10 @@ func TestChatSessionsScenario_EachSessionStateAlertLandsInTheCaptureFile(t *test
 	t.Parallel()
 	r := start(t, "chat-sessions")
 	waitForParts(t, r, map[string][]string{
-		"done":         {"demo ·", "Done"},
-		"blocked":      {"demo ·", "Blocked"},
-		"rate-limited": {"demo ·", "Rate-limited"},
-		"exited":       {"demo ·", "Exited"},
+		"done":         {"🔔 Done", "The agent finished and waits for you."},
+		"blocked":      {"🔔 Blocked", "permission"},
+		"rate-limited": {"🔔 Rate-limited", "Claude hit its usage limit."},
+		"exited":       {"🔔 Exited", "The session ended"},
 	})
 }
 

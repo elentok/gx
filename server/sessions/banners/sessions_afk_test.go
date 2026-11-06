@@ -43,11 +43,39 @@ func TestSessionAFK_DoneSendsBannerTextToChatEvenOnScreen(t *testing.T) {
 
 	step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	posts := chat.PostsSince(started)
-	if len(posts) != 1 || !strings.Contains(posts[0], "proj · fix-build") || !strings.Contains(posts[0], "Done") {
-		t.Errorf("chat posts = %q, want one with the banner text", posts)
+	if len(posts) != 1 || !strings.Contains(posts[0], "🔔 Done fix-build") || !strings.Contains(posts[0], "The agent finished and waits for you.") || strings.Contains(posts[0], "proj · fix-build") {
+		t.Errorf("chat posts = %q, want one alert reading 🔔 Done fix-build", posts)
 	}
 	if banners := h.Banners.Sent(); len(banners) != 0 {
 		t.Errorf("banners = %+v, want none while on screen", banners)
+	}
+}
+
+func TestSessionAFK_AlertReadsStatusWordNameAndReason(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		control agentfake.Control
+		state   string
+		want    []string
+	}{
+		{"blocked", agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls -la?"}, wire.SessionBlocked, []string{"🔔 Blocked fix-build", "permission — run ls -la?"}},
+		{"rate-limited", agentfake.Control{State: "ratelimited"}, wire.SessionRateLimited, []string{"🔔 Rate-limited fix-build", "Claude hit its usage limit."}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, chat, started, _, _, step := startAFKSession(t, true)
+			step(tc.control, tc.state)
+			posts := chat.PostsSince(started)
+			if len(posts) != 1 {
+				t.Fatalf("chat posts = %q, want one", posts)
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(posts[0], w) {
+					t.Errorf("post = %q, want it to contain %q", posts[0], w)
+				}
+			}
+		})
 	}
 }
 
