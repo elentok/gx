@@ -345,7 +345,9 @@ test("on a phone Note is icon-only and the Auto button keeps both names", async 
   try {
     render({});
     expect((await autoButton()).textContent).toBe("Auto-advanceAuto-queue");
-    expect(screen.getByRole("button", { name: "Note" }).textContent).toBe("✎");
+    const note = screen.getByRole("button", { name: "Note" });
+    expect(note.querySelector("svg")).not.toBeNull();
+    expect(note.textContent).toBe("");
   } finally {
     vi.unstubAllGlobals();
   }

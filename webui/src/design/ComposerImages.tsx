@@ -1,5 +1,6 @@
 import { Box, Spinner } from "@chakra-ui/react";
 import { useRef, type ClipboardEvent, type DragEvent, type ReactNode } from "react";
+import { LuPaperclip } from "react-icons/lu";
 import { Button } from "../ui/button/Button";
 import { MAX_IMAGES, MSG_MAX_IMAGES } from "./imageLimits";
 import type { ComposerImage, ComposerImages as State } from "./useComposerImages";
@@ -118,7 +119,7 @@ export function ComposerImages({ state, children, send }: { state: State; childr
       {children}
       <Box display="flex" gap="2" alignItems="center">
         <Button emphasis="secondary" aria-label="Add image" onClick={() => input.current?.click()}>
-          📎 Add
+          <LuPaperclip /> Add
         </Button>
         <input
           ref={input}

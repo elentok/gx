@@ -1,5 +1,6 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
+import { PiNotePencil } from "react-icons/pi";
 import { useComposerDraft } from "../drafts";
 import type {
   SessionInfo,
@@ -233,7 +234,8 @@ export function Composer({
               aria-expanded={open}
               onClick={() => setOpen(!open)}
             >
-              ✎{wide && " Note"}
+              <PiNotePencil />
+              {wide && " Note"}
             </Button>
             {mainButton}
           </>

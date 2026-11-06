@@ -66,7 +66,10 @@ test("drop adds the dropped files", () => {
 test("the hidden input feeds the same attach function and has no capture", () => {
   const s = state([]);
   render(s);
-  expect(screen.getByRole("button", { name: "Add image" }).textContent).toContain("Add");
+  const add = screen.getByRole("button", { name: "Add image" });
+  expect(add.textContent).toContain("Add");
+  expect(add.textContent).not.toContain("📎");
+  expect(add.querySelector("svg")).not.toBeNull();
   const input = screen.getByTestId("image-input") as HTMLInputElement;
   expect(input.accept).toBe("image/*");
   expect(input.multiple).toBe(true);
