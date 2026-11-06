@@ -262,6 +262,18 @@ func (c *ServerChat) DesignQuestion(project string, override *ServerChatConfig, 
 	}
 }
 
+// MarkOnce records key in the server's gate state and reports whether it was
+// new. An error or a nil chat reports false: a message may be lost, never doubled.
+func (c *ServerChat) MarkOnce(key string) (bool, error) {
+	if c == nil {
+		return false, errNoNotificationStatePath
+	}
+	c.mu.Lock()
+	path := c.base.GateStatePath
+	c.mu.Unlock()
+	return MarkOnce(path, key)
+}
+
 // notifyKindResult tags the message a successful one-off sends on request.
 const notifyKindResult = "result"
 

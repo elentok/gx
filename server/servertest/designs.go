@@ -101,8 +101,15 @@ type PromptFixture struct {
 // turn passes a longer one.
 func StartPromptSession(t *testing.T, grace time.Duration) PromptFixture {
 	t.Helper()
+	return StartPromptSessionWith(t, grace)
+}
+
+// StartPromptSessionWith is StartPromptSession with more server options, such
+// as a chat destination or the alerts.
+func StartPromptSessionWith(t *testing.T, grace time.Duration, opts ...func(*server.Config)) PromptFixture {
+	t.Helper()
 	cfg := t.TempDir()
-	f := StartDesigns(t, func(c *server.Config) { c.PromptGrace = grace }, WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))
+	f := StartDesigns(t, append([]func(*server.Config){func(c *server.Config) { c.PromptGrace = grace }, WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg)}, opts...)...)
 	res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)

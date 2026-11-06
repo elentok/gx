@@ -293,6 +293,11 @@ question's type (`yes-no`, `options` or `text`), its options, and which option i
 question without one is a free-text question. A question in a **Grilling round** carries one too.
 Not the **Pause reason text**, which is the question's summary line.
 
+**Design Question** — the chat message a Design sends once per **Grilling round** when it starts waiting
+for the person: epic, step, round number, the round's first question and the Design link. It is decided
+once, when the wait starts, by the **open-on-screen rule** (a visible web tab always counts, a focused TUI
+only when AFK mode is off), and in AFK mode it replaces the session alert for that wait.
+
 **Grilling round** — the numbered `❓ **Qn**` questions an agent asks a person in one turn. The person
 answers them together, in one prompt. Each question may carry a **Question block**. Not a **Pause
 round**, which is one question a Paused ticket asks.

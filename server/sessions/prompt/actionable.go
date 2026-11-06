@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/queue"
@@ -144,8 +145,53 @@ func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 	case actionableCapped:
 		p.sessions.TriggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", MaxAutoSends, a.Reason))
 	case actionableRaised:
+		if a.Grilling {
+			p.sessions.TriggerQuestionBanner(id, sound.Attention, a.Reason, p.designQuestion(id, meta, text))
+			return
+		}
 		p.sessions.TriggerBanner(id, sound.Attention, a.Reason)
 	}
+}
+
+// designQuestion is the Grilling round a Design waits on: its number and the
+// round's first question.
+func (p *Prompt) designQuestion(id string, meta sessions.Meta, text string) sessions.DesignQuestion {
+	q := sessions.DesignQuestion{Round: p.grillingRounds(id, meta)}
+	if cards := chat.RoundCards(text); len(cards) > 0 {
+		q.Text = firstLine(cards[0].Body)
+		if q.Text == "" {
+			q.Text = cards[0].Title
+		}
+	}
+	return q
+}
+
+// grillingRounds counts the Grilling rounds in the session's conversation with
+// the counter the conversation record uses, summaries not counted. It reads the
+// transcript now: the record is saved only when the conversation ends. 0 when
+// the count cannot be read.
+func (p *Prompt) grillingRounds(id string, meta sessions.Meta) int {
+	path, kind, ok := p.sessionChat.Transcript(id, meta.ChatMeta())
+	if !ok {
+		return 0
+	}
+	res, ok, err := chatreader.ReadFile(kind, path, "")
+	if err != nil || !ok {
+		p.log.Warn("design question: read conversation", "session", id, "err", err)
+		return 0
+	}
+	rounds := 0
+	for _, it := range grillround.Count(res.Messages) {
+		if it.Questions > 0 {
+			rounds++
+		}
+	}
+	return rounds
+}
+
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
+	return strings.TrimSpace(line)
 }
 
 // actionableOutcome is what decideActionable did to a session's Actionable.

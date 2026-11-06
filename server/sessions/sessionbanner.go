@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -36,11 +37,17 @@ type sessionBanners struct {
 type bannerTrigger struct {
 	sound  sound.Name
 	reason string
+	// questionSent: this wait already sent its Question, which stands in for the AFK alert.
+	questionSent bool
 }
 
 // TriggerBanner schedules the session's banner, or merges into the one
 // already waiting: attention beats done, and a reason replaces none.
 func (mg *Manager) TriggerBanner(id string, snd sound.Name, reason string) {
+	mg.triggerBanner(id, snd, reason, false)
+}
+
+func (mg *Manager) triggerBanner(id string, snd sound.Name, reason string, questionSent bool) {
 	b := &mg.banners
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -51,12 +58,13 @@ func (mg *Manager) TriggerBanner(id string, snd sound.Name, reason string) {
 		if reason != "" {
 			p.reason = reason
 		}
+		p.questionSent = p.questionSent || questionSent
 		return
 	}
 	if b.pending == nil {
 		b.pending = map[string]*bannerTrigger{}
 	}
-	b.pending[id] = &bannerTrigger{sound: snd, reason: reason}
+	b.pending[id] = &bannerTrigger{sound: snd, reason: reason, questionSent: questionSent}
 	// Waits as a session watch, so close drops the banner and doesn't wait out the delay.
 	mg.Watches.Start(func() {
 		delay := time.NewTimer(mg.cfg.SessionBannerDelay)
@@ -110,29 +118,77 @@ func (mg *Manager) NoteFailure(id string) {
 }
 
 // designDone reports whether the session is a Design whose map's Progress is Done.
-// mapProgress stays a root function; it moves with the map code.
 func (mg *Manager) designDone(m Meta) bool {
+	step, ok := mg.designStep(m)
+	return ok && step == wire.ProgressDone
+}
+
+// designStep is the Progress of the map behind a Design session.
+func (mg *Manager) designStep(m Meta) (wire.ProgressStep, bool) {
 	if !m.Design || m.Ticket == "" {
+		return "", false
+	}
+	addr, err := tickets.ParseQueuedAddress(m.Ticket)
+	if err != nil {
+		return "", false
+	}
+	epics, err := mg.projects.Epics(addr.Project)
+	if err != nil {
+		return "", false
+	}
+	for _, e := range epics {
+		if e.Name == addr.Epic && e.IsMap {
+			return queue.MapProgress(e), true
+		}
+	}
+	return "", false
+}
+
+// DesignQuestion is the round a Design session waits on, as the Question
+// message tells it. Text is the round's first question.
+type DesignQuestion struct {
+	Round int
+	Text  string
+}
+
+// TriggerQuestionBanner is TriggerBanner for a Design that starts waiting on a
+// Grilling round. It decides now, once, whether the person is told by chat: the
+// Question goes out when the session is not open on screen and the round's mark
+// is new, and then replaces the AFK alert of this wait's banner. Closing the
+// session afterwards sends nothing more.
+func (mg *Manager) TriggerQuestionBanner(id string, snd sound.Name, reason string, q DesignQuestion) {
+	sent := mg.sendDesignQuestion(id, q)
+	mg.triggerBanner(id, snd, reason, sent)
+}
+
+func (mg *Manager) sendDesignQuestion(id string, q DesignQuestion) bool {
+	if q.Round < 1 || q.Text == "" || mg.OpenOnScreen(id) {
+		return false
+	}
+	_, m, res, err := mg.SessionDir(id)
+	if res.Refused || err != nil {
+		return false
+	}
+	step, ok := mg.designStep(m)
+	if !ok {
+		return false
+	}
+	// A mark that cannot be taken sends nothing: a message may be lost, never doubled.
+	isNew, err := mg.alerts.MarkOnce(fmt.Sprintf("question:%s:%d", id, q.Round))
+	if err != nil {
+		mg.log.Warn("design question mark", "session", id, "err", err)
+		return false
+	}
+	if !isNew {
 		return false
 	}
 	addr, err := tickets.ParseQueuedAddress(m.Ticket)
 	if err != nil {
 		return false
 	}
-	epics, err := mg.projects.Epics(addr.Project)
-	if err != nil {
-		return false
-	}
-	byName := map[string]tickets.Epic{}
-	for _, e := range epics {
-		byName[e.Name] = e
-	}
-	e, ok := byName[addr.Epic]
-	if !ok || !e.IsMap {
-		return false
-	}
-	step := queue.MapProgress(e)
-	return step == wire.ProgressDone
+	project := m.Info().Project
+	mg.alerts.DesignQuestion(project, mg.projects.ChatOverride(project), addr.Epic, string(step), q.Round, q.Text, mg.designLink(m))
+	return true
 }
 
 // designLink is the Design page of a Design session, without the token; empty
@@ -180,7 +236,7 @@ func (mg *Manager) fireBanner(id string) {
 	}
 	link := mg.designLink(m)
 	// AFK adds chat without the focus check; the banner and sound keep theirs.
-	if afk {
+	if afk && !t.questionSent {
 		chatBody := alertReason(info, t.reason)
 		if link != "" {
 			chatBody += "\n" + link
