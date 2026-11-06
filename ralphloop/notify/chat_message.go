@@ -31,6 +31,20 @@ func (m chatMessage) Text(style chatmarkup.Style) chatmarkup.Text {
 	return style.Layout(m.Headline(), m.lines, m.project)
 }
 
+// conflictStartedMessage is the "an agent took over a merge conflict" message.
+func conflictStartedMessage(project, epic, ticketPath, identifier string) chatMessage {
+	subject := epic + "/" + identifier
+	if title := tickets.TicketTitle(ticketPath); title != "" {
+		subject += " " + title
+	}
+	return chatMessage{
+		icon: "🔀", status: "Conflict", subject: subject,
+		lines:   []string{"An agent is resolving the merge conflict."},
+		project: project,
+		kind:    notifyKindConflictStarted,
+	}
+}
+
 // ticketPauseMessage is the "a machine paused this ticket for a person"
 // message: Answer for the answer class, Repair for any fault. status is the
 // ticket's stored status word, old or new.

@@ -196,8 +196,7 @@ func (f finishSink) ConflictResolutionStarted(identifier string) {
 		return
 	}
 	for _, s := range f.c.projectSinks(f.override) {
-		body := s.style.conflictResolutionStartedText(f.project+"/"+f.epic, identifier)
-		s.sendIn(s.style.chatStyle.Bold(f.project), body, notifyKindConflictStarted, f.ticketPath, identifier)
+		s.sendMessage(conflictStartedMessage(f.project, f.epic, f.ticketPath, identifier), f.ticketPath, identifier)
 	}
 }
 

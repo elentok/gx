@@ -85,17 +85,6 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 	return s.chatStyle.Message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
 
-// conflictResolutionStartedText renders the "an agent took over a merge
-// conflict" notification:
-//
-//	🔀 *resolving merge conflict*
-//
-//	An agent is resolving the cherry-pick conflict
-//	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) conflictResolutionStartedText(epicName, ticketIdentifier string) chatmarkup.Text {
-	return s.chatStyle.Message("🔀", "resolving merge conflict", "", "An agent is resolving the cherry-pick conflict", s.identityLine(epicName, ticketIdentifier))
-}
-
 // epicOutcomeText is the epic-level summary under glyph and title: the full
 // queue counts line, then this run's own merged-ticket tally (a distinct
 // number from counts.Done, which may include tickets a prior run merged) and

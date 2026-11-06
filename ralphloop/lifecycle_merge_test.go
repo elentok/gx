@@ -107,8 +107,11 @@ func TestMergeBuilt_FinishSinkSendsConflictStartAndChildPauseOnly(t *testing.T) 
 		t.Fatalf("got %d sends, want one batch", len(got))
 	}
 	text := got[0]
-	if !strings.Contains(text, "resolving merge conflict") {
+	if !strings.Contains(text, "\U0001f500 Conflict epic/01") || !strings.Contains(text, "An agent is resolving the merge conflict.") {
 		t.Errorf("missing the conflict-started message:\n%s", text)
+	}
+	if conflict, _, _ := strings.Cut(text, "---"); strings.Contains(conflict, "cherry-pick") {
+		t.Errorf("conflict message still says cherry-pick:\n%s", conflict)
 	}
 	if n := strings.Count(text, "\U0001f6d1"); n != 1 || !strings.Contains(text, "epic/01a") {
 		t.Errorf("want exactly the child's pause (01a), got %d paused-for-repair messages:\n%s", n, text)
