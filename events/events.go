@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
 // Type is an event's wire code (the "type" field of a run-log line). The
@@ -71,6 +72,10 @@ const (
 	// Reason lists the files; the event names the backup ref that held them.
 	TrunkConflictOpened Type = "trunk-conflict-opened"
 )
+
+// SlowLaunch is the claim-to-prompt time past which a launch counts as slow.
+// Every reader of launch-timed events (gx evolve, Stats) compares against it.
+const SlowLaunch = 15 * time.Second
 
 // Event types added by the orchestrator-daemon stages. Fixed now so S0 ships
 // with the final wire codes.

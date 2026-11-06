@@ -87,6 +87,18 @@ After the ticket table, `gx evolve inputs` can print `slower:` and `flake:` rows
 Both go through triage (step 5) and are filed through [gx-follow-up](../gx-follow-up/SKILL.md) (step
 6). Its test-name dedupe finds a follow-up that the failing-tests rule already filed for the flake.
 
+### Launch rows
+
+`gx evolve inputs` also prints a `### Launch rows` block (`launches` in the JSON) from the epic's
+`launch-timed` events. Each row is a finding with category `idea`; don't deep-read a session for it.
+
+- **Slow launch**: a launch whose claim-to-prompt time is over 15 s. The row gives the ticket, the
+  total and the slowest of the four steps. The ticket's flag is `slow-launch`, severity `rest`, so
+  it spends none of the deep-read cap.
+- **Slow median**: one row, with no ticket, when the epic's median launch is over 15 s.
+
+Both go through triage (step 5) and are filed through [gx-follow-up](../gx-follow-up/SKILL.md) (step 6).
+
 ## 4. Join by symptom
 
 Group the subagent reports by symptom across tickets: one cause seen in five tickets is one finding

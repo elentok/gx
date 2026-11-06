@@ -35,6 +35,7 @@ const (
 	flagNudge         = "nudge"
 	flagOverrun       = "context-overrun"
 	flagSlow          = "slow"
+	flagSlowLaunch    = "slow-launch"
 	flagMetricsAbsent = "metrics-missing"
 	flagFixTickets    = "has-fix-tickets"
 )
@@ -88,6 +89,9 @@ type InputsTable struct {
 	Flakes             []FlakeRow  `json:"flakes"`
 	// FlakesNoTree counts failing check records skipped for lacking a tree id.
 	FlakesNoTree int `json:"flakes_no_tree"`
+	// Launches are the launch-timed rows: each launch over events.SlowLaunch
+	// and the median when it is over.
+	Launches []LaunchRow `json:"launches"`
 }
 
 // buildInputsTable derives every row from frontmatter, the run log and the
@@ -296,6 +300,8 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 	}
 	table.Slower, table.SlowerBaselineRuns, table.Flakes = checks.slower, checks.baselineRuns, checks.flakes
 	table.FlakesNoTree = checks.flakesNoTree
+	table.Launches = buildLaunchRows(evs)
+	flagSlowLaunches(&table)
 	if table.DigestDir, err = os.MkdirTemp(env.tempDir, "gx-evolve-digests-"); err != nil {
 		return err
 	}
@@ -310,6 +316,9 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 		return err
 	}
 	if err := printEpicChecks(w, table); err != nil {
+		return err
+	}
+	if err := printLaunchRows(w, table); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "digests: %s\n", table.DigestDir); err != nil {

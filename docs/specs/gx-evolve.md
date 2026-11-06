@@ -449,6 +449,11 @@ Contract from the map's research, with its open questions settled:
   - **Flags** (all readable without transcripts): park, needs-repair, recovery, deadlock;
     conflict-hit; relaunch (more than one session id); nudge; context overrun (actual > 2×
     expected); elapsed > 2× the epic's median; metrics missing; has code-review fix tickets.
+  - **Launch rows**: after the table it prints a `### Launch rows` block (`launches` in the JSON)
+    from the run log's `launch-timed` events: one row per launch over 15 s (ticket, total, slowest
+    step) and one row when the epic's median launch is over 15 s. The threshold is
+    `events.SlowLaunch`. The ticket gets a `slow-launch` flag at severity `rest`; launch rows are
+    `idea` findings and spend none of the deep-read cap.
   - **Severity order** for the cap: needs-repair/park > conflict > overrun > the rest.
   - If the table ever gets too big, add `--summary`, not a subagent.
 - `gx evolve export [-o <file>] [--again]`: reads `gx:follow-ups` drafts with no `exported_at`,
