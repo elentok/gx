@@ -38,7 +38,7 @@ export function StickyTopContainer({ ruled = false, children }: { ruled?: boolea
     };
   }, []);
   return (
-    <Box ref={box} mx="-4" position="sticky" top="0" zIndex="sticky" bg="surface" {...(ruled && { borderBottomWidth: "1px", borderColor: "border" })}>
+    <Box ref={box} mx="-4" position="sticky" top="var(--shell-strips-height, 0px)" zIndex="sticky" bg="surface" {...(ruled && { borderBottomWidth: "1px", borderColor: "border" })}>
       {children}
     </Box>
   );

@@ -5,6 +5,7 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { FixAgent } from "../epic/fixAgent";
 import type { MigrationFailure, RetryMigrationResult } from "../generated/server";
 import { DetailPage } from "../page/DetailPage";
+import { AppShell } from "../shell/AppShell";
 import { renderThemed } from "../ui/render";
 import { system } from "../ui/theme";
 import { toaster } from "../ui/toaster";
@@ -130,9 +131,11 @@ test("a row disappears when the snapshot drops it", () => {
 
 test("the page shell shows the strip on two different pages", () => {
   const page = (active: "epics" | "agents") => (
-    <DetailPage active={active} title={{ kind: "Epics" }}>
-      <p>{active} body</p>
-    </DetailPage>
+    <AppShell>
+      <DetailPage active={active} title={{ kind: "Epics" }}>
+        <p>{active} body</p>
+      </DetailPage>
+    </AppShell>
   );
   const { rerender } = setup([fail("gx", "bad schema")], () => page("epics"));
   expect(screen.getByText("gx: Migration blocked")).toBeTruthy();

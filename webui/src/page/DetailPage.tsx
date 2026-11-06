@@ -1,15 +1,10 @@
 import { Box } from "@chakra-ui/react";
 import { type ReactNode, useEffect } from "react";
 import { useActionableCount } from "../agents/useActionableCount";
-import { useConnectionContext, useConnectionState } from "../connection";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
-import { FailedMigrationStrip } from "../restart/FailedMigrationStrip";
-import { MigratingStrip } from "../restart/MigratingStrip";
 import { PageContainer } from "../ui/PageContainer";
-import { Strip } from "../ui/strip/Strip";
 import { StickyTopContainer } from "../ui/top-bar/StickyTopContainer";
 import type { TopBarTab } from "../ui/top-bar/TopBar";
-import { DiskStrips } from "./DiskStrips";
 import { formatTitle, type PageTitle } from "./title";
 
 // The only place that writes `document.title`. Writes on mount and whenever the string changes;
@@ -38,18 +33,12 @@ export function DetailPage({
   children: ReactNode;
 }) {
   usePageTitle(title);
-  const conn = useConnectionContext();
-  const { connected } = useConnectionState(conn);
   return (
     <Box {...(fill && { h: "100dvh", display: "flex", flexDirection: "column" })}>
       <PageContainer fill={fill}>
         <StickyTopContainer ruled={fill}>
-          {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
-          <MigratingStrip />
-          <DiskStrips />
           <ConnectedTopBar active={active} waiting={waiting} />
         </StickyTopContainer>
-        <FailedMigrationStrip />
         {children}
       </PageContainer>
     </Box>

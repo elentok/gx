@@ -1,5 +1,7 @@
 import { Box, Heading } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
+import { MascotToggle } from "../shell/MascotToggle";
+import { useShell } from "../shell/ShellContext";
 import { useWide } from "../useWide";
 import { titleSize } from "../nav/titleSize";
 
@@ -34,6 +36,9 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   const wide = useWide();
+  const shell = useShell();
+  const claimHeader = shell?.claimHeader;
+  useEffect(() => claimHeader?.(), [claimHeader]);
   const h1 = heading ?? (
     <Heading as="h1" fontFamily="condensed" {...titleSize(wide)}>
       {title}
@@ -68,8 +73,9 @@ export function PageHeader({
   );
   return (
     <Box>
-      {side || right || line ? (
+      {side || right || line || shell ? (
         <Box display="flex" alignItems="center" gap={gap}>
+          <MascotToggle />
           {sideBox}
           {text}
           {right ? <Box flex="none">{right}</Box> : null}

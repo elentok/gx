@@ -2,6 +2,7 @@ import { createHashRouter, Navigate, redirect, useLocation, useParams, type Rout
 import { AgentsPage } from "./agents/AgentsPage";
 import type { CreateSession, FetchWorktrees } from "./agents/newSession";
 import type { AuthState } from "./auth/authState";
+import { AppShell } from "./shell/AppShell";
 import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages";
 import { CertificatePage, SettingsPage, UnknownSettingsPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
 import type { FetchLogins } from "./settings/logins";
@@ -104,6 +105,10 @@ export interface RouteFetchers {
 }
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
+  return [{ element: <AppShell />, children: pageRoutes(fetchers) }, { path: "*", loader: () => redirect("/epics") }];
+}
+
+function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
   return [
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} openDesign={fetchers.openDesign} saveChecks={fetchers.saveChecks} /> },
     // "/agents/*" also matches "/agents"; the splat is the session label.
@@ -123,8 +128,6 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
       path: "/e/*",
       element: <EpicRoute fetchDetail={fetchers.epic} fetchList={fetchers.epicList} openDesign={fetchers.openDesign} fixAgent={fetchers.fixAgent} />,
     },
-    // "/", the retired "/q" and "/designs", and an unknown hash go to the Epics page.
-    { path: "*", loader: () => redirect("/epics") },
   ];
 }
 
