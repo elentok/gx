@@ -54,8 +54,8 @@ func readImages(t *testing.T, dir string, lines ...string) []transcript.ChatMess
 
 func TestReadChat_ImageWrappersBecomeImages(t *testing.T) {
 	dir := t.TempDir()
-	a := savedPNG(t, dir, "img-1-aa11.png")
-	b := savedPNG(t, dir, "img-2-bb22.png")
+	a := savedPNG(t, dir, "img-1-aa110000.png")
+	b := savedPNG(t, dir, "img-2-bb220000.png")
 	items := append(imageWrapped(a, "data:image/png;base64,AAAA", 1), imageWrapped(b, "data:image/png;base64,BBBB", 2)...)
 	items = append(items, text("[Image #1] [Image #2] what are these"))
 
@@ -67,7 +67,7 @@ func TestReadChat_ImageWrappersBecomeImages(t *testing.T) {
 	if msgs[0].Text != "what are these" {
 		t.Errorf("text = %q", msgs[0].Text)
 	}
-	want := []transcript.ChatImage{{ID: "aa11"}, {ID: "bb22"}}
+	want := []transcript.ChatImage{{ID: "aa110000"}, {ID: "bb220000"}}
 	if !reflect.DeepEqual(msgs[0].Images, want) {
 		t.Errorf("images = %+v, want %+v", msgs[0].Images, want)
 	}
@@ -75,7 +75,7 @@ func TestReadChat_ImageWrappersBecomeImages(t *testing.T) {
 
 func TestReadChat_ImagesOnlyMessageIsKept(t *testing.T) {
 	dir := t.TempDir()
-	a := savedPNG(t, dir, "img-1-aa11.png")
+	a := savedPNG(t, dir, "img-1-aa110000.png")
 
 	msgs := readImages(t, dir, imageUserLine(t, imageWrapped(a, "data:x", 1)...))
 
@@ -86,8 +86,8 @@ func TestReadChat_ImagesOnlyMessageIsKept(t *testing.T) {
 
 func TestReadChat_OutsideFolderAndMissingFileArePlaceholders(t *testing.T) {
 	dir := t.TempDir()
-	outside := savedPNG(t, t.TempDir(), "img-1-aa11.png")
-	items := append(imageWrapped(outside, "data:x", 1), imageWrapped(filepath.Join(dir, "img-2-bb22.png"), "data:x", 2)...)
+	outside := savedPNG(t, t.TempDir(), "img-1-aa110000.png")
+	items := append(imageWrapped(outside, "data:x", 1), imageWrapped(filepath.Join(dir, "img-2-bb220000.png"), "data:x", 2)...)
 
 	msgs := readImages(t, dir, imageUserLine(t, items...))
 
@@ -99,7 +99,7 @@ func TestReadChat_OutsideFolderAndMissingFileArePlaceholders(t *testing.T) {
 
 func TestReadChat_LineOverTenMBDoesNotBreakTheRead(t *testing.T) {
 	dir := t.TempDir()
-	a := savedPNG(t, dir, "img-1-aa11.png")
+	a := savedPNG(t, dir, "img-1-aa110000.png")
 	big := imageUserLine(t, append(imageWrapped(a, strings.Repeat("A", 11<<20), 1), text("[Image #1] look"))...)
 
 	msgs := readImages(t, dir, big, imageUserLine(t, text("and then")))
@@ -111,7 +111,7 @@ func TestReadChat_LineOverTenMBDoesNotBreakTheRead(t *testing.T) {
 
 func TestReadChat_CompactionThenImageMessageAndInjectedStaysHidden(t *testing.T) {
 	dir := t.TempDir()
-	a := savedPNG(t, dir, "img-1-aa11.png")
+	a := savedPNG(t, dir, "img-1-aa110000.png")
 	lines := []string{
 		imageUserLine(t, text("# AGENTS.md instructions for /x")),
 		`{"type":"compacted","payload":{}}`,
