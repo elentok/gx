@@ -19,11 +19,20 @@ export function verdictText(
   address: string,
   launchStep?: LaunchStep,
 ): string | undefined {
-  if (launchStep?.label) return `Launching: ${launchStep.label} (${launchStep.position}/${LAUNCH_STEPS})`;
   const row = pending?.find((p) => p.address === address);
-  if (!row || !row.verdict || row.verdict === CLAIMED) return undefined;
-  const verdict = row.verdict === VerdictConcurrencyCap ? "Waiting for a slot" : row.verdict;
-  return row.reason ? `${verdict}: ${row.reason}` : verdict;
+  return launchOrVerdictText(launchStep, row?.verdict, row?.reason);
+}
+
+// verdictText for a caller that holds the step and the verdict directly, like the epic card.
+export function launchOrVerdictText(
+  launchStep: LaunchStep | undefined,
+  verdictWord: string | undefined,
+  reason: string | undefined,
+): string | undefined {
+  if (launchStep?.label) return `Launching: ${launchStep.label} (${launchStep.position}/${LAUNCH_STEPS})`;
+  if (!verdictWord || verdictWord === CLAIMED) return undefined;
+  const verdict = verdictWord === VerdictConcurrencyCap ? "Waiting for a slot" : verdictWord;
+  return reason ? `${verdict}: ${reason}` : verdict;
 }
 
 export type UsageHarness = "claude" | "codex";

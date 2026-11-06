@@ -21,6 +21,7 @@ import { designHref, epicHref, ticketHref } from "../hrefs";
 import { postOpenDesign, type OpenDesign } from "../design/open";
 import { Button } from "../ui/button/Button";
 import { useWrite } from "../useWrite";
+import { launchOrVerdictText } from "../verdict";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { EpicActionButton } from "./EpicActionButton";
 import { titleHref } from "./cardLinks";
@@ -140,7 +141,11 @@ export function EpicCard({
   const kind = RING_KIND[row.card_kind ?? CardKindImplementation];
   const needsYou = row.section === SectionNeedsYou;
   const seconds = useCountdown(row.countdown_ends_at);
-  const reason = seconds !== undefined ? `Next run starts in ${seconds}s` : row.reason;
+  // The countdown wins, then the launch step or cap wait (one line, never both), then the server's reason.
+  const reason =
+    seconds !== undefined
+      ? `Next run starts in ${seconds}s`
+      : (launchOrVerdictText(row.launch_step, row.verdict, row.reason) ?? row.reason);
   const hasButtons = (row.actions?.length ?? 0) > 0;
   const tone = needsYou ? needsYouTone(row) : undefined;
   return (

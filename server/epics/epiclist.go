@@ -207,8 +207,16 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 		row.QueueSlot = qidx.slot(root.String())
 		decorateLoopCard(&row, row.QueueSlot)
 		row.Verdict, row.Reason = s.capLine(root, e, row.Queued)
+		for _, t := range e.Tickets {
+			if e.RenderedStatus(t) != tickets.StatusClaimed {
+				continue
+			}
+			if row.LaunchStep = s.launchStep(root.TicketAddress(t.DisplayNumber())); row.LaunchStep != (wire.LaunchStep{}) {
+				break
+			}
+		}
 		if n, ok := s.loopNeedsYou(root, e, row.State); ok {
-			row.Verdict = ""
+			row.Verdict, row.LaunchStep = "", wire.LaunchStep{}
 			row.Section, row.StatePill, row.Reason, row.WaitingSince = wire.SectionNeedsYou, n.Pill, n.Reason, n.Since
 			row.Actions = append([]wire.CardAction{n.Action}, n.More...)
 		}

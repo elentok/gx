@@ -46,6 +46,41 @@ func TestEpicList_CapHeldEpicCarriesTheCapLine(t *testing.T) {
 	}
 }
 
+// Seam: an epic card carries the step of its launching ticket, gone once the launch ends.
+func TestEpicList_LaunchingEpicCardCarriesItsStep(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	rigs.WriteProjectEpic(t, store, "proj", "work", "---\nstatus: open\n---\n", map[string]string{
+		"01-a.md": rigs.IssueMD("01", "claimed", "", "A"),
+	})
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	servertest.RegisterTurn(h)
+	reg := h.Server.Registry()
+	reg.PutRunAt("proj:work", runs.Run{Address: "proj:work/01", Runner: "pty"}, time.Now())
+	reg.SetLaunchStep("proj:work/01", runs.StepInstallingDeps)
+	hs, err := h.Client.Handshake(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := func() wire.LaunchStep {
+		code, body := servertest.WebDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
+		for _, r := range rigs.GetEpicList(t, code, body).Epics {
+			if r.Name == "work" {
+				return r.LaunchStep
+			}
+		}
+		t.Fatal("no work card")
+		return wire.LaunchStep{}
+	}
+	if got, want := step(), (wire.LaunchStep{Label: "installing dependencies", Position: 2}); got != want {
+		t.Errorf("card step = %+v, want %+v", got, want)
+	}
+	reg.SetLaunchStep("proj:work/01", "")
+	if got := step(); got != (wire.LaunchStep{}) {
+		t.Errorf("card step after the launch = %+v, want none", got)
+	}
+}
+
 // Seam: a launching run's step rides on the epic detail row and the summary
 // ticket, and is gone once the launch ends.
 func TestEpicDetail_LaunchingRowCarriesItsStep(t *testing.T) {

@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { EpicListRow } from "../generated/server";
+import { VerdictConcurrencyCap, type EpicListRow } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { toaster } from "../ui/toaster";
 import { EpicCard } from "./EpicCard";
@@ -104,6 +104,24 @@ test("a non-Needs-you card shows a reason but no pill", () => {
   renderThemed(<EpicCard row={row({ state: "queued", reason: "Starts after agent-runner-phase2" })} />);
   expect(screen.queryByTestId("pill")).toBeNull();
   expect(text(screen.getByTestId("reason"))).toContain("Starts after");
+});
+
+test("a launching card shows the launch step, not the cap line", () => {
+  renderThemed(
+    <EpicCard
+      row={row({
+        verdict: VerdictConcurrencyCap,
+        reason: "global cap 1/1",
+        launch_step: { label: "installing dependencies", position: 2 },
+      })}
+    />,
+  );
+  expect(text(screen.getByTestId("reason"))).toBe("Launching: installing dependencies (2/4)");
+});
+
+test("a cap-held card shows Waiting for a slot with the caps", () => {
+  renderThemed(<EpicCard row={row({ state: "queued", verdict: VerdictConcurrencyCap, reason: "global cap 1/1" })} />);
+  expect(text(screen.getByTestId("reason"))).toBe("Waiting for a slot: global cap 1/1");
 });
 
 test.each([

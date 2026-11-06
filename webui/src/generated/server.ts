@@ -834,6 +834,11 @@ export interface EpicListRow {
    */
   verdict?: string;
   /**
+   * LaunchStep is the step of the epic's launching ticket; the card shows it
+   * instead of the cap line.
+   */
+  launch_step?: LaunchStep;
+  /**
    * StatePill and WaitingSince are set on a Needs-you card: the pill word and the
    * start of the wait the section sorts by.
    */

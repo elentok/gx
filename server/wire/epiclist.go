@@ -96,6 +96,9 @@ type EpicListRow struct {
 	// Verdict is VerdictConcurrencyCap on a queued epic held by a cap; Reason
 	// then names the full caps.
 	Verdict string `json:"verdict,omitempty"`
+	// LaunchStep is the step of the epic's launching ticket; the card shows it
+	// instead of the cap line.
+	LaunchStep LaunchStep `json:"launch_step,omitzero"`
 	// StatePill and WaitingSince are set on a Needs-you card: the pill word and the
 	// start of the wait the section sorts by.
 	StatePill    string    `json:"state_pill,omitempty"`
