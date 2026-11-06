@@ -4,6 +4,7 @@
 package fakes
 
 import (
+	"context"
 	"slices"
 	"sync"
 	"testing"
@@ -145,7 +146,7 @@ func FakeDeps() (d deps.Deps, prompts *[]string, removedBranches *[]string) {
 		WorktreeExists: func(path string) (bool, error) {
 			return true, nil
 		},
-		InstallDeps: func(path, logDir string) ([]string, error) {
+		InstallDeps: func(_ context.Context, path, logDir string) ([]string, error) {
 			return nil, nil
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {

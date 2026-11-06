@@ -4,6 +4,7 @@ package projects
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -38,7 +39,7 @@ type Env struct {
 	MigrationFailurePollInterval time.Duration
 	Chat                         notify.ServerChatConfig
 	GuardPoll                    time.Duration
-	InstallDeps                  func(path, logDir string) ([]string, error)
+	InstallDeps                  func(ctx context.Context, path, logDir string) ([]string, error)
 	RateLimitResetBuffer         time.Duration
 	RunnerWait                   time.Duration
 	Sleep                        func(time.Duration)

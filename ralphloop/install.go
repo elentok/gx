@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -15,7 +16,11 @@ import (
 // directory. It runs outside worktreeLock so a slow install does not hold up
 // another ticket's git worktree add.
 func installDepsIn(d deps.Deps, o OneIteration, path string) error {
-	commands, err := d.InstallDeps(path, o.ScratchDir)
+	ctx := o.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	commands, err := d.InstallDeps(ctx, path, o.ScratchDir)
 	if err != nil {
 		return err
 	}

@@ -81,7 +81,7 @@ type Config struct {
 	Sleep func(time.Duration)
 	// InstallDeps replaces the dependency install a worktree gets before its
 	// agent starts; nil means the real one. Tests fake it so no package manager runs.
-	InstallDeps func(path, logDir string) ([]string, error)
+	InstallDeps func(ctx context.Context, path, logDir string) ([]string, error)
 
 	// CleanupRunner runs one disk cleanup command in dir; nil runs the real command.
 	CleanupRunner func(ctx context.Context, argv []string, dir string) ([]byte, error)

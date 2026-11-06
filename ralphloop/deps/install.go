@@ -60,12 +60,12 @@ func installCommand(manager string, yarnBerry bool) (command []string, ok bool) 
 // worktree's discard); "" skips the log.
 //
 // budget is the shared timeout, installTimeout outside tests.
-func installDependenciesWithin(path, pathEnv, logDir string, budget time.Duration) (commands []string, err error) {
+func installDependenciesWithin(parent context.Context, path, pathEnv, logDir string, budget time.Duration) (commands []string, err error) {
 	dirs, err := lockfileDirs(path)
 	if err != nil {
 		return nil, installError(path, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), budget)
+	ctx, cancel := context.WithTimeout(parent, budget)
 	defer cancel()
 	for _, dir := range dirs {
 		command, err := installIn(ctx, dir.path, dir.lockfiles, pathEnv, logDir)
@@ -165,6 +165,9 @@ func runInstall(ctx context.Context, dir string, command []string, pathEnv strin
 // tail plus the path of the full log.
 func describeInstallFailure(ctx context.Context, dir string, command []string, out []byte, runErr error, logDir string) error {
 	joined := strings.Join(command, " ")
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return fmt.Errorf("%s: install cancelled", joined)
+	}
 	if ctx.Err() != nil {
 		return fmt.Errorf("%s: timed out after %dm", joined, int(installTimeout.Minutes()))
 	}
@@ -189,11 +192,15 @@ var installSlots = make(chan struct{}, maxConcurrentInstalls)
 
 // CapInstalls makes install wait for one of the shared install slots. The slot
 // is held per call, outside any worktree lock the caller takes.
-func CapInstalls(install func(path, logDir string) ([]string, error)) func(path, logDir string) ([]string, error) {
-	return func(path, logDir string) ([]string, error) {
-		installSlots <- struct{}{}
+func CapInstalls(install func(ctx context.Context, path, logDir string) ([]string, error)) func(ctx context.Context, path, logDir string) ([]string, error) {
+	return func(ctx context.Context, path, logDir string) ([]string, error) {
+		select {
+		case installSlots <- struct{}{}:
+		case <-ctx.Done():
+			return nil, installError(path, fmt.Errorf("install cancelled while waiting for a slot: %w", ctx.Err()))
+		}
 		defer func() { <-installSlots }()
-		return install(path, logDir)
+		return install(ctx, path, logDir)
 	}
 }
 

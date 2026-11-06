@@ -13,7 +13,7 @@ import (
 )
 
 // installFailure is the fake install of a worktree whose dependencies will not install.
-func installFailure(path, _ string) ([]string, error) {
+func installFailure(_ context.Context, path, _ string) ([]string, error) {
 	return nil, errors.New("installing dependencies in " + path + ": boom")
 }
 

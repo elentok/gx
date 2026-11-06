@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/ralphloop/deps"
@@ -82,6 +83,9 @@ type OneIteration struct {
 	// starts or the reset changes (zero resetAt: no known reset), (false, zero)
 	// when it ends. Nil hears nothing.
 	OnRateLimit func(limited bool, resetAt time.Time)
+	// Context cancels the launch's dependency install; nil means
+	// context.Background().
+	Context context.Context
 	// LongTicketTurns is the assistant-turn count at which OnLongTicket is
 	// called, once per launch; zero or a nil callback means no alert.
 	LongTicketTurns int

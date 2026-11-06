@@ -1,6 +1,7 @@
 package deps
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,7 @@ const pkgJSON = `{"name":"x"}`
 
 // installDependenciesWith runs installDependenciesWithin on the real budget.
 func installDependenciesWith(path, pathEnv, logDir string) ([]string, error) {
-	return installDependenciesWithin(path, pathEnv, logDir, installTimeout)
+	return installDependenciesWithin(context.Background(), path, pathEnv, logDir, installTimeout)
 }
 
 // installRepo makes a committed repo holding files (path -> content), then
@@ -313,13 +314,34 @@ func TestInstallDependencies_HungInstall_TimesOut(t *testing.T) {
 	writeScriptStub(t, binDir, "npm", "sleep 5")
 
 	start := time.Now()
-	_, err := installDependenciesWithin(repo, binDir, "", 200*time.Millisecond)
+	_, err := installDependenciesWithin(context.Background(), repo, binDir, "", 200*time.Millisecond)
 	want := "installing dependencies in " + repo + ": npm ci: timed out after 5m"
 	if err == nil || err.Error() != want {
 		t.Fatalf("error = %v, want %q", err, want)
 	}
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
 		t.Errorf("took %v, want the stub killed near the budget", elapsed)
+	}
+}
+
+func TestInstallDependencies_HungInstall_CancelKillsItPromptly(t *testing.T) {
+	t.Parallel()
+	repo := installRepo(t, map[string]string{"package.json": pkgJSON, "package-lock.json": "{}"}, nil)
+	binDir := t.TempDir()
+	writeScriptStub(t, binDir, "npm", "sleep 30")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer time.AfterFunc(300*time.Millisecond, cancel).Stop()
+
+	start := time.Now()
+	_, err := installDependenciesWithin(ctx, repo, binDir, "", time.Minute)
+	want := "installing dependencies in " + repo + ": npm ci: install cancelled"
+	if err == nil || err.Error() != want {
+		t.Fatalf("error = %v, want %q", err, want)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("took %v, want the stub killed right after the cancel", elapsed)
 	}
 }
 
@@ -336,7 +358,7 @@ func TestInstallDependencies_TwoDirectories_ShareOneBudget(t *testing.T) {
 	// The first install returns at once; the second hangs until the shared budget kills it.
 	writeScriptStub(t, binDir, "npm", "if [ -e '"+marker+"' ]; then sleep 30; fi; touch '"+marker+"'")
 
-	_, err := installDependenciesWithin(repo, binDir, "", time.Second)
+	_, err := installDependenciesWithin(context.Background(), repo, binDir, "", time.Second)
 	want := "installing dependencies in " + filepath.Join(repo, "web") + ": npm ci: timed out after 5m"
 	if err == nil || err.Error() != want {
 		t.Fatalf("error = %v, want %q", err, want)

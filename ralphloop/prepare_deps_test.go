@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -20,7 +21,7 @@ type installRecorder struct {
 	err   error
 }
 
-func (r *installRecorder) install(path, _ string) ([]string, error) {
+func (r *installRecorder) install(_ context.Context, path, _ string) ([]string, error) {
 	r.paths = append(r.paths, path)
 	return []string{"fake install"}, r.err
 }
