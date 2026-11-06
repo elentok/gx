@@ -12,14 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop/ticketops"
-
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/schedule"
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
@@ -101,7 +97,7 @@ func sendTestMessage(sink *chatEventSink, text, kind string) {
 // sendTestTicketMessage is sendTestMessage filed under a ticket source, the
 // shape the per-source mute gate keys on.
 func sendTestTicketMessage(sink *chatEventSink, text, kind, identifier string) {
-	sink.send(slackStyle.chatStyle.Escape(text), kind, sink.resolveTicketPath(identifier), identifier)
+	sink.send(slackStyle.chatStyle.Escape(text), kind, ResolveTicketPath(sink.scratchDir, sink.epicName, identifier), identifier)
 }
 
 // TestChatEventSink_Close_CancelsInFlightSendPromptlyInsteadOfWaitingOutBackoff
@@ -222,42 +218,6 @@ func TestChatEventSink_Close_TotalShutdownDeadline_ReturnsWithinBound(t *testing
 	}
 }
 
-func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
-	t.Parallel()
-	ticket := tickets.Ticket{Identifier: "04", Title: "Some ticket"}
-	stats := runlog.IterationStats{ElapsedSeconds: 10, PeakContextTokens: 100, Completed: 1, Total: 2}
-
-	cases := []struct {
-		name string
-		fire func(sink *chatEventSink)
-	}{
-		{"EpicStarted", func(s *chatEventSink) { s.EpicStarted("epic", 0, 3) }},
-		{"IterationStarted", func(s *chatEventSink) {
-			s.IterationStarted(ticket, "iter-04", "/repo", "sess-1", agent.AgentKind("claude"), "pane-1")
-		}},
-		{"IterationPaused", func(s *chatEventSink) { s.IterationPaused("04", "iter-04", runlog.PauseRateLimit, "rate limited") }},
-		{"IterationResumed", func(s *chatEventSink) { s.IterationResumed("04", "iter-04", runlog.PauseRateLimit) }},
-		{"IterationFinished", func(s *chatEventSink) { s.IterationFinished(ticket, "epic", stats) }},
-		{"TicketNeedsHuman", func(s *chatEventSink) {
-			s.TicketNeedsHuman("04", "epic", ticketops.PauseStatus(events.ZeroCommit), "zero-commit", "no commits merged")
-		}},
-		{"EpicPaused", func(s *chatEventSink) { s.EpicPaused("epic", []runlog.StalledTicket{{Identifier: "04"}}) }},
-		{"EpicComplete", func(s *chatEventSink) { s.EpicComplete("epic", 5, 300) }},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-			sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
-			c.fire(sink)
-			sink.flush()
-			if got := waitForSentCount(transport, 1); len(got) != 1 {
-				t.Fatalf("sent = %v, want exactly 1 message", got)
-			}
-		})
-	}
-}
-
 func TestChatEventSink_NonMembers_SendNoMessage(t *testing.T) {
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
@@ -281,90 +241,6 @@ func TestChatEventSink_NonMembers_SendNoMessage(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if got := transport.snapshot(); len(got) != 0 {
 		t.Errorf("sent = %v, want none", got)
-	}
-}
-
-func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
-	t.Parallel()
-	inner := &fakes.RecordingSink{}
-	sink, _ := newFakeChatSink(t, inner)
-
-	sink.EpicStarted("epic", 0, 3)
-	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "/repo", "sess-1", agent.AgentKind("claude"), "pane-1")
-	sink.IterationPaused("01", "iter-01", runlog.PauseRateLimit, "rate limited")
-	sink.IterationResumed("01", "iter-01", runlog.PauseRateLimit)
-	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", runlog.IterationStats{})
-	sink.TicketNeedsHuman("01", "epic", ticketops.PauseStatus(events.ZeroCommit), "zero-commit", "no commits merged")
-	sink.EpicPaused("epic", []runlog.StalledTicket{{Identifier: "01"}})
-	sink.EpicComplete("epic", 1, 0)
-
-	want := []string{
-		"EpicStarted", "IterationStarted", "IterationPaused", "IterationResumed",
-		"IterationFinished", "TicketNeedsHuman", "EpicPaused", "EpicComplete",
-	}
-	if got := inner.Snapshot(); len(got) != len(want) {
-		t.Fatalf("inner events = %v, want %v", got, want)
-	} else {
-		for i, w := range want {
-			if got[i] != w {
-				t.Errorf("inner events[%d] = %q, want %q", i, got[i], w)
-			}
-		}
-	}
-}
-
-// TestChatEventSink_Pause_ProducesExactlyOneChatMessage pins the pause
-// cardinality rule: a pause fires both IterationPaused(paused (repair)) and
-// TicketNeedsHuman on the underlying ticket, but only TicketNeedsHuman may
-// reach chat — otherwise a single pause would read as two messages.
-func TestChatEventSink_Pause_ProducesExactlyOneChatMessage(t *testing.T) {
-	t.Parallel()
-	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
-
-	sink.IterationPaused("04", "iter-04", runlog.PauseRepair, "agent blocked on permission prompt")
-	sink.TicketNeedsHuman("04", "epic", ticketops.PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt")
-	sink.flush()
-
-	got := waitForSentCount(transport, 1)
-	if len(got) != 1 {
-		t.Fatalf("sent = %v, want exactly 1 message for the pause", got)
-	}
-	want := slackStyle.ticketNeedsHumanText("04", "epic", ticketops.PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt", schedule.EpicCounts{}).String()
-	if got[0] != want {
-		t.Errorf("sent[0] = %q, want %q", got[0], want)
-	}
-}
-
-func TestChatEventSink_IterationPausedResumed_RepairKindNeverReachesChat(t *testing.T) {
-	t.Parallel()
-	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
-
-	sink.IterationPaused("04", "iter-04", runlog.PauseRepair, "blocked")
-	sink.IterationResumed("04", "iter-04", runlog.PauseRepair)
-
-	time.Sleep(50 * time.Millisecond)
-	if got := transport.snapshot(); len(got) != 0 {
-		t.Errorf("sent = %v, want none for a repair pause/resume", got)
-	}
-}
-
-func TestChatEventSink_IterationPausedResumed_RateLimitKindReachesChat(t *testing.T) {
-	t.Parallel()
-	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
-
-	sink.IterationPaused("04", "iter-04", runlog.PauseRateLimit, "rate limited")
-	sink.IterationResumed("04", "iter-04", runlog.PauseRateLimit)
-	sink.flush()
-
-	got := waitForSentCount(transport, 1)
-	if len(got) != 1 {
-		t.Fatalf("sent = %v, want exactly 1 batched message joining both", got)
-	}
-	pausedText := slackStyle.iterationPausedText("iter-04", "rate limited", "epic", "04").String()
-	resumedText := slackStyle.iterationResumedText("iter-04", "epic", "04").String()
-	want := pausedText + "\n\n---\n\n" + resumedText
-	if got[0] != want {
-		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
 }
 
@@ -415,7 +291,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testin
 	sink, transport := newGateChatSink(t, scratchDir, epicName)
 
 	for range 5 {
-		sendTestTicketMessage(sink, "paused", notifyKindIterationPaused, "04")
+		sendTestTicketMessage(sink, "paused", notifyKindTicketNeedsHuman, "04")
 	}
 	sink.flush()
 
@@ -438,8 +314,8 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testin
 	if t.Failed() {
 		t.FailNow()
 	}
-	if len(ticket.Mutes) != 1 || ticket.Mutes[0].EventType != notifyKindIterationPaused {
-		t.Fatalf("ticket.Mutes = %+v, want one %s mute", ticket.Mutes, notifyKindIterationPaused)
+	if len(ticket.Mutes) != 1 || ticket.Mutes[0].EventType != notifyKindTicketNeedsHuman {
+		t.Fatalf("ticket.Mutes = %+v, want one %s mute", ticket.Mutes, notifyKindTicketNeedsHuman)
 	}
 
 	raw, err := os.ReadFile(ticketPath)
@@ -477,7 +353,7 @@ func TestChatEventSink_NonTrippingSequence_SendsNormallyThroughGate(t *testing.T
 	sink, transport := newGateChatSink(t, scratchDir, epicName)
 
 	for range 3 {
-		sendTestTicketMessage(sink, "paused", notifyKindIterationPaused, "07")
+		sendTestTicketMessage(sink, "paused", notifyKindTicketNeedsHuman, "07")
 	}
 	sink.flush()
 
@@ -498,7 +374,7 @@ func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessag
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
-	sendTestMessage(sink, "started", notifyKindEpicStarted)
+	sendTestMessage(sink, "started", notifyKindEpicComplete)
 	sendTestMessage(sink, "done", notifyKindEpicComplete)
 	sink.flush()
 
@@ -519,9 +395,9 @@ func TestChatEventSink_IdenticalMessages_FlushCollapsesToSingleLineWithCount(t *
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
-	sendTestMessage(sink, "started", notifyKindEpicStarted)
-	sendTestMessage(sink, "started", notifyKindEpicStarted)
-	sendTestMessage(sink, "started", notifyKindEpicStarted)
+	sendTestMessage(sink, "started", notifyKindEpicComplete)
+	sendTestMessage(sink, "started", notifyKindEpicComplete)
+	sendTestMessage(sink, "started", notifyKindEpicComplete)
 	sink.flush()
 
 	got := waitForSentCount(transport, 1)
@@ -555,7 +431,7 @@ func TestChatEventSink_Close_FlushesQueuedMessageSynchronously(t *testing.T) {
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
-	sendTestMessage(sink, "started", notifyKindEpicStarted)
+	sendTestMessage(sink, "started", notifyKindEpicComplete)
 	sink.Close()
 
 	got := transport.snapshot()
@@ -581,7 +457,7 @@ func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *t
 	// never reach the queue, which is a different code path than the one
 	// this test targets: a close-time flush finding the transport muted
 	// after the item was already queued.
-	sendTestMessage(sink, "started", notifyKindEpicStarted)
+	sendTestMessage(sink, "started", notifyKindEpicComplete)
 
 	if err := updateNotificationStateAt(sink.gateStatePath, func(state *NotificationState) {
 		state.Transports["fake"] = TransportState{Muted: true, Reason: "auto-trip"}
@@ -608,8 +484,8 @@ func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *t
 	if len(suppressed) != 1 {
 		t.Fatalf("suppressed run-log lines = %v, want exactly 1", suppressed)
 	}
-	if !strings.Contains(suppressed[0].Reason, notifyKindEpicStarted) {
-		t.Errorf("suppressed reason = %q, want it to name %q", suppressed[0].Reason, notifyKindEpicStarted)
+	if !strings.Contains(suppressed[0].Reason, notifyKindEpicComplete) {
+		t.Errorf("suppressed reason = %q, want it to name %q", suppressed[0].Reason, notifyKindEpicComplete)
 	}
 }
 
@@ -623,7 +499,7 @@ func TestChatEventSink_BurstOfEventsCoalescedIntoOneFlush_CountsOneSendAgainstBu
 	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	for i := range globalThreshold + 5 {
-		sendTestMessage(sink, fmt.Sprintf("started-%d", i), notifyKindEpicStarted)
+		sendTestMessage(sink, fmt.Sprintf("started-%d", i), notifyKindEpicComplete)
 	}
 	sink.flush()
 

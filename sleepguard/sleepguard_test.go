@@ -66,7 +66,7 @@ var allowed = map[string]int{
 	"nativerunner/pty_pending_test.go":                        1,
 	"nativerunner/pty_ratelimit_test.go":                      1, // negative wait: another API error never marks the session limited
 	"nativerunner/pty_test.go":                                1,
-	"ralphloop/notify/chat_eventsink_test.go":                 4,
+	"ralphloop/notify/chat_eventsink_test.go":                 3,
 	"ralphloop/commitless_test.go":                            1, // negative wait: a kept worktree is not removed and no wait is scheduled
 	"ralphloop/ticketops/claim_test.go":                       1,
 	"ralphloop/notify/eventlog_notify_test.go":                2,

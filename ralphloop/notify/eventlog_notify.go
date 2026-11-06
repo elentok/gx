@@ -17,15 +17,9 @@ import (
 // notification-failed line — distinct from the Type field (which is always
 // "notification-sent"/"notification-failed" itself).
 const (
-	notifyKindEpicStarted       = "epic-started"
-	notifyKindIterationStarted  = "iteration-started"
 	notifyKindIterationFinished = "iteration-finished"
-	notifyKindIterationPaused   = "iteration-paused"
-	notifyKindIterationResumed  = "iteration-resumed"
 	notifyKindEpicComplete      = "epic-complete"
-	notifyKindEpicPaused        = "epic-paused"
 	notifyKindTicketNeedsHuman  = "ticket-needs-human"
-	notifyKindEpicFailed        = "epic-failed"
 	notifyKindConflictStarted   = "conflict-resolution-started"
 	// notifyKindMuted/notifyKindGloballyMuted tag the gate's own
 	// edge-triggered "muting this"/"globally muted" notice (see

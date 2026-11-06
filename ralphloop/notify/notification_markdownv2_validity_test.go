@@ -38,20 +38,14 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 	stats := runlog.IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: fractionalCost, Completed: 2, Total: 5}
 
 	cases := map[string]chatmarkup.Text{
-		"epicStartedText":                  telegramStyle.epicStartedText(adversarialEpic, overflowCounts),
-		"iterationStartedText":             telegramStyle.iterationStartedText(ticket, adversarialEpic),
-		"iterationPausedText":              telegramStyle.iterationPausedText("iter-04", "rate limit (hit).", adversarialEpic, adversarialTicket),
-		"iterationResumedText":             telegramStyle.iterationResumedText("iter-04", adversarialEpic, adversarialTicket),
 		"iterationFinishedText":            telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
 		"ticketNeedsHumanText/answer":      telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, string(schema.StatusLegacyAnswer), "zero-commit", "No commits merged (yet).", overflowCounts),
 		"ticketNeedsHumanText/repair":      telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, string(schema.StatusLegacyRepair), "blocked-pane", "Operator intervention required.", overflowCounts),
-		"epicPausedText":                   telegramStyle.epicPausedText(adversarialEpic, []string{"04", "07"}),
-		"epicCompleteText":                 telegramStyle.epicCompleteText(adversarialEpic, overflowCounts, 5, 492, fractionalCost),
-		"epicFailedText":                   telegramStyle.epicFailedText(adversarialEpic, overflowCounts, "boom (exit 1)."),
+		"epicOutcomeText":                  telegramStyle.epicOutcomeText("\U0001f389", "epic complete", adversarialEpic, overflowCounts, 5, 492, fractionalCost),
 		"mutedText":                        telegramStyle.mutedText(adversarialEpic, adversarialTicket),
 		"globallyMutedText":                telegramStyle.globallyMutedText("telegram"),
 		"testMessageText":                  telegramStyle.testMessageText(),
-		"identityLine/punctuation-bearing": telegramStyle.iterationStartedText(tickets.Ticket{Identifier: "04 (retry)", Title: "x"}, "ui-tree.migration (v2)"),
+		"identityLine/punctuation-bearing": telegramStyle.iterationFinishedText(tickets.Ticket{Identifier: "04 (retry)", Title: "x"}, "ui-tree.migration (v2)", stats),
 	}
 
 	for name, text := range cases {
@@ -78,9 +72,9 @@ func TestMarkdownV2Validity_OverflowPausedIdentifiers(t *testing.T) {
 		Total:             10,
 	}
 
-	got := telegramStyle.epicStartedText("ui-tree-migration", counts).String()
+	got := telegramStyle.epicOutcomeText("\U0001f389", "epic complete", "ui-tree-migration", counts, 5, 492, 12.5).String()
 	if !isValidTelegramMarkdownV2(got) {
-		t.Fatalf("epicStartedText output %q is not valid MarkdownV2", got)
+		t.Fatalf("epicOutcomeText output %q is not valid MarkdownV2", got)
 	}
 	if !strings.Contains(got, `\+2 more`) {
 		t.Errorf("expected escaped overflow marker in %q", got)
@@ -99,7 +93,7 @@ func TestMarkdownV2Validity_RenderBatchWithDedupSuffix(t *testing.T) {
 	ticket1 := tickets.Ticket{Identifier: "01", Title: "Fix (parens) - literal *asterisk*."}
 	ticket2 := tickets.Ticket{Identifier: "02", Title: "Second item: cost $1.23!"}
 	items := []batchedMessage{
-		{text: telegramStyle.iterationStartedText(ticket1, epicName), kind: "iteration-started", count: 1},
+		{text: telegramStyle.mutedText(epicName, ticket1.Identifier), kind: notifyKindMuted, count: 1},
 		{
 			text: telegramStyle.iterationFinishedText(ticket2, epicName, runlog.IterationStats{
 				ElapsedSeconds: 65, PeakContextTokens: 1500, Cost: 3.456, Completed: 1, Total: 4,

@@ -43,7 +43,7 @@ func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.
 	t.Parallel()
 	dir := fixture.EpicScratchDir(t, "epic")
 	logNotificationSent(dir, "epic", "telegram", notifyKindEpicComplete, "epic complete!")
-	logNotificationFailed(dir, "epic", "slack", notifyKindIterationPaused, "post failed: 500", "iteration paused")
+	logNotificationFailed(dir, "epic", "slack", notifyKindTicketNeedsHuman, "post failed: 500", "iteration paused")
 
 	events, ok, err := runlog.ReadEvents(dir, "epic")
 	if err != nil || !ok || len(events) != 2 {
@@ -53,7 +53,7 @@ func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.
 	if sent.Type != string(eventsc.NotificationSent) || sent.Channel != "telegram" || sent.NotifyKind != notifyKindEpicComplete || sent.Body != "epic complete!" {
 		t.Errorf("sent event = %#v", sent)
 	}
-	if failed.Type != string(eventsc.NotificationFailed) || failed.Channel != "slack" || failed.NotifyKind != notifyKindIterationPaused || failed.Reason != "post failed: 500" || failed.Body != "iteration paused" {
+	if failed.Type != string(eventsc.NotificationFailed) || failed.Channel != "slack" || failed.NotifyKind != notifyKindTicketNeedsHuman || failed.Reason != "post failed: 500" || failed.Body != "iteration paused" {
 		t.Errorf("failed event = %#v", failed)
 	}
 }

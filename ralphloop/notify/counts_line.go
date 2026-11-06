@@ -36,37 +36,6 @@ func RenderCountsLine(c schedule.EpicCounts) string {
 	return strings.Join(clauses, " · ")
 }
 
-// loadEpicCounts loads epicName's current on-disk state from scratchDir and
-// tallies it into EpicCounts, epic-truth-fresh at the moment a chat message
-// sends rather than reused from any earlier read — the epic-level messages
-// this feeds (epicStartedText/epicCompleteText/ticketNeedsHumanText) fire
-// rarely enough that a dedicated load here doesn't repeat the per-poll cost
-// ticket 26 avoided for done/total. Returns the zero value if the epic can't
-// be loaded, so a transient read hiccup drops the counts clause instead of
-// the whole notification.
-func loadEpicCounts(scratchDir, epicName string) schedule.EpicCounts {
-	epic, err := schedule.LoadNamedEpic(scratchDir, epicName)
-	if err != nil || epic == nil {
-		return schedule.EpicCounts{}
-	}
-	return schedule.CountsOf(*epic)
-}
-
-// loadEpicTotalCost sums ActualCost across every ticket in epicName, the
-// epic-wide counterpart to a single merged ticket's IterationStats.Cost.
-// Same load-fresh, zero-on-failure posture as loadEpicCounts.
-func loadEpicTotalCost(scratchDir, epicName string) float64 {
-	epic, err := schedule.LoadNamedEpic(scratchDir, epicName)
-	if err != nil || epic == nil {
-		return 0
-	}
-	var total float64
-	for _, t := range epic.Tickets {
-		total += t.ActualCost
-	}
-	return total
-}
-
 // joinPausedIdentifiers lists identifiers inline, capped at
 // pausedIdentifierCap: beyond that, the rest collapse into a single "+N
 // more" marker instead of growing the line without bound.

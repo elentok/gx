@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/logger"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -58,21 +56,12 @@ type sendResult struct {
 	RetryAfter  *int
 }
 
-// chatEventSink decorates another EventSink with one chat notification per
-// chat-member event, replacing the slackEventSink/telegramEventSink pair
-// that used to implement this independently (their divergent method lists
-// are why the iteration-started event silently never reached chat). style
-// picks the markup dialect (slackStyle/telegramStyle); transport picks the
-// destination — one implementation, two configurations.
+// chatEventSink is the batching, gating, retrying send machinery behind
+// ServerChat. style picks the markup dialect (slackStyle/telegramStyle);
+// transport picks the destination — one implementation, two configurations.
+// It overrides no EventSink method: every event passes straight through to
+// the embedded EventSink, and ServerChat sends its messages with send/sendIn.
 //
-// Chat membership (see eventSinkVerdicts in eventsink_contract_test.go for
-// the full yes/no map over every EventSink method): EpicStarted,
-// IterationStarted, IterationPaused/IterationResumed (only for a
-// non-pause pause kind — PauseRepair is the same outcome
-// TicketNeedsHuman already reports, and a pause must produce exactly one
-// chat message), IterationFinished, TicketNeedsHuman, EpicPaused,
-// and EpicComplete. Every other event is a pure pass-through
-// to the embedded EventSink.
 // ChatEventSink is the interface chatEventSink satisfies — a named interface
 // a caller like ServerChat can assert against to close the sink's flush loop
 // on shutdown, instead of an anonymous method-set cast that would silently
@@ -480,20 +469,10 @@ func epicSource(epicName string) string {
 	return epicSourcePrefix + epicName
 }
 
-// resolveTicketPath finds identifier's ticket file under
-// scratchDir/epicName/issues, matching the "<id>-<slug>.md" naming
-// convention (tickets.Load uses the same pattern). Returns "" if no file
-// exists yet — gate() then hits a resolvable-but-not-found error, and send
-// fails open (see gate's doc comment) rather than block the notification on
-// a filesystem lookup.
-func (s *chatEventSink) resolveTicketPath(identifier string) string {
-	return ResolveTicketPath(s.scratchDir, s.epicName, identifier)
-}
-
 // ResolveTicketPath is the canonical "<id>-<slug>.md" ticket-file lookup
 // under scratchDir/epicName/issues, shared by every caller that needs to go
-// from a bare ticket identifier to its file on disk (chatEventSink and the
-// hard-limit kill path) so the glob pattern only needs to change in one
+// from a bare ticket identifier to its file on disk (the hard-limit kill
+// path) so the glob pattern only needs to change in one
 // place if the naming convention ever does. Returns "" if no file matches.
 func ResolveTicketPath(scratchDir, epicName, identifier string) string {
 	matches, err := filepath.Glob(filepath.Join(scratchDir, epicName, "issues", identifier+"-*.md"))
@@ -536,62 +515,6 @@ func (s *chatEventSink) pauseTicket(source, reason string) error {
 func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateResult, error) {
 	key := firstNonEmptyStr(s.gateKey, s.transport.name())
 	return notificationGateAt(s.gateStatePath, key, eventType, source, time.Now(), recordSend, s.pauseTicket)
-}
-
-func (s *chatEventSink) EpicStarted(epicName string, done, total int) {
-	s.EventSink.EpicStarted(epicName, done, total)
-	s.send(s.style.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)), notifyKindEpicStarted, epicSource(epicName), "")
-}
-
-func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent agent.AgentKind, paneID string) {
-	s.EventSink.IterationStarted(ticket, label, cwd, sessionID, agent, paneID)
-	s.send(s.style.iterationStartedText(ticket, s.epicName), notifyKindIterationStarted, ticket.Path, ticket.Identifier)
-}
-
-func (s *chatEventSink) IterationPaused(identifier, label string, kind runlog.PauseKind, reason string) {
-	s.EventSink.IterationPaused(identifier, label, kind, reason)
-	if kind == runlog.PauseRepair {
-		// A paused (repair) pause always accompanies a TicketNeedsHuman pause —
-		// that's the one chat-visible message for this outcome, so this
-		// pause itself stays TUI-only (see "pause cardinality").
-		return
-	}
-	s.send(s.style.iterationPausedText(label, reason, s.epicName, identifier), notifyKindIterationPaused, s.resolveTicketPath(identifier), identifier)
-}
-
-func (s *chatEventSink) IterationResumed(identifier, label string, kind runlog.PauseKind) {
-	s.EventSink.IterationResumed(identifier, label, kind)
-	if kind == runlog.PauseRepair {
-		return
-	}
-	s.send(s.style.iterationResumedText(label, s.epicName, identifier), notifyKindIterationResumed, s.resolveTicketPath(identifier), identifier)
-}
-
-func (s *chatEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats runlog.IterationStats) {
-	s.EventSink.IterationFinished(ticket, epicName, stats)
-	s.send(s.style.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished, ticket.Path, ticket.Identifier)
-}
-
-func (s *chatEventSink) TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string) {
-	s.EventSink.TicketNeedsHuman(identifier, epicName, status, kind, reason)
-	counts := loadEpicCounts(s.scratchDir, epicName)
-	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, kind, reason, counts), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
-}
-
-func (s *chatEventSink) EpicPaused(epicName string, stalled []runlog.StalledTicket) {
-	s.EventSink.EpicPaused(epicName, stalled)
-	identifiers := make([]string, len(stalled))
-	for i, t := range stalled {
-		identifiers[i] = t.Identifier
-	}
-	s.send(s.style.epicPausedText(epicName, identifiers), notifyKindEpicPaused, epicSource(epicName), "")
-}
-
-func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
-	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
-	counts := loadEpicCounts(s.scratchDir, epicName)
-	totalCost := loadEpicTotalCost(s.scratchDir, epicName)
-	s.send(s.style.epicCompleteText(epicName, counts, completed, elapsedSeconds, totalCost), notifyKindEpicComplete, epicSource(epicName), "")
 }
 
 // send runs (eventType, source) through the budget/mute gate before

@@ -3,7 +3,6 @@ package notify
 import (
 	"fmt"
 	"math"
-	"strings"
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/events"
@@ -67,58 +66,6 @@ func (s mrkdwnStyle) identityLine(epicName, ticketIdentifier string) string {
 	return fmt.Sprintf("%s %s", s.gxPrefix, ref)
 }
 
-// epicStartedText renders the "epic started" notification — the single
-// message every epic that leaves the queue emits exactly once, folding what
-// used to be separate no-tickets/already-complete notifications: a fresh
-// start reads as a plain counts line, while total 0 or done == total tell
-// the same story the old separate events used to. counts is the full
-// done/in-progress/paused/blocked/ready/total breakdown — the "queue counts
-// line" — since an epic-level message is the one place a run-wide picture
-// is useful rather than noise (see iterationFinishedText):
-//
-//	🚀 *epic started*
-//
-//	{counts line}
-//	[gx] {epic}
-func (s mrkdwnStyle) epicStartedText(epicName string, counts schedule.EpicCounts) chatmarkup.Text {
-	return s.chatStyle.Message("\U0001f680", "epic started", RenderCountsLine(counts), "", s.identityLine(epicName, ""))
-}
-
-// iterationStartedText renders the "iteration started" notification:
-//
-//	▶️ *{title}*
-//
-//	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) iterationStartedText(ticket tickets.Ticket, epicName string) chatmarkup.Text {
-	return s.chatStyle.Message("▶️", ticket.Title, "", "", s.identityLine(epicName, ticket.Identifier))
-}
-
-// iterationPausedText renders the "paused" notification. Only reached for a
-// non-pause pause (PauseRateLimit — see chatEventSink.IterationPaused), which
-// clears on its own, so there's a single emoji rather than the
-// pause-kind-dependent choice a pause's IterationPaused used to need before
-// TicketNeedsHuman became the one chat-visible message for every pause:
-//
-//	⏸ *paused*
-//
-//	{label}: {reason}
-//	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) iterationPausedText(label, reason, epicName, ticketIdentifier string) chatmarkup.Text {
-	detail := fmt.Sprintf("%s: %s", label, reason)
-	return s.chatStyle.Message("⏸", "paused", "", detail, s.identityLine(epicName, ticketIdentifier))
-}
-
-// iterationResumedText renders the "resumed" notification, the counterpart
-// to iterationPausedText — also only reached for a non-pause pause kind:
-//
-//	▶️ *resumed*
-//
-//	{label}
-//	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier string) chatmarkup.Text {
-	return s.chatStyle.Message("▶️", "resumed", "", label, s.identityLine(epicName, ticketIdentifier))
-}
-
 // iterationFinishedText renders the "done" notification:
 //
 //	✅ *{title}*
@@ -130,7 +77,7 @@ func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier stri
 // schedule.EpicCounts.PausedIdentifiers, Blocked, Ready, which IterationStats never
 // populates): a ticket-merged message reports what this merging changed,
 // not the epic's full paused/blocked/ready breakdown, which belongs to the
-// epic-level messages alone (see epicStartedText/epicCompleteText).
+// epic-level messages alone (see epicOutcomeText).
 func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats runlog.IterationStats) chatmarkup.Text {
 	line := RenderCountsLine(schedule.EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
 	counts := fmt.Sprintf(
@@ -176,57 +123,16 @@ func (s mrkdwnStyle) conflictResolutionStartedText(epicName, ticketIdentifier st
 	return s.chatStyle.Message("🔀", "resolving merge conflict", "", "An agent is resolving the cherry-pick conflict", s.identityLine(epicName, ticketIdentifier))
 }
 
-// epicPausedText renders the "epic paused" notification — the run is still
-// alive (unlike epicCompleteText) with every pane recoverable, waiting on a
-// person to clear one of the named tickets:
-//
-//	🅿️ *epic paused*
-//
-//	Nothing runnable left; waiting on {stalled}
-//	[gx] {epic}
-func (s mrkdwnStyle) epicPausedText(epicName string, stalled []string) chatmarkup.Text {
-	detail := "Nothing runnable left; waiting on " + strings.Join(stalled, ", ")
-	return s.chatStyle.Message("\U0001f17f️", "epic paused", "", detail, s.identityLine(epicName, ""))
-}
-
-// epicCompleteText renders the "epic complete" notification. counts is the
-// full queue counts line, same as epicStartedText; completed is this run's
-// own merged-ticket tally, a distinct number from counts.Done (the epic's
-// total done count, which may include tickets a prior run merged); totalCost
-// is the epic-wide sum of every ticket's ActualCost (see loadEpicTotalCost),
-// not just this run's own merges:
-//
-//	🎉 *epic complete*
-//
-//	{counts line}
-//	{completed} ticket(s) merged in {elapsed} · {totalCost}
-//	[gx] {epic}
-func (s mrkdwnStyle) epicCompleteText(epicName string, counts schedule.EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
-	return s.epicOutcomeText("\U0001f389", "epic complete", epicName, counts, completed, elapsedSeconds, totalCost)
-}
-
-// epicOutcomeText is the epic-level summary under glyph and title.
+// epicOutcomeText is the epic-level summary under glyph and title: the full
+// queue counts line, then this run's own merged-ticket tally (a distinct
+// number from counts.Done, which may include tickets a prior run merged) and
+// totalCost, the epic-wide sum of every ticket's ActualCost.
 func (s mrkdwnStyle) epicOutcomeText(glyph, title, epicName string, counts schedule.EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
 	detail := fmt.Sprintf("%d ticket(s) merged in %s · %s", completed, formatDuration(elapsedSeconds), tickets.FormatCost(totalCost))
 	if counts.Recovered > 0 {
 		detail += fmt.Sprintf(" · %d recovered automatically", counts.Recovered)
 	}
 	return s.chatStyle.Message(glyph, title, RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
-}
-
-// epicFailedText renders the "epic failed" notification — the second of the
-// two epic-level messages a failed run produces (epicStartedText is the
-// first), emitted after the run's own sink has
-// already closed and emptied, so counts is
-// loaded fresh rather than carried over from a live event:
-//
-//	🔥 *epic failed*
-//
-//	{counts line}
-//	{err}
-//	[gx] {epic}
-func (s mrkdwnStyle) epicFailedText(epicName string, counts schedule.EpicCounts, errMsg string) chatmarkup.Text {
-	return s.chatStyle.Message("\U0001f525", "epic failed", RenderCountsLine(counts), errMsg, s.identityLine(epicName, ""))
 }
 
 // mutedText renders the gate's edge-triggered per-source mute notice — the
