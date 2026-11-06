@@ -140,6 +140,9 @@ type Scenario struct {
 	Restart *RestartSpec
 	// Chat turns the fake's chat knob on, so a plain prompt is a chat turn.
 	Chat bool
+	// ChatCapture points the server's Slack webhook and Telegram base URL at a
+	// capture endpoint and prints the file it appends to (see chat.go).
+	ChatCapture bool
 	// Sessions are created in order once the server is up, as `gx agents create` makes them.
 	Sessions []SessionSpec
 	// Commands is what the fakes' list probes answer; nil leaves them empty.

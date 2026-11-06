@@ -167,6 +167,7 @@ func (f *fixture) addScenarioOutput(res *Output, sc scenario, transcripts map[st
 		res.GateDir = f.gateDir()
 	}
 	res.ConfigFile = f.configFile()
+	res.ChatCapture = f.chatCapture
 	res.Transcripts = transcripts
 	if sc.LimitBurn {
 		res.CodexSessionsDir = filepath.Join(f.root, "home", ".codex", "sessions")

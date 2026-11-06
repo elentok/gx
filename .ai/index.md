@@ -275,7 +275,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   registry and aliases the spec types. New scenario definitions that take no `fixture` go there too
   (the package is near the `sizeguard` limits). The `cache-gate` and
   `cache-gate-custom` scenarios (`cachegate.go`) output `gate_dir`: a fake `go` and `ps` in
-  `bin/` (put it first on PATH), `go-hold` to hold a fake build, and `go-clean.log`.
+  `bin/` (put it first on PATH), `go-hold` to hold a fake build, and `go-clean.log`. The
+  `chat-capture` scenario (`chat.go`, endpoint in `chatcapture/`) outputs `chat_capture`: a JSONL
+  file with one line per Slack or Telegram post the server makes (`transport`, `at`, `text`,
+  `parse_mode`); CLI Telegram sends (`gx notify`) still go to the real host, so only Slack reaches it.
 
 - `sizeguard/` — test-only guardrail on package, file and type size (see "File size"); like `envguard` and `playwrightguard`, it has no non-test source
 

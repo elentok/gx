@@ -35,6 +35,9 @@ type Output struct {
 	GateDir string `json:"gate_dir,omitempty"`
 	// ConfigFile is the global config file; edit it and run `gx server reload-config` to change a setting live.
 	ConfigFile string `json:"config_file"`
+	// ChatCapture is the file the chat-capture scenario's endpoint appends every Slack and
+	// Telegram post to, one JSON line each; empty elsewhere.
+	ChatCapture string `json:"chat_capture,omitempty"`
 	// RestartDir holds the fake restart binary's control files; empty outside the restart scenarios.
 	RestartDir string `json:"restart_dir,omitempty"`
 	// MigrateDir holds the migrate scenarios' control files and server script (see migrate.go); empty elsewhere.

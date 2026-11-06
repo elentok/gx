@@ -91,6 +91,11 @@ func run(args []string) (err error) {
 	if err := f.applyScenarioEnv(o, sc); err != nil {
 		return err
 	}
+	stopCapture, err := f.startChatCapture(&o, sc)
+	if err != nil {
+		return err
+	}
+	defer stopCapture()
 	if err := f.prepareStore(sc, port, o.configs); err != nil {
 		return err
 	}
@@ -189,6 +194,8 @@ type fixture struct {
 	// restarted is true once the server exited on a web restart: the fixture stays up
 	// for the server that restart started, and stops that one at shutdown.
 	restarted bool
+	// chatCapture is the capture file of a chat-capture scenario; empty elsewhere.
+	chatCapture string
 }
 
 // waitReady polls until the server answers with its web URL and Setup code.

@@ -85,6 +85,9 @@ var scenarios = map[string]scenario{
 		Queue:        []string{project + ":unknown-epic"},
 		UnknownSkill: true,
 	},
+	// chat-capture: a server whose Slack and Telegram posts land in the `chat_capture` file
+	// (see chat.go); the base of the notification checks. CLI Telegram sends do not reach it.
+	"chat-capture":          {ChatCapture: true},
 	"rejected-first-prompt": spec.RejectedFirstPrompt,
 	"stall-vim":             spec.StallVim,
 	"stall-leaves-i":        spec.StallLeavesI,
