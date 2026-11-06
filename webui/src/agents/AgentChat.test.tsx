@@ -91,3 +91,10 @@ test("a tools entry shows its count and each call", async () => {
   expect(screen.getByText("Bash: ls -la")).toBeTruthy();
   expect(screen.getByText("Read: /x/a.go")).toBeTruthy();
 });
+
+test("a prompt with images shows a grid above its text", async () => {
+  const m = { id: "p1", role: "person", kind: "prompt", text: "why?", at: new Date().toISOString(), images: [{ id: "a" }, { id: "b" }] };
+  render(session(), chat({ messages: [m] }));
+  expect(await screen.findByText("why?")).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: /^Image \d of 2$/ })).toHaveLength(2);
+});

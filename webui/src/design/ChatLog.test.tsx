@@ -809,3 +809,38 @@ test("an all-defaulted round shows one Accept these defaults card", async () => 
   fireEvent.click(viewButton("Chat"));
   expect(screen.getByText("Naming: use camelCase")).toBeTruthy();
 });
+
+const withImages = (n: number, text = "") =>
+  msg({ role: "person", kind: "prompt", text, images: Array.from({ length: n }, (_, i) => ({ id: `img-${i}` })) });
+
+const thumbs = () => document.querySelector<HTMLElement>('[data-mock-part="chat-thumbs"]')!;
+
+test.each([
+  [1, 1, false],
+  [2, 2, false],
+  [3, 3, false],
+  [10, 3, true],
+])("a prompt with %i images draws %i tiles", async (n, tiles, more) => {
+  renderChat([session()], okChat(chatOf([withImages(n, "look")])));
+  await screen.findByText("look");
+  expect(within(thumbs()).getAllByRole("button")).toHaveLength(tiles);
+  expect(within(thumbs()).queryByText(`+${n - 3}`) !== null).toBe(more);
+  const img = thumbs().querySelector("img")!;
+  expect(img.getAttribute("src")).toBe("/v1/sessions/images?session=s-a&id=img-0");
+  expect(img.getAttribute("loading")).toBe("lazy");
+  expect(img.getAttribute("decoding")).toBe("async");
+});
+
+test("an images-only prompt draws the grid and no text", async () => {
+  renderChat([session()], okChat(chatOf([withImages(2)])));
+  await waitFor(() => expect(thumbs()).toBeTruthy());
+  expect(thumbs().parentElement!.querySelector('[data-mock-part="chat-text"]')).toBeNull();
+  expect(thumbs().parentElement!.textContent).toBe("");
+});
+
+test("a placeholder image draws a plain tile, not an img", async () => {
+  const m = msg({ role: "person", kind: "prompt", text: "gone", images: [{ placeholder: true }] });
+  renderChat([session()], okChat(chatOf([m])));
+  expect(await screen.findByTestId("chat-image-placeholder")).toBeTruthy();
+  expect(thumbs().querySelector("img")).toBeNull();
+});

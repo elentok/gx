@@ -4,9 +4,11 @@ import { Button } from "../ui/button/Button";
 import { fetchArchive } from "./chat";
 import type {
   SessionBackgroundTask,
+  SessionChatImage,
   SessionChatMessage,
   SessionChatResponse,
 } from "../generated/server";
+import { sessionImageUrl } from "./sessionImages";
 import { Markdown } from "../markdown/Markdown";
 
 // The part of the chat both the Design page and the Agents page show: the scrolling messages and the working row.
@@ -17,7 +19,72 @@ const KIND_NAMES: Record<string, string> = {
   agent: "subagent",
 };
 
-function Entry({ m, showTools }: { m: SessionChatMessage; showTools: boolean }) {
+const MAX_THUMBS = 3;
+
+// Up to three thumbnails; the rest fold into a "+N" tile on the third. The full-size view is a later ticket.
+function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sessionId: string }) {
+  const shown = images.length > MAX_THUMBS ? images.slice(0, MAX_THUMBS) : images;
+  const extra = images.length - shown.length;
+  const tile = { w: "100%", h: "100%", minH: "0", borderRadius: "md", overflow: "hidden", display: "block", p: "0", border: "0" };
+  const cols = shown.length === 1 ? "1fr" : shown.length === 2 ? "1fr 1fr" : "2fr 1fr";
+  return (
+    <Box
+      data-mock-part="chat-thumbs"
+      display="grid"
+      gap="1"
+      gridTemplateColumns={cols}
+      gridTemplateRows={shown.length >= 3 ? "1fr 1fr" : undefined}
+      maxW={shown.length === 1 ? "240px" : undefined}
+      aspectRatio={shown.length === 1 ? "4/3" : shown.length === 2 ? "2/1" : "3/2"}
+    >
+      {shown.map((img, i) => {
+        const label = `Image ${i + 1} of ${images.length}`;
+        const last = i === shown.length - 1 && extra > 0;
+        return (
+          <Box
+            as="button"
+            key={img.id ?? `ph-${i}`}
+            aria-label={last ? `${label}, ${extra} more` : label}
+            bg="surface"
+            cursor="pointer"
+            position="relative"
+            gridRow={shown.length >= 3 && i === 0 ? "1 / 3" : undefined}
+            {...tile}
+          >
+            {img.id && !img.placeholder ? (
+              <img
+                src={sessionImageUrl(sessionId, img.id)}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            ) : (
+              <Box data-testid="chat-image-placeholder" w="100%" h="100%" bg="border" />
+            )}
+            {last && (
+              <Box
+                position="absolute"
+                inset="0"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                bg="surface.raised"
+                opacity="0.9"
+                fontWeight="semibold"
+                fontSize="lg"
+              >
+                {`+${extra}`}
+              </Box>
+            )}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+function Entry({ m, showTools, sessionId }: { m: SessionChatMessage; showTools: boolean; sessionId: string }) {
   if (m.kind === "compacted") {
     return (
       <Text
@@ -35,18 +102,44 @@ function Entry({ m, showTools }: { m: SessionChatMessage; showTools: boolean }) 
   }
   if (m.kind === "tools") return showTools ? <ToolCalls m={m} /> : null;
   if (m.kind === "prompt") {
+    const images = m.images ?? [];
+    if (images.length === 0) {
+      return (
+        <Box
+          alignSelf="flex-end"
+          maxW="85%"
+          bg="surface.raised"
+          borderRadius="lg"
+          px="3"
+          py="2"
+          fontSize="base"
+          whiteSpace="pre-wrap"
+        >
+          {m.text}
+        </Box>
+      );
+    }
     return (
       <Box
         alignSelf="flex-end"
         maxW="85%"
         bg="surface.raised"
+        border="1px solid"
+        borderColor="border"
         borderRadius="lg"
         px="3"
         py="2"
         fontSize="base"
-        whiteSpace="pre-wrap"
+        display="flex"
+        flexDirection="column"
+        gap="2"
       >
-        {m.text}
+        <ChatImageGrid images={images} sessionId={sessionId} />
+        {m.text && (
+          <Box as="span" data-mock-part="chat-text" whiteSpace="pre-wrap">
+            {m.text}
+          </Box>
+        )}
       </Box>
     );
   }
@@ -318,7 +411,7 @@ export function ChatMessages({
         </Text>
       )}
       {messages.map((m, i) => (
-        <Entry key={m.id || i} m={m} showTools={showTools} />
+        <Entry key={m.id || i} m={m} showTools={showTools} sessionId={sessionId} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       {busy && working}
