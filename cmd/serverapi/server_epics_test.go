@@ -34,7 +34,7 @@ func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
 	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
 	}
-	if want := "proj:a\tloop\tready\t1/2\tqueueable=true\tready-to-queue\nproj:b\tmap\tdesigning\t0/0\tqueueable=false\t\n"; out.String() != want {
+	if want := "proj:a\tloop\tready\t1/2\tqueueable=true\tready-to-queue\t\nproj:b\tmap\tdesigning\t0/0\tqueueable=false\t\t\n"; out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
 }
@@ -47,7 +47,20 @@ func TestPrintEpicList_JoinedCardPrintsTheActivePartsAddress(t *testing.T) {
 	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
 	}
-	if want := "proj:m-impl\tmap\trunning\t0/0\tqueueable=false\timplementing\n"; out.String() != want {
+	if want := "proj:m-impl\tmap\trunning\t0/0\tqueueable=false\timplementing\t\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
+func TestPrintEpicList_PrintsWorkspaceAndOnHoldSection(t *testing.T) {
+	var out bytes.Buffer
+	l := wire.EpicList{Epics: []wire.EpicListRow{
+		{Address: "proj:h", Kind: wire.EpicKindLoop, State: wire.EpicListPaused, Section: wire.SectionOnHold, Workspace: "Work"},
+	}}
+	if err := printEpicList(&out, l, false); err != nil {
+		t.Fatal(err)
+	}
+	if want := "proj:h\tloop\tpaused\t0/0\tqueueable=false\ton-hold\tWork\n"; out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
 }
@@ -61,7 +74,7 @@ func TestPrintEpicList_NeedsYouRowsKeepTheServersOldestWaitOrder(t *testing.T) {
 	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
 	}
-	want := "proj:old\tloop\tpaused\t0/0\tqueueable=false\tneeds-you\nproj:new\tloop\tmerge-blocked\t0/0\tqueueable=false\tneeds-you\n"
+	want := "proj:old\tloop\tpaused\t0/0\tqueueable=false\tneeds-you\t\nproj:new\tloop\tmerge-blocked\t0/0\tqueueable=false\tneeds-you\t\n"
 	if out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
@@ -75,7 +88,7 @@ func TestPrintEpicList_OneOffPrintsTicketAddressAndCardKind(t *testing.T) {
 	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
 	}
-	if want := "proj:one-offs/01\tone-off\tqueued\t0/0\tqueueable=false\timplementing\n"; out.String() != want {
+	if want := "proj:one-offs/01\tone-off\tqueued\t0/0\tqueueable=false\timplementing\t\n"; out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
 }

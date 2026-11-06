@@ -14,7 +14,7 @@ import (
 
 // cardSectionOrder is the order the page lists the sections in.
 var cardSectionOrder = []wire.CardSection{
-	wire.SectionNeedsYou, wire.SectionImplementing, wire.SectionReadyToQueue, wire.SectionDesigning, wire.SectionReadyToDesign, wire.SectionFinished,
+	wire.SectionNeedsYou, wire.SectionImplementing, wire.SectionReadyToQueue, wire.SectionDesigning, wire.SectionReadyToDesign, wire.SectionFinished, wire.SectionOnHold,
 }
 
 // loopCardSection is the section of a loop epic row.

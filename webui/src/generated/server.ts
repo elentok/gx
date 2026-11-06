@@ -855,6 +855,11 @@ export interface EpicListRow {
    */
   time_kind?: CardTimeKind;
   time_start?: string;
+  /**
+   * Workspace is the workspace of a Design or epic card; empty on One-off and
+   * Follow-ups cards. A joined card reads its Design's.
+   */
+  workspace?: string;
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's
@@ -914,6 +919,10 @@ export const SectionReadyToDesign: CardSection = "ready-to-design";
  */
 export const SectionFinished: CardSection = "finished";
 /**
+ * SectionOnHold holds every held card, after Finished.
+ */
+export const SectionOnHold: CardSection = "on-hold";
+/**
  * CardKind is the kind of an Epics page card.
  */
 export const CardKindImplementation = "implementation";
@@ -945,6 +954,10 @@ export const CardActionOpen: CardActionKind = "open";
  * Triage targets the project whose follow-ups the card counts.
  */
 export const CardActionTriage: CardActionKind = "triage";
+/**
+ * Unhold targets the card's active address.
+ */
+export const CardActionUnhold: CardActionKind = "unhold";
 /**
  * CardAction is one button of a card. Target is the address the button opens (a
  * ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).
@@ -1466,6 +1479,11 @@ export interface Snapshot {
    * Workspaces are the ordered workspaces; filled in by the handler.
    */
   workspaces?: Workspace[];
+  /**
+   * NeedsYouTotal counts every Needs-you card, One-off cards included; filled in
+   * by the handler.
+   */
+  needs_you_total?: number /* int */;
   /**
    * Held are the held Design and epic keys; filled in by the handler.
    */
@@ -2718,6 +2736,10 @@ export interface Workspace {
   name: string;
   default?: boolean;
   members: number /* int */;
+  /**
+   * NeedsYou counts the workspace's Needs-you cards; filled in by the snapshot.
+   */
+  needs_you?: number /* int */;
 }
 /**
  * WorkspaceList is the workspaces in order.

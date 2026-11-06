@@ -25,6 +25,8 @@ func (s *Server) epicsDeps() epics.Deps {
 		Pauses:   &s.pauseHold,
 		Sessions: s.sessions,
 
+		Workspaces: s.workspaces,
+
 		CapHeld:           func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool) { return s.explain.CapHeld(root, e) },
 		AutoFFMerge:       func(project string) bool { return s.merger.AutoFFMerge(project) },
 		CheckWaitingLabel: func(address string) string { return s.explain.CheckWaitingLabel(address) },

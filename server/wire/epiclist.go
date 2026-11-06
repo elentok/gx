@@ -110,6 +110,9 @@ type EpicListRow struct {
 	// starts. Both are empty when the start is unknown.
 	TimeKind  CardTimeKind `json:"time_kind,omitempty"`
 	TimeStart time.Time    `json:"time_start,omitzero"`
+	// Workspace is the workspace of a Design or epic card; empty on One-off and
+	// Follow-ups cards. A joined card reads its Design's.
+	Workspace string `json:"workspace,omitempty"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -144,6 +147,8 @@ const (
 	SectionReadyToQueue  CardSection = "ready-to-queue"
 	SectionReadyToDesign CardSection = "ready-to-design"
 	SectionFinished      CardSection = "finished"
+	// SectionOnHold holds every held card, after Finished.
+	SectionOnHold CardSection = "on-hold"
 )
 
 // CardKind is the kind of an Epics page card.
@@ -174,6 +179,8 @@ const (
 	CardActionOpen     CardActionKind = "open"
 	// Triage targets the project whose follow-ups the card counts.
 	CardActionTriage CardActionKind = "triage"
+	// Unhold targets the card's active address.
+	CardActionUnhold CardActionKind = "unhold"
 )
 
 // CardAction is one button of a card. Target is the address the button opens (a

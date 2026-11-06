@@ -66,6 +66,12 @@ type Sessions interface {
 	ListSessions() ([]wire.SessionInfo, error)
 }
 
+// Workspaces answers the workspace and hold of a Design or epic key.
+type Workspaces interface {
+	Workspace(key string) string
+	IsHeld(key string) bool
+}
+
 // Deps is what the epic read models need from the root server. The function
 // fields are root helpers that stay up.
 type Deps struct {
@@ -82,6 +88,8 @@ type Deps struct {
 	Queue    Queue
 	Pauses   Pauses
 	Sessions Sessions
+
+	Workspaces Workspaces
 
 	// CapHeld gives the cap verdict of the epic's next ready ticket, when a cap
 	// holds it back.

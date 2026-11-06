@@ -62,10 +62,64 @@ func mapListState(e tickets.Epic) wire.EpicListState {
 
 // EpicList serves the Epics page.
 func (s *Epics) EpicList(w http.ResponseWriter, _ *http.Request) {
-	dirs, err := tickets.ProjectDirs(s.TicketStore)
+	list, err := s.cardList()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	wire.WriteJSON(w, list)
+}
+
+// NeedsYouCounts counts the Needs-you cards per workspace and in total. A
+// One-off card counts in the total only.
+func (s *Epics) NeedsYouCounts() (perWorkspace map[string]int, total int) {
+	perWorkspace = map[string]int{}
+	list, err := s.cardList()
+	if err != nil {
+		return perWorkspace, 0
+	}
+	for _, r := range list.Epics {
+		if r.Section != wire.SectionNeedsYou {
+			continue
+		}
+		total++
+		if r.Workspace != "" {
+			perWorkspace[r.Workspace]++
+		}
+	}
+	return perWorkspace, total
+}
+
+// applyWorkspaces names the workspace of each Design and epic card and moves a
+// held card to On hold: same status words, no Needs-you pill, a Take off hold action.
+func (s *Epics) applyWorkspaces(rows []wire.EpicListRow) {
+	if s.Workspaces == nil {
+		return
+	}
+	for i := range rows {
+		r := &rows[i]
+		if r.CardKind != wire.CardKindDesign && r.CardKind != wire.CardKindImplementation {
+			continue
+		}
+		r.Workspace = s.Workspaces.Workspace(r.Address)
+		if !s.Workspaces.IsHeld(r.Address) {
+			continue
+		}
+		if r.Section == wire.SectionNeedsYou {
+			r.Reason = ""
+		}
+		r.Section, r.StatePill, r.WaitingSince, r.CountdownEndsAt = wire.SectionOnHold, "", time.Time{}, time.Time{}
+		r.Verdict, r.LaunchStep = "", wire.LaunchStep{}
+		r.Actions = []wire.CardAction{{Kind: wire.CardActionUnhold, Label: "Take off hold", Target: r.Addresses[0]}}
+		setCardTime(r, cardTimeSources{})
+	}
+}
+
+// cardList builds the page's cards, sorted, with workspaces and holds applied.
+func (s *Epics) cardList() (wire.EpicList, error) {
+	dirs, err := tickets.ProjectDirs(s.TicketStore)
+	if err != nil {
+		return wire.EpicList{}, err
 	}
 	list := wire.EpicList{Epics: []wire.EpicListRow{}, FollowUps: []wire.FollowUpCount{}}
 	designs := s.designActivities()
@@ -88,8 +142,9 @@ func (s *Epics) EpicList(w http.ResponseWriter, _ *http.Request) {
 	}
 	list.RecentlyFinished = s.Settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
+	s.applyWorkspaces(list.Epics)
 	sortCards(list.Epics, func(r wire.EpicListRow) int { return r.QueueSlot })
-	wire.WriteJSON(w, list)
+	return list, nil
 }
 
 // projectCards builds one project's cards: follow-ups, one-offs, loop and map
