@@ -17,11 +17,10 @@ import (
 // notification-failed line — distinct from the Type field (which is always
 // "notification-sent"/"notification-failed" itself).
 const (
-	notifyKindIterationFinished = "iteration-finished"
-	notifyKindEpicComplete      = "epic-complete"
-	notifyKindTicketNeedsHuman  = "ticket-needs-human"
-	notifyKindProgress          = "progress-update"
-	notifyKindConflictStarted   = "conflict-resolution-started"
+	notifyKindEpicComplete     = "epic-complete"
+	notifyKindTicketNeedsHuman = "ticket-needs-human"
+	notifyKindProgress         = "progress-update"
+	notifyKindConflictStarted  = "conflict-resolution-started"
 	// notifyKindMuted/notifyKindGloballyMuted tag the gate's own
 	// edge-triggered "muting this"/"globally muted" notice (see
 	// chatEventSink.send) — distinct from the live event that tripped the

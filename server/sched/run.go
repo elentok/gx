@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/budget"
@@ -438,13 +437,14 @@ func keepsAskedAgent(run runs.Run) bool {
 	return false
 }
 
-// NotifyDone tells chat a ticket merged. A one-off stays silent: it speaks
-// only through notifyResult, when its submit asked for it. Exported for tests.
+// NotifyDone hands a merged ticket to the epic's next Progress message; it
+// sends nothing itself. A one-off never counts: it speaks only through
+// notifyResult, when its submit asked for it. Exported for tests.
 func (l *Launcher) NotifyDone(addr tickets.Address, ticketPath string) {
 	if !l.Chat.Enabled() || queue.IsOneOffTicket(ticketPath) {
 		return
 	}
 	if e, t, ok := l.Writer.FreshTicket(addr); ok && !queue.IsOneOffEpic(e) {
-		l.Chat.TicketDone(addr.Project, l.Projects.ChatOverride(addr.Project), addr.Epic, t, schedule.CountsOf(e))
+		l.Progress.Finished(addr, t)
 	}
 }

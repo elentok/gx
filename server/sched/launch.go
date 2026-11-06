@@ -69,6 +69,8 @@ type LauncherDeps struct {
 	Merger   *merge.Merger
 	OneOffs  *queue.OneOffs
 	Chat     *notify.ServerChat
+	// Progress receives each merged epic ticket for the next Progress message.
+	Progress *ProgressTimer
 	// DropAskedAgent closes an agent that asked instead of keeping it alive.
 	DropAskedAgent bool
 }

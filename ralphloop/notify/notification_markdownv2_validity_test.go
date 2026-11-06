@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/chatmarkup"
-	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -41,11 +40,7 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 		PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06"},
 		Total:             10,
 	}
-	ticket := tickets.Ticket{Identifier: adversarialTicket, Title: adversarialTitle}
-	stats := runlog.IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: fractionalCost, Completed: 2, Total: 5}
-
 	cases := map[string]chatmarkup.Text{
-		"iterationFinishedText":     telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
 		"ticketPauseMessage/answer": ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyAnswer), "No commits merged (yet).").Text(chatmarkup.Telegram),
 		"ticketPauseMessage/repair": ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyRepair), "Operator intervention required.").Text(chatmarkup.Telegram),
 		"conflictStartedMessage":    conflictStartedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
@@ -56,10 +51,9 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 			Counts:  schedule.EpicCounts{Done: 3, InProgress: 1, Total: 12},
 			Running: []ProgressRunning{{Identifier: adversarialTicket, Title: adversarialTitle, ElapsedSeconds: 840}}, FinishedCount: 2, FinishedCost: fractionalCost,
 		}).Text(chatmarkup.Telegram),
-		"mutedMessage":                     mutedMessage(adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
-		"globallyMutedMessage":             globallyMutedMessage("telegram").Text(chatmarkup.Telegram),
-		"testMessageText":                  telegramStyle.testMessageText(),
-		"identityLine/punctuation-bearing": telegramStyle.iterationFinishedText(tickets.Ticket{Identifier: "04 (retry)", Title: "x"}, "ui-tree.migration (v2)", stats),
+		"mutedMessage":         mutedMessage(adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
+		"globallyMutedMessage": globallyMutedMessage("telegram").Text(chatmarkup.Telegram),
+		"testMessageText":      telegramStyle.testMessageText(),
 	}
 
 	for name, text := range cases {
@@ -109,10 +103,8 @@ func TestMarkdownV2Validity_RenderBatchWithDedupSuffix(t *testing.T) {
 	items := []batchedMessage{
 		{text: mutedMessage(filepath.Join(epicName, "issues", ticket1.Identifier+"-x.md"), ticket1.Identifier).Text(chatmarkup.Telegram), kind: notifyKindMuted, count: 1},
 		{
-			text: telegramStyle.iterationFinishedText(ticket2, epicName, runlog.IterationStats{
-				ElapsedSeconds: 65, PeakContextTokens: 1500, Cost: 3.456, Completed: 1, Total: 4,
-			}),
-			kind:  "iteration-finished",
+			text:  mutedMessage(filepath.Join(epicName, "issues", ticket2.Identifier+"-x.md"), ticket2.Identifier).Text(chatmarkup.Telegram),
+			kind:  notifyKindMuted,
 			count: 3,
 		},
 	}

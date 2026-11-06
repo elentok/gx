@@ -16,6 +16,8 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
@@ -398,7 +400,9 @@ func writeResultTicket(t *testing.T, dir, name string, notify bool, result strin
 	return p
 }
 
-func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
+// A merged epic ticket sends no message of its own; the next Progress message
+// reports it once, and a one-off never counts.
+func TestNotifyDone_EpicTicketFeedsTheNextProgressOneOffStaysOut(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	proj := filepath.Join(s.cfg.TicketStore, "p")
@@ -424,21 +428,31 @@ func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
 		}
 		return path
 	}
-	merged := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement})
+	merged := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement, ElapsedTime: 332, ActualCost: 1.5})
 	write("epic", "02-next.md", schema.Ticket{ID: "02", Status: schema.StatusOpen, Type: schema.TypeImplement})
-	oneOff := write("cron", queue.OneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt})
+	oneOff := write("cron", queue.OneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt, ElapsedTime: 99})
+	if !s.registry.PutIfAbsent(runs.TrackedRun{Run: runs.Run{Address: "p:epic/02"}}) {
+		t.Fatal("run not registered")
+	}
 
+	t0 := time.Now()
+	s.progress.Tick(t0) // the epic's timer starts
 	s.launcher.NotifyDone(tickets.Address{Project: "p", Epic: "cron", ID: "01"}, oneOff)
 	s.launcher.NotifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, merged)
+	s.progress.Tick(t0.Add(sched.DefaultProgressInterval))
+	s.progress.Tick(t0.Add(2 * sched.DefaultProgressInterval))
 	s.chat.Close()
-	got := wait(1)
-	if len(got) != 1 {
-		t.Fatalf("sends = %v, want only the epic ticket's", got)
+	all := strings.Join(wait(-1), "\n")
+	if n := strings.Count(all, "Finished since the last update"); n != 1 {
+		t.Fatalf("finished lines = %d, want 1 in:\n%s", n, all)
 	}
-	for _, want := range []string{"*p*", "Landed ticket", "1 done · 2 total", "p/epic/01"} {
-		if !strings.Contains(got[0], want) {
-			t.Errorf("done message lacks %q: %s", want, got[0])
+	for _, want := range []string{"Finished since the last update: 1 ticket · 5m · $1.50"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("progress lacks %q:\n%s", want, all)
 		}
+	}
+	if strings.Contains(all, "Landed ticket") || strings.Contains(all, "1m39s") {
+		t.Errorf("a finished message or the one-off leaked:\n%s", all)
 	}
 }
 
@@ -491,12 +505,18 @@ func TestNotifyDone_CrossEpicBlockersDoNotUndercountDoneTickets(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/01")
+	if !s.registry.PutIfAbsent(runs.TrackedRun{Run: runs.Run{Address: "p:epic/03"}}) {
+		t.Fatal("run not registered")
+	}
 
+	t0 := time.Now()
+	s.progress.Tick(t0)
 	s.launcher.NotifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "")
+	s.progress.Tick(t0.Add(sched.DefaultProgressInterval))
 	s.chat.Close()
-	got := wait(1)
-	if len(got) != 1 || !strings.Contains(got[0], "2 done · 2 total") {
-		t.Fatalf("sends = %v, want counts 2 done · 2 total", got)
+	got := strings.Join(wait(-1), "\n")
+	if !strings.Contains(got, "Finished since the last update: 1 ticket") || !strings.Contains(got, "2 done") {
+		t.Fatalf("sends = %v, want one finished ticket and 2 done", got)
 	}
 }
 

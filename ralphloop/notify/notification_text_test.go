@@ -9,9 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/chatmarkup"
-	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
-	"github.com/elentok/gx/tickets"
 )
 
 func TestFormatDuration(t *testing.T) {
@@ -74,30 +72,6 @@ func TestIdentityLine_EpicAndTicket(t *testing.T) {
 	want := "[gx] my-epic/04"
 	if got != want {
 		t.Errorf("identityLine = %q, want %q", got, want)
-	}
-}
-
-func TestTelegramStyleIterationFinishedText_EscapesAndFormats(t *testing.T) {
-	t.Parallel()
-	ticket := tickets.Ticket{Identifier: "02", Title: "Migrate ui"}
-	stats := runlog.IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: 1.234, Completed: 2, Total: 5}
-
-	got := telegramStyle.iterationFinishedText(ticket, "ui-tree-migration", stats).String()
-	want := "✅ *Migrate ui*\n\n5m32s · 39k tok · $1\\.23 · 2 done · 5 total\n\\[gx\\] ui\\-tree\\-migration/02"
-	if got != want {
-		t.Errorf("text = %q, want %q", got, want)
-	}
-}
-
-func TestSlackStyleIterationFinishedText_NoEscaping(t *testing.T) {
-	t.Parallel()
-	ticket := tickets.Ticket{Identifier: "02", Title: "Migrate ui"}
-	stats := runlog.IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: 1.234, Completed: 2, Total: 5}
-
-	got := slackStyle.iterationFinishedText(ticket, "ui-tree-migration", stats).String()
-	want := "✅ *Migrate ui*\n\n5m32s · 39k tok · $1.23 · 2 done · 5 total\n[gx] ui-tree-migration/02"
-	if got != want {
-		t.Errorf("text = %q, want %q", got, want)
 	}
 }
 

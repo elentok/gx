@@ -9,7 +9,6 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
-	"github.com/elentok/gx/tickets"
 )
 
 // ServerChatConfig names the chat destinations a server notifies. An empty
@@ -248,22 +247,6 @@ func (c *ServerChat) Progress(project string, override *ServerChatConfig, epic s
 	msg := progressMessage(project, epic, facts)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+epic), "")
-	}
-}
-
-// TicketDone tells the project's destinations that a ticket merged, with the
-// metrics the merge wrote onto it and the epic's counts after it.
-func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic string, t tickets.Ticket, counts schedule.EpicCounts) {
-	if c == nil {
-		return
-	}
-	stats := runlog.IterationStats{
-		ElapsedSeconds: t.ElapsedTime, PeakContextTokens: t.ActualContextWindow, Cost: t.ActualCost,
-		InProgress: counts.InProgress, Completed: counts.Done, Total: counts.Total,
-	}
-	for _, s := range c.projectSinks(override) {
-		body := s.style.iterationFinishedText(t, project+"/"+epic, stats)
-		s.send(body, notifyKindIterationFinished, t.Path, t.Identifier)
 	}
 }
 

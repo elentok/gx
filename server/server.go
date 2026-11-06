@@ -443,6 +443,9 @@ func New(cfg Config) (*Server, error) {
 	// A down herdr never stops the server; it is reported and retried.
 	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
 	// The scheduler and the launcher call each other, so the launcher is set after both exist.
+	s.progress = sched.NewProgressTimer(sched.ProgressTimerDeps{
+		Registry: s.registry, Projects: s.projects, Writer: s.writer, Chat: s.chat, Interval: cfg.Chat.ProgressInterval,
+	})
 	s.scheduler = sched.NewScheduler(sched.SchedulerDeps{
 		Log: s.log, Projects: s.projects, Recovery: s.recovery, Registry: s.registry,
 		Index: s.idx, Writer: s.writer, Settings: &s.settings, Migrator: s.migrator, Queue: s.queue,
@@ -457,13 +460,10 @@ func New(cfg Config) (*Server, error) {
 		Log: s.log, Host: s.scheduler, Projects: s.projects, Recovery: s.recovery, Sessions: s.sessions,
 		Settings: &s.settings, Registry: s.registry, Guards: s.guards, Events: s.events, Index: s.idx,
 		Budget: s.budget, Writer: s.writer, Harness: s.harness, Landing: s.landing, Merger: s.merger,
-		OneOffs: s.oneOffs, Chat: s.chat, DropAskedAgent: s.cfg.DropAskedAgent,
+		OneOffs: s.oneOffs, Chat: s.chat, Progress: s.progress, DropAskedAgent: s.cfg.DropAskedAgent,
 	})
 	s.scheduler.Launcher = s.launcher
 	s.reclaimer = sched.NewReclaimer(s.log, reclaimHost{s}, s.registry, savedRuns)
-	s.progress = sched.NewProgressTimer(sched.ProgressTimerDeps{
-		Registry: s.registry, Projects: s.projects, Writer: s.writer, Chat: s.chat, Interval: cfg.Chat.ProgressInterval,
-	})
 	s.herdr.Check()
 	return s, nil
 }

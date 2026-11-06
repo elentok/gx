@@ -5,9 +5,6 @@ import (
 	"math"
 
 	"github.com/elentok/gx/chatmarkup"
-	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/schedule"
-	"github.com/elentok/gx/tickets"
 )
 
 // formatDuration renders totalSeconds as "5m32s"/"1h5m32s"/"42s", the
@@ -62,27 +59,6 @@ func (s mrkdwnStyle) identityLine(epicName, ticketIdentifier string) string {
 		ref = fmt.Sprintf("%s/%s", epicName, ticketIdentifier)
 	}
 	return fmt.Sprintf("%s %s", s.gxPrefix, ref)
-}
-
-// iterationFinishedText renders the "done" notification:
-//
-//	✅ *{title}*
-//
-//	{elapsed} · {tokens} · {cost} · {counts line}
-//	[gx] {epic}/{ticket}
-//
-// The counts line here carries only done/in-progress/total (see
-// schedule.EpicCounts.PausedIdentifiers, Blocked, Ready, which IterationStats never
-// populates): a ticket-merged message reports what this merging changed,
-// not the epic's full paused/blocked/ready breakdown, which belongs to the
-// epic-level messages alone (see epicOutcomeText).
-func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats runlog.IterationStats) chatmarkup.Text {
-	line := RenderCountsLine(schedule.EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
-	counts := fmt.Sprintf(
-		"%s · %s · %s · %s",
-		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), tickets.FormatCost(stats.Cost), line,
-	)
-	return s.chatStyle.Message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
 
 // testMessageText renders the fixed message `gx config test-notifications`

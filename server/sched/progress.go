@@ -3,6 +3,7 @@ package sched
 import (
 	"context"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/ralphloop/notify"
@@ -33,6 +34,16 @@ type ProgressTimerDeps struct {
 type ProgressTimer struct {
 	d    ProgressTimerDeps
 	next map[string]time.Time // epic key -> next tick
+
+	mu       sync.Mutex
+	finished map[string]finishedTally // epic key -> tickets merged since the last message
+}
+
+// finishedTally is what merged since an epic's last Progress message.
+type finishedTally struct {
+	count   int
+	elapsed int
+	cost    float64
 }
 
 // NewProgressTimer builds the timer; Run drives it.
@@ -40,7 +51,28 @@ func NewProgressTimer(d ProgressTimerDeps) *ProgressTimer {
 	if d.Interval <= 0 {
 		d.Interval = DefaultProgressInterval
 	}
-	return &ProgressTimer{d: d, next: map[string]time.Time{}}
+	return &ProgressTimer{d: d, next: map[string]time.Time{}, finished: map[string]finishedTally{}}
+}
+
+// Finished records a merged ticket of an epic for its next Progress message.
+func (p *ProgressTimer) Finished(addr tickets.Address, t tickets.Ticket) {
+	key := addr.Project + "/" + addr.Epic
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	f := p.finished[key]
+	f.count++
+	f.elapsed += t.ElapsedTime
+	f.cost += t.ActualCost
+	p.finished[key] = f
+}
+
+// takeFinished returns an epic's tally and resets it.
+func (p *ProgressTimer) takeFinished(key string) finishedTally {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	f := p.finished[key]
+	delete(p.finished, key)
+	return f
 }
 
 // Run polls the registry until ctx ends. The poll is a fraction of the
@@ -84,6 +116,8 @@ func (p *ProgressTimer) Tick(now time.Time) {
 		due, started := p.next[key]
 		if !started {
 			p.next[key] = now.Add(p.d.Interval)
+			// The first message counts from the timer start, not from earlier merges.
+			p.takeFinished(key)
 			continue
 		}
 		if now.Before(due) {
@@ -104,7 +138,11 @@ func (p *ProgressTimer) send(addr tickets.Address, rs []runs.TrackedRun, now tim
 		titles[t.Identifier] = t.Title
 	}
 	sort.Slice(rs, func(i, j int) bool { return rs[i].Address < rs[j].Address })
-	facts := notify.ProgressFacts{Counts: schedule.CountsOf(epic)}
+	fin := p.takeFinished(addr.Project + "/" + addr.Epic)
+	facts := notify.ProgressFacts{
+		Counts:        schedule.CountsOf(epic),
+		FinishedCount: fin.count, FinishedElapsedSeconds: fin.elapsed, FinishedCost: fin.cost,
+	}
 	for _, r := range rs {
 		ra, err := tickets.ParseAddress(r.Address, tickets.AddressContext{})
 		if err != nil {
