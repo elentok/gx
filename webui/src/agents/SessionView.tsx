@@ -174,8 +174,7 @@ export function SessionView({
   // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
   // Each sits right after the message that was last when it was sent, so replies that stream in land below it.
   const [echoed, setEchoed] = useState<(EchoPrompt & { sessionId: string; seen: number; after?: string })[]>([]);
-  const promptCount = (e: EchoPrompt) => echoMatches(chat?.messages ?? [], e);
-  const waiting = echoed.filter((e) => e.sessionId === session.id && promptCount(e) <= e.seen);
+  const waiting = echoed.filter((e) => e.sessionId === session.id && echoMatches(chat?.messages ?? [], e) <= e.seen);
   const shown = chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat;
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
@@ -236,7 +235,7 @@ export function SessionView({
         onStale={refetch}
         onSent={(sent, images) => {
           const echo = { text: stripChips(sent), images };
-          setEchoed((all) => [...all, { ...echo, sessionId: session.id, seen: promptCount(echo), after: chat?.messages.at(-1)?.id }]);
+          setEchoed((all) => [...all, { ...echo, sessionId: session.id, seen: echoMatches(chat?.messages ?? [], echo), after: chat?.messages.at(-1)?.id }]);
         }}
         reason={locked ? undefined : sendReason(session, connected)}
       />
@@ -260,15 +259,15 @@ export function echoMatches(messages: { kind: string; text?: string; images?: un
 }
 
 // Puts each echo after its anchor message, in send order. An echo sent into an empty chat goes first; one whose anchor is gone goes last.
-export function withEchoes<M extends { id: string }>(messages: M[], echoes: (Partial<EchoPrompt> & { after?: string })[]): M[] {
-  const echo = (e: Partial<EchoPrompt>, i: number) =>
+export function withEchoes<M extends { id: string }>(messages: M[], echoes: (EchoPrompt & { after?: string })[]): M[] {
+  const echo = (e: EchoPrompt, i: number) =>
     ({
       id: `echo-${i}`,
       role: "person",
       kind: "prompt",
-      text: e.text ?? "",
+      text: e.text,
       at: "",
-      ...(e.images?.length && { images: e.images.map((id) => ({ id })) }),
+      ...(e.images.length > 0 && { images: e.images.map((id) => ({ id })) }),
     }) as unknown as M;
   const known = new Set(messages.map((m) => m.id));
   const out: M[] = [];

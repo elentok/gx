@@ -81,14 +81,14 @@ export function Composer({
   const images = useComposerImages(session.id);
   const hasImages = images.images.length > 0;
   const shared = text !== "" || hasImages;
+  // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
+  const working = session.status.state === "working" && !promptable(session);
   const [open, setOpen] = useState(shared);
+  // Adding an image while the agent works must not force the note open.
   useEffect(() => {
-    if (shared) setOpen(true);
-  }, [shared]);
-  // A ready image makes the turn sendable without text; an uploading or failed one holds Send off.
-  const hasContent = text.trim() !== "" || images.readyIds.length > 0;
-  const imagesBlock = images.uploading > 0 || images.failed > 0;
-  const withImages = () => (images.readyIds.length > 0 ? { images: images.readyIds } : {});
+    if (shared && !working) setOpen(true);
+  }, [shared, working]);
+  const hasContent = images.hasContent(text);
   const { send, write, enabled, pending } = usePromptSend({
     session,
     lastMessage,
@@ -98,8 +98,6 @@ export function Composer({
     toastRefusal: true,
   });
 
-  // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
-  const working = session.status.state === "working" && !promptable(session);
   const run: RunCall = (call) => (connected ? write(call) : Promise.resolve());
   const onInterrupt = () => {
     setInterruptOpen(false);
@@ -109,7 +107,7 @@ export function Composer({
   const inRound = round.length > 0;
   const sendRound = () => {
     setGapsOpen(false);
-    return send({ text: roundPrompt(round, answers, text), ...withImages() }, () => {
+    return send({ text: roundPrompt(round, answers, text), ...images.payload }, () => {
       setText("");
       images.clear();
       onRoundSent?.();
@@ -119,13 +117,13 @@ export function Composer({
   // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
   const onSendRound = () => {
     if (gapsOpen) setGapsOpen(false);
-    else if (imagesBlock) return;
+    else if (images.blocking) return;
     else if (unanswered.length > 0) setGapsOpen(true);
     else sendRound();
   };
 
   const sendText = () =>
-    send({ text, ...withImages() }, () => {
+    send({ text, ...images.payload }, () => {
       setText("");
       images.clear();
     });
@@ -134,7 +132,7 @@ export function Composer({
     ? () => {
         if (!enabled) return;
         if (inRound) onSendRound();
-        else if (hasContent && !imagesBlock) sendText();
+        else if (images.canSend(text)) sendText();
       }
     : undefined;
 
@@ -171,7 +169,7 @@ export function Composer({
     </Button>
   ) : inRound ? (
     <>
-      <Button ref={sendRef} disabled={!enabled || imagesBlock} onClick={onSendRound}>
+      <Button ref={sendRef} disabled={!enabled || images.blocking} onClick={onSendRound}>
         {pending && <Spinner size="sm" />}
         Send answers
       </Button>
@@ -179,7 +177,7 @@ export function Composer({
         open={gapsOpen && unanswered.length > 0}
         unanswered={unanswered}
         total={round.length}
-        sendDisabled={!enabled || imagesBlock}
+        sendDisabled={!enabled || images.blocking}
         anchorRef={sendRef}
         onSendAnyway={sendRound}
         onAnswer={(c) =>
@@ -189,7 +187,7 @@ export function Composer({
       />
     </>
   ) : (
-    <Button disabled={!enabled || !hasContent || imagesBlock} onClick={sendText}>
+    <Button disabled={!enabled || !images.canSend(text)} onClick={sendText}>
       {pending && <Spinner size="sm" />}
       Send
     </Button>
@@ -241,25 +239,25 @@ export function Composer({
           </>
         }
       >
-      {open && (
-        <NoteBox
-          name="the composer"
-          label="Message"
-          title={inRound ? "Note on this round" : "Message to the agent"}
-          placeholder={inRound ? "A note on this round" : "A message to the agent"}
-          value={text}
-          disabled={!enabled}
-          autoFocus
-          onChange={setText}
-          onSubmit={onSubmit}
-          completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
-        />
-      )}
-      {open && codexSkillHint(session.harness, text) && (
-        <Text fontSize="xs" color="text.dim">
-          {codexSkillHint(session.harness, text)}
-        </Text>
-      )}
+        {open && (
+          <NoteBox
+            name="the composer"
+            label="Message"
+            title={inRound ? "Note on this round" : "Message to the agent"}
+            placeholder={inRound ? "A note on this round" : "A message to the agent"}
+            value={text}
+            disabled={!enabled}
+            autoFocus
+            onChange={setText}
+            onSubmit={onSubmit}
+            completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
+          />
+        )}
+        {open && codexSkillHint(session.harness, text) && (
+          <Text fontSize="xs" color="text.dim">
+            {codexSkillHint(session.harness, text)}
+          </Text>
+        )}
       </ComposerImages>
     </Box>
   );

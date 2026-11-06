@@ -1159,3 +1159,12 @@ test("images: busy keeps Add working and the note disabled, and Interrupt shows"
   expect((screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement).disabled).toBe(false);
   expect(((await screen.findByLabelText("Message")) as HTMLTextAreaElement).disabled).toBe(true);
 });
+
+test("images: adding one while busy leaves the note closed", async () => {
+  uploads.upload.mockResolvedValueOnce("i1");
+  render({ state: "working" });
+  await screen.findByRole("button", { name: "Interrupt" });
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
+  await screen.findByRole("button", { name: "Remove image" });
+  expect(screen.queryByLabelText("Message")).toBeNull();
+});

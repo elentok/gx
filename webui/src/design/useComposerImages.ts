@@ -21,6 +21,14 @@ export interface ComposerImages {
   readyIds: string[];
   uploading: number;
   failed: number;
+  /** An upload still runs or failed: Send stays off. */
+  blocking: boolean;
+  /** Text or a ready image: a ready image makes the turn sendable without text. */
+  hasContent: (text: string) => boolean;
+  /** The one can-send rule. */
+  canSend: (text: string) => boolean;
+  /** The `images` field of a prompt post, empty when no image is ready. */
+  payload: { images?: string[] };
   /** The last limit refusal, "" when none. */
   error: string;
   addFiles: (files: File[]) => Promise<void>;
@@ -120,11 +128,19 @@ export function useComposerImages(sessionId: string): ComposerImages {
   // Refused thumbnails do not count as failed uploads: they never block a send.
   const failed = images.filter((i) => i.state === "failed").length;
   images.push(...refused.map((r): ComposerImage => ({ key: r.key, state: "failed", message: r.message, canRetry: false })));
+  const readyIds = draft.flatMap((e) => (e.id ? [e.id] : []));
+  const uploading = images.filter((i) => i.state === "uploading").length;
+  const blocking = uploading > 0 || failed > 0;
+  const hasContent = (text: string) => text.trim() !== "" || readyIds.length > 0;
   return {
     images,
-    readyIds: draft.flatMap((e) => (e.id ? [e.id] : [])),
-    uploading: images.filter((i) => i.state === "uploading").length,
+    readyIds,
+    uploading,
     failed,
+    blocking,
+    hasContent,
+    canSend: (text) => hasContent(text) && !blocking,
+    payload: readyIds.length > 0 ? { images: readyIds } : {},
     error,
     addFiles,
     retry,

@@ -24,21 +24,21 @@ test("an images-only echo matches images-only prompts with the same count, not t
 const ids = (all: { id: string }[]) => all.map((m) => m.id);
 
 test("an echo sits after the message that was last when it was sent, so later replies land below it", () => {
-  const out = withEchoes([msg("a"), msg("b"), msg("reply")], [{ text: "hi", after: "a" }]);
+  const out = withEchoes([msg("a"), msg("b"), msg("reply")], [{ text: "hi", images: [], after: "a" }]);
   expect(ids(out)).toEqual(["a", "echo-0", "b", "reply"]);
 });
 
 test("echoes with one anchor keep their send order", () => {
-  const out = withEchoes([msg("a"), msg("b")], [{ text: "one", after: "a" }, { text: "two", after: "a" }]);
+  const out = withEchoes([msg("a"), msg("b")], [{ text: "one", images: [], after: "a" }, { text: "two", images: [], after: "a" }]);
   expect(ids(out)).toEqual(["a", "echo-0", "echo-1", "b"]);
 });
 
 test("echoes with different anchors each land at their own place", () => {
-  const out = withEchoes([msg("a"), msg("b"), msg("c")], [{ text: "one", after: "a" }, { text: "two", after: "c" }]);
+  const out = withEchoes([msg("a"), msg("b"), msg("c")], [{ text: "one", images: [], after: "a" }, { text: "two", images: [], after: "c" }]);
   expect(ids(out)).toEqual(["a", "echo-0", "b", "c", "echo-1"]);
 });
 
 test("an echo sent into an empty chat goes first; one whose anchor is gone goes last", () => {
-  const out = withEchoes([msg("a")], [{ text: "first" }, { text: "lost", after: "gone" }]);
+  const out = withEchoes([msg("a")], [{ text: "first", images: [] }, { text: "lost", images: [], after: "gone" }]);
   expect(ids(out)).toEqual(["echo-0", "a", "echo-1"]);
 });
