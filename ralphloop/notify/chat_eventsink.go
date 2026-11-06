@@ -392,7 +392,7 @@ func (s *chatEventSink) sendFinal(text chatmarkup.Text, notifyKind string, deadl
 
 // batchSeparatorRaw is the literal divider renderBatch places between
 // originally-distinct messages, before style-specific escaping. Every
-// individual message's text arrives already escaped (see enqueue) — this is
+// individual message's text arrives already escaped (see enqueueMessage) — this is
 // the one piece of the joined output renderBatch itself introduces, so it
 // must go through style.escape the same as any other literal, or a dialect
 // that reserves one of its characters (Telegram's MarkdownV2 reserves "-")
@@ -403,7 +403,7 @@ const batchSeparatorRaw = "---"
 // between originally-distinct messages. A deduped message shows ×N at the end
 // of its Headline. style escapes the separator for
 // the target dialect — item text is already safe by the time it's queued
-// (see enqueue), but the separator is renderBatch's own literal, so it needs
+// (see enqueueMessage), but the separator is renderBatch's own literal, so it needs
 // the same treatment; chatmarkup.Join only accepts already-safe Text values,
 // so the separator physically cannot reach the wire unescaped.
 func renderBatch(style mrkdwnStyle, items []batchedMessage) chatmarkup.Text {
@@ -618,7 +618,7 @@ const maxRequeueSize = 50
 // requeue puts a failed flush's items back at the front of the queue —
 // prepended, since they're older than anything queued since the batch was
 // emptied, and merged into any identical text already queued rather than
-// appended as a duplicate (see enqueue's same dedup rule). Every requeued
+// appended as a duplicate (see enqueueItem's same dedup rule). Every requeued
 // entry is marked requeued so flush knows not to re-charge the notification
 // gate's send budget for a batch it already charged once (see flush); an
 // entry that merges with a fresh (non-requeued) one loses that mark, since

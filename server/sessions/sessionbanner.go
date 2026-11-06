@@ -241,7 +241,7 @@ func (mg *Manager) fireBanner(id string) {
 		if link != "" {
 			chatBody += "\n" + link
 		}
-		mg.alerts.SessionAlert(info.Project, mg.projects.ChatOverride(info.Project), info.Name, sessionStatusWord(info.Status.State), chatBody)
+		mg.alerts.SessionAlert(info.Project, mg.projects.ChatOverride(info.Project), info.Name, sessionStatusWord(info.Status.State), chatBody, info.Status.State != wire.SessionIdle)
 	}
 	if onScreen {
 		return

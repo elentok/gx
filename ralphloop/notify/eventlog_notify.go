@@ -25,7 +25,7 @@ const (
 	notifyKindConflictStarted  = "conflict-resolution-started"
 	// notifyKindMuted/notifyKindGloballyMuted tag the gate's own
 	// edge-triggered "muting this"/"globally muted" notice (see
-	// chatEventSink.send) — distinct from the live event that tripped the
+	// chatEventSink.sendMessage) — distinct from the live event that tripped the
 	// mute, which is itself suppressed rather than sent.
 	notifyKindMuted         = "muted"
 	notifyKindGloballyMuted = "globally-muted"

@@ -265,11 +265,11 @@ func (c *ServerChat) DesignQuestion(project string, override *ServerChatConfig, 
 // DesignReady tells the project's destinations that the Design of a map
 // finished and its implEpic holds tickets ready to queue. The source is the
 // Design's own epic, the same as its Question.
-func (c *ServerChat) DesignReady(project string, override *ServerChatConfig, designEpic, implEpic string, tickets int, link string) {
+func (c *ServerChat) DesignReady(project string, override *ServerChatConfig, designEpic, implEpic string, count int, link string) {
 	if c == nil {
 		return
 	}
-	msg := designReadyMessage(project, implEpic, tickets, link)
+	msg := designReadyMessage(project, implEpic, count, link)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+designEpic), "")
 	}
@@ -350,17 +350,24 @@ const notifyKindSessionAlert = "session-alert"
 // SessionAlert sends an interactive session's alert, "🔔 <status> <name>" with
 // the reason below and the project last, to the project's destinations. The
 // gate source is the server's: a session has no ticket to write a mute onto.
-func (c *ServerChat) SessionAlert(project string, override *ServerChatConfig, name, status, body string) {
+// needsAttention marks the session as stuck (Blocked, Rate-limited, Exited)
+// rather than done, which makes the alert urgent.
+func (c *ServerChat) SessionAlert(project string, override *ServerChatConfig, name, status, body string, needsAttention bool) {
 	if c == nil {
 		return
 	}
-	msg := chatMessage{icon: "🔔", status: status, subject: name, lines: []string{body}, project: project, kind: notifyKindSessionAlert}
-	if status != "Done" {
-		msg.urgency = urgencyAnswer // Blocked, Rate-limited, Exited
-	}
+	msg := sessionAlertMessage(project, name, status, body, needsAttention)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, serverSource, "")
 	}
+}
+
+func sessionAlertMessage(project, name, status, body string, needsAttention bool) chatMessage {
+	msg := chatMessage{icon: "🔔", status: status, subject: name, lines: []string{body}, project: project, kind: notifyKindSessionAlert}
+	if needsAttention {
+		msg.urgency = urgencyAnswer
+	}
+	return msg
 }
 
 // Close flushes every queued batch, bounded by the transport timeout.

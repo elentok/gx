@@ -116,14 +116,20 @@ func (m chatMessage) Text(style chatmarkup.Style) chatmarkup.Text {
 	return style.Layout(m.Headline(), m.lines, m.project)
 }
 
-// conflictStartedMessage is the "an agent took over a merge conflict" message.
-func conflictStartedMessage(project, epic, ticketPath, identifier string) chatMessage {
+// ticketSubject is "<epic>/<id> <title>", leaving the title out when the
+// ticket has none.
+func ticketSubject(epic, identifier, ticketPath string) string {
 	subject := epic + "/" + identifier
 	if title := tickets.TicketTitle(ticketPath); title != "" {
 		subject += " " + title
 	}
+	return subject
+}
+
+// conflictStartedMessage is the "an agent took over a merge conflict" message.
+func conflictStartedMessage(project, epic, ticketPath, identifier string) chatMessage {
 	return chatMessage{
-		icon: "🔀", status: "Conflict", subject: subject,
+		icon: "🔀", status: "Conflict", subject: ticketSubject(epic, identifier, ticketPath),
 		lines:   []string{"An agent is resolving the merge conflict."},
 		project: project,
 		kind:    notifyKindConflictStarted,
@@ -145,10 +151,7 @@ func escalatedMessage(project, epic, ticketPath, identifier, failure string) cha
 		msg.lines = []string{"All tickets are paused. Automatic recovery already ran once."}
 		return msg
 	}
-	msg.subject += "/" + identifier
-	if title := tickets.TicketTitle(ticketPath); title != "" {
-		msg.subject += " " + title
-	}
+	msg.subject = ticketSubject(epic, identifier, ticketPath)
 	msg.lines = []string{"Automatic recovery gave up. " + failure}
 	return msg
 }
@@ -159,12 +162,8 @@ func escalatedMessage(project, epic, ticketPath, identifier, failure string) cha
 func mutedMessage(source, identifier string) chatMessage {
 	issues := filepath.Dir(source)
 	epicDir := filepath.Dir(issues)
-	subject := filepath.Base(epicDir) + "/" + identifier
-	if title := tickets.TicketTitle(source); title != "" {
-		subject += " " + title
-	}
 	return chatMessage{
-		icon: "🔇", status: "Muted", subject: subject,
+		icon: "🔇", status: "Muted", subject: ticketSubject(filepath.Base(epicDir), identifier, source),
 		lines:   []string{"Too many messages. Muted until you re-enable it."},
 		project: filepath.Base(filepath.Dir(epicDir)),
 		kind:    notifyKindMuted,
@@ -196,10 +195,7 @@ const maxResultRunes = 1500
 // resultMessage is a one-off's "done" message: its Result cut at
 // maxResultRunes, or a plain line when none was recorded.
 func resultMessage(project, epic, ticketPath, identifier, result string) chatMessage {
-	subject := epic + "/" + identifier
-	if title := tickets.TicketTitle(ticketPath); title != "" {
-		subject += " " + title
-	}
+	subject := ticketSubject(epic, identifier, ticketPath)
 	result = strings.TrimSpace(result)
 	if r := []rune(result); len(r) > maxResultRunes {
 		result = string(r[:maxResultRunes]) + "…"
@@ -328,8 +324,8 @@ func designQuestionMessage(project, epic, step string, round int, question, link
 
 // designReadyMessage is the "a Design finished" message. implEpic is the new
 // epic's name. An empty link (web listener off) leaves its line out.
-func designReadyMessage(project, implEpic string, tickets int, link string) chatMessage {
-	lines := []string{fmt.Sprintf("The design is finished. %d tickets are ready to queue.", tickets)}
+func designReadyMessage(project, implEpic string, count int, link string) chatMessage {
+	lines := []string{fmt.Sprintf("The design is finished. %d tickets are ready to queue.", count)}
 	if link != "" {
 		lines = append(lines, link)
 	}
@@ -347,10 +343,7 @@ func designReadyMessage(project, implEpic string, tickets int, link string) chat
 // ticket's stored status word, old or new.
 func ticketPauseMessage(project, epic, ticketPath, identifier, status, detail string) chatMessage {
 	icon, word := pauseIconWord(status)
-	subject := epic + "/" + identifier
-	if title := tickets.TicketTitle(ticketPath); title != "" {
-		subject += " " + title
-	}
+	subject := ticketSubject(epic, identifier, ticketPath)
 	class := urgencyRepair
 	if word == "Answer" {
 		class = urgencyAnswer
