@@ -1827,6 +1827,17 @@ export interface SessionChatImage {
   placeholder?: boolean;
 }
 /**
+ * SessionTranscriptResponse locates a session's conversation file. Harness
+ * and ConversationID are the session's own, so they are set even when Found is
+ * false.
+ */
+export interface SessionTranscriptResponse {
+  harness: string;
+  conversation_id: string;
+  path: string;
+  found: boolean;
+}
+/**
  * SessionChatResponse is the visible messages of a session's newest
  * conversation. ConversationID changes after a /clear. Unsupported marks a
  * session of a harness that has no chat; its Messages stay empty. Truncated
@@ -2413,6 +2424,20 @@ export interface StatsFriction {
   median_resume_secs?: number /* int */;
 }
 /**
+ * StatsLaunch is the Launch section: launches of finished tickets, each on the
+ * day of its own claim time. Medians are milliseconds and absent (nil, no_data)
+ * when the range holds no launch, never zero. Days has one point per entry of
+ * Stats.Days; StepMedianMs is keyed by launch step.
+ */
+export interface StatsLaunch {
+  count: number /* int */;
+  median_ms?: number /* int64 */;
+  share_under_target?: number /* float64 */;
+  target_ms: number /* int64 */;
+  days: StatsAmount[];
+  step_median_ms: { [key: string]: number /* int64 */};
+}
+/**
  * Stats is the /v1/stats payload.
  */
 export interface Stats {
@@ -2422,6 +2447,7 @@ export interface Stats {
   throughput: StatsThroughput;
   cost: StatsCost;
   friction: StatsFriction;
+  launch: StatsLaunch;
   grilling: StatsGrilling;
   limit_burn: StatsLimitBurns;
 }

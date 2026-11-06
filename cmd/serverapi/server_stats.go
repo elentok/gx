@@ -43,5 +43,12 @@ func printStats(w io.Writer, s wire.Stats) error {
 			return err
 		}
 	}
-	return nil
+	l := s.Launch
+	if l.MedianMs == nil || l.ShareUnderTgt == nil {
+		_, err := fmt.Fprintln(w, "launch: no data")
+		return err
+	}
+	_, err := fmt.Fprintf(w, "launch median: %.1fs, %.0f%% under %ds (%d launches)\n",
+		float64(*l.MedianMs)/1000, *l.ShareUnderTgt*100, l.TargetMs/1000, l.Count)
+	return err
 }

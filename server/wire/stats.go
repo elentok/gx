@@ -69,6 +69,19 @@ type StatsFriction struct {
 	MedianResumeSec *int             `json:"median_resume_secs,omitempty"`
 }
 
+// StatsLaunch is the Launch section: launches of finished tickets, each on the
+// day of its own claim time. Medians are milliseconds and absent (nil, no_data)
+// when the range holds no launch, never zero. Days has one point per entry of
+// Stats.Days; StepMedianMs is keyed by launch step.
+type StatsLaunch struct {
+	Count         int              `json:"count"`
+	MedianMs      *int64           `json:"median_ms,omitempty"`
+	ShareUnderTgt *float64         `json:"share_under_target,omitempty"`
+	TargetMs      int64            `json:"target_ms"`
+	Days          []StatsAmount    `json:"days"`
+	StepMedianMs  map[string]int64 `json:"step_median_ms"`
+}
+
 // Stats is the /v1/stats payload.
 type Stats struct {
 	Range      int             `json:"range"`
@@ -77,6 +90,7 @@ type Stats struct {
 	Throughput StatsThroughput `json:"throughput"`
 	Cost       StatsCost       `json:"cost"`
 	Friction   StatsFriction   `json:"friction"`
+	Launch     StatsLaunch     `json:"launch"`
 	Grilling   StatsGrilling   `json:"grilling"`
 	LimitBurn  StatsLimitBurns `json:"limit_burn"`
 }

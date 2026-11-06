@@ -42,6 +42,9 @@ func newStats(n int) wire.Stats {
 			PauseReasons:   []string{},
 			PausesByReason: emptyCounts(n), RunEvents: emptyCounts(n), PauseEndings: emptyCounts(n),
 		},
+		Launch: wire.StatsLaunch{
+			Days: make([]wire.StatsAmount, n), StepMedianMs: map[string]int64{},
+		},
 	}
 }
 
@@ -69,6 +72,7 @@ func buildStats(in statsInput) wire.Stats {
 			pauses: out.Friction.PausesByReason, events: out.Friction.RunEvents, endings: out.Friction.PauseEndings,
 			reasonTotal: map[string]int{},
 		},
+		launch: newLaunchTally(n),
 	}
 	for _, se := range in.Epics {
 		if project == "" || se.Project == project {
@@ -76,6 +80,7 @@ func buildStats(in statsInput) wire.Stats {
 		}
 	}
 	b.friction.fill(&out.Friction)
+	b.launch.fill(&out.Launch)
 	out.Cost = statsCostOf(pickCostSource(costSourceInput{
 		costLedger: led, Days: out.Days,
 		Design: b.design, Impl: b.impl, Project: project,
@@ -92,6 +97,7 @@ type statsBuilder struct {
 	design   costSeries
 	impl     costSeries
 	friction frictionTally
+	launch   launchTally
 }
 
 func (b *statsBuilder) addEpic(e tickets.Epic) {
@@ -134,6 +140,7 @@ func (b *statsBuilder) addTicket(e tickets.Epic, tk tickets.Ticket, cost costSer
 	}
 	finished := b.win.Bucket(tk.FinishedAt())
 	b.friction.addTicket(finished, tk)
+	b.launch.addTicket(b.win, tk)
 	if originalEpic(tk, e.Name) == followUpsEpic {
 		// A move finishes nothing: it sets neither done_at nor cancelled_at.
 		if i := b.win.Bucket(tk.CreatedAt); i >= 0 {
@@ -279,6 +286,77 @@ func (f *frictionTally) fill(out *wire.StatsFriction) {
 		}
 		out.MedianResumeSec = &median
 	}
+}
+
+// LaunchTargetMs is the launch-time target the under-target share counts
+// against.
+const LaunchTargetMs = 15_000
+
+// launchTally is the Launch section while it is being summed.
+type launchTally struct {
+	totals []int64
+	days   [][]int64
+	steps  map[string][]int64
+}
+
+func newLaunchTally(n int) launchTally {
+	return launchTally{days: make([][]int64, n), steps: map[string][]int64{}}
+}
+
+// addTicket counts each launch of a finished ticket on its own claim day.
+func (l *launchTally) addTicket(win limits.StatsWindow, tk tickets.Ticket) {
+	if tk.FinishedAt().IsZero() {
+		return
+	}
+	for _, s := range tk.Launch {
+		i := win.Bucket(s.ClaimedAt)
+		if i < 0 {
+			continue
+		}
+		l.totals = append(l.totals, s.TotalMs)
+		l.days[i] = append(l.days[i], s.TotalMs)
+		l.steps["worktree"] = append(l.steps["worktree"], s.WorktreeMs)
+		l.steps["deps"] = append(l.steps["deps"], s.DepsMs)
+		l.steps["agent"] = append(l.steps["agent"], s.AgentMs)
+		l.steps["prompt"] = append(l.steps["prompt"], s.PromptMs)
+	}
+}
+
+func (l *launchTally) fill(out *wire.StatsLaunch) {
+	out.Count, out.TargetMs = len(l.totals), LaunchTargetMs
+	for i, d := range l.days {
+		if len(d) == 0 {
+			out.Days[i].NoData = true
+			continue
+		}
+		out.Days[i].Value = float64(medianMs(d))
+	}
+	if len(l.totals) == 0 {
+		return
+	}
+	m := medianMs(l.totals)
+	out.MedianMs = &m
+	under := 0
+	for _, t := range l.totals {
+		if t < LaunchTargetMs {
+			under++
+		}
+	}
+	share := float64(under) / float64(len(l.totals))
+	out.ShareUnderTgt = &share
+	for k, v := range l.steps {
+		out.StepMedianMs[k] = medianMs(v)
+	}
+}
+
+func medianMs(xs []int64) int64 {
+	s := slices.Clone(xs)
+	slices.Sort(s)
+	mid := len(s) / 2
+	if len(s)%2 == 0 {
+		return (s[mid-1] + s[mid]) / 2
+	}
+	return s[mid]
 }
 
 // WebShare is web / (web + TUI + CLI) over pause endings by source; gx- and

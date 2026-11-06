@@ -52,6 +52,7 @@ const statsOf = (over: Partial<Stats["throughput"]> = {}, extra: Partial<Stats> 
   },
   cost: { groups: [], sources: [], partial: false },
   friction: { pause_reasons: [], pauses_by_reason: [], run_events: [], pause_endings: [] },
+  launch: { count: 0, target_ms: 15000, days: [], step_median_ms: {} },
   grilling: { words: [], questions: [] },
   limit_burn: {
     claude_5h: { days: [], sum: 0, average: 0 },

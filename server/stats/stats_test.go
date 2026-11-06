@@ -440,6 +440,54 @@ func TestStats_FrictionLandsOnTheStampDayAndSplitsReasons(t *testing.T) {
 	}
 }
 
+func launchYAML(stamps ...[2]int) string {
+	out := "launch:\n"
+	for _, s := range stamps {
+		out += "  - claimed_at: " + statsStamp(s[0]) + "\n    total_ms: " + strconv.Itoa(s[1]) +
+			"\n    worktree_ms: 100\n    deps_ms: 200\n    agent_ms: 300\n    prompt_ms: 400\n"
+	}
+	return out
+}
+
+func TestStats_LaunchCountsEachLaunchOnItsClaimDay(t *testing.T) {
+	t.Parallel()
+	done := func(day int) string { return "done_at: " + statsStamp(day) + "\n" }
+	s := statsStore(t, func(store string) {
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", done(3)+launchYAML([2]int{1, 10000}, [2]int{2, 30000}), "A"),
+			"02-b.md": rigs.IssueMD("02", "done", done(3)+launchYAML([2]int{2, 20000}), "B"),
+			"03-c.md": rigs.IssueMD("03", "open", launchYAML([2]int{2, 99999}), "C"),
+		})
+	})("?range=30")
+	l := s.Launch
+	if l.Count != 3 || l.MedianMs == nil || *l.MedianMs != 20000 {
+		t.Errorf("count/median = %d, %v, want 3, 20000", l.Count, l.MedianMs)
+	}
+	if l.ShareUnderTgt == nil || math.Abs(*l.ShareUnderTgt-1.0/3) > 1e-9 {
+		t.Errorf("share under target = %v, want 1/3", l.ShareUnderTgt)
+	}
+	i1, i2, i5 := slices.Index(s.Days, statsDate(1)), slices.Index(s.Days, statsDate(2)), slices.Index(s.Days, statsDate(5))
+	if l.Days[i1].Value != 10000 || l.Days[i2].Value != 25000 || !l.Days[i5].NoData {
+		t.Errorf("days = %+v %+v %+v, want 10000, 25000, no data", l.Days[i1], l.Days[i2], l.Days[i5])
+	}
+	if l.StepMedianMs["worktree"] != 100 || l.StepMedianMs["prompt"] != 400 || len(l.StepMedianMs) != 4 {
+		t.Errorf("step medians = %v", l.StepMedianMs)
+	}
+}
+
+func TestStats_LaunchEmptyRangeIsNoData(t *testing.T) {
+	t.Parallel()
+	s := statsStore(t, func(store string) {
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(2)+"\n", "A"),
+		})
+	})("?range=30")
+	l := s.Launch
+	if l.Count != 0 || l.MedianMs != nil || l.ShareUnderTgt != nil || len(l.StepMedianMs) != 0 || !l.Days[0].NoData {
+		t.Errorf("launch = %+v, want no data", l)
+	}
+}
+
 func TestStats_FrictionWithoutPersonEndingsHasNoHeadlines(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {
