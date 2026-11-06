@@ -51,6 +51,8 @@ type sessionSpec struct {
 	thenPrompt string
 	// steps are "/" commands sent once the session is idle, in order.
 	steps []commandStep
+	// images appends the saved-image messages of agentsImagesScenario to the chat.
+	images bool
 	// rejected says the agent rejects the first prompt (see scenario.unknownSkill):
 	// the session is settled once it raises the Unknown command Actionable.
 	rejected bool
@@ -186,6 +188,9 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 		if res, err := apiclient.New(server.SocketPath(f.stateD)).Sessions.MarkRead(context.Background(), id); err != nil || res.Refused {
 			return fmt.Errorf("mark-read %s: %v (refused %v: %s)", id, err, res.Refused, res.Reason)
 		}
+	}
+	if s.images {
+		return f.seedImages(id, s.harness)
 	}
 	return nil
 }

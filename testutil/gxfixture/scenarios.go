@@ -613,6 +613,8 @@ var scenarios = map[string]scenario{
 	// agents-promote: agents plus a Codex session with one message, a held Queue
 	// agent and two design sessions, for the Promote to Design flows. See promoteScenario.
 	"agents-promote": promoteScenario(),
+	// agents-images: agents plus saved images in the chat of one Claude and one Codex session.
+	"agents-images": agentsImagesScenario(),
 	// agents-commands: six lean sessions and two design sessions with fixed
 	// command lists from both fakes and an extra skill in the feature worktree.
 	// -slow delays the list probes past what a flow waits; -failed fails them.
