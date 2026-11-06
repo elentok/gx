@@ -336,21 +336,33 @@ test("one line: the Auto menu on the left; Note and Send on the right; the note 
   expect(sw.getAttribute("aria-checked")).toBe("true");
 });
 
-test("on a phone Note is icon-only and the Auto button keeps both names", async () => {
-  vi.stubGlobal("matchMedia", () => ({
-    matches: false,
-    addEventListener() {},
-    removeEventListener() {},
-  }));
-  try {
-    render({});
-    expect((await autoButton()).textContent).toBe("Auto-advanceAuto-queue");
-    const note = screen.getByRole("button", { name: "Note" });
-    expect(note.querySelector("svg")).not.toBeNull();
-    expect(note.textContent).toBe("");
-  } finally {
-    vi.unstubAllGlobals();
+test("on a phone the footer is one row: Add, Note, Auto, Send", async () => {
+  render({ wide: false, chat: chatOf({ round: round() }) });
+  const auto = await autoButton();
+  const add = screen.getByRole("button", { name: "Add image" });
+  const note = screen.getByRole("button", { name: "Note" });
+  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+  const order = Array.from(add.parentElement!.children);
+  // Auto sits in a wrapper, so compare the row's direct children.
+  const at = (b: HTMLElement) => order.findIndex((c) => c.contains(b));
+  const places = [add, note, auto, send].map(at);
+  expect(places).toEqual([...places].sort((a, b) => a - b));
+  expect(new Set(places).size).toBe(4);
+  for (const icon of [add, note]) {
+    expect(icon.querySelector("svg")).not.toBeNull();
+    expect(icon.textContent).toBe("");
   }
+  expect(auto.textContent).toBe("AdvanceQueue");
+  expect(send.disabled).toBe(true);
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
+  await waitFor(() => expect(send.disabled).toBe(false));
+});
+
+test("on a wide screen the round button stays Send answers with the long Auto names", async () => {
+  render({ wide: true, chat: chatOf({ round: round() }) });
+  expect((await autoButton()).textContent).toBe("Auto-advanceAuto-queue");
+  expect(screen.getByRole("button", { name: "Send answers" })).toBeTruthy();
 });
 
 test("Interrupt replaces Send while working, Continue replaces it after a run-end line", async () => {

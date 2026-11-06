@@ -88,8 +88,21 @@ function lineText(state: State): { text: string; red: boolean } | undefined {
   return undefined;
 }
 
-/** Thumbnail row above `children` (the text box), Add and the status line beside `send`. Paste and drop anywhere inside add images. */
-export function ComposerImages({ state, children, send }: { state: State; children: ReactNode; send: ReactNode }) {
+/**
+ * Thumbnail row above `children` (the text box), Add and the status line beside `send`. Paste and drop anywhere inside add images.
+ * `phone` makes Add an icon and moves the status line above the row.
+ */
+export function ComposerImages({
+  state,
+  children,
+  send,
+  phone = false,
+}: {
+  state: State;
+  children: ReactNode;
+  send: ReactNode;
+  phone?: boolean;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const onPaste = (e: ClipboardEvent) => {
     const files = imageFiles(e.clipboardData?.files);
@@ -117,9 +130,25 @@ export function ComposerImages({ state, children, send }: { state: State; childr
         </Box>
       )}
       {children}
+      {phone && line && (
+        <Box fontSize="sm" color={line.red ? "tone.deadlocked.fg" : "text.dim"}>
+          {line.text}
+        </Box>
+      )}
       <Box display="flex" gap="2" alignItems="center">
-        <Button emphasis="secondary" aria-label="Add image" onClick={() => input.current?.click()}>
-          <LuPaperclip /> Add
+        <Button
+          emphasis="secondary"
+          aria-label="Add image"
+          title={phone ? "Add image" : undefined}
+          w={phone ? "44px" : undefined}
+          h={phone ? "44px" : undefined}
+          px={phone ? "0" : undefined}
+          justifyContent={phone ? "center" : undefined}
+          flex="none"
+          onClick={() => input.current?.click()}
+        >
+          <LuPaperclip />
+          {!phone && " Add"}
         </Button>
         <input
           ref={input}
@@ -133,9 +162,11 @@ export function ComposerImages({ state, children, send }: { state: State; childr
             e.target.value = "";
           }}
         />
-        <Box flex="1" fontSize="sm" color={line?.red ? "tone.deadlocked.fg" : "text.dim"}>
-          {line?.text}
-        </Box>
+        {!phone && (
+          <Box flex="1" fontSize="sm" color={line?.red ? "tone.deadlocked.fg" : "text.dim"}>
+            {line?.text}
+          </Box>
+        )}
         {send}
       </Box>
     </Box>

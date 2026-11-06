@@ -37,7 +37,10 @@ export function AutoAdvanceBar({
   setAutoAdvance,
   cancelAutoAdvance,
   menu,
+  phone = false,
 }: {
+  /** The phone footer has no room for the long switch names. */
+  phone?: boolean;
   session: SessionInfo;
   disabled: boolean;
   run: RunCall;
@@ -54,6 +57,7 @@ export function AutoAdvanceBar({
         switches={[
           {
             label: "Auto-advance",
+            short: phone ? "Advance" : undefined,
             description: "Go to the next step after a short countdown.",
             on: session.auto_advance,
             disabled,
@@ -68,6 +72,7 @@ export function AutoAdvanceBar({
           },
           {
             label: "Auto-queue",
+            short: phone ? "Queue" : undefined,
             description:
               "Queue the implementation epic when it's ready. Coming soon.",
             on: false,

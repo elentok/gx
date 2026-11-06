@@ -30,6 +30,8 @@ function Track({ on, mini }: { on: boolean; mini?: boolean }) {
 
 export type AutoSwitch = {
   label: string;
+  /** What the button shows instead of `label` where it has no room; names and the popover keep `label`. */
+  short?: string;
   description: string;
   on: boolean;
   disabled?: boolean;
@@ -79,7 +81,7 @@ export function AutoMenu({ switches, state: { open, setOpen } }: { switches: Aut
             color={s.on ? "text" : "text.dim"}
           >
             <Track on={s.on} mini />
-            {s.label}
+            {s.short ?? s.label}
           </Box>
         ))}
       </chakra.button>

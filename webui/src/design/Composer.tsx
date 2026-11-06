@@ -138,12 +138,16 @@ export function Composer({
     : undefined;
 
   const canContinue = !!next?.action.action?.length;
+  // On the phone the main button takes the row's remaining width; a round with no answers dims Send.
+  const slot = wide ? {} : { flex: "1", minW: "0", h: "44px", justifyContent: "center" };
+  const noAnswers = !wide && unanswered.length === round.length;
   // Interrupt while the agent works; Continue after a run-end line unless a note or round is waiting to go.
   const mainButton = working ? (
     <>
       <Button
         ref={interruptRef}
         emphasis="secondary"
+        {...slot}
         disabled={!connected || pending}
         aria-expanded={interruptOpen}
         onClick={() => setInterruptOpen(!interruptOpen)}
@@ -162,6 +166,7 @@ export function Composer({
   ) : canContinue && !inRound && !hasContent ? (
     <Button
       aria-label={nextTitle ? `Continue ${nextTitle}` : "Continue"}
+      {...slot}
       disabled={!enabled}
       onClick={() => send({ continue: true })}
     >
@@ -170,9 +175,14 @@ export function Composer({
     </Button>
   ) : inRound ? (
     <>
-      <Button ref={sendRef} disabled={!enabled || images.blocking} onClick={onSendRound}>
+      <Button
+        ref={sendRef}
+        {...slot}
+        disabled={!enabled || images.blocking || noAnswers}
+        onClick={onSendRound}
+      >
         {pending && <Spinner size="sm" />}
-        Send answers
+        {wide ? "Send answers" : "Send"}
       </Button>
       <SendPopover
         open={gapsOpen && unanswered.length > 0}
@@ -188,7 +198,7 @@ export function Composer({
       />
     </>
   ) : (
-    <Button disabled={!enabled || !images.canSend(text)} onClick={sendText}>
+    <Button {...slot} disabled={!enabled || !images.canSend(text)} onClick={sendText}>
       {pending && <Spinner size="sm" />}
       Send
     </Button>
@@ -202,6 +212,7 @@ export function Composer({
       setAutoAdvance={setAutoAdvance}
       cancelAutoAdvance={cancelAutoAdvance}
       menu={autoMenu}
+      phone={!wide}
     />
   );
 
@@ -220,10 +231,11 @@ export function Composer({
     >
       <ComposerImages
         state={images}
+        phone={!wide}
         send={
           <>
-            {autoAdvanceBar}
-            {canContinue && !working && (
+            {wide && autoAdvanceBar}
+            {wide && canContinue && !working && (
               <Text as="span" fontSize="xs" color="text.dim" truncate minW="0">
                 {nextTitle}
               </Text>
@@ -231,12 +243,15 @@ export function Composer({
             <Button
               emphasis="secondary"
               aria-label="Note"
+              title={wide ? undefined : "Note"}
               aria-expanded={open}
+              {...(wide ? {} : { w: "44px", h: "44px", px: "0", justifyContent: "center", flex: "none" })}
               onClick={() => setOpen(!open)}
             >
               <PiNotePencil />
               {wide && " Note"}
             </Button>
+            {!wide && autoAdvanceBar}
             {mainButton}
           </>
         }
