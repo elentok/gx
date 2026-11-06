@@ -29,7 +29,7 @@ export function AgentComposer({
   /** The line under the box; the caller decides the text. */
   reason?: string;
   /** Called with the text once the server took the prompt, so the chat can show it before the transcript catches up. */
-  onSent?: (text: string) => void;
+  onSent?: (text: string, images: string[]) => void;
 }) {
   const wide = useWide();
   const [text, setText] = useComposerDraft(session.id);
@@ -45,7 +45,7 @@ export function AgentComposer({
   const hasContent = text.trim() !== "" || images.readyIds.length > 0;
   const sendText = () =>
     send({ text, ...(images.readyIds.length > 0 && { images: images.readyIds }) }, () => {
-      onSent?.(text);
+      onSent?.(text, images.readyIds);
       setText("");
       images.clear();
     });

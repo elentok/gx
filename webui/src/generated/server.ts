@@ -2038,6 +2038,7 @@ export interface SessionPromptRequest {
    * for a plain session only, and excludes Continue.
    */
   promote?: boolean;
+  /**
    * Images are the ids of saved Prompt images, in attach order. gx pastes
    * each before Text. The 32 KB cap counts Text only.
    */

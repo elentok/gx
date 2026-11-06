@@ -173,11 +173,9 @@ export function SessionView({
   const { detail: chat, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat);
   // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
   // Each sits right after the message that was last when it was sent, so replies that stream in land below it.
-  const [echoed, setEchoed] = useState<{ sessionId: string; text: string; seen: number; after?: string }[]>([]);
-  // A slash command shows up in the transcript as a "command" message, so it counts too.
-  const promptCount = (text: string) =>
-    chat?.messages.filter((m) => (m.kind === "prompt" || m.kind === "command") && m.text === text).length ?? 0;
-  const waiting = echoed.filter((e) => e.sessionId === session.id && promptCount(e.text) <= e.seen);
+  const [echoed, setEchoed] = useState<(EchoPrompt & { sessionId: string; seen: number; after?: string })[]>([]);
+  const promptCount = (e: EchoPrompt) => echoMatches(chat?.messages ?? [], e);
+  const waiting = echoed.filter((e) => e.sessionId === session.id && promptCount(e) <= e.seen);
   const shown = chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat;
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
@@ -236,10 +234,9 @@ export function SessionView({
         connected={connected && chatty && !locked}
         lastMessage={chat?.messages.at(-1)?.id}
         onStale={refetch}
-        onSent={(sent) => {
-          // The transcript stores the trimmed text, so the echo must too or it never matches.
-          const text = sent.trim();
-          setEchoed((all) => [...all, { sessionId: session.id, text, seen: promptCount(text), after: chat?.messages.at(-1)?.id }]);
+        onSent={(sent, images) => {
+          const echo = { text: stripChips(sent), images };
+          setEchoed((all) => [...all, { ...echo, sessionId: session.id, seen: promptCount(echo), after: chat?.messages.at(-1)?.id }]);
         }}
         reason={locked ? undefined : sendReason(session, connected)}
       />
@@ -247,9 +244,32 @@ export function SessionView({
   );
 }
 
+export type EchoPrompt = { text: string; images: string[] };
+
+// The transcript text carries "[Image #N]" chips the sent text does not, and stores it trimmed, so both sides drop the chips and the edges.
+const stripChips = (text: string) => text.replace(/\[Image #\d+\]/g, "").trim();
+
+// How many transcript messages are this prompt. A slash command shows up as a "command" message, so it counts too. An images-only prompt has
+// no text to match, so it matches the images-only prompts with the same image count.
+export function echoMatches(messages: { kind: string; text?: string; images?: unknown[] }[], e: EchoPrompt): number {
+  return messages.filter((m) => {
+    if (m.kind !== "prompt" && m.kind !== "command") return false;
+    const text = stripChips(m.text ?? "");
+    return e.text === "" && e.images.length > 0 ? text === "" && (m.images?.length ?? 0) === e.images.length : text === e.text;
+  }).length;
+}
+
 // Puts each echo after its anchor message, in send order. An echo sent into an empty chat goes first; one whose anchor is gone goes last.
-export function withEchoes<M extends { id: string }>(messages: M[], echoes: { text: string; after?: string }[]): M[] {
-  const echo = (e: { text: string }, i: number) => ({ id: `echo-${i}`, role: "person", kind: "prompt", text: e.text, at: "" }) as unknown as M;
+export function withEchoes<M extends { id: string }>(messages: M[], echoes: (Partial<EchoPrompt> & { after?: string })[]): M[] {
+  const echo = (e: Partial<EchoPrompt>, i: number) =>
+    ({
+      id: `echo-${i}`,
+      role: "person",
+      kind: "prompt",
+      text: e.text ?? "",
+      at: "",
+      ...(e.images?.length && { images: e.images.map((id) => ({ id })) }),
+    }) as unknown as M;
   const known = new Set(messages.map((m) => m.id));
   const out: M[] = [];
   echoes.forEach((e, i) => e.after === undefined && out.push(echo(e, i)));
