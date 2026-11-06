@@ -65,7 +65,24 @@ func FirstUserRecord(home, sessionID string) (string, bool, error) {
 	if err != nil || len(paths) != 1 {
 		return "", false, err
 	}
-	msgs, _, err := transcript.ReadChat(paths[0], "")
+	return firstPerson(paths[0])
+}
+
+// FirstUserRecordAt is FirstUserRecord for a session whose projects dir and
+// cwd are known: loc checks the direct path and globs only as a fallback.
+func FirstUserRecordAt(loc *transcript.Locator) (string, bool, error) {
+	if loc.SessionID == "" {
+		return "", false, nil
+	}
+	path, ok, err := loc.Find()
+	if err != nil || !ok {
+		return "", false, err
+	}
+	return firstPerson(path)
+}
+
+func firstPerson(path string) (string, bool, error) {
+	msgs, _, err := transcript.ReadChat(path, "")
 	if err != nil {
 		return "", false, err
 	}
@@ -81,6 +98,12 @@ func FirstUserRecord(home, sessionID string) (string, bool, error) {
 // already shows text as its first user record.
 func LaunchRecorded(home, sessionID, text string) (bool, error) {
 	content, ok, err := FirstUserRecord(home, sessionID)
+	return ok && launchedBy(content, text), err
+}
+
+// LaunchRecordedAt is LaunchRecorded over a Locator.
+func LaunchRecordedAt(loc *transcript.Locator, text string) (bool, error) {
+	content, ok, err := FirstUserRecordAt(loc)
 	return ok && launchedBy(content, text), err
 }
 

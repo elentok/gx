@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/term"
-	"github.com/elentok/gx/transcript"
 )
 
 // stallTurnLength is how long a BehaviourStall turn stays busy.
@@ -176,7 +175,7 @@ func runTUIClaude() (int, error) {
 		started:    now,
 		pidPath:    pidPathFor(home, os.Getpid()),
 		ctlPath:    ctlPath,
-		transcript: transcript.PathIn(home, cwd, opts.sessionID),
+		transcript: tuiTranscriptPath(home, cwd, opts.sessionID),
 		pid: PidFile{
 			Pid:        os.Getpid(),
 			SessionID:  opts.sessionID,

@@ -54,8 +54,13 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if err := pr.Submit(text); err != nil {
 		return notDelivered(err)
 	}
+	projects, err := harness.ClaudeProjectsDirIn(p.Env)
+	if err != nil {
+		return err
+	}
+	loc := &transcript.Locator{ProjectsDir: projects, Cwd: ss.cwd, SessionID: s.SessionID}
 	proof := claudeui.LaunchProof{
-		FirstUser: func() (string, bool, error) { return claudeui.FirstUserRecord(home, s.SessionID) },
+		FirstUser: func() (string, bool, error) { return claudeui.FirstUserRecordAt(loc) },
 		Pane: func() (string, error) {
 			if err := pr.cancelled(); err != nil {
 				return "", err
@@ -75,7 +80,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if errors.Is(err, errPersonInput) {
 		// The person's keys end the resends; the transcript may still show the
 		// command from before they typed.
-		if ok, rerr := claudeui.LaunchRecorded(home, s.SessionID, text); rerr != nil || !ok {
+		if ok, rerr := claudeui.LaunchRecordedAt(loc, text); rerr != nil || !ok {
 			return fmt.Errorf("%w: %q: a person typed before the transcript showed the command", agentrunner.ErrDeliveryUnconfirmed, text)
 		}
 		return nil
@@ -179,6 +184,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 	if err != nil {
 		return err
 	}
+	ss.cwd = cwd
 	deadline := time.Now().Add(l.startTimeout)
 	for {
 		client, err := holder.DialHolder(dir)

@@ -83,6 +83,7 @@ var (
 type ptySession struct {
 	session   agentrunner.Session
 	epic      string
+	cwd       string
 	kind      agentrunner.Kind
 	holder    *holder.HolderClient
 	holderPID int

@@ -25,6 +25,96 @@ func TestSlugify_DotDirectory(t *testing.T) {
 	}
 }
 
+func TestSlugify_Table(t *testing.T) {
+	t.Parallel()
+	long := "/" + strings.Repeat("a", 250)
+	// Java-style hash of long, wrapped to int32 by hand: h = h*31 + c.
+	var h int32
+	for _, c := range long {
+		h = h*31 + int32(c)
+	}
+	if h < 0 {
+		h = -h
+	}
+	longSlug := "-" + strings.Repeat("a", 199) + "-" + strconv.FormatInt(int64(h), 36)
+	cases := []struct{ cwd, want string }{
+		{"/Users/david/dev/gx/main", "-Users-david-dev-gx-main"},
+		{"/Users/david/.local/share/gx/tickets", "-Users-david--local-share-gx-tickets"},
+		{"/Users/david/dev/gx/agent-actionable-detect-item-01", "-Users-david-dev-gx-agent-actionable-detect-item-01"},
+		{"/tmp/my_dir", "-tmp-my-dir"},
+		{"/tmp/my dir", "-tmp-my-dir"},
+		{long, longSlug},
+	}
+	for _, c := range cases {
+		if got := Slugify(c.cwd); got != c.want {
+			t.Errorf("Slugify(%.30q) = %q, want %q", c.cwd, got, c.want)
+		}
+	}
+}
+
+func TestLocator_DirectHitDoesNotGlob(t *testing.T) {
+	t.Parallel()
+	projects, cwd := t.TempDir(), t.TempDir()
+	resolved, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(projects, Slugify(resolved))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(dir, "s1.jsonl")
+	if err := os.WriteFile(want, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	globs := 0
+	l := &Locator{ProjectsDir: projects, Cwd: cwd, SessionID: "s1",
+		Glob: func(string, string) ([]string, error) { globs++; return nil, nil }}
+	for range 3 {
+		if got, ok, err := l.Find(); err != nil || !ok || got != want {
+			t.Fatalf("Find() = %q, %v, %v; want %q", got, ok, err, want)
+		}
+	}
+	if globs != 0 {
+		t.Errorf("globs = %d, want 0", globs)
+	}
+}
+
+func TestLocator_FallbackGlobsAtMostOncePerSecond(t *testing.T) {
+	t.Parallel()
+	projects := t.TempDir()
+	other := filepath.Join(projects, "wrong-slug")
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1000, 0)
+	globs := 0
+	l := &Locator{ProjectsDir: projects, Cwd: t.TempDir(), SessionID: "s2",
+		Now: func() time.Time { return now },
+		Glob: func(dir, id string) ([]string, error) {
+			globs++
+			return FindByIDIn(dir, id)
+		}}
+	if _, ok, _ := l.Find(); ok || globs != 1 {
+		t.Fatalf("first Find: ok=%v globs=%d, want not found after one glob", ok, globs)
+	}
+	want := filepath.Join(other, "s2.jsonl")
+	if err := os.WriteFile(want, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(500 * time.Millisecond)
+	if _, ok, _ := l.Find(); ok || globs != 1 {
+		t.Fatalf("within a second: ok=%v globs=%d, want no new glob", ok, globs)
+	}
+	now = now.Add(600 * time.Millisecond)
+	if got, ok, _ := l.Find(); !ok || got != want || globs != 2 {
+		t.Fatalf("after a second: got %q ok=%v globs=%d, want %q after a second glob", got, ok, globs, want)
+	}
+	if _, ok, _ := l.Find(); !ok || globs != 2 {
+		t.Errorf("found path should be reused without globbing, globs=%d", globs)
+	}
+}
+
 func TestPathIn_JoinsHomeSlugAndSessionID(t *testing.T) {
 	got := PathIn("/home/fake", "/repo/worktree", "session-123")
 	want := filepath.Join("/home/fake", ".claude", "projects", "-repo-worktree", "session-123.jsonl")

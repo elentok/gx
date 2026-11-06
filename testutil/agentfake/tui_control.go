@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/transcript"
 )
 
 // TUIEnv, set to "1", makes a test binary that calls TUIClaude from its
@@ -137,6 +138,15 @@ func pidPathFor(home string, pid int) string {
 		return filepath.Join(dir, strconv.Itoa(pid)+".json")
 	}
 	return PidFilePath(home, pid)
+}
+
+// tuiTranscriptPath is transcript.PathIn, moved under CLAUDE_CONFIG_DIR when
+// it is set, as real claude does.
+func tuiTranscriptPath(home, cwd, sessionID string) string {
+	if dir, err := harness.ClaudeProjectsDirIn(os.Environ()); err == nil {
+		return filepath.Join(dir, transcript.Slugify(cwd), sessionID+".jsonl")
+	}
+	return transcript.PathIn(home, cwd, sessionID)
 }
 
 // TUIControlPath is the side-channel FIFO of the TUI fake running sessionID

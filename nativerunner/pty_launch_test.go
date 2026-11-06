@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/claudeenv"
 )
 
 func launchPty(t *testing.T, caps claudeui.LaunchProofCaps, env ...string) (*nativerunner.Pty, agentrunner.Session) {
@@ -24,6 +25,11 @@ func launchPty(t *testing.T, caps claudeui.LaunchProofCaps, env ...string) (*nat
 	p := newPty(t)
 	// A later entry wins: undo newPty's opt-out, then apply the test's own.
 	p.Env = append(p.Env, agentfake.TUIReadyDelayEnv+"=0s")
+	// Drop what env overrides: the child's os.Getenv reads the first duplicate.
+	p.Env = slices.DeleteFunc(p.Env, func(kv string) bool {
+		k, _, _ := strings.Cut(kv, "=")
+		return slices.ContainsFunc(env, func(e string) bool { return strings.HasPrefix(e, k+"=") })
+	})
 	p.Env = append(p.Env, env...)
 	p.LaunchCaps = caps
 	// A worker config makes "/gx-implement x/1" start a turn (it blocks on a
@@ -105,6 +111,28 @@ func TestPty_LaunchPromptWaitsForTheReadySignal(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed < 900*time.Millisecond {
 		t.Errorf("PromptLaunch returned after %v; want it to wait for the ready signal", elapsed)
+	}
+}
+
+func TestPty_LaunchPromptProvesDeliveryUnderACustomConfigDir(t *testing.T) {
+	t.Parallel()
+	home := t.TempDir()
+	env := claudeenv.In(home)
+	cfg := ""
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, "CLAUDE_CONFIG_DIR="); ok {
+			cfg = v
+		}
+	}
+	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour}, env...)
+	// awaitReady still globs under HOME, which the custom config dir bypasses.
+	p.ReadyWait = 300 * time.Millisecond
+
+	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); err != nil {
+		t.Fatalf("PromptLaunch = %v; want nil", err)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(cfg, "projects", "*", s.SessionID+".jsonl")); len(matches) != 1 {
+		t.Errorf("transcripts under %s = %v; want one", cfg, matches)
 	}
 }
 

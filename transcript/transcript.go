@@ -6,13 +6,16 @@ package transcript
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 )
 
 // Usage is a single assistant turn's token accounting, as recorded in a
@@ -36,10 +39,37 @@ func (u Usage) Occupancy() int {
 }
 
 // Slugify turns an absolute cwd into the directory name Claude Code stores
-// that project's transcripts under: every "/" and "." replaced with "-".
+// that project's transcripts under: every character outside [a-zA-Z0-9]
+// becomes "-". A result over maxSlugLen is cut to that length and suffixed
+// with "-" and the base-36 absolute value of the 32-bit Java-style hash of cwd.
 func Slugify(cwd string) string {
-	return strings.NewReplacer("/", "-", ".", "-").Replace(cwd)
+	var b strings.Builder
+	for _, r := range cwd {
+		if r < 128 && (r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else {
+			// One "-" per UTF-16 code unit, as the JS original replaces per unit.
+			for range utf16.RuneLen(r) {
+				b.WriteByte('-')
+			}
+		}
+	}
+	slug := b.String()
+	if len(slug) <= maxSlugLen {
+		return slug
+	}
+	var h int32
+	for _, u := range utf16.Encode([]rune(cwd)) {
+		h = h*31 + int32(u)
+	}
+	abs := int64(h)
+	if abs < 0 {
+		abs = -abs
+	}
+	return slug[:maxSlugLen] + "-" + strconv.FormatInt(abs, 36)
 }
+
+const maxSlugLen = 200
 
 // PathIn returns the transcript file path under home for a Claude Code
 // session launched in cwd with the given session id (herdr's
@@ -69,6 +99,64 @@ func FindByIDIn(projectsDir, sessionID string) ([]string, error) {
 	}
 	sort.Strings(matches)
 	return matches, nil
+}
+
+// Locator finds one session's transcript with a direct stat of
+// <projectsDir>/<slug(cwd)>/<id>.jsonl, falling back to the all-directories
+// glob at most once per GlobEvery, and remembers a path once found.
+type Locator struct {
+	ProjectsDir string
+	Cwd         string
+	SessionID   string
+	// GlobEvery spaces the fallback glob; zero means a second.
+	GlobEvery time.Duration
+	// Now and Glob are test seams; nil means time.Now and FindByIDIn.
+	Now  func() time.Time
+	Glob func(projectsDir, sessionID string) ([]string, error)
+
+	found    string
+	lastGlob time.Time
+	direct   string
+	directOK bool
+}
+
+// Find returns the transcript path; ok is false while there is none, or while
+// the glob matches more than one file (an anomaly, as in FirstUserRecord).
+func (l *Locator) Find() (string, bool, error) {
+	if l.found != "" {
+		return l.found, true, nil
+	}
+	if !l.directOK {
+		l.directOK = true
+		cwd := l.Cwd
+		if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+			cwd = resolved
+		}
+		l.direct = filepath.Join(l.ProjectsDir, Slugify(cwd), l.SessionID+".jsonl")
+	}
+	if _, err := os.Stat(l.direct); err == nil {
+		l.found = l.direct
+		return l.found, true, nil
+	}
+	now, glob := time.Now, FindByIDIn
+	if l.Now != nil {
+		now = l.Now
+	}
+	if l.Glob != nil {
+		glob = l.Glob
+	}
+	every := cmp.Or(l.GlobEvery, time.Second)
+	if t := now(); !l.lastGlob.IsZero() && t.Sub(l.lastGlob) < every {
+		return "", false, nil
+	} else {
+		l.lastGlob = t
+	}
+	paths, err := glob(l.ProjectsDir, l.SessionID)
+	if err != nil || len(paths) != 1 {
+		return "", false, err
+	}
+	l.found = paths[0]
+	return l.found, true, nil
 }
 
 // Resolve returns path when it exists. Otherwise it looks for the same

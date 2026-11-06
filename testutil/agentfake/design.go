@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/elentok/gx/transcript"
 )
 
 // DesignPromptPrefix, at the start of a submitted prompt, makes the TUI fake
@@ -299,7 +297,7 @@ func (t *tui) transcriptPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return transcript.PathIn(home, t.pid.Cwd, t.pid.SessionID), nil
+	return tuiTranscriptPath(home, t.pid.Cwd, t.pid.SessionID), nil
 }
 
 // DesignTurnTime is how long a scripted turn stays busy; DesignSlowTime is how
