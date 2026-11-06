@@ -159,6 +159,8 @@ func (t *tui) designTurn(text string) error {
 	if t.design.Turns < len(script) && script[t.design.Turns] == DesignTurnSlow {
 		busy = DesignSlowTime
 	}
+	cfg, _ := LoadWorkerConfig(t.pid.Cwd)
+	held := cfg.DesignHold && t.design.Turns == 0
 	msg := t.designMessage(text, script)
 	// Busy comes first: a message that appears while the session still reads
 	// idle lets a test prompt it before the turn has started, and that prompt is lost.
@@ -176,7 +178,22 @@ func (t *tui) designTurn(text string) error {
 			return err
 		}
 	}
-	if err := appendReply(path, t.opts.model, []map[string]any{{"type": "text", "text": msg}}); err != nil {
+	reply := func() error {
+		return appendReply(path, t.opts.model, []map[string]any{{"type": "text", "text": msg}})
+	}
+	if held {
+		// The turn is busy already, so the launch prompt counts as delivered; the
+		// reply and the end of the turn wait for the test to release the hold.
+		go func() {
+			waitHold(cfg)
+			if reply() == nil {
+				time.Sleep(busy)
+				_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
+			}
+		}()
+		return nil
+	}
+	if err := reply(); err != nil {
 		return err
 	}
 	go func() {

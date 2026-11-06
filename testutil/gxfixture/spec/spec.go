@@ -59,6 +59,8 @@ type Scenario struct {
 	// Design scripts the design agent's turns (agentfake.DesignTurn*), one per
 	// prompt in order; none means the fake's default.
 	Design []string
+	// DesignHold holds the first design turn busy until the hold file is removed.
+	DesignHold bool
 	// DesignByMap scripts the design turns of one map, by address, over Design.
 	DesignByMap map[string][]string
 	// Queue lists the epics put on the queue once the server is up.

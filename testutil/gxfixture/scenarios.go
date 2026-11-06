@@ -506,6 +506,9 @@ var scenarios = map[string]scenario{
 	// design-plain (V3): a round, then a plain-text turn after the answer.
 	"design-plain": spec.DesignScript(tickets.StepResolveTickets,
 		agentfake.DesignTurnRound, agentfake.DesignTurnPlain),
+	// design-question-wait: chat-capture plus a design session whose first round is
+	// held until the hold file is removed. See spec.DesignQuestionWait.
+	"design-question-wait": spec.DesignQuestionWait(),
 	// design-branch (V4): the map is at Branch and the agent ends the run.
 	"design-branch": spec.DesignScript(tickets.StepBranch, agentfake.DesignTurnRunEnd),
 	// design-error (V13): a round, then an error turn before the run-end line.

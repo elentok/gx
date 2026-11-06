@@ -407,3 +407,39 @@ func TestChartingHandoffScenario_ContinueRestartsOnWorkerOrFailsOnStaleSlug(t *t
 	}
 	r.stop(t)
 }
+
+func TestDesignQuestionWaitScenario_ReleasingTheHoldMakesTheSessionWaitOnAGrillingRound(t *testing.T) {
+	t.Parallel()
+	r := start(t, "design-question-wait")
+	var res wire.SessionResult
+	if err := json.Unmarshal([]byte(r.gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
+		t.Fatalf("designs open = %+v, %v", res, err)
+	}
+	id := res.Session.ID
+
+	grilling := func() bool {
+		var list []wire.SessionInfo
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range list {
+			if s.ID == id {
+				return s.Actionable.Grilling
+			}
+		}
+		return false
+	}
+	// Held: the first turn is busy and has no round yet.
+	if grilling() {
+		t.Fatal("session waits on a Grilling round before the hold is released")
+	}
+	if err := os.Remove(r.HoldFile); err != nil {
+		t.Fatal(err)
+	}
+	r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return len(c.Round) > 0 })
+	r.waitIdle(t, id)
+	if !grilling() {
+		t.Fatal("session is idle after the release but not waiting on a Grilling round")
+	}
+	r.stop(t)
+}

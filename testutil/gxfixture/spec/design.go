@@ -156,6 +156,19 @@ func DoneAt(stamp string) servertest.TicketOpts {
 
 // DesignScript is the design scenario with the map at step and the design
 // agent playing turns, one per prompt in order.
+// DesignQuestionWait is chat-capture with a design session whose first turn, a
+// Grilling round, is held busy until the hold file is removed (DesignHold). A
+// test opens the session with `gx designs open`, sets focus and AFK, then
+// removes the hold; the session then waits on the round. Hold also freezes
+// ticket workers, which this scenario does not run.
+func DesignQuestionWait() scenario {
+	sc := DesignScript(tickets.StepResolveTickets, agentfake.DesignTurnRound, agentfake.DesignTurnRound)
+	sc.ChatCapture = true
+	sc.Hold = true
+	sc.DesignHold = true
+	return sc
+}
+
 func DesignScript(step tickets.DesignStep, turns ...string) scenario {
 	sc := DesignBase
 	sc.DesignSteps = map[string]string{project + ":design-epic": string(step)}

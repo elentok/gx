@@ -74,7 +74,7 @@ func (f *fixture) seed(sc scenario) error {
 	if sc.Hold {
 		holdTimeout = "1h"
 	}
-	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.Behaviour, Design: sc.Design, DesignByMap: sc.DesignByMap, Chat: sc.Chat, Transcript: sc.Transcripts}
+	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.Behaviour, Design: sc.Design, DesignHold: sc.DesignHold, DesignByMap: sc.DesignByMap, Chat: sc.Chat, Transcript: sc.Transcripts}
 	if sc.Usage {
 		resets := time.Now().Add(72 * time.Hour).Unix()
 		wcfg.Usage = &agentfake.UsageConfig{
