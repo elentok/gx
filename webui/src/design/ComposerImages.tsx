@@ -147,7 +147,7 @@ export function ComposerImages({
           flex="none"
           onClick={() => input.current?.click()}
         >
-          <LuPaperclip />
+          <LuPaperclip size={phone ? 20 : undefined} />
           {!phone && " Add"}
         </Button>
         <input

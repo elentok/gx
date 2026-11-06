@@ -139,7 +139,7 @@ export function Composer({
 
   const canContinue = !!next?.action.action?.length;
   // On the phone the main button takes the row's remaining width; a round with no answers dims Send.
-  const slot = wide ? {} : { flex: "1", minW: "0", h: "44px", justifyContent: "center" };
+  const slot = wide ? {} : { flex: "1", minW: "0", h: "44px", justifyContent: "center", borderRadius: "10px" };
   const noAnswers = !wide && unanswered.length === round.length;
   // Interrupt while the agent works; Continue after a run-end line unless a note or round is waiting to go.
   const mainButton = working ? (
@@ -248,7 +248,7 @@ export function Composer({
               {...(wide ? {} : { w: "44px", h: "44px", px: "0", justifyContent: "center", flex: "none" })}
               onClick={() => setOpen(!open)}
             >
-              <PiNotePencil />
+              <PiNotePencil size={wide ? undefined : 20} />
               {wide && " Note"}
             </Button>
             {!wide && autoAdvanceBar}

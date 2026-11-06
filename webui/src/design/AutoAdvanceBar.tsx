@@ -54,6 +54,7 @@ export function AutoAdvanceBar({
     <Box display="flex" gap="3" alignItems="center">
       <AutoMenu
         state={menu}
+        tall={phone}
         switches={[
           {
             label: "Auto-advance",

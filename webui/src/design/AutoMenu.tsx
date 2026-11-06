@@ -42,7 +42,16 @@ export type AutoSwitch = {
 export type AutoMenuState = { open: boolean; setOpen: (open: boolean) => void };
 
 // The Auto button: one mini switch per row, named as in the popover it opens.
-export function AutoMenu({ switches, state: { open, setOpen } }: { switches: AutoSwitch[]; state: AutoMenuState }) {
+export function AutoMenu({
+  switches,
+  state: { open, setOpen },
+  tall,
+}: {
+  switches: AutoSwitch[];
+  state: AutoMenuState;
+  /** The phone footer's 44px row height. */
+  tall?: boolean;
+}) {
   const anchor = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -56,7 +65,7 @@ export function AutoMenu({ switches, state: { open, setOpen } }: { switches: Aut
         flexDirection="column"
         justifyContent="center"
         gap="1"
-        h="40px"
+        h={tall ? "44px" : "40px"}
         px="2"
         borderRadius="8px"
         borderWidth="1px"
