@@ -91,7 +91,19 @@ var scenarios = map[string]scenario{
 	// chat-tickets: chat-capture plus tickets whose events make the server send
 	// ticket messages, one per mock part: answer-question (a worker asks),
 	// repair-blocked (a worker blocks on a question menu), repair-fallback (a
-	// manual pause with a long unmapped reason). Not produced yet: answer-noquestion,
+	// manual pause with a long unmapped reason). The repair pauses and the escalation:
+	//   - repair-stall: produced, by chat-tickets-stall below (a server-wide env).
+	//   - repair-died: not produced. The only died pause is nativerunner.ReasonAgentDied,
+	//     which reclaim writes for a holder that died while the server was down; the
+	//     scenario would have to stop the server, kill the holder and restart it.
+	//   - repair-herdr: not produced. The fixture runs the pty runner, not herdr.
+	//   - repair-worktree: not produced. It needs a leftover worktree folder the
+	//     fixture would have to forge in git.
+	//   - escalated-ticket: not produced. An unmatched pause (a failing agent's
+	//     iteration-error) gets no recovery at all, and the catalog rules that
+	//     could escalate need a smart-zone compaction timeout, a lost merge or a
+	//     zero-commit finish the fake cannot make.
+	// Those are covered by the pause tickets' server-level Go tests. Not produced yet: answer-noquestion,
 	// answer-zerocommit, conflict, done-result and the one-offs with an empty or an
 	// over-1500-character Result. The fake worker commits in a one-off, which pauses
 	// it as stranded commits instead of finishing it with a Result, so those need
@@ -110,6 +122,16 @@ var scenarios = map[string]scenario{
 		},
 		Steps: [][]string{
 			{"server", "tickets", "pause", project + ":manual-epic/01", "--reason", "the operator set this ticket aside while the long unmapped reason explains why it has to wait for a person to look at it"}},
+	},
+	// chat-tickets-stall: chat-capture plus a ticket whose agent never takes its
+	// launch prompt, so the launch proof gives up and the ticket pauses as
+	// agent_prompt_stalled (repair-stall). It is its own scenario because the
+	// fake's no-turn switch is an env var that every agent of a server shares.
+	"chat-tickets-stall": {
+		ChatCapture: true,
+		Epics:       []epic{{Project: project, Name: "stall-chat-epic", Tickets: []ticket{{ID: "01", Slug: "stalls", Opts: servertest.TicketOpts{}}}}},
+		Queue:       []string{project + ":stall-chat-epic"},
+		Env:         []string{agentfake.TUINoTurnEnv + "=1", "GX_LAUNCH_UNKNOWN_GRACE=2s"},
 	},
 	"rejected-first-prompt": spec.RejectedFirstPrompt,
 	"stall-vim":             spec.StallVim,

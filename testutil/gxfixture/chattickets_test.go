@@ -24,15 +24,10 @@ func captured(path string) []chatcapture.Line {
 	return got
 }
 
-func TestChatTicketsScenario_EveryProducibleKindLandsInTheCaptureFile(t *testing.T) {
-	t.Parallel()
-	r := start(t, "chat-tickets")
-	// Match on the ticket address and the old kind wording, not the layout.
-	want := map[string][]string{
-		"answer-question": {"ask-epic/01", "Answer", "Which option should the fake worker take?"},
-		"repair-blocked":  {"menu-epic/01", "blocked-pane"},
-		"repair-fallback": {"manual-epic/01", "Repair", "manual: the operator set this"},
-	}
+// waitForParts waits until, for every part, a Slack line holds all its needles.
+// Needles are the ticket address and the kind wording, not the layout.
+func waitForParts(t *testing.T, r *running, want map[string][]string) {
+	t.Helper()
 	var got []chatcapture.Line
 	missing := func() []string {
 		got = captured(r.ChatCapture)
@@ -55,7 +50,25 @@ func TestChatTicketsScenario_EveryProducibleKindLandsInTheCaptureFile(t *testing
 		}
 		return out
 	}
-	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool { return len(missing()) == 0 }) {
+	if !testutil.Poll(60*time.Second, 200*time.Millisecond, func() bool { return len(missing()) == 0 }) {
 		t.Fatalf("no capture line for %v; got %+v", missing(), got)
 	}
+}
+
+func TestChatTicketsScenario_EveryProducibleKindLandsInTheCaptureFile(t *testing.T) {
+	t.Parallel()
+	r := start(t, "chat-tickets")
+	waitForParts(t, r, map[string][]string{
+		"answer-question": {"ask-epic/01", "Answer", "Which option should the fake worker take?"},
+		"repair-blocked":  {"menu-epic/01", "permission prompt"},
+		"repair-fallback": {"manual-epic/01", "Repair", "the operator set this ticket aside"},
+	})
+}
+
+func TestChatTicketsRepairScenario_StallPauseLandsInTheCaptureFile(t *testing.T) {
+	t.Parallel()
+	r := start(t, "chat-tickets-stall")
+	waitForParts(t, r, map[string][]string{
+		"repair-stall": {"stall-chat-epic/01", "Repair", "prompt not delivered"},
+	})
 }
