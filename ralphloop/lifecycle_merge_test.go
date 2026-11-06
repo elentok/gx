@@ -113,8 +113,12 @@ func TestMergeBuilt_FinishSinkSendsConflictStartAndChildPauseOnly(t *testing.T) 
 	if conflict, _, _ := strings.Cut(text, "---"); strings.Contains(conflict, "cherry-pick") {
 		t.Errorf("conflict message still says cherry-pick:\n%s", conflict)
 	}
-	if n := strings.Count(text, "\U0001f6d1"); n != 1 || !strings.Contains(text, "epic/01a") {
-		t.Errorf("want exactly the child's pause (01a), got %d paused-for-repair messages:\n%s", n, text)
+	// The batch's summary line carries the urgency emoji too, so count the Repair messages by title.
+	if n := strings.Count(text, "\U0001f6d1 Repair epic/"); n != 1 || !strings.Contains(text, "\U0001f6d1 Repair epic/01a") {
+		t.Errorf("want exactly the child's pause (01a), got %d Repair messages:\n%s", n, text)
+	}
+	if !strings.Contains(text, "2 updates: Repair, Conflict") {
+		t.Errorf("want one batch of the Repair and the Conflict:\n%s", text)
 	}
 	if strings.Contains(text, "merge conflict not resolved") {
 		t.Errorf("parent's own pause reached chat; the server already notifies it:\n%s", text)
