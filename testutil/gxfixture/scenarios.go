@@ -120,12 +120,6 @@ type scenario struct {
 	dropAskedAgent bool
 	// unknownSkill makes the fake TUI agent reject every skill prompt as an unknown command.
 	unknownSkill bool
-	// readyDelay is how long the fake TUI agent holds back its ready signal
-	// (see readyscenarios.go); empty keeps the harness default of none.
-	readyDelay string
-	// readyWait is how long a launch prompt waits for that signal before it is
-	// sent anyway; empty keeps nativerunner.DefaultReadyWait.
-	readyWait string
 	// env is extra server environment, for the fake's knobs and the server's test hooks.
 	env []string
 	// restart points the server's restart at a fake gx binary (see restart.go).
@@ -238,8 +232,6 @@ var scenarios = map[string]scenario{
 		unknownSkill: true,
 	},
 	"rejected-first-prompt": rejectedFirstPrompt,
-	"ready-delayed":         readyDelayed,
-	"ready-never":           readyNever,
 	"stall-vim":             stallVim,
 	"stall-leaves-i":        stallLeavesI,
 	"late-registry":         lateRegistry,

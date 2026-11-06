@@ -62,9 +62,6 @@ type Pty struct {
 	// LaunchCaps bound a launch prompt's transcript proof; a zero field means
 	// the default.
 	LaunchCaps claudeui.LaunchProofCaps
-	// ReadyWait caps a launch prompt's wait for the ready signal; zero means
-	// DefaultReadyWait.
-	ReadyWait time.Duration
 
 	// log receives the vim probe's decisions (see SetLog); nil logs nothing.
 	log *slog.Logger

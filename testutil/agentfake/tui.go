@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -258,37 +257,6 @@ func (t *tui) startSession() error {
 	if err := t.writePid(); err != nil {
 		return err
 	}
-	if err := t.setStatus(StatusIdle, ""); err != nil {
-		return err
-	}
-	// Claude has its transcript file once it is ready.
-	if !t.opts.readySignal {
-		return nil
-	}
-	if t.opts.readyDelay > 0 {
-		time.AfterFunc(t.opts.readyDelay, func() {
-			_ = t.touchTranscript()
-			t.draw()
-		})
-		return nil
-	}
-	return t.touchTranscript()
+	// Like real claude, the transcript appears with the first user record.
+	return t.setStatus(StatusIdle, "")
 }
-
-func (t *tui) touchTranscript() error {
-	path, err := t.transcriptPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
-	if err != nil {
-		return err
-	}
-	return f.Close()
-}
-
-// ready is whether the input box shows yet.
-func (t *tui) ready() bool { return time.Since(t.started) >= t.opts.readyDelay }

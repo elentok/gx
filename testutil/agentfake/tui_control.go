@@ -52,12 +52,9 @@ const (
 	// TUILaunchRecordEnv makes a skill prompt's first transcript record the
 	// user record claude writes for the command. On by default; "0" turns it off.
 	TUILaunchRecordEnv = "GX_AGENTFAKE_TUI_LAUNCH_RECORD"
-	// TUIReadyDelayEnv, a Go duration, sets how long after start the fake holds
-	// back the ready signal a launch prompt waits for: an input box and a
-	// transcript file. Unset, the signal comes at once; TUIReadyOff gives none.
-	TUIReadyDelayEnv = "GX_AGENTFAKE_TUI_READY_DELAY"
-	// TUIReadyOff is the TUIReadyDelayEnv value for the "signal missing" path.
-	TUIReadyOff = "off"
+	// TUIPlainScreenEnv, set to "1", draws the plain "> " screen instead of the
+	// input box claudeui.InputBox recognises.
+	TUIPlainScreenEnv = "GX_AGENTFAKE_TUI_PLAIN_SCREEN"
 )
 
 // UnknownCommandText is what claude draws, and records, for a skill it doesn't know.

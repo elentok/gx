@@ -105,8 +105,8 @@ func (r *ptyRunner) prompt(s agentrunner.Session, text string, onNudge func(stri
 func (h *Harness) buildPty() {
 	requireSessionProcesses()
 	exe := os.Args[0]
-	// The fake gives the ready signal and the launch record by default; a test's
-	// own TUIReadyDelayEnv in cfg.Env still wins.
+	// The fake gives the launch record by default; a test's own env in cfg.Env
+	// still wins.
 	env := append(h.cfg.Env[:len(h.cfg.Env):len(h.cfg.Env)], agentfake.TUIEnv+"=1")
 	_, runnerFor := runnerbuild.New("pty", env, h.StateDir, h.cfg.RunnerWait, &runnerbuild.PtyOverride{
 		Holder:       []string{exe, holderArg},

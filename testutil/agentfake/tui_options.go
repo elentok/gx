@@ -45,9 +45,8 @@ type tuiOptions struct {
 	unknownSkill  bool
 	noTurn        bool
 	launchRecord  bool
-	// readySignal is false only for TUIReadyOff (see TUIReadyDelayEnv).
-	readySignal bool
-	readyDelay  time.Duration
+	// plainScreen draws the "> " screen instead of the input box (see TUIPlainScreenEnv).
+	plainScreen bool
 	// model is --model, reported on every reply.
 	model string
 	// settings is --settings: inline JSON or a path to a JSON file.
@@ -89,10 +88,8 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		return tuiOptions{}, errors.New("agentfake: --session-id or --resume is required")
 	}
 	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
-	readyDelay, _ := time.ParseDuration(os.Getenv(TUIReadyDelayEnv))
 	return tuiOptions{
-		readySignal:   os.Getenv(TUIReadyDelayEnv) != TUIReadyOff,
-		readyDelay:    readyDelay,
+		plainScreen:   os.Getenv(TUIPlainScreenEnv) == "1",
 		sessionID:     *sessionID,
 		trust:         os.Getenv(TUITrustEnv) == "1",
 		dropKey:       os.Getenv(TUITrustDropKeyEnv) == "1",

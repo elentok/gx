@@ -209,7 +209,7 @@ func runProgram() (int, error) {
 		p.box.logClear = p.box.leaveI || os.Getenv(ProgramLogClearEnv) == "1"
 		p.box.configPath = claudeSettingsPath()
 		if s := os.Getenv(ProgramReadyDelayEnv); s != "" {
-			if p.readyDelay, err = time.ParseDuration(s); err != nil {
+			if p.inputBoxDelay, err = time.ParseDuration(s); err != nil {
 				return 0, err
 			}
 		}
@@ -268,10 +268,10 @@ type program struct {
 	// csiParams are the bytes of the CSI sequence read so far.
 	csiParams []byte
 	// box is nil unless ProgramInputEnv is set. It takes keys once ready.
-	box        *InputBox
-	ready      bool
-	readyDelay time.Duration
-	readyC     <-chan time.Time
+	box           *InputBox
+	ready         bool
+	inputBoxDelay time.Duration
+	readyC        <-chan time.Time
 	// dialog is set while an ActionDialogBlock dialog is open; escC fires when
 	// an Esc in it stayed alone.
 	dialog bool
@@ -339,8 +339,8 @@ func (p *program) start() {
 	}
 	switch {
 	case p.box == nil:
-	case p.readyDelay > 0:
-		p.readyC = time.After(p.readyDelay)
+	case p.inputBoxDelay > 0:
+		p.readyC = time.After(p.inputBoxDelay)
 	default:
 		p.becomeReady()
 	}

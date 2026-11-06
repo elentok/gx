@@ -29,7 +29,6 @@ type PtyOverride struct {
 	StartTimeout time.Duration
 	PromptGrace  time.Duration
 	StopGrace    time.Duration
-	ReadyWait    time.Duration
 	LaunchCaps   claudeui.LaunchProofCaps
 }
 
@@ -71,7 +70,6 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 				p.StartTimeout = pty.StartTimeout
 				p.PromptGrace = pty.PromptGrace
 				p.StopGrace = pty.StopGrace
-				p.ReadyWait = pty.ReadyWait
 				p.LaunchCaps = pty.LaunchCaps
 			}
 			r = p

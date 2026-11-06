@@ -3,7 +3,6 @@ package nativerunner_test
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,8 +22,8 @@ import (
 func launchPty(t *testing.T, caps claudeui.LaunchProofCaps, env ...string) (*nativerunner.Pty, agentrunner.Session) {
 	t.Helper()
 	p := newPty(t)
-	// A later entry wins: undo newPty's opt-out, then apply the test's own.
-	p.Env = append(p.Env, agentfake.TUIReadyDelayEnv+"=0s")
+	// newPty's plain screen is dropped: a launch prompt waits for the input box.
+	p.Env = slices.DeleteFunc(p.Env, func(kv string) bool { return strings.HasPrefix(kv, agentfake.TUIPlainScreenEnv+"=") })
 	// Drop what env overrides: the child's os.Getenv reads the first duplicate.
 	p.Env = slices.DeleteFunc(p.Env, func(kv string) bool {
 		k, _, _ := strings.Cut(kv, "=")
@@ -100,17 +99,31 @@ func TestPty_LaunchPromptLateRegistryIsResentThenStartsATurn(t *testing.T) {
 	}
 }
 
-func TestPty_LaunchPromptWaitsForTheReadySignal(t *testing.T) {
+func TestPty_LaunchPromptIsDeliveredWithoutWaitingForATranscript(t *testing.T) {
 	t.Parallel()
-	start := time.Now()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
-		agentfake.TUIReadyDelayEnv+"=1s")
+	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour})
+	if matches, _ := filepath.Glob(filepath.Join(ptyHome(p), ".claude", "projects", "*", s.SessionID+".jsonl")); len(matches) != 0 {
+		t.Fatalf("transcripts before the prompt = %v; want none", matches)
+	}
 
+	start := time.Now()
 	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch = %v; want nil", err)
 	}
-	if elapsed := time.Since(start); elapsed < 900*time.Millisecond {
-		t.Errorf("PromptLaunch returned after %v; want it to wait for the ready signal", elapsed)
+	if elapsed := time.Since(start); elapsed > 10*time.Second {
+		t.Errorf("PromptLaunch took %v; want seconds, not a transcript wait", elapsed)
+	}
+}
+
+func TestPty_NeverReadyAgentFailsStartAndSendsNoPrompt(t *testing.T) {
+	t.Parallel()
+	p := newPty(t)
+	p.Env = append(p.Env, agentfake.TUINoPidFileEnv+"=1")
+	p.StartTimeout = 500 * time.Millisecond
+
+	// A failed Start returns no session, so there is nothing to prompt.
+	if _, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"}); err == nil {
+		t.Fatal("Start succeeded; want a failure when the agent never turns idle")
 	}
 }
 
@@ -125,59 +138,12 @@ func TestPty_LaunchPromptProvesDeliveryUnderACustomConfigDir(t *testing.T) {
 		}
 	}
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour}, env...)
-	// awaitReady still globs under HOME, which the custom config dir bypasses.
-	p.ReadyWait = 300 * time.Millisecond
 
 	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch = %v; want nil", err)
 	}
 	if matches, _ := filepath.Glob(filepath.Join(cfg, "projects", "*", s.SessionID+".jsonl")); len(matches) != 1 {
 		t.Errorf("transcripts under %s = %v; want one", cfg, matches)
-	}
-}
-
-func TestPty_LaunchPromptSendsAnywayWhenNeverReady(t *testing.T) {
-	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
-		agentfake.TUIReadyDelayEnv+"="+agentfake.TUIReadyOff)
-	p.ReadyWait = 400 * time.Millisecond
-	var logs strings.Builder
-	p.SetLog(slog.New(slog.NewTextHandler(&logs, nil)))
-
-	start := time.Now()
-	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); err != nil {
-		t.Fatalf("PromptLaunch = %v; want nil", err)
-	}
-	if elapsed := time.Since(start); elapsed < p.ReadyWait {
-		t.Errorf("PromptLaunch returned after %v; want it to wait out %v", elapsed, p.ReadyWait)
-	}
-	if !strings.Contains(logs.String(), "ready signal missing") {
-		t.Errorf("log = %q; want it to say the ready signal was missing", logs.String())
-	}
-}
-
-func TestPty_LaunchPromptStopsWaitingForReadyWhenCancelled(t *testing.T) {
-	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
-		agentfake.TUIReadyDelayEnv+"="+agentfake.TUIReadyOff)
-	var logs strings.Builder
-	p.SetLog(slog.New(slog.NewTextHandler(&logs, nil)))
-	ctx, cancel := context.WithCancel(context.Background())
-
-	done := make(chan error, 1)
-	go func() { done <- p.PromptLaunch(ctx, s, "/gx-implement x/1", nil) }()
-	cancel()
-
-	select {
-	case err := <-done:
-		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("PromptLaunch = %v; want context.Canceled", err)
-		}
-	case <-time.After(nativerunner.DefaultReadyWait / 3):
-		t.Fatal("PromptLaunch kept waiting for the ready signal after the cancel")
-	}
-	if strings.Contains(logs.String(), "ready signal missing") {
-		t.Errorf("log = %q; a cancel is not a missing ready signal", logs.String())
 	}
 }
 

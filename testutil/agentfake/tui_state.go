@@ -217,12 +217,10 @@ func (t *tui) draw() {
 			input = promptMarker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m"
 		}
 		rows = []string{colored("✻ Welcome to Claude Code"), "", input}
-	case t.opts.readySignal && t.typed.Len() == 0 && t.ready():
+	case !t.opts.plainScreen && t.typed.Len() == 0:
 		// The input box claudeui.InputBox recognises; typed text echoes as "> ".
 		const rule = "────────────────────"
 		rows = []string{colored("✻ Welcome to Claude Code"), "", rule, "❯ ", rule}
-	case t.opts.readySignal && t.typed.Len() == 0:
-		rows = []string{colored("✻ Welcome to Claude Code"), "", "Loading…"}
 	default:
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
 	}

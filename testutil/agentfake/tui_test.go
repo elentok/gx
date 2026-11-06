@@ -379,7 +379,7 @@ func TestTUIClaude_ChatSlowMarkerStaysBusyUntilFinished(t *testing.T) {
 }
 
 func TestTUIClaude_PlainPromptWithoutTheKnobWritesNoTranscript(t *testing.T) {
-	f := startTUIFake(t, tuiLaunchArgs, TUIReadyDelayEnv+"="+TUIReadyOff)
+	f := startTUIFake(t, tuiLaunchArgs)
 	path := f.transcriptPath()
 
 	f.typeLine("hello")
@@ -510,7 +510,7 @@ func TestTUIClaude_RegistryDelayKnobKnowsTheSkillOnlyAfterTheDelay(t *testing.T)
 }
 
 func TestTUIClaude_NoTurnKnobStaysIdleAndWritesNothing(t *testing.T) {
-	f := startTUIFake(t, tuiLaunchArgs, TUINoTurnEnv+"=1", TUIReadyDelayEnv+"="+TUIReadyOff)
+	f := startTUIFake(t, tuiLaunchArgs, TUINoTurnEnv+"=1")
 	f.waitStatus(StatusIdle, "")
 	f.control(Control{Action: ActionFast})
 	f.typeLine("/gx-implement gx:epic/01")
@@ -523,14 +523,11 @@ func TestTUIClaude_NoTurnKnobStaysIdleAndWritesNothing(t *testing.T) {
 	}
 }
 
-func TestTUIClaude_ReadySignalIsOnByDefaultAndOptOutGivesNone(t *testing.T) {
-	on := startTUIFake(t, tuiLaunchArgs)
-	if _, err := os.Stat(on.transcriptPath()); err != nil {
-		t.Errorf("default transcript file: %v; want the ready signal", err)
-	}
-	off := startTUIFake(t, tuiLaunchArgs, TUIReadyDelayEnv+"="+TUIReadyOff)
-	if _, err := os.Stat(off.transcriptPath()); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("opt-out transcript file: %v; want none", err)
+func TestTUIClaude_StartWritesNoTranscriptUntilTheFirstUserRecord(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	if _, err := os.Stat(f.transcriptPath()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("transcript file at start: %v; want none", err)
 	}
 }
 

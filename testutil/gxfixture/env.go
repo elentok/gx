@@ -76,8 +76,8 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 		"PATH="+binDir+string(os.PathListSeparator)+hostPathWithoutCodex(root),
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
 		osnotify.OffEnv+"=off",
-		// The ready signal and launch record a launch prompt waits for.
-		agentfake.TUIReadyDelayEnv+"=0s", agentfake.TUILaunchRecordEnv+"=1",
+		// The launch record a launch prompt waits for.
+		agentfake.TUILaunchRecordEnv+"=1",
 		"GIT_AUTHOR_NAME=gxfixture", "GIT_AUTHOR_EMAIL=gxfixture@example.com",
 		"GIT_COMMITTER_NAME=gxfixture", "GIT_COMMITTER_EMAIL=gxfixture@example.com",
 	)

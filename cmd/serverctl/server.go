@@ -156,14 +156,6 @@ func runServer(ctx context.Context, d Deps) error {
 		return err
 	}
 	var ptyOverride *runnerbuild.PtyOverride
-	// Test hook: gxfixture shortens how long a launch prompt waits for the ready signal.
-	if v := os.Getenv("GX_PTY_READY_WAIT"); v != "" {
-		readyWait, err := time.ParseDuration(v)
-		if err != nil {
-			return fmt.Errorf("GX_PTY_READY_WAIT: %w", err)
-		}
-		ptyOverride = &runnerbuild.PtyOverride{ReadyWait: readyWait}
-	}
 	// Test hook: gxfixture widens how long a launch prompt may sit on an unknown
 	// command, so a skill registry that fills late can still deliver it.
 	if v := os.Getenv("GX_LAUNCH_UNKNOWN_GRACE"); v != "" {
