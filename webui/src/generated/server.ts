@@ -2159,6 +2159,11 @@ export interface SessionInfo {
    */
   design?: boolean;
   /**
+   * FixOf marks a Fix agent: the address of the ticket it fixes, or the bare
+   * project name for a failed migration.
+   */
+  fix_of?: string;
+  /**
    * Queue marks a Queue agent row: a PTY-hosted ticket iteration. It has
    * no Unread or Actionable, and Holder is the agent dir the TUI opens the
    * live panel from.
@@ -2329,6 +2334,10 @@ export interface CreateSessionRequest {
    */
   unique_name?: boolean;
   ticket?: string;
+  /**
+   * FixOf is set by the Fix agent starters; see SessionInfo.FixOf.
+   */
+  fix_of?: string;
   /**
    * Prompt is typed at the session's first Idle; empty starts it Idle.
    */

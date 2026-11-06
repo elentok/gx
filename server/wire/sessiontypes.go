@@ -18,6 +18,9 @@ type SessionInfo struct {
 	Ticket string `json:"ticket,omitempty"`
 	// Design marks a session whose ticket is on a map epic: a gx-design run.
 	Design bool `json:"design,omitempty"`
+	// FixOf marks a Fix agent: the address of the ticket it fixes, or the bare
+	// project name for a failed migration.
+	FixOf string `json:"fix_of,omitempty"`
 	// Queue marks a Queue agent row: a PTY-hosted ticket iteration. It has
 	// no Unread or Actionable, and Holder is the agent dir the TUI opens the
 	// live panel from.
@@ -153,6 +156,8 @@ type CreateSessionRequest struct {
 	// UniqueName refuses the create when a live session already has Name.
 	UniqueName bool   `json:"unique_name,omitempty"`
 	Ticket     string `json:"ticket,omitempty"`
+	// FixOf is set by the Fix agent starters; see SessionInfo.FixOf.
+	FixOf string `json:"fix_of,omitempty"`
 	// Prompt is typed at the session's first Idle; empty starts it Idle.
 	Prompt string `json:"prompt,omitempty"`
 	// Harness defaults to claude.

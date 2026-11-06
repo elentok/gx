@@ -131,6 +131,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 		MadeWorktree:   req.Worktree != "" || req.MadeWorktree,
 		Name:           req.Name,
 		Ticket:         req.Ticket,
+		FixOf:          req.FixOf,
 		LaunchDesign:   sc.LaunchDesign,
 		Design:         sc.design || (req.Ticket != "" && mg.Maps.OnMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,

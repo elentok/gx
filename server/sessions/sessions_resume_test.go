@@ -36,6 +36,20 @@ func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 }
 
+func TestResumeSession_KeepsFixOf(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, _ := startFakeSessionWith(t, wire.CreateSessionRequest{FixOf: "proj:loop/01"})
+	stopFakeSession(ctx, t, h, evs, id)
+
+	res, err := h.Client.Sessions.Resume(ctx, id)
+	if err != nil || res.Refused || res.Session == nil {
+		t.Fatalf("resume = %+v, %v", res, err)
+	}
+	if res.Session.FixOf != "proj:loop/01" {
+		t.Errorf("resumed FixOf = %q, want proj:loop/01", res.Session.FixOf)
+	}
+}
+
 func TestResumeSession_UsesNewestConversation(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)

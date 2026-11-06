@@ -212,6 +212,44 @@ func TestFixAgent_ProjectStartsOnFailedMigration(t *testing.T) {
 	}
 }
 
+// fixOfByID maps each snapshot session ID to its FixOf.
+func (f designsFixture) fixOfByID(t *testing.T) map[string]string {
+	t.Helper()
+	snap, err := f.h.Client.Snapshot(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, s := range snap.Sessions {
+		got[s.ID] = s.FixOf
+	}
+	return got
+}
+
+func TestFixAgent_SessionReportsWhatItFixes(t *testing.T) {
+	t.Parallel()
+	f := startFixAgent(t, nil)
+	if err := migratefail.Record(f.h.StateDir, "proj", "boom"); err != nil {
+		t.Fatal(err)
+	}
+	ticketFix := f.fix(t, "proj:loop/01")
+	projectFix := f.fixProject(t, "proj")
+	plain, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || plain.Session == nil {
+		t.Fatalf("create = %+v, %v", plain, err)
+	}
+	if ticketFix.Session == nil || projectFix.Session == nil {
+		t.Fatalf("fix = %+v, %+v", ticketFix, projectFix)
+	}
+	got := f.fixOfByID(t)
+	want := map[string]string{ticketFix.Session.ID: "proj:loop/01", projectFix.Session.ID: "proj", plain.Session.ID: ""}
+	for id, w := range want {
+		if got[id] != w {
+			t.Errorf("session %s FixOf = %q, want %q", id, got[id], w)
+		}
+	}
+}
+
 func TestFixAgent_ProjectWithoutFailureIsRefused(t *testing.T) {
 	t.Parallel()
 	f := startFixAgent(t, nil)

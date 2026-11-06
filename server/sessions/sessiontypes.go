@@ -39,6 +39,8 @@ type Meta struct {
 	AutoName bool   `json:"auto_name,omitempty"`
 	Ticket   string `json:"ticket,omitempty"`
 	Design   bool   `json:"design,omitempty"`
+	// FixOf is the ticket address (or project name) a Fix agent fixes.
+	FixOf string `json:"fix_of,omitempty"`
 	// LaunchDesign is set only by a design launch path. Design alone (set by
 	// `gx agent link` too) says nothing about how the session was launched.
 	LaunchDesign bool `json:"launch_design,omitempty"`
@@ -130,6 +132,7 @@ func (m Meta) Info() wire.SessionInfo {
 		Harness:         m.Harness,
 		Ticket:          m.Ticket,
 		Design:          m.Design,
+		FixOf:           m.FixOf,
 		Status:          m.Status,
 		StatusChangedAt: m.StatusChangedAt,
 		RunStartedAt:    cmp.Or(m.RestoredAt, m.CreatedAt),
