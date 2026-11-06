@@ -1037,19 +1037,17 @@ title (the ticket's own title, which the headline carries).
 
 **Status word** — the one word in a headline that says what happened, e.g. Done, Merged, Answer.
 
-## Web top bar
-
-**Tray** — the group of system health icons on the right side of the web top bar: CPU load, memory
-use and free disk space of the gx server's machine. Each icon shows a state; its popover shows the
-values. The name comes from the macOS menu bar.
-_Avoid_: status area, indicators bar
-
 ## Web app shell
 
-**App shell** — the part of the web UI that stays on screen across pages: the top bar, the sidebar
-and the jump menu. Pages render inside it. (The TUI's app shell, in **Tab Caching and Reload**, is
-a different thing.)
+**App shell** — the part of the web UI that stays on screen across pages: the sidebar, the shared
+PageHeader and the jump menu. There is no top bar. Pages render inside it. (The TUI's app shell, in
+**Tab Caching and Reload**, is a different thing.)
 _Avoid_: layout, chrome
+
+**Tray** — the group of system health icons in the sidebar footer: CPU load, memory use and free
+disk space of the gx server's machine. Each icon shows a state; its popover shows the values. The
+name comes from the macOS menu bar.
+_Avoid_: status area, indicators bar
 
 **Device type** — which of three layouts the web UI uses, chosen by viewport width alone: phone
 (below 640px), tablet (640 to 992px) or desktop (from 992px). A resized desktop window gets the
@@ -1059,21 +1057,41 @@ _Avoid_: breakpoint, form factor
 ## Web workspaces
 
 **Workspace** — a named theme the person creates to group what they work on now: Designs, epics and
-agents, for example "gx bugs" or "research". An item is in exactly one workspace. In the web UI this
+chats (agents follow their epic), for example "gx bugs" or "research". An item is in exactly one workspace. In the web UI this
 meaning wins. herdr's workspace (a multiplexer window, see **Session**) is the other meaning, and
 herdr support is being phased out.
 _Avoid_: group, board, project (a project is a registered repo)
+
+**Manage workspaces** — the dialog, opened from the switcher, that lists workspaces in order. The
+person renames one in place, reorders with up and down buttons, and deletes behind a confirmation
+that says how many members go back to the **Default workspace**. The Default row can be neither
+renamed nor deleted.
 
 **Default workspace** — the workspace every new Design, epic and chat starts in, and where "Remove from
 workspace" sends an item back. It cannot be deleted. Not the repo's default branch.
 _Avoid_: Main, inbox
 
 **Active workspace** — the workspace the person is working in now. Opening an item in a workspace
-makes it active. The sidebar lists only its items and offers the others in a switcher.
+makes it active; opening a held item or an Other row leaves it unchanged. The sidebar lists only its items and offers the others in a switcher.
 
 **On hold** — a mark on a Design or epic the person does not want to deal with now. A held item
 leaves the main lists. It is not the same as being in no workspace.
 _Avoid_: snoozed, paused (a pause is a queue or ticket state), archived
+
+**Other section** — the fixed section at the bottom of the web sidebar, below On hold, the same in
+every workspace. It lists the agents that belong to no workspace: One-off agents (agents of tickets
+in a project's one-offs epic) and project-level Fix agents (a Fix agent for a failed project ticket
+migration, which has no epic). Any agent whose epic is a one-offs epic is here too, such as a Fix agent
+on a One-off ticket or an Investigate agent for a failed one-off, because that epic has no sidebar row.
+It has no Move or Hold actions, and opening a row leaves the active workspace unchanged. A Fix agent
+on a ticket and an Investigate agent of any other epic nest under its row. A Follow-up is a ticket, not a session, so it has no sidebar row.
+_Avoid_: Misc, Unfiled
+
+**Chat session** — a plain agent session, the **Interactive session** that has no Session ticket.
+The web UI calls it "Chat" and "Chats". The Slack/Telegram **Chat** (see Notification Surfaces) is
+the other meaning. In the web UI the plain-agent-session meaning wins; the notification surface is
+never called Chat there. A chat is a member of a workspace, keyed by its session label.
+_Avoid_: using "chat" for a Design session or a Queue agent
 
 ## Web access
 
