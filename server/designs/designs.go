@@ -181,6 +181,7 @@ func (s *Designs) ScanCleanups() {
 	}
 	for _, dir := range dirs {
 		epics, _ := s.idx.EpicsOf(dir)
+		s.scanReady(dir, epics)
 		for _, e := range epics {
 			if !e.IsMap {
 				continue

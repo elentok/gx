@@ -326,6 +326,22 @@ func designQuestionMessage(project, epic, step string, round int, question, link
 	}
 }
 
+// designReadyMessage is the "a Design finished" message. implEpic is the new
+// epic's name. An empty link (web listener off) leaves its line out.
+func designReadyMessage(project, implEpic string, tickets int, link string) chatMessage {
+	lines := []string{fmt.Sprintf("The design is finished. %d tickets are ready to queue.", tickets)}
+	if link != "" {
+		lines = append(lines, link)
+	}
+	return chatMessage{
+		icon: "📦", status: "Ready", subject: implEpic,
+		lines:   lines,
+		project: project,
+		kind:    notifyKindDesignReady,
+		urgency: urgencyResult,
+	}
+}
+
 // ticketPauseMessage is the "a machine paused this ticket for a person"
 // message: Answer for the answer class, Repair for any fault. status is the
 // ticket's stored status word, old or new.

@@ -298,6 +298,11 @@ for the person: epic, step, round number, the round's first question and the Des
 once, when the wait starts, by the **open-on-screen rule** (a visible web tab always counts, a focused TUI
 only when AFK mode is off), and in AFK mode it replaces the session alert for that wait.
 
+**Design Ready** — the chat message sent once per Design when its `design_step` reaches Branch and its
+`<epic>-impl` epic exists: the impl epic's name, its ticket count and a link to it. Once-ness is a mark
+keyed on the impl epic. A Design already at Branch or Done on the server's first scan ever is marked
+without a message.
+
 **Grilling round** — the numbered `❓ **Qn**` questions an agent asks a person in one turn. The person
 answers them together, in one prompt. Each question may carry a **Question block**. Not a **Pause
 round**, which is one question a Paused ticket asks.

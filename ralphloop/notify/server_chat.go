@@ -262,6 +262,19 @@ func (c *ServerChat) DesignQuestion(project string, override *ServerChatConfig, 
 	}
 }
 
+// DesignReady tells the project's destinations that the Design of a map
+// finished and its implEpic holds tickets ready to queue. The source is the
+// Design's own epic, the same as its Question.
+func (c *ServerChat) DesignReady(project string, override *ServerChatConfig, designEpic, implEpic string, tickets int, link string) {
+	if c == nil {
+		return
+	}
+	msg := designReadyMessage(project, implEpic, tickets, link)
+	for _, s := range c.projectSinks(override) {
+		s.sendMessage(msg, epicSource(project+"/"+designEpic), "")
+	}
+}
+
 // MarkOnce records key in the server's gate state and reports whether it was
 // new. An error or a nil chat reports false: a message may be lost, never doubled.
 func (c *ServerChat) MarkOnce(key string) (bool, error) {

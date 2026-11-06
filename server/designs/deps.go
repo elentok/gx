@@ -3,7 +3,9 @@ package designs
 import (
 	"log/slog"
 	"sync"
+	"sync/atomic"
 
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -21,6 +23,9 @@ type Deps struct {
 	Projects         *projects.Registry
 	Events           *broker.Broker
 	Guards           *runs.Guards
+	// Chat sends the Ready message; WebURL is the web listener's base URL, "" when off.
+	Chat   *notify.ServerChat
+	WebURL func() string
 }
 
 // Designs opens, cleans up and deletes the Design sessions of map epics.
@@ -32,6 +37,10 @@ type Designs struct {
 	projects         *projects.Registry
 	events           *broker.Broker
 	guards           *runs.Guards
+	chat             *notify.ServerChat
+	webURL           func() string
+	// seeded: the Ready seed mark has been settled this run.
+	seeded atomic.Bool
 	// sessions comes later than Designs: the Manager calls CleanupDesign back,
 	// so it is built after Designs and handed over by GiveSessions.
 	sessions *sessions.Manager
@@ -47,6 +56,7 @@ func New(d Deps) *Designs {
 	return &Designs{
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
+		chat: d.Chat, webURL: d.WebURL,
 	}
 }
 
