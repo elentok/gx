@@ -58,7 +58,9 @@ whose dependency did not pass is skipped. Never checks herdr.`,
 
 // liveDoctorSource runs checks against the installed claude.
 func liveDoctorSource() claudedoctor.Source {
-	env := os.Environ()
+	// Run from inside a claude session, the inherited CLAUDE_CODE_CHILD_SESSION
+	// marker makes the child skip writing its transcript, which the checks read.
+	env := append(os.Environ(), "CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1")
 	ptyRun := sync.OnceValues(func() (claudedoctor.Recording, error) { return livePty(env) })
 	src := claudedoctor.Source{
 		Live: true,

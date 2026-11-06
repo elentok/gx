@@ -65,7 +65,9 @@ func PtyImagePaste(p *nativerunner.Pty, cwd, dataDir string) (Recording, error) 
 		if err != nil {
 			return err
 		}
-		if err := h.Paste(path); err != nil {
+		// TypeTextBy waits out the paste settle; an Enter sent straight after
+		// the paste lands as a newline in the box instead of submitting.
+		if err := h.TypeTextBy(path, true); err != nil {
 			return err
 		}
 		if err := waitScreen(h, imageChip, 15*time.Second); err != nil {
