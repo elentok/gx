@@ -71,7 +71,7 @@ func TestChatEpicsScenario_EachEpicOutcomeLandsInTheCaptureFile(t *testing.T) {
 	waitForParts(t, r, map[string][]string{
 		"epic-merged":     {"merged-chat-epic"},
 		"epic-unmerged":   {"unmerged-chat-epic", "Not merged"},
-		"epic-escalation": {"stuck-chat-epic", "recovery escalated"},
+		"epic-escalation": {"stuck-chat-epic", "Escalated"},
 	})
 }
 

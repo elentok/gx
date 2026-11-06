@@ -195,6 +195,32 @@ var scenarios = map[string]scenario{
 			{Project: project, Prompt: "hello", Crash: true},
 		},
 	},
+	// chat-server: chat-capture with the server-notice sources a fixture can reach.
+	// A held fake agent on a queued demo epic gives the spend ledger (seeded, today
+	// under the soft limit) a transcript to append usage to; the one-turn long-ticket
+	// threshold makes that same line a long ticket. DiskLow gives the fake disk. The
+	// "gone" project has its own repo for a test to delete.
+	//   - produced: server started, low disk, disk clean, dispatch resumed, budget
+	//     soft and hard limit, long ticket, project unavailable, trunk missing and found.
+	//   - not produced: extra usage (needs a Claude account state), herdr down and up
+	//     and the herdr digest (the fixture runs the pty runner), daily summary (it
+	//     fires on the budget day rolling over, which follows the real clock). The
+	//     server-level Go tests (server/server_notify_test.go and
+	//     TestPauseFold_HerdrOutagePausesBecomeOneDigest) cover them.
+	"chat-server": {
+		ChatCapture: true,
+		Epics: []epic{
+			{Project: project, Name: "server-epic", Tickets: []ticket{{ID: "01", Slug: "held", Opts: servertest.TicketOpts{}}}},
+			{Project: "gone", Name: "gone-epic", Tickets: []ticket{{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}}}},
+		},
+		OwnRepos: []string{"gone"},
+		Queue:    []string{project + ":server-epic"},
+		Hold:     true,
+		DiskLow:  true,
+		Spend:    true,
+		Config:   []string{"budget.soft-limit=6", "budget.hard-limit=9", "budget.long-ticket-turns=1"},
+		Env:      []string{"GX_GUARD_POLL=250ms", "GX_BUDGET_KILL_GRACE=100ms"},
+	},
 	"rejected-first-prompt": spec.RejectedFirstPrompt,
 	"stall-vim":             spec.StallVim,
 	"stall-leaves-i":        spec.StallLeavesI,
