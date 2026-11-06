@@ -1467,6 +1467,11 @@ export interface Snapshot {
    */
   workspaces?: Workspace[];
   /**
+   * Placements say where each session sits, keyed by session id; filled in by
+   * the handler.
+   */
+  placements?: SessionPlacement[];
+  /**
    * SkillsInstallProblem is why the skill install `gx server start` ran
    * last did not finish; empty when it did. Filled in by the handler.
    */
@@ -2718,11 +2723,31 @@ export interface WorkspaceList {
 }
 /**
  * WorkspaceRequest is a workspace write: Name is the workspace acted on, To the
- * new name of a rename.
+ * new name of a rename. Key is the Design, epic or chat a move or remove acts
+ * on (Name is the target workspace of a move); Order is the full new order of a reorder.
  */
 export interface WorkspaceRequest {
   name: string;
   to?: string;
+  key?: string;
+  order?: string[];
+}
+export const PlacementChat = "chat";
+export const PlacementEpic = "epic";
+export const PlacementOther = "other";
+/**
+ * Where a session sits in the sidebar.
+ */
+export type Placement = typeof PlacementChat | typeof PlacementEpic | typeof PlacementOther;
+/**
+ * SessionPlacement says where one session sits: a chat (with its workspace
+ * name), under an epic (that epic's address), or in Other.
+ */
+export interface SessionPlacement {
+  session: string;
+  kind: string;
+  workspace?: string;
+  epic?: string;
 }
 /**
  * WorkspaceResult is a workspace write: the list after it, or a refusal.
@@ -2737,7 +2762,12 @@ export const ReasonWorkspaceBlankName = "workspace-blank-name";
 export const ReasonWorkspaceNameTaken = "workspace-name-taken";
 export const ReasonWorkspaceUnknown = "workspace-unknown";
 export const ReasonWorkspaceDefaultFixed = "workspace-default-fixed";
+export const ReasonWorkspaceBadOrder = "workspace-bad-order";
+export const ReasonWorkspaceBlankKey = "workspace-blank-key";
+export const ReasonWorkspaceUnknownKey = "workspace-unknown-key";
+export const ReasonWorkspaceFollowsEpic = "workspace-follows-epic";
+export const ReasonWorkspaceNotJoinable = "workspace-not-joinable";
 /**
  * Refusal reasons of the workspace writes.
  */
-export type ReasonWorkspace = typeof ReasonWorkspaceBlankName | typeof ReasonWorkspaceNameTaken | typeof ReasonWorkspaceUnknown | typeof ReasonWorkspaceDefaultFixed;
+export type ReasonWorkspace = typeof ReasonWorkspaceBlankName | typeof ReasonWorkspaceNameTaken | typeof ReasonWorkspaceUnknown | typeof ReasonWorkspaceDefaultFixed | typeof ReasonWorkspaceBadOrder | typeof ReasonWorkspaceBlankKey | typeof ReasonWorkspaceUnknownKey | typeof ReasonWorkspaceFollowsEpic | typeof ReasonWorkspaceNotJoinable;

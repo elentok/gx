@@ -68,6 +68,18 @@ func newServerWorkspacesCmd(d Deps) *cobra.Command {
 		func(ctx context.Context, cl *apiclient.Client, a []string) (wire.WorkspaceResult, error) {
 			return cl.Admin.DeleteWorkspace(ctx, a[0])
 		})
+	write("reorder <name>...", "set the workspace order; list every workspace once", cobra.MinimumNArgs(1),
+		func(ctx context.Context, cl *apiclient.Client, a []string) (wire.WorkspaceResult, error) {
+			return cl.Admin.ReorderWorkspaces(ctx, a)
+		})
+	write("move <key> <workspace>", "put a Design, epic (project:epic) or chat session in a workspace", cobra.ExactArgs(2),
+		func(ctx context.Context, cl *apiclient.Client, a []string) (wire.WorkspaceResult, error) {
+			return cl.Admin.MoveToWorkspace(ctx, a[0], a[1])
+		})
+	write("remove <key>", "send a Design, epic or chat back to the Default workspace", cobra.ExactArgs(1),
+		func(ctx context.Context, cl *apiclient.Client, a []string) (wire.WorkspaceResult, error) {
+			return cl.Admin.RemoveFromWorkspace(ctx, a[0])
+		})
 	return cmd
 }
 

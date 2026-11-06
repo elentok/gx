@@ -310,6 +310,7 @@ func New(cfg Config) (*Server, error) {
 
 		focus: sessions.NewFocusReports(),
 	}
+	wsStore.SetDirectory(workspacesDirectory{s})
 	s.restarter = s.newRestarter()
 	s.initProjects()
 	s.startup = lifecycle.NewStartup(startupHost{s}, log)

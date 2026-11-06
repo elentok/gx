@@ -96,3 +96,55 @@ func TestServerWorkspaces_JSONMatchesTheRoute(t *testing.T) {
 		t.Errorf("--json refusal = %q (%v)", out, err)
 	}
 }
+
+func TestServerWorkspaces_ReorderMoveRemove(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "follow-ups", "01", "first", "")
+	h := servertest.StartWithStore(t, store)
+	for _, n := range []string{"Bugs", "Ideas"} {
+		if _, err := runWorkspaces(t, h, "create", n); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := runWorkspaces(t, h, "reorder", "Ideas", "Default workspace", "Bugs"); err != nil {
+		t.Fatalf("reorder: %v", err)
+	}
+	out, _ := runWorkspaces(t, h, "list")
+	if want := "Ideas\t0\nDefault workspace\t0\tdefault\nBugs\t0\n"; out != want {
+		t.Errorf("list after reorder = %q, want %q", out, want)
+	}
+	if _, err := runWorkspaces(t, h, "reorder", "Ideas", "Bugs"); err == nil {
+		t.Error("a partial reorder exited zero")
+	}
+
+	if _, err := runWorkspaces(t, h, "move", "proj:plain", "Bugs"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	out, _ = runWorkspaces(t, h, "list")
+	if !strings.Contains(out, "Bugs\t1\n") {
+		t.Errorf("list after move = %q, want Bugs with one member", out)
+	}
+	for _, key := range []string{"proj:follow-ups", "proj:nope"} {
+		if _, err := runWorkspaces(t, h, "move", key, "Bugs"); err == nil {
+			t.Errorf("move %s exited zero", key)
+		}
+	}
+
+	out, err := runWorkspaces(t, h, "move", "proj:follow-ups", "Bugs", "--json")
+	var res wire.WorkspaceResult
+	if err != nil || json.Unmarshal([]byte(out), &res) != nil || !res.Refused || res.Reason != wire.ReasonWorkspaceNotJoinable {
+		t.Errorf("--json refusal = %q (%v)", out, err)
+	}
+
+	if _, err := runWorkspaces(t, h, "remove", "proj:plain"); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if _, err := runWorkspaces(t, h, "remove", "proj:plain"); err != nil {
+		t.Errorf("remove of a Default member = %v, want a no-op success", err)
+	}
+	if out, _ = runWorkspaces(t, h, "list"); !strings.Contains(out, "Bugs\t0\n") {
+		t.Errorf("list after remove = %q, want Bugs empty", out)
+	}
+}

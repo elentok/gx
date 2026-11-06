@@ -13,6 +13,11 @@ var refusals = map[Reason]string{
 	ReasonNameTaken:    wire.ReasonWorkspaceNameTaken,
 	ReasonUnknown:      wire.ReasonWorkspaceUnknown,
 	ReasonDefaultFixed: wire.ReasonWorkspaceDefaultFixed,
+	ReasonBadOrder:     wire.ReasonWorkspaceBadOrder,
+	ReasonBlankKey:     wire.ReasonWorkspaceBlankKey,
+	ReasonUnknownKey:   wire.ReasonWorkspaceUnknownKey,
+	ReasonFollowsEpic:  wire.ReasonWorkspaceFollowsEpic,
+	ReasonNotJoinable:  wire.ReasonWorkspaceNotJoinable,
 }
 
 // Routes lists the workspace endpoints. The getter is called per request, so a
@@ -45,5 +50,8 @@ func Routes(get func() *Store) []wire.Route {
 		write("POST /v1/workspaces/create", func(s *Store, r wire.WorkspaceRequest) error { return s.Create(r.Name) }),
 		write("POST /v1/workspaces/rename", func(s *Store, r wire.WorkspaceRequest) error { return s.Rename(r.Name, r.To) }),
 		write("POST /v1/workspaces/delete", func(s *Store, r wire.WorkspaceRequest) error { return s.Delete(r.Name) }),
+		write("POST /v1/workspaces/reorder", func(s *Store, r wire.WorkspaceRequest) error { return s.Reorder(r.Order) }),
+		write("POST /v1/workspaces/move", func(s *Store, r wire.WorkspaceRequest) error { return s.Join(r.Key, r.Name) }),
+		write("POST /v1/workspaces/remove", func(s *Store, r wire.WorkspaceRequest) error { return s.Remove(r.Key) }),
 	}
 }

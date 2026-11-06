@@ -28,6 +28,21 @@ func (a *Admin) DeleteWorkspace(ctx context.Context, name string) (wire.Workspac
 	return a.workspaceWrite(ctx, "/v1/workspaces/delete", wire.WorkspaceRequest{Name: name})
 }
 
+// ReorderWorkspaces sets the order; names must list every workspace once.
+func (a *Admin) ReorderWorkspaces(ctx context.Context, names []string) (wire.WorkspaceResult, error) {
+	return a.workspaceWrite(ctx, "/v1/workspaces/reorder", wire.WorkspaceRequest{Order: names})
+}
+
+// MoveToWorkspace puts a Design, epic or chat in a workspace. A refusal is a result.
+func (a *Admin) MoveToWorkspace(ctx context.Context, key, workspace string) (wire.WorkspaceResult, error) {
+	return a.workspaceWrite(ctx, "/v1/workspaces/move", wire.WorkspaceRequest{Key: key, Name: workspace})
+}
+
+// RemoveFromWorkspace sends a member back to the Default workspace.
+func (a *Admin) RemoveFromWorkspace(ctx context.Context, key string) (wire.WorkspaceResult, error) {
+	return a.workspaceWrite(ctx, "/v1/workspaces/remove", wire.WorkspaceRequest{Key: key})
+}
+
 func (a *Admin) workspaceWrite(ctx context.Context, path string, req wire.WorkspaceRequest) (wire.WorkspaceResult, error) {
 	var res wire.WorkspaceResult
 	err := a.t.post(ctx, path, req, &res)

@@ -32,6 +32,10 @@ const (
 	ReasonUnknown      Reason = "no such workspace"
 	ReasonDefaultFixed Reason = "the Default workspace cannot be renamed or deleted"
 	ReasonBlankKey     Reason = "key is blank"
+	ReasonBadOrder     Reason = "the order must list every workspace exactly once"
+	ReasonUnknownKey   Reason = "no such Design, epic or chat"
+	ReasonFollowsEpic  Reason = "a Queue or Design agent follows its epic; move the epic instead"
+	ReasonNotJoinable  Reason = "only a Design, an epic or a chat can join a workspace"
 )
 
 func (r Reason) Error() string { return string(r) }
@@ -61,7 +65,46 @@ type Store struct {
 	path     string
 	events   *broker.Broker
 	resolver Resolver
+	dir      Directory
 	st       state
+}
+
+// SetDirectory supplies what the membership rules and placement look up; it
+// also serves as the Resolver. Call it before the store is used.
+func (s *Store) SetDirectory(d Directory) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.dir, s.resolver = d, d
+}
+
+// Reorder sets the workspace order; order must name every workspace exactly once.
+func (s *Store) Reorder(order []string) error {
+	return s.write(func() error {
+		if len(order) != len(s.st.Order) {
+			return ReasonBadOrder
+		}
+		next := make([]string, 0, len(order))
+		for _, n := range order {
+			i := s.index(n)
+			if i < 0 {
+				return ReasonUnknown
+			}
+			if slices.Contains(next, s.st.Order[i]) {
+				return ReasonBadOrder
+			}
+			next = append(next, s.st.Order[i])
+		}
+		s.st.Order = next
+		return nil
+	})
+}
+
+// Join puts a Design, epic or chat in a workspace, refusing any other key.
+func (s *Store) Join(key, workspace string) error {
+	if err := s.joinable(key); err != nil {
+		return err
+	}
+	return s.SetMember(key, workspace)
 }
 
 // Open loads the persisted store from stateDir. resolver may be nil, in which

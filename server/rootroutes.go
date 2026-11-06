@@ -89,6 +89,7 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 		s.log.Warn("list sessions for snapshot", "err", err)
 	}
 	snap.Sessions = sessions
+	snap.Placements = s.workspaces.Place(sessions)
 	_ = json.NewEncoder(w).Encode(snap)
 }
 
