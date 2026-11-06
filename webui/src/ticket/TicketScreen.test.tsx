@@ -76,6 +76,47 @@ test("the ticket page shows the launch step in the verdict slot, and the cap wai
   expect(screen.getByText("Waiting for a slot: epic cap 3/2")).toBeTruthy();
 });
 
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+
+test("a launching ticket shows the claimed_at timer beside the Launching label, and the timer stays once the run is working", async () => {
+  const stats = { ...base.stats, elapsed: 0, claimed_at: minutesAgo(5) };
+  await renderTicket({ ...base, status: "claimed", stats: { ...stats, launch_step: { label: "starting agent", position: 3 } } });
+  expect(screen.getByText("Launching: starting agent (3/4)")).toBeTruthy();
+  expect(screen.getByText("5m")).toBeTruthy();
+  cleanup();
+
+  // Working: the step is gone, the label with it, and the same claimed_at clock keeps counting.
+  await renderTicket({ ...base, status: "claimed", stats });
+  expect(screen.queryByText(/Launching/)).toBeNull();
+  expect(screen.getByText("5m")).toBeTruthy();
+});
+
+test("a launch step change re-renders the ticket page with no reload", async () => {
+  const listeners: ((a?: string) => void)[] = [];
+  const evConn = { ...conn, onEvent: (l: (a?: string) => void) => (listeners.push(l), () => {}) } as unknown as Connection;
+  const stepped = (position: number, label: string): TicketDetail => ({
+    ...base,
+    status: "claimed",
+    stats: { ...base.stats, launch_step: { label, position } },
+  });
+  let current = stepped(2, "installing dependencies");
+  const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail: current });
+  const router = createMemoryRouter(appRoutes({ ticket: fetchDetail }), { initialEntries: ["/t/gx:demo/12"] });
+  renderThemed(
+    <ConnectionContext.Provider value={evConn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  );
+  await screen.findByText("Launching: installing dependencies (2/4)");
+
+  for (const [position, label] of [[3, "starting agent"], [4, "waiting for the agent"]] as const) {
+    current = stepped(position, label);
+    listeners.forEach((l) => l("gx:demo/12"));
+    await screen.findByText(`Launching: ${label} (${position}/4)`);
+  }
+  expect(screen.queryByText(/installing dependencies/)).toBeNull();
+});
+
 test("the ticket page shows the ticket's verdict under the header,and nothing without a pending row", async () => {
   const mine: PendingRow = { address: "gx:demo/12", agent: "", verdict: "disk low", reason: "/tmp has 5G free" };
   await renderTicket(base, undefined, [{ ...mine, address: "gx:demo/13", verdict: "concurrency cap" }]);
