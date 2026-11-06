@@ -22,68 +22,70 @@ const KIND_NAMES: Record<string, string> = {
 
 const MAX_THUMBS = 3;
 
-// Up to three thumbnails; the rest fold into a "+N" tile on the third. A tap opens the full-size view at that image.
+// Layout by tile count (thumbnails plus the "+N" tile): the first of three takes the left column; four make a square.
+const GRID_LAYOUT: Record<number, { cols: string; rows?: string; aspectRatio: string; tallFirst?: boolean }> = {
+  1: { cols: "1fr", aspectRatio: "4/3" },
+  2: { cols: "1fr 1fr", aspectRatio: "2/1" },
+  3: { cols: "2fr 1fr", rows: "1fr 1fr", aspectRatio: "3/2", tallFirst: true },
+  4: { cols: "1fr 1fr", rows: "1fr 1fr", aspectRatio: "1/1" },
+};
+
+// Up to three thumbnails; the rest fold into a separate "+N" tile. A tap opens the full-size view at that image.
 function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sessionId: string }) {
   const [viewing, setViewing] = useState<number>();
-  const shown = images.length > MAX_THUMBS ? images.slice(0, MAX_THUMBS) : images;
+  const shown = images.slice(0, MAX_THUMBS);
   const extra = images.length - shown.length;
-  const tile = { w: "100%", h: "100%", minH: "0", borderRadius: "md", overflow: "hidden", display: "block", p: "0", border: "0" };
-  const cols = shown.length === 1 ? "1fr" : shown.length === 2 ? "1fr 1fr" : "2fr 1fr";
+  const layout = GRID_LAYOUT[shown.length + (extra > 0 ? 1 : 0)];
+  const tile = { w: "100%", h: "100%", minH: "0", borderRadius: "md", overflow: "hidden", display: "block", p: "0", border: "0", bg: "surface", cursor: "pointer" };
   return (
     <Box
       data-mock-part="chat-thumbs"
       display="grid"
       gap="1"
-      gridTemplateColumns={cols}
-      gridTemplateRows={shown.length >= 3 ? "1fr 1fr" : undefined}
+      gridTemplateColumns={layout.cols}
+      gridTemplateRows={layout.rows}
       w="200px"
       maxW="100%"
-      aspectRatio={shown.length === 1 ? "4/3" : shown.length === 2 ? "2/1" : "3/2"}
+      aspectRatio={layout.aspectRatio}
     >
-      {shown.map((img, i) => {
-        const label = `Image ${i + 1} of ${images.length}`;
-        const last = i === shown.length - 1 && extra > 0;
-        return (
-          <Box
-            as="button"
-            key={img.id ?? `ph-${i}`}
-            aria-label={last ? `${label}, ${extra} more` : label}
-            bg="surface"
-            cursor="pointer"
-            onClick={() => setViewing(i)}
-            position="relative"
-            gridRow={shown.length >= 3 && i === 0 ? "1 / 3" : undefined}
-            {...tile}
-          >
-            {img.id && !img.placeholder ? (
-              <img
-                src={sessionImageUrl(sessionId, img.id)}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              />
-            ) : (
-              <Box data-testid="chat-image-placeholder" w="100%" h="100%" bg="border" />
-            )}
-            {last && (
-              <Box
-                position="absolute"
-                inset="0"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                bg="surface.raised"
-                opacity="0.9"
-                fontWeight="semibold"
-                fontSize="lg"
-              >
-                {`+${extra}`}
-              </Box>
-            )}
-          </Box>
-        );
-      })}
+      {shown.map((img, i) => (
+        <Box
+          as="button"
+          key={img.id ?? `ph-${i}`}
+          aria-label={`Image ${i + 1} of ${images.length}`}
+          onClick={() => setViewing(i)}
+          gridRow={layout.tallFirst && i === 0 ? "1 / 3" : undefined}
+          {...tile}
+        >
+          {img.id && !img.placeholder ? (
+            <img
+              src={sessionImageUrl(sessionId, img.id)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          ) : (
+            <Box data-testid="chat-image-placeholder" w="100%" h="100%" bg="border" />
+          )}
+        </Box>
+      ))}
+      {extra > 0 && (
+        <Box
+          as="button"
+          aria-label={`${extra} more`}
+          onClick={() => setViewing(MAX_THUMBS)}
+          fontWeight="semibold"
+          fontSize="lg"
+          {...tile}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          bg="surface.raised"
+        >
+          {`+${extra}`}
+        </Box>
+      )}
       {viewing !== undefined && (
         <ImageViewer images={images} sessionId={sessionId} start={viewing} onClose={() => setViewing(undefined)} />
       )}
@@ -110,29 +112,14 @@ function Entry({ m, showTools, sessionId }: { m: SessionChatMessage; showTools: 
   if (m.kind === "tools") return showTools ? <ToolCalls m={m} /> : null;
   if (m.kind === "prompt") {
     const images = m.images ?? [];
-    if (images.length === 0) {
-      return (
-        <Box
-          alignSelf="flex-end"
-          maxW="85%"
-          bg="surface.raised"
-          borderRadius="lg"
-          px="3"
-          py="2"
-          fontSize="base"
-          whiteSpace="pre-wrap"
-        >
-          {m.text}
-        </Box>
-      );
-    }
+    const hasImages = images.length > 0;
     return (
       <Box
         alignSelf="flex-end"
         maxW="85%"
         bg="surface.raised"
-        border="1px solid"
-        borderColor="border"
+        border={hasImages ? "1px solid" : undefined}
+        borderColor={hasImages ? "border" : undefined}
         borderRadius="lg"
         px="3"
         py="2"
@@ -141,7 +128,7 @@ function Entry({ m, showTools, sessionId }: { m: SessionChatMessage; showTools: 
         flexDirection="column"
         gap="2"
       >
-        <ChatImageGrid images={images} sessionId={sessionId} />
+        {hasImages && <ChatImageGrid images={images} sessionId={sessionId} />}
         {m.text && (
           <Box as="span" data-mock-part="chat-text" whiteSpace="pre-wrap">
             {m.text}

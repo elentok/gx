@@ -819,11 +819,13 @@ test.each([
   [1, 1, false],
   [2, 2, false],
   [3, 3, false],
-  [10, 3, true],
-])("a prompt with %i images draws %i tiles", async (n, tiles, more) => {
+  [4, 4, true],
+  [10, 4, true],
+])("a prompt with %i images draws %i tiles (thumbnails plus a +N tile)", async (n, tiles, more) => {
   renderChat([session()], okChat(chatOf([withImages(n, "look")])));
   await screen.findByText("look");
   expect(within(thumbs()).getAllByRole("button")).toHaveLength(tiles);
+  expect(within(thumbs()).getAllByRole("button", { name: /^Image \d+ of/ })).toHaveLength(Math.min(n, 3));
   expect(within(thumbs()).queryByText(`+${n - 3}`) !== null).toBe(more);
   const img = thumbs().querySelector("img")!;
   expect(img.getAttribute("src")).toBe("/v1/sessions/images?session=s-a&id=img-0");
@@ -844,9 +846,10 @@ test("a tap on the second of three thumbnails opens the viewer at 2 of 3, Close 
 test("with ten images the +N tile opens the viewer and Next reaches the tenth", async () => {
   renderChat([session()], okChat(chatOf([withImages(10, "look")])));
   await screen.findByText("look");
-  fireEvent.click(within(thumbs()).getByRole("button", { name: "Image 3 of 10, 7 more" }));
+  fireEvent.click(within(thumbs()).getByRole("button", { name: "7 more" }));
   const dialog = screen.getByRole("dialog", { name: "Image" });
-  for (let i = 0; i < 7; i++) fireEvent.click(within(dialog).getByRole("button", { name: /Next/ }));
+  expect(within(dialog).getByText("4 of 10")).toBeTruthy();
+  for (let i = 0; i < 6; i++) fireEvent.click(within(dialog).getByRole("button", { name: /Next/ }));
   expect(within(dialog).getByText("10 of 10")).toBeTruthy();
   fireEvent.keyDown(window, { key: "Escape" });
   expect(screen.queryByRole("dialog", { name: "Image" })).toBeNull();

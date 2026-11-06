@@ -117,7 +117,7 @@ test("191. Chat images on the agents-images scenario", async ({ page, start }) =
   await open(page, claude.id);
 
   // The ten-image message shows three thumbnails and a "+7" tile.
-  const ten = page.getByRole("button", { name: "Image 3 of 10, 7 more" });
+  const ten = page.getByRole("button", { name: "7 more" });
   await expect(ten).toBeVisible();
   await expect(ten).toContainText("+7");
   await expect(page.getByRole("button", { name: /^Image \d of 10/ })).toHaveCount(3);
@@ -133,7 +133,8 @@ test("191. Chat images on the agents-images scenario", async ({ page, start }) =
 
   // With ten images, Next reaches the tenth.
   await ten.click();
-  for (let i = 4; i <= 10; i++) {
+  await expect(viewer(page).getByText("4 of 10")).toBeVisible();
+  for (let i = 5; i <= 10; i++) {
     await viewer(page).getByRole("button", { name: /Next/ }).click();
     await expect(viewer(page).getByText(`${i} of 10`)).toBeVisible();
   }
@@ -145,7 +146,7 @@ test("191. Chat images on the agents-images scenario", async ({ page, start }) =
 
   // A second tab shows the thumbnails.
   const other = await freshVisit(page, `#/agents/${claude.id}`);
-  await expect(other.getByRole("button", { name: "Image 3 of 10, 7 more" })).toBeVisible();
+  await expect(other.getByRole("button", { name: "7 more" })).toBeVisible();
   await other.close();
 
   // Stop and resume the session: they still show.
@@ -154,5 +155,5 @@ test("191. Chat images on the agents-images scenario", async ({ page, start }) =
   const resumed = (await fixture.cli("agents", "resume", claude.id)).trim();
   await expect.poll(async () => (await sessions(fixture)).some((s) => s.id === resumed)).toBe(true);
   await go(page, `#/agents/${resumed}`);
-  await expect(page.getByRole("button", { name: "Image 3 of 10, 7 more" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "7 more" })).toBeVisible();
 });
