@@ -514,6 +514,9 @@ var scenarios = map[string]scenario{
 	// design-branch-ready: chat-capture, the map at create-tickets and an impl epic
 	// of three tickets; a test sets the design step to branch while the server runs.
 	"design-branch-ready": spec.DesignBranchReady(),
+	// running-ticket-tick: chat-capture, one epic with a Claude and a Codex ticket
+	// held running and a third that finishes after the release; Progress every 3s.
+	"running-ticket-tick": spec.RunningTicketTick(),
 	// design-error (V13): a round, then an error turn before the run-end line.
 	"design-error": spec.DesignScript(tickets.StepResolveTickets,
 		agentfake.DesignTurnRound, agentfake.DesignTurnError),
