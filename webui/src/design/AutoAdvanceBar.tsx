@@ -29,7 +29,44 @@ export function useAutoAdvanceCountdown(session: SessionInfo) {
     : Math.max(0, Math.ceil((deadline - now) / 1000));
 }
 
-// The Auto menu, and the countdown with its Cancel while one runs.
+// "Continuing in Ns" with its Cancel; nothing with no countdown running. `strip` is the phone's own row above the footer.
+export function AutoCountdown({
+  session,
+  disabled,
+  run,
+  cancelAutoAdvance,
+  strip = false,
+}: {
+  session: SessionInfo;
+  disabled: boolean;
+  run: RunCall;
+  cancelAutoAdvance: CancelAutoAdvance;
+  strip?: boolean;
+}) {
+  const secondsLeft = useAutoAdvanceCountdown(session);
+  if (secondsLeft === undefined) return null;
+  const state = stateToken(session);
+  return (
+    <Box
+      display="flex"
+      gap="3"
+      alignItems="center"
+      {...(strip ? { justifyContent: "space-between", minH: "44px", px: "1", "data-part": "countdown-strip" } : {})}
+    >
+      <Text>Continuing in {secondsLeft}s</Text>
+      <Button
+        emphasis="secondary"
+        disabled={disabled}
+        {...(strip ? { h: "40px" } : {})}
+        onClick={() => run(() => cancelAutoAdvance({ id: session.id, state }))}
+      >
+        Cancel
+      </Button>
+    </Box>
+  );
+}
+
+// The Auto menu, and on a wide screen the countdown with its Cancel while one runs.
 export function AutoAdvanceBar({
   session,
   disabled,
@@ -48,7 +85,6 @@ export function AutoAdvanceBar({
   cancelAutoAdvance: CancelAutoAdvance;
   menu: AutoMenuState;
 }) {
-  const secondsLeft = useAutoAdvanceCountdown(session);
   const state = stateToken(session);
   return (
     <Box display="flex" gap="3" alignItems="center">
@@ -81,19 +117,8 @@ export function AutoAdvanceBar({
           },
         ]}
       />
-      {secondsLeft !== undefined && (
-        <>
-          <Text>Continuing in {secondsLeft}s</Text>
-          <Button
-            emphasis="secondary"
-            disabled={disabled}
-            onClick={() =>
-              run(() => cancelAutoAdvance({ id: session.id, state }))
-            }
-          >
-            Cancel
-          </Button>
-        </>
+      {!phone && (
+        <AutoCountdown session={session} disabled={disabled} run={run} cancelAutoAdvance={cancelAutoAdvance} />
       )}
     </Box>
   );

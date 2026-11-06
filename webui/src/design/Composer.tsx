@@ -8,7 +8,7 @@ import type {
   SessionRoundCard,
 } from "../generated/server";
 import { Button } from "../ui/button/Button";
-import { AutoAdvanceBar, type RunCall } from "./AutoAdvanceBar";
+import { AutoAdvanceBar, AutoCountdown, type RunCall } from "./AutoAdvanceBar";
 import type { AutoMenuState } from "./AutoMenu";
 import {
   postAutoAdvance,
@@ -232,26 +232,39 @@ export function Composer({
       <ComposerImages
         state={images}
         phone={!wide}
+        afterAdd={
+          <Button
+            emphasis="secondary"
+            aria-label="Note"
+            title={wide ? undefined : "Note"}
+            aria-expanded={open}
+            {...(wide ? {} : { w: "44px", h: "44px", px: "0", justifyContent: "center", flex: "none", position: "relative" })}
+            onClick={() => setOpen(!open)}
+          >
+            <PiNotePencil size={wide ? undefined : 20} />
+            {wide && " Note"}
+            {!wide && (open || text !== "") && (
+              <Box
+                data-part="note-dot"
+                position="absolute"
+                top="7px"
+                right="7px"
+                w="8px"
+                h="8px"
+                borderRadius="full"
+                bg="tone.running.fg"
+              />
+            )}
+          </Button>
+        }
         send={
           <>
-            {wide && autoAdvanceBar}
+            {autoAdvanceBar}
             {wide && canContinue && !working && (
               <Text as="span" fontSize="xs" color="text.dim" truncate minW="0">
                 {nextTitle}
               </Text>
             )}
-            <Button
-              emphasis="secondary"
-              aria-label="Note"
-              title={wide ? undefined : "Note"}
-              aria-expanded={open}
-              {...(wide ? {} : { w: "44px", h: "44px", px: "0", justifyContent: "center", flex: "none" })}
-              onClick={() => setOpen(!open)}
-            >
-              <PiNotePencil size={wide ? undefined : 20} />
-              {wide && " Note"}
-            </Button>
-            {!wide && autoAdvanceBar}
             {mainButton}
           </>
         }
@@ -274,6 +287,15 @@ export function Composer({
           <Text fontSize="xs" color="text.dim">
             {codexSkillHint(session.harness, text)}
           </Text>
+        )}
+        {!wide && autoMenu && (
+          <AutoCountdown
+            strip
+            session={session}
+            disabled={!connected || pending}
+            run={run}
+            cancelAutoAdvance={cancelAutoAdvance}
+          />
         )}
       </ComposerImages>
     </Box>

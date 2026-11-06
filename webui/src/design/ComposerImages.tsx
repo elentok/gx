@@ -96,11 +96,14 @@ export function ComposerImages({
   state,
   children,
   send,
+  afterAdd,
   phone = false,
 }: {
   state: State;
   children: ReactNode;
   send: ReactNode;
+  /** Sits right next to Add, before the status line. */
+  afterAdd?: ReactNode;
   phone?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -162,6 +165,7 @@ export function ComposerImages({
             e.target.value = "";
           }}
         />
+        {afterAdd}
         {!phone && (
           <Box flex="1" fontSize="sm" color={line?.red ? "tone.deadlocked.fg" : "text.dim"}>
             {line?.text}

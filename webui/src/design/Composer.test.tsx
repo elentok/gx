@@ -320,15 +320,17 @@ const openAuto = async () => {
   return screen.findByRole("dialog", { name: "Auto" });
 };
 
-test("one line: the Auto menu on the left; Note and Send on the right; the note box above the bar", async () => {
+test("one line: Add, Note, Auto, then Send; the note box above the bar", async () => {
   render({ post: vi.fn<PostPrompt>(async () => ok) });
   const auto = await autoButton();
+  const add = screen.getByRole("button", { name: "Add image" });
   const note = screen.getByRole("button", { name: "Note" });
   const send = screen.getByRole("button", { name: "Send" });
   const follows = (a: Node, b: Node) =>
     !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(follows(auto, note)).toBe(true);
-  expect(follows(note, send)).toBe(true);
+  expect(follows(add, note)).toBe(true);
+  expect(follows(note, auto)).toBe(true);
+  expect(follows(auto, send)).toBe(true);
   const box = await openNote();
   expect(follows(box, auto)).toBe(true);
   const menu = await openAuto();
@@ -473,6 +475,55 @@ test("a countdown shows the seconds left and Cancel posts to the cancel route", 
   );
   expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a");
   fetchSpy.mockRestore();
+});
+
+const countdownAuto = { auto_advance_at: new Date(Date.now() + 9500).toISOString() };
+
+test("on the phone the countdown is a strip above the row with its own Cancel", async () => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({ wide: false, auto: countdownAuto });
+  const strip = (await screen.findByText(/Continuing in \d+s/)).parentElement as HTMLElement;
+  const add = screen.getByRole("button", { name: "Add image" });
+  expect(!!(strip.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  fireEvent.click(within(strip).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a"));
+  fetchSpy.mockRestore();
+});
+
+test("on the phone there is no strip without a countdown", async () => {
+  render({ wide: false });
+  await autoButton();
+  expect(screen.queryByText(/Continuing in/)).toBeNull();
+});
+
+test("on a wide screen the countdown stays inline, after Note and before Send", async () => {
+  render({ wide: true, auto: countdownAuto });
+  const text = await screen.findByText(/Continuing in \d+s/);
+  const note = screen.getByRole("button", { name: "Note" });
+  const send = screen.getByRole("button", { name: "Send" });
+  expect(!!(note.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  expect(!!(text.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+});
+
+test("the Note dot shows with an open note or text on the phone, and never on a wide screen", async () => {
+  render({ wide: false });
+  const note = await screen.findByRole("button", { name: "Note" });
+  expect(note.querySelector("[data-part=note-dot]")).toBeNull();
+  const box = await openNote();
+  expect(note.querySelector("[data-part=note-dot]")).not.toBeNull();
+  fireEvent.click(note);
+  expect(note.querySelector("[data-part=note-dot]")).toBeNull();
+  fireEvent.click(note);
+  expect(box.isConnected).toBe(false);
+  fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "hi" } });
+  fireEvent.click(note);
+  expect(note.querySelector("[data-part=note-dot]")).not.toBeNull();
+  cleanup();
+  render({ wide: true });
+  fireEvent.click(await screen.findByRole("button", { name: "Note" }));
+  expect(document.querySelector("[data-part=note-dot]")).toBeNull();
 });
 
 test("Auto-queue shows in the menu, off and disabled", async () => {
