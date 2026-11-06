@@ -32,7 +32,7 @@ export const menuItemStyle = (sheetMode: boolean) =>
     ps: "3",
     _highlighted: { bg: "surface" },
     fontWeight: "600",
-    fontSize: "17px",
+    fontSize: "15px",
     ...(sheetMode && { py: "3", minH: "44px" }),
   }) as const;
 export type MenuItemStyle = ReturnType<typeof menuItemStyle>;

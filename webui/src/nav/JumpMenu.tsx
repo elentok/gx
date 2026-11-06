@@ -318,7 +318,17 @@ export function RowList({
  * of the epic on screen; `epics` is the list the page already loaded. Ready to design and Finished
  * show only while the filter has text.
  */
-export function JumpMenu({ name, current, epics }: { name: string; current: string; epics: EpicListRow[] }) {
+export function JumpMenu({
+  name,
+  current,
+  epics,
+  fontSize,
+}: {
+  name: string;
+  current: string;
+  epics: EpicListRow[];
+  fontSize?: string;
+}) {
   const sections = useMemo(
     () =>
       sectionsOf(epics, "").map((s) => ({
@@ -329,5 +339,5 @@ export function JumpMenu({ name, current, epics }: { name: string; current: stri
       })),
     [epics, current],
   );
-  return <RowList name={name} label="Jump to epic" placeholder="Filter epics" sections={sections} />;
+  return <RowList name={name} label="Jump to epic" placeholder="Filter epics" sections={sections} fontSize={fontSize} />;
 }

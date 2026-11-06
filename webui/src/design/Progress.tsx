@@ -134,8 +134,8 @@ export function StepLine({ detail, onOpen }: { detail: EpicDetail; onOpen: () =>
       display="flex"
       gap="1"
       maxW="full"
-      fontSize="sm"
-      color="text.muted"
+      fontSize="inherit"
+      color="inherit"
       cursor="pointer"
       textAlign="left"
     >

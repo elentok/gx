@@ -7,6 +7,7 @@ import { EpicRing } from "../epic/EpicRing";
 import { PageHeader } from "../page/PageHeader";
 import { useEpicList, waitingCount, type EpicList, type FetchEpicList } from "../epics/list";
 import { JumpMenu } from "../nav/JumpMenu";
+import { headerTitleFontSize } from "../nav/titleSize";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import { hasChat, roundKeyOf, useSessionChat, type FetchChat } from "./chat";
@@ -160,7 +161,7 @@ function DesignBody({
               </chakra.button>
             ))
           }
-          heading={<JumpMenu name={name} current={address} epics={epics} />}
+          heading={<JumpMenu name={name} current={address} epics={epics} fontSize={headerTitleFontSize(wide)} />}
           line={
             detail &&
             (wide ? summaryLine(detail) : <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />)
