@@ -62,7 +62,7 @@ A launch takes under 15s from claim to launch prompt delivered, and N ready tick
 37. As a person, I want every launch that reaches prompt delivered to write one `launch-timed` run-log event with its claim time, total, four step durations and path (cold-start or resumed), so that launch time is recorded for every launch.
 38. As a person, I want a launch that waits for a shared install to count the wait in its deps step, so that the step shows what the launch really waited for.
 39. As a person, I want a failed launch to keep its `launch-failed` event and get no timing, and a launch cut off by a restart to get none either (its reclaim is a new launch with its own timing), so that timings describe only complete launches.
-40. As a person on the Stats page, I want a "Launch" section with the range median and the share of launches under 15s as headlines, a per-day median chart and the median per step, counting launches of finished tickets only (`gx-evolve` reads the run log and shows current launches), so that I can see whether the queue stays fast.
+40. As a person on the Stats page, I want a "Launch" section with the range median and the share of launches under 15s as headlines, a per-day median chart and the median per step, counting launches of finished tickets only (`gx-evolve` reads the run log and flags slow current launches, those over 15s), so that I can see whether the queue stays fast.
 41. As a person, I want each launch counted on its own day (a reclaim is a second launch), so that the chart matches when launches ran.
 42. As a person running `gx server stats`, I want text mode to print the launch median and the share under 15s and `--json` to carry the full launch data, so that I can read launch time from the terminal.
 43. As a person running `gx-evolve`, I want `gx evolve inputs` to print a "Launch rows" block beside the check rows, with one row per launch over 15s (ticket, total, slowest step) and one row when the epic's median launch is over 15s, so that slow launches are reviewed.
@@ -117,7 +117,7 @@ Vocabulary: **Launch** is the glossary term (claim the ticket, create the worktr
 
 **Fill order and caps.**
 - Fill-first stays: the first queued epic fills its slots (up to `max-agents-per-epic`, the global `max-agents` and any project cap) before the next epic gets a turn. No new setting. The one-offs root keeps `max-one-off-agents` and takes its turn by queue position. An epic at its per-epic cap is skipped. A claimed ticket is never taken back by a reorder.
-- Design runs stay outside every cap (no change to ADR 0032 "No bypass"). Queue views, slot counts and launch timings leave them out; the Agents tab and page keep listing them as Design agents. They get no Launching state and no launch timing. A finished design session must leave no live design agent (pane or process). This is a requirement, covered by a Go test (design session finish: pane closed, process gone), and a leak is fixed inside this epic. A follow-up is only for a leak whose fix needs its own design.
+- Design runs stay outside every cap (no change to ADR 0032 "No bypass"). Queue views, slot counts and launch timings leave them out; the Agents tab and page keep listing them as Design agents. They get no Launching state and no launch timing. A finished design session must leave no live design agent (pane or process). This is a requirement, covered by a Go test (design session finish: pane closed, process gone), and a leak is always fixed inside this epic.
 
 **Launch timing event.**
 - One new run-log event, `launch-timed`, is written when the launch prompt is delivered. It carries the claim time, the total, the four step durations and `path` (cold-start or resumed). Exact field names are the implementer's choice.
@@ -125,7 +125,7 @@ Vocabulary: **Launch** is the glossary term (claim the ticket, create the worktr
 - Only a launch that reaches prompt delivered is timed. A failed launch keeps its `launch-failed` event; a launch cut off by a restart gets no timing and its reclaim is a new launch.
 
 **Stats.**
-- A `launch` stamp is written at finish beside friction, holding each launch's start time, total and four step durations (the Stats build reads stamps only, never run logs). Because it is written at finish, Stats counts launches of finished tickets only; `gx-evolve` reads the run log and is where current launches show. Each launch counts on its own day, bucketed by its own start time, not by the ticket's finish day. The stamp is per ticket and per project like friction; `wire.Stats` carries it.
+- A `launch` stamp is written at finish beside friction, holding each launch's claim time, total and four step durations, taken from the in-memory run record kept from the launch (the Stats build reads stamps only, never run logs). Because it is written at finish, Stats counts launches of finished tickets only; `gx-evolve` reads the run log and is where current launches show. Each launch counts on its own day, bucketed by its own claim time, not by the ticket's finish day. The stamp is per ticket and per project like friction; `wire.Stats` carries it.
 - The Stats page gets a "Launch" section: range median and share under 15s as headlines, a per-day median chart, and the median per step. `StatCard` has no target-line prop, so the share-under-15s headline stands in for a target line.
 - `gx server stats` text mode adds the median and the share under 15s; `--json` carries the full launch data.
 - A `gx tickets migrate` step registers the `launch` field and backfills nothing. Per `.ai/index.md`, add a named step in `migrations/steps.go` and update `migrations/testdata/schema.snapshot`.
@@ -155,6 +155,9 @@ Seams, highest first:
 4. **Stats and evolve seam: Go tests on the stats build and `gx evolve inputs`.** Covers the stamp, bucketing each launch on its own day, the median and the share under 15s, the text and `--json` output of `gx server stats`, the Launch rows block and the `slow-launch` flag. Prior art: the friction series in the stats build tests and the check-rows tests. The skill anchor test pins the existing anchors.
 5. **Web seam: vitest for label and line rendering; one existing Playwright flow extended per page.** Render and component logic (labels, the shared line slot, the over-cap clause) is vitest, and the TUI row phase is a TUI unit test. Per `.ai/index.md` and `gx-playwright-e2es`, no new flow: extend an existing queue/epic flow on the scenario that holds a launching ticket, and the Stats flow for the Launch section. If a launching ticket needs a new fixture scenario, the implementer adds the scenario, not a flow, and keeps `CATALOG.md` and `maxFlows` in step.
 
+6. **Herdr runner seam: the herdr runner tests.** Covers the workspace being created once (story 2).
+7. **Design session finish seam: a Go test on design session finish.** Covers the pane closed and the process gone (story 36).
+
 Cold-store timing and real-hardware numbers are not unit-tested; the verify ticket checks them against a real launch.
 
 ## Verification
@@ -165,7 +168,7 @@ Mock states: none (no stored mock).
 
 New flows or scenarios to write (these become implementation tickets): a fixture scenario with a ticket held in `launching` at a chosen step (the implementer picks the name and how a test steps it), and a fixture scenario with an epic at its agent cap. Both extend existing flows; no new Playwright flow unless the guard allows it.
 
-1. Story 1 (15s): launch one ready ticket on the temporary server, then `grep launch-timed` the epic run log. The event's total is under 15s and `gx server stats --json` shows the launch. Stats page flow (`stats.e2e.ts`).
+1. Story 1 (15s): launch one ready ticket on the temporary server, then `grep launch-timed` the epic run log. The event's total is under 15s, and `gx evolve inputs` reads the same launch from the run log. (`gx server stats --json` shows it only after the ticket finishes.) Stats page flow (`stats.e2e.ts`).
 2. Story 2 (N together): queue an epic with 4 ready tickets and 4 free slots. Four `launch-timed` events have overlapping claim-to-delivery windows, and `ticket-claimed` events for all four precede the first `launch-timed`. Epic flow `6. Queue an epic, and outside changes show up`. A herdr-runner test launches N tickets in parallel into one new workspace and checks it is created once.
 3. Story 3 (no transcript wait): the deps-done to prompt-delivered gap in the `launch-timed` steps is under 5s with no `ready signal missing` warning in the server log.
 4. Story 4 (missing ready signal): Go test with the fake agent that never signals ready; the launch fails and the ticket pauses at once as `iteration-error`, and the pause card's Retry resumes it. Checked by the scheduler and pty tests. No catalog flow.
@@ -194,7 +197,7 @@ New flows or scenarios to write (these become implementation tickets): a fixture
 27. Story 27 (live step change): fixture advances the step; the page updates with no reload (the suite fails on a reload).
 28. Story 28 (no new status): `gx tickets validate` and the schema snapshot show no new status value; a launching ticket still reads `claimed`.
 29. Story 29 (failed launch display): fixture with a failing launch; the ticket pauses as `iteration-error` with the launch error shown and the Launching label gone.
-30. Story 30 (restart mid-launch): scheduler test; a reclaimed launching run with no agent reopens the ticket and launches again as a new launch; a live agent continues as running. Restart flows in `restart-run.e2e.ts` still pass.
+30. Story 30 (restart mid-launch): scheduler test; a reclaimed launching run with no agent reopens the ticket and launches again as a new launch; a live agent continues as running. These cases arise only after an unclean exit (crash or kill): a clean stop rolls every launch back (story 16). Restart flows in `restart-run.e2e.ts` still pass.
 31. Story 31 (Waiting for a slot): fixture scenario with an epic at its cap; the web Queue row, epic page, ticket page and TUI show "Waiting for a slot: epic cap n/m" naming every full cap.
 32. Story 32 (over cap): same scenario with the cap lowered below the live count shows the "(over cap, no new starts until one ends)" clause. vitest for the text.
 33. Story 33 (other verdicts): existing disk, harness, usage-gate and Herdr-down flows (`disk.e2e.ts` and the pause/queue flows) still show their own verdicts.
@@ -225,6 +228,7 @@ New flows or scenarios to write (these become implementation tickets): a fixture
 - A ready-check change for Codex or for non-slash prompts.
 - Backfilling launch data for old tickets.
 - Counting design runs toward any cap.
+- A debounce between a `gx tickets` write's `/changed` ping and the watcher scan.
 - Reloading only changed epics in the index (deferred until a measurement shows a need).
 - Follow-ups noted on the map: `Pty.Wait` polling cost (`gx:follow-ups/215`), server start resuming every saved session at once (`gx:follow-ups/296`), slow full test runs, and `gx tickets validate` rejecting a map epic with no children.
 
