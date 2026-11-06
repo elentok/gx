@@ -23,7 +23,7 @@ async function dispatchFiles(target: Locator, type: "paste" | "drop", files: Ret
   );
 }
 
-test("182. Paste images", async ({ page, start }) => {
+test("193. Paste images", async ({ page, start }) => {
   const fixture = await start("agents");
   await idleSession(page, fixture);
 
@@ -44,7 +44,7 @@ test("183. Drop images", async ({ page, start }) => {
   await expect(composer(page).getByText("2 of 10 images")).toBeVisible();
 });
 
-test("184. Add image button", async ({ page, start }) => {
+test("194. Add image button", async ({ page, start }) => {
   const fixture = await start("agents");
   const idle = (await sessions(fixture)).find((s) => s.status.state === "idle" && !s.design && !s.queue)!;
   await page.setViewportSize({ width: 390, height: 800 });
@@ -62,7 +62,7 @@ test("184. Add image button", async ({ page, start }) => {
   await expect(thumbs(page)).toHaveCount(4);
 });
 
-test("184. Add image button, design composer", async ({ page, start }) => {
+test("194. Add image button, design composer", async ({ page, start }) => {
   const fixture = await start("design", { autoAdvanceDelay: "1h" });
   await page.setViewportSize({ width: 1280, height: 800 });
   await go(page, "#/d/demo:design-epic");

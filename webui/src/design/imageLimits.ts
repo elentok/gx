@@ -32,24 +32,29 @@ export interface ImageCheck {
   accepted: File[];
   /** The first refusal message, or "" when every file passed. */
   error: string;
+  /** Files refused for their own size or type, each with its reason. The count limit is not here. */
+  refused: { name: string; message: string }[];
 }
 
 /** Runs before any upload. `existing` counts the images already in the draft. */
 export async function checkImages(files: File[], existing: number): Promise<ImageCheck> {
   const accepted: File[] = [];
+  const refused: ImageCheck["refused"] = [];
   let error = "";
   for (const file of files) {
     if (existing + accepted.length >= MAX_IMAGES) {
       error = error || MSG_MAX_IMAGES;
       break;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      error = error || MSG_TOO_LARGE;
-    } else if (!isSupportedImageBytes(await headBytes(file))) {
-      error = error || MSG_BAD_TYPE;
+    let message = "";
+    if (file.size > MAX_IMAGE_BYTES) message = MSG_TOO_LARGE;
+    else if (!isSupportedImageBytes(await headBytes(file))) message = MSG_BAD_TYPE;
+    if (message) {
+      refused.push({ name: file.name, message });
+      error = error || message;
     } else {
       accepted.push(file);
     }
   }
-  return { accepted, error };
+  return { accepted, error, refused };
 }

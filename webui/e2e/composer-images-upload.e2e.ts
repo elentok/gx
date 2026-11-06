@@ -30,7 +30,7 @@ async function steerUploads(page: Page) {
 const retryThumb = (page: Page) => composer(page).getByRole("button", { name: "Upload failed, tap to retry" });
 const readyThumbs = (page: Page) => composer(page).locator('[data-state="ready"]');
 
-test("185. Upload states", async ({ page, start }) => {
+test("195. Upload states", async ({ page, start }) => {
   const fixture = await start("agents");
   await idleSession(page, fixture);
   const uploads = await steerUploads(page);
@@ -65,7 +65,9 @@ test("186. Upload failures", async ({ page, start }) => {
   const uploads = await steerUploads(page);
   const refusal = async (f: ReturnType<typeof file>, text: string) => {
     await addInput(page).setInputFiles([f]);
-    await expect(composer(page).getByText(text, { exact: true })).toBeVisible();
+    // The reason sits on the refused file's own thumbnail; removing it leaves nothing behind.
+    await expect(composer(page).locator('[data-state="failed"]').getByText(text, { exact: true })).toBeVisible();
+    await thumbs(page).click();
     await expect(thumbs(page)).toHaveCount(0);
   };
 

@@ -46,6 +46,11 @@ export function useComposerImages(sessionId: string): ComposerImages {
       touch();
       uploadSessionImage(sessionId, file).then(
         (id) => {
+          // Removed while uploading: the file just saved has no owner left.
+          if (!local.current.has(key)) {
+            void deleteSessionImage(sessionId, id).catch(() => undefined);
+            return;
+          }
           local.current.delete(key);
           update((cur) => cur.map((e) => (e.key === key ? { ...e, id } : e)));
           touch();
@@ -61,10 +66,13 @@ export function useComposerImages(sessionId: string): ComposerImages {
   );
 
   const [error, setError] = useState("");
+  // Refused files stay as removable thumbnails with their own reason; they never reach the draft.
+  const [refused, setRefused] = useState<{ key: string; message: string }[]>([]);
   const addFiles = useCallback(
     async (files: File[]) => {
-      const { accepted, error } = await checkImages(files, count.current);
+      const { accepted, error, refused: bad } = await checkImages(files, count.current);
       setError(error);
+      setRefused((cur) => [...cur, ...bad.map((b) => ({ key: crypto.randomUUID(), message: b.message }))]);
       for (const file of accepted) {
         const key = crypto.randomUUID();
         update((cur) => [...cur, { key }]);
@@ -85,6 +93,7 @@ export function useComposerImages(sessionId: string): ComposerImages {
   const remove = useCallback(
     (key: string) => {
       const entry = draft.find((e) => e.key === key);
+      setRefused((cur) => cur.filter((r) => r.key !== key));
       local.current.delete(key);
       update((cur) => cur.filter((e) => e.key !== key));
       touch();
@@ -96,6 +105,7 @@ export function useComposerImages(sessionId: string): ComposerImages {
   // After a send the server owns the files: drop the draft without deleting them.
   const clear = useCallback(() => {
     local.current.clear();
+    setRefused([]);
     update(() => []);
     touch();
   }, [update]);
@@ -107,11 +117,14 @@ export function useComposerImages(sessionId: string): ComposerImages {
     if (mine?.failed) return { key: e.key, state: "failed", message: mine.failed, canRetry: true };
     return { key: e.key, state: "failed", message: MSG_CUT_OFF, canRetry: false };
   });
+  // Refused thumbnails do not count as failed uploads: they never block a send.
+  const failed = images.filter((i) => i.state === "failed").length;
+  images.push(...refused.map((r): ComposerImage => ({ key: r.key, state: "failed", message: r.message, canRetry: false })));
   return {
     images,
     readyIds: draft.flatMap((e) => (e.id ? [e.id] : [])),
     uploading: images.filter((i) => i.state === "uploading").length,
-    failed: images.filter((i) => i.state === "failed").length,
+    failed,
     error,
     addFiles,
     retry,

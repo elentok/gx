@@ -1,8 +1,16 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { renderThemed } from "../ui/render";
 import { ComposerImages } from "./ComposerImages";
-import type { ComposerImage, ComposerImages as State } from "./useComposerImages";
+import { MSG_TOO_LARGE } from "./imageLimits";
+import { deleteSessionImage, uploadSessionImage } from "./sessionImages";
+import { useComposerImages, type ComposerImage, type ComposerImages as State } from "./useComposerImages";
+
+vi.mock("./sessionImages", () => ({
+  uploadSessionImage: vi.fn(),
+  deleteSessionImage: vi.fn(async () => ({})),
+  sessionImageUrl: (s: string, id: string) => `/u/${s}/${id}`,
+}));
 
 afterEach(cleanup);
 
@@ -96,4 +104,35 @@ test("the line reads failed and uploading, N of 10, or the max message", () => {
   cleanup();
   render(state([ready("a")], { error: "Max 10 images" }));
   expect(screen.getByText("Max 10 images")).toBeTruthy();
+});
+
+const realPng = () => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", { type: "image/png" });
+
+test("removing an image while it uploads deletes the saved file once the upload completes", async () => {
+  localStorage.clear();
+  let finish: (id: string) => void = () => undefined;
+  vi.mocked(uploadSessionImage).mockReturnValue(new Promise((r) => (finish = r)));
+  const { result } = renderHook(() => useComposerImages("s1"));
+  await act(() => result.current.addFiles([realPng()]));
+  expect(result.current.uploading).toBe(1);
+  act(() => result.current.remove(result.current.images[0].key));
+  expect(deleteSessionImage).not.toHaveBeenCalled();
+  await act(async () => finish("img-1"));
+  await waitFor(() => expect(deleteSessionImage).toHaveBeenCalledExactlyOnceWith("s1", "img-1"));
+  expect(result.current.images).toHaveLength(0);
+});
+
+test("each refused file keeps its own reason on its thumbnail while another image uploads", async () => {
+  localStorage.clear();
+  vi.mocked(uploadSessionImage).mockReturnValue(new Promise(() => undefined));
+  const { result } = renderHook(() => useComposerImages("s2"));
+  const big = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "big.png", { type: "image/png" });
+  Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
+  const text = new File(["just text"], "n.png", { type: "image/png" });
+  await act(() => result.current.addFiles([realPng(), big, text]));
+  render(result.current);
+  expect(screen.getByText(MSG_TOO_LARGE)).toBeTruthy();
+  expect(screen.getByText("Not a supported image type")).toBeTruthy();
+  expect(result.current.uploading).toBe(1);
+  expect(result.current.failed).toBe(0);
 });
