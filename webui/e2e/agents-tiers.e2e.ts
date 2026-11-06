@@ -19,14 +19,14 @@ test("95. New Agents tab session tiers", async ({ page, start }) => {
   await newSession(page);
 
   // Three tiers, each with the model it runs under; Worker is the default.
-  await expect(tierSelect(page).locator("option")).toHaveText(["Light (Claude Haiku)", "Worker (Claude Sonnet)", "Strongest (Claude Opus)"]);
+  await expect(tierSelect(page).locator("option")).toHaveText(["Light (Claude Haiku)", "Worker (Claude Sonnet 5.5)", "Strongest (Claude Opus)"]);
   await expect(tierSelect(page)).toHaveValue("worker");
   await promptBox(page).fill("worker words");
   await createButton(page).click();
   const worker = await created(fixture, before);
   await expect.poll(async () => (await fixture.launches()).length).toBe(launched + 1);
   let args = (await fixture.launches()).at(-1)!;
-  expect(flag(args, "model")).toBe("sonnet");
+  expect(flag(args, "model")).toBe("claude-sonnet-5-5");
   expect(flag(args, "effort")).toBe("medium");
 
   // Strongest launches with the strongest model and effort.
