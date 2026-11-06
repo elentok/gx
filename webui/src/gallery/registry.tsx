@@ -7,7 +7,7 @@ import canned from "../canned-snapshot.json";
 import { authEntries } from "./authEntries";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
-import { CoarsePointerContext, WideContext } from "../useWide";
+import { CoarsePointerContext, type Device, DeviceContext, WideContext } from "../useWide";
 import { EpicPage } from "../epic/EpicPage";
 import { ErrorCard } from "../ErrorBoundary";
 import { EpicCard } from "../epics/EpicCard";
@@ -297,19 +297,21 @@ const MenuFrame = ({ children }: { children: ReactNode }) => (
 
 // Add one entry per primitive; the gallery page renders every case.
 const headerLine = "Speed up the Go test suite: split the slow packages, share one fixture cache, and fail CI on any test over 5 seconds.";
-const headerCase = (label: string, wide: boolean, over: Partial<ComponentProps<typeof PageHeader>> = {}) => ({
+const headerCase = (label: string, device: Device, over: Partial<ComponentProps<typeof PageHeader>> = {}) => ({
   label,
   node: (
-    <WideContext.Provider value={wide}>
-      <PageHeader
-        title="slow-tests-impl"
-        ring={<ProgressRing progress={0.33} kind="implementation" label="33%" size="sm" />}
-        line={headerLine}
-        meta="Running · 3 of 9 done · 42m · 118k tokens"
-        right={<span>⋯</span>}
-        {...over}
-      />
-    </WideContext.Provider>
+    <DeviceContext.Provider value={device}>
+      <WideContext.Provider value={device !== "phone"}>
+        <PageHeader
+          title="slow-tests-impl"
+          ring={<ProgressRing progress={0.33} kind="implementation" label="33%" size="sm" />}
+          line={headerLine}
+          meta="Running · 3 of 9 done · 42m · 118k tokens"
+          right={<span>⋯</span>}
+          {...over}
+        />
+      </WideContext.Provider>
+    </DeviceContext.Provider>
   ),
 });
 
@@ -317,10 +319,11 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "PageHeader",
     cases: [
-      headerCase("desktop", true),
-      headerCase("phone", false),
-      headerCase("no line", true, { line: undefined }),
-      headerCase("no meta bar", true, { meta: undefined }),
+      headerCase("desktop", "desktop"),
+      headerCase("tablet", "tablet"),
+      headerCase("phone", "phone"),
+      headerCase("no line", "desktop", { line: undefined }),
+      headerCase("no meta bar", "desktop", { meta: undefined }),
     ],
   },
   {
@@ -387,13 +390,15 @@ export const galleryEntries: GalleryEntry[] = [
     ].map(({ wide, coarse, label }) => ({
       label,
       node: (
-        <WideContext.Provider value={wide}>
-          <CoarsePointerContext.Provider value={coarse}>
-            <ModalFrame>
-              <LargeEditor title="Note" value={"A note\nover two lines"} placeholder="Note" selection={{ start: 0, end: 0 }} onChange={() => {}} onClose={() => {}} />
-            </ModalFrame>
-          </CoarsePointerContext.Provider>
-        </WideContext.Provider>
+        <DeviceContext.Provider value={wide ? "desktop" : "phone"}>
+          <WideContext.Provider value={wide}>
+            <CoarsePointerContext.Provider value={coarse}>
+              <ModalFrame>
+                <LargeEditor title="Note" value={"A note\nover two lines"} placeholder="Note" selection={{ start: 0, end: 0 }} onChange={() => {}} onClose={() => {}} />
+              </ModalFrame>
+            </CoarsePointerContext.Provider>
+          </WideContext.Provider>
+        </DeviceContext.Provider>
       ),
     })),
   },
@@ -749,18 +754,20 @@ export const galleryEntries: GalleryEntry[] = [
     // A bottom sheet on a phone and a centered dialog on a wide screen; the tone cases show it holding a button in that tone.
     cases: [
       ...perTone((tone) => (
-        <WideContext.Provider value={false}>
-          <ModalFrame h="200px" w="400px">
-            <BottomSheet label={tone} onClose={() => {}}>
-              <Text>{ticket.title}</Text>
-              <Box display="flex" justifyContent="flex-end">
-                <Button emphasis="main" tone={tone}>
-                  {tone}
-                </Button>
-              </Box>
-            </BottomSheet>
-          </ModalFrame>
-        </WideContext.Provider>
+        <DeviceContext.Provider value="phone">
+          <WideContext.Provider value={false}>
+            <ModalFrame h="200px" w="400px">
+              <BottomSheet label={tone} onClose={() => {}}>
+                <Text>{ticket.title}</Text>
+                <Box display="flex" justifyContent="flex-end">
+                  <Button emphasis="main" tone={tone}>
+                    {tone}
+                  </Button>
+                </Box>
+              </BottomSheet>
+            </ModalFrame>
+          </WideContext.Provider>
+        </DeviceContext.Provider>
       )),
       {
         label: "wide",
@@ -1023,7 +1030,7 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       { label: "several projects", node: <ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
       { label: "one project", node: <ModalFrame><NewDesignForm projects={["gx"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
-      { label: "phone bottom sheet", node: <WideContext.Provider value={false}><ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame></WideContext.Provider> },
+      { label: "phone bottom sheet", node: <DeviceContext.Provider value="phone"><WideContext.Provider value={false}><ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame></WideContext.Provider></DeviceContext.Provider> },
     ],
   },
 ];

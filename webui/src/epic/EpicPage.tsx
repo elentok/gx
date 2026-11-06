@@ -330,7 +330,6 @@ export function EpicPage(props: EpicPageProps) {
   const { list } = useEpicList(props.fetchList, useConnectionContext());
   return (
     <DetailPage
-      mode="narrow"
       title={{ kind: "Epic", name: slugOf(props.address) }}
       waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}
     >

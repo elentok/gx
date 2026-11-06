@@ -10,7 +10,7 @@ afterEach(cleanup);
 function Probe() {
   return (
     <MemoryRouter>
-      <DetailPage mode="wide" title={{ kind: "Epics" }}>
+      <DetailPage title={{ kind: "Epics" }}>
         x
       </DetailPage>
     </MemoryRouter>

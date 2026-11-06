@@ -253,7 +253,7 @@ export function CertificateView({ cert }: { cert: CertInfo }) {
 export function CertificatePage({ fetchAuth = fetchAuthState }: { fetchAuth?: () => Promise<AuthState> }) {
   const auth = useFetched("settings-auth", fetchAuth);
   return (
-    <DetailPage mode="narrow" title={{ kind: "Settings", name: "Certificate" }}>
+    <DetailPage title={{ kind: "Settings", name: "Certificate" }}>
       {auth.data ? <CertificateView cert={auth.data} /> : <Spinner label="Loading" />}
     </DetailPage>
   );
@@ -274,7 +274,7 @@ export function SettingsPage({
   const logins = useFetched("settings-logins", fetchList);
   const agents = useFetched("settings-agents", fetchAgents);
   return (
-    <DetailPage mode="narrow" title={{ kind: "Settings" }}>
+    <DetailPage title={{ kind: "Settings" }}>
       {auth.data ? (
         <SettingsHomeView
           loginCount={logins.data?.length}
@@ -293,7 +293,7 @@ export function SettingsPage({
 export function WebLoginsPage({ fetchList = fetchLogins, now = Date.now }: { fetchList?: FetchLogins; now?: () => number }) {
   const logins = useFetched("settings-logins", fetchList);
   return (
-    <DetailPage mode="narrow" title={{ kind: "Settings", name: "Web logins" }}>
+    <DetailPage title={{ kind: "Settings", name: "Web logins" }}>
       {logins.data ? <WebLoginsView logins={logins.data} now={now()} /> : <Spinner label="Loading" />}
     </DetailPage>
   );
@@ -317,7 +317,7 @@ export function WebLoginPage({
   const write = useWrite();
   const login = logins.data?.find((l) => l.id === id);
   return (
-    <DetailPage mode="narrow" title={{ kind: "Settings", name: login?.name ?? "Web login" }}>
+    <DetailPage title={{ kind: "Settings", name: login?.name ?? "Web login" }}>
       {!logins.data ? (
         <Spinner label="Loading" />
       ) : !login ? (
@@ -351,7 +351,7 @@ export function WebLoginPage({
 /** The `/settings/*` catch-all: a settings URL nothing handles, so only the way back. */
 export function UnknownSettingsPage() {
   return (
-    <DetailPage mode="narrow" title={{ kind: "Settings" }}>
+    <DetailPage title={{ kind: "Settings" }}>
       <Frame>
         <BackLink />
       </Frame>

@@ -36,7 +36,7 @@ test("the dirty-trunk case lists its files and both buttons", async () => {
 
 test("the PageHeader gallery cases render", () => {
   const headers = galleryEntries.find((e) => e.name === "PageHeader")?.cases ?? [];
-  expect(headers.map((c) => c.label)).toEqual(["desktop", "phone", "no line", "no meta bar"]);
+  expect(headers.map((c) => c.label)).toEqual(["desktop", "tablet", "phone", "no line", "no meta bar"]);
   for (const c of headers) {
     const { getByRole, unmount } = renderThemed(<>{c.node}</>);
     expect(getByRole("heading", { level: 1 }).textContent).toBe("slow-tests-impl");

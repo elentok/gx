@@ -198,7 +198,7 @@ export function ChangePasswordPage({
 }) {
   const { auth, loading, otherDevices, write, leave, error } = useAccountPage(fetchAuth, fetchList);
   return (
-    <DetailPage mode="narrow" title={{ kind: "Settings", name: "Change password" }}>
+    <DetailPage title={{ kind: "Settings", name: "Change password" }}>
       {loading || !auth ? (
         <Spinner label="Loading" />
       ) : (
@@ -231,7 +231,7 @@ export function AuthenticatorPage({
   const [next, setNext] = useState<NewAuthenticator>();
   const mode: AuthenticatorMode = auth?.setup_code_required ? "add" : "replace";
   return (
-    <DetailPage mode="narrow" title={{ kind: "Settings", name: mode === "add" ? "Add authenticator" : "Reset authenticator" }}>
+    <DetailPage title={{ kind: "Settings", name: mode === "add" ? "Add authenticator" : "Reset authenticator" }}>
       {loading || !auth ? (
         <Spinner label="Loading" />
       ) : !auth.totp_on ? (

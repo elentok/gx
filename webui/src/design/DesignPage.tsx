@@ -246,7 +246,6 @@ export function DesignPage(props: DesignPageProps) {
     <DetailPage
       active="epics"
       fill
-      mode="wide"
       title={{ kind: "Design", name: slugOf(props.address) }}
       waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}
     >

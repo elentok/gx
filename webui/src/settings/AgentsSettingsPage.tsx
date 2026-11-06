@@ -161,7 +161,7 @@ export function AgentsSettingsPage({
     });
   };
   return (
-    <DetailPage mode="narrow" title={{ kind: "Settings", name: "Agents" }}>
+    <DetailPage title={{ kind: "Settings", name: "Agents" }}>
       {settings.data ? (
         <AgentsSettingsView
           settings={settings.data}

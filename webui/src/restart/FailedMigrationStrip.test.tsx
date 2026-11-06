@@ -130,7 +130,7 @@ test("a row disappears when the snapshot drops it", () => {
 
 test("the page shell shows the strip on two different pages", () => {
   const page = (active: "epics" | "agents") => (
-    <DetailPage active={active} title={{ kind: "Epics" }} mode="wide">
+    <DetailPage active={active} title={{ kind: "Epics" }}>
       <p>{active} body</p>
     </DetailPage>
   );
