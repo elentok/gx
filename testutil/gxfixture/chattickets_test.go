@@ -65,6 +65,16 @@ func TestChatTicketsScenario_EveryProducibleKindLandsInTheCaptureFile(t *testing
 	})
 }
 
+func TestChatEpicsScenario_EachEpicOutcomeLandsInTheCaptureFile(t *testing.T) {
+	t.Parallel()
+	r := start(t, "chat-epics")
+	waitForParts(t, r, map[string][]string{
+		"epic-merged":     {"merged-chat-epic"},
+		"epic-unmerged":   {"unmerged-chat-epic", "Not merged"},
+		"epic-escalation": {"stuck-chat-epic", "recovery escalated"},
+	})
+}
+
 func TestChatTicketsRepairScenario_StallPauseLandsInTheCaptureFile(t *testing.T) {
 	t.Parallel()
 	r := start(t, "chat-tickets-stall")

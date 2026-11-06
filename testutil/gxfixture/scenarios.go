@@ -8,12 +8,21 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
+
+// chatEpicDone is a merged ticket that took an hour and recorded its cost.
+func chatEpicDone(doneAt string, tokens int64, cost float64) servertest.TicketOpts {
+	opts := spec.DoneAt(doneAt)
+	opts.TotalTokens, opts.ActualCost = tokens, cost
+	return opts
+}
 
 const project = limitseed.Project
 
@@ -132,6 +141,40 @@ var scenarios = map[string]scenario{
 		Epics:       []epic{{Project: project, Name: "stall-chat-epic", Tickets: []ticket{{ID: "01", Slug: "stalls", Opts: servertest.TicketOpts{}}}}},
 		Queue:       []string{project + ":stall-chat-epic"},
 		Env:         []string{agentfake.TUINoTurnEnv + "=1", "GX_LAUNCH_UNKNOWN_GRACE=2s"},
+	},
+	// chat-epics: chat-capture plus three queued epics, one per epic message of
+	// the mock: epic merged (auto project, two done tickets with cost and time,
+	// one recovery, and a last ticket that finishes and merges), epic complete
+	// unmerged (demo has auto-merge off) and epic escalation (two tickets
+	// are paused for repair and the third finishes, so the epic is deadlocked with
+	// no agent holding it; a paused agent that waits for an answer would keep it
+	// held. A seeded earlier recovery of that kind makes the guard rail escalate
+	// it instead of investigating).
+	"chat-epics": {
+		ChatCapture: true,
+		Projects:    []string{"auto"},
+		ManualMerge: []string{project},
+		Epics: []epic{
+			{Project: "auto", Name: "merged-chat-epic", Tickets: []ticket{
+				{ID: "01", Slug: "first", Opts: chatEpicDone("2026-01-01T10:00:00Z", 1_000, 0.5)},
+				{ID: "02", Slug: "second", Opts: chatEpicDone("2026-01-01T12:00:00Z", 2_000, 0.75)},
+				{ID: "03", Slug: "last", Opts: servertest.TicketOpts{BlockedBy: []string{"02"}}},
+			}},
+			{Project: project, Name: "unmerged-chat-epic", Tickets: []ticket{
+				{ID: "01", Slug: "first", Opts: chatEpicDone("2026-01-01T10:00:00Z", 1_000, 0.5)},
+				{ID: "02", Slug: "last", Opts: servertest.TicketOpts{BlockedBy: []string{"01"}}},
+			}},
+			{Project: project, Name: "stuck-chat-epic", Tickets: []ticket{
+				{ID: "01", Slug: "repair", Opts: servertest.TicketOpts{PauseReason: string(schema.PauseIterationError)}},
+				{ID: "02", Slug: "repair-too", Opts: servertest.TicketOpts{PauseReason: string(schema.PauseIterationError)}},
+				{ID: "03", Slug: "runs", Opts: servertest.TicketOpts{}},
+			}},
+		},
+		Recovered: map[string]string{
+			"auto:merged-chat-epic":      string(schema.PauseIterationError),
+			project + ":stuck-chat-epic": string(events.AllPaused),
+		},
+		Queue: []string{"auto:merged-chat-epic", project + ":unmerged-chat-epic", project + ":stuck-chat-epic"},
 	},
 	"rejected-first-prompt": spec.RejectedFirstPrompt,
 	"stall-vim":             spec.StallVim,

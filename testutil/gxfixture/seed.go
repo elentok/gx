@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
@@ -170,6 +172,12 @@ func (f *fixture) seed(sc scenario) error {
 		if meta, ok := sc.EpicMeta[addr]; ok {
 			ticketMD := filepath.Join(f.store, e.Project, e.Name, "ticket.md")
 			if err := os.WriteFile(ticketMD, []byte("---\n"+meta+"---\n"), 0o644); err != nil {
+				return err
+			}
+		}
+		if kind, ok := sc.Recovered[addr]; ok {
+			ev := runlog.Event{Time: time.Now(), Type: string(events.RecoveryApplied), Kind: kind, Reason: "seeded", Outcome: "ok"}
+			if err := runlog.AppendEvent(filepath.Join(f.store, e.Project), e.Name, ev); err != nil {
 				return err
 			}
 		}

@@ -77,6 +77,10 @@ type Scenario struct {
 	// EpicMeta replaces an epic's ticket.md frontmatter (the lines between the
 	// "---" fences), by address, e.g. "status: draft\n".
 	EpicMeta map[string]string
+	// Recovered seeds one applied, successful recovery in an epic's run log,
+	// by epic address, with the failure kind it recovered (an events.Kind). A
+	// later failure of the same kind in that epic is then not recovered again.
+	Recovered map[string]string
 	// ManualMerge lists the projects whose auto-ff-merge is off; the others have it on.
 	ManualMerge []string
 	// ProjectExtra is raw project.json members (leading comma) added per project.
