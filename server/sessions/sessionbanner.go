@@ -308,7 +308,7 @@ func sessionStatusText(info wire.SessionInfo) string {
 
 // alertReason is the line under an AFK alert's headline: the raised reason when
 // there is one, else a plain sentence for the state. A blocked session keeps its
-// kind and message, an exited one its exit kind.
+// kind and message.
 func alertReason(info wire.SessionInfo, reason string) string {
 	if reason != "" {
 		return reason
@@ -320,9 +320,6 @@ func alertReason(info wire.SessionInfo, reason string) string {
 	case wire.SessionRateLimited:
 		return "Claude hit its usage limit."
 	case wire.SessionExited:
-		if info.Exit != "" {
-			return "The session ended: " + info.Exit + "."
-		}
 		return "The session ended."
 	}
 	return strings.TrimPrefix(sessionStatusText(info), sessionStatusWord(st.State)+": ")

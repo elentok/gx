@@ -82,7 +82,7 @@ func TestChatSessionsScenario_EachSessionStateAlertLandsInTheCaptureFile(t *test
 		"done":         {"🔔 Done", "The agent finished and waits for you."},
 		"blocked":      {"🔔 Blocked", "permission"},
 		"rate-limited": {"🔔 Rate-limited", "Claude hit its usage limit."},
-		"exited":       {"🔔 Exited", "The session ended"},
+		"exited":       {"🔔 Exited", "The session ended."},
 	})
 }
 
