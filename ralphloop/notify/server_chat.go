@@ -1,10 +1,8 @@
 package notify
 
 import (
-	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -281,9 +279,9 @@ func (c *ServerChat) PauseDigest(lines []string) {
 	if c == nil || len(lines) == 0 {
 		return
 	}
-	title := fmt.Sprintf("%d paused while herdr was down", len(lines))
+	msg := pauseDigestMessage(lines)
 	for _, s := range c.globalSinks() {
-		s.send(s.style.chatStyle.Message("🅿️", title, "", strings.Join(lines, "\n"), s.style.identityLine("server", "")), notifyKindTicketNeedsHuman, serverSource, "")
+		s.sendMessage(msg, serverSource, "")
 	}
 }
 
@@ -293,6 +291,9 @@ type ServerNotice struct {
 	Emoji  string
 	Title  string
 	Detail string
+	// HoldsWork marks a notice that means work is stopped: hard budget limit,
+	// low disk, herdr down, trunk missing.
+	HoldsWork bool
 }
 
 // serverSource is the gate source for server-level notices; like "cli" it has
@@ -305,8 +306,9 @@ func (c *ServerChat) Notice(n ServerNotice) {
 	if c == nil {
 		return
 	}
+	msg := serverNoticeMessage(n)
 	for _, s := range c.globalSinks() {
-		s.send(s.style.chatStyle.Message(n.Emoji, n.Title, "", n.Detail, s.style.identityLine("server", "")), n.Kind, serverSource, "")
+		s.sendMessage(msg, serverSource, "")
 	}
 }
 

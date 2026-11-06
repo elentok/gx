@@ -91,10 +91,10 @@ func TestDiskCleanNow_HoldEndsInTheResponse(t *testing.T) {
 	}
 	r.waitClean(t, 2)
 	r.letWatcherRead(t)
-	if n := r.countBodies("disk clean"); n != 2 {
+	if n := r.countBodies("Disk clean"); n != 2 {
 		t.Errorf("clean notices = %d, want 2", n)
 	}
-	if r.countBodies("dispatch resumed") != 0 {
+	if r.countBodies("Dispatch resumed") != 0 {
 		t.Error("a resume notice was sent")
 	}
 }
@@ -118,7 +118,7 @@ func TestDiskCleanNow_UnheldDiskKeepsDispatching(t *testing.T) {
 	if !strings.Contains(body, "dispatch is not held") {
 		t.Errorf("notice = %s, want not held", body)
 	}
-	if r.countBodies("dispatch resumed") != 0 {
+	if r.countBodies("Dispatch resumed") != 0 {
 		t.Error("a resume notice was sent")
 	}
 }

@@ -161,7 +161,7 @@ func (w *HerdrWatch) SyncBanner() {
 	}
 	if show {
 		w.host.Publish(wire.EventHerdrUnavailable, "")
-		w.host.Notice(notify.ServerNotice{Kind: wire.EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text})
+		w.host.Notice(notify.ServerNotice{Kind: wire.EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text, HoldsWork: true})
 		return
 	}
 	w.host.Publish(wire.EventHerdrAvailable, "")

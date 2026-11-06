@@ -101,7 +101,7 @@ func (s *Reconciler) enterTrunkMissing(project, reason string) {
 	s.log.Warn("trunk missing", "project", project, "reason", reason)
 	s.events.PublishEvent(wire.Event{Type: wire.EventTrunkMissing, Address: project, Level: wire.EventLevelWarning, Message: reason})
 	s.chat.Notice(notify.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
-		Detail: reason + "; its tickets will not be claimed until it is fixed"})
+		Detail: reason + "; its tickets will not be claimed until it is fixed", HoldsWork: true})
 }
 
 // MigrationBlock reports a project's saved migration failure: its tickets are

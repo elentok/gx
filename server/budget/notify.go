@@ -89,6 +89,6 @@ func (b *Budget) notify(now time.Time) {
 	}
 	if hardNow {
 		b.chat.Notice(notify.ServerNotice{Kind: NoticeBudgetHard, Emoji: "🛑", Title: "budget hard limit reached",
-			Detail: fmt.Sprintf("%s of %s today", tickets.FormatCost(used), tickets.FormatCost(st.HardLimit))})
+			Detail: fmt.Sprintf("%s of %s today", tickets.FormatCost(used), tickets.FormatCost(st.HardLimit)), HoldsWork: true})
 	}
 }

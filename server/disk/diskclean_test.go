@@ -149,10 +149,10 @@ func (r *cleanRig) waitCalls(t *testing.T, n int) []string {
 // waitClean waits for n clean notices and returns the last one's body.
 func (r *cleanRig) waitClean(t *testing.T, n int) string {
 	t.Helper()
-	servertest.Await(t, func() bool { return r.countBodies("disk clean") >= n })
+	servertest.Await(t, func() bool { return r.countBodies("Disk clean") >= n })
 	var last string
 	for _, b := range r.bodies() {
-		if strings.Contains(b, "disk clean") {
+		if strings.Contains(b, "Disk clean") {
 			last = b
 		}
 	}
@@ -217,8 +217,8 @@ func TestDiskClean_CleanupOffHoldsAndSaysSo(t *testing.T) {
 	}
 	r.wantCalls(t, 0)
 	r.disksWhen(t, "one held disk", func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held && !d[0].Cleaning })
-	if r.countBodies("disk clean") != 1 {
-		t.Errorf("clean notices = %d, want 1", r.countBodies("disk clean"))
+	if r.countBodies("Disk clean") != 1 {
+		t.Errorf("clean notices = %d, want 1", r.countBodies("Disk clean"))
 	}
 }
 
@@ -257,7 +257,7 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 		t.Errorf("notice = %s, want not held", body)
 	}
 	servertest.Await(t, func() bool { return len(r.start()) >= 1 })
-	if r.countBodies("dispatch resumed") != 0 {
+	if r.countBodies("Dispatch resumed") != 0 {
 		t.Error("a resume notice was sent for the end of a clean")
 	}
 }
@@ -371,8 +371,8 @@ func TestDiskClean_NoticeCarriesFreedFreeAndHoldState(t *testing.T) {
 			if !strings.Contains(body, tc.freed) || !strings.Contains(body, tc.state) {
 				t.Errorf("notice = %s, want %q and %q", body, tc.freed, tc.state)
 			}
-			if r.countBodies("disk clean") != 1 {
-				t.Errorf("clean notices = %d, want 1", r.countBodies("disk clean"))
+			if r.countBodies("Disk clean") != 1 {
+				t.Errorf("clean notices = %d, want 1", r.countBodies("Disk clean"))
 			}
 		})
 	}
@@ -421,7 +421,7 @@ func TestDiskClean_TwoProjectsOnOneDiskSendOneNotice(t *testing.T) {
 	r.setFree(3 * gb)
 	r.waitClean(t, 1)
 	r.letWatcherRead(t)
-	if n := r.countBodies("disk clean"); n != 1 {
+	if n := r.countBodies("Disk clean"); n != 1 {
 		t.Errorf("clean notices = %d, want 1", n)
 	}
 }
@@ -458,14 +458,14 @@ func TestDiskClean_RestartOnALowDiskWarnsHoldsAndCleansAgain(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
 	r.setFree(3 * gb)
 	r.waitClean(t, 1)
-	if n := r.countBodies("low disk space"); n != 1 {
+	if n := r.countBodies("Low disk space"); n != 1 {
 		t.Fatalf("warn notices = %d, want 1", n)
 	}
 	r.h.Restart(t)
 	r.start, _, _ = servertest.RegisterTurn(r.h)
 	r.queue(t, "proj:epic-a/01")
 	r.waitClean(t, 2)
-	servertest.Await(t, func() bool { return r.countBodies("low disk space") == 2 })
+	servertest.Await(t, func() bool { return r.countBodies("Low disk space") == 2 })
 	ex, err := r.h.Client.Reads.Explain(context.Background(), "proj:epic-a/01")
 	if err != nil || ex.Verdict != wire.VerdictDiskLow {
 		t.Errorf("explain = %+v, %v, want %q", ex, err, wire.VerdictDiskLow)

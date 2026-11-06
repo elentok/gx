@@ -107,7 +107,7 @@ func TestServerNotices_RestartSendsOneServerLevelMessage(t *testing.T) {
 	got := wait(1)
 	cancel()
 	<-done
-	if len(got) != 1 || !strings.Contains(got[0], "server started") {
+	if len(got) != 1 || !strings.Contains(got[0], "Server started") {
 		t.Fatalf("sends = %v, want one 'server started'", got)
 	}
 }
@@ -239,7 +239,7 @@ func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 	s.budget.NotifyAt(now.Add(2 * time.Minute))
 	s.chat.Close()
 	got := wait(-1)
-	if len(got) != 1 || !strings.Contains(got[0], "daily summary") || !strings.Contains(got[0], "2026-10-06") {
+	if len(got) != 1 || !strings.Contains(got[0], "Daily summary") || !strings.Contains(got[0], "2026-10-06") {
 		t.Fatalf("sends = %v, want one daily summary for 2026-10-06", got)
 	}
 }
@@ -320,9 +320,9 @@ func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 		t.Fatalf("digests = %d, want 1: %s", n, all)
 	}
 	for _, p := range []string{"p1", "p2", "p3", "p4"} {
-		// Digest lines carry "[p]"; a live pause ends on the bare project line
+		// Digest lines start "p · "; a live pause ends on the bare project line
 		// (newlines are still JSON-escaped in the recorded body).
-		if strings.Count(all, "["+p+"]")+strings.Count(all, `\n`+p) != 1 {
+		if strings.Count(all, p+" · ")+strings.Count(all, `\n`+p+`\n`)+strings.Count(all, `\n`+p+`"`) != 1 {
 			t.Errorf("%s not sent exactly once: %s", p, all)
 		}
 	}
@@ -482,7 +482,7 @@ func TestCompleteRootIfDone_ResolvedCrossEpicBlockersCompleteTheEpic(t *testing.
 	s.merger.CompleteRootIfDone(queue.RootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
 	s.chat.Close()
 	got := wait(1)
-	if len(got) != 1 || !strings.Contains(got[0], "epic complete") || !strings.Contains(got[0], "2 done · 2 total") {
+	if len(got) != 1 || !strings.Contains(got[0], "Complete epic") || !strings.Contains(got[0], "2 done · 2 total") {
 		t.Fatalf("sends = %v, want one epic-complete message with 2 done · 2 total", got)
 	}
 }

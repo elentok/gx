@@ -4,7 +4,6 @@
 package ticketwrite
 
 import (
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -132,6 +131,6 @@ func (w *Writer) FlushPauseFold() {
 }
 
 // holdPause queues the pause line for the digest.
-func (w *Writer) holdPause(addr tickets.Address, status string, kind events.Kind, reason string) {
-	w.fold.Hold(fmt.Sprintf("[%s] %s/%s — %s (%s): %s", addr.Project, addr.Epic, addr.ID, status, kind, reason))
+func (w *Writer) holdPause(addr tickets.Address, ticketPath, status string, kind events.Kind, reason string) {
+	w.fold.Hold(notify.PauseDigestLine(addr.Project, addr.Epic, addr.ID, status, PauseChatDetail(ticketPath, kind, reason)))
 }

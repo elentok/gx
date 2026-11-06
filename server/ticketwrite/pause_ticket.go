@@ -56,7 +56,7 @@ func (w *Writer) AnnouncePause(addr tickets.Address, ticketPath string, kind eve
 	switch {
 	case w.d.Host.HoldPauseForRecovery(addr, ticketPath, kind, reason):
 	case kind.CauseHerdr() && w.d.Host.HerdrUnavailable():
-		w.holdPause(addr, ticketops.PauseStatus(kind), kind, reason)
+		w.holdPause(addr, ticketPath, ticketops.PauseStatus(kind), kind, reason)
 	default:
 		w.sendPause(addr, ticketPath, kind, reason)
 	}
@@ -66,7 +66,7 @@ func (w *Writer) AnnouncePause(addr tickets.Address, ticketPath string, kind eve
 // checked, the recovery hold is not.
 func (w *Writer) NotifyPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
 	if kind.CauseHerdr() && w.d.Host.HerdrUnavailable() {
-		w.holdPause(addr, ticketops.PauseStatus(kind), kind, reason)
+		w.holdPause(addr, ticketPath, ticketops.PauseStatus(kind), kind, reason)
 		return
 	}
 	w.sendPause(addr, ticketPath, kind, reason)

@@ -82,14 +82,16 @@ func (s Style) Message(emoji, headline, counts, detail, identity string) Text {
 
 // Layout assembles the Chat layout from raw fragments: the headline as plain
 // text (no emphasis in either dialect), the detail lines, then the project
-// name alone as the last line. Every fragment is escaped for the dialect.
+// name alone as the last line (left out when empty). Every fragment is escaped for the dialect.
 func (s Style) Layout(headline string, lines []string, project string) Text {
 	out := make([]string, 0, len(lines)+2)
 	out = append(out, s.escape(headline))
 	for _, l := range lines {
 		out = append(out, s.escape(l))
 	}
-	out = append(out, s.escape(project))
+	if project != "" {
+		out = append(out, s.escape(project))
+	}
 	return Text{s: strings.Join(out, "\n")}
 }
 

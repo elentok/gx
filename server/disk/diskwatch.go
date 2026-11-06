@@ -269,7 +269,7 @@ func (s *Disk) publishChange(r wire.DiskReading, c diskChange) {
 	if c.warnSet {
 		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", c.warn)
 		s.chat.Notice(notify.ServerNotice{Kind: wire.NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
-			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(c.warn)})
+			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(c.warn), HoldsWork: true})
 	}
 	if c.holdSet {
 		s.log.Warn("disk low, holding dispatch", "disk", r.Name, "free", r.Free, "clean_below", c.clean)

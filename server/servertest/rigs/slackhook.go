@@ -44,7 +44,7 @@ func (h *SlackHook) WaitStarted(t *testing.T) int {
 	servertest.WaitFor(t, 15*time.Second, "the server started notice in chat", func() bool {
 		h.mu.Lock()
 		defer h.mu.Unlock()
-		i = slices.IndexFunc(h.posts, func(p string) bool { return strings.Contains(p, "server started") })
+		i = slices.IndexFunc(h.posts, func(p string) bool { return strings.Contains(p, "Server started") })
 		return i >= 0
 	})
 	return i + 1

@@ -87,6 +87,12 @@ func TestLayout(t *testing.T) {
 	}
 }
 
+func TestLayout_EmptyProjectHasNoLastLine(t *testing.T) {
+	if got, want := Slack.Layout("🚀 Server started", []string{"build x"}, "").String(), "🚀 Server started\nbuild x"; got != want {
+		t.Errorf("Layout = %q, want %q", got, want)
+	}
+}
+
 func TestStyleMessageOmitsEmptyLines(t *testing.T) {
 	text := Telegram.Message("🚀", "started", "", "", "epic")
 	want := "🚀 *started*\n\nepic"

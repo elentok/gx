@@ -46,7 +46,7 @@ func startHoldRig(t *testing.T, repos map[string]string, clean config.ByteSize, 
 	resumes := 0
 	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
-		if strings.Contains(string(b), "dispatch resumed") {
+		if strings.Contains(string(b), "Dispatch resumed") {
 			mu.Lock()
 			resumes++
 			mu.Unlock()

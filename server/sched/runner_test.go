@@ -525,6 +525,6 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 		t.Fatalf("chat sends = %d, want exactly 1: %v", len(posts), posts)
 	}
 	if !strings.Contains(posts[0], `\nproj"`) {
-		t.Errorf("message lacks the project header: %s", posts[0])
+		t.Errorf("message lacks the project line: %s", posts[0])
 	}
 }

@@ -124,7 +124,7 @@ func TestLaunch_EmptyTierModelPausesModelMismatchAndStartsNothing(t *testing.T) 
 		b, _ := io.ReadAll(r.Body)
 		hookMu.Lock()
 		defer hookMu.Unlock()
-		if !strings.Contains(string(b), "server started") {
+		if !strings.Contains(string(b), "Server started") {
 			hookBodies = append(hookBodies, string(b))
 		}
 	}))

@@ -60,7 +60,12 @@ func (b *Budget) alertLongTicket(addr tickets.Address, ticketPath string, turns 
 	b.events.Publish(wire.EventTicketChanged, addr.String())
 	body := fmt.Sprintf("%s has run %d assistant turns", addr, turns)
 	b.settings.Banner(wire.EventLevelWarning, "Long ticket", body)
-	b.chat.Notice(notify.ServerNotice{Kind: NoticeLongTicket, Emoji: "⏳", Title: "long ticket", Detail: body})
+	phrase := "long ticket " + addr.Epic + "/" + addr.ID
+	if title := tickets.TicketTitle(ticketPath); title != "" {
+		phrase += " " + title
+	}
+	b.chat.Notice(notify.ServerNotice{Kind: NoticeLongTicket, Emoji: "⏳", Title: phrase,
+		Detail: fmt.Sprintf("The agent has run %d assistant turns.", turns)})
 	if _, err := b.host.WriteFollowUp(addr, longTicketFollowUp(addr, turns)); err != nil {
 		b.log.Warn("file long-ticket follow-up", "ticket", addr.String(), "err", err)
 	}

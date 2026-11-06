@@ -69,7 +69,7 @@ func StartDiskRig(t *testing.T, projects map[string]string, warn config.ByteSize
 		defer mu.Unlock()
 		var out []string
 		for _, b := range bodies {
-			if strings.Contains(b, "low disk space") {
+			if strings.Contains(b, "Low disk space") {
 				out = append(out, b)
 			}
 		}

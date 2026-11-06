@@ -112,7 +112,7 @@ func writeChatConfig(t *testing.T, s *Server, path, slack string, maxAgents int)
 }
 
 func notice(s *Server, kind string) {
-	s.chat.Notice(notify.ServerNotice{Kind: kind, Emoji: "🔔", Title: kind})
+	s.chat.Notice(notify.ServerNotice{Kind: kind, Emoji: "🔔", Title: kind, Detail: kind})
 }
 
 func TestConfigReloadChat_ChangedDestinationTakesLaterMessages(t *testing.T) {
