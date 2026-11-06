@@ -64,6 +64,21 @@ test("189. Send images", async ({ page, start }) => {
   await expect(chatThumbs(page)).toHaveCount(2);
   await expect(page.getByText("[Image #")).toHaveCount(0);
   await expect.poll(async () => (await messagesOf(fixture, codex.id)).some((m) => m.text?.includes("for codex"))).toBe(true);
+
+  // A slash command: the images land in the input before the command.
+  const conv = (await chatOf(fixture, claude.id)).conversation_id;
+  await open(page, claude.id);
+  await addInput(page).setInputFiles(pngs(2));
+  await expect(thumbs(page)).toHaveCount(2);
+  await messageBox(page).fill("/compact foo");
+  await sendButton(page).click();
+  await expect(thumbs(page)).toHaveCount(0);
+  await expect.poll(async () => (await sessions(fixture)).find((s) => s.id === claude.id)!.status.state).toBe("working");
+  const input = await fixture.input(conv);
+  const command = input.lastIndexOf("/compact foo");
+  expect(command).toBeGreaterThan(0);
+  expect(input.lastIndexOf("/images/", command)).toBeGreaterThan(input.lastIndexOf("three for you"));
+  expect(input.lastIndexOf("/images/")).toBeLessThan(command);
 });
 
 test("189. Send images, design composer round", async ({ page, start }) => {
@@ -88,29 +103,6 @@ test("189. Send images, design composer round", async ({ page, start }) => {
   const conv = (await chatOf(fixture, design.id)).conversation_id;
   await expect.poll(async () => (await fixture.input(conv)).split("/images/").length - 1).toBe(2);
   expect(await fixture.input(conv)).toContain("Q8 - Which store?");
-});
-
-test("190. Send images with a slash command", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const claude = (await claudeIdle(fixture))!;
-  const conv = (await chatOf(fixture, claude.id)).conversation_id;
-  await open(page, claude.id);
-
-  await addInput(page).setInputFiles(pngs(2));
-  await expect(thumbs(page)).toHaveCount(2);
-  await messageBox(page).fill("/compact foo");
-  await sendButton(page).click();
-  await expect(thumbs(page)).toHaveCount(0);
-  await expect.poll(async () => (await sessions(fixture)).find((s) => s.id === claude.id)!.status.state).toBe("working");
-
-  // The images land in the input before the command.
-  const input = await fixture.input(conv);
-  const command = input.lastIndexOf("/compact foo");
-  expect(command).toBeGreaterThan(0);
-  const first = input.indexOf("/images/");
-  expect(first).toBeGreaterThanOrEqual(0);
-  expect(first).toBeLessThan(command);
-  expect(input.lastIndexOf("/images/")).toBeLessThan(command);
 });
 
 test("191. Chat images on the agents-images scenario", async ({ page, start }) => {

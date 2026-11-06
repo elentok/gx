@@ -23,9 +23,9 @@ async function dispatchFiles(target: Locator, type: "paste" | "drop", files: Ret
   );
 }
 
-test("193. Paste images", async ({ page, start }) => {
+test("193. Paste, drop and add images", async ({ page, start }) => {
   const fixture = await start("agents");
-  await idleSession(page, fixture);
+  const idle = await idleSession(page, fixture);
 
   await dispatchFiles(messageBox(page), "paste", [png(1)]);
   await expect(thumbs(page)).toHaveCount(1);
@@ -33,33 +33,22 @@ test("193. Paste images", async ({ page, start }) => {
   await dispatchFiles(messageBox(page), "paste", [file("b.jpg", "image/jpeg", JPEG), file("c.gif", "image/gif", GIF), file("d.webp", "image/webp", WEBP)]);
   await expect(thumbs(page)).toHaveCount(4);
   await expect(composer(page).getByText("4 of 10 images")).toBeVisible();
-});
 
-test("183. Drop images", async ({ page, start }) => {
-  const fixture = await start("agents");
-  await idleSession(page, fixture);
+  await dispatchFiles(messageBox(page), "drop", [png(2), png(3)]);
+  await expect(thumbs(page)).toHaveCount(6);
+  await expect(composer(page).getByText("6 of 10 images")).toBeVisible();
 
-  await dispatchFiles(messageBox(page), "drop", [png(1), file("b.jpg", "image/jpeg", JPEG)]);
-  await expect(thumbs(page)).toHaveCount(2);
-  await expect(composer(page).getByText("2 of 10 images")).toBeVisible();
-});
-
-test("194. Add image button", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const idle = (await sessions(fixture)).find((s) => s.status.state === "idle" && !s.design && !s.queue)!;
+  // The Add image button at phone width.
   await page.setViewportSize({ width: 390, height: 800 });
-  await go(page, `#/agents/${idle.id}`);
   await expect(composer(page).getByRole("button", { name: "Add image" })).toBeVisible();
-  await expect(thumbs(page)).toHaveCount(0);
-
-  await addInput(page).setInputFiles([png(1), file("b.jpg", "image/jpeg", JPEG), file("c.gif", "image/gif", GIF)]);
-  await expect(thumbs(page)).toHaveCount(3);
+  await addInput(page).setInputFiles([png(4), png(5), png(6)]);
+  await expect(thumbs(page)).toHaveCount(9);
 
   // Busy: Add and the row keep working.
   await fixture.cli("agents", "prompt", idle.id, "keep busy");
   await expect.poll(async () => (await sessions(fixture)).find((s) => s.id === idle.id)!.status.state).toBe("working");
-  await addInput(page).setInputFiles([png(2)]);
-  await expect(thumbs(page)).toHaveCount(4);
+  await addInput(page).setInputFiles([png(7)]);
+  await expect(thumbs(page)).toHaveCount(10);
 });
 
 test("194. Add image button, design composer", async ({ page, start }) => {
@@ -79,7 +68,7 @@ test("194. Add image button, design composer", async ({ page, start }) => {
   await expect(thumbs(page)).toHaveCount(2);
 });
 
-test("187. Remove image", async ({ page, start }) => {
+test("187. Remove image and image limits", async ({ page, start }) => {
   const fixture = await start("agents");
   const idle = await idleSession(page, fixture);
 
@@ -91,13 +80,9 @@ test("187. Remove image", async ({ page, start }) => {
   await thumbs(page).first().click();
   await expect(thumbs(page)).toHaveCount(1);
   await expect.poll(() => fixture.sessionImages(idle.id)).toHaveLength(1);
-});
 
-test("188. Image limits", async ({ page, start }) => {
-  const fixture = await start("agents");
-  await idleSession(page, fixture);
-
-  await addInput(page).setInputFiles(Array.from({ length: 11 }, (_, i) => png(i)));
+  // The limit: eleven more files keep ten.
+  await addInput(page).setInputFiles(Array.from({ length: 11 }, (_, i) => png(i + 10)));
   await expect(thumbs(page)).toHaveCount(10);
   await expect(composer(page).getByText("Max 10 images")).toBeVisible();
   await expect(sendButton(page)).toBeVisible();
