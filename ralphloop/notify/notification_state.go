@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -71,6 +72,41 @@ type TransportState struct {
 // reports as sent-to.
 type NotificationState struct {
 	Transports map[string]TransportState `json:"transports"`
+	// Marks is the once-only set behind MarkOnce, oldest first. It is not per
+	// transport, so it sits beside Transports. A slice keeps insertion order
+	// for eviction; at maxMarks a linear scan is still cheap.
+	Marks []string `json:"marks,omitempty"`
+}
+
+// maxMarks bounds Marks (10000 keys, a few hundred KB of JSON). Question and
+// Ready marks accrue a handful per day at most, so a long-lived install will
+// not reach it in years; when it does, the oldest keys are evicted.
+const maxMarks = 10000
+
+// MarkOnce records key in the state file at path and reports whether it was
+// new, atomically under the state file lock: of any number of concurrent or
+// restarted callers with one key, exactly one gets true.
+//
+// On error (including ErrNotificationStateLocked) it returns false and the
+// error, and the key is not recorded. Callers choose what that means; the
+// rule is that a message may be lost, never doubled, so a caller that cannot
+// tell whether the key was new should not send.
+func MarkOnce(path, key string) (bool, error) {
+	isNew := false
+	err := UpdateNotificationState(path, func(s *NotificationState) {
+		if slices.Contains(s.Marks, key) {
+			return
+		}
+		isNew = true
+		s.Marks = append(s.Marks, key)
+		if len(s.Marks) > maxMarks {
+			s.Marks = s.Marks[len(s.Marks)-maxMarks:]
+		}
+	})
+	if err != nil {
+		return false, err
+	}
+	return isNew, nil
 }
 
 func emptyNotificationState() NotificationState {

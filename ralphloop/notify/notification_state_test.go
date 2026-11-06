@@ -2,8 +2,12 @@ package notify
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -207,5 +211,145 @@ func TestNotificationState_TripHistoryCap(t *testing.T) {
 	last := trips[len(trips)-1]
 	if !last.TrippedAt.Equal(base.Add(20 * time.Minute)) {
 		t.Fatalf("expected newest trip to be #20, got %v", last.TrippedAt)
+	}
+}
+
+func mustMark(t *testing.T, path, key string) bool {
+	t.Helper()
+	isNew, err := MarkOnce(path, key)
+	if err != nil {
+		t.Fatalf("MarkOnce(%q): %v", key, err)
+	}
+	return isNew
+}
+
+func TestNotificationState_MarkOnce_FirstTrueThenFalseAcrossReload(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notifications-state.json")
+
+	if !mustMark(t, path, "ready:gx/epic-impl") {
+		t.Fatal("first mark should be new")
+	}
+	if mustMark(t, path, "ready:gx/epic-impl") {
+		t.Fatal("second mark should not be new")
+	}
+	if !mustMark(t, path, "question:s1:1") {
+		t.Fatal("a different key should be new")
+	}
+
+	got, err := LoadNotificationState(path)
+	if err != nil {
+		t.Fatalf("LoadNotificationState: %v", err)
+	}
+	if len(got.Marks) != 2 {
+		t.Fatalf("marks after reload = %v, want 2 keys", got.Marks)
+	}
+	if mustMark(t, path, "question:s1:1") {
+		t.Fatal("mark should survive a reload from disk")
+	}
+}
+
+func TestNotificationState_MarkOnce_OldFormatFileLoads(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notifications-state.json")
+	if err := os.WriteFile(path, []byte(`{"transports":{"telegram":{"muted":true,"events":null,"sends":null,"trips":null}}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !mustMark(t, path, "k") {
+		t.Fatal("mark on an old-format file should be new")
+	}
+	got, err := LoadNotificationState(path)
+	if err != nil {
+		t.Fatalf("LoadNotificationState: %v", err)
+	}
+	if !got.Transports["telegram"].Muted {
+		t.Fatal("marking must keep existing transport state")
+	}
+}
+
+func TestNotificationState_MarksOmittedWhenEmpty(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notifications-state.json")
+	if err := UpdateNotificationState(path, func(*NotificationState) {}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "marks") {
+		t.Fatalf("empty marks should be omitted, got %s", b)
+	}
+}
+
+func TestNotificationState_MarkOnce_RaceGivesExactlyOneTrue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notifications-state.json")
+
+	const callers = 2
+	var wg sync.WaitGroup
+	var news atomic.Int32
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			isNew, err := MarkOnce(path, "question:s1:1")
+			if err != nil {
+				t.Errorf("MarkOnce: %v", err)
+				return
+			}
+			if isNew {
+				news.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := news.Load(); got != 1 {
+		t.Fatalf("exactly one caller should win, got %d", got)
+	}
+}
+
+func TestNotificationState_MarkOnce_CapEvictsOldest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notifications-state.json")
+	err := UpdateNotificationState(path, func(s *NotificationState) {
+		for i := range maxMarks {
+			s.Marks = append(s.Marks, fmt.Sprintf("k%d", i))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !mustMark(t, path, "newest") {
+		t.Fatal("newest should be new")
+	}
+
+	got, err := LoadNotificationState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Marks) != maxMarks {
+		t.Fatalf("marks = %d, want cap %d", len(got.Marks), maxMarks)
+	}
+	if got.Marks[0] != "k1" || got.Marks[len(got.Marks)-1] != "newest" {
+		t.Fatalf("oldest not evicted: first=%q last=%q", got.Marks[0], got.Marks[len(got.Marks)-1])
+	}
+	if !mustMark(t, path, "k0") {
+		t.Fatal("evicted key reads as new again")
+	}
+}
+
+func TestNotificationState_MarkOnce_LockedReturnsErrorAndRecordsNothing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notifications-state.json")
+	lockFile, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lockFile.Close()
+	if err := unix.Flock(int(lockFile.Fd()), unix.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+
+	isNew, err := MarkOnce(path, "k")
+	if !errors.Is(err, ErrNotificationStateLocked) || isNew {
+		t.Fatalf("got (%v, %v), want (false, ErrNotificationStateLocked)", isNew, err)
 	}
 }
