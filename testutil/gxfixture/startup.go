@@ -124,6 +124,11 @@ func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
 			return err
 		}
 	}
+	if sc.fakeNpm {
+		if err := f.setupFakeNpm(); err != nil {
+			return err
+		}
+	}
 	if sc.restart != nil {
 		if err := f.setupRestart(*sc.restart, sc.projectNames()); err != nil {
 			return err
@@ -158,9 +163,10 @@ func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
 
 // addScenarioOutput fills the Output fields that only some scenarios have.
 func (f *fixture) addScenarioOutput(res *Output, sc scenario, transcripts map[string]string) {
-	if sc.fakeGo {
+	if sc.fakeGo || sc.fakeNpm {
 		res.GateDir = f.gateDir()
 	}
+	res.ConfigFile = f.configFile()
 	res.Transcripts = transcripts
 	if sc.limitBurn {
 		res.CodexSessionsDir = filepath.Join(f.root, "home", ".codex", "sessions")

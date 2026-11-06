@@ -64,11 +64,16 @@ func (f *fixture) gateDir() string { return filepath.Join(f.root, "gate") }
 // releases it by removing the file; go-started marks a held command and
 // go-clean.log holds a `go clean` that ran.
 func (f *fixture) setupFakeGo() error {
+	return f.putBinFirst(map[string]string{"go": fakeGoBody, "ps": fakePsBody})
+}
+
+// putBinFirst writes the scripts into <gate dir>/bin and puts that bin first on the server's PATH.
+func (f *fixture) putBinFirst(scripts map[string]string) error {
 	bin := filepath.Join(f.gateDir(), "bin")
 	if err := os.MkdirAll(bin, 0o755); err != nil {
 		return err
 	}
-	for name, body := range map[string]string{"go": fakeGoBody, "ps": fakePsBody} {
+	for name, body := range scripts {
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
 			return err
 		}

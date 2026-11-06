@@ -15,6 +15,12 @@ one Codex ticket running. To make the usage scan save a new Codex sample, append
 (`{"timestamp":<ISO>,"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":N,"window_minutes":10080,"resets_at":<epoch>}}}}`)
 to the `rollout-*.jsonl` under `fixture.codexSessionsDir` (`codex_sessions_dir` in the fixture output). `fixture.cliInput(input, ...args)` and
 `fixture.cliEnvInput(extra, input, ...args)` are `cli`/`cliEnv` with `input` on stdin.
+The `launch-held` scenario queues one ticket whose worktree has a tracked `package-lock.json`, with a fake `npm`
+on `PATH`: the ticket stays `claimed` at "installing dependencies" while `<gate_dir>/npm-hold` exists
+(`<gate_dir>/npm-started` marks the wait), and removing the hold lets the launch go on. The `epic-at-cap` scenario
+queues four independent tickets under `execution-queue.max-agents-per-epic=2` with held workers, so the third
+and fourth read `concurrency cap` (`epic cap 2/2`). To lower the cap below the live count, set the key in the
+JSON file at `config_file` and run `gx server reload-config`; explain then reads `epic cap 2/1`. Neither has a flow yet.
 Retries are off. Locators use roles and visible text, plus `data-testid` `pill` and `reason` on
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 

@@ -115,6 +115,8 @@ type scenario struct {
 	diskLow bool
 	// fakeGo writes the gate dir's fake go (see cachegate.go).
 	fakeGo bool
+	// fakeNpm writes the gate dir's fake npm and holds it (see launchstate.go).
+	fakeNpm bool
 	// dropAskedAgent forces the server to clean up an asking agent, as a
 	// herdr-hosted run does (see keepworktree.go).
 	dropAskedAgent bool
@@ -241,6 +243,8 @@ var scenarios = map[string]scenario{
 	"keep-cleanup":          keepCleanup,
 	"cache-gate":            cacheGate,
 	"cache-gate-custom":     cacheGateCustom,
+	"launch-held":           launchHeld,
+	"epic-at-cap":           epicAtCap,
 	// restart-agents: a running agent on a queued epic, and a restart binary that passes its checks.
 	"restart-agents": {
 		epics: []epic{{project, "restart-epic", []ticket{

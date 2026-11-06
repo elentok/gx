@@ -31,7 +31,10 @@ type Output struct {
 	// HealthDir holds the fake CPU and memory control file: system.
 	HealthDir string `json:"health_dir"`
 	// GateDir holds the cache-gate scenarios' fake go (bin/go) and its control files; empty elsewhere.
+	// The launch-held scenario also uses it: bin/npm waits while npm-hold exists, and npm-started marks the wait.
 	GateDir string `json:"gate_dir,omitempty"`
+	// ConfigFile is the global config file; edit it and run `gx server reload-config` to change a setting live.
+	ConfigFile string `json:"config_file"`
 	// RestartDir holds the fake restart binary's control files; empty outside the restart scenarios.
 	RestartDir string `json:"restart_dir,omitempty"`
 	// MigrateDir holds the migrate scenarios' control files and server script (see migrate.go); empty elsewhere.
@@ -80,6 +83,9 @@ func (o Output) ShellEnv() string {
 	export("GXF_SOCKET", o.Socket)
 	if o.GateDir != "" {
 		export("GXF_GATE_DIR", o.GateDir)
+	}
+	if o.ConfigFile != "" {
+		export("GXF_CONFIG_FILE", o.ConfigFile)
 	}
 	if o.RestartDir != "" {
 		export("GXF_RESTART_DIR", o.RestartDir)
