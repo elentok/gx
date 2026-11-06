@@ -2,6 +2,7 @@ package sched
 
 import (
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/server/budget"
@@ -54,6 +55,10 @@ type Scheduler struct {
 	SchedulerDeps
 	deadlocks   deadlocks
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
+	// claimMu keeps one claim pass at a time, from the cap check to the slot
+	// reservation: AdoptMu is released before the reservation, so a second pass
+	// could otherwise count the slot as free.
+	claimMu sync.Mutex
 }
 
 // NewScheduler returns a scheduler over d.

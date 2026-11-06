@@ -120,10 +120,22 @@ func (s *Scheduler) StalledNudgeDelay() time.Duration {
 
 // claimRootAfterAdoption is claimRoot once a late-finish adoption in flight is
 // done, so a root never launches an investigation the adoption is about to cancel.
+// The lock covers the decision and the claim write only; the launch runs on its
+// own goroutine, so one slow launch holds up neither the adoption nor the loop.
 func (s *Scheduler) claimRootAfterAdoption(item wire.QueueItem) (bool, error) {
+	s.claimMu.Lock()
+	defer s.claimMu.Unlock()
 	s.Guards.AdoptMu.Lock()
-	defer s.Guards.AdoptMu.Unlock()
-	return s.claimRoot(item)
+	c, err := s.claimRoot(item)
+	s.Guards.AdoptMu.Unlock()
+	if c == nil || err != nil {
+		return false, err
+	}
+	if !s.Launcher.reserve(c) {
+		return false, nil
+	}
+	s.Launcher.goLaunch(c)
+	return true, nil
 }
 
 // PerRootLimit is how many agents one root may run at once. The one-offs root
@@ -166,41 +178,42 @@ func (s *Scheduler) ConcurrencyLimit() int {
 	return config.DefaultExecutionQueueConfig().MaxAgents
 }
 
-// claimRoot reports whether it launched an iteration for item's root. A claim
-// that paused instead (ambiguous base) launched nothing, so it used no slot.
-func (s *Scheduler) claimRoot(item wire.QueueItem) (bool, error) {
+// claimRoot writes the claim of item's root's next ticket and returns it, or nil
+// when nothing was claimed. A claim that paused instead (ambiguous base)
+// launches nothing, so it used no slot.
+func (s *Scheduler) claimRoot(item wire.QueueItem) (*claimed, error) {
 	addr, err := tickets.ParseQueuedAddress(item.Address)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	root := queue.RootOf(addr)
 	if s.Registry.CountRoot(root.String()) >= s.PerRootLimit(root) {
-		return false, nil
+		return nil, nil
 	}
 	if _, _, atCap := s.ProjectAtCap(addr.Project); atCap {
-		return false, nil
+		return nil, nil
 	}
 	if _, missing := s.Projects.UnavailablePath(addr.Project); missing {
-		return false, nil
+		return nil, nil
 	}
 	if _, held := s.Disks.FreshHeldDisk(addr.Project); held {
-		return false, nil
+		return nil, nil
 	}
 	if _, missing := s.Rec.TrunkMissing.Get(addr.Project); missing {
-		return false, nil
+		return nil, nil
 	}
 	if _, blocked := s.Rec.MigrationBlock(addr.Project); blocked {
-		return false, nil
+		return nil, nil
 	}
 	projectDir, repo, err := s.Projects.Of(addr.Project)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	// The epics of the last scan, not a fresh load: this runs every poll tick for
 	// every queued root. The sum check below catches a file the scan has not seen.
 	loaded, err := s.Projects.Epics(addr.Project)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	for _, e := range loaded {
 		if filepath.Base(e.Path) != addr.Epic {
@@ -210,30 +223,30 @@ func (s *Scheduler) claimRoot(item wire.QueueItem) (bool, error) {
 		t, ok := s.NextUntracked(addr.Project, e)
 		if !ok {
 			s.Merger.RetryHeldMerge(root, e, loaded, repo)
-			return false, nil
+			return nil, nil
 		}
 		if s.parentAwaitsAdoption(projectDir, addr, e, t) {
-			return false, nil
+			return nil, nil
 		}
 		ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
 		// A missed watch event can leave the index behind the file; claiming
 		// on that view could schedule the wrong thing, so wait for the index.
 		onDisk, err := index.FileSum(t.Path)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		if seen, _ := s.Index.SumOf(ticketAddr); seen != onDisk {
 			s.Guards.Refused.Set(ticketAddr, true)
-			return false, nil
+			return nil, nil
 		}
 		s.Guards.Refused.Set(ticketAddr, false)
 		resolved := s.Harness.ResolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t)
 		if _, held := s.Explain.ClaimHold(addr.Project, t, resolved.ResolvedHarness); held {
-			return false, nil
+			return nil, nil
 		}
-		return s.Launcher.ClaimAndLaunch(root, addr, t, repo, resolved.Harness, loaded)
+		return s.Launcher.claim(root, addr, t, repo, resolved.Harness, loaded)
 	}
-	return false, nil
+	return nil, nil
 }
 
 // parentAwaitsAdoption reports whether t's parent reported finished after its

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -76,10 +77,12 @@ type LauncherDeps struct {
 // agent ends.
 type Launcher struct {
 	LauncherDeps
+	// launching tracks the launch goroutines the claim loop starts.
+	launching sync.WaitGroup
 }
 
 // NewLauncher returns a launcher over d.
-func NewLauncher(d LauncherDeps) *Launcher { return &Launcher{d} }
+func NewLauncher(d LauncherDeps) *Launcher { return &Launcher{LauncherDeps: d} }
 
 // trunkConflictNote tells a trunk-conflict agent what the one-off skill does
 // not: it works in the target's own checkout, where a commit would be the

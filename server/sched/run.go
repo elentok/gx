@@ -28,33 +28,114 @@ import (
 // launched is false when the ticket paused on an ambiguous base: no agent runs.
 // epics is the project's loaded epics, for the base derivation.
 func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agentKind agent.AgentKind, epics []tickets.Epic) (launched bool, err error) {
+	c, err := l.claim(root, queued, t, repo, agentKind, epics)
+	if c == nil || err != nil {
+		return false, err
+	}
+	if !l.reserve(c) {
+		return false, nil
+	}
+	return l.launchClaimed(c)
+}
+
+// claimed is a ticket whose claim is on disk: the serial half is done and the
+// launch half is left.
+type claimed struct {
+	root      queue.RootRef
+	queued    tickets.Address
+	ticket    tickets.Address
+	t         tickets.Ticket
+	dir       string
+	repo      string
+	agentKind agent.AgentKind
+	epics     []tickets.Epic
+	rootBase  string
+	leafBase  string
+	answered  string
+	entry     runs.TrackedRun
+}
+
+// claim resolves the base and writes the claim. A nil claimed with a nil error
+// means the ticket paused on an ambiguous base. The claim loop calls it under
+// Guards.AdoptMu, and only this half: the rest runs outside the lock.
+func (l *Launcher) claim(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agentKind agent.AgentKind, epics []tickets.Epic) (*claimed, error) {
 	ticket := tickets.Address{Project: queued.Project, Epic: queued.Epic, ID: t.Identifier}
 	ticketAddr := ticket.String()
 	// The project dir, not the store root: the run log, merge lock and
 	// conflict-resolution tickets all live under <project>/<epic>.
 	dir, err := l.Projects.Dir(queued.Project)
 	if err != nil {
-		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
+		return nil, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
 	rootBase, resolvedBase, leafBase, err := l.Host.ResolveBase(queued, t, repo, epics)
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
 		if perr := l.Writer.Pause(dir, ticket, t.Path, events.AmbiguousBase, reason, runs.Run{}); perr != nil {
-			return false, fmt.Errorf("pause %s: %w", ticketAddr, perr)
+			return nil, fmt.Errorf("pause %s: %w", ticketAddr, perr)
 		}
-		return false, nil
+		return nil, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
+		return nil, fmt.Errorf("base for %s: %w", ticketAddr, err)
 	}
 	answered := AnsweredSession(t)
 	if err := ticketops.ClaimWithBase(t.Path, resolvedBase); err != nil {
-		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
+		return nil, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
-	l.Index.Rescan() // the claim must show now, not when the backstop poll comes
-	l.Events.Publish(wire.EventTicketClaimed, ticketAddr)
+	return &claimed{
+		root: root, queued: queued, ticket: ticket, t: t, dir: dir, repo: repo, agentKind: agentKind, epics: epics,
+		rootBase: rootBase, leafBase: leafBase, answered: answered,
+		entry: runs.TrackedRun{
+			// The runner is named now: a reservation with none reads as herdr to the run watchers.
+			Run:  runs.Run{Address: ticketAddr, Agent: string(agentKind), Runner: l.Harness.LaunchRunner(ticket.Project, agentKind).Name()},
+			Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runs.Launching,
+		},
+	}, nil
+}
 
+// reserve shows the claim in the index and takes the slot, so the caps count
+// the launch before it runs. False means a stale scan offered a ticket that is
+// already running.
+func (l *Launcher) reserve(c *claimed) bool {
+	ticketAddr := c.entry.Address
+	// Refresh, not Rescan: a launch never runs an OnRescan step.
+	if err := l.Index.Refresh(); err != nil {
+		l.Log.Warn("refresh index after claim", "ticket", ticketAddr, "err", err)
+	}
+	l.Events.Publish(wire.EventTicketClaimed, ticketAddr)
+	return l.Registry.PutIfAbsent(c.entry)
+}
+
+// goLaunch runs the launch half of a reserved claim on its own tracked
+// goroutine. A launch that ends without an agent frees its slot, so the claim
+// loop is kicked to refill it.
+func (l *Launcher) goLaunch(c *claimed) {
+	l.launching.Go(func() {
+		launched, err := l.launchClaimed(c)
+		if err != nil {
+			l.Log.Warn("launch", "ticket", c.entry.Address, "err", err)
+		}
+		if !launched {
+			l.Guards.Kick()
+		}
+	})
+}
+
+// WaitLaunches waits for the launch goroutines the claim loop started. For tests.
+func (l *Launcher) WaitLaunches() { l.launching.Wait() }
+
+// launchClaimed is the launch half: model choice, the worktree and agent, and
+// the registry updates. It owns c's reservation and gives it back on any end
+// that leaves no agent.
+func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
+	root, queued, ticket, t, dir, repo, agentKind, epics := c.root, c.queued, c.ticket, c.t, c.dir, c.repo, c.agentKind, c.epics
+	ticketAddr, entry := c.entry.Address, c.entry
+	defer func() {
+		if !launched {
+			l.Registry.DeleteStarted(ticketAddr, entry.StartedAt)
+		}
+	}()
 	if err := budget.ClearLongTicketMark(t.Path); err != nil {
 		l.Log.Warn("clear long-ticket mark", "ticket", ticketAddr, "err", err)
 	}
@@ -62,8 +143,9 @@ func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t 
 	if !ok {
 		return false, nil
 	}
+	answered := c.answered
 	one := ralphloop.OneIteration{
-		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agentKind, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
+		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agentKind, Ticket: t, RootBase: c.rootBase, LeafBase: c.leafBase,
 		Model: model, Effort: effort, Sink: l.Writer.FinishSink(ticket, t.Path), StallNudgeDelay: l.Host.StalledNudgeDelay(),
 	}
 	deps := l.Projects.DepsWith(l.Harness.LaunchRunner(ticket.Project, agentKind))
@@ -87,13 +169,7 @@ func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t 
 			return false, fmt.Errorf("merge target for %s: %w", ticketAddr, err)
 		}
 	}
-	entry := runs.TrackedRun{
-		Run:  runs.Run{Address: ticketAddr, Agent: string(agentKind), Runner: deps.Runner.Name(), Model: one.Model, Effort: one.Effort},
-		Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runs.Launching,
-	}
-	if !l.Registry.PutIfAbsent(entry) {
-		return false, nil // a stale scan offered a ticket that is already running
-	}
+	entry.Runner, entry.Model, entry.Effort = deps.Runner.Name(), one.Model, one.Effort
 	run, wt, err := l.prepareAndLaunch(deps, &one, ticket, mode, func(wt ralphloop.IterationWorktree) {
 		entry.Workspace, entry.Base, entry.Cwd = one.WorkspaceID, wt.Base(), wt.Path
 		l.Registry.Put(entry)
