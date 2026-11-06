@@ -180,6 +180,20 @@ func TestReclaim_LaunchingWithNoAgentReopens(t *testing.T) {
 	})
 }
 
+// The reopened ticket is an ordinary open ticket: queued again, it launches as a new launch.
+func TestReclaim_LaunchingWithNoAgentLaunchesAgainAsANewLaunch(t *testing.T) {
+	t.Parallel()
+	fake := servertest.NewHeadlessFake(nativerunner.VerdictDied)
+	h, ticketPath := restartLaunching(t, fake, nil, noWork)
+	waitStatus(t, ticketPath, schema.StatusOpen)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	waitStatus(t, ticketPath, schema.StatusClaimed)
+}
+
 func TestReclaim_HerdrLaunchingIdleAgentIsStoppedThenReopens(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex
