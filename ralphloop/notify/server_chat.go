@@ -240,6 +240,17 @@ func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, ep
 	}
 }
 
+// Progress sends one progress update for epic to the project's destinations.
+func (c *ServerChat) Progress(project string, override *ServerChatConfig, epic string, facts ProgressFacts) {
+	if c == nil {
+		return
+	}
+	msg := progressMessage(project, epic, facts)
+	for _, s := range c.projectSinks(override) {
+		s.sendMessage(msg, epicSource(project+"/"+epic), "")
+	}
+}
+
 // TicketDone tells the project's destinations that a ticket merged, with the
 // metrics the merge wrote onto it and the epic's counts after it.
 func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic string, t tickets.Ticket, counts schedule.EpicCounts) {

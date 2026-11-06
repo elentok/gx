@@ -257,6 +257,53 @@ func epicOutcomeMessage(project, epic string, counts schedule.EpicCounts, elapse
 	}
 }
 
+// ProgressRunning is one running ticket in a Progress message.
+type ProgressRunning struct {
+	Identifier     string
+	Title          string
+	ElapsedSeconds int
+}
+
+// ProgressFacts is the plain data of one Progress update.
+type ProgressFacts struct {
+	Counts  schedule.EpicCounts
+	Running []ProgressRunning
+	// Finished* describe the tickets that finished since the last update;
+	// FinishedElapsedSeconds is the sum of their elapsed times.
+	FinishedCount          int
+	FinishedElapsedSeconds int
+	FinishedCost           float64
+}
+
+// progressMessage is the periodic "how is the epic going" message. Left is
+// what is neither done nor running.
+func progressMessage(project, epic string, f ProgressFacts) chatMessage {
+	lines := make([]string, 0, 5)
+	if len(f.Running) > 0 {
+		parts := make([]string, len(f.Running))
+		for i, r := range f.Running {
+			parts[i] = fmt.Sprintf("%s %s (%s)", r.Identifier, r.Title, formatElapsed(r.ElapsedSeconds))
+		}
+		lines = append(lines, "Running: "+strings.Join(parts, ", "))
+	}
+	noun := "tickets"
+	if f.FinishedCount == 1 {
+		noun = "ticket"
+	}
+	lines = append(lines,
+		fmt.Sprintf("Finished since the last update: %d %s · %s · %s", f.FinishedCount, noun, formatElapsed(f.FinishedElapsedSeconds), tickets.FormatCost(f.FinishedCost)),
+		fmt.Sprintf("Left: %d", max(0, f.Counts.Total-f.Counts.Done-f.Counts.InProgress)),
+		RenderCountsLine(f.Counts))
+	return chatMessage{
+		icon: "⏳", status: "Progress",
+		subject: fmt.Sprintf("%s · %d of %d done", epic, f.Counts.Done, f.Counts.Total),
+		lines:   lines,
+		project: project,
+		kind:    notifyKindProgress,
+		urgency: urgencyInformation,
+	}
+}
+
 // ticketPauseMessage is the "a machine paused this ticket for a person"
 // message: Answer for the answer class, Repair for any fault. status is the
 // ticket's stored status word, old or new.

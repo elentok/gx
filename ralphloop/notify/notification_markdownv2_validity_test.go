@@ -45,13 +45,17 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 	stats := runlog.IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: fractionalCost, Completed: 2, Total: 5}
 
 	cases := map[string]chatmarkup.Text{
-		"iterationFinishedText":            telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
-		"ticketPauseMessage/answer":        ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyAnswer), "No commits merged (yet).").Text(chatmarkup.Telegram),
-		"ticketPauseMessage/repair":        ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyRepair), "Operator intervention required.").Text(chatmarkup.Telegram),
-		"conflictStartedMessage":           conflictStartedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
-		"escalatedMessage/ticket":          escalatedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, "No commits merged (yet).").Text(chatmarkup.Telegram),
-		"escalatedMessage/epic":            escalatedMessage(adversarialEpic, adversarialEpic, "", "", "").Text(chatmarkup.Telegram),
-		"epicOutcomeMessage":               epicOutcomeMessage(adversarialEpic, adversarialEpic, overflowCounts, 492, fractionalCost, true).Text(chatmarkup.Telegram),
+		"iterationFinishedText":     telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
+		"ticketPauseMessage/answer": ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyAnswer), "No commits merged (yet).").Text(chatmarkup.Telegram),
+		"ticketPauseMessage/repair": ticketPauseMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, string(schema.StatusLegacyRepair), "Operator intervention required.").Text(chatmarkup.Telegram),
+		"conflictStartedMessage":    conflictStartedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
+		"escalatedMessage/ticket":   escalatedMessage(adversarialEpic, adversarialEpic, adversarialPath, adversarialTicket, "No commits merged (yet).").Text(chatmarkup.Telegram),
+		"escalatedMessage/epic":     escalatedMessage(adversarialEpic, adversarialEpic, "", "", "").Text(chatmarkup.Telegram),
+		"epicOutcomeMessage":        epicOutcomeMessage(adversarialEpic, adversarialEpic, overflowCounts, 492, fractionalCost, true).Text(chatmarkup.Telegram),
+		"progressMessage": progressMessage(adversarialEpic, adversarialEpic, ProgressFacts{
+			Counts:  schedule.EpicCounts{Done: 3, InProgress: 1, Total: 12},
+			Running: []ProgressRunning{{Identifier: adversarialTicket, Title: adversarialTitle, ElapsedSeconds: 840}}, FinishedCount: 2, FinishedCost: fractionalCost,
+		}).Text(chatmarkup.Telegram),
 		"mutedMessage":                     mutedMessage(adversarialPath, adversarialTicket).Text(chatmarkup.Telegram),
 		"globallyMutedMessage":             globallyMutedMessage("telegram").Text(chatmarkup.Telegram),
 		"testMessageText":                  telegramStyle.testMessageText(),
