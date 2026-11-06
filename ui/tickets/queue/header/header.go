@@ -71,6 +71,12 @@ func epicStatusLine(icons ui.IconSet, sum wire.EpicSummary, spinnerGlyph string)
 		return icons.TicketDone, epicStateLabels[sum.State], epicStatusDoneStyle
 	case wire.EpicStateRunning, wire.EpicStateMerging:
 		return spinnerGlyph, epicStateLabels[sum.State], lipgloss.NewStyle()
+	case wire.EpicStateWaiting:
+		text = epicStateLabels[sum.State]
+		if sum.Verdict == wire.VerdictConcurrencyCap && sum.VerdictReason != "" {
+			text += ": " + sum.VerdictReason
+		}
+		return icons.EpicQueued, text, lipgloss.NewStyle()
 	case wire.EpicStatePaused:
 		text = epicStateLabels[sum.State]
 		if sum.Reason != "" {

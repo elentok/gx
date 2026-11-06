@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
@@ -76,6 +78,27 @@ func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Error("no spinner tick returned when the tab went idle -> running")
+	}
+}
+
+func TestSyncRunState_LaunchStepGivesTheLaunchingPhase(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
+		{Identifier: "01", Path: "gx:alpha/01", Title: "A", Status: "claimed"},
+		{Identifier: "02", Path: "gx:alpha/02", Title: "B", Status: "claimed"},
+	}}
+	s := Server{Summaries: map[string]wire.EpicSummary{"alpha": {State: wire.EpicStateRunning, Active: []wire.SummaryTicket{
+		{Address: "gx:alpha/01", LaunchStep: wire.LaunchStep{Label: "creating worktree", Position: 1}},
+		{Address: "gx:alpha/02"},
+	}}}}
+	s, _ = s.SyncRunState([]tickets.Epic{epic}, spinner.New())
+
+	launching := s.Live["alpha"]["01"]
+	if launching.Phase != rowfmt.LivePhaseLaunching || launching.LaunchStep != "creating worktree (1/4)" {
+		t.Errorf("launching ticket = %+v", launching)
+	}
+	if got := s.Live["alpha"]["02"]; got.Phase != rowfmt.LivePhaseImplementing {
+		t.Errorf("ticket without a step = %+v, want implementing", got)
 	}
 }
 

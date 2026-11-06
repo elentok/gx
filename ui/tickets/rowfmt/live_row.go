@@ -42,6 +42,9 @@ type LiveTicketState struct {
 	// WaitingOn is the conflict-resolution child a merging ticket waits on;
 	// when set it replaces the phase text.
 	WaitingOn string
+	// LaunchStep is the launch step's text, e.g. "creating worktree (1/4)",
+	// shown for LivePhaseLaunching.
+	LaunchStep string
 	// StartedAt is this ticket's own start time, stamped when its iteration
 	// begins, so elapsed time keeps climbing across
 	// a pause/resume instead of resetting, and doesn't conflate two tickets in
@@ -77,6 +80,7 @@ const (
 	LivePhaseCompacting
 	LivePhaseFinishingUp
 	LivePhaseMerging
+	LivePhaseLaunching
 )
 
 // suffix returns p's row-suffix text, e.g. "(implementing...)".
@@ -113,6 +117,8 @@ func (p LivePhase) color() color.Color {
 		return ui.ColorOrange
 	case LivePhaseMerging:
 		return ui.ColorMauve
+	case LivePhaseLaunching:
+		return ui.ColorTeal
 	default:
 		return ui.ColorBlue
 	}
@@ -147,6 +153,9 @@ func RenderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 		spinnerView := lipgloss.NewStyle().Foreground(live.Phase.color()).Render(strings.TrimRight(sp.View(), " "))
 		base = prefix + spinnerView + " " + title
 		suffix = live.Phase.suffix()
+		if live.Phase == LivePhaseLaunching {
+			suffix = "Launching: " + live.LaunchStep
+		}
 		if live.WaitingOn != "" {
 			suffix = fmt.Sprintf("(waiting on %s...)", live.WaitingOn)
 		}

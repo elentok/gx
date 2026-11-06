@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -148,6 +149,9 @@ func (s Server) StartConfirm() (confirm.Options, bool) {
 	}, true
 }
 
+// launchStepCount is the number of launch steps a run goes through.
+const launchStepCount = 4
+
 // SyncRunState derives the Queue tab's running state from the server's epic
 // summaries: an epic runs when the server says so, and its active tickets are
 // the ones with a run.
@@ -163,12 +167,12 @@ func (s Server) SyncRunState(epics []gxtickets.Epic, sp spinner.Model) (Server, 
 		if sum.State != wire.EpicStateRunning {
 			continue
 		}
-		active := make(map[string]time.Time, len(sum.Active))
+		active := make(map[string]wire.SummaryTicket, len(sum.Active))
 		for _, a := range sum.Active {
-			active[a.Address] = a.ClaimedAt
+			active[a.Address] = a
 		}
 		for _, t := range epic.Tickets {
-			seen, ok := active[t.Path]
+			a, ok := active[t.Path]
 			if !ok {
 				continue
 			}
@@ -179,7 +183,12 @@ func (s Server) SyncRunState(epics []gxtickets.Epic, sp spinner.Model) (Server, 
 			if t.Type == string(schema.TypeMerge) {
 				phase = rowfmt.LivePhaseMerging
 			}
-			live[epic.Name][t.Identifier] = rowfmt.LiveTicketState{Running: true, Phase: phase, StartedAt: seen}
+			state := rowfmt.LiveTicketState{Running: true, Phase: phase, StartedAt: a.ClaimedAt}
+			if a.LaunchStep.Label != "" {
+				state.Phase = rowfmt.LivePhaseLaunching
+				state.LaunchStep = fmt.Sprintf("%s (%d/%d)", a.LaunchStep.Label, a.LaunchStep.Position, launchStepCount)
+			}
+			live[epic.Name][t.Identifier] = state
 			running[epic.Name] = true
 		}
 		markConflictResolution(epic, live[epic.Name])

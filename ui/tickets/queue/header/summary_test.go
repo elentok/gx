@@ -67,6 +67,15 @@ func TestEpicStatusLine_MergeBlockedShowsReason(t *testing.T) {
 	}
 }
 
+func TestEpicStatusLine_WaitingShowsTheCapReason(t *testing.T) {
+	t.Parallel()
+	sum := wire.EpicSummary{State: wire.EpicStateWaiting, Verdict: wire.VerdictConcurrencyCap, VerdictReason: "2 of 2 agents"}
+	_, text, _ := epicStatusLine(ui.Icons(false), sum, "")
+	if text != "Waiting for a slot: 2 of 2 agents" {
+		t.Errorf("text = %q, want the label then the cap reason", text)
+	}
+}
+
 func TestEpicStatusLine_Colors(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
