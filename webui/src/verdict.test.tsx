@@ -1,9 +1,44 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VerdictUsagePrefixClaude, VerdictUsagePrefixCodex } from "./generated/server";
+import type { PendingRow } from "./generated/server";
+import { VerdictConcurrencyCap, VerdictUsagePrefixClaude, VerdictUsagePrefixCodex } from "./generated/server";
 import { renderThemed } from "./ui/render";
-import { VerdictLine } from "./verdict";
+import { VerdictLine, verdictText } from "./verdict";
+
+describe("verdictText", () => {
+  const cap: PendingRow = {
+    address: "gx:e/1",
+    agent: "",
+    verdict: VerdictConcurrencyCap,
+    reason: "epic cap 3/2, global cap 4/4",
+  };
+
+  it.each([
+    ["creating worktree", 1],
+    ["installing dependencies", 2],
+    ["starting agent", 3],
+    ["sending prompt", 4],
+  ])("labels the %s step", (label, position) => {
+    expect(verdictText(undefined, "gx:e/1", { label, position })).toBe(`Launching: ${label} (${position}/4)`);
+  });
+
+  it("relabels the cap verdict and keeps the server's reason", () => {
+    expect(verdictText([cap], "gx:e/1")).toBe("Waiting for a slot: epic cap 3/2, global cap 4/4");
+  });
+
+  it("never shows the launch step and the cap wait together", () => {
+    expect(verdictText([cap], "gx:e/1", { label: "starting agent", position: 3 })).toBe(
+      "Launching: starting agent (3/4)",
+    );
+  });
+
+  it("renders other verdicts as the server sent them", () => {
+    const row: PendingRow = { address: "gx:e/1", agent: "", verdict: "disk low", reason: "5G free" };
+    expect(verdictText([row], "gx:e/1")).toBe("disk low: 5G free");
+    expect(verdictText([{ ...row, verdict: "claimed" }], "gx:e/1")).toBeUndefined();
+  });
+});
 
 const gated = `${VerdictUsagePrefixClaude}99% of the weekly limit, resets 2026-11-02T00:00:00Z`;
 const gatedCodex = `${VerdictUsagePrefixCodex}99% of the weekly limit, resets 2026-11-02T00:00:00Z`;

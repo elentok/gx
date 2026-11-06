@@ -65,6 +65,17 @@ test("the ticket header shows the Long-running badge only for a marked ticket", 
   expect(screen.queryByText("Long-running")).toBeNull();
 });
 
+test("the ticket page shows the launch step in the verdict slot, and the cap wait as Waiting for a slot", async () => {
+  const claimed = { ...base, status: "claimed", stats: { ...base.stats, launch_step: { label: "installing dependencies", position: 2 } } };
+  await renderTicket(claimed, undefined, [{ address: "gx:demo/12", agent: "", verdict: "concurrency cap", reason: "epic cap 3/2" }]);
+  expect(document.querySelectorAll("[data-verdict]")).toHaveLength(1);
+  expect(screen.getByText("Launching: installing dependencies (2/4)")).toBeTruthy();
+  cleanup();
+
+  await renderTicket(base, undefined, [{ address: "gx:demo/12", agent: "", verdict: "concurrency cap", reason: "epic cap 3/2" }]);
+  expect(screen.getByText("Waiting for a slot: epic cap 3/2")).toBeTruthy();
+});
+
 test("the ticket page shows the ticket's verdict under the header,and nothing without a pending row", async () => {
   const mine: PendingRow = { address: "gx:demo/12", agent: "", verdict: "disk low", reason: "/tmp has 5G free" };
   await renderTicket(base, undefined, [{ ...mine, address: "gx:demo/13", verdict: "concurrency cap" }]);

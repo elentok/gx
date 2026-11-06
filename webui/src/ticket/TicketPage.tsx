@@ -31,10 +31,10 @@ export function TicketPage({
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps a running ticket's clock counting.
   const snapshot = useConnectionState(conn).snapshot;
-  const verdict = verdictText(snapshot?.pending, address);
   const navigate = useNavigate();
   const agent = snapshot?.sessions?.find((s) => s.ticket === address && !isExited(s));
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
+  const verdict = verdictText(snapshot?.pending, address, detail?.stats?.launch_step);
   // The lock being taken emits no ticket event, so a page that shows the wait re-reads until it clears.
   const waiting = !!detail?.waiting_label;
   useEffect(() => {
