@@ -76,6 +76,8 @@ type Runner struct {
 	// held marks the sessions (by pane id) in the middle of a deny with a
 	// reason: Status reports them blocked and the other verbs refuse.
 	held map[string]bool
+	// workspaceLocks serializes EnsureWorkspace per workspace label.
+	workspaceLocks map[string]*sync.Mutex
 }
 
 var _ agentrunner.Runner = (*Runner)(nil)
@@ -106,8 +108,26 @@ func (r *Runner) WaitN() time.Duration {
 
 func (r *Runner) Healthy() error { return r.CLI.Ping() }
 
+// ensureWorkspace serializes herdr's find-then-create per label, so parallel
+// starts into one new workspace create it once; other labels do not wait.
+func (r *Runner) ensureWorkspace(label, cwd string) (string, error) {
+	r.mu.Lock()
+	lock, ok := r.workspaceLocks[label]
+	if !ok {
+		if r.workspaceLocks == nil {
+			r.workspaceLocks = map[string]*sync.Mutex{}
+		}
+		lock = &sync.Mutex{}
+		r.workspaceLocks[label] = lock
+	}
+	r.mu.Unlock()
+	lock.Lock()
+	defer lock.Unlock()
+	return r.CLI.EnsureWorkspace(label, cwd)
+}
+
 func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
-	wsID, err := r.CLI.EnsureWorkspace(opts.Epic, opts.Cwd)
+	wsID, err := r.ensureWorkspace(opts.Epic, opts.Cwd)
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
