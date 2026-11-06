@@ -34,7 +34,8 @@ function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sess
       gap="1"
       gridTemplateColumns={cols}
       gridTemplateRows={shown.length >= 3 ? "1fr 1fr" : undefined}
-      maxW={shown.length === 1 ? "240px" : undefined}
+      w="200px"
+      maxW="100%"
       aspectRatio={shown.length === 1 ? "4/3" : shown.length === 2 ? "2/1" : "3/2"}
     >
       {shown.map((img, i) => {
