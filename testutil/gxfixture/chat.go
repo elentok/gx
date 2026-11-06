@@ -14,8 +14,8 @@ const chatFlushInterval = "100ms"
 // points the server at it: the Slack webhook and a fake Telegram bot go in the
 // config (through o.configs), the Telegram base URL and the short flush
 // interval in the server env. `gx notify` and `gx config test-notifications`
-// read the same config but always post Telegram to the real API host, so only
-// their Slack sends reach the capture. The returned func stops the endpoint.
+// read the same config, and the CLI env carries the Telegram base URL. The
+// returned func stops the endpoint.
 func (f *fixture) startChatCapture(o *opts, sc scenario) (func(), error) {
 	if !sc.ChatCapture {
 		return func() {}, nil
@@ -34,9 +34,8 @@ func (f *fixture) startChatCapture(o *opts, sc scenario) (func(), error) {
 	if sc.ChatFlush != "" {
 		flush = sc.ChatFlush
 	}
-	f.env = append(f.env,
-		"GX_CHAT_FLUSH_INTERVAL="+flush,
-		"GX_CHAT_TELEGRAM_BASE_URL="+srv.TelegramBaseURL(),
-	)
+	telegram := "GX_CHAT_TELEGRAM_BASE_URL=" + srv.TelegramBaseURL()
+	f.env = append(f.env, "GX_CHAT_FLUSH_INTERVAL="+flush, telegram)
+	f.cliEnv = append(f.cliEnv, telegram)
 	return func() { _ = srv.Close() }, nil
 }

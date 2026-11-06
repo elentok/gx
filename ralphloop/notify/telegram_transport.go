@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -153,7 +154,7 @@ func (t *telegramTransport) post(ctx context.Context, text, parseMode string) (s
 // success/failure directly — unlike the EventSink decorator's fire-and-forget
 // send.
 func SendTelegramTestMessage(botToken, chatID string) error {
-	return sendTelegramTestMessage(botToken, chatID, telegramAPIBaseURL)
+	return sendTelegramTestMessage(botToken, chatID, cliTelegramBaseURL())
 }
 
 func sendTelegramTestMessage(botToken, chatID, apiBaseURL string) error {
@@ -166,7 +167,7 @@ func sendTelegramTestMessage(botToken, chatID, apiBaseURL string) error {
 // reproduce/verify the batch-separator MarkdownV2 escaping bug live against
 // the real Bot API instead of only in a unit test.
 func SendTelegramTestBatch(botToken, chatID string) error {
-	return sendTelegramTestBatch(botToken, chatID, telegramAPIBaseURL)
+	return sendTelegramTestBatch(botToken, chatID, cliTelegramBaseURL())
 }
 
 func sendTelegramTestBatch(botToken, chatID, apiBaseURL string) error {
@@ -183,7 +184,14 @@ func sendTelegramTestBatch(botToken, chatID, apiBaseURL string) error {
 // EventSink decorator's fire-and-forget send. text is escaped for
 // MarkdownV2 here, so callers pass plain text.
 func SendTelegramMessage(botToken, chatID, text string) error {
-	return sendTelegramMessage(botToken, chatID, telegramAPIBaseURL, text)
+	return sendTelegramMessage(botToken, chatID, cliTelegramBaseURL(), text)
+}
+
+// cliTelegramBaseURL is the host the synchronous CLI sends post to: the real
+// Bot API unless gxfixture sets the same GX_CHAT_TELEGRAM_BASE_URL hook the
+// server reads (cmd/serverctl/chat_test_hooks.go).
+func cliTelegramBaseURL() string {
+	return firstNonEmptyStr(os.Getenv("GX_CHAT_TELEGRAM_BASE_URL"), telegramAPIBaseURL)
 }
 
 func sendTelegramMessage(botToken, chatID, apiBaseURL, text string) error {

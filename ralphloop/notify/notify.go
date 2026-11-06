@@ -18,7 +18,7 @@ const notifyKindCLI = "cli-notify"
 // sent to ("telegram", "slack") and an error joining any per-service
 // failures, so a Slack success is still visible even if Telegram fails.
 func SendMessage(cfg config.NotificationsConfig, statePath, text string) ([]string, error) {
-	return sendMessage(cfg, statePath, text, telegramAPIBaseURL)
+	return sendMessage(cfg, statePath, text, cliTelegramBaseURL())
 }
 
 // sendMessage is SendMessage with the Telegram API base URL injectable, so

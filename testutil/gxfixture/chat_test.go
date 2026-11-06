@@ -18,11 +18,11 @@ func TestChatCaptureScenario_ANotifyPostLandsInTheCaptureFile(t *testing.T) {
 	if r.ChatCapture == "" {
 		t.Fatalf("output = %+v, want chat_capture", r.Output)
 	}
-	// The CLI's Telegram send goes to the real API host and fails with the fake
-	// token, so the exit status is not the signal; the capture file is.
 	cmd := exec.Command(gxBin, "notify", "hello")
 	cmd.Env = r.Env
-	_, _ = cmd.CombinedOutput()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("gx notify: %v\n%s", err, out)
+	}
 
 	var got []chatcapture.Line
 	if !testutil.Poll(10*time.Second, 100*time.Millisecond, func() bool {
@@ -30,7 +30,7 @@ func TestChatCaptureScenario_ANotifyPostLandsInTheCaptureFile(t *testing.T) {
 		got = nil
 		for l := range strings.FieldsSeq(string(data)) {
 			var line chatcapture.Line
-			if json.Unmarshal([]byte(l), &line) == nil {
+			if json.Unmarshal([]byte(l), &line) == nil && line.Transport == "slack" {
 				got = append(got, line)
 			}
 		}
