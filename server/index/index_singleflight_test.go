@@ -15,6 +15,20 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+func pollUntil(t *testing.T, what string, ok func() bool) {
+	t.Helper()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	timeout := time.After(10 * time.Second)
+	for !ok() {
+		select {
+		case <-tick.C:
+		case <-timeout:
+			t.Fatalf("timed out waiting for %s", what)
+		}
+	}
+}
+
 func writeSingleFlightTicket(t *testing.T, store, status string) {
 	t.Helper()
 	dir := filepath.Join(store, "proj")
@@ -82,18 +96,12 @@ func TestRefresh_ConcurrentCallsShareOneTrailingScan(t *testing.T) {
 		wg.Add(1)
 		go func() { arrived.Add(1); call() }()
 	}
-	for arrived.Load() < 7 {
-		time.Sleep(time.Millisecond)
-	}
-	for {
+	pollUntil(t, "all callers to start", func() bool { return arrived.Load() >= 7 })
+	pollUntil(t, "a pending refresh", func() bool {
 		idx.flightMu.Lock()
-		p := idx.pending
-		idx.flightMu.Unlock()
-		if p != nil {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+		defer idx.flightMu.Unlock()
+		return idx.pending != nil
+	})
 	close(release)
 	wg.Wait()
 	close(errs)
