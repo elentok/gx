@@ -1,0 +1,75 @@
+package spec
+
+import (
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
+)
+
+// Workspace names the workspaces scenario creates, besides the Default workspace.
+const (
+	WorkspaceBugs     = "gx bugs"
+	WorkspaceResearch = "research"
+)
+
+// WorkspacesScenario seeds the workspaces the sidebar and the Epics page group
+// by: a live Design and a held Design in "gx bugs", an implementation epic with
+// a held worker and a held epic in "research", a chat and the one-off agent in
+// the Default workspace, and one Epics-page card per section.
+//
+// The project-level Fix agent and the failed migration are added by the
+// scenario of the ticket that follows this one: append to Sessions and set
+// Migrate on the returned value.
+func WorkspacesScenario() scenario {
+	const (
+		liveDesign = project + ":ws-design"
+		heldDesign = project + ":held-design"
+		implEpic   = project + ":ws-impl-epic"
+		heldEpic   = project + ":held-epic"
+	)
+	open := []ticket{{"01", "first", servertest.TicketOpts{}}}
+	return scenario{
+		Epics: []epic{
+			{project, "ws-design", nil},
+			{project, "held-design", nil},
+			{project, "ws-impl-epic", open},
+			{project, "held-epic", open},
+			// One-off agent: a queued one-off ticket whose worker is held.
+			{project, "one-offs", []ticket{{"01", "one-off", servertest.TicketOpts{}}}},
+			// One card per remaining section.
+			{project, "paused-epic", []ticket{{"01", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}}}},
+			{project, "ready-epic", open},
+			{project, "design-new", nil},
+			{project, "finished-a", []ticket{{"01", "built", servertest.TicketOpts{Status: "done"}}}},
+		},
+		EpicMeta: map[string]string{
+			project + ":ws-design":    "status: open\nkind: map\n",
+			project + ":held-design":  "status: open\nkind: map\n",
+			project + ":design-new":   "status: open\nkind: map\n",
+			project + ":one-offs":     "status: draft\n",
+			project + ":finished-a":   "status: open\ncompleted_at: 2026-01-01T10:00:00Z\nmerged_at: 2026-01-01T11:00:00Z\n",
+			project + ":ws-impl-epic": "status: open\nstarted_at: 2026-01-01T10:00:00Z\n",
+		},
+		DesignSteps: map[string]string{
+			liveDesign:              string(tickets.StepResolveTickets),
+			heldDesign:              string(tickets.StepResolveTickets),
+			project + ":design-new": string(tickets.StepChart),
+		},
+		DesignByMap: map[string][]string{liveDesign: {agentfake.DesignTurnPlain}},
+		OpenDesigns: []string{liveDesign},
+		Hold:        true,
+		Chat:        true,
+		Queue:       []string{implEpic, project + ":one-offs/01"},
+		Sessions:    []sessionSpec{{Project: project, Prompt: "hello", Read: true}},
+		Steps: [][]string{
+			{"server", "workspaces", "create", WorkspaceBugs},
+			{"server", "workspaces", "create", WorkspaceResearch},
+			{"server", "workspaces", "move", liveDesign, WorkspaceBugs},
+			{"server", "workspaces", "move", heldDesign, WorkspaceBugs},
+			{"server", "workspaces", "move", implEpic, WorkspaceResearch},
+			{"server", "workspaces", "move", heldEpic, WorkspaceResearch},
+			{"server", "hold", heldDesign},
+			{"server", "hold", heldEpic},
+		},
+	}
+}
