@@ -73,6 +73,13 @@ func TestServerChat_NoticeIsIconPhraseDetailWithNoProjectLine(t *testing.T) {
 	}
 }
 
+func TestServerChat_LongTicketNoticeNamesItsTicket(t *testing.T) {
+	msg := serverNoticeMessage(ServerNotice{Emoji: "⏳", Title: "long ticket e/06 Match the header", Detail: "The agent has run 62 assistant turns."})
+	if got, want := msg.Text(slackStyle.chatStyle).String(), "⏳ Long ticket e/06 Match the header\nThe agent has run 62 assistant turns."; got != want {
+		t.Errorf("long ticket = %q, want %q", got, want)
+	}
+}
+
 func TestServerChat_PauseDigestListsOneLinePerPauseWithNoProjectLine(t *testing.T) {
 	lines := []string{
 		PauseDigestLine("p1", "e", "01", ticketops.PauseStatus("spinning"), "The agent session ended unexpectedly."),
