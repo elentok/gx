@@ -1,3 +1,4 @@
+import { PNG } from "./agentsKit";
 import { expect, nav, test } from "./fixture";
 
 // 375 px is below the wide layout's 62em breakpoint.
@@ -77,14 +78,58 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
   expect(box!.height / 812).toBeLessThan(0.91);
   await expect(dialog.getByTestId("grab-handle")).toBeVisible();
 
-  // Start design is about twice as wide as Discard; Close sits in the header, above the idea box.
-  const start_ = await dialog.getByRole("button", nav("Start design")).boundingBox();
-  const discard = await dialog.getByRole("button", nav("Discard")).boundingBox();
-  expect(start_!.width / discard!.width).toBeGreaterThan(1.7);
-  expect(start_!.width / discard!.width).toBeLessThan(2.3);
+  // Close sits in the header, above the idea box.
+  const startBtn = dialog.getByRole("button", nav("Start design"));
+  const discardBtn = dialog.getByRole("button", nav("Discard"));
   const close = await dialog.getByRole("button", nav("Close")).boundingBox();
   const idea = await dialog.getByRole("textbox", nav("Rough idea")).boundingBox();
   expect(close!.y + close!.height).toBeLessThanOrEqual(idea!.y);
+
+  // The footer is Discard at its left edge and Start design at its right edge, each at natural width.
+  await expect(startBtn).toBeVisible();
+  const footer = discardBtn.locator("xpath=..");
+  const [foot, d, s] = [(await footer.boundingBox())!, (await discardBtn.boundingBox())!, (await startBtn.boundingBox())!];
+  const pad = 12;
+  expect(d.x).toBeCloseTo(foot.x + pad, 0);
+  expect(s.x + s.width).toBeCloseTo(foot.x + foot.width - pad, 0);
+  // Natural width: the label plus the button's padding, far short of the stretched half the footer once gave it.
+  const content = await startBtn.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const cs = getComputedStyle(el);
+    return range.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+  });
+  expect(s.width).toBeCloseTo(content, 0);
+
+  // With the idea empty the one-line hint shows above the footer, and Start keeps its width.
+  await dialog.getByRole("textbox", nav("Epic slug")).fill("phone-epic");
+  await expect(dialog.getByText("Saved")).toBeVisible();
+  const hint = dialog.getByText("Write an idea to start.");
+  await expect(hint).toBeVisible();
+  const h = (await hint.boundingBox())!;
+  const foot2 = (await footer.boundingBox())!;
+  expect(h.y + h.height).toBeLessThanOrEqual(foot2.y);
+  expect((await startBtn.boundingBox())!.width).toBeCloseTo(s.width, 0);
+
+  // A thumbnail click opens the image viewer.
+  await dialog.getByRole("textbox", nav("Rough idea")).evaluate((el, b64) => {
+    const data = new DataTransfer();
+    data.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], "pasted.png", { type: "image/png" }));
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, PNG.toString("base64"));
+  const open = dialog.getByRole("button", { name: "Open image" });
+  await expect(open).toHaveCount(1);
+  await open.click();
+  const closeViewer = page.getByRole("button", { name: /^Close ✕/ });
+  await expect(closeViewer).toBeVisible();
+  await closeViewer.click();
+  await expect(closeViewer).toBeHidden();
+
+  // Tab keeps focus inside the dialog.
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press("Tab");
+    expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+  }
 });
 
 test("24. Phone, Design page", async ({ page, start }) => {
