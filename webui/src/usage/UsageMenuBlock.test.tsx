@@ -156,8 +156,8 @@ describe("UsageMenuBlock", () => {
   it("reports shown once a block renders", async () => {
     const calls = shownCalls(async () => summary(UsageModeLimits));
     await screen.findByText("Claude limits");
+    await vi.waitFor(() => expect(calls.at(-1)).toBe(true));
     expect(calls[0]).toBe(false);
-    expect(calls.at(-1)).toBe(true);
   });
 
   it("never reports shown when the fetch fails", async () => {
