@@ -115,7 +115,7 @@ const sampleDrafts = (n: number): DesignDraftItem[] =>
 
 const SwitcherFrame = ({ drafts, open }: { drafts: DesignDraftItem[]; open?: boolean }) => (
   <Box position="relative" w="360px" h="380px" pt="2">
-    <DraftSwitcher label="epic-1" currentId={drafts[0]?.id} load={async () => drafts} onPick={() => {}} onNew={() => {}} defaultOpen={open} />
+    <DraftSwitcher label="epic-1" currentId={drafts[0]?.id} load={async () => drafts} onPick={() => {}} onNew={() => {}} onRename={() => {}} onDelete={async () => {}} defaultOpen={open} />
   </Box>
 );
 

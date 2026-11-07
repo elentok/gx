@@ -11,7 +11,7 @@ test("the menu loads on open, picks a draft and starts a new one", async () => {
   const load = vi.fn(async () => [item("a"), item("b", { image_count: 3 })]);
   const onPick = vi.fn();
   const onNew = vi.fn();
-  renderThemed(<DraftSwitcher label="a" currentId="a" load={load} onPick={onPick} onNew={onNew} />);
+  renderThemed(<DraftSwitcher label="a" currentId="a" load={load} onPick={onPick} onNew={onNew} onRename={() => {}} onDelete={async () => {}} />);
   expect(load).not.toHaveBeenCalled();
   await act(async () => void fireEvent.click(screen.getByRole("button", { name: /a/ })));
   expect(load).toHaveBeenCalledTimes(1);
@@ -26,7 +26,7 @@ test("the menu loads on open, picks a draft and starts a new one", async () => {
 
 test("choosing the open draft changes nothing", async () => {
   const onPick = vi.fn();
-  renderThemed(<DraftSwitcher label="a" currentId="a" load={async () => [item("a")]} onPick={onPick} onNew={() => {}} />);
+  renderThemed(<DraftSwitcher label="a" currentId="a" load={async () => [item("a")]} onPick={onPick} onNew={() => {}} onRename={() => {}} onDelete={async () => {}} />);
   await act(async () => void fireEvent.click(screen.getByRole("button", { name: /a/ })));
   await act(async () => void fireEvent.click(screen.getByRole("menuitem", { name: /editing now/ })));
   expect(onPick).not.toHaveBeenCalled();

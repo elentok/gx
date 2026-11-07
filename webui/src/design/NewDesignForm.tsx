@@ -191,6 +191,11 @@ function DraftForm({
   }));
   const [status, setStatus] = useState<SaveStatus>(restored === "unsaved" ? "unsaved" : "none");
   const [confirming, setConfirming] = useState(false);
+  const [name, setName] = useState(initial?.name);
+  // The name field under the title row; `undefined` is closed.
+  const [naming, setNaming] = useState<string>();
+  // A name change is a text save even when the fields are unchanged.
+  const nameDirty = useRef(false);
   const { run, pending } = useDesignWrite();
 
   const latest = useRef(draft);
@@ -215,7 +220,7 @@ function DraftForm({
     const s = server.current;
     const fields = latest.current;
     const key = JSON.stringify(fields);
-    if (key === s.synced) return setStatus(s.id ? "saved" : "none");
+    if (key === s.synced && !nameDirty.current) return setStatus(s.id ? "saved" : "none");
     if (!s.id && !fields.slug && !fields.idea) return setStatus("none");
     let res;
     try {
@@ -229,11 +234,14 @@ function DraftForm({
     failing.current = false;
     if (res.kind === "ok") {
       Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key });
+      nameDirty.current = false;
       settle();
       return setStatus("saved");
     }
     if (res.kind === "deleted") {
       Object.assign(s, { id: undefined, revision: 0, name: undefined, synced: key });
+      nameDirty.current = false;
+      setName(undefined);
       settle();
       return setStatus("none");
     }
@@ -284,6 +292,8 @@ function DraftForm({
     const next = { slug: theirs.slug, idea: theirs.idea, project: theirs.project };
     Object.assign(server.current, { revision: theirs.revision, name: theirs.name, synced: JSON.stringify(next) });
     latest.current = next;
+    nameDirty.current = false;
+    setName(theirs.name);
     setDraft(next);
     setImages(theirs.images);
     settle();
@@ -379,6 +389,29 @@ function DraftForm({
       onSwitch(null);
     });
   };
+  const saveName = (text: string) => {
+    const next = text.trim() || undefined;
+    setNaming(undefined);
+    if (next === server.current.name) return;
+    server.current.name = next;
+    nameDirty.current = true;
+    setName(next);
+    setStatus(!blocked.current && server.current.id ? "saving" : status);
+    flush();
+  };
+  /** Deletes a draft; deleting the open one opens the next most recent, or a blank one. */
+  const deleteOther = async (id: string) => {
+    if (id !== server.current.id) {
+      await drafts.remove(id);
+      return;
+    }
+    stopSaving();
+    await chain.current;
+    await drafts.remove(id);
+    const [next] = await drafts.list();
+    const res = next ? await drafts.read(next.id) : undefined;
+    onSwitch(res?.kind === "ok" ? res.draft : null);
+  };
   const loadDrafts = async () => {
     clearTimeout(timer.current);
     if (!blocked.current) flush();
@@ -417,13 +450,13 @@ function DraftForm({
     );
   };
 
-  const label = draft.slug || draft.idea || server.current.name ? draftLabel({ name: server.current.name, ...draft }) : draftLabel();
+  const label = draft.slug || draft.idea || name ? draftLabel({ name, ...draft }) : draftLabel();
   const reason = !draft.slug.trim() ? "Name the epic to start." : !draft.idea.trim() ? "Write an idea to start." : undefined;
 
   return (
     <BottomSheet {...sheetProps} onClose={close} as="form" onSubmit={submit}>
       <Box position="relative" display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
-        <DraftSwitcher label={label} currentId={server.current.id} load={loadDrafts} onPick={switchDraft} onNew={newDraft} />
+        <DraftSwitcher label={label} currentId={server.current.id} load={loadDrafts} onPick={switchDraft} onNew={newDraft} onRename={() => setNaming(name ?? "")} onDelete={deleteOther} />
         <Box flex="1" />
         {status !== "none" && (
           <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
@@ -436,6 +469,32 @@ function DraftForm({
           </Text>
         )}
       </Box>
+      {naming !== undefined && (
+        <Box display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
+          <chakra.input
+            aria-label="Draft name"
+            autoComplete="off"
+            autoFocus
+            {...field}
+            flex="1"
+            minW="0"
+            h="34px"
+            px="3"
+            placeholder="Name this draft (optional)"
+            value={naming}
+            onChange={(e) => setNaming(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                saveName(naming);
+              }
+            }}
+          />
+          <Button type="button" emphasis="ghost" tone="muted" onClick={() => saveName(naming)}>
+            Done
+          </Button>
+        </Box>
+      )}
       <Box display="flex" alignItems="center" gap="2" p="3" borderBottomWidth="1px" borderColor="border" flexShrink="0">
         {projects.length > 1 && (
           <>

@@ -694,3 +694,73 @@ test("switching away from a blank saved draft deletes it and saves nothing", asy
   expect(remove).toHaveBeenCalled();
   expect(save).not.toHaveBeenCalled();
 });
+
+test("Name this draft, Done: the label shows the name and the save carries it", async () => {
+  const { client, save } = twoDrafts();
+  await mount({ drafts: client });
+  await openMenu(/alpha/);
+  await pick("Name this draft");
+  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "Checkout" } });
+  await act(async () => void click("Done"));
+  expect(screen.queryByRole("textbox", { name: "Draft name" })).toBeNull();
+  expect(screen.getByRole("button", { name: /Checkout/ })).toBeTruthy();
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "a", slug: "alpha", name: "Checkout" }));
+});
+
+/** twoDrafts whose list drops what `remove` was asked to delete. */
+function deletable(aText: Partial<DesignDraft> = {}) {
+  const base = twoDrafts(aText);
+  const gone = new Set<string>();
+  const remove = vi.fn(async (id: string): Promise<DraftResult> => {
+    gone.add(id);
+    return { kind: "deleted" };
+  });
+  const client: DraftsClient = { ...base.client, remove, list: async () => (await base.client.list()).filter((d) => !gone.has(d.id)) };
+  return { client, remove };
+}
+const trash = (row: number) => act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Delete draft" })[row]));
+
+test("trash on a row with text asks Keep or Discard; Keep leaves it, Discard deletes it", async () => {
+  const { client, remove } = deletable();
+  await mount({ drafts: client });
+  await openMenu(/alpha/);
+  await trash(1);
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
+  await act(async () => void click("Keep"));
+  expect(remove).not.toHaveBeenCalled();
+  expect(screen.getAllByRole("menuitem")[1].textContent).toContain("beta");
+  await trash(1);
+  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]));
+  expect(remove).toHaveBeenCalledWith("b");
+  expect(screen.queryByText(/beta/)).toBeNull();
+});
+
+test("trash on an empty row deletes at once", async () => {
+  const { client, remove } = deletable();
+  const list = client.list;
+  await mount({ drafts: { ...client, list: async () => (await list()).map((d) => (d.id === "b" ? { ...d, slug: "", idea: "", image_count: 0 } : d)) } });
+  await openMenu(/alpha/);
+  await trash(1);
+  expect(remove).toHaveBeenCalledWith("b");
+  expect(screen.queryByText("Discard this draft and its images?")).toBeNull();
+});
+
+test("deleting the open draft opens the next most recent one", async () => {
+  const { client, remove } = deletable();
+  await mount({ drafts: client });
+  await openMenu(/alpha/);
+  await trash(0);
+  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]));
+  expect(remove).toHaveBeenCalledWith("a");
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("beta");
+});
+
+test("deleting the only draft opens a blank one", async () => {
+  const { client, remove } = deletable();
+  await mount({ drafts: { ...client, list: async () => (await client.list()).filter((d) => d.id === "a") } });
+  await openMenu(/alpha/);
+  await trash(0);
+  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]));
+  expect(remove).toHaveBeenCalledWith("a");
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("");
+});
