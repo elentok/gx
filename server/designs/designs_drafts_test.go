@@ -157,6 +157,21 @@ func TestWebDesignDrafts_SaveRefusals(t *testing.T) {
 	}
 }
 
+func TestWebDesignDrafts_SaveWithoutIDCreates(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+
+	res := f.webSave(t, "", 0, "first words")
+	if res.Refused || res.Draft == nil || res.Draft.ID == "" || res.Draft.Idea != "first words" || res.Draft.Revision != 1 {
+		t.Fatalf("create save = %+v", res)
+	}
+	var items []wire.DesignDraftItem
+	f.webGet(t, "/v1/designs/drafts", &items)
+	if len(items) != 1 || items[0].ID != res.Draft.ID {
+		t.Errorf("list = %+v, want the created draft", items)
+	}
+}
+
 func TestWebDesignDrafts_EmptyingSaveDeletes(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)

@@ -8,6 +8,14 @@ import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchEpicList } from "./list";
 
+// The New Design form opens on the server's drafts; here there are none and saves go nowhere.
+vi.mock("../design/drafts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../design/drafts")>()),
+  listDrafts: async () => [],
+  saveDraft: async () => ({ kind: "deleted" }),
+  deleteDraft: async () => ({ kind: "deleted" }),
+}));
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
@@ -249,8 +257,8 @@ test("New Design opens the form in a dialog, Close closes it", async () => {
   await loaded(mixed());
   expect(screen.queryByRole("dialog")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "New Design" }));
+  expect(await screen.findByRole("textbox", { name: "Epic slug" })).toBeTruthy();
   const dialog = screen.getByRole("dialog", { name: "New Design" });
-  expect(within(dialog).getByRole("textbox", { name: "Epic slug" })).toBeTruthy();
   fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
   expect(screen.queryByRole("dialog")).toBeNull();
 });
@@ -259,8 +267,7 @@ test("the New Design project starts on the page's filtered project", async () =>
   localStorage.setItem("gx.epics.project", "blog");
   await loaded(listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]));
   fireEvent.click(screen.getByRole("button", { name: "New Design" }));
-  const dialog = screen.getByRole("dialog", { name: "New Design" });
-  expect((within(dialog).getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe("blog");
+  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
 });
 
 test("Start posts new_design and opens the new Design page", async () => {
@@ -268,8 +275,8 @@ test("Start posts new_design and opens the new Design page", async () => {
   const { router } = renderEpics(async () => mixed(), conn, open);
   await filterBox();
   fireEvent.click(await screen.findByRole("button", { name: "New Design" }));
+  fireEvent.change(await screen.findByRole("textbox", { name: "Epic slug" }), { target: { value: "fresh" } });
   const dialog = screen.getByRole("dialog", { name: "New Design" });
-  fireEvent.change(within(dialog).getByRole("textbox", { name: "Epic slug" }), { target: { value: "fresh" } });
   fireEvent.change(within(dialog).getByRole("textbox", { name: "Rough idea" }), { target: { value: "an idea" } });
   await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Start design" })));
   expect(open).toHaveBeenCalledWith({ epic: "fresh", new_design: true, idea: "an idea", project: "gx" });

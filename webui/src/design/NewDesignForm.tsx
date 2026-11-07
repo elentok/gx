@@ -1,40 +1,37 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { BottomSheet } from "../ui/modal/BottomSheet";
+import type { DesignDraft } from "../generated/server";
+import { deleteDraft, draftLabel, listDrafts, readDraft, saveDraft, type DeleteDraft, type ListDrafts, type ReadDraft, type SaveDraft } from "./drafts";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { useDesignWrite } from "./SessionControls";
 import { useWide } from "../useWide";
 
-export interface NewDesignDraft {
-  slug?: string;
-  idea?: string;
-  project?: string;
+/** The draft calls the form makes; the prop defaults to the real ones. */
+export interface DraftsClient {
+  list: ListDrafts;
+  read: ReadDraft;
+  save: SaveDraft;
+  remove: DeleteDraft;
 }
 
-const DRAFT_KEY = "gx.newDesign.draft";
+const realDrafts: DraftsClient = { list: listDrafts, read: readDraft, save: saveDraft, remove: deleteDraft };
 
-function readDraft(): NewDesignDraft {
-  try {
-    return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as NewDesignDraft;
-  } catch {
-    return {};
-  }
+const AUTOSAVE_MS = 800;
+
+interface Fields {
+  slug: string;
+  idea: string;
+  project: string;
 }
 
-function writeDraft(draft: NewDesignDraft | undefined) {
-  try {
-    if (draft) localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    else localStorage.removeItem(DRAFT_KEY);
-  } catch {
-    // The draft is a convenience; the open form still holds it.
-  }
-}
+type SaveStatus = "none" | "saving" | "saved";
 
-const hasText = (d: NewDesignDraft) => !!(d.slug?.trim() || d.idea?.trim());
+const hasText = (d: Partial<Fields>) => !!(d.slug?.trim() || d.idea?.trim());
 
 /** A draft with text keeps its project, then the page's filter, then the draft's, then the first. */
-function startingProject(draft: NewDesignDraft, projects: string[], filterProject?: string): string {
+function startingProject(draft: Partial<Fields>, projects: string[], filterProject?: string): string {
   const known = (p?: string) => (p && projects.includes(p) ? p : undefined);
   const text = hasText(draft);
   return (text && known(draft.project)) || known(filterProject) || known(draft.project) || projects[0] || "";
@@ -52,14 +49,17 @@ const field = {
   _focusVisible: { outline: "none", ...focusRing },
 } as const;
 
-/** The New Design writing sheet: epic name and rough idea for a Design with no map yet. The draft lives in localStorage until Start or Discard. */
-export function NewDesignForm({
-  projects,
-  filterProject,
-  open = postOpenDesign,
-  onStarted,
-  onClose,
-}: {
+const sheetProps = {
+  label: "New Design",
+  fillViewport: true,
+  desktop: { borderRadius: "lg", w: "720px", h: "520px" },
+  bg: "surface.raised",
+  p: "0",
+  gap: "0",
+  overflow: "hidden",
+} as const;
+
+interface FormProps {
   projects: string[];
   /** The Epics page's project filter, when it is on one project. */
   filterProject?: string;
@@ -68,22 +68,133 @@ export function NewDesignForm({
   onStarted: (address: string, startFailure?: string) => void;
   /** Closing keeps the draft. */
   onClose: () => void;
-}) {
+  drafts?: DraftsClient;
+}
+
+/** The New Design writing sheet: epic name and rough idea for a Design with no map yet. It opens on the latest server draft and autosaves it until Start or Discard. */
+export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
+  // `undefined` is still loading; `null` is no draft to open.
+  const [initial, setInitial] = useState<DesignDraft | null | undefined>();
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const [latest] = await drafts.list();
+      const res = latest ? await drafts.read(latest.id) : undefined;
+      if (live) setInitial(res?.kind === "ok" ? res.draft : null);
+    })().catch(() => live && setInitial(null));
+    return () => {
+      live = false;
+    };
+    // The client is fixed for the form's life.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (initial === undefined) {
+    return (
+      <BottomSheet {...sheetProps} onClose={props.onClose}>
+        <Box flex="1" display="flex" alignItems="center" justifyContent="center">
+          <Spinner />
+        </Box>
+      </BottomSheet>
+    );
+  }
+  return <DraftForm {...props} drafts={drafts} initial={initial} />;
+}
+
+function DraftForm({
+  projects,
+  filterProject,
+  open = postOpenDesign,
+  onStarted,
+  onClose,
+  drafts,
+  initial,
+}: FormProps & { drafts: DraftsClient; initial: DesignDraft | null }) {
   const sheetMode = !useWide();
-  const [draft, setDraft] = useState(() => {
-    const saved = readDraft();
-    return { slug: saved.slug ?? "", idea: saved.idea ?? "", project: startingProject(saved, projects, filterProject) };
-  });
+  const [draft, setDraft] = useState<Fields>(() => ({
+    slug: initial?.slug ?? "",
+    idea: initial?.idea ?? "",
+    project: startingProject(initial ?? {}, projects, filterProject),
+  }));
+  const [status, setStatus] = useState<SaveStatus>("none");
   const [confirming, setConfirming] = useState(false);
   const { run, pending } = useDesignWrite();
 
-  const patch = (p: Partial<typeof draft>) => {
+  const latest = useRef(draft);
+  // `synced` is the fields as the server last had them, so an unchanged form saves nothing.
+  const server = useRef({ id: initial?.id, revision: initial?.revision ?? 0, name: initial?.name, synced: JSON.stringify(draft) });
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const chain = useRef<Promise<void>>(Promise.resolve());
+  const finished = useRef(false);
+
+  const persist = async () => {
+    const s = server.current;
+    const fields = latest.current;
+    const key = JSON.stringify(fields);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (key === s.synced) return setStatus(s.id ? "saved" : "none");
+      if (!s.id && !fields.slug && !fields.idea) return setStatus("none");
+      const res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision });
+      if (res.kind === "ok") {
+        Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key });
+        return setStatus("saved");
+      }
+      if (res.kind === "deleted") {
+        Object.assign(s, { id: undefined, revision: 0, name: undefined, synced: key });
+        return setStatus("none");
+      }
+      if (res.kind === "gone") {
+        Object.assign(s, { id: undefined, revision: 0, name: undefined });
+      } else {
+        // Another tab saved first; this form's text wins on the retry.
+        const current = await drafts.read(s.id!);
+        if (current.kind !== "ok") return;
+        s.revision = current.draft.revision;
+      }
+    }
+  };
+
+  const flush = () => {
+    clearTimeout(timer.current);
+    if (finished.current) return;
+    chain.current = chain.current.then(persist).catch(() => setStatus("none"));
+  };
+  const stopSaving = () => {
+    finished.current = true;
+    clearTimeout(timer.current);
+  };
+
+  useEffect(() => {
+    const leave = () => flush();
+    window.addEventListener("pagehide", leave);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      leave();
+    };
+    // flush reads refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const patch = (p: Partial<Fields>) => {
     const next = { ...draft, ...p };
     setDraft(next);
-    writeDraft(next);
+    latest.current = next;
+    setStatus(next.slug || next.idea || server.current.id ? "saving" : "none");
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, AUTOSAVE_MS);
+  };
+  const close = () => {
+    flush();
+    onClose();
   };
   const discard = () => {
-    writeDraft(undefined);
+    stopSaving();
+    // Waits for an in-flight save, which is what gives a new draft its id.
+    chain.current = chain.current
+      .then(async () => {
+        if (server.current.id) await drafts.remove(server.current.id);
+      })
+      .catch(() => {});
     onClose();
   };
 
@@ -94,7 +205,7 @@ export function NewDesignForm({
       () => open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project }),
       {
         onDone: (res) => {
-          writeDraft(undefined);
+          stopSaving();
           // With start_error the map exists though no session started; the Design page offers the retry.
           onStarted(`${draft.project}:${slug}`, res.start_error);
         },
@@ -102,21 +213,27 @@ export function NewDesignForm({
     );
   };
 
+  const label = draft.slug || draft.idea || server.current.name ? draftLabel({ name: server.current.name, ...draft }) : draftLabel();
   const reason = !draft.slug.trim() ? "Name the epic to start." : !draft.idea.trim() ? "Write an idea to start." : undefined;
 
   return (
-    <BottomSheet
-      label="New Design"
-      onClose={onClose}
-      fillViewport
-      desktop={{ borderRadius: "lg", w: "720px", h: "520px" }}
-      as="form"
-      onSubmit={submit}
-      bg="surface.raised"
-      p="0"
-      gap="0"
-      overflow="hidden"
-    >
+    <BottomSheet {...sheetProps} onClose={close} as="form" onSubmit={submit}>
+      <Box display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
+        <Text fontWeight="600" minW="0" truncate>
+          {label}
+        </Text>
+        <Box flex="1" />
+        {status !== "none" && (
+          <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
+            {status === "saved" && (
+              <chakra.span aria-hidden color="tone.done.fg">
+                ✓{" "}
+              </chakra.span>
+            )}
+            {status === "saving" ? "Saving..." : "Saved"}
+          </Text>
+        )}
+      </Box>
       <Box display="flex" alignItems="center" gap="2" p="3" borderBottomWidth="1px" borderColor="border" flexShrink="0">
         {projects.length > 1 && (
           <>
@@ -164,7 +281,7 @@ export function NewDesignForm({
           type="button"
           aria-label="Close"
           title="Close (keeps the draft)"
-          onClick={onClose}
+          onClick={close}
           color="text.dim"
           fontSize="xl"
           lineHeight="1"

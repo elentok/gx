@@ -40,7 +40,17 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.drafts.Save(req.ID, req)
+	var res wire.DesignDraftSaveResult
+	var err error
+	if req.ID == "" {
+		// The form's first save of a new draft has no id yet.
+		var d *wire.DesignDraft
+		if d, err = s.drafts.Create(req.Project, req.Slug, req.Idea, req.Name); err == nil {
+			res = wire.DesignDraftSaveResult{Draft: d, Deleted: d == nil}
+		}
+	} else {
+		res, err = s.drafts.Save(req.ID, req)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -9,7 +9,7 @@ import { designFooterEntries } from "./designFooterEntries";
 import { shellEntries } from "./shellEntries";
 import { ConnectionContext, type Connection } from "../connection";
 import { ImageStrip } from "../design/ImageStrip";
-import { NewDesignForm } from "../design/NewDesignForm";
+import { NewDesignForm, type DraftsClient } from "../design/NewDesignForm";
 import type { ComposerImage } from "../design/useComposerImages";
 import { CoarsePointerContext, type Device, DeviceContext, WideContext } from "../useWide";
 import { EpicPage } from "../epic/EpicPage";
@@ -93,6 +93,13 @@ const cardRow = (over: Partial<EpicListRow> = {}): EpicListRow => ({
 });
 
 const idleConnection = { refresh: () => {} } as Connection;
+/** A draft client with no drafts, so the New Design form renders blank without a server. */
+const noDrafts: DraftsClient = {
+  list: async () => [],
+  read: async () => ({ kind: "gone" }),
+  save: async () => ({ kind: "deleted" }),
+  remove: async () => ({ kind: "deleted" }),
+};
 
 // A transform makes the modal's fixed overlay fill this frame instead of the page.
 const ModalFrame = ({ children, h = "600px", w = "800px" }: { children: ReactNode; h?: string; w?: string }) => (
@@ -876,9 +883,9 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "NewDesignForm",
     cases: [
-      { label: "several projects", node: <ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
-      { label: "one project", node: <ModalFrame><NewDesignForm projects={["gx"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
-      { label: "phone bottom sheet", node: <DeviceContext.Provider value="phone"><WideContext.Provider value={false}><ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame></WideContext.Provider></DeviceContext.Provider> },
+      { label: "several projects", node: <ModalFrame><NewDesignForm drafts={noDrafts} projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
+      { label: "one project", node: <ModalFrame><NewDesignForm drafts={noDrafts} projects={["gx"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
+      { label: "phone bottom sheet", node: <DeviceContext.Provider value="phone"><WideContext.Provider value={false}><ModalFrame><NewDesignForm drafts={noDrafts} projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame></WideContext.Provider></DeviceContext.Provider> },
     ],
   },
 ];
