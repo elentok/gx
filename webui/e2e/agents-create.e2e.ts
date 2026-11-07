@@ -14,6 +14,7 @@ import {
   row,
   sendButton,
   sessions,
+  sidebar,
   openNewAgent,
   worktreeBox,
 } from "./agentsKit";
@@ -133,8 +134,20 @@ test("88. Phone, Agents page", async ({ page, start }) => {
   await expect(row(page, target)).toBeHidden();
   await expect(composer(page)).toBeVisible();
 
+  // The footer "+ New" menu is an anchored popover that flips above its button, not a sheet.
+  await page.getByRole("button", { name: "Show sidebar", exact: true }).click();
+  const add = sidebar(page).getByRole("button", { name: "+ New", exact: true });
+  await add.click();
+  const menu = page.getByRole("menu", { name: "+ New" });
+  await expect(menu).toBeVisible();
+  await expect(page.getByTestId("grab-handle")).toHaveCount(0);
+  await expect
+    .poll(async () => (await menu.boundingBox())!.y + (await menu.boundingBox())!.height <= (await add.boundingBox())!.y)
+    .toBe(true);
+
   // Create opens as a sheet at the bottom of the screen.
-  await openNewAgent(page);
+  await page.getByRole("menuitem", { name: /^New chat/ }).click();
+  await expect(newForm(page)).toBeVisible();
   await expect(page.getByTestId("grab-handle")).toBeVisible();
   await expect
     .poll(async () => {

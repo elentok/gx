@@ -1,4 +1,4 @@
-import { Box, chakra, Menu, Portal, Text } from "@chakra-ui/react";
+import { Box, chakra, Portal, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { fetchWorktrees, postCreateSession } from "../agents/newSession";
@@ -7,6 +7,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { useEpicList } from "../epics/list";
 import { designHref, STATS_HREF } from "../hrefs";
+import { GxMenu } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
 import { GearMenu } from "./GearMenu";
 
@@ -65,29 +66,20 @@ export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: 
   const needsYou = snapshot?.needs_you_total ?? 0;
   return (
     <Box as="footer" flex="none" display="flex" alignItems="center" gap="1" p="2" borderTopWidth="1px" borderColor="border">
-      <Menu.Root positioning={{ placement: "top-start" }} lazyMount unmountOnExit>
-        <Menu.Trigger asChild>
+      <GxMenu
+        placement="top-start"
+        trigger={
           <chakra.button type="button" h="34px" px="3" borderRadius="8px" bg="surface.raised" borderWidth="1px" borderColor="hairline" color="text" cursor="pointer">
             + New
           </chakra.button>
-        </Menu.Trigger>
-        <Portal>
-          <Menu.Positioner>
-            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">
-              <Menu.Item value="design" onClick={() => setDialog("design")} cursor="pointer" color="text" _highlighted={{ bg: "surface" }}>
-                New design
-              </Menu.Item>
-              <Menu.Item value="agent" onClick={() => setDialog("agent")} cursor="pointer" color="text" justifyContent="space-between" _highlighted={{ bg: "surface" }}>
-                New chat
-              </Menu.Item>
-              <Menu.Separator />
-              <Menu.Item value="workspace" onClick={onNewWorkspace} cursor="pointer" color="text" _highlighted={{ bg: "surface" }}>
-                New workspace…
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
+        }
+        items={[
+          { value: "design", label: "New design", onSelect: () => setDialog("design") },
+          { value: "agent", label: "New chat", onSelect: () => setDialog("agent") },
+          { kind: "separator" },
+          { value: "workspace", label: "New workspace…", onSelect: onNewWorkspace },
+        ]}
+      />
       <Box flex="1" />
       <FooterLink href={EPICS_HREF} label="Epics" badge={needsYou}>
         <EpicsIcon />

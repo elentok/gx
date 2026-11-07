@@ -1,7 +1,8 @@
-import { Box, chakra, Menu, Portal, Text } from "@chakra-ui/react";
+import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState, type FormEvent } from "react";
 import type { Workspace, WorkspaceResult } from "../generated/server";
 import { Button } from "../ui/button/Button";
+import { GxMenu } from "../ui/menu/Menu";
 import { Modal } from "../ui/modal/Modal";
 import { refusalText, useWrite } from "../useWrite";
 import { postWorkspace } from "../workspaces/postWorkspace";
@@ -83,8 +84,34 @@ export function WorkspaceSwitcher({
 }) {
   const activeNeeds = workspaces.find((w) => w.name === active)?.needs_you;
   return (
-    <Menu.Root positioning={{ placement: "bottom-start" }} lazyMount unmountOnExit>
-      <Menu.Trigger asChild>
+    <GxMenu
+      placement="bottom-start"
+      items={[
+        ...workspaces.map((w) => ({
+          value: `ws:${w.name}`,
+          label: w.default ? (
+            <>
+              {w.name}
+              <Text as="span" color="text.faint" ml="2">
+                default
+              </Text>
+            </>
+          ) : (
+            w.name
+          ),
+          hint: w.needs_you ? (
+            <Text as="span" color="tone.waiting.fg">
+              {w.needs_you} needs you
+            </Text>
+          ) : undefined,
+          inlineHint: true,
+          onSelect: () => onPick(w.name),
+        })),
+        { kind: "separator" } as const,
+        { value: "new", label: "New workspace…", onSelect: onNew },
+        { value: "manage", label: "Manage workspaces", onSelect: onManage },
+      ]}
+      trigger={
         <chakra.button
           type="button"
           aria-label={`Workspace: ${active}`}
@@ -115,37 +142,7 @@ export function WorkspaceSwitcher({
             </Box>
           ) : null}
         </chakra.button>
-      </Menu.Trigger>
-      <Portal>
-        <Menu.Positioner>
-          <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="56">
-            {workspaces.map((w) => (
-              <Menu.Item key={w.name} value={`ws:${w.name}`} onClick={() => onPick(w.name)} cursor="pointer" color="text" justifyContent="space-between" _highlighted={{ bg: "surface" }}>
-                <Box as="span">
-                  {w.name}
-                  {w.default && (
-                    <Text as="span" color="text.faint" ml="2">
-                      default
-                    </Text>
-                  )}
-                </Box>
-                {w.needs_you ? (
-                  <Text as="span" color="tone.waiting.fg">
-                    {w.needs_you} needs you
-                  </Text>
-                ) : null}
-              </Menu.Item>
-            ))}
-            <Menu.Separator />
-            <Menu.Item value="new" onClick={onNew} cursor="pointer" color="text" _highlighted={{ bg: "surface" }}>
-              New workspace…
-            </Menu.Item>
-            <Menu.Item value="manage" onClick={onManage} cursor="pointer" color="text" _highlighted={{ bg: "surface" }}>
-              Manage workspaces
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Positioner>
-      </Portal>
-    </Menu.Root>
+      }
+    />
   );
 }
