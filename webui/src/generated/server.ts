@@ -50,6 +50,71 @@ export interface KindCheck {
 }
 
 //////////
+// source: designdrafts.go
+
+/**
+ * ReasonDraftRevisionConflict: the caller saved against a revision that is no longer current.
+ */
+export const ReasonDraftRevisionConflict = "revision-conflict";
+/**
+ * ReasonDraftGone: the draft was deleted (or emptied) since the caller loaded it.
+ */
+export const ReasonDraftGone = "draft-gone";
+/**
+ * Refusal reasons of a New Design draft text save.
+ */
+export type ReasonDraft = typeof ReasonDraftRevisionConflict | typeof ReasonDraftGone;
+/**
+ * DesignDraft is one New Design form kept on the server. Slug may be empty;
+ * Images lists image ids the server alone writes.
+ */
+export interface DesignDraft {
+  id: string;
+  project: string;
+  slug: string;
+  idea: string;
+  name?: string;
+  images: string[];
+  revision: number /* int */;
+  edited_at: string;
+}
+/**
+ * DesignDraftItem is one row of the draft list: the inputs of its label and
+ * how many images it holds.
+ */
+export interface DesignDraftItem {
+  id: string;
+  project: string;
+  slug: string;
+  idea: string;
+  name?: string;
+  image_count: number /* int */;
+  edited_at: string;
+}
+/**
+ * DesignDraftSaveRequest saves the text fields of a draft. Revision is the one
+ * the caller last saw. It never carries the image list.
+ */
+export interface DesignDraftSaveRequest {
+  project: string;
+  slug: string;
+  idea: string;
+  name?: string;
+  revision: number /* int */;
+}
+/**
+ * DesignDraftSaveResult answers a text save. A refusal is a result: Reason is
+ * one of the ReasonDraft* constants. Deleted: the save left the draft empty and
+ * removed it. Draft is set on a successful, non-deleting save.
+ */
+export interface DesignDraftSaveResult {
+  refused?: boolean;
+  reason?: string;
+  deleted?: boolean;
+  draft?: DesignDraft;
+}
+
+//////////
 // source: designs.go
 
 export const ReasonDesignNotMapEpic = "not-map-epic";
@@ -81,6 +146,11 @@ export interface DesignOpenRequest {
   new_design?: boolean;
   idea?: string;
   project?: string;
+  /**
+   * FromSession is the chat that promoted the idea; the new Design starts in
+   * its workspace. An unknown id is ignored.
+   */
+  from_session?: string;
 }
 /**
  * DesignWorktreeRequest is the body of POST /v1/designs/worktree. Epic is a map

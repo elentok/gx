@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
@@ -19,10 +20,12 @@ type Deps struct {
 	Log              *slog.Logger
 	TicketStore      string
 	ConversationsDir string
-	Idx              *index.Index
-	Projects         *projects.Registry
-	Events           *broker.Broker
-	Guards           *runs.Guards
+	// StateDir holds the New Design drafts.
+	StateDir string
+	Idx      *index.Index
+	Projects *projects.Registry
+	Events   *broker.Broker
+	Guards   *runs.Guards
 	// Chat sends the Ready message; WebURL is the web listener's base URL, "" when off.
 	Chat   *notify.ServerChat
 	WebURL func() string
@@ -41,13 +44,15 @@ type Designs struct {
 	log              *slog.Logger
 	ticketStore      string
 	conversationsDir string
-	idx              *index.Index
-	projects         *projects.Registry
-	events           *broker.Broker
-	guards           *runs.Guards
-	chat             *notify.ServerChat
-	webURL           func() string
-	workspaces       Workspaces
+	// drafts keeps the New Design drafts, which are not epics.
+	drafts     *drafts.Store
+	idx        *index.Index
+	projects   *projects.Registry
+	events     *broker.Broker
+	guards     *runs.Guards
+	chat       *notify.ServerChat
+	webURL     func() string
+	workspaces Workspaces
 	// seeded: the Ready seed mark has been settled this run.
 	seeded atomic.Bool
 	// sessions comes later than Designs: the Manager calls CleanupDesign back,
@@ -66,6 +71,7 @@ func New(d Deps) *Designs {
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
 		chat: d.Chat, webURL: d.WebURL, workspaces: d.Workspaces,
+		drafts: drafts.New(d.StateDir),
 	}
 }
 
