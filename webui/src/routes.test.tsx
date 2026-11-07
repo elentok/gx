@@ -163,9 +163,12 @@ test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])("%s lands on the 
   expect(screen.getByRole("heading", { level: 1, name: "Epics" })).toBeTruthy();
 });
 
-test.each(["/agents", "/agents/s-1"])("%s renders the Agents page", async (path) => {
+test.each([
+  ["/agents", "No sessions yet"],
+  ["/agents/s-1", "Session not found"],
+])("%s renders the Agents page", async (path, text) => {
   renderAt(path, okFor);
-  expect(await screen.findByText("Sessions")).toBeTruthy();
+  expect(await screen.findByText(text)).toBeTruthy();
 });
 
 test("a ticket route shows a spinner, then the ticket whose address is in the hash", async () => {

@@ -8,7 +8,7 @@ import { ScreenModal } from "../design/ScreenModal";
 import type { FetchScreen } from "../design/screen";
 import { designOf, promptable } from "../design/view";
 import type { SessionInfo } from "../generated/server";
-import { AGENTS_HREF, designHref } from "../hrefs";
+import { designHref } from "../hrefs";
 import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
@@ -21,7 +21,6 @@ import { stateLabel, statusMark } from "./rules";
 import { AgentLine } from "../design/AgentLine";
 import { StatusMark } from "./SessionGlyphs";
 import { SessionActions } from "./SessionActions";
-import { SessionSwitcher } from "./SessionSwitcher";
 
 function DesignLink({ map, ml }: { map: string; ml?: string }) {
   return (
@@ -33,13 +32,9 @@ function DesignLink({ map, ml }: { map: string; ml?: string }) {
 
 function SessionHeader({
   session: s,
-  sessions,
-  onNew,
   promote,
 }: {
   session: SessionInfo;
-  sessions: SessionInfo[];
-  onNew: () => void;
   /** The Promote to Design button; absent for a gx-driven agent. */
   promote?: ReactNode;
 }) {
@@ -52,18 +47,10 @@ function SessionHeader({
     <Box as="header" mb="3">
       <PageHeader
         title={s.name || s.id}
-        icon={
-          wide ? undefined : (
-            <Link href={AGENTS_HREF} aria-label="All sessions" fontSize="2xl" lineHeight="1" px="2" color="text.muted">
-              ‹
-            </Link>
-          )
-        }
         subtitle={wide ? s.project : `${s.project} · ${stateLabel(s)}`}
         actions={
           <>
             <StatusMark session={s} />
-            <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} fontSize="14px" plain />
             {map && <DesignLink map={map} />}
             {wide && promote}
             {actions}
@@ -159,14 +146,10 @@ function UnlockPrompt({ kind, onConfirm, onCancel }: { kind: string; onConfirm: 
 /** The main column for a selected session: its header, chat and composer. */
 export function SessionView({
   session,
-  sessions,
   fetchChat,
   fetchScreen,
-  onNew,
 }: {
   session: SessionInfo;
-  sessions: SessionInfo[];
-  onNew: () => void;
   fetchChat?: FetchChat;
   fetchScreen?: FetchScreen;
 }) {
@@ -185,8 +168,6 @@ export function SessionView({
     <Box display="flex" flexDirection="column" height="100%" minH="0">
       <SessionHeader
         session={session}
-        sessions={sessions}
-        onNew={onNew}
         promote={
           kind === undefined && (
             <PromoteButton

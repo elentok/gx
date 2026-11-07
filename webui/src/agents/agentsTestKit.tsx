@@ -76,9 +76,6 @@ export function render(sessions: SessionInfo[] | undefined, path = "/agents", li
   return { router, setSessions, goLive, emit, update };
 }
 
-export const rows = () => screen.getAllByRole("link").filter((l) => l.getAttribute("href")?.startsWith("#/agents/"));
-export const row = (name: string) => rows().find((r) => within(r).queryByText(name))!;
-
 export const chat = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => ({
   conversation_id: "c1",
   messages: [{ id: "m1", role: "agent", kind: "text", text: "hello there", at: "2026-01-01T00:00:00Z" }],
@@ -88,17 +85,6 @@ export const chat = (over: Partial<SessionChatResponse> = {}): SessionChatRespon
 });
 
 export const chatOf = (c: SessionChatResponse) => ({ chat: async () => ({ kind: "ok" as const, detail: c }) });
-
-export const switcherSessions = () => [
-  session("s-1", "alpha", { name: "plain", dir: "/work/plain" }),
-  session("s-2", "alpha", { name: "unread one", unread: { unread: true } }),
-  session("s-3", "beta", { name: "needs you", ticket: "gx:m/07", actionable: { reason: "Pick one" } }),
-  session("s-4", "beta", { name: "the design", design: true, dir: "/work/design" }),
-];
-
-export const openSwitcher = () => fireEvent.click(screen.getByRole("button", { name: /plain/ }));
-export const dialog = () => within(screen.getByRole("dialog", { name: "Switch session" }));
-export const optionNames = () => dialog().getAllByRole("option").map((o) => o.textContent);
 
 // Answers the prompt POST with `answer`; everything else (focus reports) gets an empty object.
 export const prompts: { id: string; text: string }[] = [];

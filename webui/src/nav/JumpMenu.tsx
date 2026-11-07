@@ -1,16 +1,11 @@
-import { Box, chakra, Heading, Input, Text } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Box, Input, Text } from "@chakra-ui/react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { CardActionAnswer, CardKindDesign,SectionNeedsYou, SectionReadyToDesign, SectionFinished, type EpicListRow } from "../generated/server";
+import { CardActionAnswer, CardKindDesign, SectionNeedsYou, type EpicListRow } from "../generated/server";
 import { designHref } from "../hrefs";
-import { useWide } from "../useWide";
 import { titleHref } from "../epics/cardLinks";
-import { isCurrent } from "../epics/list";
 import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring";
-import { sectionsOf } from "../epics/view";
 import { Button } from "../ui/button/Button";
-import { hasLayer, useIsTopLayer } from "../ui/modal/layers";
-import { titleSize } from "./titleSize";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 
 /**
@@ -244,112 +239,4 @@ export function Menu({
       </Box>
     </Box>
   );
-}
-
-/**
- * The page title as a button that opens a filterable list of rows. The caller gives the sections
- * and their order. `footer` is a last row outside the sections that the filter never hides.
- * `hotkey` turns the built-in Cmd/Ctrl+K toggle off when false.
- */
-export function RowList({
-  name,
-  label,
-  placeholder,
-  sections,
-  footer,
-  hotkey = true,
-  fontSize,
-  plain,
-}: {
-  name: string;
-  label: string;
-  placeholder: string;
-  sections: ListSection[];
-  footer?: ListRowData;
-  hotkey?: boolean;
-  /** Overrides the shared page-title size, for a title that sits in a header row. */
-  fontSize?: string;
-  /** Renders a div instead of the h1, for a page whose PageHeader already has one. */
-  plain?: boolean;
-}) {
-  const phone = !useWide();
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-
-  const isTop = useIsTopLayer(open);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (hotkey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        if (open ? isTop() : !hasLayer()) setOpen((o) => !o);
-      } else if (e.key === "Escape" && isTop()) setOpen(false);
-    };
-    const onDown = (e: MouseEvent) => {
-      if (!phone && root.current && !root.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onDown);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onDown);
-    };
-  }, [phone, hotkey, open]);
-
-  return (
-    <Box ref={root} position="relative" minW="0">
-      <Heading as={plain ? "div" : "h1"} fontFamily="condensed" {...titleSize(!phone)} fontSize={fontSize ?? titleSize(!phone).fontSize}>
-        <chakra.button
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          display="inline-flex"
-          alignItems="center"
-          gap="2"
-          maxW="100%"
-          cursor="pointer"
-          onClick={() => setOpen((o) => !o)}
-        >
-          {/* Beside a PageHeader the title is already shown, so the name stays only as the button's accessible name. */}
-          <Text as="span" lineClamp="1" {...(plain && { srOnly: true })}>
-            {name}
-          </Text>
-          <Text as="span" aria-hidden fontSize="16px" color="text.dim">
-            ▾
-          </Text>
-        </chakra.button>
-      </Heading>
-      {open && <Menu sections={sections} label={label} placeholder={placeholder} footer={footer} phone={phone} onClose={() => setOpen(false)} />}
-    </Box>
-  );
-}
-
-/**
- * The epic jump menu: the page title opens a list of epics to switch to. `current` is the address
- * of the epic on screen; `epics` is the list the page already loaded. Ready to design and Finished
- * show only while the filter has text.
- */
-export function JumpMenu({
-  name,
-  current,
-  epics,
-  fontSize,
-}: {
-  name: string;
-  current: string;
-  epics: EpicListRow[];
-  fontSize?: string;
-}) {
-  const sections = useMemo(
-    () =>
-      sectionsOf(epics, "").map((s) => ({
-        key: s.key,
-        title: s.title,
-        hiddenUntilSearch: s.key === SectionReadyToDesign || s.key === SectionFinished,
-        rows: s.rows.map((r) => epicRow(r, isCurrent(r, current))),
-      })),
-    [epics, current],
-  );
-  // Cmd/Ctrl+K belongs to the shell's JumpPalette.
-  return <RowList name={name} label="Jump to epic" placeholder="Filter epics" sections={sections} fontSize={fontSize} hotkey={false} />;
 }
