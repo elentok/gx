@@ -3,7 +3,9 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { ConnectionContext, type Connection } from "../connection";
 import { CardKindDesign, CardKindImplementation, SectionImplementing, SectionOnHold, type EpicListRow, type SessionInfo, type Workspace } from "../generated/server";
+import { ListRow, type ListRowData } from "../nav/JumpMenu";
 import { AppShell } from "../shell/AppShell";
+import { buildPalette } from "../shell/JumpPalette";
 import { ManageWorkspaces } from "../shell/ManageWorkspaces";
 import { useShell } from "../shell/ShellContext";
 import { WorkspaceSwitcher } from "../shell/WorkspaceSwitcher";
@@ -110,6 +112,51 @@ const OpenSidebar = () => {
   return null;
 };
 
+// The jump menu's rows, built by the palette itself from one fixture so each kind reads as it does in the menu.
+const paletteRows = (() => {
+  const sessions = [session("c1", "scratch chat"), session("a1", "builder"), session("c2", "far chat")];
+  const sections = buildPalette({
+    rows: [...rows, row("w:docs", { name: "Docs", workspace: "Work", status_words: "Implementing" })],
+    sessions,
+    placements: [
+      { session: "c1", kind: "chat", workspace: "Default" },
+      { session: "a1", kind: "epic", epic: "p:blog" },
+      { session: "c2", kind: "chat", workspace: "Work" },
+    ],
+    workspaces,
+    workspace: "Default",
+    current: "",
+  });
+  const pick = (section: string, title: string) => {
+    const found = sections.find((s) => s.key === section)?.rows.find((r) => r.title === title);
+    if (!found) throw new Error(`no ${title} row in ${section}`);
+    return found;
+  };
+  return {
+    design: pick("designs", "Shop"),
+    epic: pick("epics", "Blog"),
+    chat: pick("chats", "scratch chat"),
+    agent: pick("agents", "builder"),
+    elsewhere: pick("elsewhere", "Docs"),
+    held: pick("on-hold", "Old"),
+  };
+})();
+
+const jumpRowCase = (label: string, row: ListRowData, step: (root: HTMLElement) => boolean = noop) => ({
+  label,
+  node: (
+    <ConnectionContext.Provider value={connection}>
+      <MemoryRouter>
+        <Box w="420px" role="listbox" aria-label="Jump to">
+          <Drive step={step}>
+            <ListRow row={row} />
+          </Drive>
+        </Box>
+      </MemoryRouter>
+    </ConnectionContext.Provider>
+  ),
+});
+
 const fetchEpicList = async () => ({ epics: rows, follow_ups: [] });
 
 const FRAME: Record<Device, { w: string; h: string }> = {
@@ -160,6 +207,18 @@ const manageCase = (label: string, step: (root: HTMLElement) => boolean) => ({
 });
 
 export const shellEntries: GalleryEntry[] = [
+  {
+    name: "JumpMenuRows",
+    cases: [
+      jumpRowCase("Design", paletteRows.design),
+      jumpRowCase("epic", paletteRows.epic),
+      jumpRowCase("chat", paletteRows.chat),
+      jumpRowCase("agent with the epic subtitle", paletteRows.agent),
+      jumpRowCase("row from another workspace", paletteRows.elsewhere),
+      jumpRowCase("held row", paletteRows.held),
+      jumpRowCase("row menu", paletteRows.epic, clickLabel("Menu")),
+    ],
+  },
   {
     name: "Sidebar",
     cases: [

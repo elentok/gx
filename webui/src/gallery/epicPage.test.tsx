@@ -44,6 +44,16 @@ test("the PageHeader gallery cases render", () => {
   }
 });
 
+test("the jump menu rows and Design footer cases render", () => {
+  for (const name of ["JumpMenuRows", "DesignFooter"]) {
+    for (const c of galleryEntries.find((e) => e.name === name)?.cases ?? []) {
+      const { container, unmount } = renderThemed(<>{c.node}</>);
+      expect(container.textContent, `${name} ${c.label}`).not.toBe("");
+      unmount();
+    }
+  }
+});
+
 test("the needs-repair dialog case opens the fix dialog", async () => {
   renderThemed(<>{cases.find((c) => c.label === "needs-repair dialog")?.node}</>);
   expect(await screen.findByRole("dialog")).toBeTruthy();

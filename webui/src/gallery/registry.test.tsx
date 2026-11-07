@@ -119,6 +119,22 @@ it("shows the sidebar for each device with an Other case, and the Manage workspa
   }
 });
 
+it("shows the jump menu row kinds and every Design footer state of mock 09", () => {
+  const labelsOf = (name: string) => galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? [];
+  expect(labelsOf("JumpMenuRows")).toEqual(["Design", "epic", "chat", "agent with the epic subtitle", "row from another workspace", "held row", "row menu"]);
+  expect(labelsOf("DesignFooter")).toEqual([
+    "design-phone-footer-empty",
+    "design-phone-footer-answered",
+    "design-phone-footer-note",
+    "design-phone-footer-auto",
+    "design-phone-footer-countdown",
+    "design-phone-footer-320",
+    "design-phone-footer-320-countdown",
+    "design-tablet-footer",
+    "design-tablet-footer-countdown",
+  ]);
+});
+
 it("keeps gallery.html out of the production build input", () => {
   expect(existsSync(join(__dirname, "../../gallery.html"))).toBe(true);
   expect(config.build?.rollupOptions?.input).toBe("index.html");
