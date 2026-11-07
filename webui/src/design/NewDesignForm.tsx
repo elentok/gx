@@ -710,7 +710,7 @@ function DraftForm({
         <DraftImages state={imgs} />
       </Box>
       {sheetMode && reason && !confirming && (
-        <Text fontSize="sm" color="tone.paused.fg" px="3" pb="2" flexShrink="0">
+        <Text fontSize="12px" color="tone.waiting.fg" px="3" pb="2" flexShrink="0">
           {reason}
         </Text>
       )}
@@ -734,7 +734,7 @@ function DraftForm({
             </Button>
             <Box flex="1" />
             {!sheetMode && reason && (
-              <Text fontSize="sm" color="tone.paused.fg">
+              <Text fontSize="12px" color="tone.waiting.fg">
                 {reason}
               </Text>
             )}
