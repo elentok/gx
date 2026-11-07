@@ -39,6 +39,11 @@ test("26. New Design form", async ({ page, start }) => {
   // An existing epic is refused by the server, and the dialog keeps what was typed.
   await slug.fill("ready-epic");
   await idea.fill("Same name.");
+  // The footer is Discard at its left edge and Start design at its right edge (flow 41 checks the phone).
+  const footer = dialog.getByRole("button", nav("Discard")).locator("xpath=..");
+  const [foot, d, s] = [(await footer.boundingBox())!, (await dialog.getByRole("button", nav("Discard")).boundingBox())!, (await dialog.getByRole("button", nav("Start design")).boundingBox())!];
+  expect(d.x).toBeCloseTo(foot.x + 12, 0);
+  expect(s.x + s.width).toBeCloseTo(foot.x + foot.width - 12, 0);
   await dialog.getByRole("button", nav("Start design")).click();
   await expect(page.locator("[data-scope='toast'][data-part='root']").last()).toContainText("already has an epic");
   await expect(slug).toHaveValue("ready-epic");
@@ -261,6 +266,12 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(page.locator("[data-scope='toast'][data-part='root']").last()).toContainText("already has an epic");
     await expect(open(form2)).toHaveCount(2);
     await expect(access(fixture.draftDir(keptId))).resolves.toBeUndefined();
+    // The refusal toast would intercept the next click while it is up.
+    const toast = page.locator("[data-scope='toast'][data-part='root']");
+    await expect(async () => {
+      for (const closer of await toast.locator("[data-part='close-trigger']").all()) await closer.click({ timeout: 1000 });
+      await expect(toast).toHaveCount(0, { timeout: 1000 });
+    }).toPass();
 
     const before = (await fixture.launches()).length;
     await fields(form2).slug.fill("pictured");
