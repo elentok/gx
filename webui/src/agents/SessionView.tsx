@@ -1,5 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { hasChat, useSessionChat, type FetchChat } from "../design/chat";
@@ -16,7 +16,6 @@ import { Modal } from "../ui/modal/Modal";
 import { PageHeader } from "../page/PageHeader";
 import { AgentChat } from "./AgentChat";
 import { AgentComposer } from "./AgentComposer";
-import { PromoteButton } from "./PromoteButton";
 import { stateLabel, statusMark } from "./rules";
 import { AgentLine } from "../design/AgentLine";
 import { StatusMark } from "./SessionGlyphs";
@@ -35,11 +34,10 @@ function SessionHeader({
   promote,
 }: {
   session: SessionInfo;
-  /** The Promote to Design button; absent for a gx-driven agent. */
-  promote?: ReactNode;
+  promote: ComponentProps<typeof SessionActions>["promote"];
 }) {
   const navigate = useNavigate();
-  const actions = <SessionActions session={s} onRemoved={() => navigate("/agents")} />;
+  const actions = <SessionActions session={s} onRemoved={() => navigate("/agents")} promote={promote} />;
   const { tone } = statusMark(s);
   const map = designOf(s);
   const wide = useWide();
@@ -52,7 +50,6 @@ function SessionHeader({
           <>
             <StatusMark session={s} />
             {map && <DesignLink map={map} />}
-            {wide && promote}
             {actions}
           </>
         }
@@ -74,7 +71,6 @@ function SessionHeader({
                 {s.ticket}
               </Text>
             )}
-            {!wide && promote && <Box flexBasis="100%">{promote}</Box>}
           </Box>
         }
       />
@@ -169,16 +165,15 @@ export function SessionView({
       <SessionHeader
         session={session}
         promote={
-          kind === undefined && (
-            <PromoteButton
-              session={session}
-              lastMessage={chat?.messages.at(-1)?.id}
-              hasMessages={(chat?.messages.length ?? 0) > 0}
-              connected={connected && chatty}
-              reason={sendReason(session, connected)}
-              onStale={refetch}
-            />
-          )
+          kind === undefined
+            ? {
+                lastMessage: chat?.messages.at(-1)?.id,
+                hasMessages: (chat?.messages.length ?? 0) > 0,
+                connected: connected && chatty,
+                reason: sendReason(session, connected),
+                onStale: refetch,
+              }
+            : undefined
         }
       />
       {chatty && chat && chat.messages.length === 0 && !chat.archived && !chat.unreadable && (

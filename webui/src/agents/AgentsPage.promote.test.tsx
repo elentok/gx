@@ -4,46 +4,59 @@ import { accepted, chat, chatOf, composerBox, prompts, refused, render, session,
 
 useAgentsPageHooks();
 
-const promoteButton = () => screen.getByRole("button", { name: "Promote to Design" }) as HTMLButtonElement;
-const findPromote = () => screen.findByRole("button", { name: "Promote to Design" }) as Promise<HTMLButtonElement>;
+const noItem = () => expect(screen.queryByRole("menuitem", { name: /Promote to Design/ })).toBeNull();
+const noButton = () => expect(screen.queryByRole("button", { name: /Promote to Design/ })).toBeNull();
+const disabled = (el: HTMLElement) => el.hasAttribute("data-disabled") || el.getAttribute("aria-disabled") === "true";
+
+// The item lives in the "More actions" menu, which opens on click.
+const findPromote = async () => {
+  fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+  return screen.findByRole("menuitem", { name: /Promote to Design/ });
+};
 
 // wide=true is the wide layout, false the phone one.
 describe.each([true, false])("wide=%s", (wide) => {
   const open = (s = session("s-1", "p"), c = chat()) => render([s], "/agents/s-1", true, chatOf(c), wide);
 
-  test("a plain session with messages shows an enabled button", async () => {
+  test("a plain session with messages shows an enabled item and no header button", async () => {
     open();
-    expect((await findPromote()).disabled).toBe(false);
+    await screen.findByText("hello there");
+    noButton();
+    expect(disabled(await findPromote())).toBe(false);
   });
 
-  test("a Design agent and a Queue agent show no button", async () => {
+  test("a Design agent and a Queue agent show no item", async () => {
     open(session("s-1", "p", { design: true }));
     await composerBox();
-    expect(screen.queryByRole("button", { name: "Promote to Design" })).toBeNull();
+    noButton();
+    fireEvent.click(screen.queryByRole("button", { name: "More actions" }) ?? document.body);
+    noItem();
     cleanup();
     open(session("s-1", "p", { queue: true }));
     await composerBox();
-    expect(screen.queryByRole("button", { name: "Promote to Design" })).toBeNull();
+    noButton();
+    fireEvent.click(screen.queryByRole("button", { name: "More actions" }) ?? document.body);
+    noItem();
   });
 
   test("it is disabled with a reason while the chat has no message and while the composer cannot send", async () => {
     open(session("s-1", "p"), chat({ messages: [] }));
-    expect((await findPromote()).disabled).toBe(true);
+    expect(disabled(await findPromote())).toBe(true);
     expect(screen.getByText("No messages yet. Promote turns on after the first message.")).toBeTruthy();
     cleanup();
     open(session("s-1", "p", { status: { state: "working" } }));
     await screen.findByText("hello there");
-    expect(promoteButton().disabled).toBe(true);
-    expect(promoteButton().title).toBe("Working. Send turns on when the session is idle.");
+    expect(disabled(await findPromote())).toBe(true);
+    expect(screen.getAllByText("Working. Send turns on when the session is idle.").length).toBeGreaterThan(0);
   });
 
   test("it is disabled with the exited reason for an exited session", async () => {
     open(session("s-1", "p", { status: { state: "exited" } }));
-    expect((await findPromote()).disabled).toBe(true);
-    expect(promoteButton().title).toBe("Exited. Restore it in gx, Agents tab.");
+    expect(disabled(await findPromote())).toBe(true);
+    expect(screen.getAllByText("Exited. Restore it in gx, Agents tab.").length).toBeGreaterThan(0);
   });
 
-  test("a click posts promote with the last message and leaves the draft alone", async () => {
+  test("a pick posts promote with the last message and leaves the draft alone", async () => {
     prompts.length = 0;
     stubPrompt(accepted);
     open();
@@ -55,7 +68,7 @@ describe.each([true, false])("wide=%s", (wide) => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  test("a refusal shows its reason beside the button", async () => {
+  test("a refusal shows its reason", async () => {
     stubPrompt(refused("stale", "the conversation moved"));
     open();
     fireEvent.click(await findPromote());

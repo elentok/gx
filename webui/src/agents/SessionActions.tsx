@@ -1,5 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
+import type { PostPrompt } from "../design/prompt";
+import { usePromptSend } from "../design/usePromptSend";
 import { postStopSession, stateToken, type StopSession } from "../design/open";
 import { agentSection } from "../design/SessionControls";
 import type { SessionInfo } from "../generated/server";
@@ -16,13 +18,32 @@ export function SessionActions({
   onRemoved,
   stop = postStopSession,
   remove = postRemoveSession,
+  promote,
 }: {
   session: SessionInfo;
   onRemoved: () => void;
   stop?: StopSession;
   remove?: RemoveSession;
+  /** Adds "Promote to Design"; absent for a gx-driven agent. */
+  promote?: {
+    lastMessage?: string;
+    hasMessages: boolean;
+    connected: boolean;
+    /** Why the composer cannot send; the caller decides the text. */
+    reason?: string;
+    post?: PostPrompt;
+    onStale?: () => void;
+  };
 }) {
   const { run, pending } = useWrite();
+  const promoteSend = usePromptSend({
+    session,
+    lastMessage: promote?.lastMessage,
+    connected: promote?.connected ?? false,
+    post: promote?.post,
+    onStale: promote?.onStale,
+    toastRefusal: true,
+  });
   const [confirming, setConfirming] = useState(false);
   const wide = useWide();
   const live = !isExited(session);
@@ -30,6 +51,18 @@ export function SessionActions({
   const sections: MoreActionsSection[] = [];
   const agent = agentSection(session, wide);
   if (agent) sections.push(agent);
+  if (promote) {
+    const off = promote.reason ?? (promote.hasMessages ? undefined : "No messages yet. Promote turns on after the first message.");
+    sections.push([
+      {
+        value: "promote",
+        label: "Promote to Design",
+        hint: off,
+        disabled: !promoteSend.enabled || off !== undefined,
+        onSelect: () => promoteSend.send({ promote: true }),
+      },
+    ]);
+  }
   if (canManage(session)) {
     const items: MoreActionsItem[] = [];
     if (live)
