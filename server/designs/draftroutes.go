@@ -44,6 +44,28 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 	wire.WriteJSON(w, res)
 }
 
+func (s *Designs) lastProjectRead(w http.ResponseWriter, _ *http.Request) {
+	p, err := s.drafts.LastProject()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, wire.DesignLastProject{Project: p})
+}
+
+func (s *Designs) lastProjectSet(w http.ResponseWriter, r *http.Request) {
+	var req wire.DesignLastProject
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.drafts.SetLastProject(req.Project); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, req)
+}
+
 func (s *Designs) draftDelete(w http.ResponseWriter, r *http.Request) {
 	var req wire.DesignDraftDeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

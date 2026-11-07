@@ -127,6 +127,8 @@ var routeVerbs = map[string]string{
 	"GET /v1/designs/drafts/read":           "designs drafts show",
 	"POST /v1/designs/drafts/save":          "designs drafts save",
 	"POST /v1/designs/drafts/delete":        "designs drafts delete",
+	"GET /v1/designs/drafts/last-project":   "designs drafts last-project",
+	"POST /v1/designs/drafts/last-project":  "designs drafts last-project",
 	"POST /v1/tickets/fix-agent":            "agents fix",
 	"POST /v1/projects/retry-migration":     "project retry-migration",
 	"GET /v1/epics":                         "server epics",

@@ -47,6 +47,13 @@ type DesignDraftSaveRequest struct {
 	Revision int    `json:"revision"`
 }
 
+// DesignLastProject is the project the New Design form last used, shared by
+// every browser: the answer of the read route and the body of the set route.
+// Project is empty on a fresh server.
+type DesignLastProject struct {
+	Project string `json:"project"`
+}
+
 // DesignDraftDeleteRequest deletes one draft.
 type DesignDraftDeleteRequest struct {
 	ID string `json:"id"`

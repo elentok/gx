@@ -43,6 +43,16 @@ func Routes(get func() *Designs) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftDelete(w, r) },
 		},
 		{
+			Pattern: "GET /v1/designs/drafts/last-project",
+			Web:     wire.WebRead,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().lastProjectRead(w, r) },
+		},
+		{
+			Pattern: "POST /v1/designs/drafts/last-project",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().lastProjectSet(w, r) },
+		},
+		{
 			Pattern: "POST /v1/designs/worktree",
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().worktreeWrite(w, r) },
 		},

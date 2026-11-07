@@ -18,7 +18,7 @@ import (
 // form keeps on the server. It calls the routes the form calls.
 func newDesignsDraftsCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "drafts", Short: "New Design drafts kept by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsDeleteCmd(d))
+	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsDeleteCmd(d), newDraftsLastProjectCmd(d))
 	return cmd
 }
 
@@ -162,6 +162,51 @@ func newDraftsDeleteCmd(d Deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
+	return cmd
+}
+
+// runDraftsLastProject prints the shared last-used project, or sets it when
+// project is non-empty and prints the new value.
+func runDraftsLastProject(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, project string) error {
+	var res wire.DesignLastProject
+	var err error
+	if project == "" {
+		res, err = cl.Sessions.DesignLastProject(ctx)
+	} else {
+		res, err = cl.Sessions.SetDesignLastProject(ctx, project)
+	}
+	if apiclient.IsNotRunning(err) {
+		return fmt.Errorf("refused (%s): no server is running; start it with `gx server start`", wire.ReasonServerNotRunning)
+	}
+	if err != nil {
+		return fmt.Errorf("server call failed: %w", err)
+	}
+	if jsonOut {
+		return writeDraftJSON(w, res)
+	}
+	_, err = fmt.Fprintln(w, res.Project)
+	return err
+}
+
+func newDraftsLastProjectCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "last-project [project]",
+		Short: "print the last project the New Design form used, or set it",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			project := ""
+			if len(args) == 1 {
+				project = args[0]
+			}
+			return runDraftsLastProject(c.Context(), cl, c.OutOrStdout(), jsonOut, project)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the result as JSON")
 	return cmd
 }
 

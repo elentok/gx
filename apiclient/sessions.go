@@ -75,6 +75,21 @@ func (s *Sessions) DeleteDesignDraft(ctx context.Context, id string) (wire.Desig
 	return res, err
 }
 
+// DesignLastProject reads the project the New Design form last used ("" on a
+// fresh server).
+func (s *Sessions) DesignLastProject(ctx context.Context) (wire.DesignLastProject, error) {
+	var res wire.DesignLastProject
+	err := s.t.get(ctx, "/v1/designs/drafts/last-project", &res)
+	return res, err
+}
+
+// SetDesignLastProject records the last-used project; the newest write wins.
+func (s *Sessions) SetDesignLastProject(ctx context.Context, project string) (wire.DesignLastProject, error) {
+	var res wire.DesignLastProject
+	err := s.t.post(ctx, "/v1/designs/drafts/last-project", wire.DesignLastProject{Project: project}, &res)
+	return res, err
+}
+
 // FixAgent starts a fix agent for a ticket paused for repair. A refusal is a
 // result (Refused set), not an error.
 func (s *Sessions) FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error) {

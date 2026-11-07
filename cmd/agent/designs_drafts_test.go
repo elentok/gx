@@ -66,6 +66,28 @@ func TestDesignsDrafts_ListShowDelete(t *testing.T) {
 	}
 }
 
+func TestDesignsDrafts_LastProject(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir())
+	ctx := context.Background()
+	var out bytes.Buffer
+
+	if err := runDraftsLastProject(ctx, h.Client, &out, false, ""); err != nil || out.String() != "\n" {
+		t.Fatalf("fresh read = %q, %v", out.String(), err)
+	}
+	out.Reset()
+	if err := runDraftsLastProject(ctx, h.Client, &out, false, "alpha"); err != nil || out.String() != "alpha\n" {
+		t.Fatalf("set = %q, %v", out.String(), err)
+	}
+	out.Reset()
+	if err := runDraftsLastProject(ctx, h.Client, &out, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	var got wire.DesignLastProject
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil || got.Project != "alpha" {
+		t.Errorf("read --json = %s, %v", out.String(), err)
+	}
+}
+
 func TestDesignsDrafts_SaveRevisionConflict(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
 	d, err := drafts.New(h.StateDir).Create("proj", "s", "idea", "")

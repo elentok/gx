@@ -64,7 +64,8 @@ func TestWebDesignDrafts_ListReadSaveDelete(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	older := f.seedDraft(t, "proj", "older", "first idea")
-	time.Sleep(10 * time.Millisecond)
+	for !time.Now().After(older.EditedAt) {
+	}
 	newer := f.seedDraft(t, "proj", "newer", "second idea")
 
 	var items []wire.DesignDraftItem
@@ -91,6 +92,45 @@ func TestWebDesignDrafts_ListReadSaveDelete(t *testing.T) {
 	f.webGet(t, "/v1/designs/drafts/read?id="+url.QueryEscape(older.ID), &read)
 	if !read.Refused || read.Reason != wire.ReasonDraftGone {
 		t.Errorf("read after delete = %+v, want draft-gone", read)
+	}
+}
+
+func TestWebDesignDrafts_LastProject(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	set := func(p string) {
+		t.Helper()
+		body := fmt.Sprintf(`{"project":%q}`, p)
+		if code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/last-project", body, f.ck, "", servertest.JSONPost(f.base)); code != http.StatusOK {
+			t.Fatalf("set = %d %s", code, out)
+		}
+	}
+	read := func() string {
+		t.Helper()
+		var res wire.DesignLastProject
+		f.webGet(t, "/v1/designs/drafts/last-project", &res)
+		return res.Project
+	}
+
+	if got := read(); got != "" {
+		t.Fatalf("fresh server last project = %q, want empty", got)
+	}
+	set("alpha")
+	if got := read(); got != "alpha" {
+		t.Fatalf("after set = %q, want alpha", got)
+	}
+	set("beta")
+	if got := read(); got != "beta" {
+		t.Fatalf("after second set = %q, want beta", got)
+	}
+
+	d := f.seedDraft(t, "beta", "s", "idea")
+	body := fmt.Sprintf(`{"id":%q}`, d.ID)
+	if code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/delete", body, f.ck, "", servertest.JSONPost(f.base)); code != http.StatusOK {
+		t.Fatalf("delete = %d %s", code, out)
+	}
+	if got := read(); got != "beta" {
+		t.Errorf("after draft delete = %q, want beta kept", got)
 	}
 }
 
