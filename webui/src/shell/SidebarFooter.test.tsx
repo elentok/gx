@@ -55,3 +55,9 @@ test("the Epics badge shows the server total and is absent at zero", () => {
   setup({ needs_you_total: 0 });
   expect(screen.getByRole("link", { name: "Epics" })).toBeTruthy();
 });
+
+test("the health button and the gear carry a title tooltip", () => {
+  setup({ mode: "running", health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") } });
+  expect(screen.getByRole("button", { name: /^System health:/ }).getAttribute("title")).toMatch(/^System health:/);
+  expect(screen.getByRole("button", { name: "Menu" }).getAttribute("title")).toBe("Menu");
+});

@@ -223,6 +223,7 @@ export function AppShell({
             <chakra.button
               type="button"
               aria-label="Hide sidebar"
+              title="Hide sidebar"
               onClick={shell.close}
               boxSize="34px"
               borderRadius="8px"

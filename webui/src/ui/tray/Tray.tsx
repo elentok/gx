@@ -30,6 +30,7 @@ export function Tray({ health, connected = true }: { health: Health; connected?:
         <chakra.button
           type="button"
           aria-label={trayLabel(health)}
+          title={trayLabel(health)}
           h="30px"
           display="flex"
           alignItems="flex-start"

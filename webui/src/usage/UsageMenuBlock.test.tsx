@@ -116,7 +116,7 @@ describe("UsageMenuBlock", () => {
     const fetcher = vi.fn<FetchSummary>(async () => summary(UsageModeSpending));
     const t = setup(fetcher);
     t.open();
-    await screen.findByText("gx spend (est.)");
+    await screen.findByText(/GX spend \(est\.\)/);
     expect(screen.queryByText("Claude limits")).toBeNull();
   });
 
@@ -139,7 +139,7 @@ describe("UsageMenuBlock", () => {
     expect(resolvers.length).toBe(2);
     await act(async () => resolvers[1](summary(UsageModeSpending)));
     await act(async () => resolvers[0](summary(UsageModeLimits)));
-    expect(screen.getByText("gx spend (est.)")).toBeTruthy();
+    expect(screen.getByText(/GX spend \(est\.\)/)).toBeTruthy();
     expect(screen.queryByText("Claude limits")).toBeNull();
   });
 

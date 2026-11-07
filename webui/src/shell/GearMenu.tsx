@@ -49,6 +49,7 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
           <Button
             type="button"
             aria-label="Menu"
+            title="Menu"
             variant="ghost"
             cursor="pointer"
             color="text.dim"
@@ -82,7 +83,7 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
               </Menu.Item>
               <UsageMenuBlock conn={conn} fetcher={usageFetcher} onShownChange={setUsageShown} />
               {snapshot?.build && (
-                <Text px="3" py="1.5" fontSize="xs" color="text.muted" data-testid="server-build">
+                <Text px="3" py="1.5" fontSize="xs" color="text.muted" truncate title={snapshot.build} data-testid="server-build">
                   {snapshot.build}
                 </Text>
               )}
