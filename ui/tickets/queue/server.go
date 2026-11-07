@@ -149,9 +149,6 @@ func (s Server) StartConfirm() (confirm.Options, bool) {
 	}, true
 }
 
-// launchStepCount is the number of launch steps a run goes through.
-const launchStepCount = 4
-
 // SyncRunState derives the Queue tab's running state from the server's epic
 // summaries: an epic runs when the server says so, and its active tickets are
 // the ones with a run.
@@ -186,7 +183,7 @@ func (s Server) SyncRunState(epics []gxtickets.Epic, sp spinner.Model) (Server, 
 			state := rowfmt.LiveTicketState{Running: true, Phase: phase, StartedAt: a.ClaimedAt}
 			if a.LaunchStep.Label != "" {
 				state.Phase = rowfmt.LivePhaseLaunching
-				state.LaunchStep = fmt.Sprintf("%s (%d/%d)", a.LaunchStep.Label, a.LaunchStep.Position, launchStepCount)
+				state.LaunchStep = fmt.Sprintf("%s (%d/%d)", a.LaunchStep.Label, a.LaunchStep.Position, a.LaunchStep.Total)
 			}
 			live[epic.Name][t.Identifier] = state
 			running[epic.Name] = true

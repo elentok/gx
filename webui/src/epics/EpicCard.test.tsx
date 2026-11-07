@@ -112,7 +112,7 @@ test("a launching card shows the launch step, not the cap line", () => {
       row={row({
         verdict: VerdictConcurrencyCap,
         reason: "global cap 1/1",
-        launch_step: { label: "installing dependencies", position: 2 },
+        launch_step: { label: "installing dependencies", position: 2, total: 4 },
       })}
     />,
   );

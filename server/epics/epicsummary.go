@@ -49,8 +49,8 @@ func (s *Epics) EpicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 
 // launchStep is the wire form of the step the run at address is launching in.
 func (s *Epics) launchStep(address string) wire.LaunchStep {
-	label, position := s.Runs.LaunchStepOf(address)
-	return wire.LaunchStep{Label: label, Position: position}
+	label, position, total := s.Runs.LaunchStepOf(address)
+	return wire.LaunchStep{Label: label, Position: position, Total: total}
 }
 
 // capLine is the verdict word and reason of the epic's next ready ticket while

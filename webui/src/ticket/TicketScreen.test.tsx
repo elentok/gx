@@ -66,7 +66,7 @@ test("the ticket header shows the Long-running badge only for a marked ticket", 
 });
 
 test("the ticket page shows the launch step in the verdict slot, and the cap wait as Waiting for a slot", async () => {
-  const claimed = { ...base, status: "claimed", stats: { ...base.stats, launch_step: { label: "installing dependencies", position: 2 } } };
+  const claimed = { ...base, status: "claimed", stats: { ...base.stats, launch_step: { label: "installing dependencies", position: 2, total: 4 } } };
   await renderTicket(claimed, undefined, [{ address: "gx:demo/12", agent: "", verdict: "concurrency cap", reason: "epic cap 3/2" }]);
   expect(document.querySelectorAll("[data-verdict]")).toHaveLength(1);
   expect(screen.getByText("Launching: installing dependencies (2/4)")).toBeTruthy();
@@ -80,7 +80,7 @@ const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString(
 
 test("a launching ticket shows the claimed_at timer beside the Launching label, and the timer stays once the run is working", async () => {
   const stats = { ...base.stats, elapsed: 0, claimed_at: minutesAgo(5) };
-  await renderTicket({ ...base, status: "claimed", stats: { ...stats, launch_step: { label: "starting agent", position: 3 } } });
+  await renderTicket({ ...base, status: "claimed", stats: { ...stats, launch_step: { label: "starting agent", position: 3, total: 4 } } });
   expect(screen.getByText("Launching: starting agent (3/4)")).toBeTruthy();
   expect(screen.getByText("5m")).toBeTruthy();
   cleanup();
@@ -97,7 +97,7 @@ test("a launch step change re-renders the ticket page with no reload", async () 
   const stepped = (position: number, label: string): TicketDetail => ({
     ...base,
     status: "claimed",
-    stats: { ...base.stats, launch_step: { label, position } },
+    stats: { ...base.stats, launch_step: { label, position, total: 4 } },
   });
   let current = stepped(2, "installing dependencies");
   const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail: current });

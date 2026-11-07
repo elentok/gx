@@ -72,7 +72,7 @@ func TestEpicList_LaunchingEpicCardCarriesItsStep(t *testing.T) {
 		t.Fatal("no work card")
 		return wire.LaunchStep{}
 	}
-	if got, want := step(), (wire.LaunchStep{Label: "installing dependencies", Position: 2}); got != want {
+	if got, want := step(), (wire.LaunchStep{Label: "installing dependencies", Position: 2, Total: 4}); got != want {
 		t.Errorf("card step = %+v, want %+v", got, want)
 	}
 	reg.SetLaunchStep("proj:work/01", "")
@@ -98,7 +98,7 @@ func TestEpicDetail_LaunchingRowCarriesItsStep(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
-	want := wire.LaunchStep{Label: "installing dependencies", Position: 2}
+	want := wire.LaunchStep{Label: "installing dependencies", Position: 2, Total: 4}
 	if got := rowOf(t, d, "proj:work/01").LaunchStep; got != want {
 		t.Errorf("launching row step = %+v, want %+v", got, want)
 	}

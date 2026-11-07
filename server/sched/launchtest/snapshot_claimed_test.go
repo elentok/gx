@@ -36,7 +36,7 @@ func TestSnapshot_LaunchingTicketCarriesItsStepUntilTheLaunchEnds(t *testing.T) 
 		}
 		return wire.LaunchStep{Label: "not claimed yet"}
 	}
-	want := wire.LaunchStep{Label: "starting agent", Position: 3}
+	want := wire.LaunchStep{Label: "starting agent", Position: 3, Total: 4}
 	servertest.WaitFor(t, 5*time.Second, "the snapshot to carry the launch step", func() bool { return stepOf() == want })
 	reg.SetLaunchStep("proj:epic-a/01", "")
 	if got := stepOf(); got != (wire.LaunchStep{}) {

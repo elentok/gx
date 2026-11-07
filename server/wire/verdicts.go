@@ -25,10 +25,11 @@ const (
 )
 
 // LaunchStep is the step a launching run is in: its label and its 1-based
-// place among the four steps. The zero value means no launch runs.
+// place among Total steps. The zero value means no launch runs.
 type LaunchStep struct {
 	Label    string `json:"label"`
 	Position int    `json:"position"`
+	Total    int    `json:"total"`
 }
 
 // PendingRow is one queue entry with its explain verdict.

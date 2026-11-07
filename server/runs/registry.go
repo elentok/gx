@@ -271,18 +271,25 @@ func (r *Registry) StartedAtOf(address string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// Position is the 1-based place of s among the four launch steps, 0 for "".
+// launchSteps is every launch step in order; its length is the step total
+// clients print, so adding a step here is the only edit a new step needs.
+var launchSteps = []LaunchStep{StepCreatingWorktree, StepInstallingDeps, StepStartingAgent, StepSendingPrompt}
+
+// Position is the 1-based place of s among the launch steps, 0 for "".
 func (s LaunchStep) Position() int {
-	return slices.Index([]LaunchStep{StepCreatingWorktree, StepInstallingDeps, StepStartingAgent, StepSendingPrompt}, s) + 1
+	return slices.Index(launchSteps, s) + 1
 }
 
-// LaunchStepOf returns the label and 1-based position of the step the run at
-// address is in; empty and 0 when it is not launching.
-func (r *Registry) LaunchStepOf(address string) (string, int) {
+// LaunchStepOf returns the label, 1-based position and step total of the step
+// the run at address is in; empty and 0s when it is not launching.
+func (r *Registry) LaunchStepOf(address string) (label string, position, total int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	t := r.runs[address]
-	return string(t.LaunchStep), t.LaunchStep.Position()
+	if t.LaunchStep.Position() == 0 {
+		return string(t.LaunchStep), 0, 0
+	}
+	return string(t.LaunchStep), t.LaunchStep.Position(), len(launchSteps)
 }
 
 func (r *Registry) List() []TrackedRun {

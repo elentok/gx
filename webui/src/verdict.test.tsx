@@ -20,7 +20,7 @@ describe("verdictText", () => {
     ["starting agent", 3],
     ["sending prompt", 4],
   ])("labels the %s step", (label, position) => {
-    expect(verdictText(undefined, "gx:e/1", { label, position })).toBe(`Launching: ${label} (${position}/4)`);
+    expect(verdictText(undefined, "gx:e/1", { label, position, total: 5 })).toBe(`Launching: ${label} (${position}/5)`);
   });
 
   it("relabels the cap verdict and keeps the server's reason", () => {
@@ -28,7 +28,7 @@ describe("verdictText", () => {
   });
 
   it("never shows the launch step and the cap wait together", () => {
-    expect(verdictText([cap], "gx:e/1", { label: "starting agent", position: 3 })).toBe(
+    expect(verdictText([cap], "gx:e/1", { label: "starting agent", position: 3, total: 4 })).toBe(
       "Launching: starting agent (3/4)",
     );
   });

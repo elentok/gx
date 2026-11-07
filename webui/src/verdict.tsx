@@ -8,9 +8,6 @@ import { refusalText, useWrite } from "./useWrite";
 // The one verdict that means the ticket is starting or running, so it shows nothing.
 const CLAIMED = "claimed";
 
-// The launch has four steps, so a step reads "(2/4)".
-const LAUNCH_STEPS = 4;
-
 // The one line slot a ticket's launch step or cap wait shares: a launching ticket shows its step and never the
 // cap wait. Else "<verdict>: <reason>" for a queued, unclaimed ticket, else undefined. The words come from the
 // server as given, except the cap verdict, which reads as a wait for a slot.
@@ -29,7 +26,7 @@ export function launchOrVerdictText(
   verdictWord: string | undefined,
   reason: string | undefined,
 ): string | undefined {
-  if (launchStep?.label) return `Launching: ${launchStep.label} (${launchStep.position}/${LAUNCH_STEPS})`;
+  if (launchStep?.label) return `Launching: ${launchStep.label} (${launchStep.position}/${launchStep.total})`;
   if (!verdictWord || verdictWord === CLAIMED) return undefined;
   const verdict = verdictWord === VerdictConcurrencyCap ? "Waiting for a slot" : verdictWord;
   return reason ? `${verdict}: ${reason}` : verdict;

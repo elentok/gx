@@ -88,7 +88,7 @@ func TestSyncRunState_LaunchStepGivesTheLaunchingPhase(t *testing.T) {
 		{Identifier: "02", Path: "gx:alpha/02", Title: "B", Status: "claimed"},
 	}}
 	s := Server{Summaries: map[string]wire.EpicSummary{"alpha": {State: wire.EpicStateRunning, Active: []wire.SummaryTicket{
-		{Address: "gx:alpha/01", LaunchStep: wire.LaunchStep{Label: "creating worktree", Position: 1}},
+		{Address: "gx:alpha/01", LaunchStep: wire.LaunchStep{Label: "creating worktree", Position: 1, Total: 4}},
 		{Address: "gx:alpha/02"},
 	}}}}
 	s, _ = s.SyncRunState([]tickets.Epic{epic}, spinner.New())

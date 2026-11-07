@@ -2803,11 +2803,12 @@ export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reache
 export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictRateLimited | typeof VerdictUsagePrefixClaude | typeof VerdictUsagePrefixCodex | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
 /**
  * LaunchStep is the step a launching run is in: its label and its 1-based
- * place among the four steps. The zero value means no launch runs.
+ * place among Total steps. The zero value means no launch runs.
  */
 export interface LaunchStep {
   label: string;
   position: number /* int */;
+  total: number /* int */;
 }
 /**
  * PendingRow is one queue entry with its explain verdict.
