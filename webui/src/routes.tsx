@@ -105,7 +105,7 @@ export interface RouteFetchers {
 }
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
-  return [{ element: <AppShell />, children: pageRoutes(fetchers) }, { path: "*", loader: () => redirect("/epics") }];
+  return [{ element: <AppShell fetchEpicList={fetchers.epicList} />, children: pageRoutes(fetchers) }, { path: "*", loader: () => redirect("/epics") }];
 }
 
 function pageRoutes(fetchers: RouteFetchers): RouteObject[] {

@@ -1,6 +1,7 @@
 import { ChakraProvider } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
+import { MemoryRouter } from "react-router";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { FixAgent } from "../epic/fixAgent";
 import type { MigrationFailure, RetryMigrationResult } from "../generated/server";
@@ -25,6 +26,7 @@ function setup(failures: MigrationFailure[], ui: (fix?: FixAgent) => React.React
     getState: () => state,
     subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
     refresh: () => {},
+    onEvent: () => () => {},
   } as unknown as Connection;
   const { rerender } = renderThemed(<ConnectionContext.Provider value={conn}>{ui(fixAgent)}</ConnectionContext.Provider>);
   return {
@@ -131,11 +133,13 @@ test("a row disappears when the snapshot drops it", () => {
 
 test("the page shell shows the strip on two different pages", () => {
   const page = (active: "epics" | "agents") => (
-    <AppShell>
-      <DetailPage title={{ kind: "Epics" }}>
-        <p>{active} body</p>
-      </DetailPage>
-    </AppShell>
+    <MemoryRouter>
+      <AppShell fetchEpicList={async () => ({ epics: [], follow_ups: [] })}>
+        <DetailPage title={{ kind: "Epics" }}>
+          <p>{active} body</p>
+        </DetailPage>
+      </AppShell>
+    </MemoryRouter>
   );
   const { rerender } = setup([fail("gx", "bad schema")], () => page("epics"));
   expect(screen.getByText("gx: Migration blocked")).toBeTruthy();

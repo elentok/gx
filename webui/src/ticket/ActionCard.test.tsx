@@ -35,7 +35,7 @@ const conn = {
 
 function renderTicket(current: () => TicketDetail) {
   const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail: current() });
-  const router = createMemoryRouter(appRoutes({ ticket: fetchDetail }), { initialEntries: ["/t/gx:demo/12"] });
+  const router = createMemoryRouter(appRoutes({ ticket: fetchDetail, epicList: async () => ({ epics: [], follow_ups: [] }) }), { initialEntries: ["/t/gx:demo/12"] });
   return renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />

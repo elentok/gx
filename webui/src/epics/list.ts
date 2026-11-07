@@ -20,8 +20,19 @@ export interface EpicListState {
   retry: () => void;
 }
 
+// The page and the shell's sidebar both read the list: calls made while one is in flight share it, so they cost one request.
+const inFlight = new WeakMap<FetchEpicList, Promise<EpicList>>();
+const shareInFlight = (fetcher: FetchEpicList): FetchEpicList => () => {
+  let p = inFlight.get(fetcher);
+  if (!p) {
+    p = fetcher().finally(() => inFlight.delete(fetcher));
+    inFlight.set(fetcher, p);
+  }
+  return p;
+};
+
 export function useEpicList(fetcher: FetchEpicList = fetchEpicList, conn?: Connection): EpicListState {
-  const { data, failed, retry } = useFetched("epics", fetcher, conn);
+  const { data, failed, retry } = useFetched("epics", shareInFlight(fetcher), conn);
   return { list: data, failed, retry };
 }
 

@@ -484,7 +484,8 @@ test("a Design's cards show the ticket type then the state", async () => {
 
 test("the buttons run partner first and the action last, Merge in the done tone", async () => {
   render("/e/gx:blog-impl", [joined], "loop", { detail: { state: "awaiting-merge" } });
-  const buttons = await screen.findAllByRole("button", { name: /^(Open design|Merge)$/ });
+  await screen.findByRole("button", { name: "Open design" });
+  const buttons = screen.getAllByRole("button", { name: /^(Open design|Merge)$/ });
   expect(buttons.map((b) => b.textContent)).toEqual(["Open design", "Merge"]);
   expect(buttons[1].getAttribute("data-tone")).toBe("done");
 });

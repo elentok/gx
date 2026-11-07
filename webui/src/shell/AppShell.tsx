@@ -2,6 +2,7 @@ import { Box, chakra, Image } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
+import type { FetchEpicList } from "../epics/list";
 import { DiskStrips } from "../page/DiskStrips";
 import { FailedMigrationStrip } from "../restart/FailedMigrationStrip";
 import { NewVersionStrip, useBuildChanged } from "../restart/NewVersionStrip";
@@ -11,6 +12,7 @@ import { useDevice, type Device } from "../useWide";
 import { MascotToggle } from "./MascotToggle";
 import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
+import { SidebarRows } from "./SidebarRows";
 
 /** The top bar's sticky offset reads this, so it sits below the strips. */
 export const SHELL_STRIPS_HEIGHT_VAR = "--shell-strips-height";
@@ -55,7 +57,7 @@ function Strips() {
 }
 
 // Mounted once above every page route. The sidebar is docked on desktop and slides over on tablet and phone.
-export function AppShell({ children }: { children?: React.ReactNode }) {
+export function AppShell({ children, fetchEpicList }: { children?: React.ReactNode; fetchEpicList?: FetchEpicList }) {
   const device = useDevice();
   const docked = device === "desktop";
   // An explicit choice holds only for the device it was made on; a resize back to the default follows the device.
@@ -135,7 +137,9 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
               <PanelIcon />
             </chakra.button>
           </Box>
-          <Box as="ul" listStyleType="none" m="0" p="0" flex="1" data-testid="sidebar-body" />
+          <Box as="ul" listStyleType="none" m="0" p="0" flex="1" data-testid="sidebar-body">
+            <SidebarRows fetcher={fetchEpicList} />
+          </Box>
           <SidebarFooter />
         </Box>
         <Box flex="1" minW="0">
