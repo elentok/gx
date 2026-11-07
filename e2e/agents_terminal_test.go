@@ -98,14 +98,14 @@ func newAgentsEnv(t *testing.T, extraEnv ...string) *agentsEnv {
 	servertest.WriteTicket(t, store, e.project, "some-epic", "01", "tiny", "")
 	servertest.SetProjectRepo(t, store, e.project, e.repo)
 
-	e.run(e.serverEnv, "server", "start")
 	t.Cleanup(func() {
 		if t.Failed() {
 			log, _ := os.ReadFile(filepath.Join(root, "state", "gx", "server.log"))
 			t.Logf("server.log:\n%s", log)
 		}
-		e.run(e.serverEnv, "server", "stop")
 	})
+	e.run(e.serverEnv, "server", "start")
+	t.Cleanup(func() { e.run(e.serverEnv, "server", "stop") })
 	return e
 }
 
