@@ -19,6 +19,7 @@ import {
   useWorkspaces,
 } from "../workspaces/useActiveWorkspace";
 import { ManageWorkspaces } from "./ManageWorkspaces";
+import { useShortcuts } from "./useShortcuts";
 import {
   NewWorkspaceDialog,
   WorkspaceSwitcher,
@@ -122,6 +123,7 @@ export function AppShell({
   const { snapshot } = useConnectionState(conn);
   const { workspaces } = useWorkspaces(conn);
   const { active, setActive } = useActiveWorkspace(conn, fetchEpicList);
+  useShortcuts({ fetcher: fetchEpicList, active, setActive });
   const [newWorkspace, setNewWorkspace] = useState(false);
   const [manageWorkspaces, setManageWorkspaces] = useState(false);
   // The snapshot learns of a new workspace from the server's event; activating it earlier would resolve straight back to Default.

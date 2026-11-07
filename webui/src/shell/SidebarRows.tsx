@@ -8,6 +8,7 @@ import type { Workspace } from "../generated/server";
 import { ItemMenu, type ItemRef } from "../workspaces/itemActions";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
+import { useAltHeld } from "./useShortcuts";
 
 const CHAT_PINK = "#ec6fa8";
 
@@ -81,7 +82,7 @@ function AgentLink({ agent }: { agent: SidebarAgent }) {
   );
 }
 
-function Row({ row, current, active, workspaces }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[] }) {
+function Row({ row, current, active, workspaces, showNumber }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[]; showNumber?: boolean }) {
   const [open, setOpen] = useState(!!row.expanded);
   const nested = row.agents.length > 0;
   const item: ItemRef = { key: row.key, name: row.title, kind: row.kind === "chat" ? "chat" : row.kind === "design" ? "design" : "epic", workspace: active, queued: row.queued, held: row.held };
@@ -103,7 +104,13 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
           <Box as="span" flex="1" minW="0" fontSize="14px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
             {row.title}
           </Box>
-          <Status status={row.status} dim={row.held} />
+          {showNumber && row.number !== undefined ? (
+            <Box as="span" data-testid="row-number" fontSize="12px" color="text.dim" flex="none">
+              {row.number}
+            </Box>
+          ) : (
+            <Status status={row.status} dim={row.held} />
+          )}
         </chakra.a>
         {/* Shown on hover and focus; always on a touch screen, which has no hover. */}
         <Box flex="none" opacity="0" _groupHover={{ opacity: 1 }} _focusWithin={{ opacity: 1 }} css={{ "@media (hover: none)": { opacity: 1 } }}>
@@ -143,19 +150,25 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 // The sidebar body: the active workspace's rows, its collapsed On hold, then the global Other.
-export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; active: string }) {
+export function useSidebarModel(fetcher: FetchEpicList | undefined, active: string) {
   const conn = useConnectionContext();
   const { list } = useEpicList(fetcher, conn);
   const snapshot = useConnectionState(conn).snapshot;
-  const { workspaces } = useWorkspaces(conn);
   const pathname = useLocation().pathname;
-  if (!list?.epics) return null;
-  const current = currentAddress(pathname);
-  const model = buildSidebar({ rows: list.epics, sessions: snapshot?.sessions ?? [], placements: snapshot?.placements ?? [], workspace: active, current });
+  if (!list?.epics) return undefined;
+  return buildSidebar({ rows: list.epics, sessions: snapshot?.sessions ?? [], placements: snapshot?.placements ?? [], workspace: active, current: currentAddress(pathname) });
+}
+
+export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; active: string }) {
+  const { workspaces } = useWorkspaces(useConnectionContext());
+  const pathname = useLocation().pathname;
+  const altHeld = useAltHeld();
+  const model = useSidebarModel(fetcher, active);
+  if (!model) return null;
   return (
     <>
       {model.rows.map((r) => (
-        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
+        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} showNumber={altHeld} />
       ))}
       {model.held.length > 0 && (
         <Section title={`On hold (${model.held.length})`}>
