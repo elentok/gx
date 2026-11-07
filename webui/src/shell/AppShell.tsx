@@ -13,6 +13,7 @@ import { JumpPalette } from "./JumpPalette";
 import { MascotToggle } from "./MascotToggle";
 import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
+import { useSidebarKeys } from "./SidebarKeys";
 import { SidebarRows } from "./SidebarRows";
 import {
   useActiveWorkspace,
@@ -119,6 +120,8 @@ export function AppShell({
     }),
     [open, device, claimHeader],
   );
+  const aside = useRef<HTMLDivElement>(null);
+  const onSidebarKeyDown = useSidebarKeys(aside, shell);
   const conn = useConnectionContext();
   const { snapshot } = useConnectionState(conn);
   const { workspaces } = useWorkspaces(conn);
@@ -150,6 +153,8 @@ export function AppShell({
         )}
         <Box
           as="aside"
+          ref={aside}
+          onKeyDown={onSidebarKeyDown}
           aria-label="Sidebar"
           data-device={device}
           data-open={open}
