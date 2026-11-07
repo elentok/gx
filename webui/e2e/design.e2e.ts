@@ -355,7 +355,7 @@ test("50. Design epic page", async ({ page, start }) => {
     await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
     await expect(page.getByText(summary, nav(summary))).toBeVisible({ timeout: 1000 });
   }).toPass();
-  const epicRing = page.locator("[data-kind]").first();
+  const epicRing = page.getByTestId("page-header-actions").locator("[data-kind]");
 
   // Before a session the ring is muted and the stats line names the step, with a time and no cost.
   await expect(epicRing).toHaveAttribute("data-tone", "muted");
@@ -372,11 +372,14 @@ test("50. Design epic page", async ({ page, start }) => {
   await expect(timed).not.toContainText("$");
 
   await page.getByRole("button", nav("Start design session")).click();
+  // The Design page it opens links to the design epic through the sidebar's card.
+  await expect(page).toHaveURL(/#\/d\/demo:design-epic$/);
+  await expect(page.getByRole("link", { name: /^design-epic\b/ }).first()).toHaveAttribute("href", "#/e/demo:design-epic");
   // Once the first round lands the session waits for answers and the ring turns "waiting", so the
   // running ring is read first. The epic page is reopened for it; the Design page has no ring.
   await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
   await expect(epicRing).toHaveAttribute("data-tone", "running");
-  await expect(page.getByTestId("comet")).toBeVisible();
+  await expect(epicRing.getByTestId("comet")).toBeVisible();
   // A live session makes a design ticket's meta read "<type> · running" and adds a time.
   await fixture.cli("tickets", "set", "demo:design-epic/01", "--status", "claimed");
   // The server reads the claim a moment after the CLI wrote it, so the page is opened until it shows.
@@ -404,7 +407,7 @@ test("Header shape: Design and Epic share the left edge and row at 1440px, and n
   await openEpicWithSummary(page, fixture, "A short destination.");
   const edges = async () => ({
     title: (await page.getByRole("heading", { level: 1 }).boundingBox())!,
-    ring: (await page.getByTestId("page-header-ring").boundingBox())!,
+    ring: (await page.getByTestId("page-header-icon").boundingBox())!,
   });
   const epic = await edges();
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
@@ -417,10 +420,10 @@ test("Header shape: Design and Epic share the left edge and row at 1440px, and n
 
   await page.setViewportSize({ width: 375, height: 812 });
   const sideways = () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-  expect(await sideways()).toBe(false);
+  await expect.poll(sideways).toBe(false);
   await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
   await expect(page.getByRole("button", nav("Show full description"))).toBeVisible();
-  expect(await sideways()).toBe(false);
+  await expect.poll(sideways).toBe(false);
 });
 
 test("Epic description popover: click, Enter, Space and Escape, and it stays inside the viewport at 375px", async ({ page, start }) => {

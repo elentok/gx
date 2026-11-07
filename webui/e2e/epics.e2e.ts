@@ -14,14 +14,14 @@ test("2. Epic looks right", async ({ page, start, context }) => {
 
   await expect(page.getByText("2/7")).toBeVisible();
   await expect(page.getByRole("img", { name: "Implementation" })).toBeVisible();
-  await expect(page.getByTestId("comet")).toHaveCount(0);
+  await expect(page.getByTestId("page-header-actions").getByTestId("comet")).toHaveCount(0);
   await expect(page.getByTestId("stats-line")).toHaveText("Not queued · $0.00 · 0s agent time");
   // mixed-epic has no summary, so the header draws no description line.
   await expect(page.getByTestId("page-header-line")).toHaveCount(0);
-  // The ⋯ menu holds only Copy epic ID, and it copies <project>:<name>.
-  await page.getByRole("button", nav("More actions")).click();
+  // The ⋯ menu holds Copy epic ID and Hold, and the copy is <project>:<name>.
+  await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).click();
   const menu = page.getByRole("menu", nav("More actions"));
-  await expect(menu.getByRole("menuitem")).toHaveCount(1);
+  await expect(menu.getByRole("menuitem")).toHaveText([/^Copy epic ID/, "Hold"]);
   await expect(menu.getByRole("menuitem", { name: /^Copy epic ID/ })).toContainText("demo:mixed-epic");
   await menu.getByRole("menuitem", { name: /^Copy epic ID/ }).click();
   await expect(menu).toHaveCount(0);
@@ -40,7 +40,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   await page.getByRole("button", nav("Queue")).click();
   await expect(page.getByText("2/7")).toBeVisible();
   await expect(page.getByTestId("stats-line")).toHaveText(/^Running · /, { timeout: 30_000 });
-  await expect(page.getByTestId("comet")).toBeVisible();
+  await expect(page.getByTestId("page-header-actions").getByTestId("comet")).toBeVisible();
   // A running card's chip reads the model, tier and effort, with the harness dot.
   const chip = page.locator("[data-chips]").first();
   await expect(chip).toHaveText("Claude Sonnet · Worker · medium", { timeout: 45_000 });
@@ -91,7 +91,7 @@ test("7. Epic completion", async ({ page, start }) => {
   await expect(page.getByText("Merged · $0.00 · 0s agent time")).toBeVisible();
   await expect(page.getByText("2 done")).toBeVisible();
   await expect(page.getByText("2/2")).toBeVisible();
-  await expect(page.getByTestId("comet")).toHaveCount(0);
+  await expect(page.getByTestId("page-header-actions").getByTestId("comet")).toHaveCount(0);
   const more = page.getByRole("button", { name: /^More stats/ });
   await expect(more).toHaveAttribute("aria-expanded", "false");
   // The divider comes first and More stats last on the page.

@@ -13,6 +13,9 @@ const NEEDS_YOU = [
   "paused", // the one-off ticket
 ];
 
+// A card's action buttons, without the round "More actions" button every card carries.
+const actions = (page: Page, name: string) => card(page, name).locator('button:not([aria-label="More actions"])');
+
 const afkItem = (page: Page) => menu(page).getByRole("menuitemcheckbox", nav("AFK"));
 const viModeItem = (page: Page) => menu(page).getByRole("menuitemcheckbox", nav("Vi mode"));
 
@@ -70,7 +73,7 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   const progress = await section(page, "Designing");
   await expect(progress.getByTestId("pill")).toHaveCount(0);
   await expect(progress.getByRole("link", { name: "design-stopped", exact: true })).toBeVisible();
-  await expect(card(page, "design-stopped").getByRole("button")).toHaveText(["Continue"]);
+  await expect(actions(page, "design-stopped")).toHaveText(["Continue"]);
   const queue = await section(page, "Ready to queue");
   await expect(queue.getByTestId("pill")).toHaveCount(0);
 
@@ -84,20 +87,20 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
 
   // Only merge-blocked and awaiting-merge cards offer Merge.
   for (const name of ["blocked-merge-epic", "awaiting-epic"]) {
-    await expect(card(page, name).getByRole("button")).toHaveText(["Merge"]);
+    await expect(actions(page, name)).toHaveText(["Merge"]);
   }
   // A dirty trunk offers both ways out and names the cause, but lists no files on the card.
   const dirty = card(page, "dirty-trunk-epic");
-  await expect(dirty.getByRole("button")).toHaveText(["Stash, merge and restore", "Merge again"]);
+  await expect(actions(page, "dirty-trunk-epic")).toHaveText(["Stash, merge and restore", "Merge again"]);
   await expect(dirty.getByTestId("pill")).toHaveText("Merge blocked");
   await expect(dirty.getByTestId("reason")).toHaveText("Trunk has local changes");
   await expect(dirty.getByTestId("merge-block-files")).toHaveCount(0);
   for (const name of ["running-epic", "queued-epic"]) {
-    await expect(card(page, name).getByRole("button")).toHaveCount(0);
+    await expect(actions(page, name)).toHaveCount(0);
   }
-  await expect(card(page, "finished-a").getByRole("button")).toHaveCount(0);
+  await expect(actions(page, "finished-a")).toHaveCount(0);
   const ready = await section(page, "Ready to design");
-  await expect(ready.locator("[data-kind]").filter({ has: page.getByRole("link", { name: "draft-epic", exact: true }) }).getByRole("button")).toHaveCount(0);
+  await expect(ready.locator("[data-kind]").filter({ has: page.getByRole("link", { name: "draft-epic", exact: true }) }).locator('button:not([aria-label="More actions"])')).toHaveCount(0);
 
   // The filter matches names across sections, and says so when nothing matches.
   const filter = page.getByRole("searchbox", { name: "Filter epics" });
@@ -113,6 +116,14 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await fixture.cli("server", "queue", "remove", "demo:queued-epic");
   await fixture.cli("server", "queue", "add", "demo:queued-epic");
   await expect(queuedTime).toHaveText("<1m");
+
+  // A held card that would need you is in neither the Epics badge nor Needs you.
+  const epicsLink = (n: number) => page.getByRole("link", nav(`Epics · ${n} need you`));
+  await expect(epicsLink(NEEDS_YOU.length)).toBeVisible();
+  await fixture.cli("server", "hold", "demo:paused-epic");
+  await expect(epicsLink(NEEDS_YOU.length - 1)).toBeVisible();
+  await expect(needs.locator("[data-section]")).toHaveCount(NEEDS_YOU.length - 1);
+  await expect(needs.getByRole("link", { name: "paused-epic", exact: true })).toHaveCount(0);
 
   // 28: AFK and Vi mode flip over SSE; the footer's paused icon follows `queue pause`.
   const paused = page.getByRole("img", nav("Server queue is paused"));
@@ -146,6 +157,7 @@ test("18. Joined card", async ({ page, start }) => {
   await expect(page.getByRole("link", { name: "design-epic", exact: true })).toHaveCount(1);
   await expect(page.getByRole("link", { name: "design-epic-impl", exact: true })).toHaveCount(0);
   await expect(joined.getByTestId("status")).toHaveText("Designing");
+  await expect(joined.getByTestId("workspace")).toHaveText("Default workspace");
   await expect(joined.getByText(/%$/)).toBeVisible();
   const bare = /^(<1m|\d+[mhdw]( \d+[mhd])?)$/;
   await expect(joined.getByTestId("time")).toHaveText(bare);
