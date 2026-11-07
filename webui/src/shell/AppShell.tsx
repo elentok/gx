@@ -4,6 +4,7 @@ import { Outlet } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { DiskStrips } from "../page/DiskStrips";
 import { FailedMigrationStrip } from "../restart/FailedMigrationStrip";
+import { NewVersionStrip, useBuildChanged } from "../restart/NewVersionStrip";
 import { MigratingStrip } from "../restart/MigratingStrip";
 import { Strip } from "../ui/strip/Strip";
 import { useDevice, type Device } from "../useWide";
@@ -26,7 +27,8 @@ function PanelIcon() {
 }
 
 function Strips() {
-  const { connected } = useConnectionState(useConnectionContext());
+  const { snapshot, connected } = useConnectionState(useConnectionContext());
+  const buildChanged = useBuildChanged(snapshot?.build);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = box.current;
@@ -47,6 +49,7 @@ function Strips() {
       <MigratingStrip />
       <DiskStrips />
       <FailedMigrationStrip />
+      {buildChanged && <NewVersionStrip />}
     </Box>
   );
 }

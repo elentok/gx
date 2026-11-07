@@ -8,6 +8,7 @@ import { NewDesignForm } from "../design/NewDesignForm";
 import { useEpicList } from "../epics/list";
 import { designHref, STATS_HREF } from "../hrefs";
 import { Tray } from "../ui/tray/Tray";
+import { GearMenu } from "./GearMenu";
 
 const EPICS_HREF = "#/epics";
 
@@ -113,6 +114,7 @@ export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: 
           <OfflineIcon />
         </Indicator>
       )}
+      <GearMenu />
       {dialog === "design" && <DesignDialog onClose={() => setDialog(null)} />}
       {dialog === "agent" && <AgentDialog onClose={() => setDialog(null)} />}
     </Box>

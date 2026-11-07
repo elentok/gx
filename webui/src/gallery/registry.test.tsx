@@ -50,13 +50,6 @@ it("shows the Button in every role, tone and size", () => {
   for (const old of ["solid", "tinted", "outline"]) expect(labels).not.toContain(old);
 });
 
-it("shows the TopBar in every state the spec lists", () => {
-  const labels = galleryEntries.find((e) => e.name === "TopBar")?.cases.map((c) => c.label) ?? [];
-  for (const label of ["Epics active", "Stats active", "none active", "Paused", "Offline", "no build string", "menu closed", "menu open, AFK off", "menu open, AFK on", "menu open, with block", "limits fresh", "limits weekly delta + Codex", "limits few days", "limits stale", "limits past reset", "limits one window", "spend normal", "spend short ledger", "spend empty"]) {
-    expect(labels, label).toContain(label);
-  }
-});
-
 it("shows the MoreActionsMenu button in its four states", () => {
   const labels = galleryEntries.find((e) => e.name === "MoreActionsMenu")?.cases.map((c) => c.label) ?? [];
   expect(labels).toEqual(["rest", "hover", "focus", "open"]);

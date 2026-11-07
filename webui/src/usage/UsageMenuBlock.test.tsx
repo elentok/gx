@@ -1,6 +1,7 @@
+import { Menu } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Connection, EventListener } from "../connection";
+import { ConnectionContext, type Connection, type ConnectionState, type EventListener } from "../connection";
 import {
   EventBudgetChanged,
   EventLimitsChanged,
@@ -9,7 +10,7 @@ import {
   type UsageSummary,
 } from "../generated/server";
 import { renderThemed } from "../ui/render";
-import { TopBar } from "../ui/top-bar/TopBar";
+import { GearMenu } from "../shell/GearMenu";
 import { UsageMenuBlock } from "./UsageMenuBlock";
 import type { FetchSummary } from "./useUsageSummary";
 
@@ -29,8 +30,12 @@ function fakeConn() {
 
 function setup(fetcher: FetchSummary) {
   const c = fakeConn();
+  const state = { snapshot: { build: "v1" }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const conn = { ...c.conn, getState: () => state, subscribe: () => () => {} } as unknown as Connection;
   renderThemed(
-    <TopBar connected build="v1" onToggleAfk={() => {}} menuBlock={<UsageMenuBlock conn={c.conn} fetcher={fetcher} />} />,
+    <ConnectionContext.Provider value={conn}>
+      <GearMenu usageFetcher={fetcher} />
+    </ConnectionContext.Provider>,
   );
   return {
     ...c,
@@ -90,15 +95,16 @@ describe("UsageMenuBlock", () => {
     const t = setup(fetcher);
     t.open();
     const menu = (await screen.findByRole("menuitem", { name: "Settings" })).closest("[role=menu]")!;
-    expect(menu.querySelectorAll("[role=separator]").length).toBe(0);
+    // The menu's own separator sits above Settings; the block adds two more.
+    expect(menu.querySelectorAll("[role=separator]").length).toBe(1);
     await act(async () => resolve(summary(UsageModeLimits)));
-    expect(menu.querySelectorAll("[role=separator]").length).toBe(2);
+    expect(menu.querySelectorAll("[role=separator]").length).toBe(3);
 
     fetcher.mockRejectedValueOnce(new Error("down"));
     await t.emit(EventLimitsChanged);
     await t.flush();
     expect(screen.queryByText("Claude limits")).toBeNull();
-    expect(menu.querySelectorAll("[role=separator]").length).toBe(0);
+    expect(menu.querySelectorAll("[role=separator]").length).toBe(1);
 
     fetcher.mockResolvedValueOnce(summary(UsageModeLimits));
     await t.emit(EventLimitsChanged);
@@ -114,13 +120,13 @@ describe("UsageMenuBlock", () => {
     expect(screen.queryByText("Claude limits")).toBeNull();
   });
 
-  it("orders the menu: Settings, AFK, separator, block, separator, build", async () => {
+  it("orders the menu: AFK, Vi mode, separator, Settings, Restart, separator, block, separator, build", async () => {
     const t = setup(async () => summary(UsageModeLimits));
     t.open();
     await screen.findByText("Claude limits");
     const menu = screen.getByRole("menuitem", { name: "Settings" }).closest("[role=menu]")!;
     const kinds = [...menu.children].map((el) => el.getAttribute("role") ?? el.getAttribute("data-testid") ?? el.textContent);
-    expect(kinds).toEqual(["menuitem", "menuitemcheckbox", "separator", "Claude limits", "separator", "server-build"]);
+    expect(kinds).toEqual(["menuitemcheckbox", "menuitemcheckbox", "separator", "menuitem", "menuitem", "separator", "Claude limits", "separator", "server-build"]);
   });
 
   it("does not let an older slow response replace a newer one", async () => {
@@ -140,9 +146,10 @@ describe("UsageMenuBlock", () => {
   function shownCalls(fetcher: FetchSummary) {
     const calls: boolean[] = [];
     renderThemed(
-      <TopBar connected menuBlock={<UsageMenuBlock conn={fakeConn().conn} fetcher={fetcher} onShownChange={(s) => calls.push(s)} />} />,
+      <Menu.Root open>
+        <UsageMenuBlock conn={fakeConn().conn} fetcher={fetcher} onShownChange={(s) => calls.push(s)} />
+      </Menu.Root>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     return calls;
   }
 

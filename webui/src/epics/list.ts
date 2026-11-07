@@ -27,6 +27,3 @@ export function useEpicList(fetcher: FetchEpicList = fetchEpicList, conn?: Conne
 
 export const isCurrent = (row: EpicListRow, current: string) => row.address === current || (row.addresses?.includes(current) ?? false);
 
-/** The Needs-you cards other than the epic on screen. */
-export const waitingCount = (epics: EpicListRow[], current: string): number =>
-  epics.filter((e) => e.section === SectionNeedsYou && !isCurrent(e, current)).length;

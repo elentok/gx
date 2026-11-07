@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Health, HealthState, MeterHealth } from "../../generated/server";
 import { renderThemed } from "../render";
-import { TopBar } from "../top-bar/TopBar";
 import { Tray } from "./Tray";
 
 const meter = (state: HealthState, level = 1): MeterHealth => ({ level, state, read_at: "" });
@@ -62,19 +61,5 @@ describe("Tray", () => {
   it("names each meter's state in the aria-label, with no percent", () => {
     const { getByRole } = renderThemed(<Tray health={healthOf(meter("high"), meter("normal"), meter("unknown"))} />);
     expect(getByRole("button", { name: "System health: CPU high; memory normal; disk unknown" })).toBeTruthy();
-  });
-});
-
-describe("TopBar Tray", () => {
-  it("sits after the Paused chip and the Offline dot and before the menu", () => {
-    const { container } = renderThemed(<TopBar mode="paused" connected={false} build="v1" health={healthOf(meter("normal"))} />);
-    const right = container.querySelector("nav > div:last-child")!;
-    const labels = [...right.children].map((c) => c.getAttribute("aria-label") ?? c.textContent);
-    expect(labels).toEqual(["Paused", "Offline", "System health: CPU normal; memory normal; disk normal", "Menu"]);
-  });
-
-  it("renders without an AFK toggle or build", () => {
-    const { getByRole } = renderThemed(<TopBar connected health={healthOf(meter("normal"))} />);
-    expect(getByRole("button", { name: /^System health/ })).toBeTruthy();
   });
 });

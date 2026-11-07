@@ -155,28 +155,17 @@ test("navigating between routes changes the tab title", async () => {
   await waitFor(() => expect(title()).toBe("e · Epic · gx"));
 });
 
-const currentTab = () => screen.getByRole("link", { current: "page" }).textContent;
+const epicsFilter = () => screen.getByRole("searchbox", { name: "Filter epics" });
 
-test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])("%s lands on the Epics page with the Epics tab marked and no h1", async (path) => {
+test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])("%s lands on the Epics page with no h1", async (path) => {
   renderAt(path, okFor);
-  await waitFor(() => expect(currentTab()).toBe("Epics"));
+  await waitFor(() => expect(epicsFilter()).toBeTruthy());
   expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
 });
 
-test.each(["/agents", "/agents/s-1"])("%s renders the Agents page with the Agents tab marked", async (path) => {
+test.each(["/agents", "/agents/s-1"])("%s renders the Agents page", async (path) => {
   renderAt(path, okFor);
-  await waitFor(() => expect(currentTab()).toBe("Agents"));
-  expect(screen.getByText("Sessions")).toBeTruthy();
-});
-
-test("the epic and ticket pages mark no tab", async () => {
-  renderAt("/e/gx:e", okFor, undefined, epicFetch());
-  await screen.findByText("No tickets yet");
-  expect(screen.queryByRole("link", { current: "page" })).toBeNull();
-  cleanup();
-  renderAt("/t/gx:e/01", okFor);
-  await screen.findByRole("heading", { name: "Title of gx:e/01" });
-  expect(screen.queryByRole("link", { current: "page" })).toBeNull();
+  expect(await screen.findByText("Sessions")).toBeTruthy();
 });
 
 test("a ticket route shows a spinner, then the ticket whose address is in the hash", async () => {
@@ -771,7 +760,7 @@ const withDisks = (...disks: DiskStatus[]) => fakeConnection(true, { ...emptySna
 
 test("no disk strip with an empty disk list", async () => {
   renderAt("/epics", okFor);
-  await waitFor(() => expect(currentTab()).toBe("Epics"));
+  await waitFor(() => expect(epicsFilter()).toBeTruthy());
   expect(screen.queryByRole("button", { name: "Clean now" })).toBeNull();
 });
 

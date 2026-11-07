@@ -5,7 +5,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { EpicRing } from "../epic/EpicRing";
 import { PageHeader } from "../page/PageHeader";
-import { useEpicList, waitingCount, type EpicList, type FetchEpicList } from "../epics/list";
+import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
 import { JumpMenu } from "../nav/JumpMenu";
 import { headerTitleFontSize } from "../nav/titleSize";
 import { DetailPage } from "../page/DetailPage";
@@ -243,12 +243,7 @@ type DesignPageProps = {
 export function DesignPage(props: DesignPageProps) {
   const { list, failed } = useEpicList(props.fetchList, useConnectionContext());
   return (
-    <DetailPage
-      active="epics"
-      fill
-      title={{ kind: "Design", name: slugOf(props.address) }}
-      waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}
-    >
+    <DetailPage fill title={{ kind: "Design", name: slugOf(props.address) }}>
       <DesignPageBody {...props} list={list} failed={failed} />
     </DetailPage>
   );

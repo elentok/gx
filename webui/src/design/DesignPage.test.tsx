@@ -113,11 +113,6 @@ function render(
   return Object.assign(router, { setSessions });
 }
 
-test("the Epics tab counts the other Needs-you cards from the loaded list", async () => {
-  render([map("a", { section: "needs-you" }), map("b", { section: "needs-you" })], []);
-  expect(await screen.findByRole("link", { name: "Epics · 1 needs you" })).toBeTruthy();
-});
-
 const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent;
 
 test("the meta bar shows the harness, model and effort of a Codex session, never the tier, and nothing without a session", async () => {

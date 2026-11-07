@@ -45,7 +45,6 @@ import { DiskStrip } from "../ui/disk-strip/DiskStrip";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { StickyTopContainer } from "../ui/top-bar/StickyTopContainer";
-import { TopBar } from "../ui/top-bar/TopBar";
 import { Tray } from "../ui/tray/Tray";
 import type { Health, HealthState, LimitWindow, UsageLimits, UsageLimitWindow, UsageSpend, UsageSummary } from "../generated/server";
 import { UsageModeLimits, UsageModeSpending } from "../generated/server";
@@ -492,82 +491,6 @@ export const galleryEntries: GalleryEntry[] = [
       ),
       { label: "disabled", node: <Button disabled>disabled</Button> },
       { label: "main disabled", node: <Button emphasis="main" disabled>disabled</Button> },
-    ],
-  },
-  {
-    name: "TopBar",
-    cases: [
-      ...perTone((tone) => <TopBar active="epics" tone={tone} build="v1.2.3" connected />),
-      { label: "Epics active", node: <TopBar active="epics" build="v1.2.3" connected /> },
-      { label: "Agents active", node: <TopBar active="agents" build="v1.2.3" connected actionable={2} /> },
-      { label: "Stats active", node: <TopBar active="stats" build="v1.2.3" connected /> },
-      { label: "none active", node: <TopBar build="v1.2.3" connected /> },
-      { label: "Paused", node: <TopBar active="epics" build="v1.2.3" mode="paused" connected /> },
-      { label: "Offline", node: <TopBar active="epics" build="v1.2.3" connected={false} /> },
-      { label: "menu closed", node: <TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} /> },
-      { label: "menu open, AFK off", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} onToggleViMode={() => {}} /></OpenMenu> },
-      { label: "menu open, AFK on", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected afk onToggleAfk={() => {}} onToggleViMode={() => {}} /></OpenMenu> },
-      {
-        label: "menu open, with block",
-        node: (
-          <OpenMenu>
-            <TopBar
-              active="epics"
-              build="v1.2.3"
-              connected
-              onToggleAfk={() => {}}
-              menuBlock={
-                <>
-                  <Menu.Separator />
-                  <Text px="3" py="1.5" fontSize="xs" color="text.muted">Placeholder block</Text>
-                  <Menu.Separator />
-                </>
-              }
-            />
-          </OpenMenu>
-        ),
-      },
-      { label: "no build string", node: <TopBar active="epics" connected /> },
-      ...limitsStates.map(([label, limits, codex]) => ({
-        label,
-        node: (
-          <OpenMenu>
-            <TopBar
-              active="epics"
-              build="v1.2.3"
-              connected
-              onToggleAfk={() => {}}
-              menuBlock={
-                <>
-                  <Menu.Separator />
-                  <LimitsBlock summary={{ mode: UsageModeLimits, limits, codex, spend: {} as UsageSummary["spend"] }} now={limitsNow} />
-                  <Menu.Separator />
-                </>
-              }
-            />
-          </OpenMenu>
-        ),
-      })),
-      ...spendStates.map(([label, spend]) => ({
-        label,
-        node: (
-          <OpenMenu>
-            <TopBar
-              active="epics"
-              build="v1.2.3"
-              connected
-              onToggleAfk={() => {}}
-              menuBlock={
-                <>
-                  <Menu.Separator />
-                  <SpendBlock summary={{ mode: UsageModeSpending, limits: {}, spend }} />
-                  <Menu.Separator />
-                </>
-              }
-            />
-          </OpenMenu>
-        ),
-      })),
     ],
   },
   {

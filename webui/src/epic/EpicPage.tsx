@@ -15,7 +15,7 @@ import { EpicRing } from "./EpicRing";
 import { MergeButton, StashMergeButton } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
-import { useEpicList, waitingCount, type EpicList, type FetchEpicList } from "../epics/list";
+import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
 import { JumpMenu } from "../nav/JumpMenu";
 import { headerTitleFontSize } from "../nav/titleSize";
 import { Markdown } from "../markdown/Markdown";
@@ -329,10 +329,7 @@ type EpicPageProps = {
 export function EpicPage(props: EpicPageProps) {
   const { list } = useEpicList(props.fetchList, useConnectionContext());
   return (
-    <DetailPage
-      title={{ kind: "Epic", name: slugOf(props.address) }}
-      waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}
-    >
+    <DetailPage title={{ kind: "Epic", name: slugOf(props.address) }}>
       <EpicPageBody {...props} list={list} />
     </DetailPage>
   );

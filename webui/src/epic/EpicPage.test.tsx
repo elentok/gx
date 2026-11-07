@@ -83,15 +83,6 @@ test("the epic page has a title that opens the jump menu and no back link", asyn
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
 
-test("the Epics tab counts the other Needs-you cards from the loaded list", async () => {
-  render("/e/gx:blog-impl", [
-    { ...joined, section: "needs-you" },
-    row("q1", { section: "needs-you" }),
-    row("q2", { section: "needs-you" }),
-  ]);
-  expect(await screen.findByRole("link", { name: "Epics · 2 need you" })).toBeTruthy();
-});
-
 test("a Design's epic page has an Open implementation epic button that goes to the -impl page", async () => {
   render("/e/gx:blog", [joined], "map");
   fireEvent.click(await screen.findByRole("button", { name: "Open implementation epic" }));
