@@ -60,9 +60,24 @@ func (s *Scheduler) ClaimNext() {
 	limit := s.ConcurrencyLimit()
 	running := s.Registry.Count()
 	seen := map[string]bool{}
-	for _, item := range s.Queue.List() {
+	items := s.Queue.List()
+	perRoot := map[string]int{}
+	for _, item := range items {
+		if addr, err := tickets.ParseQueuedAddress(item.Address); err == nil {
+			perRoot[queue.RootOf(addr).String()]++
+		}
+	}
+	for _, item := range items {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
-		if err != nil || seen[queue.RootOf(addr).String()] {
+		if err != nil {
+			continue
+		}
+		// The last entry of a root is what keeps the root queued, so it stays.
+		if root := queue.RootOf(addr).String(); perRoot[root] > 1 && s.dropIfTerminal(item.Address, addr) {
+			perRoot[root]--
+			continue
+		}
+		if seen[queue.RootOf(addr).String()] {
 			continue
 		}
 		seen[queue.RootOf(addr).String()] = true
@@ -79,6 +94,35 @@ func (s *Scheduler) ClaimNext() {
 			running++
 		}
 	}
+}
+
+// dropIfTerminal takes a queued ticket entry off the queue once its ticket is
+// done or cancelled, so hand edits and history already on disk are covered
+// too, and reports whether it did. Epic entries are never dropped here.
+func (s *Scheduler) dropIfTerminal(queued string, addr tickets.Address) bool {
+	if addr.ID == "" {
+		return false
+	}
+	loaded, err := s.Projects.Epics(addr.Project)
+	if err != nil {
+		return false
+	}
+	for _, e := range loaded {
+		if filepath.Base(e.Path) != addr.Epic {
+			continue
+		}
+		for _, t := range e.Tickets {
+			if t.Identifier != addr.ID || !t.IsTerminal() {
+				continue
+			}
+			dropped, err := s.Queue.DropItem(queued)
+			if err != nil {
+				s.Log.Warn("drop terminal queue item", "address", queued, "err", err)
+			}
+			return dropped
+		}
+	}
+	return false
 }
 
 // ClaimTicket claims and launches one ticket the way a claim pass would, but

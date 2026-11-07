@@ -392,6 +392,22 @@ func (q *Queue) Remove(req wire.QueueRequest) (wire.QueueResult, error) {
 	})
 }
 
+// DropItem takes the single entry addr off the queue, leaving tickets forked
+// from it, and reports whether it was queued. For entries whose ticket is
+// already terminal, so no live run can be inside it.
+func (q *Queue) DropItem(addr string) (bool, error) {
+	dropped := false
+	_, err := q.Write(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
+		if indexOfAddr(items, addr) < 0 {
+			r := Refusal(wire.ReasonNotQueued, addr+" is not queued")
+			return nil, &r
+		}
+		dropped = true
+		return dropAddresses(items, map[string]bool{addr: true}), nil
+	})
+	return dropped, err
+}
+
 // Replace swaps one project's pending entries for req.Items, leaving the
 // other projects' entries where they are. The new entries go at the end.
 func (q *Queue) Replace(req wire.QueueRequest) (wire.QueueResult, error) {
