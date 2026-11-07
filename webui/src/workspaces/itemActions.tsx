@@ -50,70 +50,24 @@ export function useCardActions(card: EpicListRow | undefined, workspaces: Worksp
 
 export interface ItemWriters {
   move: (key: string, to: string) => Promise<WorkspaceResult>;
-  remove: (key: string) => Promise<WorkspaceResult>;
   hold: (epic: string, yes?: boolean) => Promise<HoldResult>;
   unhold: (epic: string) => Promise<HoldResult>;
 }
 
 export const postMove = (key: string, to: string) => postWorkspace<WorkspaceResult>("move", { name: to, key });
-export const postRemove = (key: string) => postWorkspace<WorkspaceResult>("remove", { name: "", key });
 export const postHold = (epic: string, yes?: boolean) =>
   postWorkspace<HoldResult>("hold", { epic, ...(yes ? { yes } : {}) });
 export const postUnhold = (epic: string) => postWorkspace<HoldResult>("unhold", { epic });
 
-export const defaultWriters: ItemWriters = { move: postMove, remove: postRemove, hold: postHold, unhold: postUnhold };
+export const defaultWriters: ItemWriters = { move: postMove, hold: postHold, unhold: postUnhold };
 
-type Dialog = { kind: "move" } | { kind: "remove" } | { kind: "hold"; sessions: string[] };
+type Dialog = { kind: "hold"; sessions: string[] };
 
 interface DialogProps {
   item: ItemRef;
   writers: ItemWriters;
   run: ReturnType<typeof useWrite>["run"];
   close: () => void;
-}
-
-function MoveDialog({ item, writers, run, close, others }: DialogProps & { others: Workspace[] }) {
-  return (
-    <Modal label={`Move ${item.name}`} onClose={close} maxW="sm">
-      <Text>Move {item.name} to:</Text>
-      <Box display="flex" flexDirection="column" gap="2">
-        {others.map((w) => (
-          <Button
-            key={w.name}
-            emphasis="secondary"
-            onClick={() => {
-              close();
-              void run(() => writers.move(item.key, w.name));
-            }}
-          >
-            {w.name}
-          </Button>
-        ))}
-      </Box>
-    </Modal>
-  );
-}
-
-function RemoveDialog({ item, writers, run, close }: DialogProps) {
-  return (
-    <Modal label={`Remove ${item.name}`} onClose={close} maxW="sm">
-      <Text>Remove {item.name} from {item.workspace}? It moves back to Default.</Text>
-      <Box display="flex" gap="2" justifyContent="flex-end">
-        <Button emphasis="secondary" onClick={close} autoFocus>
-          Keep
-        </Button>
-        <Button
-          tone="paused"
-          onClick={() => {
-            close();
-            void run(() => writers.remove(item.key));
-          }}
-        >
-          Remove
-        </Button>
-      </Box>
-    </Modal>
-  );
 }
 
 function HoldDialog({ item, writers, run, close, sessions }: DialogProps & { sessions: string[] }) {
@@ -144,14 +98,29 @@ export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[
   const [dialog, setDialog] = useState<Dialog>();
   if (!item) return { groups: [] as MenuEntry[][], dialogs: null as ReactNode };
   const close = () => setDialog(undefined);
-  const others = workspaces.filter((w) => w.name !== item.workspace);
-  const isDefault = !!workspaces.find((w) => w.name === item.workspace)?.default;
 
   const groups: MenuEntry[][] = [];
-  const filing: MenuEntry[] = [];
-  if (others.length > 0) filing.push({ value: "move", label: "Move to workspace", disabled: pending, onSelect: () => setDialog({ kind: "move" }) });
-  if (!isDefault) filing.push({ value: "remove", label: "Remove from workspace", danger: true, disabled: pending, onSelect: () => setDialog({ kind: "remove" }) });
-  if (filing.length > 0) groups.push(filing);
+  if (workspaces.length > 0) {
+    groups.push([
+      {
+        kind: "submenu",
+        value: "move",
+        label: "Move to workspace",
+        items: workspaces.map((w) => {
+          const current = w.name === item.workspace;
+          return {
+            value: `move-${w.name}`,
+            label: w.name,
+            current,
+            inlineHint: true,
+            hint: current ? "✓" : undefined,
+            disabled: pending,
+            onSelect: () => void run(() => writers.move(item.key, w.name)),
+          };
+        }),
+      },
+    ]);
+  }
 
   if (item.kind !== "chat") {
     const hold = () =>
@@ -178,11 +147,7 @@ export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[
   }
 
   const props = { item, writers, run, close };
-  const dialogs: ReactNode =
-    dialog?.kind === "move" ? <MoveDialog {...props} others={others} /> :
-    dialog?.kind === "remove" ? <RemoveDialog {...props} /> :
-    dialog?.kind === "hold" ? <HoldDialog {...props} sessions={dialog.sessions} /> :
-    null;
+  const dialogs: ReactNode = dialog ? <HoldDialog {...props} sessions={dialog.sessions} /> : null;
 
   return { groups, dialogs };
 }

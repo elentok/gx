@@ -278,7 +278,7 @@ const spaces: Workspace[] = [
   { name: "Work", members: 1 },
 ];
 
-test("a Design in a workspace appends Move, Remove and Hold after the existing items", async () => {
+test("a Design in a workspace appends Move and Hold after the existing items", async () => {
   render("/d/gx:a", [session("a")], {}, detailOf(), { card: { addresses: ["gx:a"], workspace: "Work" }, workspaces: spaces });
   await openMenu();
   await newSession();
@@ -287,7 +287,7 @@ test("a Design in a workspace appends Move, Remove and Hold after the existing i
   expect(at("New session")).toBeGreaterThanOrEqual(0);
   expect(at("Copy design ID")).toBeGreaterThan(at("New session"));
   expect(at("Move to workspace")).toBeGreaterThan(at("Copy design ID"));
-  expect(at("Remove from workspace")).toBeGreaterThan(at("Move to workspace"));
+  expect(at("Remove from workspace")).toBe(-1);
   expect(labels.at(-1)).toBe("Hold");
 });
 

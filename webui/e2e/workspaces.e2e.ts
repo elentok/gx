@@ -146,30 +146,27 @@ test("Workspaces", async ({ page, start }) => {
   const moveTo = async (menu: ReturnType<typeof rowMenu>, item: string, to: string) => {
     await menu.click();
     await page.getByRole("menuitem", nav("Move to workspace")).click();
-    await page.getByRole("dialog", nav(`Move ${item}`)).getByRole("button", nav(to)).click();
+    await page.getByRole("menuitem", nav(to)).click();
   };
+  // The submenu opens to the side of its item, lists every workspace (the Default workspace too) and marks the current one.
+  await rowMenu("ws-impl-epic").click();
+  const moveItem = page.getByRole("menuitem", nav("Move to workspace"));
+  await moveItem.click();
+  const current = page.getByRole("menuitem", { name: /^research/ });
+  await expect(current).toHaveAttribute("aria-current", "true");
+  await expect(page.getByRole("menuitem", nav("Default workspace"))).toHaveAttribute("aria-current", "false");
+  await expect(page.getByRole("menuitem", nav("gx bugs"))).toBeVisible();
+  const [itemBox, subBox] = [await moveItem.boundingBox(), await current.boundingBox()];
+  expect(subBox!.x).toBeGreaterThanOrEqual(itemBox!.x + itemBox!.width - 1);
+  await expect(page.getByRole("menuitem", nav("Remove from workspace"))).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+
   await moveTo(rowMenu("ws-impl-epic"), "ws-impl-epic", "gx bugs");
   await expect(row("ws-impl-epic")).toHaveCount(0);
   await pick("gx bugs");
   await expect(row("ws-impl-epic")).toBeVisible();
-
-  // Remove asks first, and sends the item back to Default; Default's rows have no Remove.
-  await rowMenu("ws-impl-epic").click();
-  await page.getByRole("menuitem", nav("Remove from workspace")).click();
-  const removing = page.getByRole("dialog", nav("Remove ws-impl-epic"));
-  await removing.getByRole("button", nav("Keep")).click();
-  await expect(row("ws-impl-epic")).toBeVisible();
-  await rowMenu("ws-impl-epic").click();
-  await page.getByRole("menuitem", nav("Remove from workspace")).click();
-  await removing.getByRole("button", nav("Remove")).click();
-  await expect(row("ws-impl-epic")).toHaveCount(0);
-  await pick("Default workspace");
-  await expect(row("ws-impl-epic")).toBeVisible();
-  await rowMenu("ws-impl-epic").click();
-  await expect(page.getByRole("menuitem", nav("Move to workspace"))).toBeVisible();
-  await expect(page.getByRole("menuitem", nav("Remove from workspace"))).toHaveCount(0);
-  await page.getByRole("menuitem", nav("Move to workspace")).click();
-  await page.getByRole("dialog", nav("Move ws-impl-epic")).getByRole("button", nav("research")).click();
+  await moveTo(rowMenu("ws-impl-epic"), "ws-impl-epic", "research");
   await expect(row("ws-impl-epic")).toHaveCount(0);
 
   // Move from an Epics page card.
@@ -177,7 +174,7 @@ test("Workspaces", async ({ page, start }) => {
   await expect(card(page, "ws-impl-epic").getByTestId("workspace")).toHaveText("research");
   await card(page, "ws-impl-epic").getByRole("button", nav("More actions")).click();
   await page.getByRole("menuitem", nav("Move to workspace")).click();
-  await page.getByRole("dialog", nav("Move ws-impl-epic")).getByRole("button", nav("gx bugs")).click();
+  await page.getByRole("menuitem", nav("gx bugs")).click();
   await expect(card(page, "ws-impl-epic").getByTestId("workspace")).toHaveText("gx bugs");
 
   // Jump dialog: Move from a row, then opening an item in another workspace switches the sidebar.
@@ -197,7 +194,7 @@ test("Workspaces", async ({ page, start }) => {
   await openJump("ws-impl-epic");
   await jumpRow("ws-impl-epic").getByRole("button", nav("More actions")).click();
   await page.getByRole("menuitem", nav("Move to workspace")).click();
-  await page.getByRole("dialog", nav("Move ws-impl-epic")).getByRole("button", nav("research")).click();
+  await page.getByRole("menuitem", nav("research")).click();
   await expect(jumpRow("ws-impl-epic")).toContainText("research");
   await jumpRow("ws-impl-epic").click();
   await expect(page).toHaveURL(/#\/e\/demo:ws-impl-epic$/);
@@ -354,6 +351,18 @@ test("Workspaces", async ({ page, start }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await goto(page, "#/epics");
   await page.getByRole("button", nav("Show sidebar")).click();
+  // A tap outside an open menu closes it; Move swaps in place with a Back row, Back returns.
+  await rowMenu("paused-epic").click();
+  await expect(page.getByRole("menuitem", nav("Move to workspace"))).toBeVisible();
+  await page.mouse.click(380, 600);
+  await expect(page.getByRole("menuitem", nav("Move to workspace"))).toHaveCount(0);
+  await rowMenu("paused-epic").click();
+  await page.getByRole("menuitem", nav("Move to workspace")).click();
+  await expect(page.getByRole("menuitem", nav("Hold"))).toHaveCount(0);
+  await page.getByRole("menuitem", nav("‹ Back")).click();
+  await expect(page.getByRole("menuitem", nav("Hold"))).toBeVisible();
+  await page.mouse.click(380, 600);
+  await expect(page.getByRole("menuitem", nav("Hold"))).toHaveCount(0);
   await moveTo(rowMenu("paused-epic"), "paused-epic", "scratch");
   await expect(row("paused-epic")).toHaveCount(0);
   await pick("scratch");

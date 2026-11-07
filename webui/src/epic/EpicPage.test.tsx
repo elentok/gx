@@ -732,12 +732,12 @@ const menuLabels = async () => {
 
 test("a card in a named workspace adds Move, Remove and Hold to the menu", async () => {
   render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Work" })], "loop", { workspaces: spaces });
-  expect(await menuLabels()).toEqual(["Copy epic IDgx:blog-impl", "Move to workspace", "Remove from workspace", "Hold"]);
+  expect(await menuLabels()).toEqual(["Copy epic IDgx:blog-impl", "Move to workspace›", "Hold"]);
 });
 
 test("a held card offers Take off hold", async () => {
   render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Default", section: "on-hold" })], "loop", { workspaces: spaces });
-  expect(await menuLabels()).toEqual(["Copy epic IDgx:blog-impl", "Move to workspace", "Take off hold"]);
+  expect(await menuLabels()).toEqual(["Copy epic IDgx:blog-impl", "Move to workspace›", "Take off hold"]);
 });
 
 test("a queued epic's Hold is disabled", async () => {

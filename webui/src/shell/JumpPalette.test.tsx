@@ -231,8 +231,7 @@ test("Move from a row posts and does not open the row", async () => {
   await waitFor(() => expect(names()).toContain("blog"));
   fireEvent.click(menuOf("blog")!);
   fireEvent.click(await screen.findByRole("menuitem", { name: "Move to workspace" }));
-  fireEvent.mouseDown(await screen.findByRole("button", { name: "Work" }));
-  fireEvent.click(screen.getByRole("button", { name: "Work" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /^Work/ }));
   await waitFor(() => expect(posts()).toHaveLength(1));
   expect(String(posts()[0][0])).toContain("/v1/workspaces/move");
   expect(JSON.parse(String(posts()[0][1]?.body))).toEqual({ name: "Work", key: "p:blog" });

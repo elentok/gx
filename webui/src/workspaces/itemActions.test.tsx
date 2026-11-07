@@ -14,7 +14,6 @@ const workspaces: Workspace[] = [
 
 const writers = (over: Partial<ItemWriters> = {}): ItemWriters => ({
   move: vi.fn(async () => ({})),
-  remove: vi.fn(async () => ({})),
   hold: vi.fn(async () => ({ held: [] })),
   unhold: vi.fn(async () => ({ held: [] })),
   ...over,
@@ -34,27 +33,24 @@ async function open(item: ItemRef, w: ItemWriters) {
 
 const labels = () => screen.getAllByRole("menuitem").map((i) => i.textContent);
 
-test("a Design in a named workspace offers Move, Remove and Hold; Move posts the picked workspace", async () => {
+test("a Design offers Move and Hold, never Remove; Move lists every workspace with the current one marked and posts the pick", async () => {
   const w = writers();
   await open(design, w);
-  expect(labels()).toEqual(["Move to workspace", "Remove from workspace", "Hold"]);
+  expect(labels()).toEqual(["Move to workspace›", "Hold"]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Default" }));
+  const work = await screen.findByRole("menuitem", { name: /Work/ });
+  expect(work.getAttribute("aria-current")).toBe("true");
+  expect(work.textContent).toContain("✓");
+  const dflt = screen.getByRole("menuitem", { name: "Default" });
+  expect(dflt.getAttribute("aria-current")).toBe("false");
+  fireEvent.click(dflt);
   await waitFor(() => expect(w.move).toHaveBeenCalledWith("p:shop", "Default"));
 });
 
-test("a Default member has no Remove", async () => {
+test("a Default member lists Default as the current workspace", async () => {
   await open({ ...design, workspace: "Default" }, writers());
-  expect(labels()).toEqual(["Move to workspace", "Hold"]);
-});
-
-test("Remove asks first, then posts", async () => {
-  const w = writers();
-  await open(design, w);
-  fireEvent.click(screen.getByRole("menuitem", { name: "Remove from workspace" }));
-  expect(w.remove).not.toHaveBeenCalled();
-  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
-  await waitFor(() => expect(w.remove).toHaveBeenCalledWith("p:shop"));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }));
+  expect((await screen.findByRole("menuitem", { name: /Default/ })).getAttribute("aria-current")).toBe("true");
 });
 
 test("a queued epic's Hold is disabled with the reason", async () => {
@@ -85,12 +81,12 @@ test("Take off hold posts with no confirmation", async () => {
   await waitFor(() => expect(w.unhold).toHaveBeenCalledWith("p:shop"));
 });
 
-test("a chat can move and be removed but not held", async () => {
+test("a chat can move but not be held", async () => {
   await open({ ...design, kind: "chat" }, writers());
-  expect(labels()).toEqual(["Move to workspace", "Remove from workspace"]);
+  expect(labels()).toEqual(["Move to workspace›"]);
 });
 
 test("an item with nothing to offer renders no button", () => {
-  renderThemed(<ItemMenu item={{ ...design, kind: "chat", workspace: "Default" }} workspaces={[{ name: "Default", default: true, members: 1 }]} writers={writers()} />);
+  renderThemed(<ItemMenu item={{ ...design, kind: "chat" }} workspaces={[]} writers={writers()} />);
   expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
 });

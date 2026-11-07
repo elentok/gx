@@ -146,7 +146,7 @@ test("a row's ... menu opens and Move posts the other workspace", async () => {
   const shop = await body().findByRole("link", { name: /Shop/ });
   fireEvent.click(within(shop.closest("li")!).getByRole("button", { name: "More actions" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Move to workspace" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Work" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /^Work/ }));
   await waitFor(() => {
     const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/v1/workspaces/move"));
     expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ name: "Work", key: "p:shop" });
