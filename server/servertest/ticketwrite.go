@@ -82,10 +82,18 @@ func StartBlockable(t *testing.T, runnerName string, opts ...func(*server.Config
 	Await(t, func() bool { _, ok, _ := turn.Find(HolderLabel); return ok })
 	// A block raised while the launch still waits for the session to be ready fails
 	// the launch instead of pausing the ticket.
-	WaitFor(t, time.Minute, "the launch finishes", func() bool {
-		return len(h.Server.Runs()) == 1 && h.Server.Budget().LaunchingRuns() == 0
-	})
+	h.AwaitLaunched(t, 1)
 	return h, ticketPath, turn
+}
+
+// AwaitLaunched waits until the server has n runs and none is still launching.
+// A launch runs in a goroutine after the claim, so stopping before this can
+// roll it back.
+func (h *Harness) AwaitLaunched(t *testing.T, n int) {
+	t.Helper()
+	WaitFor(t, time.Minute, "the launch finishes", func() bool {
+		return len(h.Server.Runs()) == n && h.Server.Budget().LaunchingRuns() == 0
+	})
 }
 
 // RunsJSONHas reports whether the server's runs.json contains s.
