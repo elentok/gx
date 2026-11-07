@@ -98,7 +98,8 @@ At each detection, including after a chain, report the step it starts with
 the ticket title during `resolve-tickets`.
 
 1. **The map has no `## Destination`** → report the step as `chart`. Read `## Initial prompt` as the
-   loose idea and follow gx-wayfinder's "Chart the map" into the existing map, including its
+   loose idea. Read every image listed under `Images:` in `## Initial prompt` before charting, then
+   follow gx-wayfinder's "Chart the map" into the existing map, including its
    Destination grilling. After charting, end the run with the run-end line: never chain into a later
    step in this run.
    - **Tiers.** The charting session runs on the strongest tier. Its subagents follow the tier list,

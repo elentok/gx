@@ -84,6 +84,23 @@ func TestGxDesignEndsRunAfterChartAndDestination(t *testing.T) {
 	}
 }
 
+func TestGxDesignChartStepReadsInitialPromptImages(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	start := strings.Index(text, "The map has no `## Destination`")
+	if start < 0 {
+		t.Fatal("gx-design/SKILL.md lacks the chart step")
+	}
+	step := text[start:]
+	if end := strings.Index(step, "2. **"); end >= 0 {
+		step = step[:end]
+	}
+	for _, want := range []string{"`Images:`", "`## Initial prompt`"} {
+		if !strings.Contains(step, want) {
+			t.Errorf("chart step lacks %q", want)
+		}
+	}
+}
+
 func TestGxDesignChartingSessionSubagentTiers(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
 	start := strings.Index(text, "1. **The map has no `## Destination`**")
