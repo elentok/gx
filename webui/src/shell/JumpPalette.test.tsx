@@ -74,7 +74,7 @@ function Where() {
 function setup({ path = "/agents", narrow = false } = {}) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })));
   if (narrow) vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
-  const state = { snapshot: { sessions, placements, workspaces: [] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const state = { snapshot: { sessions, placements, workspaces: [{ name: "Default", default: true, members: 3 }, { name: "Work", members: 2 }] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const router = createMemoryRouter(
     [
@@ -206,4 +206,48 @@ test("on a phone the menu is a full screen with a Close button", async () => {
   expect(screen.getByRole("dialog")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+const menuOf = (name: string) => within(option(name)).queryByRole("button", { name: "More actions" });
+const posts = () => vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "POST");
+
+test("Design, epic and chat rows have a row menu; agent and One-off rows do not", async () => {
+  setup();
+  await open();
+  await waitFor(() => expect(names()).toContain("blog"));
+  expect(menuOf("shop")).toBeTruthy();
+  expect(menuOf("blog")).toBeTruthy();
+  expect(menuOf("my-chat")).toBeTruthy();
+  expect(menuOf("waiting-oneoff")).toBeNull();
+  type("builder");
+  expect(menuOf("builder")).toBeNull();
+  type("quiet");
+  expect(menuOf("quiet-oneoff")).toBeNull();
+});
+
+test("Move from a row posts and does not open the row", async () => {
+  setup();
+  await open();
+  await waitFor(() => expect(names()).toContain("blog"));
+  fireEvent.click(menuOf("blog")!);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Move to workspace" }));
+  fireEvent.mouseDown(await screen.findByRole("button", { name: "Work" }));
+  fireEvent.click(screen.getByRole("button", { name: "Work" }));
+  await waitFor(() => expect(posts()).toHaveLength(1));
+  expect(String(posts()[0][0])).toContain("/v1/workspaces/move");
+  expect(JSON.parse(String(posts()[0][1]?.body))).toEqual({ name: "Work", key: "p:blog" });
+  expect(screen.getByTestId("where").textContent).toBe("/agents");
+});
+
+test("Hold from a row posts, and a held row offers Take off hold", async () => {
+  setup();
+  await open();
+  await waitFor(() => expect(names()).toContain("blog"));
+  fireEvent.click(menuOf("blog")!);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Hold" }));
+  await waitFor(() => expect(posts()).toHaveLength(1));
+  expect(String(posts()[0][0])).toContain("/v1/workspaces/hold");
+  type("frozen");
+  fireEvent.click(menuOf("frozen")!);
+  expect(await screen.findByRole("menuitem", { name: "Take off hold" })).toBeTruthy();
 });

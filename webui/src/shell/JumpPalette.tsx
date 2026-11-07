@@ -17,7 +17,9 @@ import {
   type EpicListRow,
   type SessionInfo,
   type SessionPlacement,
+  type Workspace,
 } from "../generated/server";
+import { ItemMenu, itemOfCard, type ItemRef } from "../workspaces/itemActions";
 import { agentHref } from "../hrefs";
 import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMenu";
 import { hasLayer, useIsTopLayer } from "../ui/modal/layers";
@@ -39,7 +41,21 @@ function Words({ status }: { status: SidebarStatus }) {
   );
 }
 
-function agentRow(s: SessionInfo, subtitle = ""): ListRowData {
+/** Words, then the item's "..." menu when it has one. A click on the menu must not pick the row. */
+function trailingOf(status: SidebarStatus, item: ItemRef | undefined, workspaces: Workspace[]) {
+  return (
+    <>
+      <Words status={status} />
+      {item && (
+        <Box flex="none" onClick={(e) => e.stopPropagation()}>
+          <ItemMenu item={item} workspaces={workspaces} />
+        </Box>
+      )}
+    </>
+  );
+}
+
+function agentRow(s: SessionInfo, subtitle = "", item?: ItemRef, workspaces: Workspace[] = []): ListRowData {
   const name = s.name || s.ticket || s.id;
   return {
     key: s.id,
@@ -48,7 +64,7 @@ function agentRow(s: SessionInfo, subtitle = ""): ListRowData {
     href: agentHref(s.id),
     searchText: [name, s.project, s.ticket, subtitle].join(" "),
     lead: dot,
-    trailing: <Words status={sessionStatus(s)} />,
+    trailing: trailingOf(sessionStatus(s), item, workspaces),
   };
 }
 
@@ -56,6 +72,7 @@ export interface PaletteInput {
   rows: EpicListRow[];
   sessions: SessionInfo[];
   placements: SessionPlacement[];
+  workspaces?: Workspace[];
   workspace: string;
   current: string;
 }
@@ -64,7 +81,7 @@ export interface PaletteInput {
  * The jump palette's sections. Empty filter: the active workspace's Designs, epics and chats, then
  * Needs you for the rest. The sections marked `hiddenUntilSearch` hold everything else.
  */
-export function buildPalette({ rows, sessions, placements, workspace, current }: PaletteInput): ListSection[] {
+export function buildPalette({ rows, sessions, placements, workspaces = [], workspace, current }: PaletteInput): ListSection[] {
   const byId = new Map(sessions.map((s) => [s.id, s]));
   const placed = placements.flatMap((p) => {
     const s = byId.get(p.session);
@@ -73,7 +90,7 @@ export function buildPalette({ rows, sessions, placements, workspace, current }:
   const cards = rows.filter(isCard);
   const mine = (r: EpicListRow) => r.workspace === workspace;
   const row = (r: EpicListRow, subtitle?: string): ListRowData => {
-    return { ...epicRow(r, isCurrent(r, current)), subtitle: subtitle ?? "", trailing: <Words status={cardStatus(r)} /> };
+    return { ...epicRow(r, isCurrent(r, current)), subtitle: subtitle ?? "", trailing: trailingOf(cardStatus(r), itemOfCard(r), workspaces) };
   };
   const elsewhere = (r: EpicListRow) => (mine(r) ? undefined : r.workspace);
   const held = (r: EpicListRow) => r.section === SectionOnHold;
@@ -81,7 +98,13 @@ export function buildPalette({ rows, sessions, placements, workspace, current }:
   const open = cards.filter((r) => !held(r) && !staged(r));
 
   const chats = placed.filter(({ p }) => p.kind === PlacementChat);
-  const chatRow = ({ p, s }: { p: SessionPlacement; s: SessionInfo }) => agentRow(s, p.workspace === workspace ? "" : (p.workspace ?? ""));
+  const chatRow = ({ p, s }: { p: SessionPlacement; s: SessionInfo }) =>
+    agentRow(
+      s,
+      p.workspace === workspace ? "" : (p.workspace ?? ""),
+      p.workspace ? { key: s.id, name: s.name || s.ticket || s.id, kind: "chat", workspace: p.workspace } : undefined,
+      workspaces,
+    );
   const epicName = (epic: string) => cards.find((r) => r.address === epic || r.addresses?.includes(epic))?.name ?? epic;
 
   return [
@@ -150,6 +173,8 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
       } else if (e.key === "Escape" && isTop()) setOpen(false);
     };
     const onDown = (e: MouseEvent) => {
+      // A row's menu and its dialogs sit in portals outside the popover.
+      if ((e.target as Element).closest?.('[role="menu"],[role="dialog"]')) return;
       if (!phone && root.current && !root.current.contains(e.target as Node)) setOpen(false);
     };
     window.addEventListener("keydown", onKey);
@@ -163,10 +188,11 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
   const rows = list?.epics;
   const sessions = snapshot?.sessions;
   const placements = snapshot?.placements;
+  const workspaces = snapshot?.workspaces;
   const current = currentAddress(pathname);
   const sections = useMemo(
-    () => buildPalette({ rows: rows ?? [], sessions: sessions ?? [], placements: placements ?? [], workspace: active, current }),
-    [rows, sessions, placements, active, current],
+    () => buildPalette({ rows: rows ?? [], sessions: sessions ?? [], placements: placements ?? [], workspaces, workspace: active, current }),
+    [rows, sessions, placements, workspaces, active, current],
   );
   if (!open) return null;
   return (
