@@ -221,6 +221,7 @@ func writeGxConfig(t *testing.T, home string, extra map[string]any) {
 // logs what the server and the restart wrote.
 func newLifecycleEnv(t *testing.T, extra ...string) (*lifecycleEnv, string) {
 	t.Helper()
+	herdrctl.RequireHerdr(t) // `gx server start` refuses to run without a herdr daemon
 	root, err := testutil.ShortTempDir("gxl")
 	if err != nil {
 		t.Fatal(err)

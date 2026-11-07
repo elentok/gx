@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/herdrctl"
 )
 
 var (
@@ -71,6 +72,7 @@ type agentsEnv struct {
 // sessions' claude, such as the TUI fake's launch knobs.
 func newAgentsEnv(t *testing.T, extraEnv ...string) *agentsEnv {
 	t.Helper()
+	herdrctl.RequireHerdr(t) // `gx server start` refuses to run without a herdr daemon
 	root, err := os.MkdirTemp("", "gxa")
 	if err != nil {
 		t.Fatal(err)
