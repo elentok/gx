@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
@@ -463,8 +464,28 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 		return sessions.Refusal(wire.ReasonDesignBranchClash, msg), nil
 	}
 
-	if err := createMap(s.conversationsDir, dir, slug, idea); err != nil {
+	// A draft that is gone must not block Start: it just brings no images.
+	var images []string
+	if req.DraftID != "" {
+		if d, err := s.drafts.Get(req.DraftID); err == nil {
+			for _, id := range d.Images {
+				if p, ok := imagestore.Find(s.drafts.ImagesDir(req.DraftID), id); ok {
+					images = append(images, p)
+				}
+			}
+		}
+	}
+	if err := createMap(s.conversationsDir, dir, slug, idea, images); err != nil {
 		return wire.SessionResult{}, err
+	}
+	// The map exists: the draft's images are copied into it, so the draft goes.
+	if req.DraftID != "" {
+		if err := s.drafts.Delete(req.DraftID); err != nil {
+			s.log.Warn("delete started draft", "draft", req.DraftID, "err", err)
+		}
+	}
+	if err := s.drafts.SetLastProject(req.Project); err != nil {
+		s.log.Warn("set last-used project", "project", req.Project, "err", err)
 	}
 	if s.workspaces != nil && req.FromSession != "" {
 		if err := s.workspaces.SetMember(addr, s.workspaces.Workspace(req.FromSession)); err != nil {
@@ -479,13 +500,48 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 }
 
 // createMap writes the uncharted map epic for a New Design, at the Chart step.
-func createMap(conversationsDir, dir, slug, idea string) error {
-	epicPath, err := tickets.CreateEpic(conversationsDir, dir, slug, tickets.EpicFields{Kind: tickets.KindMap, Status: string(schema.StatusOpen)}, "## Initial prompt\n\n"+idea+"\n")
+// images are files copied into the epic's images/ folder under their own names
+// and listed after the idea; a copy that fails removes the epic again, so the
+// caller's source files are still the only copy.
+func createMap(conversationsDir, dir, slug, idea string, images []string) error {
+	imagesDir := filepath.Join(dir, slug, "images")
+	var body strings.Builder
+	fmt.Fprintf(&body, "## Initial prompt\n\n%s\n", idea)
+	if len(images) > 0 {
+		body.WriteString("\nImages:\n")
+		for _, src := range images {
+			fmt.Fprintf(&body, "%s\n", filepath.Join(imagesDir, filepath.Base(src)))
+		}
+	}
+	epicPath, err := tickets.CreateEpic(conversationsDir, dir, slug, tickets.EpicFields{Kind: tickets.KindMap, Status: string(schema.StatusOpen)}, body.String())
 	if err != nil {
+		return err
+	}
+	if err := copyImages(images, imagesDir); err != nil {
+		_ = os.RemoveAll(epicPath)
 		return err
 	}
 	step := string(tickets.StepChart)
 	return tickets.UpdateEpicFields(filepath.Join(epicPath, "ticket.md"), tickets.EpicUpdate{DesignStep: &step})
+}
+
+func copyImages(srcs []string, dest string) error {
+	if len(srcs) == 0 {
+		return nil
+	}
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		return err
+	}
+	for _, src := range srcs {
+		b, err := os.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dest, filepath.Base(src)), b, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // startSession starts the design session for a map that now exists. A failure

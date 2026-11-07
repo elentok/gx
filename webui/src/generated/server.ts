@@ -168,6 +168,11 @@ export interface DesignOpenRequest {
    * its workspace. An unknown id is ignored.
    */
   from_session?: string;
+  /**
+   * DraftID is the New Design draft being started: its images move into the
+   * map and the draft is deleted. An unknown id is ignored.
+   */
+  draft_id?: string;
 }
 /**
  * DesignWorktreeRequest is the body of POST /v1/designs/worktree. Epic is a map

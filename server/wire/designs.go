@@ -26,6 +26,9 @@ type DesignOpenRequest struct {
 	// FromSession is the chat that promoted the idea; the new Design starts in
 	// its workspace. An unknown id is ignored.
 	FromSession string `json:"from_session,omitempty"`
+	// DraftID is the New Design draft being started: its images move into the
+	// map and the draft is deleted. An unknown id is ignored.
+	DraftID string `json:"draft_id,omitempty"`
 }
 
 // DesignWorktreeRequest is the body of POST /v1/designs/worktree. Epic is a map
