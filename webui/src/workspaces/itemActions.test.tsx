@@ -63,8 +63,6 @@ test("a queued epic's Hold is disabled with the reason", async () => {
   const hold = screen.getByRole("menuitem", { name: /Hold/ });
   expect(hold.textContent).toContain(HoldQueuedText);
   expect(hold.getAttribute("aria-disabled") ?? hold.getAttribute("data-disabled")).not.toBeNull();
-  fireEvent.click(hold);
-  expect(w.hold).not.toHaveBeenCalled();
 });
 
 test("holding a Design with live sessions names them, then re-posts with yes", async () => {

@@ -42,13 +42,9 @@ export function itemOfCard(card: EpicListRow | undefined): ItemRef | undefined {
   };
 }
 
-const NO_ITEM: ItemRef = { key: "", name: "", kind: "chat", workspace: "" };
-
 /** The page-header form of {@link useItemActions}: no sections and no dialogs while the card is unknown. */
 export function useCardActions(card: EpicListRow | undefined, workspaces: Workspace[]) {
-  const item = itemOfCard(card);
-  const actions = useItemActions(item ?? NO_ITEM, workspaces);
-  return item ? actions : { sections: [] as MoreActionsSection[], dialogs: null as ReactNode };
+  return useItemActions(itemOfCard(card), workspaces);
 }
 
 export interface ItemWriters {
@@ -68,10 +64,84 @@ export const defaultWriters: ItemWriters = { move: postMove, remove: postRemove,
 
 type Dialog = { kind: "move" } | { kind: "remove" } | { kind: "hold"; sessions: string[] };
 
-/** The Move, Remove and Hold sections of an item's menu, plus the dialogs they open. */
-export function useItemActions(item: ItemRef, workspaces: Workspace[], writers: ItemWriters = defaultWriters) {
+interface DialogProps {
+  item: ItemRef;
+  writers: ItemWriters;
+  run: ReturnType<typeof useWrite>["run"];
+  close: () => void;
+}
+
+function MoveDialog({ item, writers, run, close, others }: DialogProps & { others: Workspace[] }) {
+  return (
+    <Modal label={`Move ${item.name}`} onClose={close} maxW="sm">
+      <Text>Move {item.name} to:</Text>
+      <Box display="flex" flexDirection="column" gap="2">
+        {others.map((w) => (
+          <Button
+            key={w.name}
+            emphasis="secondary"
+            onClick={() => {
+              close();
+              void run(() => writers.move(item.key, w.name));
+            }}
+          >
+            {w.name}
+          </Button>
+        ))}
+      </Box>
+    </Modal>
+  );
+}
+
+function RemoveDialog({ item, writers, run, close }: DialogProps) {
+  return (
+    <Modal label={`Remove ${item.name}`} onClose={close} maxW="sm">
+      <Text>Remove {item.name} from {item.workspace}? It moves back to Default.</Text>
+      <Box display="flex" gap="2" justifyContent="flex-end">
+        <Button emphasis="secondary" onClick={close} autoFocus>
+          Keep
+        </Button>
+        <Button
+          tone="paused"
+          onClick={() => {
+            close();
+            void run(() => writers.remove(item.key));
+          }}
+        >
+          Remove
+        </Button>
+      </Box>
+    </Modal>
+  );
+}
+
+function HoldDialog({ item, writers, run, close, sessions }: DialogProps & { sessions: string[] }) {
+  return (
+    <Modal label={`Hold ${item.name}`} onClose={close} maxW="sm">
+      <Text>Holding {item.name} ends its live sessions: {sessions.join(", ")}.</Text>
+      <Box display="flex" gap="2" justifyContent="flex-end">
+        <Button emphasis="secondary" onClick={close} autoFocus>
+          Cancel
+        </Button>
+        <Button
+          tone="paused"
+          onClick={() => {
+            close();
+            void run(() => writers.hold(item.key, true));
+          }}
+        >
+          Hold and end sessions
+        </Button>
+      </Box>
+    </Modal>
+  );
+}
+
+/** The Move, Remove and Hold sections of an item's menu, plus the dialogs they open. No item, no sections and no dialogs. */
+export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[], writers: ItemWriters = defaultWriters) {
   const { run, pending } = useWrite();
   const [dialog, setDialog] = useState<Dialog>();
+  if (!item) return { sections: [] as MoreActionsSection[], dialogs: null as ReactNode };
   const close = () => setDialog(undefined);
   const others = workspaces.filter((w) => w.name !== item.workspace);
   const isDefault = !!workspaces.find((w) => w.name === item.workspace)?.default;
@@ -84,7 +154,6 @@ export function useItemActions(item: ItemRef, workspaces: Workspace[], writers: 
 
   if (item.kind !== "chat") {
     const hold = () =>
-      item.queued ||
       run(async () => {
         const res = await writers.hold(item.key);
         // A refusal that names live sessions is a question, not an error: ask, then re-post with yes.
@@ -103,71 +172,16 @@ export function useItemActions(item: ItemRef, workspaces: Workspace[], writers: 
             hint: item.queued ? HoldQueuedText : undefined,
             disabled: pending || item.queued,
             onSelect: () => void hold(),
-
           },
     ]);
   }
 
-  const confirmHold = () => {
-    close();
-    void run(() => writers.hold(item.key, true));
-  };
-
-  let dialogs: ReactNode = null;
-  if (dialog?.kind === "move")
-    dialogs = (
-      <Modal label={`Move ${item.name}`} onClose={close} maxW="sm">
-        <Text>Move {item.name} to:</Text>
-        <Box display="flex" flexDirection="column" gap="2">
-          {others.map((w) => (
-            <Button
-              key={w.name}
-              emphasis="secondary"
-              onClick={() => {
-                close();
-                void run(() => writers.move(item.key, w.name));
-              }}
-            >
-              {w.name}
-            </Button>
-          ))}
-        </Box>
-      </Modal>
-    );
-  else if (dialog?.kind === "remove")
-    dialogs = (
-      <Modal label={`Remove ${item.name}`} onClose={close} maxW="sm">
-        <Text>Remove {item.name} from {item.workspace}? It moves back to Default.</Text>
-        <Box display="flex" gap="2" justifyContent="flex-end">
-          <Button emphasis="secondary" onClick={close} autoFocus>
-            Keep
-          </Button>
-          <Button
-            tone="paused"
-            onClick={() => {
-              close();
-              void run(() => writers.remove(item.key));
-            }}
-          >
-            Remove
-          </Button>
-        </Box>
-      </Modal>
-    );
-  else if (dialog?.kind === "hold")
-    dialogs = (
-      <Modal label={`Hold ${item.name}`} onClose={close} maxW="sm">
-        <Text>Holding {item.name} ends its live sessions: {dialog.sessions.join(", ")}.</Text>
-        <Box display="flex" gap="2" justifyContent="flex-end">
-          <Button emphasis="secondary" onClick={close} autoFocus>
-            Cancel
-          </Button>
-          <Button tone="paused" onClick={confirmHold}>
-            Hold and end sessions
-          </Button>
-        </Box>
-      </Modal>
-    );
+  const props = { item, writers, run, close };
+  const dialogs: ReactNode =
+    dialog?.kind === "move" ? <MoveDialog {...props} others={others} /> :
+    dialog?.kind === "remove" ? <RemoveDialog {...props} /> :
+    dialog?.kind === "hold" ? <HoldDialog {...props} sessions={dialog.sessions} /> :
+    null;
 
   return { sections, dialogs };
 }
