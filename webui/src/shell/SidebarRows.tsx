@@ -83,7 +83,25 @@ function AgentLink({ agent }: { agent: SidebarAgent }) {
   );
 }
 
-function Row({ row, current, active, workspaces, showNumber }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[]; showNumber?: boolean }) {
+/** The menu-button slot: the row's Alt+n number while Alt is held, the "..." menu otherwise. Only this leaf watches Alt. */
+function MenuSlot({ number, item, workspaces }: { number?: number; item: ItemRef; workspaces: Workspace[] }) {
+  const altHeld = useAltHeld();
+  if (altHeld && number !== undefined) {
+    return (
+      <Box as="span" data-testid="row-number" display="grid" placeItems="center" boxSize="28px" fontSize="12px" color="text.dim">
+        {number}
+      </Box>
+    );
+  }
+  return (
+    // Shown on hover and focus; always on a touch screen, which has no hover.
+    <Box opacity="0" _groupHover={{ opacity: 1 }} _focusWithin={{ opacity: 1 }} css={{ "@media (hover: none)": { opacity: 1 } }}>
+      <ItemMenu item={item} workspaces={workspaces} />
+    </Box>
+  );
+}
+
+function Row({ row, current, active, workspaces }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[] }) {
   const [open, setOpen] = useState(false);
   const nested = row.agents.length > 0;
   const item: ItemRef = { key: row.key, name: row.title, kind: row.kind === "chat" ? "chat" : row.kind === "design" ? "design" : "epic", workspace: active, queued: row.queued, held: row.held };
@@ -105,17 +123,10 @@ function Row({ row, current, active, workspaces, showNumber }: { row: SidebarRow
           <Box as="span" flex="1" minW="0" fontSize="14px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
             {row.title}
           </Box>
-          {showNumber && row.number !== undefined ? (
-            <Box as="span" data-testid="row-number" fontSize="12px" color="text.dim" flex="none">
-              {row.number}
-            </Box>
-          ) : (
-            <Status status={row.status} dim={row.held} />
-          )}
+          <Status status={row.status} dim={row.held} />
         </chakra.a>
-        {/* Shown on hover and focus; always on a touch screen, which has no hover. */}
-        <Box flex="none" opacity="0" _groupHover={{ opacity: 1 }} _focusWithin={{ opacity: 1 }} css={{ "@media (hover: none)": { opacity: 1 } }}>
-          <ItemMenu item={item} workspaces={workspaces} />
+        <Box flex="none">
+          <MenuSlot number={row.number} item={item} workspaces={workspaces} />
         </Box>
       </Box>
       {nested && open && (
@@ -164,13 +175,12 @@ export function useSidebarModel(fetcher: FetchEpicList | undefined, active: stri
 export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; active: string }) {
   const { workspaces } = useWorkspaces(useConnectionContext());
   const pathname = useLocation().pathname;
-  const altHeld = useAltHeld();
   const model = useSidebarModel(fetcher, active);
   if (!model) return null;
   return (
     <>
       {model.rows.map((r) => (
-        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} showNumber={altHeld} />
+        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
       ))}
       {model.held.length > 0 && (
         <Section title={`On hold (${model.held.length})`}>

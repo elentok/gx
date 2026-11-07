@@ -43,12 +43,37 @@ test("Workspaces", async ({ page, start }) => {
   await goto(page, "#/epics");
 
   // Rows show their numbers while Alt is held, and Alt+1 opens the first one.
+  // Numbers take the menu-button slot; nothing else changes: no /v1 request, no DOM change outside the sidebar.
   const numbers = sidebar.getByTestId("row-number");
+  const status = row("ready-epic").locator("span").last();
   await expect(numbers).toHaveCount(0);
+  const wordsBefore = await status.textContent();
+  const requests: string[] = [];
+  page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/v1/") && requests.push(r.url())));
+  await page.evaluate(() => {
+    const w = window as unknown as { __outside: MutationRecord[] };
+    w.__outside = [];
+    const side = document.querySelector('[aria-label="Sidebar"]');
+    new MutationObserver((rs) => w.__outside.push(...rs.filter((r) => !side?.contains(r.target)))).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
   await page.keyboard.down("Alt");
   await expect(numbers.first()).toHaveText("1");
+  await expect(status).toHaveText(wordsBefore!);
   await page.keyboard.up("Alt");
   await expect(numbers).toHaveCount(0);
+  expect(requests).toEqual([]);
+  expect(await page.evaluate(() => (window as unknown as { __outside: MutationRecord[] }).__outside.length)).toBe(0);
+  // A focused text field makes Alt do nothing.
+  await page.evaluate(() => {
+    const i = document.createElement("input");
+    i.id = "alt-probe";
+    document.body.appendChild(i);
+    i.focus();
+  });
+  await page.keyboard.down("Alt");
+  await expect(numbers).toHaveCount(0);
+  await page.keyboard.up("Alt");
+  await page.evaluate(() => document.getElementById("alt-probe")?.remove());
   const firstHref = (await sidebar.getByRole("link").first().getAttribute("href"))!.slice(1);
   await page.keyboard.press("Alt+1");
   await expect.poll(() => new URL(page.url()).hash.slice(1)).toBe(firstHref);

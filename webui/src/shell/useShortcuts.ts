@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext } from "../connection";
 import type { FetchEpicList } from "../epics/list";
@@ -6,23 +6,41 @@ import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { digitOf, isTextTarget } from "./keys";
 import { useSidebarModel } from "./SidebarRows";
 
-/** True while Alt is held; a blur drops it, since the keyup goes to another window. */
+// Alt-held lives outside React so only the leaf that reads it (a row's slot) re-renders on Alt; no page component does.
+let altHeld = false;
+const altListeners = new Set<() => void>();
+const setAlt = (v: boolean) => {
+  if (altHeld === v) return;
+  altHeld = v;
+  altListeners.forEach((l) => l());
+};
+
+// A blur drops it, since the keyup goes to another window. Keydown stands down in a text field; keyup never does.
+const onAltDown = (e: KeyboardEvent) => e.key === "Alt" && !isTextTarget(e.target) && setAlt(true);
+const onAltUp = (e: KeyboardEvent) => e.key === "Alt" && setAlt(false);
+const onAltOff = () => setAlt(false);
+
+function subscribeAlt(l: () => void) {
+  if (altListeners.size === 0) {
+    window.addEventListener("keydown", onAltDown);
+    window.addEventListener("keyup", onAltUp);
+    window.addEventListener("blur", onAltOff);
+  }
+  altListeners.add(l);
+  return () => {
+    altListeners.delete(l);
+    if (altListeners.size === 0) {
+      window.removeEventListener("keydown", onAltDown);
+      window.removeEventListener("keyup", onAltUp);
+      window.removeEventListener("blur", onAltOff);
+      altHeld = false;
+    }
+  };
+}
+
+/** True while Alt is held. Call it only from a leaf component. */
 export function useAltHeld(): boolean {
-  const [held, setHeld] = useState(false);
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => e.key === "Alt" && setHeld(true);
-    const up = (e: KeyboardEvent) => e.key === "Alt" && setHeld(false);
-    const off = () => setHeld(false);
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    window.addEventListener("blur", off);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", off);
-    };
-  }, []);
-  return held;
+  return useSyncExternalStore(subscribeAlt, () => altHeld, () => false);
 }
 
 /** Alt+1..9 open the nth numbered sidebar row; Alt+Shift+1..9 pick the nth workspace in the switcher's order. */

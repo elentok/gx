@@ -40,6 +40,12 @@ const rows = [
   row("p:old", { name: "Old", section: SectionOnHold, status_words: "Held" }),
 ];
 
+let pageRenders = 0;
+function Page() {
+  pageRenders++;
+  return <div>page</div>;
+}
+
 function setup(sort?: string) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })));
   const state = {
@@ -54,7 +60,7 @@ function setup(sort?: string) {
     tick: 0,
   } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
-  const router = createMemoryRouter([{ element: <AppShell />, children: [{ path: "*", element: <div>page</div> }] }], { initialEntries: ["/"] });
+  const router = createMemoryRouter([{ element: <AppShell />, children: [{ path: "*", element: <Page /> }] }], { initialEntries: ["/"] });
   renderThemed(
     <DeviceContext.Provider value="desktop">
       <ConnectionContext.Provider value={conn}>
@@ -97,6 +103,31 @@ test("numbers show while Alt is held, only on own rows, and vanish on keyup and 
   press({ key: "Alt", code: "AltLeft", altKey: true });
   act(() => void fireEvent.blur(window));
   expect(body().queryAllByTestId("row-number")).toHaveLength(0);
+});
+
+test("Alt changes only the menu slot: status words stay and no page component re-renders", async () => {
+  setup();
+  await body().findByRole("link", { name: /Blog/ });
+  const words = () => body().getAllByRole("link").map((l) => l.textContent);
+  const before = words();
+  const renders = pageRenders;
+  press({ key: "Alt", code: "AltLeft", altKey: true });
+  expect(body().getAllByTestId("row-number")).toHaveLength(2);
+  expect(words()).toEqual(before);
+  act(() => void fireEvent.keyUp(window, { key: "Alt", code: "AltLeft" }));
+  expect(words()).toEqual(before);
+  expect(pageRenders).toBe(renders);
+});
+
+test("Alt held does nothing while a text field has focus", async () => {
+  setup();
+  await body().findByRole("link", { name: /Blog/ });
+  const input = document.createElement("input");
+  document.body.appendChild(input);
+  input.focus();
+  press({ key: "Alt", code: "AltLeft", altKey: true, bubbles: true }, input);
+  expect(body().queryAllByTestId("row-number")).toHaveLength(0);
+  input.remove();
 });
 
 test("Alt+3 does nothing: held rows have no number", async () => {
