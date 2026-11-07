@@ -308,16 +308,19 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 	label := worktree.ConflictLabel(p.Ticket.Identifier)
 	prompt := agent.SkillPrompt(p.Agent, "gx-resolving-merge-conflicts", "")
 
-	l, err := supervise.StartAndPromptLogged(context.Background(), d.Runner, agentrunner.StartOptions{
+	l, err := supervise.StartAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  p.FeatureBranch,
 		Cwd:   p.FeatureWorktree,
 		Kind:  agentrunner.Kind(p.Agent),
 		Args:  agent.AgentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
-	}, prompt, func(attempt int, kind events.Kind, err error) {
-		p.logLaunchFailed(label, attempt, kind, err)
-	}, func(attempt int, decision string) {
-		p.logPromptNudged(label, attempt, decision)
+	}, prompt, supervise.Hooks{
+		OnFail: func(attempt int, kind events.Kind, err error) {
+			p.logLaunchFailed(label, attempt, kind, err)
+		},
+		OnNudge: func(attempt int, decision string) {
+			p.logPromptNudged(label, attempt, decision)
+		},
 	})
 
 	var launchFail *supervise.LaunchFailure

@@ -19,9 +19,9 @@ type launchFail struct {
 func startAndPromptFake(t *testing.T, r *runnerfake.Runner) (agentrunner.Session, error, []launchFail) {
 	t.Helper()
 	var fails []launchFail
-	l, err := StartAndPromptLogged(context.Background(), r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", func(attempt int, kind events.Kind, _ error) {
+	l, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", Hooks{OnFail: func(attempt int, kind events.Kind, _ error) {
 		fails = append(fails, launchFail{attempt, kind})
-	}, func(int, string) {})
+	}})
 
 	return l.Session, err, fails
 }
@@ -93,7 +93,8 @@ func TestStartAndPrompt_ServerLaunchNeverAdopts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := StartAndPrompt(context.Background(), r, opts, "/go", func(int, string) {}, nil); !errors.Is(err, agentrunner.ErrLabelTaken) {
+	opts.NoAdopt = true
+	if _, err := StartAndPrompt(context.Background(), r, opts, "/go", Hooks{}); !errors.Is(err, agentrunner.ErrLabelTaken) {
 		t.Fatalf("err = %v, want ErrLabelTaken", err)
 	}
 	if got := r.Prompts("it-01"); len(got) != 0 {

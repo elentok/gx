@@ -31,10 +31,11 @@ type launchResult struct {
 func launchOn(t *testing.T, r agentrunner.Runner) launchResult {
 	t.Helper()
 	var res launchResult
-	res.session, res.err = StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic}, "/gx-implement gx:my-epic/01",
-		func(attempt int, decision string) {
+	l, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic, NoAdopt: true}, "/gx-implement gx:my-epic/01",
+		Hooks{OnNudge: func(attempt int, decision string) {
 			res.nudges = append(res.nudges, fmt.Sprintf("%d:%s", attempt, decision))
-		}, nil)
+		}})
+	res.session, res.err = l.Session, err
 	return res
 }
 
@@ -58,13 +59,13 @@ func TestStartAndPrompt_OnStarted_RunsAfterStartBeforePromptOnEachAttempt(t *tes
 	var order []string
 
 	_, err := StartAndPrompt(context.Background(), orderRunner{Runner: d.Runner, order: &order},
-		agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic}, "/go", func(int, string) {},
-		func(attempt int) { order = append(order, fmt.Sprintf("started:%d", attempt)) })
+		agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic, NoAdopt: true}, "/go",
+		Hooks{OnStarted: func() { order = append(order, "started") }})
 
 	if err != nil {
 		t.Fatalf("StartAndPrompt = %v", err)
 	}
-	if want := []string{"started:1", "prompt", "started:2", "prompt"}; !slices.Equal(order, want) {
+	if want := []string{"started", "prompt", "started", "prompt"}; !slices.Equal(order, want) {
 		t.Fatalf("order = %v, want %v", order, want)
 	}
 }
@@ -132,8 +133,8 @@ func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakes.FakeDeps()
 	var kinds []events.Kind
-	_, err := StartAndPromptLogged(context.Background(), unknownSkillRunner{d.Runner}, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/gx-implement gx:epic/01",
-		func(_ int, kind events.Kind, _ error) { kinds = append(kinds, kind) }, func(int, string) {})
+	_, err := StartAndPrompt(context.Background(), unknownSkillRunner{d.Runner}, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/gx-implement gx:epic/01",
+		Hooks{OnFail: func(_ int, kind events.Kind, _ error) { kinds = append(kinds, kind) }})
 	var lf *LaunchFailure
 	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
 		t.Fatalf("err = %v, want agent_prompt_stalled LaunchFailure", err)
@@ -246,7 +247,7 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 	r := fakes.FakeRunner(d)
 	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
 
-	_, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel}, "/go", func(int, string) {}, nil)
+	_, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel, NoAdopt: true}, "/go", Hooks{})
 
 	if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "gx claude doctor") {
 		t.Errorf("StartAndPrompt = %v, want ErrMissingCapability with the doctor hint", err)

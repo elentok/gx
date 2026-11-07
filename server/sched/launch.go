@@ -145,7 +145,8 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	ctx := one.Context
 	start := func() (agentrunner.Session, error) {
 		l.setLaunchStep(ticket.String(), runs.StepStartingAgent)
-		return supervise.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
+		launched, err := supervise.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
+			NoAdopt:         true,
 			Label:           label,
 			Epic:            ticket.Epic,
 			Cwd:             cwd,
@@ -153,9 +154,13 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 			Args:            agent.AgentArgs(agentKind, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
 			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agentKind),
 			ResumeSessionID: resumeID,
-		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
-			l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
-		}, func(int) { l.setLaunchStep(ticket.String(), runs.StepSendingPrompt) })
+		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), supervise.Hooks{
+			OnNudge: func(attempt int, decision string) {
+				l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
+			},
+			OnStarted: func() { l.setLaunchStep(ticket.String(), runs.StepSendingPrompt) },
+		})
+		return launched.Session, err
 	}
 	session, err := start()
 	if err != nil && ctx.Err() != nil {

@@ -44,11 +44,11 @@ func driveIteration(t *testing.T, d deps.Deps, scratchDir, path string, sink run
 		t.Fatalf("PrepareIteration: %v", err)
 	}
 	s, err := supervise.StartAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{Label: w.Label, Epic: "epic", Cwd: w.Path},
-		"/gx-implement gx:epic/01", func(int, string) {}, nil)
+		"/gx-implement gx:epic/01", supervise.Hooks{})
 	if err != nil {
 		t.Fatalf("StartAndPrompt: %v", err)
 	}
-	if err := WaitIterationFinished(d, one, w, s); err != nil {
+	if err := WaitIterationFinished(d, one, w, s.Session); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
 	}
 	out, err := FinishIteration(d, one, w, s.ID)

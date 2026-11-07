@@ -37,24 +37,34 @@ func LaunchFailureKind(err error) (events.Kind, bool) {
 	return "", false
 }
 
-// StartAndPromptLogged starts a session and sends its initial prompt. A prompt the
+// Hooks are StartAndPrompt's observers; every one is optional.
+type Hooks struct {
+	// OnFail is called for every failed attempt, to log launch-failed.
+	OnFail func(attempt int, kind events.Kind, err error)
+	// OnNudge is called for every nudge decision the runner made on the prompt.
+	OnNudge func(attempt int, decision string)
+	// OnStarted is called on every attempt once Start returns and before the
+	// prompt is sent.
+	OnStarted func()
+}
+
+// StartAndPrompt starts a session and sends its initial prompt. A prompt the
 // agent never picks up (ErrNotDelivered) points at a bad session rather than a
 // slow agent, so it gets exactly one fresh session before pausing as
 // agent_prompt_stalled. Any other prompt error (e.g. ErrNotReady on a blocked
 // agent) returns with the session still live, for the blocked-pane pause.
-// onFail is called for every failed attempt, to log launch-failed, and
-// onNudge for every nudge decision the runner made on the prompt.
 //
 // A label already live before Start means Start adopted our own earlier
 // session (e.g. a second gx process racing the same ticket): that one is
-// returned unprompted with Adopted set, since it may be mid-turn.
-func StartAndPromptLogged(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error), onNudge func(attempt int, decision string)) (Launched, error) {
-	return startAndPrompt(ctx, r, opts, prompt, onFail, onNudge, nil)
-}
-
-// startAndPrompt is StartAndPromptLogged with onStarted, called on every
-// attempt once Start returns and before the prompt is sent.
-func startAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error), onNudge func(attempt int, decision string), onStarted func(attempt int)) (Launched, error) {
+// returned unprompted with Adopted set, since it may be mid-turn. A caller
+// that must never adopt a holder of the label (the server's launch, ADR 0039)
+// sets opts.NoAdopt.
+func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, hooks Hooks) (Launched, error) {
+	fail := func(attempt int, kind events.Kind, err error) {
+		if hooks.OnFail != nil {
+			hooks.OnFail(attempt, kind, err)
+		}
+	}
 	_, adopted, err := r.Find(opts.Label)
 	if err != nil {
 		// Not fatal: Start still runs, it just can't be an adoption.
@@ -68,25 +78,29 @@ func startAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 				kind = events.AgentNameTaken
 			}
 			err = withDoctorHint(fmt.Errorf("starting %s: %w", opts.Label, err))
-			onFail(attempt, kind, err)
+			fail(attempt, kind, err)
 			return Launched{}, &LaunchFailure{Kind: kind, Err: err}
 		}
 		if adopted {
 			return Launched{Session: s, Adopted: true}, nil
 		}
-		if onStarted != nil {
-			onStarted(attempt)
+		if hooks.OnStarted != nil {
+			hooks.OnStarted()
 		}
 		status, err := r.Status(s)
 		if err != nil {
 			log.Printf("reading %s status before initial prompt: %v", opts.Label, err)
 		}
-		err = agentrunner.PromptLaunch(ctx, r, s, prompt, func(decision string) { onNudge(attempt, decision) })
+		err = agentrunner.PromptLaunch(ctx, r, s, prompt, func(decision string) {
+			if hooks.OnNudge != nil {
+				hooks.OnNudge(attempt, decision)
+			}
+		})
 		if !errors.Is(err, agentrunner.ErrNotDelivered) {
 			return Launched{Session: s, Baseline: status.Turn}, withDoctorHint(err)
 		}
 		err = fmt.Errorf("sending initial prompt: %w", err)
-		onFail(attempt, events.AgentPromptStalled, err)
+		fail(attempt, events.AgentPromptStalled, err)
 		if stopErr := r.Stop(s); stopErr != nil {
 			log.Printf("stopping undelivered session %s: %v", s.Label, stopErr)
 		}
@@ -116,16 +130,7 @@ func withDoctorHint(err error) error {
 	return err
 }
 
-// StartAndPrompt is StartAndPromptLogged for callers outside the loop (the server's
-// launch): same retry on an undelivered prompt, no launch-failed events. It
-// never adopts a holder of the label (ADR 0039). onStarted may be nil.
-func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onNudge func(attempt int, decision string), onStarted func(attempt int)) (agentrunner.Session, error) {
-	opts.NoAdopt = true
-	l, err := startAndPrompt(ctx, r, opts, prompt, func(int, events.Kind, error) {}, onNudge, onStarted)
-	return l.Session, err
-}
-
-// Launched is a session StartAndPromptLogged started and prompted, or adopted.
+// Launched is a session StartAndPrompt started and prompted, or adopted.
 type Launched struct {
 	agentrunner.Session
 	Adopted bool
@@ -165,7 +170,7 @@ func reportStarted(d deps.Deps, p LaunchParams, sessionID string, seq int) {
 	}
 }
 
-// AdoptedLaunch takes over p.Session, a live session StartAndPromptLogged adopted
+// AdoptedLaunch takes over p.Session, a live session StartAndPrompt adopted
 // unprompted. An idle one whose turn hasn't moved past its logged launch
 // baseline (see noActivitySinceLaunch) never got its prompt, so it gets it
 // now; an idle one that has moved is already finished; anything else is
