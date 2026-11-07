@@ -51,11 +51,7 @@ func runImageGet(c *cobra.Command, d Deps, jsonOut bool, out, id string, fetch f
 	if err != nil {
 		return err
 	}
-	ctx := c.Context()
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	data, contentType, err := fetch(ctx, cl)
+	data, contentType, err := fetch(ctxOrBackground(c.Context()), cl)
 	if err != nil {
 		return err
 	}
@@ -84,13 +80,10 @@ func newAgentsImageRmCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
+			ctx := ctxOrBackground(c.Context())
 			res, err := cl.Sessions.RemoveImage(ctx, wire.SessionImageRequest{ID: args[0], Image: args[1]})
 			if apiclient.IsNotRunning(err) {
-				res, err = wire.SessionImageResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, nil
+				res, err = wire.SessionImageResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: notRunningMessage}, nil
 			}
 			if err != nil {
 				return fmt.Errorf("server write failed: %w", err)
@@ -100,6 +93,17 @@ func newAgentsImageRmCmd(d Deps) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	return cmd
+}
+
+const notRunningMessage = "no server is running; start it with `gx server start`"
+
+// ctxOrBackground covers a command run without a context (cobra's is nil when
+// the command is executed directly).
+func ctxOrBackground(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }
 
 func writeJSON(w io.Writer, v any) error {
@@ -142,16 +146,13 @@ func newAgentsImageAddCmd(d Deps) *cobra.Command {
 // runAgentsImageAdd uploads the file's bytes; the server picks the saved name
 // and decides the type from the bytes, never from the file name.
 func runAgentsImageAdd(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, session, file string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
-	res, err := cl.Sessions.AddImage(ctx, session, data)
+	res, err := cl.Sessions.AddImage(ctxOrBackground(ctx), session, data)
 	if apiclient.IsNotRunning(err) {
-		res, err = wire.SessionImageResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, nil
+		res, err = wire.SessionImageResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: notRunningMessage}, nil
 	}
 	if err != nil {
 		return fmt.Errorf("server write failed: %w", err)

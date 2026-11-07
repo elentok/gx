@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -25,13 +24,10 @@ func NewDesigns(d Deps) *cobra.Command {
 // runDesignsWorktree never starts the server: a dead socket is a refusal. The
 // caller's own gx session, when set, is left out of the rebase's live check.
 func runDesignsWorktree(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.DesignWorktreeRequest) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := cl.Sessions.DesignWorktree(ctx, req)
+	res, err := cl.Sessions.DesignWorktree(ctxOrBackground(ctx), req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.DesignWorktreeResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.DesignWorktreeResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: notRunningMessage}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -40,9 +36,7 @@ func runDesignsWorktree(ctx context.Context, cl *apiclient.Client, w io.Writer, 
 		if err != nil {
 			return err
 		}
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(stamped)
+		return writeJSON(w, stamped)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -78,10 +72,7 @@ func newDesignsWorktreeCmd(d Deps) *cobra.Command {
 
 // runDesignsDelete never starts the server: a dead socket is a refusal.
 func runDesignsDelete(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, epic string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := cl.Sessions.DeleteDesign(ctx, wire.DesignDeleteRequest{Epic: epic})
+	res, err := cl.Sessions.DeleteDesign(ctxOrBackground(ctx), wire.DesignDeleteRequest{Epic: epic})
 	return printSessionResult(w, jsonOut, res, err)
 }
 
@@ -105,10 +96,7 @@ func newDesignsDeleteCmd(d Deps) *cobra.Command {
 
 // runDesignsOpen never starts the server: a dead socket is a refusal.
 func runDesignsOpen(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.DesignOpenRequest) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := cl.Sessions.OpenDesign(ctx, req)
+	res, err := cl.Sessions.OpenDesign(ctxOrBackground(ctx), req)
 	// A New Design whose map was written but whose session did not start is a
 	// failure in text mode; --json carries epic_created and start_error at exit 0.
 	if err == nil && !jsonOut && !res.Refused && res.EpicCreated && res.StartError != "" {

@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -65,10 +64,7 @@ func runAgentsAutoAdvance(ctx context.Context, cl *apiclient.Client, w io.Writer
 // runAgentsSessionCall runs a session write and prints its outcome. It is the
 // one place a nil command context becomes Background.
 func runAgentsSessionCall(ctx context.Context, w io.Writer, jsonOut bool, call func(context.Context) (wire.SessionResult, error)) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := call(ctx)
+	res, err := call(ctxOrBackground(ctx))
 	return printSessionResult(w, jsonOut, res, err)
 }
 
@@ -110,10 +106,7 @@ func newAgentActionableCmd(d Deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			req := wire.MarkActionableRequest{ID: os.Getenv(holder.AgentSessionEnv), Reason: args[0], Action: action}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
+			ctx := ctxOrBackground(c.Context())
 			return runAgentActionable(ctx, d.Dial(), c.OutOrStdout(), jsonOut, req)
 		},
 	}
@@ -140,10 +133,7 @@ func newAgentLinkCmd(d Deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			req := wire.LinkSessionRequest{ID: os.Getenv(holder.AgentSessionEnv), Ticket: args[0]}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
+			ctx := ctxOrBackground(c.Context())
 			return runAgentLink(ctx, d.Dial(), c.OutOrStdout(), jsonOut, req)
 		},
 	}
@@ -168,10 +158,7 @@ func newAgentTranscriptCmd(d Deps) *cobra.Command {
 		Short: "print the conversation file of this gx session; exits 1 outside one or with no file",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
+			ctx := ctxOrBackground(c.Context())
 			return runAgentTranscript(ctx, d.Dial(), c.OutOrStdout(), jsonOut, os.Getenv(holder.AgentSessionEnv))
 		},
 	}
@@ -185,9 +172,7 @@ func newAgentTranscriptCmd(d Deps) *cobra.Command {
 func runAgentTranscript(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, id string) error {
 	res, lookupErr := lookupTranscript(ctx, client, id)
 	if jsonOut {
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(res)
+		return writeJSON(w, res)
 	}
 	if lookupErr != nil {
 		return lookupErr
@@ -227,10 +212,7 @@ func newAgentStepCmd(d Deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			req := wire.ReportStepRequest{ID: os.Getenv(holder.AgentSessionEnv), Step: args[0], Title: title}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
+			ctx := ctxOrBackground(c.Context())
 			return runAgentStep(ctx, d.Dial(), c.OutOrStdout(), jsonOut, req)
 		},
 	}
@@ -278,10 +260,7 @@ func newAgentsReportFocusCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
+			ctx := ctxOrBackground(c.Context())
 			res, err := cl.Sessions.ReportFocus(ctx, req)
 			return printSessionResult(c.OutOrStdout(), jsonOut, res, err)
 		},
@@ -379,7 +358,7 @@ func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err error) error {
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.SessionResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.SessionResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: notRunningMessage}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -388,9 +367,7 @@ func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err e
 		if err != nil {
 			return err
 		}
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(stamped)
+		return writeJSON(w, stamped)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -428,9 +405,7 @@ func newAgentsChatCmd(d Deps) *cobra.Command {
 }
 
 func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut, archive bool, id string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
+	ctx = ctxOrBackground(ctx)
 	read := cl.Sessions.Chat
 	if archive {
 		read = cl.Sessions.ChatArchive
@@ -483,10 +458,7 @@ func newAgentsScreenCmd(d Deps) *cobra.Command {
 }
 
 func runAgentsSessionScreen(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	screen, err := cl.Sessions.Screen(ctx, id)
+	screen, err := cl.Sessions.Screen(ctxOrBackground(ctx), id)
 	if err != nil {
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
@@ -520,10 +492,7 @@ func newAgentsListCmd(d Deps) *cobra.Command {
 }
 
 func runAgentsList(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	list, err := cl.Sessions.List(ctx)
+	list, err := cl.Sessions.List(ctxOrBackground(ctx))
 	if err != nil {
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}

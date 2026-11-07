@@ -11,10 +11,7 @@ import (
 
 // runAgentsFix never starts the server: a dead socket is a refusal.
 func runAgentsFix(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, address string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := cl.Sessions.FixAgent(ctx, wire.FixAgentRequest{Address: address})
+	res, err := cl.Sessions.FixAgent(ctxOrBackground(ctx), wire.FixAgentRequest{Address: address})
 	return printSessionResult(w, jsonOut, res.SessionResult, err)
 }
 

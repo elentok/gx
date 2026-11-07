@@ -42,10 +42,7 @@ func newAgentsCommandsCmd(d Deps) *cobra.Command {
 }
 
 func runAgentsCommands(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id, project, dir, kind string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := cl.Sessions.Commands(ctx, id, project, dir, kind)
+	res, err := cl.Sessions.Commands(ctxOrBackground(ctx), id, project, dir, kind)
 	if err != nil {
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
