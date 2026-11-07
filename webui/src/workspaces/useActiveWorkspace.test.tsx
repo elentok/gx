@@ -9,6 +9,8 @@ import { useActiveWorkspace } from "./useActiveWorkspace";
 afterEach(cleanup);
 
 const list = { epics: [] as EpicListRow[], follow_ups: [] } as EpicList;
+const epicRow = (name: string, workspace: string) =>
+  ({ address: `demo:${name}`, addresses: [`demo:${name}`], section: "implementing", workspace }) as EpicListRow;
 
 function fakeConnection(workspaces: Workspace[]) {
   const listeners = new Set<() => void>();
@@ -41,11 +43,11 @@ function Probe({ conn }: { conn: Connection }) {
 const MAIN: Workspace = { name: "Main", default: true, members: 0 };
 const SIDE: Workspace = { name: "Side", members: 0 };
 
-function setup(workspaces: Workspace[]) {
+function setup(workspaces: Workspace[], route = "/stats") {
   const fake = fakeConnection(workspaces);
-  const router = createMemoryRouter([{ path: "*", element: <Probe conn={fake.conn} /> }], { initialEntries: ["/stats"] });
+  const router = createMemoryRouter([{ path: "*", element: <Probe conn={fake.conn} /> }], { initialEntries: [route] });
   render(<RouterProvider router={router} />);
-  return fake;
+  return { ...fake, router };
 }
 
 test("a workspaces-changed refresh that removes the active workspace drops to Default and stores it", async () => {
@@ -67,4 +69,19 @@ test("picking a workspace stores it", async () => {
 
   await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Side"));
   expect(localStorage.getItem(ACTIVE_KEY)).toBe("Side");
+});
+
+test("picking a workspace on an item page sticks until another item is opened", async () => {
+  list.epics = [epicRow("blog", "Main"), epicRow("ops", "Main"), epicRow("side", "Side")];
+  const { router } = setup([MAIN, SIDE], "/e/demo:blog");
+  await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Main"));
+
+  act(() => screen.getByText("pick").click());
+  await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Side"));
+  expect(localStorage.getItem(ACTIVE_KEY)).toBe("Side");
+
+  await act(() => router.navigate("/e/demo:ops"));
+  await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Main"));
+  expect(localStorage.getItem(ACTIVE_KEY)).toBe("Main");
+  list.epics = [];
 });

@@ -20,14 +20,19 @@ export function useActiveWorkspace(conn: Connection, fetcher?: FetchEpicList): {
 
   const rows = list?.epics;
   const loaded = workspaces.length > 0 && rows !== undefined;
-  const active = loaded ? resolveActive({ route, rows, placements, workspaces, stored }) : (stored ?? "");
+  // The open item's workspace wins only for a route not yet applied; after that a pick (stored) wins.
+  const [appliedRoute, setAppliedRoute] = useState<string | null>(null);
+  const routeIsNew = route !== appliedRoute;
+  const active = loaded ? resolveActive({ route: routeIsNew ? route : "", rows, placements, workspaces, stored }) : (stored ?? "");
 
   // Persist what resolved, so an opened item's workspace sticks and a vanished one falls back to Default at once.
   useEffect(() => {
-    if (!loaded || active === stored) return;
+    if (!loaded) return;
+    if (routeIsNew) setAppliedRoute(route);
+    if (active === stored) return;
     writeStoredWorkspace(active);
     setStored(active);
-  }, [loaded, active, stored]);
+  }, [loaded, active, stored, routeIsNew, route]);
 
   const setActive = useCallback((name: string) => {
     writeStoredWorkspace(name);

@@ -81,11 +81,12 @@ test("Workspaces", async ({ page, start }) => {
   await row("ws-design").click();
   await expect(page).toHaveURL(/#\/e\/demo:ws-design$/);
   await expect(row("ws-design")).toHaveAttribute("aria-current", "page");
-  // An open item keeps its own workspace active, so leave the page before picking another.
-  await goto(page, "#/epics");
+  // Picking another workspace on the open item's page switches to it and the pick sticks.
   await pick("research");
+  await expect(page.getByRole("button", nav("Workspace: research"))).toBeVisible();
   await expect(row("ws-impl-epic")).toBeVisible();
   await expect(row("ws-design")).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/e\/demo:ws-design$/);
 
 
   // Move from a sidebar row: the row leaves this workspace and shows in the target.
