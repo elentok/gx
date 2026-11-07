@@ -126,8 +126,11 @@ function DraftForm({
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const chain = useRef<Promise<void>>(Promise.resolve());
   const finished = useRef(false);
+  // Set while Start is in flight: a save then could recreate the draft Start is about to delete.
+  const starting = useRef(false);
 
   const persist = async () => {
+    if (finished.current || starting.current) return;
     const s = server.current;
     const fields = latest.current;
     const key = JSON.stringify(fields);
@@ -202,10 +205,23 @@ function DraftForm({
     e.preventDefault();
     const slug = draft.slug.trim();
     run(
-      () => open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project }),
+      async () => {
+        starting.current = true;
+        clearTimeout(timer.current);
+        try {
+          // The draft id must be the one a save in flight is creating.
+          await chain.current;
+          const res = await open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project, draft_id: server.current.id });
+          if (!res.refused) finished.current = true;
+          return res;
+        } finally {
+          starting.current = false;
+          // A failed Start keeps the draft, so the text typed meanwhile still saves.
+          flush();
+        }
+      },
       {
         onDone: (res) => {
-          stopSaving();
           // With start_error the map exists though no session started; the Design page offers the retry.
           onStarted(`${draft.project}:${slug}`, res.start_error);
         },
@@ -317,7 +333,7 @@ function DraftForm({
         {confirming ? (
           <>
             <Text flex="1" fontSize="sm" color="tone.paused.fg" fontWeight="600">
-              Discard this draft?
+              Discard this draft and its images?
             </Text>
             <Button type="button" emphasis="ghost" tone="muted" onClick={() => setConfirming(false)}>
               Keep
@@ -328,7 +344,7 @@ function DraftForm({
           </>
         ) : (
           <>
-            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) ? setConfirming(true) : discard())}>
+            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) || initial?.images?.length ? setConfirming(true) : discard())}>
               Discard
             </Button>
             <Box flex="1" />

@@ -224,7 +224,7 @@ test("Discard with an empty draft closes at once and deletes nothing", async () 
   const { onClose, remove } = await mount();
   click("Discard");
   expect(onClose).toHaveBeenCalled();
-  expect(screen.queryByText("Discard this draft?")).toBeNull();
+  expect(screen.queryByText("Discard this draft and its images?")).toBeNull();
   expect(remove).not.toHaveBeenCalled();
 });
 
@@ -232,10 +232,10 @@ test("Discard with text asks first; Keep returns, Discard deletes the saved draf
   const { onClose, remove, save } = await mount({}, { slug: "fresh" });
   type("Rough idea", "words");
   click("Discard");
-  expect(screen.getByText("Discard this draft?")).toBeTruthy();
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
   click("Keep");
-  expect(screen.queryByText("Discard this draft?")).toBeNull();
+  expect(screen.queryByText("Discard this draft and its images?")).toBeNull();
   click("Discard");
   click("Discard");
   expect(onClose).toHaveBeenCalled();
@@ -244,18 +244,50 @@ test("Discard with text asks first; Keep returns, Discard deletes the saved draf
   expect(save).not.toHaveBeenCalled();
 });
 
-test("Start design posts and reports the address, and stops saving", async () => {
+test("Start design posts the draft id and reports the address, and stops saving", async () => {
   vi.useFakeTimers();
   const open = vi.fn(ok);
-  const { onStarted, save } = await mount({ open });
+  const { onStarted, save } = await mount({ open }, { slug: "old", idea: "old idea" });
   type("Epic slug", " fresh ");
   type("Rough idea", "an idea");
   await act(async () => click("Start design"));
-  expect(open).toHaveBeenCalledWith({ epic: "fresh", new_design: true, idea: "an idea", project: "gx" });
+  expect(open).toHaveBeenCalledWith({ epic: "fresh", new_design: true, idea: "an idea", project: "gx", draft_id: "d1" });
   expect(onStarted).toHaveBeenCalledWith("gx:fresh", undefined);
   await wait(800);
   cleanup();
   expect(save).not.toHaveBeenCalled();
+});
+
+test("Start waits for a save in flight and sends the id it created; that save is not repeated", async () => {
+  vi.useFakeTimers();
+  const open = vi.fn(ok);
+  const { client } = fakeDrafts();
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => (release = r));
+  const save = vi.fn(async (body: DesignDraftSaveRequest): Promise<DraftResult> => {
+    await gate;
+    return { kind: "ok", draft: { images: [], edited_at: "", ...body, id: "created", revision: 1 } };
+  });
+  await mount({ open, drafts: { ...client, save } });
+  type("Epic slug", "fresh");
+  type("Rough idea", "an idea");
+  await wait(800);
+  await act(async () => click("Start design"));
+  expect(open).not.toHaveBeenCalled();
+  await act(async () => release());
+  expect(open).toHaveBeenCalledWith(expect.objectContaining({ draft_id: "created" }));
+  await wait(2000);
+  expect(save).toHaveBeenCalledTimes(1);
+});
+
+test("a refused Start keeps the text and the draft saves again", async () => {
+  vi.useFakeTimers();
+  const { save } = await mount({ open: async () => ({ refused: true, message: "epic exists" }) as never }, { slug: "old", idea: "old idea" });
+  type("Epic slug", "fresh");
+  await act(async () => click("Start design"));
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("fresh");
+  await wait(0);
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "d1", slug: "fresh" }));
 });
 
 test("a start_error hands the reason to the page", async () => {
