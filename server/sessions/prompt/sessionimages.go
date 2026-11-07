@@ -75,7 +75,10 @@ func (p *Prompt) saveSessionImage(sessionID string, data []byte) (wire.SessionIm
 	if !ok {
 		return imageRefusal(wire.ReasonImageTypeNotAllowed, "only PNG, JPEG, GIF and WebP images are accepted"), nil
 	}
-	return p.writeImage(filepath.Join(dir, imagesDir), ext, data)
+	// imageMu makes the count and the create one step, so two uploads never share an <n>.
+	p.imageMu.Lock()
+	defer p.imageMu.Unlock()
+	return writeImage(filepath.Join(dir, imagesDir), ext, data)
 }
 
 // imageSessionDir is the session gate of the upload and delete routes: the
@@ -235,11 +238,8 @@ func detectType(data []byte) string {
 	return mt
 }
 
-// writeImage creates the next img-<n>-<id><ext> in folder. imageMu makes the
-// count and the create one step, so two uploads never share an <n>.
-func (p *Prompt) writeImage(folder, ext string, data []byte) (wire.SessionImageResult, error) {
-	p.imageMu.Lock()
-	defer p.imageMu.Unlock()
+// writeImage creates the next img-<n>-<id><ext> in folder. The caller holds imageMu.
+func writeImage(folder, ext string, data []byte) (wire.SessionImageResult, error) {
 	if err := os.MkdirAll(folder, 0o755); err != nil {
 		return wire.SessionImageResult{}, err
 	}

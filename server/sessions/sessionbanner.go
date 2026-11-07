@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
@@ -111,20 +112,20 @@ func (mg *Manager) NoteFailure(id string) {
 		reason = f.Label
 	}
 	// A Done Design exiting cleanly is expected; the Design page hides it too.
-	if kind == wire.FailureKindEnded && mg.designDone(m) {
+	if kind == wire.FailureKindEnded && designDone(mg.projects, m) {
 		return
 	}
 	mg.TriggerBanner(id, sound.Attention, reason)
 }
 
 // designDone reports whether the session is a Design whose map's Progress is Done.
-func (mg *Manager) designDone(m Meta) bool {
-	step, ok := mg.designStep(m)
+func designDone(reg *projects.Registry, m Meta) bool {
+	step, ok := designStep(reg, m)
 	return ok && step == wire.ProgressDone
 }
 
 // designStep is the Progress of the map behind a Design session.
-func (mg *Manager) designStep(m Meta) (wire.ProgressStep, bool) {
+func designStep(reg *projects.Registry, m Meta) (wire.ProgressStep, bool) {
 	if !m.Design || m.Ticket == "" {
 		return "", false
 	}
@@ -132,7 +133,7 @@ func (mg *Manager) designStep(m Meta) (wire.ProgressStep, bool) {
 	if err != nil {
 		return "", false
 	}
-	epics, err := mg.projects.Epics(addr.Project)
+	epics, err := reg.Epics(addr.Project)
 	if err != nil {
 		return "", false
 	}
@@ -169,7 +170,7 @@ func (mg *Manager) sendDesignQuestion(id string, q DesignQuestion) bool {
 	if res.Refused || err != nil {
 		return false
 	}
-	step, ok := mg.designStep(m)
+	step, ok := designStep(mg.projects, m)
 	if !ok {
 		return false
 	}

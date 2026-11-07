@@ -11,8 +11,6 @@ import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { NAV_ATTR } from "./SidebarKeys";
 import { useAltHeld } from "./useShortcuts";
 
-const CHAT_PINK = "#ec6fa8";
-
 /** The epic address of the open page, or "". */
 export function currentAddress(pathname: string): string {
   const [, kind, ...rest] = pathname.split("/");
@@ -45,7 +43,7 @@ function Status({ status, dim }: { status: SidebarStatus; dim?: boolean }) {
 
 function ChatIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke={CHAT_PINK} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label="Chat" role="img">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="var(--chakra-colors-chat)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label="Chat" role="img">
       <path d="M5 7.5a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 21 7.5v7a2.5 2.5 0 0 1-2.5 2.5H12l-4 3.5V17h-.5A2.5 2.5 0 0 1 5 14.5v-7z" />
     </svg>
   );

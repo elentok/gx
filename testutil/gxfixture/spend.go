@@ -68,7 +68,7 @@ func (f *fixture) seedSpend(shape string) error {
 // agentTranscript is where the held fake agent's transcript belongs; a flow
 // appends usage lines there and the ledger poll prices them.
 func (f *fixture) agentTranscript(ctx context.Context) (string, error) {
-	m, err := f.waitAgentMeta(ctx)
+	m, err := f.waitAgentMetaLabel(ctx, "*")
 	if err != nil {
 		return "", err
 	}

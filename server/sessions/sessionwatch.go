@@ -326,7 +326,7 @@ func (mg *Manager) recordSessionExit(m *Meta, exit string) bool {
 	} else {
 		mg.raiseUnread(m)
 		// A Done Design exiting cleanly is expected: no banner.
-		if exit != wire.SessionExitClean || !mg.designDone(*m) {
+		if exit != wire.SessionExitClean || !designDone(mg.projects, *m) {
 			mg.TriggerBanner(m.ID, sound.Done, "")
 		}
 	}

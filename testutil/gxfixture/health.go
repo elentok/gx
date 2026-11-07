@@ -83,7 +83,7 @@ func writeHealthFile(path, body string) error {
 // tieAgentProcesses waits for the fake agent's meta.json, then writes its real
 // pids into the process table.
 func (f *fixture) tieAgentProcesses(ctx context.Context) error {
-	m, err := f.waitAgentMeta(ctx)
+	m, err := f.waitAgentMetaLabel(ctx, "*")
 	if err != nil {
 		return err
 	}
@@ -94,12 +94,8 @@ func (f *fixture) tieAgentProcesses(ctx context.Context) error {
 	return writeHealthFile(filepath.Join(f.healthDir(), "processes"), body)
 }
 
-// waitAgentMeta waits up to 30 seconds for a running fake agent's meta.json.
-func (f *fixture) waitAgentMeta(ctx context.Context) (nativerunner.Meta, error) {
-	return f.waitAgentMetaLabel(ctx, "*")
-}
-
-// waitAgentMetaLabel is waitAgentMeta for the agent dir named label.
+// waitAgentMetaLabel waits up to 30 seconds for the meta.json of the agent dir
+// matching label (a glob; "*" is any running fake agent).
 func (f *fixture) waitAgentMetaLabel(ctx context.Context, label string) (nativerunner.Meta, error) {
 	root := nativerunner.AgentsRoot(f.stateD, project)
 	deadline := time.Now().Add(30 * time.Second)
@@ -140,7 +136,7 @@ const checkHolderRun = "run-holding-the-lock"
 // keyed by the agent's pid, which lives as long as the hold, so the server keeps
 // reading it until the flow removes the file. It returns the file's path.
 func writeCheckWaiting(ctx context.Context, f *fixture) (string, error) {
-	m, err := f.waitAgentMeta(ctx)
+	m, err := f.waitAgentMetaLabel(ctx, "*")
 	if err != nil {
 		return "", err
 	}
