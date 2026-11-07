@@ -80,7 +80,7 @@ test("the menu lists every workspace in order with its Needs-you count; picking 
   await body().findByRole("link", { name: /p:alpha/ });
   const menu = within(await openMenu());
   const items = menu.getAllByRole("menuitem").map((i) => i.textContent);
-  expect(items).toEqual(["Default2", "Side1", "New workspace…", "Manage workspaces"]);
+  expect(items).toEqual(["Defaultdefault2 needs you", "Side1 needs you","New workspace…", "Manage workspaces"]);
   fireEvent.click(menu.getByRole("menuitem", { name: /Side/ }));
   await waitFor(() => expect(body().getByRole("link", { name: /p:beta/ })).toBeTruthy());
   expect(body().queryByRole("link", { name: /p:alpha/ })).toBeNull();

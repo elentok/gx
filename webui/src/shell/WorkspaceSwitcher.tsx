@@ -89,6 +89,7 @@ export function WorkspaceSwitcher({
   onNew: () => void;
   onManage: () => void;
 }) {
+  const activeNeeds = workspaces.find((w) => w.name === active)?.needs_you;
   return (
     <Menu.Root positioning={{ placement: "bottom-start" }} lazyMount unmountOnExit>
       <Menu.Trigger asChild>
@@ -99,19 +100,28 @@ export function WorkspaceSwitcher({
           alignItems="center"
           gap="2"
           w="100%"
-          minH="34px"
+          h="40px"
           px="3"
           color="text"
+          fontFamily="inherit"
+          fontSize="17px"
           fontWeight="600"
           cursor="pointer"
           _hover={{ bg: "surface.raised" }}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M2.5 4.5 6 8l3.5-3.5" />
-          </svg>
           <Box as="span" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
             {active}
           </Box>
+          <Box as="span" flex="none" color="text.dim" display="grid">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+              <path d="m3 4.5 3 3 3-3" />
+            </svg>
+          </Box>
+          {activeNeeds ? (
+            <Box as="span" ml="auto" flex="none" color="tone.waiting.fg" fontSize="12px" fontWeight="500">
+              {activeNeeds} needs you
+            </Box>
+          ) : null}
         </chakra.button>
       </Menu.Trigger>
       <Portal>
@@ -119,12 +129,17 @@ export function WorkspaceSwitcher({
           <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="56">
             {workspaces.map((w) => (
               <Menu.Item key={w.name} value={`ws:${w.name}`} onClick={() => onPick(w.name)} cursor="pointer" color="text" justifyContent="space-between" _highlighted={{ bg: "surface" }}>
-                <Box as="span" fontWeight={w.name === active ? "600" : "400"}>
+                <Box as="span">
                   {w.name}
+                  {w.default && (
+                    <Text as="span" color="text.faint" ml="2">
+                      default
+                    </Text>
+                  )}
                 </Box>
                 {w.needs_you ? (
-                  <Text as="span" color="tone.waiting.fg" fontSize="sm" aria-label={`${w.needs_you} need you`}>
-                    {w.needs_you}
+                  <Text as="span" color="tone.waiting.fg">
+                    {w.needs_you} needs you
                   </Text>
                 ) : null}
               </Menu.Item>
