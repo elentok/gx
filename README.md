@@ -283,7 +283,8 @@ Manage config (create, edit, inspect):
 
 ```sh
 gx config edit        # open config in $EDITOR (creates it if missing)
-gx config show        # print the effective (merged) config as JSON
+gx config show        # print the effective (merged) config as JSON, secrets redacted (--reveal shows them)
+gx config get <key>   # print one value, e.g. skills.code-review (secret keys need --reveal)
 gx config defaults    # print the built-in default config as JSON
 ```
 

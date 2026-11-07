@@ -9,15 +9,15 @@ type NotificationsConfig struct {
 // TelegramConfig holds Telegram bot credentials for sending notifications.
 // An empty BotToken is the "off" state.
 type TelegramConfig struct {
-	BotToken string `json:"bot-token"`
-	ChatID   string `json:"chat-id"`
+	BotToken string `json:"bot-token" secret:"true"`
+	ChatID   string `json:"chat-id" secret:"true"`
 }
 
 // SlackConfig holds a Slack workflow webhook URL for sending notifications —
 // a webhook that accepts a single {"text": "..."} body. An empty WebhookURL
 // is the "off" state.
 type SlackConfig struct {
-	WebhookURL string `json:"webhook-url"`
+	WebhookURL string `json:"webhook-url" secret:"true"`
 }
 
 // DefaultNotificationsConfig returns the notifications defaults.

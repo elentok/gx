@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Changed `gx config show` to redact the Telegram bot token and chat id and the Slack webhook, so they stay out of agent transcripts. `--reveal` prints them.
+- Added `gx config get <key>` to print one config value by dotted path. A secret key is refused without `--reveal`.
+
 ## v0.45.1 - 2026-11-04
 
 - Fixed `gx server` using about 500% CPU on machines with many Claude project directories. Each web snapshot searched every project directory for every ticket session. The server now caches that lookup: found sessions for good, missing ones for 15 seconds.

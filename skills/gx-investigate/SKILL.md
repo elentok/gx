@@ -51,7 +51,7 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
   `--event` repeatable) rather than hand-rolling a `python3`/`jq` filter. This is usually the
   fastest way to see *why* the scheduler picked or skipped a ticket, especially for "it's in the
   tree but never starts" reports.
-- **`~/.config/gx/config.json`** — effective gx config (`gx config show` prints it resolved).
+- **`~/.config/gx/config.json`** — effective gx config (`gx config show` prints it resolved with secrets redacted; `gx config get <key>` prints one value).
 - **Agent session transcript** — `~/.claude/projects/<slugified-cwd>/<session-id>.jsonl`, keyed by
   the `Cwd`/`AgentSession` recorded on that ticket's `iteration-started` event. Locate it with
   `gx claude session-path <session-id> [--grep <pattern>]` instead of a manual `fd` search — it

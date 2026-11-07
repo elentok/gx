@@ -132,6 +132,88 @@ func TestExecute_ConfigShow_PrintsJSON(t *testing.T) {
 	}
 }
 
+func secretDeps(stdout *bytes.Buffer) Deps {
+	return Deps{Env: cmdbase.Env{
+		Stdout: stdout,
+		Stderr: bytes.NewBuffer(nil),
+		LoadConfig: func() (gxconfig.Config, error) {
+			cfg := gxconfig.Default()
+			cfg.Notifications.Telegram = gxconfig.TelegramConfig{BotToken: "tok-123", ChatID: "chat-456"}
+			cfg.Notifications.Slack.WebhookURL = "https://hooks.example/secret-path"
+			return cfg, nil
+		},
+	}}
+}
+
+func TestExecute_ConfigShow_RedactsSecretsUnlessRevealed(t *testing.T) {
+	t.Parallel()
+	for _, secret := range []string{"tok-123", "chat-456", "secret-path"} {
+		var stdout bytes.Buffer
+		d := secretDeps(&stdout)
+		d.Env.Env = cmdtest.EnvFor(t)
+		if err := run(t, d, "config", "show"); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(stdout.String(), secret) {
+			t.Fatalf("show leaked %q: %s", secret, stdout.String())
+		}
+		if !strings.Contains(stdout.String(), redacted) {
+			t.Fatalf("show has no placeholder: %s", stdout.String())
+		}
+	}
+	var stdout bytes.Buffer
+	d := secretDeps(&stdout)
+	d.Env.Env = cmdtest.EnvFor(t)
+	if err := run(t, d, "config", "show", "--reveal"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "tok-123") {
+		t.Fatalf("--reveal did not print the token: %s", stdout.String())
+	}
+}
+
+func TestExecute_ConfigGet(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		args    []string
+		want    string
+		wantErr string
+	}{
+		{"nested value", []string{"agent-runner"}, "auto", ""},
+		{"dotted path", []string{"agents.banners.enabled"}, "true", ""},
+		{"key containing a dot", []string{"evolve.deep-read-cap"}, "8", ""},
+		{"secret refused", []string{"notifications.telegram.bot-token"}, "", "--reveal"},
+		{"section holding a secret refused", []string{"notifications"}, "", "--reveal"},
+		{"secret revealed", []string{"notifications.telegram.bot-token", "--reveal"}, "tok-123", ""},
+		{"unknown key", []string{"nope.nothing"}, "", "no config key"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var stdout bytes.Buffer
+			d := secretDeps(&stdout)
+			d.Env.Env = cmdtest.EnvFor(t)
+			err := run(t, d, append([]string{"config", "get"}, tc.args...)...)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("err = %v, want containing %q", err, tc.wantErr)
+				}
+				if strings.Contains(stdout.String(), "tok-123") {
+					t.Fatalf("refused get leaked the secret: %s", stdout.String())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.TrimSpace(stdout.String()); got != tc.want {
+				t.Fatalf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExecute_ConfigShow_PropagatesError(t *testing.T) {
 	t.Parallel()
 	d := Deps{Env: cmdbase.Env{

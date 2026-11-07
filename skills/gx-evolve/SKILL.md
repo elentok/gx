@@ -38,7 +38,7 @@ Pick tickets from the flag table. A ticket with no flags is **never** read.
 - **Always**: the epic's `code-review` ticket and its fix tickets, and, for a conflict-hit ticket,
   its conflict-resolution session.
 - **Then by severity** (paused-repair/paused-answer > conflict > overrun > the rest) until you reach the cap:
-  `gx config show` prints the effective config as JSON; read `.["evolve.deep-read-cap"]`.
+  `gx config get evolve.deep-read-cap` prints the effective cap.
 - Tickets flagged past the cap are not read; they appear as rows in step 4.
 
 Start every subagent in one turn, one per picked ticket, then wait for all of them (`general-purpose`, model from `gx agent model worker`,
