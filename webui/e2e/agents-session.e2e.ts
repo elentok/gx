@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, nav, test } from "./fixture";
-import { ask, go, moreActions, REPLY, row, sessions, titleHeading } from "./agentsKit";
+import { ask, go, moreActions, REPLY, sessions, titleHeading } from "./agentsKit";
 
 /** The chat's scroll box, found from a message in it. */
 const scrollBox = (page: Page, text: string) => page.getByText(text, { exact: true }).first();
@@ -111,12 +111,13 @@ test("103. Rate-limit hold", async ({ page, start }) => {
   await go(page, "#/e/demo:waiting-epic");
   await expect(verdict("waiting-epic")).toContainText("rate-limited");
 
-  await go(page, "#/agents");
-  await page.getByRole("complementary").getByText(/^Queue agents/).click();
+  // The Agents page has no session list, so the queue agent is opened by its address.
   const [queueAgent] = (await sessions(fixture)).filter((s) => s.id.startsWith("queue-limited-epic"));
-  await expect(row(page, queueAgent).getByRole("img", { name: "rate-limited" })).toBeVisible();
+  await go(page, `#/agents/${queueAgent.id}`);
+  const mark = page.getByTestId("page-header-actions").getByRole("img", { name: "rate-limited" });
+  await expect(mark).toBeVisible();
 
-  await expect(row(page, queueAgent).getByRole("img", { name: "rate-limited" })).toHaveCount(0, holdEnds);
+  await expect(mark).toHaveCount(0, holdEnds);
   await go(page, "#/e/demo:waiting-epic");
   await expect(verdict("waiting-epic")).toHaveCount(0, holdEnds);
 });
