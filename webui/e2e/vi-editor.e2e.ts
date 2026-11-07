@@ -108,7 +108,7 @@ test.describe("123. Vi editor: layouts and touch bar", () => {
     const saved = (await dialog.getByText("Saved as you type").boundingBox())!;
     expect((await text.boundingBox())!.x).toBeLessThan(saved.x);
 
-    const jump = page.getByRole("dialog", nav("Jump to epic"));
+    const jump = page.getByRole("dialog", nav("Jump to"));
     await page.keyboard.press("ControlOrMeta+k");
     await expect(jump).toHaveCount(0);
     await expect(dialog).toBeVisible();

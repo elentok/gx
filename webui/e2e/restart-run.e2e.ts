@@ -99,10 +99,14 @@ test("139. Restart with a failed migration", async ({ page, context, start }) =>
     expect(await realpath(started.dir)).toBe(await realpath(`${path.split("/data/gx/tickets")[0]}/broken-repo`));
     expect(started.tier).toBe("strongest");
     expect(started.project).toBe("broken");
-    await expect.poll(async () => (await fixture.launches()).at(-1)!.join(" ")).toContain("--model opus --effort high");
+    await expect.poll(async () => ((await fixture.launches()).at(-1) ?? []).join(" ")).toContain("--model opus --effort high");
 
     // A hash change keeps the page: a reload would fail the test.
     await page.evaluate(() => (location.hash = "#/agents"));
+    // The session is a one-off, so its row sits in the sidebar's collapsed Other section.
+    const other = page.getByRole("complementary", { name: "Sidebar", exact: true }).getByRole("button", nav("Other"));
+    await expect(other).toBeVisible();
+    if ((await other.getAttribute("aria-expanded")) === "false") await other.click();
     await expect(page.locator(`a[href$="/agents/${started.id}"]`)).toBeVisible();
 
     const second = await context.newPage();
@@ -114,6 +118,9 @@ test("139. Restart with a failed migration", async ({ page, context, start }) =>
     await second.close();
     await page.goBack();
     await expect(strip(page)).toBeVisible();
+    // The strip lives in the shell, so its dialog stays open across the hash changes.
+    await fixDialog(page).getByRole("button", nav("Close")).click();
+    await expect(fixDialog(page)).toHaveCount(0);
   });
 
   await test.step("fixing the project and Retry migration clears the strip", async () => {

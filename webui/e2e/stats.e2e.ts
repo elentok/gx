@@ -83,6 +83,9 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)",async ({ page, 
 
   // 182 phone: the four limit cards stack in one column with no horizontal overflow.
   await page.setViewportSize({ width: 375, height: 812 });
+  // The sidebar slides away on the way to phone width; measure after it has.
+  await expect(page.getByRole("button", { name: "Show sidebar", exact: true })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Sidebar", exact: true })).toBeHidden();
   const boxes = [];
   for (const t of LIMIT_CARDS) boxes.push((await costCard(page, t).boundingBox())!);
   for (const b of boxes.slice(1)) expect(b.x).toBe(boxes[0].x);
