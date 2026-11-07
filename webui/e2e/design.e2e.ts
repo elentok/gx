@@ -412,16 +412,14 @@ test("Header shape: Design and Epic share the left edge and row at 1440px, and n
   await openEpicWithSummary(page, fixture, "A short destination.");
   const edges = async () => ({
     title: (await page.getByRole("heading", { level: 1 }).boundingBox())!,
-    ring: (await page.getByTestId("page-header-icon").boundingBox())!,
   });
   const epic = await edges();
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
   await expect(page.getByRole("button", nav("Start design session"))).toBeVisible();
   const design = await edges();
-  expect(design.ring.x).toBeCloseTo(epic.ring.x, 0);
   expect(design.title.x).toBeCloseTo(epic.title.x, 0);
   // The two pages' containers differ by a sub-pixel or a border, so the row may sit 1px apart.
-  expect(Math.abs(design.ring.y - epic.ring.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(design.title.y - epic.title.y)).toBeLessThanOrEqual(1);
 
   await page.setViewportSize({ width: 375, height: 812 });
   const sideways = () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

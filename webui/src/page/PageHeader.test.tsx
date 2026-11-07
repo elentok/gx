@@ -19,7 +19,7 @@ test("renders icon, title, subtitle, actions and meta bar", () => {
   expect(getByTestId("page-header-meta").textContent).toBe("meta");
 });
 
-test("inside the shell the page icon shows on desktop and is dropped on tablet and phone, leaving the mascot alone", () => {
+test("inside the shell the page icon is dropped on every device, leaving the mascot alone", () => {
   const shell = { sidebarOpen: false, toggle: () => {}, close: () => {}, claimHeader: () => () => {} };
   const state = { snapshot: { needs_you_total: 0 }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
@@ -33,14 +33,12 @@ test("inside the shell the page icon shows on desktop and is dropped on tablet a
         </ConnectionContext.Provider>
       </DeviceContext.Provider>,
     );
-  for (const device of ["tablet", "phone"] as const) {
+  for (const device of ["desktop", "tablet", "phone"] as const) {
     const { queryByTestId, getByRole, unmount } = at(device);
     expect(queryByTestId("page-header-icon")).toBeNull();
     expect(getByRole("button", { name: "Show sidebar" })).toBeTruthy();
     unmount();
   }
-  const { getByTestId } = at("desktop");
-  expect(getByTestId("page-header-icon")).toBeTruthy();
 });
 
 test("the title is a 19px heading in the text font, not a button", () => {
