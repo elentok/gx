@@ -20,6 +20,9 @@ import (
 // against its whole project, so an error in a sibling ticket or epic fails it
 // too; an ad-hoc file is validated on its own frontmatter alone.
 func runTicketsValidate(path string, w, stderr io.Writer) error {
+	if ticketref.IsEpicTicketMD(path) {
+		return runEpicValidate(path, w, stderr)
+	}
 	ticket, err := schema.ParseTicket(path)
 	if err != nil {
 		return err
@@ -36,6 +39,27 @@ func runTicketsValidate(path string, w, stderr io.Writer) error {
 		return err
 	}
 	fmt.Fprintf(w, "%s: valid ticket (id=%s, status=%s)\n", ticketref.TicketLabel(path), ticket.ID, ticket.Status)
+	return nil
+}
+
+// runEpicValidate validates an epic's own ticket.md, which carries epic
+// frontmatter (kind, design_step, ...) and not a work ticket's id and type.
+// ValidateProject checks that file together with every ticket of the epic
+// and the rest of the project, for map and loop epics alike.
+func runEpicValidate(path string, w, stderr io.Writer) error {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	epicDir := filepath.Dir(abs)
+	projectDir := filepath.Dir(epicDir)
+	if err := tickets.ValidateProject(projectDir); err != nil {
+		return err
+	}
+	if err := printProjectWarnings(projectDir, stderr); err != nil {
+		return err
+	}
+	fmt.Fprintf(w, "%s: valid epic\n", filepath.Base(epicDir))
 	return nil
 }
 

@@ -271,7 +271,7 @@ that drives it.
     `gx tickets set <project:epic> --design-step chart`. Fill in the sections as in the first case.
     (A frontmatter block at the top of the body may set `destination_unconfirmed: true`.)
 
-  Then run `gx tickets validate` on any ticket of the epic. Later edits to the map body (Decisions so far,
+  Then run `gx tickets validate <project:epic>`. Later edits to the map body (Decisions so far,
   Not yet specified, Out of scope) go through `gx tickets section <project:epic> <heading> -`.
 - **Child ticket**: `gx tickets add <epic> --slug <slug> --type <type> [--blocked-by <ids>] --body
   -`, with the question under `## Question`.

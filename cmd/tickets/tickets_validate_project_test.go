@@ -2,6 +2,8 @@ package tickets
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -21,6 +23,28 @@ func TestExecute_TicketsValidate_ReportsErrorInSiblingEpic(t *testing.T) {
 	}
 	if want := `blocked_by "09" names no ticket in this epic`; !strings.Contains(err.Error(), want) {
 		t.Errorf("error = %q, want it to contain %q", err, want)
+	}
+}
+
+func TestExecute_TicketsValidate_EpicWithoutTicketsValidatesAsEpic(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	epicFile := cmdtest.WriteEpicTicket(t, dir, "m", "01-x.md", cmdtest.TicketFrontmatter("01", ""))
+	// Drop the only ticket so the epic is just its own ticket.md.
+	if err := os.Remove(epicFile); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "m", "ticket.md")
+	cmdtest.WriteTicketFile(t, path, "---\nkind: map\nstatus: open\n---\n# Map\n")
+
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+	if err := execute(t, []string{"tickets", "validate", path}, d); err != nil {
+		t.Fatalf("a map epic with no tickets should validate: %v", err)
+	}
+
+	cmdtest.WriteTicketFile(t, path, "---\nkind: map\nstatus: open\ndesign_step: nonsense\n---\n# Map\n")
+	if err := execute(t, []string{"tickets", "validate", path}, d); err == nil {
+		t.Fatal("expected a bad epic design_step to fail validate, got nil")
 	}
 }
 
