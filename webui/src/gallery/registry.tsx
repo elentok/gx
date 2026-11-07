@@ -8,7 +8,9 @@ import { authEntries } from "./authEntries";
 import { designFooterEntries } from "./designFooterEntries";
 import { shellEntries } from "./shellEntries";
 import { ConnectionContext, type Connection } from "../connection";
+import { ImageStrip } from "../design/ImageStrip";
 import { NewDesignForm } from "../design/NewDesignForm";
+import type { ComposerImage } from "../design/useComposerImages";
 import { CoarsePointerContext, type Device, DeviceContext, WideContext } from "../useWide";
 import { EpicPage } from "../epic/EpicPage";
 import { ErrorCard } from "../ErrorBoundary";
@@ -61,6 +63,12 @@ export interface GalleryEntry {
   cases: GalleryCase[];
 }
 
+const stripImages: ComposerImage[] = [
+  { key: "a", state: "ready", canRetry: false },
+  { key: "b", state: "uploading", canRetry: false },
+  { key: "c", state: "failed", message: "Too large", canRetry: true },
+  { key: "d", state: "failed", message: "Upload cut off", canRetry: false },
+];
 const ticket = canned.tickets[0];
 const longReason = "Waiting on a long chain of upstream tickets that all have to merge first. ".repeat(4);
 
@@ -610,6 +618,13 @@ export const galleryEntries: GalleryEntry[] = [
   },
   { name: "LiveDot", cases: perTone((tone) => <LiveDot tone={tone} label={tone} />) },
   { name: "Strip", cases: perTone((tone) => <Strip tone={tone}>{tone}</Strip>) },
+  {
+    name: "ImageStrip",
+    cases: [
+      { label: "editable", node: <ImageStrip images={stripImages} /> },
+      { label: "readOnly", node: <ImageStrip images={stripImages} readOnly onOpen={() => {}} /> },
+    ],
+  },
   {
     name: "Tray",
     // The Tray has no tone of its own: its states are normal, high, critical and unknown, so the tone

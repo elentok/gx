@@ -87,7 +87,7 @@ function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sess
         </Box>
       )}
       {viewing !== undefined && (
-        <ImageViewer images={images} sessionId={sessionId} start={viewing} onClose={() => setViewing(undefined)} />
+        <ImageViewer images={images} source={(img) => sessionImageUrl(sessionId, img.id ?? "")} start={viewing} onClose={() => setViewing(undefined)} />
       )}
     </Box>
   );

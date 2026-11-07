@@ -3,17 +3,17 @@ import { useState } from "react";
 import type { SessionChatImage } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
-import { sessionImageUrl } from "./sessionImages";
 
-/** A dark full-size view of one message's images: Prev and Next stop at the ends, Close and Escape return to the chat. */
+/** A dark full-size view of a list of images: Prev and Next stop at the ends, Close and Escape return to the page. */
 export function ImageViewer({
   images,
-  sessionId,
+  source,
   start,
   onClose,
 }: {
   images: SessionChatImage[];
-  sessionId: string;
+  /** The URL of one image; chat images use the session source, other callers bring their own. */
+  source: (image: SessionChatImage) => string;
   start: number;
   onClose: () => void;
 }) {
@@ -35,7 +35,7 @@ export function ImageViewer({
     >
       {img?.id && !img.placeholder ? (
         <img
-          src={sessionImageUrl(sessionId, img.id)}
+          src={source(img)}
           alt={`Image ${index + 1} of ${images.length}`}
           style={{ width: "100%", maxHeight: "380px", aspectRatio: "4/3", objectFit: "contain", display: "block", borderRadius: "6px" }}
         />

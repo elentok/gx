@@ -2,14 +2,24 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { renderThemed } from "../ui/render";
 import { ImageViewer } from "./ImageViewer";
+import { sessionImageUrl } from "./sessionImages";
 
 afterEach(cleanup);
 
 const ids = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `img-${i}` }));
 
+const session = (img: { id?: string }) => sessionImageUrl("s-a", img.id ?? "");
+
 function open(n: number, start = 0, onClose = () => {}) {
-  renderThemed(<ImageViewer images={ids(n)} sessionId="s-a" start={start} onClose={onClose} />);
+  renderThemed(<ImageViewer images={ids(n)} source={session} start={start} onClose={onClose} />);
 }
+
+test("shows the URL its source returns for the current image and still steps", () => {
+  renderThemed(<ImageViewer images={ids(2)} source={(img) => `/draft/${img.id}`} start={0} onClose={() => {}} />);
+  expect(shown()).toBe("/draft/img-0");
+  fireEvent.click(screen.getByRole("button", { name: /Next/ }));
+  expect(shown()).toBe("/draft/img-1");
+});
 
 const shown = () => screen.getByRole("img").getAttribute("src");
 
@@ -45,7 +55,7 @@ test("Close and Escape both close", () => {
 });
 
 test("a placeholder image draws a plain box, not an img", () => {
-  renderThemed(<ImageViewer images={[{ placeholder: true }]} sessionId="s-a" start={0} onClose={() => {}} />);
+  renderThemed(<ImageViewer images={[{ placeholder: true }]} source={session} start={0} onClose={() => {}} />);
   expect(screen.queryByRole("img")).toBeNull();
   expect(screen.getByText("1 of 1")).toBeTruthy();
 });
