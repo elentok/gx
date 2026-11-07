@@ -9,7 +9,9 @@ type Workspace struct {
 	Default bool   `json:"default,omitempty"`
 	Members int    `json:"members"`
 	// NeedsYou counts the workspace's Needs-you cards; filled in by the server, 0 when none.
-	NeedsYou int `json:"needs_you"`
+	NeedsYou int `json:"needs_you,omitempty"`
+	// Sort is one of the Sort* values.
+	Sort string `json:"sort,omitempty"`
 }
 
 // WorkspaceList is the workspaces in order.
@@ -89,4 +91,15 @@ const (
 	ReasonWorkspaceUnknownKey   = "workspace-unknown-key"
 	ReasonWorkspaceFollowsEpic  = "workspace-follows-epic"
 	ReasonWorkspaceNotJoinable  = "workspace-not-joinable"
+	ReasonWorkspaceBadSort      = "workspace-bad-sort"
 )
+
+// Sort values of a workspace. The labels live in the web.
+const (
+	SortNeedsYou = "needs-you"
+	SortActivity = "activity"
+	SortName     = "name"
+)
+
+// SortDefault is what a workspace reads as until a Sort is set.
+const SortDefault = SortNeedsYou

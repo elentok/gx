@@ -3,9 +3,14 @@ package workspaces
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
+	"os"
+	"path/filepath"
+
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/wire"
 )
 
 // fakeDesigns answers only DesignExists; the embedded nil Directory panics on
@@ -54,6 +59,8 @@ func TestRefusals(t *testing.T) {
 		{"rename to blank", func() error { return s.Rename("Bugs", " ") }, ReasonBlankName},
 		{"delete unknown", func() error { return s.Delete("Nope") }, ReasonUnknown},
 		{"member of unknown", func() error { return s.SetMember("p:a", "Nope") }, ReasonUnknown},
+		{"sort unknown value", func() error { return s.SetSort("Bugs", "random") }, ReasonBadSort},
+		{"sort unknown workspace", func() error { return s.SetSort("Nope", wire.SortName) }, ReasonUnknown},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -234,6 +241,104 @@ func TestPersistence(t *testing.T) {
 	}
 	if r.Workspace("p:x") != "B" || !r.IsHeld("p:x") {
 		t.Fatal("membership or hold lost on reopen")
+	}
+}
+
+func listedSort(s *Store, name string) string {
+	for _, w := range s.Listed() {
+		if w.Name == name {
+			return w.Sort
+		}
+	}
+	return "missing"
+}
+
+func TestSort(t *testing.T) {
+	dir := t.TempDir()
+	b := broker.New(0)
+	s := open(t, dir, b)
+	for _, n := range []string{"A", "B"} {
+		if err := s.Create(n); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if s.Sort("A") != wire.SortNeedsYou || listedSort(s, "A") != wire.SortNeedsYou {
+		t.Fatal("a new workspace should read the default")
+	}
+
+	seq := b.CurrentSeq()
+	if err := s.SetSort("a", wire.SortActivity); err != nil {
+		t.Fatal(err)
+	}
+	if b.CurrentSeq() != seq+1 {
+		t.Fatalf("seq after set = %d, want %d", b.CurrentSeq(), seq+1)
+	}
+	if s.Sort("A") != wire.SortActivity || listedSort(s, "A") != wire.SortActivity {
+		t.Fatal("set value not read")
+	}
+	if s.Sort("B") != wire.SortNeedsYou {
+		t.Fatal("another workspace changed")
+	}
+	if err := s.SetSort("A", wire.SortActivity); err != nil || b.CurrentSeq() != seq+1 {
+		t.Fatalf("no-op set err=%v seq=%d", err, b.CurrentSeq())
+	}
+
+	if err := s.SetSort("B", "bogus"); !errors.Is(err, ReasonBadSort) || s.Sort("B") != wire.SortNeedsYou || b.CurrentSeq() != seq+1 {
+		t.Fatalf("refusal stored or published: %v", err)
+	}
+
+	r := open(t, dir, broker.New(0))
+	if r.Sort("A") != wire.SortActivity {
+		t.Fatal("sort lost on reopen")
+	}
+
+	if err := s.Rename("A", "C"); err != nil {
+		t.Fatal(err)
+	}
+	if s.Sort("C") != wire.SortActivity || s.Sort("A") != wire.SortNeedsYou {
+		t.Fatal("rename did not move the sort")
+	}
+	if err := s.SetSort("C", wire.SortNeedsYou); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, fileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), `"C"`) && strings.Contains(string(data), `"sorts"`) {
+		t.Fatalf("default value left an entry: %s", data)
+	}
+
+	if err := s.SetSort("C", wire.SortName); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Delete("C"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Create("C"); err != nil {
+		t.Fatal(err)
+	}
+	if s.Sort("C") != wire.SortNeedsYou {
+		t.Fatal("delete kept the sort")
+	}
+}
+
+func TestSortFromFile(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"order":["Default workspace","A"],"members":{},"held":null}`
+	if err := os.WriteFile(filepath.Join(dir, fileName), []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if s := open(t, dir, broker.New(0)); s.Sort("A") != wire.SortNeedsYou {
+		t.Fatal("file without sorts should read the default")
+	}
+	bad := `{"order":["Default workspace","A"],"members":{},"sorts":{"A":"weird"}}`
+	if err := os.WriteFile(filepath.Join(dir, fileName), []byte(bad), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := open(t, dir, broker.New(0))
+	if s.Sort("A") != wire.SortNeedsYou || listedSort(s, "A") != wire.SortNeedsYou {
+		t.Fatal("unknown value should read the default")
 	}
 }
 

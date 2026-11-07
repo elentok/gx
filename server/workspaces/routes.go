@@ -18,6 +18,7 @@ var refusals = map[Reason]string{
 	ReasonUnknownKey:   wire.ReasonWorkspaceUnknownKey,
 	ReasonFollowsEpic:  wire.ReasonWorkspaceFollowsEpic,
 	ReasonNotJoinable:  wire.ReasonWorkspaceNotJoinable,
+	ReasonBadSort:      wire.ReasonWorkspaceBadSort,
 }
 
 // Routes lists the workspace endpoints. The getter is called per request, so a

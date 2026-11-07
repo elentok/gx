@@ -2255,6 +2255,20 @@ export interface SessionScreenResponse {
   rows: string[];
 }
 /**
+ * RemoveExitedRequest is one sweep of every Exited session. DryRun lists them
+ * without deleting.
+ */
+export interface RemoveExitedRequest {
+  dry_run?: boolean;
+}
+/**
+ * RemoveExitedResult lists the ids a sweep removed, or with DryRun would.
+ */
+export interface RemoveExitedResult {
+  removed: string[];
+  dry_run?: boolean;
+}
+/**
  * SessionRequest names the session a stop or remove acts on. State is the
  * token the web sends with a stop or Restore; see SessionStateToken. Only the
  * web mux checks it (see checkDesignWrite): the plain mux ignores State, and on
@@ -2835,9 +2849,13 @@ export interface Workspace {
   default?: boolean;
   members: number /* int */;
   /**
-   * NeedsYou counts the workspace's Needs-you cards; filled in by the snapshot.
+   * NeedsYou counts the workspace's Needs-you cards; filled in by the server, 0 when none.
    */
   needs_you?: number /* int */;
+  /**
+   * Sort is one of the Sort* values.
+   */
+  sort?: string;
 }
 /**
  * WorkspaceList is the workspaces in order.
@@ -2931,7 +2949,19 @@ export const ReasonWorkspaceBlankKey = "workspace-blank-key";
 export const ReasonWorkspaceUnknownKey = "workspace-unknown-key";
 export const ReasonWorkspaceFollowsEpic = "workspace-follows-epic";
 export const ReasonWorkspaceNotJoinable = "workspace-not-joinable";
+export const ReasonWorkspaceBadSort = "workspace-bad-sort";
 /**
  * Refusal reasons of the workspace writes.
  */
-export type ReasonWorkspace = typeof ReasonWorkspaceBlankName | typeof ReasonWorkspaceNameTaken | typeof ReasonWorkspaceUnknown | typeof ReasonWorkspaceDefaultFixed | typeof ReasonWorkspaceBadOrder | typeof ReasonWorkspaceBlankKey | typeof ReasonWorkspaceUnknownKey | typeof ReasonWorkspaceFollowsEpic | typeof ReasonWorkspaceNotJoinable;
+export type ReasonWorkspace = typeof ReasonWorkspaceBlankName | typeof ReasonWorkspaceNameTaken | typeof ReasonWorkspaceUnknown | typeof ReasonWorkspaceDefaultFixed | typeof ReasonWorkspaceBadOrder | typeof ReasonWorkspaceBlankKey | typeof ReasonWorkspaceUnknownKey | typeof ReasonWorkspaceFollowsEpic | typeof ReasonWorkspaceNotJoinable | typeof ReasonWorkspaceBadSort;
+export const SortNeedsYou = "needs-you";
+export const SortActivity = "activity";
+export const SortName = "name";
+/**
+ * Sort values of a workspace. The labels live in the web.
+ */
+export type Sort = typeof SortNeedsYou | typeof SortActivity | typeof SortName;
+/**
+ * SortDefault is what a workspace reads as until a Sort is set.
+ */
+export const SortDefault = SortNeedsYou;

@@ -37,6 +37,7 @@ const (
 	ReasonUnknownKey   Reason = "no such Design, epic or chat"
 	ReasonFollowsEpic  Reason = "a Queue or Design agent follows its epic; move the epic instead"
 	ReasonNotJoinable  Reason = "only a Design, an epic or a chat can join a workspace"
+	ReasonBadSort      Reason = "the sort must be one of needs-you, activity or name"
 )
 
 func (r Reason) Error() string { return string(r) }
@@ -44,15 +45,62 @@ func (r Reason) Error() string { return string(r) }
 type state struct {
 	Order   []string          `json:"order"`
 	Members map[string]string `json:"members"`
-	Held    []string          `json:"held"`
+	// Sorts maps a workspace to its non-default Sort; absent means the default.
+	Sorts map[string]string `json:"sorts,omitempty"`
+	Held  []string          `json:"held"`
 }
 
 func (s state) clone() state {
 	return state{
 		Order:   slices.Clone(s.Order),
 		Members: maps.Clone(s.Members),
+		Sorts:   maps.Clone(s.Sorts),
 		Held:    slices.Clone(s.Held),
 	}
+}
+
+func validSort(v string) bool {
+	return v == wire.SortNeedsYou || v == wire.SortActivity || v == wire.SortName
+}
+
+// sortOf reads a workspace's Sort; a missing entry or an unknown value is the default.
+func (s *Store) sortOf(canonical string) string {
+	if v := s.st.Sorts[canonical]; validSort(v) {
+		return v
+	}
+	return wire.SortDefault
+}
+
+// Sort returns a workspace's Sort, the default when none is set.
+func (s *Store) Sort(name string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if i := s.index(name); i >= 0 {
+		return s.sortOf(s.st.Order[i])
+	}
+	return wire.SortDefault
+}
+
+// SetSort sets a workspace's Sort; the default value clears the entry.
+func (s *Store) SetSort(name, value string) error {
+	return s.write(func() error {
+		i := s.index(name)
+		switch {
+		case i < 0:
+			return ReasonUnknown
+		case !validSort(value):
+			return ReasonBadSort
+		}
+		canonical := s.st.Order[i]
+		delete(s.st.Sorts, canonical)
+		if value != wire.SortDefault {
+			if s.st.Sorts == nil {
+				s.st.Sorts = map[string]string{}
+			}
+			s.st.Sorts[canonical] = value
+		}
+		return nil
+	})
 }
 
 // Store is the workspace store. All methods are safe for concurrent use.
@@ -131,7 +179,7 @@ func (s *Store) Listed() []wire.Workspace {
 	}
 	out := make([]wire.Workspace, 0, len(s.st.Order))
 	for _, n := range s.st.Order {
-		out = append(out, wire.Workspace{Name: n, Default: n == DefaultName, Members: counts[n]})
+		out = append(out, wire.Workspace{Name: n, Default: n == DefaultName, Members: counts[n], Sort: s.sortOf(n)})
 	}
 	return out
 }
@@ -198,6 +246,10 @@ func (s *Store) Rename(from, to string) error {
 				s.st.Members[k] = to
 			}
 		}
+		if v, ok := s.st.Sorts[old]; ok {
+			delete(s.st.Sorts, old)
+			s.st.Sorts[to] = v
+		}
 		return nil
 	})
 }
@@ -219,6 +271,7 @@ func (s *Store) Delete(name string) error {
 				delete(s.st.Members, k)
 			}
 		}
+		delete(s.st.Sorts, old)
 		return nil
 	})
 }
