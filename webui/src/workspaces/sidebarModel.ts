@@ -92,9 +92,10 @@ const agentRow = (s: SessionInfo): SidebarAgent => ({
 });
 
 function cardRow(r: EpicListRow, agents: SidebarAgent[], current: string, held: boolean): SidebarRow {
+  const kind = RING_KIND[r.card_kind ?? CardKindImplementation];
   return {
     key: r.address,
-    kind: RING_KIND[r.card_kind ?? CardKindImplementation],
+    kind,
     title: r.name,
     href: titleHref(r),
     status: cardStatus(r),
@@ -102,7 +103,8 @@ function cardRow(r: EpicListRow, agents: SidebarAgent[], current: string, held: 
     ...(held ? { held: true } : {}),
     ...(r.queued ? { queued: true } : {}),
     ...(isCurrent(r, current) ? { expanded: true } : {}),
-    agents,
+    // A Design is one row: its session shows on the Design page, not nested under it.
+    agents: kind === "design" ? [] : agents,
   };
 }
 

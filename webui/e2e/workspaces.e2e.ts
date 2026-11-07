@@ -22,15 +22,21 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("ws-design")).toHaveCount(0);
 
   // The chevron expands an epic's agents; the open epic starts expanded.
-  const links = sidebar.getByRole("link");
+  // Counted inside the epic's own item, so a row still loading elsewhere cannot skew the count.
+  const links = row("inv-epic").locator("xpath=ancestor::li[1]").getByRole("link");
   const expand = sidebar.getByRole("button", nav("Expand inv-epic"));
   await expect(expand).toHaveAttribute("aria-expanded", "false");
-  const collapsed = await links.count();
+  await expect(links).toHaveCount(1);
   await expand.click();
   await expect(sidebar.getByRole("button", nav("Collapse inv-epic"))).toHaveAttribute("aria-expanded", "true");
-  await expect(links).toHaveCount(collapsed + 1);
+  await expect(links).toHaveCount(2);
   await sidebar.getByRole("button", nav("Collapse inv-epic")).click();
-  await expect(links).toHaveCount(collapsed);
+  await expect(links).toHaveCount(1);
+  // The open epic's row starts expanded.
+  await goto(page, "#/e/demo:inv-epic");
+  await expect(sidebar.getByRole("button", nav("Collapse inv-epic"))).toHaveAttribute("aria-expanded", "true");
+  await expect(links).toHaveCount(2);
+  await goto(page, "#/epics");
 
   // Rows show their numbers while Alt is held, and Alt+1 opens the first one.
   const numbers = sidebar.getByTestId("row-number");
@@ -269,6 +275,8 @@ test("Workspaces", async ({ page, start }) => {
   await expect(items.nth(0)).toHaveText(/^scratch/);
   await expect(items.nth(2)).toHaveText(/^studies/);
   await page.keyboard.press("Escape");
+  // The closing menu keeps covering the sidebar until it is gone.
+  await expect(page.getByRole("menuitem")).toHaveCount(0);
   await fx.cli("server", "workspaces", "delete", "studies");
   await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible();
 

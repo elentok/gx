@@ -113,7 +113,9 @@ function render(
   return Object.assign(router, { setSessions });
 }
 
-const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent;
+const DESIGN_EPIC_LINK = "Design epic: a ↗";
+// The agent part of the meta bar; the Design epic link follows it.
+const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent?.replace(DESIGN_EPIC_LINK, "");
 
 test("the meta bar shows the harness, model and effort of a Codex session, never the tier, and nothing without a session", async () => {
   render([map("a")], [session("a", { harness: "codex", tier: "worker", model: "gpt-5.3-codex", effort: "medium" })]);
@@ -122,7 +124,8 @@ test("the meta bar shows the harness, model and effort of a Codex session, never
   cleanup();
   render([map("a")], []);
   await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByTestId("page-header-meta")).toBeNull();
+  expect(await metaText()).toBe("");
+  expect(screen.getByRole("link", { name: DESIGN_EPIC_LINK }).getAttribute("href")).toBe("#/e/gx:a");
 });
 
 test("with no model the meta bar reads the harness CLI default and the effort", async () => {

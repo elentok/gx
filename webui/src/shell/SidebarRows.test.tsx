@@ -49,6 +49,7 @@ const placements: SessionPlacement[] = [
   { session: "s1", kind: "epic", epic: "p:blog" },
   { session: "s2", kind: "other" },
   { session: "s3", kind: "chat", workspace: "Default" },
+  { session: "s4", kind: "epic", epic: "p:shop" },
 ];
 
 function setup(device: Device, path = "/") {
@@ -57,7 +58,12 @@ function setup(device: Device, path = "/") {
     snapshot: {
       needs_you_total: 0,
       workspaces: [{ name: "Default", default: true, members: 0 }, { name: "Work", members: 0 }],
-      sessions: [session("s1", "p", { name: "builder" }), session("s2", "p", { name: "scratch" }), session("s3", "p", { name: "talk" })],
+      sessions: [
+        session("s1", "p", { name: "builder" }),
+        session("s2", "p", { name: "scratch" }),
+        session("s3", "p", { name: "talk" }),
+        session("s4", "p", { name: "designer" }),
+      ],
       placements,
     },
     connected: true,
@@ -92,6 +98,13 @@ test("the chevron expands a nested agent without navigating", async () => {
   expect(body().queryByRole("link", { name: /builder/ })).toBeNull();
   fireEvent.click(body().getByRole("button", { name: "Expand Blog" }));
   expect(body().getByRole("link", { name: /builder/ })).toBeTruthy();
+});
+
+test("a Design is one row: no chevron and no nested session, even when open", async () => {
+  setup("desktop", "/d/p:shop");
+  await body().findByRole("link", { name: /Shop/ });
+  expect(body().queryByRole("button", { name: /(Expand|Collapse) Shop/ })).toBeNull();
+  expect(body().queryByRole("link", { name: /designer/ })).toBeNull();
 });
 
 test("On hold is collapsed with a count and opens on click; Other lists its rows", async () => {

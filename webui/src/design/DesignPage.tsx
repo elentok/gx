@@ -166,7 +166,14 @@ function DesignBody({
               </>
             )
           }
-          meta={session && <AgentLine session={session} wide={wide} />}
+          meta={
+            <Box display="flex" flexWrap="wrap" alignItems="center" columnGap="3" rowGap="1" fontSize="12px">
+              {session && <AgentLine session={session} wide={wide} />}
+              <chakra.a href={`#/e/${address}`} color="text.dim" textDecoration="underline">
+                Design epic: {name} ↗
+              </chakra.a>
+            </Box>
+          }
           actions={
             <>
               {detail &&

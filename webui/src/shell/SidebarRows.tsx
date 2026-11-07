@@ -1,5 +1,5 @@
 import { Box, chakra } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
@@ -85,6 +85,10 @@ function AgentLink({ agent }: { agent: SidebarAgent }) {
 
 function Row({ row, current, active, workspaces, showNumber }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[]; showNumber?: boolean }) {
   const [open, setOpen] = useState(!!row.expanded);
+  // The row outlives navigation, so opening its page expands it too, not only mounting on it.
+  useEffect(() => {
+    if (row.expanded) setOpen(true);
+  }, [row.expanded]);
   const nested = row.agents.length > 0;
   const item: ItemRef = { key: row.key, name: row.title, kind: row.kind === "chat" ? "chat" : row.kind === "design" ? "design" : "epic", workspace: active, queued: row.queued, held: row.held };
   return (
