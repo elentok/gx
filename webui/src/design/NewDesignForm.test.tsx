@@ -307,6 +307,85 @@ test("a refusal shows in the dialog and keeps saving the draft", async () => {
   expect(onStarted).not.toHaveBeenCalled();
 });
 
+const CONFLICT = "This draft changed on another device.";
+const GONE = "This draft was deleted or started on another device.";
+
+/** A form whose first save is refused with `kind`; `theirs` is what the server holds when read. */
+async function refused(kind: "conflict" | "gone", theirs: Partial<DesignDraft> = {}) {
+  vi.useFakeTimers();
+  const base = fakeDrafts({ slug: "mine", idea: "my idea", name: "Named", project: "blog", images: ["a.png"] });
+  const refuse = vi.fn(async (): Promise<DraftResult> => ({ kind }));
+  const save = vi.fn(base.save).mockImplementationOnce(refuse);
+  const server: DesignDraft = { id: "d1", project: "gx", slug: "theirs", idea: "their idea", images: ["b.png", "c.png"], revision: 9, edited_at: "", ...theirs };
+  // The first read opens the form on the local draft; later reads see the server's copy.
+  const read = vi.fn(async (_id: string): Promise<DraftResult> => ({ kind: "ok", draft: server })).mockImplementationOnce(base.client.read);
+  const view = await mount({ drafts: { ...base.client, save, read } }, { slug: "mine", idea: "my idea", name: "Named", project: "blog", images: ["a.png"] });
+  type("Rough idea", "latest");
+  await wait(800);
+  return { ...view, save, read };
+}
+
+test("a conflict raises the banner; typing sends nothing and Start is off", async () => {
+  const { save } = await refused("conflict");
+  expect(screen.getByText(CONFLICT)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Load theirs" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Keep mine" })).toBeTruthy();
+  expect(save).toHaveBeenCalledTimes(1);
+  type("Rough idea", "still typing");
+  await wait(2000);
+  expect(save).toHaveBeenCalledTimes(1);
+  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("Keep mine saves the latest local text over the server's revision and resumes", async () => {
+  const { save } = await refused("conflict");
+  type("Rough idea", "newest");
+  await act(async () => click("Keep mine"));
+  await wait(0);
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ id: "d1", idea: "newest", revision: 9 }));
+  expect(screen.queryByText(CONFLICT)).toBeNull();
+  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(false);
+  type("Rough idea", "after");
+  await wait(800);
+  expect(save).toHaveBeenCalledTimes(3);
+});
+
+test("Load theirs replaces the text and image list and drops local edits", async () => {
+  const { save } = await refused("conflict");
+  await act(async () => click("Load theirs"));
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("theirs");
+  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("their idea");
+  expect(project()).toBe("gx");
+  expect(screen.queryByText(CONFLICT)).toBeNull();
+  await wait(2000);
+  expect(save).toHaveBeenCalledTimes(1);
+  // Their image list is what Discard now warns about.
+  click("Discard");
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
+});
+
+test("a gone refusal raises the gone banner; Keep as new draft saves a new draft with no images", async () => {
+  const { save } = await refused("gone");
+  expect(screen.getByText(GONE)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Keep mine" })).toBeNull();
+  type("Rough idea", "typed while gone");
+  await wait(2000);
+  expect(save).toHaveBeenCalledTimes(1);
+  await act(async () => click("Keep as new draft"));
+  await wait(0);
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(save).toHaveBeenLastCalledWith({ id: undefined, slug: "mine", idea: "typed while gone", project: "blog", name: "Named", revision: 0 });
+  expect(screen.queryByText(GONE)).toBeNull();
+});
+
+test("Keep mine against a draft that is gone raises the gone banner", async () => {
+  const { read } = await refused("conflict");
+  read.mockResolvedValueOnce({ kind: "gone" });
+  await act(async () => click("Keep mine"));
+  expect(screen.getByText(GONE)).toBeTruthy();
+});
+
 test("Start design is disabled while pending, and a server error shows its text in a toast", async () => {
   let fail: (e: Error) => void = () => {};
   const { onStarted } = await mount({ open: () => new Promise((_, reject) => (fail = reject)) as never });

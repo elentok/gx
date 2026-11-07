@@ -27,6 +27,7 @@ interface Fields {
 }
 
 type SaveStatus = "none" | "saving" | "saved";
+type Banner = "conflict" | "gone" | undefined;
 
 const hasText = (d: Partial<Fields>) => !!(d.slug?.trim() || d.idea?.trim());
 
@@ -128,38 +129,73 @@ function DraftForm({
   const finished = useRef(false);
   // Set while Start is in flight: a save then could recreate the draft Start is about to delete.
   const starting = useRef(false);
+  // The banner's ref twin, so a flush in flight sees it before a render.
+  const blocked = useRef<Banner>(undefined);
+  const [banner, setBanner] = useState<Banner>();
+  const [images, setImages] = useState(initial?.images ?? []);
 
   const persist = async () => {
     if (finished.current || starting.current) return;
     const s = server.current;
     const fields = latest.current;
     const key = JSON.stringify(fields);
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (key === s.synced) return setStatus(s.id ? "saved" : "none");
-      if (!s.id && !fields.slug && !fields.idea) return setStatus("none");
-      const res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision });
-      if (res.kind === "ok") {
-        Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key });
-        return setStatus("saved");
-      }
-      if (res.kind === "deleted") {
-        Object.assign(s, { id: undefined, revision: 0, name: undefined, synced: key });
-        return setStatus("none");
-      }
-      if (res.kind === "gone") {
-        Object.assign(s, { id: undefined, revision: 0, name: undefined });
-      } else {
-        // Another tab saved first; this form's text wins on the retry.
-        const current = await drafts.read(s.id!);
-        if (current.kind !== "ok") return;
-        s.revision = current.draft.revision;
-      }
+    if (key === s.synced) return setStatus(s.id ? "saved" : "none");
+    if (!s.id && !fields.slug && !fields.idea) return setStatus("none");
+    const res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision });
+    if (res.kind === "ok") {
+      Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key });
+      return setStatus("saved");
     }
+    if (res.kind === "deleted") {
+      Object.assign(s, { id: undefined, revision: 0, name: undefined, synced: key });
+      return setStatus("none");
+    }
+    raise(res.kind);
+  };
+
+  /** A refusal pauses autosave until the person picks a way out of the banner. */
+  const raise = (kind: "conflict" | "gone") => {
+    blocked.current = kind;
+    setBanner(kind);
+    setStatus("none");
+  };
+  /** Reads the server's copy; a draft that is gone raises the gone banner instead. */
+  const readServer = async () => {
+    const res = await drafts.read(server.current.id!);
+    if (res.kind === "ok") return res.draft;
+    raise("gone");
+  };
+  const resume = () => {
+    blocked.current = undefined;
+    setBanner(undefined);
+    flush();
+  };
+  const keepMine = async () => {
+    const theirs = await readServer();
+    if (theirs) {
+      server.current.revision = theirs.revision;
+      resume();
+    }
+  };
+  const loadTheirs = async () => {
+    const theirs = await readServer();
+    if (!theirs) return;
+    const next = { slug: theirs.slug, idea: theirs.idea, project: theirs.project };
+    Object.assign(server.current, { revision: theirs.revision, name: theirs.name, synced: JSON.stringify(next) });
+    latest.current = next;
+    setDraft(next);
+    setImages(theirs.images);
+    resume();
+  };
+  const keepAsNew = () => {
+    Object.assign(server.current, { id: undefined, revision: 0, synced: "" });
+    setImages([]);
+    resume();
   };
 
   const flush = () => {
     clearTimeout(timer.current);
-    if (finished.current) return;
+    if (finished.current || blocked.current) return;
     chain.current = chain.current.then(persist).catch(() => setStatus("none"));
   };
   const stopSaving = () => {
@@ -182,7 +218,7 @@ function DraftForm({
     const next = { ...draft, ...p };
     setDraft(next);
     latest.current = next;
-    setStatus(next.slug || next.idea || server.current.id ? "saving" : "none");
+    setStatus(!blocked.current && (next.slug || next.idea || server.current.id) ? "saving" : "none");
     clearTimeout(timer.current);
     timer.current = setTimeout(flush, AUTOSAVE_MS);
   };
@@ -310,6 +346,18 @@ function DraftForm({
           ×
         </chakra.button>
       </Box>
+      {banner && (
+        <Box role="alert" display="flex" alignItems="center" flexWrap="wrap" gap="2" mx="3" mt="3" px="3" py="10px" borderRadius="8px" bg="tone.waiting.bg" color="tone.waiting.fg" fontSize="13px" flexShrink="0">
+          <Text flex="1" minW="0">
+            {banner === "conflict" ? "This draft changed on another device." : "This draft was deleted or started on another device."}
+          </Text>
+          {(banner === "conflict" ? [["Load theirs", loadTheirs] as const, ["Keep mine", keepMine] as const] : [["Keep as new draft", keepAsNew] as const]).map(([text, onClick]) => (
+            <chakra.button key={text} type="button" onClick={onClick} h="30px" px="10px" borderRadius="6px" borderWidth="1px" borderColor="currentColor" cursor="pointer">
+              {text}
+            </chakra.button>
+          ))}
+        </Box>
+      )}
       <chakra.textarea
         aria-label="Rough idea"
         {...field}
@@ -344,7 +392,7 @@ function DraftForm({
           </>
         ) : (
           <>
-            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) || initial?.images?.length ? setConfirming(true) : discard())}>
+            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) || images.length ? setConfirming(true) : discard())}>
               Discard
             </Button>
             <Box flex="1" />
@@ -353,7 +401,7 @@ function DraftForm({
                 {reason}
               </Text>
             )}
-            <Button type="submit" tone="running" disabled={pending || !!reason}>
+            <Button type="submit" tone="running" disabled={pending || !!reason || !!banner}>
               {pending && <Spinner size="sm" />}
               Start design
             </Button>
