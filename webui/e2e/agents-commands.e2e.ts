@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, holdRoute, nav, test, touch } from "./fixture";
-import { claudeIdle, commandMenu, commandNames, commandRows, go, messageBox, newForm, promptBox, sidebar } from "./agentsKit";
+import { claudeIdle, commandMenu, commandNames, commandRows, go, messageBox, openNewAgent, promptBox } from "./agentsKit";
 
 /** Whether a command of that name is in the open menu. */
 const hasName = (page: Parameters<typeof commandRows>[0], name: string) => commandNames(page).then((names) => names.includes(name));
@@ -55,10 +55,7 @@ const openNote = async (page: Page) => {
 
 const openNewForm = async (page: Page) => {
   await go(page, "#/agents");
-  const phone = (page.viewportSize()?.width ?? 0) < 600;
-  if (phone) await page.getByRole("button", { name: "+ New session", exact: true }).click();
-  else await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
-  await expect(newForm(page)).toBeVisible();
+  await openNewAgent(page, "demo");
 };
 
 test("152. Phone, command menu", async ({ page, start }) => {

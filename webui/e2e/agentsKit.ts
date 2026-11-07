@@ -16,7 +16,20 @@ export const codexIdle = async (fixture: Fixture) =>
 
 export const row = (page: Page, s: SessionInfo) => page.locator(`a[href$="/agents/${s.id}"]`);
 
-export const sidebar = (page: Page) => page.getByRole("complementary");
+/** The shell sidebar every page shares; the Agents page has no list of its own. */
+export const sidebar = (page: Page) => page.getByRole("complementary", { name: "Sidebar", exact: true });
+
+/** Opens the New session form from the footer "+ New" menu, sliding the sidebar open first on a phone. */
+export async function openNewAgent(page: Page, project?: string) {
+  const show = page.getByRole("button", { name: "Show sidebar", exact: true });
+  const add = sidebar(page).getByRole("button", { name: "+ New", exact: true });
+  await add.or(show).first().waitFor();
+  if (await show.isVisible()) await show.click();
+  await add.click();
+  await page.getByRole("menuitem", { name: /^New agent/ }).click();
+  await expect(newForm(page)).toBeVisible();
+  if (project) await projectSelect(page).selectOption(project);
+}
 
 // A hash change keeps the page, since the fixture fails a test whose page reloaded.
 export const go = (page: Page, hash: string) => page.evaluate((h) => (location.hash = h), hash);
@@ -90,10 +103,10 @@ export async function setViMode(fixture: Fixture, page: Page, on: boolean) {
   await expect(menu(page)).toHaveCount(0);
 }
 
-export const titleButton = (page: Page) => page.getByRole("heading", { level: 1 }).getByRole("button");
+/** The session header's "..." button; the sidebar rows carry their own "More actions" buttons. */
+export const moreActions = (page: Page) => page.locator("header").getByRole("button", { name: "More actions", exact: true });
 
-export const switcher = (page: Page) => page.getByRole("dialog", { name: "Switch session" });
-export const switcherFilter = (page: Page) => switcher(page).getByRole("combobox");
+export const titleHeading = (page: Page) => page.getByRole("heading", { level: 1 });
 
 export const newForm = (page: Page) => page.getByRole("dialog", { name: "New session" });
 export const projectSelect = (page: Page) => newForm(page).getByRole("combobox", { name: "Project" });

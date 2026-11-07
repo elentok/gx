@@ -6,6 +6,7 @@ import {
   createButton,
   go,
   messageBox,
+  moreActions,
   newForm,
   projectSelect,
   promptBox,
@@ -13,9 +14,7 @@ import {
   row,
   sendButton,
   sessions,
-  sidebar,
-  switcher,
-  titleButton,
+  openNewAgent,
   worktreeBox,
 } from "./agentsKit";
 
@@ -27,7 +26,7 @@ test("85. Create session", async ({ page, start }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await go(page, "#/agents");
 
-  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
+  await openNewAgent(page, "demo");
   await expect(projectSelect(page)).toHaveValue("demo");
   await expect(worktreeBox(page)).toHaveValue("Project root");
   await promptBox(page).fill("first words");
@@ -43,8 +42,7 @@ test("85. Create session", async ({ page, start }) => {
 
   // 86. Create in a new worktree.
   const beforeTree = await sessions(fixture);
-  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
-  await expect(newForm(page)).toBeVisible();
+  await openNewAgent(page, "demo");
 
   // A bad name shows the refusal in the form and keeps the input.
   await worktreeBox(page).fill("bad name");
@@ -74,12 +72,12 @@ test("85. Create session", async ({ page, start }) => {
 
   // 98. A project with no tier config runs the default worker model, and a reply keeps the label.
   const beforeOther = await sessions(fixture);
-  await sidebar(page).getByRole("button", { name: "New session in other" }).click();
+  await openNewAgent(page, "other");
   await createButton(page).click();
   const interactive = await created(fixture, beforeOther);
   const label = page.getByText("Claude Sonnet · medium", { exact: true });
   const tierShown = async () => {
-    await page.getByRole("button", nav("More actions")).click();
+    await moreActions(page).click();
     await expect(page.getByRole("menu", nav("More actions")).getByText("Worker", { exact: true })).toBeVisible();
     // Escape goes to the menu once focus is inside it.
     await expect(async () => {
@@ -98,7 +96,7 @@ test("85. Create session", async ({ page, start }) => {
   await go(page, `#/agents/${idle.id}`);
   await expect(page.getByText(REPLY)).toBeVisible();
   await messageBox(page).fill("typed before the drop");
-  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
+  await openNewAgent(page, "demo");
   await promptBox(page).fill("a first prompt");
   await expect(createButton(page)).toBeEnabled();
 
@@ -123,37 +121,20 @@ test("88. Phone, Agents page", async ({ page, start }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   const { width, height } = page.viewportSize()!;
 
-  // The list alone, with no session panel beside it.
+  // The page alone, with the shared sidebar slid away.
   await go(page, "#/agents");
-  await expect(row(page, target)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Pick a session" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Pick a session" })).toBeVisible();
+  await expect(row(page, target)).toBeHidden();
 
-  // A row opens the session on its own; "‹" returns to the list.
+  // The sidebar's row opens the session on its own and slides the sidebar closed.
+  await page.getByRole("button", { name: "Show sidebar", exact: true }).click();
   await row(page, target).click();
   await expect(page).toHaveURL(new RegExp(`#/agents/${target.id}$`));
-  await expect(row(page, target)).toHaveCount(0);
+  await expect(row(page, target)).toBeHidden();
   await expect(composer(page)).toBeVisible();
-  await page.getByRole("link", { name: "All sessions" }).click();
-  await expect(page).toHaveURL(/#\/agents$/);
-  await expect(row(page, target)).toBeVisible();
-
-  // The switcher covers the screen and Close closes it.
-  await row(page, target).click();
-  await titleButton(page).click();
-  await expect(switcher(page)).toBeVisible();
-  await expect
-    .poll(async () => {
-      const box = (await switcher(page).boundingBox())!;
-      return [box.x, box.y, box.width, box.height];
-    })
-    .toEqual([0, 0, width, height]);
-  await switcher(page).getByRole("button", { name: "Close" }).click();
-  await expect(switcher(page)).toHaveCount(0);
 
   // Create opens as a sheet at the bottom of the screen.
-  await page.getByRole("link", { name: "All sessions" }).click();
-  await page.getByRole("button", { name: "+ New session", exact: true }).click();
-  await expect(newForm(page)).toBeVisible();
+  await openNewAgent(page);
   await expect(page.getByTestId("grab-handle")).toBeVisible();
   await expect
     .poll(async () => {

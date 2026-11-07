@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "./fixture";
-import { ask, go, REPLY, row, sessions, titleButton } from "./agentsKit";
+import { expect, nav, test } from "./fixture";
+import { ask, go, moreActions, REPLY, row, sessions, titleHeading } from "./agentsKit";
 
 /** The chat's scroll box, found from a message in it. */
 const scrollBox = (page: Page, text: string) => page.getByText(text, { exact: true }).first();
@@ -30,7 +30,15 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(header.getByText(new RegExp(`^${idle.status.state}$`, "i"))).toBeVisible();
   await expect(header.getByText(idle.dir)).toBeVisible();
   await expect(header.getByText(idle.harness, { exact: true })).toHaveCount(0);
-  await expect(titleButton(page)).toContainText(idle.name || idle.id);
+  await expect(titleHeading(page)).toContainText(idle.name || idle.id);
+  // Promote to Design lives in the "..." menu, not as a header button.
+  await expect(header.getByRole("button", { name: "Promote to Design", exact: true })).toHaveCount(0);
+  await moreActions(page).click();
+  await expect(page.getByRole("menu", nav("More actions")).getByRole("menuitem", { name: "Promote to Design", exact: true })).toBeVisible();
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu", nav("More actions"))).toHaveCount(0, { timeout: 500 });
+  }).toPass();
   const ticketed = list.find((s) => s.ticket && s.harness === "claude")!;
   await go(page, `#/agents/${ticketed.id}`);
   await expect(header.getByText(ticketed.ticket!, { exact: true })).toBeVisible();
@@ -42,9 +50,7 @@ test("75. Read a session", async ({ page, start }) => {
 
   // Unread clears when the session is viewed.
   expect(unread.unread.unread).toBe(true);
-  await expect(row(page, unread).getByRole("img", { name: "Unread" })).toBeVisible();
   await go(page, `#/agents/${unread.id}`);
-  await expect(row(page, unread).getByRole("img", { name: "Unread" })).toHaveCount(0);
   await expect.poll(async () => !!(await sessions(fixture)).find((s) => s.id === unread.id)!.unread.unread).toBe(false);
 
   // A Working session shows a plain Working row.

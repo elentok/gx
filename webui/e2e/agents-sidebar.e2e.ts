@@ -7,16 +7,19 @@ test("73. Agents sidebar", async ({ page, start }) => {
   const fixture = await start("agents");
   const list = await sessions(fixture);
   await go(page, "#/agents");
+  await page.setViewportSize({ width: 1280, height: 800 });
   const side = sidebar(page);
   const visible = list.filter((s) => !s.design);
-  const live = list.filter((s) => s.status.state !== "exited").length;
-  await expect(side.getByText(`${live} live`)).toBeVisible();
 
-  // Live updates: a stopped idle session changes its mark and the count with no reload.
+  // The shared sidebar lists the agents; the Agents page has no session list of its own.
+  await expect(side).toBeVisible();
+  await expect(page.getByRole("complementary")).toHaveCount(1);
+  await expect(row(page, visible[0])).toBeVisible();
+
+  // Live updates: a stopped idle session changes its status word with no reload.
   const idle = visible.find((s) => s.status.state === "idle" && s.harness === "claude")!;
   await fixture.cli("agents", "stop", idle.id);
-  await expect(row(page, idle).getByRole("img", { name: "exited", exact: true })).toBeVisible();
-  await expect(side.getByText(`${live - 1} live`)).toBeVisible();
+  await expect(row(page, idle)).toContainText("Exited");
 
   // A removed Exited session leaves, a new one arrives.
   const exited = list.find((s) => s.status.state === "exited")!;
@@ -27,5 +30,4 @@ test("73. Agents sidebar", async ({ page, start }) => {
   await expect.poll(async () => (await sessions(fixture)).filter((s) => !before.has(s.id)).length).toBe(1);
   const added = (await sessions(fixture)).find((s) => !before.has(s.id))!;
   await expect(row(page, added)).toBeVisible();
-  await expect(side.getByText(`${live} live`)).toBeVisible();
 });
