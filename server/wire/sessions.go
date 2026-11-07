@@ -309,6 +309,18 @@ type SessionScreenResponse struct {
 	Rows []string `json:"rows"`
 }
 
+// RemoveExitedRequest is one sweep of every Exited session. DryRun lists them
+// without deleting.
+type RemoveExitedRequest struct {
+	DryRun bool `json:"dry_run,omitempty"`
+}
+
+// RemoveExitedResult lists the ids a sweep removed, or with DryRun would.
+type RemoveExitedResult struct {
+	Removed []string `json:"removed"`
+	DryRun  bool     `json:"dry_run,omitempty"`
+}
+
 // SessionRequest names the session a stop or remove acts on. State is the
 // token the web sends with a stop or Restore; see SessionStateToken. Only the
 // web mux checks it (see checkDesignWrite): the plain mux ignores State, and on

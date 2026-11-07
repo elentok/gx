@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/elentok/gx/server/queue"
@@ -42,6 +43,19 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 		{Pattern: "POST /v1/sessions/create", Web: wire.WebWrite, Handler: m((*Manager).SessionCreateWrite), WebHandler: m((*Manager).SessionCreateWeb)},
 		{Pattern: "POST /v1/sessions/stop", Web: wire.WebWrite, Handler: write(stop), WebHandler: agentWeb(stop)},
 		{Pattern: "POST /v1/sessions/remove", Web: wire.WebWrite, Handler: write(remove), WebHandler: agentWeb(remove)},
+		{Pattern: "POST /v1/sessions/remove-exited", Handler: func(w http.ResponseWriter, r *http.Request) {
+			var req wire.RemoveExitedRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			res, err := mg().RemoveExitedSessions(req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			wire.WriteJSON(w, res)
+		}},
 		{Pattern: "POST /v1/sessions/mark-read", Handler: write(func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().MarkSessionRead })},
 		{Pattern: "POST /v1/sessions/focus", Web: wire.WebWrite, Handler: m((*Manager).SessionFocusWrite), WebHandler: m((*Manager).SessionFocusWriteWeb)},
 		{Pattern: "POST /v1/sessions/show", Handler: write(func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().FocusSession })},

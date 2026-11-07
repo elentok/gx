@@ -26,7 +26,7 @@ func NewAgents(d Deps) *cobra.Command {
 	cmd.AddCommand(newAgentsCreateCmd(d.Dial()), newAgentsListCmd(d), newAgentsChatCmd(d), newAgentsScreenCmd(d), newAgentsCommandsCmd(d), newAgentsPermissionCmd(d), newAgentsKeysCmd(d),
 		newAgentsSessionCmd(d, "stop", "end a live session's agent (it stays, Exited)", (*apiclient.Sessions).Stop),
 		newAgentsSessionCmd(d, "interrupt", "end a Working session's current turn (the session stays)", (*apiclient.Sessions).Interrupt),
-		newAgentsSessionCmd(d, "remove", "delete an Exited session", (*apiclient.Sessions).Remove),
+		newAgentsRemoveCmd(d),
 		newAgentsSessionCmd(d, "mark-read", "clear a session's Unread", (*apiclient.Sessions).MarkRead),
 		newAgentsSessionCmd(d, "resume", "resume an Exited session's conversation", (*apiclient.Sessions).Resume),
 		newAgentsSessionCmd(d, "run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Sessions).RunAction),
@@ -338,6 +338,58 @@ func newAgentsSessionCmd(d Deps, verb, short string, write sessionWriteFunc) *co
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	return cmd
+}
+
+// newAgentsRemoveCmd is `gx agents remove <id>` or `--exited`, which sweeps
+// every Exited session in one server call.
+func newAgentsRemoveCmd(d Deps) *cobra.Command {
+	var jsonOut, exited, dryRun bool
+	cmd := &cobra.Command{
+		Use:   "remove <id> | --exited [--dry-run]",
+		Short: "delete an Exited session, or every Exited session with --exited",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			switch {
+			case exited && len(args) > 0:
+				return fmt.Errorf("--exited takes no session id")
+			case !exited && len(args) == 0:
+				return fmt.Errorf("give a session id or --exited")
+			case dryRun && !exited:
+				return fmt.Errorf("--dry-run needs --exited")
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			if exited {
+				return runAgentsRemoveExited(c.Context(), cl, c.OutOrStdout(), jsonOut, dryRun)
+			}
+			return runAgentsSessionWrite(c.Context(), cl, c.OutOrStdout(), jsonOut, (*apiclient.Sessions).Remove, args[0])
+		},
+	}
+	cmd.Flags().BoolVar(&exited, "exited", false, "remove every Exited session, printing the ids removed")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "with --exited, list the ids without removing them")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+func runAgentsRemoveExited(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut, dryRun bool) error {
+	res, err := cl.Sessions.RemoveExited(ctxOrBackground(ctx), dryRun)
+	if apiclient.IsNotRunning(err) {
+		return fmt.Errorf("%s", notRunningMessage)
+	}
+	if err != nil {
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	if jsonOut {
+		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+	}
+	for _, id := range res.Removed {
+		if _, err := fmt.Fprintln(w, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func runAgentsSessionWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, write sessionWriteFunc, id string) error {

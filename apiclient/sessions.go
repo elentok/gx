@@ -178,6 +178,14 @@ func (s *Sessions) Remove(ctx context.Context, id string) (wire.SessionResult, e
 	return res, err
 }
 
+// RemoveExited deletes every Exited session in one server-side sweep, or with
+// dryRun only lists them.
+func (s *Sessions) RemoveExited(ctx context.Context, dryRun bool) (wire.RemoveExitedResult, error) {
+	var res wire.RemoveExitedResult
+	err := s.t.post(ctx, "/v1/sessions/remove-exited", wire.RemoveExitedRequest{DryRun: dryRun}, &res)
+	return res, err
+}
+
 // MarkRead clears a session's Unread. A refusal is a result (Refused set), not
 // an error.
 func (s *Sessions) MarkRead(ctx context.Context, id string) (wire.SessionResult, error) {

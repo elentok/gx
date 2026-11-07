@@ -367,6 +367,36 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 	}
 }
 
+func TestRemoveExited_DryRunListsThenSweepsOnlyExited(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, exited, _ := startFakeSession(t)
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create live = %+v, %v", res, err)
+	}
+	live := res.Session.ID
+	servertest.StopFakeSession(ctx, t, h, evs, exited)
+
+	dry, err := h.Client.Sessions.RemoveExited(ctx, true)
+	if err != nil || !dry.DryRun || len(dry.Removed) != 1 || dry.Removed[0] != exited {
+		t.Fatalf("dry run = %+v, %v; want only %s", dry, err, exited)
+	}
+	if _, err := os.Stat(filepath.Join(h.SessionsDir, exited)); err != nil {
+		t.Fatalf("dry run touched the exited state dir: %v", err)
+	}
+
+	got, err := h.Client.Sessions.RemoveExited(ctx, false)
+	if err != nil || got.DryRun || len(got.Removed) != 1 || got.Removed[0] != exited {
+		t.Fatalf("sweep = %+v, %v; want only %s", got, err, exited)
+	}
+	if _, err := os.Stat(filepath.Join(h.SessionsDir, exited)); !os.IsNotExist(err) {
+		t.Errorf("exited state dir after sweep: %v, want gone", err)
+	}
+	if _, err := os.Stat(filepath.Join(h.SessionsDir, live)); err != nil {
+		t.Errorf("sweep touched the live session: %v", err)
+	}
+}
+
 func TestFirstPrompt_WaitsOutBlockedThenTypedAtIdle(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Prompt: "fix the bug"})

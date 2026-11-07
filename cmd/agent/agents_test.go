@@ -403,6 +403,36 @@ func TestAgentStep_OutsideASessionIsANote(t *testing.T) {
 	}
 }
 
+func TestAgentsRemoveExited_PrintsIdsAndDryRunKeepsThem(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	ctx := context.Background()
+	created, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || created.Session == nil {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
+	id := created.Session.ID
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runAgentsRemoveExited(ctx, h.Client, &out, false, false); err != nil || out.Len() != 0 {
+		t.Fatalf("sweep with a live session = %q, %v; want nothing removed", out.String(), err)
+	}
+	servertest.StopFakeSession(ctx, t, h, evs, id)
+	if err := runAgentsRemoveExited(ctx, h.Client, &out, false, true); err != nil || out.String() != id+"\n" {
+		t.Fatalf("dry run = %q, %v; want %q", out.String(), err, id+"\n")
+	}
+	out.Reset()
+	if err := runAgentsRemoveExited(ctx, h.Client, &out, false, false); err != nil || out.String() != id+"\n" {
+		t.Fatalf("sweep = %q, %v; want %q", out.String(), err, id+"\n")
+	}
+	list, err := h.Client.Sessions.List(ctx)
+	if err != nil || len(list) != 0 {
+		t.Errorf("sessions after sweep = %+v, %v; want none", list, err)
+	}
+}
+
 func TestAgentsStopAndRemove_JSON(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()

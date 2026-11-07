@@ -575,6 +575,33 @@ func (mg *Manager) RemoveSession(req wire.SessionRequest) (wire.SessionResult, e
 	return wire.SessionResult{Session: &info}, nil
 }
 
+// RemoveExitedSessions removes every Exited session through RemoveSession, so a
+// sweep and a single remove share their semantics. A session that goes live or
+// vanishes between the listing and its removal is skipped.
+func (mg *Manager) RemoveExitedSessions(req wire.RemoveExitedRequest) (wire.RemoveExitedResult, error) {
+	metas, err := mg.ListSessionMetas()
+	if err != nil {
+		return wire.RemoveExitedResult{}, err
+	}
+	out := wire.RemoveExitedResult{Removed: []string{}, DryRun: req.DryRun}
+	for _, m := range metas {
+		if m.Status.State != wire.SessionExited {
+			continue
+		}
+		if !req.DryRun {
+			res, err := mg.RemoveSession(wire.SessionRequest{ID: m.ID})
+			if err != nil {
+				return out, err
+			}
+			if res.Refused {
+				continue
+			}
+		}
+		out.Removed = append(out.Removed, m.ID)
+	}
+	return out, nil
+}
+
 func (mg *Manager) sessionGone(id string) {
 	if mg.OnSessionGone != nil {
 		mg.OnSessionGone(id)
