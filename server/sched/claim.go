@@ -60,27 +60,16 @@ func (s *Scheduler) ClaimNext() {
 	limit := s.ConcurrencyLimit()
 	running := s.Registry.Count()
 	seen := map[string]bool{}
-	items := s.Queue.List()
-	perRoot := map[string]int{}
-	for _, item := range items {
-		if addr, err := tickets.ParseQueuedAddress(item.Address); err == nil {
-			perRoot[queue.RootOf(addr).String()]++
-		}
-	}
-	for _, item := range items {
+	for _, item := range s.pruneTerminal(s.Queue.List()) {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil {
 			continue
 		}
-		// The last entry of a root is what keeps the root queued, so it stays.
-		if root := queue.RootOf(addr).String(); perRoot[root] > 1 && s.dropIfTerminal(item.Address, addr) {
-			perRoot[root]--
+		root := queue.RootOf(addr).String()
+		if seen[root] {
 			continue
 		}
-		if seen[queue.RootOf(addr).String()] {
-			continue
-		}
-		seen[queue.RootOf(addr).String()] = true
+		seen[root] = true
 		// One root fills its own slots before the next root in the queue gets a turn.
 		for running < limit {
 			launched, err := s.claimRootAfterAdoption(item)
@@ -96,17 +85,48 @@ func (s *Scheduler) ClaimNext() {
 	}
 }
 
-// dropIfTerminal takes a queued ticket entry off the queue once its ticket is
+// pruneTerminal takes queued ticket entries off the queue once their ticket is
 // done or cancelled, so hand edits and history already on disk are covered
-// too, and reports whether it did. Epic entries are never dropped here.
-func (s *Scheduler) dropIfTerminal(queued string, addr tickets.Address) bool {
-	if addr.ID == "" {
-		return false
+// too, and returns the surviving items. Epic entries are never dropped, and the
+// last entry of a root stays because it is what keeps the root queued.
+// Each root is computed once and each project's epics are loaded at most once.
+func (s *Scheduler) pruneTerminal(items []wire.QueueItem) []wire.QueueItem {
+	type entry struct {
+		addr tickets.Address
+		root string
+		ok   bool
 	}
-	loaded, err := s.Projects.Epics(addr.Project)
-	if err != nil {
-		return false
+	entries := make([]entry, len(items))
+	perRoot := map[string]int{}
+	for i, item := range items {
+		if addr, err := tickets.ParseQueuedAddress(item.Address); err == nil {
+			entries[i] = entry{addr: addr, root: queue.RootOf(addr).String(), ok: true}
+			perRoot[entries[i].root]++
+		}
 	}
+	epicsByProject := map[string][]tickets.Epic{}
+	kept := make([]wire.QueueItem, 0, len(items))
+	for i, item := range items {
+		e := entries[i]
+		if e.ok && e.addr.ID != "" && perRoot[e.root] > 1 {
+			loaded, seen := epicsByProject[e.addr.Project]
+			if !seen {
+				loaded, _ = s.Projects.Epics(e.addr.Project)
+				epicsByProject[e.addr.Project] = loaded
+			}
+			if s.dropIfTerminal(item.Address, e.addr, loaded) {
+				perRoot[e.root]--
+				continue
+			}
+		}
+		kept = append(kept, item)
+	}
+	return kept
+}
+
+// dropIfTerminal drops the queued ticket entry when its ticket in loaded is
+// terminal, and reports whether it did.
+func (s *Scheduler) dropIfTerminal(queued string, addr tickets.Address, loaded []tickets.Epic) bool {
 	for _, e := range loaded {
 		if filepath.Base(e.Path) != addr.Epic {
 			continue
