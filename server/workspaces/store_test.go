@@ -8,17 +8,31 @@ import (
 	"github.com/elentok/gx/server/broker"
 )
 
-type fakeDesigns map[string]bool
+// fakeDesigns answers only DesignExists; the embedded nil Directory panics on
+// anything else, which these tests never reach.
+type fakeDesigns struct {
+	Directory
+	designs map[string]bool
+}
 
-func (f fakeDesigns) DesignExists(key string) bool { return f[key] }
+func (f fakeDesigns) DesignExists(key string) bool { return f.designs[key] }
 
 func open(t *testing.T, dir string, b *broker.Broker) *Store {
 	t.Helper()
-	s, err := Open(dir, b, fakeDesigns{"p:nav": true})
+	d := fakeDesigns{designs: map[string]bool{"p:nav": true}}
+	s, err := Open(dir, b, func() Directory { return d })
 	if err != nil {
 		t.Fatal(err)
 	}
 	return s
+}
+
+func names(s *Store) []string {
+	var out []string
+	for _, w := range s.Listed() {
+		out = append(out, w.Name)
+	}
+	return out
 }
 
 func TestRefusals(t *testing.T) {
@@ -48,7 +62,7 @@ func TestRefusals(t *testing.T) {
 			}
 		})
 	}
-	if got := s.List(); !slices.Equal(got, []string{DefaultName, "Bugs"}) {
+	if got := names(s); !slices.Equal(got, []string{DefaultName, "Bugs"}) {
 		t.Fatalf("list = %v", got)
 	}
 }
@@ -60,19 +74,19 @@ func TestOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := s.List(); !slices.Equal(got, []string{DefaultName, "A", "B"}) {
+	if got := names(s); !slices.Equal(got, []string{DefaultName, "A", "B"}) {
 		t.Fatalf("new last: %v", got)
 	}
 	if err := s.Move(DefaultName, 2); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.List(); !slices.Equal(got, []string{"A", "B", DefaultName}) {
+	if got := names(s); !slices.Equal(got, []string{"A", "B", DefaultName}) {
 		t.Fatalf("default moved: %v", got)
 	}
 	if err := s.Move("b", 0); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.List(); !slices.Equal(got, []string{"B", "A", DefaultName}) {
+	if got := names(s); !slices.Equal(got, []string{"B", "A", DefaultName}) {
 		t.Fatalf("b first: %v", got)
 	}
 }
@@ -215,7 +229,7 @@ func TestPersistence(t *testing.T) {
 	}
 
 	r := open(t, dir, broker.New(0))
-	if got := r.List(); !slices.Equal(got, []string{"A", DefaultName, "B"}) {
+	if got := names(r); !slices.Equal(got, []string{"A", DefaultName, "B"}) {
 		t.Fatalf("list = %v", got)
 	}
 	if r.Workspace("p:x") != "B" || !r.IsHeld("p:x") {

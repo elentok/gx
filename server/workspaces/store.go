@@ -41,11 +41,6 @@ const (
 
 func (r Reason) Error() string { return string(r) }
 
-// Resolver answers whether a Design exists, given its `project:epic` key.
-type Resolver interface {
-	DesignExists(key string) bool
-}
-
 type state struct {
 	Order   []string          `json:"order"`
 	Members map[string]string `json:"members"`
@@ -62,20 +57,11 @@ func (s state) clone() state {
 
 // Store is the workspace store. All methods are safe for concurrent use.
 type Store struct {
-	mu       sync.Mutex
-	path     string
-	events   *broker.Broker
-	resolver Resolver
-	dir      Directory
-	st       state
-}
-
-// SetDirectory supplies what the membership rules and placement look up; it
-// also serves as the Resolver. Call it before the store is used.
-func (s *Store) SetDirectory(d Directory) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.dir, s.resolver = d, d
+	mu     sync.Mutex
+	path   string
+	events *broker.Broker
+	dir    func() Directory
+	st     state
 }
 
 // Reorder sets the workspace order; order must name every workspace exactly once.
@@ -108,10 +94,10 @@ func (s *Store) Join(key, workspace string) error {
 	return s.SetMember(key, workspace)
 }
 
-// Open loads the persisted store from stateDir. resolver may be nil, in which
-// case no `-impl` key is folded into a Design.
-func Open(stateDir string, events *broker.Broker, resolver Resolver) (*Store, error) {
-	s := &Store{path: filepath.Join(stateDir, fileName), events: events, resolver: resolver}
+// Open loads the persisted store from stateDir. dir is called on each lookup,
+// so the server can hand over itself after it is built.
+func Open(stateDir string, events *broker.Broker, dir func() Directory) (*Store, error) {
+	s := &Store{path: filepath.Join(stateDir, fileName), events: events, dir: dir}
 	data, err := os.ReadFile(s.path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
@@ -129,13 +115,6 @@ func Open(stateDir string, events *broker.Broker, resolver Resolver) (*Store, er
 		s.st.Members = map[string]string{}
 	}
 	return s, nil
-}
-
-// List returns the workspace names in order.
-func (s *Store) List() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return slices.Clone(s.st.Order)
 }
 
 // Listed returns the workspaces in order with their member counts.
@@ -327,10 +306,7 @@ func (s *Store) index(name string) int {
 
 // canon maps a Design's `-impl` key to the Design's key, so both read one workspace and hold.
 func (s *Store) canon(key string) string {
-	if s.resolver == nil {
-		return key
-	}
-	if design, ok := strings.CutSuffix(key, tickets.ImplEpicSuffix); ok && s.resolver.DesignExists(design) {
+	if design, ok := strings.CutSuffix(key, tickets.ImplEpicSuffix); ok && s.dir().DesignExists(design) {
 		return design
 	}
 	return key

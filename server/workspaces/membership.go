@@ -11,7 +11,8 @@ import (
 // Directory is what the membership rules and placement need from the server:
 // the epic behind a `project:epic` key, whether it is a Design, and the sessions.
 type Directory interface {
-	Resolver
+	// DesignExists reports whether a Design exists, given its `project:epic` key.
+	DesignExists(key string) bool
 	Epic(key string) (tickets.Epic, bool)
 	Sessions() []wire.SessionInfo
 	// RootQueued reports whether any ticket of the `project:epic` root is queued.
@@ -26,14 +27,12 @@ func (s *Store) joinable(key string) error {
 	if key == "" {
 		return ReasonBlankKey
 	}
-	if s.dir == nil {
-		return ReasonUnknownKey
-	}
+	dir := s.dir()
 	if _, name, ok := tickets.ParseEpicAddress(key); ok {
 		if name == tickets.FollowUpsEpic || name == tickets.ArchivedFollowUpsEpic || tickets.IsOneOffsEpicName(name) {
 			return ReasonNotJoinable
 		}
-		e, ok := s.dir.Epic(key)
+		e, ok := dir.Epic(key)
 		switch {
 		case !ok:
 			return ReasonUnknownKey
@@ -42,7 +41,7 @@ func (s *Store) joinable(key string) error {
 		}
 		return nil
 	}
-	for _, si := range s.dir.Sessions() {
+	for _, si := range dir.Sessions() {
 		if si.ID != key {
 			continue
 		}
@@ -82,13 +81,11 @@ func (s *Store) place(si wire.SessionInfo) wire.SessionPlacement {
 		return other
 	}
 	epic := a.Project + ":" + a.Epic
-	if s.dir == nil {
-		return wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementEpic, Epic: epic}
-	}
-	if e, ok := s.dir.Epic(epic); ok && tickets.IsOneOffEpic(e) {
+	dir := s.dir()
+	if e, ok := dir.Epic(epic); ok && tickets.IsOneOffEpic(e) {
 		return other
 	}
-	if design, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && s.dir.DesignExists(design) {
+	if design, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && dir.DesignExists(design) {
 		epic = design
 	}
 	return wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementEpic, Epic: epic}

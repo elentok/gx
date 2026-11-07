@@ -200,11 +200,12 @@ func (d fakeDir) Epic(key string) (tickets.Epic, bool) {
 }
 
 func TestStorePlace_QueueAndOneOffAgents(t *testing.T) {
-	s, err := workspaces.Open(t.TempDir(), broker.New(0), nil)
+	s, err := workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory {
+		return fakeDir{designs: map[string]bool{"proj:map": true}}
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.SetDirectory(fakeDir{designs: map[string]bool{"proj:map": true}})
 	got := s.Place([]wire.SessionInfo{
 		{ID: "agent-a", Queue: true, Ticket: "proj:map-impl/02"},
 		{ID: "agent-b", Queue: true, Ticket: "proj:plain/01"},
@@ -221,14 +222,15 @@ func TestStorePlace_QueueAndOneOffAgents(t *testing.T) {
 }
 
 func TestStoreJoin_QueueAndOneOffAgentsRefuse(t *testing.T) {
-	s, err := workspaces.Open(t.TempDir(), broker.New(0), nil)
+	s, err := workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory {
+		return fakeDir{sessions: []wire.SessionInfo{
+			{ID: "agent-a", Queue: true, Ticket: "proj:plain/01"},
+			{ID: "agent-c", Queue: true, Ticket: "proj:one-offs/03"},
+		}}
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.SetDirectory(fakeDir{sessions: []wire.SessionInfo{
-		{ID: "agent-a", Queue: true, Ticket: "proj:plain/01"},
-		{ID: "agent-c", Queue: true, Ticket: "proj:one-offs/03"},
-	}})
 	if err := s.Create("Bugs"); err != nil {
 		t.Fatal(err)
 	}

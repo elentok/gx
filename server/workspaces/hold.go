@@ -24,9 +24,7 @@ func (s *Store) holdTargetOf(addr string) (holdTarget, *wire.HoldResult) {
 		return holdTarget{}, &wire.HoldResult{Held: s.HeldKeys(), Refused: true, Reason: reason, Message: msg}
 	}
 	addr = strings.TrimSpace(addr)
-	if s.dir == nil {
-		return refuse(wire.ReasonHoldUnknown, string(ReasonUnknownKey))
-	}
+	dir := s.dir()
 	if _, _, ok := tickets.ParseEpicAddress(addr); !ok {
 		return refuse(wire.ReasonHoldUnknown, string(ReasonUnknownKey))
 	}
@@ -37,10 +35,10 @@ func (s *Store) holdTargetOf(addr string) (holdTarget, *wire.HoldResult) {
 		return refuse(wire.ReasonHoldUnknown, err.Error())
 	}
 	design := addr
-	if d, ok := strings.CutSuffix(addr, tickets.ImplEpicSuffix); ok && s.dir.DesignExists(d) {
+	if d, ok := strings.CutSuffix(addr, tickets.ImplEpicSuffix); ok && dir.DesignExists(d) {
 		design = d
 	}
-	if s.dir.DesignExists(design) {
+	if dir.DesignExists(design) {
 		return holdTarget{key: design, design: true, roots: []string{design, design + tickets.ImplEpicSuffix}}, nil
 	}
 	return holdTarget{key: addr, roots: []string{addr}}, nil
@@ -53,12 +51,13 @@ func (s *Store) HoldEpic(addr string, yes bool) (wire.HoldResult, error) {
 	if refused != nil {
 		return *refused, nil
 	}
-	if slices.ContainsFunc(t.roots, s.dir.RootQueued) {
+	dir := s.dir()
+	if slices.ContainsFunc(t.roots, dir.RootQueued) {
 		return wire.HoldResult{Held: s.HeldKeys(), Refused: true, Reason: wire.ReasonHoldQueued, Message: wire.HoldQueuedText}, nil
 	}
 	var live []string
 	if t.design {
-		for _, si := range s.dir.Sessions() {
+		for _, si := range dir.Sessions() {
 			if si.Design && si.Status.State != wire.SessionExited && tickets.EpicAddress(si.Ticket) == t.key {
 				live = append(live, si.ID)
 			}
@@ -72,7 +71,7 @@ func (s *Store) HoldEpic(addr string, yes bool) (wire.HoldResult, error) {
 	}
 	var ended []string
 	for _, id := range live {
-		if err := s.dir.StopSession(id); err != nil {
+		if err := dir.StopSession(id); err != nil {
 			return wire.HoldResult{}, err
 		}
 		ended = append(ended, id)

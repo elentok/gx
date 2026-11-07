@@ -235,7 +235,8 @@ func New(cfg Config) (*Server, error) {
 		lock.Release()
 		return nil, fmt.Errorf("load vi mode: %w", err)
 	}
-	wsStore, err := workspaces.Open(cfg.StateDir, events, nil)
+	var s *Server
+	wsStore, err := workspaces.Open(cfg.StateDir, events, func() workspaces.Directory { return workspacesDirectory{s} })
 	if err != nil {
 		lock.Release()
 		return nil, fmt.Errorf("load workspaces: %w", err)
@@ -287,7 +288,7 @@ func New(cfg Config) (*Server, error) {
 		lock.Release()
 		return nil, fmt.Errorf("load runs: %w", err)
 	}
-	s := &Server{
+	s = &Server{
 		cfg:  cfg,
 		lock: lock,
 		ln:   ln,
@@ -310,7 +311,6 @@ func New(cfg Config) (*Server, error) {
 
 		focus: sessions.NewFocusReports(),
 	}
-	wsStore.SetDirectory(workspacesDirectory{s})
 	s.restarter = s.newRestarter()
 	s.initProjects()
 	s.startup = lifecycle.NewStartup(startupHost{s}, log)
