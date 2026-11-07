@@ -5,6 +5,7 @@ import { BottomSheet } from "../ui/modal/BottomSheet";
 import type { DesignDraft } from "../generated/server";
 import { deleteDraft, draftLabel, listDrafts, readDraft, saveDraft, type DeleteDraft, type ListDrafts, type ReadDraft, type SaveDraft } from "./drafts";
 import { postOpenDesign, type OpenDesign } from "./open";
+import { clearUnsaved, NEW_DRAFT_KEY, readUnsaved, stashUnsaved } from "./unsaved";
 import { useDesignWrite } from "./SessionControls";
 import { useWide } from "../useWide";
 
@@ -19,6 +20,7 @@ export interface DraftsClient {
 const realDrafts: DraftsClient = { list: listDrafts, read: readDraft, save: saveDraft, remove: deleteDraft };
 
 const AUTOSAVE_MS = 800;
+const RETRY_MS = 5000;
 
 interface Fields {
   slug: string;
@@ -26,7 +28,7 @@ interface Fields {
   project: string;
 }
 
-type SaveStatus = "none" | "saving" | "saved";
+type SaveStatus = "none" | "saving" | "saved" | "unsaved";
 type Banner = "conflict" | "gone" | undefined;
 
 const hasText = (d: Partial<Fields>) => !!(d.slug?.trim() || d.idea?.trim());
@@ -76,9 +78,18 @@ interface FormProps {
 export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
   // `undefined` is still loading; `null` is no draft to open.
   const [initial, setInitial] = useState<DesignDraft | null | undefined>();
+  const [restored, setRestored] = useState<Restored>();
   useEffect(() => {
     let live = true;
     (async () => {
+      const stuck = await saveUnsaved(drafts);
+      if (stuck) {
+        if (live) {
+          setRestored(stuck.state);
+          setInitial(stuck.draft);
+        }
+        return;
+      }
       const [latest] = await drafts.list();
       const res = latest ? await drafts.read(latest.id) : undefined;
       if (live) setInitial(res?.kind === "ok" ? res.draft : null);
@@ -99,7 +110,33 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
       </BottomSheet>
     );
   }
-  return <DraftForm {...props} drafts={drafts} initial={initial} />;
+  return <DraftForm {...props} drafts={drafts} initial={initial} restored={restored} />;
+}
+
+/** Why the form opened on a fallback entry instead of the latest draft. */
+type Restored = "unsaved" | "conflict" | "gone";
+
+/**
+ * Saves each fallback entry to its draft with its revision. The first one that cannot settle
+ * (a refusal, or the server still down) is returned for the form to open on; its entry stays
+ * until the form saves, starts or discards it.
+ */
+async function saveUnsaved(drafts: DraftsClient): Promise<{ draft: DesignDraft; state: Restored } | undefined> {
+  for (const [id, e] of Object.entries(readUnsaved())) {
+    const fields = { project: e.project, slug: e.slug, idea: e.idea, name: e.name };
+    let state: Restored;
+    try {
+      const res = await drafts.save({ id: id || undefined, ...fields, revision: e.revision });
+      if (res.kind === "ok" || res.kind === "deleted") {
+        clearUnsaved(id);
+        continue;
+      }
+      state = res.kind;
+    } catch {
+      state = "unsaved";
+    }
+    return { draft: { id, images: [], edited_at: "", ...fields, revision: e.revision }, state };
+  }
 }
 
 function DraftForm({
@@ -110,28 +147,33 @@ function DraftForm({
   onClose,
   drafts,
   initial,
-}: FormProps & { drafts: DraftsClient; initial: DesignDraft | null }) {
+  restored,
+}: FormProps & { drafts: DraftsClient; initial: DesignDraft | null; restored?: Restored }) {
   const sheetMode = !useWide();
   const [draft, setDraft] = useState<Fields>(() => ({
     slug: initial?.slug ?? "",
     idea: initial?.idea ?? "",
     project: startingProject(initial ?? {}, projects, filterProject),
   }));
-  const [status, setStatus] = useState<SaveStatus>("none");
+  const [status, setStatus] = useState<SaveStatus>(restored === "unsaved" ? "unsaved" : "none");
   const [confirming, setConfirming] = useState(false);
   const { run, pending } = useDesignWrite();
 
   const latest = useRef(draft);
-  // `synced` is the fields as the server last had them, so an unchanged form saves nothing.
-  const server = useRef({ id: initial?.id, revision: initial?.revision ?? 0, name: initial?.name, synced: JSON.stringify(draft) });
+  // `synced` is the fields as the server last had them, so an unchanged form saves nothing. A restored entry never reached the server.
+  const server = useRef({ id: initial?.id || undefined, revision: initial?.revision ?? 0, name: initial?.name, synced: restored ? "" : JSON.stringify(draft) });
+  // Set after a failed save until one succeeds; a leave then keeps the text in localStorage.
+  const failing = useRef(restored === "unsaved");
+  // Fallback keys this form wrote or inherited, cleared together once the text is settled.
+  const stashed = useRef<string[]>(restored ? [initial?.id ?? NEW_DRAFT_KEY] : []);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const chain = useRef<Promise<void>>(Promise.resolve());
   const finished = useRef(false);
   // Set while Start is in flight: a save then could recreate the draft Start is about to delete.
   const starting = useRef(false);
   // The banner's ref twin, so a flush in flight sees it before a render.
-  const blocked = useRef<Banner>(undefined);
-  const [banner, setBanner] = useState<Banner>();
+  const blocked = useRef<Banner>(restored === "conflict" || restored === "gone" ? restored : undefined);
+  const [banner, setBanner] = useState<Banner>(blocked.current);
   const [images, setImages] = useState(initial?.images ?? []);
 
   const persist = async () => {
@@ -141,20 +183,45 @@ function DraftForm({
     const key = JSON.stringify(fields);
     if (key === s.synced) return setStatus(s.id ? "saved" : "none");
     if (!s.id && !fields.slug && !fields.idea) return setStatus("none");
-    const res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision });
+    let res;
+    try {
+      res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision });
+    } catch {
+      // The text stays in memory and is retried on the next keystroke and every RETRY_MS.
+      failing.current = true;
+      stash();
+      return setStatus("unsaved");
+    }
+    failing.current = false;
     if (res.kind === "ok") {
       Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key });
+      settle();
       return setStatus("saved");
     }
     if (res.kind === "deleted") {
       Object.assign(s, { id: undefined, revision: 0, name: undefined, synced: key });
+      settle();
       return setStatus("none");
     }
     raise(res.kind);
   };
 
+  /** Keeps the unsaved text in localStorage for the next open. */
+  const stash = () => {
+    const s = server.current;
+    const key = s.id ?? NEW_DRAFT_KEY;
+    stashUnsaved(key, { revision: s.revision, ...latest.current, name: s.name });
+    if (!stashed.current.includes(key)) stashed.current.push(key);
+  };
+  /** The text reached the server, or Start or Discard took it over. */
+  const settle = () => {
+    clearUnsaved(...stashed.current);
+    stashed.current = [];
+  };
+
   /** A refusal pauses autosave until the person picks a way out of the banner. */
   const raise = (kind: "conflict" | "gone") => {
+    stash();
     blocked.current = kind;
     setBanner(kind);
     setStatus("none");
@@ -185,6 +252,7 @@ function DraftForm({
     latest.current = next;
     setDraft(next);
     setImages(theirs.images);
+    settle();
     resume();
   };
   const keepAsNew = () => {
@@ -201,10 +269,15 @@ function DraftForm({
   const stopSaving = () => {
     finished.current = true;
     clearTimeout(timer.current);
+    settle();
   };
 
   useEffect(() => {
-    const leave = () => flush();
+    const leave = () => {
+      // The save below may not finish before the page goes, so the fallback is written first.
+      if (!finished.current && (failing.current || blocked.current) && JSON.stringify(latest.current) !== server.current.synced) stash();
+      flush();
+    };
     window.addEventListener("pagehide", leave);
     return () => {
       window.removeEventListener("pagehide", leave);
@@ -213,6 +286,14 @@ function DraftForm({
     // flush reads refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (status !== "unsaved") return;
+    const id = setInterval(flush, RETRY_MS);
+    return () => clearInterval(id);
+    // flush reads refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   const patch = (p: Partial<Fields>) => {
     const next = { ...draft, ...p };
@@ -248,7 +329,10 @@ function DraftForm({
           // The draft id must be the one a save in flight is creating.
           await chain.current;
           const res = await open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project, draft_id: server.current.id });
-          if (!res.refused) finished.current = true;
+          if (!res.refused) {
+            finished.current = true;
+            settle();
+          }
           return res;
         } finally {
           starting.current = false;
@@ -282,7 +366,7 @@ function DraftForm({
                 ✓{" "}
               </chakra.span>
             )}
-            {status === "saving" ? "Saving..." : "Saved"}
+            {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
           </Text>
         )}
       </Box>

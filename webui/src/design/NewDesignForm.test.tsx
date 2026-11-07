@@ -10,6 +10,7 @@ import { NewDesignForm, type DraftsClient } from "./NewDesignForm";
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   vi.useRealTimers();
 });
 
@@ -484,4 +485,107 @@ test("the overlay covers the visual viewport, so the keyboard does not hide the 
 test("a wide viewport has no grab handle", async () => {
   await mount();
   expect(screen.queryByTestId("grab-handle")).toBeNull();
+});
+
+const UNSAVED_KEY = "gx.newDesign.unsaved";
+const unsavedMap = () => JSON.parse(localStorage.getItem(UNSAVED_KEY) ?? "{}");
+
+/** A form on draft d1 whose saves throw while `down.on` is set. */
+async function serverDown() {
+  vi.useFakeTimers();
+  localStorage.clear();
+  const base = fakeDrafts({ slug: "mine", idea: "my idea", project: "blog" });
+  const down = { on: true };
+  const save = vi.fn(async (body: DesignDraftSaveRequest) => {
+    if (down.on) throw new WriteError("offline");
+    return base.save(body);
+  });
+  const view = await mount({ drafts: { ...base.client, save } }, { slug: "mine", idea: "my idea", project: "blog" });
+  return { ...view, save, remove: base.remove, down };
+}
+
+test("a failing save shows Not saved, and a keystroke and a 5 s tick each retry", async () => {
+  const { save, down } = await serverDown();
+  type("Rough idea", "one");
+  await wait(800);
+  expect(screen.getByText("Not saved")).toBeTruthy();
+  expect(save).toHaveBeenCalledTimes(1);
+  type("Rough idea", "two");
+  await wait(800);
+  expect(save).toHaveBeenCalledTimes(2);
+  await wait(5000);
+  expect(save).toHaveBeenCalledTimes(3);
+  down.on = false;
+  await wait(5000);
+  expect(save).toHaveBeenCalledTimes(4);
+  expect(screen.getByText("Saved")).toBeTruthy();
+  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
+});
+
+test("closing while unsaved keeps one entry for the draft", async () => {
+  const { onClose } = await serverDown();
+  type("Rough idea", "typed offline");
+  await wait(800);
+  click("Close");
+  expect(onClose).toHaveBeenCalled();
+  expect(unsavedMap()).toEqual({ d1: { revision: 3, project: "blog", slug: "mine", idea: "typed offline" } });
+});
+
+test("the next open saves a fallback entry with its revision and clears it", async () => {
+  vi.useFakeTimers();
+  localStorage.setItem(UNSAVED_KEY, JSON.stringify({ d1: { revision: 3, project: "blog", slug: "mine", idea: "kept", name: "N" } }));
+  const { save } = await mount({}, { slug: "mine", idea: "old" });
+  expect(save).toHaveBeenCalledWith({ id: "d1", project: "blog", slug: "mine", idea: "kept", name: "N", revision: 3 });
+  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
+});
+
+test.each([
+  ["conflict", CONFLICT],
+  ["gone", GONE],
+] as const)("a fallback entry refused as %s raises its banner and keeps the text", async (kind, text) => {
+  vi.useFakeTimers();
+  localStorage.setItem(UNSAVED_KEY, JSON.stringify({ d1: { revision: 3, project: "blog", slug: "mine", idea: "kept" } }));
+  const base = fakeDrafts({ slug: "mine", idea: "old" });
+  await mount({ drafts: { ...base.client, save: vi.fn(async (): Promise<DraftResult> => ({ kind })) } });
+  expect(screen.getByText(text)).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("kept");
+  expect(Object.keys(unsavedMap())).toEqual(["d1"]);
+});
+
+test("a fallback entry survives a second failed open and another draft's entry stays beside it", async () => {
+  vi.useFakeTimers();
+  localStorage.setItem(
+    UNSAVED_KEY,
+    JSON.stringify({
+      d1: { revision: 3, project: "blog", slug: "a", idea: "A text" },
+      d2: { revision: 1, project: "gx", slug: "b", idea: "B text" },
+    }),
+  );
+  const base = fakeDrafts({ slug: "a", idea: "old" });
+  await mount({ drafts: { ...base.client, save: vi.fn(async () => Promise.reject(new WriteError("offline"))) } });
+  expect(screen.getByText("Not saved")).toBeTruthy();
+  expect(Object.keys(unsavedMap()).sort()).toEqual(["d1", "d2"]);
+});
+
+test("Discard removes the entry", async () => {
+  const { remove } = await serverDown();
+  type("Rough idea", "typed offline");
+  await wait(800);
+  expect(localStorage.getItem(UNSAVED_KEY)).not.toBeNull();
+  click("Discard");
+  click("Discard");
+  await act(async () => {});
+  expect(remove).toHaveBeenCalledWith("d1");
+  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
+});
+
+test("Start while Not saved leaves no entry, so no draft comes back", async () => {
+  const { onStarted } = await serverDown();
+  type("Rough idea", "typed offline");
+  await wait(800);
+  expect(localStorage.getItem(UNSAVED_KEY)).not.toBeNull();
+  await act(async () => click("Start design"));
+  expect(onStarted).toHaveBeenCalled();
+  cleanup();
+  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
 });
