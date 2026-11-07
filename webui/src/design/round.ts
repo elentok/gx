@@ -1,6 +1,8 @@
 import type { SessionRoundCard } from "../generated/server";
 
-export type Answer = { choice?: string; text?: string; note?: string };
+export type Answer = { choice?: string; text?: string; note?: string; huh?: boolean };
+
+export const HUH_MESSAGE = "I don't understand the question, please explain in a clearer way";
 export type Answers = Record<string, Answer>;
 
 export const choicesOf = (c: SessionRoundCard) =>
@@ -11,10 +13,11 @@ export const choicesOf = (c: SessionRoundCard) =>
       ]
     : (c.options ?? []);
 
-export const isAnswered = (a?: Answer) => !!a?.choice || !!a?.text?.trim();
+export const isAnswered = (a?: Answer) => !!a?.huh || !!a?.choice || !!a?.text?.trim();
 
-/** The answer as the prompt words it: the picked option's label, or the typed text. */
+/** The answer as the prompt words it: the Huh? message, the picked option's label, or the typed text. */
 export const answerText = (c: SessionRoundCard, a: Answer) => {
+  if (a.huh) return HUH_MESSAGE;
   if (a.choice) {
     if (c.kind === "yes-no") return a.choice === "yes" ? "Yes" : "No";
     return choicesOf(c).find((o) => o.id === a.choice)?.label ?? a.choice;

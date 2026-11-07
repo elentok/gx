@@ -93,7 +93,7 @@ export function Question({
             title={`Answer to ${nameOf(card)} - ${card.title}`}
             placeholder="Your answer"
             value={answer.text ?? ""}
-            onChange={(t) => onChange({ ...answer, text: t })}
+            onChange={(t) => onChange({ ...answer, huh: false, text: t })}
           />
         </>
       ) : (
@@ -107,7 +107,7 @@ export function Question({
                 on={on}
                 recommended={card.recommended === c.id}
                 onClick={() => {
-                  onChange({ ...answer, choice: on ? undefined : c.id });
+                  onChange({ ...answer, huh: false, choice: on ? undefined : c.id });
                   if (!on) onPicked();
                 }}
               />
@@ -115,6 +115,18 @@ export function Question({
           })}
         </Box>
       )}
+      <Box>
+        <Choice
+          label="Huh?"
+          on={!!answer.huh}
+          recommended={false}
+          onClick={() => {
+            const on = !answer.huh;
+            onChange({ ...answer, huh: on, choice: on ? undefined : answer.choice });
+            if (on) onPicked();
+          }}
+        />
+      </Box>
       <Box>
         <Button
           emphasis="ghost"

@@ -5,7 +5,7 @@ import type { SessionRoundCard } from "../generated/server";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
 import { Question, QuestionSheet } from "./QuestionSheet";
-import type { Answers } from "./round";
+import { HUH_MESSAGE, roundPrompt, type Answers } from "./round";
 
 afterEach(cleanup);
 
@@ -110,6 +110,26 @@ test("the question note's large editor is titled with the question and its text 
   );
   await typeInLargeEditor("Note on Q2 - Pick one", "hello");
   expect(seen.at(-1)?.["2"]?.note).toBe("hello");
+});
+
+test.each(["text", "yes-no"])("Huh? on a %s question answers it with the fixed message, and a pick replaces it", (kind) => {
+  function Harness() {
+    const [answers, setAnswers] = useState<Answers>({});
+    return (
+      <>
+        <QuestionSheet round={[card({ kind })]} answers={answers} onAnswers={(u) => setAnswers(u)} />
+        <output>{roundPrompt([card({ kind })], answers, "")}</output>
+      </>
+    );
+  }
+  renderThemed(<Harness />);
+  fireEvent.click(screen.getByText("Huh?"));
+  expect(screen.getByText("1 of 1 answered")).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toBe(`Q1 - Pick: ${HUH_MESSAGE}`);
+  if (kind === "yes-no") {
+    fireEvent.click(screen.getByText("Yes"));
+    expect(screen.getByRole("status").textContent).toBe("Q1 - Pick: Yes");
+  }
 });
 
 describe("a move scrolls the body to the top", () => {
