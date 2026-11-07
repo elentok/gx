@@ -32,6 +32,48 @@ test("Workspaces", async ({ page, start }) => {
   await sidebar.getByRole("button", nav("Collapse inv-epic")).click();
   await expect(links).toHaveCount(collapsed);
 
+  // Rows show their numbers while Alt is held, and Alt+1 opens the first one.
+  const numbers = sidebar.getByTestId("row-number");
+  await expect(numbers).toHaveCount(0);
+  await page.keyboard.down("Alt");
+  await expect(numbers.first()).toHaveText("1");
+  await page.keyboard.up("Alt");
+  await expect(numbers).toHaveCount(0);
+  const firstHref = (await sidebar.getByRole("link").first().getAttribute("href"))!.slice(1);
+  await page.keyboard.press("Alt+1");
+  await expect.poll(() => new URL(page.url()).hash.slice(1)).toBe(firstHref);
+  await goto(page, "#/epics");
+
+  // Cmd/Ctrl+B hides the sidebar and brings it back with focus on a row; j/k, l/h and Enter move, expand and open.
+  await page.locator("body").click({ position: { x: 600, y: 600 } });
+  await page.keyboard.press("ControlOrMeta+b");
+  await expect(sidebar).toBeHidden();
+  await page.keyboard.press("ControlOrMeta+b");
+  await expect(sidebar).toBeVisible();
+  const navs = sidebar.locator("[data-nav]");
+  await expect(navs.first()).toBeFocused();
+  await page.keyboard.press("j");
+  await expect(navs.nth(1)).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(navs.first()).toBeFocused();
+  await page.keyboard.press("k");
+  await expect(navs.first()).toBeFocused();
+  await row("inv-epic").focus();
+  await page.keyboard.press("l");
+  await expect(sidebar.getByRole("button", nav("Collapse inv-epic"))).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("h");
+  await expect(sidebar.getByRole("button", nav("Expand inv-epic"))).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#\/e\/demo:inv-epic$/);
+  await goto(page, "#/epics");
+
+  // Alt+Shift+2 picks the second workspace.
+  await page.keyboard.press("Alt+Shift+2");
+  await expect(page.getByRole("button", nav("Workspace: gx bugs"))).toBeVisible();
+  await expect(row("ws-design")).toBeVisible();
+  await page.keyboard.press("Alt+Shift+1");
+  await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible();
+
   // Switching workspace changes the rows, on the Epics page and after in-app navigation to a Design.
   await pick("gx bugs");
   await expect(row("ws-design")).toBeVisible();
@@ -139,6 +181,7 @@ test("Workspaces", async ({ page, start }) => {
 
   // Hold from the page header, and from a jump row.
   await goto(page, "#/e/demo:design-new");
+  await expect(page.getByRole("heading", { level: 1, name: "design-new" })).toBeVisible();
   await page.getByRole("button", nav("More actions")).last().click();
   await page.getByRole("menuitem", nav("Hold")).click();
   await expect(onHold).toHaveText("On hold (2)");
@@ -227,4 +270,39 @@ test("Workspaces", async ({ page, start }) => {
   await page.keyboard.press("Escape");
   await fx.cli("server", "workspaces", "delete", "studies");
   await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible();
+
+  // At 744px the sidebar slides over: picking a row closes it, the jump menu is a popover, no page scrolls sideways.
+  await page.setViewportSize({ width: 744, height: 900 });
+  await goto(page, "#/epics");
+  await expect(sidebar).toBeHidden();
+  await page.getByRole("button", nav("Show sidebar")).click();
+  await expect(sidebar).toBeVisible();
+  await row("paused-epic").click();
+  await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
+  await expect(sidebar).toBeHidden();
+  await page.keyboard.press("ControlOrMeta+k");
+  const popover = (await jump.boundingBox())!;
+  expect(popover.width).toBeLessThan(744);
+  expect(popover.height).toBeLessThan(900);
+  await page.keyboard.press("Escape");
+  const sideways = () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  const ticket = page.locator('a[href^="#/t/"]').first();
+  await expect(ticket).toBeVisible();
+  const ticketHash = (await ticket.getAttribute("href"))!;
+  for (const hash of ["#/epics", "#/e/demo:paused-epic", ticketHash, "#/e/demo:ws-design", "#/agents", "#/stats", "#/settings"]) {
+    await goto(page, hash);
+    await expect(page.getByRole("heading").first()).toBeVisible();
+    expect(await sideways(), hash).toBe(false);
+  }
+
+  // At 390px an item outside the active workspace opens through the switcher: its row is not in the sidebar.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await goto(page, "#/epics");
+  await page.getByRole("button", nav("Show sidebar")).click();
+  await moveTo(rowMenu("paused-epic"), "paused-epic", "scratch");
+  await expect(row("paused-epic")).toHaveCount(0);
+  await pick("scratch");
+  await row("paused-epic").click();
+  await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
+  await expect(sidebar).toBeHidden();
 });
