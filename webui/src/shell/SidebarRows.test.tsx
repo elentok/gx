@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { session } from "../agents/agentsTestKit";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
@@ -52,6 +52,10 @@ const placements: SessionPlacement[] = [
   { session: "s4", kind: "epic", epic: "p:shop" },
 ];
 
+function Page() {
+  return <div data-testid="page-path">{useLocation().pathname}</div>;
+}
+
 function setup(device: Device, path = "/") {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })));
   const state = {
@@ -71,7 +75,7 @@ function setup(device: Device, path = "/") {
     tick: 0,
   } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
-  const router = createMemoryRouter([{ element: <AppShell />, children: [{ path: "*", element: <div>page</div> }] }], { initialEntries: [path] });
+  const router = createMemoryRouter([{ element: <AppShell />, children: [{ path: "*", element: <Page /> }] }], { initialEntries: [path] });
   renderThemed(
     <DeviceContext.Provider value={device}>
       <ConnectionContext.Provider value={conn}>
@@ -151,6 +155,39 @@ test("a row's ... menu opens and Move posts the other workspace", async () => {
     const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/v1/workspaces/move"));
     expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ name: "Work", key: "p:shop" });
   });
+});
+
+test("a chat row's menu offers Stop and Remove; nested agent rows have no menu button", async () => {
+  setup("desktop");
+  const chat = await body().findByRole("link", { name: /^Chat talk/ });
+  fireEvent.click(within(chat.closest("li")!).getByRole("button", { name: "More actions" }));
+  await screen.findAllByRole("menuitem");
+  expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Move to workspace›", "Stop", "Remove"]);
+  cleanup();
+  setup("desktop");
+  await body().findByRole("link", { name: /Blog/ });
+  fireEvent.click(body().getByRole("button", { name: "Expand Blog" }));
+  const agent = body().getByRole("link", { name: /builder/ });
+  expect(within(agent.closest("li")!).queryByRole("button", { name: "More actions" })).toBeNull();
+});
+
+test("removing the open chat from its row confirms, then leaves its page", async () => {
+  const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
+    const u = String(url);
+    if (u.includes("/v1/sessions/stop")) return new Response(JSON.stringify({ session: session("s3", "p", { status: { state: "exited" } }) }), { status: 200 });
+    if (u.includes("/v1/sessions/remove")) return new Response(JSON.stringify({}), { status: 200 });
+    return new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 });
+  });
+  setup("desktop", "/agents/s3");
+  vi.stubGlobal("fetch", fetchMock);
+  const chat = await body().findByRole("link", { name: /^Chat talk/ });
+  fireEvent.click(within(chat.closest("li")!).getByRole("button", { name: "More actions" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+  expect((await screen.findByText("Stop and remove talk? Its session is deleted.")).textContent).toBeTruthy();
+  expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/v1/sessions/remove"))).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/v1/sessions/remove"))).toBe(true));
+  await waitFor(() => expect(screen.getByTestId("page-path").textContent).toBe("/agents"));
 });
 
 test("on a tablet a row click closes the sidebar", async () => {

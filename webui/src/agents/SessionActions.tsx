@@ -1,17 +1,14 @@
-import { Box, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { Box } from "@chakra-ui/react";
 import type { PostPrompt } from "../design/prompt";
 import { usePromptSend } from "../design/usePromptSend";
-import { postStopSession, stateToken, type StopSession } from "../design/open";
+import { postStopSession, type StopSession } from "../design/open";
 import { agentSection } from "../design/SessionControls";
 import type { SessionInfo } from "../generated/server";
-import { useWrite } from "../useWrite";
-import { Button } from "../ui/button/Button";
-import { Modal } from "../ui/modal/Modal";
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu";
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
 import { useWide } from "../useWide";
-import { canManage, isExited, postRemoveSession, removeSession, type RemoveSession } from "./sessionWrites";
+import { postRemoveSession, type RemoveSession } from "./sessionWrites";
+import { useSessionManage } from "./useSessionManage";
 
 /** The "⋯" menu: the Agent block, plus Stop (while live) and Remove for a session a person manages. */
 export function SessionActions({
@@ -36,7 +33,7 @@ export function SessionActions({
     onStale?: () => void;
   };
 }) {
-  const { run, pending } = useWrite();
+  const manage = useSessionManage(session, onRemoved, { stop, remove });
   const promoteSend = usePromptSend({
     session,
     lastMessage: promote?.lastMessage,
@@ -45,10 +42,7 @@ export function SessionActions({
     onStale: promote?.onStale,
     toastRefusal: true,
   });
-  const [confirming, setConfirming] = useState(false);
   const wide = useWide();
-  const live = !isExited(session);
-  const name = session.name || session.id;
   const groups: MenuEntry[][] = [];
   const agent = agentSection(session, wide);
   if (agent) groups.push(agent);
@@ -64,38 +58,13 @@ export function SessionActions({
       },
     ]);
   }
-  if (canManage(session)) {
-    const items: MenuEntry[] = [];
-    if (live)
-      items.push({ value: "stop", label: "Stop", danger: true, disabled: pending, onSelect: () => run(() => stop({ id: session.id, state: stateToken(session) })) });
-    items.push({ value: "remove", label: "Remove", danger: true, disabled: pending, onSelect: () => setConfirming(true) });
-    groups.push(items);
-  }
+  if (manage.items.length > 0) groups.push(manage.items);
   // A queue session with no tier, model or effort has nothing to put in the menu.
   if (groups.length === 0) return null;
   return (
     <Box>
       <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
-      {confirming && (
-        <Modal label={`Remove ${name}`} onClose={() => setConfirming(false)} maxW="sm">
-          <Text>{live ? `Stop and remove ${name}? Its session is deleted.` : `Remove ${name}? Its session is deleted.`}</Text>
-          <Box display="flex" gap="2" justifyContent="flex-end">
-            <Button emphasis="secondary" onClick={() => setConfirming(false)} autoFocus>
-              Keep
-            </Button>
-            <Button
-              tone="paused"
-              disabled={pending}
-              onClick={() => {
-                setConfirming(false);
-                run(() => removeSession(session, { stop, remove }), { onDone: onRemoved });
-              }}
-            >
-              Remove
-            </Button>
-          </Box>
-        </Modal>
-      )}
+      {manage.dialog}
     </Box>
   );
 }

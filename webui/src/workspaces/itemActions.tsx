@@ -7,9 +7,13 @@ import {
   type EpicListRow,
   ReasonHoldLiveSessions,
   type HoldResult,
+  type SessionInfo,
   type Workspace,
   type WorkspaceResult,
 } from "../generated/server";
+import type { StopSession } from "../design/open";
+import { useSessionManage } from "../agents/useSessionManage";
+import type { RemoveSession } from "../agents/sessionWrites";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu";
@@ -28,6 +32,8 @@ export interface ItemRef {
   /** The epic (or the Design's -impl) holds a queue item. */
   queued?: boolean;
   held?: boolean;
+  /** A chat's session, for Stop and Remove. */
+  session?: SessionInfo;
 }
 
 /** The menu target of a Design or epic card; none for a card outside every workspace (One-off, Follow-ups, Other). */
@@ -52,6 +58,9 @@ export interface ItemWriters {
   move: (key: string, to: string) => Promise<WorkspaceResult>;
   hold: (epic: string, yes?: boolean) => Promise<HoldResult>;
   unhold: (epic: string) => Promise<HoldResult>;
+  /** A chat's Stop and Remove; the agent page's defaults when absent. */
+  stop?: StopSession;
+  remove?: RemoveSession;
 }
 
 export const postMove = (key: string, to: string) => postWorkspace<WorkspaceResult>("move", { name: to, key });
@@ -93,9 +102,16 @@ function HoldDialog({ item, writers, run, close, sessions }: DialogProps & { ses
 }
 
 /** The Move, Remove and Hold sections of an item's menu, plus the dialogs they open. No item, no sections and no dialogs. */
-export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[], writers: ItemWriters = defaultWriters) {
+export function useItemActions(
+  item: ItemRef | undefined,
+  workspaces: Workspace[],
+  writers: ItemWriters = defaultWriters,
+  /** Runs after a chat's Remove lands. */
+  onRemoved: () => void = () => {},
+) {
   const { run, pending } = useWrite();
   const [dialog, setDialog] = useState<Dialog>();
+  const manage = useSessionManage(item?.session, onRemoved, { stop: writers.stop, remove: writers.remove });
   if (!item) return { groups: [] as MenuEntry[][], dialogs: null as ReactNode };
   const close = () => setDialog(undefined);
 
@@ -122,6 +138,8 @@ export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[
     ]);
   }
 
+  if (item.kind === "chat" && manage.items.length > 0) groups.push(manage.items);
+
   if (item.kind !== "chat") {
     const hold = () =>
       run(async () => {
@@ -147,14 +165,29 @@ export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[
   }
 
   const props = { item, writers, run, close };
-  const dialogs: ReactNode = dialog ? <HoldDialog {...props} sessions={dialog.sessions} /> : null;
+  const dialogs: ReactNode = (
+    <>
+      {dialog ? <HoldDialog {...props} sessions={dialog.sessions} /> : null}
+      {manage.dialog}
+    </>
+  );
 
   return { groups, dialogs };
 }
 
 /** The "..." menu of one item; renders nothing when it has no actions. */
-export function ItemMenu({ item, workspaces, writers }: { item: ItemRef; workspaces: Workspace[]; writers?: ItemWriters }) {
-  const { groups, dialogs } = useItemActions(item, workspaces, writers);
+export function ItemMenu({
+  item,
+  workspaces,
+  writers,
+  onRemoved,
+}: {
+  item: ItemRef;
+  workspaces: Workspace[];
+  writers?: ItemWriters;
+  onRemoved?: () => void;
+}) {
+  const { groups, dialogs } = useItemActions(item, workspaces, writers, onRemoved);
   if (groups.length === 0) return null;
   return (
     <>

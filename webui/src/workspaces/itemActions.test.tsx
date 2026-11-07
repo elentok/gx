@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { HoldQueuedText, ReasonHoldLiveSessions, type Workspace } from "../generated/server";
+import { session } from "../agents/agentsTestKit";
 import { renderThemed } from "../ui/render";
 import { WideContext } from "../useWide";
 import { ItemMenu, type ItemRef, type ItemWriters } from "./itemActions";
@@ -83,6 +84,47 @@ test("Take off hold posts with no confirmation", async () => {
 
 test("a chat can move but not be held", async () => {
   await open({ ...design, kind: "chat" }, writers());
+  expect(labels()).toEqual(["Move to workspace›"]);
+});
+
+const chat = (state: "idle" | "exited"): ItemRef => ({
+  ...design,
+  kind: "chat",
+  key: "s3",
+  name: "talk",
+  session: session("s3", "p", { name: "talk", status: { state } }),
+});
+
+test("a live chat offers Stop and Remove; Stop posts the stop", async () => {
+  const stop = vi.fn(async () => ({}));
+  await open(chat("idle"), writers({ stop }));
+  expect(labels()).toEqual(["Move to workspace›", "Stop", "Remove"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Stop" }));
+  await waitFor(() => expect(stop).toHaveBeenCalledWith(expect.objectContaining({ id: "s3" })));
+});
+
+test("an exited chat offers Remove only; Remove asks first, then removes and reports", async () => {
+  const remove = vi.fn(async () => ({}));
+  const onRemoved = vi.fn();
+  renderThemed(
+    <WideContext.Provider value={true}>
+      <ItemMenu item={chat("exited")} workspaces={workspaces} writers={writers({ remove })} onRemoved={onRemoved} />
+    </WideContext.Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  await screen.findAllByRole("menuitem");
+  expect(labels()).toEqual(["Move to workspace›", "Remove"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
+  expect((await screen.findByText("Remove talk? Its session is deleted.")).textContent).toBeTruthy();
+  expect(remove).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: "s3" })));
+  await waitFor(() => expect(onRemoved).toHaveBeenCalled());
+});
+
+test("a queue agent's chat gets no Stop or Remove", async () => {
+  const item = chat("idle");
+  await open({ ...item, session: { ...item.session!, queue: true } as ItemRef["session"] }, writers());
   expect(labels()).toEqual(["Move to workspace›"]);
 });
 

@@ -1,10 +1,10 @@
 import { Box, chakra } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { buildSidebar, type SidebarAgent, type SidebarRow, type SidebarStatus } from "../workspaces/sidebarModel";
-import type { Workspace } from "../generated/server";
+import type { SessionInfo, Workspace } from "../generated/server";
 import { ItemMenu, type ItemRef } from "../workspaces/itemActions";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
@@ -84,7 +84,7 @@ function AgentLink({ agent }: { agent: SidebarAgent }) {
 }
 
 /** The menu-button slot: the row's Alt+n number while Alt is held, the "..." menu otherwise. Only this leaf watches Alt. */
-function MenuSlot({ number, item, workspaces }: { number?: number; item: ItemRef; workspaces: Workspace[] }) {
+function MenuSlot({ number, item, workspaces, onRemoved }: { number?: number; item: ItemRef; workspaces: Workspace[]; onRemoved: () => void }) {
   const altHeld = useAltHeld();
   if (altHeld && number !== undefined) {
     return (
@@ -96,15 +96,28 @@ function MenuSlot({ number, item, workspaces }: { number?: number; item: ItemRef
   return (
     // Shown on hover and focus; always on a touch screen, which has no hover.
     <Box opacity="0" _groupHover={{ opacity: 1 }} _focusWithin={{ opacity: 1 }} css={{ "@media (hover: none)": { opacity: 1 } }}>
-      <ItemMenu item={item} workspaces={workspaces} />
+      <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} />
     </Box>
   );
 }
 
-function Row({ row, current, active, workspaces }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[] }) {
+function Row({ row, current, active, workspaces, sessions }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[]; sessions: SessionInfo[] }) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const nested = row.agents.length > 0;
-  const item: ItemRef = { key: row.key, name: row.title, kind: row.kind === "chat" ? "chat" : row.kind === "design" ? "design" : "epic", workspace: active, queued: row.queued, held: row.held };
+  const item: ItemRef = {
+    key: row.key,
+    name: row.title,
+    kind: row.kind === "chat" ? "chat" : row.kind === "design" ? "design" : "epic",
+    workspace: active,
+    queued: row.queued,
+    held: row.held,
+    session: row.kind === "chat" ? sessions.find((s) => s.id === row.key) : undefined,
+  };
+  // The removed chat's page is gone; leave it for the agents list, as the agent page does.
+  const onRemoved = () => {
+    if (current) navigate("/agents");
+  };
   return (
     <li className="group">
       <Box display="flex" alignItems="center" pl="1" bg={current ? "surface.raised" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
@@ -126,7 +139,7 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
           <Status status={row.status} dim={row.held} />
         </chakra.a>
         <Box flex="none">
-          <MenuSlot number={row.number} item={item} workspaces={workspaces} />
+          <MenuSlot number={row.number} item={item} workspaces={workspaces} onRemoved={onRemoved} />
         </Box>
       </Box>
       {nested && open && (
@@ -176,16 +189,17 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
   const { workspaces } = useWorkspaces(useConnectionContext());
   const pathname = useLocation().pathname;
   const model = useSidebarModel(fetcher, active);
+  const sessions = useConnectionState(useConnectionContext()).snapshot?.sessions ?? [];
   if (!model) return null;
   return (
     <>
       {model.rows.map((r) => (
-        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
+        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} sessions={sessions} />
       ))}
       {model.held.length > 0 && (
         <Section title={`On hold (${model.held.length})`}>
           {model.held.map((r) => (
-            <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
+            <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} sessions={sessions} />
           ))}
         </Section>
       )}

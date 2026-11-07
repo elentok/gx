@@ -439,4 +439,25 @@ test("Workspaces", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/agents\//);
   await expect(prompt).toBeVisible();
   await expect(prompt).not.toBeFocused();
+
+  // The chat row's "..." menu: Stop ends the live session, Remove confirms and deletes it, and removing the open chat leaves its page.
+  const chatId = page.url().split("/agents/")[1];
+  const chatMenu = () => chatRow.locator("xpath=ancestor::li").getByRole("button", nav("More actions"));
+  await goto(page, "#/epics");
+  await page.getByRole("button", nav("Show sidebar")).click();
+  await chatMenu().click();
+  await page.getByRole("menuitem", nav("Stop")).click();
+  await expect(chatRow).toContainText("Exited");
+  await chatMenu().click();
+  await expect(page.getByRole("menuitem", nav("Remove"))).toBeVisible();
+  await expect(page.getByRole("menuitem", nav("Stop"))).toHaveCount(0);
+  await closeMenus();
+  await goto(page, `#/agents/${chatId}`);
+  await chatMenu().click();
+  await page.getByRole("menuitem", nav("Remove")).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  expect(await fx.cli("agents", "list")).toContain(chatId);
+  await page.getByRole("dialog").getByRole("button", nav("Remove")).click();
+  await expect(page).not.toHaveURL(new RegExp(`#/agents/${chatId}$`));
+  await expect.poll(() => fx.cli("agents", "list")).not.toContain(chatId);
 });
