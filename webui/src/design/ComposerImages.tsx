@@ -143,10 +143,7 @@ export function ComposerImages({
           emphasis="secondary"
           aria-label="Add image"
           title={phone ? "Add image" : undefined}
-          w={phone ? "44px" : undefined}
-          h={phone ? "44px" : undefined}
-          px={phone ? "0" : undefined}
-          justifyContent={phone ? "center" : undefined}
+          {...(phone ? { w: "44px", h: "44px", px: "0", justifyContent: "center" } : {})}
           flex="none"
           onClick={() => input.current?.click()}
         >

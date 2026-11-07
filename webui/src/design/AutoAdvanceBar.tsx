@@ -53,7 +53,9 @@ export function AutoCountdown({
       alignItems="center"
       {...(strip ? { justifyContent: "space-between", minH: "44px", px: "1", "data-part": "countdown-strip" } : {})}
     >
-      <Text>Continuing in {secondsLeft}s</Text>
+      <Text color="tone.waiting.fg" whiteSpace="nowrap">
+        Continuing in {secondsLeft}s
+      </Text>
       <Button
         emphasis="secondary"
         disabled={disabled}
