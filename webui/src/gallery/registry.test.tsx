@@ -105,6 +105,20 @@ it("shows the Tray busy and critical cases in the mock's meter states", () => {
   expect(states("critical")).toEqual(["critical", "critical", "critical"]);
 });
 
+it("shows the sidebar for each device with an Other case, and the Manage workspaces states", () => {
+  const labelsOf = (name: string) => galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? [];
+  const sidebar = labelsOf("Sidebar");
+  for (const device of ["desktop", "tablet", "phone"]) expect(sidebar.some((l) => l.startsWith(device)), device).toBe(true);
+  expect(sidebar.some((l) => l.includes("Other"))).toBe(true);
+  expect(sidebar).toContain("desktop, On hold collapsed");
+  expect(sidebar).toContain("desktop, On hold expanded");
+  expect(labelsOf("WorkspaceSwitcher")).toEqual(["menu open"]);
+  expect(labelsOf("ManageWorkspaces")).toEqual(["default", "rename in progress", "delete confirmation"]);
+  for (const name of ["Sidebar", "WorkspaceSwitcher", "ManageWorkspaces"]) {
+    for (const c of galleryEntries.find((e) => e.name === name)?.cases ?? []) expect(c.label, name).not.toBe("");
+  }
+});
+
 it("keeps gallery.html out of the production build input", () => {
   expect(existsSync(join(__dirname, "../../gallery.html"))).toBe(true);
   expect(config.build?.rollupOptions?.input).toBe("index.html");

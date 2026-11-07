@@ -5,6 +5,7 @@ import { PageIcon } from "../page/PageIcon";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import canned from "../canned-snapshot.json";
 import { authEntries } from "./authEntries";
+import { shellEntries } from "./shellEntries";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { CoarsePointerContext, type Device, DeviceContext, WideContext } from "../useWide";
@@ -854,6 +855,7 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [{ label: "render error", node: <ErrorCard /> }],
   },
   ...authEntries,
+  ...shellEntries,
   {
     name: "NewDesignForm",
     cases: [
