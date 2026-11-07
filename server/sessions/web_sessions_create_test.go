@@ -105,6 +105,57 @@ func TestWebSessionCreate_NewWorktreeRunsTheSessionThere(t *testing.T) {
 	}
 }
 
+// workspaceMembers is the member count of each workspace by name.
+func (f designsFixture) workspaceMembers(t *testing.T) map[string]int {
+	t.Helper()
+	l, err := f.h.Client.Reads.Workspaces(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]int{}
+	for _, w := range l.Workspaces {
+		out[w.Name] = w.Members
+	}
+	return out
+}
+
+func TestWebSessionCreate_WorkspaceNameDecidesWhereTheChatLands(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	root := f.projectRoot(t)
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, "Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	create := func(workspace string) {
+		t.Helper()
+		body, _ := json.Marshal(sessions.WebCreateSessionRequest{Project: "proj", Dir: root, Workspace: workspace})
+		if code, res := f.webCreate(t, string(body)); code != http.StatusOK || res.Refused || res.Session == nil {
+			t.Fatalf("create %q = %d %+v", workspace, code, res)
+		}
+	}
+	create("Bugs")
+	create("")
+	create("No such workspace")
+	got := f.workspaceMembers(t)
+	if got["Bugs"] != 1 {
+		t.Errorf("Bugs members = %d, want 1 (members %v)", got["Bugs"], got)
+	}
+}
+
+func TestSessionCreate_CliRouteLandsInDefault(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, "Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()}); err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	if got := f.workspaceMembers(t); got["Bugs"] != 0 {
+		t.Errorf("Bugs members = %d, want 0 (members %v)", got["Bugs"], got)
+	}
+}
+
 func TestSessionCreate_CliRouteStillAcceptsASlashPrompt(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)

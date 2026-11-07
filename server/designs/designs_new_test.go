@@ -175,6 +175,61 @@ func TestDesignsOpenNew_PromotedFromAChatStartsInItsWorkspace(t *testing.T) {
 	}
 }
 
+func TestDesignsOpenNew_WorkspaceNameDecidesWhereItLands(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	for _, name := range []string{"Bugs", "Other"} {
+		if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	chat, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()})
+	if err != nil || chat.Session == nil {
+		t.Fatalf("create chat = %+v, %v", chat, err)
+	}
+	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, chat.Session.ID, "Bugs"); err != nil || res.Refused {
+		t.Fatalf("move chat = %+v, %v", res, err)
+	}
+	var members func() map[string]int
+	open := func(req wire.DesignOpenRequest) {
+		t.Helper()
+		req.NewDesign, req.Idea, req.Project = true, "idea", "proj"
+		if res, err := f.h.Client.Sessions.OpenDesign(f.ctx, req); err != nil || res.Refused {
+			t.Fatalf("open %s = %+v, %v", req.Epic, res, err)
+		}
+	}
+	members = func() map[string]int {
+		l, err := f.h.Client.Reads.Workspaces(f.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]int{}
+		for _, w := range l.Workspaces {
+			out[w.Name] = w.Members
+		}
+		return out
+	}
+	open(wire.DesignOpenRequest{Epic: "named", Workspace: "Other"})
+	open(wire.DesignOpenRequest{Epic: "missing"})
+	open(wire.DesignOpenRequest{Epic: "unknown", Workspace: "No such workspace"})
+	// Promote wins over the name: this Design joins its chat in Bugs.
+	open(wire.DesignOpenRequest{Epic: "promoted", Workspace: "Other", FromSession: chat.Session.ID})
+	// The chat's own membership can lapse when its session exits, so Bugs is
+	// only checked for the promoted Design; Other holding just "named" is the
+	// proof that Promote beat the name.
+	got := members()
+	if got["Other"] != 1 || got["Bugs"] < 1 {
+		t.Errorf("members = %v, want Other 1 (named) and Bugs at least 1 (promoted)", got)
+	}
+	// Reopening an existing Design with another name never moves it.
+	if _, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "named", Workspace: "Bugs"}); err != nil {
+		t.Fatal(err)
+	}
+	if again := members(); again["Other"] != 1 {
+		t.Errorf("after reopen members = %v, want unchanged", again)
+	}
+}
+
 func TestDesignsOpenNew_LinkingToItsOwnAddressKeepsDesign(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)

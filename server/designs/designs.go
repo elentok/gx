@@ -486,9 +486,17 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 	if err := s.drafts.SetLastProject(req.Project); err != nil {
 		s.log.Warn("set last-used project", "project", req.Project, "err", err)
 	}
-	if s.workspaces != nil && req.FromSession != "" {
-		if err := s.workspaces.SetMember(addr, s.workspaces.Workspace(req.FromSession)); err != nil {
-			s.log.Warn("place promoted design in its chat's workspace", "design", addr, "err", err)
+	if s.workspaces != nil {
+		// FromSession wins over the requested name; an unknown name is refused
+		// by SetMember and the Design stays in Default.
+		name := req.Workspace
+		if req.FromSession != "" {
+			name = s.workspaces.Workspace(req.FromSession)
+		}
+		if name != "" {
+			if err := s.workspaces.SetMember(addr, name); err != nil {
+				s.log.Warn("place new design in its workspace", "design", addr, "err", err)
+			}
 		}
 	}
 	d, err := s.resolveDesignDir(req.Project, slug, "")

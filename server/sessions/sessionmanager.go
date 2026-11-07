@@ -69,6 +69,8 @@ type Manager struct {
 	prompter Prompter
 	// designs is the design cleanup the remove path calls back.
 	designs designCleaner
+	// workspaces places a web-created chat in the workspace the page named.
+	workspaces WorkspaceMembers
 	// rollouts answers whether Codex still has a rollout for a session.
 	rollouts codexRollouts
 }
@@ -92,6 +94,13 @@ type ManagerDeps struct {
 	Prompter Prompter
 	Designs  designCleaner
 	Rollouts codexRollouts
+	// Workspaces may be nil, which skips placing web creates.
+	Workspaces WorkspaceMembers
+}
+
+// WorkspaceMembers is the slice of the workspace store a web create uses.
+type WorkspaceMembers interface {
+	SetMember(key, workspace string) error
 }
 
 // NewManager builds the Manager from d.
@@ -105,7 +114,7 @@ func NewManager(d ManagerDeps) *Manager {
 		Logs:    &AgentLogs{ticketStore: d.Cfg.TicketStore, log: d.Log, settings: d.Settings, harness: d.Harness},
 		Maps:    maps,
 		Conv:    &convrecord.Recorder{Dir: d.Cfg.ConversationsDir, Log: d.Log, Host: convHost{d.Projects, maps}},
-		designs: d.Designs, rollouts: d.Rollouts,
+		designs: d.Designs, rollouts: d.Rollouts, workspaces: d.Workspaces,
 	}
 }
 

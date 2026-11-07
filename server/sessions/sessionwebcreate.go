@@ -24,6 +24,8 @@ type WebCreateSessionRequest struct {
 	Prompt string `json:"prompt,omitempty"`
 	// Tier is light, worker or strongest; empty means worker.
 	Tier agent.Tier `json:"tier,omitempty"`
+	// Workspace is the workspace the chat lands in; missing or unknown reads as Default.
+	Workspace string `json:"workspace,omitempty"`
 }
 
 // SessionCreateWeb is sessionCreateWrite for the web mux. A body with any
@@ -80,7 +82,7 @@ func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionRe
 	if refusal != nil {
 		return *refusal, nil
 	}
-	return mg.CreateSession(wire.CreateSessionRequest{
+	res, err := mg.CreateSession(wire.CreateSessionRequest{
 		Project:  req.Project,
 		Dir:      req.Dir,
 		Worktree: req.Worktree,
@@ -88,4 +90,11 @@ func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionRe
 		Prompt:   prompt,
 		Tier:     req.Tier,
 	}, SessionCtx{})
+	if err == nil && res.Session != nil && req.Workspace != "" && mg.workspaces != nil {
+		// An unknown name is refused by SetMember and the chat stays in Default.
+		if err := mg.workspaces.SetMember(res.Session.ID, req.Workspace); err != nil {
+			mg.log.Warn("place new chat in its workspace", "session", res.Session.ID, "err", err)
+		}
+	}
+	return res, err
 }

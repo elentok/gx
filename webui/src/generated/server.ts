@@ -174,6 +174,11 @@ export interface DesignOpenRequest {
    */
   from_session?: string;
   /**
+   * Workspace is the workspace a new Design lands in; FromSession wins, and
+   * a missing or unknown name reads as Default.
+   */
+  workspace?: string;
+  /**
    * DraftID is the New Design draft being started: its images move into the
    * map and the draft is deleted. An unknown id is ignored.
    */
