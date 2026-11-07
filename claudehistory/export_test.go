@@ -20,6 +20,19 @@ const fixtureExport = `{"type":"mode","mode":"normal","sessionId":"export-test"}
 {"parentUuid":null,"isSidechain":false,"type":"system","subtype":"turn_duration","durationMs":100,"timestamp":"2026-01-01T10:00:07Z"}
 `
 
+func TestExportMarkdownLineLongerThanScannerLimit(t *testing.T) {
+	huge := strings.Repeat("x", 2*1024*1024)
+	long := `{"type":"user","message":{"role":"user","content":"` + huge + `"}}` + "\n"
+	path := writeFixture(t, long+`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"after the long line"}]}}`)
+	out, err := ExportMarkdown(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "after the long line") {
+		t.Errorf("turn after the long line (no trailing newline) missing")
+	}
+}
+
 func TestExportMarkdownRoleHeadings(t *testing.T) {
 	path := writeFixture(t, fixtureExport)
 	out, err := ExportMarkdown(path)

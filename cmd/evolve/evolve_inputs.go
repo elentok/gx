@@ -400,6 +400,7 @@ func newEvolveInputsCmd(env func() (evolveEnv, error)) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			e.stderr = c.ErrOrStderr()
 			return runEvolveInputs(e, c.OutOrStdout(), args[0], asJSON)
 		},
 	}

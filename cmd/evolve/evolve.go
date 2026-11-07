@@ -52,6 +52,8 @@ type evolveEnv struct {
 	homeDir, stateDir, codexHome, tempDir string
 	// dataDir holds the check record and brief index; "" skips the check rows.
 	dataDir string
+	// stderr receives warnings that do not fail the verb; nil drops them.
+	stderr io.Writer
 }
 
 // evolveTarget is an epic an evolve verb acts on.

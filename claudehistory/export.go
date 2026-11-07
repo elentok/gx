@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -26,11 +27,18 @@ func ExportMarkdown(path string) (string, error) {
 
 	var parts []string
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-	for scanner.Scan() {
+	// A Scanner caps the line length; transcripts hold lines of any size.
+	reader := bufio.NewReader(f)
+	for {
+		line, readErr := reader.ReadBytes('\n')
+		if readErr != nil && readErr != io.EOF {
+			return "", readErr
+		}
+		if len(line) == 0 && readErr == io.EOF {
+			break
+		}
 		var rec exportLine
-		if err := json.Unmarshal(scanner.Bytes(), &rec); err != nil {
+		if err := json.Unmarshal(line, &rec); err != nil {
 			continue
 		}
 
@@ -58,10 +66,6 @@ func ExportMarkdown(path string) (string, error) {
 			continue
 		}
 		parts = append(parts, rendered)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return "", err
 	}
 
 	if len(parts) == 0 {

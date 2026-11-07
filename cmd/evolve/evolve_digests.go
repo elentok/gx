@@ -51,7 +51,11 @@ func writeDigests(env evolveEnv, t evolveTarget, dir string, table *InputsTable)
 		for _, s := range sessions {
 			ds, err := digestSession(env, t, dir, row.ID, s.id, s.kind)
 			if err != nil {
-				return fmt.Errorf("ticket %s session %s: %w", row.ID, s.id, err)
+				// One unreadable session must not sink the epic's table.
+				if env.stderr != nil {
+					fmt.Fprintf(env.stderr, "warning: ticket %s session %s: %v\n", row.ID, s.id, err)
+				}
+				ds = []InputsDigest{{Session: s.id, Kind: s.kind, Source: sessionlookup.Missing}}
 			}
 			row.Digests = append(row.Digests, ds...)
 		}

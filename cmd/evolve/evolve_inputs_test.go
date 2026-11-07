@@ -177,6 +177,40 @@ func TestEvolveInputs_TableOutput(t *testing.T) {
 	}
 }
 
+func TestEvolveInputs_UnreadableSessionIsMissingWithWarning(t *testing.T) {
+	t.Parallel()
+	fx := inputsFixture(t)
+	root := t.TempDir()
+	// A directory where the transcript should be makes the read fail.
+	if err := os.MkdirAll(filepath.Join(root, ".claude/projects/p/s1.jsonl"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := fx.env
+	env.homeDir = root
+	var stderr bytes.Buffer
+	env.stderr = &stderr
+
+	var out bytes.Buffer
+	if err := runEvolveInputs(env, &out, "proj:epic", true); err != nil {
+		t.Fatalf("one unreadable session failed the verb: %v", err)
+	}
+	var table InputsTable
+	if err := json.Unmarshal(out.Bytes(), &table); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range table.Rows {
+		if r.ID != "01" {
+			continue
+		}
+		if len(r.Digests) == 0 || r.Digests[0].Session != "s1" || r.Digests[0].Source != "missing" {
+			t.Errorf("ticket 01 digests = %+v, want s1 missing", r.Digests)
+		}
+	}
+	if !strings.Contains(stderr.String(), "ticket 01 session s1") {
+		t.Errorf("stderr = %q, want a warning naming ticket 01 session s1", stderr.String())
+	}
+}
+
 func TestEvolveInputs_WritesDigests(t *testing.T) {
 	t.Parallel()
 	fx := inputsFixture(t)
