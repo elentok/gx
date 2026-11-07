@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
+	"slices"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -147,19 +148,22 @@ func claimTargetTip(o OneIteration) string {
 }
 
 // addFeatureWorktree creates the epic's feature worktree (see Deps.AddWorktree).
-// When the branch lacks the base's newer commits, as for a design's <map>-impl
-// branch cut when the design ended, it rebases the branch onto the base, so the
-// epic does not start from a stale tree. This holds whether the worktree was
-// just attached or already existed. A worktree with uncommitted changes or a
-// rebase in progress is left alone. Callers hold the worktree lock.
-// A conflicting or failing rebase is aborted and returned as an error: the
-// branch keeps its old tip, and the launch fails so the ticket pauses with the
-// reason instead of starting on a stale tree.
+// Before the epic's first run, when the branch lacks the base's newer commits,
+// as for a design's <map>-impl branch cut when the design ended, it rebases the
+// branch onto the base, so the epic does not start from a stale tree. This
+// holds whether the worktree was just attached or already existed. Once any
+// ticket of the epic has launched, the branch is never rebased here: that
+// would rewrite commits already merged onto it, and catching up with the base
+// is the merge step's job. A worktree with uncommitted changes or a rebase in
+// progress is left alone. Callers hold the worktree lock.
+// A conflicting or failing rebase is aborted and logged as epic-rebase-skipped:
+// the branch keeps its old tip and the launch goes on, so the merge step
+// resolves the conflict later instead of every ticket of the epic pausing.
 func addFeatureWorktree(d deps.Deps, o OneIteration, path string) error {
 	if err := d.AddWorktree(o.RepoDir, path, o.Epic, o.RootBase); err != nil {
 		return err
 	}
-	if d.RebaseOntoOrAbort == nil {
+	if d.RebaseOntoOrAbort == nil || epicHasRun(o) {
 		return nil
 	}
 	base, err := d.RevParse(o.RepoDir, cmp.Or(o.RootBase, "HEAD"))
@@ -176,7 +180,22 @@ func addFeatureWorktree(d deps.Deps, o OneIteration, path string) error {
 		return nil
 	}
 	if err := d.RebaseOntoOrAbort(path, base); err != nil {
-		return fmt.Errorf("rebasing %s onto %s before its first run: %w", o.Epic, cmp.Or(o.RootBase, "HEAD"), err)
+		_ = runlog.AppendEvent(o.ScratchDir, o.Epic, runlog.Event{
+			Type:   string(events.EpicRebaseSkipped),
+			Ticket: o.Ticket.Identifier,
+			Reason: fmt.Sprintf("rebasing %s onto %s before its first run: %v", o.Epic, cmp.Or(o.RootBase, "HEAD"), err),
+		})
 	}
 	return nil
+}
+
+// epicHasRun reports whether any ticket of the epic has launched: its run log
+// holds an iteration-started event. An unreadable log counts as run, so a
+// launch never rewrites an epic branch it cannot show is fresh.
+func epicHasRun(o OneIteration) bool {
+	evs, _, err := runlog.ReadEvents(o.ScratchDir, o.Epic)
+	if err != nil {
+		return true
+	}
+	return slices.ContainsFunc(evs, func(ev runlog.Event) bool { return ev.Type == string(events.IterationStarted) })
 }

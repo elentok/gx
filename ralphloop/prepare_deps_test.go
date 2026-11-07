@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -202,15 +203,46 @@ func TestPrepare_RebasesAnExistingEpicBranchOntoTheBaseOnFirstAttach(t *testing.
 	}
 }
 
-func TestPrepareFeature_FailsWhenTheRebaseConflicts(t *testing.T) {
+func TestPrepareFeature_LaunchesOnTheOldTipWhenTheFirstRunRebaseConflicts(t *testing.T) {
 	d, _, o := prepareDepsFixture(t)
 	gitIn(t, o.RepoDir, "branch", o.Epic)
 	gitIn(t, o.RepoDir, "commit", "--allow-empty", "-m", "newer trunk commit")
 	d.RebaseOntoOrAbort = func(string, string) error { return errors.New("conflict") }
 
-	_, err := PrepareFeature(d, o)
-	if err == nil || !strings.Contains(err.Error(), "conflict") {
-		t.Fatalf("PrepareFeature err = %v, want the rebase conflict", err)
+	if _, err := PrepareFeature(d, o); err != nil {
+		t.Fatalf("PrepareFeature err = %v, want the launch to go on", err)
+	}
+	evs, _, err := runlog.ReadEvents(o.ScratchDir, o.Epic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(evs, func(ev runlog.Event) bool { return ev.Type == string(events.EpicRebaseSkipped) })
+	if i < 0 || evs[i].Ticket != "01" || !strings.Contains(evs[i].Reason, "conflict") {
+		t.Errorf("events = %+v, want epic-rebase-skipped for 01 naming the conflict", evs)
+	}
+}
+
+func TestPrepare_LeavesTheEpicBranchAloneOnceTheEpicHasRun(t *testing.T) {
+	for name, prepare := range map[string]func(deps.Deps, OneIteration) error{
+		"iteration": func(d deps.Deps, o OneIteration) error { _, err := PrepareIteration(d, o); return err },
+		"feature":   func(d deps.Deps, o OneIteration) error { _, err := PrepareFeature(d, o); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			d, _, o := prepareDepsFixture(t)
+			gitIn(t, o.RepoDir, "branch", o.Epic)
+			if err := runlog.AppendEvent(o.ScratchDir, o.Epic, runlog.Event{Type: string(events.IterationStarted), Ticket: "01"}); err != nil {
+				t.Fatal(err)
+			}
+			gitIn(t, o.RepoDir, "commit", "--allow-empty", "-m", "newer trunk commit")
+			d.RebaseOntoOrAbort = func(string, string) error {
+				t.Error("rebased an epic branch that has already run")
+				return nil
+			}
+
+			if err := prepare(d, o); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

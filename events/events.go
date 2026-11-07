@@ -71,6 +71,10 @@ const (
 	// fast-forwarded and restoring the uncommitted files left conflict markers.
 	// Reason lists the files; the event names the backup ref that held them.
 	TrunkConflictOpened Type = "trunk-conflict-opened"
+	// EpicRebaseSkipped is an epic's first launch that could not rebase the
+	// epic branch onto its base (a conflict): the rebase was aborted and the
+	// ticket launched on the old tip. Reason holds the rebase error.
+	EpicRebaseSkipped Type = "epic-rebase-skipped"
 )
 
 // SlowLaunch is the claim-to-prompt time past which a launch counts as slow.
