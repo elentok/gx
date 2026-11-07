@@ -1,7 +1,4 @@
-/** The shared Design and Epic header's title size; other pages keep `titleSize`. */
-export const headerTitleFontSize = (wide: boolean) => (wide ? "34px" : "26px");
-
-/** The page title's size by layout, shared by the plain h1 and the jump menu title. */
+/** The jump menu title's size by layout. */
 export const titleSize = (wide: boolean) =>
   wide
     ? ({ fontSize: "30px", lineHeight: "1.1", overflowWrap: "anywhere" } as const)

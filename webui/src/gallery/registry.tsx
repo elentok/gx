@@ -1,6 +1,7 @@
 import { Box, Menu, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, type ComponentProps, type ReactNode } from "react";
 import { PageHeader } from "../page/PageHeader";
+import { PageIcon } from "../page/PageIcon";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
@@ -303,10 +304,15 @@ const headerCase = (label: string, device: Device, over: Partial<ComponentProps<
       <WideContext.Provider value={device !== "phone"}>
         <PageHeader
           title="slow-tests-impl"
-          ring={<ProgressRing progress={0.33} kind="implementation" label="33%" size="sm" />}
-          line={headerLine}
+          icon={<PageIcon kind="epic" />}
+          subtitle={headerLine}
           meta="Running · 3 of 9 done · 42m · 118k tokens"
-          right={<span>⋯</span>}
+          actions={
+            <>
+              <ProgressRing progress={0.33} kind="implementation" label="33%" size="sm" />
+              <span>⋯</span>
+            </>
+          }
           {...over}
         />
       </WideContext.Provider>
@@ -321,7 +327,7 @@ export const galleryEntries: GalleryEntry[] = [
       headerCase("desktop", "desktop"),
       headerCase("tablet", "tablet"),
       headerCase("phone", "phone"),
-      headerCase("no line", "desktop", { line: undefined }),
+      headerCase("no subtitle", "desktop", { subtitle: undefined }),
       headerCase("no meta bar", "desktop", { meta: undefined }),
     ],
   },

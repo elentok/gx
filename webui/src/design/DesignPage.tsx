@@ -6,8 +6,7 @@ import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { EpicRing } from "../epic/EpicRing";
 import { PageHeader } from "../page/PageHeader";
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
-import { JumpMenu } from "../nav/JumpMenu";
-import { headerTitleFontSize } from "../nav/titleSize";
+import { PageIcon } from "../page/PageIcon";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import { hasChat, roundKeyOf, useSessionChat, type FetchChat } from "./chat";
@@ -151,32 +150,32 @@ function DesignBody({
       <Box mt="4" mb="3" flex="none">
         <PageHeader
           title={name}
-          ring={
-            detail &&
-            (wide ? (
-              ring("header")
-            ) : (
-              <chakra.button type="button" aria-label="Show progress steps" aria-haspopup="dialog" cursor="pointer" onClick={() => setStepsOpen(true)}>
-                {ring("headerSm")}
-              </chakra.button>
-            ))
-          }
-          heading={<JumpMenu name={name} current={address} epics={epics} fontSize={headerTitleFontSize(wide)} />}
-          line={
+          icon={<PageIcon kind="design" />}
+          subtitle={
             detail &&
             (wide ? summaryLine(detail) : <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />)
           }
           meta={session && <AgentLine session={session} wide={wide} />}
-          right={
-            <SessionStrip
-              address={address}
-              session={session}
-              live={live}
-              deps={deps}
-              onSelect={setSelected}
-              startFailure={startFailure}
-              deletable={detail?.deletable}
-            />
+          actions={
+            <>
+              {detail &&
+                (wide ? (
+                  ring("header")
+                ) : (
+                  <chakra.button type="button" aria-label="Show progress steps" aria-haspopup="dialog" cursor="pointer" onClick={() => setStepsOpen(true)}>
+                    {ring("headerSm")}
+                  </chakra.button>
+                ))}
+              <SessionStrip
+                address={address}
+                session={session}
+                live={live}
+                deps={deps}
+                onSelect={setSelected}
+                startFailure={startFailure}
+                deletable={detail?.deletable}
+              />
+            </>
           }
         />
       </Box>

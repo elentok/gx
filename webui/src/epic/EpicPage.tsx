@@ -16,11 +16,10 @@ import { MergeButton, StashMergeButton } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
-import { JumpMenu } from "../nav/JumpMenu";
-import { headerTitleFontSize } from "../nav/titleSize";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
+import { PageIcon } from "../page/PageIcon";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -360,12 +359,14 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
           <Box mt="4">
             <PageHeader
               title={name}
-              ring={<EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "header" : "headerSm"} />}
-              heading={
-                <JumpMenu name={name} current={address} epics={list?.epics ?? []} fontSize={headerTitleFontSize(wide)} />
+              icon={<PageIcon kind="epic" />}
+              subtitle={detail.summary ? <DescriptionLine summary={detail.summary} /> : undefined}
+              actions={
+                <>
+                  <EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "header" : "headerSm"} />
+                  <EpicMenu address={address} />
+                </>
               }
-              line={detail.summary ? <DescriptionLine summary={detail.summary} /> : undefined}
-              right={<EpicMenu address={address} />}
               meta={
                 <EpicBar
                   address={address}

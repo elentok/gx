@@ -3,82 +3,68 @@ import { type ReactNode, useEffect } from "react";
 import { MascotToggle } from "../shell/MascotToggle";
 import { useShell } from "../shell/ShellContext";
 import { useWide } from "../useWide";
-import { titleSize } from "../nav/titleSize";
 
-/** Ring box sides: the height of the title plus one line, so a header with no line keeps the same height. */
-export const ringSize = (wide: boolean) => (wide ? 56 : 44);
-
-// Condensed h1 and an optional line under it. The shared Design and Epic header uses
-// `ring`, `line`, `meta` and `right`; `lead` and `children` are the older form.
+/** The one header every page uses: icon, title, subtitle, actions, then an optional meta bar. */
 export function PageHeader({
   title,
-  heading,
-  lead,
-  ring,
-  line,
+  icon,
+  subtitle,
+  actions,
   meta,
-  right,
   children,
 }: {
   title: string;
-  /** Replaces the plain h1, for a title that is a control. It must render the h1 itself. */
-  heading?: ReactNode;
-  /** Sits left of the title, such as a ProgressRing. */
-  lead?: ReactNode;
-  /** The progress ring, boxed to the shared ring size beside the title. */
-  ring?: ReactNode;
+  /** The large icon left of the title. */
+  icon?: ReactNode;
   /** One truncated line of text under the title. Nothing renders when it is empty. */
-  line?: ReactNode;
+  subtitle?: ReactNode;
+  /** Page controls at the right edge: the progress ring or status icon first, then the "..." menu. */
+  actions?: ReactNode;
   /** The meta bar under a hairline. Nothing renders when it is empty. */
   meta?: ReactNode;
-  /** Page controls at the right edge, such as the menu button. */
-  right?: ReactNode;
   children?: ReactNode;
 }) {
   const wide = useWide();
   const shell = useShell();
   const claimHeader = shell?.claimHeader;
   useEffect(() => claimHeader?.(), [claimHeader]);
-  const h1 = heading ?? (
-    <Heading as="h1" fontFamily="condensed" {...titleSize(wide)}>
+  const h1 = (
+    <Heading as="h1" fontFamily="inherit" fontWeight="normal" fontSize="19px" lineHeight="1.2" overflowWrap="anywhere">
       {title}
     </Heading>
   );
-  const gap = wide ? "18px" : "14px";
-  const side = ring ?? lead;
-  const sideBox = ring ? (
-    <Box data-testid="page-header-ring" flex="none" boxSize={`${ringSize(wide)}px`}>
-      {ring}
-    </Box>
-  ) : (
-    lead
-  );
-  const text = (
-    <Box minW="0" flex="1">
-      {h1}
-      {line ? (
-        <Box
-          data-testid="page-header-line"
-          mt="2px"
-          color="text.dim"
-          fontSize={wide ? "15px" : "14px"}
-          whiteSpace="nowrap"
-          overflow="hidden"
-          textOverflow="ellipsis"
-        >
-          {line}
-        </Box>
-      ) : null}
-    </Box>
-  );
+  const rich = icon || subtitle || actions || shell;
   return (
     <Box>
-      {side || right || line || shell ? (
-        <Box display="flex" alignItems="center" gap={gap}>
+      {rich ? (
+        <Box display="flex" alignItems="center" gap={wide ? "14px" : "10px"}>
           <MascotToggle />
-          {sideBox}
-          {text}
-          {right ? <Box flex="none">{right}</Box> : null}
+          {icon ? (
+            <Box data-testid="page-header-icon" flex="none" display="flex" alignItems="center" color="text.dim">
+              {icon}
+            </Box>
+          ) : null}
+          <Box minW="0" flex="1">
+            {h1}
+            {subtitle ? (
+              <Box
+                data-testid="page-header-subtitle"
+                mt="2px"
+                color="text.dim"
+                fontSize={wide ? "15px" : "14px"}
+                whiteSpace="nowrap"
+                overflow="hidden"
+                textOverflow="ellipsis"
+              >
+                {subtitle}
+              </Box>
+            ) : null}
+          </Box>
+          {actions ? (
+            <Box data-testid="page-header-actions" flex="none" display="flex" alignItems="center" gap="10px">
+              {actions}
+            </Box>
+          ) : null}
         </Box>
       ) : (
         h1

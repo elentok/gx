@@ -168,7 +168,8 @@ test("Copy design ID copies the address and shows it as the subtitle, with no se
 test("the title row holds the Design name and More actions, with no picker or state label", async () => {
   render([map("a"), map("b")], [session("a", { status: { state: "working" } })]);
   const title = await screen.findByRole("heading", { level: 1 });
-  expect(within(title).getByRole("button", { name: /^a/ })).toBeTruthy();
+  expect(title.textContent).toBe("a");
+  expect(within(title).queryByRole("button")).toBeNull();
   expect(screen.queryByRole("link", { name: /^←/ })).toBeNull();
   expect(screen.getByRole("button", { name: "More actions" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "New session" })).toBeNull();
@@ -199,11 +200,11 @@ test.each([
   expect(!!screen.queryByTestId("comet")).toBe(comet);
 });
 
-test("the ring leads the header at 56px, and at 44px on a phone", async () => {
+test("the ring sits in the header actions after the title at 56px, and at 44px on a phone", async () => {
   render([map("a")], []);
   await screen.findByText("0%");
   const title = screen.getByRole("heading", { level: 1 });
-  expect(ringOf().compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(title.compareDocumentPosition(ringOf()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 56 56");
   cleanup();
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
@@ -409,7 +410,7 @@ test("Delete design shows only for a deletable Design with no live session, foll
 test("the long step line on desktop names the ticket", async () => {
   const rows = [ticketRow("02", "Done one", { rendered_status: "done" }), ticketRow("03", "Chat content", { current: true })];
   render([map("a")], [], "/d/gx:a", detailOf({ rows }));
-  expect((await screen.findByTestId("page-header-line")).textContent).toMatch(/^Resolve tickets · 03 Chat content \(2 of 2\)/);
+  expect((await screen.findByTestId("page-header-subtitle")).textContent).toMatch(/^Resolve tickets · 03 Chat content \(2 of 2\)/);
 });
 
 test("the detail is fetched once on mount and once more when a session starts or exits", async () => {

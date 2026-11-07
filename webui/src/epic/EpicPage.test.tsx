@@ -75,12 +75,11 @@ function render(
 
 const joined = row("blog-impl", { addresses: ["gx:blog-impl", "gx:blog"], card_kind: "design" });
 
-test("the epic page has a title that opens the jump menu and no back link", async () => {
+test("the epic page title is a plain heading, not a dropdown, and there is no back link", async () => {
   render("/e/gx:blog-impl", [joined, row("other")]);
   const title = await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByRole("link", { name: /^←/ })).toBeNull();
-  fireEvent.click(within(title).getByRole("button", { name: /^blog-impl/ }));
-  expect(await screen.findByRole("dialog")).toBeTruthy();
+  expect(within(title).queryByRole("button")).toBeNull();
 });
 
 test("a Design's epic page has an Open implementation epic button that goes to the -impl page", async () => {
@@ -679,12 +678,12 @@ const descriptionButton = () => screen.findByRole("button", { name: "Show full d
 
 test("the description is one line under the title, and no summary renders no line", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { summary: "A short summary" } });
-  const line = await screen.findByTestId("page-header-line");
+  const line = await screen.findByTestId("page-header-subtitle");
   expect(within(line).getByRole("button", { name: "Show full description" }).textContent).toBe("A short summary");
   cleanup();
   render("/e/gx:blog-impl", [], "loop", { detail: { summary: "" } });
   await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByTestId("page-header-line")).toBeNull();
+  expect(screen.queryByTestId("page-header-subtitle")).toBeNull();
 });
 
 // Enter and Space are the browser's own click on a native button; the e2e flow presses them for real.

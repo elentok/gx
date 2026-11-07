@@ -6,48 +6,51 @@ import { PageHeader } from "./PageHeader";
 const render = (node: React.ReactNode, wide = true) =>
   renderThemed(<WideContext.Provider value={wide}>{node}</WideContext.Provider>);
 
-test("renders ring, title, line, meta bar and right slot", () => {
+test("renders icon, title, subtitle, actions and meta bar", () => {
   const { getByRole, getByTestId } = render(
-    <PageHeader title="slow-tests" ring={<i>ring</i>} line="a line" meta={<b>meta</b>} right={<u>menu</u>} />,
+    <PageHeader title="slow-tests" icon={<i>icon</i>} subtitle="a line" actions={<u>menu</u>} meta={<b>meta</b>} />,
   );
   expect(getByRole("heading", { level: 1 }).textContent).toBe("slow-tests");
-  expect(getByTestId("page-header-ring").textContent).toBe("ring");
-  expect(getByTestId("page-header-line").textContent).toBe("a line");
+  expect(getByTestId("page-header-icon").textContent).toBe("icon");
+  expect(getByTestId("page-header-subtitle").textContent).toBe("a line");
+  expect(getByTestId("page-header-actions").textContent).toBe("menu");
   expect(getByTestId("page-header-meta").textContent).toBe("meta");
-  expect(getByTestId("page-header-meta").parentElement?.textContent).toContain("menu");
 });
 
-test("the line truncates on one line", () => {
-  const { getByTestId } = render(<PageHeader title="t" line={"x".repeat(300)} />);
-  const style = getComputedStyle(getByTestId("page-header-line"));
+test("the title is a 19px regular-weight heading, not a button", () => {
+  const { getByRole, queryByRole } = render(<PageHeader title="t" icon={<i />} />);
+  const style = getComputedStyle(getByRole("heading", { level: 1 }));
+  expect(style.fontSize).toBe("19px");
+  expect(style.fontWeight).toContain("normal");
+  expect(queryByRole("button")).toBeNull();
+});
+
+test("the subtitle truncates on one line", () => {
+  const { getByTestId } = render(<PageHeader title="t" subtitle={"x".repeat(300)} />);
+  const style = getComputedStyle(getByTestId("page-header-subtitle"));
   expect(style.whiteSpace).toBe("nowrap");
   expect(style.textOverflow).toBe("ellipsis");
   expect(style.overflow).toBe("hidden");
 });
 
-test("no line, no meta renders no empty rows", () => {
-  const { queryByTestId } = render(<PageHeader title="t" ring={<i>r</i>} />);
-  expect(queryByTestId("page-header-line")).toBeNull();
+test("the ring comes before the menu button in actions", () => {
+  const { getByTestId } = render(<PageHeader title="t" actions={<><i>ring</i><u>menu</u></>} />);
+  expect(getByTestId("page-header-actions").textContent).toBe("ringmenu");
+});
+
+test("no subtitle, no meta renders no empty rows", () => {
+  const { queryByTestId } = render(<PageHeader title="t" icon={<i>i</i>} />);
+  expect(queryByTestId("page-header-subtitle")).toBeNull();
   expect(queryByTestId("page-header-meta")).toBeNull();
+  expect(queryByTestId("page-header-actions")).toBeNull();
 });
 
-test("the ring box is 56px wide and 44px on a phone, with or without a line", () => {
-  for (const line of ["a line", undefined]) {
-    const view = render(<PageHeader title="t" ring={<i />} line={line} />);
-    expect(getComputedStyle(view.getByTestId("page-header-ring")).height).toBe("56px");
-    view.unmount();
-  }
-  const phone = render(<PageHeader title="t" ring={<i />} line="a line" />, false);
-  expect(getComputedStyle(phone.getByTestId("page-header-ring")).height).toBe("44px");
-});
-
-test("the older lead form still renders the title and children", () => {
+test("a bare title renders children", () => {
   const { getByText, getByRole } = render(
-    <PageHeader title="old" lead={<i>lead</i>}>
+    <PageHeader title="old">
       <p>child</p>
     </PageHeader>,
   );
   expect(getByRole("heading", { level: 1 }).textContent).toBe("old");
-  expect(getByText("lead")).toBeTruthy();
   expect(getByText("child")).toBeTruthy();
 });
