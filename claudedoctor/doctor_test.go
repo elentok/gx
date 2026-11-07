@@ -276,6 +276,25 @@ func TestHolderSurvives_FailsWhenKickstartFails(t *testing.T) {
 	}
 }
 
+func TestRun_SkipIfSkipsALiveCheckWithoutRunningIt(t *testing.T) {
+	ran := false
+	table := []Check{{Runner: "pty", Name: "s", Mode: Live, SkipIf: func() string { return "why" },
+		Run: func(Input) (string, bool) { ran = true; return "", true }}}
+	got := Run(table, "pty", Source{Live: true})
+	if ran || got[0].Status != Skip || got[0].Detail != "why" {
+		t.Errorf("ran=%v result=%+v", ran, got[0])
+	}
+}
+
+func TestHolderCheck_SkipsUnderGoTest(t *testing.T) {
+	if notGxExecutable() == "" {
+		t.Error("the test binary was treated as gx")
+	}
+	if got := notGx("/usr/local/bin/gx"); got != "" {
+		t.Errorf("gx binary skipped: %q", got)
+	}
+}
+
 func TestRun_SkipReasonSkipsEvenLive(t *testing.T) {
 	t.Parallel()
 	table := []Check{{Runner: "pty", Name: "s", Mode: Fixture, SkipReason: "not yet", Run: pass}}

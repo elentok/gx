@@ -41,7 +41,10 @@ type Check struct {
 	// SkipReason, when set, always skips the check with this detail: a row
 	// gx knows it cannot verify yet, kept in the table so it stays visible.
 	SkipReason string
-	Run        func(Input) (detail string, ok bool)
+	// SkipIf, when it returns a non-empty detail, skips the check with it: a
+	// reason known only at run time.
+	SkipIf func() string
+	Run    func(Input) (detail string, ok bool)
 }
 
 // Recording is what one canned session produced: headless stream-json
@@ -129,6 +132,12 @@ func runCheck(c Check, src Source, status map[string]Status, sessions map[string
 	if c.Mode == Live && !src.Live {
 		r.Status, r.Detail = Skip, "live only"
 		return r
+	}
+	if c.SkipIf != nil {
+		if why := c.SkipIf(); why != "" {
+			r.Status, r.Detail = Skip, why
+			return r
+		}
 	}
 
 	in := Input{ClaudeVersion: src.ClaudeVersion, Env: src.Env, Live: src.Live}

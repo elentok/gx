@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -20,7 +21,25 @@ var ptyChecks = []Check{
 	{Runner: "pty", Name: "rate-limit-transcript", Mode: Fixture, Session: "pty-rate-limit", Run: checkRateLimitTranscript},
 	{Runner: "pty", Name: "image-paste", Mode: Fixture, Session: "pty-image-paste", Run: checkImagePaste},
 	{Runner: "pty", Name: "image-paste-slash-record", Mode: Live, Session: "pty-image-slash", Run: checkImageSlash},
-	{Runner: "pty", Name: "holder-survives-kickstart", Mode: Live, Run: checkHolderSurvivesKickstart},
+	{Runner: "pty", Name: "holder-survives-kickstart", Mode: Live, SkipIf: notGxExecutable, Run: checkHolderSurvivesKickstart},
+}
+
+// notGxExecutable explains why the holder check cannot run: it launches
+// os.Executable() as `agent-holder`, and any binary but gx (a .test binary
+// under go test) would re-run itself instead and fork without end.
+func notGxExecutable() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return err.Error()
+	}
+	return notGx(exe)
+}
+
+func notGx(exe string) string {
+	if filepath.Base(exe) == "gx" {
+		return ""
+	}
+	return fmt.Sprintf("%s is not gx; cannot prove launchd survival", filepath.Base(exe))
 }
 
 // checkRateLimitTranscript reads the recorded transcript with the reader the
