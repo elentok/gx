@@ -3,10 +3,20 @@ package skills
 import (
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/tickets/ticketspec"
 )
+
+func TestToTicketsPrefactorChecks(t *testing.T) {
+	text := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	for _, anchor := range []string{"#### Prefactor tickets", "`sizeguard`", "gopls", "the export decision"} {
+		if !strings.Contains(text, normalizeSpace(anchor)) {
+			t.Errorf("gx-to-tickets/SKILL.md is missing %q", anchor)
+		}
+	}
+}
 
 // The split limit lives in two places: the skill text and the Go constant.
 // This test keeps them equal.
