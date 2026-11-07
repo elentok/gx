@@ -13,8 +13,16 @@ import { MascotToggle } from "./MascotToggle";
 import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
 import { SidebarRows } from "./SidebarRows";
-import { useActiveWorkspace, useWorkspaces } from "../workspaces/useActiveWorkspace";
-import { NewWorkspaceDialog, WorkspaceSwitcher, type CreateWorkspace } from "./WorkspaceSwitcher";
+import {
+  useActiveWorkspace,
+  useWorkspaces,
+} from "../workspaces/useActiveWorkspace";
+import { ManageWorkspaces } from "./ManageWorkspaces";
+import {
+  NewWorkspaceDialog,
+  WorkspaceSwitcher,
+  type CreateWorkspace,
+} from "./WorkspaceSwitcher";
 
 /** The top bar's sticky offset reads this, so it sits below the strips. */
 export const SHELL_STRIPS_HEIGHT_VAR = "--shell-strips-height";
@@ -23,7 +31,17 @@ const WIDTH: Record<Device, number> = { desktop: 280, tablet: 330, phone: 344 };
 
 function PanelIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <rect x="2.5" y="3.5" width="15" height="13" rx="2.5" />
       <path d="M7.5 3.5v13" />
     </svg>
@@ -37,9 +55,15 @@ function Strips() {
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const publish = () => document.documentElement.style.setProperty(SHELL_STRIPS_HEIGHT_VAR, `${el.offsetHeight}px`);
+    const publish = () =>
+      document.documentElement.style.setProperty(
+        SHELL_STRIPS_HEIGHT_VAR,
+        `${el.offsetHeight}px`,
+      );
     publish();
-    if (typeof ResizeObserver === "undefined") return () => document.documentElement.style.removeProperty(SHELL_STRIPS_HEIGHT_VAR);
+    if (typeof ResizeObserver === "undefined")
+      return () =>
+        document.documentElement.style.removeProperty(SHELL_STRIPS_HEIGHT_VAR);
     const observer = new ResizeObserver(publish);
     observer.observe(el);
     return () => {
@@ -74,7 +98,10 @@ export function AppShell({
   const device = useDevice();
   const docked = device === "desktop";
   // An explicit choice holds only for the device it was made on; a resize back to the default follows the device.
-  const [choice, setChoice] = useState<{ device: Device; open: boolean } | null>(null);
+  const [choice, setChoice] = useState<{
+    device: Device;
+    open: boolean;
+  } | null>(null);
   const open = choice?.device === device ? choice.open : docked;
   const [headers, setHeaders] = useState(0);
   const claimHeader = useCallback(() => {
@@ -95,6 +122,7 @@ export function AppShell({
   const { workspaces } = useWorkspaces(conn);
   const { active, setActive } = useActiveWorkspace(conn, fetchEpicList);
   const [newWorkspace, setNewWorkspace] = useState(false);
+  const [manageWorkspaces, setManageWorkspaces] = useState(false);
   // The snapshot learns of a new workspace from the server's event; activating it earlier would resolve straight back to Default.
   const [created, setCreated] = useState<string>();
   useEffect(() => {
@@ -107,7 +135,16 @@ export function AppShell({
   return (
     <ShellContext.Provider value={shell}>
       <Box display="flex" alignItems="flex-start" minH="100dvh">
-        {!docked && open && <Box data-testid="scrim" position="fixed" inset="0" bg="blackAlpha.700" zIndex="overlay" onClick={shell.close} />}
+        {!docked && open && (
+          <Box
+            data-testid="scrim"
+            position="fixed"
+            inset="0"
+            bg="blackAlpha.700"
+            zIndex="overlay"
+            onClick={shell.close}
+          />
+        )}
         <Box
           as="aside"
           aria-label="Sidebar"
@@ -125,7 +162,11 @@ export function AppShell({
           overflowY="auto"
           zIndex="modal"
           {...(docked
-            ? { position: "sticky", top: "0", ...(open ? {} : { display: "none" }) }
+            ? {
+                position: "sticky",
+                top: "0",
+                ...(open ? {} : { display: "none" }),
+              }
             : {
                 position: "fixed",
                 top: "0",
@@ -136,13 +177,37 @@ export function AppShell({
               })}
           // Picking an item on a sliding sidebar closes it.
           onClick={(e) => {
-            if (!docked && (e.target as HTMLElement).closest("a")) shell.close();
+            if (!docked && (e.target as HTMLElement).closest("a"))
+              shell.close();
           }}
         >
-          <Box display="flex" alignItems="center" gap="2" pt="10px" pr="2" pb="6px" pl="3">
-            <Image src="/gx-logo-wide.png" alt="gx" h="26px" w="auto" draggable={false} />
+          <Box
+            display="flex"
+            alignItems="center"
+            gap="2"
+            pt="10px"
+            pr="2"
+            pb="6px"
+            pl="3"
+          >
+            <Image
+              src="/gx-logo-wide.png"
+              alt="gx"
+              h="26px"
+              w="auto"
+              draggable={false}
+            />
             {snapshot?.build && (
-              <Box as="span" color="text.faint" fontSize="12px" minW="0" whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis" title={snapshot.build}>
+              <Box
+                as="span"
+                color="text.faint"
+                fontSize="12px"
+                minW="0"
+                whiteSpace="nowrap"
+                overflow="hidden"
+                textOverflow="ellipsis"
+                title={snapshot.build}
+              >
                 {snapshot.build}
               </Box>
             )}
@@ -162,11 +227,33 @@ export function AppShell({
               <PanelIcon />
             </chakra.button>
           </Box>
-          <WorkspaceSwitcher workspaces={workspaces} active={active} onPick={setActive} onNew={() => setNewWorkspace(true)} onManage={onManageWorkspaces} />
-          <Box as="ul" listStyleType="none" m="0" p="0" flex="1" data-testid="sidebar-body">
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            active={active}
+            onPick={setActive}
+            onNew={() => setNewWorkspace(true)}
+            onManage={() => {
+              setManageWorkspaces(true);
+              onManageWorkspaces();
+            }}
+          />
+          <Box
+            as="ul"
+            listStyleType="none"
+            m="0"
+            p="0"
+            flex="1"
+            data-testid="sidebar-body"
+          >
             <SidebarRows fetcher={fetchEpicList} active={active} />
           </Box>
           <SidebarFooter onNewWorkspace={() => setNewWorkspace(true)} />
+          {manageWorkspaces && (
+            <ManageWorkspaces
+              workspaces={workspaces}
+              onClose={() => setManageWorkspaces(false)}
+            />
+          )}
           {newWorkspace && (
             <NewWorkspaceDialog
               create={createWorkspace}
