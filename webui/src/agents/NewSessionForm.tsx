@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { useCompletion } from "../commands/useCompletion";
 import type { CommandTarget, FetchCommands } from "../commands/useCommandList";
 import { modelName } from "../modelName";
+import { TIERS } from "../tiers";
 import { useWide } from "../useWide";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { ProjectWorktrees } from "../generated/server";
@@ -13,12 +14,6 @@ import { Field, field } from "./formField";
 import { fetchWorktrees, postCreateSession, type CreateSession, type FetchWorktrees } from "./newSession";
 import { trimmed, useNewSessionDraft, type NewSessionDraft } from "./useNewSessionDraft";
 import { baseName, WorktreePicker, type Option } from "./WorktreePicker";
-
-export const TIERS = [
-  { id: "light", label: "Light" },
-  { id: "worker", label: "Worker" },
-  { id: "strongest", label: "Strongest" },
-];
 
 // The picker is Claude-only and a tier reads as the family: "Worker (Claude Sonnet)".
 const tierModel = (id: string) => modelName(id, "claude");

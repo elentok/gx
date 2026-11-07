@@ -3,6 +3,7 @@ import type { EpicDetail, EpicDetailRow } from "./detail";
 import { modelName, type ModelLabel } from "../modelName";
 import type { Tone } from "../ui/tone";
 import { ticketPath } from "../hrefs";
+import { tierLabel } from "../tiers";
 import { epicBadge } from "../view";
 
 type Bucket = "done" | "running" | "asking" | "waiting" | "children" | "attention";
@@ -216,8 +217,6 @@ const designDoneTime = (row: EpicDetailRow) =>
 
 export type RowChips = { harness: string; tierLabel: string; model: ModelLabel; effort: string; note: string };
 
-const TIER_LABELS: Record<string, string> = { light: "Light", worker: "Worker", strongest: "Strongest" };
-
 // What a loop row shows after its title: a running row its harness, tier and model; a waiting row the
 // server's note (and its harness when it has one). Any other row, and a map row, shows nothing.
 export function rowChips(row: EpicDetailRow): RowChips | undefined {
@@ -225,7 +224,7 @@ export function rowChips(row: EpicDetailRow): RowChips | undefined {
     if (!row.harness) return undefined;
     return {
       harness: row.harness,
-      tierLabel: TIER_LABELS[row.tier ?? ""] ?? "",
+      tierLabel: tierLabel(row.tier),
       model: modelName(row.model ?? "", row.harness),
       effort: row.effort ?? "",
       note: "",
