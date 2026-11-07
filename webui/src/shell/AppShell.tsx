@@ -13,6 +13,8 @@ import { MascotToggle } from "./MascotToggle";
 import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
 import { SidebarRows } from "./SidebarRows";
+import { useActiveWorkspace, useWorkspaces } from "../workspaces/useActiveWorkspace";
+import { NewWorkspaceDialog, WorkspaceSwitcher, type CreateWorkspace } from "./WorkspaceSwitcher";
 
 /** The top bar's sticky offset reads this, so it sits below the strips. */
 export const SHELL_STRIPS_HEIGHT_VAR = "--shell-strips-height";
@@ -57,7 +59,18 @@ function Strips() {
 }
 
 // Mounted once above every page route. The sidebar is docked on desktop and slides over on tablet and phone.
-export function AppShell({ children, fetchEpicList }: { children?: React.ReactNode; fetchEpicList?: FetchEpicList }) {
+export function AppShell({
+  children,
+  fetchEpicList,
+  createWorkspace,
+  onManageWorkspaces = () => {},
+}: {
+  children?: React.ReactNode;
+  fetchEpicList?: FetchEpicList;
+  createWorkspace?: CreateWorkspace;
+  /** Opens the manage-workspaces dialog. */
+  onManageWorkspaces?: () => void;
+}) {
   const device = useDevice();
   const docked = device === "desktop";
   // An explicit choice holds only for the device it was made on; a resize back to the default follows the device.
@@ -77,7 +90,19 @@ export function AppShell({ children, fetchEpicList }: { children?: React.ReactNo
     }),
     [open, device, claimHeader],
   );
-  const { snapshot } = useConnectionState(useConnectionContext());
+  const conn = useConnectionContext();
+  const { snapshot } = useConnectionState(conn);
+  const { workspaces } = useWorkspaces(conn);
+  const { active, setActive } = useActiveWorkspace(conn, fetchEpicList);
+  const [newWorkspace, setNewWorkspace] = useState(false);
+  // The snapshot learns of a new workspace from the server's event; activating it earlier would resolve straight back to Default.
+  const [created, setCreated] = useState<string>();
+  useEffect(() => {
+    if (created && workspaces.some((w) => w.name === created)) {
+      setActive(created);
+      setCreated(undefined);
+    }
+  }, [created, workspaces, setActive]);
   const width = WIDTH[device];
   return (
     <ShellContext.Provider value={shell}>
@@ -137,10 +162,21 @@ export function AppShell({ children, fetchEpicList }: { children?: React.ReactNo
               <PanelIcon />
             </chakra.button>
           </Box>
+          <WorkspaceSwitcher workspaces={workspaces} active={active} onPick={setActive} onNew={() => setNewWorkspace(true)} onManage={onManageWorkspaces} />
           <Box as="ul" listStyleType="none" m="0" p="0" flex="1" data-testid="sidebar-body">
-            <SidebarRows fetcher={fetchEpicList} />
+            <SidebarRows fetcher={fetchEpicList} active={active} />
           </Box>
-          <SidebarFooter />
+          <SidebarFooter onNewWorkspace={() => setNewWorkspace(true)} />
+          {newWorkspace && (
+            <NewWorkspaceDialog
+              create={createWorkspace}
+              onClose={() => setNewWorkspace(false)}
+              onCreated={(name) => {
+                setCreated(name);
+                setNewWorkspace(false);
+              }}
+            />
+          )}
         </Box>
         <Box flex="1" minW="0">
           <Strips />

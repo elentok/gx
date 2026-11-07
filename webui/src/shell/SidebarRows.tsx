@@ -4,7 +4,6 @@ import { useLocation } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { buildSidebar, type SidebarAgent, type SidebarRow, type SidebarStatus } from "../workspaces/sidebarModel";
-import { useActiveWorkspace } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 
 const CHAT_PINK = "#ec6fa8";
@@ -136,10 +135,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 // The sidebar body: the active workspace's rows, its collapsed On hold, then the global Other.
-export function SidebarRows({ fetcher }: { fetcher?: FetchEpicList }) {
+export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; active: string }) {
   const conn = useConnectionContext();
   const { list } = useEpicList(fetcher, conn);
-  const { active } = useActiveWorkspace(conn, fetcher);
   const snapshot = useConnectionState(conn).snapshot;
   const pathname = useLocation().pathname;
   if (!list?.epics) return null;
