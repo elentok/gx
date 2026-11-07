@@ -367,6 +367,16 @@ test("on a wide screen the round button stays Send answers with the long Auto na
   expect(screen.getByRole("button", { name: "Send answers" })).toBeTruthy();
 });
 
+test("on a wide screen Auto sits right after Note, not beside Send answers", async () => {
+  render({ wide: true, chat: chatOf({ round: round() }) });
+  const auto = await autoButton();
+  const note = screen.getByRole("button", { name: "Note" });
+  const send = screen.getByRole("button", { name: "Send answers" });
+  expect(!!(note.compareDocumentPosition(auto) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  expect(note.nextElementSibling?.contains(auto)).toBe(true);
+  expect(auto.parentElement?.parentElement?.nextElementSibling).not.toBe(send);
+});
+
 test("Interrupt replaces Send while working, Continue replaces it after a run-end line", async () => {
   render({ state: "working" });
   await screen.findByRole("button", { name: "Interrupt" });

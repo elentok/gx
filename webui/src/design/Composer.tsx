@@ -233,33 +233,35 @@ export function Composer({
         state={images}
         phone={!wide}
         afterAdd={
-          <Button
-            emphasis="secondary"
-            aria-label="Note"
-            title={wide ? undefined : "Note"}
-            aria-expanded={open}
-            {...(wide ? {} : { w: "44px", h: "44px", px: "0", justifyContent: "center", flex: "none", position: "relative" })}
-            onClick={() => setOpen(!open)}
-          >
-            <PiNotePencil size={wide ? undefined : 20} />
-            {wide && " Note"}
-            {!wide && (open || text !== "") && (
-              <Box
-                data-part="note-dot"
-                position="absolute"
-                top="7px"
-                right="7px"
-                w="8px"
-                h="8px"
-                borderRadius="full"
-                bg="tone.running.fg"
-              />
-            )}
-          </Button>
+          <>
+            <Button
+              emphasis="secondary"
+              aria-label="Note"
+              title={wide ? undefined : "Note"}
+              aria-expanded={open}
+              {...(wide ? {} : { w: "44px", h: "44px", px: "0", justifyContent: "center", flex: "none", position: "relative" })}
+              onClick={() => setOpen(!open)}
+            >
+              <PiNotePencil size={wide ? undefined : 20} />
+              {wide && " Note"}
+              {!wide && (open || text !== "") && (
+                <Box
+                  data-part="note-dot"
+                  position="absolute"
+                  top="7px"
+                  right="7px"
+                  w="8px"
+                  h="8px"
+                  borderRadius="full"
+                  bg="tone.running.fg"
+                />
+              )}
+            </Button>
+            {autoAdvanceBar}
+          </>
         }
         send={
           <>
-            {autoAdvanceBar}
             {wide && canContinue && !working && (
               <Text as="span" fontSize="xs" color="text.dim" truncate minW="0">
                 {nextTitle}
