@@ -899,6 +899,16 @@ test("a refused file is a failed tile with its reason and Remove, never retried 
   expect(uploadImage).not.toHaveBeenCalled();
 });
 
+test("an 11th image is a failed tile with Remove and no retry", async () => {
+  const { uploadImage } = await mount({}, { slug: "x", images: Array.from({ length: 10 }, (_, i) => `i${i}`) });
+  addImages(png("extra.png"));
+  const tiles = await screen.findAllByText("Max 10 images");
+  expect(tiles.length).toBeGreaterThan(0);
+  expect(screen.queryByText(/tap to retry/)).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Remove image" })).toHaveLength(11);
+  expect(uploadImage).not.toHaveBeenCalled();
+});
+
 test("a transport failure offers tap to retry, and retry uploads", async () => {
   const { uploadImage } = await mount({}, { slug: "x" });
   uploadImage.mockRejectedValueOnce(new Error("Network down"));

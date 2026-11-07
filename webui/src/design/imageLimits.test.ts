@@ -47,6 +47,7 @@ describe("checkImages", () => {
   it("adds the first 10 and refuses the 11th", async () => {
     const r = await checkImages(Array.from({ length: 11 }, () => file(PNG)), 0);
     expect(r.accepted).toHaveLength(10);
+    expect(r.refused).toEqual([{ name: "x.bin", message: MSG_MAX_IMAGES }]);
     expect(r.error).toBe(MSG_MAX_IMAGES);
   });
 
