@@ -14,6 +14,15 @@ catalog is `webui/e2e/CATALOG.md`, the same file the Playwright suite (`make web
 agents and the suite check the same flows. Read the catalog entry for the flow you run, not the whole
 file. Read [gx-playwright-cli](../gx-playwright-cli/SKILL.md) for the browser commands.
 
+## 0. Preflight the browser
+
+Before building the UI or starting a fixture, run `playwright-cli -s=preflight open about:blank`,
+then `playwright-cli -s=preflight close`. A sandboxed agent can fail here (for example
+`Failed to get the path for 1001`), and finding that out after the build and fixture wastes them.
+If `open` fails to launch, stop at once and follow "When only a person can answer" in
+[gx-local-tracker](../gx-local-tracker.md): run `gx tickets ask` naming the launch error. Never
+retry with the sandbox disabled on your own.
+
 ## 1. Build and start a scenario
 
 One command builds and starts the scenario, from the repo root. The `gx` binary embeds

@@ -66,6 +66,9 @@ func TestMockRulesAnchors(t *testing.T) {
 			"`waitUntil: \"domcontentloaded\"`",
 			"`cookie_name`",
 			"`nextTotpCode()`",
+			"## 0. Preflight the browser",
+			"open about:blank",
+			"Never retry with the sandbox disabled on your own",
 		}},
 		{"implement", "gx-implement/SKILL.md", []string{
 			"## Mock check",
