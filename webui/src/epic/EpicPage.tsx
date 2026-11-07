@@ -10,7 +10,9 @@ import { slugOf } from "../slug";
 import { useWide } from "../useWide";
 import { verdictText } from "../verdict";
 import { hasDesignSession, liveSessions } from "../design/view";
-import { ActionMerge, ActionStashMerge, type EpicDetailRow } from "../generated/server";
+import { ActionMerge, ActionStashMerge, type EpicDetailRow, type EpicListRow } from "../generated/server";
+import { useCardActions } from "../workspaces/itemActions";
+import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { EpicRing } from "./EpicRing";
 import { MergeButton, StashMergeButton } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
@@ -226,22 +228,28 @@ function DescriptionLine({ summary }: { summary: string }) {
   );
 }
 
-// The only item: the epic address, `<project>:<name>`.
-function EpicMenu({ address }: { address: string }) {
+// Copy epic ID (the address, `<project>:<name>`), then Move, Remove and Hold for a card in a workspace.
+function EpicMenu({ address, card }: { address: string; card?: EpicListRow }) {
+  const { workspaces } = useWorkspaces(useConnectionContext());
+  const { sections, dialogs } = useCardActions(card, workspaces);
   return (
-    <MoreActionsMenu
-      sections={[
-        [
-          {
-            value: "copy-epic-id",
-            label: "Copy epic ID",
-            hint: address,
-            inlineHint: true,
-            onSelect: () => void copyText(address, null),
-          },
-        ],
-      ]}
-    />
+    <>
+      <MoreActionsMenu
+        sections={[
+          [
+            {
+              value: "copy-epic-id",
+              label: "Copy epic ID",
+              hint: address,
+              inlineHint: true,
+              onSelect: () => void copyText(address, null),
+            },
+          ],
+          ...sections,
+        ]}
+      />
+      {dialogs}
+    </>
   );
 }
 
@@ -364,7 +372,7 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
               actions={
                 <>
                   <EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "header" : "headerSm"} />
-                  <EpicMenu address={address} />
+                  <EpicMenu address={address} card={card} />
                 </>
               }
               meta={

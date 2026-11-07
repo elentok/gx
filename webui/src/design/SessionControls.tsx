@@ -2,7 +2,9 @@ import { Box, Menu, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { copyText } from "../clipboard";
 import { useConnectionContext } from "../connection";
-import type { DesignOpenRequest, SessionInfo } from "../generated/server";
+import type { DesignOpenRequest, EpicListRow, SessionInfo } from "../generated/server";
+import { useCardActions } from "../workspaces/itemActions";
+import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { Button } from "../ui/button/Button";
 import { menuItemStyle, type MenuItemStyle } from "../ui/more-actions/menuFrame";
 import { MoreActionsMenu,type MoreActionsItem, type MoreActionsSection } from "../ui/more-actions/MoreActionsMenu";
@@ -182,8 +184,11 @@ export function DesignActionsMenu({
   open = postOpenDesign,
   stop = postStopSession,
   remove = postDeleteDesign,
+  card,
 }: {
   address: string;
+  /** The Design's card; its workspace and hold state drive the Move, Remove and Hold items. */
+  card?: EpicListRow;
   shown?: SessionInfo;
   /** Live design sessions, newest first. */
   live: SessionInfo[];
@@ -198,6 +203,8 @@ export function DesignActionsMenu({
   const { run, pending } = useDesignWrite();
   const [confirming, setConfirming] = useState(false);
   const wide = useWide();
+  const { workspaces } = useWorkspaces(useConnectionContext());
+  const itemActions = useCardActions(card, workspaces);
   const item = menuItemStyle(!wide);
   const canDelete = deletable && live.length === 0;
 
@@ -240,6 +247,7 @@ export function DesignActionsMenu({
       onSelect: () => setConfirming(true),
     });
   sections.push(copySection);
+  sections.push(...itemActions.sections);
   if (canDelete && confirming)
     sections.push({
       content: (
@@ -250,7 +258,12 @@ export function DesignActionsMenu({
         />
       ),
     });
-  return <MoreActionsMenu sections={sections} onClosed={() => setConfirming(false)} />;
+  return (
+    <>
+      <MoreActionsMenu sections={sections} onClosed={() => setConfirming(false)} />
+      {itemActions.dialogs}
+    </>
+  );
 }
 
 /** The menu's Agent block for what the header leaves out (Tier, Effort on a phone, the switched note); none when it has no rows. */

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicDetail, EpicList, EpicListRow, PendingRow } from "../generated/server";
+import type { EpicDetail, EpicList, EpicListRow, PendingRow, Workspace } from "../generated/server";
 import { appRoutes } from "../routes";
 import type { FixAgent } from "./fixAgent";
 import { renderThemed } from "../ui/render";
@@ -44,10 +44,10 @@ function render(
   path: string,
   epics: EpicListRow[],
   kind: EpicDetail["kind"] = "loop",
-  extra: { sessions?: unknown[]; detail?: Partial<EpicDetail>; hang?: boolean; notFound?: boolean; fixAgent?: FixAgent; pending?: PendingRow[] } = {},
+  extra: { workspaces?: Workspace[]; sessions?: unknown[]; detail?: Partial<EpicDetail>; hang?: boolean; notFound?: boolean; fixAgent?: FixAgent; pending?: PendingRow[] } = {},
 ) {
   const state = {
-    snapshot: { sessions: extra.sessions ?? [], pending: extra.pending ?? [] },
+    snapshot: { workspaces: extra.workspaces, sessions: extra.sessions ?? [], pending: extra.pending ?? [] },
     connected: true,
     loadedOnce: true,
     tick: 0,
@@ -716,6 +716,32 @@ test("Copy epic ID is the only menu item and copies project:name", async () => {
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+const spaces: Workspace[] = [
+  { name: "Default", default: true, members: 1 },
+  { name: "Work", members: 1 },
+];
+const menuLabels = async () => {
+  fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+  return (await screen.findAllByRole("menuitem")).map((i) => i.textContent);
+};
+
+test("a card in a named workspace adds Move, Remove and Hold to the menu", async () => {
+  render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Work" })], "loop", { workspaces: spaces });
+  expect(await menuLabels()).toEqual(["Copy epic IDgx:blog-impl", "Move to workspace", "Remove from workspace", "Hold"]);
+});
+
+test("a held card offers Take off hold", async () => {
+  render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Default", section: "on-hold" })], "loop", { workspaces: spaces });
+  expect(await menuLabels()).toEqual(["Copy epic IDgx:blog-impl", "Move to workspace", "Take off hold"]);
+});
+
+test("a queued epic's Hold is disabled", async () => {
+  render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Default", queued: true })], "loop", { workspaces: spaces });
+  await menuLabels();
+  const hold = screen.getByRole("menuitem", { name: /^Hold/ });
+  expect(hold.getAttribute("aria-disabled") ?? hold.hasAttribute("data-disabled")).toBeTruthy();
 });
 
 test("the spinner shows before data and an unknown address says not found", async () => {

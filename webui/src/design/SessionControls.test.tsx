@@ -12,6 +12,7 @@ import type {
   SessionInfo,
   SessionPromptRequest,
   SessionResult,
+  Workspace,
 } from "../generated/server";
 import { appRoutes, type RouteFetchers } from "../routes";
 import { renderThemed } from "../ui/render";
@@ -73,9 +74,10 @@ function render(
   sessions: SessionInfo[],
   over: Partial<RouteFetchers> = {},
   detail = detailOf(),
+  placed: { card?: object; workspaces?: Workspace[] } = {},
 ) {
   const state = {
-    snapshot: { sessions },
+    snapshot: { sessions, workspaces: placed.workspaces },
     connected: true,
     loadedOnce: true,
     tick: 0,
@@ -101,6 +103,7 @@ function render(
             queued: false,
             queueable: false,
             blocked_by_epics: [],
+            ...placed.card,
           },
         ],
         follow_ups: [],
@@ -268,6 +271,32 @@ test("New session and the Live sessions rows share a section, with a rule before
     !!(a.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(b.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_PRECEDING);
   expect(rules.filter(between(fresh, live))).toHaveLength(0);
   expect(rules.filter(between(live, copy))).toHaveLength(1);
+});
+
+const spaces: Workspace[] = [
+  { name: "Default", default: true, members: 1 },
+  { name: "Work", members: 1 },
+];
+
+test("a Design in a workspace appends Move, Remove and Hold after the existing items", async () => {
+  render("/d/gx:a", [session("a")], {}, detailOf(), { card: { addresses: ["gx:a"], workspace: "Work" }, workspaces: spaces });
+  await openMenu();
+  await newSession();
+  const labels = screen.getAllByRole("menuitem").map((i) => i.textContent);
+  const at = (prefix: string) => labels.findIndex((l) => l?.startsWith(prefix));
+  expect(at("New session")).toBeGreaterThanOrEqual(0);
+  expect(at("Copy design ID")).toBeGreaterThan(at("New session"));
+  expect(at("Move to workspace")).toBeGreaterThan(at("Copy design ID"));
+  expect(at("Remove from workspace")).toBeGreaterThan(at("Move to workspace"));
+  expect(labels.at(-1)).toBe("Hold");
+});
+
+test("a held Design offers Take off hold and says On hold in its subtitle", async () => {
+  render("/d/gx:a", [session("a")], {}, detailOf(), { card: { addresses: ["gx:a"], workspace: "Work", section: "on-hold" }, workspaces: spaces });
+  await openMenu();
+  expect(await screen.findByRole("menuitem", { name: "Take off hold" })).toBeTruthy();
+  expect(screen.queryByRole("menuitem", { name: "Hold" })).toBeNull();
+  expect(screen.getByText(/On hold/)).toBeTruthy();
 });
 
 test("the Live sessions list switches the page and stops another session with a token", async () => {

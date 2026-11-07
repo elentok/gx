@@ -18,7 +18,7 @@ import { AgentLine } from "./AgentLine";
 import { ImplLink, Progress, StepLine, StepsSheet, showsImplLink, summaryLine } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { DesignActionsMenu, Failure, StartDesignButton } from "./SessionControls";
-import type { EpicListRow, SessionInfo } from "../generated/server";
+import { SectionOnHold, type EpicListRow, type SessionInfo } from "../generated/server";
 import { slugOf } from "../slug";
 import { useWide } from "../useWide";
 import { designSession, liveSessions } from "./view";
@@ -45,6 +45,7 @@ interface SessionStripProps {
   startFailure?: string;
   /** The map has no Destination and no tickets yet, so it can still be deleted. */
   deletable?: boolean;
+  card?: EpicListRow;
 }
 
 // The right of the title row: the failed-start message, the first Start button, and the menu.
@@ -56,6 +57,7 @@ function SessionStrip({
   onSelect,
   startFailure,
   deletable,
+  card,
 }: SessionStripProps) {
   const navigate = useNavigate();
   // The reason is for the failed start only: a live session means a retry worked.
@@ -69,6 +71,7 @@ function SessionStrip({
         shown={session}
         live={live}
         deletable={deletable}
+        card={card}
         onSelect={onSelect}
         onDeleted={() => navigate("/epics")}
         open={deps.open}
@@ -152,8 +155,12 @@ function DesignBody({
           title={name}
           icon={<PageIcon kind="design" />}
           subtitle={
-            detail &&
-            (wide ? summaryLine(detail) : <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />)
+            detail && (
+              <>
+                {wide ? summaryLine(detail) : <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />}
+                {card?.section === SectionOnHold && " · On hold"}
+              </>
+            )
           }
           meta={session && <AgentLine session={session} wide={wide} />}
           actions={
@@ -173,6 +180,7 @@ function DesignBody({
                 deps={deps}
                 onSelect={setSelected}
                 startFailure={startFailure}
+                card={card}
                 deletable={detail?.deletable}
               />
             </>

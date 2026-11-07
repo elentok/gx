@@ -2,7 +2,10 @@ import { Box, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
 import { apiFetch } from "../apiFetch";
 import {
+  CardKindDesign,
   HoldQueuedText,
+  SectionOnHold,
+  type EpicListRow,
   ReasonHoldLiveSessions,
   type HoldRequest,
   type HoldResult,
@@ -26,6 +29,28 @@ export interface ItemRef {
   /** The epic (or the Design's -impl) holds a queue item. */
   queued?: boolean;
   held?: boolean;
+}
+
+/** The menu target of a Design or epic card; none for a card outside every workspace (One-off, Follow-ups, Other). */
+export function itemOfCard(card: EpicListRow | undefined): ItemRef | undefined {
+  if (!card?.workspace) return undefined;
+  return {
+    key: card.address,
+    name: card.name,
+    kind: card.card_kind === CardKindDesign ? "design" : "epic",
+    workspace: card.workspace,
+    queued: card.queued,
+    held: card.section === SectionOnHold,
+  };
+}
+
+const NO_ITEM: ItemRef = { key: "", name: "", kind: "chat", workspace: "" };
+
+/** The page-header form of {@link useItemActions}: no sections and no dialogs while the card is unknown. */
+export function useCardActions(card: EpicListRow | undefined, workspaces: Workspace[]) {
+  const item = itemOfCard(card);
+  const actions = useItemActions(item ?? NO_ITEM, workspaces);
+  return item ? actions : { sections: [] as MoreActionsSection[], dialogs: null as ReactNode };
 }
 
 export interface ItemWriters {
