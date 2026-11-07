@@ -92,9 +92,11 @@ export function ListRow({
             </Text>
           )}
         </Text>
-        <Text fontSize="13px" color="text.dim" lineClamp="1">
-          {row.subtitle}
-        </Text>
+        {row.subtitle && (
+          <Text fontSize="13px" color="text.dim" lineClamp="1">
+            {row.subtitle}
+          </Text>
+        )}
       </Box>
       {row.trailing}
     </Box>
@@ -192,7 +194,7 @@ export function Menu({
       {...(phone
         ? { position: "fixed", inset: "0", p: "4", gap: "3" }
         : floating
-          ? { position: "fixed", top: "12vh", left: "50%", transform: "translateX(-50%)", w: "560px", maxW: "calc(100vw - 32px)", p: "3", gap: "2", boxShadow: "lg" }
+          ? { position: "fixed", top: "12vh", left: "50%", transform: "translateX(-50%)", w: "460px", maxW: "calc(100vw - 32px)", p: "3", gap: "2", boxShadow: "lg" }
           : { position: "absolute", top: "100%", left: "0", mt: "2", w: "440px", maxW: "calc(100vw - 32px)", p: "3", gap: "2" })}
     >
       <Box display="flex" alignItems="center" gap="2">

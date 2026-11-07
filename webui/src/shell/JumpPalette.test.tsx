@@ -47,8 +47,8 @@ const rows = [
   row("shop", { card_kind: CardKindDesign }),
   row("away", { workspace: "Work" }),
   row("away-waiting", { workspace: "Work", section: SectionNeedsYou, state_pill: "Question" }),
-  row("parked", { section: SectionOnHold }),
-  row("parked-away", { workspace: "Work", section: SectionOnHold }),
+  row("frozen", { section: SectionOnHold }),
+  row("frozen-away", { workspace: "Work", section: SectionOnHold }),
   row("unstarted", { card_kind: CardKindDesign, section: SectionReadyToDesign }),
   row("shipped", { section: SectionFinished }),
 ];
@@ -154,19 +154,19 @@ test("the empty menu is the active workspace, then Needs you elsewhere", async (
   setup();
   await open();
   await waitFor(() => expect(names()).toContain("blog"));
-  expect(screen.getAllByRole("group").map((g) => g.getAttribute("aria-label"))).toEqual(["Designs", "Epics", "Chats", "Needs you"]);
+  expect(screen.getAllByRole("group").map((g) => g.getAttribute("aria-label"))).toEqual(["Designs", "Epics", "Chats", "Needs you elsewhere"]);
   expect(names()).toEqual(["shop", "blog", "my-chat", "away-waiting", "waiting-oneoff"]);
   expect(within(option("away-waiting")).getByText("Work")).toBeTruthy();
-  expect(within(option("waiting-oneoff")).getByText("One-off agent")).toBeTruthy();
+  expect(within(option("waiting-oneoff")).getByText("Needs you")).toBeTruthy();
 });
 
 test("typing finds held, Ready to design, Finished items, agents and other workspaces", async () => {
   setup();
   await open();
   await waitFor(() => expect(names()).toContain("blog"));
-  type("parked");
-  expect(names()).toEqual(["parked", "parked-away"]);
-  expect(within(option("parked")).getByText("On hold")).toBeTruthy();
+  type("frozen");
+  expect(names()).toEqual(["frozen", "frozen-away"]);
+  expect(within(option("frozen")).getByText("On hold")).toBeTruthy();
   type("unstart");
   expect(names()).toEqual(["unstarted"]);
   type("shipped");
@@ -175,7 +175,7 @@ test("typing finds held, Ready to design, Finished items, agents and other works
   expect(names()).toEqual(["builder"]);
   expect(within(option("builder")).getByText("blog")).toBeTruthy();
   type("away");
-  expect(names()).toEqual(["away-waiting", "away", "parked-away"]);
+  expect(names()).toEqual(["away-waiting", "away", "frozen-away"]);
   expect(within(option("away")).getByText("Work")).toBeTruthy();
   type("far-chat");
   expect(names()).toEqual(["far-chat"]);

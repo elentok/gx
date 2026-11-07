@@ -72,13 +72,13 @@ export interface SidebarInput {
 
 const isCard = (r: EpicListRow) => r.card_kind === CardKindDesign || r.card_kind === CardKindImplementation;
 
-function cardStatus(r: EpicListRow): SidebarStatus {
+export function cardStatus(r: EpicListRow): SidebarStatus {
   if (r.section === SectionNeedsYou) return { words: NEEDS_YOU, tone: "waiting" };
   if (isLive(r)) return { words: WORKING, tone: "running" };
   return { words: r.status_words ?? "", tone: "muted" };
 }
 
-function sessionStatus(s: SessionInfo): SidebarStatus {
+export function sessionStatus(s: SessionInfo): SidebarStatus {
   if (isActionable(s)) return { words: NEEDS_YOU, tone: "waiting" };
   if (s.status.state === SessionWorking) return { words: WORKING, tone: "running" };
   return { words: stateLabel(s), tone: "muted" };
