@@ -20,21 +20,8 @@ func ArchiveDir(scratchDir string) string {
 // not an error: it reports zero, mirroring how Load handles a missing
 // ".scratch/".
 func CountArchivedEpics(scratchDir string) (int, error) {
-	entries, err := os.ReadDir(ArchiveDir(scratchDir))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return 0, nil
-		}
-		return 0, err
-	}
-
-	count := 0
-	for _, entry := range entries {
-		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
-			count++
-		}
-	}
-	return count, nil
+	names, err := ArchivedEpicNames(scratchDir)
+	return len(names), err
 }
 
 // ArchivedEpicNames is the set of epic names under scratchDir's ".archive"

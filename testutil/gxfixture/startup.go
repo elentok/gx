@@ -167,7 +167,7 @@ func (f *fixture) addScenarioOutput(res *Output, sc scenario, transcripts map[st
 	if sc.FakeGo || sc.FakeNpm {
 		res.GateDir = f.gateDir()
 	}
-	res.ConfigFile = f.configFile()
+	res.ConfigFile = configFile(f.root)
 	res.ChatCapture = f.chatCapture
 	res.Transcripts = transcripts
 	if sc.LimitBurn {

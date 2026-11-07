@@ -89,6 +89,6 @@ func (f *fixture) setupFakeNpm(failing bool) error {
 }
 
 // configFile is the global config the server loaded; a test edits it and reloads.
-func (f *fixture) configFile() string {
-	return filepath.Join(f.root, "home", ".config", "gx", "config.json")
+func configFile(root string) string {
+	return filepath.Join(root, "home", ".config", "gx", "config.json")
 }
