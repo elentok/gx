@@ -15,7 +15,7 @@ import (
 // Composer image flows (+6): paste, drop and the file picker need real browser
 // clipboard/drag events and a server round trip to the session's image dir,
 // which jsdom tests cannot see.
-const maxFlows = 124
+const maxFlows = 125
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

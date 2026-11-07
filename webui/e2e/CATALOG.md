@@ -77,6 +77,10 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **94. New Design launches at the strongest tier.**
 - **27. Design a not-started Design.**
 
+### `workspaces.e2e.ts`
+
+- **Workspaces** (scenario `workspaces`: "gx bugs" holds a live and a held Design, "research" an implementation epic and a held epic; the Default workspace holds a chat, a paused epic with a Fix agent and an epic with an Investigate agent; Other holds a project-level Fix agent and the One-off agents). The sidebar follows the active workspace; the chevron expands an epic's agents; Move from a sidebar row and an Epics card, Remove with its confirmation, hidden on Default.
+
 ### `united.e2e.ts`
 
 - **16. Needs you (+63, 28, 29, 30).**
