@@ -9,6 +9,7 @@ import { NewVersionStrip, useBuildChanged } from "../restart/NewVersionStrip";
 import { MigratingStrip } from "../restart/MigratingStrip";
 import { Strip } from "../ui/strip/Strip";
 import { useDevice, type Device } from "../useWide";
+import { JumpPalette } from "./JumpPalette";
 import { MascotToggle } from "./MascotToggle";
 import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
@@ -274,6 +275,7 @@ export function AppShell({
           )}
           {children ?? <Outlet />}
         </Box>
+        <JumpPalette fetcher={fetchEpicList} active={active} />
       </Box>
     </ShellContext.Provider>
   );

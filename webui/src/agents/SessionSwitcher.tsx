@@ -55,5 +55,5 @@ export function SessionSwitcher({
     () => ({ key: "new", title: "+ New session", subtitle: "", href: "#/agents", searchText: "", onSelect: onNew }),
     [onNew],
   );
-  return <RowList name={name} label="Switch session" placeholder="Filter sessions" sections={sections} footer={footer} fontSize={fontSize} plain={plain} />;
+  return <RowList name={name} label="Switch session" placeholder="Filter sessions" sections={sections} footer={footer} fontSize={fontSize} plain={plain} hotkey={false} />;
 }

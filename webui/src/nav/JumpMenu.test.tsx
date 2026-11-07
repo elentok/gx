@@ -3,7 +3,6 @@ import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicListRow } from "../generated/server";
-import { Modal } from "../ui/modal/Modal";
 import { renderThemed } from "../ui/render";
 import { JumpMenu, jumpHref, RowList, type ListRowData, type ListSection } from "./JumpMenu";
 
@@ -73,42 +72,11 @@ test("a click opens the menu with the filter focused", async () => {
   expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Jump to epic" }));
 });
 
-test("Ctrl+K and ⌘K open the menu", async () => {
+test("the title menu leaves Cmd/Ctrl+K to the shell's palette", async () => {
   setup();
   await titleButton();
   fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-  expect(await screen.findByRole("dialog", { name: "Jump to epic" })).toBeTruthy();
-  fireEvent.keyDown(window, { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
-  fireEvent.keyDown(window, { key: "k", metaKey: true });
-  expect(await screen.findByRole("dialog")).toBeTruthy();
-});
-
-test("Ctrl+K does nothing under a Modal, and Escape closes only the Modal", async () => {
-  setup();
-  await titleButton();
-  const onClose = vi.fn();
-  const modal = renderThemed(
-    <Modal label="Over" onClose={onClose}>
-      body
-    </Modal>,
-  );
-  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-  expect(screen.queryByRole("dialog", { name: "Jump to epic" })).toBeNull();
-  modal.unmount();
-  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-  expect(await screen.findByRole("dialog", { name: "Jump to epic" })).toBeTruthy();
-
-  renderThemed(
-    <Modal label="Over" onClose={onClose}>
-      body
-    </Modal>,
-  );
-  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-  expect(screen.getByRole("dialog", { name: "Jump to epic" })).toBeTruthy();
-  fireEvent.keyDown(window, { key: "Escape" });
-  expect(onClose).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("dialog", { name: "Jump to epic" })).toBeTruthy();
 });
 
 test("the menu input has no expand button", async () => {

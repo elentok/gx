@@ -101,7 +101,7 @@ export function ListRow({
   );
 }
 
-function epicRow(row: EpicListRow, current: boolean): ListRowData {
+export function epicRow(row: EpicListRow, current: boolean): ListRowData {
   const kind = RING_KIND[row.card_kind ?? "implementation"];
   const needsYou = row.section === SectionNeedsYou;
   return {
@@ -132,12 +132,13 @@ export function JumpRow({
   return <ListRow row={epicRow(row, current)} active={active} onPick={onPick} id={id} />;
 }
 
-function Menu({
+export function Menu({
   sections: all,
   label,
   placeholder,
   footer,
   phone,
+  floating,
   onClose,
 }: {
   sections: ListSection[];
@@ -145,6 +146,8 @@ function Menu({
   placeholder: string;
   footer?: ListRowData;
   phone: boolean;
+  /** A popover near the top of the window instead of one hanging under its trigger. */
+  floating?: boolean;
   onClose: () => void;
 }) {
   const navigate = useNavigate();
@@ -185,10 +188,12 @@ function Menu({
       borderRadius={phone ? undefined : "16px"}
       display="flex"
       flexDirection="column"
-      zIndex={phone ? "modal" : "dropdown"}
+      zIndex={phone || floating ? "modal" : "dropdown"}
       {...(phone
         ? { position: "fixed", inset: "0", p: "4", gap: "3" }
-        : { position: "absolute", top: "100%", left: "0", mt: "2", w: "440px", maxW: "calc(100vw - 32px)", p: "3", gap: "2" })}
+        : floating
+          ? { position: "fixed", top: "12vh", left: "50%", transform: "translateX(-50%)", w: "560px", maxW: "calc(100vw - 32px)", p: "3", gap: "2", boxShadow: "lg" }
+          : { position: "absolute", top: "100%", left: "0", mt: "2", w: "440px", maxW: "calc(100vw - 32px)", p: "3", gap: "2" })}
     >
       <Box display="flex" alignItems="center" gap="2">
         <Input
@@ -343,5 +348,6 @@ export function JumpMenu({
       })),
     [epics, current],
   );
-  return <RowList name={name} label="Jump to epic" placeholder="Filter epics" sections={sections} fontSize={fontSize} />;
+  // Cmd/Ctrl+K belongs to the shell's JumpPalette.
+  return <RowList name={name} label="Jump to epic" placeholder="Filter epics" sections={sections} fontSize={fontSize} hotkey={false} />;
 }

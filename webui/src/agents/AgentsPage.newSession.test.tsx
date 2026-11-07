@@ -4,6 +4,8 @@ import { dialog, entryOptions, formProject, optionNames, render, session, useAge
 
 useAgentsPageHooks();
 
+const openSwitcher = () => fireEvent.click(screen.getAllByRole("button").find((b) => b.getAttribute("aria-haspopup") === "dialog")!);
+
 test("+ New session opens the form prefilled with the selected session's project, and a create opens the new session", async () => {
   const trees = [
     { project: "p", root: "/dev/p", worktrees: [], tiers: {} },
@@ -42,7 +44,7 @@ test.each([
 
 test("the switcher ends with + New session, reached by keys, and opens the form with the selected project", async () => {
   render([session("s-1", "p"), session("s-2", "q")], "/agents/s-2", true, entryOptions);
-  fireEvent.keyDown(window, { key: "k", metaKey: true });
+  openSwitcher();
   const names = optionNames();
   expect(names[names.length - 1]).toContain("+ New session");
   const input = dialog().getByRole("combobox");
@@ -54,7 +56,7 @@ test("the switcher ends with + New session, reached by keys, and opens the form 
 
 test("the switcher's New session row stays while the filter matches nothing", () => {
   render([session("s-1", "p")], "/agents/s-1", true, entryOptions);
-  fireEvent.keyDown(window, { key: "k", metaKey: true });
+  openSwitcher();
   fireEvent.change(dialog().getByRole("combobox"), { target: { value: "zzz" } });
   expect(optionNames()).toEqual(["+ New session"]);
 });

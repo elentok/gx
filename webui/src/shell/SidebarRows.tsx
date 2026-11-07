@@ -12,7 +12,7 @@ import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 const CHAT_PINK = "#ec6fa8";
 
 /** The epic address of the open page, or "". */
-function currentAddress(pathname: string): string {
+export function currentAddress(pathname: string): string {
   const [, kind, ...rest] = pathname.split("/");
   const id = decodeURIComponent(rest.join("/"));
   if (kind === "d" || kind === "e") return id;

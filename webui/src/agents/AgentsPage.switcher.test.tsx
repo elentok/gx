@@ -16,12 +16,9 @@ test("the title button opens the switcher with Actionable, Unread, Other section
   expect(names.slice(2).join()).toContain("plain");
 });
 
-test("the title button and Cmd-K open the switcher on the filter", () => {
+test("the title button opens the switcher on the filter", () => {
   render(switcherSessions(), "/agents/s-1");
   openSwitcher();
-  expect(document.activeElement).toBe(dialog().getByRole("combobox"));
-  fireEvent.keyDown(window, { key: "Escape" });
-  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
   expect(document.activeElement).toBe(dialog().getByRole("combobox"));
 });
 
@@ -30,25 +27,15 @@ test("the switcher title shows no ⌘K hint", () => {
   expect(screen.getByRole("heading", { level: 1 }).textContent).not.toContain("⌘K");
 });
 
-test("Cmd-K and Ctrl-K open the switcher", () => {
-  render(switcherSessions(), "/agents/s-1");
-  fireEvent.keyDown(window, { key: "k", metaKey: true });
-  expect(screen.getByRole("dialog", { name: "Switch session" })).toBeTruthy();
-  fireEvent.keyDown(window, { key: "k", metaKey: true });
-  expect(screen.queryByRole("dialog")).toBeNull();
-  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-  expect(screen.getByRole("dialog", { name: "Switch session" })).toBeTruthy();
-});
-
 const showGroups = () => {
   localStorage.setItem("gx.agents.design", "1");
   localStorage.setItem("gx.agents.queue", "1");
 };
 
-test("Cmd-K opens the switcher before a session is picked", () => {
+test("the title button opens the switcher before a session is picked", () => {
   showGroups();
   render(switcherSessions(), "/agents");
-  fireEvent.keyDown(window, { key: "k", metaKey: true });
+  fireEvent.click(screen.getByRole("button", { name: /^Switch session/ }));
   expect(dialog().getAllByRole("option")).toHaveLength(5);
 });
 
