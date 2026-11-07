@@ -6,7 +6,7 @@ const openDesign = async (page: Page) => {
   await expect(page.getByRole("button", nav("Start design session"))).toBeVisible();
 };
 
-const moreActions = (page: Page) => page.getByRole("button", nav("More actions"));
+const moreActions = (page: Page) => page.getByTestId("page-header-actions").getByRole("button", nav("More actions"));
 const actionsMenu = (page: Page) => page.getByRole("menu", nav("More actions"));
 
 test.describe("72. Design actions menu", () => {
@@ -91,12 +91,13 @@ test.describe("72. Design actions menu", () => {
 });
 
 test.describe("72b. Design menu before Start", () => {
-  test("the button exists before Start and the menu holds only Copy design ID", async ({ page, start }) => {
+  test("the button exists before Start and the menu holds only Copy design ID and Hold", async ({ page, start }) => {
     await start("design");
     await openDesign(page);
     await moreActions(page).click();
     const menu = actionsMenu(page);
-    await expect(menu.getByRole("menuitem")).toHaveCount(1);
+    await expect(menu.getByRole("menuitem")).toHaveCount(2);
+    await expect(menu.getByRole("menuitem", { name: "Hold", exact: true })).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: /^Copy design ID/ })).toContainText("demo:design-epic");
   });
 });

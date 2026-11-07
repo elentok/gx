@@ -15,7 +15,7 @@ const showChat = (page: Page) => page.getByRole("group", nav("View")).getByRole(
 const step = (page: Page, name: string, state: string) => page.locator(`li[data-step="${name}"][data-state="${state}"]`);
 
 // The Design page ring: a Design badge (role img) inside the element that carries data-tone.
-const ring = (page: Page) => page.locator("[data-kind='design']").first();
+const ring = (page: Page) => page.locator("[data-kind='design']:not([data-testid='sidebar-body'] *)").first();
 
 test.describe("5. Start a design session and answer a round", () => {
   test("first step, ids, answer, Continue and a fresh round", async ({ page, start }) => {
@@ -23,9 +23,10 @@ test.describe("5. Start a design session and answer a round", () => {
     await start("design", { autoAdvanceDelay: "1h" });
     await openDesign(page);
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
-    await expect(page.getByRole("link", nav("Epics"))).toHaveAttribute("aria-current", "page");
-    // The charted design has no session, so its ⋯ menu holds only Copy design ID.
-    await expect(page.getByRole("button", nav("More actions"))).toHaveCount(1);
+    // A Design is a workspace item now, so the Epics footer link no longer stands for it.
+    await expect(page.getByRole("link", nav("Epics"))).not.toHaveAttribute("aria-current", "page");
+    // The charted design has no session, so its ⋯ menu holds only Copy design ID and Hold.
+    await expect(page.getByTestId("page-header-actions").getByRole("button", nav("More actions"))).toHaveCount(1);
     await page.getByRole("button", nav("Start design session")).click();
     await expect(page.getByRole("button", nav("Start design session"))).toHaveCount(0);
 
@@ -95,7 +96,10 @@ test.describe("9. Design progress to the end", () => {
     await expect(badge.getByRole("img", nav("Design"))).toBeVisible();
     const ringBox = (await badge.boundingBox())!;
     const nameBox = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
-    expect(ringBox.x + ringBox.width).toBeLessThanOrEqual(nameBox.x);
+    // The header's ring sits in the actions, level with the title and before the ⋯ button.
+    const moreBox = (await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).boundingBox())!;
+    expect(ringBox.x).toBeGreaterThanOrEqual(nameBox.x + nameBox.width);
+    expect(ringBox.x + ringBox.width).toBeLessThanOrEqual(moreBox.x);
     expect(Math.abs(ringBox.y + ringBox.height / 2 - (nameBox.y + nameBox.height / 2))).toBeLessThan(nameBox.height);
     await expect(badge).toContainText(epicLabel);
     await expect(badge).toHaveAttribute("data-tone", "muted");
@@ -246,7 +250,7 @@ const stopSession = async (fixture: Fixture, slug: string) => {
 
 // The ⋯ menu's items; opening it is a click on the trigger.
 const actionsMenu = async (page: Page) => {
-  await page.getByRole("button", nav("More actions")).click();
+  await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).click();
   return page.getByRole("menu", nav("More actions"));
 };
 
