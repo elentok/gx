@@ -85,14 +85,16 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("ws-design")).toBeVisible();
   await expect(row("ready-epic")).toHaveCount(0);
   await row("ws-design").click();
-  await expect(page).toHaveURL(/#\/e\/demo:ws-design$/);
+  // A Design row opens the Design page with its composer, not the epic page.
+  await expect(page).toHaveURL(/#\/d\/demo:ws-design$/);
+  await expect(page.getByRole("form", { name: "Composer" })).toBeVisible();
   await expect(row("ws-design")).toHaveAttribute("aria-current", "page");
   // Picking another workspace on the open item's page switches to it and the pick sticks.
   await pick("research");
   await expect(page.getByRole("button", nav("Workspace: research"))).toBeVisible();
   await expect(row("ws-impl-epic")).toBeVisible();
   await expect(row("ws-design")).toHaveCount(0);
-  await expect(page).toHaveURL(/#\/e\/demo:ws-design$/);
+  await expect(page).toHaveURL(/#\/d\/demo:ws-design$/);
 
 
   // Move from a sidebar row: the row leaves this workspace and shows in the target.

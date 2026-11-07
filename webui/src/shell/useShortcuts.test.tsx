@@ -40,12 +40,12 @@ const rows = [
   row("p:old", { name: "Old", section: SectionOnHold, status_words: "Held" }),
 ];
 
-function setup() {
+function setup(sort?: string) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })));
   const state = {
     snapshot: {
       needs_you_total: 0,
-      workspaces: [{ name: "Default", default: true, members: 0 }, { name: "Work", members: 0 }],
+      workspaces: [{ name: "Default", default: true, members: 0, sort }, { name: "Work", members: 0 }],
       sessions: [session("s2", "p", { name: "scratch" })],
       placements: [{ session: "s2", kind: "other" }],
     },
@@ -74,7 +74,16 @@ test("Alt+1 opens the first own row, reading the digit from the physical code", 
   press({ key: "¡", code: "Digit1", altKey: true });
   await waitFor(() => expect(router.state.location.pathname).toBe("/e/p:blog"));
   press({ key: "™", code: "Digit2", altKey: true });
-  await waitFor(() => expect(router.state.location.pathname).toBe("/e/p:shop"));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/d/p:shop"));
+});
+
+test("Alt+1 opens the first row of the sorted list", async () => {
+  rows[1] = { ...rows[1], last_activity_at: "2026-01-01T00:00:00Z" };
+  const router = setup("activity");
+  await body().findByRole("link", { name: /Blog/ });
+  press({ key: "¡", code: "Digit1", altKey: true });
+  await waitFor(() => expect(router.state.location.pathname).toBe("/d/p:shop"));
+  rows[1] = { ...rows[1], last_activity_at: undefined };
 });
 
 test("numbers show while Alt is held, only on own rows, and vanish on keyup and on blur", async () => {

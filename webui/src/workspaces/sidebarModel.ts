@@ -7,14 +7,18 @@ import {
   SectionNeedsYou,
   SectionOnHold,
   SessionWorking,
+  SortActivity,
+  SortName,
+  SortNeedsYou,
   type EpicListRow,
   type SessionInfo,
   type SessionPlacement,
+  type Sort,
 } from "../generated/server";
 import { isActionable, stateLabel } from "../agents/rules";
 import { isCurrent } from "../epics/list";
 import { RING_KIND, isLive, ringProgress } from "../epics/ring";
-import { agentHref } from "../hrefs";
+import { agentHref, designHref } from "../hrefs";
 import { titleHref } from "../epics/cardLinks";
 import type { Kind, Tone } from "../ui/tone";
 
@@ -68,6 +72,8 @@ export interface SidebarInput {
   workspace: string;
   /** The open page's epic address, or "". */
   current: string;
+  /** The active workspace's Sort value; missing or unknown reads as needs-you. */
+  sort?: string;
 }
 
 const isCard = (r: EpicListRow) => r.card_kind === CardKindDesign || r.card_kind === CardKindImplementation;
@@ -97,7 +103,7 @@ function cardRow(r: EpicListRow, agents: SidebarAgent[], current: string, held: 
     key: r.address,
     kind,
     title: r.name,
-    href: titleHref(r),
+    href: kind === "design" ? designHref(r.address) : titleHref(r),
     status: cardStatus(r),
     ring: ringProgress(r),
     ...(held ? { held: true } : {}),
@@ -108,37 +114,84 @@ function cardRow(r: EpicListRow, agents: SidebarAgent[], current: string, held: 
   };
 }
 
-export function buildSidebar({ rows, sessions, placements, workspace, current }: SidebarInput): Sidebar {
+/** A missing or unknown value reads as needs-you. */
+const sortOf = (sort: string | undefined): Sort => (sort === SortName || sort === SortActivity ? sort : SortNeedsYou);
+
+const time = (iso: string | undefined): number | undefined => {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(t) ? undefined : t;
+};
+
+const newest = (times: (number | undefined)[]): number | undefined => {
+  const known = times.filter((t): t is number => t !== undefined);
+  return known.length ? Math.max(...known) : undefined;
+};
+
+interface Sortable<T> {
+  item: T;
+  name: string;
+  needsYou: boolean;
+  at: number | undefined;
+}
+
+/** Array.sort is stable, so ties keep server order. */
+function sortBy<T>(sort: Sort, entries: Sortable<T>[]): T[] {
+  const byName = (a: Sortable<T>, b: Sortable<T>) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  const cmp = (a: Sortable<T>, b: Sortable<T>) => {
+    if (sort === SortName) return byName(a, b);
+    if (sort === SortActivity) {
+      if (a.at === undefined || b.at === undefined) return a.at === b.at ? byName(a, b) : a.at === undefined ? 1 : -1;
+      return b.at - a.at || 0;
+    }
+    return Number(b.needsYou) - Number(a.needsYou) || byName(a, b);
+  };
+  return [...entries].sort(cmp).map((e) => e.item);
+}
+
+export function buildSidebar({ rows, sessions, placements, workspace, current, sort }: SidebarInput): Sidebar {
+  const mode = sortOf(sort);
   const byId = new Map(sessions.map((s) => [s.id, s]));
   const placed = placements.flatMap((p) => {
     const s = byId.get(p.session);
     return s ? [{ p, s }] : [];
   });
-  const agentsOf = (r: EpicListRow) =>
+  const sessionsOf = (r: EpicListRow) =>
     placed
       .filter(({ p }) => p.kind === PlacementEpic && !!p.epic && (p.epic === r.address || !!r.addresses?.includes(p.epic)))
-      .map(({ s }) => agentRow(s));
+      .map(({ s }) => s);
+  const sessionAt = (s: SessionInfo) => time(s.status_changed_at);
+  const sortAgents = (ss: SessionInfo[]) =>
+    sortBy(
+      mode,
+      ss.map((s) => ({ item: agentRow(s), name: s.name || s.ticket || s.id, needsYou: isActionable(s), at: sessionAt(s) })),
+    );
+  const cardEntry = (r: EpicListRow, held: boolean): Sortable<SidebarRow> => {
+    const ss = sessionsOf(r);
+    const row = cardRow(r, held ? [] : sortAgents(ss), current, held);
+    return { item: row, name: r.name, needsYou: row.status.words === NEEDS_YOU, at: newest([time(r.last_activity_at), ...ss.map(sessionAt)]) };
+  };
 
   const mine = rows.filter((r) => isCard(r) && r.workspace === workspace);
-  const own = mine.filter((r) => r.section !== SectionOnHold).map((r) => cardRow(r, agentsOf(r), current, false));
+  const own = mine.filter((r) => r.section !== SectionOnHold).map((r) => cardEntry(r, false));
   const chats = placed
     .filter(({ p }) => p.kind === PlacementChat && p.workspace === workspace)
-    .map(({ s }): SidebarRow => ({
-      key: s.id,
-      kind: "chat",
-      title: s.name || s.id,
-      href: agentHref(s.id),
-      status: sessionStatus(s),
-      agents: [],
-    }));
-  const all = [...own, ...chats];
+    .map(({ s }): Sortable<SidebarRow> => {
+      const status = sessionStatus(s);
+      return {
+        item: { key: s.id, kind: "chat", title: s.name || s.id, href: agentHref(s.id), status, agents: [] },
+        name: s.name || s.id,
+        needsYou: status.words === NEEDS_YOU,
+        at: sessionAt(s),
+      };
+    });
+  const all = sortBy(mode, [...own, ...chats]);
   all.forEach((row, i) => {
     if (i < MAX_NUMBERED) row.number = i + 1;
   });
 
   return {
     rows: all,
-    held: mine.filter((r) => r.section === SectionOnHold).map((r) => cardRow(r, [], current, true)),
-    other: placed.filter(({ p }) => p.kind === PlacementOther).map(({ s }) => agentRow(s)),
+    held: sortBy(mode, mine.filter((r) => r.section === SectionOnHold).map((r) => cardEntry(r, true))),
+    other: sortAgents(placed.filter(({ p }) => p.kind === PlacementOther).map(({ s }) => s)),
   };
 }

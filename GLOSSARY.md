@@ -1062,7 +1062,7 @@ _Avoid_: breakpoint, form factor
 ## Web workspaces
 
 **Workspace** — a named theme the person creates to group what they work on now: Designs, epics and
-chats (agents follow their epic), for example "gx bugs" or "research". An item is in exactly one workspace. In the web UI this
+chats (agents follow their epic), for example "gx bugs" or "research". An item is in exactly one workspace, and each workspace keeps its own Sort. In the web UI this
 meaning wins. herdr's workspace (a multiplexer window, see **Session**) is the other meaning, and
 herdr support is being phased out.
 _Avoid_: group, board, project (a project is a registered repo)
@@ -1083,8 +1083,8 @@ makes it active; opening a held item or an Other row leaves it unchanged. The si
 leaves the main lists. It is not the same as being in no workspace.
 _Avoid_: snoozed, paused (a pause is a queue or ticket state), archived
 
-**Other section** — the fixed section at the bottom of the web sidebar, below On hold, the same in
-every workspace. It lists the agents that belong to no workspace: One-off agents (agents of tickets
+**Other section** — the fixed section at the bottom of the web sidebar, below On hold. Its contents are the
+same in every workspace, but its order follows the active workspace's Sort. It lists the agents that belong to no workspace: One-off agents (agents of tickets
 in a project's one-offs epic) and project-level Fix agents (a Fix agent for a failed project ticket
 migration, which has no epic). Any agent whose epic is a one-offs epic is here too, such as a Fix agent
 on a One-off ticket or an Investigate agent for a failed one-off, because that epic has no sidebar row.

@@ -161,7 +161,8 @@ export function useSidebarModel(fetcher: FetchEpicList | undefined, active: stri
   const snapshot = useConnectionState(conn).snapshot;
   const pathname = useLocation().pathname;
   if (!list?.epics) return undefined;
-  return buildSidebar({ rows: list.epics, sessions: snapshot?.sessions ?? [], placements: snapshot?.placements ?? [], workspace: active, current: currentAddress(pathname) });
+  const sort = snapshot?.workspaces?.find((w) => w.name === active)?.sort;
+  return buildSidebar({ rows: list.epics, sessions: snapshot?.sessions ?? [], placements: snapshot?.placements ?? [], workspace: active, current: currentAddress(pathname), sort });
 }
 
 export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; active: string }) {
