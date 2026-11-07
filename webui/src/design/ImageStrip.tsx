@@ -70,6 +70,7 @@ function Thumb({
       {!readOnly && (
         <Box
           as="button"
+          {...{ type: "button" }}
           position="absolute"
           top="-7px"
           right="-7px"

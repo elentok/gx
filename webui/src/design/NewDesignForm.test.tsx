@@ -871,3 +871,98 @@ test("an image on a draft with no text yet fails with a reason and can be retrie
   await screen.findByText("Write the epic name or an idea first, tap to retry");
   expect(uploadImage).not.toHaveBeenCalled();
 });
+
+const start = () => screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement;
+const UPLOADING = "Wait for the upload to finish";
+const FAILED = "Remove the failed image first";
+
+/** An upload the test settles later. */
+function held(uploadImage: ReturnType<typeof fakeDrafts>["uploadImage"]) {
+  let settle: { ok: (id: string) => void; fail: (m: string) => void } | undefined;
+  uploadImage.mockImplementationOnce(() => new Promise<string>((ok, fail) => (settle = { ok, fail: (m) => fail(new Error(m)) })));
+  return { ok: (id: string) => act(async () => settle!.ok(id)), fail: (m: string) => act(async () => settle!.fail(m)) };
+}
+
+test("Start is off with a reason during a held upload, and on after it lands", async () => {
+  const { uploadImage } = await mount({}, { slug: "x", idea: "y" });
+  expect(start().disabled).toBe(false);
+  const up = held(uploadImage);
+  addImages(png());
+  await screen.findByText(UPLOADING);
+  expect(start().disabled).toBe(true);
+  await up.ok("i9");
+  expect(screen.queryByText(UPLOADING)).toBeNull();
+  expect(start().disabled).toBe(false);
+});
+
+test("Start is off with a failed tile, and on again after retry succeeds or the tile is removed", async () => {
+  const { uploadImage } = await mount({}, { slug: "x", idea: "y" });
+  uploadImage.mockRejectedValueOnce(new Error("Network down"));
+  addImages(png());
+  fireEvent.click(await screen.findByText("Network down, tap to retry"));
+  await waitFor(() => expect(start().disabled).toBe(false));
+  uploadImage.mockRejectedValueOnce(new Error("Network down"));
+  addImages(png());
+  await screen.findByText(FAILED);
+  expect(start().disabled).toBe(true);
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove image" }).at(-1)!);
+  expect(start().disabled).toBe(false);
+  // Remove sits inside the form and must not submit it.
+  expect(screen.queryByRole("button", { name: /Start design/ })?.querySelector(".chakra-spinner")).toBeNull();
+});
+
+test("images alone leave Start off with the idea reason", async () => {
+  await mount({}, { slug: "x", images: ["i1"] });
+  expect(start().disabled).toBe(true);
+  expect(screen.getByText("Write an idea to start.")).toBeTruthy();
+});
+
+test("switching drafts during a held upload leaves it running; the tile is ready on return", async () => {
+  const { client, uploadImage } = twoDrafts();
+  const up = held(uploadImage);
+  // Like the server, the draft lists the image once it has landed.
+  let landed: string[] = [];
+  const read: DraftsClient["read"] = async (id) => {
+    const res = await client.read(id);
+    return res.kind === "ok" && id === "a" ? { kind: "ok", draft: { ...res.draft, images: landed } } : res;
+  };
+  await mount({ drafts: { ...client, read } });
+  addImages(png());
+  await screen.findByText(UPLOADING);
+  await openMenu(/alpha/);
+  await pick(/beta/);
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("beta");
+  expect(screen.queryByText(UPLOADING)).toBeNull();
+  landed = ["i9"];
+  await up.ok("i9");
+  await openMenu(/beta/);
+  await pick(/alpha/);
+  expect(uploadImage).toHaveBeenCalledWith("a", expect.any(File));
+  expect(screen.getAllByRole("button", { name: "Open image" })).toHaveLength(1);
+});
+
+test("a failure while away shows as a failed tile on return", async () => {
+  const { client, uploadImage } = twoDrafts();
+  const up = held(uploadImage);
+  await mount({ drafts: client });
+  addImages(png());
+  await openMenu(/alpha/);
+  await pick(/beta/);
+  await up.fail("Draft is gone");
+  await openMenu(/beta/);
+  await pick(/alpha/);
+  expect(screen.getByText("Draft is gone, tap to retry")).toBeTruthy();
+});
+
+test("Load theirs shows the server's image list", async () => {
+  await refused("conflict");
+  await act(async () => click("Load theirs"));
+  expect(screen.getByText("2 of 10 images")).toBeTruthy();
+});
+
+test("clicking a ready thumbnail opens the viewer on that image's URL", async () => {
+  await mount({}, { slug: "x", images: ["i1", "i2"] });
+  fireEvent.click(screen.getAllByRole("button", { name: "Open image" })[1]!);
+  const img = screen.getByAltText("Image 2 of 2") as HTMLImageElement;
+  expect(img.getAttribute("src")).toBe("/v1/designs/drafts/images?id=d1&image=i2");
+});

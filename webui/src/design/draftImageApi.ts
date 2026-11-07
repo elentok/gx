@@ -6,6 +6,7 @@ import { postJson, readWrite } from "./open";
 export type UploadDraftImage = (draftId: string, file: Blob) => Promise<string>;
 export type RemoveDraftImage = (draftId: string, image: string) => Promise<unknown>;
 
+export const MSG_DRAFT_GONE = "Draft is gone";
 const BASE = "/v1/designs/drafts/images";
 
 export const uploadDraftImage: UploadDraftImage = async (draftId, file) => {
@@ -15,6 +16,7 @@ export const uploadDraftImage: UploadDraftImage = async (draftId, file) => {
     body: file,
   });
   const result = await readWrite<SessionImageResult & SessionResult>(res);
+  if (result.reason === "draft-gone") throw new Error(MSG_DRAFT_GONE);
   if (result.refused || !result.id) throw new Error(result.message || "Upload failed");
   return result.id;
 };

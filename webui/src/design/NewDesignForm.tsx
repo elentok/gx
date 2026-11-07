@@ -21,7 +21,7 @@ import {
 import { removeDraftImage, uploadDraftImage, type RemoveDraftImage, type UploadDraftImage } from "./draftImageApi";
 import { DraftImages } from "./DraftImages";
 import { imageFiles } from "./ComposerImages";
-import { useDraftImages } from "./useDraftImages";
+import { ImageSlot, useDraftImages } from "./useDraftImages";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { clearUnsaved, NEW_DRAFT_KEY, readUnsaved, stashUnsaved } from "./unsaved";
 import { useDesignWrite } from "./SessionControls";
@@ -114,6 +114,8 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
   const [restored, setRestored] = useState<Restored>();
   // A new generation remounts the form on another draft.
   const [generation, setGeneration] = useState(0);
+  const slot = useRef<ImageSlot>(undefined);
+  const kept = useRef(new Map<string, ImageSlot>());
   // The server's last project used; a server that cannot answer leaves the first project.
   const [lastProject, setLast] = useState("");
   const fetchLast = () => drafts.getLastProject().catch(() => "");
@@ -154,14 +156,21 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
       </BottomSheet>
     );
   }
-  const switchTo = async (next: DesignDraft | null) => {
+  slot.current ??= new ImageSlot(initial?.images);
+  const switchTo = async (next: DesignDraft | null, leaving?: string) => {
+    // An upload or failed tile stays with its draft, so returning finds it.
+    if (leaving && slot.current?.pending) kept.current.set(leaving, slot.current);
+    const back = next ? kept.current.get(next.id) : undefined;
+    if (next) kept.current.delete(next.id);
+    if (next) back?.syncSaved(next.images);
+    slot.current = back ?? new ImageSlot(next?.images);
     // A blank draft starts on the project last picked, which this form may just have set.
     if (!next) setLast(await fetchLast());
     setRestored(undefined);
     setInitial(next);
     setGeneration((g) => g + 1);
   };
-  return <DraftForm key={generation} {...props} drafts={drafts} initial={initial} lastProject={lastProject} restored={restored} onSwitch={switchTo} />;
+  return <DraftForm key={generation} {...props} drafts={drafts} initial={initial} lastProject={lastProject} restored={restored} slot={slot.current} onSwitch={switchTo} />;
 }
 
 const LEGACY_DRAFT_KEY = "gx.newDesign.draft";
@@ -223,8 +232,17 @@ function DraftForm({
   initial,
   lastProject,
   restored,
+  slot,
   onSwitch,
-}: FormProps & { drafts: DraftsClient; initial: DesignDraft | null; lastProject: string; restored?: Restored; onSwitch: (next: DesignDraft | null) => void }) {
+}: FormProps & {
+  drafts: DraftsClient;
+  initial: DesignDraft | null;
+  lastProject: string;
+  restored?: Restored;
+  slot: ImageSlot;
+  /** `leaving` is the id of the draft the form was on. */
+  onSwitch: (next: DesignDraft | null, leaving?: string) => void;
+}) {
   const sheetMode = !useWide();
   const slugInput = useRef<HTMLInputElement>(null);
   // A saved draft keeps its project; one whose project is gone is moved as a new draft would start.
@@ -278,7 +296,7 @@ function DraftForm({
     return server.current.id;
   };
   const imgs = useDraftImages({
-    initial: initial?.images ?? [],
+    slot,
     draftId: () => server.current.id,
     ensureDraft,
     upload: drafts.uploadImage,
@@ -464,13 +482,13 @@ function DraftForm({
       const res = await drafts.read(id);
       if (res.kind !== "ok") return;
       finished.current = true;
-      onSwitch(res.draft);
+      onSwitch(res.draft, server.current.id);
     });
   const newDraft = () => {
     if (!hasContent()) return slugInput.current?.focus();
     return leaveDraft(async () => {
       finished.current = true;
-      onSwitch(null);
+      onSwitch(null, server.current.id);
     });
   };
   const saveName = (text: string) => {
@@ -535,7 +553,15 @@ function DraftForm({
   };
 
   const label = draft.slug || draft.idea || name ? draftLabel({ name, ...draft }) : draftLabel();
-  const reason = !draft.slug.trim() ? "Name the epic to start." : !draft.idea.trim() ? "Write an idea to start." : undefined;
+  const reason = !draft.slug.trim()
+    ? "Name the epic to start."
+    : !draft.idea.trim()
+      ? "Write an idea to start."
+      : imgs.failed
+        ? `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`
+        : imgs.uploading
+          ? "Wait for the upload to finish"
+          : undefined;
 
   return (
     <BottomSheet {...sheetProps} onClose={close} as="form" onSubmit={submit}>

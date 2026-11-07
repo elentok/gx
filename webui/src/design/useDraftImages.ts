@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { draftImageUrl, type RemoveDraftImage, type UploadDraftImage } from "./draftImageApi";
 import { checkImages } from "./imageLimits";
 import type { ComposerImage } from "./useComposerImages";
@@ -33,32 +33,55 @@ export interface DraftImages {
 }
 
 /**
+ * One draft's tiles, outside the form so an upload outlives it: switching drafts remounts the form, and the upload
+ * finishes into the slot of the draft it began on.
+ */
+export class ImageSlot {
+  entries: Entry[];
+  private subs = new Set<() => void>();
+  constructor(ids: string[] = []) {
+    this.entries = ids.map((id) => ({ key: id, id }));
+  }
+  set(entries: Entry[]) {
+    this.entries = entries;
+    this.subs.forEach((f) => f());
+  }
+  subscribe = (f: () => void) => {
+    this.subs.add(f);
+    return () => void this.subs.delete(f);
+  };
+  /** True while a tile is still an upload or a failure: the slot must outlive its form. */
+  get pending() {
+    return this.entries.some((e) => !e.id);
+  }
+  /** The server's list replaces the saved tiles; uploads and failures stay. */
+  syncSaved(ids: string[]) {
+    this.set([...ids.map((id) => ({ key: id, id })), ...this.entries.filter((e) => !e.id)]);
+  }
+}
+
+/**
  * Image state of a New Design draft: the server's ids plus the uploads this tab runs. `ensureDraft` resolves to the
  * draft's id, saving the text first when the draft has none yet; `draftId` reads the current id for urls and removes.
  */
 export function useDraftImages({
-  initial,
+  slot,
   draftId,
   ensureDraft,
   upload: send,
   remove: erase,
 }: {
-  initial: string[];
+  slot: ImageSlot;
   draftId: () => string | undefined;
   ensureDraft: () => Promise<string>;
   upload: UploadDraftImage;
   remove: RemoveDraftImage;
 }): DraftImages {
-  const [entries, setEntries] = useState<Entry[]>(() => initial.map((id) => ({ key: id, id })));
-  // The mirror lets an upload that finishes later see whether its tile still exists.
-  const live = useRef(entries);
-  const change = (fn: (cur: Entry[]) => Entry[]) => {
-    live.current = fn(live.current);
-    setEntries(live.current);
-  };
+  const entries = useSyncExternalStore(slot.subscribe, () => slot.entries);
+  const change = (fn: (cur: Entry[]) => Entry[]) => slot.set(fn(slot.entries));
   const [error, setError] = useState("");
   const patch = (key: string, p: Partial<Entry>) => change((cur) => cur.map((e) => (e.key === key ? { ...e, ...p } : e)));
-  const counted = () => live.current.filter((e) => !e.refused).length;
+  const counted = () => slot.entries.filter((e) => !e.refused).length;
 
   const upload = (key: string, file: File) => {
     patch(key, { file, failed: undefined });
@@ -67,11 +90,11 @@ export function useDraftImages({
       .then(
         ({ draft, id }) => {
           // Removed while uploading: the file just saved has no owner left.
-          if (!live.current.some((e) => e.key === key)) return void erase(draft, id).catch(() => undefined);
+          if (!slot.entries.some((e) => e.key === key)) return void erase(draft, id).catch(() => undefined);
           change((cur) => cur.map((e) => (e.key === key ? { key, id } : e)));
         },
         (err) => {
-          if (live.current.some((e) => e.key === key)) patch(key, { failed: err instanceof Error ? err.message : "Upload failed" });
+          if (slot.entries.some((e) => e.key === key)) patch(key, { failed: err instanceof Error ? err.message : "Upload failed" });
         },
       );
   };
@@ -88,12 +111,12 @@ export function useDraftImages({
   };
 
   const retry = (key: string) => {
-    const e = live.current.find((x) => x.key === key);
+    const e = slot.entries.find((x) => x.key === key);
     if (e?.failed && e.file) upload(key, e.file);
   };
 
   const remove = (key: string) => {
-    const e = live.current.find((x) => x.key === key);
+    const e = slot.entries.find((x) => x.key === key);
     change((cur) => cur.filter((x) => x.key !== key));
     const draft = draftId();
     if (e?.id && draft) void erase(draft, e.id).catch(() => undefined);

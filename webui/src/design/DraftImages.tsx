@@ -10,7 +10,8 @@ export const MSG_LIMITS = "Paste or add images (PNG, JPEG, GIF, WebP, up to 20 M
 
 function lineText(s: State): { text: string; red: boolean } {
   if (s.error === MSG_MAX_IMAGES) return { text: MSG_MAX_IMAGES, red: true };
-  if (s.failed || s.uploading) return { text: `${s.failed} failed · ${s.uploading} uploading`, red: s.failed > 0 };
+  if (s.failed) return { text: s.failed === 1 ? "1 image failed. Remove it or retry before starting." : `${s.failed} images failed. Remove them or retry before starting.`, red: true };
+  if (s.uploading) return { text: `${s.uploading} uploading`, red: false };
   if (s.error) return { text: s.error, red: true };
   if (s.images.length) return { text: `${s.count} of ${MAX_IMAGES} images`, red: false };
   return { text: MSG_LIMITS, red: false };
