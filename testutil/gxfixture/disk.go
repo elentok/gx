@@ -32,6 +32,11 @@ printf '%s\n' "$want" > "$dir/free.tmp" && mv "$dir/free.tmp" "$dir/free"
 // diskDir sits outside the project repo, so the trunk stays clean.
 func (f *fixture) diskDir() string { return filepath.Join(f.root, "disk") }
 
+// rateLimitReleaseFile is outside the repo for the same reason as diskDir.
+func (f *fixture) rateLimitReleaseFile() string {
+	return filepath.Join(f.root, "ratelimit-release")
+}
+
 func cleanScript(diskDir string) string { return filepath.Join(diskDir, "clean.sh") }
 
 // setupDisk gives every scenario the fake disk: the server reads its free space

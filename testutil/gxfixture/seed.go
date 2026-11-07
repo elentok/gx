@@ -83,10 +83,10 @@ func (f *fixture) seed(sc scenario) error {
 		}
 	}
 	if sc.RateLimitFromUsage {
-		// Long enough for the flow to see the hold, short enough to wait it out; the fake sets
-		// the window's reset when it hits the limit.
+		// The window stays open until the flow creates the release file; the fake sets the
+		// window's reset when it hits the limit.
 		wcfg.RateLimitFromUsage = true
-		wcfg.RateLimitReset = "8s"
+		wcfg.RateLimitReset = "1h"
 		wcfg.Usage = &agentfake.UsageConfig{FiveHour: agentfake.UsageWindow{UsedPercentage: 100}}
 	}
 	if sc.CodexUsage {

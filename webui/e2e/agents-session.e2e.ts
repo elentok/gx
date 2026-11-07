@@ -90,7 +90,7 @@ test("75. Read a session", async ({ page, start }) => {
 // 80 and 80 crashed (FailureBanner.test.tsx, AgentsPage.composer.test.tsx failureCases),
 // 83 (AgentsPage.composer.test.tsx).
 
-// The hold ends about 8 s after the limit in this scenario.
+// The hold lasts until the flow releases it; the server then waits out its 1 s buffer.
 const holdEnds = { timeout: 60_000 };
 
 test("103. Rate-limit hold", async ({ page, start }) => {
@@ -117,9 +117,10 @@ test("103. Rate-limit hold", async ({ page, start }) => {
   const mark = page.getByTestId("page-header-actions").getByRole("img", { name: "rate-limited" });
   await expect(mark).toBeVisible();
 
+  await fixture.releaseRateLimit();
   await expect(mark).toHaveCount(0, holdEnds);
   await go(page, "#/e/demo:waiting-epic");
-  await expect(verdict("waiting-epic")).toHaveCount(0, holdEnds);
+  await afterTick(() => expect(verdict("waiting-epic")).toHaveCount(0, { timeout: 1_000 }));
 });
 
 test("104. Usage gate and override", async ({ page, start }) => {

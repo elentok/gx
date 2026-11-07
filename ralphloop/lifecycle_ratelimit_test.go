@@ -3,6 +3,8 @@ package ralphloop
 import (
 	"errors"
 	"github.com/elentok/gx/ralphloop/supervise"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -115,6 +117,28 @@ func TestWaitIterationFinished_RateLimitPastResetContinuesAtOnce(t *testing.T) {
 	}
 	if slices.Contains(*sleeps, supervise.RateLimitResetBuffer) || slices.Contains(*sleeps, supervise.RateLimitPollInterval) {
 		t.Errorf("sleeps = %v, want no hold sleep", *sleeps)
+	}
+}
+
+func TestWaitIterationFinished_RateLimitReleaseFileEndsTheHoldBeforeTheReset(t *testing.T) {
+	release := filepath.Join(t.TempDir(), "release")
+	if err := os.WriteFile(release, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(supervise.RateLimitReleaseFileEnv, release)
+	d, r, one, sleeps, _ := rateLimitFixture(t, func(r *runnerfake.Runner) {
+		r.SetRateLimit("iter-01", rateLimitClock.Add(time.Hour))
+	}, clearOn(1))
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue"}) {
+		t.Errorf("prompts = %q, want one continue", got)
+	}
+	var total time.Duration
+	for _, s := range *sleeps {
+		total += s
+	}
+	if total >= time.Hour {
+		t.Errorf("sleeps = %v, want the release file to end the hold early", *sleeps)
 	}
 }
 

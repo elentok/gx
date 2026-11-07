@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/migrations"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -213,7 +214,7 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 		f.env = append(f.env, "GX_USAGE_POLL_INTERVAL="+limitBurnUsagePollInterval)
 	}
 	if sc.RateLimitFromUsage {
-		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s")
+		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s", supervise.RateLimitReleaseFileEnv+"="+f.rateLimitReleaseFile())
 	}
 	if sc.PromptGrace != "" {
 		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.PromptGrace)

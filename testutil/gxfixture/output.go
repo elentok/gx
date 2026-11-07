@@ -51,6 +51,9 @@ type Output struct {
 	// CheckWaitingFile is the live check-lock waiting state of the check-lock
 	// scenario; removing it ends the wait. Empty elsewhere.
 	CheckWaitingFile string `json:"check_waiting_file,omitempty"`
+	// RateLimitReleaseFile is the file whose creation ends the rate-limit hold of a
+	// RateLimitFromUsage scenario; the hold lasts until then. Empty elsewhere.
+	RateLimitReleaseFile string `json:"ratelimit_release_file,omitempty"`
 	// Transcripts are the limit-burn live shape's Claude transcript paths, keyed
 	// queue, one_off, design and other; the directories may not exist yet.
 	Transcripts map[string]string `json:"transcripts,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -20,6 +21,28 @@ const RateLimitPollInterval = 5 * time.Minute
 // RateLimitResetBuffer is added past a successfully-parsed reset time so the
 // loop wakes just after the quota actually rolls over, not right at it.
 const RateLimitResetBuffer = 60 * time.Second
+
+// RateLimitReleaseFileEnv names a file whose existence ends a rate-limit hold
+// early. Only the e2e fixture sets it, so a flow can keep the window open as
+// long as it needs instead of racing a real-time reset.
+const RateLimitReleaseFileEnv = "GX_RATE_LIMIT_RELEASE_FILE"
+
+const rateLimitReleasePoll = 100 * time.Millisecond
+
+// sleepRateLimit waits out a hold, ending it early once the release file exists.
+func sleepRateLimit(d deps.Deps, wait time.Duration) {
+	file := os.Getenv(RateLimitReleaseFileEnv)
+	if file == "" {
+		d.Sleep(wait)
+		return
+	}
+	for ; wait > 0; wait -= rateLimitReleasePoll {
+		if _, err := os.Stat(file); err == nil {
+			return
+		}
+		d.Sleep(min(wait, rateLimitReleasePoll))
+	}
+}
 
 func codexBlocked(d deps.Deps, p LaunchParams) bool {
 	st, err := d.Runner.Status(p.SessionOrDefault())
@@ -50,7 +73,7 @@ func HoldRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time
 		if resetAt.IsZero() {
 			d.Sleep(RateLimitPollInterval)
 		} else if wait := resetAt.Add(cmp.Or(d.RateLimitResetBuffer, RateLimitResetBuffer)).Sub(d.Now()); wait > 0 {
-			d.Sleep(wait)
+			sleepRateLimit(d, wait)
 		}
 		// A Codex pane back on its own dialog is not waiting for "continue": that
 		// is a prompt, not a dialog answer. Release the hold and let the caller's
