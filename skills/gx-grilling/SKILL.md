@@ -38,7 +38,7 @@ options:
 
 Every question carries a `gx-question` block (the `gx tickets ask` YAML), after the `➡️` line and before `---`. The format is defined in [gx-local-tracker.md](../gx-local-tracker.md) "The question block".
 
-- Pick the type from the question. A yes/no question ("Does...?", "Should...?") is `yes-no`. A "Which...?" or "What...?" question with real alternatives is `options`: list every alternative, with a short label each. Never use `yes-no` for a question that has more than two answers.
+- Pick the type from the question. A yes/no question ("Does...?", "Should...?") is `yes-no`. A "Which...?" or "What...?" question with real alternatives is `options`: list the real alternatives, with a short label each. An `options` block takes 2 to 6 options; with more candidates, keep the best 6 (or fewer) and name the rest in the question text, because a block with 7 or more options is unreadable and the question loses its buttons. Never use `yes-no` for a question that has more than two answers.
 - `recommended` must name the same answer as your `➡️` line. If the `➡️` line says "No", write `recommended: no`. For `options`, name the option id your `➡️` line picks. Check this before you send the round.
 - Wrap every `label`, `consequence`, `yes` and `no` value in double quotes. A bare value with `: ` or a backtick makes the block unreadable and the question loses its buttons.
 

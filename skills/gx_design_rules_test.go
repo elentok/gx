@@ -325,6 +325,16 @@ func TestGxGrillingSkipRule_FailsWithoutDestinationException(t *testing.T) {
 	}
 }
 
+func TestGxGrillingCapsOptionsBlockAtSix(t *testing.T) {
+	text := normalizeSpace(readFile(t, "gx-grilling/SKILL.md"))
+	if !strings.Contains(text, normalizeSpace("An `options` block takes 2 to 6 options")) {
+		t.Error("gx-grilling/SKILL.md lacks the 2 to 6 options limit")
+	}
+	if strings.Contains(text, "list every alternative") {
+		t.Error("gx-grilling/SKILL.md still tells the agent to list every alternative")
+	}
+}
+
 func TestGxWayfinderLetsCallerAllowMoreTickets(t *testing.T) {
 	text := readFile(t, "gx-wayfinder/SKILL.md")
 	if !strings.Contains(text, "unless the calling skill allows more") {
