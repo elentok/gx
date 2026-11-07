@@ -148,6 +148,7 @@ test("a start_error clears the draft and hands the reason to the page", async ()
 test("a refusal shows in the dialog and keeps the draft", async () => {
   const { onStarted } = mount({ open: async () => ({ refused: true, message: "name taken" }) as never });
   type("Epic slug", "fresh");
+  type("Rough idea", "an idea");
   await act(async () => click("Start design"));
   expect(await screen.findByText("name taken")).toBeTruthy();
   expect(onStarted).not.toHaveBeenCalled();
@@ -158,6 +159,7 @@ test("Start design is disabled while pending, and a server error shows its text 
   let fail: (e: Error) => void = () => {};
   const { onStarted } = mount({ open: () => new Promise((_, reject) => (fail = reject)) as never });
   type("Epic slug", "fresh");
+  type("Rough idea", "an idea");
   await act(async () => click("Start design"));
   expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(true);
   await act(async () => fail(new WriteError("slug already exists")));
@@ -165,14 +167,40 @@ test("Start design is disabled while pending, and a server error shows its text 
   expect(onStarted).not.toHaveBeenCalled();
 });
 
-test("Tab wraps inside the dialog", () => {
+test("Tab is trapped by the shared Modal, not by the form", () => {
   mount();
+  type("Epic slug", "fresh");
+  type("Rough idea", "an idea");
   const start = screen.getByRole("button", { name: "Start design" });
   start.focus();
   fireEvent.keyDown(start, { key: "Tab" });
   expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Project" }));
   fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
   expect(document.activeElement).toBe(start);
+});
+
+test("Start is disabled with a reason for no slug and for no idea", () => {
+  mount();
+  const start = () => screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement;
+  expect(start().disabled).toBe(true);
+  expect(screen.getByText("Name the epic to start.")).toBeTruthy();
+  type("Rough idea", "an idea");
+  expect(start().disabled).toBe(true);
+  expect(screen.getByText("Name the epic to start.")).toBeTruthy();
+  type("Epic slug", "fresh");
+  expect(start().disabled).toBe(false);
+  type("Rough idea", " ");
+  expect(start().disabled).toBe(true);
+  expect(screen.getByText("Write an idea to start.")).toBeTruthy();
+});
+
+test("the footer is Discard left, Start right, with no stretch", () => {
+  mount();
+  const discard = screen.getByRole("button", { name: "Discard" });
+  const start = screen.getByRole("button", { name: "Start design" });
+  expect(discard.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(getComputedStyle(start).flexGrow).not.toBe("2");
+  expect(getComputedStyle(discard).flexGrow).not.toBe("1");
 });
 
 function stubPhone() {
@@ -186,13 +214,17 @@ function stubPhone() {
   };
 }
 
-test("a narrow viewport renders the bottom sheet with a grab handle, Close, and a 1:2 footer", () => {
+test("a narrow viewport renders the bottom sheet with a grab handle, Close, and a natural-width footer with the reason above it", () => {
   stubPhone();
   mount();
   expect(screen.getByTestId("grab-handle")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
-  expect(getComputedStyle(screen.getByRole("button", { name: "Discard" })).flexGrow).toBe("1");
-  expect(getComputedStyle(screen.getByRole("button", { name: "Start design" })).flexGrow).toBe("2");
+  const start = screen.getByRole("button", { name: "Start design" });
+  const discard = screen.getByRole("button", { name: "Discard" });
+  expect(getComputedStyle(discard).flexGrow).not.toBe("1");
+  expect(getComputedStyle(start).flexGrow).not.toBe("2");
+  const hint = screen.getByText("Name the epic to start.");
+  expect(hint.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   vi.unstubAllGlobals();
 });
 

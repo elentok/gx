@@ -1,5 +1,5 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import { postOpenDesign, type OpenDesign } from "./open";
@@ -76,7 +76,6 @@ export function NewDesignForm({
   });
   const [confirming, setConfirming] = useState(false);
   const { run, pending } = useDesignWrite();
-  const sheet = useRef<HTMLDivElement>(null);
 
   const patch = (p: Partial<typeof draft>) => {
     const next = { ...draft, ...p };
@@ -103,14 +102,7 @@ export function NewDesignForm({
     );
   };
 
-  const keyDown = (e: KeyboardEvent) => {
-    if (e.key === "Tab") {
-      const items = [...(sheet.current?.querySelectorAll<HTMLElement>("input, textarea, select, button:not(:disabled)") ?? [])];
-      const [first, last] = [items[0], items[items.length - 1]];
-      if (e.shiftKey && document.activeElement === first) (e.preventDefault(), last?.focus());
-      else if (!e.shiftKey && document.activeElement === last) (e.preventDefault(), first?.focus());
-    }
-  };
+  const reason = !draft.slug.trim() ? "Name the epic to start." : !draft.idea.trim() ? "Write an idea to start." : undefined;
 
   return (
     <BottomSheet
@@ -118,10 +110,8 @@ export function NewDesignForm({
       onClose={onClose}
       fillViewport
       desktop={{ borderRadius: "lg", w: "720px", h: "520px" }}
-      ref={sheet}
       as="form"
       onSubmit={submit}
-      onKeyDown={keyDown}
       bg="surface.raised"
       p="0"
       gap="0"
@@ -201,6 +191,11 @@ export function NewDesignForm({
         value={draft.idea}
         onChange={(e) => patch({ idea: e.target.value })}
       />
+      {sheetMode && reason && !confirming && (
+        <Text fontSize="sm" color="tone.paused.fg" px="3" pb="2" flexShrink="0">
+          {reason}
+        </Text>
+      )}
       <Box display="flex" alignItems="center" gap="2" p="3" borderTopWidth="1px" borderColor="border" bg="surface" flexShrink="0">
         {confirming ? (
           <>
@@ -216,11 +211,16 @@ export function NewDesignForm({
           </>
         ) : (
           <>
-            <Button type="button" emphasis="ghost" tone="muted" flex={sheetMode ? "1" : undefined} onClick={() => (hasText(draft) ? setConfirming(true) : discard())}>
+            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) ? setConfirming(true) : discard())}>
               Discard
             </Button>
-            {!sheetMode && <Box flex="1" />}
-            <Button type="submit" tone="running" flex={sheetMode ? "2" : undefined} disabled={pending}>
+            <Box flex="1" />
+            {!sheetMode && reason && (
+              <Text fontSize="sm" color="tone.paused.fg">
+                {reason}
+              </Text>
+            )}
+            <Button type="submit" tone="running" disabled={pending || !!reason}>
               {pending && <Spinner size="sm" />}
               Start design
             </Button>
