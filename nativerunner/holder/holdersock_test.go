@@ -1,6 +1,7 @@
 package holder_test
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"net"
@@ -141,6 +142,9 @@ func TestDialHolder_OldHolderStartTimesNotKnown(t *testing.T) {
 			return
 		}
 		defer conn.Close()
+		// Read the request first: replying and closing at once makes the
+		// client's write hit a closed socket.
+		_, _ = bufio.NewReader(conn).ReadBytes('\n')
 		_, _ = conn.Write([]byte(`{"version":1,"ops":["deny-reason"],"pid":4242}` + "\n"))
 	}()
 
