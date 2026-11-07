@@ -24,6 +24,13 @@ test("the menu loads on open, picks a draft and starts a new one", async () => {
   expect(onNew).toHaveBeenCalled();
 });
 
+test("an open menu dims the form behind it with a scrim", async () => {
+  renderThemed(<DraftSwitcher label="a" currentId="a" load={async () => [item("a")]} onPick={() => {}} onNew={() => {}} onRename={() => {}} onDelete={async () => {}} />);
+  expect(screen.queryByTestId("switcher-scrim")).toBeNull();
+  await act(async () => void fireEvent.click(screen.getByRole("button", { name: /a/ })));
+  expect(screen.getByTestId("switcher-scrim")).toBeTruthy();
+});
+
 test("choosing the open draft changes nothing", async () => {
   const onPick = vi.fn();
   renderThemed(<DraftSwitcher label="a" currentId="a" load={async () => [item("a")]} onPick={onPick} onNew={() => {}} onRename={() => {}} onDelete={async () => {}} />);

@@ -24,7 +24,8 @@ const rowStyle = {
   display: "flex",
   flexDirection: "column",
   alignItems: "flex-start",
-  gap: "1px",
+  gap: "0",
+  lineHeight: "1.3",
   w: "100%",
   px: "12px",
   py: "10px",
@@ -81,6 +82,7 @@ export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename,
           ▾
         </chakra.span>
       </chakra.button>
+      {open && <Box data-testid="switcher-scrim" position="absolute" inset="0" bg="rgba(0,0,0,.5)" zIndex="9" />}
       {open && (
         <Box
           role="menu"
@@ -119,10 +121,10 @@ export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename,
                 ) : (
                   <>
                     <chakra.button type="button" role="menuitem" onClick={() => choose(() => (here ? undefined : onPick(d.id)))} {...rowStyle} borderBottomWidth="0" flex="1" minW="0">
-                      <Text fontWeight="600" fontSize="sm" truncate maxW="100%">
+                      <Text fontWeight="600" fontSize="14px" truncate maxW="100%">
                         {draftLabel(d)}
                       </Text>
-                      <Text fontSize="xs" color="text.dim">
+                      <Text fontSize="12px" color="text.dim" truncate maxW="100%">
                         {d.project} · {d.image_count > 0 && `${d.image_count} ${d.image_count === 1 ? "image" : "images"} · `}{here ? "editing now" : `edited ${timeAgo(d.edited_at)}`}
                       </Text>
                     </chakra.button>
@@ -134,14 +136,14 @@ export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename,
               </Box>
             );
           })}
-          <chakra.button type="button" role="menuitem" onClick={() => choose(onNew)} {...rowStyle} color="tone.running.fg" fontWeight="600" fontSize="sm">
+          <chakra.button type="button" role="menuitem" onClick={() => choose(onNew)} {...rowStyle} minH="46px" color="tone.running.fg" fontWeight="600" fontSize="14px">
             <span>
               <chakra.span aria-hidden>＋ </chakra.span>New draft
             </span>
           </chakra.button>
-          <chakra.button type="button" role="menuitem" onClick={() => choose(onRename)} {...rowStyle} fontSize="sm">
+          <chakra.button type="button" role="menuitem" onClick={() => choose(onRename)} {...rowStyle} minH="0" py="8px" fontSize="12px" color="text.dim" bg="surface">
             <span>
-              <chakra.span aria-hidden>✎ </chakra.span>Name this draft
+              <chakra.span aria-hidden>✎</chakra.span>Name this draft
             </span>
           </chakra.button>
         </Box>
