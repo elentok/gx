@@ -66,7 +66,8 @@ The JSON line has these fields:
   `GXF_MOCK_URL`.
 - `browser_session`: the worktree directory name. Pass it to every browser command as
   `playwright-cli -s=<browser_session> ...`. The default session is shared by concurrent sessions,
-  so another session's tabs would interfere. `--env` exports it as `GXF_BROWSER_SESSION`.
+  so another session's tabs would interfere. `--env` exports it as `GXF_BROWSER_SESSION`. If
+  `open` fails to launch, see "Open parameters" in gx-playwright-cli (`--browser=chromium`).
 - `log_file`: the server's combined stdout and stderr. A failed cleanup command shows up there as
   `disk cleanup command failed`, with the command's exit code and output tail. Read it when the UI
   shows a failure you cannot explain. `--env` exports it as `GXF_LOG_FILE`.

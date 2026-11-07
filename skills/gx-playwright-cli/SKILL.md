@@ -219,6 +219,11 @@ playwright-cli list --json
 
 ## Open parameters
 
+The repo's `.playwright/cli.config.json` pins plain chromium, because the CLI's default `chrome`
+channel is not installed here and `open` crashes with a Node stack trace. If `open` still fails to
+launch, run `ls ~/Library/Caches/ms-playwright` (a missing or mismatched `chromium-*` cache is the
+usual cause), try `--browser=chromium`, and don't pipe `open` through `tail`: it hides the error.
+
 ```bash
 # Use specific browser when creating session
 playwright-cli open --browser=chrome
