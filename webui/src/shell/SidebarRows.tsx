@@ -4,6 +4,9 @@ import { useLocation } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { buildSidebar, type SidebarAgent, type SidebarRow, type SidebarStatus } from "../workspaces/sidebarModel";
+import type { Workspace } from "../generated/server";
+import { ItemMenu, type ItemRef } from "../workspaces/itemActions";
+import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 
 const CHAT_PINK = "#ec6fa8";
@@ -78,11 +81,12 @@ function AgentLink({ agent }: { agent: SidebarAgent }) {
   );
 }
 
-function Row({ row, current }: { row: SidebarRow; current: boolean }) {
+function Row({ row, current, active, workspaces }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[] }) {
   const [open, setOpen] = useState(!!row.expanded);
   const nested = row.agents.length > 0;
+  const item: ItemRef = { key: row.key, name: row.title, kind: row.kind === "chat" ? "chat" : row.kind === "design" ? "design" : "epic", workspace: active, queued: row.queued, held: row.held };
   return (
-    <li>
+    <li className="group">
       <Box display="flex" alignItems="center" pl="1" bg={current ? "surface.raised" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
         <Box w="20px" flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
@@ -101,6 +105,10 @@ function Row({ row, current }: { row: SidebarRow; current: boolean }) {
           </Box>
           <Status status={row.status} dim={row.held} />
         </chakra.a>
+        {/* Shown on hover and focus; always on a touch screen, which has no hover. */}
+        <Box flex="none" opacity="0" _groupHover={{ opacity: 1 }} _focusWithin={{ opacity: 1 }} css={{ "@media (hover: none)": { opacity: 1 } }}>
+          <ItemMenu item={item} workspaces={workspaces} />
+        </Box>
       </Box>
       {nested && open && (
         <Box as="ul" listStyleType="none" m="0" p="0">
@@ -139,6 +147,7 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
   const conn = useConnectionContext();
   const { list } = useEpicList(fetcher, conn);
   const snapshot = useConnectionState(conn).snapshot;
+  const { workspaces } = useWorkspaces(conn);
   const pathname = useLocation().pathname;
   if (!list?.epics) return null;
   const current = currentAddress(pathname);
@@ -146,12 +155,12 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
   return (
     <>
       {model.rows.map((r) => (
-        <Row key={r.key} row={r} current={r.href === `#${pathname}`} />
+        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
       ))}
       {model.held.length > 0 && (
         <Section title={`On hold (${model.held.length})`}>
           {model.held.map((r) => (
-            <Row key={r.key} row={r} current={r.href === `#${pathname}`} />
+            <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
           ))}
         </Section>
       )}

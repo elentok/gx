@@ -48,6 +48,8 @@ export interface SidebarRow {
   number?: number;
   /** True on On hold rows so the view dims their words. */
   held?: boolean;
+  /** The card's epic (or a Design's -impl) holds a queue item; Hold is then disabled. */
+  queued?: boolean;
   /** The open page's epic starts expanded. */
   expanded?: boolean;
   agents: SidebarAgent[];
@@ -98,6 +100,7 @@ function cardRow(r: EpicListRow, agents: SidebarAgent[], current: string, held: 
     status: cardStatus(r),
     ring: ringProgress(r),
     ...(held ? { held: true } : {}),
+    ...(r.queued ? { queued: true } : {}),
     ...(isCurrent(r, current) ? { expanded: true } : {}),
     agents,
   };

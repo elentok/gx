@@ -55,7 +55,7 @@ function setup(device: Device, path = "/") {
   const state = {
     snapshot: {
       needs_you_total: 0,
-      workspaces: [{ name: "Default", default: true, members: 0 }],
+      workspaces: [{ name: "Default", default: true, members: 0 }, { name: "Work", members: 0 }],
       sessions: [session("s1", "p", { name: "builder" }), session("s2", "p", { name: "scratch" })],
       placements,
     },
@@ -102,6 +102,23 @@ test("On hold is collapsed with a count and opens on click; Other lists its rows
   expect(body().queryByRole("link", { name: /scratch/ })).toBeNull();
   fireEvent.click(body().getByRole("button", { name: "Other" }));
   expect(body().getByRole("link", { name: /scratch/ })).toBeTruthy();
+});
+
+test("a row's ... menu opens and Move posts the other workspace", async () => {
+  const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+    new Response(JSON.stringify(String(url).includes("/v1/workspaces/") ? { workspaces: [] } : { epics: rows, follow_ups: [] }), { status: 200 }),
+  );
+  setup("desktop");
+  vi.stubGlobal("fetch", fetchMock);
+  await body().findByRole("link", { name: /Shop/ });
+  const buttons = body().getAllByRole("button", { name: "More actions" });
+  fireEvent.click(buttons[buttons.length - 1]);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Move to workspace" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Work" }));
+  await waitFor(() => {
+    const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/v1/workspaces/move"));
+    expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ name: "Work", key: "p:shop" });
+  });
 });
 
 test("on a tablet a row click closes the sidebar", async () => {

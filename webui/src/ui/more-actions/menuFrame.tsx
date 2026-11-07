@@ -1,9 +1,15 @@
-import { Box, Menu } from "@chakra-ui/react";
+import { Box, Menu, Portal } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 /** The popover's positioner, or on a phone a dimmed backdrop that holds the menu as a bottom sheet and closes it on a press. */
 export function MenuFrame({ sheet, children }: { sheet: boolean; children: ReactNode }) {
-  if (!sheet) return <Menu.Positioner>{children}</Menu.Positioner>;
+  // Portalled so a scrolling container (the sidebar) cannot clip the popover.
+  if (!sheet)
+    return (
+      <Portal>
+        <Menu.Positioner>{children}</Menu.Positioner>
+      </Portal>
+    );
   return (
     <Menu.Context>
       {(menu) =>
