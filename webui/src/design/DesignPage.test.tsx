@@ -217,6 +217,22 @@ test("the ring sits in the header actions after the title at 56px, and at 44px o
   }
 });
 
+test("a tablet-width Design page lays the chat beside the phase column", async () => {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === "(min-width: 40em)",
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  try {
+    render([map("a")], []);
+    await screen.findByText("0%");
+    const grid = screen.getByRole("region", { name: "Chat" }).parentElement!;
+    expect(getComputedStyle(grid).gridTemplateColumns).toContain("300px");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("the countdown keeps running after Close dialog", async () => {
   const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
   render(

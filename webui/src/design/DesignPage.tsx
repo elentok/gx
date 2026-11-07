@@ -20,7 +20,7 @@ import type { FetchScreen } from "./screen";
 import { DesignActionsMenu, Failure, StartDesignButton } from "./SessionControls";
 import { SectionOnHold, type EpicListRow, type SessionInfo } from "../generated/server";
 import { slugOf } from "../slug";
-import { useWide } from "../useWide";
+import { useDevice, useWide } from "../useWide";
 import { designSession, liveSessions } from "./view";
 
 /** The injected fetchers and actions the Design page talks to the server through. */
@@ -113,6 +113,7 @@ function DesignBody({
       detail?.rows.find((r) => r.current)?.title) ||
     current?.label;
   const name = slugOf(address);
+  const sideColumn = useDevice() !== "phone";
   // The card speaks for this page only while its active (first) address is this Design.
   const card = epics.find((e) => e.addresses?.[0] === address);
   const live = liveSessions(address, sessions);
@@ -189,7 +190,7 @@ function DesignBody({
       </Box>
       <Box
         display="grid"
-        gridTemplateColumns={{ base: "1fr", lg: "minmax(0, 1fr) 300px" }}
+        gridTemplateColumns={sideColumn ? "minmax(0, 1fr) 300px" : "1fr"}
         gridTemplateRows={"minmax(0, 1fr)"}
         gap="4"
         flex="1"
