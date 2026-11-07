@@ -16,7 +16,6 @@ import {
   type Sort,
 } from "../generated/server";
 import { isActionable, stateLabel } from "../agents/rules";
-import { isCurrent } from "../epics/list";
 import { RING_KIND, isLive, ringProgress } from "../epics/ring";
 import { agentHref, designHref } from "../hrefs";
 import { titleHref } from "../epics/cardLinks";
@@ -54,8 +53,6 @@ export interface SidebarRow {
   held?: boolean;
   /** The card's epic (or a Design's -impl) holds a queue item; Hold is then disabled. */
   queued?: boolean;
-  /** The open page's epic starts expanded. */
-  expanded?: boolean;
   agents: SidebarAgent[];
 }
 
@@ -70,8 +67,6 @@ export interface SidebarInput {
   sessions: SessionInfo[];
   placements: SessionPlacement[];
   workspace: string;
-  /** The open page's epic address, or "". */
-  current: string;
   /** The active workspace's Sort value; missing or unknown reads as needs-you. */
   sort?: string;
 }
@@ -97,7 +92,7 @@ const agentRow = (s: SessionInfo): SidebarAgent => ({
   status: sessionStatus(s),
 });
 
-function cardRow(r: EpicListRow, agents: SidebarAgent[], current: string, held: boolean): SidebarRow {
+function cardRow(r: EpicListRow, agents: SidebarAgent[], held: boolean): SidebarRow {
   const kind = RING_KIND[r.card_kind ?? CardKindImplementation];
   return {
     key: r.address,
@@ -108,7 +103,6 @@ function cardRow(r: EpicListRow, agents: SidebarAgent[], current: string, held: 
     ring: ringProgress(r),
     ...(held ? { held: true } : {}),
     ...(r.queued ? { queued: true } : {}),
-    ...(isCurrent(r, current) ? { expanded: true } : {}),
     // A Design is one row: its session shows on the Design page, not nested under it.
     agents: kind === "design" ? [] : agents,
   };
@@ -148,7 +142,7 @@ function sortBy<T>(sort: Sort, entries: Sortable<T>[]): T[] {
   return [...entries].sort(cmp).map((e) => e.item);
 }
 
-export function buildSidebar({ rows, sessions, placements, workspace, current, sort }: SidebarInput): Sidebar {
+export function buildSidebar({ rows, sessions, placements, workspace, sort }: SidebarInput): Sidebar {
   const mode = sortOf(sort);
   const byId = new Map(sessions.map((s) => [s.id, s]));
   const placed = placements.flatMap((p) => {
@@ -167,7 +161,7 @@ export function buildSidebar({ rows, sessions, placements, workspace, current, s
     );
   const cardEntry = (r: EpicListRow, held: boolean): Sortable<SidebarRow> => {
     const ss = sessionsOf(r);
-    const row = cardRow(r, held ? [] : sortAgents(ss), current, held);
+    const row = cardRow(r, held ? [] : sortAgents(ss), held);
     return { item: row, name: r.name, needsYou: row.status.words === NEEDS_YOU, at: newest([time(r.last_activity_at), ...ss.map(sessionAt)]) };
   };
 

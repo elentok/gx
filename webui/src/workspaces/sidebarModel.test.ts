@@ -34,7 +34,7 @@ const row = (address: string, over: Partial<EpicListRow>): EpicListRow =>
     ...over,
   }) as EpicListRow;
 
-const base = { workspace: "Default", current: "" };
+const base = { workspace: "Default" };
 const place = (session: string, kind: string, extra: Partial<SessionPlacement> = {}): SessionPlacement => ({ session, kind, ...extra });
 
 describe("buildSidebar", () => {
@@ -52,15 +52,13 @@ describe("buildSidebar", () => {
     ]);
   });
 
-  it("nests agents under their epic and expands the current one", () => {
+  it("nests agents under their epic", () => {
     const rows = [row("p:a", { addresses: ["p:a"] }), row("p:b", {})];
     const sessions = [session("s1", "p", { name: "q", queue: true }), session("s2", "p")];
     const placements = [place("s1", "epic", { epic: "p:a" }), place("s2", "epic", { epic: "p:b" })];
-    const s = buildSidebar({ ...base, rows, sessions, placements, current: "p:a" });
+    const s = buildSidebar({ ...base, rows, sessions, placements });
     expect(s.rows[0].agents.map((a) => a.id)).toEqual(["s1"]);
-    expect(s.rows[0].expanded).toBe(true);
     expect(s.rows[1].agents.map((a) => a.id)).toEqual(["s2"]);
-    expect(s.rows[1].expanded).toBeUndefined();
   });
 
   it("maps Needs you, Working and dimmed server words", () => {

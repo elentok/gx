@@ -21,21 +21,25 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("ready-epic")).toBeVisible();
   await expect(row("ws-design")).toHaveCount(0);
 
-  // The chevron expands an epic's agents; the open epic starts expanded.
+  // Clicking an epic row only navigates; the chevron expands and collapses its agents, and a page visit leaves the row as left.
   // Counted inside the epic's own item, so a row still loading elsewhere cannot skew the count.
   const links = row("inv-epic").locator("xpath=ancestor::li[1]").getByRole("link");
   const expand = sidebar.getByRole("button", nav("Expand inv-epic"));
   await expect(expand).toHaveAttribute("aria-expanded", "false");
   await expect(links).toHaveCount(1);
+  await row("inv-epic").click();
+  await expect(page).toHaveURL(/#\/e\/demo:inv-epic$/);
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  await expect(links).toHaveCount(1);
   await expand.click();
   await expect(sidebar.getByRole("button", nav("Collapse inv-epic"))).toHaveAttribute("aria-expanded", "true");
   await expect(links).toHaveCount(2);
+  await goto(page, "#/epics");
+  await expect(links).toHaveCount(2);
   await sidebar.getByRole("button", nav("Collapse inv-epic")).click();
   await expect(links).toHaveCount(1);
-  // The open epic's row starts expanded.
   await goto(page, "#/e/demo:inv-epic");
-  await expect(sidebar.getByRole("button", nav("Collapse inv-epic"))).toHaveAttribute("aria-expanded", "true");
-  await expect(links).toHaveCount(2);
+  await expect(links).toHaveCount(1);
   await goto(page, "#/epics");
 
   // Rows show their numbers while Alt is held, and Alt+1 opens the first one.
@@ -51,12 +55,14 @@ test("Workspaces", async ({ page, start }) => {
   await goto(page, "#/epics");
 
   // Cmd/Ctrl+B hides the sidebar and brings it back with focus on a row; j/k, l/h and Enter move, expand and open.
+  // The roving stop is the last row focused: the earlier row click left it on inv-epic, so put it back on the first.
+  const navs = sidebar.locator("[data-nav]");
+  await navs.first().focus();
   await page.locator("body").click({ position: { x: 600, y: 600 } });
   await page.keyboard.press("ControlOrMeta+b");
   await expect(sidebar).toBeHidden();
   await page.keyboard.press("ControlOrMeta+b");
   await expect(sidebar).toBeVisible();
-  const navs = sidebar.locator("[data-nav]");
   await expect(navs.first()).toBeFocused();
   await page.keyboard.press("j");
   await expect(navs.nth(1)).toBeFocused();
@@ -71,6 +77,19 @@ test("Workspaces", async ({ page, start }) => {
   await expect(sidebar.getByRole("button", nav("Expand inv-epic"))).toHaveAttribute("aria-expanded", "false");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/#\/e\/demo:inv-epic$/);
+  await goto(page, "#/epics");
+
+  // Enter on a chat row focuses its prompt; a click opens the chat and leaves the prompt alone.
+  const chatRow = sidebar.locator("a[data-chat]");
+  const prompt = page.getByRole("form", nav("Composer")).getByRole("textbox");
+  await chatRow.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#\/agents\//);
+  await expect(prompt).toBeFocused();
+  await goto(page, "#/epics");
+  await chatRow.click();
+  await expect(prompt).toBeVisible();
+  await expect(prompt).not.toBeFocused();
   await goto(page, "#/epics");
 
   // Alt+Shift+2 picks the second workspace.
@@ -316,4 +335,13 @@ test("Workspaces", async ({ page, start }) => {
   await row("paused-epic").click();
   await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
   await expect(sidebar).toBeHidden();
+
+  // A tap on a chat row opens it without the keyboard: the prompt is not the active element. The fixture page has no touch context, so a click stands in.
+  await goto(page, "#/epics");
+  await page.getByRole("button", nav("Show sidebar")).click();
+  await pick("Default workspace");
+  await chatRow.click();
+  await expect(page).toHaveURL(/#\/agents\//);
+  await expect(prompt).toBeVisible();
+  await expect(prompt).not.toBeFocused();
 });

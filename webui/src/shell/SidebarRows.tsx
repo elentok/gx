@@ -1,5 +1,5 @@
 import { Box, chakra } from "@chakra-ui/react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
@@ -8,7 +8,7 @@ import type { Workspace } from "../generated/server";
 import { ItemMenu, type ItemRef } from "../workspaces/itemActions";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
-import { NAV_ATTR } from "./SidebarKeys";
+import { CHAT_ATTR, NAV_ATTR } from "./SidebarKeys";
 import { useAltHeld } from "./useShortcuts";
 
 /** The epic address of the open page, or "". */
@@ -84,11 +84,7 @@ function AgentLink({ agent }: { agent: SidebarAgent }) {
 }
 
 function Row({ row, current, active, workspaces, showNumber }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[]; showNumber?: boolean }) {
-  const [open, setOpen] = useState(!!row.expanded);
-  // The row outlives navigation, so opening its page expands it too, not only mounting on it.
-  useEffect(() => {
-    if (row.expanded) setOpen(true);
-  }, [row.expanded]);
+  const [open, setOpen] = useState(false);
   const nested = row.agents.length > 0;
   const item: ItemRef = { key: row.key, name: row.title, kind: row.kind === "chat" ? "chat" : row.kind === "design" ? "design" : "epic", workspace: active, queued: row.queued, held: row.held };
   return (
@@ -97,7 +93,7 @@ function Row({ row, current, active, workspaces, showNumber }: { row: SidebarRow
         <Box w="20px" flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
-        <chakra.a href={row.href} {...{ [NAV_ATTR]: "" }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
+        <chakra.a href={row.href} {...{ [NAV_ATTR]: "", ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
           {row.kind === "chat" ? (
             <ChatIcon />
           ) : (
@@ -162,7 +158,7 @@ export function useSidebarModel(fetcher: FetchEpicList | undefined, active: stri
   const pathname = useLocation().pathname;
   if (!list?.epics) return undefined;
   const sort = snapshot?.workspaces?.find((w) => w.name === active)?.sort;
-  return buildSidebar({ rows: list.epics, sessions: snapshot?.sessions ?? [], placements: snapshot?.placements ?? [], workspace: active, current: currentAddress(pathname), sort });
+  return buildSidebar({ rows: list.epics, sessions: snapshot?.sessions ?? [], placements: snapshot?.placements ?? [], workspace: active, sort });
 }
 
 export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; active: string }) {

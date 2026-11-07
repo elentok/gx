@@ -2,13 +2,17 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { session } from "../agents/agentsTestKit";
+import { requestPromptFocus } from "../agents/promptFocus";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { CardKindImplementation, SectionImplementing, SectionOnHold, type EpicListRow, type SessionPlacement } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { DeviceContext } from "../useWide";
 import { AppShell } from "./AppShell";
 
+vi.mock("../agents/promptFocus", () => ({ requestPromptFocus: vi.fn(), usePromptFocus: () => {} }));
+
 afterEach(() => {
+  vi.mocked(requestPromptFocus).mockClear();
   cleanup();
   vi.unstubAllGlobals();
   localStorage.clear();
@@ -40,14 +44,14 @@ const placements: SessionPlacement[] = [
   { session: "s2", kind: "other" },
 ];
 
-async function setup() {
+async function setup(withChat = false) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })));
   const state = {
     snapshot: {
       needs_you_total: 0,
       workspaces: [{ name: "Default", default: true, members: 0 }],
-      sessions: [session("s1", "p", { name: "builder" }), session("s2", "p", { name: "scratch" })],
-      placements,
+      sessions: [session("s1", "p", { name: "builder" }), session("s2", "p", { name: "scratch" }), ...(withChat ? [session("s3", "p", { name: "talk" })] : [])],
+      placements: withChat ? [...placements, { session: "s3", kind: "chat", workspace: "Default" }] : placements,
     },
     connected: true,
     loadedOnce: true,
@@ -132,6 +136,23 @@ test("Enter opens the focused row", async () => {
   focus(body().getByRole("link", { name: /Shop/ }));
   press("Enter");
   await waitFor(() => expect(window.location.hash).toBe("#/e/p:shop"));
+});
+
+test("Enter on a chat sends the prompt focus request; on an epic row it only navigates", async () => {
+  await setup(true);
+  focus(body().getByRole("link", { name: /Blog/ }));
+  press("Enter");
+  await waitFor(() => expect(window.location.hash).toBe("#/e/p:blog"));
+  expect(requestPromptFocus).not.toHaveBeenCalled();
+  focus(body().getByRole("link", { name: /talk/ }));
+  press("Enter");
+  expect(requestPromptFocus).toHaveBeenCalledTimes(1);
+});
+
+test("a click on a chat row sends no focus request", async () => {
+  await setup(true);
+  fireEvent.click(body().getByRole("link", { name: /talk/ }));
+  expect(requestPromptFocus).not.toHaveBeenCalled();
 });
 
 test("vim keys do nothing outside the sidebar or in a text field", async () => {

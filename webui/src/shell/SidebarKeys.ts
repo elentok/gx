@@ -1,10 +1,13 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
+import { requestPromptFocus } from "../agents/promptFocus";
 import { isMod, isTextTarget } from "./keys";
 import type { Shell } from "./ShellContext";
 
 /** Marks every sidebar row anchor and section header: the stops of the roving focus. */
 export const NAV_ATTR = "data-nav";
 const NAV = `[${NAV_ATTR}]`;
+/** Marks a chat row's anchor: Enter on it also focuses the chat's prompt. */
+export const CHAT_ATTR = "data-chat";
 
 const items = (root: HTMLElement) => Array.from(root.querySelectorAll<HTMLElement>(NAV));
 
@@ -61,6 +64,7 @@ function onSidebarKey(root: HTMLElement, e: ReactKeyboardEvent) {
   }
   if (e.key === "Enter" && target.matches("a")) {
     e.preventDefault();
+    if (target.hasAttribute(CHAT_ATTR)) requestPromptFocus();
     target.click();
   }
 }

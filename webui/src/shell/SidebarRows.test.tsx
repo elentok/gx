@@ -83,20 +83,33 @@ function setup(device: Device, path = "/") {
 
 const body = () => within(screen.getByTestId("sidebar-body"));
 
-test("rows show the name and status words; the open epic is current and starts expanded", async () => {
+test("rows show the name and status words; the open epic is current and stays collapsed", async () => {
   setup("desktop", "/e/p:blog");
   const link = await body().findByRole("link", { name: /Blog/ });
   expect(link.textContent).toContain("Waiting on review");
   expect(link.getAttribute("href")).toBe("#/e/p:blog");
   expect(link.getAttribute("aria-current")).toBe("page");
-  expect(body().getByRole("link", { name: /builder/ })).toBeTruthy();
+  expect(body().queryByRole("link", { name: /builder/ })).toBeNull();
 });
 
-test("the chevron expands a nested agent without navigating", async () => {
+test("clicking an epic row navigates and leaves it collapsed; the chevron toggles both ways", async () => {
   setup("desktop", "/");
-  await body().findByRole("link", { name: /Blog/ });
+  const link = await body().findByRole("link", { name: /Blog/ });
+  fireEvent.click(link);
+  await waitFor(() => expect(window.location.hash).toBe("#/e/p:blog"));
   expect(body().queryByRole("link", { name: /builder/ })).toBeNull();
   fireEvent.click(body().getByRole("button", { name: "Expand Blog" }));
+  expect(body().getByRole("link", { name: /builder/ })).toBeTruthy();
+  fireEvent.click(body().getByRole("button", { name: "Collapse Blog" }));
+  expect(body().queryByRole("link", { name: /builder/ })).toBeNull();
+});
+
+test("opening another page leaves an expanded row expanded", async () => {
+  setup("desktop", "/");
+  await body().findByRole("link", { name: /Blog/ });
+  fireEvent.click(body().getByRole("button", { name: "Expand Blog" }));
+  fireEvent.click(body().getByRole("link", { name: /Shop/ }));
+  await waitFor(() => expect(window.location.hash).toBe("#/d/p:shop"));
   expect(body().getByRole("link", { name: /builder/ })).toBeTruthy();
 });
 

@@ -14,6 +14,7 @@ import type { SessionInfo } from "../generated/server";
 import { refusalText } from "../useWrite";
 import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
+import { usePromptFocus } from "./promptFocus";
 
 // Under the Agents page's chat: the box is always open with Send beside it. A refusal shows inline only, as in the mock.
 export function AgentComposer({
@@ -38,6 +39,8 @@ export function AgentComposer({
   onSent?: (text: string, images: string[]) => void;
 }) {
   const wide = useWide();
+  const box = useRef<HTMLDivElement>(null);
+  usePromptFocus(box);
   const [text, setText] = useComposerDraft(session.id);
   const images = useComposerImages(session.id);
   const { send, write, enabled, pending, refusal, error } = usePromptSend({
@@ -83,6 +86,7 @@ export function AgentComposer({
 
   return (
     <Box
+      ref={box}
       position="sticky"
       bottom="0"
       bg="surface"
