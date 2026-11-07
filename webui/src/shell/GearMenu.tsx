@@ -5,15 +5,12 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { SETTINGS_HREF } from "../hrefs";
 import { RestartDialog } from "../restart/RestartDialog";
 import { showToast } from "../ui/toaster";
-import { UsageMenuBlock } from "../usage/UsageMenuBlock";
-import type { FetchSummary } from "../usage/useUsageSummary";
 import { postViMode as defaultPostViMode } from "../vimode";
 import { WriteError } from "../useWrite";
 
 interface Props {
   postAfk?: (on: boolean) => Promise<void>;
   postViMode?: (on: boolean) => Promise<void>;
-  usageFetcher?: FetchSummary;
 }
 
 const itemStyle = { cursor: "pointer", color: "text", ps: "3", _highlighted: { bg: "surface" } } as const;
@@ -35,10 +32,8 @@ function GearIcon() {
 }
 
 // The app menu: the old top bar's menu, opened from the sidebar footer.
-export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViMode, usageFetcher }: Props) {
-  const conn = useConnectionContext();
-  const { snapshot } = useConnectionState(conn);
-  const [usageShown, setUsageShown] = useState(false);
+export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViMode }: Props) {
+  const { snapshot } = useConnectionState(useConnectionContext());
   const [restartOpen, setRestartOpen] = useState(false);
   const afk = snapshot?.afk ?? false;
   const viMode = snapshot?.vi_mode ?? false;
@@ -65,7 +60,7 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
         </Menu.Trigger>
         <Portal>
           <Menu.Positioner>
-            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40" {...(usageShown ? { w: "280px", maxW: "calc(100vw - 2rem)" } : {})}>
+            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">
               <Menu.CheckboxItem value="afk" checked={afk} onCheckedChange={() => flip(postAfk, afk)} justifyContent="space-between" {...itemStyle}>
                 AFK
                 <MenuSwitch on={afk} />
@@ -81,7 +76,6 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
               <Menu.Item value="restart" closeOnSelect onClick={() => setRestartOpen(true)} {...itemStyle}>
                 Restart server
               </Menu.Item>
-              <UsageMenuBlock conn={conn} fetcher={usageFetcher} onShownChange={setUsageShown} />
               {snapshot?.build && (
                 <Text px="3" py="1.5" fontSize="xs" color="text.muted" truncate title={snapshot.build} data-testid="server-build">
                   {snapshot.build}

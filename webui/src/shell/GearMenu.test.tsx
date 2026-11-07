@@ -1,35 +1,32 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import { UsageModeLimits, type UsageSummary } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { GearMenu } from "./GearMenu";
 
 afterEach(cleanup);
-
-const summary = { mode: UsageModeLimits, limits: { windows: [] }, spend: { today: 0, since_sunday: 0, since_first: 0 } } as unknown as UsageSummary;
 
 function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}) {
   const state = { snapshot, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   renderThemed(
     <ConnectionContext.Provider value={conn}>
-      <GearMenu usageFetcher={async () => summary} {...props} />
+      <GearMenu {...props} />
     </ConnectionContext.Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
 }
 
-test("lists AFK, Vi mode, Settings, Restart server, the usage block and the build in order", async () => {
+test("lists AFK, Vi mode, Settings, Restart server and the build in order, with no limits block", async () => {
   setup({ build: "v1.2.3" });
   const afk = await screen.findByRole("menuitemcheckbox", { name: "AFK" });
   const vi = screen.getByRole("menuitemcheckbox", { name: "Vi mode" });
   const settings = screen.getByRole("menuitem", { name: "Settings" });
   const restart = screen.getByRole("menuitem", { name: "Restart server" });
-  const usage = await screen.findByText("Claude limits");
   const build = screen.getByTestId("server-build");
   expect(build.textContent).toBe("v1.2.3");
-  const order = [afk, vi, settings, restart, usage, build];
+  expect(screen.queryByText("Claude limits")).toBeNull();
+  const order = [afk, vi, settings, restart, build];
   order.slice(1).forEach((el, i) => expect(order[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
 });
 

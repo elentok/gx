@@ -1,7 +1,7 @@
 import { appendFile, glob, mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { expect, menu, openMenu as openAppMenu, test, type Fixture } from "./fixture";
+import { expect, nav, test, type Fixture } from "./fixture";
 import type { Page } from "@playwright/test";
 
 const nowSec = () => Math.floor(Date.now() / 1000);
@@ -19,11 +19,33 @@ const payload = (fiveHour: number, sevenDay: number) =>
 const report = (fixture: Fixture, body: string) =>
   fixture.cliInput(body, "claude", "statusline");
 
+// The limits tray popover; the tray sits beside the app menu button, so it opens the sidebar the same way.
 const openMenu = async (page: Page) => {
-  await openAppMenu(page);
-  await expect(menu(page)).toBeVisible();
-  return menu(page);
+  const show = page.getByRole("button", nav("Show sidebar"));
+  const tray = page.getByRole("button", nav("Usage limits"));
+  await tray.or(show).first().waitFor();
+  if (await show.isVisible()) await show.click();
+  await tray.click();
+  const popover = page.getByRole("dialog", nav("Usage limits"));
+  await expect(popover).toBeVisible();
+  return popover;
 };
+
+const bar = (page: Page, letter: string) => page.getByRole("button", nav("Usage limits")).locator(`[data-meter=${letter}]`);
+
+test.describe("117b. Limits tray bars", () => {
+  test("letters C and X; fill and tone follow usage", async ({ page, start }) => {
+    const fixture = await start("limits", { shape: "fresh" });
+    await expect(bar(page, "C")).toHaveText("C");
+    await expect(bar(page, "X")).toHaveText("X");
+    await expect(bar(page, "C")).toHaveAttribute("data-tone", "running");
+    await expect(bar(page, "C")).toHaveAttribute("data-percent", "34");
+
+    await report(fixture, payload(85, 90));
+    await expect(bar(page, "C")).toHaveAttribute("data-tone", "waiting");
+    await expect(bar(page, "C")).toHaveAttribute("data-percent", "85");
+  });
+});
 
 const row = (page: Page, name: string) => page.getByRole("group", { name });
 
@@ -48,13 +70,14 @@ const amount = async (page: Page, name: string) => {
 };
 
 test.describe("120. Menu refresh", () => {
-  // The ledger event is throttled to once per 60 s; the menu's own 60 s tick is the backstop.
-  test("amount rises while open; closed menu stops fetching", async ({
+  // The ledger event is throttled to once per 60 s; the tray's own 60 s tick is the backstop.
+  test("amount rises while the popover is open", async ({
     page,
     start,
   }) => {
-    const fixture = await start("spend", { shape: "normal" });
+    // The tray's 60 s tick starts at page load, so the fake clock must exist before the page loads.
     await page.clock.install();
+    const fixture = await start("spend", { shape: "normal" });
     const menu = await openMenu(page);
     await expect(menu.getByText("gx spend (est.)")).toBeVisible();
     await expect(row(page, "Today").getByText(dollars(4.82))).toBeVisible();
@@ -77,16 +100,6 @@ test.describe("120. Menu refresh", () => {
       await page.clock.fastForward(60_000);
       await expect(row(page, "Today").getByText(dollars(before + 3))).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });
-
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toBeHidden();
-    let summaries = 0;
-    page.on("request", (req) => {
-      if (req.url().includes("/v1/usage/summary")) summaries++;
-    });
-    await report(fixture, payload(40, 50));
-    await page.waitForTimeout(4000);
-    expect(summaries).toBe(0);
   });
 });
 

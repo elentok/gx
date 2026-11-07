@@ -9,6 +9,7 @@ import { useEpicList } from "../epics/list";
 import { designHref, STATS_HREF } from "../hrefs";
 import { GxMenu } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
+import { LimitsTray } from "../usage/LimitsTray";
 import { GearMenu } from "./GearMenu";
 
 const EPICS_HREF = "#/epics";
@@ -59,7 +60,8 @@ function Indicator({ label, tone, children }: { label: string; tone: "waiting" |
 type Dialog = "design" | "agent" | null;
 
 export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: () => void }) {
-  const { snapshot, connected } = useConnectionState(useConnectionContext());
+  const conn = useConnectionContext();
+  const { snapshot, connected } = useConnectionState(conn);
   const [dialog, setDialog] = useState<Dialog>(null);
   const health = snapshot?.health;
   const unhealthy = !!health && [health.cpu, health.memory, health.disk].some((m) => m.state === "high" || m.state === "critical");
@@ -87,7 +89,12 @@ export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: 
       <FooterLink href={STATS_HREF} label="Stats and health">
         <StatsIcon />
       </FooterLink>
-      {health && <Tray health={health} connected={connected} />}
+      {health && (
+        <>
+          <Tray health={health} connected={connected} />
+          <LimitsTray conn={conn} />
+        </>
+      )}
       {unhealthy && (
         <Indicator label="System health is high or critical" tone="waiting">
           <WarningIcon />

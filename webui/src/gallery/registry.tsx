@@ -54,6 +54,7 @@ import { Tray } from "../ui/tray/Tray";
 import type { Health, HealthState, LimitWindow, UsageLimits, UsageLimitWindow, UsageSpend, UsageSummary } from "../generated/server";
 import { UsageModeLimits, UsageModeSpending } from "../generated/server";
 import { LimitsBlock } from "../usage/LimitsBlock";
+import { LimitsTray } from "../usage/LimitsTray";
 import { SpendBlock } from "../usage/SpendBlock";
 import { KINDS, TONES, type Tone } from "../ui/tone";
 
@@ -185,6 +186,17 @@ const limitsStates: [string, UsageLimits, UsageLimits?][] = [
   ["limits past reset", { five_hour: limitWin(34, -60, 21600), seven_day: limitWin(52, 187200, 21600) }],
   ["limits one window", { seven_day: limitWin(12, 464400, 60) }],
 ];
+// The tray reads the real clock, so its windows reset relative to now, not to limitsNow.
+function LimitsTrayDemo({ claude, codex, spending }: { claude: number; codex?: number; spending?: boolean }) {
+  const win = (pct: number): LimitWindow => ({ used_percentage: pct, resets_at: Date.now() / 1000 + 7800, received_at: Date.now() / 1000 - 60 });
+  const summary = {
+    mode: spending ? UsageModeSpending : UsageModeLimits,
+    limits: { five_hour: win(claude), seven_day: win(claude) },
+    codex: codex === undefined ? undefined : { five_hour: win(codex), seven_day: win(codex) },
+    spend: { today: 4.82, since_sunday: 21.5, since_first: 96.1, first_day: "2026-09-01" },
+  } as UsageSummary;
+  return <LimitsTray conn={idleEpicConnection} fetcher={async () => summary} />;
+}
 const spendStates: [string, UsageSpend][] = [
   ["spend normal", { today: 4.82, since_sunday: 21.5, since_first: 96.1, first_day: "2026-09-01" }],
   [
@@ -720,6 +732,15 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "busy", node: <Tray health={mixedHealth("high", "normal", "high")} /> },
       { label: "critical", node: <Tray health={mixedHealth("critical", "critical", "critical")} /> },
       { label: "unknown", node: <Tray health={trayHealth("unknown")} /> },
+    ],
+  },
+  {
+    name: "LimitsTray",
+    cases: [
+      { label: "fresh", node: <LimitsTrayDemo claude={34} codex={12} /> },
+      { label: "past 80%", node: <LimitsTrayDemo claude={85} codex={100} /> },
+      { label: "popover", node: <OpenTip><LimitsTrayDemo claude={34} codex={12} /></OpenTip> },
+      { label: "spending popover", node: <OpenTip><LimitsTrayDemo claude={34} spending /></OpenTip> },
     ],
   },
   {
