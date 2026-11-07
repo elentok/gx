@@ -1,22 +1,20 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import { apiFetch } from "../apiFetch";
 import {
   CardKindDesign,
   HoldQueuedText,
   SectionOnHold,
   type EpicListRow,
   ReasonHoldLiveSessions,
-  type HoldRequest,
   type HoldResult,
   type Workspace,
-  type WorkspaceRequest,
   type WorkspaceResult,
 } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
 import { MoreActionsMenu, type MoreActionsItem, type MoreActionsSection } from "../ui/more-actions/MoreActionsMenu";
-import { useWrite, WriteError } from "../useWrite";
+import { useWrite } from "../useWrite";
+import { postWorkspace } from "./postWorkspace";
 
 /** What the menu needs of a Design or epic card, a chat or a jump row. One-off, Follow-ups and Other get no menu. */
 export interface ItemRef {
@@ -60,20 +58,11 @@ export interface ItemWriters {
   unhold: (epic: string) => Promise<HoldResult>;
 }
 
-async function post<R>(route: string, body: WorkspaceRequest | HoldRequest): Promise<R> {
-  const res = await apiFetch(`/v1/workspaces/${route}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`);
-  return (await res.json()) as R;
-}
-
-export const postMove = (key: string, to: string) => post<WorkspaceResult>("move", { name: to, key });
-export const postRemove = (key: string) => post<WorkspaceResult>("remove", { name: "", key });
-export const postHold = (epic: string, yes?: boolean) => post<HoldResult>("hold", { epic, ...(yes ? { yes } : {}) });
-export const postUnhold = (epic: string) => post<HoldResult>("unhold", { epic });
+export const postMove = (key: string, to: string) => postWorkspace<WorkspaceResult>("move", { name: to, key });
+export const postRemove = (key: string) => postWorkspace<WorkspaceResult>("remove", { name: "", key });
+export const postHold = (epic: string, yes?: boolean) =>
+  postWorkspace<HoldResult>("hold", { epic, ...(yes ? { yes } : {}) });
+export const postUnhold = (epic: string) => postWorkspace<HoldResult>("unhold", { epic });
 
 export const defaultWriters: ItemWriters = { move: postMove, remove: postRemove, hold: postHold, unhold: postUnhold };
 

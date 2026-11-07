@@ -1,22 +1,14 @@
 import { Box, chakra, Menu, Portal, Text } from "@chakra-ui/react";
 import { useState, type FormEvent } from "react";
-import { apiFetch } from "../apiFetch";
 import type { Workspace, WorkspaceResult } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
-import { refusalText, useWrite, WriteError } from "../useWrite";
+import { refusalText, useWrite } from "../useWrite";
+import { postWorkspace } from "../workspaces/postWorkspace";
 
 export type CreateWorkspace = (name: string) => Promise<WorkspaceResult>;
 
-export async function postCreateWorkspace(name: string): Promise<WorkspaceResult> {
-  const res = await apiFetch("/v1/workspaces/create", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-  if (!res.ok) throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`);
-  return (await res.json()) as WorkspaceResult;
-}
+export const postCreateWorkspace = (name: string) => postWorkspace<WorkspaceResult>("create", { name });
 
 /** Asks for a name and creates the workspace; a refusal (a clash, say) shows under the field and keeps the dialog open. */
 export function NewWorkspaceDialog({

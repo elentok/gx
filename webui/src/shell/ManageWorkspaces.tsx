@@ -1,6 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { apiFetch } from "../apiFetch";
 import type {
   Workspace,
   WorkspaceRequest,
@@ -8,7 +7,8 @@ import type {
 } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
-import { refusalText, useWrite, WriteError } from "../useWrite";
+import { refusalText, useWrite } from "../useWrite";
+import { postWorkspace } from "../workspaces/postWorkspace";
 
 export interface WorkspaceWriters {
   rename: (name: string, to: string) => Promise<WorkspaceResult>;
@@ -16,21 +16,7 @@ export interface WorkspaceWriters {
   reorder: (order: string[]) => Promise<WorkspaceResult>;
 }
 
-async function post(
-  route: string,
-  body: WorkspaceRequest,
-): Promise<WorkspaceResult> {
-  const res = await apiFetch(`/v1/workspaces/${route}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok)
-    throw new WriteError(
-      (await res.text().catch(() => "")).trim() || `HTTP ${res.status}`,
-    );
-  return (await res.json()) as WorkspaceResult;
-}
+const post = (route: string, body: WorkspaceRequest) => postWorkspace<WorkspaceResult>(route, body);
 
 export const postWorkspaceWriters: WorkspaceWriters = {
   rename: (name, to) => post("rename", { name, to }),
