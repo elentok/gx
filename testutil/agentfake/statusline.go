@@ -68,6 +68,11 @@ func (t *tui) runStatusLine() {
 		limited.FiveHour.ResetsAt = t.limitResetsAt
 		usage = &limited
 	}
+	if usage != nil && t.limitLifted {
+		lifted := *usage
+		lifted.FiveHour.UsedPercentage = 0
+		usage = &lifted
+	}
 	payload, err := StatusLinePayload(t.opts.model, usage)
 	if err != nil {
 		return

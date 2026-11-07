@@ -22,6 +22,9 @@ type tui struct {
 	// limitResetsAt, when set (Unix seconds), replaces the five-hour window's reset in the
 	// usage the statusLine reports, so a rate limit's reset is relative to when it was hit.
 	limitResetsAt int64
+	// limitLifted makes the statusLine report the five-hour window as unused once the
+	// rate limit that set limitResetsAt has been resumed past.
+	limitLifted bool
 	// notice is a line drawn under the input, such as an unknown-command error.
 	notice string
 	// vim is set by ActionVimToggle: the input then draws the INSERT footer.

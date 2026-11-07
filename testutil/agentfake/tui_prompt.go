@@ -30,6 +30,11 @@ func (t *tui) submit() error {
 		}
 		if w := t.resume; w != nil && text != "" {
 			t.resume = nil
+			if t.limitResetsAt != 0 {
+				// Resuming after a rate limit means the window rolled over.
+				t.limitResetsAt = 0
+				t.limitLifted = true
+			}
 			t.prompt = text
 			go t.work(w.Cfg, w.Address)
 			return t.setStatus(StatusBusy, "")

@@ -214,7 +214,8 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 		f.env = append(f.env, "GX_USAGE_POLL_INTERVAL="+limitBurnUsagePollInterval)
 	}
 	if sc.RateLimitFromUsage {
-		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s", supervise.RateLimitReleaseFileEnv+"="+f.rateLimitReleaseFile())
+		// The short usage poll lets the server see the window's reset well inside the flow's wait.
+		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s", "GX_USAGE_POLL_INTERVAL="+limitBurnUsagePollInterval, supervise.RateLimitReleaseFileEnv+"="+f.rateLimitReleaseFile())
 	}
 	if sc.PromptGrace != "" {
 		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.PromptGrace)
