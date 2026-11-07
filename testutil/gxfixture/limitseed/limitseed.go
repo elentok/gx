@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tokenledger"
 )
 
@@ -54,8 +55,8 @@ var Shapes = map[string]func(now time.Time) Seed{
 	// 100%), Codex weekly at 40%, both 5-hour rows.
 	"menu": menuSeed,
 	// live: the menu limits and an empty ledger, with one held agent per cost
-	// group (see gxfixture's limitBurnLive).
-	"live": menuSeed,
+	// group (see gxfixture's limitBurnLive), and four finished launches.
+	"live": liveSeed,
 	// few-days: Claude weekly at 22%, the first sample earlier today, no Codex data.
 	"few-days": func(now time.Time) Seed {
 		reset := LocalMidnight(now).AddDate(0, 0, 4)
@@ -132,6 +133,29 @@ func ShapeNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// liveSeed is the menu seed plus finished tickets with launch stamps and no
+// tokens, so the Stats Launch cards are populated and the cost ledger stays empty.
+func liveSeed(now time.Time) Seed {
+	s := menuSeed(now)
+	s.Ledger = &Ledger{}
+	for i, ago := range []int{5, 4, 3, 2} {
+		s.Ledger.Stamped = append(s.Ledger.Stamped, Stamped{fmt.Sprintf("%02d", i+1), fmt.Sprintf("launched-%d-days-ago", ago), servertest.TicketOpts{
+			Status: "done",
+			DoneAt: LocalMidnight(now).AddDate(0, 0, -ago).Add(14 * time.Hour).Format(time.RFC3339),
+			// Totals on both sides of the launch target.
+			Launch: []schema.LaunchStamp{{
+				ClaimedAt:  LocalMidnight(now).AddDate(0, 0, -ago).Add(13 * time.Hour),
+				TotalMs:    int64(4_000 + (ago%2)*60_000),
+				WorktreeMs: 1_000,
+				DepsMs:     1_000,
+				AgentMs:    1_000,
+				PromptMs:   1_000,
+			}},
+		}})
+	}
+	return s
 }
 
 func menuSeed(now time.Time) Seed {

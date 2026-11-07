@@ -78,8 +78,15 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)",async ({ page, 
   await page.mouse.move(0, 0);
   await check(afterSecond);
 
-  // The limit-burn scenario has no finished launches, so the Launch headline reads "—".
-  await expect(page.getByRole("region", nav("Launch")).locator("[data-tone]").filter({ hasText: "Launch time" })).toContainText("—");
+  // The limit-burn scenario seeds finished launches: a median, a share under target and per-step medians, no "—".
+  const launch = page.getByRole("region", nav("Launch"));
+  const launchCard = launch.locator("[data-tone]").filter({ hasText: "Launch time" });
+  await expect(launchCard).toContainText(/\d+(\.\d+)?s/);
+  await expect(launchCard).toContainText(/\d+% under/);
+  await expect(launchCard).not.toContainText("—");
+  const steps = launch.getByTestId("launch-steps");
+  await expect(steps).toContainText("worktree");
+  await expect(steps).not.toContainText("—");
 
   // 182 phone: the four limit cards stack in one column with no horizontal overflow.
   await page.setViewportSize({ width: 375, height: 812 });

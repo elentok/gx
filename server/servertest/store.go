@@ -2,12 +2,16 @@ package servertest
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // WriteConfig writes fields as a config.json at path. The ticket-store path
@@ -68,6 +72,8 @@ type TicketOpts struct {
 	// stamps; both are omitted when TotalTokens is 0.
 	TotalTokens int64
 	ActualCost  float64
+	// Launch is the ticket's launch: stamps, omitted when empty.
+	Launch []schema.LaunchStamp
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -153,6 +159,13 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	}
 	if opts.TotalTokens > 0 {
 		fm += "total_tokens: " + strconv.FormatInt(opts.TotalTokens, 10) + "\nactual_cost: " + strconv.FormatFloat(opts.ActualCost, 'f', -1, 64) + "\n"
+	}
+	if len(opts.Launch) > 0 {
+		fm += "launch:\n"
+		for _, s := range opts.Launch {
+			fm += fmt.Sprintf("  - claimed_at: %s\n    total_ms: %d\n    worktree_ms: %d\n    deps_ms: %d\n    agent_ms: %d\n    prompt_ms: %d\n",
+				s.ClaimedAt.Format(time.RFC3339), s.TotalMs, s.WorktreeMs, s.DepsMs, s.AgentMs, s.PromptMs)
+		}
 	}
 	fm += "---\n\n# " + slug + "\n"
 	return os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644)
