@@ -108,7 +108,7 @@ func printWorkspaces(w io.Writer, l wire.WorkspaceList) error {
 		if ws.Default {
 			def = "\tdefault"
 		}
-		if _, err := fmt.Fprintf(w, "%s\t%d%s\n", ws.Name, ws.Members, def); err != nil {
+		if _, err := fmt.Fprintf(w, "%s\t%d\t%d needs you%s\n", ws.Name, ws.Members, ws.NeedsYou, def); err != nil {
 			return err
 		}
 	}

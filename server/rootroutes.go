@@ -78,12 +78,7 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Mode = s.queue.Mode()
 	snap.AFK = s.afk.IsOn()
 	snap.ViMode = s.viMode.IsOn()
-	snap.Workspaces = s.workspaces.Listed()
-	perWorkspace, total := s.epics.NeedsYouCounts()
-	for i := range snap.Workspaces {
-		snap.Workspaces[i].NeedsYou = perWorkspace[snap.Workspaces[i].Name]
-	}
-	snap.NeedsYouTotal = total
+	snap.Workspaces, snap.NeedsYouTotal = s.workspacesWithNeedsYou()
 	snap.Held = s.workspaces.HeldKeys()
 	snap.SkillsInstallProblem = skills.ReadProblem(skills.StatusPath(s.cfg.StateDir))
 	// Checked on every snapshot: a PATH entry can vanish while the server

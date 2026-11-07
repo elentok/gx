@@ -2,6 +2,7 @@ package epics_test
 
 import (
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -125,6 +126,66 @@ func TestWorkspaces_HeldDesignPullsItsImplIntoOnHold(t *testing.T) {
 	}
 	if a := got["design"].Actions; len(a) != 1 || a[0].Target != got["design"].Addresses[0] {
 		t.Errorf("unhold target = %+v, addresses %v", a, got["design"].Addresses)
+	}
+}
+
+func TestWorkspaces_OneOffCardCountsInTotalButNoWorkspace(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "one-offs", "01", "stuck one-off", servertest.TicketOpts{PauseReason: "iteration-error"})
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	r := wsRig{t: t, h: h}
+
+	if row := r.list()["stuck one-off"]; row.CardKind != wire.CardKindOneOff || row.Section != wire.SectionNeedsYou {
+		t.Fatalf("one-off row = kind %q section %q, want a one-off in needs-you", row.CardKind, row.Section)
+	}
+	snap, err := h.Client.Snapshot(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.NeedsYouTotal != 1 || needsYou(snap, "Default workspace") != 0 {
+		t.Errorf("snapshot: total=%d workspaces=%+v, want total 1 and no workspace count", snap.NeedsYouTotal, snap.Workspaces)
+	}
+	list, err := h.Client.Reads.Workspaces(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range list.Workspaces {
+		if w.NeedsYou != 0 {
+			t.Errorf("route workspace %+v counts the one-off card", w)
+		}
+	}
+}
+
+func TestWorkspaces_RestartKeepsTheListAndTheHeldCard(t *testing.T) {
+	t.Parallel()
+	r := startWorkspaceRig(t)
+	ctx := t.Context()
+	r.mustWrite(r.h.Client.Admin.CreateWorkspace(ctx, "Work"))
+	r.mustWrite(r.h.Client.Admin.MoveToWorkspace(ctx, "proj:design", "Work"))
+	if res, err := r.h.Client.Admin.HoldEpic(ctx, "proj:stuck", true); err != nil || res.Refused {
+		t.Fatalf("hold: %v %+v", err, res)
+	}
+	before, err := r.h.Client.Reads.Workspaces(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.h.Restart(t)
+
+	after, err := r.h.Client.Reads.Workspaces(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(before.Workspaces, after.Workspaces) {
+		t.Errorf("workspaces after restart = %+v, before %+v", after.Workspaces, before.Workspaces)
+	}
+	got := r.list()
+	if got["stuck"].Section != wire.SectionOnHold {
+		t.Errorf("stuck section after restart = %q, want on-hold", got["stuck"].Section)
+	}
+	if got["design"].Workspace != "Work" {
+		t.Errorf("design workspace after restart = %q, want Work", got["design"].Workspace)
 	}
 }
 

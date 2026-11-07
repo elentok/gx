@@ -21,8 +21,9 @@ var refusals = map[Reason]string{
 }
 
 // Routes lists the workspace endpoints. The getter is called per request, so a
-// route can be listed before its Store is built.
-func Routes(get func() *Store) []wire.Route {
+// route can be listed before its Store is built. Listed returns the workspaces
+// with their Needs-you counts filled in.
+func Routes(get func() *Store, listed func() []wire.Workspace) []wire.Route {
 	write := func(pattern string, do func(*Store, wire.WorkspaceRequest) error) wire.Route {
 		return wire.Route{Pattern: pattern, Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) {
 			var req wire.WorkspaceRequest
@@ -35,7 +36,7 @@ func Routes(get func() *Store) []wire.Route {
 			var reason Reason
 			switch {
 			case err == nil:
-				wire.WriteJSON(w, wire.WorkspaceResult{Workspaces: s.Listed()})
+				wire.WriteJSON(w, wire.WorkspaceResult{Workspaces: listed()})
 			case errors.As(err, &reason):
 				wire.WriteJSON(w, wire.WorkspaceResult{Refused: true, Reason: refusals[reason], Message: reason.Error()})
 			default:
@@ -62,7 +63,7 @@ func Routes(get func() *Store) []wire.Route {
 		hold("POST /v1/workspaces/hold", func(s *Store, r wire.HoldRequest) (wire.HoldResult, error) { return s.HoldEpic(r.Epic, r.Yes) }),
 		hold("POST /v1/workspaces/unhold", func(s *Store, r wire.HoldRequest) (wire.HoldResult, error) { return s.UnholdEpic(r.Epic) }),
 		{Pattern: "GET /v1/workspaces", Web: wire.WebRead, Handler: func(w http.ResponseWriter, _ *http.Request) {
-			wire.WriteJSON(w, wire.WorkspaceList{Workspaces: get().Listed()})
+			wire.WriteJSON(w, wire.WorkspaceList{Workspaces: listed()})
 		}},
 		write("POST /v1/workspaces/create", func(s *Store, r wire.WorkspaceRequest) error { return s.Create(r.Name) }),
 		write("POST /v1/workspaces/rename", func(s *Store, r wire.WorkspaceRequest) error { return s.Rename(r.Name, r.To) }),

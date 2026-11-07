@@ -8,8 +8,8 @@ type Workspace struct {
 	Name    string `json:"name"`
 	Default bool   `json:"default,omitempty"`
 	Members int    `json:"members"`
-	// NeedsYou counts the workspace's Needs-you cards; filled in by the snapshot.
-	NeedsYou int `json:"needs_you,omitempty"`
+	// NeedsYou counts the workspace's Needs-you cards; filled in by the server, 0 when none.
+	NeedsYou int `json:"needs_you"`
 }
 
 // WorkspaceList is the workspaces in order.

@@ -42,8 +42,8 @@ func TestServerWorkspaces_CreateThenClashAndDefaultDeleteRefuse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "Default workspace\t0\tdefault\nBugs\t0\n"; out != want {
-		t.Errorf("list = %q, want %q", out, want)
+	if want := "Default workspace\t0\t0 needs you\tdefault\nBugs\t0\t0 needs you\n"; out != want {
+		t.Errorf("list =%q, want %q", out, want)
 	}
 }
 
@@ -55,7 +55,7 @@ func TestServerWorkspaces_RenameAndDelete(t *testing.T) {
 		}
 	}
 	out, err := runWorkspaces(t, h, "list")
-	if err != nil || !strings.Contains(out, "Fixes\t0\n") {
+	if err != nil || !strings.Contains(out, "Fixes\t0\t0 needs you\n") {
 		t.Fatalf("list after rename = %q, %v", out, err)
 	}
 	if _, err := runWorkspaces(t, h, "delete", "Fixes"); err != nil {
@@ -97,6 +97,22 @@ func TestServerWorkspaces_JSONMatchesTheRoute(t *testing.T) {
 	}
 }
 
+func TestServerWorkspaces_ListShowsNeedsYouCount(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "stuck", "01", "broken", servertest.TicketOpts{PauseReason: "iteration-error"})
+	h := servertest.StartWithStore(t, store)
+
+	out, err := runWorkspaces(t, h, "list")
+	if want := "Default workspace\t0\t1 needs you\tdefault\n"; err != nil || out != want {
+		t.Errorf("list = %q (%v), want %q", out, err, want)
+	}
+	out, err = runWorkspaces(t, h, "list", "--json")
+	var got wire.WorkspaceList
+	if err != nil || json.Unmarshal([]byte(out), &got) != nil || len(got.Workspaces) != 1 || got.Workspaces[0].NeedsYou != 1 {
+		t.Errorf("--json = %q (%v), want needs_you 1", out, err)
+	}
+}
+
 func TestServerWorkspaces_ReorderMoveRemove(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
@@ -112,7 +128,7 @@ func TestServerWorkspaces_ReorderMoveRemove(t *testing.T) {
 		t.Fatalf("reorder: %v", err)
 	}
 	out, _ := runWorkspaces(t, h, "list")
-	if want := "Ideas\t0\nDefault workspace\t0\tdefault\nBugs\t0\n"; out != want {
+	if want := "Ideas\t0\t0 needs you\nDefault workspace\t0\t0 needs you\tdefault\nBugs\t0\t0 needs you\n"; out != want {
 		t.Errorf("list after reorder = %q, want %q", out, want)
 	}
 	if _, err := runWorkspaces(t, h, "reorder", "Ideas", "Bugs"); err == nil {
@@ -123,7 +139,7 @@ func TestServerWorkspaces_ReorderMoveRemove(t *testing.T) {
 		t.Fatalf("move: %v", err)
 	}
 	out, _ = runWorkspaces(t, h, "list")
-	if !strings.Contains(out, "Bugs\t1\n") {
+	if !strings.Contains(out, "Bugs\t1\t0 needs you\n") {
 		t.Errorf("list after move = %q, want Bugs with one member", out)
 	}
 	for _, key := range []string{"proj:follow-ups", "proj:nope"} {
@@ -144,7 +160,7 @@ func TestServerWorkspaces_ReorderMoveRemove(t *testing.T) {
 	if _, err := runWorkspaces(t, h, "remove", "proj:plain"); err != nil {
 		t.Errorf("remove of a Default member = %v, want a no-op success", err)
 	}
-	if out, _ = runWorkspaces(t, h, "list"); !strings.Contains(out, "Bugs\t0\n") {
+	if out, _ = runWorkspaces(t, h, "list"); !strings.Contains(out, "Bugs\t0\t0 needs you\n") {
 		t.Errorf("list after remove = %q, want Bugs empty", out)
 	}
 }

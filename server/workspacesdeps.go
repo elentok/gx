@@ -11,6 +11,17 @@ import (
 // workspacesDirectory answers the workspace store's lookups from the index and the sessions.
 type workspacesDirectory struct{ s *Server }
 
+// workspacesWithNeedsYou lists the workspaces with each one's Needs-you count,
+// and the total of every Needs-you card (One-off cards included).
+func (s *Server) workspacesWithNeedsYou() ([]wire.Workspace, int) {
+	ws := s.workspaces.Listed()
+	perWorkspace, total := s.epics.NeedsYouCounts()
+	for i := range ws {
+		ws[i].NeedsYou = perWorkspace[ws[i].Name]
+	}
+	return ws, total
+}
+
 // Epic finds the epic behind a `project:epic` key.
 func (d workspacesDirectory) Epic(key string) (tickets.Epic, bool) {
 	project, name, ok := tickets.ParseEpicAddress(key)
