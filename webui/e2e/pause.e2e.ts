@@ -29,7 +29,7 @@ test.describe("3. Pause reasons and recovery", () => {
 
     // Repair: the card counts the other pauses and keeps "Fix it with an agent" below the link.
     await expect(pausedCard.getByText(/\+6 more/)).toBeVisible();
-    await page.getByRole("link", { name: "paused-epic" }).click();
+    await page.getByRole("link", { name: "paused-epic", exact: true }).click();
     await expect(page.getByText("needs-repair · Run failed").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Fix it with an agent" })).toHaveCount(3);
     const repair = page
@@ -159,7 +159,7 @@ test.describe("55. Fix it with an agent", () => {
     await fixture.cli("server", "queue", "add", "demo:paused-epic");
     const before = (await sessions(fixture)).length;
 
-    await page.getByRole("link", { name: "paused-epic" }).click();
+    await page.getByRole("link", { name: "paused-epic", exact: true }).click();
     await openFixDialog(page);
     await expect(fixDialog(page).getByText(fixPrompt)).toBeVisible();
     await fixDialog(page).getByRole("button", nav("Copy")).click();
@@ -189,7 +189,7 @@ test.describe("116. Retry on a question menu", () => {
   test("Retry lifts the pause", async ({ page, start }) => {
     await start("blocked-menu");
 
-    await page.getByRole("link", { name: "menu-epic" }).click();
+    await page.getByRole("link", { name: "menu-epic", exact: true }).click();
     await expect(page.getByText("needs answer").first()).toBeVisible(dwell);
     await page.locator('a[href$="/t/demo:menu-epic/01"]').filter({ hasNotText: "→" }).click();
 
@@ -207,7 +207,7 @@ test.describe("56. Fix it with an agent, remote control", () => {
     const fixture = await start("paused", { config: { "agents.fix-agent-remote-control": "true" } });
     await fixture.cli("server", "queue", "add", "demo:paused-epic");
 
-    await page.getByRole("link", { name: "paused-epic" }).click();
+    await page.getByRole("link", { name: "paused-epic", exact: true }).click();
     await openFixDialog(page);
     await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
     await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab or in the Claude app")).toBeVisible();

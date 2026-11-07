@@ -1,12 +1,12 @@
 import type { Page } from "@playwright/test";
 // Flow 96 moved to AgentsPage.sessionView.test.tsx; flow 98 merged into flow 85 (agents-create.e2e.ts).
-import { created, createButton, go, newForm, projectSelect, promptBox, sessions } from "./agentsKit";
+import { created, createButton, go, newForm, openNewAgent, projectSelect, promptBox, sessions } from "./agentsKit";
 import { expect, flag, test } from "./fixture";
 
 const tierSelect = (page: Page) => newForm(page).getByRole("combobox", { name: "Tier" });
 
 const newSession = async (page: Page) => {
-  await page.getByRole("button", { name: "+ New session", exact: true }).click();
+  await openNewAgent(page);
   await expect(projectSelect(page)).toHaveValue("demo");
 };
 

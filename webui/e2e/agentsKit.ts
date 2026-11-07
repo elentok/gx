@@ -19,14 +19,14 @@ export const row = (page: Page, s: SessionInfo) => page.locator(`a[href$="/agent
 /** The shell sidebar every page shares; the Agents page has no list of its own. */
 export const sidebar = (page: Page) => page.getByRole("complementary", { name: "Sidebar", exact: true });
 
-/** Opens the New session form from the footer "+ New" menu, sliding the sidebar open first on a phone. */
+/** Opens the New session form from the footer "+ New" menu ("New chat"), sliding the sidebar open first on a phone. */
 export async function openNewAgent(page: Page, project?: string) {
   const show = page.getByRole("button", { name: "Show sidebar", exact: true });
   const add = sidebar(page).getByRole("button", { name: "+ New", exact: true });
   await add.or(show).first().waitFor();
   if (await show.isVisible()) await show.click();
   await add.click();
-  await page.getByRole("menuitem", { name: /^New agent/ }).click();
+  await page.getByRole("menuitem", { name: /^New chat/ }).click();
   await expect(newForm(page)).toBeVisible();
   if (project) await projectSelect(page).selectOption(project);
 }

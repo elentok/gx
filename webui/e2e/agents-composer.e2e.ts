@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { SessionInfo } from "../src/generated/server";
 import { expect, nav, test, type Fixture } from "./fixture";
-import { ask, chatOf, composer, created, freshVisit, go, messageBox, REPLY, sendButton, sessions } from "./agentsKit";
+import { ask, chatOf, composer, created, freshVisit, go, messageBox, moreActions, REPLY, sendButton, sessions } from "./agentsKit";
 
 test("76. Send and draft", async ({ page, start }) => {
   const fixture = await start("agents-promote");
@@ -29,7 +29,7 @@ test("76. Send and draft", async ({ page, start }) => {
     const session = (await plainIdle(fixture, harness)).withMessages[0];
     await go(page, `#/agents/${session.id}`);
     await messageBox(page).fill(draft);
-    await promoteButton(page).click();
+    await promote(page);
     await expect.poll(() => fixture.cli("agents", "chat", session.id)).toContain(command);
     await expect(messageBox(page)).toHaveValue(draft);
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -132,7 +132,11 @@ test("93. Shared draft", async ({ page, start }) => {
   await agentsPage.close();
 });
 
-const promoteButton = (page: Page) => page.getByRole("button", { name: "Promote to Design", exact: true });
+/** Opens the header "..." menu and clicks its Promote to Design item. */
+async function promote(page: Page) {
+  await moreActions(page).click();
+  await page.getByRole("menu", nav("More actions")).getByRole("menuitem", { name: "Promote to Design", exact: true }).click();
+}
 
 /** Idle plain sessions of one harness, split by whether their chat has a message. */
 async function plainIdle(fixture: Fixture, harness: "claude" | "codex") {

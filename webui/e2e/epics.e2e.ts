@@ -111,7 +111,7 @@ test("6. Queue an epic, and outside changes show up", async ({ page, start }) =>
 
   const release = await holdRoute(page, "**/v1/queue/add");
   await card(page, "ready-epic").getByRole("button", nav("Queue")).click();
-  await expect(card(page, "ready-epic").getByRole("button")).toBeDisabled();
+  await expect(card(page, "ready-epic").getByRole("button", nav("Queueing…"))).toBeDisabled();
   release();
 
   await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);

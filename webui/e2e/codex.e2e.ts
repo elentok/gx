@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { created, createButton, go, newForm, promptBox, sessions } from "./agentsKit";
+import { created, createButton, go, moreActions, newForm, openNewAgent, promptBox, sessions, sidebar } from "./agentsKit";
 import { expect, nav, openMenu, test } from "./fixture";
 
 async function openAgentsSettings(page: Page) {
@@ -53,17 +53,20 @@ test("117. Default harness setting", async ({ page, start }) => {
   // The new session starts on the Default harness; the form has no harness picker.
   const before = await sessions(fixture);
   await go(page, "#/agents");
-  await page.getByRole("button", { name: "+ New session", exact: true }).click();
+  await openNewAgent(page);
   await expect(newForm(page).getByRole("combobox", { name: "Harness" })).toHaveCount(0);
   await promptBox(page).fill("hello codex");
   await createButton(page).click();
   const fresh = await created(fixture, before);
   expect(fresh.harness).toBe("codex");
+  // The drawer that opened for "+ New" stays open over the page on a phone; a hash change does not close it.
+  await sidebar(page).getByRole("button", { name: "Hide sidebar", exact: true }).click();
+  await expect(page.getByTestId("scrim")).toHaveCount(0);
 
   // On a phone the header reads the model name alone; the menu's Agent block holds the tier and effort, and a model switched by hand says so.
   const label = (s: { id: string }) => go(page, `#/agents/${s.id}`);
   const menu = async () => {
-    await page.getByRole("button", nav("More actions")).click();
+    await moreActions(page).click();
     return page.getByRole("menu", nav("More actions"));
   };
   const closeMenu = async () => {
@@ -188,7 +191,7 @@ const dwell = { timeout: 30_000 };
 const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: true });
 
 async function openBlockedTicket(page: Page, epic: string) {
-  await page.getByRole("link", { name: epic }).click();
+  await page.getByRole("link", { name: epic, exact: true }).click();
   await expect(page.getByText("needs answer").first()).toBeVisible(dwell); // oldword:ok the kept legacy rendered status
   await page.locator(`a[href$="/t/demo:${epic}/01"]`).filter({ hasNotText: "→" }).click();
   await expect(stuck(page)).toBeVisible();
@@ -197,7 +200,7 @@ async function openBlockedTicket(page: Page, epic: string) {
 
 test("121. Codex error pause", async ({ page, start }) => {
   await start("codex-error");
-  await page.getByRole("link", { name: "codex-error-epic" }).click();
+  await page.getByRole("link", { name: "codex-error-epic", exact: true }).click();
   await expect(page.getByText("needs answer").first()).toBeVisible(dwell); // oldword:ok the kept legacy rendered status
   await page.locator('a[href$="/t/demo:codex-error-epic/01"]').filter({ hasNotText: "→" }).click();
 
@@ -217,7 +220,7 @@ test("122. Codex design run", async ({ page, start }) => {
   const meta = page.getByTestId("page-header-meta");
   await expect(meta).toHaveText(/^Codex \S+ · \S+$/);
   await expect(meta).not.toContainText(/Light|Worker|Strongest/);
-  await page.getByRole("button", nav("More actions")).click();
+  await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).click();
   await expect(page.getByRole("menu", nav("More actions")).getByText(/^(Light|Worker|Strongest)$/)).toBeVisible();
   await page.keyboard.press("Escape");
 
