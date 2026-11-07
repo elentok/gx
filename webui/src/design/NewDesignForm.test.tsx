@@ -742,6 +742,23 @@ test("Name this draft, Done: the label shows the name and the save carries it", 
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "a", slug: "alpha", name: "Checkout" }));
 });
 
+test("the title follows the name field while typing, before Done", async () => {
+  await mount({ drafts: twoDrafts().client });
+  await openMenu(/alpha/);
+  await pick("Name this draft");
+  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "Check" } });
+  expect(screen.getByRole("button", { name: /Check/ })).toBeTruthy();
+  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "" } });
+  expect(screen.queryByRole("button", { name: /Check/ })).toBeNull();
+});
+
+test("a saved draft shows Saved right after a switch, with no edit", async () => {
+  await mount({ drafts: twoDrafts().client });
+  await openMenu(/alpha/);
+  await pick(/beta/);
+  expect(screen.getByText("Saved")).toBeTruthy();
+});
+
 test("a name on a blank draft saves it", async () => {
   const { save } = await mount();
   await openMenu(/New draft/);

@@ -254,7 +254,7 @@ function DraftForm({
   }));
   const [movedFrom] = useState(() => (initial && !kept && initial.project ? initial.project : undefined));
   const [moved, setMoved] = useState(movedFrom !== undefined);
-  const [status, setStatus] = useState<SaveStatus>(restored === "unsaved" ? "unsaved" : "none");
+  const [status, setStatus] = useState<SaveStatus>(restored === "unsaved" ? "unsaved" : initial?.id && !restored ? "saved" : "none");
   const [confirming, setConfirming] = useState(false);
   const [name, setName] = useState(initial?.name);
   // The name field under the title row; `undefined` is closed.
@@ -553,7 +553,9 @@ function DraftForm({
   };
 
   const hasWork = hasText(draft) || !!name || imgs.count > 0;
-  const label = draft.slug || draft.idea || name ? draftLabel({ name, ...draft }) : draftLabel();
+  // The title follows the name field while it is open.
+  const shownName = naming !== undefined ? naming.trim() || undefined : name;
+  const label = draft.slug || draft.idea || shownName ? draftLabel({ name: shownName, ...draft }) : draftLabel();
   const reason = !draft.slug.trim()
     ? "Name the epic to start."
     : !draft.idea.trim()
