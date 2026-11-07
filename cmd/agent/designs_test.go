@@ -97,8 +97,11 @@ func TestDesignsOpen_FailedStart(t *testing.T) {
 	if err == nil {
 		t.Fatal("text mode: err = nil, want non-zero exit")
 	}
-	if !strings.HasPrefix(out.String(), "proj:fresh-idea\n") || strings.Count(out.String(), "\n") < 2 {
-		t.Errorf("text output = %q, want the address then the start error", out.String())
+	if out.String() != "proj:fresh-idea\n" {
+		t.Errorf("text output = %q, want only the address (the error carries the start error)", out.String())
+	}
+	if !strings.Contains(err.Error(), "proj:fresh-idea") {
+		t.Errorf("err = %q, want it to name the design and the start error", err)
 	}
 
 	req.Epic = "other-idea"

@@ -112,7 +112,7 @@ func runDesignsOpen(ctx context.Context, cl *apiclient.Client, w io.Writer, json
 	// A New Design whose map was written but whose session did not start is a
 	// failure in text mode; --json carries epic_created and start_error at exit 0.
 	if err == nil && !jsonOut && !res.Refused && res.EpicCreated && res.StartError != "" {
-		if _, werr := fmt.Fprintf(w, "%s:%s\n%s\n", req.Project, req.Epic, res.StartError); werr != nil {
+		if _, werr := fmt.Fprintf(w, "%s:%s\n", req.Project, req.Epic); werr != nil {
 			return werr
 		}
 		return fmt.Errorf("design %s:%s was created but its session did not start: %s", req.Project, req.Epic, res.StartError)
