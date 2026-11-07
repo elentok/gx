@@ -72,8 +72,17 @@ export function useDetail<T>(
     const off = conn.onEvent((a) => {
       if (a === address || (watchPrefix && a?.startsWith(watchPrefix))) refetch();
     });
+    // Events sent while the stream was down never reach `onEvent`, so a reopened stream refetches.
+    // The first stream replays from the snapshot, so it misses nothing.
+    let streams = conn.getState().streams;
+    const offState = conn.subscribe(() => {
+      const next = conn.getState().streams;
+      if (streams > 0 && next > streams) refetch();
+      streams = next;
+    });
     return () => {
       off();
+      offState();
       latest.current++;
     };
   }, [address, conn, refetch, watchPrefix]);

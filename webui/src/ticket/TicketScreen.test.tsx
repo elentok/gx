@@ -117,6 +117,26 @@ test("a launch step change re-renders the ticket page with no reload", async () 
   expect(screen.queryByText(/installing dependencies/)).toBeNull();
 });
 
+test("a ticket page refetches when the event stream reopens, since events sent while it was down never reached it", async () => {
+  const subscribers: (() => void)[] = [];
+  const reState = { ...state, streams: 1 } as unknown as ConnectionState;
+  const reConn = { getState: () => reState, subscribe: (l: () => void) => (subscribers.push(l), () => {}), onEvent: () => () => {} } as unknown as Connection;
+  let current: TicketDetail = { ...base, status: "claimed", stats: { ...base.stats, launch_step: { label: "sending prompt", position: 4, total: 4 } } };
+  const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail: current });
+  const router = createMemoryRouter(appRoutes({ ticket: fetchDetail }), { initialEntries: ["/t/gx:demo/12"] });
+  renderThemed(
+    <ConnectionContext.Provider value={reConn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  );
+  await screen.findByText("Launching: sending prompt (4/4)");
+
+  current = { ...base, status: "claimed" };
+  reState.streams = 2;
+  subscribers.forEach((l) => l());
+  await vi.waitFor(() => expect(screen.queryByText(/Launching/)).toBeNull());
+});
+
 test("the ticket page shows the ticket's verdict under the header,and nothing without a pending row", async () => {
   const mine: PendingRow = { address: "gx:demo/12", agent: "", verdict: "disk low", reason: "/tmp has 5G free" };
   await renderTicket(base, undefined, [{ ...mine, address: "gx:demo/13", verdict: "concurrency cap" }]);
