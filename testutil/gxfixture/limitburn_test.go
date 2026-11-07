@@ -262,8 +262,11 @@ func TestLimitBurnFixture_AppendedTokenCountSavesACodexSample(t *testing.T) {
 	if rollout == "" {
 		t.Fatalf("no rollout under %s", r.CodexSessionsDir)
 	}
+	// The history ignores a reading not newer than the seeded sample's received-at,
+	// and the fixture starts fast enough to share that second with the wall clock.
+	seen := time.Unix(readSeededHistory(t, r.StateDir).Latest[wire.LimitIDCodexWeekly].ReceivedAt+2, 0)
 	line := fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":55,"window_minutes":10080,"resets_at":%d}}}}`+"\n",
-		time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), time.Now().Add(72*time.Hour).Unix())
+		seen.UTC().Format("2006-01-02T15:04:05.000Z"), time.Now().Add(72*time.Hour).Unix())
 	f, err := os.OpenFile(rollout, os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		t.Fatal(err)

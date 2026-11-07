@@ -210,6 +210,7 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 		if err := f.seedLimitBurn(shape); err != nil {
 			return fmt.Errorf("seed limit burn: %w", err)
 		}
+		f.env = append(f.env, "GX_USAGE_POLL_INTERVAL="+limitBurnUsagePollInterval)
 	}
 	if sc.RateLimitFromUsage {
 		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s")

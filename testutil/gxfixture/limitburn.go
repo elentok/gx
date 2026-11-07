@@ -23,6 +23,8 @@ const (
 	liveMapEpic   = "design-epic"
 	// liveTokenPollInterval is short so a usage line appended by a flow shows within a second or two.
 	liveTokenPollInterval = "1s"
+	// limitBurnUsagePollInterval is short so the usage scan sees a line appended to a held agent's rollout well inside a test's wait.
+	limitBurnUsagePollInterval = "1s"
 )
 
 // limitBurnLive replaces the limit-burn scenario for --shape live: one held
