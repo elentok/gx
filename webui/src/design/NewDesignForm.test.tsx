@@ -589,3 +589,40 @@ test("Start while Not saved leaves no entry, so no draft comes back", async () =
   cleanup();
   expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
 });
+
+const LEGACY_KEY = "gx.newDesign.draft";
+
+test("a stored legacy draft with text becomes a server draft with its project and the key is gone", async () => {
+  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: "old", idea: "old idea", project: "blog" }));
+  const { save } = await mount();
+  expect(save).toHaveBeenCalledWith({ project: "blog", slug: "old", idea: "old idea", revision: 0 });
+  expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+});
+
+test("a refused legacy move keeps the key and the next open retries it", async () => {
+  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: "old", idea: "", project: "blog" }));
+  const base = fakeDrafts();
+  const refuse = vi.fn(async (): Promise<DraftResult> => ({ kind: "conflict" }));
+  await mount({ drafts: { ...base.client, save: refuse } });
+  expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull();
+  cleanup();
+  await mount({ drafts: base.client });
+  expect(base.save).toHaveBeenCalledTimes(1);
+  expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+});
+
+test("a legacy key with no text is deleted and creates nothing", async () => {
+  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: " ", idea: "", project: "blog" }));
+  const { save } = await mount();
+  expect(save).not.toHaveBeenCalled();
+  expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+});
+
+test("a second open after a successful move creates nothing", async () => {
+  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: "old", idea: "x", project: "gx" }));
+  const base = fakeDrafts();
+  await mount({ drafts: base.client });
+  cleanup();
+  await mount({ drafts: base.client });
+  expect(base.save).toHaveBeenCalledTimes(1);
+});
