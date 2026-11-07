@@ -1,4 +1,4 @@
-import { Box, chakra, Image } from "@chakra-ui/react";
+import { Box, chakra, Image, Portal } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -167,7 +167,7 @@ export function AppShell({
           maxW="100vw"
           h="100dvh"
           flex="none"
-          overflowY="auto"
+          overflow="hidden"
           zIndex="modal"
           {...(docked
             ? {
@@ -252,27 +252,31 @@ export function AppShell({
             m="0"
             p="0"
             flex="1"
+            minH="0"
+            overflowY="auto"
             data-testid="sidebar-body"
           >
             <SidebarRows fetcher={fetchEpicList} active={active} />
           </Box>
           <SidebarFooter onNewWorkspace={() => setNewWorkspace(true)} />
-          {manageWorkspaces && (
-            <ManageWorkspaces
-              workspaces={workspaces}
-              onClose={() => setManageWorkspaces(false)}
-            />
-          )}
-          {newWorkspace && (
-            <NewWorkspaceDialog
-              create={createWorkspace}
-              onClose={() => setNewWorkspace(false)}
-              onCreated={(name) => {
-                setCreated(name);
-                setNewWorkspace(false);
-              }}
-            />
-          )}
+          <Portal>
+            {manageWorkspaces && (
+              <ManageWorkspaces
+                workspaces={workspaces}
+                onClose={() => setManageWorkspaces(false)}
+              />
+            )}
+            {newWorkspace && (
+              <NewWorkspaceDialog
+                create={createWorkspace}
+                onClose={() => setNewWorkspace(false)}
+                onCreated={(name) => {
+                  setCreated(name);
+                  setNewWorkspace(false);
+                }}
+              />
+            )}
+          </Portal>
         </Box>
         <Box flex="1" minW="0">
           <Strips />

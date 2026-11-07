@@ -64,7 +64,7 @@ export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: 
   const unhealthy = !!health && [health.cpu, health.memory, health.disk].some((m) => m.state === "high" || m.state === "critical");
   const needsYou = snapshot?.needs_you_total ?? 0;
   return (
-    <Box as="footer" display="flex" alignItems="center" gap="1" p="2" borderTopWidth="1px" borderColor="border">
+    <Box as="footer" flex="none" display="flex" alignItems="center" gap="1" p="2" borderTopWidth="1px" borderColor="border">
       <Menu.Root positioning={{ placement: "top-start" }} lazyMount unmountOnExit>
         <Menu.Trigger asChild>
           <chakra.button type="button" h="34px" px="3" borderRadius="8px" bg="surface.raised" borderWidth="1px" borderColor="hairline" color="text" cursor="pointer">
@@ -112,8 +112,10 @@ export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: 
         </Indicator>
       )}
       <GearMenu />
-      {dialog === "design" && <DesignDialog onClose={() => setDialog(null)} />}
-      {dialog === "agent" && <AgentDialog onClose={() => setDialog(null)} />}
+      <Portal>
+        {dialog === "design" && <DesignDialog onClose={() => setDialog(null)} />}
+        {dialog === "agent" && <AgentDialog onClose={() => setDialog(null)} />}
+      </Portal>
     </Box>
   );
 }
