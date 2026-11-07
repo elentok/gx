@@ -74,7 +74,7 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
                 <MenuSwitch on={viMode} />
               </Menu.CheckboxItem>
               <Menu.Separator />
-              <Menu.Item value="settings" asChild {...itemStyle}>
+              <Menu.Item value="settings" asChild closeOnSelect {...itemStyle}>
                 <a href={SETTINGS_HREF}>Settings</a>
               </Menu.Item>
               <Menu.Item value="restart" closeOnSelect onClick={() => setRestartOpen(true)} {...itemStyle}>

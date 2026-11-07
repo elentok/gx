@@ -46,7 +46,7 @@ test("102. Login (+103 rate limit, +104 certificate help)", async ({ page, start
   await signIn(page, fixture.password, await fixture.nextTotpCode());
   await expect(page.getByRole("heading", { name: "Sign in" })).toHaveCount(0);
   expect(page.url()).toMatch(/#\/stats$/);
-  await expect(page.getByRole("link", { name: "Stats", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Stats and health", exact: true })).toBeVisible();
 
   // 103: rate limit, last
   const context = await browser.newContext({ ignoreHTTPSErrors: true });

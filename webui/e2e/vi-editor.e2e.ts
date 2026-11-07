@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { composer, go, messageBox, sessions } from "./agentsKit";
-import { card, expect, type Fixture, menu, menuButton, nav, test, touch } from "./fixture";
+import { card, expect, type Fixture, menu, menuButton, nav, openMenu, test, touch } from "./fixture";
 
 // Most vi-editor behaviour (open keys, closers, Done, backdrop, mode text, bar, vim motions and
 // edits) is covered in vitest under src/ui/expandable-text. These flows keep what needs a real
@@ -11,10 +11,13 @@ const TOLERANCE = 1;
 // `gx vimode` changes the server; the page follows, which the menu switch shows.
 const setViMode = async (fixture: Fixture, page: Page, on: boolean) => {
   await fixture.cli("vimode", on ? "on" : "off");
-  await menuButton(page).click();
+  await openMenu(page);
   await expect(menuSwitch(page)).toHaveAttribute("aria-checked", String(on));
   await menuButton(page).click();
   await expect(menu(page)).toHaveCount(0);
+  // A sidebar that slid over a narrow page would block the page behind its scrim.
+  if (await page.getByTestId("scrim").isVisible()) await page.getByRole("button", nav("Hide sidebar")).click();
+  await expect(page.getByTestId("scrim")).toHaveCount(0);
 };
 
 type Locator = ReturnType<Page["getByRole"]>;
@@ -322,9 +325,9 @@ test.describe("126. Vi editor: layers and focus", () => {
     await expect(editor).toBeVisible();
     await expect(again).toBeVisible();
 
-    // Last, so a failure here hides nothing above. The editor's backdrop starts below the top bar,
-    // so the press lands beside the 860px panel, mid-height, not in the corner.
-    await page.mouse.click(5, 450);
+    // Last, so a failure here hides nothing above. The press lands beside the 860px panel, mid-height,
+    // on the right edge: the docked sidebar covers the left one.
+    await page.mouse.click(page.viewportSize()!.width - 5, 450);
     await expect(editor).toHaveCount(0);
     await expect(again).toBeVisible();
   });

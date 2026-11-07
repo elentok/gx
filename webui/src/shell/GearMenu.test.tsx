@@ -45,6 +45,12 @@ test("the AFK and Vi mode items post the opposite of the snapshot", async () => 
   await waitFor(() => expect(postViMode).toHaveBeenCalledWith(true));
 });
 
+test("choosing Settings closes the menu", async () => {
+  setup();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Settings" }));
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+});
+
 test("Restart server opens the restart dialog", async () => {
   setup();
   fireEvent.click(await screen.findByRole("menuitem", { name: "Restart server" }));

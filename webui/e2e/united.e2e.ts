@@ -114,9 +114,8 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await fixture.cli("server", "queue", "add", "demo:queued-epic");
   await expect(queuedTime).toHaveText("<1m");
 
-  // 28: AFK and Vi mode flip over SSE; the Paused chip follows `queue pause`.
-  const bar = page.getByRole("navigation");
-  const paused = bar.getByText("Paused", { exact: true });
+  // 28: AFK and Vi mode flip over SSE; the footer's paused icon follows `queue pause`.
+  const paused = page.getByRole("img", nav("Server queue is paused"));
   await expect(paused).toHaveCount(0);
   await menuButton(page).click();
   await expect(afkItem(page)).toHaveAttribute("aria-checked", "false");

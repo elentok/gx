@@ -38,6 +38,8 @@ test("81. Tray popover (and 82. Tray offline)", async ({ page, start }) => {
   await expect(dialog).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 800 });
+  // The footer lives in the sidebar, which slides over on a phone.
+  await page.getByRole("button", nav("Show sidebar")).click();
   await tray(page).click();
   await expect(dialog).toBeVisible();
   // One evaluate measures everything at the same instant, so the open animation's scale cancels out.
@@ -66,7 +68,10 @@ test("81. Tray popover (and 82. Tray offline)", async ({ page, start }) => {
   await expect(dialog.locator('[data-part="cpu"]')).toContainText("75% busy");
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
+  const offline = page.getByRole("img", nav("Disconnected from the server"));
+  await expect(offline).toHaveCount(0);
   await fixture.stopServer();
+  await expect(offline).toBeVisible();
   await expect(tray(page)).toHaveAttribute("data-stale", "");
   await expect(tray(page)).toHaveCSS("opacity", "0.45");
   await expect(meter(page, "C")).toHaveAttribute("data-state", "high");

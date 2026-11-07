@@ -1,9 +1,9 @@
 import type { Page } from "@playwright/test";
 import { created, createButton, go, newForm, promptBox, sessions } from "./agentsKit";
-import { expect, menuButton, nav, test } from "./fixture";
+import { expect, nav, openMenu, test } from "./fixture";
 
 async function openAgentsSettings(page: Page) {
-  await menuButton(page).click();
+  await openMenu(page);
   await page.getByRole("menuitem", nav("Settings")).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   const row = page.getByRole("link", { name: /^Agents Default:/ });
@@ -18,7 +18,8 @@ const projectRow = (page: Page, project: string) =>
 
 test("117. Default harness setting", async ({ page, start }) => {
   const fixture = await start("default-harness");
-  await page.setViewportSize({ width: 640, height: 900 });
+  // Below the 640px breakpoint: the header reads as on a phone.
+  await page.setViewportSize({ width: 600, height: 900 });
   await openAgentsSettings(page);
 
   await expect(control(page).getByRole("button", { name: "Claude" })).toHaveAttribute("aria-pressed", "true");
