@@ -193,7 +193,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/projects/` holds the project `Registry`, the start-up `Migrator` and `Checks`, with their
   routes, the scratch and outbox projects and `AgentEnv` (imports `index`, `runs`, `settings` and
   `wire`; `cmd` imports it too); `server/queue/` holds the queue and its pause gate, the Queue agent
-  rows, AFK and vi mode, and the one-offs (submit, sweep, `IsOneOffEpic`), with their routes
+  rows, AFK and vi mode, and the one-offs (submit, sweep; the predicates `IsOneOffEpic` and `EpicAddress` live in `tickets`), with their routes
   (imports `index`, `projects`, `runs`, `broker` and `wire`; the root implements `Host`; `cmd`
   imports it too); `server/harness/` holds the harness and runner choice (resolution order, Default
   harness, labels, missing-program checks, runner selection) and the `/v1/settings/agents` routes

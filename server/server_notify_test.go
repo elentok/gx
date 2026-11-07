@@ -430,7 +430,7 @@ func TestNotifyDone_EpicTicketFeedsTheNextProgressOneOffStaysOut(t *testing.T) {
 	}
 	merged := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement, ElapsedTime: 332, ActualCost: 1.5})
 	write("epic", "02-next.md", schema.Ticket{ID: "02", Status: schema.StatusOpen, Type: schema.TypeImplement})
-	oneOff := write("cron", queue.OneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt, ElapsedTime: 99})
+	oneOff := write("cron", tickets.OneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt, ElapsedTime: 99})
 	if !s.registry.PutIfAbsent(runs.TrackedRun{Run: runs.Run{Address: "p:epic/02"}}) {
 		t.Fatal("run not registered")
 	}

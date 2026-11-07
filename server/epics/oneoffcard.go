@@ -17,7 +17,7 @@ import (
 // oneOffCards lists the cards of e's one-off tickets, none when e holds none. A
 // done or archived one-off gets a Finished card; capFinishedOneOffs trims those.
 func (s *Epics) oneOffCards(project string, e tickets.Epic, qidx queueIndex) []wire.EpicListRow {
-	if !queue.IsOneOffEpic(e) {
+	if !tickets.IsOneOffEpic(e) {
 		return nil
 	}
 	var rows []wire.EpicListRow

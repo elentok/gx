@@ -2,7 +2,6 @@ package queue
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -29,13 +28,6 @@ func (r TicketRef) Address(t tickets.Ticket) string {
 // TicketAddress is the canonical address of ticket id under the root.
 func (r RootRef) TicketAddress(id string) string {
 	return tickets.Address{Project: r.Project, Epic: r.Epic, ID: id}.String()
-}
-
-// EpicAddress is the "project:epic" part of a ticket address, whatever project
-// the session itself runs in.
-func EpicAddress(addr string) string {
-	epicPart, _, _ := strings.Cut(addr, "/")
-	return epicPart
 }
 
 // MapProgress is a map's current Progress step. It comes from the epic's

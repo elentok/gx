@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/ralphloop/agent"
-	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/tickets"
 	"io/fs"
 	"net/http"
 	"os"
@@ -591,7 +591,7 @@ func (mg *Manager) UpdateSessionMeta(dir, id string, change func(*Meta) bool) er
 		mg.sessionGone(id)
 	}
 	if exited && meta.Design {
-		if project, epic, ok := strings.Cut(queue.EpicAddress(meta.Ticket), ":"); ok {
+		if project, epic, ok := strings.Cut(tickets.EpicAddress(meta.Ticket), ":"); ok {
 			time.Sleep(mg.cfg.SessionExitCleanupDelay)
 			mg.designs.CleanupDesign(project, epic)
 		}

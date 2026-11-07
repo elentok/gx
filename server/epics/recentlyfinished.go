@@ -18,7 +18,7 @@ import (
 // time. A cancelled one-off carries no stamp and never counts.
 func finishedOneOffs(project string, e tickets.Epic) []wire.FinishedEpic {
 	epic := filepath.Base(e.Path)
-	if !queue.IsOneOffsEpicName(epic) {
+	if !tickets.IsOneOffsEpicName(epic) {
 		return nil
 	}
 	var out []wire.FinishedEpic
@@ -50,7 +50,7 @@ func RecentlyFinished(loaded map[string][]tickets.Epic, limit int) []wire.Finish
 	for dir, epics := range loaded {
 		project := tickets.ProjectName(dir)
 		for _, e := range epics {
-			if e.IsMap || e.CompletedAt.IsZero() || queue.IsOneOffsEpicName(filepath.Base(e.Path)) {
+			if e.IsMap || e.CompletedAt.IsZero() || tickets.IsOneOffsEpicName(filepath.Base(e.Path)) {
 				continue
 			}
 			f := wire.FinishedEpic{

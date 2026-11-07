@@ -20,7 +20,7 @@ const followUpsEpicName = "follow-ups"
 // epicListed reports whether the Epics page can show e: one-offs, follow-ups
 // and archived epics are never listed.
 func epicListed(e tickets.Epic) bool {
-	return e.Name != followUpsEpicName && !strings.HasSuffix(e.Name, "-archived") && !queue.IsOneOffEpic(e)
+	return e.Name != followUpsEpicName && !strings.HasSuffix(e.Name, "-archived") && !tickets.IsOneOffEpic(e)
 }
 
 // epicListState is the one rule for a listed epic's state. A map has no

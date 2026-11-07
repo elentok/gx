@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -60,7 +59,7 @@ func (s *Store) HoldEpic(addr string, yes bool) (wire.HoldResult, error) {
 	var live []string
 	if t.design {
 		for _, si := range s.dir.Sessions() {
-			if si.Design && si.Status.State != wire.SessionExited && queue.EpicAddress(si.Ticket) == t.key {
+			if si.Design && si.Status.State != wire.SessionExited && tickets.EpicAddress(si.Ticket) == t.key {
 				live = append(live, si.ID)
 			}
 		}

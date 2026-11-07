@@ -109,7 +109,7 @@ func TestEpicsDeps_DesignActivitiesReadsTheSessionsFake(t *testing.T) {
 	d.Sessions = fakeSessions{list: []wire.SessionInfo{{Design: true, Ticket: "p:map/01"}}}
 	s := New(d)
 	got := s.designActivities()
-	if a := got[queue.EpicAddress("p:map/01")]; !a.running {
+	if a := got[tickets.EpicAddress("p:map/01")]; !a.running {
 		t.Fatalf("activities = %+v, want the map running", got)
 	}
 }

@@ -72,7 +72,7 @@ func decorateLoopCard(row *wire.EpicListRow, position int) {
 // queueKey is the queue slot key of an item address: its epic root, or the
 // ticket itself for a one-off.
 func queueKey(a tickets.Address) string {
-	if queue.IsOneOffsEpicName(a.Epic) {
+	if tickets.IsOneOffsEpicName(a.Epic) {
 		return a.String()
 	}
 	return queue.RootOf(a).String()

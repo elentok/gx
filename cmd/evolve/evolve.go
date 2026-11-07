@@ -16,7 +16,6 @@ import (
 	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/projects"
-	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sessionlookup"
@@ -218,7 +217,7 @@ func evolveCandidates(env evolveEnv, projectDir string, since time.Duration) ([]
 	cutoff := env.now().Add(-since)
 	var out []tickets.Epic
 	for _, e := range epics {
-		if e.IsMap || queue.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
+		if e.IsMap || tickets.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
 			continue
 		}
 		if e.CompletedAt.IsZero() || e.CompletedAt.Before(cutoff) {

@@ -306,7 +306,7 @@ func (s *Merger) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir s
 // notifyEpicOutcome sends the epic-level notice. A one-off skips it.
 func (s *Merger) notifyEpicOutcome(project, dir string, one ralphloop.OneIteration, e tickets.Epic, merged bool) {
 	// The epic, not one: a one-off's merge ticket is not its one-off file.
-	if !s.chat.Enabled() || queue.IsOneOffEpic(e) {
+	if !s.chat.Enabled() || tickets.IsOneOffEpic(e) {
 		return
 	}
 	elapsed, cost := schedule.EpicTotals(e)
@@ -320,7 +320,7 @@ func (s *Merger) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 // pause, or all-done with auto-ff-merge off. A refused submit is logged, never an error:
 // the dedupe key refuses a second live retro of the same epic.
 func (s *Merger) submitRetro(root queue.RootRef, projectDir string, e tickets.Epic) {
-	if e.IsMap || queue.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
+	if e.IsMap || tickets.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
 		return
 	}
 	pf, err := config.ReadProjectFile(projectDir)

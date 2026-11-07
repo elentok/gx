@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -71,7 +72,7 @@ func designActionable(text, ticket, agent string, final bool) (wire.SessionActio
 // DesignFinal reports whether the map behind a design ticket is at Branch or
 // Done, where no step follows. A map that cannot be read is not final.
 func (p *Prompt) DesignFinal(ticket string) bool {
-	addr := queue.EpicAddress(ticket)
+	addr := tickets.EpicAddress(ticket)
 	project, name, _ := strings.Cut(addr, ":")
 	epics, err := p.projects.Epics(project)
 	if err != nil {
