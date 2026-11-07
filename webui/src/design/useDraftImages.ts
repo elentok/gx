@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from "react";
-import { draftImageUrl, type RemoveDraftImage, type UploadDraftImage } from "./draftImageApi";
+import { draftImageUrl, MSG_DRAFT_GONE, type RemoveDraftImage, type UploadDraftImage } from "./draftImageApi";
 import { checkImages } from "./imageLimits";
 import type { ComposerImage } from "./useComposerImages";
 
@@ -131,7 +131,7 @@ export function useDraftImages({
   const images = entries.map((e): ComposerImage => {
     if (e.id) return { key: e.key, state: "ready", url: urlOf(e.id), canRetry: false };
     if (e.refused) return { key: e.key, state: "failed", message: e.refused, canRetry: false };
-    if (e.failed) return { key: e.key, state: "failed", message: e.failed, canRetry: true };
+    if (e.failed) return { key: e.key, state: "failed", message: e.failed, canRetry: e.failed !== MSG_DRAFT_GONE };
     return { key: e.key, state: "uploading", canRetry: false };
   });
   return {

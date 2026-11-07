@@ -742,6 +742,47 @@ test("Name this draft, Done: the label shows the name and the save carries it", 
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "a", slug: "alpha", name: "Checkout" }));
 });
 
+test("a name on a blank draft saves it", async () => {
+  const { save } = await mount();
+  await openMenu(/New draft/);
+  await pick("Name this draft");
+  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "Checkout" } });
+  await act(async () => void click("Done"));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: "Checkout", slug: "", idea: "" }));
+});
+
+test("switching away from a name-only draft keeps it", async () => {
+  const { client, remove } = twoDrafts({ slug: "", idea: "", name: "Checkout" });
+  await mount({ drafts: client });
+  await openMenu(/Checkout/);
+  await pick(/beta/);
+  expect(remove).not.toHaveBeenCalled();
+});
+
+test("New draft on a name-only draft creates a new draft", async () => {
+  const { client } = twoDrafts({ slug: "", idea: "", name: "Checkout" });
+  await mount({ drafts: client });
+  await openMenu(/Checkout/);
+  await pick("New draft");
+  expect(screen.queryByRole("button", { name: /Checkout/ })).toBeNull();
+});
+
+test("Discard on a name-only draft asks Keep or Discard", async () => {
+  const { client } = twoDrafts({ slug: "", idea: "", name: "Checkout" });
+  await mount({ drafts: client });
+  click("Discard");
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
+});
+
+test("the row trash of a name-only draft asks first", async () => {
+  const { client, remove } = twoDrafts();
+  const list = client.list;
+  await mount({ drafts: { ...client, list: async () => (await list()).map((d) => (d.id === "b" ? { ...d, slug: "", idea: "", name: "Named" } : d)) } });
+  await openMenu(/alpha/);
+  fireEvent.click(screen.getAllByRole("button", { name: "Delete draft" })[1]!);
+  expect(remove).not.toHaveBeenCalled();
+});
+
 /** twoDrafts whose list drops what `remove` was asked to delete. */
 function deletable(aText: Partial<DesignDraft> = {}) {
   const base = twoDrafts(aText);
@@ -951,7 +992,8 @@ test("a failure while away shows as a failed tile on return", async () => {
   await up.fail("Draft is gone");
   await openMenu(/beta/);
   await pick(/alpha/);
-  expect(screen.getByText("Draft is gone, tap to retry")).toBeTruthy();
+  expect(screen.getByText("Draft is gone")).toBeTruthy();
+  expect(screen.queryByText(/tap to retry/)).toBeNull();
 });
 
 test("Load theirs shows the server's image list", async () => {

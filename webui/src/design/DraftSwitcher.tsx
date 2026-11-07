@@ -126,7 +126,7 @@ export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename,
                         {d.project} · {d.image_count > 0 && `${d.image_count} ${d.image_count === 1 ? "image" : "images"} · `}{here ? "editing now" : `edited ${timeAgo(d.edited_at)}`}
                       </Text>
                     </chakra.button>
-                    <chakra.button type="button" aria-label="Delete draft" title="Delete draft" onClick={() => (d.slug.trim() || d.idea.trim() || d.image_count > 0 ? setAsked(d.id) : remove(d.id))} w="36px" h="36px" mr="6px" flexShrink="0" borderRadius="8px" color="text.dim" _hover={{ bg: "surface", color: "text" }}>
+                    <chakra.button type="button" aria-label="Delete draft" title="Delete draft" onClick={() => (d.slug.trim() || d.idea.trim() || d.name || d.image_count > 0 ? setAsked(d.id) : remove(d.id))} w="36px" h="36px" mr="6px" flexShrink="0" borderRadius="8px" color="text.dim" _hover={{ bg: "surface", color: "text" }}>
                       🗑
                     </chakra.button>
                   </>

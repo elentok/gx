@@ -309,7 +309,7 @@ function DraftForm({
     const fields = latest.current;
     const key = JSON.stringify(fields);
     if (key === s.synced && !nameDirty.current) return setStatus(s.id ? "saved" : "none");
-    if (!s.id && !fields.slug && !fields.idea) return setStatus("none");
+    if (!s.id && !fields.slug && !fields.idea && !s.name) return setStatus("none");
     let res;
     try {
       res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision, ...(key === unedited.current && { keep_edited_at: true }) });
@@ -462,8 +462,8 @@ function DraftForm({
     onClose();
   };
 
-  // Images keep a draft with no text from being blank.
-  const hasContent = () => hasText(latest.current) || imgs.count > 0;
+  // A name or images keep a draft with no text from being blank.
+  const hasContent = () => hasText(latest.current) || !!server.current.name || imgs.count > 0;
   /** Saves the open draft (a blank one is deleted instead), then calls `next` to open another. */
   const leaveDraft = async (next: () => Promise<void>) => {
     clearTimeout(timer.current);
@@ -552,6 +552,7 @@ function DraftForm({
     );
   };
 
+  const hasWork = hasText(draft) || !!name || imgs.count > 0;
   const label = draft.slug || draft.idea || name ? draftLabel({ name, ...draft }) : draftLabel();
   const reason = !draft.slug.trim()
     ? "Name the epic to start."
@@ -726,7 +727,7 @@ function DraftForm({
           </>
         ) : (
           <>
-            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) || imgs.count ?setConfirming(true) : discard())}>
+            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasWork ? setConfirming(true) : discard())}>
               Discard
             </Button>
             <Box flex="1" />
