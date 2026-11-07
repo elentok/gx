@@ -104,7 +104,14 @@ func TestReadChat_ImageWithoutSourceLineIsPlaceholder(t *testing.T) {
 
 func TestReadChat_PlainUserLineHasNoImages(t *testing.T) {
 	msgs := readLines(t, t.TempDir(), `{"type":"user","uuid":"u1","message":{"content":"hello [Image #1]"}}`)
-	if len(msgs) != 1 || msgs[0].Images != nil || msgs[0].Text != "hello" {
+	if len(msgs) != 1 || msgs[0].Images != nil || msgs[0].Text != "hello [Image #1]" {
+		t.Fatalf("msgs = %+v", msgs)
+	}
+}
+
+func TestReadChat_ChipInMiddleLeavesSingleSpace(t *testing.T) {
+	msgs := readLines(t, t.TempDir(), imageUserLine("p1", "look [Image #1] here", 1))
+	if len(msgs) != 1 || msgs[0].Text != "look here" {
 		t.Fatalf("msgs = %+v", msgs)
 	}
 }

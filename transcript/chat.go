@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -93,6 +94,7 @@ var (
 	commandOutputRE = regexp.MustCompile(`(?s)^<local-command-stdout>(.*?)</local-command-stdout>$`)
 	imageChipRE     = regexp.MustCompile(`\[Image #\d+\]`)
 	imageSourceRE   = regexp.MustCompile(`\[Image: source: ([^\]]+)\]`)
+	spaceRunRE      = regexp.MustCompile(` {2,}`)
 )
 
 // MaxCommandOutputBytes caps one output entry; a cut entry ends with
@@ -240,8 +242,15 @@ func resolveImages(msg *ChatMessage, meta chatLine, imagesDir string) {
 	}
 }
 
-// StripImageChips removes the "[Image #N]" chips from a prompt's text.
-func StripImageChips(text string) string { return imageChipRE.ReplaceAllString(text, "") }
+// StripImageChips removes the "[Image #N]" chips from the text of a prompt that
+// carries images, and collapses the run of spaces a chip leaves behind. Call it
+// only for such prompts: a person may have typed the literal text.
+func StripImageChips(text string) string {
+	if !imageChipRE.MatchString(text) {
+		return text
+	}
+	return spaceRunRE.ReplaceAllString(imageChipRE.ReplaceAllString(text, ""), " ")
+}
 
 // SavedImage maps a pasted image's source path to a saved image, or to a
 // placeholder when the path is outside imagesDir or the file is gone.
@@ -312,13 +321,15 @@ func (l chatLine) message() (ChatMessage, bool) {
 	}
 	var texts []string
 	var images []ChatImage
-	for _, b := range decodeContentBlocks(l.Message.Content) {
+	blocks := decodeContentBlocks(l.Message.Content)
+	hasImages := slices.ContainsFunc(blocks, func(b contentBlock) bool { return b.Type == "image" })
+	for _, b := range blocks {
 		switch {
 		case b.Type == "image" && l.Type == "user":
 			images = append(images, ChatImage{Placeholder: true})
 		case b.Type == "text":
 			t := b.Text
-			if l.Type == "user" {
+			if l.Type == "user" && hasImages {
 				t = StripImageChips(t)
 			}
 			if t = strings.TrimSpace(t); t != "" {

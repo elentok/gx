@@ -109,6 +109,25 @@ func TestReadChat_LineOverTenMBDoesNotBreakTheRead(t *testing.T) {
 	}
 }
 
+func TestReadChat_TypedChipWithoutImagesIsKept(t *testing.T) {
+	msgs := readImages(t, t.TempDir(), imageUserLine(t, text("fix [Image #1] please")))
+
+	if len(msgs) != 1 || msgs[0].Text != "fix [Image #1] please" {
+		t.Fatalf("msgs = %+v", msgs)
+	}
+}
+
+func TestReadChat_ChipInMiddleLeavesSingleSpace(t *testing.T) {
+	dir := t.TempDir()
+	a := savedPNG(t, dir, "img-1-aa110000.png")
+
+	msgs := readImages(t, dir, imageUserLine(t, append(imageWrapped(a, "data:x", 1), text("look [Image #1] here"))...))
+
+	if len(msgs) != 1 || msgs[0].Text != "look here" {
+		t.Fatalf("msgs = %+v", msgs)
+	}
+}
+
 func TestReadChat_CompactionThenImageMessageAndInjectedStaysHidden(t *testing.T) {
 	dir := t.TempDir()
 	a := savedPNG(t, dir, "img-1-aa110000.png")

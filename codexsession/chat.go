@@ -146,7 +146,10 @@ func ReadChat(r io.Reader, imagesDir string) (Chat, error) {
 		case p.Type == "message" && (p.Role == "assistant" || p.Role == "user"):
 			var texts []string
 			var images []transcript.ChatImage
-			inImage := false
+			inImage, hasImages := false, false
+			for _, c := range p.Content {
+				hasImages = hasImages || p.Role == "user" && (c.Type == "input_image" || imageOpenRE.MatchString(c.Text))
+			}
 			for _, c := range p.Content {
 				if p.Role == "user" {
 					if m := imageOpenRE.FindStringSubmatch(c.Text); m != nil {
@@ -166,7 +169,7 @@ func ReadChat(r io.Reader, imagesDir string) (Chat, error) {
 					}
 				}
 				t := c.Text
-				if p.Role == "user" {
+				if hasImages {
 					t = transcript.StripImageChips(t)
 				}
 				if t = strings.TrimSpace(t); t != "" && (p.Role == "assistant" || !IsInjected(t)) {
