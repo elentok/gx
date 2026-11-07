@@ -9,6 +9,7 @@ import { Strip } from "../ui/strip/Strip";
 import { useDevice, type Device } from "../useWide";
 import { MascotToggle } from "./MascotToggle";
 import { ShellContext, type Shell } from "./ShellContext";
+import { SidebarFooter } from "./SidebarFooter";
 
 /** The top bar's sticky offset reads this, so it sits below the strips. */
 export const SHELL_STRIPS_HEIGHT_VAR = "--shell-strips-height";
@@ -132,6 +133,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
             </chakra.button>
           </Box>
           <Box as="ul" listStyleType="none" m="0" p="0" flex="1" data-testid="sidebar-body" />
+          <SidebarFooter />
         </Box>
         <Box flex="1" minW="0">
           <Strips />
