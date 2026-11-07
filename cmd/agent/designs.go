@@ -18,7 +18,7 @@ import (
 // on a map epic.
 func NewDesigns(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "designs", Short: "map epics' design sessions owned by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newDesignsOpenCmd(d), newDesignsDeleteCmd(d), newDesignsWorktreeCmd(d))
+	cmd.AddCommand(newDesignsOpenCmd(d), newDesignsDeleteCmd(d), newDesignsWorktreeCmd(d), newDesignsDraftsCmd(d))
 	return cmd
 }
 

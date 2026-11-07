@@ -93,9 +93,11 @@ export interface DesignDraftItem {
 }
 /**
  * DesignDraftSaveRequest saves the text fields of a draft. Revision is the one
- * the caller last saw. It never carries the image list.
+ * the caller last saw. It never carries the image list. ID names the draft on
+ * the save route; the store takes the id separately.
  */
 export interface DesignDraftSaveRequest {
+  id?: string;
   project: string;
   slug: string;
   idea: string;
@@ -103,7 +105,14 @@ export interface DesignDraftSaveRequest {
   revision: number /* int */;
 }
 /**
- * DesignDraftSaveResult answers a text save. A refusal is a result: Reason is
+ * DesignDraftDeleteRequest deletes one draft.
+ */
+export interface DesignDraftDeleteRequest {
+  id: string;
+}
+/**
+ * DesignDraftSaveResult answers a text save, and a draft read (Draft set, or
+ * refused draft-gone) and delete (Deleted). A refusal is a result: Reason is
  * one of the ReasonDraft* constants. Deleted: the save left the draft empty and
  * removed it. Draft is set on a successful, non-deleting save.
  */

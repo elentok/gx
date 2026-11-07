@@ -23,6 +23,26 @@ func Routes(get func() *Designs) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().deleteWrite(w, r) },
 		},
 		{
+			Pattern: "GET /v1/designs/drafts",
+			Web:     wire.WebRead,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftList(w, r) },
+		},
+		{
+			Pattern: "GET /v1/designs/drafts/read",
+			Web:     wire.WebRead,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftRead(w, r) },
+		},
+		{
+			Pattern: "POST /v1/designs/drafts/save",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftSave(w, r) },
+		},
+		{
+			Pattern: "POST /v1/designs/drafts/delete",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftDelete(w, r) },
+		},
+		{
 			Pattern: "POST /v1/designs/worktree",
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().worktreeWrite(w, r) },
 		},

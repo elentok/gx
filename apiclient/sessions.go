@@ -46,6 +46,35 @@ func (s *Sessions) DesignWorktree(ctx context.Context, req wire.DesignWorktreeRe
 	return res, err
 }
 
+// DesignDrafts lists the New Design drafts, most recently edited first.
+func (s *Sessions) DesignDrafts(ctx context.Context) ([]wire.DesignDraftItem, error) {
+	var items []wire.DesignDraftItem
+	err := s.t.get(ctx, "/v1/designs/drafts", &items)
+	return items, err
+}
+
+// DesignDraft reads one draft. A gone draft is a refused result, not an error.
+func (s *Sessions) DesignDraft(ctx context.Context, id string) (wire.DesignDraftSaveResult, error) {
+	var res wire.DesignDraftSaveResult
+	err := s.t.get(ctx, "/v1/designs/drafts/read?id="+url.QueryEscape(id), &res)
+	return res, err
+}
+
+// SaveDesignDraft saves a draft's text fields against req.Revision. A stale
+// revision or a gone draft is a refused result, not an error.
+func (s *Sessions) SaveDesignDraft(ctx context.Context, req wire.DesignDraftSaveRequest) (wire.DesignDraftSaveResult, error) {
+	var res wire.DesignDraftSaveResult
+	err := s.t.post(ctx, "/v1/designs/drafts/save", req, &res)
+	return res, err
+}
+
+// DeleteDesignDraft deletes a draft. A draft already gone is not an error.
+func (s *Sessions) DeleteDesignDraft(ctx context.Context, id string) (wire.DesignDraftSaveResult, error) {
+	var res wire.DesignDraftSaveResult
+	err := s.t.post(ctx, "/v1/designs/drafts/delete", wire.DesignDraftDeleteRequest{ID: id}, &res)
+	return res, err
+}
+
 // FixAgent starts a fix agent for a ticket paused for repair. A refusal is a
 // result (Refused set), not an error.
 func (s *Sessions) FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error) {
