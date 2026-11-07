@@ -308,6 +308,14 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 	label := worktree.ConflictLabel(p.Ticket.Identifier)
 	prompt := agent.SkillPrompt(p.Agent, "gx-resolving-merge-conflicts", "")
 
+	// The feature worktree may have no installed web dependencies, and a
+	// resolver that cannot run the tests commits its hand-merge unverified.
+	installFor := OneIteration{Epic: p.FeatureBranch, ScratchDir: p.ScratchDir, Ticket: p.Ticket, Agent: p.Agent}
+	if err := installDepsIn(d, installFor, p.FeatureWorktree); err != nil {
+		reason := fmt.Sprintf("installing dependencies before conflict-resolution agent %s: %v", label, err)
+		return "", pauseConflictResolutionChildRepair(p, childPath, childID, label, reason)
+	}
+
 	l, err := supervise.StartAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  p.FeatureBranch,

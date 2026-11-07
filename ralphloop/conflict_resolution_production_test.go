@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -345,6 +346,52 @@ func TestResolveCherryPickConflict_StopFailure_FailsTheResolution(t *testing.T) 
 
 	if _, err := resolveCherryPickConflict(d, p); !errors.Is(err, stopErr) {
 		t.Fatalf("resolveCherryPickConflict() error = %v, want it to wrap %v", err, stopErr)
+	}
+}
+
+func TestResolveCherryPickConflict_InstallsDepsInFeatureWorktreeBeforeLaunch(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	p := conflictParams(t, t.TempDir())
+	var installedIn []string
+	d.InstallDeps = func(_ context.Context, path, _ string) ([]string, error) {
+		installedIn = append(installedIn, path)
+		return []string{"fake install"}, nil
+	}
+	started := false
+	fakes.OnRunnerStart(d, func(agentrunner.StartOptions) error {
+		started = len(installedIn) == 1
+		return nil
+	})
+
+	_, _ = resolveCherryPickConflict(d, p)
+
+	if !slices.Equal(installedIn, []string{p.FeatureWorktree}) {
+		t.Errorf("installed in %v, want [%s]", installedIn, p.FeatureWorktree)
+	}
+	if !started {
+		t.Error("resolver started before the install finished")
+	}
+}
+
+func TestResolveCherryPickConflict_InstallFailure_PausesWithoutLaunching(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	p := conflictParams(t, t.TempDir())
+	d.InstallDeps = func(context.Context, string, string) ([]string, error) {
+		return nil, errors.New("install boom")
+	}
+	fakes.OnRunnerStart(d, func(agentrunner.StartOptions) error {
+		t.Error("resolver launched despite a failed install")
+		return nil
+	})
+
+	_, err := resolveCherryPickConflict(d, p)
+	if !errors.Is(err, errConflictResolutionUnresolved) {
+		t.Fatalf("err = %v, want errConflictResolutionUnresolved", err)
+	}
+	if !strings.Contains(err.Error(), "install boom") {
+		t.Errorf("err = %v, want it to name the install failure", err)
 	}
 }
 
