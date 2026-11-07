@@ -1,21 +1,17 @@
 import { expect, menu, menuButton, nav, test } from "./fixture";
 import { dialog,expectReloaded, openDialog, passing, pidLine, restartButton, restartItem } from "./restart-helpers";
 
-// Also covers 128 (the item sits between AFK and the build line, and opening it closes the menu).
+// Also covers 128 (the item sits below AFK, and opening it closes the menu).
 test("129. Restart server keyboard", async ({ page, start }) => {
   await start("restart-projects");
   await menuButton(page).focus();
   await page.keyboard.press("Enter");
   await expect(menu(page)).toBeVisible();
-  // The usage block (with its InfoTip) can mount before the menu opens: focus must still land on the menu.
-  await expect(menu(page).getByRole("button", nav("About gx spend"))).toBeVisible();
   await expect(menu(page).getByRole("menuitemcheckbox", nav("AFK"))).toHaveAttribute("data-highlighted", "");
   const afk = await menu(page).getByRole("menuitemcheckbox", nav("AFK")).boundingBox();
   const restart = await restartItem(page).boundingBox();
-  const build = await menu(page).getByTestId("server-build").boundingBox();
   expect(restart!.y).toBeGreaterThan(afk!.y);
-  expect(build!.y).toBeGreaterThan(restart!.y);
-  // AFK, Vi mode, Settings, Restart: Restart is three presses from the highlighted AFK.
+  // AFK, Vi mode, Sort, Restart: Restart is three presses from the highlighted AFK.
   for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowDown");
   await expect(restartItem(page)).toHaveAttribute("data-highlighted", "");
   await page.keyboard.press("Enter");

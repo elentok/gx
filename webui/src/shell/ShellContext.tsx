@@ -4,6 +4,8 @@ export interface Shell {
   sidebarOpen: boolean;
   toggle: () => void;
   close: () => void;
+  /** Closes the sidebar when it slides over the page (phone, tablet); a docked sidebar stays. */
+  closeSliding: () => void;
   /** A page header calls this on mount so the shell skips its own toggle row. */
   claimHeader: () => () => void;
 }

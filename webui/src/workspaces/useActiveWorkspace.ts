@@ -12,7 +12,7 @@ export function useWorkspaces(conn: Connection): { workspaces: Workspace[]; plac
 }
 
 /** The workspace the sidebar shows, kept per browser; the server stores nothing. */
-export function useActiveWorkspace(conn: Connection, fetcher?: FetchEpicList): { active: string; setActive: (name: string) => void } {
+export function useActiveWorkspace(conn: Connection, fetcher?: FetchEpicList): { active: string; resolved: boolean; setActive: (name: string) => void } {
   const { workspaces, placements } = useWorkspaces(conn);
   const { list } = useEpicList(fetcher, conn);
   const route = useLocation().pathname;
@@ -39,5 +39,5 @@ export function useActiveWorkspace(conn: Connection, fetcher?: FetchEpicList): {
     setStored(name);
   }, []);
 
-  return { active, setActive };
+  return { active, resolved: loaded, setActive };
 }

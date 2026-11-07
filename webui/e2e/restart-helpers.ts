@@ -15,18 +15,11 @@ export const openDialog = async (page: Page) => {
   await expect(dialog(page)).toBeVisible();
 };
 
-/** The build text in the menu, e.g. what the dialog calls the running version. */
+/** The build text in the sidebar header, e.g. what the dialog calls the running version. */
 export const buildText = async (page: Page) => {
-  await menuButton(page).click();
-  const build = menu(page).getByTestId("server-build");
+  const build = page.getByTestId("server-build");
   await expect(build).toBeVisible();
-  const text = (await build.textContent())!.trim();
-  // The first Escape can land before the menu takes focus.
-  await expect(async () => {
-    await page.keyboard.press("Escape");
-    await expect(menu(page)).toHaveCount(0, { timeout: 1_000 });
-  }).toPass({ timeout: 10_000 });
-  return text;
+  return (await build.textContent())!.trim();
 };
 
 /** What `restart-check` prints when every project passes, on restart-projects (projects demo and broken). */

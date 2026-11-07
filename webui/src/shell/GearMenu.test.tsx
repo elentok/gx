@@ -1,33 +1,44 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
+import type { Workspace } from "../generated/server";
 import { renderThemed } from "../ui/render";
+import { WriteError } from "../useWrite";
 import { GearMenu } from "./GearMenu";
+import { ShellContext } from "./ShellContext";
 
-afterEach(cleanup);
+const showToast = vi.hoisted(() => vi.fn());
+vi.mock("../ui/toaster", async (importOriginal) => ({ ...(await importOriginal<typeof import("../ui/toaster")>()), showToast }));
 
-function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}) {
+afterEach(() => {
+  cleanup();
+  showToast.mockClear();
+  window.location.hash = "";
+});
+
+const research: Workspace = { name: "research", sort: "activity" } as Workspace;
+
+function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}, closeSliding = () => {}) {
   const state = { snapshot, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  const shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding, claimHeader: () => () => {} };
   renderThemed(
     <ConnectionContext.Provider value={conn}>
-      <GearMenu {...props} />
+      <ShellContext.Provider value={shell}>
+        <GearMenu {...props} />
+      </ShellContext.Provider>
     </ConnectionContext.Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
 }
 
-test("lists AFK, Vi mode, Settings, Restart server and the build in order, with no limits block", async () => {
-  setup({ build: "v1.2.3" });
-  const afk = await screen.findByRole("menuitemcheckbox", { name: "AFK" });
-  const vi = screen.getByRole("menuitemcheckbox", { name: "Vi mode" });
-  const settings = screen.getByRole("menuitem", { name: "Settings" });
-  const restart = screen.getByRole("menuitem", { name: "Restart server" });
-  const build = screen.getByTestId("server-build");
-  expect(build.textContent).toBe("v1.2.3");
+test("lists AFK, Vi mode, Sort, Restart server and More settings in order, with no build or limits", async () => {
+  setup({ build: "v1.2.3" }, { activeWorkspace: research });
+  await screen.findByRole("menuitemcheckbox", { name: "AFK" });
+  const items = [...screen.getByRole("menu").querySelectorAll('[role^="menuitem"]')].map((el) => el.textContent?.replace(/\s+/g, " ").trim());
+  expect(items).toEqual(["AFK", "Vi mode", "Sort · research›", "Restart server", "More settings..."]);
+  expect(screen.queryByTestId("server-build")).toBeNull();
   expect(screen.queryByText("Claude limits")).toBeNull();
-  const order = [afk, vi, settings, restart, build];
-  order.slice(1).forEach((el, i) => expect(order[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
 });
 
 test("the AFK and Vi mode items post the opposite of the snapshot", async () => {
@@ -42,9 +53,47 @@ test("the AFK and Vi mode items post the opposite of the snapshot", async () => 
   await waitFor(() => expect(postViMode).toHaveBeenCalledWith(true));
 });
 
-test("choosing Settings closes the menu", async () => {
+test("Sort is disabled until the active workspace resolves", async () => {
   setup();
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Settings" }));
+  const sort = await screen.findByRole("menuitem", { name: "Sort" });
+  expect(sort.getAttribute("aria-disabled")).toBe("true");
+});
+
+test("the Sort submenu offers three radios with the stored value checked, and a pick posts it for the active workspace", async () => {
+  const postSort = vi.fn(async () => {});
+  setup({}, { activeWorkspace: research, postSort });
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Sort · research/ }));
+  const radios = await screen.findAllByRole("menuitemradio");
+  expect(radios.map((r) => [r.textContent, r.getAttribute("aria-checked")])).toEqual([
+    ["Needs you first, then by name", "false"],
+    ["By last activity, newest first", "true"],
+    ["Alphabetically by name", "false"],
+  ]);
+  fireEvent.click(radios[2]);
+  await waitFor(() => expect(postSort).toHaveBeenCalledWith("research", "name"));
+});
+
+test("a refused sort write shows the toast and the radio stays on the stored value", async () => {
+  const postSort = vi.fn(async () => {
+    throw new WriteError("no such workspace");
+  });
+  setup({}, { activeWorkspace: research, postSort });
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Sort · research/ }));
+  fireEvent.click((await screen.findAllByRole("menuitemradio"))[0]);
+  await waitFor(() => expect(showToast).toHaveBeenCalledWith({ type: "error", title: "no such workspace" }));
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Sort · research/ }));
+  const checked = (await screen.findAllByRole("menuitemradio")).filter((r) => r.getAttribute("aria-checked") === "true");
+  expect(checked.map((r) => r.textContent)).toEqual(["By last activity, newest first"]);
+});
+
+test("More settings... opens Settings and closes a sliding sidebar", async () => {
+  const closeSliding = vi.fn();
+  setup({}, {}, closeSliding);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "More settings..." }));
+  expect(window.location.hash).toBe("#/settings");
+  expect(closeSliding).toHaveBeenCalled();
   await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
 });
 

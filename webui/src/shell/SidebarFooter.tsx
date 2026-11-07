@@ -6,6 +6,7 @@ import { NewSessionForm } from "../agents/NewSessionForm";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { useEpicList } from "../epics/list";
+import type { Workspace } from "../generated/server";
 import { designHref, STATS_HREF } from "../hrefs";
 import { GxMenu } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
@@ -59,7 +60,7 @@ function Indicator({ label, tone, children }: { label: string; tone: "waiting" |
 
 type Dialog = "design" | "agent" | null;
 
-export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: () => void }) {
+export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { onNewWorkspace?: () => void; activeWorkspace?: Workspace }) {
   const conn = useConnectionContext();
   const { snapshot, connected } = useConnectionState(conn);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -110,7 +111,7 @@ export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: 
           <OfflineIcon />
         </Indicator>
       )}
-      <GearMenu />
+      <GearMenu activeWorkspace={activeWorkspace} />
       <Portal>
         {dialog === "design" && <DesignDialog onClose={() => setDialog(null)} />}
         {dialog === "agent" && <AgentDialog onClose={() => setDialog(null)} />}

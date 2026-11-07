@@ -20,7 +20,7 @@ test("renders icon, title, subtitle, actions and meta bar", () => {
 });
 
 test("inside the shell the page icon is dropped on every device, leaving the mascot alone", () => {
-  const shell = { sidebarOpen: false, toggle: () => {}, close: () => {}, claimHeader: () => () => {} };
+  const shell = { sidebarOpen: false, toggle: () => {}, close: () => {}, closeSliding: () => {}, claimHeader: () => () => {} };
   const state = { snapshot: { needs_you_total: 0 }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const at = (device: Device) =>

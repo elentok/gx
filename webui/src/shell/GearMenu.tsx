@@ -1,23 +1,36 @@
-import { Box, Button, Menu, Portal, Text } from "@chakra-ui/react";
+import { Box, Button } from "@chakra-ui/react";
 import { useState } from "react";
 import { postAfk as defaultPostAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
+import { SortActivity, SortDefault, SortName, SortNeedsYou, type Workspace } from "../generated/server";
 import { SETTINGS_HREF } from "../hrefs";
 import { RestartDialog } from "../restart/RestartDialog";
+import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { showToast } from "../ui/toaster";
 import { postViMode as defaultPostViMode } from "../vimode";
 import { WriteError } from "../useWrite";
+import { postWorkspace } from "../workspaces/postWorkspace";
+import { useShell } from "./ShellContext";
 
 interface Props {
   postAfk?: (on: boolean) => Promise<void>;
   postViMode?: (on: boolean) => Promise<void>;
+  postSort?: (workspace: string, sort: string) => Promise<unknown>;
+  /** The active workspace once it resolves; Sort stays disabled until then. */
+  activeWorkspace?: Workspace;
 }
 
-const itemStyle = { cursor: "pointer", color: "text", ps: "3", _highlighted: { bg: "surface" } } as const;
+const SORT_OPTIONS = [
+  { value: SortNeedsYou, label: "Needs you first, then by name" },
+  { value: SortActivity, label: "By last activity, newest first" },
+  { value: SortName, label: "Alphabetically by name" },
+];
 
-// A failed write leaves the switch as the last snapshot showed it.
-function flip(post: (on: boolean) => Promise<void>, current: boolean | undefined) {
-  void post(!current).catch((err) =>
+const defaultPostSort = (workspace: string, sort: string) => postWorkspace("sort", { name: workspace, sort });
+
+// A failed write leaves the control as the last snapshot showed it.
+function guarded(write: Promise<unknown>) {
+  void write.catch((err) =>
     showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." }),
   );
 }
@@ -32,15 +45,44 @@ function GearIcon() {
 }
 
 // The app menu: the old top bar's menu, opened from the sidebar footer.
-export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViMode }: Props) {
+export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViMode, postSort = defaultPostSort, activeWorkspace }: Props) {
   const { snapshot } = useConnectionState(useConnectionContext());
+  const shell = useShell();
   const [restartOpen, setRestartOpen] = useState(false);
   const afk = snapshot?.afk ?? false;
   const viMode = snapshot?.vi_mode ?? false;
+  const toggle = (label: string, value: string, on: boolean, post: (on: boolean) => Promise<void>): MenuEntry => ({
+    kind: "checkbox",
+    value,
+    label,
+    checked: on,
+    closeOnSelect: false,
+    hint: <MenuSwitch on={on} />,
+    inlineHint: true,
+    onCheckedChange: () => guarded(post(!on)),
+  });
+  const sort: MenuEntry = activeWorkspace
+    ? {
+        kind: "submenu",
+        value: "sort",
+        label: `Sort · ${activeWorkspace.name}`,
+        inlineHint: true,
+        items: [
+          {
+            kind: "radio-group",
+            value: "sort-order",
+            current: activeWorkspace.sort || SortDefault,
+            onValueChange: (v) => guarded(postSort(activeWorkspace.name, v)),
+            options: SORT_OPTIONS,
+          },
+        ],
+      }
+    : { value: "sort", label: "Sort", disabled: true, onSelect: () => {} };
   return (
     <>
-      <Menu.Root closeOnSelect={false} lazyMount unmountOnExit positioning={{ placement: "top-end" }}>
-        <Menu.Trigger asChild>
+      <GxMenu
+        placement="top-end"
+        trigger={
           <Button
             type="button"
             aria-label="Menu"
@@ -57,34 +99,23 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
           >
             <GearIcon />
           </Button>
-        </Menu.Trigger>
-        <Portal>
-          <Menu.Positioner>
-            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">
-              <Menu.CheckboxItem value="afk" checked={afk} onCheckedChange={() => flip(postAfk, afk)} justifyContent="space-between" {...itemStyle}>
-                AFK
-                <MenuSwitch on={afk} />
-              </Menu.CheckboxItem>
-              <Menu.CheckboxItem value="vimode" checked={viMode} onCheckedChange={() => flip(postViMode, viMode)} justifyContent="space-between" {...itemStyle}>
-                Vi mode
-                <MenuSwitch on={viMode} />
-              </Menu.CheckboxItem>
-              <Menu.Separator />
-              <Menu.Item value="settings" asChild closeOnSelect {...itemStyle}>
-                <a href={SETTINGS_HREF}>Settings</a>
-              </Menu.Item>
-              <Menu.Item value="restart" closeOnSelect onClick={() => setRestartOpen(true)} {...itemStyle}>
-                Restart server
-              </Menu.Item>
-              {snapshot?.build && (
-                <Text px="3" py="1.5" fontSize="xs" color="text.muted" truncate title={snapshot.build} data-testid="server-build">
-                  {snapshot.build}
-                </Text>
-              )}
-            </Menu.Content>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
+        }
+        items={[
+          toggle("AFK", "afk", afk, postAfk),
+          toggle("Vi mode", "vimode", viMode, postViMode),
+          { kind: "separator" },
+          sort,
+          { value: "restart", label: "Restart server", onSelect: () => setRestartOpen(true) },
+          {
+            value: "settings",
+            label: "More settings...",
+            onSelect: () => {
+              window.location.hash = SETTINGS_HREF;
+              shell?.closeSliding();
+            },
+          },
+        ]}
+      />
       {restartOpen && <RestartDialog liveInstance={snapshot?.instance} onClose={() => setRestartOpen(false)} />}
     </>
   );

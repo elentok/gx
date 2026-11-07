@@ -80,6 +80,18 @@ test.each(["tablet", "phone"] as const)("%s: closed by default, the mascot opens
   expect(isOpen()).toBe(false);
 });
 
+test.each([
+  ["tablet", false],
+  ["phone", false],
+  ["desktop", true],
+] as const)("%s: More settings in the gear menu closes a sliding sidebar only (stays open: %s)", async (device, staysOpen) => {
+  setup(device);
+  if (device !== "desktop") fireEvent.click(mascot()!);
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "More settings..." }));
+  expect(isOpen()).toBe(staysOpen);
+});
+
 test("the amber dot shows only while the sidebar is closed and something needs me", () => {
   setup("tablet", 2);
   expect(screen.getByTestId("mascot-dot")).toBeTruthy();

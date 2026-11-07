@@ -10,10 +10,20 @@ test("Workspaces", async ({ page, start }) => {
   const sidebar = page.getByRole("complementary", nav("Sidebar"));
   const row = (title: string) => sidebar.getByRole("link", { name: new RegExp(`^${title}(?![\\w-])`) });
   const switcher = page.getByRole("button", { name: /^Workspace:/ });
+  // The first Escape can land before a menu takes focus, and a closing menu keeps covering the sidebar until it is gone.
+  // A click on a submenu item that lands before the menu has taken focus does not open it.
+  const menuFocused = () => expect(page.locator('[role="menu"]:focus-within')).toHaveCount(1);
+  const closeMenus = () =>
+    expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("menu")).toHaveCount(0, { timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
   const pick = async (name: string) => {
     await switcher.click();
     await page.getByRole("menuitem", { name: new RegExp(`^${name}`) }).click();
     await expect(page.getByRole("button", nav(`Workspace: ${name}`))).toBeVisible();
+    // The closing menu keeps covering the sidebar, and its items answer later queries, until it is gone.
+    await expect(page.getByRole("menu")).toHaveCount(0);
   };
 
   // The sidebar shows the Default workspace's rows on the Epics page.
@@ -48,6 +58,9 @@ test("Workspaces", async ({ page, start }) => {
   const status = row("ready-epic").locator("span").last();
   await expect(numbers).toHaveCount(0);
   const wordsBefore = await status.textContent();
+  // The Epics page's own loads (epics, checks) land after the goto above; count requests only once its cards are drawn.
+  await expect(card(page, "ready-epic")).toBeVisible();
+  await page.waitForResponse((r) => r.url().includes("/v1/checks/status")).catch(() => {});
   const requests: string[] = [];
   page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/v1/") && requests.push(r.url())));
   await page.evaluate(() => {
@@ -145,19 +158,25 @@ test("Workspaces", async ({ page, start }) => {
   const rowMenu = (title: string) => row(title).locator("xpath=..").getByRole("button", nav("More actions"));
   const moveTo = async (menu: ReturnType<typeof rowMenu>, item: string, to: string) => {
     await menu.click();
+    await menuFocused();
     await page.getByRole("menuitem", nav("Move to workspace")).click();
     await page.getByRole("menuitem", nav(to)).click();
+    await expect(page.getByRole("menu")).toHaveCount(0);
   };
   // The submenu opens to the side of its item, lists every workspace (the Default workspace too) and marks the current one.
   await rowMenu("ws-impl-epic").click();
   const moveItem = page.getByRole("menuitem", nav("Move to workspace"));
+  const current = page.getByRole("menu").last().getByRole("menuitem", { name: /^research/ });
+  await menuFocused();
   await moveItem.click();
-  const current = page.getByRole("menuitem", { name: /^research/ });
   await expect(current).toHaveAttribute("aria-current", "true");
   await expect(page.getByRole("menuitem", nav("Default workspace"))).toHaveAttribute("aria-current", "false");
   await expect(page.getByRole("menuitem", nav("gx bugs"))).toBeVisible();
-  const [itemBox, subBox] = [await moveItem.boundingBox(), await current.boundingBox()];
-  expect(subBox!.x).toBeGreaterThanOrEqual(itemBox!.x + itemBox!.width - 1);
+  // Both menus animate in; measure once they hold still.
+  await expect(async () => {
+    const [itemBox, subBox] = [await moveItem.boundingBox(), await current.boundingBox()];
+    expect(subBox!.x).toBeGreaterThanOrEqual(itemBox!.x + itemBox!.width - 1);
+  }).toPass({ timeout: 5_000 });
   await expect(page.getByRole("menuitem", nav("Remove from workspace"))).toHaveCount(0);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
@@ -173,8 +192,12 @@ test("Workspaces", async ({ page, start }) => {
   await goto(page, "#/epics");
   await expect(card(page, "ws-impl-epic").getByTestId("workspace")).toHaveText("research");
   await card(page, "ws-impl-epic").getByRole("button", nav("More actions")).click();
-  await page.getByRole("menuitem", nav("Move to workspace")).click();
-  await page.getByRole("menuitem", nav("gx bugs")).click();
+  await menuFocused();
+  // The card menu sits in a page that re-renders as cards load; retry the open until the submenu stays.
+  await expect(async () => {
+    if (!(await page.getByRole("menuitem", nav("gx bugs")).isVisible())) await page.getByRole("menuitem", nav("Move to workspace")).click({ timeout: 2_000 });
+    await page.getByRole("menuitem", nav("gx bugs")).click({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   await expect(card(page, "ws-impl-epic").getByTestId("workspace")).toHaveText("gx bugs");
 
   // Jump dialog: Move from a row, then opening an item in another workspace switches the sidebar.
@@ -193,6 +216,7 @@ test("Workspaces", async ({ page, start }) => {
   await goto(page, "#/epics");
   await openJump("ws-impl-epic");
   await jumpRow("ws-impl-epic").getByRole("button", nav("More actions")).click();
+  await menuFocused();
   await page.getByRole("menuitem", nav("Move to workspace")).click();
   await page.getByRole("menuitem", nav("research")).click();
   await expect(jumpRow("ws-impl-epic")).toContainText("research");
@@ -317,11 +341,41 @@ test("Workspaces", async ({ page, start }) => {
   const items = page.getByRole("menuitem").filter({ hasText: /^(scratch|Default workspace|studies)/ });
   await expect(items.nth(0)).toHaveText(/^scratch/);
   await expect(items.nth(2)).toHaveText(/^studies/);
-  await page.keyboard.press("Escape");
-  // The closing menu keeps covering the sidebar until it is gone.
-  await expect(page.getByRole("menuitem")).toHaveCount(0);
+  await closeMenus();
   await fx.cli("server", "workspaces", "delete", "studies");
   await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible();
+
+  // The gear menu holds AFK, Vi mode, Sort, Restart server and More settings; Sort is per workspace and follows the CLI.
+  const gear = page.getByRole("button", nav("Menu"));
+  const gearItems = page.getByRole("menu").locator('[role^="menuitem"]');
+  await gear.click();
+  await expect(gearItems).toHaveText([/^AFK$/, /^Vi mode$/, /^Sort · Default workspace/, /^Restart server$/, /^More settings\.\.\.$/]);
+  const sortOptions = page.getByRole("menuitemradio");
+  const openSort = async (workspace: string) => {
+    await closeMenus();
+    await gear.click();
+    await menuFocused();
+    await page.getByRole("menuitem", { name: new RegExp(`^Sort · ${workspace}`) }).click();
+  };
+  await openSort("Default workspace");
+  await expect(sortOptions).toHaveText(["Needs you first, then by name", "By last activity, newest first", "Alphabetically by name"]);
+  await expect(sortOptions.nth(0)).toHaveAttribute("aria-checked", "true");
+  await sortOptions.nth(1).click();
+  await expect.poll(() => fx.cli("server", "workspaces", "sort", "Default workspace")).toContain("activity");
+  await fx.cli("server", "workspaces", "sort", "Default workspace", "name");
+  await openSort("Default workspace");
+  await expect(sortOptions.nth(2)).toHaveAttribute("aria-checked", "true");
+  await closeMenus();
+  await fx.cli("server", "workspaces", "sort", "Default workspace", "needs-you");
+  await pick("scratch");
+  await openSort("scratch");
+  await expect(sortOptions.nth(0)).toHaveAttribute("aria-checked", "true");
+  await closeMenus();
+  await pick("Default workspace");
+  await gear.click();
+  await page.getByRole("menuitem", nav("More settings...")).click();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await goto(page, "#/epics");
 
   // At 744px the sidebar slides over: picking a row closes it, the jump menu is a popover, no page scrolls sideways.
   await page.setViewportSize({ width: 744, height: 900 });
@@ -329,6 +383,13 @@ test("Workspaces", async ({ page, start }) => {
   await expect(sidebar).toBeHidden();
   await page.getByRole("button", nav("Show sidebar")).click();
   await expect(sidebar).toBeVisible();
+  await gear.click();
+  await menuFocused();
+  await page.getByRole("menuitem", nav("More settings...")).click();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(sidebar).toBeHidden();
+  await goto(page, "#/epics");
+  await page.getByRole("button", nav("Show sidebar")).click();
   await row("paused-epic").click();
   await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
   await expect(sidebar).toBeHidden();

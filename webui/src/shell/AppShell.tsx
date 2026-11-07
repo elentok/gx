@@ -116,16 +116,19 @@ export function AppShell({
       sidebarOpen: open,
       toggle: () => setChoice({ device, open: !open }),
       close: () => setChoice({ device, open: false }),
+      closeSliding: () => {
+        if (!docked) setChoice({ device, open: false });
+      },
       claimHeader,
     }),
-    [open, device, claimHeader],
+    [open, device, docked, claimHeader],
   );
   const aside = useRef<HTMLDivElement>(null);
   const onSidebarKeyDown = useSidebarKeys(aside, shell);
   const conn = useConnectionContext();
   const { snapshot } = useConnectionState(conn);
   const { workspaces } = useWorkspaces(conn);
-  const { active, setActive } = useActiveWorkspace(conn, fetchEpicList);
+  const { active, resolved, setActive } = useActiveWorkspace(conn, fetchEpicList);
   useShortcuts({ fetcher: fetchEpicList, active, setActive });
   const [newWorkspace, setNewWorkspace] = useState(false);
   const [manageWorkspaces, setManageWorkspaces] = useState(false);
@@ -215,6 +218,7 @@ export function AppShell({
                 overflow="hidden"
                 textOverflow="ellipsis"
                 title={snapshot.build}
+                data-testid="server-build"
               >
                 {snapshot.build}
               </Box>
@@ -258,7 +262,10 @@ export function AppShell({
           >
             <SidebarRows fetcher={fetchEpicList} active={active} />
           </Box>
-          <SidebarFooter onNewWorkspace={() => setNewWorkspace(true)} />
+          <SidebarFooter
+            onNewWorkspace={() => setNewWorkspace(true)}
+            activeWorkspace={resolved ? workspaces.find((w) => w.name === active) : undefined}
+          />
           <Portal>
             {manageWorkspaces && (
               <ManageWorkspaces

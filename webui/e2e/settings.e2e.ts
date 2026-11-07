@@ -9,7 +9,7 @@ const loginRows = (page: Page) => page.locator('a[href^="#/settings/logins/"]');
 
 async function openWebLogins(page: Page) {
   await menuButton(page).click();
-  await page.getByRole("menuitem", nav("Settings")).click();
+  await page.getByRole("menuitem", nav("More settings...")).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByRole("link", { name: /^Web logins/ }).click();
   await expect(page.getByRole("heading", { name: "Web logins" })).toBeVisible();
@@ -30,7 +30,7 @@ const signedInPage = (other: Page) => expect(other.getByRole("heading", { name: 
 
 async function openAccountPage(page: Page, link: string) {
   await menuButton(page).click();
-  await page.getByRole("menuitem", nav("Settings")).click();
+  await page.getByRole("menuitem", nav("More settings...")).click();
   await page.getByRole("link", { name: link }).click();
 }
 
@@ -76,7 +76,7 @@ test("107. Sign out of this device (+111 CLI revoke)", async ({ page, start }) =
   expect(before).toHaveLength(4);
 
   await menuButton(page).click();
-  await page.getByRole("menuitem", nav("Settings")).click();
+  await page.getByRole("menuitem", nav("More settings...")).click();
   await page.getByRole("button", { name: "Sign out of this device" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   expect(await loginIds(fixture)).toHaveLength(3);
