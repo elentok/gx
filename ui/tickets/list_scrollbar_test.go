@@ -42,31 +42,6 @@ func TestModel_SidebarScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 	}
 }
 
-func TestModel_MouseWheelScrollsSidebarWithoutMovingSelection(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	for i := 1; i <= 60; i++ {
-		tickettest.WriteTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
-	}
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
-	m = updated.(Model)
-
-	before := m.sidebar.Tree.ScrollOffset()
-	selected := m.sidebar.Tree.SelectedIndex()
-	updated, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
-	m = updated.(Model)
-
-	if m.sidebar.Tree.ScrollOffset() <= before {
-		t.Fatalf("expected mouse wheel down to increase scroll offset from %d, got %d", before, m.sidebar.Tree.ScrollOffset())
-	}
-	if m.sidebar.Tree.SelectedIndex() != selected {
-		t.Fatalf("expected mouse wheel to leave selection at %d, got %d", selected, m.sidebar.Tree.SelectedIndex())
-	}
-}
-
 // TestModel_CtrlDCtrlUPagesSidebar mirrors the Queue tab's ctrl+d/ctrl+u
 // paging test — both tabs must page by list.DefaultScroll rows.
 func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {

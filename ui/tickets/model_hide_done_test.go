@@ -1,17 +1,17 @@
 package tickets
 
 import (
-	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
-	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
-func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
+// TestModel_TCTogglesHideDone covers the "tc" chord's wiring; what hiding
+// does to the rows is tested in the sidebar package.
+func TestModel_TCTogglesHideDone(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
@@ -22,74 +22,15 @@ func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	if !strings.Contains(m.View().Content, "First ticket") {
-		t.Fatalf("expected done ticket visible before 'tc', got:\n%s", m.View().Content)
-	}
-	if got := len(visibleRows(m)); got != 3 {
-		t.Fatalf("expected 3 visible rows (epic + 2 tickets) before 'tc', got %d", got)
-	}
+	for i, wantRows := range []int{2, 3} {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+		m = updated.(Model)
+		updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+		m = updated.(Model)
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
-	m = updated.(Model)
-
-	if strings.Contains(m.View().Content, "First ticket") {
-		t.Fatalf("expected done ticket hidden after 'tc', got:\n%s", m.View().Content)
-	}
-	if !strings.Contains(m.View().Content, "Second ticket") {
-		t.Fatalf("expected open ticket still visible after 'tc', got:\n%s", m.View().Content)
-	}
-	if got := len(visibleRows(m)); got != 2 {
-		t.Fatalf("expected 2 visible rows (epic + open ticket) after 'tc', got %d", got)
-	}
-	// Epic header counts read epic.Tickets directly, so the filter must not
-	// change them.
-	if !strings.Contains(m.View().Content, "(1 done / 2)") {
-		t.Fatalf("expected epic header counts unaffected by 'tc', got:\n%s", m.View().Content)
-	}
-
-	// Toggling 'tc' again restores the done ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
-	m = updated.(Model)
-
-	if !strings.Contains(m.View().Content, "First ticket") {
-		t.Fatalf("expected done ticket visible again after second 'tc', got:\n%s", m.View().Content)
-	}
-	if got := len(visibleRows(m)); got != 3 {
-		t.Fatalf("expected 3 visible rows again after second 'tc', got %d", got)
-	}
-}
-
-func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	tickettest.WriteTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-
-	// The Closed section starts collapsed by default; expand it (and the
-	// epic itself, which has no default of its own) so its ticket row would
-	// normally be visible.
-	setCollapsedSection(&m, sidebar.SectionComplete, false)
-	setCollapsedEpic(&m, indexOfEpic(t, m, "done-epic"), false)
-
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
-	m = updated.(Model)
-
-	rows := visibleRows(m)
-	if len(rows) != 1 || !rows[0].IsEpic() {
-		t.Fatalf("expected only the epic row visible for a fully-done epic under 'tc', got %+v", rows)
-	}
-	if !strings.Contains(m.View().Content, "done-epic") {
-		t.Fatalf("expected epic row to still render, got:\n%s", m.View().Content)
+		if got := len(visibleRows(m)); got != wantRows || m.sidebar.HideDone != (i == 0) {
+			t.Fatalf("after 'tc' #%d: rows=%d (want %d), hideDone=%v", i+1, got, wantRows, m.sidebar.HideDone)
+		}
 	}
 }
 

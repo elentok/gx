@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
@@ -54,38 +53,9 @@ func deliverCmd(t *testing.T, m Model, cmd tea.Cmd) Model {
 	return updated.(Model)
 }
 
-func findEpic(t *testing.T, m Model, name string) tickets.Epic {
-	t.Helper()
-	return m.sidebar.Epics[indexOfEpic(t, m, name)]
-}
-
-func indexOfEpic(t *testing.T, m Model, name string) int {
-	t.Helper()
-	for i, e := range m.sidebar.Epics {
-		if e.Name == name {
-			return i
-		}
-	}
-	t.Fatalf("epic %q not found", name)
-	return -1
-}
-
-// setCollapsedEpic mirrors a user's explicit toggle keypress: write directly
-// into m.sidebar.explicitCollapsed (never m.sidebar.tree's own map, which
-// clampSelected/refreshSidebarCollapse now overwrites from explicit state on
-// every rebuild), then clampSelected to rebuild entries so a caller's
-// subsequent Entries()/selectedRow() call sees the change.
-func setCollapsedEpic(m *Model, epicIdx int, collapsed bool) {
-	if m.sidebar.ExplicitCollapsed == nil {
-		m.sidebar.ExplicitCollapsed = map[string]bool{}
-	}
-	m.sidebar.ExplicitCollapsed[m.sidebar.Epics[epicIdx].Path] = collapsed
-	m.clampSelected()
-}
-
-// setCollapsedSection mirrors setCollapsedEpic for a section's own root row
-// (e.g. expanding the Closed section, which now starts collapsed by
-// default, so a test can see its epics/tickets).
+// setCollapsedSection mirrors a user's explicit toggle of a section's root
+// row: write the durable explicit map, then clampSelected to rebuild entries
+// so a caller's subsequent Entries()/selectedRow() call sees the change.
 func setCollapsedSection(m *Model, section sidebar.Section, collapsed bool) {
 	if m.sidebar.ExplicitCollapsed == nil {
 		m.sidebar.ExplicitCollapsed = map[string]bool{}
