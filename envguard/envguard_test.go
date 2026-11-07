@@ -10,13 +10,14 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/testutil/repofiles"
 )
 
 // Rules the scan counts.
@@ -197,12 +198,8 @@ func countChildren(body *ast.BlockStmt, counts map[string]int) {
 
 func trackedFiles(t *testing.T) []string {
 	t.Helper()
-	out, err := exec.Command("git", "-C", "..", "ls-files", "*.go").Output()
-	if err != nil {
-		t.Fatalf("git ls-files: %v", err)
-	}
 	var files []string
-	for p := range strings.FieldsSeq(string(out)) {
+	for _, p := range repofiles.List(t, "*.go") {
 		if !strings.HasSuffix(p, "_test.go") {
 			files = append(files, p)
 		}

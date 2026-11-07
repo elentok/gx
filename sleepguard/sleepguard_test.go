@@ -5,12 +5,13 @@ package sleepguard
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/testutil/repofiles"
 )
 
 // sleepCall matches a call. A value use such as `c.Sleep = time.Sleep` has no
@@ -193,18 +194,9 @@ func compare(found, allow map[string]int) []string {
 	return problems
 }
 
-func trackedTestFiles(t *testing.T) []string {
-	t.Helper()
-	out, err := exec.Command("git", "-C", "..", "ls-files", "*_test.go").Output()
-	if err != nil {
-		t.Fatalf("git ls-files: %v", err)
-	}
-	return strings.Fields(string(out))
-}
-
 func TestNoNewSleeps(t *testing.T) {
 	found := map[string]int{}
-	for _, path := range trackedTestFiles(t) {
+	for _, path := range repofiles.List(t, "*_test.go") {
 		if path == selfFile {
 			continue
 		}
