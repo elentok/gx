@@ -190,6 +190,7 @@ func measure(files map[string]string) ([]measurement, []string) {
 			problems = append(problems, fmt.Sprintf("%s: cannot parse: %v", p, err))
 			continue
 		}
+		fileTestFuncs := 0
 		for _, d := range f.Decls {
 			fn, ok := d.(*ast.FuncDecl)
 			if !ok {
@@ -198,13 +199,14 @@ func measure(files map[string]string) ([]measurement, []string) {
 			switch {
 			case isTest && isTestFunc(fn):
 				st.testFuncs++
-				st.addPart(measureTestFuncs, p, 1)
+				fileTestFuncs++
 			case !isTest && fn.Recv != nil && len(fn.Recv.List) == 1:
 				if name := receiverName(fn.Recv.List[0].Type); name != "" {
 					methods[dir+"."+name]++
 				}
 			}
 		}
+		st.addPart(measureTestFuncs, p, fileTestFuncs)
 	}
 
 	for dir, st := range pkgs {
@@ -396,6 +398,27 @@ func TestCheck_PackageBreachListsLargestFiles(t *testing.T) {
 	}
 	if strings.Contains(got, "small_test.go") {
 		t.Errorf("breakdown should list only the largest %d files:\n%s", maxBreakdownFiles, got)
+	}
+}
+
+func TestCheck_TestFuncsBreachNamesFilesWithCounts(t *testing.T) {
+	problems := check(map[string]string{
+		"big/a_test.go": tests("x", 40),
+		"big/b_test.go": tests("x", 100),
+		"big/c_test.go": tests("x", 41),
+	}, nil)
+	if len(problems) != 1 {
+		t.Fatalf("want one problem, got:\n%s", strings.Join(problems, "\n"))
+	}
+	got := problems[0]
+	order := []string{"100  big/b_test.go", "41  big/c_test.go", "40  big/a_test.go"}
+	last := -1
+	for _, w := range order {
+		i := strings.Index(got, w)
+		if i < 0 || i < last {
+			t.Fatalf("want %q after the previous row, largest first:\n%s", w, got)
+		}
+		last = i
 	}
 }
 

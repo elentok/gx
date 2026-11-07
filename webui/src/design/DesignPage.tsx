@@ -14,12 +14,33 @@ import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import { MapImageStrip } from "./MapImageStrip";
 import type { FetchMapImages } from "./mapImages";
-import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
+import type {
+  DeleteDesign,
+  OpenDesign,
+  ResumeSession,
+  StopSession,
+} from "./open";
 import type { PostPrompt } from "./prompt";
 import { AgentLine } from "./AgentLine";
-import { ImplLink, Progress, StepLine, StepsSheet, showsImplLink, summaryLine } from "./Progress";import type { FetchScreen } from "./screen";
-import { DesignActionsMenu, Failure, StartDesignButton } from "./SessionControls";
-import { SectionOnHold, type EpicListRow, type SessionInfo } from "../generated/server";
+import {
+  ImplLink,
+  Progress,
+  StepLine,
+  StepsSheet,
+  showsImplLink,
+  summaryLine,
+} from "./Progress";
+import type { FetchScreen } from "./screen";
+import {
+  DesignActionsMenu,
+  Failure,
+  StartDesignButton,
+} from "./SessionControls";
+import {
+  SectionOnHold,
+  type EpicListRow,
+  type SessionInfo,
+} from "../generated/server";
 import { slugOf } from "../slug";
 import { useDevice, useWide } from "../useWide";
 import { designSession, liveSessions } from "./view";
@@ -63,7 +84,8 @@ function SessionStrip({
 }: SessionStripProps) {
   const navigate = useNavigate();
   // The reason is for the failed start only: a live session means a retry worked.
-  const reason = !session || session.status.state === "exited" ? startFailure : undefined;
+  const reason =
+    !session || session.status.state === "exited" ? startFailure : undefined;
   return (
     <Box display="flex" alignItems="center" justifyContent="flex-end" gap="3">
       <Failure>{reason ?? ""}</Failure>
@@ -126,11 +148,18 @@ function DesignBody({
   const session =
     live.find((s) => s.id === selected) ?? designSession(address, sessions);
   const chatty = hasChat(session?.harness);
-  const { detail: chat, refetch: refetchChat } = useSessionChat(session && chatty ? session.id : undefined, conn, deps.fetchChat);
+  const { detail: chat, refetch: refetchChat } = useSessionChat(
+    session && chatty ? session.id : undefined,
+    conn,
+    deps.fetchChat,
+  );
   // Derived, not stored, so it cannot go stale: a round opens in Questions, and the reader's toggle holds for
   // that session and round only. The message list and the impl link both read it.
   const viewKey = `${session?.id}|${roundKeyOf(chat)}`;
-  const questions = chatty &&(chat?.round?.length ?? 0) > 0 && (toggle?.key === viewKey ? toggle.on : true);
+  const questions =
+    chatty &&
+    (chat?.round?.length ?? 0) > 0 &&
+    (toggle?.key === viewKey ? toggle.on : true);
   // The busy row follows what the agent reported; Progress and Continue keep following the map.
   const running =
     detail?.steps?.find((s) => s.step === session?.reported_step) ?? current;
@@ -139,8 +168,7 @@ function DesignBody({
     step: running?.label,
     title:
       running?.step === "resolve-tickets"
-        ? session?.reported_title ||
-          detail?.rows.find((r) => r.current)?.title
+        ? session?.reported_title || detail?.rows.find((r) => r.current)?.title
         : undefined,
   };
   useFocusReport(conn, session?.id, connState.streams, deps.focus);
@@ -152,10 +180,18 @@ function DesignBody({
     seenLiveKey.current = liveKey;
     refetch();
   }, [liveKey, refetch]);
-  const ring = (size: "header" | "headerSm" | "compact") => <EpicRing detail={detail!} card={card} sessions={sessions} size={size} />;
+  const ring = (size: "header" | "headerSm" | "compact") => (
+    <EpicRing detail={detail!} card={card} sessions={sessions} size={size} />
+  );
   return (
     <>
-      {stepsOpen && detail && <StepsSheet detail={detail} ring={ring("compact")} onClose={() => setStepsOpen(false)} />}
+      {stepsOpen && detail && (
+        <StepsSheet
+          detail={detail}
+          ring={ring("compact")}
+          onClose={() => setStepsOpen(false)}
+        />
+      )}
       <Box mt="4" mb="3" flex="none">
         <PageHeader
           title={name}
@@ -164,15 +200,30 @@ function DesignBody({
           subtitle={
             detail && (
               <>
-                {stepsInline ? summaryLine(detail) : <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />}
+                {stepsInline ? (
+                  summaryLine(detail)
+                ) : (
+                  <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />
+                )}
                 {card?.section === SectionOnHold && " · On hold"}
               </>
             )
           }
           meta={
-            <Box display="flex" flexWrap="wrap" alignItems="center" columnGap="3" rowGap="1" fontSize="12px">
+            <Box
+              display="flex"
+              flexWrap="wrap"
+              alignItems="center"
+              columnGap="3"
+              rowGap="1"
+              fontSize="12px"
+            >
               {session && <AgentLine session={session} wide={wide} />}
-              <chakra.a href={`#/e/${address}`} color="text.dim" textDecoration="underline">
+              <chakra.a
+                href={`#/e/${address}`}
+                color="text.dim"
+                textDecoration="underline"
+              >
                 Design epic: {name} ↗
               </chakra.a>
             </Box>
@@ -183,7 +234,13 @@ function DesignBody({
                 (stepsInline ? (
                   ring("header")
                 ) : (
-                  <chakra.button type="button" aria-label="Show progress steps" aria-haspopup="dialog" cursor="pointer" onClick={() => setStepsOpen(true)}>
+                  <chakra.button
+                    type="button"
+                    aria-label="Show progress steps"
+                    aria-haspopup="dialog"
+                    cursor="pointer"
+                    onClick={() => setStepsOpen(true)}
+                  >
                     {ring("headerSm")}
                   </chakra.button>
                 ))}
@@ -243,7 +300,14 @@ function DesignBody({
           />
         </Box>
         {stepsInline && (
-          <Box aria-label="Progress" role="region" gridRow={1} gridColumn={2} minH="0" overflowY="auto">
+          <Box
+            aria-label="Progress"
+            role="region"
+            gridRow={1}
+            gridColumn={2}
+            minH="0"
+            overflowY="auto"
+          >
             {detail && <Progress detail={detail} />}
           </Box>
         )}
