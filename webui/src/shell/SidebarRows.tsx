@@ -22,7 +22,7 @@ const rowStyle = {
   display: "flex",
   alignItems: "center",
   gap: "2",
-  minH: "44px",
+  minH: "34px",
   px: "3",
   textDecoration: "none",
   color: "inherit",
@@ -54,10 +54,10 @@ function Chevron({ open, onToggle, label }: { open: boolean; onToggle: () => voi
       aria-label={label}
       aria-expanded={open}
       onClick={onToggle}
-      boxSize="20px"
+      boxSize="16px"
       display="grid"
       placeItems="center"
-      color="text.dim"
+      color="text.faint"
       cursor="pointer"
       flex="none"
     >
@@ -84,18 +84,23 @@ function Row({ row, current }: { row: SidebarRow; current: boolean }) {
   const nested = row.agents.length > 0;
   return (
     <li>
-      <Box display="flex" alignItems="center" pl="1" bg={current ? "surface.raised" : undefined}>
+      <Box display="flex" alignItems="center" pl="1" bg={current ? "surface.raised" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
         <Box w="20px" flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
         <chakra.a href={row.href} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
-          {row.kind === "chat" ? <ChatIcon /> : <ProgressRing progress={row.ring ?? 0} kind={row.kind} size="compact" tone={row.status.tone === "muted" ? "muted" : row.status.tone} live={row.status.tone === "running"} />}
-          <Box display="flex" flexDirection="column" minW="0">
-            <Box as="span" fontSize="14px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-              {row.title}
+          {row.kind === "chat" ? (
+            <ChatIcon />
+          ) : (
+            <Box position="relative" flex="none">
+              <ProgressRing progress={row.ring ?? 0} kind={row.kind} size="sidebar" tone={row.status.tone} live={row.status.tone === "running"} />
+              <Box data-testid="kind-dot" position="absolute" right="-2px" bottom="-2px" boxSize="8px" borderRadius="full" borderWidth="1.5px" borderColor="surface" bg={`kind.${row.kind}.fg`} />
             </Box>
-            <Status status={row.status} dim={row.held} />
+          )}
+          <Box as="span" flex="1" minW="0" fontSize="14px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+            {row.title}
           </Box>
+          <Status status={row.status} dim={row.held} />
         </chakra.a>
       </Box>
       {nested && open && (

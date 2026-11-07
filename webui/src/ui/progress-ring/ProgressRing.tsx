@@ -22,6 +22,8 @@ const SIZES = {
   header: { px: 56, stroke: 4, font: "13px", badge: true },
   headerSm: { px: 44, stroke: 4, font: "11px", badge: true },
   compact: { px: 26, stroke: 3, font: "9px", badge: false },
+  // The sidebar rows' ring in shell/SidebarRows.tsx.
+  sidebar: { px: 20, stroke: 2.5, font: "8px", badge: false },
 } as const;
 
 // Both drawn on a 100-unit path so the comet's 16% share does not depend on the radius.
