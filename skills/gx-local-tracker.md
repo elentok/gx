@@ -356,7 +356,13 @@ its own tool.
 | stop a background shell | TaskStop | none: a step that asks for it waits or runs inline |
 | load a deferred tool | ToolSearch | none: every tool is already loaded |
 | run in the background | `run_in_background` | none: a step that asks for it waits or runs inline |
+| wait for a background task | Monitor | none: a step that asks for it waits or runs inline |
 | ask a person | `gx tickets ask` | `gx tickets ask` |
+
+Load a deferred tool before its first call: a deferred tool called without its schema fails with
+`InputValidationError`, and that turn is wasted. Before the first use of the tool behind any phrase
+above, load it first. To wait on a background task, use the wait-for-a-background-task tool, not a
+hand-written `sleep` or `until` loop in a shell call.
 
 ## Claiming
 
