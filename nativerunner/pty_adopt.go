@@ -62,6 +62,15 @@ func (p *Pty) holderRuns(ss *ptySession) bool {
 	return err != nil || live
 }
 
+func (ss *ptySession) hasExited() bool {
+	select {
+	case <-ss.exited:
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *Pty) newSession(label string, meta Meta) *ptySession {
 	return &ptySession{
 		session:     agentrunner.Session{Label: label, ID: label, SessionID: meta.SessionID},
@@ -109,7 +118,9 @@ func (p *Pty) heldLabel(opts agentrunner.StartOptions) (agentrunner.Session, boo
 // whose dial failed doesn't outlive its processes.
 func (p *Pty) Find(label string) (agentrunner.Session, bool, error) {
 	if ss, ok := p.reg.get(label); ok {
-		if !p.reg.hasDied(ss) || p.holderRuns(ss) {
+		// watchExit only closes exited; died is set by a failing call, so a
+		// holder killed while nobody drives it is not yet marked died.
+		if !p.reg.hasDied(ss) && !ss.hasExited() || p.holderRuns(ss) {
 			return ss.session, true, nil
 		}
 		p.reg.remove(label)

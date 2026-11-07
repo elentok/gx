@@ -802,6 +802,26 @@ func TestPty_FindDeadHolderIsNotFound(t *testing.T) {
 	}
 }
 
+// A holder killed while no call drives its session leaves nothing to mark it
+// died, yet Find must stop reporting it (Retry refuses "live pane" otherwise).
+func TestPty_FindForgetsAdoptedHolderThatWasKilled(t *testing.T) {
+	t.Parallel()
+	procs := ptyAgentProcs()
+	p, dir := preparePtyAgent(t, procs)
+	p.PollInterval = 10 * time.Millisecond
+	serveOldHolder(t, dir, map[string]any{"ping": map[string]any{"pid": agentPID}})
+	if _, ok, err := p.Find("e-01"); err != nil || !ok {
+		t.Fatalf("Find = %v, %v; want found", ok, err)
+	}
+
+	procs.kill(holderPID)
+
+	waitFor(t, "Find to forget the killed holder", func() bool {
+		_, ok, _ := p.Find("e-01")
+		return !ok
+	})
+}
+
 func TestPty_FindSilentHolderIsDead(t *testing.T) {
 	t.Parallel()
 	p, dir := preparePtyAgent(t, ptyAgentProcs())
