@@ -79,7 +79,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `workspaces.e2e.ts`
 
-- **Workspaces** (scenario `workspaces`: "gx bugs" holds a live and a held Design, "research" an implementation epic and a held epic; the Default workspace holds a chat, a paused epic with a Fix agent and an epic with an Investigate agent; Other holds a project-level Fix agent and the One-off agents). The sidebar follows the active workspace; the chevron expands an epic's agents; Move from a sidebar row and an Epics card, Remove with its confirmation, hidden on Default.
+- **Workspaces** (scenario `workspaces`: "gx bugs" holds a live and a held Design, "research" an implementation epic and a held epic; the Default workspace holds a chat, a paused epic with a Fix agent and an epic with an Investigate agent; Other holds a project-level Fix agent and the One-off agents). The sidebar follows the active workspace; the chevron expands an epic's agents; Move from a sidebar row, an Epics card and a jump row (opening an item in another workspace switches the sidebar, a held one does not), Remove with its confirmation, hidden on Default; a chat shows in its workspace; Hold from a card, sidebar row, page header and jump row, the "Hold and end sessions" confirmation for a live Design, and the collapsed "On hold (n)" section; the Other section (same in every workspace, no Move or Hold, opening a row keeps the workspace, a ticket's Fix agent nests under its epic); the Manage workspaces dialog (order, rename, reorder, delete naming its members, no controls on Default); CLI rename, reorder and delete reaching the open page without a reload, deleting the active workspace dropping to Default.
 
 ### `united.e2e.ts`
 
