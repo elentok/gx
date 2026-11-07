@@ -183,17 +183,7 @@ func newAgentTranscriptCmd(d Deps) *cobra.Command {
 // fails with the reason on stderr (the returned error) and nothing on stdout;
 // --json reports found=false instead.
 func runAgentTranscript(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, id string) error {
-	var res wire.SessionTranscriptResponse
-	var lookupErr error
-	if id == "" {
-		lookupErr = fmt.Errorf("not in a gx session (%s unset)", holder.AgentSessionEnv)
-	} else if cl, err := client(); err != nil {
-		lookupErr = err
-	} else if res, err = cl.Sessions.Transcript(ctx, id); err != nil {
-		lookupErr = fmt.Errorf("read transcript: %w", err)
-	} else if !res.Found {
-		lookupErr = fmt.Errorf("no transcript file found for session %s", id)
-	}
+	res, lookupErr := lookupTranscript(ctx, client, id)
 	if jsonOut {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
@@ -204,6 +194,26 @@ func runAgentTranscript(ctx context.Context, client func() (*apiclient.Client, e
 	}
 	_, err := fmt.Fprintln(w, res.Path)
 	return err
+}
+
+// lookupTranscript fetches session id's transcript; the error says why there
+// is no file, and res is whatever the server returned alongside it.
+func lookupTranscript(ctx context.Context, client func() (*apiclient.Client, error), id string) (wire.SessionTranscriptResponse, error) {
+	if id == "" {
+		return wire.SessionTranscriptResponse{}, fmt.Errorf("not in a gx session (%s unset)", holder.AgentSessionEnv)
+	}
+	cl, err := client()
+	if err != nil {
+		return wire.SessionTranscriptResponse{}, err
+	}
+	res, err := cl.Sessions.Transcript(ctx, id)
+	if err != nil {
+		return res, fmt.Errorf("read transcript: %w", err)
+	}
+	if !res.Found {
+		return res, fmt.Errorf("no transcript file found for session %s", id)
+	}
+	return res, nil
 }
 
 // newAgentStepCmd is `gx agent step`: the calling agent reports the Design

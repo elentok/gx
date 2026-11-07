@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/nativerunner/holder"
@@ -117,30 +118,22 @@ func TestDesignsOpenCmd_IdeaFromStdin(t *testing.T) {
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
 
-	text, err := readIdea("-", strings.NewReader("an idea from stdin"))
-	if err != nil || text != "an idea from stdin" {
-		t.Fatalf("readIdea = %q, %v", text, err)
-	}
-	if text, _ := readIdea("literal", strings.NewReader("ignored")); text != "literal" {
-		t.Errorf("literal idea = %q", text)
-	}
-
 	for name, tc := range map[string]struct {
 		slug, idea, reason string
 	}{
 		"fits":     {"stdin-idea", "an idea", ""},
 		"too long": {"long-idea", strings.Repeat("a", wire.MaxSessionPromptBytes+1), wire.ReasonPromptTextTooLong},
 	} {
-		got, err := readIdea("-", strings.NewReader(tc.idea))
-		if err != nil {
-			t.Fatal(err)
-		}
-		req, err := designOpenRequest(tc.slug, got, "proj", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		cmd := newDesignsOpenCmd(Deps{Env: cmdbase.Env{
+			Env:       cmdtest.EnvFor(t),
+			NewClient: func() (*apiclient.Client, error) { return h.Client, nil },
+		}})
 		var out bytes.Buffer
-		err = runDesignsOpen(context.Background(), h.Client, &out, false, req)
+		cmd.SetIn(strings.NewReader(tc.idea))
+		cmd.SetOut(&out)
+		cmd.SetArgs([]string{tc.slug, "--idea", "-", "--project", "proj"})
+		cmd.SilenceUsage, cmd.SilenceErrors = true, true
+		err := cmd.ExecuteContext(context.Background())
 		if tc.reason == "" && err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
