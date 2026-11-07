@@ -43,6 +43,11 @@ func (a *Admin) RemoveFromWorkspace(ctx context.Context, key string) (wire.Works
 	return a.workspaceWrite(ctx, "/v1/workspaces/remove", wire.WorkspaceRequest{Key: key})
 }
 
+// SetWorkspaceSort sets a workspace's Sort. A refusal is a result (Refused set).
+func (a *Admin) SetWorkspaceSort(ctx context.Context, name, sort string) (wire.WorkspaceResult, error) {
+	return a.workspaceWrite(ctx, "/v1/workspaces/sort", wire.WorkspaceRequest{Name: name, Sort: sort})
+}
+
 // HoldEpic holds a Design or epic; yes confirms exiting the Design's live
 // sessions. A refusal is a result (Refused set).
 func (a *Admin) HoldEpic(ctx context.Context, epic string, yes bool) (wire.HoldResult, error) {

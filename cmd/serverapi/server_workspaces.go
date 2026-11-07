@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -50,12 +51,15 @@ func newServerWorkspacesCmd(d Deps) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return runWorkspaceWrite(ctx, c.OutOrStdout(), jsonOut, func() (wire.WorkspaceResult, error) { return do(ctx, cl, args) })
+				return runWorkspaceWrite(ctx, c.OutOrStdout(), jsonOut, func(w io.Writer, l []wire.Workspace) error {
+					return printWorkspaces(w, wire.WorkspaceList{Workspaces: l})
+				}, func() (wire.WorkspaceResult, error) { return do(ctx, cl, args) })
 			},
 		}
 		v.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 		cmd.AddCommand(v)
 	}
+	cmd.AddCommand(newWorkspaceSortCmd(d))
 	write("create <name>", "add a workspace last", cobra.ExactArgs(1),
 		func(ctx context.Context, cl *apiclient.Client, a []string) (wire.WorkspaceResult, error) {
 			return cl.Admin.CreateWorkspace(ctx, a[0])
@@ -83,9 +87,61 @@ func newServerWorkspacesCmd(d Deps) *cobra.Command {
 	return cmd
 }
 
-// runWorkspaceWrite prints the result of one workspace write. With --json the
+// newWorkspaceSortCmd reads a workspace's Sort, or sets it when a value is given.
+func newWorkspaceSortCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	v := &cobra.Command{
+		Use:   "sort <workspace> [value]",
+		Short: "show a workspace's Sort, or set it to needs-you, activity or name",
+		Args:  cobra.RangeArgs(1, 2),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			name := args[0]
+			show := func(w io.Writer, l []wire.Workspace) error {
+				for _, ws := range l {
+					if strings.EqualFold(ws.Name, name) {
+						_, err := fmt.Fprintln(w, sortOrDefault(ws.Sort))
+						return err
+					}
+				}
+				return fmt.Errorf("refused (%s): no workspace named %q", wire.ReasonWorkspaceUnknown, name)
+			}
+			if len(args) == 2 {
+				return runWorkspaceWrite(ctx, c.OutOrStdout(), jsonOut, show, func() (wire.WorkspaceResult, error) {
+					return cl.Admin.SetWorkspaceSort(ctx, name, args[1])
+				})
+			}
+			l, err := cl.Reads.Workspaces(ctx)
+			if apiclient.IsNotRunning(err) {
+				return fmt.Errorf("no server is running; start it with `gx server start`")
+			}
+			if err != nil {
+				return fmt.Errorf("server read failed: %w", err)
+			}
+			return show(c.OutOrStdout(), l.Workspaces)
+		},
+	}
+	v.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON when setting")
+	return v
+}
+
+func sortOrDefault(s string) string {
+	if s == "" {
+		return wire.SortDefault
+	}
+	return s
+}
+
+// runWorkspaceWrite prints the result of one workspace write through show. With --json the
 // result or refusal is the output; otherwise a refusal is an error.
-func runWorkspaceWrite(_ context.Context, w io.Writer, jsonOut bool, do func() (wire.WorkspaceResult, error)) error {
+func runWorkspaceWrite(_ context.Context, w io.Writer, jsonOut bool, show func(io.Writer, []wire.Workspace) error, do func() (wire.WorkspaceResult, error)) error {
 	res, err := do()
 	switch {
 	case apiclient.IsNotRunning(err):
@@ -99,7 +155,7 @@ func runWorkspaceWrite(_ context.Context, w io.Writer, jsonOut bool, do func() (
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
 	}
-	return printWorkspaces(w, wire.WorkspaceList{Workspaces: res.Workspaces})
+	return show(w, res.Workspaces)
 }
 
 func printWorkspaces(w io.Writer, l wire.WorkspaceList) error {

@@ -22,11 +22,13 @@ type WorkspaceList struct {
 // WorkspaceRequest is a workspace write: Name is the workspace acted on, To the
 // new name of a rename. Key is the Design, epic or chat a move or remove acts
 // on (Name is the target workspace of a move); Order is the full new order of a reorder.
+// Sort is the Sort* value a sort write sets on Name.
 type WorkspaceRequest struct {
 	Name  string   `json:"name"`
 	To    string   `json:"to,omitempty"`
 	Key   string   `json:"key,omitempty"`
 	Order []string `json:"order,omitempty"`
+	Sort  string   `json:"sort,omitempty"`
 }
 
 // Where a session sits in the sidebar.

@@ -71,6 +71,7 @@ func Routes(get func() *Store, listed func() []wire.Workspace) []wire.Route {
 		write("POST /v1/workspaces/delete", func(s *Store, r wire.WorkspaceRequest) error { return s.Delete(r.Name) }),
 		write("POST /v1/workspaces/reorder", func(s *Store, r wire.WorkspaceRequest) error { return s.Reorder(r.Order) }),
 		write("POST /v1/workspaces/move", func(s *Store, r wire.WorkspaceRequest) error { return s.Join(r.Key, r.Name) }),
+		write("POST /v1/workspaces/sort", func(s *Store, r wire.WorkspaceRequest) error { return s.SetSort(r.Name, r.Sort) }),
 		write("POST /v1/workspaces/remove", func(s *Store, r wire.WorkspaceRequest) error { return s.Remove(r.Key) }),
 	}
 }

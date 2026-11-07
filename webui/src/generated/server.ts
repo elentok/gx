@@ -2867,12 +2867,14 @@ export interface WorkspaceList {
  * WorkspaceRequest is a workspace write: Name is the workspace acted on, To the
  * new name of a rename. Key is the Design, epic or chat a move or remove acts
  * on (Name is the target workspace of a move); Order is the full new order of a reorder.
+ * Sort is the Sort* value a sort write sets on Name.
  */
 export interface WorkspaceRequest {
   name: string;
   to?: string;
   key?: string;
   order?: string[];
+  sort?: string;
 }
 export const PlacementChat = "chat";
 export const PlacementEpic = "epic";
