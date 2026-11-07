@@ -7,6 +7,7 @@ import { MIN_PASSWORD, PASSWORD_HINT } from "../auth/refusals";
 import { SETTINGS_HREF } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
+import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useFetched } from "../useFetched";
@@ -68,7 +69,7 @@ export function ChangePasswordView({
   return (
     <Frame>
       <BackLink />
-      <PageHeader title="Change password" />
+      <PageHeader title="Change password" icon={<PageIcon kind="settings" />} />
       <Form
         onSubmit={(e) => {
           const v = formValues(e.currentTarget);
@@ -137,7 +138,7 @@ export function AuthenticatorView({
   return (
     <Frame>
       <BackLink />
-      <PageHeader title={mode === "add" ? "Add authenticator" : "Reset authenticator"} />
+      <PageHeader title={mode === "add" ? "Add authenticator" : "Reset authenticator"} icon={<PageIcon kind="settings" />} />
       {next ? (
         <Form onSubmit={(e) => onFinish({ totp_code: formValues(e.currentTarget).totp_code })}>
           <AddAuthenticator secret={next.secret} uri={next.uri} error={error} codeLabel="Code from the new app" />

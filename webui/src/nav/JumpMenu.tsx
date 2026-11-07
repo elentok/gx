@@ -252,6 +252,7 @@ export function RowList({
   footer,
   hotkey = true,
   fontSize,
+  plain,
 }: {
   name: string;
   label: string;
@@ -261,6 +262,8 @@ export function RowList({
   hotkey?: boolean;
   /** Overrides the shared page-title size, for a title that sits in a header row. */
   fontSize?: string;
+  /** Renders a div instead of the h1, for a page whose PageHeader already has one. */
+  plain?: boolean;
 }) {
   const phone = !useWide();
   const [open, setOpen] = useState(false);
@@ -288,7 +291,7 @@ export function RowList({
 
   return (
     <Box ref={root} position="relative" minW="0">
-      <Heading as="h1" fontFamily="condensed" {...titleSize(!phone)} fontSize={fontSize ?? titleSize(!phone).fontSize}>
+      <Heading as={plain ? "div" : "h1"} fontFamily="condensed" {...titleSize(!phone)} fontSize={fontSize ?? titleSize(!phone).fontSize}>
         <chakra.button
           type="button"
           aria-haspopup="dialog"
@@ -300,7 +303,8 @@ export function RowList({
           cursor="pointer"
           onClick={() => setOpen((o) => !o)}
         >
-          <Text as="span" lineClamp="1">
+          {/* Beside a PageHeader the title is already shown, so the name stays only as the button's accessible name. */}
+          <Text as="span" lineClamp="1" {...(plain && { srOnly: true })}>
             {name}
           </Text>
           <Text as="span" aria-hidden fontSize="16px" color="text.dim">

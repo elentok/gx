@@ -6,6 +6,7 @@ import { CER_LABEL, Fingerprint, PROFILE_LABEL, type CertInfo } from "../auth/ce
 import { SETTINGS_HREF } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
+import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { Spinner } from "../ui/spinner/Spinner";
@@ -66,7 +67,7 @@ export function SettingsHomeView({
 }) {
   return (
     <Frame>
-      <PageHeader title="Settings" />
+      <PageHeader title="Settings" icon={<PageIcon kind="settings" />} />
       <Group label="Security">
         <LinkRow
           href={LOGINS_HREF}
@@ -107,7 +108,7 @@ export function WebLoginsView({ logins, now }: { logins: WebLoginEntry[]; now: n
   return (
     <Frame>
       <BackLink />
-      <PageHeader title="Web logins" />
+      <PageHeader title="Web logins" icon={<PageIcon kind="settings" />} />
       <Text mt="2" fontSize="sm" color="text.muted">
         A web login ends after 90 days without use.
       </Text>
@@ -170,7 +171,7 @@ export function WebLoginView({
   return (
     <Frame>
       <BackLink />
-      <PageHeader title={login.name} />
+      <PageHeader title={login.name} icon={<PageIcon kind="settings" />} />
       <Group>
         <Box data-mock-part="login-facts">
           <Fact label="Signed in" value={signedInText(login.created)} />
@@ -233,7 +234,7 @@ export function CertificateView({ cert }: { cert: CertInfo }) {
   return (
     <Frame>
       <BackLink />
-      <PageHeader title="Certificate" />
+      <PageHeader title="Certificate" icon={<PageIcon kind="settings" />} />
       <Box data-mock-part="downloads">
         <Group>
           <LinkRow href={cert.profile_path} label={PROFILE_LABEL} />

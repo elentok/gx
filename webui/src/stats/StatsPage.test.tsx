@@ -88,6 +88,12 @@ const cardText = async (title: string) => {
   return el?.textContent ?? "";
 };
 
+test("the page has a Stats heading whose subtitle names the project and range", async () => {
+  renderStats(async () => statsOf(), "/stats?range=30&project=gx");
+  expect(await screen.findByRole("heading", { level: 1, name: "Stats" })).toBeTruthy();
+  expect(screen.getByTestId("page-header-subtitle").textContent).toBe("gx · last 30 days");
+});
+
 test("the Throughput cards follow their headline rules", async () => {
   renderStats(async () => statsOf());
   expect(await cardText("Tickets merged")).toContain("6");

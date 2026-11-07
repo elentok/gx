@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router";
 import { useConnectionContext } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { DetailPage } from "../page/DetailPage";
+import { PageHeader } from "../page/PageHeader";
+import { PageIcon } from "../page/PageIcon";
 import { SectionHeading } from "../page/SectionHeading";
 import { Button } from "../ui/button/Button";
 import type { ReactNode } from "react";
@@ -204,6 +206,9 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
 
   return (
     <DetailPage title={{ kind: "Stats" }}>
+      <Box mt="4">
+        <PageHeader title="Stats" icon={<PageIcon kind="stats" />} subtitle={`${project || "All projects"} · last ${range} days`} />
+      </Box>
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <chakra.select aria-label="Project" value={project} onChange={(e) => set("project", e.target.value)} {...selectProps}>
           <option value="">All projects</option>

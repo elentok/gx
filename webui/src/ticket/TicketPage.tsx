@@ -8,6 +8,7 @@ import { DetailPage } from "../page/DetailPage";
 import { VerdictLine, verdictText } from "../verdict";
 import { isExited } from "../agents/sessionWrites";
 import { PageHeader } from "../page/PageHeader";
+import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
@@ -51,7 +52,7 @@ export function TicketPage({
           <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
         ) : detail ? (
           <>
-            <PageHeader title={detail.title}>
+            <PageHeader title={detail.title} icon={<PageIcon kind="ticket" />} subtitle={address}>
               <TicketHeader detail={detail} now={Date.now()} />
               {verdict && (
                 <Box mt="2">

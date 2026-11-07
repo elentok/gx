@@ -32,12 +32,15 @@ export function SessionSwitcher({
   current,
   onNew,
   fontSize,
+  plain,
 }: {
   name: string;
   sessions: SessionInfo[];
   current?: string;
   onNew: () => void;
   fontSize?: string;
+  /** Sits beside a PageHeader, which owns the h1. */
+  plain?: boolean;
 }) {
   const { showQueue, showDesign } = useGroupVisibility();
   const sections = useMemo<ListSection[]>(() => {
@@ -52,5 +55,5 @@ export function SessionSwitcher({
     () => ({ key: "new", title: "+ New session", subtitle: "", href: "#/agents", searchText: "", onSelect: onNew }),
     [onNew],
   );
-  return <RowList name={name} label="Switch session" placeholder="Filter sessions" sections={sections} footer={footer} fontSize={fontSize} />;
+  return <RowList name={name} label="Switch session" placeholder="Filter sessions" sections={sections} footer={footer} fontSize={fontSize} plain={plain} />;
 }

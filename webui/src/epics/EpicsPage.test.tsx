@@ -94,6 +94,13 @@ const sectionRegions = () => screen.queryAllByRole("region").filter((r) => r.has
 const regionNames = () => sectionRegions().map((r) => r.getAttribute("aria-labelledby"));
 const toggle = (title: string) => screen.getByRole("button", { name: new RegExp(`^.?\\s*${title}`) });
 
+test("the page has an Epics heading with the epic count and the New Design action", async () => {
+  await loaded(mixed());
+  expect(screen.getByRole("heading", { level: 1, name: "Epics" })).toBeTruthy();
+  expect(screen.getByTestId("page-header-subtitle").textContent).toMatch(/^\d+ epics?$/);
+  expect(within(screen.getByTestId("page-header-actions")).getByRole("button", { name: "New Design" })).toBeTruthy();
+});
+
 test("six sections show in order with counts, Ready to design and Finished start collapsed", async () => {
   await loaded(mixed());
   expect(regionNames()).toEqual([

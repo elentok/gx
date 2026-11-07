@@ -13,6 +13,7 @@ import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { Modal } from "../ui/modal/Modal";
+import { PageHeader } from "../page/PageHeader";
 import { AgentChat } from "./AgentChat";
 import { AgentComposer } from "./AgentComposer";
 import { PromoteButton } from "./PromoteButton";
@@ -47,45 +48,49 @@ function SessionHeader({
   const { tone } = statusMark(s);
   const map = designOf(s);
   const wide = useWide();
-  if (!wide) {
-    return (
-      <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3" pb="2" borderBottomWidth="1px" borderColor="border">
-        <Link href={AGENTS_HREF} aria-label="All sessions" fontSize="2xl" lineHeight="1" px="2" color="text.muted">
-          ‹
-        </Link>
-        <StatusMark session={s} />
-        <Box display="flex" flexDirection="column" minW="0">
-          <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} />
-          <Text as="span" fontSize="sm" color="text.dim">
-            {s.project} · {stateLabel(s)}
-          </Text>
-          <AgentLine session={s} wide={false} />
-        </Box>
-        {map && <DesignLink map={map} ml="auto" />}
-        <Box ml={map ? undefined : "auto"}>{actions}</Box>
-        {promote && <Box flexBasis="100%">{promote}</Box>}
-      </Box>
-    );
-  }
   return (
-    <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3">
-      <StatusMark session={s} />
-      <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} fontSize="26px" />
-      <Chip tone={tone} fontSize="12.5px" outlined={false}>
-        {stateLabel(s)}
-      </Chip>
-      <AgentLine session={s} wide />
-      <Text as="span" fontSize="sm" color="text.dim">
-        {s.dir}
-      </Text>
-      {s.ticket && (
-        <Text as="span" fontSize="sm" color="text.dim">
-          {s.ticket}
-        </Text>
-      )}
-      {map && <DesignLink map={map} ml="auto" />}
-      {promote}
-      <Box ml={map ? undefined : "auto"}>{actions}</Box>
+    <Box as="header" mb="3">
+      <PageHeader
+        title={s.name || s.id}
+        icon={
+          wide ? undefined : (
+            <Link href={AGENTS_HREF} aria-label="All sessions" fontSize="2xl" lineHeight="1" px="2" color="text.muted">
+              ‹
+            </Link>
+          )
+        }
+        subtitle={wide ? s.project : `${s.project} · ${stateLabel(s)}`}
+        actions={
+          <>
+            <StatusMark session={s} />
+            <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} fontSize="14px" plain />
+            {map && <DesignLink map={map} />}
+            {wide && promote}
+            {actions}
+          </>
+        }
+        meta={
+          <Box display="flex" alignItems="center" flexWrap="wrap" gap="2">
+            {wide && (
+              <Chip tone={tone} fontSize="12.5px" outlined={false}>
+                {stateLabel(s)}
+              </Chip>
+            )}
+            <AgentLine session={s} wide={wide} />
+            {wide && (
+              <Text as="span" fontSize="sm" color="text.dim">
+                {s.dir}
+              </Text>
+            )}
+            {wide && s.ticket && (
+              <Text as="span" fontSize="sm" color="text.dim">
+                {s.ticket}
+              </Text>
+            )}
+            {!wide && promote && <Box flexBasis="100%">{promote}</Box>}
+          </Box>
+        }
+      />
     </Box>
   );
 }

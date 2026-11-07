@@ -2,6 +2,7 @@ import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
+import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { Spinner } from "../ui/spinner/Spinner";
@@ -72,7 +73,7 @@ export function AgentsSettingsView({
   return (
     <Frame>
       <BackLink />
-      <PageHeader title="Agents" />
+      <PageHeader title="Agents" icon={<PageIcon kind="settings" />} />
       {note && (
         <Text mt="1" fontSize="sm" color="text.dim">
           {note}

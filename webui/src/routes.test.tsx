@@ -157,10 +157,10 @@ test("navigating between routes changes the tab title", async () => {
 
 const epicsFilter = () => screen.getByRole("searchbox", { name: "Filter epics" });
 
-test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])("%s lands on the Epics page with no h1", async (path) => {
+test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])("%s lands on the Epics page with its Epics h1", async (path) => {
   renderAt(path, okFor);
   await waitFor(() => expect(epicsFilter()).toBeTruthy());
-  expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+  expect(screen.getByRole("heading", { level: 1, name: "Epics" })).toBeTruthy();
 });
 
 test.each(["/agents", "/agents/s-1"])("%s renders the Agents page", async (path) => {

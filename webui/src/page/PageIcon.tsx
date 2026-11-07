@@ -1,6 +1,11 @@
 const PATHS = {
   epic: "M3 4.5h10M3 8h10M3 11.5h6",
   design: "M10.5 2.5l3 3-7.5 7.5H3v-3l7.5-7.5z",
+  epics: "M3 3.5h10M3 6.5h10M3 9.5h10M3 12.5h6",
+  stats: "M3.5 13V8M8 13V3M12.5 13V6",
+  settings: "M3 5h10M3 11h10M6 3v4M10 9v4",
+  ticket: "M3 4h10v8H3zM6 7h4M6 9.5h3",
+  agent: "M3 3.5h10v7H8l-3 2.5v-2.5H3z",
 } as const;
 
 /** The large icon in a PageHeader for the pages that have a kind. */

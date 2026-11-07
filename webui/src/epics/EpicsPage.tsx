@@ -10,6 +10,8 @@ import type { OpenDesign } from "../design/open";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { designHref } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
+import { PageHeader } from "../page/PageHeader";
+import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
@@ -155,6 +157,14 @@ export function EpicsPage({
 
   return (
     <DetailPage title={{ kind: "Epics" }}>
+      <Box mt="4">
+        <PageHeader
+          title="Epics"
+          icon={<PageIcon kind="epics" />}
+          subtitle={list ? `${list.epics.length} ${list.epics.length === 1 ? "epic" : "epics"}` : undefined}
+          actions={list && list.epics.length > 0 ? newDesign : undefined}
+        />
+      </Box>
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <Input
           type="search"
@@ -169,7 +179,6 @@ export function EpicsPage({
           onChange={(e) => setQuery(e.target.value)}
         />
         {projects.length > 1 && <ProjectFilter projects={projects} selected={filterProjects ?? []} onChange={chooseProjects} />}
-        {list && list.epics.length > 0 && newDesign}
       </Box>
       {!bannerHidden && <MissingBanner missing={missing} onSetUp={setSettingUp} onDismiss={() => setBannerHidden(true)} />}
       {failed ? (
