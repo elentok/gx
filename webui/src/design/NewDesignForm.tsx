@@ -8,6 +8,7 @@ import { postOpenDesign, type OpenDesign } from "./open";
 import { clearUnsaved, NEW_DRAFT_KEY, readUnsaved, stashUnsaved } from "./unsaved";
 import { useDesignWrite } from "./SessionControls";
 import { useWide } from "../useWide";
+import { DraftSwitcher } from "./DraftSwitcher";
 
 /** The draft calls the form makes; the prop defaults to the real ones. */
 export interface DraftsClient {
@@ -79,6 +80,8 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
   // `undefined` is still loading; `null` is no draft to open.
   const [initial, setInitial] = useState<DesignDraft | null | undefined>();
   const [restored, setRestored] = useState<Restored>();
+  // A new generation remounts the form on another draft.
+  const [generation, setGeneration] = useState(0);
   useEffect(() => {
     let live = true;
     (async () => {
@@ -111,7 +114,12 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
       </BottomSheet>
     );
   }
-  return <DraftForm {...props} drafts={drafts} initial={initial} restored={restored} />;
+  const switchTo = (next: DesignDraft | null) => {
+    setRestored(undefined);
+    setInitial(next);
+    setGeneration((g) => g + 1);
+  };
+  return <DraftForm key={generation} {...props} drafts={drafts} initial={initial} restored={restored} onSwitch={switchTo} />;
 }
 
 const LEGACY_DRAFT_KEY = "gx.newDesign.draft";
@@ -172,8 +180,10 @@ function DraftForm({
   drafts,
   initial,
   restored,
-}: FormProps & { drafts: DraftsClient; initial: DesignDraft | null; restored?: Restored }) {
+  onSwitch,
+}: FormProps & { drafts: DraftsClient; initial: DesignDraft | null; restored?: Restored; onSwitch: (next: DesignDraft | null) => void }) {
   const sheetMode = !useWide();
+  const slugInput = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<Fields>(() => ({
     slug: initial?.slug ?? "",
     idea: initial?.idea ?? "",
@@ -342,6 +352,40 @@ function DraftForm({
     onClose();
   };
 
+  /** Saves the open draft (a blank one is deleted instead), then calls `next` to open another. */
+  const leaveDraft = async (next: () => Promise<void>) => {
+    clearTimeout(timer.current);
+    if (hasText(latest.current)) {
+      flush();
+      await chain.current;
+    } else {
+      // A save in flight may be the one that gives the blank draft its id.
+      await chain.current;
+      if (server.current.id) await drafts.remove(server.current.id).catch(() => {});
+    }
+    await next();
+  };
+  const switchDraft = (id: string) =>
+    leaveDraft(async () => {
+      const res = await drafts.read(id);
+      if (res.kind !== "ok") return;
+      finished.current = true;
+      onSwitch(res.draft);
+    });
+  const newDraft = () => {
+    if (!hasText(latest.current)) return slugInput.current?.focus();
+    return leaveDraft(async () => {
+      finished.current = true;
+      onSwitch(null);
+    });
+  };
+  const loadDrafts = async () => {
+    clearTimeout(timer.current);
+    if (!blocked.current) flush();
+    await chain.current;
+    return drafts.list();
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const slug = draft.slug.trim();
@@ -378,10 +422,8 @@ function DraftForm({
 
   return (
     <BottomSheet {...sheetProps} onClose={close} as="form" onSubmit={submit}>
-      <Box display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
-        <Text fontWeight="600" minW="0" truncate>
-          {label}
-        </Text>
+      <Box position="relative" display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
+        <DraftSwitcher label={label} currentId={server.current.id} load={loadDrafts} onPick={switchDraft} onNew={newDraft} />
         <Box flex="1" />
         {status !== "none" && (
           <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
@@ -427,6 +469,7 @@ function DraftForm({
           autoCapitalize="off"
           spellCheck={false}
           autoFocus
+          ref={slugInput}
           {...field}
           flex="1"
           minW="0"

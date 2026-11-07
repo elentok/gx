@@ -116,7 +116,7 @@ test("the form opens on the latest draft's text and label", async () => {
   expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("fresh");
   expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("an idea");
   expect(project()).toBe("blog");
-  expect(screen.getByText("fresh", { selector: "p" })).toBeTruthy();
+  expect(screen.getByText("fresh", { selector: "span" })).toBeTruthy();
 });
 
 test("typing shows Saving..., saves 800 ms after the last keystroke with the revision, then shows Saved", async () => {
@@ -168,11 +168,11 @@ test("a blank form shows no status and saves nothing, even when typed in and cle
 
 test("the title is the name, else the slug, else the idea's first words", async () => {
   await mount({}, { name: "Named", slug: "slug", idea: "words" });
-  expect(screen.getByText("Named", { selector: "p" })).toBeTruthy();
+  expect(screen.getByText("Named", { selector: "span" })).toBeTruthy();
   cleanup();
   await mount({}, { slug: "slug", idea: "words" });
   type("Epic slug", "");
-  expect(screen.getByText("words", { selector: "p" })).toBeTruthy();
+  expect(screen.getByText("words", { selector: "span" })).toBeTruthy();
 });
 
 test("Close, Escape and a backdrop click close and save at once", async () => {
@@ -406,7 +406,7 @@ test("Tab is trapped by the shared Modal, not by the form", async () => {
   const start = screen.getByRole("button", { name: "Start design" });
   start.focus();
   fireEvent.keyDown(start, { key: "Tab" });
-  expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Project" }));
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: /fresh/, expanded: false }));
   fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
   expect(document.activeElement).toBe(start);
 });
@@ -625,4 +625,72 @@ test("a second open after a successful move creates nothing", async () => {
   cleanup();
   await mount({ drafts: base.client });
   expect(base.save).toHaveBeenCalledTimes(1);
+});
+
+/** Two stored drafts: "alpha" (gx, 2 images, opened first) and "beta" (blog, 3 h old). */
+function twoDrafts(aText: Partial<DesignDraft> = {}) {
+  const a: DesignDraft = { id: "a", project: "gx", slug: "alpha", idea: "first idea", images: [], revision: 1, edited_at: new Date().toISOString(), ...aText };
+  const b: DesignDraft = { id: "b", project: "blog", slug: "beta", idea: "second idea", images: [], revision: 1, edited_at: new Date(Date.now() - 3 * 3_600_000).toISOString() };
+  const fake = fakeDrafts();
+  const client: DraftsClient = {
+    ...fake.client,
+    list: async () => [
+      { ...a, image_count: 2 },
+      { ...b, image_count: 0 },
+    ],
+    read: async (id) => ({ kind: "ok", draft: id === "a" ? a : b }),
+  };
+  return { ...fake, client };
+}
+const openMenu = (name: RegExp) => act(async () => void fireEvent.click(screen.getByRole("button", { name })));
+const pick = (name: string | RegExp) => act(async () => void fireEvent.click(screen.getByRole("menuitem", { name })));
+
+test("the draft menu lists label, project, images and time, and marks the open draft", async () => {
+  await mount({ drafts: twoDrafts().client });
+  await openMenu(/alpha/);
+  const rows = screen.getAllByRole("menuitem").map((r) => r.textContent);
+  expect(rows[0]).toContain("alpha");
+  expect(rows[0]).toContain("gx · 2 images · editing now");
+  expect(rows[1]).toContain("beta");
+  expect(rows[1]).toContain("blog · edited 3 h ago");
+  expect(rows[2]).toContain("New draft");
+});
+
+test("choosing another draft saves the current one first, then shows the other's text and project", async () => {
+  const { client, save } = twoDrafts();
+  await mount({ drafts: client });
+  type("Rough idea", "changed");
+  await openMenu(/alpha/);
+  await pick(/beta/);
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "a", idea: "changed" }));
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("beta");
+  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("second idea");
+  expect(project()).toBe("blog");
+});
+
+test("New draft shows a blank form with the slug field focused", async () => {
+  await mount({ drafts: twoDrafts().client });
+  await openMenu(/alpha/);
+  await pick("New draft");
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("");
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }));
+});
+
+test("New draft on a blank draft refocuses the slug and creates nothing", async () => {
+  const { save, remove } = await mount();
+  await openMenu(/New draft/);
+  screen.getByRole("textbox", { name: "Rough idea" }).focus();
+  await pick("New draft");
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }));
+  expect(save).not.toHaveBeenCalled();
+  expect(remove).not.toHaveBeenCalled();
+});
+
+test("switching away from a blank saved draft deletes it and saves nothing", async () => {
+  const { client, save, remove } = twoDrafts({ slug: "", idea: "" });
+  await mount({ drafts: client });
+  await openMenu(/New draft/);
+  await pick(/beta/);
+  expect(remove).toHaveBeenCalled();
+  expect(save).not.toHaveBeenCalled();
 });

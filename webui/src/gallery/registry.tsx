@@ -8,6 +8,7 @@ import { authEntries } from "./authEntries";
 import { designFooterEntries } from "./designFooterEntries";
 import { shellEntries } from "./shellEntries";
 import { ConnectionContext, type Connection } from "../connection";
+import { DraftSwitcher } from "../design/DraftSwitcher";
 import { ImageStrip } from "../design/ImageStrip";
 import { NewDesignForm, type DraftsClient } from "../design/NewDesignForm";
 import type { ComposerImage } from "../design/useComposerImages";
@@ -15,7 +16,7 @@ import { CoarsePointerContext, type Device, DeviceContext, WideContext } from ".
 import { EpicPage } from "../epic/EpicPage";
 import { ErrorCard } from "../ErrorBoundary";
 import { EpicCard } from "../epics/EpicCard";
-import type { EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult } from "../generated/server";
+import type { DesignDraftItem, EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult } from "../generated/server";
 import { JumpRow } from "../nav/JumpMenu";
 import { Arc } from "../ui/arc/Arc";
 import { StatusIcon, STATUS_LABELS, type StatusKind } from "../ui/status-icon/StatusIcon";
@@ -102,6 +103,22 @@ const noDrafts: DraftsClient = {
 };
 
 // A transform makes the modal's fixed overlay fill this frame instead of the page.
+const sampleDrafts = (n: number): DesignDraftItem[] =>
+  Array.from({ length: n }, (_, i) => ({
+    id: `d${i}`,
+    project: ["gx", "blog", "dotfiles"][i % 3],
+    slug: `epic-${i + 1}`,
+    idea: "",
+    image_count: i % 4,
+    edited_at: new Date(Date.now() - i * 5_400_000).toISOString(),
+  }));
+
+const SwitcherFrame = ({ drafts, open }: { drafts: DesignDraftItem[]; open?: boolean }) => (
+  <Box position="relative" w="360px" h="380px" pt="2">
+    <DraftSwitcher label="epic-1" currentId={drafts[0]?.id} load={async () => drafts} onPick={() => {}} onNew={() => {}} defaultOpen={open} />
+  </Box>
+);
+
 const ModalFrame = ({ children, h = "600px", w = "800px" }: { children: ReactNode; h?: string; w?: string }) => (
   <ConnectionContext.Provider value={idleConnection}>
     <Box position="relative" h={h} w={w} transform="translateZ(0)" overflow="hidden" borderWidth="1px" borderColor="border">
@@ -880,6 +897,15 @@ export const galleryEntries: GalleryEntry[] = [
   ...authEntries,
   ...shellEntries,
   ...designFooterEntries,
+  {
+    name: "DraftSwitcher",
+    cases: [
+      { label: "menu closed", node: <SwitcherFrame drafts={sampleDrafts(3)} /> },
+      { label: "menu open", node: <SwitcherFrame drafts={sampleDrafts(3)} open /> },
+      { label: "empty list", node: <SwitcherFrame drafts={[]} open /> },
+      { label: "many drafts", node: <SwitcherFrame drafts={sampleDrafts(30)} open /> },
+    ],
+  },
   {
     name: "NewDesignForm",
     cases: [
