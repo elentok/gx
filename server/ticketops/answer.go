@@ -38,6 +38,23 @@ func answerFrame(seq int, answer, note string) string {
 	return frame
 }
 
+// yesNoReply words a yes-no choice as "Yes - <yes line>", so the agent reads
+// the consequence the person agreed to, not a bare Yes that fits two readings.
+// Other kinds, and a yes-no question with no consequence line, pass through.
+func yesNoReply(q ticketlog.Question, answer string) string {
+	if q.Kind != ticketlog.QuestionYesNo {
+		return answer
+	}
+	label, line := "Yes", q.Yes
+	if answer == "no" {
+		label, line = "No", q.No
+	}
+	if line == "" {
+		return label
+	}
+	return label + " - " + line
+}
+
 // validateAnswer checks the answer against the question's kind and returns the
 // text to deliver and log: the choice (or the free text) and the note.
 func validateAnswer(q ticketlog.Question, req wire.QueueRequest) (answer, note string, bad *wire.QueueResult) {
@@ -129,7 +146,7 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 				if err != nil {
 					return tickets.LogEvent{}, err
 				}
-				err = runner.Prompt(run.Session, answerFrame(open.Seq, answer, note))
+				err = runner.Prompt(run.Session, answerFrame(open.Seq, yesNoReply(q, answer), note))
 				switch {
 				case errors.Is(err, agentrunner.ErrNotReady):
 					return refuse(queue.Refusal(wire.ReasonAgentNotReady, err.Error()))

@@ -19,7 +19,10 @@ export const isAnswered = (a?: Answer) => !!a?.huh || !!a?.choice || !!a?.text?.
 export const answerText = (c: SessionRoundCard, a: Answer) => {
   if (a.huh) return HUH_MESSAGE;
   if (a.choice) {
-    if (c.kind === "yes-no") return a.choice === "yes" ? "Yes" : "No";
+    if (c.kind === "yes-no") {
+      const [label, line] = a.choice === "yes" ? ["Yes", c.yes] : ["No", c.no];
+      return line ? `${label} - ${line}` : label;
+    }
     return choicesOf(c).find((o) => o.id === a.choice)?.label ?? a.choice;
   }
   return a.text?.trim() ?? "";

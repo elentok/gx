@@ -782,7 +782,7 @@ test("Send answers the whole round in one prompt", async () => {
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect(post).toHaveBeenCalledWith({
     id: "s-a",
-    text: "Q1 - T1: Alpha\n  Note: because\nQ2 - T2: No\nQ3 - T3: free text\n\nNote:\noverall",
+    text: "Q1 - T1: Alpha\n  Note: because\nQ2 - T2: No - Nope\nQ3 - T3: free text\n\nNote:\noverall",
     last_message: "m9",
   });
 });
