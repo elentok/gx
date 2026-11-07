@@ -29,7 +29,7 @@ export function PageHeader({
   const claimHeader = shell?.claimHeader;
   useEffect(() => claimHeader?.(), [claimHeader]);
   const h1 = (
-    <Heading as="h1" fontFamily="inherit" fontWeight="normal" fontSize="19px" lineHeight="1.2" overflowWrap="anywhere">
+    <Heading as="h1" fontFamily="inherit" fontWeight="600" fontSize="19px" lineHeight="1.2" overflowWrap="anywhere">
       {title}
     </Heading>
   );
@@ -37,14 +37,15 @@ export function PageHeader({
   return (
     <Box>
       {rich ? (
-        <Box display="flex" alignItems="center" gap={wide ? "14px" : "10px"}>
+        <Box display="flex" flexWrap="wrap" alignItems="center" gap={wide ? "14px" : "10px"}>
           <MascotToggle />
           {icon ? (
             <Box data-testid="page-header-icon" flex="none" display="flex" alignItems="center" color="text.dim">
               {icon}
             </Box>
           ) : null}
-          <Box minW="0" flex="1">
+          {/* A wide action (the Design session button) wraps below instead of squeezing the title. */}
+          <Box minW="0" flex="1 1 140px">
             {h1}
             {subtitle ? (
               <Box
@@ -61,7 +62,7 @@ export function PageHeader({
             ) : null}
           </Box>
           {actions ? (
-            <Box data-testid="page-header-actions" flex="none" display="flex" alignItems="center" gap="10px">
+            <Box data-testid="page-header-actions" flex="none" ml="auto" display="flex" alignItems="center" gap="10px">
               {actions}
             </Box>
           ) : null}

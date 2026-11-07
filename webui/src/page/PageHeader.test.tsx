@@ -17,11 +17,11 @@ test("renders icon, title, subtitle, actions and meta bar", () => {
   expect(getByTestId("page-header-meta").textContent).toBe("meta");
 });
 
-test("the title is a 19px regular-weight heading, not a button", () => {
+test("the title is a 19px heading in the text font, not a button", () => {
   const { getByRole, queryByRole } = render(<PageHeader title="t" icon={<i />} />);
   const style = getComputedStyle(getByRole("heading", { level: 1 }));
   expect(style.fontSize).toBe("19px");
-  expect(style.fontWeight).toContain("normal");
+  expect(style.fontFamily).toBe("inherit");
   expect(queryByRole("button")).toBeNull();
 });
 
