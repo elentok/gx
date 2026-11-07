@@ -73,7 +73,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `newdesign.e2e.ts`
 
-- **26. New Design form.**
+- **26. New Design form.** Start, then the draft journey: autosave ("Saved") and reload, close and reopen on the same draft, `gx designs drafts` and `gx server epics`, a second context seeing the draft, conflict (Load theirs, Keep mine), a second draft with switching, naming, the row trash and Discard, and the last project picked on both devices.
 - **94. New Design launches at the strongest tier.**
 - **27. Design a not-started Design.**
 
