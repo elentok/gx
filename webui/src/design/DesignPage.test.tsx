@@ -463,6 +463,29 @@ test("confirming Delete calls the route and goes to the Epics page", async () =>
   expect(deleteDesign).toHaveBeenCalledWith({ epic: "gx:a" });
 });
 
+const chatFetcher: RouteFetchers = {
+  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, background: [] } }),
+};
+
+test("a Design with map images shows a read-only strip that opens the viewer with the map-image URL", async () => {
+  const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }, { id: "b.png" }] }));
+  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chatFetcher, mapImages });
+  const strip = await screen.findByLabelText("Images");
+  expect(mapImages).toHaveBeenCalledWith("gx:a");
+  expect(within(strip).queryByRole("button", { name: /remove/i })).toBeNull();
+  fireEvent.click(within(strip).getAllByRole("button")[1]);
+  const img = await screen.findByAltText("Image 2 of 2");
+  expect(img.getAttribute("src")).toBe("/v1/designs/images/read?epic=gx%3Aa&id=b.png");
+});
+
+test("a Design with no map images shows no strip", async () => {
+  const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [] }));
+  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chatFetcher, mapImages });
+  await waitFor(() => expect(mapImages).toHaveBeenCalled());
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByLabelText("Images")).toBeNull();
+});
+
 test("a refused delete shows the reason and keeps the page", async () => {
   const deleteDesign = vi.fn(async () => ({ refused: true, message: "a session is running" }));
   const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign });

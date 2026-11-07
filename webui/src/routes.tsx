@@ -14,6 +14,7 @@ import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./des
 import type { PostFocus } from "./design/focus";
 import type { PostPrompt } from "./design/prompt";
 import type { FetchScreen } from "./design/screen";
+import type { FetchMapImages } from "./design/mapImages";
 import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
 import type { FixAgent } from "./epic/fixAgent";
@@ -74,6 +75,7 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
         resume: fetchers.resume,
         fetchScreen: fetchers.screen,
         focus: fetchers.focus,
+        fetchMapImages: fetchers.mapImages,
       }}
     />
   );
@@ -85,6 +87,7 @@ export interface RouteFetchers {
   stop?: StopSession;
   resume?: ResumeSession;
   screen?: FetchScreen;
+  mapImages?: FetchMapImages;
   ticketScreen?: FetchScreen;
   ticket?: FetchDetail;
   epic?: FetchEpicDetail;

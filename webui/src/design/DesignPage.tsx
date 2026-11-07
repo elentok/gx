@@ -12,6 +12,8 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { hasChat, roundKeyOf, useSessionChat, type FetchChat } from "./chat";
 import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
+import { MapImageStrip } from "./MapImageStrip";
+import type { FetchMapImages } from "./mapImages";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import { AgentLine } from "./AgentLine";
@@ -34,6 +36,7 @@ export interface DesignDeps {
   resume?: ResumeSession;
   fetchScreen?: FetchScreen;
   focus?: PostFocus;
+  fetchMapImages?: FetchMapImages;
 }
 
 interface SessionStripProps {
@@ -221,6 +224,7 @@ function DesignBody({
           {!questions && detail && showsImplLink(detail) && (
             <ImplLink address={detail.impl_address!} />
           )}
+          <MapImageStrip address={address} fetcher={deps.fetchMapImages} />
           <DesignChat
             session={session}
             chat={chat}
