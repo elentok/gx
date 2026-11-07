@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 // binRoot holds every binary the tests build, so one RemoveAll after the run
@@ -11,6 +14,8 @@ import (
 var binRoot string
 
 func TestMain(m *testing.M) {
+	servertest.RunSessionProcesses()
+	herdrfake.RunHelperProcess()
 	var err error
 	binRoot, err = os.MkdirTemp("", "gx-e2e-")
 	if err != nil {

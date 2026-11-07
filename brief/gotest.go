@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
@@ -26,6 +28,14 @@ const (
 	serverParallelFactor = 2
 )
 
+// procCapScript is relative to the directory go test runs in.
+const procCapScript = "scripts/proc-cap"
+
+func fileExists(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && !st.IsDir()
+}
+
 // GoTest wraps `go test`.
 type GoTest struct{}
 
@@ -34,7 +44,7 @@ func (GoTest) Name() string { return "go-test" }
 // Plan always adds -json and -v, once. Flags after -args belong to the test
 // binary and pass through untouched. It caps GOMAXPROCS (see goTestProcs)
 // unless env already sets it.
-func (GoTest) Plan(env []string, _ string, args []string) (Invocation, error) {
+func (GoTest) Plan(env []string, dir string, args []string) (Invocation, error) {
 	exe, err := LookPath(env, "go")
 	if err != nil {
 		return Invocation{}, errors.New("go not found on PATH")
@@ -42,6 +52,13 @@ func (GoTest) Plan(env []string, _ string, args []string) (Invocation, error) {
 	rest, tail := splitArgs(args)
 	rest, _ = stripFlag(rest, false, "json", "v")
 	argv := []string{"test", "-json", "-v"}
+	// A test binary that re-runs itself (a missing TestMain hook) fork-storms;
+	// proc-cap makes that fail instead of taking the machine down.
+	if _, has := stripFlag(rest, true, "exec"); !has {
+		if procCap := filepath.Join(dir, procCapScript); fileExists(procCap) {
+			argv = append(argv, "-exec", procCap)
+		}
+	}
 	if _, has := stripFlag(rest, true, "timeout"); !has {
 		argv = append(argv, defaultTimeout)
 	}

@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -83,6 +84,47 @@ func TestGoTestPlan_TimeoutDefaultsButCallerWins(t *testing.T) {
 		if strings.Join(inv.Argv, " ") != strings.Join(tt.want, " ") {
 			t.Errorf("Plan(%v) argv = %v, want %v", tt.args, inv.Argv, tt.want)
 		}
+	}
+}
+
+func TestGoTestPlan_RunsTestBinariesThroughProcCapWhenPresent(t *testing.T) {
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := []string{"PATH=" + bin}
+	dir := t.TempDir()
+
+	inv, err := GoTest{}.Plan(env, dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(inv.Argv, "-exec") {
+		t.Errorf("argv = %v, want no -exec when the script is missing", inv.Argv)
+	}
+
+	script := filepath.Join(dir, "scripts", "proc-cap")
+	if err := os.MkdirAll(filepath.Dir(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(script, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	inv, err = GoTest{}.Plan(env, dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"test", "-json", "-v", "-exec", script, "-timeout=30m"}
+	if !slices.Equal(inv.Argv, want) {
+		t.Errorf("argv = %v, want %v", inv.Argv, want)
+	}
+
+	inv, err = GoTest{}.Plan(env, dir, []string{"-exec", "other", "./a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(inv.Argv, script) {
+		t.Errorf("argv = %v, caller's -exec must win", inv.Argv)
 	}
 }
 
