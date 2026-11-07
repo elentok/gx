@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -99,37 +98,16 @@ func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 }
 
 // The agents-blocked scenario seeds two dozen sessions one by one, so the
-// read-only TestBlockedScenario_* tests share one fixture. The last test to
-// finish stops it.
-var blocked struct {
-	mu   sync.Mutex
-	refs int
-	r    *running
-}
+// read-only TestBlockedScenario_* tests share one fixture, which TestMain
+// starts and stops.
+var blocked *running
 
 func sharedBlocked(t *testing.T) *running {
 	t.Helper()
-	blocked.mu.Lock()
-	defer blocked.mu.Unlock()
-	blocked.refs++
-	var kill func()
-	t.Cleanup(func() {
-		blocked.mu.Lock()
-		defer blocked.mu.Unlock()
-		if blocked.refs--; blocked.refs > 0 {
-			return
-		}
-		if r := blocked.r; r != nil {
-			blocked.r = nil
-			r.stop(t)
-		} else if kill != nil {
-			kill() // the launch failed after the process started
-		}
-	})
-	if blocked.r == nil {
-		blocked.r = launch(t, func(k func()) { kill = k }, "agents-blocked", nil)
+	if blocked == nil {
+		t.Skip("the agents-blocked fixture is not running: -run skipped the Blocked tests")
 	}
-	return blocked.r
+	return blocked
 }
 
 func TestBlockedScenario_BlockedSessionsSettleBlocked(t *testing.T) {

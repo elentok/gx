@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,6 +46,20 @@ func TestMain(m *testing.M) {
 				return 1
 			}
 		}
+		// The shared fixture's seeding is slow, so it starts here, outside
+		// every test's time limit. A -run that skips the Blocked tests skips it.
+		flag.Parse() // test.run is unset until flags are parsed
+		if f := flag.Lookup("test.run"); f == nil || f.Value.String() == "" || strings.Contains(f.Value.String(), "Blocked") {
+			var err error
+			blocked, err = launchProc(func(func()) {}, "agents-blocked", nil)
+			if blocked != nil {
+				defer blocked.kill()
+			}
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "agents-blocked fixture:", err)
+				return 1
+			}
+		}
 		return m.Run()
 	}())
 }
@@ -72,27 +87,37 @@ func startWith(t *testing.T, scenario string, env []string, flags ...string) *ru
 // that outlives one test.
 func launch(t *testing.T, register func(func()), scenario string, env []string, flags ...string) *running {
 	t.Helper()
+	r, err := launchProc(register, scenario, env, flags...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+// launchProc is launch without a test, so TestMain can start a shared fixture
+// outside every test's time limit.
+func launchProc(register func(func()), scenario string, env []string, flags ...string) (*running, error) {
 	args := append([]string{"--gx", gxBin, "--fakeclaude", fakeBin}, flags...)
 	cmd := exec.Command(fixtureBin, append(args, scenario)...)
 	cmd.Env = append(os.Environ(), env...)
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	r := &running{cmd: cmd}
 	register(r.kill)
 	line, err := bufio.NewReader(stdout).ReadBytes('\n')
 	if err != nil {
-		t.Fatalf("no output line: %v", err)
+		return r, fmt.Errorf("no output line: %v", err)
 	}
 	if err := json.Unmarshal(line, &r.Output); err != nil {
-		t.Fatalf("output is not JSON: %v\n%s", err, line)
+		return r, fmt.Errorf("output is not JSON: %v\n%s", err, line)
 	}
-	return r
+	return r, nil
 }
 
 // kill is the cleanup for a fixture its test did not stop.
