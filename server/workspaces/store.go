@@ -88,10 +88,14 @@ func (s *Store) Reorder(order []string) error {
 
 // Join puts a Design, epic or chat in a workspace, refusing any other key.
 func (s *Store) Join(key, workspace string) error {
-	if err := s.joinable(key); err != nil {
-		return err
-	}
-	return s.SetMember(key, workspace)
+	// The check shares the write's lock hold, so a delete cannot slip between them.
+	// The directory (index, queue) never calls back into the store, as canon already relies on.
+	return s.write(func() error {
+		if err := s.joinable(key); err != nil {
+			return err
+		}
+		return s.setMemberLocked(key, workspace)
+	})
 }
 
 // Open loads the persisted store from stateDir. dir is called on each lookup,
@@ -236,22 +240,25 @@ func (s *Store) Move(name string, to int) error {
 
 // SetMember puts key in a workspace. The Default workspace stores nothing.
 func (s *Store) SetMember(key, workspace string) error {
-	return s.write(func() error {
-		key = s.canon(key)
-		if strings.TrimSpace(key) == "" {
-			return ReasonBlankKey
-		}
-		i := s.index(workspace)
-		if i < 0 {
-			return ReasonUnknown
-		}
-		if s.st.Order[i] == DefaultName {
-			delete(s.st.Members, key)
-		} else {
-			s.st.Members[key] = s.st.Order[i]
-		}
-		return nil
-	})
+	return s.write(func() error { return s.setMemberLocked(key, workspace) })
+}
+
+// setMemberLocked is SetMember's body; the caller holds s.mu through write.
+func (s *Store) setMemberLocked(key, workspace string) error {
+	key = s.canon(key)
+	if strings.TrimSpace(key) == "" {
+		return ReasonBlankKey
+	}
+	i := s.index(workspace)
+	if i < 0 {
+		return ReasonUnknown
+	}
+	if s.st.Order[i] == DefaultName {
+		delete(s.st.Members, key)
+	} else {
+		s.st.Members[key] = s.st.Order[i]
+	}
+	return nil
 }
 
 // Remove returns key to the Default workspace.

@@ -221,6 +221,49 @@ func TestStorePlace_QueueAndOneOffAgents(t *testing.T) {
 	}
 }
 
+// lockProbeDir tries a store write from inside Epic; a write that completes
+// there means Join checked the epic without holding the store lock.
+type lockProbeDir struct {
+	fakeDir
+	probe func() bool
+}
+
+func (d lockProbeDir) Epic(key string) (tickets.Epic, bool) {
+	d.probe()
+	return d.fakeDir.Epic(key)
+}
+
+func TestStoreJoin_ChecksEpicUnderTheStoreLock(t *testing.T) {
+	var s *workspaces.Store
+	wroteDuringCheck := false
+	probe := func() bool {
+		done := make(chan struct{})
+		go func() { _ = s.Remove("x"); close(done) }()
+		select {
+		case <-done:
+			wroteDuringCheck = true
+		case <-time.After(50 * time.Millisecond):
+		}
+		return wroteDuringCheck
+	}
+	var err error
+	s, err = workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory {
+		return lockProbeDir{fakeDir: fakeDir{}, probe: probe}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Create("Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Join("proj:plain", "Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	if wroteDuringCheck {
+		t.Error("a store write completed while Join was checking the epic: check and write do not share one lock hold")
+	}
+}
+
 func TestStoreJoin_QueueAndOneOffAgentsRefuse(t *testing.T) {
 	s, err := workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory {
 		return fakeDir{sessions: []wire.SessionInfo{
