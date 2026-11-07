@@ -175,12 +175,27 @@ func TestDesignQuestion_AMarkedRoundIsNeverResent(t *testing.T) {
 	t.Parallel()
 	r := startQuestionRig(t, false)
 	// What a restart leaves behind: the round's mark already on disk.
-	if isNew, err := notify.MarkOnce(r.gate, "question:"+r.f.ID+":1"); err != nil || !isNew {
+	if isNew, err := notify.MarkOnce(r.gate, "question:"+r.f.ID+":"+r.f.Conv+":1"); err != nil || !isNew {
 		t.Fatalf("seed mark = %v, %v", isNew, err)
 	}
 	r.askRound(t, 1)
 	if got := countContaining(r.quiet(), "❓ Question"); got != 0 {
 		t.Errorf("Questions = %d, want none for a round already marked", got)
+	}
+}
+
+// A handoff starts a new conversation under the same session id, so its round
+// numbers restart: round 1 of the new conversation is not the old round 1.
+func TestDesignQuestion_ARoundNumberUsedByAnEarlierConversationIsStillSent(t *testing.T) {
+	t.Parallel()
+	r := startQuestionRig(t, false)
+	// The earlier conversation's round 1, marked under the key a session-wide round number would use.
+	if isNew, err := notify.MarkOnce(r.gate, "question:"+r.f.ID+":1"); err != nil || !isNew {
+		t.Fatalf("seed mark = %v, %v", isNew, err)
+	}
+	r.askRound(t, 1)
+	if got := countContaining(r.quiet(), "❓ Question"); got != 1 {
+		t.Errorf("Questions = %d, want one: the mark belongs to another conversation", got)
 	}
 }
 

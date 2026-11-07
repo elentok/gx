@@ -175,7 +175,9 @@ func (mg *Manager) sendDesignQuestion(id string, q DesignQuestion) bool {
 		return false
 	}
 	// A mark that cannot be taken sends nothing: a message may be lost, never doubled.
-	isNew, err := mg.alerts.MarkOnce(fmt.Sprintf("question:%s:%d", id, q.Round))
+	// The round number restarts with each conversation (a handoff starts a new one
+	// under the same session id), so the conversation is part of the key.
+	isNew, err := mg.alerts.MarkOnce(fmt.Sprintf("question:%s:%s:%d", id, m.ConversationID, q.Round))
 	if err != nil {
 		mg.log.Warn("design question mark", "session", id, "err", err)
 		return false
