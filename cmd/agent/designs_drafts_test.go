@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -85,6 +87,41 @@ func TestDesignsDrafts_LastProject(t *testing.T) {
 	var got wire.DesignLastProject
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil || got.Project != "alpha" {
 		t.Errorf("read --json = %s, %v", out.String(), err)
+	}
+}
+
+func TestDesignsDrafts_ImageAddRm(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir())
+	st := drafts.New(h.StateDir)
+	d, err := st.Create("proj", "s", "idea", "")
+	if err != nil || d == nil {
+		t.Fatal(d, err)
+	}
+	ctx := context.Background()
+	file := filepath.Join(t.TempDir(), "a.png")
+	if err := os.WriteFile(file, append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 32)...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runDraftsImageAdd(ctx, h.Client, &out, false, d.ID, file); err != nil {
+		t.Fatal(err)
+	}
+	id := strings.TrimSpace(out.String())
+	got, err := st.Get(d.ID)
+	if err != nil || len(got.Images) != 1 || got.Images[0] != id {
+		t.Fatalf("draft after add = %+v, %v; want image %q", got, err, id)
+	}
+
+	if err := runDraftsImageRm(ctx, h.Client, &out, false, d.ID, id); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.Get(d.ID); len(got.Images) != 0 {
+		t.Errorf("images after rm = %v, want none", got.Images)
+	}
+	err = runDraftsImageRm(ctx, h.Client, &out, false, d.ID, id)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonImageNotFound) {
+		t.Errorf("second rm err = %v, want image-not-found", err)
 	}
 }
 

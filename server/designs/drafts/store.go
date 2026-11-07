@@ -11,11 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -165,6 +167,71 @@ func (s *Store) Save(id string, req wire.DesignDraftSaveRequest) (wire.DesignDra
 		return wire.DesignDraftSaveResult{}, err
 	}
 	return wire.DesignDraftSaveResult{Draft: d}, nil
+}
+
+func goneImage() wire.SessionImageResult {
+	return imagestore.Refusal(wire.ReasonDraftGone, "draft is gone")
+}
+
+// AddImage stores one image in the draft's folder and lists its id on the
+// record. It changes the image list only: the text revision stays, so a text
+// save in flight never conflicts with it. A missing draft is a refused result.
+func (s *Store) AddImage(id string, data []byte) (wire.SessionImageResult, error) {
+	if !idPattern.MatchString(id) {
+		return goneImage(), nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	d, err := s.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		return goneImage(), nil
+	}
+	if err != nil {
+		return wire.SessionImageResult{}, err
+	}
+	if len(d.Images) >= wire.MaxPromptImages {
+		return imagestore.Refusal(wire.ReasonImageTooMany, fmt.Sprintf("a draft holds at most %d images", wire.MaxPromptImages)), nil
+	}
+	res, err := imagestore.Save(s.ImagesDir(id), data)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	d.Images = append(d.Images, res.ID)
+	if err := s.write(d); err != nil {
+		_, _, _ = imagestore.Remove(s.ImagesDir(id), res.ID)
+		return wire.SessionImageResult{}, err
+	}
+	return res, nil
+}
+
+// RemoveImage deletes one image file and drops its id from the record, leaving
+// the text revision alone.
+func (s *Store) RemoveImage(id, image string) (wire.SessionImageResult, error) {
+	if !idPattern.MatchString(id) {
+		return goneImage(), nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	d, err := s.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		return goneImage(), nil
+	}
+	if err != nil {
+		return wire.SessionImageResult{}, err
+	}
+	i := slices.Index(d.Images, image)
+	if i < 0 {
+		return imagestore.Refusal(wire.ReasonImageNotFound, fmt.Sprintf("no image %s in draft %s", image, id)), nil
+	}
+	name, _, err := imagestore.Remove(s.ImagesDir(id), image)
+	if err != nil {
+		return wire.SessionImageResult{}, err
+	}
+	d.Images = slices.Delete(d.Images, i, i+1)
+	if err := s.write(d); err != nil {
+		return wire.SessionImageResult{}, err
+	}
+	return wire.SessionImageResult{ID: image, Name: name}, nil
 }
 
 // Delete removes a draft's record and its image folder. A missing draft is not an error.

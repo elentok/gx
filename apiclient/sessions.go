@@ -68,6 +68,21 @@ func (s *Sessions) SaveDesignDraft(ctx context.Context, req wire.DesignDraftSave
 	return res, err
 }
 
+// AddDesignDraftImage saves one image, as its raw bytes, on a draft. A refusal
+// is a result (Refused set), not an error.
+func (s *Sessions) AddDesignDraftImage(ctx context.Context, id string, data []byte) (wire.SessionImageResult, error) {
+	var res wire.SessionImageResult
+	err := s.t.postBody(ctx, "/v1/designs/drafts/images?id="+url.QueryEscape(id), "application/octet-stream", data, &res)
+	return res, err
+}
+
+// RemoveDesignDraftImage deletes one image of a draft. A refusal is a result.
+func (s *Sessions) RemoveDesignDraftImage(ctx context.Context, id, image string) (wire.SessionImageResult, error) {
+	var res wire.SessionImageResult
+	err := s.t.post(ctx, "/v1/designs/drafts/images/delete", wire.SessionImageRequest{ID: id, Image: image}, &res)
+	return res, err
+}
+
 // DeleteDesignDraft deletes a draft. A draft already gone is not an error.
 func (s *Sessions) DeleteDesignDraft(ctx context.Context, id string) (wire.DesignDraftSaveResult, error) {
 	var res wire.DesignDraftSaveResult

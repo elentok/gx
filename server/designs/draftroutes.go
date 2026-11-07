@@ -3,9 +3,11 @@ package designs
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/elentok/gx/server/designs/drafts"
+	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -64,6 +66,42 @@ func (s *Designs) lastProjectSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wire.WriteJSON(w, req)
+}
+
+// draftImageUpload serves POST /v1/designs/drafts/images?id=<draft>: the body
+// is one image's raw bytes, capped like a session image upload.
+func (s *Designs) draftImageUpload(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, imagestore.MaxBytes+64<<10))
+	var tooBig *http.MaxBytesError
+	if errors.As(err, &tooBig) {
+		wire.WriteJSON(w, imagestore.TooLarge())
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := s.drafts.AddImage(r.URL.Query().Get("id"), body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, res)
+}
+
+// draftImageRemove serves POST /v1/designs/drafts/images/delete.
+func (s *Designs) draftImageRemove(w http.ResponseWriter, r *http.Request) {
+	var req wire.SessionImageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := s.drafts.RemoveImage(req.ID, req.Image)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, res)
 }
 
 func (s *Designs) draftDelete(w http.ResponseWriter, r *http.Request) {

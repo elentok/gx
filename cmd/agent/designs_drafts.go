@@ -18,8 +18,77 @@ import (
 // form keeps on the server. It calls the routes the form calls.
 func newDesignsDraftsCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "drafts", Short: "New Design drafts kept by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsDeleteCmd(d), newDraftsLastProjectCmd(d))
+	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsDeleteCmd(d), newDraftsLastProjectCmd(d), newDraftsImageCmd(d))
 	return cmd
+}
+
+// newDraftsImageCmd is `gx designs drafts image`: the images of a draft.
+func newDraftsImageCmd(d Deps) *cobra.Command {
+	cmd := &cobra.Command{Use: "image", Short: "images of a draft", Args: cobra.NoArgs}
+	cmd.AddCommand(newDraftsImageAddCmd(d), newDraftsImageRmCmd(d))
+	return cmd
+}
+
+func newDraftsImageAddCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "add <draft> <file>",
+		Short: "attach an image file to a draft",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			return runDraftsImageAdd(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0], args[1])
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+func newDraftsImageRmCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "rm <draft> <id>",
+		Short: "remove an image from a draft",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			return runDraftsImageRm(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0], args[1])
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+// runDraftsImageAdd uploads the file's bytes; the server decides the type
+// from the bytes, never from the file name.
+func runDraftsImageAdd(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, draft, file string) error {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	res, err := cl.Sessions.AddDesignDraftImage(ctx, draft, data)
+	return printDraftImageResult(w, jsonOut, res, err)
+}
+
+func runDraftsImageRm(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, draft, image string) error {
+	res, err := cl.Sessions.RemoveDesignDraftImage(ctx, draft, image)
+	return printDraftImageResult(w, jsonOut, res, err)
+}
+
+func printDraftImageResult(w io.Writer, jsonOut bool, res wire.SessionImageResult, err error) error {
+	if apiclient.IsNotRunning(err) {
+		res, err = wire.SessionImageResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, nil
+	}
+	if err != nil {
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	return printImageResult(w, jsonOut, res)
 }
 
 // draftNotRunning is the refusal every drafts verb prints when no server

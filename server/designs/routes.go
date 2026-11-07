@@ -43,6 +43,17 @@ func Routes(get func() *Designs) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftDelete(w, r) },
 		},
 		{
+			Pattern: "POST /v1/designs/drafts/images",
+			Web:     wire.WebWrite,
+			RawBody: true,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftImageUpload(w, r) },
+		},
+		{
+			Pattern: "POST /v1/designs/drafts/images/delete",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftImageRemove(w, r) },
+		},
+		{
 			Pattern: "GET /v1/designs/drafts/last-project",
 			Web:     wire.WebRead,
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().lastProjectRead(w, r) },
