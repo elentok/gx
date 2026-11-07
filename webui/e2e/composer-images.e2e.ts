@@ -81,9 +81,10 @@ test("187. Remove image and image limits", async ({ page, start }) => {
   await expect(thumbs(page)).toHaveCount(1);
   await expect.poll(() => fixture.sessionImages(idle.id)).toHaveLength(1);
 
-  // The limit: eleven more files keep ten.
+  // The limit: eleven more files keep ten; the two past the count show as failed tiles with Remove.
   await addInput(page).setInputFiles(Array.from({ length: 11 }, (_, i) => png(i + 10)));
-  await expect(thumbs(page)).toHaveCount(10);
-  await expect(composer(page).getByText("Max 10 images")).toBeVisible();
+  await expect(thumbs(page)).toHaveCount(12);
+  await expect(page.locator('[data-state="failed"]')).toHaveCount(2);
+  await expect(composer(page).getByText("Max 10 images")).toHaveCount(3); // two tiles and the line
   await expect(sendButton(page)).toBeVisible();
 });
