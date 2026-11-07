@@ -48,7 +48,10 @@ func WorkspacesScenario() scenario {
 				{"02", "investigate", servertest.TicketOpts{Type: "investigate", Parent: "01"}},
 			}},
 			// One card per remaining section.
-			{project, "paused-epic", []ticket{{"01", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}}}},
+			{project, "paused-epic", []ticket{
+				{"01", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}},
+				{"02", "repair-two", servertest.TicketOpts{PauseReason: "iteration-error"}},
+			}},
 			{project, "ready-epic", open},
 			{project, "design-new", nil},
 			{project, "finished-a", []ticket{{"01", "built", servertest.TicketOpts{Status: "done"}}}},
@@ -70,14 +73,17 @@ func WorkspacesScenario() scenario {
 		OpenDesigns: []string{liveDesign},
 		Hold:        true,
 		Chat:        true,
+		Limits:      true,
 		Queue:       []string{implEpic, project + ":one-offs/01", project + ":inv-epic/02"},
 
 		// The fake agent shows no sign of taking an Investigate prompt, so the
 		// default grace would hold those agents' launch for 45 seconds.
 		PromptGrace:     "1s",
 		FailedMigration: project,
-		FixAgents:       []string{project + ":one-offs/04", project + ":paused-epic/01"},
-		Sessions:        []sessionSpec{{Project: project, Prompt: "hello", Read: true}},
+		// paused-epic holds two Fix agents: 01 needs you (Idle), 02 is Working.
+		FixAgents:        []string{project + ":one-offs/04", project + ":paused-epic/01", project + ":paused-epic/02"},
+		WorkingFixAgents: []string{project + ":paused-epic/02"},
+		Sessions:         []sessionSpec{{Project: project, Prompt: "hello", Read: true}},
 		Steps: [][]string{
 			{"server", "workspaces", "create", WorkspaceBugs},
 			{"server", "workspaces", "create", WorkspaceResearch},

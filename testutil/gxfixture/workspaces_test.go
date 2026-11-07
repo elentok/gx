@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -69,6 +70,40 @@ func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *test
 		t.Fatalf("agents list has %d sessions, want a chat, a Queue agent and a One-off agent", len(sessions))
 	}
 	r.stop(t)
+}
+
+func TestWorkspacesScenario_ServesClaudeLimitsAndTwoPausedEpicFixAgentsOneWorking(t *testing.T) {
+	t.Parallel()
+	r := start(t, "workspaces")
+	defer r.stop(t)
+	var sum wire.UsageSummary
+	if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
+		t.Fatal(err)
+	}
+	if sum.Mode != wire.UsageModeLimits || sum.Limits.FiveHour == nil || sum.Limits.SevenDay == nil {
+		t.Errorf("want both Claude limit windows, got mode %q: %+v", sum.Mode, sum.Limits)
+	}
+	// The Fix agents under paused-epic read as one Needs you (Idle) and one Working.
+	want := map[string]string{
+		"demo:paused-epic/01": wire.SessionIdle,
+		"demo:paused-epic/02": wire.SessionWorking,
+	}
+	var got map[string]string
+	if !testutil.Poll(60*time.Second, time.Second, func() bool {
+		var sessions []wire.SessionInfo
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &sessions); err != nil {
+			t.Fatal(err)
+		}
+		got = map[string]string{}
+		for _, si := range sessions {
+			if _, ok := want[si.FixOf]; ok {
+				got[si.FixOf] = si.Status.State
+			}
+		}
+		return maps.Equal(got, want)
+	}) {
+		t.Fatalf("fix agent states %v, want %v", got, want)
+	}
 }
 
 func TestWorkspacesScenario_SeedsFixAgentsAndAnInvestigateAgentInOtherAndUnderEpics(t *testing.T) {

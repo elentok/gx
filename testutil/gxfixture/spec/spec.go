@@ -194,6 +194,9 @@ type Scenario struct {
 	FailedMigration string
 	// FixAgents are the ticket addresses a Fix agent is started on after the server is up.
 	FixAgents []string
+	// WorkingFixAgents are the FixAgents tickets whose agent is then given a plain
+	// prompt, which the fake never finishes, so the agent reads Working, not Idle.
+	WorkingFixAgents []string
 }
 
 // WebMode is how far the fixture takes the web setup and sign-in.

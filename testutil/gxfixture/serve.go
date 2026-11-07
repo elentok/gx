@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/websignin"
 )
 
@@ -124,6 +125,53 @@ func (f *fixture) queueAll(ctx context.Context, sc scenario) error {
 	return nil
 }
 
+// controlFIFOs lists the control FIFOs of the TUI fakes started so far.
+func (f *fixture) controlFIFOs() []string {
+	paths, _ := filepath.Glob(agentfake.TUIControlPath(filepath.Join(f.root, "home"), "*"))
+	return paths
+}
+
+// workFixAgent makes the Fix agent of session id read Working. Nothing maps a
+// session to its fake's control FIFO, so it arms every fake that started after
+// the FIFOs in before (the Fix agent's among them), then types a slash prompt;
+// the armed fake answers with a turn that never ends. The server refuses the
+// prompt until the agent is Idle, so the whole step is retried.
+func (f *fixture) workFixAgent(ctx context.Context, cl *apiclient.Client, id string, before []string) error {
+	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		for _, p := range f.controlFIFOs() {
+			if slices.Contains(before, p) {
+				continue
+			}
+			if err := agentfake.SendControl(p, agentfake.Control{Action: agentfake.ActionBusy}); err != nil {
+				return err
+			}
+		}
+		// The armed fake may already have taken the server's own launch prompt as
+		// the turn that never ends; then it is Working and the prompt is refused.
+		working, err := f.sessionWorking(ctx, cl, id)
+		if err != nil || working {
+			return err
+		}
+		if _, err := cl.Sessions.Prompt(ctx, wire.SessionPromptRequest{ID: id, Text: "/keep-working"}); err != nil {
+			return err
+		}
+		if working, err = f.sessionWorking(ctx, cl, id); err != nil || working {
+			return err
+		}
+	}
+	return fmt.Errorf("session %s never read Working", id)
+}
+
+func (f *fixture) sessionWorking(ctx context.Context, cl *apiclient.Client, id string) (bool, error) {
+	list, err := cl.Sessions.List(ctx)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(list, func(si wire.SessionInfo) bool {
+		return si.ID == id && si.Status.State == wire.SessionWorking
+	}), nil
+}
+
 // startFixAgents starts the scenario's Fix agents through the API: one per
 // FixAgents ticket, and the project-level one for a recorded failed migration.
 func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
@@ -139,12 +187,19 @@ func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
 		reqs = append(reqs, wire.FixAgentRequest{Project: sc.FailedMigration})
 	}
 	for _, req := range reqs {
+		before := f.controlFIFOs()
 		res, err := cl.Sessions.FixAgent(ctx, req)
 		if err != nil {
 			return fmt.Errorf("fix agent %v: %w", req, err)
 		}
 		if res.Refused {
 			return fmt.Errorf("fix agent %v refused: %s", req, res.Message)
+		}
+		if !slices.Contains(sc.WorkingFixAgents, req.Address) {
+			continue
+		}
+		if err := f.workFixAgent(ctx, cl, res.Session.ID, before); err != nil {
+			return fmt.Errorf("work fix agent %s: %w", req.Address, err)
 		}
 	}
 	return nil
