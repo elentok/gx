@@ -186,15 +186,20 @@ func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
 	if len(fields) < 2 || !strings.HasPrefix(fields[0], "/") {
 		return "", WorkerConfig{}, false
 	}
-	// A fix agent's prompt ends in free text, not a ticket address.
+	address := fields[len(fields)-1]
 	if fields[0] == "/gx-investigate" {
-		return "", WorkerConfig{}, false
+		// A fix agent's prompt ends in free text, not a ticket address. A queued
+		// investigate ticket's launch sets the env to its address and waits for a turn.
+		address = os.Getenv("GX_INVESTIGATE_TICKET")
+		if address == "" {
+			return "", WorkerConfig{}, false
+		}
 	}
 	cfg, err := LoadWorkerConfig(t.pid.Cwd)
 	if err != nil {
 		return "", WorkerConfig{}, false
 	}
-	return fields[len(fields)-1], cfg, true
+	return address, cfg, true
 }
 
 // work does the ticket's work off the input loop, then sends the turn's end

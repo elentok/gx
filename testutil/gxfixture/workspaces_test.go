@@ -70,3 +70,60 @@ func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *test
 	}
 	r.stop(t)
 }
+
+func TestWorkspacesScenario_SeedsFixAgentsAndAnInvestigateAgentInOtherAndUnderEpics(t *testing.T) {
+	t.Parallel()
+	r := start(t, "workspaces")
+	// fix_of -> placement kind and epic.
+	wantFix := map[string]string{
+		"demo":                "other|",
+		"demo:one-offs/04":    "other|",
+		"demo:paused-epic/01": "epic|demo:paused-epic",
+	}
+	var sessions []wire.SessionInfo
+	var snap wire.Snapshot
+	var problems []string
+	testutil.Poll(60*time.Second, time.Second, func() bool {
+		sessions, problems = nil, nil
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &sessions); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal([]byte(r.gx(t, "server", "snapshot", "--json")), &snap); err != nil {
+			t.Fatal(err)
+		}
+		placed := map[string]wire.SessionPlacement{}
+		for _, p := range snap.Placements {
+			placed[p.Session] = p
+		}
+		fixes := map[string]wire.SessionPlacement{}
+		var investigate []wire.SessionPlacement
+		for _, si := range sessions {
+			if si.FixOf != "" {
+				fixes[si.FixOf] = placed[si.ID]
+			}
+			if si.Queue && (strings.HasPrefix(si.Ticket, "demo:one-offs/01") || strings.HasPrefix(si.Ticket, "demo:inv-epic/02")) {
+				investigate = append(investigate, placed[si.ID])
+			}
+		}
+		for fixOf, want := range wantFix {
+			if got := fixes[fixOf].Kind + "|" + fixes[fixOf].Epic; got != want {
+				problems = append(problems, "fix agent of "+fixOf+": got "+got+", want "+want)
+			}
+		}
+		if len(investigate) != 2 {
+			problems = append(problems, "want two Investigate Queue agents")
+		}
+		return len(problems) == 0
+	})
+	if len(problems) > 0 {
+		var rows []string
+		for _, si := range sessions {
+			rows = append(rows, si.ID+" ticket="+si.Ticket+" fix_of="+si.FixOf)
+		}
+		for _, tk := range snap.Tickets {
+			rows = append(rows, "TICKET "+tk.Address+" "+tk.Status+" "+tk.RenderedStatus+" "+tk.Type+" parent="+tk.Parent+" step="+tk.LaunchStep.Label)
+		}
+		t.Fatalf("%s\nsessions:\n%s\nplacements: %+v", strings.Join(problems, "\n"), strings.Join(rows, "\n"), snap.Placements)
+	}
+	r.stop(t)
+}
