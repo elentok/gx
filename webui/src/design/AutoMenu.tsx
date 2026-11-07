@@ -65,6 +65,8 @@ export function AutoMenu({
         flexDirection="column"
         justifyContent="center"
         gap="1"
+        flex="none"
+        whiteSpace="nowrap"
         h={tall ? "44px" : "40px"}
         px="2"
         borderRadius="8px"

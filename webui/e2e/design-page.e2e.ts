@@ -218,6 +218,36 @@ test.describe("74. Question sheet layout", () => {
     };
 
     await pass();
+
+    // At 744px (tablet) the footer keeps full labels on one line and Send is its right-most item.
+    // Layout widths are what jsdom cannot see.
+    await page.setViewportSize({ width: 744, height: 900 });
+    await expect(send).toBeVisible();
+    // Auto stacks its two switches, one line each; Send is a single line.
+    const labels = [
+      [send, 1],
+      [composer.getByRole("button", { name: /^Auto:/ }), 2],
+    ] as const;
+    for (const [l, lines] of labels) {
+      await expect(l).toBeVisible();
+      const oneLine = await l.evaluate((el) => {
+        const ys = new Set<number>();
+        const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+          const r = document.createRange();
+          r.selectNodeContents(n);
+          for (const q of r.getClientRects()) ys.add(Math.round(q.y / 4));
+        }
+        return ys.size;
+      });
+      expect(oneLine, "tablet footer label wraps").toBeLessThanOrEqual(lines);
+    }
+    const sendBox = (await send.boundingBox())!;
+    for (const b of await composer.getByRole("button").all()) {
+      const box = await b.boundingBox();
+      if (box && (await b.getAttribute("aria-label")) !== "Send answers" && (await b.innerText()) !== "Send answers")
+        expect(box.x + box.width, "Send is right-most").toBeLessThanOrEqual(sendBox.x + 1);
+    }
   });
 });
 

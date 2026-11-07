@@ -217,7 +217,7 @@ test("the ring sits in the header actions after the title at 56px, and at 44px o
   }
 });
 
-test("a tablet-width Design page lays the chat beside the phase column", async () => {
+test("a tablet-width Design page gives the chat the full width, leaving the footer room", async () => {
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: query === "(min-width: 40em)",
     addEventListener() {},
@@ -227,7 +227,8 @@ test("a tablet-width Design page lays the chat beside the phase column", async (
     render([map("a")], []);
     await screen.findByText("0%");
     const grid = screen.getByRole("region", { name: "Chat" }).parentElement!;
-    expect(getComputedStyle(grid).gridTemplateColumns).toContain("300px");
+    expect(getComputedStyle(grid).gridTemplateColumns).not.toContain("300px");
+    expect(screen.queryByRole("region", { name: "Progress" })).toBeNull();
   } finally {
     vi.unstubAllGlobals();
   }

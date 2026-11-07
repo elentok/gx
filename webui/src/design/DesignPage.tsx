@@ -113,7 +113,10 @@ function DesignBody({
       detail?.rows.find((r) => r.current)?.title) ||
     current?.label;
   const name = slugOf(address);
-  const sideColumn = useDevice() !== "phone";
+  // Below desktop the chat takes the full width: the footer's Add, Note, Auto, countdown and Send need it on one line.
+  // The steps then open from the header like on a phone.
+  const sideColumn = useDevice() === "desktop";
+  const stepsInline = wide && sideColumn;
   // The card speaks for this page only while its active (first) address is this Design.
   const card = epics.find((e) => e.addresses?.[0] === address);
   const live = liveSessions(address, sessions);
@@ -158,7 +161,7 @@ function DesignBody({
           subtitle={
             detail && (
               <>
-                {wide ? summaryLine(detail) : <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />}
+                {stepsInline ? summaryLine(detail) : <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />}
                 {card?.section === SectionOnHold && " · On hold"}
               </>
             )
@@ -167,7 +170,7 @@ function DesignBody({
           actions={
             <>
               {detail &&
-                (wide ? (
+                (stepsInline ? (
                   ring("header")
                 ) : (
                   <chakra.button type="button" aria-label="Show progress steps" aria-haspopup="dialog" cursor="pointer" onClick={() => setStepsOpen(true)}>
@@ -228,7 +231,7 @@ function DesignBody({
             }}
           />
         </Box>
-        {wide && (
+        {stepsInline && (
           <Box aria-label="Progress" role="region" gridRow={1} gridColumn={2} minH="0" overflowY="auto">
             {detail && <Progress detail={detail} />}
           </Box>
