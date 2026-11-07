@@ -6,10 +6,11 @@ import { accepted, chat, chatOf, composerBox, prompts, refused, render, sendButt
 
 useAgentsPageHooks();
 
-test("Send is off while Working, with the Working reason, and the box stays editable", async () => {
+test("Interrupt replaces Send while Working, with the Working reason, and the box stays editable", async () => {
   render([session("s-1", "p", { status: { state: "working" } })], "/agents/s-1", true, chatOf(chat()));
   await type("hi");
-  expect(sendButton().disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy();
   expect((await composerBox()).value).toBe("hi");
   expect(screen.getByText("Working. Send turns on when the session is idle.")).toBeTruthy();
 });
@@ -109,7 +110,8 @@ test("a Codex session shows its chat, and Send follows the idle rule", async () 
   cleanup();
   render([session("s-3", "p", { harness: "codex", status: { state: "working" } })], "/agents/s-3", true, chatOf(chat()));
   await type("hi");
-  expect(sendButton().disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy();
   expect(screen.getByText("Working. Send turns on when the session is idle.")).toBeTruthy();
 });
 
@@ -215,7 +217,9 @@ test.each(failureCases)("$kind failure: label, text, only its buttons, and the c
   expect(screen.getByText("hello there")).toBeTruthy();
   await type("hi");
   if (c.reason) expect(screen.getByText(c.reason)).toBeTruthy();
-  expect(sendButton().disabled).toBe(c.sendOff);
+  // A Working session shows Interrupt in place of Send.
+  if (c.over.status?.state === "working") expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  else expect(sendButton().disabled).toBe(c.sendOff);
 });
 
 test("Retry on an auth failure posts continue with the last message id", async () => {

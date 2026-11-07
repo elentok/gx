@@ -1,6 +1,10 @@
 import { Box, Spinner } from "@chakra-ui/react";
+import { useRef, useState } from "react";
 import { codexSkillHint } from "../design/chat";
 import { ComposerImages } from "../design/ComposerImages";
+import { InterruptPopover } from "../design/InterruptPopover";
+import { postInterruptSession, stateToken, type InterruptSession } from "../design/open";
+import { promptable } from "../design/view";
 import { useComposerImages } from "../design/useComposerImages";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import type { PostPrompt } from "../design/prompt";
@@ -17,6 +21,7 @@ export function AgentComposer({
   lastMessage,
   connected,
   post,
+  interrupt = postInterruptSession,
   onStale,
   reason,
   onSent,
@@ -25,6 +30,7 @@ export function AgentComposer({
   lastMessage?: string;
   connected: boolean;
   post?: PostPrompt;
+  interrupt?: InterruptSession;
   onStale?: () => void;
   /** The line under the box; the caller decides the text. */
   reason?: string;
@@ -34,7 +40,7 @@ export function AgentComposer({
   const wide = useWide();
   const [text, setText] = useComposerDraft(session.id);
   const images = useComposerImages(session.id);
-  const { send, enabled, pending, refusal, error } = usePromptSend({
+  const { send, write, enabled, pending, refusal, error } = usePromptSend({
     session,
     lastMessage,
     connected,
@@ -42,6 +48,14 @@ export function AgentComposer({
     onStale,
     toastRefusal: false,
   });
+  // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
+  const working = session.status.state === "working" && !promptable(session);
+  const [interruptOpen, setInterruptOpen] = useState(false);
+  const interruptRef = useRef<HTMLButtonElement>(null);
+  const onInterrupt = () => {
+    setInterruptOpen(false);
+    return connected ? write(() => interrupt({ id: session.id, state: stateToken(session) })) : Promise.resolve();
+  };
   const canSend = images.canSend(text);
   const sendText = () =>
     send({ text, ...images.payload }, () => {
@@ -83,10 +97,32 @@ export function AgentComposer({
       <ComposerImages
         state={images}
         send={
-          <Button disabled={!enabled || !canSend} onClick={sendText}>
-            {pending && <Spinner size="sm" />}
-            Send
-          </Button>
+          working ? (
+            <>
+              <Button
+                ref={interruptRef}
+                emphasis="secondary"
+                disabled={!connected || pending}
+                aria-expanded={interruptOpen}
+                onClick={() => setInterruptOpen(!interruptOpen)}
+              >
+                {pending && <Spinner size="sm" />}
+                Interrupt
+              </Button>
+              <InterruptPopover
+                open={interruptOpen}
+                disabled={!connected || pending}
+                anchorRef={interruptRef}
+                onConfirm={onInterrupt}
+                onClose={() => setInterruptOpen(false)}
+              />
+            </>
+          ) : (
+            <Button disabled={!enabled || !canSend} onClick={sendText}>
+              {pending && <Spinner size="sm" />}
+              Send
+            </Button>
+          )
         }
       >
         <ExpandableTextField

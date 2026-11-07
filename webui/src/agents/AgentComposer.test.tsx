@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import type { InterruptSession } from "../design/open";
 import type { PostPrompt } from "../design/prompt";
 import type { SessionInfo } from "../generated/server";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
@@ -68,11 +69,24 @@ test("Send is off when not connected, but the box stays editable", () => {
   expect((send() as HTMLButtonElement).disabled).toBe(true);
 });
 
-test("Send is off when the session is not promptable, but the box stays editable", () => {
-  render({ s: session("working") });
+test("a Working session swaps Send for Interrupt, posting the state token after a confirm; the box stays editable", async () => {
+  const interrupt = vi.fn(async () => ({ ok: true })) as unknown as InterruptSession;
+  renderThemed(
+    <WideContext.Provider value={true}>
+      <AgentComposer session={session("working")} connected interrupt={interrupt} />
+    </WideContext.Provider>,
+  );
   fireEvent.change(box(), { target: { value: "hi" } });
   expect((box() as HTMLTextAreaElement).value).toBe("hi");
-  expect((send() as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Interrupt" }));
+  const confirm = await screen.findByRole("alertdialog", { name: "Interrupt the agent?" });
+  expect(interrupt).not.toHaveBeenCalled();
+  fireEvent.click(within(confirm).getByRole("button", { name: "Interrupt" }));
+  await waitFor(() => expect(interrupt).toHaveBeenCalled());
+  const body = (interrupt as unknown as { mock: { calls: { id: string; state: string }[][] } }).mock.calls[0][0];
+  expect(body.id).toBe("s-a");
+  expect(body.state).toMatch(/^s-a:working:\d+$/);
 });
 
 test("a refused send shows its reason inline only, no toast, and keeps the draft", async () => {
