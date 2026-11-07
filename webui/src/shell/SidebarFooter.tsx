@@ -78,10 +78,7 @@ export function SidebarFooter({ onNewWorkspace = () => {} }: { onNewWorkspace?: 
                 New design
               </Menu.Item>
               <Menu.Item value="agent" onClick={() => setDialog("agent")} cursor="pointer" color="text" justifyContent="space-between" _highlighted={{ bg: "surface" }}>
-                New agent
-                <Text as="span" color="text.faint" fontSize="sm">
-                  New session
-                </Text>
+                New chat
               </Menu.Item>
               <Menu.Separator />
               <Menu.Item value="workspace" onClick={onNewWorkspace} cursor="pointer" color="text" _highlighted={{ bg: "surface" }}>

@@ -43,7 +43,7 @@ test("the + New menu lists the three items and New workspace calls its prop", as
   setup({}, true, onNewWorkspace);
   fireEvent.click(screen.getByRole("button", { name: "+ New" }));
   expect(await screen.findByRole("menuitem", { name: "New design" })).toBeTruthy();
-  expect(screen.getByRole("menuitem", { name: /^New agent/ })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "New chat" })).toBeTruthy();
   fireEvent.click(screen.getByRole("menuitem", { name: "New workspace…" }));
   await waitFor(() => expect(onNewWorkspace).toHaveBeenCalled());
 });

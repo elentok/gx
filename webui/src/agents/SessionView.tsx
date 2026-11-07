@@ -45,7 +45,7 @@ function SessionHeader({
     <Box as="header" mb="3">
       <PageHeader
         title={s.name || s.id}
-        subtitle={wide ? s.project : `${s.project} · ${stateLabel(s)}`}
+        subtitle={wide ? `Chat · ${s.project}` : `Chat · ${s.project} · ${stateLabel(s)}`}
         actions={
           <>
             <StatusMark session={s} />

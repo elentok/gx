@@ -13,7 +13,7 @@ test("phone: #/agents never redirects to the last session", () => {
 test("phone: a session shows its title and project · status", () => {
   render([session("s-1", "gx", { name: "plain" })], "/agents/s-1", true, {}, false);
   expect(screen.getByRole("heading", { name: "plain" })).toBeTruthy();
-  expect(screen.getByText("gx · Idle")).toBeTruthy();
+  expect(screen.getByText("Chat · gx · Idle")).toBeTruthy();
 });
 
 test("phone: a design session's header links to its design page", () => {

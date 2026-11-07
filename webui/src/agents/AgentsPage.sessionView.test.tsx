@@ -17,6 +17,12 @@ test("the header names the session, status, dir and ticket, with the joined mode
   expect(await screen.findByText("Codex CLI default")).toBeTruthy();
 });
 
+test("the header subtitle says Chat before the project", async () => {
+  render([session("s-1", "proj", { name: "one" })], "/agents/s-1", true, chatOf(chat()));
+  await screen.findByRole("heading", { name: /one/ });
+  expect(screen.getByTestId("page-header-subtitle").textContent).toBe("Chat · proj");
+});
+
 test("renders messages, the truncation note and the background strip", async () => {
   render(
     [session("s-1", "p")],

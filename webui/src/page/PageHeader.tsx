@@ -2,7 +2,7 @@ import { Box, Heading } from "@chakra-ui/react";
 import { type ReactNode, useEffect } from "react";
 import { MascotToggle } from "../shell/MascotToggle";
 import { useShell } from "../shell/ShellContext";
-import { useWide } from "../useWide";
+import { useDevice, useWide } from "../useWide";
 
 /** The one header every page uses: icon, title, subtitle, actions, then an optional meta bar. */
 export function PageHeader({
@@ -25,6 +25,8 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   const wide = useWide();
+  // On tablet and phone the mascot toggle leads the header; a page icon beside it reads as a second toggle.
+  const device = useDevice();
   const shell = useShell();
   const claimHeader = shell?.claimHeader;
   useEffect(() => claimHeader?.(), [claimHeader]);
@@ -39,7 +41,7 @@ export function PageHeader({
       {rich ? (
         <Box display="flex" flexWrap="wrap" alignItems="center" gap={wide ? "14px" : "10px"}>
           <MascotToggle />
-          {icon ? (
+          {icon && (device === "desktop" || !shell) ? (
             <Box data-testid="page-header-icon" flex="none" display="flex" alignItems="center" color="text.dim">
               {icon}
             </Box>

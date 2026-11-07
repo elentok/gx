@@ -48,6 +48,7 @@ const rows = [
 const placements: SessionPlacement[] = [
   { session: "s1", kind: "epic", epic: "p:blog" },
   { session: "s2", kind: "other" },
+  { session: "s3", kind: "chat", workspace: "Default" },
 ];
 
 function setup(device: Device, path = "/") {
@@ -56,7 +57,7 @@ function setup(device: Device, path = "/") {
     snapshot: {
       needs_you_total: 0,
       workspaces: [{ name: "Default", default: true, members: 0 }, { name: "Work", members: 0 }],
-      sessions: [session("s1", "p", { name: "builder" }), session("s2", "p", { name: "scratch" })],
+      sessions: [session("s1", "p", { name: "builder" }), session("s2", "p", { name: "scratch" }), session("s3", "p", { name: "talk" })],
       placements,
     },
     connected: true,
@@ -104,15 +105,20 @@ test("On hold is collapsed with a count and opens on click; Other lists its rows
   expect(body().getByRole("link", { name: /scratch/ })).toBeTruthy();
 });
 
+test("a chat row reads Chat before its name", async () => {
+  setup("desktop");
+  await body().findByRole("link", { name: /Blog/ });
+  expect(body().getByRole("link", { name: /^Chat talk/ })).toBeTruthy();
+});
+
 test("a row's ... menu opens and Move posts the other workspace", async () => {
   const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
     new Response(JSON.stringify(String(url).includes("/v1/workspaces/") ? { workspaces: [] } : { epics: rows, follow_ups: [] }), { status: 200 }),
   );
   setup("desktop");
   vi.stubGlobal("fetch", fetchMock);
-  await body().findByRole("link", { name: /Shop/ });
-  const buttons = body().getAllByRole("button", { name: "More actions" });
-  fireEvent.click(buttons[buttons.length - 1]);
+  const shop = await body().findByRole("link", { name: /Shop/ });
+  fireEvent.click(within(shop.closest("li")!).getByRole("button", { name: "More actions" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Move to workspace" }));
   fireEvent.click(await screen.findByRole("button", { name: "Work" }));
   await waitFor(() => {

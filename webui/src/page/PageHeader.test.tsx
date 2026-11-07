@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
 import { renderThemed } from "../ui/render";
-import { WideContext } from "../useWide";
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
+import { ShellContext } from "../shell/ShellContext";
+import { DeviceContext, type Device, WideContext } from "../useWide";
 import { PageHeader } from "./PageHeader";
 
 const render = (node: React.ReactNode, wide = true) =>
@@ -15,6 +17,30 @@ test("renders icon, title, subtitle, actions and meta bar", () => {
   expect(getByTestId("page-header-subtitle").textContent).toBe("a line");
   expect(getByTestId("page-header-actions").textContent).toBe("menu");
   expect(getByTestId("page-header-meta").textContent).toBe("meta");
+});
+
+test("inside the shell the page icon shows on desktop and is dropped on tablet and phone, leaving the mascot alone", () => {
+  const shell = { sidebarOpen: false, toggle: () => {}, close: () => {}, claimHeader: () => () => {} };
+  const state = { snapshot: { needs_you_total: 0 }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  const at = (device: Device) =>
+    renderThemed(
+      <DeviceContext.Provider value={device}>
+        <ConnectionContext.Provider value={conn}>
+          <ShellContext.Provider value={shell}>
+            <PageHeader title="t" icon={<i>icon</i>} />
+          </ShellContext.Provider>
+        </ConnectionContext.Provider>
+      </DeviceContext.Provider>,
+    );
+  for (const device of ["tablet", "phone"] as const) {
+    const { queryByTestId, getByRole, unmount } = at(device);
+    expect(queryByTestId("page-header-icon")).toBeNull();
+    expect(getByRole("button", { name: "Show sidebar" })).toBeTruthy();
+    unmount();
+  }
+  const { getByTestId } = at("desktop");
+  expect(getByTestId("page-header-icon")).toBeTruthy();
 });
 
 test("the title is a 19px heading in the text font, not a button", () => {
