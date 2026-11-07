@@ -1,31 +1,6 @@
-import type { Page, Route } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixture";
-import { addInput, composer, file, freshVisit, idleSession, messageBox, png, sendButton, thumbs } from "./agentsKit";
-
-type Mode = "pass" | "fail" | "hold";
-
-/** Steers every image upload the page makes: let it through, refuse it, or hold it until `release`. */
-async function steerUploads(page: Page) {
-  let mode: Mode = "pass";
-  const held: Route[] = [];
-  await page.route(/\/v1\/sessions\/images\?id=/, async (route) => {
-    if (route.request().method() !== "POST" || mode === "pass") return route.fallback();
-    if (mode === "fail") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ refused: true }) });
-    held.push(route);
-  });
-  return {
-    set: (m: Mode) => {
-      mode = m;
-    },
-    /** Lets held uploads through, or refuses them when `as` is "fail". */
-    release: async (as: "pass" | "fail" = "pass") => {
-      for (const route of held.splice(0)) {
-        if (as === "pass") await route.continue();
-        else await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ refused: true }) });
-      }
-    },
-  };
-}
+import { addInput, composer, file, freshVisit, idleSession, messageBox, png, sendButton, steerUploads, thumbs } from "./agentsKit";
 
 const retryThumb = (page: Page) => composer(page).getByRole("button", { name: "Upload failed, tap to retry" });
 const readyThumbs = (page: Page) => composer(page).locator('[data-state="ready"]');

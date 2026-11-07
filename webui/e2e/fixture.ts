@@ -110,6 +110,8 @@ export interface Fixture {
   readStoreFile(path: string): Promise<string>;
   /** The uploaded image files in `<DataDir>/sessions/<id>/images`, without the sent markers. */
   sessionImages(id: string): Promise<string[]>;
+  /** The state-dir folder of New Design draft `id`, whether or not it exists. */
+  draftDir(id: string): string;
   /** Merges `patch` into the top-level keys of `project`'s `project.json`. */
   patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>;
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
@@ -297,6 +299,7 @@ async function startFixture(
       const next = { ...JSON.parse(await readFile(path, "utf8")), ...patch };
       await writeFile(path, JSON.stringify(next, null, 2));
     },
+    draftDir: (id) => join(env.XDG_STATE_HOME!, "gx", "design-drafts", id),
     async launches() {
       const dir = join(env.HOME!, ".claude", "agentfake");
       const files = (await readdir(dir).catch(() => [] as string[])).filter((n) => n.endsWith(".args"));

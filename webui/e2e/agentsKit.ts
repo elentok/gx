@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 import type { SessionInfo } from "../src/generated/server";
 import { expect, menu, menuButton, type Fixture } from "./fixture";
 
@@ -68,6 +68,31 @@ export const png = (n: number) => file(`pic-${n}.png`, "image/png", PNG);
 
 export const thumbs = (page: Page) => page.getByRole("button", { name: "Remove image" });
 export const addInput = (page: Page) => page.getByTestId("image-input");
+
+type UploadMode = "pass" | "fail" | "hold";
+
+/** Steers every image upload the page makes, session or New Design draft: let it through, refuse it, or hold it until `release`. */
+export async function steerUploads(page: Page) {
+  let mode: UploadMode = "pass";
+  const held: Route[] = [];
+  await page.route(/\/images\?id=/, async (route) => {
+    if (route.request().method() !== "POST" || mode === "pass") return route.fallback();
+    if (mode === "fail") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ refused: true }) });
+    held.push(route);
+  });
+  return {
+    set: (m: UploadMode) => {
+      mode = m;
+    },
+    /** Lets held uploads through, or refuses them when `as` is "fail". */
+    release: async (as: "pass" | "fail" = "pass") => {
+      for (const route of held.splice(0)) {
+        if (as === "pass") await route.continue();
+        else await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ refused: true }) });
+      }
+    },
+  };
+}
 
 /** Opens the first idle plain session at desktop width with its composer showing. */
 export async function idleSession(page: Page, fixture: Fixture) {

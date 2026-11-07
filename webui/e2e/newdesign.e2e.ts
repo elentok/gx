@@ -1,5 +1,7 @@
+import { access } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
-import { card, expect, flag, nav, section, test } from "./fixture";
+import { chatOf, PNG, png, steerUploads } from "./agentsKit";
+import { card, expect, flag, nav, section, sessionRows, test } from "./fixture";
 
 const openDialog = async (page: Page) => {
   await page.getByRole("button", nav("New Design")).click();
@@ -7,6 +9,8 @@ const openDialog = async (page: Page) => {
   await expect(dialog).toBeVisible();
   return dialog;
 };
+
+const addInput = (dialog: Locator) => dialog.getByTestId("image-input");
 
 const fields = (dialog: Locator) => ({
   slug: dialog.getByRole("textbox", nav("Epic slug")),
@@ -25,12 +29,12 @@ test("26. New Design form", async ({ page, start }) => {
   const { slug, idea, project } = fields(dialog);
 
   // The select lists every project, even one with no epics ("scratch"); the one-project rule is in NewDesignForm.test.
-  // The idea box fills more than half the dialog.
+  // The idea box takes the space left, over a third of the dialog beside the header and the image row.
   await expect(project.locator("option")).toHaveText(["demo", "scratch"]);
   await expect(slug).toHaveAttribute("placeholder", "my-epic");
   await expect(idea).toHaveAttribute("placeholder", "What is the problem? Who hits it? What does done look like?");
   const [box, sheet] = [await idea.boundingBox(), await dialog.boundingBox()];
-  expect(box!.height).toBeGreaterThan(sheet!.height / 2);
+  expect(box!.height).toBeGreaterThan(sheet!.height / 3);
 
   // An existing epic is refused by the server, and the dialog keeps what was typed.
   await slug.fill("ready-epic");
@@ -175,6 +179,123 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(fields(await openDialog(page)).project).toHaveValue("scratch");
     await page2.reload();
     await expect(fields(await openDialog(page2)).project).toHaveValue("scratch");
+    await page2.keyboard.press("Escape");
+
+    // Images: a pasted PNG and an Add image file each get a thumbnail, and the line counts them.
+    const imgs = page.getByRole("dialog", nav("New Design"));
+    const { slug: imgSlug, idea: imgIdea, project: imgProject } = fields(imgs);
+    const open = (where: Locator) => where.getByRole("button", { name: "Open image" });
+    const start = imgs.getByRole("button", nav("Start design"));
+    const uploads = await steerUploads(page);
+    await imgProject.selectOption("demo");
+    // An image needs a saved draft, so the epic name comes first.
+    await imgSlug.fill("ready-epic");
+    await expect(imgs.getByText("Saved")).toBeVisible();
+    await expect(imgIdea).toBeVisible();
+    await imgIdea.evaluate((el, b64) => {
+      const data = new DataTransfer();
+      data.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], "pasted.png", { type: "image/png" }));
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    }, PNG.toString("base64"));
+    await expect(open(imgs)).toHaveCount(1);
+    await addInput(imgs).setInputFiles([png(1)]);
+    await expect(open(imgs)).toHaveCount(2);
+    await expect(imgs.getByText("2 of 10 images")).toBeVisible();
+
+    // Start stays off with the reason for no slug, then for no idea.
+    await expect(start).toBeDisabled();
+    await expect(imgs.getByText("Write an idea to start.")).toBeVisible();
+    await imgIdea.fill("Same name.");
+    await imgSlug.fill("");
+    await expect(start).toBeDisabled();
+    await expect(imgs.getByText("Name the epic to start.")).toBeVisible();
+    await imgSlug.fill("ready-epic");
+    await expect(start).toBeEnabled();
+
+    // A held upload shows the spinner and "1 uploading"; a failed one shows the red tile.
+    uploads.set("hold");
+    await addInput(imgs).setInputFiles([png(2)]);
+    await expect(imgs.getByLabel("Uploading")).toBeVisible();
+    await expect(imgs.getByText("1 uploading")).toBeVisible();
+    await expect(start).toBeDisabled();
+    await expect(imgs.getByText("Wait for the upload to finish")).toBeVisible();
+    await uploads.release("fail");
+    const failed = imgs.locator('[data-state="failed"]');
+    await expect(failed).toBeVisible();
+    await expect(imgs.getByText("Remove the failed image first")).toBeVisible();
+    await expect(start).toBeDisabled();
+    await failed.getByRole("button", nav("Remove image")).click();
+    await expect(failed).toHaveCount(0);
+    await expect(start).toBeEnabled();
+    uploads.set("pass");
+
+    // The other device shows the same ready thumbnails, and a click opens the viewer.
+    await page2.reload();
+    const theirImgs = await openDialog(page2);
+    await expect(fields(theirImgs).slug).toHaveValue("ready-epic");
+    await expect(open(theirImgs)).toHaveCount(2);
+    await page2.keyboard.press("Escape");
+    await open(imgs).first().click();
+    await page.getByRole("button", { name: /^Close ✕/ }).click();
+    await expect(page.getByRole("button", { name: /^Close ✕/ })).toBeHidden();
+
+    // Discard with text and images asks, then removes the draft and its folder.
+    const draftId = (await fixture.cli("designs", "drafts", "list")).split("\t")[0]!;
+    await expect.poll(() => access(fixture.draftDir(draftId)).then(() => true, () => false)).toBe(true);
+    await imgs.getByRole("button", nav("Discard")).click();
+    await expect(imgs.getByText("Discard this draft and its images?")).toBeVisible();
+    await imgs.getByRole("button", nav("Discard")).click();
+    await expect(imgs).toBeHidden();
+    await expect.poll(() => fixture.cli("designs", "drafts", "list")).not.toContain("ready-epic");
+    await expect.poll(() => access(fixture.draftDir(draftId)).then(() => true, () => false)).toBe(false);
+
+    // Start with images: an existing epic is refused and the draft keeps its images; a good Start moves the files.
+    const form2 = await openDialog(page);
+    await fields(form2).project.selectOption("demo");
+    await fields(form2).slug.fill("ready-epic");
+    await fields(form2).idea.fill("With pictures.");
+    await addInput(form2).setInputFiles([png(3), png(4)]);
+    await expect(open(form2)).toHaveCount(2);
+    const keptId = (await fixture.cli("designs", "drafts", "list")).split("\t")[0]!;
+    await form2.getByRole("button", nav("Start design")).click();
+    await expect(page.locator("[data-scope='toast'][data-part='root']").last()).toContainText("already has an epic");
+    await expect(open(form2)).toHaveCount(2);
+    await expect(access(fixture.draftDir(keptId))).resolves.toBeUndefined();
+
+    const before = (await fixture.launches()).length;
+    await fields(form2).slug.fill("pictured");
+    await form2.getByRole("button", nav("Start design")).click();
+    await expect(page).toHaveURL(/#\/d\/demo:pictured$/);
+    const shown2 = await fixture.cli("tickets", "show", "demo:pictured");
+    const lines = shown2.slice(shown2.indexOf("## Initial prompt")).trimEnd().split("\n");
+    const after = lines.slice(lines.lastIndexOf("Images:") + 1);
+    const listed = after.slice(0, after.includes("") ? after.indexOf("") : undefined);
+    expect(lines.lastIndexOf("Images:")).toBeGreaterThan(0);
+    expect(listed).toHaveLength(2);
+    for (const path of listed) {
+      // `gx tickets root` needs a git repo, which the fixture's cwd is not; the store is under the fixture's data dir.
+      expect(path).toMatch(/^\/.*\/gx\/tickets\/demo\/pictured\/images\/[^/]+$/);
+      await expect(access(path)).resolves.toBeUndefined();
+    }
+    await expect.poll(() => access(fixture.draftDir(keptId)).then(() => true, () => false)).toBe(false);
+    await expect.poll(async () => (await fixture.launches()).length).toBe(before + 1);
+    const launched = (await fixture.launches()).at(-1)!;
+    // The first prompt is the bare skill command; the image paths live in the map ticket, not the prompt.
+    expect(launched).not.toContain("Images:");
+    await expect.poll(async () => (await sessionRows(fixture, "pictured")).length).toBeGreaterThan(0);
+    const conv = (await chatOf(fixture, (await sessionRows(fixture, "pictured"))[0]!.split("\t")[0]!)).conversation_id;
+    await expect.poll(() => fixture.input(conv)).toContain("/gx-design demo:pictured");
+    expect(await fixture.input(conv)).not.toContain("Images:");
+
+    // The Design chat shows the strip read-only: no Remove, Add or upload states; a click opens the viewer.
+    const strip = page.getByLabel("Images", { exact: true });
+    await expect(open(strip)).toHaveCount(2);
+    await expect(strip.getByRole("button", nav("Remove image"))).toHaveCount(0);
+    await expect(strip.getByRole("button", nav("Add image"))).toHaveCount(0);
+    await expect(strip.getByLabel("Uploading")).toHaveCount(0);
+    await open(strip).first().click();
+    await page.getByRole("button", { name: /^Close ✕/ }).click();
+    await expect(page.getByRole("button", { name: /^Close ✕/ })).toBeHidden();
   } finally {
     await other.close();
   }
