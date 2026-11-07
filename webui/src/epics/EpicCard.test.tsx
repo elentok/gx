@@ -345,3 +345,29 @@ describe("time label", () => {
     expect(text(screen.getByTestId("time"))).toBe("3h 5m");
   });
 });
+
+test("a card with a workspace shows its name and a menu; one without shows neither", () => {
+  const { unmount } = renderThemed(
+    <EpicCard row={row({ workspace: "Side" })} workspaces={[{ name: "Default", default: true }, { name: "Side" }] as never} />,
+  );
+  expect(screen.getByTestId("workspace").textContent).toBe("Side");
+  expect(screen.getByRole("button", { name: "More actions" })).toBeTruthy();
+  unmount();
+  renderThemed(<EpicCard row={row()} />);
+  expect(screen.queryByTestId("workspace")).toBeNull();
+  expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
+});
+
+test("a held card is dimmed and Take off hold unholds it", async () => {
+  const unhold = vi.fn(async () => ({}) as never);
+  renderThemed(
+    <EpicCard
+      row={row({ section: "on-hold", workspace: "Default", actions: [{ kind: "unhold", label: "Take off hold" }] })}
+      writes={{ unhold }}
+    />,
+  );
+  const card = screen.getByRole("link", { name: "blog" }).closest("[data-section]")!;
+  expect(getComputedStyle(card).opacity).not.toBe("1");
+  fireEvent.click(screen.getByRole("button", { name: "Take off hold" }));
+  await waitFor(() => expect(unhold).toHaveBeenCalledWith("gx:blog"));
+});

@@ -23,7 +23,7 @@ const finished = (name: string, project: string) => row(name, { project, state: 
 const names = (sections: ReturnType<typeof sectionsOf>, key: string) =>
   sections.find((s) => s.key === key)!.rows.map((r) => r.name);
 
-test("sections run Needs you, Implementing, Ready to queue, Designing, Ready to design, Finished", () => {
+test("sections run Needs you, Implementing, Ready to queue, Designing, Ready to design, Finished, On hold", () => {
   expect(sectionsOf([], "").map((s) => s.title)).toEqual([
     "Needs you",
     "Implementing",
@@ -31,7 +31,26 @@ test("sections run Needs you, Implementing, Ready to queue, Designing, Ready to 
     "Designing",
     "Ready to design",
     "Finished",
+    "On hold",
   ]);
+  expect(sectionsOf([], "").at(-1)!.collapsedByDefault).toBe(true);
+});
+
+test("a workspace filter keeps that workspace's cards and drops cards with none", () => {
+  const epics = [
+    row("a", { workspace: "Default" }),
+    row("b", { workspace: "Side" }),
+    row("oneoff", { section: "ready-to-queue" }),
+    row("held", { workspace: "Side", section: "on-hold" }),
+  ];
+  expect(names(sectionsOf(epics, "", undefined, undefined, "Side"), "ready-to-queue")).toEqual(["b"]);
+  expect(names(sectionsOf(epics, "", undefined, undefined, "Side"), "on-hold")).toEqual(["held"]);
+  expect(names(sectionsOf(epics, "", undefined, undefined, undefined), "ready-to-queue")).toEqual(["a", "b", "oneoff"]);
+});
+
+test("the text filter matches held cards", () => {
+  const epics = [row("held-one", { section: "on-hold" }), row("other", { section: "on-hold" })];
+  expect(names(sectionsOf(epics, "one"), "on-hold")).toEqual(["held-one"]);
 });
 
 test("a project filter keeps only that project's cards, with and without text", () => {

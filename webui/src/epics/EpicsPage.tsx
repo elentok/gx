@@ -1,4 +1,4 @@
-import { Box, Input, Text } from "@chakra-ui/react";
+import { Box, chakra, Input, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { MissingBanner } from "../checks/MissingBanner";
@@ -8,6 +8,7 @@ import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status";
 import { useConnectionContext } from "../connection";
 import type { OpenDesign } from "../design/open";
 import { NewDesignForm } from "../design/NewDesignForm";
+import type { Workspace } from "../generated/server";
 import { designHref } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
@@ -16,6 +17,7 @@ import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useFetched } from "../useFetched";
+import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { EpicCard } from "./EpicCard";
 import { useEpicList, type FetchEpicList } from "./list";
 import { ProjectFilter } from "./ProjectFilter";
@@ -56,12 +58,14 @@ function SectionBlock({
   section,
   now,
   open,
+  workspaces,
   onToggle,
   onChanged,
 }: {
   section: Section;
   now: number;
   open: boolean;
+  workspaces: Workspace[];
   onToggle: () => void;
   onChanged: () => void;
 }) {
@@ -92,7 +96,7 @@ function SectionBlock({
       {open && (
         <Box display="grid" gap="20px" gridTemplateColumns="repeat(auto-fill, minmax(min(100%, 360px), 1fr))">
           {section.rows.map((r) => (
-            <EpicCard key={r.address} row={r} now={now} onChanged={onChanged} />
+            <EpicCard key={r.address} row={r} now={now} workspaces={workspaces} onChanged={onChanged} />
           ))}
         </Box>
       )}
@@ -121,6 +125,8 @@ export function EpicsPage({
   const [query, setQuery] = useState("");
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [designing, setDesigning] = useState(false);
+  const [workspace, setWorkspace] = useState<string>();
+  const { workspaces } = useWorkspaces(conn);
   const [storedProjects, setStoredProjects] = useState(readStoredProjects);
   const now = usePageClock((list?.epics ?? []).some((e) => e.time_kind && e.time_start));
   const searching = query.trim() !== "";
@@ -131,7 +137,9 @@ export function EpicsPage({
   const filterProjects = projects.length > 1 && known.length > 0 ? known : undefined;
   const missing = (checks?.projects ?? []).filter((p) => p.missing && (filterProjects === undefined || filterProjects.includes(p.project)));
   const setupProject = checks?.projects.find((p) => p.project === settingUp);
-  const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProjects) : [];
+  // The choice lives in this page's state only; a workspace that is gone acts as "All workspaces".
+  const filterWorkspace = workspaces.some((w) => w.name === workspace) ? workspace : undefined;
+  const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProjects, filterWorkspace) : [];
   const shown = sections.filter((s) => s.rows.length > 0);
   const chooseProjects = (chosen: string[]) => {
     setStoredProjects(chosen);
@@ -179,6 +187,29 @@ export function EpicsPage({
           onChange={(e) => setQuery(e.target.value)}
         />
         {projects.length > 1 && <ProjectFilter projects={projects} selected={filterProjects ?? []} onChange={chooseProjects} />}
+        {workspaces.length > 1 && (
+          <chakra.select
+            aria-label="Workspace"
+            value={filterWorkspace ?? ""}
+            onChange={(e) => setWorkspace(e.target.value)}
+            bg="surface"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="sm"
+            px="3"
+            h="40px"
+            fontSize="16px"
+            flexShrink="0"
+            cursor="pointer"
+          >
+            <option value="">All workspaces</option>
+            {workspaces.map((w) => (
+              <option key={w.name} value={w.name}>
+                {w.name}
+              </option>
+            ))}
+          </chakra.select>
+        )}
       </Box>
       {!bannerHidden && <MissingBanner missing={missing} onSetUp={setSettingUp} onDismiss={() => setBannerHidden(true)} />}
       {failed ? (
@@ -195,7 +226,9 @@ export function EpicsPage({
       ) : shown.length === 0 ? (
         <EmptyState title="No match" />
       ) : (
-        shown.map((s) => <SectionBlock key={s.key} section={s} now={now} open={isOpen(s)} onToggle={() => toggle(s.key)} onChanged={retry} />)
+        shown.map((s) => (
+          <SectionBlock key={s.key} section={s} now={now} open={isOpen(s)} workspaces={workspaces} onToggle={() => toggle(s.key)} onChanged={retry} />
+        ))
       )}
       {setupProject && <SetupDialog project={setupProject} save={saveChecks} onSaved={rereadChecks} onClose={() => setSettingUp(undefined)} />}
       {designing && (

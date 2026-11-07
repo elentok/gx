@@ -383,6 +383,46 @@ test("a failed first fetch is retried when the connection comes back", async () 
   expect(calls).toBe(2);
 });
 
+const wsConn = (): Connection => {
+  const s = { ...state, snapshot: { workspaces: [{ name: "Default", default: true }, { name: "Side" }] } } as unknown as ConnectionState;
+  return { getState: () => s, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
+};
+
+const inWorkspaces = () =>
+  listOf([
+    row("home", { section: "implementing", workspace: "Default" }),
+    row("away", { section: "implementing", workspace: "Side" }),
+    row("loose", { section: "implementing" }),
+    row("frozen", { section: "on-hold", workspace: "Side" }),
+  ]);
+
+// The shell sidebar lists the same epics; only the page's section regions count.
+const cardNames = () => sectionRegions().flatMap((r) => within(r).queryAllByRole("link").map((a) => a.textContent));
+
+test("the workspace filter defaults to All workspaces, filters locally and stores nothing", async () => {
+  const setItem = vi.spyOn(Storage.prototype, "setItem");
+  renderEpics(async () => inWorkspaces(), wsConn());
+  const select = (await screen.findByRole("combobox", { name: "Workspace" })) as HTMLSelectElement;
+  await waitFor(() => expect(cardNames()).toContain("loose"));
+  expect(select.value).toBe("");
+  expect(cardNames()).toEqual(["home", "away", "loose"]);
+  setItem.mockClear();
+  fireEvent.change(select, { target: { value: "Side" } });
+  expect(cardNames()).toEqual(["away"]);
+  expect(setItem).not.toHaveBeenCalled();
+  setItem.mockRestore();
+});
+
+test("On hold is last, collapsed with a count, and a text match opens it", async () => {
+  renderEpics(async () => inWorkspaces(), wsConn());
+  await waitFor(() => expect(cardNames()).toContain("home"));
+  expect(regionNames().at(-1)).toBe("epics-on-hold");
+  expect(toggle("On hold").textContent).toContain("1");
+  expect(cardNames()).not.toContain("frozen");
+  fireEvent.change(await filterBox(), { target: { value: "froz" } });
+  expect(cardNames()).toEqual(["frozen"]);
+});
+
 const T0 = Date.parse("2026-01-01T10:00:00Z");
 const timed = () => listOf([row("busy", { section: "implementing", time_kind: "elapsed", time_start: new Date(T0).toISOString() })]);
 const timeText = () => screen.getByTestId("time").textContent;

@@ -11,12 +11,16 @@ import {
   CardActionQueue,
   CardActionStashMerge,
   CardActionTriage,
+  CardActionUnhold,
   CardKindDesign,
   CardKindImplementation,
   SectionNeedsYou,
+  SectionOnHold,
   type CardAction,
   type EpicListRow,
+  type Workspace,
 } from "../generated/server";
+import { ItemMenu, postUnhold, type ItemWriters } from "../workspaces/itemActions";
 import { designHref, epicHref, ticketHref } from "../hrefs";
 import { postOpenDesign, type OpenDesign } from "../design/open";
 import { Button } from "../ui/button/Button";
@@ -59,6 +63,7 @@ export interface CardWrites {
   openDesign?: OpenDesign;
   /** Goes to a hash route. */
   navigate?: (href: string) => void;
+  unhold?: ItemWriters["unhold"];
 }
 
 const goTo = (href: string) => {
@@ -74,7 +79,7 @@ function ActionButtons({
   writes: CardWrites;
   onChanged: () => void;
 }) {
-  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, openDesign = postOpenDesign, navigate = goTo } = writes;
+  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, openDesign = postOpenDesign, navigate = goTo, unhold = postUnhold } = writes;
   const [triage, setTriage] = useState(false);
   const { run, pending } = useWrite();
 
@@ -100,6 +105,7 @@ function ActionButtons({
       );
     }
     const onClick = {
+      [CardActionUnhold]: () => void run(() => unhold(target)),
       [CardActionDesign]: () => startDesign(target),
       [CardActionContinue]: () => startDesign(target),
       [CardActionOpen]: () => navigate(designHref(target)),
@@ -129,12 +135,15 @@ export function EpicCard({
   row,
   now = Date.now(),
   writes = {},
+  workspaces = [],
   onChanged = () => {},
 }: {
   row: EpicListRow;
   /** The page clock, in epoch milliseconds. */
   now?: number;
   writes?: CardWrites;
+  /** The ordered workspaces the "..." menu moves between. */
+  workspaces?: Workspace[];
   onChanged?: () => void;
 }) {
   const time = timeLabel(row.time_kind, row.time_start, now);
@@ -148,10 +157,12 @@ export function EpicCard({
       : (launchOrVerdictText(row.launch_step, row.verdict, row.reason) ?? row.reason);
   const hasButtons = (row.actions?.length ?? 0) > 0;
   const tone = needsYou ? needsYouTone(row) : undefined;
+  const held = row.section === SectionOnHold;
   return (
     <Box
       data-kind={kind}
       data-section={row.section}
+      opacity={held ? 0.6 : undefined}
       bg="surface.raised"
       borderWidth="1px"
       borderColor="border"
@@ -182,6 +193,14 @@ export function EpicCard({
             <Text as="span" color="text.dim">
               {row.project}
             </Text>
+            {row.workspace && (
+              <>
+                {" · "}
+                <Text as="span" data-testid="workspace" color="text.dim">
+                  {row.workspace}
+                </Text>
+              </>
+            )}
             {" · "}
             {time && (
               <>
@@ -196,6 +215,21 @@ export function EpicCard({
             </Text>
           </Text>
         </Box>
+        {row.workspace && (
+          <Box ml="auto" flex="none">
+            <ItemMenu
+              item={{
+                key: row.address,
+                name: row.name,
+                kind: row.card_kind === CardKindDesign ? "design" : "epic",
+                workspace: row.workspace,
+                queued: row.queued,
+                held,
+              }}
+              workspaces={workspaces}
+            />
+          </Box>
+        )}
       </Box>
       {(needsYou || reason) && (
         <Box display="flex" flexDirection="column" alignItems="flex-start" gap="2">
