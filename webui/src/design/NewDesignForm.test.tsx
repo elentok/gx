@@ -17,27 +17,32 @@ afterEach(() => {
 const ok: OpenDesign = async () => ({ refused: false }) as never;
 
 /** An in-memory draft store: `latest` is the one the form opens on, if any. */
-function fakeDrafts(latest?: Partial<DesignDraft>) {
+function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
   const stored: DesignDraft | undefined = latest && { id: "d1", project: "gx", slug: "", idea: "", images: [], revision: 3, edited_at: "", ...latest };
   let revision = stored?.revision ?? 0;
   const save = vi.fn(async (body: DesignDraftSaveRequest): Promise<DraftResult> => {
     revision++;
-    return { kind: "ok", draft: { images: [], edited_at: "", ...body, id: body.id ?? "created", revision } };
+    // Like the server: a save stamps a new edited-at unless asked to keep it.
+    const edited_at = body.keep_edited_at ? (stored?.edited_at ?? "") : "stamped";
+    return { kind: "ok", draft: { images: [], ...body, edited_at, id: body.id ?? "created", revision } };
   });
   const remove = vi.fn(async (): Promise<DraftResult> => ({ kind: "deleted" }));
+  const setLastProject = vi.fn(async (_project: string) => {});
   const client: DraftsClient = {
     list: async () => (stored ? [{ ...stored, image_count: 0 }] : []),
     read: async () => (stored ? { kind: "ok", draft: stored } : { kind: "gone" }),
     save,
     remove,
+    getLastProject: async () => lastProject,
+    setLastProject,
   };
-  return { client, save, remove };
+  return { client, save, remove, setLastProject };
 }
 
-async function mount(over: Partial<Parameters<typeof NewDesignForm>[0]> = {}, latest?: Partial<DesignDraft>) {
+async function mount(over: Partial<Parameters<typeof NewDesignForm>[0]> = {}, latest?: Partial<DesignDraft>, lastProject = "") {
   const onClose = vi.fn();
   const onStarted = vi.fn();
-  const fake = fakeDrafts(latest);
+  const fake = fakeDrafts(latest, lastProject);
   await act(async () => {
     renderThemed(
       <ConnectionContext.Provider value={{ refresh: () => {} } as Connection}>
@@ -85,30 +90,55 @@ test("the form shows a spinner, not its fields, while the drafts load", async ()
   expect(screen.getByRole("textbox", { name: "Epic slug" })).toBeTruthy();
 });
 
-test("starting project: the page filter, then the first", async () => {
-  await mount({ filterProject: "blog" });
+test("starting project of a new draft: the one-project filter, else the last used, else the first", async () => {
+  await mount({ filterProject: "blog" }, undefined, "gx");
   expect(project()).toBe("blog");
   cleanup();
-  await mount();
+  await mount({}, undefined, "blog");
+  expect(project()).toBe("blog");
+  cleanup();
+  await mount({ projects: ["gx", "blog", "web"] }, undefined, "web");
+  expect(project()).toBe("web");
+  cleanup();
+  await mount({}, undefined, "");
+  expect(project()).toBe("gx");
+  cleanup();
+  await mount({}, undefined, "gone");
   expect(project()).toBe("gx");
 });
 
-test("starting project: a draft with text wins over the filter", async () => {
-  await mount({ filterProject: "blog" }, { slug: "x", project: "gx" });
+test("a saved draft keeps its project against another filter, even with no text", async () => {
+  await mount({ filterProject: "blog" }, { slug: "x", project: "gx" }, "blog");
   expect(project()).toBe("gx");
-});
-
-test("starting project: an empty draft yields to the filter, and to the first when All projects", async () => {
+  cleanup();
   await mount({ filterProject: "gx" }, { slug: " ", project: "blog" });
-  expect(project()).toBe("gx");
-  cleanup();
-  await mount({}, { slug: " ", project: "blog" });
   expect(project()).toBe("blog");
 });
 
-test("starting project skips a project that is gone", async () => {
-  await mount({ filterProject: "blog" }, { slug: "x", project: "old" });
+test("picking a project sets the last project used; typing does not", async () => {
+  vi.useFakeTimers();
+  const { setLastProject } = await mount({}, { slug: "x", project: "gx" });
+  type("Epic slug", "xy");
+  type("Rough idea", "an idea");
+  await wait(800);
+  expect(setLastProject).not.toHaveBeenCalled();
+  type("Project", "blog");
+  expect(setLastProject).toHaveBeenCalledExactlyOnceWith("blog");
+});
+
+test("a draft whose project is gone moves to the new-draft project with a note, keeping its edited-at", async () => {
+  vi.useFakeTimers();
+  const { save } = await mount({ filterProject: "blog" }, { slug: "x", project: "old", edited_at: "2026-01-01T00:00:00Z" });
   expect(project()).toBe("blog");
+  expect(screen.getByText("old no longer exists; moved to blog")).toBeTruthy();
+  await wait(0);
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ id: "d1", project: "blog", revision: 3, keep_edited_at: true }));
+  const saved = await save.mock.results[0]!.value;
+  expect(saved.draft.edited_at).toBe("2026-01-01T00:00:00Z");
+  type("Epic slug", "xy");
+  await wait(800);
+  expect(save).toHaveBeenLastCalledWith(expect.not.objectContaining({ keep_edited_at: true }));
 });
 
 test("the form opens on the latest draft's text and label", async () => {

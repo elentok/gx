@@ -38,6 +38,18 @@ func TestSave_CurrentRevisionBumpsAndStamps(t *testing.T) {
 	}
 }
 
+func TestSave_KeepEditedAtLeavesTimeAndBumpsRevision(t *testing.T) {
+	s := newStore(t)
+	d := mustCreate(t, s, "a")
+	res, err := s.Save(d.ID, wire.DesignDraftSaveRequest{Project: "other", Idea: "a", Revision: d.Revision, KeepEditedAt: true})
+	if err != nil || res.Draft == nil {
+		t.Fatalf("save: %+v %v", res, err)
+	}
+	if !res.Draft.EditedAt.Equal(d.EditedAt) || res.Draft.Revision != d.Revision+1 || res.Draft.Project != "other" {
+		t.Fatalf("want same edited-at, next revision, new project: %+v", res.Draft)
+	}
+}
+
 func TestSave_OldRevisionConflictLeavesFile(t *testing.T) {
 	s := newStore(t)
 	d := mustCreate(t, s, "a")

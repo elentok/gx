@@ -3,7 +3,21 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import type { DesignDraft } from "../generated/server";
-import { deleteDraft, draftLabel, listDrafts, readDraft, saveDraft, type DeleteDraft, type ListDrafts, type ReadDraft, type SaveDraft } from "./drafts";
+import {
+  deleteDraft,
+  draftLabel,
+  getLastProject,
+  listDrafts,
+  readDraft,
+  saveDraft,
+  setLastProject,
+  type DeleteDraft,
+  type GetLastProject,
+  type ListDrafts,
+  type ReadDraft,
+  type SaveDraft,
+  type SetLastProject,
+} from "./drafts";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { clearUnsaved, NEW_DRAFT_KEY, readUnsaved, stashUnsaved } from "./unsaved";
 import { useDesignWrite } from "./SessionControls";
@@ -16,9 +30,11 @@ export interface DraftsClient {
   read: ReadDraft;
   save: SaveDraft;
   remove: DeleteDraft;
+  getLastProject: GetLastProject;
+  setLastProject: SetLastProject;
 }
 
-const realDrafts: DraftsClient = { list: listDrafts, read: readDraft, save: saveDraft, remove: deleteDraft };
+const realDrafts: DraftsClient = { list: listDrafts, read: readDraft, save: saveDraft, remove: deleteDraft, getLastProject, setLastProject };
 
 const AUTOSAVE_MS = 800;
 const RETRY_MS = 5000;
@@ -34,11 +50,10 @@ type Banner = "conflict" | "gone" | undefined;
 
 const hasText = (d: Partial<Fields>) => !!(d.slug?.trim() || d.idea?.trim());
 
-/** A draft with text keeps its project, then the page's filter, then the draft's, then the first. */
-function startingProject(draft: Partial<Fields>, projects: string[], filterProject?: string): string {
+/** A new draft starts on the page's one-project filter, then the last project used, then the first. */
+function newDraftProject(projects: string[], filterProject?: string, lastProject?: string): string {
   const known = (p?: string) => (p && projects.includes(p) ? p : undefined);
-  const text = hasText(draft);
-  return (text && known(draft.project)) || known(filterProject) || known(draft.project) || projects[0] || "";
+  return known(filterProject) || known(lastProject) || projects[0] || "";
 }
 
 const focusRing = { borderColor: "tone.running.fg", boxShadow: "0 0 0 3px {colors.tone.running.bg}" };
@@ -82,12 +97,17 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
   const [restored, setRestored] = useState<Restored>();
   // A new generation remounts the form on another draft.
   const [generation, setGeneration] = useState(0);
+  // The server's last project used; a server that cannot answer leaves the first project.
+  const [lastProject, setLast] = useState("");
+  const fetchLast = () => drafts.getLastProject().catch(() => "");
   useEffect(() => {
     let live = true;
     (async () => {
+      const last = await fetchLast();
       const stuck = await saveUnsaved(drafts);
       if (stuck) {
         if (live) {
+          setLast(last);
           setRestored(stuck.state);
           setInitial(stuck.draft);
         }
@@ -96,7 +116,10 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
       await moveLegacyDraft(drafts);
       const [latest] = await drafts.list();
       const res = latest ? await drafts.read(latest.id) : undefined;
-      if (live) setInitial(res?.kind === "ok" ? res.draft : null);
+      if (live) {
+        setLast(last);
+        setInitial(res?.kind === "ok" ? res.draft : null);
+      }
     })().catch(() => live && setInitial(null));
     return () => {
       live = false;
@@ -114,12 +137,14 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
       </BottomSheet>
     );
   }
-  const switchTo = (next: DesignDraft | null) => {
+  const switchTo = async (next: DesignDraft | null) => {
+    // A blank draft starts on the project last picked, which this form may just have set.
+    if (!next) setLast(await fetchLast());
     setRestored(undefined);
     setInitial(next);
     setGeneration((g) => g + 1);
   };
-  return <DraftForm key={generation} {...props} drafts={drafts} initial={initial} restored={restored} onSwitch={switchTo} />;
+  return <DraftForm key={generation} {...props} drafts={drafts} initial={initial} lastProject={lastProject} restored={restored} onSwitch={switchTo} />;
 }
 
 const LEGACY_DRAFT_KEY = "gx.newDesign.draft";
@@ -179,16 +204,21 @@ function DraftForm({
   onClose,
   drafts,
   initial,
+  lastProject,
   restored,
   onSwitch,
-}: FormProps & { drafts: DraftsClient; initial: DesignDraft | null; restored?: Restored; onSwitch: (next: DesignDraft | null) => void }) {
+}: FormProps & { drafts: DraftsClient; initial: DesignDraft | null; lastProject: string; restored?: Restored; onSwitch: (next: DesignDraft | null) => void }) {
   const sheetMode = !useWide();
   const slugInput = useRef<HTMLInputElement>(null);
+  // A saved draft keeps its project; one whose project is gone is moved as a new draft would start.
+  const kept = initial && projects.includes(initial.project) ? initial.project : undefined;
   const [draft, setDraft] = useState<Fields>(() => ({
     slug: initial?.slug ?? "",
     idea: initial?.idea ?? "",
-    project: startingProject(initial ?? {}, projects, filterProject),
+    project: kept ?? newDraftProject(projects, filterProject, lastProject),
   }));
+  const [movedFrom] = useState(() => (initial && !kept && initial.project ? initial.project : undefined));
+  const [moved, setMoved] = useState(movedFrom !== undefined);
   const [status, setStatus] = useState<SaveStatus>(restored === "unsaved" ? "unsaved" : "none");
   const [confirming, setConfirming] = useState(false);
   const [name, setName] = useState(initial?.name);
@@ -200,7 +230,14 @@ function DraftForm({
 
   const latest = useRef(draft);
   // `synced` is the fields as the server last had them, so an unchanged form saves nothing. A restored entry never reached the server.
-  const server = useRef({ id: initial?.id || undefined, revision: initial?.revision ?? 0, name: initial?.name, synced: restored ? "" : JSON.stringify(draft) });
+  // A moved draft starts out of sync, so its first save writes the new project; `unedited` is the fields as moved, which that save stamps without a new edited-at.
+  const unedited = useRef(movedFrom !== undefined ? JSON.stringify(draft) : undefined);
+  const server = useRef({
+    id: initial?.id || undefined,
+    revision: initial?.revision ?? 0,
+    name: initial?.name,
+    synced: restored ? "" : JSON.stringify(movedFrom !== undefined ? { ...draft, project: movedFrom } : draft),
+  });
   // Set after a failed save until one succeeds; a leave then keeps the text in localStorage.
   const failing = useRef(restored === "unsaved");
   // Fallback keys this form wrote or inherited, cleared together once the text is settled.
@@ -224,7 +261,7 @@ function DraftForm({
     if (!s.id && !fields.slug && !fields.idea) return setStatus("none");
     let res;
     try {
-      res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision });
+      res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision, ...(key === unedited.current && { keep_edited_at: true }) });
     } catch {
       // The text stays in memory and is retried on the next keystroke and every RETRY_MS.
       failing.current = true;
@@ -233,6 +270,7 @@ function DraftForm({
     }
     failing.current = false;
     if (res.kind === "ok") {
+      unedited.current = undefined;
       Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key });
       nameDirty.current = false;
       settle();
@@ -332,6 +370,12 @@ function DraftForm({
   }, []);
 
   useEffect(() => {
+    if (movedFrom !== undefined) flush();
+    // Once, on open; flush reads refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (status !== "unsaved") return;
     const id = setInterval(flush, RETRY_MS);
     return () => clearInterval(id);
@@ -339,6 +383,11 @@ function DraftForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
+  const pickProject = (project: string) => {
+    setMoved(false);
+    patch({ project });
+    drafts.setLastProject(project).catch(() => {});
+  };
   const patch = (p: Partial<Fields>) => {
     const next = { ...draft, ...p };
     setDraft(next);
@@ -501,7 +550,7 @@ function DraftForm({
             <chakra.select
               aria-label="Project"
               value={draft.project}
-              onChange={(e) => patch({ project: e.target.value })}
+              onChange={(e) => pickProject(e.target.value)}
               fontSize="16px"
               h="40px"
               px="3"
@@ -556,6 +605,11 @@ function DraftForm({
           ×
         </chakra.button>
       </Box>
+      {moved && (
+        <Text fontSize="sm" color="text.dim" px="3" pt="2" flexShrink="0">
+          {movedFrom} no longer exists; moved to {draft.project}
+        </Text>
+      )}
       {banner && (
         <Box role="alert" display="flex" alignItems="center" flexWrap="wrap" gap="2" mx="3" mt="3" px="3" py="10px" borderRadius="8px" bg="tone.waiting.bg" color="tone.waiting.fg" fontSize="13px" flexShrink="0">
           <Text flex="1" minW="0">

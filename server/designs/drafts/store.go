@@ -162,7 +162,9 @@ func (s *Store) Save(id string, req wire.DesignDraftSaveRequest) (wire.DesignDra
 		return wire.DesignDraftSaveResult{Deleted: true}, nil
 	}
 	d.Revision++
-	d.EditedAt = s.now().UTC()
+	if !req.KeepEditedAt {
+		d.EditedAt = s.now().UTC()
+	}
 	if err := s.write(d); err != nil {
 		return wire.DesignDraftSaveResult{}, err
 	}

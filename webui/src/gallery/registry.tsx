@@ -100,6 +100,8 @@ const noDrafts: DraftsClient = {
   read: async () => ({ kind: "gone" }),
   save: async () => ({ kind: "deleted" }),
   remove: async () => ({ kind: "deleted" }),
+  getLastProject: async () => "",
+  setLastProject: async () => {},
 };
 
 // A transform makes the modal's fixed overlay fill this frame instead of the page.

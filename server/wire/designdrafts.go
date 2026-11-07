@@ -45,6 +45,9 @@ type DesignDraftSaveRequest struct {
 	Idea     string `json:"idea"`
 	Name     string `json:"name,omitempty"`
 	Revision int    `json:"revision"`
+	// KeepEditedAt saves without moving the edited-at time, for a change the
+	// person did not make (the form moving a draft off a deleted project).
+	KeepEditedAt bool `json:"keep_edited_at,omitempty"`
 }
 
 // DesignLastProject is the project the New Design form last used, shared by
