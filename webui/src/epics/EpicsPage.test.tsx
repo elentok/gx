@@ -270,6 +270,13 @@ test("the New Design project starts on the page's filtered project", async () =>
   expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
 });
 
+test("the New Design project ignores a filter of several projects", async () => {
+  localStorage.setItem("gx.epics.project", '["gx","other"]');
+  await loaded(listOf([row("a"), row("b", { project: "blog", address: "blog:b" }), row("c", { project: "other", address: "other:c" })]));
+  fireEvent.click(screen.getByRole("button", { name: "New Design" }));
+  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
+});
+
 test("Start posts new_design and opens the new Design page", async () => {
   const open = vi.fn(async () => ({ refused: false }) as never);
   const { router } = renderEpics(async () => mixed(), conn, open);

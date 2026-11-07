@@ -234,7 +234,7 @@ export function EpicsPage({
       {designing && (
         <NewDesignForm
           projects={projects}
-          filterProject={filterProjects?.[0]}
+          filterProject={filterProjects?.length === 1 ? filterProjects[0] : undefined}
           open={openDesign}
           onStarted={(address, startFailure) => navigate(designHref(address).slice(1), { state: { startFailure } })}
           onClose={() => setDesigning(false)}
