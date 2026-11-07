@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -58,6 +60,10 @@ type Registry struct {
 	chat        *notify.ServerChat
 	back        RegistryBack
 	unavailable unavailableNotes
+
+	worktreeDirsMu sync.Mutex
+	worktreeDirs   map[string]worktreeDirEntry
+	findRepo       func(dir string) (*git.Repo, error) // nil: git.FindRepo; a test seam
 }
 
 // NewRegistry builds the Registry.
@@ -135,17 +141,54 @@ func (p *Registry) MergingOnMerged(project string) bool {
 	return pf.LandingPolicy() == config.LandingOnLanded
 }
 
-// WorktreeDir is where the project's repo keeps its linked worktrees.
+// worktreeDirKey identifies the project.json a cached worktree dir was read from.
+type worktreeDirKey struct {
+	mtime time.Time
+	size  int64
+}
+
+type worktreeDirEntry struct {
+	key worktreeDirKey
+	dir string
+}
+
+// WorktreeDir is where the project's repo keeps its linked worktrees. The
+// budget and token pollers ask for every live ticket each tick, and resolving
+// it forks git, so a hit is served until project.json changes. A failed
+// lookup is not cached.
 func (p *Registry) WorktreeDir(project string) string {
-	pf, err := config.ReadProjectFile(filepath.Join(p.cfg().TicketStore, project))
-	if err != nil || pf.Repo == nil {
-		return ""
-	}
-	repo, err := git.FindRepo(*pf.Repo)
+	projectDir := filepath.Join(p.cfg().TicketStore, project)
+	st, err := os.Stat(filepath.Join(projectDir, config.ProjectFileName))
 	if err != nil {
 		return ""
 	}
-	return repo.LinkedWorktreeDir()
+	key := worktreeDirKey{mtime: st.ModTime(), size: st.Size()}
+	p.worktreeDirsMu.Lock()
+	e, ok := p.worktreeDirs[project]
+	p.worktreeDirsMu.Unlock()
+	if ok && e.key == key {
+		return e.dir
+	}
+	pf, err := config.ReadProjectFile(projectDir)
+	if err != nil || pf.Repo == nil {
+		return ""
+	}
+	find := p.findRepo
+	if find == nil {
+		find = git.FindRepo
+	}
+	repo, err := find(*pf.Repo)
+	if err != nil {
+		return ""
+	}
+	dir := repo.LinkedWorktreeDir()
+	p.worktreeDirsMu.Lock()
+	if p.worktreeDirs == nil {
+		p.worktreeDirs = map[string]worktreeDirEntry{}
+	}
+	p.worktreeDirs[project] = worktreeDirEntry{key: key, dir: dir}
+	p.worktreeDirsMu.Unlock()
+	return dir
 }
 
 // DepsWith is the default deps talking to runner.
