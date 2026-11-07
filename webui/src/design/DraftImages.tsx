@@ -44,7 +44,8 @@ export function DraftImages({ state }: { state: State }) {
               borderStyle="dashed"
               borderColor="border"
               color="text"
-              fontSize="12px"
+              fontSize="14px"
+              fontWeight="400"
               lineHeight="1.2"
               px="3"
               textAlign="center"
@@ -78,7 +79,7 @@ export function DraftImages({ state }: { state: State }) {
           </>
         }
       />
-      <Box px="3" pb="2" fontSize="12px" color={line.red ? "tone.deadlocked.fg" : "text.dim"} flexShrink="0" data-mock-part="image-line">
+      <Box pl="0.5" pb="2" fontSize="12px" color={line.red ? "tone.deadlocked.fg" : "text.dim"} flexShrink="0" data-mock-part="image-line">
         {line.text}
       </Box>
       {viewing !== undefined && (
