@@ -29,6 +29,26 @@ func TestExecute_TicketsValidate_OldFormatMissingFrontmatterFails(t *testing.T) 
 	}
 }
 
+func TestExecute_TicketsValidate_AllWithAddressIsUsageErrorNotPanic(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
+
+	if err := execute(t, []string{"tickets", "validate", "gx:some-epic", "--all"}, d); err == nil {
+		t.Fatal("expected a usage error for an address with --all, got nil")
+	}
+}
+
+func TestExecute_TicketsValidate_NoArgsIsUsageErrorNotPanic(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
+
+	if err := execute(t, []string{"tickets", "validate"}, d); err == nil {
+		t.Fatal("expected a usage error for no address, got nil")
+	}
+}
+
 func TestExecute_TicketsValidate_ValidNewFormat(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

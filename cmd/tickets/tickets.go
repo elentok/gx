@@ -111,11 +111,11 @@ func newTicketsSectionCmd(d Deps) *cobra.Command {
 		Long: "With <addr> and <heading> only, prints the section (same as show --section).\n" +
 			"With content, replaces or appends the section; empty or whitespace-only content is refused.\n" +
 			"To blank a section on purpose: gx tickets section --clear <addr> <heading>.",
-		Args: func(_ *cobra.Command, args []string) error {
+		Args: func(c *cobra.Command, args []string) error {
 			if sectionClear {
-				return cobra.ExactArgs(2)(nil, args)
+				return cobra.ExactArgs(2)(c, args)
 			}
-			return cobra.RangeArgs(2, 3)(nil, args)
+			return cobra.RangeArgs(2, 3)(c, args)
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 2 && !sectionClear {
@@ -151,11 +151,11 @@ func newTicketsValidateCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate <addr|path> | --all",
 		Short: "validate a ticket and its whole project, by address or file path; --all walks the store",
-		Args: func(_ *cobra.Command, args []string) error {
+		Args: func(c *cobra.Command, args []string) error {
 			if validateAll {
-				return cobra.NoArgs(nil, args)
+				return cobra.NoArgs(c, args)
 			}
-			return cobra.ExactArgs(1)(nil, args)
+			return cobra.ExactArgs(1)(c, args)
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if validateAll {
