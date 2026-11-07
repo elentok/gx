@@ -315,10 +315,11 @@ test("the Live sessions list switches the page and stops another session with a 
   await waitFor(() => expect(chatFor).toHaveBeenCalledWith("new"));
   await openMenu();
   expect(await screen.findByText("Live sessions · 2")).toBeTruthy();
-  expect(screen.getByRole("menuitem", { name: "new" }).getAttribute("aria-current")).toBe("true");
+  expect(screen.getByRole("menuitem", { name: "new ✓" }).getAttribute("aria-current")).toBe("true");
   expect(screen.queryByRole("menuitem", { name: "Stop new" })).toBeNull();
   fireEvent.click(screen.getByRole("menuitem", { name: "old" }));
   await waitFor(() => expect(chatFor).toHaveBeenCalledWith("old"));
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   await openMenu();
   fireEvent.click(await screen.findByRole("menuitem", { name: "Stop new" }));
   await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "new", state: stateToken(newer) }));
@@ -339,7 +340,7 @@ test("arrow keys reach another session's Stop item; Enter stops it and the menu 
     await waitFor(() => expect(target.hasAttribute("data-highlighted")).toBe(true));
   };
   await arrowTo(screen.getByRole("menuitem", { name: /New session/ }));
-  await arrowTo(screen.getByRole("menuitem", { name: "new" }));
+  await arrowTo(screen.getByRole("menuitem", { name: "new ✓" }));
   await arrowTo(sessionItem);
   await arrowTo(stopItem);
   fireEvent.keyDown(menu, { key: "Enter" });
@@ -350,7 +351,7 @@ test("arrow keys reach another session's Stop item; Enter stops it and the menu 
 
 const phone = () => vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
 
-test("on a phone the ⋯ menu is a bottom sheet with a grab handle and the desktop items", async () => {
+test("on a phone the ⋯ menu is an anchored popover with the desktop items", async () => {
   phone();
   try {
     const s = session("s1");
@@ -361,7 +362,6 @@ test("on a phone the ⋯ menu is a bottom sheet with a grab handle and the deskt
     render("/d/gx:a", [s, other], { openDesign, stop });
     await openMenu();
     const menu = await screen.findByRole("menu");
-    expect(screen.getByTestId("grab-handle")).toBeTruthy();
     expect(screen.getByText("Live sessions · 2")).toBeTruthy();
     fireEvent.click(screen.getByRole("menuitem", { name: "Stop s2" }));
     await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "s2", state: stateToken(other) }));
@@ -393,7 +393,6 @@ test("on a phone Delete design is in the sheet while it can run", async () => {
     render("/d/gx:a", [], {}, detailOf({ deletable: true }));
     await openMenu();
     expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy();
-    expect(screen.getByTestId("grab-handle")).toBeTruthy();
   } finally {
     vi.unstubAllGlobals();
   }

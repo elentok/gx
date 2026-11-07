@@ -12,7 +12,8 @@ import {
 } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
-import { MoreActionsMenu, type MoreActionsItem, type MoreActionsSection } from "../ui/more-actions/MoreActionsMenu";
+import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu";
+import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
 import { useWrite } from "../useWrite";
 import { postWorkspace } from "./postWorkspace";
 
@@ -141,16 +142,16 @@ function HoldDialog({ item, writers, run, close, sessions }: DialogProps & { ses
 export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[], writers: ItemWriters = defaultWriters) {
   const { run, pending } = useWrite();
   const [dialog, setDialog] = useState<Dialog>();
-  if (!item) return { sections: [] as MoreActionsSection[], dialogs: null as ReactNode };
+  if (!item) return { groups: [] as MenuEntry[][], dialogs: null as ReactNode };
   const close = () => setDialog(undefined);
   const others = workspaces.filter((w) => w.name !== item.workspace);
   const isDefault = !!workspaces.find((w) => w.name === item.workspace)?.default;
 
-  const sections: MoreActionsSection[] = [];
-  const filing: MoreActionsItem[] = [];
+  const groups: MenuEntry[][] = [];
+  const filing: MenuEntry[] = [];
   if (others.length > 0) filing.push({ value: "move", label: "Move to workspace", disabled: pending, onSelect: () => setDialog({ kind: "move" }) });
   if (!isDefault) filing.push({ value: "remove", label: "Remove from workspace", danger: true, disabled: pending, onSelect: () => setDialog({ kind: "remove" }) });
-  if (filing.length > 0) sections.push(filing);
+  if (filing.length > 0) groups.push(filing);
 
   if (item.kind !== "chat") {
     const hold = () =>
@@ -163,7 +164,7 @@ export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[
         }
         return res;
       });
-    sections.push([
+    groups.push([
       item.held
         ? { value: "unhold", label: "Take off hold", disabled: pending, onSelect: () => void run(() => writers.unhold(item.key)) }
         : {
@@ -183,16 +184,16 @@ export function useItemActions(item: ItemRef | undefined, workspaces: Workspace[
     dialog?.kind === "hold" ? <HoldDialog {...props} sessions={dialog.sessions} /> :
     null;
 
-  return { sections, dialogs };
+  return { groups, dialogs };
 }
 
 /** The "..." menu of one item; renders nothing when it has no actions. */
 export function ItemMenu({ item, workspaces, writers }: { item: ItemRef; workspaces: Workspace[]; writers?: ItemWriters }) {
-  const { sections, dialogs } = useItemActions(item, workspaces, writers);
-  if (sections.length === 0) return null;
+  const { groups, dialogs } = useItemActions(item, workspaces, writers);
+  if (groups.length === 0) return null;
   return (
     <>
-      <MoreActionsMenu sections={sections} />
+      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
       {dialogs}
     </>
   );

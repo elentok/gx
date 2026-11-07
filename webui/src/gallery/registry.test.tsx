@@ -29,8 +29,8 @@ it("shows every exported primitive in the gallery", () => {
 // Coloured by harness, not by tone: its cases are the harness and the label states.
 // The text fields have no tone: their cases are the closed, disabled and with-text states.
 // ModeText takes a vi mode, which picks its tone: its cases are the three modes.
-// MoreActionsMenu's cases are the button's four states. Menu's cases are each device type, closed and open.
-const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText", "MoreActionsMenu", "Menu"];
+// MoreActionsButton's cases are its four states. Menu's cases are each device type, closed and open.
+const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText", "MoreActionsButton", "Menu"];
 
 it("shows the Menu on each device type, closed and open", () => {
   const labels = galleryEntries.find((e) => e.name === "Menu")?.cases.map((c) => c.label) ?? [];
@@ -55,8 +55,8 @@ it("shows the Button in every role, tone and size", () => {
   for (const old of ["solid", "tinted", "outline"]) expect(labels).not.toContain(old);
 });
 
-it("shows the MoreActionsMenu button in its four states", () => {
-  const labels = galleryEntries.find((e) => e.name === "MoreActionsMenu")?.cases.map((c) => c.label) ?? [];
+it("shows the MoreActionsButton in its four states", () => {
+  const labels = galleryEntries.find((e) => e.name === "MoreActionsButton")?.cases.map((c) => c.label) ?? [];
   expect(labels).toEqual(["rest", "hover", "focus", "open"]);
 });
 

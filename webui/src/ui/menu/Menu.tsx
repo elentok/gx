@@ -18,6 +18,8 @@ interface ItemBase {
 export interface ActionItem extends ItemBase {
   kind?: "action";
   danger?: boolean;
+  /** Marks the item that is the current choice (aria-current); false marks it as not current. */
+  current?: boolean;
   /** False keeps the menu open after the pick. */
   closeOnSelect?: boolean;
   onSelect: () => void;
@@ -56,6 +58,11 @@ export interface ContentItem {
 }
 
 export type MenuEntry = ActionItem | CheckboxItem | RadioGroupItem | SubmenuItem | SeparatorItem | ContentItem;
+
+/** Joins groups of entries into one list with a rule between non-empty groups. */
+export function menuGroups(groups: MenuEntry[][]): MenuEntry[] {
+  return groups.filter((g) => g.length > 0).flatMap((g, i) => (i > 0 ? [{ kind: "separator" } as const, ...g] : g));
+}
 
 /** The one place item styling and focus state are drawn. */
 const itemStyle = {
@@ -146,6 +153,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
           closeOnSelect={entry.closeOnSelect}
           disabled={entry.disabled}
           title={entry.disabled ? entry.disabledReason : undefined}
+          aria-current={entry.current}
           onClick={entry.disabled ? undefined : entry.onSelect}
           {...rowLayout(entry.inlineHint)}
           {...itemStyle}

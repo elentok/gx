@@ -1,6 +1,7 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react";
 import { copyText } from "../clipboard";
-import { MoreActionsMenu } from "../ui/more-actions/MoreActionsMenu";
+import { GxMenu, menuGroups } from "../ui/menu/Menu";
+import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
 import { Fragment, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -233,11 +234,12 @@ function DescriptionLine({ summary }: { summary: string }) {
 // Copy epic ID (the address, `<project>:<name>`), then Move, Remove and Hold for a card in a workspace.
 function EpicMenu({ address, card }: { address: string; card?: EpicListRow }) {
   const { workspaces } = useWorkspaces(useConnectionContext());
-  const { sections, dialogs } = useCardActions(card, workspaces);
+  const { groups, dialogs } = useCardActions(card, workspaces);
   return (
     <>
-      <MoreActionsMenu
-        sections={[
+      <GxMenu
+        trigger={<MoreActionsButton />}
+        items={menuGroups([
           [
             {
               value: "copy-epic-id",
@@ -247,8 +249,8 @@ function EpicMenu({ address, card }: { address: string; card?: EpicListRow }) {
               onSelect: () => void copyText(address, null),
             },
           ],
-          ...sections,
-        ]}
+          ...groups,
+        ])}
       />
       {dialogs}
     </>

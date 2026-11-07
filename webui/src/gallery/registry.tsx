@@ -39,7 +39,7 @@ import { ModeText } from "../ui/expandable-text/ModeText";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import { GxMenu } from "../ui/menu/Menu";
-import { MoreActionsMenu } from "../ui/more-actions/MoreActionsMenu";
+import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
 import { Modal } from "../ui/modal/Modal";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
@@ -359,10 +359,15 @@ export const galleryEntries: GalleryEntry[] = [
     ],
   },
   {
-    name: "MoreActionsMenu",
+    name: "MoreActionsButton",
     cases: (["rest", "hover", "focus", "open"] as const).map((state) => ({
       label: state,
-      node: <MoreActionsMenu pinned={state === "rest" ? undefined : state} sections={[[{ value: "copy", label: "Copy ID", onSelect: () => {} }]]} />,
+      node: (
+        <GxMenu
+          trigger={<MoreActionsButton pinned={state === "rest" ? undefined : state} />}
+          items={[{ value: "copy", label: "Copy ID", onSelect: () => {} }]}
+        />
+      ),
     })),
   },
   {

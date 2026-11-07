@@ -28,6 +28,7 @@ interface Row {
   danger?: boolean;
   checked?: boolean;
   chevron?: boolean;
+  current?: boolean;
   run: () => void;
 }
 
@@ -85,9 +86,10 @@ export function PhoneMenu({ trigger, items, onClosed, closeSignal }: MenuProps) 
   useLayoutEffect(() => {
     if (anchor && !placed && panel.current) setPlaced(place(anchor.rect, panel.current.getBoundingClientRect().height));
   }, [anchor, placed]);
+  // A browser refuses to focus the panel while it is still hidden, so wait until it is placed.
   useEffect(() => {
-    if (anchor) panel.current?.focus();
-  }, [anchor]);
+    if (anchor && placed) panel.current?.focus();
+  }, [anchor, placed]);
 
   const enter = (s: SubmenuItem) => {
     setPath([...path, s]);
@@ -238,6 +240,7 @@ export function PhoneMenu({ trigger, items, onClosed, closeSignal }: MenuProps) 
                     key={r.key}
                     role={r.role}
                     aria-checked={r.role === "menuitem" ? undefined : !!r.checked}
+                    aria-current={r.current}
                     aria-disabled={r.disabled || undefined}
                     data-disabled={r.disabled ? "" : undefined}
                     data-highlighted={r.key === active ? "" : undefined}

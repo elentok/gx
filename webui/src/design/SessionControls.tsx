@@ -1,4 +1,4 @@
-import { Box, Menu, Spinner, Text } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { copyText } from "../clipboard";
 import { useConnectionContext } from "../connection";
@@ -6,8 +6,8 @@ import type { DesignOpenRequest, EpicListRow, SessionInfo } from "../generated/s
 import { useCardActions } from "../workspaces/itemActions";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { Button } from "../ui/button/Button";
-import { menuItemStyle, type MenuItemStyle } from "../ui/more-actions/menuFrame";
-import { MoreActionsMenu,type MoreActionsItem, type MoreActionsSection } from "../ui/more-actions/MoreActionsMenu";
+import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu";
+import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
 import { useWide } from "../useWide";
 import { agentDetails } from "./agentDetails";
 import { useWrite } from "../useWrite";
@@ -78,80 +78,44 @@ export function startNew(
 }
 
 /** The live sessions: pick one to show it, or stop one that is not shown. */
-function LiveSessionRows({
-  item,
-  live,
-  shown,
-  pending,
-  onSelect,
-  onStop,
-}: {
-  item: MenuItemStyle;
-  live: SessionInfo[];
-  shown: SessionInfo;
-  pending: boolean;
-  onSelect: (id: string) => void;
-  onStop: (s: SessionInfo) => void;
-}) {
-  return (
-    <>
+function liveSessionEntries(
+  live: SessionInfo[],
+  shown: SessionInfo,
+  pending: boolean,
+  onSelect: (id: string) => void,
+  onStop: (s: SessionInfo) => void,
+): MenuEntry[] {
+  const heading: MenuEntry = {
+    kind: "content",
+    value: "live-sessions",
+    content: (
       <Text px="3" pt="2" pb="0.5" fontFamily="mono" fontSize="11px" letterSpacing="0.07em" textTransform="uppercase" color="text.muted">
         Live sessions · {live.length}
       </Text>
-      {live.map((s) => (
-        <Box
-          key={s.id}
-          display="flex"
-          alignItems="center"
-          justifyContent="space-between"
-          w="full"
-          gap="2"
-          pe="2"
-          borderRadius="md"
-          bg={s.id === shown.id ? "surface" : undefined}
-        >
-          <Menu.Item
-            value={`session-${s.id}`}
-            aria-current={s.id === shown.id}
-            onClick={() => onSelect(s.id)}
-            flex="1"
-            w="auto"
-            minW="0"
-            justifyContent="space-between"
-            {...item}
-          >
-            <Text as="span" truncate fontSize="13px" fontWeight="600">
-              {s.name || s.id}
-            </Text>
-            {s.id === shown.id && <Text as="span" aria-hidden color="tone.running.fg">✓</Text>}
-          </Menu.Item>
-          {s.id !== shown.id && (
-            <Menu.Item
-              value={`stop-${s.id}`}
-              closeOnSelect={false}
-              aria-label={`Stop ${s.name || s.id}`}
-              disabled={pending}
-              onClick={() => onStop(s)}
-              cursor="pointer"
-              flex="none"
-              w="auto"
-              minH="32px"
-              px="2.5"
-              borderWidth="1px"
-              borderColor="tone.deadlocked.fg"
-              borderRadius="md"
-              fontSize="13px"
-              fontWeight="600"
-              color="tone.deadlocked.fg"
-            >
-              {pending && <Spinner size="sm" />}
-              Stop
-            </Menu.Item>
-          )}
-        </Box>
-      ))}
-    </>
-  );
+    ),
+  };
+  return [
+    heading,
+    ...live.flatMap((s): MenuEntry[] => {
+      const name = s.name || s.id;
+      const isShown = s.id === shown.id;
+      return [
+        { value: `session-${s.id}`, label: name, hint: isShown ? "✓" : undefined, inlineHint: true, current: isShown, onSelect: () => onSelect(s.id) },
+        ...(isShown
+          ? []
+          : [
+              {
+                value: `stop-${s.id}`,
+                label: `Stop ${name}`,
+                danger: true,
+                closeOnSelect: false,
+                disabled: pending,
+                onSelect: () => onStop(s),
+              },
+            ]),
+      ];
+    }),
+  ];
 }
 
 /** The in-place confirm "Delete design" turns into before it deletes. */
@@ -205,13 +169,12 @@ export function DesignActionsMenu({
   const wide = useWide();
   const { workspaces } = useWorkspaces(useConnectionContext());
   const itemActions = useCardActions(card, workspaces);
-  const item = menuItemStyle(!wide);
   const canDelete = deletable && live.length === 0;
 
-  const sections: MoreActionsSection[] = [];
+  const groups: MenuEntry[][] = [];
   const agent = shown && agentSection(shown, wide);
-  if (agent) sections.push(agent);
-  const sessionItems: MoreActionsItem[] = [];
+  if (agent) groups.push(agent);
+  const sessionItems: MenuEntry[] = [];
   if (shown)
     sessionItems.push({
       value: "new-session",
@@ -221,21 +184,9 @@ export function DesignActionsMenu({
       onSelect: () => startNew(run, address, shown, open),
     });
   if (shown && live.length > 1)
-    sections.push({
-      items: sessionItems,
-      content: (
-        <LiveSessionRows
-          item={item}
-          live={live}
-          shown={shown}
-          pending={pending}
-          onSelect={onSelect}
-          onStop={(s) => run(() => stop({ id: s.id, state: stateToken(s) }))}
-        />
-      ),
-    });
-  else if (sessionItems.length > 0) sections.push(sessionItems);
-  const copySection: MoreActionsItem[] = [
+    sessionItems.push(...liveSessionEntries(live, shown, pending, onSelect, (s) => run(() => stop({ id: s.id, state: stateToken(s) }))));
+  if (sessionItems.length > 0) groups.push(sessionItems);
+  const copySection: MenuEntry[] = [
     { value: "copy-design-id", label: "Copy design ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) },
   ];
   if (canDelete && !confirming)
@@ -246,34 +197,38 @@ export function DesignActionsMenu({
       closeOnSelect: false,
       onSelect: () => setConfirming(true),
     });
-  sections.push(copySection);
-  sections.push(...itemActions.sections);
+  groups.push(copySection);
+  groups.push(...itemActions.groups);
   if (canDelete && confirming)
-    sections.push({
-      content: (
-        <ConfirmDelete
-          pending={pending}
-          onKeep={() => setConfirming(false)}
-          onDelete={() => run(() => remove({ epic: address }), { onDone: onDeleted })}
-        />
-      ),
-    });
+    groups.push([
+      {
+        kind: "content",
+        value: "confirm-delete",
+        content: (
+          <ConfirmDelete
+            pending={pending}
+            onKeep={() => setConfirming(false)}
+            onDelete={() => run(() => remove({ epic: address }), { onDone: onDeleted })}
+          />
+        ),
+      },
+    ]);
   return (
     <>
-      <MoreActionsMenu sections={sections} onClosed={() => setConfirming(false)} />
+      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} onClosed={() => setConfirming(false)} />
       {itemActions.dialogs}
     </>
   );
 }
 
 /** The menu's Agent block for what the header leaves out (Tier, Effort on a phone, the switched note); none when it has no rows. */
-export function agentSection(session: SessionInfo, wide: boolean): MoreActionsSection | undefined {
+export function agentSection(session: SessionInfo, wide: boolean): MenuEntry[] | undefined {
   const agent = agentDetails(session);
   const rows: AgentRow[] = [];
   if (agent.tier) rows.push({ key: "Tier", value: agent.tier });
   if (!wide && agent.effort) rows.push({ key: "Effort", value: agent.effort });
   if (agent.switched) rows.push({ note: "switched by hand" });
-  return rows.length > 0 ? { content: <AgentBlock rows={rows} /> } : undefined;
+  return rows.length > 0 ? [{ kind: "content", value: "agent", content: <AgentBlock rows={rows} /> }] : undefined;
 }
 
 type AgentRow = { key: string; value: string } | { note: string };

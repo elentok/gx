@@ -3,7 +3,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WideContext } from "../../useWide";
 import { renderThemed } from "../render";
-import { GxMenu, type MenuEntry } from "./Menu";
+import { GxMenu, menuGroups, type MenuEntry } from "./Menu";
 
 const trigger = <button type="button" aria-label="Menu">open</button>;
 
@@ -147,6 +147,23 @@ describe("GxMenu", () => {
     expect(r.getAllByRole("menuitemradio").map((e) => e.getAttribute("aria-checked"))).toEqual(["true", "false"]);
     expect(r.getByRole("menuitem", { name: /Sub/ })).toBeTruthy();
     expect(r.getByText("custom")).toBeTruthy();
+  });
+
+  it("puts a rule between non-empty groups, and an inline hint on the label's row", async () => {
+    const items = menuGroups([
+      [
+        { value: "a", label: "Inline", hint: "h", inlineHint: true, onSelect: vi.fn() },
+        { value: "b", label: "Below", hint: "h", onSelect: vi.fn() },
+      ],
+      [],
+      [{ value: "c", label: "Last", onSelect: vi.fn() }],
+    ]);
+    const r = renderThemed(<GxMenu trigger={trigger} items={items} />);
+    await open(r);
+    expect(r.getAllByRole("separator")).toHaveLength(1);
+    expect(r.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Inlineh", "Belowh", "Last"]);
+    expect(getComputedStyle(r.getByRole("menuitem", { name: /Inline/ })).flexDirection).toBe("row");
+    expect(getComputedStyle(r.getByRole("menuitem", { name: /Below/ })).flexDirection).toBe("column");
   });
 
   it("opens a submenu beside its item and runs its action", async () => {
