@@ -45,6 +45,9 @@ func (f designsFixture) stop(t *testing.T, id string) {
 	if _, err := f.h.Client.Sessions.Stop(f.ctx, id); err != nil {
 		t.Fatal(err)
 	}
+	// Stop returns before the session reads as exited, and a cleanup that scans
+	// in that gap sees a live session and keeps the worktree without a warning.
+	waitFor(t, func() bool { return f.sessionExited(t, id) })
 }
 
 func (f designsFixture) serverLog(t *testing.T) string {
