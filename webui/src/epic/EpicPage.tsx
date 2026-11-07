@@ -100,29 +100,8 @@ function DesignSessionButton({ detail, open }: { detail: EpicDetail; open?: Open
 
 const QUEUE_LOCKED = "Queue unlocks once all tickets are published";
 
-// One bar under a hairline: the stats line on the left, the buttons on the right. On phones the buttons wrap to
-// their own row at a touch-friendly height. A merge-blocked epic's notice sits under the bar, and it has no Merge.
-function EpicBar({
-  address,
-  detail,
-  now,
-  wide,
-  designLive,
-  partner,
-  openDesign,
-  onChanged,
-}: {
-  address: string;
-  detail: EpicDetail;
-  now: number;
-  wide: boolean;
-  designLive: boolean;
-  partner?: string;
-  openDesign?: OpenDesign;
-  onChanged: () => void;
-}) {
-  const navigate = useNavigate();
-  const isImpl = address.endsWith("-impl");
+// The stats line stacks under the title in the header.
+function StatsLine({ detail, now, designLive }: { detail: EpicDetail; now: number; designLive: boolean }) {
   // The server's wall clock is as of the fetch, so a running epic adds the time since then.
   const fetchedAt = useMemo(() => Date.now(), [detail]);
   const wallClock =
@@ -134,22 +113,45 @@ function EpicBar({
       ? designStatParts(detail, designLive, now)
       : loopStatParts({ ...detail, wall_clock: wallClock });
   return (
+    <Text data-testid="stats-line" fontSize="inherit" lineHeight="normal" color="text.dim" overflow="hidden" textOverflow="ellipsis">
+      {parts.map((p, i) => (
+        <Fragment key={i}>
+          {i > 0 && " · "}
+          {p.tone || p.bright ? (
+            <Text as="span" color={p.tone ? `tone.${p.tone}.fg` : "text.muted"}>
+              {p.text}
+            </Text>
+          ) : (
+            p.text
+          )}
+        </Fragment>
+      ))}
+    </Text>
+  );
+}
+
+// One bar under a hairline holding the buttons, right-aligned. On phones the buttons wrap to
+// their own row at a touch-friendly height. A merge-blocked epic's notice sits under the bar, and it has no Merge.
+function EpicBar({
+  address,
+  detail,
+  wide,
+  partner,
+  openDesign,
+  onChanged,
+}: {
+  address: string;
+  detail: EpicDetail;
+  wide: boolean;
+  partner?: string;
+  openDesign?: OpenDesign;
+  onChanged: () => void;
+}) {
+  const navigate = useNavigate();
+  const isImpl = address.endsWith("-impl");
+  return (
     <>
-      <Box display="flex" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap="3">
-        <Text data-testid="stats-line" fontSize="14px" lineHeight="normal" color="text.dim">
-          {parts.map((p, i) => (
-            <Fragment key={i}>
-              {i > 0 && " · "}
-              {p.tone || p.bright ? (
-                <Text as="span" color={p.tone ? `tone.${p.tone}.fg` : "text.muted"}>
-                  {p.text}
-                </Text>
-              ) : (
-                p.text
-              )}
-            </Fragment>
-          ))}
-        </Text>
+      <Box display="flex" flexWrap="wrap" alignItems="center" justifyContent="flex-end" gap="3">
         <Box
           display="flex"
           flexWrap="wrap"
@@ -368,7 +370,13 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
             <PageHeader
               title={name}
               icon={<PageIcon kind="epic" />}
-              subtitle={detail.summary ? <DescriptionLine summary={detail.summary} /> : undefined}
+              caret
+              subtitle={
+                <>
+                  <StatsLine detail={detail} now={now} designLive={designLive} />
+                  {detail.summary ? <DescriptionLine summary={detail.summary} /> : null}
+                </>
+              }
               actions={
                 <>
                   <EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "header" : "headerSm"} />
@@ -379,9 +387,7 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
                 <EpicBar
                   address={address}
                   detail={detail}
-                  now={now}
                   wide={wide}
-                  designLive={designLive}
                   partner={partner}
                   openDesign={openDesign}
                   onChanged={refetch}

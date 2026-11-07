@@ -677,14 +677,17 @@ test("an empty epic reads 0/0", async () => {
 
 const descriptionButton = () => screen.findByRole("button", { name: "Show full description" });
 
-test("the description is one line under the title, and no summary renders no line", async () => {
+test("the stats line stacks under the title, with the description below it when there is a summary", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { summary: "A short summary" } });
   const line = await screen.findByTestId("page-header-subtitle");
+  expect(within(line).getByTestId("stats-line")).toBeTruthy();
   expect(within(line).getByRole("button", { name: "Show full description" }).textContent).toBe("A short summary");
+  expect(screen.getByTestId("page-header-caret")).toBeTruthy();
   cleanup();
   render("/e/gx:blog-impl", [], "loop", { detail: { summary: "" } });
-  await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByTestId("page-header-subtitle")).toBeNull();
+  const bare = await screen.findByTestId("page-header-subtitle");
+  expect(within(bare).getByTestId("stats-line")).toBeTruthy();
+  expect(within(bare).queryByRole("button", { name: "Show full description" })).toBeNull();
 });
 
 // Enter and Space are the browser's own click on a native button; the e2e flow presses them for real.

@@ -28,8 +28,8 @@ test.describe("61. Page modes at 760px", () => {
 
     const stats = (await page.getByTestId("stats-line").boundingBox())!;
     const queue = (await page.getByRole("button", nav("Queue")).boundingBox())!;
-    // Same row: the button is taller than the text, so its top may sit above the stats line's.
-    expect(Math.abs(queue.y - stats.y)).toBeLessThan(stats.height);
+    // The stats line stacks in the header, above the divider; the button sits below it.
+    expect(queue.y).toBeGreaterThanOrEqual(stats.y + stats.height);
 
     // The meta sits on the title's line, to the right of it.
     const link = page.getByRole("link", { name: "02 open ready" });

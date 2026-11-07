@@ -158,6 +158,7 @@ function DesignBody({
         <PageHeader
           title={name}
           icon={<PageIcon kind="design" />}
+          caret
           subtitle={
             detail && (
               <>
