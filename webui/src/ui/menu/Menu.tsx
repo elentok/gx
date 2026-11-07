@@ -1,5 +1,7 @@
 import { Box, Menu as ChakraMenu, Portal, Text } from "@chakra-ui/react";
 import { Fragment, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { useWide } from "../../useWide";
+import { PhoneMenu } from "./PhoneMenu";
 
 interface ItemBase {
   /** Unique within the menu; also the key. */
@@ -177,19 +179,20 @@ function Panel({ entries }: { entries: MenuEntry[] }) {
  * becomes the menu's. Changing `closeSignal` closes the menu, so a parent can close every menu
  * opened from it.
  */
-export function GxMenu({
-  trigger,
-  items,
-  onClosed,
-  closeSignal,
-  placement = "bottom-end",
-}: {
+export function GxMenu(props: MenuProps) {
+  // On a phone the menu is an anchored popover with in-place submenus; placement is a desktop concern.
+  return useWide() ? <WideMenu {...props} /> : <PhoneMenu {...props} />;
+}
+
+export interface MenuProps {
   trigger: ReactElement;
   items: MenuEntry[];
   onClosed?: () => void;
   closeSignal?: unknown;
   placement?: "bottom-end" | "bottom-start" | "top-end" | "top-start";
-}) {
+}
+
+function WideMenu({ trigger, items, onClosed, closeSignal, placement = "bottom-end" }: MenuProps) {
   const [open, setOpen] = useState(false);
   const first = useRef(true);
   useEffect(() => {

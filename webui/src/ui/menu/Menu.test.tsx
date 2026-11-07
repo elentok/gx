@@ -1,6 +1,7 @@
-import { fireEvent, waitFor } from "@testing-library/react";
+import { fireEvent, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { WideContext } from "../../useWide";
 import { renderThemed } from "../render";
 import { GxMenu, type MenuEntry } from "./Menu";
 
@@ -10,6 +11,114 @@ const open = async (r: ReturnType<typeof renderThemed>) => {
   fireEvent.click(r.getByRole("button", { name: "Menu" }));
   return r.findByRole("menu", { name: "Menu" });
 };
+
+describe("GxMenu on the phone", () => {
+  const PANEL_HEIGHT = 300;
+  const rect = (r: Partial<DOMRect>) => ({ x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, ...r }) as DOMRect;
+
+  // jsdom has no layout: the trigger sits where the test says, the panel is PANEL_HEIGHT tall.
+  const layout = (button: Partial<DOMRect>) =>
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this.getAttribute("role") === "menu" ? rect({ height: PANEL_HEIGHT, width: 280 }) : rect(button);
+    });
+  const phone = (items: MenuEntry[], onClosed?: () => void) =>
+    renderThemed(
+      <WideContext.Provider value={false}>
+        <GxMenu trigger={trigger} items={items} onClosed={onClosed} />
+      </WideContext.Provider>,
+    );
+  const sub: MenuEntry[] = [
+    { value: "a", label: "A", onSelect: vi.fn() },
+    { kind: "submenu", value: "s", label: "Sub", items: [{ value: "inner", label: "Inner", onSelect: vi.fn() }] },
+  ];
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("opens below the button with its right edge on the button's, 280px wide with 48px rows", async () => {
+    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+    Object.defineProperty(window, "innerWidth", { value: 390, configurable: true });
+    layout({ top: 100, bottom: 136, left: 300, right: 336 });
+    const menu = await open(phone(sub));
+    await waitFor(() => expect(menu.style.visibility === "hidden").toBe(false));
+    expect(menu.style.left).toBe("56px");
+    expect(menu.style.top).toBe("140px");
+    expect(getComputedStyle(menu).width).toBe("280px");
+    expect(getComputedStyle(within(menu).getByRole("menuitem", { name: "A" })).minHeight).toBe("48px");
+  });
+
+  it("flips above when there is no room below", async () => {
+    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+    layout({ top: 700, bottom: 736, left: 300, right: 336 });
+    const menu = await open(phone(sub));
+    await waitFor(() => expect(menu.style.bottom).toBe("104px"));
+    expect(menu.style.top).toBe("");
+  });
+
+  it("keeps 8px inside the screen", async () => {
+    Object.defineProperty(window, "innerWidth", { value: 390, configurable: true });
+    layout({ top: 100, bottom: 136, left: 0, right: 36 });
+    const menu = await open(phone(sub));
+    await waitFor(() => expect(menu.style.left).toBe("8px"));
+  });
+
+  it("dims behind the menu and closes on a tap outside", async () => {
+    layout({ top: 100, bottom: 136, left: 300, right: 336 });
+    const onClosed = vi.fn();
+    const r = phone(sub, onClosed);
+    const menu = await open(r);
+    fireEvent.click(menu);
+    expect(r.queryByRole("menu")).toBeTruthy();
+    fireEvent.click(r.getByTestId("menu-dim"));
+    await waitFor(() => expect(r.queryByRole("menu")).toBeNull());
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("swaps a submenu into the same panel with a Back row and divider, and Back returns", async () => {
+    layout({ top: 100, bottom: 136, left: 300, right: 336 });
+    const r = phone(sub);
+    const menu = await open(r);
+    await waitFor(() => expect(menu.style.top).toBe("140px"));
+    fireEvent.click(r.getByRole("menuitem", { name: /Sub/ }));
+    expect(r.getAllByRole("menu").length).toBe(1);
+    expect(r.queryByRole("menuitem", { name: "A" })).toBeNull();
+    const rows = r.getAllByRole("menuitem").map((e) => e.textContent);
+    expect(rows).toEqual(["‹ Back", "Inner"]);
+    expect(r.getByRole("separator")).toBeTruthy();
+    expect(menu.style.top).toBe("140px");
+    fireEvent.click(r.getByRole("menuitem", { name: /Back/ }));
+    expect(r.getByRole("menuitem", { name: "A" })).toBeTruthy();
+  });
+
+  it("closes after choosing a submenu option", async () => {
+    layout({ top: 100, bottom: 136, left: 300, right: 336 });
+    const pick = vi.fn();
+    const r = phone([{ kind: "submenu", value: "s", label: "Sub", items: [{ value: "i", label: "Inner", onSelect: pick }] }]);
+    await open(r);
+    fireEvent.click(r.getByRole("menuitem", { name: /Sub/ }));
+    fireEvent.click(r.getByRole("menuitem", { name: "Inner" }));
+    expect(pick).toHaveBeenCalled();
+    await waitFor(() => expect(r.queryByRole("menu")).toBeNull());
+  });
+
+  it("works from the keyboard: arrows, Enter, Left for Back, Escape", async () => {
+    layout({ top: 100, bottom: 136, left: 300, right: 336 });
+    const r = phone(sub);
+    const menu = await open(r);
+    await waitFor(() => expect(document.activeElement).toBe(menu));
+    const highlighted = () => r.getAllByRole("menuitem").find((e) => e.hasAttribute("data-highlighted"))?.textContent;
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(highlighted()).toBe("A");
+    fireEvent.keyDown(menu, { key: "End" });
+    expect(highlighted()).toBe("Sub›");
+    fireEvent.keyDown(menu, { key: "Enter" });
+    expect(r.getByRole("menuitem", { name: "Inner" })).toBeTruthy();
+    fireEvent.keyDown(menu, { key: "ArrowLeft" });
+    expect(r.getByRole("menuitem", { name: "A" })).toBeTruthy();
+    fireEvent.keyDown(menu, { key: "Escape" });
+    await waitFor(() => expect(r.queryByRole("menu")).toBeNull());
+    expect(document.activeElement).toBe(r.getByRole("button", { name: "Menu" }));
+  });
+});
 
 describe("GxMenu", () => {
   it("renders every item kind", async () => {

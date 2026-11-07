@@ -11,9 +11,9 @@ import { TONES } from "../ui/tone";
 import { galleryEntries } from "./registry";
 
 // Every primitive is src/ui/<folder>/<Name>.tsx; tests and non-component files don't match.
-// CodeEditor is LargeEditor's lazy chunk, shown through LargeEditor.
+// CodeEditor is LargeEditor's lazy chunk, shown through LargeEditor; PhoneMenu is Menu's phone mode.
 const primitiveFiles = Object.keys(import.meta.glob("../ui/*/[A-Z]*.tsx")).filter(
-  (f) => !f.endsWith(".test.tsx") && !f.endsWith("/CodeEditor.tsx"),
+  (f) => !f.endsWith(".test.tsx") && !f.endsWith("/CodeEditor.tsx") && !f.endsWith("/PhoneMenu.tsx"),
 );
 const primitiveNames = primitiveFiles.map((f) => f.split("/").pop()?.replace(".tsx", "") ?? f);
 
@@ -29,8 +29,13 @@ it("shows every exported primitive in the gallery", () => {
 // Coloured by harness, not by tone: its cases are the harness and the label states.
 // The text fields have no tone: their cases are the closed, disabled and with-text states.
 // ModeText takes a vi mode, which picks its tone: its cases are the three modes.
-// MoreActionsMenu's cases are the button's four states.
-const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText", "MoreActionsMenu"];
+// MoreActionsMenu's cases are the button's four states. Menu's cases are each device type, closed and open.
+const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText", "MoreActionsMenu", "Menu"];
+
+it("shows the Menu on each device type, closed and open", () => {
+  const labels = galleryEntries.find((e) => e.name === "Menu")?.cases.map((c) => c.label) ?? [];
+  expect(labels).toEqual(["phone closed", "phone open", "tablet closed", "tablet open", "desktop closed", "desktop open"]);
+});
 
 it("shows every primitive in every tone", () => {
   for (const name of primitiveNames.filter((n) => !untoned.includes(n))) {

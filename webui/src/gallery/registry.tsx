@@ -38,6 +38,7 @@ import { LargeEditor } from "../ui/expandable-text/LargeEditor";
 import { ModeText } from "../ui/expandable-text/ModeText";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { BottomSheet } from "../ui/modal/BottomSheet";
+import { GxMenu } from "../ui/menu/Menu";
 import { MoreActionsMenu } from "../ui/more-actions/MoreActionsMenu";
 import { Modal } from "../ui/modal/Modal";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
@@ -363,6 +364,33 @@ export const galleryEntries: GalleryEntry[] = [
       label: state,
       node: <MoreActionsMenu pinned={state === "rest" ? undefined : state} sections={[[{ value: "copy", label: "Copy ID", onSelect: () => {} }]]} />,
     })),
+  },
+  {
+    name: "Menu",
+    // Open on each device type: a popover beside the button on tablet and desktop, an anchored popover with in-place submenus on a phone.
+    cases: (["phone", "tablet", "desktop"] as const).flatMap((device) =>
+      [false, true].map((openMenu) => {
+        const menu = (
+          <GxMenu
+            trigger={<button type="button" aria-label="Menu">⋯</button>}
+            items={[
+              { value: "rename", label: "Rename", onSelect: () => {} },
+              { kind: "submenu", value: "move", label: "Move to workspace", items: [{ value: "work", label: "Work", onSelect: () => {} }] },
+              { kind: "separator" },
+              { value: "remove", label: "Remove", danger: true, onSelect: () => {} },
+            ]}
+          />
+        );
+        return {
+          label: `${device} ${openMenu ? "open" : "closed"}`,
+          node: (
+            <DeviceContext.Provider value={device}>
+              <WideContext.Provider value={device !== "phone"}>{openMenu ? <OpenMenu>{menu}</OpenMenu> : menu}</WideContext.Provider>
+            </DeviceContext.Provider>
+          ),
+        };
+      }),
+    ),
   },
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
   { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },
