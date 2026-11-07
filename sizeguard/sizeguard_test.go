@@ -66,6 +66,31 @@ var exceptions = map[string]exception{}
 type measurement struct {
 	key, name, measure string
 	size, def          int
+	parts              []filePart // per-file contribution, package measures only
+}
+
+type filePart struct {
+	path string
+	n    int
+}
+
+// maxBreakdownFiles caps the per-file list printed under a package breach.
+const maxBreakdownFiles = 10
+
+// breakdown names the overage and the files contributing most to it, so the reader
+// can see what to cut or move without re-running.
+func breakdown(parts []filePart, over int) string {
+	parts = slices.Clone(parts)
+	sort.SliceStable(parts, func(i, j int) bool { return parts[i].n > parts[j].n })
+	if len(parts) > maxBreakdownFiles {
+		parts = parts[:maxBreakdownFiles]
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n  Over by %d. Largest contributors:", over)
+	for _, p := range parts {
+		fmt.Fprintf(&b, "\n    %6d  %s", p.n, p.path)
+	}
+	return b.String()
 }
 
 func countLines(src string) int {
@@ -117,6 +142,13 @@ func receiverName(e ast.Expr) string {
 
 type pkgStats struct {
 	files, sourceLines, testLines, testFuncs int
+	parts                                    map[string][]filePart // measure -> per-file counts
+}
+
+func (s *pkgStats) addPart(measure, p string, n int) {
+	if n > 0 {
+		s.parts[measure] = append(s.parts[measure], filePart{p, n})
+	}
 }
 
 // measure sizes every package, file and type in files (tracked path -> source).
@@ -139,16 +171,19 @@ func measure(files map[string]string) ([]measurement, []string) {
 		lines := countLines(src)
 		st := pkgs[dir]
 		if st == nil {
-			st = &pkgStats{}
+			st = &pkgStats{parts: map[string][]filePart{}}
 			pkgs[dir] = st
 		}
 		st.files++
+		st.addPart(measureFiles, p, lines)
 		if isTest {
 			st.testLines += lines
+			st.addPart(measureTestLines, p, lines)
 		} else {
 			st.sourceLines += lines
+			st.addPart(measureSourceLines, p, lines)
 		}
-		out = append(out, measurement{p, p, measureLines, lines, maxFileLines})
+		out = append(out, measurement{p, p, measureLines, lines, maxFileLines, nil})
 
 		f, err := parser.ParseFile(token.NewFileSet(), p, src, parser.SkipObjectResolution)
 		if err != nil {
@@ -163,6 +198,7 @@ func measure(files map[string]string) ([]measurement, []string) {
 			switch {
 			case isTest && isTestFunc(fn):
 				st.testFuncs++
+				st.addPart(measureTestFuncs, p, 1)
 			case !isTest && fn.Recv != nil && len(fn.Recv.List) == 1:
 				if name := receiverName(fn.Recv.List[0].Type); name != "" {
 					methods[dir+"."+name]++
@@ -181,11 +217,11 @@ func measure(files map[string]string) ([]measurement, []string) {
 			{measureTestLines, st.testLines, maxTestLines},
 			{measureTestFuncs, st.testFuncs, maxTestFuncs},
 		} {
-			out = append(out, measurement{dir + ":" + m.measure, dir, m.measure, m.size, m.def})
+			out = append(out, measurement{dir + ":" + m.measure, dir, m.measure, m.size, m.def, st.parts[m.measure]})
 		}
 	}
 	for key, n := range methods {
-		out = append(out, measurement{key, key, measureMethods, n, maxMethodsPerType})
+		out = append(out, measurement{key, key, measureMethods, n, maxMethodsPerType, nil})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].key+out[i].measure < out[j].key+out[j].measure })
 	return out, problems
@@ -210,7 +246,11 @@ func check(files map[string]string, allow map[string]exception) []string {
 			limit = e.limit
 		}
 		if m.size > limit {
-			problems = append(problems, fmt.Sprintf("%s: %s is %d, limit is %d. %s", m.name, m.measure, m.size, limit, splitInstruction))
+			msg := fmt.Sprintf("%s: %s is %d, limit is %d. %s", m.name, m.measure, m.size, limit, splitInstruction)
+			if len(m.parts) > 0 {
+				msg += breakdown(m.parts, m.size-limit)
+			}
+			problems = append(problems, msg)
 		}
 	}
 	keys := make([]string, 0, len(allow))
@@ -333,6 +373,29 @@ func TestCheck_Breaches(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCheck_PackageBreachListsLargestFiles(t *testing.T) {
+	files := map[string]string{
+		"big/small_test.go": src("x", 10),
+		"big/huge_test.go":  src("x", 600),
+	}
+	for i := range 10 {
+		files[fmt.Sprintf("big/f%d_test.go", i)] = src("x", 490)
+	}
+	problems := check(files, nil)
+	if len(problems) != 1 {
+		t.Fatalf("want one problem, got:\n%s", strings.Join(problems, "\n"))
+	}
+	got := problems[0]
+	for _, w := range []string{"Over by 510", "600  big/huge_test.go", "490  big/f0_test.go"} {
+		if !strings.Contains(got, w) {
+			t.Errorf("problem lacks %q:\n%s", w, got)
+		}
+	}
+	if strings.Contains(got, "small_test.go") {
+		t.Errorf("breakdown should list only the largest %d files:\n%s", maxBreakdownFiles, got)
 	}
 }
 
