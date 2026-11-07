@@ -106,19 +106,29 @@ export const ImplLink = ({ address }: { address: string }) => (
 export const showsImplLink = (detail: EpicDetail) =>
   !!detail.impl_address && !!detail.steps?.some((s) => (s.step === BRANCH || s.step === DONE) && s.state !== "todo");
 
-/**
- * "Resolve tickets · 03 Chat content (2 of 7)": the current step, and its current ticket while tickets resolve.
- * `short` (a phone) drops the ticket: "Resolve tickets · 2 of 7".
- */
-export function summaryLine(detail: EpicDetail, short = false): string {
+/** The current step's label and, while tickets resolve, the position of its current ticket. */
+function progressOf(detail: EpicDetail) {
   const steps = stepsOf(detail);
   const { rows } = detail;
   const step = steps.find((s) => s.state === "current") ?? steps.filter((s) => s.state === "done").at(-1);
-  if (!step) return "";
-  const at = ticketsOf(steps, rows).findIndex((r) => r.current);
-  if (at < 0) return step.label;
-  if (short) return `${step.label} · ${at + 1} of ${rows.length}`;
-  return `${step.label} · ${idOf(rows[at].address)} ${rows[at].title} (${at + 1} of ${rows.length})`;
+  if (!step) return undefined;
+  return { label: step.label, rows, at: ticketsOf(steps, rows).findIndex((r) => r.current) };
+}
+
+/** "Resolve tickets · 03 Chat content (2 of 7)": the current step, and its current ticket while tickets resolve. */
+export function summaryLine(detail: EpicDetail): string {
+  const p = progressOf(detail);
+  if (!p) return "";
+  if (p.at < 0) return p.label;
+  return `${p.label} · ${idOf(p.rows[p.at].address)} ${p.rows[p.at].title} (${p.at + 1} of ${p.rows.length})`;
+}
+
+/** A phone's summary, without the ticket: "Resolve tickets · 2 of 7". */
+export function shortSummaryLine(detail: EpicDetail): string {
+  const p = progressOf(detail);
+  if (!p) return "";
+  if (p.at < 0) return p.label;
+  return `${p.label} · ${p.at + 1} of ${p.rows.length}`;
 }
 
 // A detail from an older server has no steps.
@@ -140,7 +150,7 @@ export function StepLine({ detail, onOpen }: { detail: EpicDetail; onOpen: () =>
       textAlign="left"
     >
       <Text as="span" truncate>
-        {summaryLine(detail, true)}
+        {shortSummaryLine(detail)}
       </Text>
       <Text as="span" aria-hidden flexShrink="0">
         ▾

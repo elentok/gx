@@ -269,26 +269,26 @@ export function DesignActionsMenu({
 /** The menu's Agent block for what the header leaves out (Tier, Effort on a phone, the switched note); none when it has no rows. */
 export function agentSection(session: SessionInfo, wide: boolean): MoreActionsSection | undefined {
   const agent = agentDetails(session);
-  const rows = [
-    agent.tier && ["Tier", agent.tier],
-    !wide && agent.effort && ["Effort", agent.effort],
-    agent.switched && ["", "switched by hand"],
-  ].filter((row): row is string[] => !!row);
+  const rows: AgentRow[] = [];
+  if (agent.tier) rows.push({ key: "Tier", value: agent.tier });
+  if (!wide && agent.effort) rows.push({ key: "Effort", value: agent.effort });
+  if (agent.switched) rows.push({ note: "switched by hand" });
   return rows.length > 0 ? { content: <AgentBlock rows={rows} /> } : undefined;
 }
 
-/** Key-value rows; a row with no key is a note. */
-function AgentBlock({ rows }: { rows: string[][] }) {
+type AgentRow = { key: string; value: string } | { note: string };
+
+function AgentBlock({ rows }: { rows: AgentRow[] }) {
   return (
     <Box>
       <Text fontFamily="mono" fontSize="11px" letterSpacing="0.07em" textTransform="uppercase" color="text.muted" px="3" pt="2" pb="0.5">
         Agent
       </Text>
-      {rows.map(([key, value]) => (
-        <Box key={key + value} display="flex" justifyContent="space-between" gap="3" px="3" py="5px" fontSize="13.5px" color="text.dim">
-          {key && <span>{key}</span>}
+      {rows.map((row) => (
+        <Box key={"note" in row ? row.note : row.key} display="flex" justifyContent="space-between" gap="3" px="3" py="5px" fontSize="13.5px" color="text.dim">
+          {"key" in row && <span>{row.key}</span>}
           <Text as="b" fontFamily="mono" fontSize="13px" fontWeight="500" color="text">
-            {value}
+            {"note" in row ? row.note : row.value}
           </Text>
         </Box>
       ))}
