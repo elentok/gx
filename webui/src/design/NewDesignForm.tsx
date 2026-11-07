@@ -18,6 +18,10 @@ import {
   type SaveDraft,
   type SetLastProject,
 } from "./drafts";
+import { removeDraftImage, uploadDraftImage, type RemoveDraftImage, type UploadDraftImage } from "./draftImageApi";
+import { DraftImages } from "./DraftImages";
+import { imageFiles } from "./ComposerImages";
+import { useDraftImages } from "./useDraftImages";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { clearUnsaved, NEW_DRAFT_KEY, readUnsaved, stashUnsaved } from "./unsaved";
 import { useDesignWrite } from "./SessionControls";
@@ -32,9 +36,22 @@ export interface DraftsClient {
   remove: DeleteDraft;
   getLastProject: GetLastProject;
   setLastProject: SetLastProject;
+  uploadImage: UploadDraftImage;
+  removeImage: RemoveDraftImage;
 }
 
-const realDrafts: DraftsClient = { list: listDrafts, read: readDraft, save: saveDraft, remove: deleteDraft, getLastProject, setLastProject };
+const realDrafts: DraftsClient = {
+  list: listDrafts,
+  read: readDraft,
+  save: saveDraft,
+  remove: deleteDraft,
+  getLastProject,
+  setLastProject,
+  uploadImage: uploadDraftImage,
+  removeImage: removeDraftImage,
+};
+
+const MSG_NEEDS_TEXT = "Write the epic name or an idea first";
 
 const AUTOSAVE_MS = 800;
 const RETRY_MS = 5000;
@@ -250,7 +267,23 @@ function DraftForm({
   // The banner's ref twin, so a flush in flight sees it before a render.
   const blocked = useRef<Banner>(restored === "conflict" || restored === "gone" ? restored : undefined);
   const [banner, setBanner] = useState<Banner>(blocked.current);
-  const [images, setImages] = useState(initial?.images ?? []);
+  /** The draft's id for an image upload; a draft that has none yet is saved first, which needs some text. */
+  const ensureDraft = async () => {
+    await chain.current;
+    if (!server.current.id) {
+      flush();
+      await chain.current;
+    }
+    if (!server.current.id) throw new Error(MSG_NEEDS_TEXT);
+    return server.current.id;
+  };
+  const imgs = useDraftImages({
+    initial: initial?.images ?? [],
+    draftId: () => server.current.id,
+    ensureDraft,
+    upload: drafts.uploadImage,
+    remove: drafts.removeImage,
+  });
 
   const persist = async () => {
     if (finished.current || starting.current) return;
@@ -333,13 +366,13 @@ function DraftForm({
     nameDirty.current = false;
     setName(theirs.name);
     setDraft(next);
-    setImages(theirs.images);
+    imgs.reset(theirs.images);
     settle();
     resume();
   };
   const keepAsNew = () => {
     Object.assign(server.current, { id: undefined, revision: 0, synced: "" });
-    setImages([]);
+    imgs.reset([]);
     resume();
   };
 
@@ -411,10 +444,12 @@ function DraftForm({
     onClose();
   };
 
+  // Images keep a draft with no text from being blank.
+  const hasContent = () => hasText(latest.current) || imgs.count > 0;
   /** Saves the open draft (a blank one is deleted instead), then calls `next` to open another. */
   const leaveDraft = async (next: () => Promise<void>) => {
     clearTimeout(timer.current);
-    if (hasText(latest.current)) {
+    if (hasContent()) {
       flush();
       await chain.current;
     } else {
@@ -432,7 +467,7 @@ function DraftForm({
       onSwitch(res.draft);
     });
   const newDraft = () => {
-    if (!hasText(latest.current)) return slugInput.current?.focus();
+    if (!hasContent()) return slugInput.current?.focus();
     return leaveDraft(async () => {
       finished.current = true;
       onSwitch(null);
@@ -635,7 +670,16 @@ function DraftForm({
         placeholder="What is the problem? Who hits it? What does done look like?"
         value={draft.idea}
         onChange={(e) => patch({ idea: e.target.value })}
+        onPaste={(e) => {
+          const files = imageFiles(e.clipboardData?.files);
+          if (files.length === 0) return;
+          e.preventDefault();
+          void imgs.addFiles(files);
+        }}
       />
+      <Box flexShrink="0" px="3">
+        <DraftImages state={imgs} />
+      </Box>
       {sheetMode && reason && !confirming && (
         <Text fontSize="sm" color="tone.paused.fg" px="3" pb="2" flexShrink="0">
           {reason}
@@ -656,7 +700,7 @@ function DraftForm({
           </>
         ) : (
           <>
-            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) || images.length ? setConfirming(true) : discard())}>
+            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) || imgs.count ?setConfirming(true) : discard())}>
               Discard
             </Button>
             <Box flex="1" />

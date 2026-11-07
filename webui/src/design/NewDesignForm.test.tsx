@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection } from "../connection";
 import type { DesignDraft, DesignDraftSaveRequest } from "../generated/server";
@@ -28,7 +28,12 @@ function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
   });
   const remove = vi.fn(async (): Promise<DraftResult> => ({ kind: "deleted" }));
   const setLastProject = vi.fn(async (_project: string) => {});
+  let uploaded = 0;
+  const uploadImage = vi.fn(async (_draft: string, _file: Blob) => `img${++uploaded}`);
+  const removeImage = vi.fn(async (_draft: string, _image: string) => ({}));
   const client: DraftsClient = {
+    uploadImage,
+    removeImage,
     list: async () => (stored ? [{ ...stored, image_count: 0 }] : []),
     read: async () => (stored ? { kind: "ok", draft: stored } : { kind: "gone" }),
     save,
@@ -36,7 +41,7 @@ function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
     getLastProject: async () => lastProject,
     setLastProject,
   };
-  return { client, save, remove, setLastProject };
+  return { client, save, remove, setLastProject, uploadImage, removeImage };
 }
 
 async function mount(over: Partial<Parameters<typeof NewDesignForm>[0]> = {}, latest?: Partial<DesignDraft>, lastProject = "") {
@@ -793,4 +798,76 @@ test("deleting the only draft opens a blank one", async () => {
   await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]));
   expect(remove).toHaveBeenCalledWith("a");
   expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("");
+});
+
+const png = (name = "a.png") => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], name, { type: "image/png" });
+const pasteInto = (name: string, file: File) =>
+  fireEvent.paste(screen.getByRole("textbox", { name }), { clipboardData: { files: [file], types: ["Files"] } });
+const addImages = (...files: File[]) => fireEvent.change(screen.getByTestId("image-input"), { target: { files } });
+const LIMITS = "Paste or add images (PNG, JPEG, GIF, WebP, up to 20 MB, 10 per draft)";
+
+test("pasting a PNG in the idea box uploads it to the draft and shows a thumbnail", async () => {
+  const { uploadImage } = await mount({}, { slug: "x" });
+  pasteInto("Rough idea", png());
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "Open image" })).toHaveLength(1));
+  expect(uploadImage).toHaveBeenCalledWith("d1", expect.any(File));
+  expect(screen.getByText("1 of 10 images")).toBeTruthy();
+});
+
+test("pasting into the slug field adds nothing", async () => {
+  const { uploadImage } = await mount({}, { slug: "x" });
+  pasteInto("Epic slug", png());
+  await act(async () => {});
+  expect(uploadImage).not.toHaveBeenCalled();
+  expect(screen.getByText(LIMITS)).toBeTruthy();
+});
+
+test("Add image picks files, and the line counts them", async () => {
+  await mount({}, { slug: "x" });
+  expect(screen.getByText(LIMITS)).toBeTruthy();
+  addImages(png("a.png"), png("b.png"));
+  await waitFor(() => expect(screen.getByText("2 of 10 images")).toBeTruthy());
+});
+
+test("a refused file is a failed tile with its reason and Remove, never retried or uploaded", async () => {
+  const { uploadImage } = await mount({}, { slug: "x" });
+  const big = png("big.png");
+  Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
+  addImages(big,new File(["not an image"], "t.txt", { type: "image/png" }));
+  await screen.findByText("Too large, max 20 MB");
+  expect(screen.getByText("Not a supported image type")).toBeTruthy();
+  expect(screen.queryByText(/tap to retry/)).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Remove image" })).toHaveLength(2);
+  expect(uploadImage).not.toHaveBeenCalled();
+});
+
+test("a transport failure offers tap to retry, and retry uploads", async () => {
+  const { uploadImage } = await mount({}, { slug: "x" });
+  uploadImage.mockRejectedValueOnce(new Error("Network down"));
+  addImages(png());
+  const tile = await screen.findByText("Network down, tap to retry");
+  fireEvent.click(tile);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Open image" })).toBeTruthy());
+  expect(uploadImage).toHaveBeenCalledTimes(2);
+});
+
+test("Remove deletes the saved image on the server", async () => {
+  const { removeImage } = await mount({}, { slug: "x", images: ["i1", "i2"] });
+  expect(screen.getByText("2 of 10 images")).toBeTruthy();
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove image" })[0]);
+  expect(removeImage).toHaveBeenCalledWith("d1", "i1");
+  expect(screen.getByText("1 of 10 images")).toBeTruthy();
+});
+
+test("a draft with only images is not blank: Discard asks first", async () => {
+  await mount({}, { images: ["i1"] });
+  click("Discard");
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
+});
+
+test("an image on a draft with no text yet fails with a reason and can be retried after typing", async () => {
+  const { uploadImage } = await mount();
+  addImages(png());
+  await screen.findByText("Write the epic name or an idea first, tap to retry");
+  expect(uploadImage).not.toHaveBeenCalled();
 });

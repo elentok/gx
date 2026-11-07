@@ -9,7 +9,9 @@ import { designFooterEntries } from "./designFooterEntries";
 import { shellEntries } from "./shellEntries";
 import { ConnectionContext, type Connection } from "../connection";
 import { DraftSwitcher } from "../design/DraftSwitcher";
+import { DraftImages } from "../design/DraftImages";
 import { ImageStrip } from "../design/ImageStrip";
+import type { DraftImages as DraftImagesState } from "../design/useDraftImages";
 import { NewDesignForm, type DraftsClient } from "../design/NewDesignForm";
 import type { ComposerImage } from "../design/useComposerImages";
 import { CoarsePointerContext, type Device, DeviceContext, WideContext } from "../useWide";
@@ -70,6 +72,19 @@ const stripImages: ComposerImage[] = [
   { key: "c", state: "failed", message: "Too large", canRetry: true },
   { key: "d", state: "failed", message: "Upload cut off", canRetry: false },
 ];
+const draftImagesState = (images: ComposerImage[]): DraftImagesState => ({
+  images,
+  readyIds: images.filter((i) => i.state === "ready").map((i) => i.key),
+  uploading: images.filter((i) => i.state === "uploading").length,
+  failed: images.filter((i) => i.state === "failed").length,
+  error: "",
+  count: images.length,
+  addFiles: async () => {},
+  retry: () => {},
+  remove: () => {},
+  reset: () => {},
+  urlOf: () => "",
+});
 const ticket = canned.tickets[0];
 const longReason = "Waiting on a long chain of upstream tickets that all have to merge first. ".repeat(4);
 
@@ -102,6 +117,8 @@ const noDrafts: DraftsClient = {
   remove: async () => ({ kind: "deleted" }),
   getLastProject: async () => "",
   setLastProject: async () => {},
+  uploadImage: async () => "gallery",
+  removeImage: async () => ({}),
 };
 
 // A transform makes the modal's fixed overlay fill this frame instead of the page.
@@ -649,6 +666,15 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       { label: "editable", node: <ImageStrip images={stripImages} /> },
       { label: "readOnly", node: <ImageStrip images={stripImages} readOnly onOpen={() => {}} /> },
+    ],
+  },
+  {
+    name: "DraftImages",
+    cases: [
+      { label: "empty", node: <DraftImages state={draftImagesState([])} /> },
+      { label: "ready", node: <DraftImages state={draftImagesState(stripImages.slice(0, 1))} /> },
+      { label: "uploading", node: <DraftImages state={draftImagesState(stripImages.slice(0, 2))} /> },
+      { label: "failed", node: <DraftImages state={draftImagesState(stripImages)} /> },
     ],
   },
   {

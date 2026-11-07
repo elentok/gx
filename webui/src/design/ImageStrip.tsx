@@ -1,4 +1,5 @@
 import { Box, Spinner } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import type { ComposerImage } from "./useComposerImages";
 
 function Thumb({
@@ -97,12 +98,15 @@ export function ImageStrip({
   onOpen,
   onRetry = () => {},
   onRemove = () => {},
+  trailing,
 }: {
   images: ComposerImage[];
   readOnly?: boolean;
   onOpen?: (index: number) => void;
   onRetry?: (key: string) => void;
   onRemove?: (key: string) => void;
+  /** Sits after the last thumbnail in the same scrolling row. */
+  trailing?: ReactNode;
 }) {
   return (
     <Box display="flex" gap="10px" overflowX="auto" pt="2" pb="1" pl="0.5" pr="1" aria-label="Images">
@@ -116,6 +120,7 @@ export function ImageStrip({
           onRemove={() => onRemove(image.key)}
         />
       ))}
+      {trailing}
     </Box>
   );
 }

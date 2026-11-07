@@ -6,7 +6,7 @@ import { MAX_IMAGES, MSG_MAX_IMAGES } from "./imageLimits";
 import { ImageStrip } from "./ImageStrip";
 import type { ComposerImages as State } from "./useComposerImages";
 
-const imageFiles = (list: FileList | null | undefined): File[] =>
+export const imageFiles = (list: FileList | null | undefined): File[] =>
   Array.from(list ?? []).filter((f) => f.type.startsWith("image/") || f.type === "");
 
 function lineText(state: State): { text: string; red: boolean } | undefined {
