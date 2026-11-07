@@ -193,7 +193,7 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 	entry.Runner, entry.Model, entry.Effort = deps.Runner.Name(), one.Model, one.Effort
 	run, wt, err := l.prepareAndLaunch(deps, &one, ticket, mode, func(wt ralphloop.IterationWorktree) {
 		entry.Workspace, entry.Base, entry.Cwd = one.WorkspaceID, wt.Base(), wt.Path
-		l.Registry.Put(entry)
+		l.Registry.Replace(entry)
 	})
 	if err != nil {
 		l.Registry.DeleteStarted(ticketAddr, entry.StartedAt)
@@ -221,10 +221,9 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 	}
 	// The launch context ends with this function; the settle path outlives it.
 	one.Context = nil
-	l.Registry.Put(runs.TrackedRun{
+	l.Registry.Replace(runs.TrackedRun{
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), Cwd: wt.Path, TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})
-	l.Registry.SetLaunchStep(ticketAddr, "") // IterationStarted below makes clients re-snapshot
 	l.Events.Publish(wire.EventIterationStarted, ticketAddr)
 	l.Guards.GoSettle(func() { l.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })
 	return true, nil

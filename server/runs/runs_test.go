@@ -42,10 +42,15 @@ func TestRunRegistry_LaunchStep(t *testing.T) {
 	if !r.SetLaunchStep(addr, StepInstallingDeps) || r.SetLaunchStep(addr, StepInstallingDeps) {
 		t.Error("SetLaunchStep must report a change once, not for the same step again")
 	}
-	r.Put(TrackedRun{Run: Run{Address: addr}, State: Launching})
+	r.Replace(TrackedRun{Run: Run{Address: addr}, State: Launching})
 	if got, _ := r.Tracked(addr); got.LaunchStep != StepInstallingDeps {
-		t.Errorf("step after Put = %q, want it kept", got.LaunchStep)
+		t.Errorf("step after Replace = %q, want it kept", got.LaunchStep)
 	}
+	r.Put(TrackedRun{Run: Run{Address: addr}})
+	if got, _ := r.Tracked(addr); got.LaunchStep != "" {
+		t.Errorf("step after Put = %q, want Put to store the entry as given", got.LaunchStep)
+	}
+	r.SetLaunchStep(addr, StepInstallingDeps)
 	data, err := os.ReadFile(r.path)
 	if err != nil {
 		t.Fatal(err)

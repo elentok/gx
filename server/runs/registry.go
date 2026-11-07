@@ -594,10 +594,18 @@ func (t *TrackedRun) moveStep(step LaunchStep) {
 	t.stepSince, t.LaunchStep = now, step
 }
 
-// Put replaces the entry at t.Address. The launch step and its timings are
-// in-memory state the replaced entry owns, so they carry over; SetLaunchStep
-// clears the step.
+// Put stores t at t.Address as given, replacing any entry there.
 func (r *Registry) Put(t TrackedRun) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.runs[t.Address] = t
+	r.save()
+}
+
+// Replace is Put for a run whose launch is in progress or just ended: the
+// launch step and its timings are in-memory state the replaced entry owns, so
+// they carry over and t's own values are discarded.
+func (r *Registry) Replace(t TrackedRun) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	old := r.runs[t.Address]
