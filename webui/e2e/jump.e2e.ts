@@ -7,13 +7,12 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   const fx = await start("united");
   const back = (n: number) => page.getByRole("link", nav(`Epics · ${n} need you`));
 
-  // Eight other cards need you from a Needs-you epic, nine from one that does not.
-  // Start on an epic outside Needs you: the permission card joins it only once its held worker asks,
-  // so the full count of nine is the signal that the scenario has settled.
+  // The footer badge counts every card that needs you, whichever page is open.
+  // The permission card joins only once its held worker asks, so the full count of nine is the signal that the scenario has settled.
   await goto(page, "#/e/demo:running-epic");
   await expect(back(9)).toBeVisible({ timeout: 60_000 });
   await goto(page, "#/e/demo:paused-epic");
-  await expect(back(8)).toBeVisible();
+  await expect(back(9)).toBeVisible();
   await goto(page, "#/d/demo:design-live");
   await expect(back(9)).toBeVisible();
   await goto(page, "#/e/demo:running-epic");
@@ -27,9 +26,20 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   });
   expect(style).toEqual({ recolored: true, bg: "rgb(242, 184, 69)" });
 
-  // The title button carries no number and nothing is called waiting-count.
-  await expect(page.getByRole("heading", { level: 1 }).getByRole("button")).not.toContainText(/\d/);
+  // The page title is not a button and nothing is called waiting-count.
+  await expect(page.getByRole("heading", { level: 1 }).getByRole("button")).toHaveCount(0);
   await expect(page.getByTestId("waiting-count")).toHaveCount(0);
+
+  // Cmd/Ctrl+K opens the shell menu on the Epics page and on the Agents page, and Escape closes it.
+  const jump = page.getByRole("dialog", nav("Jump to"));
+  for (const hash of ["#/epics", "#/agents"]) {
+    await goto(page, hash);
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(jump).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(jump).toHaveCount(0);
+  }
+  await goto(page, "#/e/demo:running-epic");
 
   // Clicking the count text itself opens the Epics page.
   await back(9).getByText("9", { exact: true }).click();
@@ -51,13 +61,12 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   const timeLineHeight = await time.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
   expect(timeBox!.height).toBeLessThanOrEqual(timeLineHeight * 1.5);
 
-  // The Epics tab stays on one line with its count.
+  // The sidebar slides in over the phone page and its footer keeps the Epics link with its count.
   await goto(page, "#/d/demo:design-live");
-  const tab = back(9);
-  await expect(tab).toBeVisible();
-  const line = await tab.boundingBox();
-  const lineHeight = await tab.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
-  expect(line!.height).toBeLessThanOrEqual(lineHeight * 1.5);
+  await page.getByRole("button", nav("Show sidebar")).click();
+  await expect(back(9)).toBeVisible();
+  await page.getByRole("button", nav("Hide sidebar")).click();
+  await expect(back(9)).toBeHidden();
 
   // On the epic page the buttons sit below the stats line.
   await goto(page, "#/e/demo:awaiting-epic");
@@ -72,6 +81,7 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
 
   // The count follows the server with no reload.
   await goto(page, "#/e/demo:running-epic");
+  await page.getByRole("button", nav("Show sidebar")).first().click();
   await expect(back(9)).toBeVisible();
   await fx.cli("tickets", "set", "demo:paused-epic/01", "--status", "open");
   await expect(back(8)).toBeVisible();

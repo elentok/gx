@@ -21,7 +21,7 @@ test.describe("61. Page modes at 760px", () => {
       await expect(page.getByText(SUMMARY, nav(SUMMARY))).toBeVisible({ timeout: 1000 });
     }).toPass();
 
-    const ring = (await page.locator("[data-kind]").first().boundingBox())!;
+    const ring = (await page.getByTestId("page-header-actions").locator("[data-kind]").boundingBox())!;
     expect(ring.width).toBe(56);
     const summary = (await page.getByText(SUMMARY, nav(SUMMARY)).boundingBox())!;
     expect(summary.y).toBeLessThan(ring.y + ring.height);
@@ -39,11 +39,10 @@ test.describe("61. Page modes at 760px", () => {
     expect(meta.y + meta.height).toBeGreaterThan(title.y);
     expect(meta.x).toBeGreaterThanOrEqual(title.x + title.width);
 
-    // The jump menu is a popover, not a full-screen sheet, and the heading shows no ⌘K hint.
-    const heading = page.getByRole("heading", { level: 1 });
-    await expect(heading.getByText("⌘K")).toHaveCount(0);
-    await heading.getByRole("button").click();
-    const menu = page.getByRole("dialog", nav("Jump to epic"));
+    // The title is not a button; Cmd/Ctrl+K opens the jump menu as a popover, not a full-screen sheet.
+    await expect(page.getByRole("heading", { level: 1 }).getByRole("button")).toHaveCount(0);
+    await page.keyboard.press("ControlOrMeta+k");
+    const menu = page.getByRole("dialog", nav("Jump to"));
     await expect(menu).toBeVisible();
     const box = (await menu.boundingBox())!;
     expect(box.width).toBeLessThan(760);
@@ -92,12 +91,15 @@ test.describe("61. Page modes at 760px", () => {
     for (const r of rows) expect(r.gap).toBeCloseTo(16, 0);
   });
 
+  // 760px is a tablet now, so the phone sheet is measured at 390px.
   test("Design page gets the phone layout", async ({ page, start }) => {
     await start("design");
+    await page.setViewportSize({ width: 390, height: 844 });
     await goto(page, "#/d/demo:design-epic");
-    await page.getByRole("heading", { level: 1 }).getByRole("button").click();
-    const sheet = page.getByRole("dialog", nav("Jump to epic"));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.keyboard.press("ControlOrMeta+k");
+    const sheet = page.getByRole("dialog", nav("Jump to"));
     await expect(sheet).toBeVisible();
-    expect(await sheet.boundingBox()).toMatchObject({ x: 0, y: 0, width: 760, height: 900 });
+    expect(await sheet.boundingBox()).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
   });
 });

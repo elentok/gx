@@ -109,9 +109,9 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ## Layout and navigation (`jump`, `phone`, `modes`, `menu`)
 
-- **`jump.e2e.ts` 22. Back link count, then the phone layout.**
-- **`phone.e2e.ts`:** a card's meta sits below its title and the answer and fix buttons are full-width tap targets; **41. Phone, New Design sheet**; **24. Phone, Design page.**
-- **`modes.e2e.ts`:** the Epic page gets the wide layout and a popover jump menu (and 62. Card columns); the Design page gets the phone layout.
+- **`jump.e2e.ts` 22. Back link count, then the phone layout:** the sidebar footer's Epics badge counts every card that needs you on any page and follows the server; the page title is not a button; Cmd/Ctrl+K opens the jump menu on the Epics and Agents pages; on a phone the sidebar slides in over the page and keeps the badge.
+- **`phone.e2e.ts`:** a card's meta sits below its title and the answer and fix buttons are full-width tap targets; **41. Phone, New Design sheet**; **24. Phone, Design page** (Send is dimmed until an answer exists and named "Send" on a phone; at 390px the footer is one row of Add, Note, Auto, Send with 44px Add and Note; Cmd/Ctrl+K opens a full-screen jump sheet).
+- **`modes.e2e.ts`:** at 760px the Epic page gets the wide layout and Cmd/Ctrl+K opens a popover jump menu (and 62. Card columns); at 390px the Design page's jump menu is a full-screen sheet.
 - **`menu.e2e.ts`:** a statusline report reaches the open menu; the amount rises while open and a closed menu stops fetching; the open menu flips to limits and its output matches the no-server run; the narrow menu fits and updates live.
 
 ## Stats, health, disk and checks (`stats`, `health`, `disk`, `check-lock`, `checks`)

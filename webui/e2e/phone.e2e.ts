@@ -125,7 +125,10 @@ test("24. Phone, Design page", async ({ page, start }) => {
 
   // Send with gaps: the popover fits the screen and overlaps the sheet.
   const questions = page.getByRole("group", nav("Questions"));
-  await page.getByRole("button", nav("Send answers")).click();
+  // Send is dimmed until one question is answered; the other stays open, so the gaps popover shows.
+  await expect(page.getByRole("button", nav("Send"))).toBeDisabled();
+  await page.getByRole("button", { name: /^SQLite/ }).click();
+  await page.getByRole("button", nav("Send")).click();
   const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
   await expect(popover).toBeVisible();
   // It scales in, so it is measured once settled.
@@ -144,16 +147,30 @@ test("24. Phone, Design page", async ({ page, start }) => {
   const line = (await stepLine.boundingBox())!;
   expect(line.y + line.height).toBeLessThanOrEqual((await questions.boundingBox())!.y);
 
-  // Note loses its text; the Auto button keeps both names.
-  await expect(page.getByRole("button", nav("Note"))).toHaveText("✎");
-  await expect(page.getByRole("button", { name: /^Auto:/ })).toHaveText("Auto-advanceAuto-queue");
+  // Note is an icon with no text; the Auto button shows both short names.
+  await expect(page.getByRole("button", nav("Note"))).toHaveText("");
+  await expect(page.getByRole("button", { name: /^Auto:/ })).toHaveText("AdvanceQueue");
 
-  // A tap on the title opens a full-screen sheet; its close button closes it.
-  await page.getByRole("heading", { level: 1 }).getByRole("button").click();
-  const sheet = page.getByRole("dialog", nav("Jump to epic"));
+  // The footer is one row at 390px: Add, Note, Auto, Send, with 44px Add and Note.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const row = ["Add image", "Note"].map((n) => page.getByRole("button", nav(n)));
+  const auto = page.getByRole("button", { name: /^Auto:/ });
+  const send = page.getByRole("button", nav("Send"));
+  const boxes = [];
+  for (const b of [...row, auto, send]) {
+    await expect(b).toBeVisible();
+    boxes.push((await b.boundingBox())!);
+  }
+  for (const b of boxes.slice(0, 2)) expect([b.width, b.height]).toEqual([44, 44]);
+  const centers = boxes.map((b) => b.y + b.height / 2);
+  for (const c of centers) expect(c).toBeCloseTo(centers[0], 0);
+  for (let i = 1; i < boxes.length; i++) expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width);
+
+  // Cmd/Ctrl+K opens the jump menu as a full-screen sheet; its close button closes it.
+  await page.keyboard.press("ControlOrMeta+k");
+  const sheet = page.getByRole("dialog", nav("Jump to"));
   await expect(sheet).toBeVisible();
-  const box = await sheet.boundingBox();
-  expect(box).toMatchObject({ x: 0, y: 0, width: 375, height: 812 });
+  expect(await sheet.boundingBox()).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
   await sheet.getByRole("button", nav("Close")).click();
   await expect(sheet).toHaveCount(0);
 });
