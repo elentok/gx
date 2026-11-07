@@ -25,7 +25,76 @@ func newDesignsDraftsCmd(d Deps) *cobra.Command {
 // newDraftsImageCmd is `gx designs drafts image`: the images of a draft.
 func newDraftsImageCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "image", Short: "images of a draft", Args: cobra.NoArgs}
-	cmd.AddCommand(newDraftsImageAddCmd(d), newDraftsImageRmCmd(d))
+	cmd.AddCommand(newDraftsImageAddCmd(d), newDraftsImageGetCmd(d), newDraftsImageRmCmd(d))
+	return cmd
+}
+
+func newDraftsImageGetCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	var out string
+	cmd := &cobra.Command{
+		Use:   "get <draft> <id>",
+		Short: "print a draft image's bytes, or save them with -o",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			return runImageGet(c, d, jsonOut, out, args[1], func(ctx context.Context, cl *apiclient.Client) ([]byte, string, error) {
+				return cl.Sessions.DesignDraftImage(ctx, args[0], args[1])
+			})
+		},
+	}
+	addImageGetFlags(cmd, &out, &jsonOut)
+	return cmd
+}
+
+// newDesignsImagesCmd is `gx designs images`: the images/ folder of a map.
+func newDesignsImagesCmd(d Deps) *cobra.Command {
+	cmd := &cobra.Command{Use: "images", Short: "images/ folder of a map epic", Args: cobra.NoArgs}
+	cmd.AddCommand(newDesignsImagesListCmd(d), newDesignsImagesGetCmd(d))
+	return cmd
+}
+
+func newDesignsImagesListCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "list <project:epic>",
+		Short: "list a map epic's images in order",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			items, err := cl.Sessions.DesignImages(c.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(c.OutOrStdout(), items)
+			}
+			for _, it := range items {
+				fmt.Fprintf(c.OutOrStdout(), "%s\t%s\n", it.ID, it.Name)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the list as JSON")
+	return cmd
+}
+
+func newDesignsImagesGetCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	var out string
+	cmd := &cobra.Command{
+		Use:   "get <project:epic> <id>",
+		Short: "print a map image's bytes, or save them with -o",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			return runImageGet(c, d, jsonOut, out, args[1], func(ctx context.Context, cl *apiclient.Client) ([]byte, string, error) {
+				return cl.Sessions.DesignImage(ctx, args[0], args[1])
+			})
+		},
+	}
+	addImageGetFlags(cmd, &out, &jsonOut)
 	return cmd
 }
 

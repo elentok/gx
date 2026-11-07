@@ -125,6 +125,58 @@ func TestDesignsDrafts_ImageAddRm(t *testing.T) {
 	}
 }
 
+func TestDesignsDrafts_ImageGet(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir())
+	st := drafts.New(h.StateDir)
+	d, err := st.Create("proj", "s", "idea", "")
+	if err != nil || d == nil {
+		t.Fatal(d, err)
+	}
+	ctx := context.Background()
+	png := append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 32)...)
+	res, err := h.Client.Sessions.AddDesignDraftImage(ctx, d.ID, png)
+	if err != nil || res.Refused {
+		t.Fatal(res, err)
+	}
+	data, ct, err := h.Client.Sessions.DesignDraftImage(ctx, d.ID, res.ID)
+	if err != nil || ct != "image/png" || !bytes.Equal(data, png) {
+		t.Errorf("DesignDraftImage = %d bytes %q, %v; want the png", len(data), ct, err)
+	}
+	if _, _, err := h.Client.Sessions.DesignDraftImage(ctx, d.ID, "00000000"); err == nil {
+		t.Error("unknown image id read without an error")
+	}
+}
+
+func TestDesignsImages_ListGet(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "map", "01", "first", servertest.TicketOpts{})
+	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	png := append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 32)...)
+	imgs := filepath.Join(store, "proj", "map", "images")
+	if err := os.MkdirAll(imgs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(imgs, "img-1-aaaaaaaa.png"), png, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+	ctx := context.Background()
+
+	list, err := h.Client.Sessions.DesignImages(ctx, "proj:map")
+	if err != nil || len(list) != 1 || list[0].ID != "aaaaaaaa" {
+		t.Fatalf("DesignImages = %+v, %v; want aaaaaaaa", list, err)
+	}
+	data, ct, err := h.Client.Sessions.DesignImage(ctx, "proj:map", "aaaaaaaa")
+	if err != nil || ct != "image/png" || !bytes.Equal(data, png) {
+		t.Errorf("DesignImage = %d bytes %q, %v; want the png", len(data), ct, err)
+	}
+	if _, _, err := h.Client.Sessions.DesignImage(ctx, "proj:map", "ticket.md"); err == nil {
+		t.Error("ticket.md read without an error")
+	}
+}
+
 func TestDesignsDrafts_SaveRevisionConflict(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
 	d, err := drafts.New(h.StateDir).Create("proj", "s", "idea", "")

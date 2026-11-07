@@ -76,6 +76,23 @@ func (s *Sessions) AddDesignDraftImage(ctx context.Context, id string, data []by
 	return res, err
 }
 
+// DesignDraftImage reads one image of a draft: its bytes and detected Content-Type.
+func (s *Sessions) DesignDraftImage(ctx context.Context, id, image string) ([]byte, string, error) {
+	return s.t.getBytes(ctx, "/v1/designs/drafts/images?id="+url.QueryEscape(id)+"&image="+url.QueryEscape(image))
+}
+
+// DesignImages lists the ids and file names in a map epic's images/ folder.
+func (s *Sessions) DesignImages(ctx context.Context, epic string) ([]wire.SessionImageResult, error) {
+	var res []wire.SessionImageResult
+	err := s.t.get(ctx, "/v1/designs/images?epic="+url.QueryEscape(epic), &res)
+	return res, err
+}
+
+// DesignImage reads one image of a map epic's images/ folder.
+func (s *Sessions) DesignImage(ctx context.Context, epic, id string) ([]byte, string, error) {
+	return s.t.getBytes(ctx, "/v1/designs/images/read?epic="+url.QueryEscape(epic)+"&id="+url.QueryEscape(id))
+}
+
 // RemoveDesignDraftImage deletes one image of a draft. A refusal is a result.
 func (s *Sessions) RemoveDesignDraftImage(ctx context.Context, id, image string) (wire.SessionImageResult, error) {
 	var res wire.SessionImageResult

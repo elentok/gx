@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -132,4 +133,45 @@ func Remove(folder, id string) (name string, found bool, err error) {
 		return "", true, err
 	}
 	return filepath.Base(path), true, nil
+}
+
+// List is the saved images of folder in order, as id and file name. A missing
+// folder is an empty list; files gx did not name are left out.
+func List(folder string) []wire.SessionImageResult {
+	entries, _ := os.ReadDir(folder)
+	type item struct {
+		n   int
+		res wire.SessionImageResult
+	}
+	var items []item
+	for _, e := range entries {
+		if n, id, ok := transcript.ParseSavedImageName(e.Name()); ok && e.Type().IsRegular() {
+			items = append(items, item{n, wire.SessionImageResult{ID: id, Name: e.Name()}})
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].n < items[j].n })
+	out := make([]wire.SessionImageResult, len(items))
+	for i, it := range items {
+		out[i] = it.res
+	}
+	return out
+}
+
+// Serve writes the saved image id of folder, typed from its bytes, or a 404.
+func Serve(w http.ResponseWriter, r *http.Request, folder, id string) {
+	path, ok := Find(folder, id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", DetectType(data))
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	_, _ = w.Write(data)
 }

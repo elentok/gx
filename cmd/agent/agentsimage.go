@@ -28,38 +28,49 @@ func newAgentsImageGetCmd(d Deps) *cobra.Command {
 		Short: "print a saved image's bytes, or save them with -o",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			if jsonOut && out == "" {
-				return errors.New("--json needs -o: the image bytes would mix with the JSON")
-			}
-			cl, err := d.Dial()()
-			if err != nil {
-				return err
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			data, contentType, err := cl.Sessions.Image(ctx, args[0], args[1])
-			if err != nil {
-				return err
-			}
-			if out == "" {
-				_, err = c.OutOrStdout().Write(data)
-				return err
-			}
-			if err := os.WriteFile(out, data, 0o644); err != nil {
-				return err
-			}
-			if jsonOut {
-				return writeJSON(c.OutOrStdout(), map[string]any{"id": args[1], "path": out, "bytes": len(data), "contentType": contentType})
-			}
-			_, err = fmt.Fprintln(c.OutOrStdout(), out)
-			return err
+			return runImageGet(c, d, jsonOut, out, args[1], func(ctx context.Context, cl *apiclient.Client) ([]byte, string, error) {
+				return cl.Sessions.Image(ctx, args[0], args[1])
+			})
 		},
 	}
-	cmd.Flags().StringVarP(&out, "output", "o", "", "write the image to this file instead of stdout")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the saved file's path, size and type as JSON (needs -o)")
+	addImageGetFlags(cmd, &out, &jsonOut)
 	return cmd
+}
+
+func addImageGetFlags(cmd *cobra.Command, out *string, jsonOut *bool) {
+	cmd.Flags().StringVarP(out, "output", "o", "", "write the image to this file instead of stdout")
+	cmd.Flags().BoolVar(jsonOut, "json", false, "emit the saved file's path, size and type as JSON (needs -o)")
+}
+
+// runImageGet fetches one image and prints its bytes, or saves them to out.
+func runImageGet(c *cobra.Command, d Deps, jsonOut bool, out, id string, fetch func(context.Context, *apiclient.Client) ([]byte, string, error)) error {
+	if jsonOut && out == "" {
+		return errors.New("--json needs -o: the image bytes would mix with the JSON")
+	}
+	cl, err := d.Dial()()
+	if err != nil {
+		return err
+	}
+	ctx := c.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	data, contentType, err := fetch(ctx, cl)
+	if err != nil {
+		return err
+	}
+	if out == "" {
+		_, err = c.OutOrStdout().Write(data)
+		return err
+	}
+	if err := os.WriteFile(out, data, 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(c.OutOrStdout(), map[string]any{"id": id, "path": out, "bytes": len(data), "contentType": contentType})
+	}
+	_, err = fmt.Fprintln(c.OutOrStdout(), out)
+	return err
 }
 
 func newAgentsImageRmCmd(d Deps) *cobra.Command {

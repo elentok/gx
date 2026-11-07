@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/imagestore"
@@ -102,6 +104,50 @@ func (s *Designs) draftImageRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wire.WriteJSON(w, res)
+}
+
+// draftImageServe serves GET /v1/designs/drafts/images?id=<draft>&image=<image>.
+// Get validates the draft id before it names a folder.
+func (s *Designs) draftImageServe(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if _, err := s.drafts.Get(id); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	imagestore.Serve(w, r, s.drafts.ImagesDir(id), r.URL.Query().Get("image"))
+}
+
+// mapImagesDir is the images/ folder of the map epic named by ?epic=project:epic.
+func (s *Designs) mapImagesDir(r *http.Request) (string, bool) {
+	project, epic, ok := strings.Cut(r.URL.Query().Get("epic"), ":")
+	if !ok || project == "" || epic == "" || strings.ContainsAny(epic, `/\`) || epic == ".." {
+		return "", false
+	}
+	dir, reason, _ := s.mapEpicDir(project, epic)
+	if reason != "" {
+		return "", false
+	}
+	return filepath.Join(dir, epic, "images"), true
+}
+
+// mapImageList serves GET /v1/designs/images?epic=project:epic: the ids and
+// file names in the map's images/ folder. Anything unusable lists nothing.
+func (s *Designs) mapImageList(w http.ResponseWriter, r *http.Request) {
+	list := []wire.SessionImageResult{}
+	if folder, ok := s.mapImagesDir(r); ok {
+		list = imagestore.List(folder)
+	}
+	wire.WriteJSON(w, list)
+}
+
+// mapImageServe serves GET /v1/designs/images/read?epic=project:epic&id=<image>.
+func (s *Designs) mapImageServe(w http.ResponseWriter, r *http.Request) {
+	folder, ok := s.mapImagesDir(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	imagestore.Serve(w, r, folder, r.URL.Query().Get("id"))
 }
 
 func (s *Designs) draftDelete(w http.ResponseWriter, r *http.Request) {
