@@ -322,6 +322,29 @@ here rather than restating it. The filing procedure lives in the
   gets one recording its original address. Old run-log lines, trailers and branch names keep the
   old address; the Resolution records it.
 
+## Triage record
+
+A **Triage** is one run of [gx-triage-follow-ups](gx-triage-follow-ups/SKILL.md) over a project's
+`follow-ups` epic. Its state is one JSON record under `<project dir>/.triage/` in the ticket store (the
+dot prefix keeps the epic loader away; no folder means no Triage). The record, not the conversation,
+says where the run is, so a `/clear`ed or a web session continues the same record.
+
+- **Record state**: `live`, `done` or `abandoned`. One live record per project.
+- **Step**, detected by `gx tickets triage show`: `start` (no live record), `verify` (a row has no
+  verdict), `plan`, `approve` (plan saved, not approved), `write` (approved), `done`.
+- **Row write state**, set during write: `pending`, `done`, `failed` or `gone`.
+- **Every verb takes `--project <p>`** (default: the cwd's project). Write verbs take `--revision <n>`; a
+  stale one is refused, so reprint the record and ask again. Run `gx tickets triage --help` and
+  `<verb> --help` for the flags; the verbs are:
+  - `create`, `show [--json]`, `pending [--json]`: start, read, and list the rows with no verdict.
+  - `verdict --row <addr> [--verdict relevant|fixed|obsolete] [--evidence ..] [--file ..] [--question ..]
+    [--destination ..] | --gone`: save one verdict.
+  - `plan [--gone <addr>]` (rows as JSON on stdin), `row --row <addr> --revision <n> ...` (the person's
+    edits, step approve only), `approve --revision <n>`, `abandon`.
+  - `locate --row <addr> [--seen-from <addr>]`: where the follow-up is now and what is already written.
+  - `answers`, `seen-again`, `epics`, `write-state`, `last-pass`: the idempotent write-step verbs.
+  - `abandon` is refused once the step is `write`.
+
 ## Skill conventions
 
 Rules every gx skill follows when it names a model or launches a sub-agent:

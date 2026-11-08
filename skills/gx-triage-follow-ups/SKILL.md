@@ -3,7 +3,7 @@ name: gx-triage-follow-ups
 description: >-
   Empty a project's `follow-ups` epic: verify each item against the code, dedupe, route every item
   to a ready epic or an area map epic, and close what is fixed or obsolete. Manual; one approval of
-  one table. Never grills.
+  one table. Runs under the gx server (web) or in a plain terminal (chat). Never grills.
 disable-model-invocation: true
 ---
 
@@ -11,7 +11,8 @@ disable-model-invocation: true
 
 Empty `<project>:follow-ups` until it holds no tickets. The project is the current one, or the one
 named by `--project <name>`. Read [gx-local-tracker.md](../gx-local-tracker.md) for the ticket
-commands, the Follow-ups format and the Map epics section; don't restate them here.
+commands, the Follow-ups format, the Map epics section and the Triage record verbs
+(`gx tickets triage`); don't restate their syntax here.
 
 You are the main session. Subagents verify; you plan; the user approves once; then you write. This
 skill never grills: a design question is routed to a map epic, not asked.
@@ -21,21 +22,35 @@ skill never grills: a design question is routed to a map epic, not asked.
 ralph-loop builds the fixes without a person watching, so a slower fix costs agent time, not the
 person's time. When a choice is between a quick fix (a workaround, a special case, a patch on the
 symptom) and a slower fix that is clean and correct (it fixes the cause, or puts the logic where it
-belongs), pick the correct fix. This applies to every suggested fix from step 1, every default
+belongs), pick the correct fix. This applies to every suggested fix from Verify, every default
 answer to a `quick` question, and every ticket sent to the ready epic. Pick the quick fix only when
 the person asks for it, and then record the reason in the ticket body.
 
-## 0. List the items
+## 0. Link and detect the step
 
-`gx tickets show <project>:follow-ups` lists the epic's tickets. A follow-up without a `category`
-predates the format: infer `bug` or `idea` from its body, and read its sections as they are.
+1. Run `gx agent link --triage <project>`. Success means **web mode**: the server shows the record
+   and the person approves in the web plan view. Failure means **chat mode**: you talk to the person
+   in this terminal. The routing rules and the record are the same in both.
+2. Detect the step with the record, not the conversation. Run `gx tickets triage show --project
+   <project>`:
+   - No live Triage → create one (`gx tickets triage create`), then Verify.
+   - Otherwise the first match: rows with no verdict → **Verify**; **Plan**; **Approve** (plan
+     saved, not approved); **Write** (approved); **Done**.
+   - A live Triage found from a plain session is continued, never duplicated.
+3. Report the step with `gx agent step <verify|plan|write|done>` when it starts.
+
+Each step ends with one line, `✅ <step>: <what was done>. Next: <what runs next>`. When more work
+is left, the Next is: `/clear`, then `/gx-triage-follow-ups --project <project>`. Never chain a step
+into the next one in the same session except where a step below says so.
 
 ## 1. Verify
 
-Start one subagent (Agent tool) per item in one turn, then wait for all of them (`general-purpose`, model from `gx agent model worker`; a second word is its `reasoning_effort`, see
-[Skill conventions](../gx-local-tracker.md#skill-conventions)),
-about 8 in parallel; start the next batch as each finishes. Each gets the ticket address and this
-brief:
+`gx tickets triage pending` lists the rows with no verdict; a fresh session verifies only those.
+
+Start one subagent (Agent tool) per row in one turn, then wait for all of them (`general-purpose`,
+model from `gx agent model worker`; a second word is its `reasoning_effort`, see
+[Skill conventions](../gx-local-tracker.md#skill-conventions)), about 8 in parallel. Subagents verify
+and write nothing. Each gets the ticket address and this brief:
 
 "Read the ticket with `gx tickets show`. Read the code and logs it cites and `git log` since it was
 filed. Do not reproduce it and do not run tests. When a quick fix and a clean, correct fix both
@@ -45,22 +60,21 @@ exist, suggest the correct one. Report: (1) verdict `relevant`, `fixed` or
 decision with trade-offs); (4) a suggested destination: ready epic as `implement`, or map epic as
 `grilling` or `research`. If you cannot decide, say `relevant`. Under 300 words."
 
-An undecided verdict counts as **relevant**.
+You save each verdict the moment its subagent returns, with `gx tickets triage verdict`. An undecided
+verdict counts as **relevant**. A follow-up already closed or moved is saved with `--gone`.
 
-## 2. Dedupe
+Before starting another batch, run `gx agent context-window --fits verify`. If it says no, end the
+run with the `✅ verify:` line. When the last verdict is saved, end the same way, pointing at Plan.
 
-Compare verdicts only; don't re-read tickets. For items describing the same problem, keep the
-**oldest**. Merge each newer one's Source and Evidence into the kept ticket's `## Evidence` as a
-"seen again" entry with the date (`gx tickets section <addr> Evidence -`, content = the existing
-text plus the entry). Close the newer one with `gx tickets close <addr> --reason duplicate --note
-<kept-address>`.
+## 2. Plan
 
-Hold these writes for step 5; step 3 shows them in the table.
+Plan writes no epics and no tickets; it saves the plan rows (`gx tickets triage plan`, rows as JSON
+on stdin). Compare verdicts only; don't re-read tickets.
 
-## 3. Plan
+**Dedupe is part of Plan.** For items describing the same problem, keep the **oldest**. The newer
+ones are `merge into X` rows; the merge itself (the "seen again" entry, the close) waits for Write.
 
-Print **one table** and write nothing. One row per item: address, title, verdict, action, and the
-suggested destination. Actions:
+One row per item with its action and suggested destination:
 
 - **close (reason)** — `fixed` or `obsolete`, with the evidence.
 - **merge into X** — a duplicate of X.
@@ -74,66 +88,69 @@ Routing, first match wins:
 3. Otherwise → ready epic, as `implement`.
 
 Group map-epic items by **area of code or tool**, not bug vs idea: 1–8 items per epic, a singleton is
-fine, plain descriptive slug. For the ready epic, list which items touch overlapping files; they get
-chained by `blocked_by` in step 5.
+fine, plain descriptive slug. For the ready epic, record which items touch overlapping files
+(`overlapWith`); they get chained by `blocked_by` in Write.
 
-## 4. Approve once
+**Web mode** ends here: end with `✅ plan: ...` and a Next line pointing at the web plan view, where
+the person edits and approves.
 
-Show the table and let the user edit it or approve it. Ask every `quick` question of the items going
-to the ready epic in this same step, in one message. Write each answer into that ticket's body
-(`gx tickets section <addr> "Open questions" -`, or a `## Decisions` section). Never ask a `design`
-question: it travels with its ticket into the map epic.
+**Chat mode** continues in this session:
 
-Make each question answerable on its own; the user should not have to match numbers back to the
-table. Group the questions by ticket. For each ticket, give its address and title, one or two lines
-on what the ticket is about and what the fix changes, then each question with the options and a
-default.
+1. Print the table.
+2. Ask every `quick` question of the ready-epic items in one message. Make each answerable on its
+   own, grouped by ticket: its address and title, one or two lines on what the fix changes, then each
+   question with the options and a default. Never ask a `design` question: it travels with its ticket
+   into the map epic.
+3. Save answers and the person's edits with `gx tickets triage row`. A stale refusal: reprint the
+   table and ask again.
+4. On "yes", call `gx tickets triage approve --revision <n>` and run Write in this same session. If it
+   prints "already approved", report it was approved elsewhere and stop.
 
-Do not write anything before approval.
+## 3. Approve
 
-## 5. Execute
+A saved, unapproved plan. Web mode: end with a `✅ approve:` line pointing at the web plan view; the
+person approves there. Chat mode: print the table and ask for "yes" as in Plan, then approve and run
+Write. Do not write anything before approval.
 
-Run the approved table with the tracker's verbs: `gx tickets epic add`, `close`, `move`, `set`. Use
-`gx tickets move --dry-run` first if a move might refuse.
+## 4. Write
 
-**Closes** — `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it --note ...`.
+Write takes the approved plan as final and never re-plans. Report the step with `gx agent step
+write`. Record the epics first (`gx tickets triage epics`), then run each row in order with the
+tracker's verbs. Before each action ask `gx tickets triage locate`, and do only what it says is not
+yet done, so a re-run after a `/clear` repeats nothing.
 
-**Ready epic** — one per run, `follow-ups-<date>`:
+Per row, in this order:
 
-- `gx tickets epic add <project>:follow-ups-<date> --kind loop --status open`. Do not queue it.
-- `gx tickets move <addr> follow-ups-<date>`, then `gx tickets set <new-addr> --type implement
-  --status open`. Only `implement` tickets go here: the queue does not run `research` tickets.
-- Chain tickets whose expected files overlap: `gx tickets set <new-addr> --blocked-by
-  <earlier-new-id>`.
+1. The answers: `gx tickets triage answers`.
+2. For a merge, the seen-again note: `gx tickets triage seen-again`.
+3. `gx tickets move <addr> <epic>` or `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it
+   --note ...`. A move renumbers the ticket. Capture the printed address, use it for every later
+   command and save it with `--new-address`.
+4. `gx tickets set <new-addr> --type ... --status open`. Only `implement` tickets go to the ready
+   epic: the queue does not run `research` tickets.
 
-**A move renumbers the ticket.** `move` prints the new address; the old one no longer exists. Capture
-it and use it for every later `set`, `section` and `--blocked-by`, never the pre-move address.
+Epics: the ready epic is `gx tickets epic add <project>:follow-ups-<date> --kind loop --status open`.
+This skill never queues it. Area map epics are `gx tickets epic add <project>:<slug> --kind map
+--status open --body -`, the body opening with a frontmatter block carrying
+`destination_unconfirmed: true`, then a **Destination** (provisional: "decide these items, then a spec
+`docs/specs/<slug>.md`"), **Notes** ("Triaged from follow-ups on `<date>`" and the source
+addresses), and empty **Decisions so far** and **Not yet specified**. A design item gets a
+`## Question` built from its Open questions (`gx tickets section <new-addr> Question -`).
 
-**Area map epic** — one per area:
+Save each row's result with `gx tickets triage write-state`. One failed row never stops the others:
+save it `failed` with the verb's refusal text unchanged.
 
-- `gx tickets epic add <project>:<slug> --kind map --status open --body -`, the body opening with a
-  frontmatter block carrying `destination_unconfirmed: true`, then: a **Destination** (provisional:
-  "decide these items, then a spec `docs/specs/<slug>.md`"), **Notes** ("Triaged from follow-ups on
-  `<date>`" and the source addresses), and empty **Decisions so far** and **Not yet specified**.
-- A design item: move it in, then `gx tickets set <new-addr> --type grilling --status open`, and add
-  a `## Question` built from its Open questions (`gx tickets section <new-addr> Question -`). It
-  keeps its follow-up sections.
-- A research-only item: move it in, then `gx tickets set <new-addr> --type research --status open`.
-
-**Code review** — once all moves and chains are done, so it comes last, run `gx tickets ensure-code-review
-<project>:follow-ups-<date>` for the ready epic. Fill the stub's "What to review" with "all follow-up
-fixes in this epic" (`gx tickets section <review-addr> "What to review" -`). Map epics get none: they
-merge no code.
-
+**Last pass**, after every row: chain edges (`gx tickets set <new-addr> --blocked-by
+<earlier-new-id>` for overlapping files), the code-review stub (`gx tickets ensure-code-review
+<project>:follow-ups-<date>`, then fill "What to review" with "all follow-up fixes in this epic";
+map epics get none), and `gx tickets close --sweep [project]`. Then `gx tickets triage last-pass`.
 `gx tickets validate` one ticket of each new epic.
 
-## 6. Done
+## 5. Done
 
 **Done** = `<project>:follow-ups` holds no tickets. Run `gx tickets show <project>:follow-ups` and
-report what is left, if anything; a ticket the user held back stays and the run isn't done.
+report what is left, if anything; a ticket the user held back stays and the run isn't done. Report
+the step with `gx agent step done`.
 
-For follow-ups already `done` or `cancelled` before this run, `gx tickets close --sweep [project]`
-moves them into `follow-ups-archived`; run it first when the epic has such tickets.
-
-Finish with a short report: counts per action, the ready epic's address, and each map epic's
-address. Finish with zero background shells.
+Finish with `✅ done: ...`: counts per action, the ready epic's address, each map epic's address, and
+any failed rows. Finish with zero background shells.
