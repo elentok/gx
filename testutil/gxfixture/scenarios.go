@@ -141,7 +141,7 @@ var scenarios = map[string]scenario{
 		ChatCapture: true,
 		Epics:       []epic{{Project: project, Name: "stall-chat-epic", Tickets: []ticket{{ID: "01", Slug: "stalls", Opts: servertest.TicketOpts{}}}}},
 		Queue:       []string{project + ":stall-chat-epic"},
-		Env:         []string{agentfake.TUINoTurnEnv + "=1", "GX_LAUNCH_UNKNOWN_GRACE=2s"},
+		Env:         []string{agentfake.TUINoTurnEnv + "=1", "GX_LAUNCH_UNKNOWN_GRACE=500ms"},
 	},
 	// chat-epics: chat-capture plus three queued epics, one per epic message of
 	// the mock: epic merged (auto project, two done tickets with cost and time,

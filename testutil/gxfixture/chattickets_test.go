@@ -89,8 +89,10 @@ func TestChatSessionsScenario_EachSessionStateAlertLandsInTheCaptureFile(t *test
 func TestChatTicketsRepairScenario_StallPauseLandsInTheCaptureFile(t *testing.T) {
 	t.Parallel()
 	r := start(t, "chat-tickets-stall")
+	// Recovery gives up on the stalled ticket and files an investigate ticket
+	// in the same epic, so the Repair line names the epic, not ticket 01.
 	waitForParts(t, r, map[string][]string{
-		"repair-stall": {"stall-chat-epic/01", "Repair", "did not accept its prompt"},
+		"repair-stall": {"stall-chat-epic/", "Repair", "did not accept its prompt"},
 	})
 }
 
