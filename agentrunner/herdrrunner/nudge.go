@@ -122,20 +122,30 @@ func (p *herdrPrompter) InputEmpty() (bool, bool, error) {
 // ReadyToType runs the harness's ready-to-type step over herdr's text read and
 // key presses.
 func (p *herdrPrompter) ReadyToType() bool {
-	io := p.probe
+	return p.typing.ReadyToType(herdrTypingIO(p.probe, p.opts.Target, p.read, p.sendKeys))
+}
+
+// herdrTypingIO fills probe's Rows and SendKeys from herdr's text read and key
+// presses on target.
+func herdrTypingIO(
+	probe harness.TypingIO,
+	target string,
+	read func(target string, opts herdr.AgentReadOptions) (string, error),
+	sendKeys func(target string, keys ...string) error,
+) harness.TypingIO {
 	// Styled: a plain recent-unwrapped read can pick a scrollback row for the
 	// input, which the probe's before/after comparison would misread.
-	io.Rows = func() ([]string, error) {
-		screen, err := p.StyledScreen()
+	probe.Rows = func() ([]string, error) {
+		screen, err := read(target, herdr.AgentReadOptions{Source: "recent-unwrapped", Format: "ansi"})
 		return strings.Split(screen, "\n"), err
 	}
-	io.SendKeys = func(keys string) error {
+	probe.SendKeys = func(keys string) error {
 		if name, ok := herdrKeyNames[keys]; ok {
 			keys = name
 		}
-		return p.sendKeys(p.opts.Target, keys)
+		return sendKeys(target, keys)
 	}
-	return p.typing.ReadyToType(io)
+	return probe
 }
 
 // herdrKeyNames maps the raw clear keys harness rules use to herdr's key names.

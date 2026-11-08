@@ -266,6 +266,12 @@ func (r *Runner) PromptLaunch(ctx context.Context, s agentrunner.Session, text s
 	if err := r.guard(s); err != nil {
 		return err
 	}
+	if !codex && !agentrunner.VimCheckSkipped(ctx) {
+		probe := harness.TypingIO{Session: s.SessionID, Log: r.log, Caller: "herdr-launch"}
+		if harness.CheckVimLaunch(herdrTypingIO(probe, s.ID, r.CLI.AgentRead, r.CLI.AgentSendKeys)) {
+			return &claudeui.VimEditorError{}
+		}
+	}
 	turn, err := r.awaitNotBusy(s)
 	if err != nil {
 		return err
