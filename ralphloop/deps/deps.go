@@ -191,6 +191,10 @@ type Deps struct {
 	// running (see waitForBackgroundTasks). Codex has no equivalent transcript
 	// signal, so callers only ever invoke this for agent.AgentClaude.
 	ReadBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error)
+	// ReadClassifierOutage counts the consecutive "no verdict" tool errors at
+	// the end of the Claude session's transcript. Nil, or a session with no
+	// transcript yet, counts 0.
+	ReadClassifierOutage func(cwd, sessionID string) (int, error)
 	// ReadBackgroundProcess reads, from process state only, whether one
 	// background task's process still runs. Nil, or Known false, never
 	// releases a held task early.
@@ -396,6 +400,13 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return transcript.BackgroundTaskReading{}, nil
 			}
 			return transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, time.Now())
+		},
+		ReadClassifierOutage: func(cwd, sessionID string) (int, error) {
+			path, found := transcriptPath(overrides.Home, cwd, sessionID)
+			if !found {
+				return 0, nil
+			}
+			return transcript.CountClassifierNoVerdict(path)
 		},
 		ReadBackgroundProcess: readBackgroundProcess,
 		ReadUnexecutedToolCall: func(cwd, sessionID string) (bool, error) {

@@ -306,6 +306,7 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 	lguard := supervise.NewLongTicketGuard(d, p, now)
 	elapsedMs := 0
 	nudged := false
+	outageResends := 0
 	for {
 		st, err := d.Runner.Wait(s, waitStates, cmp.Or(d.GuardPoll, supervise.SmartZonePollMs*time.Millisecond))
 		if err != nil {
@@ -345,6 +346,21 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 			}
 			continue
 		}
+		// A classifier outage ends the turn without the agent choosing to: re-send
+		// "continue" at growing delays instead of reading a finish.
+		outage := classifierOutage(d, p, s)
+		if !outage {
+			outageResends = 0
+		} else if outageResends < len(classifierResendDelays) {
+			in.Sleep(d, classifierResendDelays[outageResends])
+			outageResends++
+			if classifierOutage(d, p, s) {
+				if err := d.Runner.Prompt(s, classifierResendText); err != nil && !errors.Is(err, agentrunner.ErrNotReady) {
+					return fmt.Errorf("re-sending continue to %s: %w", w.Label, err)
+				}
+			}
+			continue
+		}
 		confirmed, err := supervise.ConfirmFinished(d, in, s, until)
 		if err != nil {
 			return fmt.Errorf("confirming %s finished: %w", w.Label, err)
@@ -360,7 +376,8 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 		if !confirmed {
 			continue
 		}
-		if nudged || o.StallNudgeDelay <= 0 {
+		// The nudge tells the agent to run gx, which an outage fails too.
+		if nudged || o.StallNudgeDelay <= 0 || outage {
 			return nil
 		}
 		nudgedNow, again, err := nudgeIfStalled(d, in, o, w, s, until, p, sessionID)
@@ -372,6 +389,26 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 		}
 		nudged = nudged || nudgedNow
 	}
+}
+
+// classifierResendDelays are the waits before each "continue" re-send during a
+// classifier outage; after the last the outage is left to the finish path.
+var classifierResendDelays = []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute}
+
+const classifierResendText = "continue"
+
+// classifierOutage reports whether a Claude transcript ends in "no verdict"
+// tool errors. Codex has no auto-mode classifier.
+func classifierOutage(d deps.Deps, p supervise.LaunchParams, s agentrunner.Session) bool {
+	if p.Agent != agent.AgentClaude || d.ReadClassifierOutage == nil {
+		return false
+	}
+	status, err := d.Runner.Status(s)
+	if err != nil || status.SessionID == "" {
+		return false
+	}
+	n, err := d.ReadClassifierOutage(p.SessionCwd, status.SessionID)
+	return err == nil && n > 0
 }
 
 // RelaunchRequest is the wait's answer to a pane that stopped taking keys: the

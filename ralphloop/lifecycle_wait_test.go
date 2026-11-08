@@ -191,6 +191,60 @@ func TestWaitIterationFinished_NudgeRereadsSignalAndWaitsWhenTaskIsLive(t *testi
 	}
 }
 
+// A classifier outage is re-sent "continue" after 1, 2 and 4 minutes in the same
+// session; the unchanged stall nudge only comes once the outage has cleared.
+func TestWaitIterationFinished_ClassifierOutageResendsContinueThenNudgesAnotherStall(t *testing.T) {
+	t.Parallel()
+	d, r, one, sleeps := stallNudgeFixture(t, "", 30*time.Second)
+	d.ReadClassifierOutage = func(string, string) (int, error) {
+		if len(r.Prompts("iter-01")) < 3 {
+			return 2, nil
+		}
+		return 0, nil
+	}
+	waitStallFixture(t, d, one)
+	want := []string{"continue", "continue", "continue", supervise.StallNudgeText}
+	if got := r.Prompts("iter-01"); !slices.Equal(got, want) {
+		t.Errorf("prompts = %q, want %q", got, want)
+	}
+	var resendWaits []time.Duration
+	for _, s := range *sleeps {
+		if s >= time.Minute {
+			resendWaits = append(resendWaits, s)
+		}
+	}
+	if wantWaits := []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute}; !slices.Equal(resendWaits, wantWaits) {
+		t.Errorf("resend waits = %v, want %v", resendWaits, wantWaits)
+	}
+}
+
+// While the outage shows, no stall nudge is typed and the wait records nothing
+// as the agent's choice; after the retries it hands back to the finish path.
+func TestWaitIterationFinished_ClassifierOutageSkipsStallNudge(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 30*time.Second)
+	d.ReadClassifierOutage = func(string, string) (int, error) { return 1, nil }
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue", "continue", "continue"}) {
+		t.Errorf("prompts = %q, want only the three re-sends", got)
+	}
+	if evs := stallNudgeEvents(t, one); len(evs) != 0 {
+		t.Errorf("stall-nudged events = %+v, want none", evs)
+	}
+}
+
+// Codex has no classifier, so an outage reading never applies to it.
+func TestWaitIterationFinished_ClassifierOutageIgnoredForCodex(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 30*time.Second)
+	one.Agent = agent.AgentCodex
+	d.ReadClassifierOutage = func(string, string) (int, error) { return 1, nil }
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{supervise.StallNudgeText}) {
+		t.Errorf("prompts = %q, want only the stall nudge", got)
+	}
+}
+
 func TestWaitIterationFinished_NoNudgeWhileQuestionOpenOrFinished(t *testing.T) {
 	t.Parallel()
 	for _, status := range []string{string(schema.IterationStatusAsking), "finished"} {
