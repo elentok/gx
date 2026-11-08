@@ -56,18 +56,11 @@ func (rs *Resumer) HandoffRefusal(meta Meta, action []string) (wire.SessionResul
 // exit a no-op, so it does not end the session. A restart that fails ends the
 // session Exited crashed, as any failed start does; Resume carries on.
 func (rs *Resumer) chartingHandoff(dir, id string) {
-	old, ok := rs.beginHandoff(dir, id)
+	old, ok := rs.mg.beginRestart(dir, id)
 	if !ok {
 		return
 	}
-	// No lock held: the stop waits for the holder to save its exit.
-	if c, err := holder.DialHolder(dir); err == nil {
-		if err := c.Stop(); err != nil {
-			rs.mg.log.Warn("handoff: stop agent", "session", id, "err", err)
-		} else {
-			waitForFile(filepath.Join(dir, holder.ExitCodeFile), sessionStopTimeout)
-		}
-	}
+	rs.mg.stopForRestart(dir, id)
 	rs.mg.Watches.MetaMu.Lock()
 	defer rs.mg.Watches.MetaMu.Unlock()
 	meta, err := ReadMeta(dir)
@@ -81,47 +74,98 @@ func (rs *Resumer) chartingHandoff(dir, id string) {
 	}
 }
 
-// beginHandoff bumps the run and returns the conversation being ended. It
+// beginRestart bumps the run and returns the conversation being ended. It
 // reports false when the session ended in the meantime.
-func (rs *Resumer) beginHandoff(dir, id string) (string, bool) {
-	rs.mg.Watches.MetaMu.Lock()
-	defer rs.mg.Watches.MetaMu.Unlock()
+func (m *Manager) beginRestart(dir, id string) (string, bool) {
+	m.Watches.MetaMu.Lock()
+	defer m.Watches.MetaMu.Unlock()
 	meta, err := ReadMeta(dir)
 	if err != nil || meta.Status.State == wire.SessionExited {
 		return "", false
 	}
 	meta.Run++
 	if err := WriteMeta(dir, meta); err != nil {
-		rs.mg.log.Warn("handoff: save meta", "session", id, "err", err)
+		m.log.Warn("restart: save meta", "session", id, "err", err)
 		return "", false
 	}
 	return meta.ConversationID, true
 }
 
+// stopForRestart stops the old holder and waits for it to save its exit. The
+// caller holds no lock.
+func (m *Manager) stopForRestart(dir, id string) {
+	c, err := holder.DialHolder(dir)
+	if err != nil {
+		return
+	}
+	if err := c.Stop(); err != nil {
+		m.log.Warn("restart: stop agent", "session", id, "err", err)
+		return
+	}
+	waitForFile(filepath.Join(dir, holder.ExitCodeFile), sessionStopTimeout)
+}
+
 // restartOnWorker ends the old conversation like an agent exit, records a new
 // one and launches it under the worker tier. The caller holds metaMu.
 func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
-	rs.mg.Conv.SaveTotals(meta.ConvSession(), old)
+	return rs.mg.restartConversation(dir, meta, old, func(meta *Meta) {
+		rs.mg.applyTier(meta, agent.TierWorker)
+		meta.HandoffTier = true
+		meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
+	})
+}
+
+// restartConversation is the holder restart both restarts share: it ends the
+// old conversation like an agent exit, records a new one, lets change set what
+// the new launch differs in, and starts a fresh holder and watch. The caller
+// holds metaMu.
+func (m *Manager) restartConversation(dir string, meta *Meta, old string, change func(*Meta)) error {
+	m.Conv.SaveTotals(meta.ConvSession(), old)
 	conv, err := nativerunner.NewUUID()
 	if err != nil {
 		return err
 	}
 	meta.ConversationID = conv
-	rs.mg.applyTier(meta, agent.TierWorker)
-	meta.HandoffTier = true
-	meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
+	change(meta)
 	meta.Actionable = wire.SessionActionable{}
-	rs.mg.Conv.Record(meta.ConvSession())
+	m.Conv.Record(meta.ConvSession())
 	if err := clearOldHolder(dir); err != nil {
 		return err
 	}
 	meta.Run++
 	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = wire.SessionStatus{}, time.Now(), "", false
-	if err := rs.mg.startSessionHolder(dir, meta, 0, 0, false); err != nil {
+	if err := m.startSessionHolder(dir, meta, 0, 0, false); err != nil {
 		return err
 	}
 	id, run := meta.ID, meta.Run
-	rs.mg.Watches.Start(func() { rs.mg.watchSession(dir, id, run, time.Time{}, false) })
-	rs.mg.events.Publish(wire.EventSessionChanged, id)
+	m.Watches.Start(func() { m.watchSession(dir, id, run, time.Time{}, false) })
+	m.events.Publish(wire.EventSessionChanged, id)
 	return nil
+}
+
+// RestartFresh restarts a live session in the same tier with a new run and a
+// new conversation, and types prompt again as its first prompt (meta clears it
+// once handed over, so the caller hands it back). It records the run it made in
+// VimRelaunchRun so a caller restarts once per launch. The caller must not hold
+// metaMu. A restart that fails ends the session as a failed start does.
+func (m *Manager) RestartFresh(dir, id, prompt string) {
+	old, ok := m.beginRestart(dir, id)
+	if !ok {
+		return
+	}
+	m.stopForRestart(dir, id)
+	m.Watches.MetaMu.Lock()
+	defer m.Watches.MetaMu.Unlock()
+	meta, err := ReadMeta(dir)
+	if err != nil {
+		m.log.Warn("restart: read meta", "session", id, "err", err)
+		return
+	}
+	if err := m.restartConversation(dir, &meta, old, func(meta *Meta) {
+		meta.FirstPrompt = prompt
+		meta.VimRelaunchRun = meta.Run + 1
+	}); err != nil {
+		m.log.Warn("restart: restart", "session", id, "err", err)
+		m.endFailedStart(dir, &meta)
+	}
 }

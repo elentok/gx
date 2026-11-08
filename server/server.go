@@ -718,3 +718,6 @@ func recordShutdown(step string) {
 // Settings is the settings subsystem, for tests that reach its seams from
 // outside the package.
 func (s *Server) Settings() *settings.Holder { return &s.settings }
+
+// SessionManager is the session manager, for tests that drive a restart directly.
+func (s *Server) SessionManager() *sessions.Manager { return s.sessions }
