@@ -211,6 +211,7 @@ func (t *tui) startBackgroundTask() error {
 	// The child outlives this call and a bounded sleep keeps a forgotten one
 	// from lingering.
 	child := exec.Command("sh", "-c", "for i in 1 2 3 4; do echo soak line $i; done; exec sleep 120")
+	child.Env = os.Environ()
 	child.Stdout = out
 	if err := child.Start(); err != nil {
 		return err
