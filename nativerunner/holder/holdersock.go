@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -762,6 +763,24 @@ func (c *HolderClient) call(req holderRequest) (holderResponse, error) {
 // the holder is dead.
 var ErrHolderUnreachable = errors.New("holder unreachable")
 
+// UnreachableStatusDialsEnv makes the first n status calls of this process
+// fail as a holder that does not answer its dial, then work: the fixture's
+// slow-holder knob. A real timeout would cost three retries of holderIOTimeout
+// per call.
+const UnreachableStatusDialsEnv = "GX_HOLDER_UNREACHABLE_STATUS_DIALS"
+
+var unreachableStatusDials atomic.Int64
+
+// statusDialDropped reports whether this status call is one of the first n the
+// env asks to fail.
+func statusDialDropped(op string) bool {
+	if op != opStatus {
+		return false
+	}
+	n, err := strconv.Atoi(os.Getenv(UnreachableStatusDialsEnv))
+	return err == nil && unreachableStatusDials.Add(1) <= int64(n)
+}
+
 var (
 	dialAttempts = 3
 	dialBackoff  = 500 * time.Millisecond
@@ -791,6 +810,9 @@ func (c *HolderClient) dial() (net.Conn, error) {
 
 func (c *HolderClient) callWithin(req holderRequest, timeout time.Duration) (holderResponse, error) {
 	var resp holderResponse
+	if statusDialDropped(req.Op) {
+		return resp, fmt.Errorf("%w: dropped by %s", ErrHolderUnreachable, UnreachableStatusDialsEnv)
+	}
 	conn, err := c.dial()
 	if err != nil {
 		return resp, err

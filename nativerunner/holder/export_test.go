@@ -58,6 +58,12 @@ func SetHolderDial(t *testing.T, dial func(network, addr string, timeout time.Du
 	t.Cleanup(func() { holderDial, dialBackoff = oldDial, oldBackoff })
 }
 
+// ResetUnreachableStatusDials restarts the count the env knob works from.
+func ResetUnreachableStatusDials(t *testing.T) {
+	unreachableStatusDials.Store(0)
+	t.Cleanup(func() { unreachableStatusDials.Store(0) })
+}
+
 const FrameInterval = defaultFrameInterval
 
 // SetFramePacing sets the attach pacing for the test, so a check can use

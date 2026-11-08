@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/codex"
@@ -33,6 +34,11 @@ var (
 	// HungPaneTwiceCodex is HungPaneTwice on the Codex fake.
 	HungPaneTwiceCodex = recoveryEpic("hung-codex-epic", servertest.TicketOpts{Agent: "codex"}, true,
 		agentfake.TUIHangLaunchesEnv+"=2:"+RootToken+"/hang-count")
+	// SlowHolder: the server's first three holder status calls get no dial
+	// answer, so the ticket card shows "holder unreachable, retrying" and
+	// clears once a dial works (under HolderReadoptCap, so it never pauses).
+	SlowHolder = recoveryEpic("slow-holder-epic", servertest.TicketOpts{}, false,
+		holder.UnreachableStatusDialsEnv+"=3")
 	// CodexDropsPrompt: the Codex fake never takes its launch prompt, so the
 	// launch proof from the rollout fails.
 	CodexDropsPrompt = recoveryEpic("codex-drop-epic", servertest.TicketOpts{Agent: "codex"}, true,

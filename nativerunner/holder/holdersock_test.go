@@ -535,6 +535,20 @@ func TestHolderClient_DialNeverAnswering_ReturnsUnreachable(t *testing.T) {
 	}
 }
 
+func TestHolderClient_UnreachableStatusDialsEnv_FailsFirstStatusCallsThenWorks(t *testing.T) {
+	_, c, _ := startHolder(t, echoChild)
+	holder.ResetUnreachableStatusDials(t)
+	t.Setenv(holder.UnreachableStatusDialsEnv, "2")
+	for i := range 2 {
+		if _, _, err := c.Status(); !errors.Is(err, holder.ErrHolderUnreachable) {
+			t.Fatalf("Status %d = %v; want ErrHolderUnreachable", i, err)
+		}
+	}
+	if _, _, err := c.Status(); err != nil {
+		t.Fatalf("Status after the knob ran out = %v; want nil", err)
+	}
+}
+
 func TestHolderClient_DialRefused_FailsWithoutRetry(t *testing.T) {
 	_, c, _ := startHolder(t, echoChild)
 	calls := 0
