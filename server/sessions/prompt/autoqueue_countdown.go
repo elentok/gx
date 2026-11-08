@@ -11,7 +11,7 @@ import (
 
 // AutoQueueDeadline is when the session's auto-queue countdown ends; zero with
 // none running. The countdowns are separate state from auto-advance's.
-func (p *Prompt) AutoQueueDeadline(id string) time.Time { return p.autoQueues.deadline(id) }
+func (p *autoQueuer) AutoQueueDeadline(id string) time.Time { return p.autoQueues.deadline(id) }
 
 // mapOf splits a Design session's ticket into its project and map name.
 func mapOf(ticket string) (project, mapName string) {
@@ -22,7 +22,7 @@ func mapOf(ticket string) (project, mapName string) {
 
 // DesignReachedBranch starts the countdown on the map's newest Design session
 // when that session's switch is on. A readiness failure starts nothing.
-func (p *Prompt) DesignReachedBranch(project, mapName string) {
+func (p *autoQueuer) DesignReachedBranch(project, mapName string) {
 	info, found, err := p.NewestDesignSession(project, mapName)
 	if err != nil || !found || !info.AutoQueue {
 		return
@@ -35,7 +35,7 @@ func (p *Prompt) DesignReachedBranch(project, mapName string) {
 // startAutoQueue starts the session's countdown when its map is ready now. It
 // starts nothing, and says nothing, when the delay is off, one already runs or
 // the readiness check fails.
-func (p *Prompt) startAutoQueue(id, ticket string) bool {
+func (p *autoQueuer) startAutoQueue(id, ticket string) bool {
 	delay := cmp.Or(p.cfg.AutoAdvanceDelay, DefaultAutoAdvanceDelay)
 	if delay < 0 || !p.autoQueues.deadline(id).IsZero() {
 		return false
@@ -66,7 +66,7 @@ func (p *Prompt) startAutoQueue(id, ticket string) bool {
 
 // queueAtCountdownEnd re-runs the readiness check, then queues the map's impl
 // epic. Any failure queues nothing and names itself in a banner.
-func (p *Prompt) queueAtCountdownEnd(id, project, mapName string) {
+func (p *autoQueuer) queueAtCountdownEnd(id, project, mapName string) {
 	implName := mapName + "-impl"
 	fail := func(why string) {
 		p.log.Info("auto-queue did not queue", "session", id, "epic", implName, "why", why)
@@ -92,7 +92,7 @@ func (p *Prompt) queueAtCountdownEnd(id, project, mapName string) {
 
 // cancelAutoQueue stops the session's countdown and tells the person why. It
 // reports whether one was running.
-func (p *Prompt) cancelAutoQueue(id, why string) bool {
+func (p *autoQueuer) cancelAutoQueue(id, why string) bool {
 	if !p.autoQueues.stop(id) {
 		return false
 	}
@@ -103,7 +103,7 @@ func (p *Prompt) cancelAutoQueue(id, why string) bool {
 
 // cancelAutoQueueRoute is the cancel route: it stops a running countdown and is
 // a no-op with none. It leaves the auto-advance countdown alone.
-func (p *Prompt) cancelAutoQueueRoute(req wire.SessionRequest) (wire.SessionResult, error) {
+func (p *autoQueuer) cancelAutoQueueRoute(req wire.SessionRequest) (wire.SessionResult, error) {
 	_, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err

@@ -100,8 +100,8 @@ func (p *Prompt) autoAdvanceHandler(web bool) http.HandlerFunc {
 }
 
 // autoQueueHandler serves the auto-queue switch, guarded like autoAdvanceHandler.
-func (p *Prompt) autoQueueHandler(web bool) http.HandlerFunc {
-	return switchHandler(p, web, p.setAutoQueue, func(r wire.AutoQueueRequest) wire.SessionRequest {
+func (p *autoQueuer) autoQueueHandler(web bool) http.HandlerFunc {
+	return switchHandler(p.Prompt, web, p.setAutoQueue, func(r wire.AutoQueueRequest) wire.SessionRequest {
 		return wire.SessionRequest{ID: r.ID, State: r.State}
 	})
 }
@@ -137,7 +137,7 @@ func switchHandler[R any](p *Prompt, web bool, set func(R) (wire.SessionResult, 
 
 // setAutoQueue flips a Design session's auto-queue switch. Turning it on over a
 // ready map starts the countdown; turning it off cancels a running one.
-func (p *Prompt) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult, error) {
+func (p *autoQueuer) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult, error) {
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err

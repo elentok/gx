@@ -52,7 +52,7 @@ func (s epicState) notReady() string {
 
 // AutoQueueNotReady decides whether the Design map `project:mapName` may be
 // auto-queued. It returns "" when ready, else the failing condition.
-func (p *Prompt) AutoQueueNotReady(project, mapName string) (string, error) {
+func (p *autoQueuer) AutoQueueNotReady(project, mapName string) (string, error) {
 	epics, err := p.projects.Epics(project)
 	if err != nil {
 		return "", err
@@ -80,7 +80,7 @@ func (p *Prompt) AutoQueueNotReady(project, mapName string) (string, error) {
 
 // QueueEpic queues `project:epic` through the Queue's Add, as the Epic page's
 // Queue button does. A refusal comes back in the result.
-func (p *Prompt) QueueEpic(project, epic string) (wire.QueueResult, error) {
+func (p *autoQueuer) QueueEpic(project, epic string) (wire.QueueResult, error) {
 	if p.queue == nil {
 		return wire.QueueResult{}, fmt.Errorf("no queue")
 	}
@@ -90,7 +90,7 @@ func (p *Prompt) QueueEpic(project, epic string) (wire.QueueResult, error) {
 // NewestDesignSession finds the session whose auto-queue switch counts for a
 // map: the newest live Design session, else the newest exited one. It mirrors
 // designSession in webui/src/design/view.ts.
-func (p *Prompt) NewestDesignSession(project, mapName string) (wire.SessionInfo, bool, error) {
+func (p *autoQueuer) NewestDesignSession(project, mapName string) (wire.SessionInfo, bool, error) {
 	metas, err := p.sessions.ListSessionMetas()
 	if err != nil {
 		return wire.SessionInfo{}, false, err

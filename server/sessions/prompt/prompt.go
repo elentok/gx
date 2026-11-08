@@ -93,6 +93,10 @@ type Deps struct {
 // Prompt holds the auto-advance countdowns and the turn settling of the
 // sessions.
 type Prompt struct {
+	// autoQueuer holds the auto-queue methods, which keeps Prompt's own method
+	// count under the sizeguard limit. Its methods are promoted onto Prompt.
+	*autoQueuer
+
 	cfg         Config
 	log         *slog.Logger
 	events      *broker.Broker
@@ -117,11 +121,17 @@ type Prompt struct {
 
 // New builds Prompt from d.
 func New(d Deps) *Prompt {
-	return &Prompt{
+	p := &Prompt{
 		cfg: d.Cfg, log: d.Log, events: d.Events, sessionChat: d.SessionChat,
 		settings: d.Settings, projects: d.Projects, badRounds: d.BadRounds, held: d.Held, queue: d.Queue,
 	}
+	p.autoQueuer = &autoQueuer{p}
+	return p
 }
+
+// autoQueuer is the auto-queue half of Prompt: it reads and writes Prompt's
+// state through the embedded pointer.
+type autoQueuer struct{ *Prompt }
 
 // GiveSessions sets the Manager the prompt code reads and writes sessions through.
 func (p *Prompt) GiveSessions(m *sessions.Manager) { p.sessions = m }
