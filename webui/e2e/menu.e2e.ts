@@ -38,7 +38,7 @@ test.describe("117b. Limits tray bars", () => {
     const fixture = await start("limits", { shape: "fresh" });
     await expect(bar(page, "C")).toHaveText("C");
     await expect(bar(page, "X")).toHaveText("X");
-    await expect(bar(page, "C")).toHaveAttribute("data-tone", "running");
+    await expect(bar(page, "C")).toHaveAttribute("data-tone", "done");
     await expect(bar(page, "C")).toHaveAttribute("data-percent", "34");
 
     await report(fixture, payload(85, 90));

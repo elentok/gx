@@ -25,8 +25,9 @@ const bar = (letter: string) => document.querySelector(`[data-meter=${letter}]`)
 
 describe("barFill", () => {
   it.each([
-    [79, "running"],
+    [79, "done"],
     [80, "waiting"],
+    [94.4, "waiting"],
     [100, "deadlocked"],
   ])("%i%% is %s", (pct, tone) => {
     expect(barFill(limits(pct) as never, NOW).tone).toBe(tone);
@@ -50,7 +51,7 @@ describe("LimitsTray", () => {
     await setup(async () => summary(UsageModeLimits, 34, 85));
     expect(bar("C").textContent).toBe("C");
     expect(bar("X").textContent).toBe("X");
-    expect(bar("C").getAttribute("data-tone")).toBe("running");
+    expect(bar("C").getAttribute("data-tone")).toBe("done");
     expect(bar("X").getAttribute("data-tone")).toBe("waiting");
   });
 

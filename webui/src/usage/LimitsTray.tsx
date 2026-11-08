@@ -10,12 +10,18 @@ import { useUsageSummary, type FetchSummary } from "./useUsageSummary";
 
 const MIN_FILL = 8;
 
+// Only the tray bar is green below 80%; popover rows keep limitTone's own low tone.
+const barTone = (whole: number) => {
+  const tone = limitTone(whole);
+  return tone === "running" ? ("done" as const) : tone;
+};
+
 // A provider with no 5h window, or one whose window already reset, shows an empty bar.
 export function barFill(limits: UsageLimits | undefined, now: number) {
   const win = limits?.five_hour;
-  if (!win || isPastReset(win.resets_at, now)) return { percent: MIN_FILL, tone: "running" as const, whole: 0 };
+  if (!win || isPastReset(win.resets_at, now)) return { percent: MIN_FILL, tone: barTone(0), whole: 0 };
   const whole = wholePercent(win.used_percentage);
-  return { percent: Math.min(100, Math.max(MIN_FILL, whole)), tone: limitTone(whole), whole };
+  return { percent: Math.min(100, Math.max(MIN_FILL, whole)), tone: barTone(whole), whole };
 }
 
 function Bar({ letter, name, limits, now }: { letter: string; name: string; limits: UsageLimits | undefined; now: number }) {
