@@ -37,13 +37,24 @@ func NewAgents(d Deps) *cobra.Command {
 	return cmd
 }
 
+// idAndOnOffArgs checks only the second argument: cobra.OnlyValidArgs would
+// check the session id against ValidArgs too and refuse every real id.
+func idAndOnOffArgs(_ *cobra.Command, args []string) error {
+	if err := cobra.ExactArgs(2)(nil, args); err != nil {
+		return err
+	}
+	if args[1] != "on" && args[1] != "off" {
+		return fmt.Errorf("invalid argument %q: want on or off", args[1])
+	}
+	return nil
+}
+
 func newAgentsAutoAdvanceCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
-		Use:       "auto-advance <id> <on|off>",
-		Short:     "turn a design session's auto-advance on or off",
-		Args:      cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
-		ValidArgs: []string{"on", "off"},
+		Use:   "auto-advance <id> <on|off>",
+		Short: "turn a design session's auto-advance on or off",
+		Args:  idAndOnOffArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			cl, err := d.Dial()()
 			if err != nil {
@@ -65,10 +76,9 @@ func runAgentsAutoAdvance(ctx context.Context, cl *apiclient.Client, w io.Writer
 func newAgentsAutoQueueCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
-		Use:       "auto-queue <id> <on|off>",
-		Short:     "turn a design session's auto-queue on or off",
-		Args:      cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
-		ValidArgs: []string{"on", "off"},
+		Use:   "auto-queue <id> <on|off>",
+		Short: "turn a design session's auto-queue on or off",
+		Args:  idAndOnOffArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			cl, err := d.Dial()()
 			if err != nil {
