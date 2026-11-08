@@ -35,6 +35,22 @@ func (r *Reads) Cleanup(ctx context.Context, project string) (wire.CleanupReport
 	return rep, err
 }
 
+// RemoveCleanupWorktree removes a merged branch's worktree, then the branch. A
+// refusal is a result (Refused set), not an error.
+func (r *Reads) RemoveCleanupWorktree(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
+	var res wire.CleanupWriteResult
+	err := r.t.post(ctx, "/v1/cleanup/remove-worktree", req, &res)
+	return res, err
+}
+
+// DeleteCleanupBranch deletes a merged branch that has no worktree. A refusal
+// is a result (Refused set), not an error.
+func (r *Reads) DeleteCleanupBranch(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
+	var res wire.CleanupWriteResult
+	err := r.t.post(ctx, "/v1/cleanup/delete-branch", req, &res)
+	return res, err
+}
+
 // AddProject registers a project. A refusal is a result (Refused set), not an
 // error.
 func (r *Reads) AddProject(ctx context.Context, req wire.AddProjectRequest) (wire.AddProjectResult, error) {

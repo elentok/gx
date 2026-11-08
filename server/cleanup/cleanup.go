@@ -56,6 +56,8 @@ func New(d Deps) *Cleanup {
 func Routes(c func() *Cleanup) []wire.Route {
 	return []wire.Route{
 		{Pattern: "GET /v1/cleanup", Web: wire.WebRead, Handler: func(w http.ResponseWriter, r *http.Request) { c().read(w, r) }},
+		{Pattern: "POST /v1/cleanup/remove-worktree", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().removeWrite(w, r) }},
+		{Pattern: "POST /v1/cleanup/delete-branch", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().deleteWrite(w, r) }},
 	}
 }
 

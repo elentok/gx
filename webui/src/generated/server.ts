@@ -96,6 +96,36 @@ export interface CleanupReport {
   worktrees: CleanupWorktree[];
   attic_refs: string[];
 }
+/**
+ * CleanupWriteRequest names the branch a cleanup write acts on. Remove takes a
+ * branch that has a worktree, Delete one that has none.
+ */
+export interface CleanupWriteRequest {
+  project: string;
+  branch: string;
+}
+export const ReasonCleanupUnknown = "cleanup-unknown";
+export const ReasonCleanupNotMerged = "cleanup-not-merged";
+export const ReasonCleanupHasWorktree = "cleanup-has-worktree";
+export const ReasonCleanupNoWorktree = "cleanup-no-worktree";
+export const ReasonCleanupGitRefused = "cleanup-git-refused";
+/**
+ * Reasons a cleanup write refuses.
+ */
+export type ReasonCleanup = typeof ReasonCleanupUnknown | typeof ReasonCleanupNotMerged | typeof ReasonCleanupHasWorktree | typeof ReasonCleanupNoWorktree | typeof ReasonCleanupGitRefused;
+/**
+ * CleanupWriteResult is a cleanup write's answer. A refusal is a result, not
+ * an error; Message then holds the reason, git's own when git refused.
+ */
+export interface CleanupWriteResult {
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+  /**
+   * WorktreeRemoved is set when the worktree went but the branch stayed.
+   */
+  worktree_removed?: boolean;
+}
 
 //////////
 // source: designdrafts.go

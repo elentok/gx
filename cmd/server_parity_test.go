@@ -38,6 +38,8 @@ var routeVerbs = map[string]string{
 	"GET /v1/config/status":                 "server config-status",
 	"GET /v1/checks/status":                 "server checks",
 	"GET /v1/cleanup":                       "server cleanup",
+	"POST /v1/cleanup/remove-worktree":      "server cleanup-remove",
+	"POST /v1/cleanup/delete-branch":        "server cleanup-delete",
 	"GET /v1/disk/status":                   "server disk status",
 	"POST /v1/disk/clean":                   "server disk clean",
 	"GET /v1/health":                        "server health",

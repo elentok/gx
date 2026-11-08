@@ -39,3 +39,29 @@ type CleanupReport struct {
 	Worktrees []CleanupWorktree `json:"worktrees"`
 	AtticRefs []string          `json:"attic_refs"`
 }
+
+// CleanupWriteRequest names the branch a cleanup write acts on. Remove takes a
+// branch that has a worktree, Delete one that has none.
+type CleanupWriteRequest struct {
+	Project string `json:"project"`
+	Branch  string `json:"branch"`
+}
+
+// Reasons a cleanup write refuses.
+const (
+	ReasonCleanupUnknown     = "cleanup-unknown"
+	ReasonCleanupNotMerged   = "cleanup-not-merged"
+	ReasonCleanupHasWorktree = "cleanup-has-worktree"
+	ReasonCleanupNoWorktree  = "cleanup-no-worktree"
+	ReasonCleanupGitRefused  = "cleanup-git-refused"
+)
+
+// CleanupWriteResult is a cleanup write's answer. A refusal is a result, not
+// an error; Message then holds the reason, git's own when git refused.
+type CleanupWriteResult struct {
+	Refused bool   `json:"refused,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+	// WorktreeRemoved is set when the worktree went but the branch stayed.
+	WorktreeRemoved bool `json:"worktree_removed,omitempty"`
+}
