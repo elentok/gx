@@ -12,6 +12,7 @@ import { DesignActionsMenu, Failure, StartDesignButton } from "../design/Session
 import type { EpicListRow, SessionInfo } from "../generated/server";
 import { PageHeader } from "../page/PageHeader";
 import { useKeyboardOpen } from "../page/useKeyboardOpen";
+import type { MenuEntry } from "../ui/menu/Menu";
 import { useDevice } from "../useWide";
 import type { SteppedModel } from "./model";
 import { Progress, StepLine, StepsSheet, summaryLine } from "./Progress";
@@ -62,6 +63,10 @@ export interface SteppedPageProps {
   chatTop?: (ctx: { questions: boolean }) => ReactNode;
   ticketRows?: ReactNode;
   designMenu?: DesignMenu;
+  /** Extra items for the ⋯ menu, beside Copy ID. */
+  menuItems?: MenuEntry[];
+  /** Shown below the columns. */
+  footer?: ReactNode;
 }
 
 // The right of the title row: the failed-start message, the first Start button, and the menu.
@@ -75,7 +80,8 @@ function SessionStrip({
   startLabel,
   headerButton,
   designMenu,
-}: Pick<SteppedPageProps, "address" | "live" | "actions" | "startFailure" | "startLabel" | "headerButton" | "designMenu"> & {
+  menuItems,
+}: Pick<SteppedPageProps, "address" | "live" | "actions" | "startFailure" | "startLabel" | "headerButton" | "designMenu" | "menuItems"> & {
   session?: SessionInfo;
   onSelect: (id: string) => void;
 }) {
@@ -94,6 +100,7 @@ function SessionStrip({
         shown={session}
         live={live}
         designItems={!!designMenu}
+        extraItems={menuItems}
         deletable={designMenu?.deletable}
         card={designMenu?.card}
         onSelect={onSelect}
@@ -126,6 +133,8 @@ export function SteppedPage({
   chatTop,
   ticketRows,
   designMenu,
+  menuItems,
+  footer,
 }: SteppedPageProps) {
   const conn = useConnectionContext();
   const connState = useConnectionState(conn);
@@ -197,6 +206,7 @@ export function SteppedPage({
                 startLabel={startLabel}
                 headerButton={headerButton}
                 designMenu={designMenu}
+                menuItems={menuItems}
               />
             </>
           }
@@ -243,6 +253,11 @@ export function SteppedPage({
           </Box>
         )}
       </Box>
+      {footer && (
+        <Box flex="none" maxH="30vh" overflowY="auto" mt="3">
+          {footer}
+        </Box>
+      )}
     </>
   );
 }

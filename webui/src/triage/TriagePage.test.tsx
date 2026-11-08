@@ -147,3 +147,79 @@ test("a project with no record shows the empty state", async () => {
   render([], { triage: async () => ({ kind: "ok", detail: viewOf({ state: "none" }) }) });
   await screen.findByText("No Triage for gx");
 });
+
+type Result = TriageView["history"][number]["result"];
+const past = (id: string, started: string, state = "done", result: Result = { groups: [] }) => ({
+  id,
+  state,
+  started_at: started,
+  rows: 3,
+  result,
+});
+
+const openMenu = async () => fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+
+test("the menu offers Abandon only when can_abandon is true", async () => {
+  render([session("working")], { triage: async () => ({ kind: "ok", detail: viewOf({ can_abandon: true }) }) });
+  await openMenu();
+  await screen.findByRole("menuitem", { name: /Abandon Triage/ });
+  cleanup();
+  render([session("working")], { triage: async () => ({ kind: "ok", detail: viewOf({ can_abandon: false, steps: stepsAt(3) }) }) });
+  await openMenu();
+  await screen.findByRole("menuitem", { name: /Copy triage ID/ });
+  expect(screen.queryByRole("menuitem", { name: /Abandon Triage/ })).toBeNull();
+});
+
+test("confirming Abandon posts once and the page shows the empty state with the record in history", async () => {
+  let abandoned = false;
+  const triage = async () => ({
+    kind: "ok" as const,
+    detail: abandoned
+      ? viewOf({ state: "abandoned", can_abandon: false, history: [past("t1", "2026-01-02T10:00:00Z", "abandoned")] })
+      : viewOf({ can_abandon: true, revision: 7 }),
+  });
+  const abandonTriage = vi.fn(async () => ((abandoned = true), {}));
+  const { emit } = render([session("working")], { triage, abandonTriage });
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Abandon Triage/ }));
+  await screen.findByText(/Rows already written stay written/);
+  fireEvent.click(screen.getByRole("button", { name: "Abandon" }));
+  await waitFor(() => expect(abandonTriage).toHaveBeenCalledTimes(1));
+  expect(abandonTriage).toHaveBeenCalledWith({ project: "gx", revision: 7 });
+  emit("gx");
+  await screen.findByText("No Triage for gx");
+  expect(document.querySelector('[data-history-item="t1"]')?.textContent).toContain("abandoned");
+  expect(abandonTriage).toHaveBeenCalledTimes(1);
+});
+
+test("Cancel posts nothing", async () => {
+  const abandonTriage = vi.fn(async () => ({}));
+  render([session("working")], { triage: async () => ({ kind: "ok", detail: viewOf({ can_abandon: true }) }), abandonTriage });
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Abandon Triage/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByText(/Rows already written stay written/)).toBeNull());
+  expect(abandonTriage).not.toHaveBeenCalled();
+});
+
+test("history lists past Triages in the order sent, read-only, with epic links", async () => {
+  const result: Result = {
+    ready_epic: "gx:ready-1",
+    groups: [
+      { action: "ready", items: [{ address: "gx:follow-ups/1", title: "a" }] },
+      { action: "map", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
+      { action: "close", items: [{ address: "gx:follow-ups/4", title: "c" }] },
+    ],
+  };
+  const history = [past("new", "2026-02-01T10:00:00Z", "done", result), past("old", "2026-01-01T10:00:00Z", "abandoned")];
+  render([session("working")], { triage: async () => ({ kind: "ok", detail: viewOf({ history }) }) });
+  const region = await screen.findByRole("region", { name: "Past Triages" });
+  const items = [...region.querySelectorAll("[data-history-item]")];
+  expect(items.map((i) => i.getAttribute("data-history-item"))).toEqual(["new", "old"]);
+  expect(items[0].textContent).toContain("ready 1 · map 1 · merged 0 · closed 1 · kept 0");
+  expect(items[0].textContent).toContain("done");
+  expect(items[1].textContent).toContain("abandoned");
+  expect(region.querySelector('a[href="#/e/gx:ready-1"]')).toBeTruthy();
+  expect(region.querySelector('a[href="#/e/gx:map-a"]')).toBeTruthy();
+  expect(region.querySelectorAll("button").length).toBe(0);
+});

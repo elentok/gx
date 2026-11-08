@@ -1,13 +1,16 @@
 import { Box, Spinner as ChakraSpinner, Text, chakra } from "@chakra-ui/react";
+import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { flowSession, liveFlowSessions } from "../design/view";
-import { postOpenTriage, type OpenFlow, type ResumeSession, type StopSession } from "../design/open";
+import { postAbandonTriage, postOpenTriage, type AbandonTriage, type OpenFlow, type ResumeSession, type StopSession } from "../design/open";
 import { useDesignWrite } from "../design/SessionControls";
 import type { FetchChat } from "../design/chat";
 import type { PostFocus } from "../design/focus";
 import type { PostPrompt } from "../design/prompt";
 import type { FetchScreen } from "../design/screen";
-import { TriageNone, type SessionInfo, type TriageView } from "../generated/server";
+import { TriageAbandoned, TriageNone, type SessionInfo, type TriageView } from "../generated/server";
+import { Modal } from "../ui/modal/Modal";
+import { TriageHistory } from "./History";
 import { DetailPage } from "../page/DetailPage";
 import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
@@ -28,6 +31,7 @@ export interface TriageDeps {
   resume?: ResumeSession;
   fetchScreen?: FetchScreen;
   focus?: PostFocus;
+  abandon?: AbandonTriage;
 }
 
 const FLOW = "triage";
@@ -47,14 +51,53 @@ function HeaderButton({ project, session, open = postOpenTriage }: { project: st
 // The verdicts the Triage has saved so far, out of its rows.
 const verdictsSaved = (view: TriageView) => `${view.rows.filter((r) => r.verdict).length} of ${view.rows.length}`;
 
+/** Confirms Abandon. It writes nothing to tickets, so rows already written stay written. */
+function AbandonDialog({
+  project,
+  revision,
+  abandon = postAbandonTriage,
+  onClose,
+}: {
+  project: string;
+  revision?: number;
+  abandon?: AbandonTriage;
+  onClose: () => void;
+}) {
+  const { run, pending } = useDesignWrite();
+  return (
+    <Modal label="Abandon Triage" onClose={onClose} p="4" gap="3">
+      <Text fontWeight="semibold">Abandon this Triage?</Text>
+      <Text>It moves to the past Triages. Rows already written stay written.</Text>
+      <Box display="flex" gap="2" justifyContent="flex-end">
+        <Button emphasis="ghost" disabled={pending} onClick={onClose}>
+          Cancel
+        </Button>
+        <Button tone="paused" disabled={pending} onClick={() => run(() => abandon({ project, revision: revision ?? 0 }), { onDone: onClose })}>
+          {pending && <ChakraSpinner size="sm" />}
+          Abandon
+        </Button>
+      </Box>
+    </Modal>
+  );
+}
+
 function TriageBody({ project, view, deps }: { project: string; view: TriageView; deps: TriageDeps }) {
+  const [abandoning, setAbandoning] = useState(false);
   const wide = useWide();
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const live = liveFlowSessions(FLOW, project, sessions);
   const model = triageModel({ key: project, steps: view.steps, ringPercent: view.ring_percent });
   return (
-    <SteppedPage
+    <>
+      {abandoning && <AbandonDialog project={project} revision={view.revision} abandon={deps.abandon} onClose={() => setAbandoning(false)} />}
+      <SteppedPage
+      menuItems={
+        view.can_abandon
+          ? [{ value: "abandon-triage", label: "Abandon Triage", danger: true, onSelect: () => setAbandoning(true) }]
+          : undefined
+      }
+      footer={<TriageHistory items={view.history} />}
       address={project}
       title={`Triage: ${project}`}
       icon={<PageIcon kind="triage" />}
@@ -100,7 +143,8 @@ function TriageBody({ project, view, deps }: { project: string; view: TriageView
           </Box>
         )
       }
-    />
+      />
+    </>
   );
 }
 
@@ -116,7 +160,14 @@ export function TriagePage({ project, deps = {} }: { project: string; deps?: Tri
 function TriagePageBody({ project, deps }: { project: string; deps: TriageDeps }) {
   const conn = useConnectionContext();
   const { detail, notFound } = useTriage(project, conn, deps.fetchTriage);
-  if (notFound || detail?.state === TriageNone) return <Text color="text.muted">No Triage for {project}</Text>;
+  // An abandoned latest record is no Triage to work on; it stays in history.
+  if (notFound || detail?.state === TriageNone || detail?.state === TriageAbandoned)
+    return (
+      <Box display="flex" flexDirection="column" gap="4">
+        <Text color="text.muted">No Triage for {project}</Text>
+        {detail && <TriageHistory items={detail.history} />}
+      </Box>
+    );
   if (!detail) return <Spinner label="Loading Triage" />;
   return <TriageBody project={project} view={detail} deps={deps} />;
 }

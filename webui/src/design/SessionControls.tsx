@@ -152,8 +152,11 @@ export function DesignActionsMenu({
   remove = postDeleteDesign,
   card,
   designItems = true,
+  extraItems = [],
 }: {
   address: string;
+  /** Items another flow adds beside Copy ID, such as the Triage's Abandon. */
+  extraItems?: MenuEntry[];
   /** Delete, Hold and workspace Move belong to a Design only; another flow's menu leaves them out. */
   designItems?: boolean;
   /** The Design's card; its workspace and hold state drive the Move, Remove and Hold items. */
@@ -194,6 +197,7 @@ export function DesignActionsMenu({
   const copySection: MenuEntry[] = [
     { value: "copy-design-id", label: designItems ? "Copy design ID" : "Copy triage ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) },
   ];
+  copySection.push(...extraItems);
   if (canDelete && !confirming)
     copySection.push({
       value: "delete-design",

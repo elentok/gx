@@ -6,6 +6,8 @@ import type {
   SessionInfo,
   SessionRequest,
   SessionResult,
+  TriageAbandonRequest,
+  TriageEditResult,
 } from "../generated/server";
 import { apiFetch } from "../apiFetch";
 import { WriteError } from "../useWrite";
@@ -48,6 +50,8 @@ export async function readWrite<R extends SessionResult>(res: Response): Promise
 export const postOpenDesign: OpenDesign = postJson("/v1/designs/open");
 const postTriageStart = postJson("/v1/triage/open");
 export const postOpenTriage: OpenFlow = ({ epic, ...rest }) => postTriageStart({ project: epic, ...rest });
+export type AbandonTriage = (body: TriageAbandonRequest) => Promise<TriageEditResult>;
+export const postAbandonTriage: AbandonTriage = postJson<TriageEditResult>("/v1/triage/abandon");
 export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete");
 export const postStopSession: StopSession = postJson("/v1/sessions/stop");
 export const postResumeSession: ResumeSession = postJson("/v1/sessions/resume");
