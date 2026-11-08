@@ -70,5 +70,12 @@ test.describe("198. Cleanup", () => {
     expect(text).toContain("unmerged-epic");
     // Whole list lines: "merged-epic" is a substring of "unmerged-epic".
     expect(text).not.toMatch(/^- (merged-wt|squash-one|merged-epic)$/m);
+
+    // The cleanup fake asks at the confirm, so the one-off waits for an answer on its page.
+    await page.evaluate(() => (location.hash = "#/t/demo:one-offs/01"));
+    const answer = page.getByRole("form", nav("Answer"));
+    await answer.getByRole("textbox", { name: "Your answer" }).fill("Remove them");
+    await answer.getByRole("button", nav("Send answer")).click();
+    await expect(page.getByText(/^Answer sent/)).toBeVisible();
   });
 });

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // cleanupOld is old enough that no seeded branch tip counts as active work.
@@ -26,7 +27,11 @@ var Cleanup = scenario{
 	EpicMeta: map[string]string{
 		project + ":merged-epic": "status: open\nmerged_at: 2026-01-01T10:00:00Z\n",
 	},
-	GitSetup: cleanupGit,
+	// The Start cleanup agent one-off is the first ticket in one-offs. Its fake
+	// asks at the /gx-cleanup confirm instead of finishing, so the Answer card
+	// has a question to show.
+	Behaviour: map[string]string{project + ":one-offs/01": agentfake.BehaviourAsk},
+	GitSetup:  cleanupGit,
 }
 
 // oldCommit commits file on a new branch from main with an old committer
