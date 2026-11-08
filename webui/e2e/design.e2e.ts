@@ -227,7 +227,7 @@ test.describe("12. The auto-advance switch", () => {
     await showChat(page);
     await expect(page.getByText("A fresh round.")).toBeVisible();
 
-    // Auto-queue: the row is enabled and off; on, the Branch step starts "Queuing in Ns" and the epic is queued at its end.
+    // Auto-queue: the row is enabled and off; on, the Branch step starts "Queuing <epic> in Ns" and the epic is queued at its end.
     const queueName = (on: "on" | "off") => `Auto-queue ${on}`;
     const queueButton = (on: "on" | "off") =>
       page.getByRole("button", { name: new RegExp(`^Auto: .*Auto-queue ${on}$`) });
@@ -239,10 +239,10 @@ test.describe("12. The auto-advance switch", () => {
     await expect(queueButton("on")).toBeVisible();
 
     await fixture.cli("tickets", "set", "demo:design-epic", "--design-step", "branch");
-    await expect(page.getByText(/Queuing in \ds/)).toBeVisible();
+    await expect(page.getByText(/Queuing design-epic in \ds/)).toBeVisible();
     await expect(page.getByRole("button", nav("Cancel auto-queue"))).toBeVisible();
     await expect.poll(() => fixture.cli("server", "queue", "items")).toContain("design-epic-impl");
-    await expect(page.getByText(/Queuing in/)).toHaveCount(0);
+    await expect(page.getByText(/Queuing design-epic in/)).toHaveCount(0);
   });
 });
 

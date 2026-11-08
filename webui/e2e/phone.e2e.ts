@@ -220,7 +220,7 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await expect(page.getByRole("button", { name: /Auto-queue on$/ })).toHaveText("AdvanceQueue");
   await fixture.cli("tickets", "set", "demo:design-epic", "--design-step", "branch");
   const strip = page.locator('[data-part="countdown-strip"]');
-  await expect(strip).toContainText(/Queuing in \ds/);
+  await expect(strip).toContainText(/Queuing design-epic in \ds/);
   const cancel = strip.getByRole("button", nav("Cancel auto-queue"));
   expect((await cancel.boundingBox())!.height).toBeGreaterThanOrEqual(40);
   expect((await strip.boundingBox())!.y + (await strip.boundingBox())!.height).toBeLessThanOrEqual((await send.boundingBox())!.y + 1);

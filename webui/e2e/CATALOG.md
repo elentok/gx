@@ -55,7 +55,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **Cancel stops the send and Continue stays.**
 - **An all-defaulted round:** one "Accept these defaults" card and a grilling Actionable.
 - **Shows the step and ticket, then follows the step report.**
-- **Auto-advance:** shows while working and idle; off, then on starts the countdown and a fresh round follows; then the Auto-queue row is enabled and off, flips on, the Branch step shows "Queuing in Ns" with Cancel auto-queue, and the epic is queued at the end.
+- **Auto-advance:** shows while working and idle; off, then on starts the countdown and a fresh round follows; then the Auto-queue row is enabled and off, flips on, the Branch step shows "Queuing <epic> in Ns" with Cancel auto-queue, and the epic is queued at the end.
 - **Stopped session card:** live asks first, a stopped card moves to Ready to design, the menu and the banner start a new session.
 - **Delete design:** appears when the session stops with the page open, and Delete removes the design.
 - **50. Design epic page.**

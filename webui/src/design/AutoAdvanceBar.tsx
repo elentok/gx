@@ -1,6 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import type { SessionInfo } from "../generated/server";
+import { slugOf } from "../slug";
 import { Button } from "../ui/button/Button";
 import type { Refusable } from "../useWrite";
 import {
@@ -69,7 +70,13 @@ function CountdownRow({
   );
 }
 
-// "Continuing in Ns" and "Queuing in Ns", each with its Cancel; they stack when both run. Only the Auto-queue Cancel carries a name, so "Cancel" stays the auto-advance one.
+// The session's ticket is `project:epic/NN`; the countdown names the epic.
+function epicName(session: SessionInfo): string {
+  const address = session.ticket ?? "";
+  return slugOf(address.split("/")[0]);
+}
+
+// "Continuing in Ns" and "Queuing <epic> in Ns", each with its Cancel; they stack when both run. Only the Auto-queue Cancel carries a name, so "Cancel" stays the auto-advance one.
 export function AutoCountdown({
   session,
   disabled,
@@ -97,7 +104,7 @@ export function AutoCountdown({
       />
       <CountdownRow
         at={session.auto_queue_at}
-        text={(s) => `Queuing in ${s}s`}
+        text={(s) => `Queuing ${epicName(session)} in ${s}s`}
         cancelName="Cancel auto-queue"
         disabled={disabled}
         strip={strip}

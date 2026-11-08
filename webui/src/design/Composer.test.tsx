@@ -580,7 +580,7 @@ test.each([true, false])("the Auto-queue countdown shows (wide=%s) and its Cance
     .spyOn(globalThis, "fetch")
     .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
   render({ wide, auto: queueAuto });
-  expect(await screen.findByText(/Queuing in \d+s/)).toBeTruthy();
+  expect(await screen.findByText(/^Queuing a in \d+s$/)).toBeTruthy();
   expect(screen.queryByText(/Continuing in/)).toBeNull();
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Cancel auto-queue" }));
@@ -595,7 +595,7 @@ test("two countdowns stack and each Cancel is addressable", async () => {
     .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
   render({ wide: false, auto: { ...countdownAuto, ...queueAuto } });
   const advance = (await screen.findByText(/Continuing in \d+s/)).parentElement as HTMLElement;
-  const queue = (await screen.findByText(/Queuing in \d+s/)).parentElement as HTMLElement;
+  const queue = (await screen.findByText(/Queuing a in \d+s/)).parentElement as HTMLElement;
   expect(advance.getAttribute("data-part")).toBe("countdown-strip");
   expect(queue.getAttribute("data-part")).toBe("countdown-strip");
   expect(advance.parentElement).toBe(queue.parentElement);
