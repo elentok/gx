@@ -216,6 +216,7 @@ func fillHeader(d *wire.TicketDetail, ref queue.TicketRef, t schema.Ticket) {
 	}
 	d.Type = ref.Ticket.Type
 	d.Body = ref.Ticket.Body
+	d.LatestSummary = latestSummary(ref.Ticket.Body)
 	if ref.Epic.RenderedStatus(ref.Ticket) == tickets.StatusError {
 		d.Status = tickets.StatusError.Word()
 		d.ErrorReason = ticketlog.PauseDetail(ref.Epic, ref.Ticket)
@@ -224,6 +225,27 @@ func fillHeader(d *wire.TicketDetail, ref queue.TicketRef, t schema.Ticket) {
 	if t.PausedClass() != "" {
 		d.PauseText = schema.Section(ref.Ticket.Body, "Paused")
 	}
+}
+
+// latestSummary picks the newest gx entry and the newest other entry; nil when
+// the body has no entries.
+func latestSummary(body string) *wire.LatestSummary {
+	var out wire.LatestSummary
+	for _, s := range schema.ParseIterationSummaries(body) {
+		e := &wire.SummaryEntry{
+			SessionID: s.SessionID, Time: s.Time.UTC().Format(time.RFC3339), Label: s.Label,
+			Did: s.Did, WentWrong: s.WentWrong, Decisions: s.Decisions, Left: s.Left,
+		}
+		if s.Label == "gx" {
+			out.Gx = e
+		} else {
+			out.Agent = e
+		}
+	}
+	if out.Agent == nil && out.Gx == nil {
+		return nil
+	}
+	return &out
 }
 
 // PermissionCard is the pending prompt of addr's live agent, or nil. It reads

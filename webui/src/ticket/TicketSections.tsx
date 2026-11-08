@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import type { TicketDetail } from "../generated/server";
+import type { SummaryEntry, TicketDetail } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { SectionHeading } from "../page/SectionHeading";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
@@ -24,8 +24,35 @@ const showsRuns = (d: TicketDetail) => !d.map_epic && d.runs.length > 0;
 /** Whether any section shows, so the page can say it has nothing. */
 export const hasSections = (d: TicketDetail) => {
   const { resolution, description } = pageText(d);
-  return !!resolution || !!description || d.related.length > 0 || showsRuns(d);
+  return !!resolution || !!description || d.related.length > 0 || showsRuns(d) || !!d.latest_summary;
 };
+
+const SUMMARY_PARTS: [string, keyof SummaryEntry][] = [
+  ["Did", "did"],
+  ["Went wrong", "went_wrong"],
+  ["Decisions", "decisions"],
+  ["Left", "left"],
+];
+
+function SummaryEntryView({ entry, title }: { entry: SummaryEntry; title: string }) {
+  return (
+    <Box mt="2">
+      <Text fontSize="sm" fontWeight="semibold">
+        {title}
+      </Text>
+      <Box as="dl" fontSize="sm">
+        {SUMMARY_PARTS.map(([label, key]) => (
+          <Box key={key} display="flex" gap="2">
+            <Text as="dt" fontWeight="medium">
+              {label}:
+            </Text>
+            <Text as="dd">{entry[key]}</Text>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
 
 // Resolution (map tickets), Related, the description, then Runs, each hidden when empty.
 export function TicketSections({ detail, now }: { detail: TicketDetail; now: number }) {
@@ -62,6 +89,12 @@ export function TicketSections({ detail, now }: { detail: TicketDetail; now: num
           <Markdown epic={epic} smallHeadings>
             {description}
           </Markdown>
+        </Section>
+      )}
+      {detail.latest_summary && (
+        <Section id="ticket-latest-summary" tone="muted" title="Latest summary">
+          {detail.latest_summary.agent && <SummaryEntryView entry={detail.latest_summary.agent} title="Agent" />}
+          {detail.latest_summary.gx && <SummaryEntryView entry={detail.latest_summary.gx} title="Written by gx" />}
         </Section>
       )}
       {showsRuns(detail) && (

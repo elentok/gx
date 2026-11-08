@@ -107,6 +107,36 @@ test("Description renders the body as markdown without the Paused section", asyn
   expect(section.textContent).not.toContain("Paused");
 });
 
+test("Latest summary shows the agent's four parts and gx's own entry, labelled", async () => {
+  const entry = (label: string, did: string) => ({
+    session_id: "sess-2",
+    time: "2026-11-07T11:00:00Z",
+    label,
+    did,
+    went_wrong: `${label} wrong`,
+    decisions: `${label} decided`,
+    left: `${label} left`,
+  });
+  renderTicket({ ...plain, latest_summary: { agent: entry("agent", "wired it"), gx: entry("gx", "resent continue") } });
+  await screen.findByText("wired it");
+  expect(headings()).toContain("Latest summary");
+  const section = screen.getByRole("region", { name: "Latest summary" });
+  for (const part of ["Did", "Went wrong", "Decisions", "Left"]) {
+    expect(screen.getAllByText(part, { exact: false }).length).toBeGreaterThan(0);
+  }
+  expect(section.textContent).toContain("agent wrong");
+  expect(section.textContent).toContain("agent decided");
+  expect(section.textContent).toContain("agent left");
+  expect(section.textContent).toContain("Written by gx");
+  expect(section.textContent).toContain("resent continue");
+});
+
+test("no Latest summary section without a summary", async () => {
+  renderTicket({ ...plain, body: "Some text." });
+  await screen.findByText("Some text.");
+  expect(headings()).not.toContain("Latest summary");
+});
+
 test("Description keeps a leftover Paused section on a ticket that is not Paused", async () => {
   renderTicket({
     ...plain,

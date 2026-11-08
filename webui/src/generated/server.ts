@@ -451,6 +451,25 @@ export interface ChatMessage {
   text: string;
 }
 /**
+ * SummaryEntry is one "## Iteration summaries" entry.
+ */
+export interface SummaryEntry {
+  session_id: string;
+  time: string; // RFC 3339
+  label: string;
+  did: string;
+  went_wrong: string;
+  decisions: string;
+  left: string;
+}
+/**
+ * LatestSummary is the newest agent entry and the newest gx entry; either may be absent.
+ */
+export interface LatestSummary {
+  agent?: SummaryEntry;
+  gx?: SummaryEntry;
+}
+/**
  * TicketDetail is the /v1/tickets/detail payload.
  */
 export interface TicketDetail {
@@ -496,6 +515,10 @@ export interface TicketDetail {
    * Body is the whole body markdown, comments included.
    */
   body?: string;
+  /**
+   * LatestSummary is unset when the body has no Iteration summaries entry.
+   */
+  latest_summary?: LatestSummary;
   related: RelatedTicket[];
   stats?: DetailStats;
   /**

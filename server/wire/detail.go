@@ -102,6 +102,23 @@ type ChatMessage struct {
 	Text string `json:"text"`
 }
 
+// SummaryEntry is one "## Iteration summaries" entry.
+type SummaryEntry struct {
+	SessionID string `json:"session_id"`
+	Time      string `json:"time"` // RFC 3339
+	Label     string `json:"label"`
+	Did       string `json:"did"`
+	WentWrong string `json:"went_wrong"`
+	Decisions string `json:"decisions"`
+	Left      string `json:"left"`
+}
+
+// LatestSummary is the newest agent entry and the newest gx entry; either may be absent.
+type LatestSummary struct {
+	Agent *SummaryEntry `json:"agent,omitempty"`
+	Gx    *SummaryEntry `json:"gx,omitempty"`
+}
+
 // TicketDetail is the /v1/tickets/detail payload.
 type TicketDetail struct {
 	Address string `json:"address"`
@@ -129,9 +146,11 @@ type TicketDetail struct {
 	// MapEpic is set for a ticket of a map epic, which has no stats and never pauses.
 	MapEpic bool `json:"map_epic"`
 	// Body is the whole body markdown, comments included.
-	Body    string          `json:"body,omitempty"`
-	Related []RelatedTicket `json:"related"`
-	Stats   *DetailStats    `json:"stats,omitempty"`
+	Body string `json:"body,omitempty"`
+	// LatestSummary is unset when the body has no Iteration summaries entry.
+	LatestSummary *LatestSummary  `json:"latest_summary,omitempty"`
+	Related       []RelatedTicket `json:"related"`
+	Stats         *DetailStats    `json:"stats,omitempty"`
 	// Answered is derived, never stored: the ticket is open again and its
 	// latest question has an answer.
 	Answered bool `json:"answered"`

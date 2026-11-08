@@ -136,3 +136,32 @@ func TestTicketDetail_CostAndContextAppearOnceMerged(t *testing.T) {
 		t.Fatalf("unmerged stats = %+v", open)
 	}
 }
+
+func TestTicketDetail_LatestSummaryHasAgentAndGxEntries(t *testing.T) {
+	t.Parallel()
+	body := "## Iteration summaries\n\n" +
+		"### old — 2026-11-07T10:00:00Z — agent\n\n- Did: first\n- Went wrong: x\n- Decisions: y\n- Left: z\n\n" +
+		"### sess-2 — 2026-11-07T11:00:00Z — agent\n\n- Did: wired it\n- Went wrong: flaky fixture\n- Decisions: kept table\n- Left: docs\n\n" +
+		"### sess-2 — 2026-11-07T11:05:00Z — gx\n\n- Did: resent continue once\n- Went wrong: none recorded\n- Decisions: none\n- Left: none\n"
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": issueWithBody("01", "open", "", "A", body),
+			"02-b.md": rigs.IssueMD("02", "open", "", "No summary"),
+		})
+		withRepo(t, store)
+	})
+
+	s := fetchDetail(t, h, base, "proj:work/01").LatestSummary
+	if s == nil || s.Agent == nil || s.Gx == nil {
+		t.Fatalf("latest summary = %+v", s)
+	}
+	if a := *s.Agent; a.SessionID != "sess-2" || a.Did != "wired it" || a.WentWrong != "flaky fixture" || a.Decisions != "kept table" || a.Left != "docs" {
+		t.Errorf("agent entry = %+v", a)
+	}
+	if g := *s.Gx; g.Did != "resent continue once" || g.Label != "gx" {
+		t.Errorf("gx entry = %+v", g)
+	}
+	if d := fetchDetail(t, h, base, "proj:work/02"); d.LatestSummary != nil {
+		t.Errorf("ticket without summaries has %+v", d.LatestSummary)
+	}
+}
