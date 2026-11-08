@@ -69,7 +69,7 @@ func (h ticketWriteHost) SettleLive(addrs []tickets.Address, stop bool, reason s
 }
 
 func (h ticketWriteHost) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent agent.AgentKind, epics []tickets.Epic) (bool, error) {
-	return h.s.launcher.ClaimAndLaunch(root, queued, t, repo, agent, epics)
+	return h.s.scheduler.ClaimAndLaunch(root, queued, t, repo, agent, epics)
 }
 
 func (h ticketWriteHost) CancelInvestigateChild(ref queue.TicketRef, source string) error {

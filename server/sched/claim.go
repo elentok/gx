@@ -161,7 +161,7 @@ func (s *Scheduler) ClaimTicket(address, agentKind string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return s.Launcher.ClaimAndLaunch(queue.RootOf(addr), addr, ref.Ticket, ref.Repo, agent.AgentKind(agentKind), epics)
+	return s.ClaimAndLaunch(queue.RootOf(addr), addr, ref.Ticket, ref.Repo, agent.AgentKind(agentKind), epics)
 }
 
 // releaseWaitingSlots frees the slots of agents that waited past the grace
@@ -187,19 +187,53 @@ func (s *Scheduler) StalledNudgeDelay() time.Duration {
 // The lock covers the decision and the claim write only; the launch runs on its
 // own goroutine, so one slow launch holds up neither the adoption nor the loop.
 func (s *Scheduler) claimRootAfterAdoption(item wire.QueueItem) (bool, error) {
-	s.claimMu.Lock()
-	defer s.claimMu.Unlock()
-	s.Guards.AdoptMu.Lock()
-	c, err := s.claimRoot(item)
-	s.Guards.AdoptMu.Unlock()
+	c, err := s.claimAndReserve(func() (*claimed, error) {
+		s.Guards.AdoptMu.Lock()
+		defer s.Guards.AdoptMu.Unlock()
+		return s.claimRoot(item)
+	})
 	if c == nil || err != nil {
 		return false, err
 	}
-	if !s.Launcher.reserve(c) {
-		return false, nil
-	}
 	s.Launcher.goLaunch(c)
 	return true, nil
+}
+
+// claimAndReserve is the one claim-and-reserve step: under claimMu it runs
+// claim and takes the slot, so the claim loop and a human Retry never both
+// count the same slot as free. The caller launches the returned claim, inline or
+// in the background. Nil means nothing was claimed or the ticket was already running.
+func (s *Scheduler) claimAndReserve(claim func() (*claimed, error)) (*claimed, error) {
+	s.claimMu.Lock()
+	defer s.claimMu.Unlock()
+	c, err := claim()
+	if c == nil || err != nil {
+		return nil, err
+	}
+	if !s.Launcher.reserve(c) {
+		return nil, nil
+	}
+	return c, nil
+}
+
+// ClaimAndLaunch is the human Retry's claim: it writes the claim to the ticket
+// file first, so markdown stays the truth, then launches inline. A failed launch
+// pauses the ticket stuck rather than leaving a claim with no agent behind it.
+// launched is false when the ticket paused on an ambiguous base: no agent runs.
+// A launch that ends without an agent kicks the claim loop to refill the slot.
+// epics is the project's loaded epics, for the base derivation.
+func (s *Scheduler) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agentKind agent.AgentKind, epics []tickets.Epic) (bool, error) {
+	c, err := s.claimAndReserve(func() (*claimed, error) {
+		return s.Launcher.claim(root, queued, t, repo, agentKind, epics)
+	})
+	if c == nil || err != nil {
+		return false, err
+	}
+	launched, err := s.Launcher.launchClaimed(c)
+	if !launched {
+		s.Guards.Kick()
+	}
+	return launched, err
 }
 
 // PerRootLimit is how many agents one root may run at once. The one-offs root

@@ -23,22 +23,6 @@ import (
 	"github.com/elentok/gx/tickets/ticketlog"
 )
 
-// ClaimAndLaunch writes the claim to the ticket file first, so markdown stays
-// the truth and nothing streams before it is on disk. A failed launch pauses the
-// ticket stuck rather than leaving a claim with no agent behind it.
-// launched is false when the ticket paused on an ambiguous base: no agent runs.
-// epics is the project's loaded epics, for the base derivation.
-func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agentKind agent.AgentKind, epics []tickets.Epic) (launched bool, err error) {
-	c, err := l.claim(root, queued, t, repo, agentKind, epics)
-	if c == nil || err != nil {
-		return false, err
-	}
-	if !l.reserve(c) {
-		return false, nil
-	}
-	return l.launchClaimed(c)
-}
-
 // claimed is a ticket whose claim is on disk: the serial half is done and the
 // launch half is left.
 type claimed struct {
