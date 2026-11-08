@@ -134,6 +134,21 @@ func finishIteration(d deps.Deps, p iterationParams, path, pane, base, branch, s
 		}
 
 		if ahead == 0 {
+			// One last read of the signal: a task started since the finish was
+			// confirmed means the agent is not done, so wait it out (the wait's
+			// cap pauses background-task-gate) and recount.
+			waited, newAhead, err := waitOutLiveBackgroundTask(d, p, path, pane, base, branch, sessionID)
+			if err != nil {
+				if _, paused := errors.AsType[*supervise.BlockedPausedError](err); paused {
+					return nil
+				}
+				return err
+			}
+			if waited {
+				ahead = newAhead
+			}
+		}
+		if ahead == 0 {
 			// The agent finished without merging any commits: leave the worktree/
 			// tab in place for inspection instead of silently marking done or
 			// retrying, and let the scheduler move on to other unblocked tickets.
@@ -262,6 +277,31 @@ func retryUnexecutedToolCallOnce(d deps.Deps, p iterationParams, path, pane, bas
 		return false, 0, "", fmt.Errorf("counting commits ahead of %s after corrective retry: %w", base, err)
 	}
 	return true, newAhead, retrySessionID, nil
+}
+
+// waitOutLiveBackgroundTask waits for the agent to finish again when a
+// background task is live at the moment of the zero-commit pause, then recounts
+// the commits. waited is false when nothing was live.
+func waitOutLiveBackgroundTask(d deps.Deps, p iterationParams, path, pane, base, branch, sessionID string) (waited bool, ahead int, err error) {
+	label := worktree.IterationLabel(p.FeatureBranch, p.Ticket.Identifier)
+	lp := p.launchAndPromptParams(label, pane, "", path, "", "")
+	lp.VerifyCap = p.verifyCap
+	if !supervise.BackgroundTaskLive(d, lp, sessionID) {
+		return false, 0, nil
+	}
+	s, found, err := d.Runner.Find(label)
+	if err != nil || !found {
+		return false, 0, nil
+	}
+	lp.Session = s
+	if err := supervise.WaitForFinish(d, lp, sessionID); err != nil {
+		return false, 0, fmt.Errorf("waiting for %s background task before pausing: %w", label, err)
+	}
+	ahead, err = iterationCommitsAhead(d, path, base, branch)
+	if err != nil {
+		return false, 0, fmt.Errorf("counting commits ahead of %s after background task: %w", base, err)
+	}
+	return true, ahead, nil
 }
 
 // adoptCommitlessFinish honours a ticket's `gx tickets set --iteration-status

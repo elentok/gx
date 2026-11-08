@@ -63,6 +63,7 @@ func WaitForFinish(d deps.Deps, p LaunchParams, sessionID string) error {
 	now := ClockOf(d)
 	mguard := NewModelGuard(d, p, now)
 	lguard := NewLongTicketGuard(d, p, now)
+	codexHeldMs := 0
 	for {
 		pollMs := SmartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -184,6 +185,16 @@ func WaitForFinish(d deps.Deps, p LaunchParams, sessionID string) error {
 					return err
 				}
 				continue
+			}
+			// Codex reports a live background terminal as working, so the wait
+			// never sees it idle: the same cap that bounds a Claude hold bounds this.
+			if st, statusErr := d.Runner.Status(p.SessionOrDefault()); statusErr == nil && st.Background {
+				codexHeldMs += pollMs
+				if codexHeldMs >= int(BackgroundTaskHoldCap/time.Millisecond) {
+					return pauseBackgroundTaskHold(p, sessionID, nil, nil)
+				}
+			} else {
+				codexHeldMs = 0
 			}
 		}
 
@@ -774,6 +785,47 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 	}
 }
 
+// BackgroundTaskLive re-reads, from state only, whether a background task is
+// live right now: the same reading WaitForBackgroundTasks holds on, for callers
+// about to act on a finish (the stall nudge, the zero-commit pause). A Codex
+// session is live while its title heuristic reports Background.
+func BackgroundTaskLive(d deps.Deps, p LaunchParams, sessionID string) bool {
+	if p.Agent == agent.AgentCodex {
+		if d.Runner == nil {
+			return false
+		}
+		st, err := d.Runner.Status(p.SessionOrDefault())
+		return err == nil && st.Background
+	}
+	if p.Agent != agent.AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
+		return false
+	}
+	tr, err := d.ReadBackgroundTasks(p.SessionCwd, sessionID)
+	if err != nil {
+		return false
+	}
+	reading := backgroundtask.Resolve(backgroundtask.PidUnknown, tr, nil)
+	if reading.AwaitingTurnEnd {
+		return true
+	}
+	reportedAt := finishedReportTime(p)
+	for _, m := range reading.Tasks {
+		if m.Status != transcript.BackgroundTaskOutstandingFresh {
+			continue
+		}
+		if !reportedAt.IsZero() && m.StartedAt.Before(reportedAt) {
+			continue
+		}
+		if d.ReadBackgroundProcess != nil {
+			if proc, err := d.ReadBackgroundProcess(sessionID, m.TaskID); err == nil && proc.Known && !proc.Alive {
+				continue
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // BackgroundTaskHoldCap is the one cap on every live-task hold: a task, or a
 // turn a task woke, that outlasts it pauses the ticket instead of waiting on.
 const BackgroundTaskHoldCap = 60 * time.Minute
@@ -851,7 +903,11 @@ func pauseBackgroundTaskHold(p LaunchParams, sessionID string, tasks []transcrip
 			return err
 		}
 	}
-	reason := fmt.Sprintf("%s still waited on background task %s after %s", p.Label, named, BackgroundTaskHoldCap)
+	subject := "background task " + named
+	if named == "" {
+		subject = "its background terminal"
+	}
+	reason := fmt.Sprintf("%s still waited on %s after %s", p.Label, subject, BackgroundTaskHoldCap)
 	ticketops.PauseTicket(p.EventSink(), ticketops.PauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
 		Type: events.Paused, Kind: events.BackgroundTaskGate, Reason: reason,

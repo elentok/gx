@@ -332,6 +332,7 @@ func watchedStatus(st agentrunner.Status, w holder.WatchedStatus) agentrunner.St
 	if w.ConversationID != "" {
 		st.SessionID = w.ConversationID
 	}
+	st.Background = w.Status.Background
 	switch w.Status.State {
 	case harness.Idle:
 		st.State = agentrunner.StateIdle

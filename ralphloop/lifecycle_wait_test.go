@@ -167,6 +167,30 @@ func TestWaitIterationFinished_NudgesIdleAgentWithNoReportOnce(t *testing.T) {
 	}
 }
 
+// A task that goes live between the stall decision and the type step gets
+// nothing typed: the wait goes back to the finish wait and nudges only once the
+// task has resolved.
+func TestWaitIterationFinished_NudgeRereadsSignalAndWaitsWhenTaskIsLive(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	var reads int
+	d.ReadBackgroundTasks = func(string, string) (transcript.BackgroundTaskReading, error) {
+		reads++
+		status := transcript.BackgroundTaskResolved
+		if reads == 2 {
+			status = transcript.BackgroundTaskOutstandingFresh
+		}
+		return transcript.BackgroundTaskReading{Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}}}, nil
+	}
+	waitStallFixture(t, d, one)
+	if reads != 5 {
+		t.Errorf("ReadBackgroundTasks calls = %d, want 5 (wait, live re-read, wait again, clear re-read, wait after the nudge)", reads)
+	}
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != supervise.StallNudgeText {
+		t.Errorf("prompts = %q, want exactly one nudge, after the task resolved", got)
+	}
+}
+
 func TestWaitIterationFinished_NoNudgeWhileQuestionOpenOrFinished(t *testing.T) {
 	t.Parallel()
 	for _, status := range []string{string(schema.IterationStatusAsking), "finished"} {

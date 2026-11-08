@@ -363,7 +363,7 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 		if nudged || o.StallNudgeDelay <= 0 {
 			return nil
 		}
-		nudgedNow, again, err := nudgeIfStalled(d, in, o, w, s, until)
+		nudgedNow, again, err := nudgeIfStalled(d, in, o, w, s, until, p, sessionID)
 		if err != nil {
 			return err
 		}
@@ -385,7 +385,7 @@ func (e *RelaunchRequest) Unwrap() error { return e.Err }
 // agent that is still idle with no open question and no finished report.
 // again tells the caller to wait for the agent to settle once more: after the
 // nudge, or because the agent went back to work during the delay.
-func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State) (nudged, again bool, err error) {
+func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State, p supervise.LaunchParams, sessionID string) (nudged, again bool, err error) {
 	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
 		return false, false, err
 	}
@@ -399,6 +399,11 @@ func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w It
 			return false, true, nil
 		}
 		return false, false, err
+	}
+	// A task started during the delay is live: back to the finish wait, which
+	// holds on it, instead of typing into an agent that is not stalled.
+	if supervise.BackgroundTaskLive(d, p, sessionID) {
+		return false, true, nil
 	}
 	text := stallNudgeText(d, o, w, s)
 	err = d.Runner.Prompt(s, text)

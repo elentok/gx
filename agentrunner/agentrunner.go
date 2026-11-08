@@ -76,6 +76,7 @@ type Status struct {
 	Error string
 	// Background is set with StateIdle while a background task the agent
 	// started still runs: the turn is over, but the task may wake it again.
+	// A Codex session reports it with StateWorking.
 	Background bool
 	// Pending is the open tool-permission request, for runners that can name
 	// it (headless). Nil when none is open.
