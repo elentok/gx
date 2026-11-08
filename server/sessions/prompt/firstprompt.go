@@ -268,7 +268,7 @@ func (f *firstPrompt) vimRestarted(c *holder.HolderClient, prompt string) bool {
 		return false
 	}
 	f.log.Warn("vim footer after launch, restarting once")
-	f.p.sessions.RestartFresh(f.dir, f.id, prompt)
+	f.p.resumer.RestartFresh(f.dir, f.id, prompt)
 	return true
 }
 

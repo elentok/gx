@@ -56,11 +56,11 @@ func (rs *Resumer) HandoffRefusal(meta Meta, action []string) (wire.SessionResul
 // exit a no-op, so it does not end the session. A restart that fails ends the
 // session Exited crashed, as any failed start does; Resume carries on.
 func (rs *Resumer) chartingHandoff(dir, id string) {
-	old, ok := rs.mg.beginRestart(dir, id)
+	old, ok := rs.beginRestart(dir, id)
 	if !ok {
 		return
 	}
-	rs.mg.stopForRestart(dir, id)
+	rs.stopForRestart(dir, id)
 	rs.mg.Watches.MetaMu.Lock()
 	defer rs.mg.Watches.MetaMu.Unlock()
 	meta, err := ReadMeta(dir)
@@ -76,7 +76,8 @@ func (rs *Resumer) chartingHandoff(dir, id string) {
 
 // beginRestart bumps the run and returns the conversation being ended. It
 // reports false when the session ended in the meantime.
-func (m *Manager) beginRestart(dir, id string) (string, bool) {
+func (rs *Resumer) beginRestart(dir, id string) (string, bool) {
+	m := rs.mg
 	m.Watches.MetaMu.Lock()
 	defer m.Watches.MetaMu.Unlock()
 	meta, err := ReadMeta(dir)
@@ -93,7 +94,8 @@ func (m *Manager) beginRestart(dir, id string) (string, bool) {
 
 // stopForRestart stops the old holder and waits for it to save its exit. The
 // caller holds no lock.
-func (m *Manager) stopForRestart(dir, id string) {
+func (rs *Resumer) stopForRestart(dir, id string) {
+	m := rs.mg
 	c, err := holder.DialHolder(dir)
 	if err != nil {
 		return
@@ -108,7 +110,7 @@ func (m *Manager) stopForRestart(dir, id string) {
 // restartOnWorker ends the old conversation like an agent exit, records a new
 // one and launches it under the worker tier. The caller holds metaMu.
 func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
-	return rs.mg.restartConversation(dir, meta, old, func(meta *Meta) {
+	return rs.restartConversation(dir, meta, old, func(meta *Meta) {
 		rs.mg.applyTier(meta, agent.TierWorker)
 		meta.HandoffTier = true
 		meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
@@ -119,7 +121,8 @@ func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
 // old conversation like an agent exit, records a new one, lets change set what
 // the new launch differs in, and starts a fresh holder and watch. The caller
 // holds metaMu.
-func (m *Manager) restartConversation(dir string, meta *Meta, old string, change func(*Meta)) error {
+func (rs *Resumer) restartConversation(dir string, meta *Meta, old string, change func(*Meta)) error {
+	m := rs.mg
 	m.Conv.SaveTotals(meta.ConvSession(), old)
 	conv, err := nativerunner.NewUUID()
 	if err != nil {
@@ -148,12 +151,13 @@ func (m *Manager) restartConversation(dir string, meta *Meta, old string, change
 // once handed over, so the caller hands it back). It records the run it made in
 // VimRelaunchRun so a caller restarts once per launch. The caller must not hold
 // metaMu. A restart that fails ends the session as a failed start does.
-func (m *Manager) RestartFresh(dir, id, prompt string) {
-	old, ok := m.beginRestart(dir, id)
+func (rs *Resumer) RestartFresh(dir, id, prompt string) {
+	m := rs.mg
+	old, ok := rs.beginRestart(dir, id)
 	if !ok {
 		return
 	}
-	m.stopForRestart(dir, id)
+	rs.stopForRestart(dir, id)
 	m.Watches.MetaMu.Lock()
 	defer m.Watches.MetaMu.Unlock()
 	meta, err := ReadMeta(dir)
@@ -161,7 +165,7 @@ func (m *Manager) RestartFresh(dir, id, prompt string) {
 		m.log.Warn("restart: read meta", "session", id, "err", err)
 		return
 	}
-	if err := m.restartConversation(dir, &meta, old, func(meta *Meta) {
+	if err := rs.restartConversation(dir, &meta, old, func(meta *Meta) {
 		meta.FirstPrompt = prompt
 		meta.VimRelaunchRun = meta.Run + 1
 	}); err != nil {

@@ -719,5 +719,6 @@ func recordShutdown(step string) {
 // outside the package.
 func (s *Server) Settings() *settings.Holder { return &s.settings }
 
-// SessionManager is the session manager, for tests that drive a restart directly.
-func (s *Server) SessionManager() *sessions.Manager { return s.sessions }
+// ResumerOf is s's session resumer, for tests that drive a restart directly. A
+// function, not a method, to stay under Server's method limit.
+func ResumerOf(s *Server) *sessions.Resumer { return s.resumer }

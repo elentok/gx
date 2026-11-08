@@ -48,7 +48,7 @@ type Meta struct {
 	// yet run well. A Resume of a crash resolves it again from the config, so a
 	// fixed slug takes effect; any other Resume keeps the launch's model.
 	HandoffTier bool `json:"handoff_tier,omitempty"`
-	// VimRelaunchRun is the Run a Manager.RestartFresh produced, so a caller
+	// VimRelaunchRun is the Run a Resumer.RestartFresh produced, so a caller
 	// restarts once per launch; a later resume has a new Run and a fresh budget.
 	VimRelaunchRun int `json:"vim_relaunch_run,omitempty"`
 	// RemoteControl is the name a Claude fix-agent session was started with
