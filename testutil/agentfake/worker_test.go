@@ -55,6 +55,28 @@ func TestWorkTicket_FinishAcceptsACheckWithNothingToRun(t *testing.T) {
 	}
 }
 
+func TestWorkTicket_NotesWritesVerifiedAndSummaryBeforeFinishing(t *testing.T) {
+	cfg, gxLog := WorkerEnv(t)
+	cfg.Behaviour = map[string]string{"p:e/01": BehaviourNotes}
+	if err := WorkTicket(cfg, "p:e/01"); err != nil {
+		t.Fatal(err)
+	}
+	// The fake gx logs each call's args and then its stdin.
+	log := readLog(t, gxLog)
+	last := -1
+	for _, want := range []string{
+		"tickets section p:e/01 Verified -\n- Story 1: the fake story — pass @ ",
+		"tickets section p:e/01 Iteration summaries -\n### fake-session",
+		"tickets set p:e/01 --iteration-status finished",
+	} {
+		at := strings.Index(log, want)
+		if at <= last {
+			t.Errorf("gx log lacks %q after the previous call:\n%s", want, log)
+		}
+		last = at
+	}
+}
+
 func TestWorkTicket_FailCommitsAndReportsNothing(t *testing.T) {
 	cfg, gxLog := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourFail}

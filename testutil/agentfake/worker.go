@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // WorkerConfigFile is read from the agent's working directory (the iteration
@@ -118,6 +119,10 @@ const (
 	// error (a model Codex rejects) and no rate-limit sample; the next prompt
 	// finishes the ticket.
 	BehaviourError = "error"
+	// BehaviourNotes finishes like BehaviourFinish, after writing what a verify
+	// or summary agent leaves in its ticket: a "## Verified" entry and an
+	// "## Iteration summaries" entry.
+	BehaviourNotes = "notes"
 )
 
 // CodexModelError is the message the Codex fake ends a BehaviourError turn with,
@@ -245,9 +250,38 @@ func commitWork(address string) error {
 	return nil
 }
 
+// writeNotes leaves the entries a verify or summary agent writes: one verified
+// story at the commit just made, and one iteration summary.
+func writeNotes(cfg WorkerConfig, address string) error {
+	head, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
+	if err != nil {
+		return err
+	}
+	verified := schema.AppendVerified("", schema.VerifiedEntry{Story: "Story 1: the fake story", Verdict: "pass", Commit: strings.TrimSpace(string(head))})
+	summary := schema.AppendIterationSummary("", schema.IterationSummary{
+		SessionID: "fake-session", Time: time.Now(), Label: "agent",
+		Did: "Verified the fake story.", WentWrong: "Nothing.", Decisions: "None.", Left: "Nothing.",
+	})
+	for _, s := range [][2]string{{schema.VerifiedHeading, verified}, {schema.IterationSummaryHeading, summary}} {
+		heading := s[0]
+		cmd := exec.Command(cfg.Gx, "tickets", "section", address, heading, "-")
+		cmd.Env = append(os.Environ(), cfg.Env...)
+		cmd.Stdin = strings.NewReader(schema.Section(s[1], heading))
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("gx tickets section %s: %w\n%s", heading, err, out)
+		}
+	}
+	return nil
+}
+
 func finishTicket(cfg WorkerConfig, address string) error {
 	if err := commitWork(address); err != nil {
 		return err
+	}
+	if cfg.Behaviour[address] == BehaviourNotes {
+		if err := writeNotes(cfg, address); err != nil {
+			return err
+		}
 	}
 	// The finish guard refuses a tree without a passing check run.
 	for _, args := range [][]string{

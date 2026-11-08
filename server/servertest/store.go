@@ -64,6 +64,8 @@ type TicketOpts struct {
 	ModelRan, ModelExpected string
 	// Category is the ticket's category: frontmatter field ("bug", "idea"), omitted when empty.
 	Category string
+	// Unique is the ticket's unique: frontmatter field (a one-off's dedupe key), omitted when empty.
+	Unique string
 	// ClaimedAt, DoneAt and CancelledAt are RFC 3339 stamps, omitted when empty.
 	ClaimedAt, DoneAt, CancelledAt string
 	// LongTicketTurns is the turn count the long-ticket alert marked the ticket with; omitted when 0.
@@ -148,6 +150,9 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	}
 	if opts.Category != "" {
 		fm += "category: " + opts.Category + "\n"
+	}
+	if opts.Unique != "" {
+		fm += "unique: " + opts.Unique + "\n"
 	}
 	for _, stamp := range [][2]string{{"claimed_at", opts.ClaimedAt}, {"done_at", opts.DoneAt}, {"cancelled_at", opts.CancelledAt}} {
 		if stamp[1] != "" {
