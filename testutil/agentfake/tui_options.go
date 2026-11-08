@@ -17,6 +17,15 @@ import (
 	"github.com/charmbracelet/x/term"
 )
 
+// outageTurns parses TUIClassifierOutageEnv: a count of failing turns, 0 when unset or bad.
+func outageTurns(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
 // stallTurnLength is how long a BehaviourStall turn stays busy.
 const stallTurnLength = 1500 * time.Millisecond
 
@@ -53,8 +62,8 @@ type tuiOptions struct {
 	launchRecord  bool
 	// plainScreen draws the "> " screen instead of the input box (see TUIPlainScreenEnv).
 	plainScreen bool
-	// classifierOutage fails every worker turn (see TUIClassifierOutageEnv).
-	classifierOutage bool
+	// classifierOutage is how many more turns fail (see TUIClassifierOutageEnv).
+	classifierOutage int
 	// model is --model, reported on every reply.
 	model string
 	// settings is --settings: inline JSON or a path to a JSON file.
@@ -119,7 +128,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	return tuiOptions{
 		hung:             hung,
 		plainScreen:      os.Getenv(TUIPlainScreenEnv) == "1",
-		classifierOutage: os.Getenv(TUIClassifierOutageEnv) == "1",
+		classifierOutage: outageTurns(os.Getenv(TUIClassifierOutageEnv)),
 		sessionID:        *sessionID,
 		trust:            os.Getenv(TUITrustEnv) == "1",
 		dropKey:          os.Getenv(TUITrustDropKeyEnv) == "1",

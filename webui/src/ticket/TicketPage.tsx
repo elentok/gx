@@ -43,6 +43,13 @@ export function TicketPage({
     const id = setInterval(refetch, WAITING_REFETCH_MS);
     return () => clearInterval(id);
   }, [waiting, refetch]);
+  // A live task ending emits no ticket event, and the gate card's buttons depend on it.
+  const taskLive = !!detail?.task;
+  useEffect(() => {
+    if (!taskLive) return;
+    const id = setInterval(refetch, WAITING_REFETCH_MS);
+    return () => clearInterval(id);
+  }, [taskLive, refetch]);
   const [sent, setSent] = useState<Sent | null>(null);
   const [showScreen, setShowScreen] = useState(false);
 

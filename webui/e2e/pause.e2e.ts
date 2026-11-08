@@ -21,7 +21,7 @@ const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: t
 // Resume needs ticket 08, which Start over consumes.
 test.describe("3. Pause reasons and recovery", () => {
   test("every pause reason recovers", async ({ page, start }) => {
-    test.setTimeout(600_000);
+    test.setTimeout(1_200_000);
     const fixture = await start("paused");
     await fixture.cli("server", "queue", "add", "demo:paused-epic");
 
@@ -106,7 +106,11 @@ test.describe("3. Pause reasons and recovery", () => {
       await start(scenario);
       await openTicket(page, "01", epic);
       await expect(page.getByText(reason).first()).toBeVisible(gateWait);
-      await expect(recovery(page).getByRole("button")).toHaveText(buttons.map((b) => new RegExp(`^${b}(\\s*Recommended)?$`)));
+      // 20: while a repair pause's run is still finishing the card has no buttons; they return when it settles.
+      await expect(recovery(page).getByRole("button")).toHaveText(
+        buttons.map((b) => new RegExp(`^${b}(\\s*Recommended)?$`)),
+        gateWait,
+      );
       await act?.();
     };
     const retry = async () => {
@@ -134,8 +138,28 @@ test.describe("3. Pause reasons and recovery", () => {
       await cleared();
     });
 
-    // 64: with a dirty worktree a live task still offers all four.
-    await recover("live-task-gate-dirty", "live-task-dirty-epic", gate, ["Keep waiting", "Stop task", "Retry", "Start over"]);
+    // 64: with a dirty worktree a live task still offers all four, and once the task's process exits
+    // the card drops to Retry and Start over.
+    await recover("live-task-gate-dirty", "live-task-dirty-epic", gate, ["Keep waiting", "Stop task", "Retry", "Start over"], async () => {
+      await expect(recovery(page).getByRole("button")).toHaveText([/^Retry(\s*Recommended)?$/, /^Start over$/], gateWait);
+    });
+
+    // 65: a Codex task cannot be stopped; Start over states the discard and ends the pause.
+    await recover("live-task-gate-codex", "live-task-codex-epic", gate, ["Keep waiting", "Retry", "Start over"], async () => {
+      await recovery(page).getByRole("button", nav("Start over")).click();
+      const dialog = page.getByRole("dialog", { name: "Start over" });
+      await expect(dialog.getByText(/Start over discards the branch's commits/)).toBeVisible();
+      await dialog.getByRole("textbox", { name: "Reason" }).fill("drop the task");
+      await dialog.getByRole("button", nav("Start over")).click();
+      await cleared();
+    });
+
+    // 41: every turn ends on a "no verdict" error until the re-sends run out; Retry prompts the live
+    // agent, and the pause stays for the agent's own next move to end.
+    await recover("classifier-outage", "classifier-outage-epic", "Classifier gave no verdict", ["Retry"], async () => {
+      await retry();
+      await expect(toasts(page).getByText(/refused|stale/i)).toHaveCount(0);
+    });
 
     // 16/68: the holder is alive but never answers; the run fails with Retry and Start over.
     await recover("holder-unreachable", "holder-dead-epic", "Run failed", ["Retry", "Start over"]);

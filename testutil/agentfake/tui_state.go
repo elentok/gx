@@ -210,13 +210,18 @@ func (t *tui) startBackgroundTask() error {
 	defer out.Close()
 	// The child outlives this call and a bounded sleep keeps a forgotten one
 	// from lingering.
-	child := exec.Command("sh", "-c", "for i in 1 2 3 4; do echo soak line $i; done; exec sleep 120")
+	child := exec.Command("sh", "-c", "for i in 1 2 3 4; do echo soak line $i; done; exec sleep 150")
 	child.Env = os.Environ()
 	child.Stdout = out
 	if err := child.Start(); err != nil {
 		return err
 	}
-	go func() { _ = child.Wait() }()
+	// Like claude, a task that ends is reported resolved and the shell state clears.
+	go func() {
+		_ = child.Wait()
+		_ = SendControl(t.ctlPath, Control{Action: ActionBackground})
+		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
+	}()
 	return t.writeBackgroundMarker(true)
 }
 

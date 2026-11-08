@@ -64,7 +64,7 @@ func WaitForFinish(d deps.Deps, p LaunchParams, sessionID string) error {
 	now := ClockOf(d)
 	mguard := NewModelGuard(d, p, now)
 	lguard := NewLongTicketGuard(d, p, now)
-	codexHeldMs := 0
+	var codexHold CodexHold
 	for {
 		pollMs := SmartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -187,15 +187,8 @@ func WaitForFinish(d deps.Deps, p LaunchParams, sessionID string) error {
 				}
 				continue
 			}
-			// Codex reports a live background terminal as working, so the wait
-			// never sees it idle: the same cap that bounds a Claude hold bounds this.
-			if st, statusErr := d.Runner.Status(p.SessionOrDefault()); statusErr == nil && st.Background {
-				codexHeldMs += pollMs
-				if codexHeldMs >= int(holdCap()/time.Millisecond) {
-					return pauseBackgroundTaskHold(p, sessionID, nil, nil)
-				}
-			} else {
-				codexHeldMs = 0
+			if err := codexHold.Tick(d, p, sessionID, pollMs); err != nil {
+				return err
 			}
 		}
 
@@ -841,6 +834,29 @@ func holdCap() time.Duration {
 		return d
 	}
 	return BackgroundTaskHoldCap
+}
+
+// CodexHold counts how long a Codex session has shown a live background
+// terminal. Codex reports it as working, so a finish wait never sees the
+// session idle: the same cap that bounds a Claude hold bounds this.
+type CodexHold struct{ heldMs int }
+
+// Tick adds one poll of pollMs and pauses the ticket once the hold reaches the
+// cap; a poll with no background terminal resets the count. Any other agent is
+// ignored.
+func (h *CodexHold) Tick(d deps.Deps, p LaunchParams, sessionID string, pollMs int) error {
+	if p.Agent != agent.AgentCodex {
+		return nil
+	}
+	if st, err := d.Runner.Status(p.SessionOrDefault()); err != nil || !st.Background {
+		h.heldMs = 0
+		return nil
+	}
+	h.heldMs += pollMs
+	if h.heldMs >= int(holdCap()/time.Millisecond) {
+		return pauseBackgroundTaskHold(p, sessionID, nil, nil)
+	}
+	return nil
 }
 
 // BackgroundTaskCheckEvery is how often a held task's process state is read.

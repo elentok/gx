@@ -77,10 +77,11 @@ func (v PauseVerb) Word() string { return pauseVerbs[v].Word }
 // VerbNeedsUntrackedRun reports whether v on a pause of kind r may run only once
 // the server no longer tracks the ticket's run. A repair-class pause is a fault
 // whose run is still settling; an answer-class one (the background-task gate
-// among them) is tracked by design. The offered actions and the write guard both
+// among them) is tracked by design, and so is a classifier outage's, whose
+// Retry prompts the live agent. The offered actions and the write guard both
 // ask this, so the web never offers a verb the server refuses.
 func (r PauseReason) VerbNeedsUntrackedRun(v PauseVerb) bool {
-	return pauseClasses[r] == PauseClassRepair && (v == VerbRetry || v == VerbStartOver)
+	return pauseClasses[r] == PauseClassRepair && r != PauseClassifierOutage && (v == VerbRetry || v == VerbStartOver)
 }
 
 // VerbOfWord is the verb that Word spells as w.

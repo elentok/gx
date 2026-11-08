@@ -45,6 +45,9 @@ func (t *tui) submit() error {
 			return t.designTurn(text)
 		case promptWorker:
 			t.prompt = text
+			if t.opts.classifierOutage > 0 {
+				t.outageWork = &PendingWork{cfg, address}
+			}
 			if cfg.Transcript {
 				path, err := t.transcriptPath()
 				if err != nil {
@@ -98,6 +101,11 @@ func (t *tui) submit() error {
 			return t.setStatus(StatusWaiting, "permission prompt")
 		}
 		t.prompt = text
+		if w := t.outageWork; w != nil {
+			// A re-sent "continue" is a turn on the ticket again.
+			go t.work(w.Cfg, w.Address)
+			return t.setStatus(StatusBusy, "")
+		}
 		if t.fast {
 			return t.fastTurn()
 		}
@@ -216,17 +224,19 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	// be too late; claude also refreshes it mid-turn.
 	t.runStatusLine()
 	began := time.Now()
-	if t.opts.classifierOutage {
+	failing := t.opts.classifierOutage > 0
+	if failing {
+		t.opts.classifierOutage--
 		if path, err := t.transcriptPath(); err == nil {
 			_ = appendClassifierNoVerdict(path)
 		}
 	} else if err := WorkTicket(cfg, address); err != nil {
 		fmt.Fprintln(os.Stderr, "fakeclaude worker:", err)
 	}
-	if b := cfg.Behaviour[address]; b == BehaviourAsk || b == BehaviourWriteAsk {
-		// An ask is one gx call, so under load the whole turn can fit between two
-		// polls of the pid file: the launch then sees no turn and pauses as
-		// agent_prompt_stalled over the question.
+	if b := cfg.Behaviour[address]; b == BehaviourAsk || b == BehaviourWriteAsk || failing {
+		// An ask is one gx call, and an outage turn is one appended record, so
+		// under load the whole turn can fit between two polls of the pid file: the
+		// launch then sees no turn and pauses as agent_prompt_stalled.
 		time.Sleep(max(0, stallTurnLength-time.Since(began)))
 	}
 	if cfg.Behaviour[address] == BehaviourFail {

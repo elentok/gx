@@ -54,10 +54,11 @@ var (
 	LiveTaskGateCodex = backgroundEpic("live-task-codex-epic", servertest.TicketOpts{Agent: "codex"}, true, agentfake.BehaviourBackgroundTask)
 	// LiveTaskGateDirty is LiveTaskGate with an uncommitted file in the worktree.
 	LiveTaskGateDirty = backgroundEpic("live-task-dirty-epic", servertest.TicketOpts{}, false, agentfake.BehaviourBackgroundDirty)
-	// ClassifierOutage: every turn ends on a "no verdict" tool error, so the
-	// re-sends run out and the ticket pauses as classifier-outage.
+	// ClassifierOutage: the first turn and every re-send end on a "no verdict"
+	// tool error, so the re-sends run out and the ticket pauses as
+	// classifier-outage; the turn Retry sends works.
 	ClassifierOutage = recoveryEpic("classifier-outage-epic", servertest.TicketOpts{}, false,
-		agentfake.TUIClassifierOutageEnv+"=1", ralphloop.ClassifierResendDelayEnv+"=1ms")
+		agentfake.TUIClassifierOutageEnv+"=4", ralphloop.ClassifierResendDelayEnv+"=1ms")
 	// HolderUnreachable: every holder status call gets no dial answer, so past
 	// HolderReadoptCap the ticket pauses as iteration-error with the holder alive.
 	HolderUnreachable = recoveryEpic("holder-dead-epic", servertest.TicketOpts{}, false,

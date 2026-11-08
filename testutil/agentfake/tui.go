@@ -64,6 +64,8 @@ type tui struct {
 	// resume is the ticket a ratelimit or question-menu worker finishes on the
 	// next prompt, whatever that prompt says.
 	resume *PendingWork
+	// outageWork is the ticket a plain prompt works once an outage has passed.
+	outageWork *PendingWork
 	// images are the paths behind the [Image #N] chips in the input.
 	images []string
 	paste  pasteState

@@ -308,13 +308,18 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 	elapsedMs := 0
 	nudged := false
 	outageResends := 0
+	var codexHold supervise.CodexHold
 	for {
-		st, err := d.Runner.Wait(s, waitStates, cmp.Or(d.GuardPoll, supervise.SmartZonePollMs*time.Millisecond))
+		poll := cmp.Or(d.GuardPoll, supervise.SmartZonePollMs*time.Millisecond)
+		st, err := d.Runner.Wait(s, waitStates, poll)
 		if err != nil {
 			if errors.Is(err, agentrunner.ErrTimeout) {
 				sessionID := ""
 				if status, err := d.Runner.Status(s); err == nil {
 					sessionID = status.SessionID
+				}
+				if err := codexHold.Tick(d, p, sessionID, int(poll/time.Millisecond)); err != nil {
+					return err
 				}
 				if err := mguard.Tick(d, p, sessionID); err != nil {
 					return err
