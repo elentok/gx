@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -64,6 +65,9 @@ type Runner struct {
 	Home string
 	// LaunchCaps bound that proof; a zero field means the default.
 	LaunchCaps claudeui.LaunchProofCaps
+	// CodexHome is the home of the Codex rollouts a Codex launch prompt is
+	// proved against. Empty skips the rollout proof.
+	CodexHome string
 
 	// log receives the vim probe's decisions (see SetLog); nil logs nothing.
 	log *slog.Logger
@@ -88,7 +92,7 @@ var _ agentrunner.Nudger = (*Runner)(nil)
 // transcripts under home and reading Codex quotas from codexHome. An empty home
 // skips the gating.
 func NewIn(cli herdr.CLI, home, codexHome string) *Runner {
-	r := &Runner{CLI: cli, Home: home, started: map[string]agentrunner.StartOptions{}}
+	r := &Runner{CLI: cli, Home: home, CodexHome: codexHome, started: map[string]agentrunner.StartOptions{}}
 	r.CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		return codexsession.LastRateLimitIn(codexHome, cwd, sessionID)
 	}
@@ -250,10 +254,13 @@ var _ agentrunner.LaunchPrompter = (*Runner)(nil)
 // A Claude "/" command needs two agreeing proofs: herdr showed the agent
 // working or blocked (or its seq moved), and the transcript's first user
 // record is the command (see claudeui.CheckLaunchDelivered, which also owns
-// the resends). Other prompts, and runners without a Claude home, keep the
-// PromptNudged path.
+// the resends). A Codex prompt is proved by the rollout's first user record
+// instead, and herdr's status only shortens the wait. Other prompts, and
+// runners without the matching home, keep the PromptNudged path.
 func (r *Runner) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
-	if r.Home == "" || r.kindOf(s) != harness.Claude || !isSlashCommand(text) {
+	kind := r.kindOf(s)
+	codex := kind == harness.Codex
+	if (codex && r.CodexHome == "") || (!codex && (r.Home == "" || kind != harness.Claude || !isSlashCommand(text))) {
 		return r.PromptNudged(s, text, onNudge)
 	}
 	if err := r.guard(s); err != nil {
@@ -263,10 +270,47 @@ func (r *Runner) PromptLaunch(ctx context.Context, s agentrunner.Session, text s
 	if err != nil {
 		return err
 	}
-	return r.launchSlash(ctx, s, text, turn, onNudge)
+	if codex {
+		return r.launchProved(ctx, s, text, turn, onNudge, r.codexFirstUser(s), false)
+	}
+	claudeFirst := func() (string, bool, error) { return claudeui.FirstUserRecord(r.Home, s.SessionID) }
+	return r.launchProved(ctx, s, text, turn, onNudge, claudeFirst, true)
 }
 
-func (r *Runner) launchSlash(ctx context.Context, s agentrunner.Session, text string, turn int, onNudge func(string)) error {
+// codexFirstUser returns the first user record of s's rollout after the offset
+// taken now: a resumed launch appends to its old rollout. The rollout is found
+// by session id, else by cwd and start time.
+func (r *Runner) codexFirstUser(s agentrunner.Session) func() (string, bool, error) {
+	r.mu.Lock()
+	cwd := r.started[s.Label].Cwd
+	r.mu.Unlock()
+	since := time.Now().Add(-time.Second)
+	locate := func() (string, bool, error) {
+		if s.SessionID != "" {
+			return codexsession.RolloutPathIn(r.CodexHome, s.SessionID)
+		}
+		return codexsession.LocateRollout(r.CodexHome, cwd, since)
+	}
+	var offset int64
+	if path, ok, err := locate(); err == nil && ok {
+		if info, err := os.Stat(path); err == nil {
+			offset = info.Size()
+		}
+	}
+	return func() (string, bool, error) {
+		path, ok, err := locate()
+		if err != nil || !ok {
+			return "", false, err
+		}
+		prompt, ok, err := codexsession.FirstPrompt(path, offset)
+		return prompt.Text, ok, err
+	}
+}
+
+// launchProved sends text and returns once firstUser shows it. needSeen also
+// demands that herdr showed the agent working or blocked (or its seq moved);
+// without it the record alone proves delivery.
+func (r *Runner) launchProved(ctx context.Context, s agentrunner.Session, text string, turn int, onNudge func(string), firstUser func() (string, bool, error), needSeen bool) error {
 	agent, herdrErr := r.CLI.AgentPrompt(herdr.AgentPromptOptions{
 		Target: s.ID, Text: text, Wait: true, Until: []string{"working", "blocked"}, TimeoutMs: toMs(r.WaitN()),
 	})
@@ -286,7 +330,7 @@ func (r *Runner) launchSlash(ctx context.Context, s agentrunner.Session, text st
 	caps.Poll = cmp.Or(r.LaunchCaps.Poll, caps.Poll)
 	caps.ResendEvery = cmp.Or(r.LaunchCaps.ResendEvery, caps.ResendEvery)
 	proof := claudeui.LaunchProof{
-		FirstUser: func() (string, bool, error) { return claudeui.FirstUserRecord(r.Home, s.SessionID) },
+		FirstUser: firstUser,
 		Pane: func() (string, error) {
 			text, err := ReadPaneRecent(r.CLI)(s.ID)
 			return text, mapNotFound(err)
@@ -308,7 +352,7 @@ func (r *Runner) launchSlash(ctx context.Context, s agentrunner.Session, text st
 	if err := claudeui.CheckLaunchDelivered(ctx, proof, text, caps); err != nil {
 		return err
 	}
-	if seen {
+	if seen || !needSeen {
 		return nil
 	}
 	// The turn may have passed between herdr's polls: the seq still moved.

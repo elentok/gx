@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -125,7 +127,75 @@ func TestPrompt_ClaudeSlashCommandIsStillSentOnce(t *testing.T) {
 	}
 }
 
-// Codex launches keep the unproved single send.
+// startCodexLaunch is a Codex session whose rollouts live under a temp home.
+func startCodexLaunch(t *testing.T) (*herdrrunner.Runner, *herdrfake.State, agentrunner.Session) {
+	t.Helper()
+	r, state, s := startCodex(t, nil)
+	r.CodexHome = t.TempDir()
+	r.N = 50 * time.Millisecond
+	r.LaunchCaps = claudeui.LaunchProofCaps{
+		Grace: 300 * time.Millisecond, UnknownGrace: 100 * time.Millisecond,
+		Poll: 5 * time.Millisecond, ResendEvery: 100 * time.Millisecond,
+	}
+	s.SessionID = "sess-codex"
+	return r, state, s
+}
+
+func writeCodexUser(t *testing.T, home, text string) {
+	t.Helper()
+	path := filepath.Join(home, "sessions", "2026", "08", "04", "rollout-2026-08-04T00-00-00-sess-codex.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := `{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"` + text + `"}]}}` + "\n"
+	if err := os.WriteFile(path, []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPromptLaunch_CodexRolloutRecordIsDelivered(t *testing.T) {
+	r, state, s := startCodexLaunch(t)
+	// Codex writes the record after the send, so the offset taken before it
+	// must not hide it.
+	writeCodexUser(t, r.CodexHome, "an older prompt")
+	go func() {
+		for {
+			if got, _ := state.Received(s.Label); len(got) > 0 {
+				break
+			}
+			runtime.Gosched()
+		}
+		path, _, _ := codexsession.RolloutPathIn(r.CodexHome, s.SessionID)
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+		if err == nil {
+			_, _ = f.WriteString(`{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"` + launchText + `"}]}}` + "\n")
+			_ = f.Close()
+		}
+	}()
+	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); err != nil {
+		t.Fatalf("PromptLaunch = %v, want nil", err)
+	}
+	if got, _ := state.Received(s.Label); !slices.Equal(got, []string{launchText}) {
+		t.Fatalf("received = %q, want one send", got)
+	}
+}
+
+func TestPromptLaunch_CodexWithoutARecordResendsAndIsNotDelivered(t *testing.T) {
+	r, state, s := startCodexLaunch(t)
+	var nudges []string
+	err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, func(d string) { nudges = append(nudges, d) })
+	if !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
+	}
+	if got, _ := state.Received(s.Label); len(got) < 2 {
+		t.Fatalf("received = %q, want a resend", got)
+	}
+	if len(nudges) == 0 {
+		t.Fatal("onNudge never called for the resends")
+	}
+}
+
+// Codex launches without a Codex home keep the unproved single send.
 func TestPromptLaunch_CodexIsUnchanged(t *testing.T) {
 	r, state, s := startCodex(t, nil)
 	r.Home = t.TempDir()
