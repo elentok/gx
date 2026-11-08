@@ -244,10 +244,12 @@ function ChatBody({
           chat={chat}
           busy={busy}
           sessionId={session.id}
-          working={step && <WorkingRow {...step} background={chat.background} />}
+          working={step && <WorkingRow {...step} background={chat.background} current={chat.current} others={chat.others} />}
         />
       )}
-      {questions && busy && step && <WorkingRow {...step} background={chat.background} />}
+      {questions && busy && step && (
+        <WorkingRow {...step} background={chat.background} current={chat.current} others={chat.others} />
+      )}
       <ChatTail
         session={session}
         chat={chat}

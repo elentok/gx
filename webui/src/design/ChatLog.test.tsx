@@ -237,6 +237,12 @@ test("the background strip lists running tasks",async () => {
   expect(within(strip).getByText("subagent: survey")).toBeTruthy();
 });
 
+test("a busy turn names the tool in flight", async () => {
+  const current = { kind: "agent", label: "survey" };
+  renderChat([session({ status: { state: "working" } })], okChat(chatOf([msg({ text: "hi" })], { current })));
+  expect(await screen.findByText("Working · waiting for sub-agent: survey")).toBeTruthy();
+});
+
 test("a busy turn names the background tasks it waits on, also in the Questions view", async () => {
   const background = [
     { kind: "shell", label: "make test", started_at: ago(0) },

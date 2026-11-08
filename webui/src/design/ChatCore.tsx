@@ -9,6 +9,7 @@ import type {
   SessionChatResponse,
 } from "../generated/server";
 import { ImageViewer } from "./ImageViewer";
+import { InFlightTools } from "./InFlightTools";
 import { sessionImageUrl } from "./sessionImages";
 import { Markdown } from "../markdown/Markdown";
 
@@ -266,7 +267,9 @@ export function WorkingRow({
   step,
   title,
   background = [],
-}: WorkingStep & { background?: SessionBackgroundTask[] }) {
+  current,
+  others,
+}: WorkingStep & Pick<SessionChatResponse, "current" | "others"> & { background?: SessionBackgroundTask[] }) {
   return (
     <Box
       role="status"
@@ -281,6 +284,12 @@ export function WorkingRow({
         Working
         {step && `: ${step}`}
         {title && ` · ${title}`}
+        {current && (
+          <>
+            {" · "}
+            <InFlightTools current={current} others={others} />
+          </>
+        )}
         {background.length > 0 && ` · waiting on ${backgroundSummary(background)}`}
       </Text>
     </Box>
