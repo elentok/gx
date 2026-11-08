@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useLocation } from "react-router";
 import { isActionable } from "../agents/rules";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -25,6 +25,7 @@ import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMe
 import { hasLayer, useIsTopLayer } from "../ui/modal/layers";
 import { useWide } from "../useWide";
 import { cardStatus, sessionStatus, type SidebarStatus } from "../workspaces/sidebarModel";
+import { setJumpOpen, useJumpOpen } from "./jumpOpen";
 import { currentAddress } from "./SidebarRows";
 
 const isCard = (r: EpicListRow) => r.card_kind === CardKindDesign || r.card_kind === CardKindImplementation;
@@ -161,9 +162,12 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
   const snapshot = useConnectionState(conn).snapshot;
   const pathname = useLocation().pathname;
   const phone = !useWide();
-  const [open, setOpen] = useState(false);
+  const open = useJumpOpen();
+  const setOpen = setJumpOpen;
   const root = useRef<HTMLDivElement>(null);
   const isTop = useIsTopLayer(open);
+
+  useEffect(() => () => setJumpOpen(false), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

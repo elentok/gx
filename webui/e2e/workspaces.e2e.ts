@@ -423,6 +423,14 @@ test("Workspaces", async ({ page, start }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await goto(page, "#/epics");
   await page.getByRole("button", nav("Show sidebar")).click();
+  // The header's search button opens the jump menu above the sliding sidebar; its tooltip names the key.
+  const search = sidebar.getByRole("button", nav("Search"));
+  await expect(search).toHaveAttribute("title", /^Search \((⌘K|Ctrl\+K)\)$/);
+  await search.click();
+  await expect(jump).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(jump).toHaveCount(0);
+  await expect(sidebar).toBeVisible();
   // A tap outside an open menu closes it; Move swaps in place with a Back row, Back returns.
   await rowMenu("paused-epic").click();
   await expect(page.getByRole("menuitem", nav("Move to workspace"))).toBeVisible();

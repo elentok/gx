@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { PageHeader } from "../page/PageHeader";
 import { renderThemed } from "../ui/render";
@@ -102,4 +102,24 @@ test("the amber dot shows only while the sidebar is closed and something needs m
 test("no dot when nothing needs me", () => {
   setup("tablet", 0);
   expect(screen.queryByTestId("mascot-dot")).toBeNull();
+});
+
+test.each(["desktop", "tablet", "phone"] as const)("%s: the header search button opens the jump menu", async (device) => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: [], follow_ups: [] }), { status: 200 })));
+  setup(device);
+  if (device !== "desktop") fireEvent.click(mascot()!);
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  expect(await screen.findByRole("dialog", { name: "Jump to" })).toBeTruthy();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test.each([
+  ["MacIntel", "Search (⌘K)"],
+  ["Linux x86_64", "Search (Ctrl+K)"],
+])("the search button's tooltip names the platform key (%s)", (platform, title) => {
+  vi.spyOn(navigator, "platform", "get").mockReturnValue(platform);
+  setup("desktop");
+  expect(screen.getByRole("button", { name: "Search" }).getAttribute("title")).toBe(title);
+  vi.restoreAllMocks();
 });

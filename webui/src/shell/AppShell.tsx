@@ -9,7 +9,9 @@ import { NewVersionStrip, useBuildChanged } from "../restart/NewVersionStrip";
 import { MigratingStrip } from "../restart/MigratingStrip";
 import { Strip } from "../ui/strip/Strip";
 import { useDevice, type Device } from "../useWide";
+import { isMac } from "../platform";
 import { JumpPalette } from "./JumpPalette";
+import { setJumpOpen } from "./jumpOpen";
 import { MascotToggle } from "./MascotToggle";
 import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
@@ -31,6 +33,15 @@ import {
 export const SHELL_STRIPS_HEIGHT_VAR = "--shell-strips-height";
 
 const WIDTH: Record<Device, number> = { desktop: 280, tablet: 330, phone: 344 };
+
+function SearchIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
+      <circle cx="9" cy="9" r="5.5" />
+      <path d="M13 13l4 4" />
+    </svg>
+  );
+}
 
 function PanelIcon() {
   return (
@@ -224,6 +235,21 @@ export function AppShell({
               </Box>
             )}
             <Box flex="1" />
+            <chakra.button
+              type="button"
+              aria-label="Search"
+              title={isMac() ? "Search (⌘K)" : "Search (Ctrl+K)"}
+              onClick={() => setJumpOpen(true)}
+              boxSize="34px"
+              borderRadius="8px"
+              display="grid"
+              placeItems="center"
+              color="text.dim"
+              cursor="pointer"
+              _hover={{ bg: "surface.raised" }}
+            >
+              <SearchIcon />
+            </chakra.button>
             <chakra.button
               type="button"
               aria-label="Hide sidebar"
