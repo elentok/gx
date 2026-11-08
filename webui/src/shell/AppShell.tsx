@@ -7,6 +7,8 @@ import { DiskStrips } from "../page/DiskStrips";
 import { FailedMigrationStrip } from "../restart/FailedMigrationStrip";
 import { NewVersionStrip, useBuildChanged } from "../restart/NewVersionStrip";
 import { MigratingStrip } from "../restart/MigratingStrip";
+import { CloseSignalContext } from "../ui/closeSignal";
+import { hasLayer } from "../ui/modal/layers";
 import { Strip } from "../ui/strip/Strip";
 import { useDevice, type Device } from "../useWide";
 import { isMac } from "../platform";
@@ -135,6 +137,13 @@ export function AppShell({
     }),
     [open, device, docked, claimHeader],
   );
+  // Bumped each time the sidebar closes, however it closes; every menu and popover inside it closes on the change.
+  const [closeSignal, setCloseSignal] = useState(0);
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (wasOpen.current && !open) setCloseSignal((n) => n + 1);
+    wasOpen.current = open;
+  }, [open]);
   const aside = useRef<HTMLDivElement>(null);
   const onSidebarKeyDown = useSidebarKeys(aside, shell);
   useSidebarSwipe({
@@ -142,7 +151,8 @@ export function AppShell({
     open,
     aside,
     onOpen: () => setChoice({ device, open: true }),
-    onClose: shell.close,
+    // A dialog opened from the sidebar keeps it open: the swipe belongs to the dialog.
+    onClose: () => hasLayer() || shell.close(),
   });
   const conn = useConnectionContext();
   const { snapshot } = useConnectionState(conn);
@@ -211,6 +221,7 @@ export function AppShell({
               shell.close();
           }}
         >
+          <CloseSignalContext.Provider value={closeSignal}>
           <Box
             display="flex"
             alignItems="center"
@@ -321,6 +332,7 @@ export function AppShell({
               />
             )}
           </Portal>
+          </CloseSignalContext.Provider>
         </Box>
         <Box flex="1" minW="0">
           <Strips />

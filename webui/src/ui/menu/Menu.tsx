@@ -1,6 +1,7 @@
 import { Box, Menu as ChakraMenu, Portal, Text } from "@chakra-ui/react";
 import { Fragment, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { useWide } from "../../useWide";
+import { useCloseSignal } from "../closeSignal";
 import { PhoneMenu } from "./PhoneMenu";
 
 interface ItemBase {
@@ -188,8 +189,10 @@ function Panel({ entries }: { entries: MenuEntry[] }) {
  * opened from it.
  */
 export function GxMenu(props: MenuProps) {
+  const inherited = useCloseSignal();
+  const all = { ...props, closeSignal: props.closeSignal ?? inherited };
   // On a phone the menu is an anchored popover with in-place submenus; placement is a desktop concern.
-  return useWide() ? <WideMenu {...props} /> : <PhoneMenu {...props} />;
+  return useWide() ? <WideMenu {...all} /> : <PhoneMenu {...all} />;
 }
 
 export interface MenuProps {

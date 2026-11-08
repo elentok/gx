@@ -1,5 +1,7 @@
 import { Box, chakra, Popover, Portal } from "@chakra-ui/react";
+import { useState } from "react";
 import type { Connection } from "../connection";
+import { useCloseSignal, useOnCloseSignal } from "../ui/closeSignal";
 import { UsageModeLimits, UsageModeSpending, type UsageLimits } from "../generated/server";
 import { isPastReset, limitTone, wholePercent } from "./format";
 import { LimitsBlock } from "./LimitsBlock";
@@ -33,6 +35,8 @@ function Bar({ letter, name, limits, now }: { letter: string; name: string; limi
 // Renders nothing until a fetch succeeds, as the gear menu's block did: no spinner.
 export function LimitsTray({ conn, fetcher }: { conn: Connection; fetcher?: FetchSummary }) {
   const state = useUsageSummary(conn, fetcher);
+  const [open, setOpen] = useState(false);
+  useOnCloseSignal(useCloseSignal(), () => setOpen(false));
   const summary = state?.summary;
   if (!state || !summary) return null;
   const body =
@@ -48,7 +52,7 @@ export function LimitsTray({ conn, fetcher }: { conn: Connection; fetcher?: Fetc
   if (!body) return null;
   const label = "Usage limits";
   return (
-    <Popover.Root positioning={{ placement: "top-end" }} lazyMount unmountOnExit>
+    <Popover.Root open={open} onOpenChange={(e) => setOpen(e.open)} positioning={{ placement: "top-end" }} lazyMount unmountOnExit>
       <Popover.Trigger asChild>
         <chakra.button
           type="button"

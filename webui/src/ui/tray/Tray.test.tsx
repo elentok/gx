@@ -1,4 +1,7 @@
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
+import { CloseSignalContext } from "../closeSignal";
 import type { Health, HealthState, MeterHealth } from "../../generated/server";
 import { renderThemed } from "../render";
 import { Tray } from "./Tray";
@@ -7,6 +10,23 @@ const meter = (state: HealthState, level = 1): MeterHealth => ({ level, state, r
 const healthOf = (cpu: MeterHealth, memory = meter("normal"), disk = meter("normal")): Health => ({ cpu, memory, disk });
 
 describe("Tray", () => {
+  it("closes its popover when the container's close signal changes", async () => {
+    function Harness() {
+      const [signal, setSignal] = useState(0);
+      return (
+        <CloseSignalContext.Provider value={signal}>
+          <Tray health={healthOf(meter("normal"))} />
+          <button onClick={() => setSignal(signal + 1)}>bump</button>
+        </CloseSignalContext.Provider>
+      );
+    }
+    renderThemed(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /System health/ }));
+    await screen.findByRole("dialog", { name: "System health" });
+    fireEvent.click(screen.getByText("bump"));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "System health" })).toBeNull());
+  });
+
   it("draws the meters in the order CPU, memory, disk with C, M, D under them", () => {
     const { container } = renderThemed(<Tray health={healthOf(meter("normal"))} />);
     const meters = [...container.querySelectorAll("[data-meter]")];

@@ -1,5 +1,7 @@
 import { Box, chakra, Popover, Portal } from "@chakra-ui/react";
+import { useState } from "react";
 import type { Health, MeterHealth } from "../../generated/server";
+import { useCloseSignal, useOnCloseSignal } from "../closeSignal";
 import { HealthPopover } from "../../health/HealthPopover";
 import { METERS } from "./meters";
 import { STATE_COLOR } from "./stateColor";
@@ -23,9 +25,17 @@ const phoneAnchorRect: NonNullable<NonNullable<Popover.RootProps["positioning"]>
 };
 
 export function Tray({ health, connected = true }: { health: Health; connected?: boolean }) {
+  const [open, setOpen] = useState(false);
+  useOnCloseSignal(useCloseSignal(), () => setOpen(false));
   // The body mounts only while open, so its polling starts and stops with the popover.
   return (
-    <Popover.Root positioning={{ placement: "bottom-end", getAnchorRect: phoneAnchorRect, overflowPadding: PHONE_EDGE_GAP }} lazyMount unmountOnExit>
+    <Popover.Root
+      open={open}
+      onOpenChange={(e) => setOpen(e.open)}
+      positioning={{ placement: "bottom-end", getAnchorRect: phoneAnchorRect, overflowPadding: PHONE_EDGE_GAP }}
+      lazyMount
+      unmountOnExit
+    >
       <Popover.Trigger asChild>
         <chakra.button
           type="button"

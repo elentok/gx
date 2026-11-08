@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { requestPromptFocus } from "../agents/promptFocus";
 import { isMod, isTextTarget } from "./keys";
+import { hasLayer } from "../ui/modal/layers";
 import type { Shell } from "./ShellContext";
 
 /** Marks every sidebar row anchor and section header: the stops of the roving focus. */
@@ -99,6 +100,8 @@ export function useSidebarKeys(aside: RefObject<HTMLElement | null>, shell: Shel
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!isMod(e) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "b" || isTextTarget(e.target)) return;
+      // A dialog opened from the sidebar owns the key.
+      if (hasLayer()) return;
       e.preventDefault();
       focusOnOpen.current = !sidebarOpen;
       toggle();

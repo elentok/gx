@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
@@ -90,6 +90,38 @@ test.each([
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "More settings..." }));
   expect(isOpen()).toBe(staysOpen);
+});
+
+describe("closing the sidebar closes its menus", () => {
+  const closers: [string, () => void][] = [
+    ["the toggle", () => fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }))],
+    ["the scrim", () => fireEvent.click(screen.getByTestId("scrim"))],
+    ["Ctrl+B", () => fireEvent.keyDown(window, { key: "b", ctrlKey: true })],
+    ["a swipe", () => swipe(sidebar(), [200, 300], [100, 300])],
+  ];
+  test.each(closers)("%s closes an open gear menu", async (_, close) => {
+    setup("phone");
+    fireEvent.click(mascot()!);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    await screen.findByRole("menuitem", { name: "More settings..." });
+    close();
+    expect(isOpen()).toBe(false);
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "More settings..." })).toBeNull());
+  });
+
+  test("a dialog from a menu item stays open and blocks Cmd+B and a swipe", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: [], follow_ups: [], projects: [] }), { status: 200 })));
+    setup("phone");
+    fireEvent.click(mascot()!);
+    fireEvent.click(screen.getByRole("button", { name: "+ New" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "New design" }));
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    swipe(sidebar(), [200, 300], [100, 300]);
+    expect(isOpen()).toBe(true);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
 });
 
 test("the amber dot shows only while the sidebar is closed and something needs me", () => {

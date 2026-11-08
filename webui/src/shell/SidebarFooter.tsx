@@ -12,6 +12,7 @@ import { GxMenu } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
 import { LimitsTray } from "../usage/LimitsTray";
 import { GearMenu } from "./GearMenu";
+import { useShell } from "./ShellContext";
 
 const EPICS_HREF = "#/epics";
 
@@ -122,6 +123,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
 
 function DesignDialog({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
+  const shell = useShell();
   const { list } = useEpicList();
   const projects = [...new Set([...(list?.projects ?? []), ...(list?.epics ?? []).map((e) => e.project)])].sort();
   return (
@@ -130,6 +132,7 @@ function DesignDialog({ onClose }: { onClose: () => void }) {
       onStarted={(address, startFailure) => {
         onClose();
         navigate(designHref(address).slice(1), { state: { startFailure } });
+        shell?.closeSliding();
       }}
       onClose={onClose}
     />
@@ -138,6 +141,7 @@ function DesignDialog({ onClose }: { onClose: () => void }) {
 
 function AgentDialog({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
+  const shell = useShell();
   return (
     <NewSessionForm
       fetchTrees={fetchWorktrees}
@@ -146,6 +150,7 @@ function AgentDialog({ onClose }: { onClose: () => void }) {
       onCreated={(id) => {
         onClose();
         navigate(`/agents/${id}`);
+        shell?.closeSliding();
       }}
     />
   );
