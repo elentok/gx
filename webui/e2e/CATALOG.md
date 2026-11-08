@@ -15,6 +15,15 @@ one Codex ticket running. To make the usage scan save a new Codex sample, append
 (`{"timestamp":<ISO>,"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":N,"window_minutes":10080,"resets_at":<epoch>}}}}`)
 to the `rollout-*.jsonl` under `fixture.codexSessionsDir` (`codex_sessions_dir` in the fixture output). `fixture.cliInput(input, ...args)` and
 `fixture.cliEnvInput(extra, input, ...args)` are `cli`/`cliEnv` with `input` on stdin.
+The `triage` scenario seeds follow-ups of both categories and a Triage in the state its shape names
+(`start("triage", { shape })`; default `c-few`). Each shape is its own server start, because the sidebar badge sums every project of a
+workspace. Counts: `c-zero` (no open follow-up), `c-few` (3: 2 bugs and 1 idea across `demo` and `side`), `c-many` (45: 30 bugs, 15 ideas),
+`c-live` (a Triage waiting for Approve, 12 rows left), `c-named` (a named workspace, "triage ws", holding both projects). Triage pages:
+`verify` (45 rows, 31 verdicts saved, session running), `b-questions` (Approve, three open questions), `b-review` (Approve, no open
+question, five action groups, three rows changed), `writing` (session running, two failed rows: one before its move, one after), `result`
+(Done, two kept rows, a ready epic and a map epic), `stopped` (started from the CLI: no session, stopped at Plan). `journey` has
+follow-ups and no record, for the Triage journey flow. Records are written with the `triage` package; the `verify` and `writing`
+sessions are started with `gx server triage open`. Data: `testutil/gxfixture/spec/triage.go`.
 The `launch-held` scenario queues one ticket whose worktree has a tracked `package-lock.json`, with a fake `npm`
 on `PATH`: the ticket stays `claimed` at "installing dependencies" while `<gate_dir>/npm-hold` exists
 (`<gate_dir>/npm-started` marks the wait), and removing the hold lets the launch go on. The `epic-at-cap` scenario

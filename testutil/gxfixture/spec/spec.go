@@ -197,6 +197,11 @@ type Scenario struct {
 	// WorkingFixAgents are the FixAgents tickets whose agent is then given a plain
 	// prompt, which the fake never finishes, so the agent reads Working, not Idle.
 	WorkingFixAgents []string
+	// Triage seeds Triage records before the server starts (see TriageScenario).
+	Triage []TriageSeed
+	// TriageShaped marks the triage scenario, whose whole content comes from the
+	// --shape value (TriageScenario).
+	TriageShaped bool
 }
 
 // WebMode is how far the fixture takes the web setup and sign-in.

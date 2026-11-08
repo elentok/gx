@@ -221,6 +221,9 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 		// The short usage poll lets the server see the window's reset well inside the flow's wait.
 		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s", "GX_USAGE_POLL_INTERVAL="+limitBurnUsagePollInterval, supervise.RateLimitReleaseFileEnv+"="+f.rateLimitReleaseFile())
 	}
+	if err := f.seedTriage(sc); err != nil {
+		return fmt.Errorf("seed triage: %w", err)
+	}
 	if sc.PromptGrace != "" {
 		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.PromptGrace)
 	}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 // limitShapes are the --shape values of a limits scenario. Each builds the
@@ -69,9 +70,11 @@ func checkShape(sc scenario, shape string) (string, error) {
 		def, names = "normal", spendShapeNames()
 	case sc.LimitBurn:
 		def, names = "menu", limitseed.ShapeNames()
+	case sc.TriageShaped:
+		def, names = "c-few", spec.TriageShapes
 	default:
 		if shape != "" {
-			return "", fmt.Errorf("--shape only applies to the limits, spend and limit-burn scenarios")
+			return "", fmt.Errorf("--shape only applies to the limits, spend, limit-burn and triage scenarios")
 		}
 		return "", nil
 	}

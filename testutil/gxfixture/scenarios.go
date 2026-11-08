@@ -585,6 +585,9 @@ var scenarios = map[string]scenario{
 	// workspaces: three workspaces with members, held items, agents and one card
 	// per section. See spec.WorkspacesScenario.
 	"workspaces": spec.WorkspacesScenario(),
+	// triage: follow-ups and a Triage in the state --shape names (default c-few).
+	// run swaps in spec.TriageScenario(shape).
+	"triage": {TriageShaped: true},
 	// dirty-trunk: a complete epic whose merge is paused because trunk's checkout
 	// holds an uncommitted same.txt that the epic's branch also adds, so
 	// restoring the stash after the merge conflicts.
