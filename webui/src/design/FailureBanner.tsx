@@ -6,7 +6,7 @@ import { Button } from "../ui/button/Button";
 import { refusalText, useWrite } from "../useWrite";
 import { postKeys, type PostKeys } from "./keys";
 import { fetchPermission, usePermission, type FetchPermission } from "./permission";
-import { postResumeSession, stateToken, type OpenDesign, type ResumeSession } from "./open";
+import { postResumeSession, stateToken, type OpenFlow, type ResumeSession } from "./open";
 import { postPrompt, type PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
 import { ScreenModal } from "./ScreenModal";
@@ -58,7 +58,7 @@ const PERMISSION_REFUSALS: Record<string, string> = {
 export interface FailureActions {
   /** The Design's epic address, for New session. */
   address: string;
-  open?: OpenDesign;
+  open?: OpenFlow;
   resume?: ResumeSession;
   fetchScreen?: FetchScreen;
 }

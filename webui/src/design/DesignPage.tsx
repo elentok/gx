@@ -1,49 +1,26 @@
-import { Box, Text, chakra } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { Text, chakra } from "@chakra-ui/react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { EpicRing } from "../epic/EpicRing";
-import { PageHeader } from "../page/PageHeader";
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
 import { PageIcon } from "../page/PageIcon";
-import { useKeyboardOpen } from "../page/useKeyboardOpen";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
-import { hasChat, roundKeyOf, useSessionChat, type FetchChat } from "./chat";
-import { useFocusReport, type PostFocus } from "./focus";
-import { DesignChat } from "./ChatLog";
+import type { FetchChat } from "./chat";
+import type { PostFocus } from "./focus";
 import { MapImageStrip } from "./MapImageStrip";
 import type { FetchMapImages } from "./mapImages";
-import type {
-  DeleteDesign,
-  OpenDesign,
-  ResumeSession,
-  StopSession,
-} from "./open";
+import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
-import { AgentLine } from "./AgentLine";
 import { ImplLink, Tickets, showsImplLink } from "./Progress";
 import { designModel } from "../stepped/model";
-import {
-  Progress,
-  StepLine,
-  StepsSheet,
-  summaryLine,
-} from "../stepped/Progress";
+import { SteppedPage } from "../stepped/SteppedPage";
 import type { FetchScreen } from "./screen";
-import {
-  DesignActionsMenu,
-  Failure,
-  StartDesignButton,
-} from "./SessionControls";
-import {
-  SectionOnHold,
-  type EpicListRow,
-  type SessionInfo,
-} from "../generated/server";
+import { SectionOnHold, type EpicListRow } from "../generated/server";
 import { slugOf } from "../slug";
-import { useDevice, useWide } from "../useWide";
+import { useWide } from "../useWide";
 import { designSession, liveSessions } from "./view";
 
 /** The injected fetchers and actions the Design page talks to the server through. */
@@ -60,54 +37,7 @@ export interface DesignDeps {
   fetchMapImages?: FetchMapImages;
 }
 
-interface SessionStripProps {
-  address: string;
-  session?: SessionInfo;
-  live: SessionInfo[];
-  deps: DesignDeps;
-  onSelect: (id: string) => void;
-  startFailure?: string;
-  /** The map has no Destination and no tickets yet, so it can still be deleted. */
-  deletable?: boolean;
-  card?: EpicListRow;
-}
-
-// The right of the title row: the failed-start message, the first Start button, and the menu.
-function SessionStrip({
-  address,
-  session,
-  live,
-  deps,
-  onSelect,
-  startFailure,
-  deletable,
-  card,
-}: SessionStripProps) {
-  const navigate = useNavigate();
-  // The reason is for the failed start only: a live session means a retry worked.
-  const reason =
-    !session || session.status.state === "exited" ? startFailure : undefined;
-  return (
-    <Box display="flex" alignItems="center" justifyContent="flex-end" gap="3">
-      <Failure>{reason ?? ""}</Failure>
-      {!session && <StartDesignButton address={address} open={deps.open} />}
-      <DesignActionsMenu
-        address={address}
-        shown={session}
-        live={live}
-        deletable={deletable}
-        card={card}
-        onSelect={onSelect}
-        onDeleted={() => navigate("/epics")}
-        open={deps.open}
-        stop={deps.stop}
-        remove={deps.remove}
-      />
-    </Box>
-  );
-}
-
-// The title row and the Chat and Progress columns of one Design. Progress reads the Design's epic detail.
+// One Design in the shared stepped frame. Progress reads the Design's epic detail.
 function DesignBody({
   address,
   wide,
@@ -121,52 +51,15 @@ function DesignBody({
   epics: EpicListRow[];
   startFailure?: string;
 }) {
+  const navigate = useNavigate();
   const conn = useConnectionContext();
   const { detail, refetch } = useEpicDetail(address, conn, deps.fetchDetail);
-  const connState = useConnectionState(conn);
-  const sessions = connState.snapshot?.sessions ?? [];
-  const [selected, setSelected] = useState<string>();
-  const [toggle, setToggle] = useState<{ key: string; on: boolean }>();
-  const [stepsOpen, setStepsOpen] = useState(false);
-  const model = detail && designModel(detail);
-  const { done, current, nextTitle } = model ?? {};
+  const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
+  const model = detail ? designModel(detail) : undefined;
   const name = slugOf(address);
-  // Below desktop the chat takes the full width: the footer's Add, Note, Auto, countdown and Send need it on one line.
-  // The steps then open from the header like on a phone.
-  const sideColumn = useDevice() === "desktop";
-  const keyboardOpen = useKeyboardOpen();
-  const stepsInline = wide && sideColumn;
   // The card speaks for this page only while its active (first) address is this Design.
   const card = epics.find((e) => e.addresses?.[0] === address);
   const live = liveSessions(address, sessions);
-  // Switching shows an older live session; once it is gone the newest drives the page again.
-  const session =
-    live.find((s) => s.id === selected) ?? designSession(address, sessions);
-  const chatty = hasChat(session?.harness);
-  const { detail: chat, refetch: refetchChat } = useSessionChat(
-    session && chatty ? session.id : undefined,
-    conn,
-    deps.fetchChat,
-  );
-  // Derived, not stored, so it cannot go stale: a round opens in Questions, and the reader's toggle holds for
-  // that session and round only. The message list and the impl link both read it.
-  const viewKey = `${session?.id}|${roundKeyOf(chat)}`;
-  const questions =
-    chatty &&
-    (chat?.round?.length ?? 0) > 0 &&
-    (toggle?.key === viewKey ? toggle.on : true);
-  // The busy row follows what the agent reported; Progress and Continue keep following the map.
-  const running =
-    detail?.steps?.find((s) => s.step === session?.reported_step) ?? current;
-  // Without the map detail there is no step to name, so the row reads a bare "Working".
-  const working = {
-    step: running?.label,
-    title:
-      running?.step === "resolve-tickets"
-        ? session?.reported_title || detail?.rows.find((r) => r.current)?.title
-        : undefined,
-  };
-  useFocusReport(conn, session?.id, connState.streams, deps.focus);
   // `deletable` depends on the live sessions, and a session stop is no ticket event.
   const liveKey = live.map((s) => s.id).join(",");
   const seenLiveKey = useRef(liveKey);
@@ -175,145 +68,46 @@ function DesignBody({
     seenLiveKey.current = liveKey;
     refetch();
   }, [liveKey, refetch]);
-  const ring = (size: "header" | "headerSm" | "compact") => (
-    <EpicRing detail={detail!} card={card} sessions={sessions} size={size} />
-  );
   return (
-    <>
-      {stepsOpen && model && (
-        <StepsSheet
-          model={model}
-          rows={<Tickets rows={model.tickets} />}
-          ring={ring("compact")}
-          onClose={() => setStepsOpen(false)}
-        />
-      )}
-      {/* With the keyboard up the header would take most of the visible height; the question needs it. */}
-      <Box mt="4" mb="3" flex="none" display={keyboardOpen && !sideColumn ? "none" : undefined}>
-        <PageHeader
-          title={name}
-          icon={<PageIcon kind="design" />}
-          caret
-          subtitle={
-            model && (
-              <>
-                {stepsInline ? (
-                  summaryLine(model)
-                ) : (
-                  <StepLine model={model} onOpen={() => setStepsOpen(true)} />
-                )}
-                {card?.section === SectionOnHold && " · On hold"}
-              </>
-            )
-          }
-          meta={
-            <Box
-              display="flex"
-              flexWrap="wrap"
-              alignItems="center"
-              columnGap="3"
-              rowGap="1"
-              fontSize="12px"
-            >
-              {session && <AgentLine session={session} wide={wide} />}
-              <chakra.a
-                href={`#/e/${address}`}
-                color="text.dim"
-                textDecoration="underline"
-              >
-                Design epic: {name} ↗
-              </chakra.a>
-            </Box>
-          }
-          actions={
-            <>
-              {detail &&
-                (stepsInline ? (
-                  ring("header")
-                ) : (
-                  <chakra.button
-                    type="button"
-                    aria-label="Show progress steps"
-                    aria-haspopup="dialog"
-                    cursor="pointer"
-                    onClick={() => setStepsOpen(true)}
-                  >
-                    {ring("headerSm")}
-                  </chakra.button>
-                ))}
-              <SessionStrip
-                address={address}
-                session={session}
-                live={live}
-                deps={deps}
-                onSelect={setSelected}
-                startFailure={startFailure}
-                card={card}
-                deletable={detail?.deletable}
-              />
-            </>
-          }
-        />
-      </Box>
-      <Box
-        display="grid"
-        gridTemplateColumns={sideColumn ? "minmax(0, 1fr) 300px" : "1fr"}
-        gridTemplateRows={"minmax(0, 1fr)"}
-        gap="4"
-        flex="1"
-        minH="0"
-      >
-        <Box
-          aria-label="Chat"
-          role="region"
-          minW="0"
-          minH="0"
-          // The question card keeps a floor height (QuestionSheet); on a very short viewport the region scrolls.
-          overflowY="auto"
-          display="flex"
-          flexDirection="column"
-          gap="3"
-          gridRow={1}
-          gridColumn={1}
-        >
-          {!questions && detail && showsImplLink(detail) && (
-            <ImplLink address={detail.impl_address!} />
-          )}
+    <SteppedPage
+      address={address}
+      title={name}
+      icon={<PageIcon kind="design" />}
+      wide={wide}
+      model={model}
+      ring={detail ? (size) => <EpicRing detail={detail} card={card} sessions={sessions} size={size} /> : undefined}
+      live={live}
+      current={designSession(address, sessions)}
+      actions={deps}
+      startLabel="Start design session"
+      startFailure={startFailure}
+      working={(session) => {
+        // The busy row follows what the agent reported; Progress and Continue keep following the map.
+        const running = detail?.steps?.find((s) => s.step === session?.reported_step) ?? model?.current;
+        // Without the map detail there is no step to name, so the row reads a bare "Working".
+        return {
+          step: running?.label,
+          title:
+            running?.step === "resolve-tickets"
+              ? session?.reported_title || detail?.rows.find((r) => r.current)?.title
+              : undefined,
+        };
+      }}
+      subtitleSuffix={card?.section === SectionOnHold && " · On hold"}
+      metaLink={
+        <chakra.a href={`#/e/${address}`} color="text.dim" textDecoration="underline">
+          Design epic: {name} ↗
+        </chakra.a>
+      }
+      chatTop={({ questions }) => (
+        <>
+          {!questions && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />}
           <MapImageStrip address={address} fetcher={deps.fetchMapImages} />
-          <DesignChat
-            session={session}
-            chat={chat}
-            refetch={refetchChat}
-            post={deps.post}
-            done={done}
-            nextTitle={nextTitle}
-            working={working}
-            questions={questions}
-            onQuestions={(on) => setToggle({ key: viewKey, on })}
-            actions={{
-              address,
-              open: deps.open,
-              resume: deps.resume,
-              fetchScreen: deps.fetchScreen,
-            }}
-          />
-        </Box>
-        {stepsInline && (
-          <Box
-            aria-label="Progress"
-            role="region"
-            gridRow={1}
-            gridColumn={2}
-            minH="0"
-            overflowY="auto"
-          >
-            {model && (
-              <Progress model={model} rows={<Tickets rows={model.tickets} />} />
-            )}
-          </Box>
-        )}
-      </Box>
-    </>
+        </>
+      )}
+      ticketRows={model && <Tickets rows={model.tickets} />}
+      designMenu={{ card, deletable: detail?.deletable, remove: deps.remove, onDeleted: () => navigate("/epics") }}
+    />
   );
 }
 

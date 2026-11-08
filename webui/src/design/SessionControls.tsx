@@ -17,7 +17,7 @@ import {
   postStopSession,
   stateToken,
   type DeleteDesign,
-  type OpenDesign,
+  type OpenFlow,
   type StopSession,
 } from "./open";
 
@@ -43,22 +43,24 @@ export const Failure = ({ children }: { children: string }) =>
     </Text>
   ) : null;
 
-/** Starts the Design's session. `onStarted` runs once it exists, e.g. to go to the Design page. */
+/** Starts the flow's session. `onStarted` runs once it exists, e.g. to go to the Design page. */
 export function StartDesignButton({
   address,
   open = postOpenDesign,
   onStarted,
+  label = "Start design session",
 }: {
   address: string;
-  open?: OpenDesign;
+  open?: OpenFlow;
   onStarted?: () => void;
+  label?: string;
 }) {
   const { run, pending } = useDesignWrite();
   return (
     <Box display="flex" alignItems="center" gap="2">
       <Button tone="running" disabled={pending} onClick={() => run(() => open({ epic: address }), { onDone: onStarted })}>
         {pending && <Spinner size="sm" />}
-        Start design session
+        {label}
       </Button>
     </Box>
   );
@@ -69,7 +71,7 @@ export function startNew(
   run: ReturnType<typeof useDesignWrite>["run"],
   address: string,
   shown: SessionInfo,
-  open: OpenDesign = postOpenDesign,
+  open: OpenFlow = postOpenDesign,
 ) {
   const isLive = shown.status.state !== "exited";
   if (isLive && !window.confirm("Stop the current session and start a new one?")) return;
@@ -149,8 +151,11 @@ export function DesignActionsMenu({
   stop = postStopSession,
   remove = postDeleteDesign,
   card,
+  designItems = true,
 }: {
   address: string;
+  /** Delete, Hold and workspace Move belong to a Design only; another flow's menu leaves them out. */
+  designItems?: boolean;
   /** The Design's card; its workspace and hold state drive the Move, Remove and Hold items. */
   card?: EpicListRow;
   shown?: SessionInfo;
@@ -160,7 +165,7 @@ export function DesignActionsMenu({
   deletable?: boolean;
   onSelect: (id: string) => void;
   onDeleted: () => void;
-  open?: OpenDesign;
+  open?: OpenFlow;
   stop?: StopSession;
   remove?: DeleteDesign;
 }) {
@@ -169,7 +174,7 @@ export function DesignActionsMenu({
   const wide = useWide();
   const { workspaces } = useWorkspaces(useConnectionContext());
   const itemActions = useCardActions(card, workspaces);
-  const canDelete = deletable && live.length === 0;
+  const canDelete = designItems && deletable && live.length === 0;
 
   const groups: MenuEntry[][] = [];
   const agent = shown && agentSection(shown, wide);
@@ -187,7 +192,7 @@ export function DesignActionsMenu({
     sessionItems.push(...liveSessionEntries(live, shown, pending, onSelect, (s) => run(() => stop({ id: s.id, state: stateToken(s) }))));
   if (sessionItems.length > 0) groups.push(sessionItems);
   const copySection: MenuEntry[] = [
-    { value: "copy-design-id", label: "Copy design ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) },
+    { value: "copy-design-id", label: designItems ? "Copy design ID" : "Copy triage ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) },
   ];
   if (canDelete && !confirming)
     copySection.push({
@@ -198,7 +203,7 @@ export function DesignActionsMenu({
       onSelect: () => setConfirming(true),
     });
   groups.push(copySection);
-  groups.push(...itemActions.groups);
+  if (designItems) groups.push(...itemActions.groups);
   if (canDelete && confirming)
     groups.push([
       {
@@ -216,7 +221,7 @@ export function DesignActionsMenu({
   return (
     <>
       <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} onClosed={() => setConfirming(false)} />
-      {itemActions.dialogs}
+      {designItems && itemActions.dialogs}
     </>
   );
 }

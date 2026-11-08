@@ -11,6 +11,8 @@ import { apiFetch } from "../apiFetch";
 import { WriteError } from "../useWrite";
 
 export type OpenDesign = (body: DesignOpenRequest) => Promise<SessionResult>;
+/** Opens a stepped flow's session. `epic` is the flow's key: a Design's map address, a Triage's project. */
+export type OpenFlow = (body: Pick<DesignOpenRequest, "epic" | "new" | "state">) => Promise<SessionResult>;
 export type DeleteDesign = (
   body: DesignDeleteRequest,
 ) => Promise<SessionResult>;
@@ -44,6 +46,8 @@ export async function readWrite<R extends SessionResult>(res: Response): Promise
 }
 
 export const postOpenDesign: OpenDesign = postJson("/v1/designs/open");
+const postTriageStart = postJson("/v1/triage/open");
+export const postOpenTriage: OpenFlow = ({ epic, ...rest }) => postTriageStart({ project: epic, ...rest });
 export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete");
 export const postStopSession: StopSession = postJson("/v1/sessions/stop");
 export const postResumeSession: ResumeSession = postJson("/v1/sessions/resume");
