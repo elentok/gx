@@ -573,6 +573,38 @@ test("Auto-queue reads the session's real state and posts the flip off", async (
   fetchSpy.mockRestore();
 });
 
+const queueAuto = { auto_queue_at: new Date(Date.now() + 9500).toISOString() };
+
+test.each([true, false])("the Auto-queue countdown shows (wide=%s) and its Cancel stops only Auto-queue", async (wide) => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({ wide, auto: queueAuto });
+  expect(await screen.findByText(/Queuing in \d+s/)).toBeTruthy();
+  expect(screen.queryByText(/Continuing in/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel auto-queue" }));
+  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-queue/cancel").id).toBe("s-a"));
+  expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-advance/cancel", expect.anything());
+  fetchSpy.mockRestore();
+});
+
+test("two countdowns stack and each Cancel is addressable", async () => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({ wide: false, auto: { ...countdownAuto, ...queueAuto } });
+  const advance = (await screen.findByText(/Continuing in \d+s/)).parentElement as HTMLElement;
+  const queue = (await screen.findByText(/Queuing in \d+s/)).parentElement as HTMLElement;
+  expect(advance.getAttribute("data-part")).toBe("countdown-strip");
+  expect(queue.getAttribute("data-part")).toBe("countdown-strip");
+  expect(advance.parentElement).toBe(queue.parentElement);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a"));
+  expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-queue/cancel", expect.anything());
+  fetchSpy.mockRestore();
+});
+
 test("without a countdown there is no countdown text or Cancel", async () => {
   render({});
   await autoButton();

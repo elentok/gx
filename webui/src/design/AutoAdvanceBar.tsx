@@ -14,10 +14,8 @@ import { AutoMenu, type AutoMenuState } from "./AutoMenu";
 export type RunCall = (call: () => Promise<Refusable>) => Promise<void>;
 
 // Counts down to the server's deadline; undefined with no countdown running.
-export function useAutoAdvanceCountdown(session: SessionInfo) {
-  const deadline = session.auto_advance_at
-    ? Date.parse(session.auto_advance_at)
-    : undefined;
+function useCountdown(at: string | undefined) {
+  const deadline = at ? Date.parse(at) : undefined;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (deadline === undefined) return;
@@ -30,23 +28,24 @@ export function useAutoAdvanceCountdown(session: SessionInfo) {
     : Math.max(0, Math.ceil((deadline - now) / 1000));
 }
 
-// "Continuing in Ns" with its Cancel; nothing with no countdown running. `strip` is the phone's own row above the footer.
-export function AutoCountdown({
-  session,
+// One countdown line with its Cancel; nothing with no countdown running. `strip` is the phone's own row above the footer.
+function CountdownRow({
+  at,
+  text,
+  cancelName,
   disabled,
-  run,
-  cancelAutoAdvance,
-  strip = false,
+  onCancel,
+  strip,
 }: {
-  session: SessionInfo;
+  at: string | undefined;
+  text: (secondsLeft: number) => string;
+  cancelName?: string;
   disabled: boolean;
-  run: RunCall;
-  cancelAutoAdvance: CancelAutoAdvance;
-  strip?: boolean;
+  onCancel: () => void;
+  strip: boolean;
 }) {
-  const secondsLeft = useAutoAdvanceCountdown(session);
+  const secondsLeft = useCountdown(at);
   if (secondsLeft === undefined) return null;
-  const state = stateToken(session);
   return (
     <Box
       display="flex"
@@ -55,16 +54,55 @@ export function AutoCountdown({
       {...(strip ? { justifyContent: "space-between", minH: "44px", px: "1", "data-part": "countdown-strip" } : {})}
     >
       <Text color="tone.waiting.fg" whiteSpace="nowrap">
-        Continuing in {secondsLeft}s
+        {text(secondsLeft)}
       </Text>
       <Button
         emphasis="secondary"
+        aria-label={cancelName}
         disabled={disabled}
         {...(strip ? { h: "40px" } : {})}
-        onClick={() => run(() => cancelAutoAdvance({ id: session.id, state }))}
+        onClick={onCancel}
       >
         Cancel
       </Button>
+    </Box>
+  );
+}
+
+// "Continuing in Ns" and "Queuing in Ns", each with its Cancel; they stack when both run. Only the Auto-queue Cancel carries a name, so "Cancel" stays the auto-advance one.
+export function AutoCountdown({
+  session,
+  disabled,
+  run,
+  cancelAutoAdvance,
+  cancelAutoQueue,
+  strip = false,
+}: {
+  session: SessionInfo;
+  disabled: boolean;
+  run: RunCall;
+  cancelAutoAdvance: CancelAutoAdvance;
+  cancelAutoQueue: CancelAutoAdvance;
+  strip?: boolean;
+}) {
+  const state = stateToken(session);
+  return (
+    <Box display="flex" flexDirection="column" gap="1">
+      <CountdownRow
+        at={session.auto_advance_at}
+        text={(s) => `Continuing in ${s}s`}
+        disabled={disabled}
+        strip={strip}
+        onCancel={() => run(() => cancelAutoAdvance({ id: session.id, state }))}
+      />
+      <CountdownRow
+        at={session.auto_queue_at}
+        text={(s) => `Queuing in ${s}s`}
+        cancelName="Cancel auto-queue"
+        disabled={disabled}
+        strip={strip}
+        onCancel={() => run(() => cancelAutoQueue({ id: session.id, state }))}
+      />
     </Box>
   );
 }
@@ -77,6 +115,7 @@ export function AutoAdvanceBar({
   setAutoAdvance,
   setAutoQueue,
   cancelAutoAdvance,
+  cancelAutoQueue,
   menu,
   phone = false,
 }: {
@@ -88,6 +127,7 @@ export function AutoAdvanceBar({
   setAutoAdvance: SetAutoAdvance;
   setAutoQueue: SetAutoQueue;
   cancelAutoAdvance: CancelAutoAdvance;
+  cancelAutoQueue: CancelAutoAdvance;
   menu: AutoMenuState;
 }) {
   const state = stateToken(session);
@@ -130,7 +170,13 @@ export function AutoAdvanceBar({
         ]}
       />
       {!phone && (
-        <AutoCountdown session={session} disabled={disabled} run={run} cancelAutoAdvance={cancelAutoAdvance} />
+        <AutoCountdown
+          session={session}
+          disabled={disabled}
+          run={run}
+          cancelAutoAdvance={cancelAutoAdvance}
+          cancelAutoQueue={cancelAutoQueue}
+        />
       )}
     </Box>
   );

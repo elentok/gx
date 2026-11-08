@@ -14,6 +14,7 @@ import {
   postAutoAdvance,
   postAutoQueue,
   postCancelAutoAdvance,
+  postCancelAutoQueue,
   postInterruptSession,
   stateToken,
   type CancelAutoAdvance,
@@ -45,6 +46,7 @@ export function Composer({
   setAutoAdvance = postAutoAdvance,
   setAutoQueue = postAutoQueue,
   cancelAutoAdvance = postCancelAutoAdvance,
+  cancelAutoQueue = postCancelAutoQueue,
   onStale,
   round = [],
   answers = {},
@@ -64,6 +66,7 @@ export function Composer({
   setAutoAdvance?: SetAutoAdvance;
   setAutoQueue?: SetAutoQueue;
   cancelAutoAdvance?: CancelAutoAdvance;
+  cancelAutoQueue?: CancelAutoAdvance;
   /** The conversation moved under the person: refetch the chat, keep the draft. */
   onStale?: () => void;
   /** The open Grilling round: Send answers all of it in one prompt. */
@@ -216,6 +219,7 @@ export function Composer({
       setAutoAdvance={setAutoAdvance}
       setAutoQueue={setAutoQueue}
       cancelAutoAdvance={cancelAutoAdvance}
+      cancelAutoQueue={cancelAutoQueue}
       menu={autoMenu}
       phone={!wide}
     />
@@ -302,6 +306,7 @@ export function Composer({
             disabled={!connected || pending}
             run={run}
             cancelAutoAdvance={cancelAutoAdvance}
+            cancelAutoQueue={cancelAutoQueue}
           />
         )}
       </ComposerImages>
