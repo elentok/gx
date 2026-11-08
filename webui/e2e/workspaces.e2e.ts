@@ -380,11 +380,11 @@ test("Workspaces", async ({ page, start }) => {
   await fx.cli("server", "workspaces", "delete", "studies");
   await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible();
 
-  // The gear menu holds AFK, Vi mode, Sort, Restart server and More settings; Sort is per workspace and follows the CLI.
+  // The gear menu holds AFK, Vi mode, Sort, Restart server, More settings, Cleanup and Tips; Sort is per workspace and follows the CLI.
   const gear = page.getByRole("button", nav("Menu"));
   const gearItems = page.getByRole("menu").locator('[role^="menuitem"]');
   await gear.click();
-  await expect(gearItems).toHaveText([/^AFK$/, /^Vi mode$/, /^Sort · Default workspace/, /^Restart server$/, /^More settings\.\.\.$/]);
+  await expect(gearItems).toHaveText([/^AFK$/, /^Vi mode$/, /^Sort · Default workspace/, /^Restart server$/, /^More settings\.\.\.$/, /^Cleanup/, /^Tips$/]);
   const sortOptions = page.getByRole("menuitemradio");
   const openSort = async (workspace: string) => {
     await closeMenus();
