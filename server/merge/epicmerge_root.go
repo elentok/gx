@@ -315,12 +315,13 @@ func (s *Merger) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 	s.chat.EpicComplete(project, s.projects.ChatOverride(project), one.Epic, counts, elapsed, cost, merged)
 }
 
-// submitRetro files the evolve one-off for a completed loop epic. It runs at
-// the epic's final outcome, where completed_at is stamped: the merge, a root
-// pause, or all-done with auto-ff-merge off. A refused submit is logged, never an error:
-// the dedupe key refuses a second live retro of the same epic.
+// submitRetro files the evolve one-off for a completed loop epic or a done map.
+// It runs at a loop epic's final outcome, where completed_at is stamped: the
+// merge, a root pause, or all-done with auto-ff-merge off; and when a map is
+// marked done. A refused submit is logged, never an error: the dedupe key
+// refuses a second live retro of the same epic.
 func (s *Merger) submitRetro(root queue.RootRef, projectDir string, e tickets.Epic) {
-	if e.IsMap || tickets.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
+	if tickets.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
 		return
 	}
 	pf, err := config.ReadProjectFile(projectDir)
@@ -365,8 +366,13 @@ func (s *Merger) StampEpic(root queue.RootRef, epicPath string, keys ...string) 
 	}
 	// Every merge path stamps merged_at here, so an <map>-impl merge completes its map here.
 	if slices.Contains(keys, "merged_at") {
-		if _, err := ticketmigrate.MarkMapDone(epicPath, false); err != nil {
+		change, err := ticketmigrate.MarkMapDone(epicPath, false)
+		if err != nil {
 			s.log.Warn("mark map done", "root", root, "err", err)
+		}
+		if change != nil {
+			// A map is done only once, so its retro is submitted only once.
+			s.submitRetro(root, filepath.Dir(epicPath), tickets.LoadEpicAt(filepath.Dir(change.Path)))
 		}
 		s.guards.GoSettle(func() { s.rec.RemoveMergedWorktree(root) })
 	}

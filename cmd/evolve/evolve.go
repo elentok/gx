@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
 )
 
@@ -126,6 +127,9 @@ func runEvolveRun(ctx context.Context, env evolveEnv, w, errW io.Writer, arg str
 	if err != nil {
 		return err
 	}
+	if err := refuseUndoneMap(t, force); err != nil {
+		return err
+	}
 	if !t.epic.EvolvedAt.IsZero() && !force {
 		return fmt.Errorf("epic %s:%s was already evolved at %s%s; pass --force to run it again", t.project, t.name, t.epic.EvolvedAt.Format(time.RFC3339), evolveTicketNote(env, t))
 	}
@@ -133,6 +137,19 @@ func runEvolveRun(ctx context.Context, env evolveEnv, w, errW io.Writer, arg str
 		return err
 	}
 	return evolveReminder(env, t.mode, w)
+}
+
+func mapIsDone(e tickets.Epic) bool {
+	return schema.Status(strings.ToLower(strings.TrimSpace(e.Status))) == schema.StatusDone
+}
+
+// refuseUndoneMap refuses a map that is not done: the completion hook retros it
+// once it is, so an earlier run is a mistake unless forced.
+func refuseUndoneMap(t evolveTarget, force bool) error {
+	if !t.epic.IsMap || force || mapIsDone(t.epic) {
+		return nil
+	}
+	return fmt.Errorf("map %s:%s is not done; pass --force to evolve it anyway", t.project, t.name)
 }
 
 // evolveTicketNote names the epic's retro ticket as " (retro <address>)",
@@ -175,9 +192,12 @@ func submitRetro(ctx context.Context, env evolveEnv, w, errW io.Writer, project,
 
 // runEvolveSkip marks the epic as deliberately not evolved: evolved_at and
 // evolve_skipped, never an evolve_ticket.
-func runEvolveSkip(env evolveEnv, w io.Writer, arg string) error {
+func runEvolveSkip(env evolveEnv, w io.Writer, arg string, force bool) error {
 	t, err := resolveEvolveTarget(env, arg)
 	if err != nil {
+		return err
+	}
+	if err := refuseUndoneMap(t, force); err != nil {
 		return err
 	}
 	err = tickets.StampEpicFields(t.epic.Path, map[string]any{"evolved_at": env.now().UTC(), "evolve_skipped": true})
@@ -208,7 +228,7 @@ func parseEvolveSince(s string) (time.Duration, error) {
 }
 
 // evolveCandidates lists the project's loop epics that completed inside the
-// window and have not been evolved. Maps and one-offs never get a retro.
+// window and have not been evolved. Done maps count; one-offs never get a retro.
 func evolveCandidates(env evolveEnv, projectDir string, since time.Duration) ([]tickets.Epic, error) {
 	epics, err := tickets.Load(projectDir)
 	if err != nil {
@@ -217,7 +237,10 @@ func evolveCandidates(env evolveEnv, projectDir string, since time.Duration) ([]
 	cutoff := env.now().Add(-since)
 	var out []tickets.Epic
 	for _, e := range epics {
-		if e.IsMap || tickets.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
+		if tickets.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
+			continue
+		}
+		if e.IsMap && !mapIsDone(e) {
 			continue
 		}
 		if e.CompletedAt.IsZero() || e.CompletedAt.Before(cutoff) {
@@ -329,8 +352,9 @@ func New(d Deps) *cobra.Command {
 	}
 	run.Flags().BoolVar(&force, "force", false, "run again for an epic that was already evolved")
 
+	var skipForce bool
 	skip := &cobra.Command{
-		Use:   "skip <epic>",
+		Use:   "skip <epic> [--force]",
 		Short: "mark the epic as evolved without running a retro",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -338,9 +362,10 @@ func New(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runEvolveSkip(e, c.OutOrStdout(), args[0])
+			return runEvolveSkip(e, c.OutOrStdout(), args[0], skipForce)
 		},
 	}
+	skip.Flags().BoolVar(&skipForce, "force", false, "skip a map that is not done")
 
 	var since string
 	var allProjects, yes bool

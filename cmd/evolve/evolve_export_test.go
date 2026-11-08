@@ -120,7 +120,7 @@ func TestEvolveReminder_EveryVerbInContributorMode(t *testing.T) {
 		"run": func(out *bytes.Buffer) error {
 			return runEvolveRun(context.Background(), f.env, out, &bytes.Buffer{}, "proj:epic", true)
 		},
-		"skip": func(out *bytes.Buffer) error { return runEvolveSkip(f.env, out, "proj:epic") },
+		"skip": func(out *bytes.Buffer) error { return runEvolveSkip(f.env, out, "proj:epic", false) },
 		"inputs": func(out *bytes.Buffer) error {
 			return runEvolveInputs(f.env, out, "proj:epic", false)
 		},
@@ -142,7 +142,7 @@ func TestEvolveReminder_EveryVerbInContributorMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := runEvolveSkip(f.env, &out, "proj:epic"); err != nil {
+	if err := runEvolveSkip(f.env, &out, "proj:epic", false); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(out.String(), "unexported") {
@@ -155,7 +155,7 @@ func TestEvolveReminder_SilentOutsideContributorMode(t *testing.T) {
 	f := newEvolveFixture(t, config.EvolveMaintainer, true, "")
 	addFollowUp(t, f, "01-x.md", "01", "category: bug\n", "## Source\n\ns\n")
 	var out bytes.Buffer
-	if err := runEvolveSkip(f.env, &out, "proj:epic"); err != nil {
+	if err := runEvolveSkip(f.env, &out, "proj:epic", false); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(out.String(), "unexported") {

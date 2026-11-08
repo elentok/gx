@@ -134,7 +134,7 @@ func TestEvolveSkip_StampsBothFieldsAndNoTicket(t *testing.T) {
 	t.Parallel()
 	f := newEvolveFixture(t, config.EvolveContributor, false, "")
 	var out bytes.Buffer
-	if err := runEvolveSkip(f.env, &out, "proj:epic"); err != nil {
+	if err := runEvolveSkip(f.env, &out, "proj:epic", false); err != nil {
 		t.Fatal(err)
 	}
 	e := f.loadEpic(t)
@@ -143,6 +143,29 @@ func TestEvolveSkip_StampsBothFieldsAndNoTicket(t *testing.T) {
 	}
 	if len(f.sent) != 0 {
 		t.Errorf("skip submitted %d", len(f.sent))
+	}
+}
+
+func TestEvolve_OpenMapNeedsForce(t *testing.T) {
+	t.Parallel()
+	for _, verb := range []string{"run", "skip"} {
+		do := func(f *evolveFixture, force bool) error {
+			var out, errOut bytes.Buffer
+			if verb == "run" {
+				return runEvolveRun(context.Background(), f.env, &out, &errOut, "proj:epic", force)
+			}
+			return runEvolveSkip(f.env, &out, "proj:epic", force)
+		}
+		f := newEvolveFixture(t, config.EvolveContributor, false, "kind: map\n")
+		if err := do(f, false); err == nil || !strings.Contains(err.Error(), "not done") {
+			t.Errorf("%s on an open map: err = %v, want a not-done refusal", verb, err)
+		}
+		if len(f.sent) != 0 || !f.loadEpic(t).EvolvedAt.IsZero() {
+			t.Errorf("%s on an open map still acted", verb)
+		}
+		if err := do(f, true); err != nil {
+			t.Errorf("%s --force on an open map: %v", verb, err)
+		}
 	}
 }
 
@@ -158,7 +181,7 @@ func TestEvolve_MaintainerWithoutGxProjectRefuses(t *testing.T) {
 		}
 	}
 	check("run", runEvolveRun(context.Background(), f.env, &out, &errOut, "proj:epic", false))
-	check("skip", runEvolveSkip(f.env, &out, "proj:epic"))
+	check("skip", runEvolveSkip(f.env, &out, "proj:epic", false))
 	if len(f.sent) != 0 || f.loadEpic(t).EvolveSkipped {
 		t.Error("a refused verb still acted")
 	}
@@ -188,14 +211,14 @@ func TestEvolve_OutboxProjectOnlyInContributorMode(t *testing.T) {
 
 	for _, mode := range []string{config.EvolveMaintainer, config.EvolveOff} {
 		f := newEvolveFixture(t, mode, false, "")
-		_ = runEvolveSkip(f.env, &out, "proj:epic")
+		_ = runEvolveSkip(f.env, &out, "proj:epic", false)
 		if _, err := os.Stat(gxProject(f)); err == nil {
 			t.Errorf("%s mode created a gx project", mode)
 		}
 	}
 
 	existing := newEvolveFixture(t, config.EvolveContributor, true, "")
-	if err := runEvolveSkip(existing.env, &out, "proj:epic"); err != nil {
+	if err := runEvolveSkip(existing.env, &out, "proj:epic", false); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(gxProject(existing))
@@ -241,6 +264,10 @@ func newEvolveAllFixture(t *testing.T) *evolveFixture {
 	addEpic(t, s, "proj", "recent", "completed_at: 2026-03-01T00:00:00Z\n", "01-a.md")
 	addEpic(t, s, "proj", "old", "completed_at: 2026-01-01T00:00:00Z\n", "01-a.md")
 	addEpic(t, s, "proj", "mapped", "kind: map\ncompleted_at: 2026-03-01T00:00:00Z\n", "01-a.md")
+	addEpic(t, s, "proj", "openmap", "", "01-a.md")
+	if err := os.WriteFile(filepath.Join(s, "proj", "openmap", "ticket.md"), []byte("---\nstatus: open\nkind: map\ncompleted_at: 2026-03-01T00:00:00Z\n---\n\n# e\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	addEpic(t, s, "proj", "oneoff", "completed_at: 2026-03-01T00:00:00Z\n", "01-one-off.md")
 	addEpic(t, s, "proj", "evolved", "completed_at: 2026-03-01T00:00:00Z\nevolved_at: 2026-03-02T00:00:00Z\n", "01-a.md")
 	addEpic(t, s, "other", "theirs", "completed_at: 2026-03-02T00:00:00Z\n", "01-a.md")
@@ -255,17 +282,19 @@ func TestEvolveAll_WindowAndExclusions(t *testing.T) {
 	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, evolveAllWindow, false, false); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := sentEpics(f), []string{"evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("default window sent %v, want %v", got, want)
+	got := sentEpics(f)
+	sort.Strings(got)
+	if want := []string{"evolve:proj/mapped", "evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("default window sent %v, want %v (a done map counts, an open one does not)", got, want)
 	}
 
 	f.sent = nil
 	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, 90*24*time.Hour, false, false); err != nil {
 		t.Fatal(err)
 	}
-	got := sentEpics(f)
+	got = sentEpics(f)
 	sort.Strings(got)
-	if want := []string{"evolve:proj/old", "evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"evolve:proj/mapped", "evolve:proj/old", "evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("wide window sent %v, want %v", got, want)
 	}
 }
@@ -280,7 +309,7 @@ func TestEvolveAll_AllProjectsCoversEach(t *testing.T) {
 	}
 	got := sentEpics(f)
 	sort.Strings(got)
-	if want := []string{"evolve:other/theirs", "evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"evolve:other/theirs", "evolve:proj/mapped", "evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("sent %v, want %v", got, want)
 	}
 }
@@ -294,16 +323,16 @@ func TestEvolveAll_YesSkipsPromptAndNoSubmitsNothing(t *testing.T) {
 	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, evolveAllWindow, false, false); err != nil {
 		t.Fatal(err)
 	}
-	if asked != 1 || len(f.sent) != 0 {
-		t.Errorf("asked %d, sent %d; want 1 prompt and nothing sent", asked, len(f.sent))
+	if asked != 2 || len(f.sent) != 0 {
+		t.Errorf("asked %d, sent %d; want 2 prompts and nothing sent", asked, len(f.sent))
 	}
 
 	asked = 0
 	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, evolveAllWindow, false, true); err != nil {
 		t.Fatal(err)
 	}
-	if asked != 0 || len(f.sent) != 1 {
-		t.Errorf("--yes: asked %d, sent %d; want no prompt and 1 sent", asked, len(f.sent))
+	if asked != 0 || len(f.sent) != 2 {
+		t.Errorf("--yes: asked %d, sent %d; want no prompt and 2 sent", asked, len(f.sent))
 	}
 }
 

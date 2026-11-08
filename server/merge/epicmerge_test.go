@@ -9,11 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -36,6 +38,32 @@ func ticketFiles(t *testing.T, store string) map[string]string {
 		files[p] = servertest.ReadFile(t, p)
 	}
 	return files
+}
+
+func TestStampEpic_ImplMergeCompletesMapAndFilesItsRetro(t *testing.T) {
+	t.Parallel()
+	f := retroFixture(t, rigs.WithEvolve(config.EvolveContributor))
+	done := servertest.TicketOpts{Status: "done"}
+	servertest.WriteTicketWith(t, f.Store, "proj", "design", "01", "t", done)
+	testutil.WriteFile(t, filepath.Join(f.Store, "proj", "design"), "ticket.md", "---\nkind: map\nstatus: open\n---\n# Map\n")
+	servertest.WriteTicketWith(t, f.Store, "proj", "design-impl", "01", "t", done)
+	f.H.Server.Rescan()
+
+	root := queue.RootRef{Project: "proj", Epic: "design-impl"}
+	f.H.Server.Merger().StampEpic(root, filepath.Join(f.Store, "proj", "design-impl"), "merged_at")
+
+	var retros []string
+	servertest.Poll(10*time.Second, func() bool {
+		retros, _ = filepath.Glob(filepath.Join(f.Store, "proj", tickets.OneOffsEpic, "issues", "*-evolve-design-2*.md"))
+		return len(retros) > 0
+	})
+	if len(retros) != 1 {
+		t.Fatalf("retros of the done map = %v, want one", retros)
+	}
+	md := servertest.ReadFile(t, filepath.Join(f.Store, "proj", "design", "ticket.md"))
+	if !strings.Contains(md, "status: done") {
+		t.Errorf("map not done:\n%s", md)
+	}
 }
 
 func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
