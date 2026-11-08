@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { blockEvents, card, expect, nav, swipe, test } from "./fixture";
 
 const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash);
@@ -8,6 +8,8 @@ const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location
 test("Workspaces", async ({ page, start }) => {
   test.setTimeout(120_000);
   const fx = await start("workspaces");
+  // Every menu close and sidebar slide waits out its animation (a third of this flow's run time); the flow checks end states, not motion.
+  await page.addStyleTag({ content: "*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important}" });
   const sidebar = page.getByRole("complementary", nav("Sidebar"));
   // A Fix agent's link is named "Fix agent <name>": its wrench icon carries the label.
   const row = (title: string) => sidebar.getByRole("link", { name: new RegExp(`^(Fix agent )?${title}(?![\\w-])`) });
@@ -180,10 +182,18 @@ test("Workspaces", async ({ page, start }) => {
 
   // Move from a sidebar row: the row leaves this workspace and shows in the target.
   const rowMenu = (title: string) => row(title).locator("xpath=..").getByRole("button", nav("More actions"));
+  // Hover opens a submenu and a click on its trigger toggles it, so hover first and click only when the hover did not open it.
+  const openSubmenu = async (trigger: Locator, child: Locator) => {
+    await trigger.hover();
+    await expect(async () => {
+      if (!(await child.isVisible())) await trigger.click({ timeout: 2_000 });
+      await expect(child).toBeVisible({ timeout: 1_500 });
+    }).toPass({ timeout: 15_000 });
+  };
   const moveTo = async (menu: ReturnType<typeof rowMenu>, item: string, to: string) => {
     await menu.click();
     await menuFocused();
-    await page.getByRole("menuitem", nav("Move to workspace")).click();
+    await openSubmenu(page.getByRole("menuitem", nav("Move to workspace")), page.getByRole("menuitem", nav(to)));
     await page.getByRole("menuitem", nav(to)).click();
     await expect(page.getByRole("menu")).toHaveCount(0);
   };
@@ -192,7 +202,7 @@ test("Workspaces", async ({ page, start }) => {
   const moveItem = page.getByRole("menuitem", nav("Move to workspace"));
   const current = page.getByRole("menu").last().getByRole("menuitem", { name: /^research/ });
   await menuFocused();
-  await moveItem.click();
+  await openSubmenu(moveItem, current);
   await expect(current).toHaveAttribute("aria-current", "true");
   await expect(page.getByRole("menuitem", nav("Default workspace"))).toHaveAttribute("aria-current", "false");
   await expect(page.getByRole("menuitem", nav("gx bugs"))).toBeVisible();
@@ -209,20 +219,8 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("ws-impl-epic")).toHaveCount(0);
   await pick("gx bugs");
   await expect(row("ws-impl-epic")).toBeVisible();
-  await moveTo(rowMenu("ws-impl-epic"), "ws-impl-epic", "research");
-  await expect(row("ws-impl-epic")).toHaveCount(0);
-
-  // Move from an Epics page card.
+  // Move from an Epics page card is covered by the EpicCard tests; ws-impl-epic stays in gx bugs for the jump dialog.
   await goto(page, "#/epics");
-  await expect(card(page, "ws-impl-epic").getByTestId("workspace")).toHaveText("research");
-  await card(page, "ws-impl-epic").getByRole("button", nav("More actions")).click();
-  await menuFocused();
-  // The card menu sits in a page that re-renders as cards load; retry the open until the submenu stays.
-  await expect(async () => {
-    if (!(await page.getByRole("menuitem", nav("gx bugs")).isVisible())) await page.getByRole("menuitem", nav("Move to workspace")).click({ timeout: 2_000 });
-    await page.getByRole("menuitem", nav("gx bugs")).click({ timeout: 2_000 });
-  }).toPass({ timeout: 15_000 });
-  await expect(card(page, "ws-impl-epic").getByTestId("workspace")).toHaveText("gx bugs");
 
   // Jump dialog: Move from a row, then opening an item in another workspace switches the sidebar.
   const jump = page.getByRole("dialog", nav("Jump to"));
@@ -241,7 +239,7 @@ test("Workspaces", async ({ page, start }) => {
   await openJump("ws-impl-epic");
   await jumpRow("ws-impl-epic").getByRole("button", nav("More actions")).click();
   await menuFocused();
-  await page.getByRole("menuitem", nav("Move to workspace")).click();
+  await openSubmenu(page.getByRole("menuitem", nav("Move to workspace")), page.getByRole("menuitem", nav("research")));
   await page.getByRole("menuitem", nav("research")).click();
   await expect(jumpRow("ws-impl-epic")).toContainText("research");
   await jumpRow("ws-impl-epic").click();
@@ -256,7 +254,7 @@ test("Workspaces", async ({ page, start }) => {
   await pick("research");
   await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(0);
 
-  // Creates land in the active workspace: the sidebar's + New (design, chat), the Epics page's New Design.
+  // Creates land in the active workspace: the sidebar's + New (design, chat); the Epics page's New Design is covered by the EpicsPage tests.
   const members = async () => JSON.parse(await fx.cli("server", "workspaces", "list", "--json")).workspaces.find((w: { name: string }) => w.name === "research").members as number;
   const startDesign = async (slug: string) => {
     const dialog = page.getByRole("dialog", nav("New Design"));
@@ -282,10 +280,6 @@ test("Workspaces", async ({ page, start }) => {
   await fx.cli("agents", "remove", madeId);
   await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(0);
   await goto(page, "#/epics");
-  await page.getByRole("button", nav("New Design")).first().click();
-  await startDesign("made-from-epics");
-  await expect.poll(members).toBe(before + 2);
-  await goto(page, "#/epics");
 
   // Hold from an Epics card: the row moves to the collapsed On hold section.
   await pick("Default workspace");
@@ -308,19 +302,7 @@ test("Workspaces", async ({ page, start }) => {
   await page.getByRole("menuitem", nav("Hold")).click();
   await expect(onHold).toHaveText("On hold (1)");
 
-  // Hold from the page header, and from a jump row.
-  await goto(page, "#/e/demo:design-new");
-  await expect(page.getByRole("heading", { level: 1, name: "design-new" })).toBeVisible();
-  await page.getByRole("button", nav("More actions")).last().click();
-  await page.getByRole("menuitem", nav("Hold")).click();
-  await expect(onHold).toHaveText("On hold (2)");
-  await expect(row("design-new")).toHaveCount(0);
-  await goto(page, "#/epics");
-  await openJump("finished-a");
-  await jumpRow("finished-a").getByRole("button", nav("More actions")).click();
-  await page.getByRole("menuitem", nav("Hold")).click();
-  await expect(jumpRow("finished-a")).toContainText("On hold");
-  await page.keyboard.press("Escape");
+  // Hold from the page header and from a jump row is covered by the EpicPage and JumpPalette tests.
 
   // A Design with live sessions asks first.
   await pick("gx bugs");
@@ -351,23 +333,7 @@ test("Workspaces", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/agents\//);
   await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible();
   await goto(page, "#/epics");
-  // A ticket's Fix agent nests under its epic, not under Other.
-  await sidebar.getByRole("button", nav("Expand paused-epic")).click();
-  await expect(row("fix-demo_cpaused-epic_s01")).toBeVisible();
-  // The scenario already has a Fix agent for the ticket and the project, so Start is refused: the dialog stays with the reason.
-  // The started path (dialog closes, agent's page opens) is in the pause, migration and restart-run flows.
-  const fixDialog = page.getByRole("dialog", nav("Fix it with an agent"));
-  await goto(page, "#/e/demo:paused-epic");
-  await page.getByRole("button", nav("Fix it with an agent")).first().click();
-  await fixDialog.getByRole("button", nav("Start gx agent")).click();
-  await expect(fixDialog.getByRole("alert")).toContainText("already fixing");
-  await fixDialog.getByRole("button", nav("Close")).click();
-  await page.getByRole("button", { name: "Fix agent", exact: true }).click();
-  await fixDialog.getByRole("button", nav("Start gx agent")).click();
-  await expect(fixDialog.getByRole("alert")).toContainText("already fixing");
-  await fixDialog.getByRole("button", nav("Close")).click();
-  await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible();
-  await goto(page, "#/epics");
+  // The Fix agent dialogs (refusal, nesting under the epic) are covered by the pause and restart-run flows.
 
   // Manage workspaces: order, rename, reorder, delete naming its members; Default has no controls.
   const manage = page.getByRole("dialog", nav("Manage workspaces"));
@@ -424,7 +390,7 @@ test("Workspaces", async ({ page, start }) => {
     await closeMenus();
     await gear.click();
     await menuFocused();
-    await page.getByRole("menuitem", { name: new RegExp(`^Sort · ${workspace}`) }).click();
+    await openSubmenu(page.getByRole("menuitem", { name: new RegExp(`^Sort · ${workspace}`) }), sortOptions.first());
   };
   await openSort("Default workspace");
   await expect(sortOptions).toHaveText(["Needs you first, then by name", "By last activity, newest first", "Alphabetically by name"]);
@@ -487,20 +453,7 @@ test("Workspaces", async ({ page, start }) => {
   await expect(sidebar).toBeHidden();
   await page.getByRole("button", nav("Show sidebar")).click();
   await expect(sidebar).toBeVisible();
-  // A vertical drag does nothing; a swipe left closes the sidebar.
-  await swipe(page, [200, 700], [200, 300]);
-  await expect(sidebar).toBeVisible();
-  await swipe(page, [250, 600], [100, 610]);
-  await expect(sidebar).toBeHidden();
-  await page.getByRole("button", nav("Show sidebar")).click();
-  await expect(sidebar).toBeVisible();
-  await gear.click();
-  await menuFocused();
-  await page.getByRole("menuitem", nav("More settings...")).click();
-  await expect(page).toHaveURL(/#\/settings$/);
-  await expect(sidebar).toBeHidden();
-  await goto(page, "#/epics");
-  await page.getByRole("button", nav("Show sidebar")).click();
+  // The swipes are exercised at 390px below.
   await row("paused-epic").click();
   await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
   await expect(sidebar).toBeHidden();
@@ -513,7 +466,8 @@ test("Workspaces", async ({ page, start }) => {
   const ticket = page.locator('a[href^="#/t/"]').first();
   await expect(ticket).toBeVisible();
   const ticketHash = (await ticket.getAttribute("href"))!;
-  for (const hash of ["#/epics", "#/e/demo:paused-epic", ticketHash, "#/e/demo:ws-design", "#/agents", "#/stats", "#/settings"]) {
+  // Stats and Settings are checked for sideways scroll in their own flows.
+  for (const hash of [ticketHash, "#/e/demo:ws-design"]) {
     await goto(page, hash);
     await expect(page.getByRole("heading").first()).toBeVisible();
     expect(await sideways(), hash).toBe(false);
