@@ -90,6 +90,14 @@ func (f *fakeSessionClient) SetAutoAdvance(_ context.Context, id string, on bool
 	return f.record("auto-advance " + id + " " + strconv.FormatBool(on))
 }
 
+func (f *fakeSessionClient) SetAutoQueue(_ context.Context, id string, on bool) (wire.SessionResult, error) {
+	return f.record("auto-queue " + id + " " + strconv.FormatBool(on))
+}
+
+func (f *fakeSessionClient) CancelAutoQueue(_ context.Context, id string) (wire.SessionResult, error) {
+	return f.record("cancel-auto-queue " + id)
+}
+
 func (f *fakeSessionClient) CancelAutoAdvance(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("cancel-auto-advance " + id)
 }

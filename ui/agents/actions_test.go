@@ -509,6 +509,60 @@ func TestActions_AutoAdvanceItemFlipsTheSwitch(t *testing.T) {
 	}
 }
 
+func TestActions_AutoQueueItemIsForDesignSessionsOnly(t *testing.T) {
+	has := func(s wire.SessionInfo) bool {
+		return slices.ContainsFunc(sessionMenuItems(s), func(it contextmenu.Item[wire.SessionInfo]) bool {
+			return strings.HasPrefix(it.Label, "Auto-queue")
+		})
+	}
+	if !has(wire.SessionInfo{ID: "d", Harness: "claude", Design: true}) {
+		t.Error("Design session lacks the item")
+	}
+	if has(wire.SessionInfo{ID: "p", Harness: "claude"}) {
+		t.Error("plain session has the item")
+	}
+}
+
+func TestActions_AutoQueueItemFlipsTheSwitch(t *testing.T) {
+	for _, tc := range []struct {
+		on    bool
+		label string
+		want  string
+	}{{true, "Auto-queue: on", "auto-queue d false"}, {false, "Auto-queue: off", "auto-queue d true"}} {
+		f := &fakeSessionClient{}
+		m := openedModel(t, f, "", wire.SessionInfo{ID: "d", Project: "gx", Design: true, AutoQueue: tc.on, Status: idleStatus})
+		pickMenuItem(t, m, "d", tc.label)
+		if got := calls(f); !slices.Equal(got, []string{tc.want}) {
+			t.Errorf("calls = %v, want %q", got, tc.want)
+		}
+	}
+}
+
+func TestActions_CancelAutoQueueItemShowsOnlyDuringACountdown(t *testing.T) {
+	has := func(s wire.SessionInfo) bool {
+		return slices.ContainsFunc(sessionMenuItems(s), func(it contextmenu.Item[wire.SessionInfo]) bool {
+			return it.Label == "Cancel auto-queue"
+		})
+	}
+	at := time.Now().Add(5 * time.Second)
+	if has(wire.SessionInfo{ID: "d", Design: true, AutoQueue: true}) {
+		t.Error("item shown with no countdown")
+	}
+	if !has(wire.SessionInfo{ID: "d", Design: true, AutoQueue: true, AutoQueueAt: &at}) {
+		t.Error("item missing during a countdown")
+	}
+}
+
+func TestActions_CancelAutoQueueItemCancelsTheCountdown(t *testing.T) {
+	at := time.Now().Add(5 * time.Second)
+	f := &fakeSessionClient{}
+	m := openedModel(t, f, "", wire.SessionInfo{ID: "d", Project: "gx", Design: true, AutoQueue: true, AutoQueueAt: &at, Status: idleStatus})
+	pickMenuItem(t, m, "d", "Cancel auto-queue")
+	if got := calls(f); !slices.Equal(got, []string{"cancel-auto-queue d"}) {
+		t.Errorf("calls = %v", got)
+	}
+}
+
 func TestActions_CancelItemCancelsARunningCountdown(t *testing.T) {
 	at := time.Now().Add(5 * time.Second)
 	f := &fakeSessionClient{}

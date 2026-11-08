@@ -69,6 +69,12 @@ func (a *sessionActions) pick(key string, s wire.SessionInfo, ok bool, attach *t
 		}, s.ID)
 	case "cancel-auto-advance":
 		return sessionActionCmd("cancel auto-advance", a.sessionAPI.CancelAutoAdvance, s.ID)
+	case "auto-queue":
+		return sessionActionCmd("auto-queue", func(ctx context.Context, id string) (wire.SessionResult, error) {
+			return a.sessionAPI.SetAutoQueue(ctx, id, !s.AutoQueue)
+		}, s.ID)
+	case "cancel-auto-queue":
+		return sessionActionCmd("cancel auto-queue", a.sessionAPI.CancelAutoQueue, s.ID)
 	}
 	return nil
 }
@@ -243,6 +249,14 @@ func sessionMenuItems(s wire.SessionInfo) []contextmenu.Item[wire.SessionInfo] {
 		items = append(items, item(label, "", "auto-advance", ""))
 		if s.AutoAdvanceAt != nil {
 			items = append(items, item("Cancel auto-advance", "", "cancel-auto-advance", ""))
+		}
+		queueLabel := "Auto-queue: off"
+		if s.AutoQueue {
+			queueLabel = "Auto-queue: on"
+		}
+		items = append(items, item(queueLabel, "", "auto-queue", ""))
+		if s.AutoQueueAt != nil {
+			items = append(items, item("Cancel auto-queue", "", "cancel-auto-queue", ""))
 		}
 	}
 	return items
