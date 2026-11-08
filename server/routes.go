@@ -27,6 +27,7 @@ import (
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
+	"github.com/elentok/gx/server/tips"
 	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
@@ -56,6 +57,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		limits.Routes(func() *limits.Limits { return s.limits }),
 		budget.Routes(func() *budget.Budget { return s.budget }),
 		stats.Routes(func() *stats.Stats { return s.stats }),
+		tips.Routes(func() *tips.Tips { return s.tips }),
 		chat.Routes(func() *chat.Chat { return s.sessionChat }),
 		sessions.Routes(func() *sessions.Manager { return s.sessions }, func() *sessions.Resumer { return s.resumer }, func() *queue.Queue { return s.queue }),
 		fixagent.Routes(func() *fixagent.FixAgent { return s.fixAgent }),

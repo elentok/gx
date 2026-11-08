@@ -170,6 +170,13 @@ func (r *Reads) Stats(ctx context.Context, days int, project string) (wire.Stats
 	return s, err
 }
 
+// Tips returns the tips for the server machine's OS.
+func (r *Reads) Tips(ctx context.Context) ([]wire.Tip, error) {
+	var l []wire.Tip
+	err := r.t.get(ctx, "/v1/tips", &l)
+	return l, err
+}
+
 // Iterations returns the live iterations.
 func (r *Reads) Iterations(ctx context.Context) ([]wire.IterationInfo, error) {
 	var l []wire.IterationInfo

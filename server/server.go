@@ -46,11 +46,13 @@ import (
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
+	"github.com/elentok/gx/server/tips"
 	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
 )
 
@@ -115,6 +117,7 @@ type Server struct {
 	tokens     *tokenledger.Ledger
 	limits     *limits.Limits
 	stats      *stats.Stats
+	tips       *tips.Tips
 	events     *broker.Broker
 	herdr      *sched.HerdrWatch
 	writer     *ticketwrite.Writer
@@ -412,6 +415,17 @@ func New(cfg Config) (*Server, error) {
 	s.stats = stats.New(stats.Deps{
 		TicketStore: cfg.TicketStore, ConversationsDir: cfg.ConversationsDir,
 		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s},
+	})
+	s.tips = tips.New(tips.Deps{
+		Projects: func() []string {
+			dirs, _ := tickets.ProjectDirs(cfg.TicketStore)
+			names := make([]string, len(dirs))
+			for i, d := range dirs {
+				names[i] = tickets.ProjectName(d)
+			}
+			return names
+		},
+		WorktreeDir: s.projects.WorktreeDir, GOOS: cfg.TipsGOOS, Extra: cfg.TipsExtra,
 	})
 	s.sessionChat = chat.New(chat.Deps{
 		Config: chat.Config{

@@ -85,6 +85,10 @@ type Config struct {
 
 	// CleanupRunner runs one disk cleanup command in dir; nil runs the real command.
 	CleanupRunner func(ctx context.Context, argv []string, dir string) ([]byte, error)
+	// TipsGOOS is the OS the tips list is filtered for; empty means the real one.
+	// TipsExtra is appended to the built-in tips list; tests only.
+	TipsGOOS  string
+	TipsExtra []wire.Tip
 	// CleanupTimeout is the time limit per cleanup command; zero means ten minutes.
 	CleanupTimeout time.Duration
 	// TempSweepDir is the temp dir a clean sweeps for stale gx-epic-* and

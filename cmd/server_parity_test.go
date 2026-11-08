@@ -149,6 +149,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/epics":                             "server epics",
 	"GET /v1/epics/detail":                      "server epics detail",
 	"GET /v1/stats":                             "server stats",
+	"GET /v1/tips":                              "server tips",
 }
 
 func TestRouteTableHasCLIVerbs(t *testing.T) {

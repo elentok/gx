@@ -2782,6 +2782,21 @@ export interface StatsLimitBurns {
 }
 
 //////////
+// source: tips.go
+
+/**
+ * Tip is one entry of the tips page. Folders is filled by the call for tips
+ * that point at the project worktree folders.
+ */
+export interface Tip {
+  id: string;
+  title: string;
+  body: string;
+  platform: string; // GOOS value the tip applies to
+  folders?: string[];
+}
+
+//////////
 // source: usagesummary.go
 
 export const UsageModeLimits = "limits";
