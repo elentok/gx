@@ -149,6 +149,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if err := t.cancel(); err != nil {
 				return 0, err
 			}
+		case ev.Key == ctrlU && t.opts.clearIgnored:
 		case ev.Key == ctrlU:
 			t.typed.Reset()
 			if t.opts.clearLeavesI {

@@ -129,7 +129,8 @@ func (pr *ptyPrompter) awaitEmptyInput(wait time.Duration) error {
 		return err
 	}
 	deadline := time.Now().Add(wait)
-	extraRound := false
+	extraRound, gxCleared := false, false
+	var before string
 	for {
 		if pr.ctx != nil && pr.ctx.Err() != nil {
 			return pr.cancelled()
@@ -140,16 +141,21 @@ func (pr *ptyPrompter) awaitEmptyInput(wait time.Duration) error {
 		}
 		if !time.Now().Before(deadline) {
 			if extraRound {
+				// gx's own `i` survived its clear key and nothing moved on screen.
+				if screen, _ := pr.Screen(); gxCleared && screen == before {
+					return &claudeui.HungPaneError{Screen: screen}
+				}
 				return fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, inputNotEmpty{})
 			}
 			extraRound = true
+			before, _ = pr.Screen()
 			cleared, err := pr.clearGxI()
 			if err != nil {
 				return err
 			}
+			gxCleared = cleared
 			if pr.p.log != nil {
-				screen, _ := pr.Screen()
-				pr.p.log.Info("input not empty, extra clear round", "session", pr.ss.session.SessionID, "cleared", cleared, "screen", screen)
+				pr.p.log.Info("input not empty, extra clear round", "session", pr.ss.session.SessionID, "cleared", cleared, "screen", before)
 			}
 			deadline = time.Now().Add(5 * pr.p.pollInterval())
 			continue

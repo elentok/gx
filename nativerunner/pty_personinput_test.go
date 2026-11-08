@@ -243,6 +243,22 @@ func TestPty_ExtraClearRoundRemovesTheILeftByTheFirst(t *testing.T) {
 	}
 }
 
+// A clear key that changes nothing on gx's own `i` is a hung pane.
+func TestPty_ClearIgnoredOnGxI_IsHungPane(t *testing.T) {
+	t.Parallel()
+	p := newPty(t)
+	p.Env = append(p.Env, agentfake.TUIDraftEnv+"=i", agentfake.TUIClearIgnoredEnv+"=1")
+	p.PromptGrace = 200 * time.Millisecond
+	s := startPersonInputPty(t, p)
+	gxharness.RecordInputPress(s.SessionID)
+
+	err := p.Prompt(s, "do it")
+	var hung *claudeui.HungPaneError
+	if !errors.As(err, &hung) || !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("Prompt = %v; want a HungPaneError that is ErrNotDelivered", err)
+	}
+}
+
 func TestPty_DraftThatStaysIsNotTypedOver(t *testing.T) {
 	t.Parallel()
 	p := draftPty(t)

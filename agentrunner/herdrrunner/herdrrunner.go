@@ -215,6 +215,8 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 		return nil
 	case errors.As(err, &blocked):
 		return fmt.Errorf("%w: %s", agentrunner.ErrNotReady, blocked.Message)
+	case errors.Is(err, agentrunner.ErrNotDelivered):
+		return err
 	case errors.Is(err, claudeui.ErrStuckSubmission):
 		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
 	case err != nil:

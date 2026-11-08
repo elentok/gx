@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/agentrunner"
 )
 
 // fakePrompter is an in-memory Prompter. starts scripts WaitStart's answers in
@@ -52,6 +54,9 @@ func (f *fakePrompter) WaitStart(timeout time.Duration) (bool, error) {
 }
 
 func (f *fakePrompter) Screen() (string, error) {
+	if len(f.screens) == 0 {
+		return "", nil
+	}
 	s := f.screens[0]
 	if len(f.screens) > 1 {
 		f.screens = f.screens[1:]
@@ -255,6 +260,43 @@ func TestClearInput_NeverEmpty_LogsTheCaptureAndIsInputNotEmpty(t *testing.T) {
 	}
 	if out := buf.String(); !strings.Contains(out, "STUCK-DRAFT") {
 		t.Fatalf("log = %q, want the pane capture", out)
+	}
+}
+
+func TestClearInput_IdenticalScreensHoldingGxText_IsHungPane(t *testing.T) {
+	noInputSettle(t)
+	f := &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"header\n> do the thing please\nfooter"}}, known: true}
+	err := ClearInput(f, "do the thing please")
+	var hung *HungPaneError
+	if !errors.As(err, &hung) || !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("ClearInput() error = %v, want HungPaneError wrapping ErrNotDelivered", err)
+	}
+	if !strings.Contains(err.Error(), "> do the thing please") {
+		t.Fatalf("error = %q, want the last screen lines", err)
+	}
+}
+
+func TestClearInput_NotHung(t *testing.T) {
+	noInputSettle(t)
+	tests := map[string]struct {
+		screens []string
+		text    string
+	}{
+		"screen changes between rounds": {[]string{"> do the thing", "> do the thing please"}, "do the thing"},
+		"input does not hold gx's text": {[]string{"someone else's draft"}, "do the thing"},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			f := &checkingPrompter{fakePrompter: &fakePrompter{screens: tt.screens}, known: true}
+			err := ClearInput(f, tt.text)
+			var hung *HungPaneError
+			if errors.As(err, &hung) || !errors.Is(err, ErrInputNotEmpty) {
+				t.Fatalf("ClearInput() error = %v, want plain ErrInputNotEmpty", err)
+			}
+			if !strings.Contains(err.Error(), tt.screens[len(tt.screens)-1]) {
+				t.Fatalf("error = %q, want the last screen lines", err)
+			}
+		})
 	}
 }
 

@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/agentrunner"
 )
 
 // NudgeCaps bound PromptWithNudge. Grace bounds each submit/nudge wait for the
@@ -39,6 +41,47 @@ var (
 	ErrNotReadyToType = errors.New("input not ready to type")
 	ErrInputNotEmpty  = errors.New("input not empty after clearing")
 )
+
+// screenTailLines is how many of the last screen lines an input-not-empty or
+// hung-pane error carries, so the run log and pause can show the pane.
+const screenTailLines = 12
+
+// HungPaneError means the pane stopped taking keys: the screen did not change
+// across the clear rounds and the input still holds gx's own text. It is
+// agentrunner.ErrNotDelivered, so callers start a fresh session, and it keeps
+// matching ErrStuckSubmission and ErrInputNotEmpty for existing consumers.
+type HungPaneError struct {
+	Screen string
+}
+
+func (e *HungPaneError) Error() string {
+	return "pane hung: screen unchanged across clear rounds and the input still holds gx's text; last screen lines:\n" + screenTail(e.Screen)
+}
+
+func (e *HungPaneError) Unwrap() []error {
+	return []error{agentrunner.ErrNotDelivered, ErrStuckSubmission, ErrInputNotEmpty}
+}
+
+// screenTail is the last screenTailLines non-blank lines of screen.
+func screenTail(screen string) string {
+	var lines []string
+	for l := range strings.SplitSeq(screen, "\n") {
+		if strings.TrimSpace(l) != "" {
+			lines = append(lines, strings.TrimRight(l, " "))
+		}
+	}
+	return strings.Join(lines[max(0, len(lines)-screenTailLines):], "\n")
+}
+
+// holdsText reports whether screen still shows the start of text, which
+// gx typed into the input.
+func holdsText(screen, text string) bool {
+	first, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+	if len(first) > 20 {
+		first = first[:20]
+	}
+	return first != "" && strings.Contains(screen, first)
+}
 
 // NudgeDecision is what PromptWithNudge did about a submit the agent didn't
 // pick up. Its values are written to the run log as is.
@@ -120,7 +163,8 @@ const clearRounds = 2
 // it when the Prompter can.
 func clearWhole(p Prompter, text string) error {
 	c, checks := p.(InputChecker)
-	for round := range clearRounds {
+	var roundScreens []string
+	for range clearRounds {
 		for range clearPresses(text) {
 			if err := p.Clear(); err != nil {
 				return fmt.Errorf("clearing input before retype: %w", err)
@@ -140,9 +184,8 @@ func clearWhole(p Prompter, text string) error {
 		if err != nil || !known || empty {
 			return nil
 		}
-		if round == clearRounds-1 {
-			break
-		}
+		s, _ := p.Screen()
+		roundScreens = append(roundScreens, s)
 	}
 	screen, _ := p.Screen()
 	log := slog.Default()
@@ -150,7 +193,10 @@ func clearWhole(p Prompter, text string) error {
 		log = lp.Log()
 	}
 	log.Info("input not empty after full clear", "screen", screen)
-	return fmt.Errorf("%w: %w", ErrStuckSubmission, ErrInputNotEmpty)
+	if roundScreens[0] == roundScreens[len(roundScreens)-1] && holdsText(screen, text) {
+		return &HungPaneError{Screen: screen}
+	}
+	return fmt.Errorf("%w: %w: last screen lines:\n%s", ErrStuckSubmission, ErrInputNotEmpty, screenTail(screen))
 }
 
 // ClearInput gets the input ready to type, then empties the whole input once,

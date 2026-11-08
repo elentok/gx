@@ -39,6 +39,8 @@ type tuiOptions struct {
 	draft string
 	// clearLeavesI makes the first Ctrl+U leave "i" (see TUIClearLeavesIEnv).
 	clearLeavesI bool
+	// clearIgnored makes every Ctrl+U a no-op (see TUIClearIgnoredEnv).
+	clearIgnored bool
 	// registryDelay, unknownSkill, noTurn and launchRecord are the skill-prompt
 	// knobs; see the TUI...Env consts.
 	registryDelay time.Duration
@@ -97,6 +99,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		mouse:         os.Getenv(TUIMouseEnv) == "1",
 		draft:         os.Getenv(TUIDraftEnv),
 		clearLeavesI:  os.Getenv(TUIClearLeavesIEnv) == "1",
+		clearIgnored:  os.Getenv(TUIClearIgnoredEnv) == "1",
 		registryDelay: registryDelay,
 		unknownSkill:  os.Getenv(TUIUnknownSkillEnv) == "1",
 		noTurn:        os.Getenv(TUINoTurnEnv) == "1",

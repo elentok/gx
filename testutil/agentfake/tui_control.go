@@ -39,6 +39,9 @@ const (
 	// TUIClearLeavesIEnv, set to "1", makes the first clear key leave a lone "i"
 	// in the input; the second clears it.
 	TUIClearLeavesIEnv = "GX_AGENTFAKE_TUI_CLEAR_LEAVES_I"
+	// TUIClearIgnoredEnv, set to "1", makes every clear key do nothing and
+	// leaves the screen unchanged: a hung pane.
+	TUIClearIgnoredEnv = "GX_AGENTFAKE_TUI_CLEAR_IGNORED"
 	// TUIRegistryDelayEnv, a Go duration, keeps the skill registry empty for
 	// that long after start: a skill prompt typed earlier is an unknown command.
 	TUIRegistryDelayEnv = "GX_AGENTFAKE_TUI_REGISTRY_DELAY"

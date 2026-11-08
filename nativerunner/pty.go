@@ -468,6 +468,9 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 }
 
 func notDelivered(err error) error {
+	if errors.Is(err, agentrunner.ErrNotDelivered) {
+		return err
+	}
 	if errors.Is(err, claudeui.ErrStuckSubmission) || errors.Is(err, claudeui.ErrStartTimeout) {
 		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
 	}
