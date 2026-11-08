@@ -65,6 +65,18 @@ func TestMergeClaudeSettings_NoFlagAppends(t *testing.T) {
 	}
 }
 
+func TestClaudeCommand_OneSettingsFlagWithEditorModeNormal(t *testing.T) {
+	for _, args := range [][]string{
+		{"claude", "x"},
+		{"claude", "x", "--settings", `{"editorMode":"vim","theme":"dark"}`},
+	} {
+		vals := settingsValues(claudeCommand(args, nil).Args)
+		if len(vals) != 1 || decode(t, vals[0])["editorMode"] != "normal" {
+			t.Errorf("args %q: settings = %q", args, vals)
+		}
+	}
+}
+
 func TestMergeClaudeSettings_Idempotent(t *testing.T) {
 	once := MergeClaudeSettings([]string{"--settings", `{"hooks":{"PreToolUse":[{"matcher":"Bash"}]}}`})
 	twice := MergeClaudeSettings(once)

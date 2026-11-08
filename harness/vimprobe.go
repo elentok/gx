@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -191,6 +192,44 @@ func footerHasInsert(rows []string) bool {
 		}
 	}
 	return false
+}
+
+// vimFooter is the trimmed footer row below the last input row that shows a vim
+// mode marker, "" when none does.
+func vimFooter(rows []string) string {
+	input := lastInputRow(rows, claudeInput)
+	if input < 0 {
+		return ""
+	}
+	for _, row := range rows[input+1:] {
+		p := plain(row)
+		if strings.Contains(p, vimInsertMarker) || strings.Contains(p, vimNormalMarker) {
+			return strings.TrimSpace(p)
+		}
+	}
+	return ""
+}
+
+// CheckVimLaunch reports whether a session launched with editorMode normal
+// still shows a vim footer, so the override did not take. It only looks when
+// the launch applied the override, reads one settled screen, and gives false
+// (logging why) when the screen never settles. The event is a log line, not an
+// events.Kind.
+func CheckVimLaunch(io TypingIO) bool {
+	if !EditorOverrideApplied(io.Session) {
+		return false
+	}
+	rows, _, ok := settledRows(io)
+	if !ok {
+		io.logUnknown("input never settled for the launch vim check")
+		return false
+	}
+	footer := vimFooter(rows)
+	if footer == "" {
+		return false
+	}
+	io.log("vim footer " + strconv.Quote(footer) + " shown after an editorMode normal launch")
+	return true
 }
 
 // settledRows reads until two reads in a row agree, so a stale or transient

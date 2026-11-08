@@ -6,7 +6,10 @@ import (
 	"path/filepath"
 )
 
-const vimInsertMarker = "-- INSERT --"
+const (
+	vimInsertMarker = "-- INSERT --"
+	vimNormalMarker = "-- NORMAL --"
+)
 
 // ReadyToType makes sure claude's input is in insert mode when the editor mode
 // could be vim (see probeWanted). A missing marker is never read as NORMAL: the

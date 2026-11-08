@@ -62,6 +62,16 @@ func (e *HungPaneError) Unwrap() []error {
 	return []error{agentrunner.ErrNotDelivered, ErrStuckSubmission, ErrInputNotEmpty}
 }
 
+// VimEditorError means a session launched with editorMode normal still shows a
+// vim footer: the override did not take, so gx cannot type into it safely.
+type VimEditorError struct {
+	Footer string
+}
+
+func (e *VimEditorError) Error() string {
+	return "claude is in vim editor mode despite the editorMode normal launch override; footer: " + e.Footer
+}
+
 // screenTail is the last screenTailLines non-blank lines of screen.
 func screenTail(screen string) string {
 	var lines []string
