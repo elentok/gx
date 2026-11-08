@@ -23,9 +23,10 @@ Three things in the web UI and the agent launch path let down the person who wat
    (+2 more)". The count opens a popover listing the other calls in flight.
 2. After a key press or Type text, the Screen modal shows the screen once the agent has redrawn it.
    It marks the rows that changed, and says "Screen unchanged" when nothing changed.
-3. gx checks, on every Claude launch, that Claude is not in vim mode before it types the first
-   prompt. If a vim footer shows, gx logs an event and relaunches once. The hung-pane recovery that
-   `gx:agent-launch-and-recovery-impl` 03 to 05 ships stays as the fallback.
+3. gx checks, on every Claude launch (Queue agents on the native PTY launcher or herdr, and web
+   sessions), that Claude is not in vim mode before it types the first prompt. If a vim footer shows,
+   gx logs an event and relaunches once. The hung-pane recovery that `gx:agent-launch-and-recovery-impl`
+   03 to 05 ships (already on trunk) stays as the fallback.
 
 Honest status of change 3: the mechanism inside Claude is **unproven and was not reproduced**. What
 is verified is a correlation (see Further Notes). The spec makes the likely cure a checked invariant
@@ -80,36 +81,53 @@ instead of a silent setting; it does not claim to have found the cause.
     cap, so that a slow agent never leaves me with an error and no screen.
 24. As a chat user, I want quick keys in chat and the CLI to keep today's fast reply, so that they do
     not wait on a settle.
-25. As a person on any runner (PTY runner or herdr), I want the settle to work the same, so that the
-    modal does not depend on how the session was launched.
+25. As a person with a holder-backed session (every session the keys route accepts), I want the
+    settle to work the same for Claude and Codex, so that the modal does not depend on the agent.
 
 ### Vim-mode launch check
 
 26. As a person launching a Claude agent, I want gx to check Claude is not in vim mode before the
     first prompt is typed, so that the prompt cannot land in a wedged editor.
-27. As a person, I want the check on both Claude launch paths (native PTY launcher and herdr
-    runner), so that no launch skips it.
+27. As a person, I want the check on all three Claude launch paths (the native PTY launcher, the
+    herdr runner, and the web session first prompt in `firstPrompt.deliver`), so that no launch skips
+    it. The headless runner has no editor and is skipped.
 28. As a person, I want either vim footer (`-- INSERT --` or `-- NORMAL --`) to trip the check, so
     that a vim editor in any mode is caught.
 29. As a person, I want gx to log an event and relaunch Claude once when a footer shows, so that I
     can see it happened and the agent starts clean.
 30. As a person, I want that relaunch to happen after Ready and before the prompt is typed, so that
     no prompt is lost in the first Claude.
-31. As a person, I want gx never to relaunch twice, so that a stuck setting cannot loop.
+31. As a person, I want the vim check to relaunch at most once per launch, so that a stuck setting
+    cannot loop. The existing hung-pane recovery keeps its own budget and outcome.
 32. As a person, I want gx, when a footer persists after the relaunch, to log again, type the prompt
     anyway and rely on the hung-pane recovery, so that the launch still moves on.
-33. As a person, I want no new pause kind for this, so that the queue and the Agents tab show nothing
-    new to learn.
+33. As a person, I want the vim check to add no pause kind and no new way into an existing one, so
+    that the queue and the Agents tab show nothing new to learn. A persistent footer on a pane that
+    also hangs may end in the existing `agent_prompt_stalled` launch failure, which the hung-pane
+    recovery already produces today and which the Retry button on the parked ticket ends.
 34. As a Codex user, I want Codex launches left alone, so that they pay no cost for a Claude setting.
 35. As a person, I want a healthy Claude launch (no footer) to pay no extra relaunch and no visible
-    delay beyond one screen read, so that the common path stays fast.
+    delay beyond one settled screen read, so that the common path stays fast.
 
 ## Implementation Decisions
 
 ### Working row [T01]
 
 - The server builds the chat response's in-flight tools from tool calls that have no result yet.
-  Nothing is stored.
+  Nothing is stored. Only calls in the current turn count, with the turn found the way
+  `transcript/unexecuted_tool_call.go` finds it, so a call left open by an interrupted earlier turn
+  never shows as running. Sidechain (`isSidechain`) lines belong to a sub-agent and are skipped.
+  Backgrounded tasks (shell, Monitor, sub-agent) stay with the existing `background` list.
+- Kind and label per tool (unknown tools are `other` with the tool name as label):
+
+  | Kind | Claude tools (label source) | Codex tools |
+  | --- | --- | --- |
+  | `shell` | Bash (`command`) | `exec_command` (`cmd`) |
+  | `agent` | Agent, Task (`description`, else `subagent_type`) | none today |
+  | `search` | Grep, Glob (`pattern`), WebSearch (`query`), WebFetch (`url`) | `web_search` (`query`) |
+
+  The implementer checks the real tool names against the transcript readers and fills any gap with
+  `other`.
 - Each transcript reader fills the field: the Claude reader from `tool_use` entries without a
   `tool_result`; the Codex reader from `function_call` and `custom_tool_call` entries without an
   output. The field shape is shared.
@@ -130,8 +148,14 @@ instead of a silent setting; it does not claim to have found the cause.
 - The keys endpoint (`POST /v1/sessions/keys`) gains an opt-in request flag. When set, after sending
   the key or text the server reads the screen every 100 ms until two consecutive reads match, up to
   about 1.5 s, and returns the settled rows in the response. The browser does no timing.
-- The settle sits behind the one screen read the keys route already uses, so it covers every runner
-  (PTY runner holder and herdr) without per-runner code.
+- The settle covers every session the keys route accepts. That route dials only a holder
+  (`holder.DialHolder`) and refuses Queue agents, so these are holder-backed Claude and Codex
+  sessions. The settle reads the holder screen through the same `liveRows` helper the screen route
+  uses (`server/sessions/chat/screen.go`); the keys route reads no screen today.
+- The settle runs after `Watches.MetaMu` is released, so it never blocks status updates or other
+  session routes. It is ignored for `only_blocked` and `permission` requests, which keep today's
+  behavior. The settled rows go in a new optional `SessionResult.rows` field; types are regenerated
+  with tygo.
 - The modal's key buttons and Type text set the flag. Chat quick keys and the CLI do not, and keep
   the fast reply.
 - If a settle read fails or hits the cap, the response still succeeds and carries the last rows
@@ -142,21 +166,35 @@ instead of a silent setting; it does not claim to have found the cause.
 
 ### Vim-mode launch check [T03, T04]
 
-- One shared vim-mode check is called by both Claude launch paths, the native PTY launcher and the
-  herdr runner. It runs after Ready and before the prompt is typed. Codex launches skip it.
-- The check reads the screen and trips on either vim footer (`-- INSERT --` or `-- NORMAL --`).
-- On a trip: log an event, relaunch Claude once, then continue the launch as usual.
+- One shared vim-mode check is called by all three Claude launch paths: the native PTY launcher
+  (`nativerunner`), the herdr runner, and the web session first prompt (`firstPrompt.deliver` in
+  `server/sessions/prompt/firstprompt.go`). It runs after Ready and before the prompt is typed. Codex
+  and the headless runner skip it (Codex is unaffected by the hang; the headless runner has no editor).
+- The check builds on the existing `harness` footer helpers (`harness/vimprobe.go`: `footerHasInsert`,
+  `settledRows`) and runs only when the launch applied the `editorMode: normal` override
+  (`Meta.EditorModeNormal`). `ReadyToType` keeps its mid-session `/config` toggle behavior; today's
+  probe treats `-- INSERT --` as good news there, and this launch check is separate from it.
+- The check reads the screen with a settled read (two equal reads, as `settledRows` does) so a
+  half-drawn frame is not misread. It trips on either vim footer (`-- INSERT --` or `-- NORMAL --`).
+  If the screen never settles the check counts as passed and logs a line.
+- On a trip: log an event, relaunch Claude once, then continue the launch as usual. Who relaunches:
+  the check returns a typed error from the prompt step, and the caller that already owns stop and
+  relaunch does the single relaunch. That is the supervisor launch loop
+  (`ralphloop/supervise/startandprompt.go`) for Queue agents on either runner, and the session manager's
+  existing restart path for web sessions. A relaunch is a new session id, Meta and transcript.
 - If a footer is still shown after the relaunch: log the event again, type the prompt anyway and rely
-  on the hung-pane recovery. It never relaunches twice. It adds no pause kind.
+  on the hung-pane recovery. The vim check relaunches at most once per launch. It adds no pause kind
+  and no new way into an existing one: a pane that also hangs already ends in the existing
+  `agent_prompt_stalled` launch failure today.
 - The existing launch with `editorMode: normal` stays; the check makes it a verified invariant
-  rather than an assumed one.
+  rather than an assumed one. A unit test also asserts the final claude argv carries exactly one
+  `--settings` with `editorMode: normal`.
 - Event name and fields are the implementer's choice.
 - No bracketed-paste or typing change: gx keeps typing the prompt as one plain write and Enter as a
   separate write, and keeps proving delivery from the transcript. Reconsider only if a vim-mode hang
   is ever reproduced.
-- The hung-pane recovery (`gx:agent-launch-and-recovery-impl` 03 to 05, commits 2c57791fd, 8257f323a,
-  e8a500f50) is **not in this branch's HEAD**. It is a dependency of the fallback test, not work for
-  this epic.
+- The hung-pane recovery (`gx:agent-launch-and-recovery-impl` 03 to 05, `HungPaneError` in
+  `agentrunner/claudeui/nudge.go`) is already on trunk. This epic does not change it.
 
 ## Testing Decisions
 
@@ -168,20 +206,23 @@ launches happen. It does not check internal calls or timing constants beyond the
   empty case. Prior art: the existing chat snapshot tests.
 - **Working row, vitest.** The row renders step, title, current tool and background tasks in order;
   the count button opens its popover on click and focus; empty state reads "Working".
+- **Working row, in-flight scope.** Go fixtures: an unmatched call from an earlier turn is not
+  shown, a sidechain call is not shown, a tool-name table case per kind.
 - **Keys settle, Go.** A fake holder whose screen changes on the second read: the opt-in request
-  returns the new rows; a request without the flag returns fast; a read error or a never-settling
-  screen still succeeds with the last rows. The fake holder stands behind the one screen read, so
-  the same test covers every runner.
+  returns the new rows in `SessionResult.rows`; a request without the flag returns fast; a read error
+  or a never-settling screen still succeeds with the last rows; `only_blocked` and `permission`
+  requests ignore the flag; the settle runs with `MetaMu` released.
 - **Screen modal, vitest.** A fake poster returns new rows: changed rows are marked, marks fade,
   equal rows show "Screen unchanged", Refresh does one plain read.
-- **Vim-mode check, Go.** Fake-Claude knobs "vim wedge" (draws a vim footer and stops taking keys)
-  and "ignore the editor-mode override", extending the existing ignored-env knob in the agent fake.
-  Cases, each on both launch paths: no footer means one launch and the prompt typed; a footer once
-  means one relaunch then the prompt typed; a footer after the relaunch means two logged events, the
-  prompt typed anyway, no third launch and no pause. Codex launch shows no check.
-- **Fallback test.** A launch where the footer persists and the pane hangs ends in the hung-pane
-  recovery. It needs `gx:agent-launch-and-recovery-impl` 03 to 05 and cannot be written until that
-  work is in the branch.
+- **Vim-mode check, Go.** New fake-Claude knobs "vim wedge" (draws a vim footer and stops taking
+  keys) and "ignore the editor-mode override", added as `GX_AGENTFAKE_TUI_*` env knobs beside
+  `TUIClearIgnoredEnv` and `TUIClearLeavesIEnv` in `testutil/agentfake/tui_control.go`. Cases, each on
+  all three launch paths: no footer means one launch and the prompt typed; a footer once means one
+  relaunch then the prompt typed; a footer after the relaunch means two logged events, the prompt
+  typed anyway and no further vim relaunch. Codex launch shows no check. The argv unit test above.
+- **Fallback test.** A launch where the footer persists and the pane hangs ends in the existing
+  hung-pane recovery (the `hung-pane-*` fixture scenarios in `testutil/gxfixture/scenarios.go` are
+  prior art).
 - **E2E.** Existing catalog flows cover the Screen modal key bar, commands and permission dialogs
   (see Verification). The Working row has no catalog flow; one is written or an existing chat flow
   is extended. The `gx-playwright-e2es` flow budget applies.
@@ -227,23 +268,26 @@ Run against a temporary gx server after the epic is built. Catalog flows are in 
 24. Fast replies. CLI check: `gx` keys send without the flag returns without waiting; Go test
     asserts the response has no settled rows. Chat quick keys in `agents-commands-send` 153 still
     pass.
-25. Both runners. Go test with the fake holder behind the one screen read; a herdr-backed scenario
-    run of `agents-keys` 156 if the fixture supports it.
+25. Holder-backed sessions. Go test with a fake holder for a Claude and a Codex session through the
+    keys route; the settle reads the holder screen through `liveRows`.
 26. Check before the prompt. Go test with the fake-Claude "vim wedge" knob: the prompt is not typed
     into the wedged first Claude.
-27. Both launch paths. The same Go test table runs on the native PTY launcher and the herdr runner.
+27. All three launch paths. The same Go test table runs on the native PTY launcher, the herdr runner
+    and the web session first prompt (`firstPrompt.deliver`).
 28. Both footers. Go test cases for `-- INSERT --` and `-- NORMAL --`.
 29. Log and relaunch once. Go test: one event, two Claude launches, then the prompt is typed. Check
     the event in the server log of a temporary server started with the "ignore the editor-mode
     override" knob.
 30. After Ready, before typing. Go test asserts order: Ready, check, relaunch, prompt.
-31. Never twice. Go test: footer on every launch yields exactly two launches.
+31. At most one vim relaunch. Go test: footer on every launch yields exactly one vim relaunch (two
+    launches) from the vim check.
 32. Persistent footer. Go test: two events logged, prompt typed anyway. The follow-on recovery is the
-    fallback test and depends on `gx:agent-launch-and-recovery-impl` 03 to 05.
-33. No new pause. Go test: the persistent-footer case produces no new pause kind in the queue or
-    Agents tab status.
+    fallback test, using the `hung-pane-*` fixture scenarios.
+33. No new pause. Go test: the persistent-footer case adds no pause kind. With a hanging pane too, it
+    ends in the existing `agent_prompt_stalled` launch failure, ended by the Retry button on the parked
+    ticket.
 34. Codex untouched. Go test: a Codex launch triggers no check and no relaunch.
-35. Healthy path. Go test: no footer yields one launch and no event.
+35. Healthy path. Go test: no footer yields one launch and no event, with one settled read.
 
 New flows or scenarios to write (become implementation tickets):
 
@@ -257,12 +301,14 @@ New flows or scenarios to write (become implementation tickets):
 ## Out of Scope
 
 - Reproducing the Claude hang or naming the exact trigger inside Claude.
-- Any change to the hung-pane recovery itself (`gx:agent-launch-and-recovery-impl` 03 to 05).
+- Any change to the hung-pane recovery itself (`gx:agent-launch-and-recovery-impl` 03 to 05, on trunk).
 - A new pause kind, or any queue or Agents tab status for the vim-mode check.
 - Bracketed paste or other changes to how the launch prompt is typed.
 - A vim-mode check for Codex.
 - Browser-side polling or timing for the Screen modal.
 - Settling for chat quick keys or the CLI.
+- Making the keys route and the Screen modal work for herdr (Queue agent) panes. The settle covers
+  holder-backed sessions only.
 
 ## Further Notes
 
