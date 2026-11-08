@@ -95,6 +95,8 @@ type Deps struct {
 	Held func(key string) bool
 	// Queue is the Queue the auto-queue code queues epics through. Nil is none.
 	Queue EpicQueue
+	// OnTriageIdle runs when a Triage session of a project goes idle. Nil is none.
+	OnTriageIdle func(project string)
 }
 
 // Prompt holds the auto-advance countdowns and the turn settling of the
@@ -104,15 +106,16 @@ type Prompt struct {
 	// count under the sizeguard limit. Its methods are promoted onto Prompt.
 	*autoQueuer
 
-	cfg         Config
-	log         *slog.Logger
-	events      *broker.Broker
-	sessionChat *chat.Chat
-	settings    *settings.Holder
-	projects    *projects.Registry
-	badRounds   BadRounds
-	held        func(key string) bool
-	queue       EpicQueue
+	cfg          Config
+	log          *slog.Logger
+	events       *broker.Broker
+	sessionChat  *chat.Chat
+	settings     *settings.Holder
+	projects     *projects.Registry
+	badRounds    BadRounds
+	held         func(key string) bool
+	queue        EpicQueue
+	onTriageIdle func(project string)
 	// sessions comes later than Prompt: the Manager calls the Prompter back, so
 	// it is built after Prompt and handed over by GiveSessions.
 	sessions *sessions.Manager
@@ -131,6 +134,7 @@ func New(d Deps) *Prompt {
 	p := &Prompt{
 		cfg: d.Cfg, log: d.Log, events: d.Events, sessionChat: d.SessionChat,
 		settings: d.Settings, projects: d.Projects, badRounds: d.BadRounds, held: d.Held, queue: d.Queue,
+		onTriageIdle: d.OnTriageIdle,
 	}
 	p.autoQueuer = &autoQueuer{p}
 	return p

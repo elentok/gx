@@ -35,3 +35,23 @@ func Next(rec *Record) Branch {
 	}
 	return BranchPlan
 }
+
+// Final reports whether no run follows the record's step: no live record, the
+// approve and done steps, and a write with no row left pending. Verify and plan
+// are not final; plan's last save moves the step to approve before its run ends.
+func Final(rec *Record) bool {
+	if rec == nil || rec.State != StateLive {
+		return true
+	}
+	switch rec.Step {
+	case tickets.StepVerify, tickets.StepPlan:
+		return false
+	case tickets.StepWrite:
+		for _, row := range rec.Rows {
+			if row.Write == WritePending {
+				return false
+			}
+		}
+	}
+	return true
+}

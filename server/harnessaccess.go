@@ -12,6 +12,7 @@ import (
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/sched"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
+	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
@@ -80,6 +81,9 @@ func (s *Server) Workspaces() *workspaces.Store { return s.workspaces }
 // Prompt is the prompt code. Tests outside the package read the auto-queue
 // seams through here.
 func (s *Server) Prompt() *sessprompt.Prompt { return s.prompt }
+
+// Triage gives tests the Triage seams (StopFinished).
+func (s *Server) Triage() *triage.Triage { return s.triage }
 
 // Harness is the server's harness choice. Tests outside the package read it
 // through here.

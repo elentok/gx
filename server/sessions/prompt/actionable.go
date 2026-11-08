@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
+	triagerec "github.com/elentok/gx/triage"
 )
 
 func (p *Prompt) actionableWrite(w http.ResponseWriter, r *http.Request) {
@@ -70,13 +71,30 @@ func designActionable(text string, ref chat.FlowRef, agent string, final bool) (
 }
 
 // StepFinal reports whether the flow is at a step with no Continue. A Design
-// reads its map's progress. Until the Triage record is wired in, a Triage is
-// always final, so nothing auto-advances by accident.
+// reads its map's progress, a Triage its project's live record.
 func (p *Prompt) StepFinal(ref chat.FlowRef) bool {
-	if ref.Flow != tickets.FlowDesign {
+	switch ref.Flow {
+	case tickets.FlowDesign:
+		return p.designFinal(ref.Key)
+	case tickets.FlowTriage:
+		return p.triageFinal(ref.Key)
+	}
+	return true
+}
+
+// triageFinal reads the project's live Triage record. A record that cannot be
+// read is final: nothing auto-advances by accident.
+func (p *Prompt) triageFinal(project string) bool {
+	dir, err := p.projects.Dir(project)
+	if err != nil {
 		return true
 	}
-	return p.designFinal(ref.Key)
+	rec, err := triagerec.NewStore(dir).LoadLive()
+	if err != nil {
+		p.log.Warn("triage step: read record", "project", project, "err", err)
+		return true
+	}
+	return triagerec.Final(rec)
 }
 
 // designFinal reports whether the map behind a design ticket is at Branch or
@@ -129,6 +147,10 @@ func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 		meta = sessions.Meta{}
 	}
 	meta.ConversationID = design.Conversation
+	if design.Flow.Flow == tickets.FlowTriage && p.onTriageIdle != nil {
+		// After the Actionable is settled: the stop must not race the run-end line.
+		defer p.onTriageIdle(design.Flow.Key)
+	}
 	text, ok := p.lastAssistantText(id, meta)
 	if !ok {
 		return
