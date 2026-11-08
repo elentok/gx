@@ -8,6 +8,7 @@ import type {
   SessionResult,
   TriageAbandonRequest,
   TriageApproveRequest,
+  TriageRowActionRequest,
   TriageEditResult,
   TriageRowRequest,
 } from "../generated/server";
@@ -56,6 +57,9 @@ export type AbandonTriage = (body: TriageAbandonRequest) => Promise<TriageEditRe
 export const postAbandonTriage: AbandonTriage = postJson<TriageEditResult>("/v1/triage/abandon");
 export type SaveTriageRow = (body: TriageRowRequest) => Promise<TriageEditResult>;
 export const postSaveTriageRow: SaveTriageRow = postJson<TriageEditResult>("/v1/triage/row");
+export type TriageRowAction = (body: TriageRowActionRequest) => Promise<TriageEditResult>;
+export const postRetryTriageRow: TriageRowAction = postJson<TriageEditResult>("/v1/triage/retry");
+export const postKeepTriageRow: TriageRowAction = postJson<TriageEditResult>("/v1/triage/keep");
 export type ApproveTriage =(body: TriageApproveRequest) => Promise<TriageEditResult>;
 export const postApproveTriage: ApproveTriage = postJson<TriageEditResult>("/v1/triage/approve");
 export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete");

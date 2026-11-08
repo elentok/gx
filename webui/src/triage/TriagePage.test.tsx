@@ -100,6 +100,22 @@ test("the strip names the verdicts saved while a session runs", async () => {
   await screen.findByText(/Triage session running · verdicts saved 2 of 3/);
 });
 
+test("at Write the strip counts rows written and Continue follows the session", async () => {
+  const rows = [
+    { ...row(1), write_state: "done" },
+    { ...row(2), write_state: "failed", refusal: "close: ticket is claimed, not draft or open", can_retry: true },
+    { ...row(3), write_state: "pending" },
+  ];
+  const detail = viewOf({ steps: stepsAt(3), rows });
+  render([session("working")], { triage: async () => ({ kind: "ok", detail }) });
+  await screen.findByText("Write session running · rows written 1 of 3");
+  screen.getByText("close: ticket is claimed, not draft or open");
+  expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
+  cleanup();
+  render([session("exited")], { triage: async () => ({ kind: "ok", detail }) });
+  expect(((await screen.findByRole("button", { name: "Continue" })) as HTMLButtonElement).disabled).toBe(false);
+});
+
 test("Continue is disabled while a session runs and enabled once it is stopped, and posts the open route", async () => {
   const openTriage = vi.fn(async () => ({}));
   render([session("working")], { openTriage });

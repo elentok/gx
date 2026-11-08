@@ -2,7 +2,7 @@ import { Box, Spinner as ChakraSpinner, Text, chakra } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { flowSession, liveFlowSessions } from "../design/view";
-import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type OpenFlow, type ResumeSession, type SaveTriageRow, type StopSession } from "../design/open";
+import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type OpenFlow, type ResumeSession, type SaveTriageRow, type StopSession, type TriageRowAction } from "../design/open";
 import { useDesignWrite } from "../design/SessionControls";
 import type { FetchChat } from "../design/chat";
 import type { PostFocus } from "../design/focus";
@@ -22,6 +22,7 @@ import { SteppedPage } from "../stepped/SteppedPage";
 import { useWide } from "../useWide";
 import { QuestionsView } from "./QuestionsView";
 import { ReviewView } from "./ReviewView";
+import { WriteView, rowsWritten } from "./WriteView";
 import { useTriage,type FetchTriage } from "./useTriage";
 
 /** The injected fetchers and actions the Triage page talks to the server through. */
@@ -37,10 +38,13 @@ export interface TriageDeps {
   abandon?: AbandonTriage;
   approve?: ApproveTriage;
   saveRow?: SaveTriageRow;
+  retry?: TriageRowAction;
+  keep?: TriageRowAction;
 }
 
 const FLOW = "triage";
 const APPROVE = "approve";
+const WRITE = "write";
 
 /** Start, or Continue once a session exists. The open route returns the live Triage, so it never starts a second one. */
 function HeaderButton({ project, session, open = postOpenTriage }: { project: string; session?: SessionInfo; open?: OpenFlow }) {
@@ -92,6 +96,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
   const approveView = useApproveView(view.revision, view.open_questions);
   const approval = useApprove({ project, view, refetch, approve: deps.approve, carryReview: approveView.carryReview });
   const atApprove = view.steps.some((s) => s.step === APPROVE && s.state === "current");
+  const atWrite = view.steps.some((s) => s.step === WRITE && s.state === "current");
   const wide = useWide();
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -148,6 +153,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
       chatTop={() => (
         <>
           {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} questions={<QuestionsView project={project} view={view} refetch={refetch} save={deps.saveRow} />} review={<ReviewView project={project} view={view} refetch={refetch} save={deps.saveRow} />} />}
+          {atWrite && <WriteView project={project} view={view} refetch={refetch} retry={deps.retry} keep={deps.keep} />}
           {live.length > 0 && (
           <Box
             display="flex"
@@ -161,7 +167,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
             fontSize="sm"
           >
             <Box aria-hidden w="8px" h="8px" borderRadius="full" bg="tone.running.fg" />
-            Triage session running · verdicts saved {verdictsSaved(view)}
+            {atWrite ? `Write session running · rows written ${rowsWritten(view)} of ${view.rows.length}` : `Triage session running · verdicts saved ${verdictsSaved(view)}`}
           </Box>
           )}
         </>
