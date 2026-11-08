@@ -138,8 +138,14 @@ function Entry({ entry }: { entry: MenuEntry }) {
     case "submenu":
       return (
         <ChakraMenu.Root positioning={{ placement: "right-start", gutter: 2 }} lazyMount unmountOnExit>
-          <ChakraMenu.TriggerItem {...rowLayout(entry.inlineHint)} {...itemStyle}>
-            <Label item={entry} />
+          <ChakraMenu.TriggerItem {...rowLayout(true)} {...itemStyle}>
+            {entry.inlineHint ? (
+              <Label item={entry} />
+            ) : (
+              <Box display="flex" flexDirection="column" alignItems="flex-start">
+                <Label item={entry} />
+              </Box>
+            )}
             <Text as="span" aria-hidden>
               ›
             </Text>
