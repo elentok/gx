@@ -251,8 +251,7 @@ const idleEpicState = { snapshot: { sessions: [] }, connected: true, loadedOnce:
 const idleEpicConnection = {
   getState: () => idleEpicState,
   subscribe: () => () => {},
-  onEvent: () => () => {},
-  refresh: () => {},
+  onEvent: () => () => {},  refresh: () => {},
 } as unknown as Connection;
 
 // The page needs a router and a connection; the transform keeps the fix dialog's fixed overlay inside the frame.

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, swipe, test } from "./fixture";
+import { blockEvents, card, expect, nav, swipe, test } from "./fixture";
 
 const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash);
 
@@ -496,4 +496,15 @@ test("Workspaces", async ({ page, start }) => {
   await page.getByRole("dialog").getByRole("button", nav("Remove")).click();
   await expect(page).not.toHaveURL(new RegExp(`#/agents/${chatId}$`));
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chatId);
+
+  // Returning to the app restarts the stream and refetches: with the stream blocked, a rename from the CLI
+  // reaches the sidebar only through visibilitychange and pageshow, with no reload.
+  await goto(page, "#/epics");
+  const unblock = await blockEvents(page);
+  await fx.cli("server", "workspaces", "rename", "scratch", "archive");
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await page.evaluate(() => window.dispatchEvent(new Event("pageshow")));
+  await unblock();
+  await switcher.click();
+  await expect(page.getByRole("menuitem", { name: /^archive/ })).toBeVisible();
 });

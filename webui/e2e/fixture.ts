@@ -480,6 +480,13 @@ export async function holdRoute(page: Page, url: string): Promise<() => void> {
   return release;
 }
 
+/** Refuses every `/v1/events` request until the returned release runs, so the page cannot hear the server. */
+export async function blockEvents(page: Page): Promise<() => Promise<void>> {
+  const pattern = "**/v1/events*";
+  await page.route(pattern, (route) => route.abort());
+  return () => page.unroute(pattern);
+}
+
 /** The toasts on screen. */
 export const toasts = (page: Page) => page.getByRole("region", { name: /^Notifications/ }).getByRole("status");
 

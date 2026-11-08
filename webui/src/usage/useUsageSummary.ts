@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Connection } from "../connection";
+import { RESYNC_EVENT, type Connection } from "../connection";
 import { EventBudgetChanged, EventLimitsChanged, type UsageSummary } from "../generated/server";
 import { fetchJson } from "../ticket/detail";
 
@@ -41,7 +41,7 @@ export function useUsageSummary(conn: Connection, fetcher: FetchSummary = fetchS
     refetch();
     const timer = setInterval(refetch, REFRESH_MS);
     const off = conn.onEvent((_address, type) => {
-      if (type === EventLimitsChanged || type === EventBudgetChanged) refetch();
+      if (type === RESYNC_EVENT || type === EventLimitsChanged || type === EventBudgetChanged) refetch();
     });
     return () => {
       clearInterval(timer);

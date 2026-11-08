@@ -8,6 +8,8 @@ export const BACKOFF_MAX_MS = 15000;
 export const WATCHDOG_MS = 45000;
 export const OFFLINE_DELAY_MS = 5000;
 export const TICK_MS = 60000;
+/** Sent to event listeners (with no address) when the app returns to the foreground. */
+export const RESYNC_EVENT = "resync";
 
 export interface ConnectionState {
   snapshot: Snapshot | null;
@@ -218,10 +220,17 @@ export function createConnection(deps: ConnectionDeps = {}) {
     ticker = undefined;
   }
 
+  // A stream can look alive after the OS suspended the page, so coming back always reconnects
+  // and tells page-data hooks to refetch.
+  function resync() {
+    void connect();
+    eventListeners.forEach((l) => l(undefined, RESYNC_EVENT));
+  }
+
   function onVisibility() {
     if (document.visibilityState === "visible") {
       startTick();
-      if (!live) void connect();
+      resync();
     } else {
       stopTick();
     }
@@ -248,6 +257,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
     },
     start() {
       document.addEventListener("visibilitychange", onVisibility);
+      window.addEventListener("pageshow", resync);
       window.addEventListener("online", onOnline);
       if (document.visibilityState === "visible") startTick();
       markDown();
@@ -255,6 +265,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
     },
     stop() {
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", resync);
       window.removeEventListener("online", onOnline);
       teardown();
       stopTick();

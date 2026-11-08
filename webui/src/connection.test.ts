@@ -4,6 +4,7 @@ import {
   BACKOFF_MAX_MS,
   createConnection,
   OFFLINE_DELAY_MS,
+  RESYNC_EVENT,
   TICK_MS,
   WATCHDOG_MS,
 } from "./connection";
@@ -101,6 +102,39 @@ test("an event frame refetches the snapshot without reconnecting", async () => {
   expect(log).toEqual(["snapshot", "events /v1/events?since=1&client=tab-1", "snapshot"]);
   expect(conn.getState().snapshot?.seq).toBe(2);
   conn.stop();
+});
+
+test.each([
+  ["visibilitychange", () => setVisibility("visible")],
+  ["pageshow", () => window.dispatchEvent(new Event("pageshow"))],
+])("%s restarts a live stream and fires the resync", async (_name, trigger) => {
+  const { conn, log, streams } = setup();
+  const resyncs = vi.fn();
+  conn.onEvent((_a, type) => type === RESYNC_EVENT && resyncs());
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  trigger();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(resyncs).toHaveBeenCalledTimes(1);
+  expect(streams).toHaveLength(2);
+  expect(log.filter((l) => l === "snapshot")).toHaveLength(2);
+  conn.stop();
+});
+
+test("hiding the page does not resync, and stop() removes the listeners", async () => {
+  const { conn, streams } = setup();
+  const resyncs = vi.fn();
+  conn.onEvent((_a, type) => type === RESYNC_EVENT && resyncs());
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  setVisibility("hidden");
+  expect(resyncs).not.toHaveBeenCalled();
+  conn.stop();
+  setVisibility("visible");
+  window.dispatchEvent(new Event("pageshow"));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(resyncs).not.toHaveBeenCalled();
+  expect(streams).toHaveLength(1);
 });
 
 test("listeners receive (address, type) for each event block", async () => {
@@ -210,14 +244,10 @@ test("a quick reconnect never flips connected", async () => {
   conn.stop();
 });
 
-test("becoming visible leaves a live stream alone, online reconnects", async () => {
+test("online reconnects a live stream", async () => {
   const { conn, log } = setup();
   conn.start();
   await vi.advanceTimersByTimeAsync(0);
-  setVisibility("hidden");
-  setVisibility("visible");
-  await vi.advanceTimersByTimeAsync(0);
-  expect(log.filter((l) => l === "snapshot").length).toBe(1);
   window.dispatchEvent(new Event("online"));
   await vi.advanceTimersByTimeAsync(0);
   expect(log.filter((l) => l === "snapshot").length).toBe(2);

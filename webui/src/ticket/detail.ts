@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../apiFetch";
-import type { Connection } from "../connection";
+import { RESYNC_EVENT, type Connection } from "../connection";
 import type { TicketDetail } from "../generated/server";
 import { readPageCache, writePageCache } from "../pageCache";
 
@@ -69,8 +69,8 @@ export function useDetail<T>(
 
   useEffect(() => {
     refetch();
-    const off = conn.onEvent((a) => {
-      if (a === address || (watchPrefix && a?.startsWith(watchPrefix))) refetch();
+    const off = conn.onEvent((a, type) => {
+      if (type === RESYNC_EVENT || a === address || (watchPrefix && a?.startsWith(watchPrefix))) refetch();
     });
     // Events sent while the stream was down never reach `onEvent`, so a reopened stream refetches.
     // The first stream replays from the snapshot, so it misses nothing.
