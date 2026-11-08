@@ -277,8 +277,12 @@ func (t *tui) draw() {
 	if t.notice != "" && t.pid.Status == StatusIdle {
 		rows = append(rows, t.notice)
 	}
-	if t.vim && t.pid.Status == StatusIdle {
-		rows = append(rows, "-- INSERT --")
+	footer := t.opts.vimFooter
+	if t.vim {
+		footer = "-- INSERT --"
+	}
+	if footer != "" && t.pid.Status == StatusIdle {
+		rows = append(rows, footer)
 	}
 	if t.opts.mouse {
 		rows = append(rows, fmt.Sprintf("wheel up %d down %d", t.wheelUp, t.wheelDown))

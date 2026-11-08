@@ -148,6 +148,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if quit, err := t.trustKey(ev.Key); quit || err != nil {
 				return 1, err
 			}
+		case t.opts.wedged:
 		case t.pasteKey(ev.Key):
 		case t.opts.mouse && (ev.Key == EscKey || len(t.seq) > 0):
 			if err := t.mouseSeqKey(ev.Key); err != nil {

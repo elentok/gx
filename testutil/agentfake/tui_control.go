@@ -51,6 +51,16 @@ const (
 	// Enter nor a clear key, so the screen stops changing. Later launches are
 	// healthy. The file counts launches across the fake's processes.
 	TUIHangLaunchesEnv = "GX_AGENTFAKE_TUI_HANG_LAUNCHES"
+	// TUIVimWedgeEnv, "<INSERT|NORMAL>:<n>:<counter file>", wedges the first n
+	// launches that share the counter file: once idle the pane draws that vim
+	// footer below the input and takes no key at all, as the hung panes did.
+	// Later launches are healthy.
+	TUIVimWedgeEnv = "GX_AGENTFAKE_TUI_VIM_WEDGE"
+	// TUIIgnoreEditorModeEnv, set to "1", starts every launch in vim INSERT
+	// (the "-- INSERT --" footer at idle) although --settings carried
+	// editorMode normal, as a person's vim setting beating the override does.
+	// Keys still work.
+	TUIIgnoreEditorModeEnv = "GX_AGENTFAKE_TUI_IGNORE_EDITOR_MODE"
 	// TUIRegistryDelayEnv, a Go duration, keeps the skill registry empty for
 	// that long after start: a skill prompt typed earlier is an unknown command.
 	TUIRegistryDelayEnv = "GX_AGENTFAKE_TUI_REGISTRY_DELAY"

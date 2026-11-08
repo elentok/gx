@@ -56,6 +56,10 @@ type tuiOptions struct {
 	redrawDelay time.Duration
 	// hung makes Enter a no-op as well (see TUIHangLaunchesEnv).
 	hung bool
+	// vimFooter is the vim footer row drawn at idle, "" for none; wedged makes
+	// the pane take no key (see TUIVimWedgeEnv, TUIIgnoreEditorModeEnv).
+	vimFooter string
+	wedged    bool
 	// registryDelay, unknownSkill, noTurn and launchRecord are the skill-prompt
 	// knobs; see the TUI...Env consts.
 	registryDelay time.Duration
@@ -89,6 +93,17 @@ func HangThisLaunch(spec string) bool {
 	prior, _ := f.Seek(0, io.SeekEnd)
 	_, _ = f.WriteString("x")
 	return int(prior) < limit
+}
+
+// vimWedge parses a TUIVimWedgeEnv spec into the footer row to draw and
+// whether this launch is wedged. A bad spec or a launch past the count is
+// healthy.
+func vimWedge(spec string) (footer string, wedged bool) {
+	mode, rest, ok := strings.Cut(spec, ":")
+	if !ok || (mode != "INSERT" && mode != "NORMAL") || !HangThisLaunch(rest) {
+		return "", false
+	}
+	return "-- " + mode + " --", true
 }
 
 // parseTUIArgs accepts exactly the PTY runner's launch flags, so a new flag
@@ -128,8 +143,14 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
 	redrawDelay, _ := time.ParseDuration(os.Getenv(TUIRedrawDelayEnv))
 	hung := HangThisLaunch(os.Getenv(TUIHangLaunchesEnv))
+	vimFooter, wedged := vimWedge(os.Getenv(TUIVimWedgeEnv))
+	if vimFooter == "" && os.Getenv(TUIIgnoreEditorModeEnv) == "1" {
+		vimFooter = "-- INSERT --"
+	}
 	return tuiOptions{
 		hung:             hung,
+		vimFooter:        vimFooter,
+		wedged:           wedged,
 		plainScreen:      os.Getenv(TUIPlainScreenEnv) == "1",
 		classifierOutage: outageTurns(os.Getenv(TUIClassifierOutageEnv)),
 		sessionID:        *sessionID,
