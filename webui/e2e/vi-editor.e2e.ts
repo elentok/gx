@@ -13,9 +13,11 @@ const setViMode = async (fixture: Fixture, page: Page, on: boolean) => {
   await fixture.cli("vimode", on ? "on" : "off");
   await openMenu(page);
   await expect(menuSwitch(page)).toHaveAttribute("aria-checked", String(on));
-  // The menu's dim covers the button, so Escape closes it.
-  await page.keyboard.press("Escape");
-  await expect(menu(page)).toHaveCount(0);
+  // The menu's dim covers the button, so Escape closes it once focus is inside the menu.
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(menu(page)).toHaveCount(0, { timeout: 500 });
+  }).toPass();
   // A sidebar that slid over a narrow page would block the page behind its scrim.
   if (await page.getByTestId("scrim").isVisible()) await page.getByRole("button", nav("Hide sidebar")).click();
   await expect(page.getByTestId("scrim")).toHaveCount(0);
