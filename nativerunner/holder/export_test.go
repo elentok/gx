@@ -2,6 +2,7 @@ package holder
 
 import (
 	"encoding/binary"
+	"net"
 	"testing"
 	"time"
 
@@ -48,6 +49,13 @@ func SetHolderDenyTimeout(t *testing.T, d time.Duration) {
 	old := holderDenyTimeout
 	holderDenyTimeout = d
 	t.Cleanup(func() { holderDenyTimeout = old })
+}
+
+// SetHolderDial swaps the dial the client calls make and shortens the backoff.
+func SetHolderDial(t *testing.T, dial func(network, addr string, timeout time.Duration) (net.Conn, error)) {
+	oldDial, oldBackoff := holderDial, dialBackoff
+	holderDial, dialBackoff = dial, time.Millisecond
+	t.Cleanup(func() { holderDial, dialBackoff = oldDial, oldBackoff })
 }
 
 const FrameInterval = defaultFrameInterval

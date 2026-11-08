@@ -501,6 +501,53 @@ func waitForScreen(t *testing.T, c *holder.HolderClient, want string) {
 	})
 }
 
+type timeoutErr struct{}
+
+func (timeoutErr) Error() string   { return "i/o timeout" }
+func (timeoutErr) Timeout() bool   { return true }
+func (timeoutErr) Temporary() bool { return true }
+
+func TestHolderClient_DialTimingOutTwiceThenAnswering_Succeeds(t *testing.T) {
+	_, c, _ := startHolder(t, echoChild)
+	fails := 2
+	holder.SetHolderDial(t, func(network, addr string, d time.Duration) (net.Conn, error) {
+		if fails > 0 {
+			fails--
+			return nil, &net.OpError{Op: "dial", Err: timeoutErr{}}
+		}
+		return net.DialTimeout(network, addr, d)
+	})
+	if _, _, err := c.Status(); err != nil {
+		t.Fatalf("Status after two slow dials = %v; want nil", err)
+	}
+	if fails != 0 {
+		t.Fatalf("dial failures left = %d; want the call to have retried through them", fails)
+	}
+}
+
+func TestHolderClient_DialNeverAnswering_ReturnsUnreachable(t *testing.T) {
+	_, c, _ := startHolder(t, echoChild)
+	holder.SetHolderDial(t, func(string, string, time.Duration) (net.Conn, error) {
+		return nil, &net.OpError{Op: "dial", Err: timeoutErr{}}
+	})
+	if _, _, err := c.Status(); !errors.Is(err, holder.ErrHolderUnreachable) {
+		t.Fatalf("Status = %v; want ErrHolderUnreachable", err)
+	}
+}
+
+func TestHolderClient_DialRefused_FailsWithoutRetry(t *testing.T) {
+	_, c, _ := startHolder(t, echoChild)
+	calls := 0
+	holder.SetHolderDial(t, func(string, string, time.Duration) (net.Conn, error) {
+		calls++
+		return nil, errors.New("connection refused")
+	})
+	err := c.Stop()
+	if err == nil || errors.Is(err, holder.ErrHolderUnreachable) || calls != 1 {
+		t.Fatalf("Stop = %v after %d dials; want a plain error after one", err, calls)
+	}
+}
+
 // shortTempDir keeps holder.sock under the unix socket path limit, which a
 // t.TempDir path can exceed on macOS.
 func shortTempDir(t *testing.T) string {

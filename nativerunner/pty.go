@@ -261,6 +261,10 @@ func (p *Pty) died(ss *ptySession, err error) error {
 	if errors.Is(err, holder.ErrHolderDenyBusy) {
 		return fmt.Errorf("%w: %v", agentrunner.ErrNotReady, err)
 	}
+	if errors.Is(err, holder.ErrHolderUnreachable) {
+		// A slow holder is not a dead one; the caller retries the poll.
+		return err
+	}
 	var exited *holder.ClaudeExitedError
 	if errors.As(err, &exited) {
 		return agentrunner.SessionDied(exited.Error())

@@ -757,9 +757,41 @@ func (c *HolderClient) call(req holderRequest) (holderResponse, error) {
 	return c.callWithin(req, holderIOTimeout)
 }
 
+// ErrHolderUnreachable is a dial that timed out on every try: the holder may
+// be alive but slow, so unlike a refused or missing socket it is not proof
+// the holder is dead.
+var ErrHolderUnreachable = errors.New("holder unreachable")
+
+var (
+	dialAttempts = 3
+	dialBackoff  = 500 * time.Millisecond
+	// holderDial is a variable so a test can delay or fail the dial.
+	holderDial = net.DialTimeout
+)
+
+// dial retries only timeouts; a refused or missing socket fails at once.
+func (c *HolderClient) dial() (net.Conn, error) {
+	var err error
+	for i := range dialAttempts {
+		if i > 0 {
+			time.Sleep(dialBackoff * time.Duration(i))
+		}
+		var conn net.Conn
+		conn, err = holderDial("unix", c.sock, holderIOTimeout)
+		if err == nil {
+			return conn, nil
+		}
+		var ne net.Error
+		if !errors.As(err, &ne) || !ne.Timeout() {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("%w: %w", ErrHolderUnreachable, err)
+}
+
 func (c *HolderClient) callWithin(req holderRequest, timeout time.Duration) (holderResponse, error) {
 	var resp holderResponse
-	conn, err := net.DialTimeout("unix", c.sock, holderIOTimeout)
+	conn, err := c.dial()
 	if err != nil {
 		return resp, err
 	}

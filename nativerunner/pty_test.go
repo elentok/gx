@@ -567,6 +567,15 @@ func TestPty_ExitBeforeExitCodeFileIsClaudeExited(t *testing.T) {
 	}
 }
 
+func TestPty_UnreachableHolderIsNotSessionDied(t *testing.T) {
+	t.Parallel()
+	p := &nativerunner.Pty{Root: t.TempDir()}
+	err := nativerunner.Died(p, "e-01", fmt.Errorf("status: %w", holder.ErrHolderUnreachable))
+	if !errors.Is(err, holder.ErrHolderUnreachable) || errors.Is(err, agentrunner.ErrSessionDied) {
+		t.Fatalf("died = %v; want ErrHolderUnreachable and not ErrSessionDied", err)
+	}
+}
+
 func TestPty_HolderCrashIsSessionDied(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)

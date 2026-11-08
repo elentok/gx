@@ -51,6 +51,9 @@ const (
 	// StallNudged is the fixed text the server typed into an agent that sat idle
 	// with no open question and no finished report.
 	StallNudged Type = "stall-nudged"
+	// HolderUnreachable is a holder whose dial timed out on every retry. The
+	// session is not treated as dead; the event clears when a dial works.
+	HolderUnreachable Type = "holder-unreachable"
 	// PromptNudged is one step a runner took on a launch prompt the agent
 	// didn't pick up; its reason is a claudeui.NudgeDecision.
 	PromptNudged Type = "prompt-nudged"
