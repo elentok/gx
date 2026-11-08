@@ -251,3 +251,19 @@ test("history lists past Triages in the order sent, read-only, with epic links",
   expect(region.querySelector('a[href="#/e/gx:map-a"]')).toBeTruthy();
   expect(region.querySelectorAll("button").length).toBe(0);
 });
+
+test("a done Triage with a ready epic orders the header Queue button, ring, menu", async () => {
+  const detail = viewOf({
+    state: "done",
+    steps: stepsAt(5),
+    ring_percent: 100,
+    result: { ready_epic: "gx:ready-1", groups: [{ action: "ready", items: [{ address: "gx:follow-ups/1", title: "a" }] }] },
+  });
+  const ready = { address: "gx:ready-1", project: "gx", name: "ready-1", kind: "loop", state: "ready", done: 0, total: 1, queued: false, queueable: true, blocked_by_epics: [], addresses: ["gx:ready-1"] };
+  render([], { triage: async () => ({ kind: "ok", detail }), epicList: async () => ({ epics: [ready], follow_ups: [] }) as never });
+  const queue = await screen.findByRole("button", { name: "Queue epic" });
+  const ring = screen.getByRole("img", { name: "Follow-ups" });
+  const menu = screen.getByRole("button", { name: "More actions" });
+  expect(queue.compareDocumentPosition(ring) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(ring.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});

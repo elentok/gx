@@ -55,6 +55,8 @@ export interface SteppedPageProps {
   startFailure?: string;
   /** Replaces the Start button: a flow's primary header button, given the session the page shows. */
   headerButton?: (session?: SessionInfo) => ReactNode;
+  /** A header control left of the ring. */
+  beforeRing?: ReactNode;
   /** What the busy row names: the step the agent reported and, for a ticket step, its title. */
   working: (session?: SessionInfo) => { step?: string; title?: string };
   // Design-only parts, each rendered only when given.
@@ -131,6 +133,7 @@ export function SteppedPage({
   startLabel,
   startFailure,
   headerButton,
+  beforeRing,
   working,
   subtitleSuffix,
   metaLink,
@@ -188,6 +191,7 @@ export function SteppedPage({
           }
           actions={
             <>
+              {beforeRing}
               {ring &&
                 (stepsInline ? (
                   ring("header")

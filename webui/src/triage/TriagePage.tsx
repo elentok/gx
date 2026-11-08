@@ -8,7 +8,7 @@ import type { FetchChat } from "../design/chat";
 import type { PostFocus } from "../design/focus";
 import type { PostPrompt } from "../design/prompt";
 import type { FetchScreen } from "../design/screen";
-import { TriageAbandoned, TriageNone, type SessionInfo, type TriageView } from "../generated/server";
+import { TriageAbandoned, TriageDone, TriageNone, type SessionInfo, type TriageView } from "../generated/server";
 import { Modal } from "../ui/modal/Modal";
 import { TriageHistory } from "./History";
 import { ApproveShell, approveSubRows, useApprove, useApproveView } from "./ApproveShell";
@@ -20,6 +20,9 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { triageModel } from "../stepped/model";
 import { SteppedPage } from "../stepped/SteppedPage";
 import { useWide } from "../useWide";
+import { DoneQueue, DoneView } from "./DoneView";
+import type { FetchEpicList } from "../epics/list";
+import type { PostEpicWrite } from "../epics/queue";
 import { QuestionsView } from "./QuestionsView";
 import { ReviewView } from "./ReviewView";
 import { WriteView, rowsWritten } from "./WriteView";
@@ -40,6 +43,8 @@ export interface TriageDeps {
   saveRow?: SaveTriageRow;
   retry?: TriageRowAction;
   keep?: TriageRowAction;
+  fetchEpics?: FetchEpicList;
+  queue?: PostEpicWrite;
 }
 
 const FLOW = "triage";
@@ -97,6 +102,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
   const approval = useApprove({ project, view, refetch, approve: deps.approve, carryReview: approveView.carryReview });
   const atApprove = view.steps.some((s) => s.step === APPROVE && s.state === "current");
   const atWrite = view.steps.some((s) => s.step === WRITE && s.state === "current");
+  const atDone = view.state === TriageDone;
   const wide = useWide();
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -131,8 +137,9 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
       current={flowSession(FLOW, project, sessions)}
       actions={deps}
       startLabel="Start"
+      beforeRing={atDone && view.result?.ready_epic ? <DoneQueue epic={view.result.ready_epic} fetchEpics={deps.fetchEpics} queue={deps.queue} /> : undefined}
       headerButton={(session) =>
-        atApprove ? (
+        atDone ? null : atApprove ? (
           <Button tone="done" disabled={!!approval.blocked || approval.pending} onClick={approval.approve}>
             {approval.pending && <ChakraSpinner size="sm" />}
             Approve
@@ -153,6 +160,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
       chatTop={() => (
         <>
           {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} questions={<QuestionsView project={project} view={view} refetch={refetch} save={deps.saveRow} />} review={<ReviewView project={project} view={view} refetch={refetch} save={deps.saveRow} />} />}
+          {atDone && view.result && <DoneView result={view.result} />}
           {atWrite && <WriteView project={project} view={view} refetch={refetch} retry={deps.retry} keep={deps.keep} />}
           {live.length > 0 && (
           <Box

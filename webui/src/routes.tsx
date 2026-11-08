@@ -104,6 +104,7 @@ function TriageRoute({ fetchers }: { fetchers: RouteFetchers }) {
         focus: fetchers.focus,
         abandon: fetchers.abandonTriage,
         approve: fetchers.approveTriage,
+        fetchEpics: fetchers.epicList,
       }}
     />
   );
