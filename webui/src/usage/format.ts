@@ -24,7 +24,13 @@ export function limitTone(
   return "running";
 }
 
-export const isStale = (receivedAtSec: number, nowMs: number): boolean =>
+/** Bar fill tone: green below 80%, then limitTone's amber and red. Text keeps limitTone. */
+export function barTone(whole: number) {
+  const tone = limitTone(whole);
+  return tone === "running" ? ("done" as const) : tone;
+}
+
+export const isStale =(receivedAtSec: number, nowMs: number): boolean =>
   nowMs / 1000 - receivedAtSec > LimitsStaleAfterSeconds;
 
 export const isPastReset = (resetsAtSec: number, nowMs: number): boolean =>

@@ -9,6 +9,7 @@ import {
 import { InfoTip } from "../ui/info-tip/InfoTip";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import {
+  barTone,
   chipText,
   chipTooltip,
   exactTime,
@@ -85,7 +86,7 @@ function LimitRow({
             {whole}%
           </Text>
           <Box mt="1.5">
-            <ProgressBar thin value={whole} max={100} tone={tone} />
+            <ProgressBar thin value={whole} max={100} tone={barTone(whole)} />
           </Box>
         </>
       )}

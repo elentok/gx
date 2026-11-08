@@ -46,16 +46,18 @@ describe("LimitsBlock", () => {
   });
 
   it.each([
-    [79, "running"],
-    [80, "waiting"],
-    [94, "waiting"],
-    [95, "deadlocked"],
-    [79.5, "waiting"],
-  ])("tones %d as %s on bar and percentage", (pct, tone) => {
+    [34, "done", "running"],
+    [79, "done", "running"],
+    [80, "waiting", "waiting"],
+    [81, "waiting", "waiting"],
+    [94, "waiting", "waiting"],
+    [95, "deadlocked", "deadlocked"],
+    [79.5, "waiting", "waiting"],
+  ])("tones %d as bar %s and percentage %s", (pct, barTone, textTone) => {
     const v = show({ five_hour: win(pct) });
-    expect(v.getByRole("progressbar").getAttribute("data-tone")).toBe(tone);
+    expect(v.getByRole("progressbar").getAttribute("data-tone")).toBe(barTone);
     expect(v.getByText(`${Math.round(pct)}%`).getAttribute("data-tone")).toBe(
-      tone,
+      textTone,
     );
   });
 

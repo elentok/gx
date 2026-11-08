@@ -3,18 +3,12 @@ import { useState } from "react";
 import type { Connection } from "../connection";
 import { useCloseSignal, useOnCloseSignal } from "../ui/closeSignal";
 import { UsageModeLimits, UsageModeSpending, type UsageLimits } from "../generated/server";
-import { isPastReset, limitTone, wholePercent } from "./format";
+import { barTone, isPastReset, wholePercent } from "./format";
 import { LimitsBlock } from "./LimitsBlock";
 import { SpendBlock } from "./SpendBlock";
 import { useUsageSummary, type FetchSummary } from "./useUsageSummary";
 
 const MIN_FILL = 8;
-
-// Only the tray bar is green below 80%; popover rows keep limitTone's own low tone.
-const barTone = (whole: number) => {
-  const tone = limitTone(whole);
-  return tone === "running" ? ("done" as const) : tone;
-};
 
 // A provider with no 5h window, or one whose window already reset, shows an empty bar.
 export function barFill(limits: UsageLimits | undefined, now: number) {
