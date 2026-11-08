@@ -12,9 +12,9 @@ import (
 )
 
 // A task that goes live after the finish was confirmed, right before the
-// zero-commit park, is waited out instead of pausing: the commits it lets the
+// zero-commit pause, is waited out instead of pausing: the commits it lets the
 // agent land then merge.
-func TestFinishIteration_ParkRereadsSignalAndWaitsWhenTaskIsLive(t *testing.T) {
+func TestFinishIteration_PauseRereadsSignalAndWaitsWhenTaskIsLive(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
 	d, _, _ := fakes.FakeDeps()
@@ -37,7 +37,7 @@ func TestFinishIteration_ParkRereadsSignalAndWaitsWhenTaskIsLive(t *testing.T) {
 	out := driveIteration(t, d, scratchDir, path, fakes.NewRecordingEventSink())
 
 	if liveReads.Load() == 0 {
-		t.Fatal("the park never re-read the signal")
+		t.Fatal("the pause never re-read the signal")
 	}
 	if !out.Merged {
 		t.Errorf("outcome = %+v, want merged once the task finished", out)
