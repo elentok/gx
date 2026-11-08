@@ -55,14 +55,16 @@ epic's verify ticket runs the Verification section below.
    timing and there is no new setting.
 9. As a person, I want the epic queued as soon as the countdown ends, so that implementation starts
    without another step.
-10. As a person, I want the server to re-check the epic when the countdown ends (it must be open and
-    not a follow-ups epic), so that a draft or changed epic is never queued behind my back.
+10. As a person, I want the server to run the same readiness check when the countdown ends that it
+    ran when the countdown started (the Design is at Branch and not held, and the epic is open, not a
+    follow-ups epic, not queued and never run), so that a draft, a changed or a hand-queued epic is
+    never queued behind my back.
 11. As a person, I want a banner with the reason when the re-check skips the queue, so that I know
     the epic is waiting for me and why.
 12. As a person, I want the switch accepted for any Design session even when its epic would be
     refused later, so that the switch is never refused for a reason that only matters at the end.
-13. As a person, I want switching Auto-queue on while the epic is ready (the Design is at Branch,
-    and the impl epic is open, not queued and never run) to start the countdown at once, and
+13. As a person, I want switching Auto-queue on while the epic is ready (it passes the readiness
+    check of story 10) to start the countdown at once, and
     otherwise to start nothing, so that I do not have to wait for another event and never see a
     pointless countdown.
 14. As a person, I want switching Auto-queue off to cancel a running countdown and show a banner, so
@@ -108,8 +110,8 @@ epic's verify ticket runs the Verification section below.
     branches do not pile up.
 33. As a person, I want iteration branches that were cherry-picked onto their epic's branch deleted
     with `git branch -D` only after a server-side patch-id check passes for every commit, so that a
-    cherry-picked branch is recognised as done. The same rule covers a squash-merged branch, with or
-    without a worktree.
+    cherry-picked branch is recognised as done. A squash-merged branch, with one commit or several,
+    and with or without a worktree, is deleted the same way after a whole-branch patch-id check.
 34. As a person, I want a branch with any commit the check cannot match never deleted by a button
     and offered to the agent instead, so that no unmerged work is lost.
 35. As a person, I want a Remove button for an unmerged worktree that is clean and idle (no
@@ -175,27 +177,30 @@ epic's verify ticket runs the Verification section below.
   verb like auto-advance's (ADR 0028; the parity test covers them). Both are refusal results, not
   HTTP errors. The set route refuses a non-Design session. The implementer picks the route paths,
   verb names and refusal reason strings (reasons are a public contract once released).
-- **Trigger.** The countdown starts when the Design reaches Branch and the `<map>-impl` epic
-  exists, for a Design whose switch is on. The switch that counts is the newest Design session of
+- **Readiness check.** One server-side check decides the trigger, the switch-on rule and the end of
+  the countdown. The epic is ready when the Design is at Branch (not past it) and not held (the same
+  hold that auto-advance's `designHeld` backstop reads), and the `<map>-impl` epic is open, is not a
+  follow-ups epic, is not queued and has never run ("never run" is read the way `ralphloop`'s
+  `epicHasRun` reads it). Epics with `base:` or blocked by another epic are ready as usual.
+- **Trigger.** The countdown starts when the Design reaches Branch, for a Design whose switch is on,
+  and only if the readiness check passes. If it fails, nothing starts and no banner shows. The switch that counts is the newest Design session of
   the map's, live or exited; the countdown and its banner show on that session. The countdown starts
   only on a step change to Branch seen inside a running server, never on the first scan after a
   restart (Design Ready's first scan treats every Design as moved, so reusing it as is would
   restart countdowns for every Design already at Branch). The implementer picks where the server
-  hooks this and how "not queued" is read. Design Ready's once-per-Design mark is not reused:
-  Auto-queue has its own state.
-- **Switch-on rule.** Turning the switch on starts a countdown at once only when the epic is ready:
-  the Design is at Branch (not past it), and the impl epic is open, not queued and has never run.
-  Otherwise turning it on starts nothing and shows no banner.
-- **Held Designs.** A held Design starts no countdown. The end-of-countdown re-check also skips, with
-  a banner, if the Design is held (the same hold that auto-advance's `designHeld` backstop reads).
+  hooks this. Design Ready's once-per-Design mark is not reused: Auto-queue has its own state.
+- **Switch-on rule.** Turning the switch on starts a countdown at once only when the readiness check
+  passes. Otherwise turning it on starts nothing and shows no banner.
+- **Held Designs.** A held Design fails the readiness check, so it starts no countdown. If the
+  Design becomes held during a countdown, the end-of-countdown check skips with a banner.
 - **Delay.** The auto-advance delay: 10 seconds, no user config key. The only override is the
   `GX_AUTO_ADVANCE_DELAY` test hook, and a negative value there turns both countdowns off. The
   `servertest` fixture sets a negative delay by default, so Auto-queue server tests set a delay the
   way the `autoadvance` fixture does.
-- **End of the countdown.** The server re-checks, then queues through the same operation as the Epic
-  page's Queue button. Re-check: the epic is open and is not a follow-ups epic. If not, it queues
-  nothing and shows a banner with the reason. Epics with `base:` or blocked by another epic are
-  queued as usual. A refusal from the queue itself (already queued, for one) also shows as a banner.
+- **End of the countdown.** The server runs the readiness check again, then queues through the same
+  operation as the Epic page's Queue button. If the check fails (for example the person queued the
+  epic by hand during the countdown), it queues nothing and shows a banner with the failing
+  condition. A refusal from the queue itself also shows as a banner.
 - **Switch off.** Cancels a running countdown and shows a banner. Cancel shows a banner too.
 - **No new pause (ADR 0042).** A skipped Auto-queue is a banner on the Design session, not a pause
   kind: the epic stays an ordinary unqueued epic, and the person's recovery is the Queue button the
@@ -236,15 +241,19 @@ epic's verify ticket runs the Verification section below.
   web writes do, and the matching verbs are separate socket routes (ADR 0028 amendment).
 - **Button rules.**
   - Archive: done epic that has landed on trunk (merged).
-  - Merged means: patch ids match trunk. For an iteration branch, they match its epic's branch (or
-    trunk if that branch is gone).
+  - Merged means one of two patch-id checks passes. Per-commit: every commit's patch id matches a
+    commit on trunk (cherry-pick). Whole-branch: the patch id of the combined `merge-base..tip` diff
+    matches a commit on trunk (squash merge, including a squash of several commits). For an
+    iteration branch, the baseline is its epic's branch (or trunk if that branch is gone).
   - Remove a worktree whose branch is merged: removes the worktree, then deletes the branch (a
     branch is never deleted before its worktree is gone).
   - Delete a merged branch with no worktree.
-  - One deletion rule for both: `git branch -d` when ancestry shows the branch merged; `git branch
-    -D` when only the patch-id check proves it merged (squash or cherry-pick), and only after the
-    server re-runs the patch-id check on every commit when the write arrives. One unmatched commit
-    means no button; the branch goes to the agent group.
+  - One deletion rule for both: `git branch -d` only when ancestry shows the branch merged into
+    trunk (`-d` checks against upstream or HEAD, which is trunk in the bare repo); `git branch -D`
+    for every other proven merge (cherry-pick, squash, or an iteration branch merged into an epic
+    branch that is not on trunk yet), and only after the server re-runs the check that proved it
+    when the write arrives. A branch that passes neither patch-id check has no button; it goes to
+    the agent group.
   - Remove an unmerged worktree that is clean and idle (no uncommitted changes, no live session): a
     separate Remove button that warns the ignored files are lost and the branch stays, and asks to
     confirm before anything is removed. The branch is not touched.
@@ -308,8 +317,11 @@ epic's verify ticket runs the Verification section below.
 - **Prior art.** Auto-advance tests in the prompt package and the `autoadvance` fixture in
   `servertest`; `ui/agents` actions tests for the TUI items; the Design page and footer component
   tests; the existing scan tests with real repos; the route-to-verb parity test in `cmd`.
-- Cherry-pick checks (the patch-id rule) need real commits: a branch that is cherry-picked, one with
-  one extra commit, and one reachable by ancestry.
+- Patch-id checks need real commits: a branch that is cherry-picked, one with one extra commit, one
+  reachable by ancestry, a one-commit squash and a multi-commit squash (each with and without a
+  worktree), and an iteration branch merged by ancestry into an epic branch that is not on trunk.
+  The `cleanup` scenario holds each of these.
+- Auto-queue readiness has a server test per failing condition (see Verification 11).
 - Tests run capped (`scripts/proc-cap`); a package using `servertest` needs both TestMain hooks.
 
 ## Verification
@@ -335,12 +347,15 @@ from `webui/e2e/CATALOG.md`.
 8. **Story 8.** Check: run the fixture with `GX_AUTO_ADVANCE_DELAY` set; Auto-queue's deadline is
    that long after Branch.
 9. **Story 10, 11.** Check: set the impl epic to draft before the countdown ends; nothing is
-   queued and the session's banner names the reason. Same for a follow-ups epic.
+   queued and the session's banner names the reason. Same for a follow-ups epic, for an epic the
+   person queued by hand during the countdown, and for a Design held during the countdown.
 10. **Story 12, 18.** CLI: the verb to set Auto-queue on a Design session exits 0 with `refused:
     false`, and on a non-Design session answers `refused: true` with a reason (`--json`).
-11. **Story 13.** Check: epic ready and unqueued, switch on: the countdown shows at once. A Design
-    past Branch (impl epic already run or merged), or a held Design, switch on: no countdown and no
-    banner (held: no countdown).
+11. **Story 13.** Check: epic ready, switch on: the countdown shows at once. One case per failing
+    readiness condition, each with the switch turned on and each expecting no countdown and no
+    banner: the Design is past Branch, the epic is queued, the epic has run, the epic is not open,
+    the Design is held. One more case: the switch is already on, the Design reaches Branch while the
+    epic is already queued, and no countdown starts.
 12. **Story 14.** Check: switch off during a countdown: the countdown ends and a banner shows.
 13. **Story 15, 16.** Check: flip on, restart the fixture server (`restart` flows' helper): the
     switch is still on and no countdown shows. Also restart with a Design at Branch, the switch on
@@ -363,8 +378,10 @@ from `webui/e2e/CATALOG.md`.
     (`git worktree list`, `git branch`).
 22. **Story 32.** Check: Delete on a merged branch with no worktree removes it.
 23. **Story 33, 34.** Check: a cherry-picked iteration branch is deleted with `-D`; a branch with one
-    extra commit has no button and shows in the agent group. A squash-merged branch is deleted with
-    `-D`, with and without a worktree; an ancestry-merged branch is deleted with `-d`.
+    extra commit has no button and shows in the agent group. A squash-merged branch, of one commit
+    and of several, is deleted with `-D`, with and without a worktree. A branch merged by ancestry
+    into trunk is deleted with `-d`. An iteration branch merged by ancestry into an epic branch that
+    is not on trunk is deleted with `-D` and git does not refuse it.
 24. **Story 35, 36.** Flow: Remove on an unmerged clean idle worktree shows the warning and a
     confirm; Cancel removes nothing; Confirm removes the folder and leaves the branch.
 25. **Story 37.** Check: a dirty worktree and one with a live session show no Remove button, and the
