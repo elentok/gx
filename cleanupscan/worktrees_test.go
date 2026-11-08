@@ -3,6 +3,7 @@ package cleanupscan
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +145,36 @@ func TestScanWorktrees_OtherBranch(t *testing.T) {
 
 	if scan.Kind != "other" {
 		t.Fatalf("Kind = %q, want other", scan.Kind)
+	}
+}
+
+func TestScanWorktrees_DetachedWorktreeListedAndDirtyReported(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	old := time.Now().Add(-72 * time.Hour)
+	wtDir := filepath.Join(t.TempDir(), "detached")
+	scanGit(t, dir, old, "worktree", "add", "--detach", wtDir, "main")
+	testutil.WriteFile(t, wtDir, "dirty.txt", "x")
+
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scans, err := scanWorktrees(repo, nil)
+	if err != nil {
+		t.Fatalf("scanWorktrees: %v", err)
+	}
+	var found *WorktreeScan
+	for i := range scans {
+		if scans[i].Branch == "" {
+			found = &scans[i]
+		}
+	}
+	if found == nil {
+		t.Fatalf("detached worktree not listed in %+v", scans)
+	}
+	if found.Kind != "detached" || found.Head == "" || !found.Dirty || found.Recommendation != "" {
+		t.Errorf("detached scan = %+v, want kind detached, head set, dirty, no recommendation", *found)
+	}
+	if filepath.Base(found.Path) != "detached" {
+		t.Errorf("Path = %q, want the detached worktree", found.Path)
 	}
 }
 

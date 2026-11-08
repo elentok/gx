@@ -23,10 +23,15 @@ type WorktreeScan struct {
 	// Path is the linked worktree's directory, empty when the branch has no
 	// worktree checked out.
 	Path string `json:"path,omitempty"`
-	Kind string `json:"kind"` // "iteration", "feature", "other"
+	Kind string `json:"kind"` // "iteration", "feature", "other", "detached"
 	// Active is true when there's a recent commit or uncommitted changes,
 	// suppressing Recommendation regardless of what it would otherwise be.
 	Active bool `json:"active"`
+	// Dirty is true when the linked worktree has uncommitted changes. Unlike
+	// Active it ignores commit age, so a caller can gate removing the worktree.
+	Dirty bool `json:"dirty,omitempty"`
+	// Head is the checked-out commit of a detached worktree (Branch is empty).
+	Head string `json:"head,omitempty"`
 
 	// Epic is set for "iteration" (the epic the iteration belongs to) and
 	// "feature" (the epic itself) kinds.
@@ -65,9 +70,13 @@ func scanWorktrees(repo git.Repo, epics []tickets.Epic) ([]WorktreeScan, error) 
 		return nil, err
 	}
 	pathByBranch := map[string]string{}
+	detached := []git.Worktree{}
 	for _, wt := range worktrees {
-		if wt.Branch != "" {
+		switch {
+		case wt.Branch != "":
 			pathByBranch[wt.Branch] = wt.Path
+		case wt.IsDetached && !wt.IsBare:
+			detached = append(detached, wt)
 		}
 	}
 
@@ -83,7 +92,35 @@ func scanWorktrees(repo git.Repo, epics []tickets.Epic) ([]WorktreeScan, error) 
 		}
 		names = append(names, b.Name)
 	}
-	return classifyBranches(repo, names, pathByBranch, epicByName)
+	result, err := classifyBranches(repo, names, pathByBranch, epicByName)
+	if err != nil {
+		return nil, err
+	}
+	for _, wt := range detached {
+		scan, err := classifyDetached(repo, wt)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, scan)
+	}
+	return result, nil
+}
+
+// classifyDetached reports a detached-HEAD worktree. It has no branch to
+// delete or merge, so it never gets a recommendation.
+func classifyDetached(repo git.Repo, wt git.Worktree) (WorktreeScan, error) {
+	scan := WorktreeScan{Path: wt.Path, Kind: "detached", Head: wt.Head}
+	dirty, err := worktreeDirty(wt.Path)
+	if err != nil {
+		return WorktreeScan{}, err
+	}
+	scan.Dirty = dirty
+	recent, err := recentCommit(repo, wt.Head)
+	if err != nil {
+		return WorktreeScan{}, err
+	}
+	scan.Active = dirty || recent
+	return scan, nil
 }
 
 // classifyBranches classifies each named branch, sorted by name. A branch that
@@ -114,6 +151,10 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 		return WorktreeScan{}, err
 	}
 	scan.Active = active
+	scan.Dirty, err = worktreeDirty(path)
+	if err != nil {
+		return WorktreeScan{}, err
+	}
 
 	if epicName, ticketID, ok := ticketgit.ParseIterationBranch(branch); ok {
 		scan.Kind = "iteration"
@@ -164,14 +205,25 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 // isActiveWork reports whether branch has a commit within worktreeActiveWindow,
 // or (when it has a linked worktree at path) uncommitted changes sitting in it.
 func isActiveWork(repo git.Repo, branch, path string) (bool, error) {
-	head, err := git.HeadCommit(repo.Root, branch)
+	recent, err := recentCommit(repo, branch)
+	if err != nil || recent {
+		return recent, err
+	}
+	return worktreeDirty(path)
+}
+
+// recentCommit reports whether ref's tip is within worktreeActiveWindow.
+func recentCommit(repo git.Repo, ref string) (bool, error) {
+	head, err := git.HeadCommit(repo.Root, ref)
 	if err != nil {
 		return false, err
 	}
-	if !head.Date.IsZero() && time.Since(head.Date) < worktreeActiveWindow {
-		return true, nil
-	}
+	return !head.Date.IsZero() && time.Since(head.Date) < worktreeActiveWindow, nil
+}
 
+// worktreeDirty reports uncommitted changes at path; an empty path (no
+// worktree) is never dirty.
+func worktreeDirty(path string) (bool, error) {
 	if path == "" {
 		return false, nil
 	}

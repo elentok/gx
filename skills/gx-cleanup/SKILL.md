@@ -43,12 +43,18 @@ The result has three parts:
 
 - **`epics`** — one entry per non-`.archive` directory under the ticket store root (`gx tickets root`): `all_done`,
   `merged_to_main`, `has_code_review_ticket`, `code_review_done`.
-- **`worktrees`** — one entry per local branch other than trunk: `kind`
-  (`"iteration"` | `"feature"` | `"other"`), `active` (recent commit or uncommitted changes —
-  never propose an action against this one), `epic`/`ticket_id`/`ticket_done` and the flag that follows it
-  (whether the commits already reached the target; iteration branches only), `merged_to_main` (feature/other branches only), and `recommendation`
+- **`worktrees`** — one entry per local branch other than trunk, plus one per detached-HEAD
+  worktree: `kind`
+  (`"iteration"` | `"feature"` | `"other"` | `"detached"`), `active` (recent commit or uncommitted changes —
+  never propose an action against this one), `dirty` (the worktree at `path` has uncommitted
+  changes), `epic`/`ticket_id`/`ticket_done` and the flag that follows it
+  (whether the commits already reached the target; iteration branches only), `merged_to_main` (feature/other branches only), `delete_mode`
+  (`"-d"` or `"-D"`, the `git branch` flag the scan proved safe; empty when not proven merged), and `recommendation`
   (`"delete"`, `"merge"`, or `""` when the scan itself can't call it — always `""` when `active`
-  is true).
+  is true). A `"detached"` entry has no `branch` (it has `path` and `head`) and never a
+  recommendation: report it, and never propose a branch delete for it. Iteration branches of
+  archived epics are scanned too, so they can read `"delete"`. The standing `one-offs` epic
+  never appears in `epics`.
 - **`housekeeping`** — a legacy-only check: tracked files that leaked under the old `.scratch`
   tree and whether `.gitignore` covers it. Epics no longer live there.
 
@@ -137,12 +143,16 @@ ff-only-merge path (case-2.1 merge candidates and the "merge, skip review" pick 
   staging or commit in the repo.
 - **Safe deletes** (branches/worktrees with `recommendation == "delete"`, or investigated as "safe
   to delete" in Step 3): run `git worktree remove <path>` if the entry has a `path`, then
-  `git branch -d <branch>` — git refuses to delete a branch still checked out in a worktree.
-  Never pass `--force` to either. If git refuses (dirty worktree or not fully merged — the
-  scan's or an investigation's classification was wrong), stop for that item only: leave it as-is,
-  and add it to an end-of-run failure list with the equivalent force command
-  (`git worktree remove --force <path>` / `git branch -D <branch>`) printed for you to run
-  manually — never run the force command yourself.
+  `git branch <delete_mode> <branch>` — `delete_mode` is the scan's field: `-d`, or `-D` when the
+  scan proved the commits merged by patch-id (cherry-picked commits are not ancestors, so `-d`
+  would refuse them). When the entry has no `delete_mode` (an investigated "safe to delete"),
+  use `-d`. git refuses to delete a branch still checked out in a worktree.
+  Never pass `--force` to `git worktree remove`, and never use `-D` unless the scan gave it. If git
+  refuses (dirty worktree or not fully merged — the scan's or an investigation's classification
+  was wrong), stop for that item only: leave it as-is, and add it to an end-of-run failure list
+  with the equivalent force command (`git worktree remove --force <path>` /
+  `git branch -D <branch>`) printed for you to run manually — never run the force command
+  yourself. A `dirty` worktree is never removed.
 - **Case-2.2 "add review ticket" picks**: run `gx tickets ensure-code-review <epic>`, then flag
   the epic as needs-review in the end-of-run report. Do not attempt to merge it in this run.
 - **Housekeeping**: if `housekeeping.TrackedFiles` is non-empty, `git rm --cached <file>` for each.

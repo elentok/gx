@@ -117,6 +117,56 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	}
 }
 
+func scanJSON(t *testing.T, dir string) cleanupscan.Result {
+	t.Helper()
+	var stdout bytes.Buffer
+	env := scanEnv(t, dir, &stdout)
+	if err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env})); err != nil {
+		t.Fatalf("execute cleanup scan --json: %v", err)
+	}
+	var result cleanupscan.Result
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("unmarshal: %v\noutput: %s", err, stdout.String())
+	}
+	return result
+}
+
+func TestExecute_CleanupScan_ArchivedEpicIterationBranchIsDeletable(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	project := cmdtest.StoreProjectFor(t, dir)
+	writeCleanupScanTicket(t, filepath.Join(project, ".archive"), "old-epic", "01-work.md", "01", "done", "implement")
+
+	old := time.Now().Add(-72 * time.Hour).Format(time.RFC3339)
+	t.Setenv("GIT_AUTHOR_DATE", old)
+	t.Setenv("GIT_COMMITTER_DATE", old)
+	testutil.MustGitExported(t, dir, "branch", "ralph-loop/old-epic-item-01")
+
+	result := scanJSON(t, dir)
+	for _, w := range result.Worktrees {
+		if w.Branch == "ralph-loop/old-epic-item-01" {
+			if w.Recommendation != "delete" || !w.TicketDone {
+				t.Errorf("archived iteration branch = %+v, want ticket_done and delete", w)
+			}
+			return
+		}
+	}
+	t.Fatalf("iteration branch missing from %+v", result.Worktrees)
+}
+
+func TestExecute_CleanupScan_OneOffsEpicNeverListed(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	project := cmdtest.StoreProjectFor(t, dir)
+	writeCleanupScanTicket(t, project, tickets.OneOffsEpic, "01-work.md", "01", "done", "implement")
+	writeCleanupScanTicket(t, project, "real-epic", "01-work.md", "01", "done", "implement")
+
+	result := scanJSON(t, dir)
+	for _, e := range result.Epics {
+		if tickets.IsOneOffsEpicName(e.Name) {
+			t.Errorf("epics include %q, want it never listed", e.Name)
+		}
+	}
+}
+
 func TestExecute_CleanupScan_SkipsOnDemandContainerEpics(t *testing.T) {
 	dir := testutil.TempRepo(t)
 	project := cmdtest.StoreProjectFor(t, dir)

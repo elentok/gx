@@ -97,6 +97,10 @@ func Scan(dirs config.Dirs, cwd string) (Result, error) {
 			continue
 		}
 		activeEpics = append(activeEpics, epic)
+		// The standing one-offs epic never finishes and never merges as a unit.
+		if tickets.IsOneOffsEpicName(epic.Name) {
+			continue
+		}
 		scan, err := scanEpic(repo, epic)
 		if err != nil {
 			return Result{}, err
@@ -104,7 +108,13 @@ func Scan(dirs config.Dirs, cwd string) (Result, error) {
 		result.Epics = append(result.Epics, scan)
 	}
 
-	result.Worktrees, err = scanWorktrees(repo, activeEpics)
+	// Archived epics are done, so their iteration branches resolve to done
+	// tickets and earn a delete recommendation once merged.
+	archived, err := tickets.LoadArchived(root)
+	if err != nil {
+		return Result{}, err
+	}
+	result.Worktrees, err = scanWorktrees(repo, append(activeEpics, archived...))
 	if err != nil {
 		return Result{}, err
 	}
