@@ -2,13 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/tickets"
 )
 
 type triageWant struct {
@@ -214,5 +217,114 @@ func TestTriageScenario_ApproveShapesCarryQuestionsAndChanges(t *testing.T) {
 			r := startWith(t, "triage", nil, "--shape", shape)
 			check(t, r.triageView(t))
 		})
+	}
+}
+
+// waitTriage polls the shown Triage until ok holds and returns that view.
+func (r *running) waitTriage(t *testing.T, what string, ok func(v wire.TriageView) bool) wire.TriageView {
+	t.Helper()
+	var v wire.TriageView
+	if !testutil.Poll(60*time.Second, 500*time.Millisecond, func() bool {
+		v = r.triageView(t)
+		return ok(v)
+	}) {
+		t.Fatalf("waiting for %s: state %q step %q, %d open questions, rows %+v", what, v.State, currentStep(v), v.OpenQuestions, v.Rows)
+	}
+	return v
+}
+
+// waitNoSession polls until none of the project's Triage sessions is working.
+// The card cannot say: at Approve it reads "waiting for you" while the Plan
+// session still prints its run-end line.
+func (r *running) waitNoSession(t *testing.T) {
+	t.Helper()
+	if !testutil.Poll(60*time.Second, 250*time.Millisecond, func() bool {
+		for _, s := range r.sessionsOf(t) {
+			if s.Flow == string(tickets.FlowTriage) && s.FlowKey == project && s.Status.State == wire.SessionWorking {
+				return false
+			}
+		}
+		return true
+	}) {
+		t.Fatal("the Triage session never ended")
+	}
+}
+
+func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
+	t.Parallel()
+	r := startWith(t, "triage", nil, "--shape", "journey", "--auto-advance-delay", "100ms")
+	r.gx(t, "server", "triage", "open", project)
+
+	// Verify takes two sessions: the fake saves three verdicts per session.
+	verified := func(v wire.TriageView) int {
+		n := 0
+		for _, row := range v.Rows {
+			if row.Verdict != "" {
+				n++
+			}
+		}
+		return n
+	}
+	r.waitTriage(t, "the first Verify batch", func(v wire.TriageView) bool { return verified(v) == 3 })
+	r.waitTriage(t, "Plan to end at Approve", func(v wire.TriageView) bool { return currentStep(v) == "approve" && v.OpenQuestions == 3 })
+
+	v := r.triageView(t)
+	if verified(v) != 5 {
+		t.Errorf("verdicts at Approve = %d, want 5", verified(v))
+	}
+	if len(v.ActionCounts) != 5 {
+		t.Errorf("action groups = %v, want all five actions", v.ActionCounts)
+	}
+
+	// Answer every open question, then approve. Plan's session prints its run-end
+	// line after the last save: a person approving before it ends would also
+	// see the countdown advance that session into Write.
+	r.waitNoSession(t)
+	for _, row := range v.Rows {
+		var args []string
+		for _, q := range row.Questions {
+			args = append(args, "--answer", q.ID+"=ok")
+		}
+		if len(args) == 0 {
+			continue
+		}
+		r.gx(t, append([]string{"server", "triage", "row", project, row.Address, "--revision", fmt.Sprint(r.triageView(t).Revision)}, args...)...)
+	}
+	v = r.waitTriage(t, "no open question", func(v wire.TriageView) bool { return v.OpenQuestions == 0 })
+	r.gx(t, "server", "triage", "approve", project, "--revision", fmt.Sprint(v.Revision))
+
+	// The Write session leaves the scripted row failed and the rest done.
+	failedRow := project + ":follow-ups/01"
+	v = r.waitTriage(t, "the Write session to end", func(v wire.TriageView) bool {
+		failed, written := 0, 0
+		for _, row := range v.Rows {
+			switch row.WriteState {
+			case "failed":
+				failed++
+			case "done":
+				written++
+			}
+		}
+		return failed == 1 && written == 4
+	})
+	// The last pass saves after the last row, so wait for the session to end
+	// before retrying: a Retry while one is live starts no new session.
+	r.waitNoSession(t)
+	v = r.triageView(t)
+	for _, row := range v.Rows {
+		if row.WriteState == "failed" && (row.Address != failedRow || row.Refusal != agentfake.TriageRefusalBeforeMove) {
+			t.Errorf("failed row %s with refusal %q, want %s with %q", row.Address, row.Refusal, failedRow, agentfake.TriageRefusalBeforeMove)
+		}
+	}
+
+	r.gx(t, "server", "triage", "retry", project, failedRow, "--revision", fmt.Sprint(v.Revision))
+	v = r.waitTriage(t, "the Triage to be done", func(v wire.TriageView) bool { return v.State == wire.TriageDone })
+	if v.Result == nil {
+		t.Fatal("a done Triage has no result")
+	}
+	for _, row := range v.Rows {
+		if row.WriteState != "done" {
+			t.Errorf("row %s write state = %q, want done", row.Address, row.WriteState)
+		}
 	}
 }

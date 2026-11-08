@@ -43,6 +43,8 @@ func (t *tui) submit() error {
 		switch kind {
 		case promptDesign:
 			return t.designTurn(text)
+		case promptTriage:
+			return t.triageTurn(text)
 		case promptWorker:
 			t.prompt = text
 			if t.opts.classifierOutage > 0 {
@@ -166,6 +168,7 @@ type promptKind int
 const (
 	promptPlain promptKind = iota
 	promptDesign
+	promptTriage
 	promptWorker
 	promptSlash
 	promptPermission
@@ -178,6 +181,9 @@ const (
 func (t *tui) classify(text string) (promptKind, string, WorkerConfig) {
 	if IsDesignPrompt(text) || (t.design.Active && text != "" && !strings.HasPrefix(text, "/")) {
 		return promptDesign, "", WorkerConfig{}
+	}
+	if IsTriagePrompt(text) {
+		return promptTriage, "", WorkerConfig{}
 	}
 	if address, cfg, ok := t.workerPrompt(text); ok {
 		return promptWorker, address, cfg

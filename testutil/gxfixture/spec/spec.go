@@ -199,6 +199,8 @@ type Scenario struct {
 	WorkingFixAgents []string
 	// Triage seeds Triage records before the server starts (see TriageScenario).
 	Triage []TriageSeed
+	// TriageAgent tunes the fake Triage agent (see agentfake.TriageConfig).
+	TriageAgent *agentfake.TriageConfig
 	// TriageShaped marks the triage scenario, whose whole content comes from the
 	// --shape value (TriageScenario).
 	TriageShaped bool
