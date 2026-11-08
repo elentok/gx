@@ -36,7 +36,7 @@ test("lists AFK, Vi mode, Sort, Restart server and More settings in order, with 
   setup({ build: "v1.2.3" }, { activeWorkspace: research });
   await screen.findByRole("menuitemcheckbox", { name: "AFK" });
   const items = [...screen.getByRole("menu").querySelectorAll('[role^="menuitem"]')].map((el) => el.textContent?.replace(/\s+/g, " ").trim());
-  expect(items).toEqual(["AFK", "Vi mode", "Sort · research›", "Restart server", "More settings..."]);
+  expect(items).toEqual(["AFK", "Vi mode", "Sort · research›", "Restart server", "More settings...", "Cleanup"]);
   expect(screen.queryByTestId("server-build")).toBeNull();
   expect(screen.queryByText("Claude limits")).toBeNull();
 });
@@ -107,6 +107,14 @@ test("More settings... opens Settings and closes a sliding sidebar", async () =>
   expect(window.location.hash).toBe("#/settings");
   expect(closeSliding).toHaveBeenCalled();
   await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+});
+
+test("Cleanup opens the Cleanup page and closes a sliding sidebar", async () => {
+  const closeSliding = vi.fn();
+  setup({}, {}, closeSliding);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Cleanup" }));
+  expect(window.location.hash).toBe("#/cleanup");
+  expect(closeSliding).toHaveBeenCalled();
 });
 
 test("Restart server opens the restart dialog", async () => {

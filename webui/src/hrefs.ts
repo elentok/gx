@@ -9,6 +9,8 @@ export const designHref = (address: string) => `#/d/${address}`;
 
 export const STATS_HREF = "#/stats";
 
+export const CLEANUP_HREF = "#/cleanup";
+
 export const AGENTS_HREF = "#/agents";
 
 export const SETTINGS_HREF = "#/settings";
