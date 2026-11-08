@@ -169,7 +169,7 @@ func runCodex() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	id := cmp.Or(opts.resume, os.Getenv(CodexIDEnv), fmt.Sprintf("fakecodex-%d", time.Now().UnixNano()))
+	id := cmp.Or(opts.resume, os.Getenv(CodexIDEnv), fmt.Sprintf("fakecodex-%d-%d", time.Now().UnixNano(), os.Getpid()))
 	argv, err := json.Marshal(args)
 	if err != nil {
 		return 0, err

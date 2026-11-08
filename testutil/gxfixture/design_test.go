@@ -454,8 +454,7 @@ func TestDesignQuestionWaitScenario_ReleasingTheHoldMakesTheSessionWaitOnAGrilli
 	}
 	r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return len(c.Round) > 0 })
 	r.waitIdle(t, id)
-	if !grilling() {
-		t.Fatal("session is idle after the release but not waiting on a Grilling round")
-	}
+	// The Grilling flag trails the idle status by a poll.
+	testutil.WaitFor(t, 15*time.Second, "an idle session waiting on a Grilling round", grilling)
 	r.stop(t)
 }
