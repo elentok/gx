@@ -81,6 +81,8 @@ func (t *tui) handleControl(c Control) error {
 		return nil
 	case ActionBackground:
 		return t.writeBackgroundMarker(c.Running)
+	case ActionToolUse:
+		return t.startToolCalls(c.ToolCalls)
 	case ActionFast:
 		t.fast = true
 		return nil
@@ -170,6 +172,41 @@ func (t *tui) writeBackgroundMarker(running bool) error {
 			"\n" + `{"isSidechain":false,"type":"assistant","timestamp":"` + ts + `","message":{"role":"assistant","stop_reason":"end_turn","content":[]}}`
 	}
 	return t.appendTranscript(line)
+}
+
+// ToolCall is a tool call Claude has started: its name and input.
+type ToolCall struct {
+	Name  string         `json:"name"`
+	Input map[string]any `json:"input,omitempty"`
+}
+
+// startToolCalls appends one assistant line per call, as claude writes them,
+// and leaves the session busy so the calls stay in flight.
+func (t *tui) startToolCalls(calls []ToolCall) error {
+	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	var lines []string
+	for i, c := range calls {
+		line, err := json.Marshal(map[string]any{
+			"isSidechain": false,
+			"type":        "assistant",
+			"timestamp":   ts,
+			"message": map[string]any{
+				"role":        "assistant",
+				"stop_reason": "tool_use",
+				"content": []map[string]any{{
+					"type": "tool_use", "id": fmt.Sprintf("toolu_f%d", i+1), "name": c.Name, "input": c.Input,
+				}},
+			},
+		})
+		if err != nil {
+			return err
+		}
+		lines = append(lines, string(line))
+	}
+	if err := t.appendTranscript(strings.Join(lines, "\n")); err != nil {
+		return err
+	}
+	return t.setStatus(StatusBusy, "")
 }
 
 func (t *tui) appendTranscript(lines string) error {

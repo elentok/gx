@@ -57,6 +57,10 @@ const (
 	// ActionIgnoreAllow makes the TUI fake ignore Enter on a dialog, so the
 	// dialog stays open.
 	ActionIgnoreAllow = "ignoreallow"
+	// ActionToolUse makes the TUI fake append one assistant tool_use line per
+	// entry of ToolCalls, with no tool_result, and go busy: the calls are in
+	// flight until ActionFinish.
+	ActionToolUse = "tooluse"
 	// The Codex fake's scripted events. ActionToolCall runs Tool (default
 	// "Bash") with Command through its PreToolUse hooks; ActionPermission asks
 	// approval for Command through its PermissionRequest hooks; ActionTokenCount
@@ -111,6 +115,8 @@ type Control struct {
 	// Codex fake.
 	Tool    string `json:"tool,omitempty"`
 	Command string `json:"command,omitempty"`
+	// ToolCalls are the calls an ActionToolUse leaves in flight, oldest first.
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 	// UsedPercent is the primary rate-limit use an ActionTokenCount writes.
 	UsedPercent float64 `json:"used_percent,omitempty"`
 }

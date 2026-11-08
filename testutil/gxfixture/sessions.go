@@ -106,6 +106,15 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 		if err := sendControl(*control); err != nil {
 			return err
 		}
+		// The control leaves the session busy; the scenario starts once the
+		// server shows it Working with the calls in flight.
+		if control.Action == agentfake.ActionToolUse {
+			if err := f.waitFor(id, "Working with a tool in flight", func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
+				return si.Status.State == wire.SessionWorking && chat.Current != nil
+			}); err != nil {
+				return err
+			}
+		}
 	}
 	if s.ThenPrompt != "" {
 		if err := f.promptAgain(id, s.ThenPrompt); err != nil {

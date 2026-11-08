@@ -642,6 +642,8 @@ var scenarios = map[string]scenario{
 	// agents: eight sessions in demo (4), other (2) and site (2), one per row of
 	// the Agents mock, and a worktree in demo. See spec.AgentsScenario.
 	"agents": spec.AgentsScenario(),
+	// agents-tools: three Working Claude sessions with tool calls in flight. See spec.ToolsScenario.
+	"agents-tools": spec.ToolsScenario(),
 	// agents-promote: agents plus a Codex session with one message, a held Queue
 	// agent and two design sessions, for the Promote to Design flows. See spec.PromoteScenario.
 	"agents-promote": spec.PromoteScenario(),
