@@ -37,7 +37,8 @@ test.describe("72. Design actions menu", () => {
       await page.keyboard.press("Tab");
       await expect(moreActions(page)).toBeFocused({ timeout: 300 });
     }).toPass();
-    expect(await moreActions(page).evaluate((el) => getComputedStyle(el).outlineStyle)).not.toBe("none");
+    // The global focus ring is a box-shadow, not an outline.
+    expect(await moreActions(page).evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
 
     await moreActions(page).click();
     const menu = actionsMenu(page);
@@ -96,7 +97,8 @@ test.describe("72b. Design menu before Start", () => {
     await openDesign(page);
     await moreActions(page).click();
     const menu = actionsMenu(page);
-    await expect(menu.getByRole("menuitem")).toHaveCount(2);
+    await expect(menu.getByRole("menuitem")).toHaveCount(3);
+    await expect(menu.getByRole("menuitem", nav("Move to workspace"))).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: "Hold", exact: true })).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: /^Copy design ID/ })).toContainText("demo:design-epic");
   });

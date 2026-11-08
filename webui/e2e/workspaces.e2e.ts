@@ -45,7 +45,7 @@ test("Workspaces", async ({ page, start }) => {
   await epicCard.getByRole("link", nav("ready-epic")).focus();
   await expect(epicCard.getByRole("link", nav("ready-epic"))).toHaveCSS("box-shadow", ring);
   await switcher.focus();
-  await expect(switcher).toHaveCSS("box-shadow", ring);
+  await expect(switcher).toHaveCSS("box-shadow", new RegExp(`${blue.replace(/[()]/g, "\\$&")} 0px 0px 0px 2px inset`));
   await page.keyboard.press("Enter");
   await menuFocused();
   await expect(page.getByRole("menuitem").first()).toHaveCSS("box-shadow", ring);

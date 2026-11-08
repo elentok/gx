@@ -448,9 +448,13 @@ export const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
 /** Opens the app menu, sliding the sidebar open first when the viewport hides it. */
 export async function openMenu(page: Page) {
   const show = page.getByRole("button", nav("Show sidebar"));
-  await menuButton(page).or(show).first().waitFor();
-  if (await show.isVisible()) await show.click();
-  await menuButton(page).click();
+  // A narrow page first renders the sidebar open, then closes it, so retry until the menu is open.
+  await expect(async () => {
+    await menuButton(page).or(show).first().waitFor({ timeout: 2_000 });
+    if (await show.isVisible()) await show.click({ timeout: 2_000 });
+    if (!(await menu(page).isVisible())) await menuButton(page).click({ timeout: 2_000 });
+    await expect(menu(page)).toBeVisible({ timeout: 1_000 });
+  }).toPass();
 }
 
 /** The `gx agents list` rows that mention `slug` (tab-separated, the session id first). */

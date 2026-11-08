@@ -4,7 +4,7 @@ import { expect, nav, openMenu, test } from "./fixture";
 
 async function openAgentsSettings(page: Page) {
   await openMenu(page);
-  await page.getByRole("menuitem", nav("Settings")).click();
+  await page.getByRole("menuitem", nav("More settings...")).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   const row = page.getByRole("link", { name: /^Agents Default:/ });
   await expect(row).toContainText("Default: Claude");
@@ -59,8 +59,7 @@ test("117. Default harness setting", async ({ page, start }) => {
   await createButton(page).click();
   const fresh = await created(fixture, before);
   expect(fresh.harness).toBe("codex");
-  // The drawer that opened for "+ New" stays open over the page on a phone; a hash change does not close it.
-  await sidebar(page).getByRole("button", { name: "Hide sidebar", exact: true }).click();
+  // On a phone the drawer opened for "+ New" is closed by now, so no scrim covers the page.
   await expect(page.getByTestId("scrim")).toHaveCount(0);
 
   // On a phone the header reads the model name alone; the menu's Agent block holds the tier and effort, and a model switched by hand says so.

@@ -18,10 +18,10 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   await expect(page.getByTestId("stats-line")).toHaveText("Not queued · $0.00 · 0s agent time");
   // mixed-epic has no summary, so the header draws no description line.
   await expect(page.getByTestId("page-header-line")).toHaveCount(0);
-  // The ⋯ menu holds Copy epic ID and Hold, and the copy is <project>:<name>.
+  // The ⋯ menu holds Copy epic ID, Move to workspace and Hold, and the copy is <project>:<name>.
   await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).click();
   const menu = page.getByRole("menu", nav("More actions"));
-  await expect(menu.getByRole("menuitem")).toHaveText([/^Copy epic ID/, "Hold"]);
+  await expect(menu.getByRole("menuitem")).toHaveText([/^Copy epic ID/, /^Move to workspace/, "Hold"]);
   await expect(menu.getByRole("menuitem", { name: /^Copy epic ID/ })).toContainText("demo:mixed-epic");
   await menu.getByRole("menuitem", { name: /^Copy epic ID/ }).click();
   await expect(menu).toHaveCount(0);
