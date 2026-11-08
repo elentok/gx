@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/sched"
@@ -77,6 +78,9 @@ func TestHolderReadopt_SlowHolderKeepsTheRun(t *testing.T) {
 	servertest.WaitFor(t, 10*time.Second, "the retry state to clear", func() bool { return !holderRetrying(t, h, base) })
 	if n := len(pty.Prompts(readoptLabel)); n != 1 {
 		t.Errorf("prompts = %d, want 1: the run was relaunched", n)
+	}
+	if got := servertest.OfType(servertest.RunLog(t, h), events.HolderUnreachable); len(got) != 1 || got[0].Address != "proj:epic-a/01" {
+		t.Errorf("holder-unreachable events = %+v, want one for proj:epic-a/01", got)
 	}
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusClaimed {
 		t.Errorf("status = %q, err = %v, want the ticket still claimed", tk.Status, err)

@@ -96,6 +96,27 @@ func StampRun(t *testing.T, h *Harness, runner string, session agentrunner.Sessi
 	}
 }
 
+// setRunAgent rewrites the staged handle's agent.
+func setRunAgent(t *testing.T, h *Harness, agent string) {
+	t.Helper()
+	path := filepath.Join(h.StateDir, "runs.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runs []map[string]any
+	if err := json.Unmarshal(data, &runs); err != nil {
+		t.Fatal(err)
+	}
+	runs[0]["agent"] = agent
+	if data, err = json.Marshal(runs); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // MarkWaiting stamps the staged handle as waiting for an answer, as a server
 // that was stopped while the agent waited would have saved it.
 func MarkWaiting(t *testing.T, h *Harness, since time.Time) {
@@ -123,6 +144,13 @@ func MarkWaiting(t *testing.T, h *Harness, since time.Time) {
 // that read its prompts.
 func StartWaitingRestartFake(t *testing.T, hardLimit float64, tweak ...func(*server.Config)) (*Harness, string, *HeadlessFake) {
 	t.Helper()
+	return StartWaitingRestartFakeAs(t, "claude", hardLimit, tweak...)
+}
+
+// StartWaitingRestartFakeAs is StartWaitingRestartFake with the run recorded
+// as launched by agent.
+func StartWaitingRestartFakeAs(t *testing.T, agent string, hardLimit float64, tweak ...func(*server.Config)) (*Harness, string, *HeadlessFake) {
+	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	SetProjectRepo(t, store, "proj", repo)
@@ -141,6 +169,7 @@ func StartWaitingRestartFake(t *testing.T, hardLimit float64, tweak ...func(*ser
 		t.Fatal(err)
 	}
 	AsHeadlessRun(t, h)
+	setRunAgent(t, h, agent)
 	MarkWaiting(t, h, time.Now().Add(-time.Hour))
 	h.Restart(t)
 	return h, ticketPath, fake
