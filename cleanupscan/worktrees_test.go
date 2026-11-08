@@ -1,4 +1,4 @@
-package gitops
+package cleanupscan
 
 import (
 	"os"

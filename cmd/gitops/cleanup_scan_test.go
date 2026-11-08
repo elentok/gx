@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cleanupscan"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
@@ -80,31 +81,31 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 		t.Fatalf("execute cleanup scan --json: %v", err)
 	}
 
-	var result CleanupScanResult
+	var result cleanupscan.Result
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("unmarshal output: %v\noutput: %s", err, stdout.String())
 	}
 
-	byName := map[string]EpicScan{}
+	byName := map[string]cleanupscan.EpicScan{}
 	for _, e := range result.Epics {
 		byName[e.Name] = e
 	}
 
-	if got, want := byName["epic-done-merged-review-done"], (EpicScan{
+	if got, want := byName["epic-done-merged-review-done"], (cleanupscan.EpicScan{
 		Name: "epic-done-merged-review-done", AllDone: true, MergedToTrunk: true,
 		HasCodeReviewTicket: true, CodeReviewDone: true,
 	}); got != want {
 		t.Errorf("epic-done-merged-review-done = %+v, want %+v", got, want)
 	}
 
-	if got, want := byName["epic-done-unmerged-review-pending"], (EpicScan{
+	if got, want := byName["epic-done-unmerged-review-pending"], (cleanupscan.EpicScan{
 		Name: "epic-done-unmerged-review-pending", AllDone: false, MergedToTrunk: false,
 		HasCodeReviewTicket: true, CodeReviewDone: false,
 	}); got != want {
 		t.Errorf("epic-done-unmerged-review-pending = %+v, want %+v", got, want)
 	}
 
-	if got, want := byName["epic-open-no-review"], (EpicScan{
+	if got, want := byName["epic-open-no-review"], (cleanupscan.EpicScan{
 		Name: "epic-open-no-review", AllDone: false, MergedToTrunk: false,
 		HasCodeReviewTicket: false, CodeReviewDone: false,
 	}); got != want {
@@ -130,7 +131,7 @@ func TestExecute_CleanupScan_SkipsOnDemandContainerEpics(t *testing.T) {
 		t.Fatalf("execute cleanup scan --json: %v", err)
 	}
 
-	var result CleanupScanResult
+	var result cleanupscan.Result
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -159,7 +160,7 @@ func TestExecute_CleanupScan_ReportsAtticRefsAndKeepsThem(t *testing.T) {
 		return stdout.String()
 	}
 
-	var result CleanupScanResult
+	var result cleanupscan.Result
 	jsonOut := run("--json")
 	if err := json.Unmarshal([]byte(jsonOut), &result); err != nil {
 		t.Fatalf("unmarshal output: %v\noutput: %s", err, jsonOut)
@@ -214,7 +215,7 @@ func TestExecute_CleanupScan_HousekeepingReportsTrackedFilesAndMissingGitignore(
 		t.Fatalf("execute cleanup scan --json: %v", err)
 	}
 
-	var result CleanupScanResult
+	var result cleanupscan.Result
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("unmarshal output: %v\noutput: %s", err, stdout.String())
 	}
@@ -242,7 +243,7 @@ func TestExecute_CleanupScan_HousekeepingSkippedAtBareRootWithNoWorktree(t *test
 		t.Fatalf("execute cleanup scan --json: %v", err)
 	}
 
-	var result CleanupScanResult
+	var result cleanupscan.Result
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("unmarshal output: %v\noutput: %s", err, stdout.String())
 	}
@@ -279,12 +280,12 @@ func TestExecute_CleanupScan_FollowsConfiguredTrunk(t *testing.T) {
 	if err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env})); err != nil {
 		t.Fatalf("cleanup scan: %v", err)
 	}
-	var result CleanupScanResult
+	var result cleanupscan.Result
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("unmarshal: %v\noutput: %s", err, stdout.String())
 	}
 
-	byBranch := map[string]WorktreeScan{}
+	byBranch := map[string]cleanupscan.WorktreeScan{}
 	for _, ws := range result.Worktrees {
 		byBranch[ws.Branch] = ws
 	}
