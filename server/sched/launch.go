@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
@@ -94,9 +95,16 @@ const trunkConflictNote = "This is a trunk-conflict ticket. You are in the check
 	"Leave the files uncommitted: do not commit, stash, reset or switch branches."
 
 // launchNote is what the agent is told on top of the skill command.
-func launchNote(t tickets.Ticket) string {
+func launchNote(t tickets.Ticket, cwd string) string {
 	if t.Type == string(schema.TypeTrunkConflict) {
 		return trunkConflictNote
+	}
+	if t.IsVerify() {
+		head, err := git.RevParse(cwd, "HEAD")
+		if err != nil {
+			return ""
+		}
+		return srvrecovery.VerifyResumeNote(t, head)
 	}
 	return srvrecovery.InvestigatePrompt(t)
 }
@@ -154,7 +162,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 			Args:            agent.AgentArgs(agentKind, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
 			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agentKind),
 			ResumeSessionID: resumeID,
-		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), supervise.Hooks{
+		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t, cwd), ticket.String()), supervise.Hooks{
 			OnNudge: func(attempt int, decision string) {
 				l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 			},

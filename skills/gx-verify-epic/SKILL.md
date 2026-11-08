@@ -164,6 +164,16 @@ never fixes, never commits, never judges scope and never opens tickets.
 
 **Lone.** Write the lines and findings the same way, under `## Results` in your own ticket.
 
+### Verified section
+
+After each story, also append one entry to the `## Verified` section of your own ticket, in the
+format `- <story> — <verdict> @ <commit>`, where `<commit>` is `git rev-parse HEAD`. Rewrite the
+whole section each time with `gx tickets section <addr> "Verified" -`, keeping the earlier entries.
+
+On a relaunch, start from that section. An entry counts only when its commit equals the current
+HEAD: trust it and skip that story. Re-check every other story, including entries marked
+`[history]`. The launch prompt lists both groups.
+
 ### Part cap stop
 
 When the session shows a finish-up prompt, stop checking:
