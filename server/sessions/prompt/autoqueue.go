@@ -98,7 +98,7 @@ func (p *autoQueuer) NewestDesignSession(project, mapName string) (wire.SessionI
 	var live, exited []wire.SessionInfo
 	for _, m := range metas {
 		epic, _, _ := strings.Cut(m.Ticket, "/")
-		if !m.Design || epic != project+":"+mapName {
+		if !m.IsDesign() || epic != project+":"+mapName {
 			continue
 		}
 		if info := m.Info(); info.Status.State == wire.SessionExited {

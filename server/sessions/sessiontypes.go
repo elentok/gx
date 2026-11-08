@@ -2,7 +2,10 @@ package sessions
 
 import (
 	"cmp"
+	"encoding/json"
 	"time"
+
+	"github.com/elentok/gx/tickets"
 
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/sessions/chat"
@@ -38,7 +41,10 @@ type Meta struct {
 	// is never replaced.
 	AutoName bool   `json:"auto_name,omitempty"`
 	Ticket   string `json:"ticket,omitempty"`
-	Design   bool   `json:"design,omitempty"`
+	// Flow is the Flow the session runs; empty for a plain session. A Design's
+	// key is Ticket (its map address); a Triage's is FlowKey (the project name).
+	Flow    tickets.Flow `json:"flow,omitempty"`
+	FlowKey string       `json:"flow_key,omitempty"`
 	// FixOf is the ticket address (or project name) a Fix agent fixes.
 	FixOf string `json:"fix_of,omitempty"`
 	// LaunchDesign is set only by a design launch path. Design alone (set by
@@ -104,14 +110,47 @@ type Meta struct {
 	RebaseNote string `json:"rebase_note,omitempty"`
 }
 
+// UnmarshalJSON reads a meta written before flows, which recorded only
+// `design: true`, as the design flow.
+func (m *Meta) UnmarshalJSON(b []byte) error {
+	type plain Meta
+	aux := struct {
+		*plain
+		LegacyDesign bool `json:"design"`
+	}{plain: (*plain)(m)}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	if m.Flow == "" && aux.LegacyDesign {
+		m.Flow = tickets.FlowDesign
+	}
+	return nil
+}
+
+// IsDesign reports whether the session runs the design flow.
+func (m Meta) IsDesign() bool { return m.Flow == tickets.FlowDesign }
+
+// IsStepped reports whether the session runs any flow.
+func (m Meta) IsStepped() bool { return m.Flow != "" }
+
+// key is the identity the flow runs on: a Design's map address, a Triage's
+// project name.
+func (m Meta) key() string {
+	if m.IsDesign() {
+		return m.Ticket
+	}
+	return m.FlowKey
+}
+
+func (m Meta) ConvSession() convrecord.Session {
+	return convrecord.Session{ID: m.ID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, ConversationID: m.ConversationID, Design: m.IsDesign()}
+}
+
 // CanAutoAdvance is the one rule for whether the session's raised Actionable
 // may be sent by the server: the switch is on, it is a derived Continue (not a
 // grilling round, not agent- or gx-raised), the session waits for the person,
 // whatever its harness. Call sites add their own conditions: the
 // detector needs a live turn and the cap, the switch needs no countdown running.
-func (m Meta) ConvSession() convrecord.Session {
-	return convrecord.Session{ID: m.ID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, ConversationID: m.ConversationID, Design: m.Design}
-}
 
 func (m Meta) CanAutoAdvance() bool {
 	a := m.Actionable
@@ -136,7 +175,9 @@ func (m Meta) Info() wire.SessionInfo {
 		Dir:             m.Dir,
 		Harness:         m.Harness,
 		Ticket:          m.Ticket,
-		Design:          m.Design,
+		Design:          m.IsDesign(),
+		Flow:            string(m.Flow),
+		FlowKey:         m.key(),
 		FixOf:           m.FixOf,
 		Status:          m.Status,
 		StatusChangedAt: m.StatusChangedAt,

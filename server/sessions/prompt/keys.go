@@ -128,7 +128,7 @@ func (p *Prompt) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 	if err := runlog.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
 		p.log.Warn("logging session keys", "session", req.ID, "err", err)
 	}
-	if meta.Design && !req.OnlyBlocked {
+	if meta.IsDesign() && !req.OnlyBlocked {
 		if err := p.notePersonTyped(dir, meta, "Auto-advance stopped: you pressed a key"); err != nil {
 			return dir, nil, wire.SessionResult{}, err
 		}

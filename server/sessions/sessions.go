@@ -133,12 +133,14 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 		Ticket:         req.Ticket,
 		FixOf:          req.FixOf,
 		LaunchDesign:   sc.LaunchDesign,
-		Design:         sc.design || (req.Ticket != "" && mg.Maps.OnMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
 		RemoteControl:  sc.RemoteControl,
 		RebaseNote:     req.RebaseNote,
 		ConversationID: conv,
 		CreatedAt:      time.Now(),
+	}
+	if sc.design || (req.Ticket != "" && mg.Maps.OnMapEpic(req.Ticket)) {
+		meta.Flow = tickets.FlowDesign
 	}
 	mg.applyTier(&meta, tier)
 	dir, err := mg.saveNewSession(&meta, req.UniqueName)
@@ -148,7 +150,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 	if err != nil {
 		return wire.SessionResult{}, err
 	}
-	if meta.Design && meta.Ticket != "" {
+	if meta.IsDesign() && meta.Ticket != "" {
 		// Cosmetic: a failed stamp must not fail the session.
 		if err := mg.Maps.stampDesignStart(meta.Ticket, meta.CreatedAt); err != nil {
 			mg.log.Warn("stamp design start", "session", meta.ID, "ticket", meta.Ticket, "err", err)
@@ -281,7 +283,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 	if err := WriteMeta(dir, *meta); err != nil {
 		return err
 	}
-	if meta.Design && meta.Ticket != "" {
+	if meta.IsDesign() && meta.Ticket != "" {
 		mg.Maps.designStarted(meta.Ticket)
 	}
 	h, err := harness.Lookup(agentrunner.Kind(meta.Harness))
@@ -349,7 +351,7 @@ func launchArgs(meta *Meta, claudeArgs, codexRoots []string) []string {
 		return nil
 	}
 	args := slices.Clone(claudeArgs)
-	if meta.Design {
+	if meta.IsDesign() {
 		args = agentrunner.WithDesignDisallowedTools(args)
 	}
 	// A configured flag wins over the tier for its knob.
@@ -617,7 +619,7 @@ func (mg *Manager) UpdateSessionMeta(dir, id string, change func(*Meta) bool) er
 	if exited {
 		mg.sessionGone(id)
 	}
-	if exited && meta.Design {
+	if exited && meta.IsDesign() {
 		if project, epic, ok := strings.Cut(tickets.EpicAddress(meta.Ticket), ":"); ok {
 			time.Sleep(mg.cfg.SessionExitCleanupDelay)
 			mg.designs.CleanupDesign(project, epic)

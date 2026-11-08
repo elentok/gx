@@ -29,7 +29,7 @@ func (rs *Resumer) StartContinue(dir string, meta Meta, label string, action []s
 // strongest-tier session that gx launched for the design, on a map past
 // charting. Only a harness with a chat reader restarts, as only it has a design Continue.
 func (rs *Resumer) chartingHandoffDue(meta Meta, action []string) bool {
-	return meta.LaunchDesign && meta.Design &&
+	return meta.LaunchDesign && meta.IsDesign() &&
 		rs.mg.settings.Load().HasChatReader(meta.Harness) &&
 		meta.Tier == agent.TierStrongest &&
 		slices.Equal(action, chat.DesignContinueAction(meta.Ticket, meta.Harness)) &&

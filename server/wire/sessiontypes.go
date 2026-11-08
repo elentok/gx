@@ -17,7 +17,13 @@ type SessionInfo struct {
 	// Ticket is the Session ticket's address.
 	Ticket string `json:"ticket,omitempty"`
 	// Design marks a session whose ticket is on a map epic: a gx-design run.
+	// It is true exactly when Flow is "design".
 	Design bool `json:"design,omitempty"`
+	// Flow is the Flow the session runs ("design" or "triage"); empty for a
+	// plain session. FlowKey is the identity it runs on: a Design's map
+	// address, a Triage's project name.
+	Flow    string `json:"flow,omitempty"`
+	FlowKey string `json:"flow_key,omitempty"`
 	// FixOf marks a Fix agent: the address of the ticket it fixes, or the bare
 	// project name for a failed migration.
 	FixOf string `json:"fix_of,omitempty"`

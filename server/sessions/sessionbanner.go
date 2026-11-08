@@ -126,7 +126,7 @@ func designDone(reg *projects.Registry, m Meta) bool {
 
 // designStep is the Progress of the map behind a Design session.
 func designStep(reg *projects.Registry, m Meta) (wire.ProgressStep, bool) {
-	if !m.Design || m.Ticket == "" {
+	if !m.IsDesign() || m.Ticket == "" {
 		return "", false
 	}
 	addr, err := tickets.ParseQueuedAddress(m.Ticket)
@@ -197,7 +197,7 @@ func (mg *Manager) sendDesignQuestion(id string, q DesignQuestion) bool {
 // designLink is the Design page of a Design session, without the token; empty
 // when the web listener is off or the session is not a Design.
 func designLink(base string, m Meta) string {
-	if base == "" || !m.Design || m.Ticket == "" {
+	if base == "" || !m.IsDesign() || m.Ticket == "" {
 		return ""
 	}
 	addr, err := tickets.ParseQueuedAddress(m.Ticket)

@@ -142,7 +142,7 @@ func (p *autoQueuer) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if !meta.Design {
+	if !meta.IsDesign() {
 		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	var info wire.SessionInfo
@@ -172,7 +172,7 @@ func (p advanceSwitch) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.Session
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if !meta.Design {
+	if !meta.IsDesign() {
 		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	var info wire.SessionInfo

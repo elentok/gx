@@ -2513,8 +2513,16 @@ export interface SessionInfo {
   ticket?: string;
   /**
    * Design marks a session whose ticket is on a map epic: a gx-design run.
+   * It is true exactly when Flow is "design".
    */
   design?: boolean;
+  /**
+   * Flow is the Flow the session runs ("design" or "triage"); empty for a
+   * plain session. FlowKey is the identity it runs on: a Design's map
+   * address, a Triage's project name.
+   */
+  flow?: string;
+  flow_key?: string;
   /**
    * FixOf marks a Fix agent: the address of the ticket it fixes, or the bare
    * project name for a failed migration.

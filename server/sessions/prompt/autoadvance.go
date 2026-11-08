@@ -125,7 +125,7 @@ func (p advanceSwitch) designHeld(id string) bool {
 		return false
 	}
 	_, meta, res, err := p.sessions.SessionDir(id)
-	if res.Refused || err != nil || !meta.Design {
+	if res.Refused || err != nil || !meta.IsDesign() {
 		return false
 	}
 	epic, _, _ := strings.Cut(meta.Ticket, "/")

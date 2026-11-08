@@ -54,12 +54,12 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if req.Continue && req.Promote {
 		return sessions.Refusal(wire.ReasonSessionBadRequest, "continue and promote cannot be combined"), nil
 	}
-	if req.Continue && !meta.Design {
+	if req.Continue && !meta.IsDesign() {
 		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if req.Promote {
 		// A Queue agent never gets here: SessionDir refuses its id as unknown.
-		if meta.Design {
+		if meta.IsDesign() {
 			return sessions.Refusal(wire.ReasonSessionNotPlain, fmt.Sprintf("session %s is a design session, not a plain one", req.ID)), nil
 		}
 		// The server builds the command, so the prefix rule stays closed to the page.

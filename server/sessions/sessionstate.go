@@ -27,7 +27,7 @@ func (mg *Manager) CheckDesignWrite(req wire.SessionRequest) (wire.SessionResult
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if !meta.Design {
+	if !meta.IsDesign() {
 		return Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if req.State != SessionStateToken(meta.Info()) {

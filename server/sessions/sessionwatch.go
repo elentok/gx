@@ -173,7 +173,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 					}
 					if st.Promptable() && !prev.Promptable() {
 						idleEdge = true
-						if m.Design {
+						if m.IsDesign() {
 							design = chat.DesignRef{Conversation: m.ConversationID, Ticket: m.Ticket, Live: live}
 						}
 					}
