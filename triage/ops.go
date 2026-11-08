@@ -352,6 +352,28 @@ func (s *Store) SetLastPass(id string, revision int, complete bool) (*Record, er
 	})
 }
 
+// RecordEpics adds the ready epic (when non-empty) and map epics to the record.
+// A ready epic already recorded stays; naming another is refused.
+func (s *Store) RecordEpics(id string, revision int, ready string, maps []string) (*Record, error) {
+	return s.modify(id, revision, func(rec *Record) error {
+		if err := requireStep(rec, "epics", tickets.StepWrite); err != nil {
+			return err
+		}
+		if ready != "" {
+			if rec.ReadyEpic != "" && rec.ReadyEpic != ready {
+				return phaseErr("the ready epic is already %s", rec.ReadyEpic)
+			}
+			rec.ReadyEpic = ready
+		}
+		for _, m := range maps {
+			if !slices.Contains(rec.MapEpics, m) {
+				rec.MapEpics = append(rec.MapEpics, m)
+			}
+		}
+		return nil
+	})
+}
+
 // Retry turns a failed row back to pending. Allowed only at step write.
 func (s *Store) Retry(id string, revision int, address string) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {

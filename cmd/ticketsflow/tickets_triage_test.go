@@ -15,12 +15,18 @@ import (
 // triageProject is a project with two open follow-ups.
 func triageProject(t *testing.T) (repo string) {
 	t.Helper()
-	repo, project := setupShowProject(t)
+	repo, _ = triageProjectDir(t)
+	return repo
+}
+
+func triageProjectDir(t *testing.T) (repo, project string) {
+	t.Helper()
+	repo, project = setupShowProject(t)
 	for _, id := range []string{"01", "02"} {
 		writeEpicTicket(t, project, tickets.FollowUpsEpic, id+"-f.md",
 			"---\nid: \""+id+"\"\nstatus: open\ntype: research\ncategory: bug\n---\n\n# Follow-up "+id+"\n")
 	}
-	return repo
+	return repo, project
 }
 
 type triageShown struct {

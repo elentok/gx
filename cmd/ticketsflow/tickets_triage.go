@@ -79,7 +79,9 @@ func newTicketsTriageCmd(d Deps) *cobra.Command {
 		Short: "work with the Triage record of a project's follow-ups",
 	}
 	cmd.AddCommand(newTriageCreateCmd(d), newTriageShowCmd(d), newTriagePendingCmd(d), newTriageVerdictCmd(d),
-		newTriagePlanCmd(d), newTriageRowCmd(d), newTriageApproveCmd(d), newTriageAbandonCmd(d))
+		newTriagePlanCmd(d), newTriageRowCmd(d), newTriageApproveCmd(d), newTriageAbandonCmd(d),
+		newTriageLocateCmd(d), newTriageAnswersCmd(d), newTriageSeenAgainCmd(d), newTriageWriteStateCmd(d),
+		newTriageEpicsCmd(d), newTriageLastPassCmd(d))
 	return cmd
 }
 

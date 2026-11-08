@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -117,6 +118,15 @@ type Record struct {
 	// LastPassComplete is set when the last verify pass covered every row.
 	LastPassComplete bool   `json:"lastPassComplete,omitempty"`
 	Result           string `json:"result,omitempty"`
+	// ReadyEpic and MapEpics are the epics this Triage creates, recorded before
+	// each `epic add` runs so a crash between the two never fails the rerun.
+	ReadyEpic string   `json:"readyEpic,omitempty"`
+	MapEpics  []string `json:"mapEpics,omitempty"`
+}
+
+// ListsEpic reports whether the record names epic as one it creates.
+func (r *Record) ListsEpic(epic string) bool {
+	return epic != "" && (r.ReadyEpic == epic || slices.Contains(r.MapEpics, epic))
 }
 
 // LiveError is returned by Create when the project already has a live Triage.
@@ -134,6 +144,9 @@ type Store struct {
 
 // NewStore returns the store of projectDir; nothing is created until Create.
 func NewStore(projectDir string) *Store { return &Store{projectDir: projectDir} }
+
+// ProjectDir is the project's ticket directory the store lives under.
+func (s *Store) ProjectDir() string { return s.projectDir }
 
 func (s *Store) dir() string { return filepath.Join(s.projectDir, dirName) }
 
