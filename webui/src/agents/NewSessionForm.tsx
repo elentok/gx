@@ -10,6 +10,7 @@ import type { ProjectWorktrees } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import { refusalText, useWrite } from "../useWrite";
+import { useShell } from "../shell/ShellContext";
 import { Field, field } from "./formField";
 import { fetchWorktrees, postCreateSession, type CreateSession, type FetchWorktrees } from "./newSession";
 import { trimmed, useNewSessionDraft, type NewSessionDraft } from "./useNewSessionDraft";
@@ -83,6 +84,7 @@ export function NewSessionForm({
   const { draft, update, clear } = useNewSessionDraft(prefillProject);
   const { connected } = useConnectionState(useConnectionContext());
   const { run, pending, refusal, error } = useWrite();
+  const workspace = useShell()?.workspace;
 
   useEffect(() => {
     let live = true;
@@ -125,6 +127,7 @@ export function NewSessionForm({
           name: trimmed(draft.name),
           prompt: trimmed(draft.prompt),
           tier,
+          ...(workspace ? { workspace } : {}),
         }),
       {
         onDone: (res) => {

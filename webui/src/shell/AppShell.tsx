@@ -120,6 +120,8 @@ export function AppShell({
     open: boolean;
   } | null>(null);
   const open = choice?.device === device ? choice.open : docked;
+  const conn = useConnectionContext();
+  const { active, resolved, setActive } = useActiveWorkspace(conn, fetchEpicList);
   const [headers, setHeaders] = useState(0);
   const claimHeader = useCallback(() => {
     setHeaders((n) => n + 1);
@@ -134,8 +136,9 @@ export function AppShell({
         if (!docked) setChoice({ device, open: false });
       },
       claimHeader,
+      workspace: active,
     }),
-    [open, device, docked, claimHeader],
+    [open, device, docked, claimHeader, active],
   );
   // Bumped each time the sidebar closes, however it closes; every menu and popover inside it closes on the change.
   const [closeSignal, setCloseSignal] = useState(0);
@@ -154,10 +157,8 @@ export function AppShell({
     // A dialog opened from the sidebar keeps it open: the swipe belongs to the dialog.
     onClose: () => hasLayer() || shell.close(),
   });
-  const conn = useConnectionContext();
   const { snapshot } = useConnectionState(conn);
   const { workspaces } = useWorkspaces(conn);
-  const { active, resolved, setActive } = useActiveWorkspace(conn, fetchEpicList);
   useShortcuts({ fetcher: fetchEpicList, active, setActive });
   const [newWorkspace, setNewWorkspace] = useState(false);
   const [manageWorkspaces, setManageWorkspaces] = useState(false);

@@ -6,6 +6,7 @@ const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location
 // One journey over the `workspaces` scenario: the sidebar's rows follow the active workspace, and
 // Move, Remove and Hold work from every place an item shows.
 test("Workspaces", async ({ page, start }) => {
+  test.setTimeout(120_000);
   const fx = await start("workspaces");
   const sidebar = page.getByRole("complementary", nav("Sidebar"));
   // A Fix agent's link is named "Fix agent <name>": its wrench icon carries the label.
@@ -232,6 +233,37 @@ test("Workspaces", async ({ page, start }) => {
   await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(1);
   await pick("research");
   await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(0);
+
+  // Creates land in the active workspace: the sidebar's + New (design, chat), the Epics page's New Design.
+  const members = async () => JSON.parse(await fx.cli("server", "workspaces", "list", "--json")).workspaces.find((w: { name: string }) => w.name === "research").members as number;
+  const startDesign = async (slug: string) => {
+    const dialog = page.getByRole("dialog", nav("New Design"));
+    await dialog.getByRole("textbox", nav("Epic slug")).fill(slug);
+    await dialog.getByRole("textbox", nav("Rough idea")).fill("an idea");
+    await dialog.getByRole("button", nav("Start design")).click();
+    await expect(dialog).toHaveCount(0);
+  };
+  const before = await members();
+  await sidebar.getByRole("button", { name: "+ New", exact: true }).click();
+  await page.getByRole("menuitem", { name: /^New design/ }).click();
+  await startDesign("made-from-sidebar");
+  await expect.poll(members).toBe(before + 1);
+  await goto(page, "#/epics");
+  await sidebar.getByRole("button", { name: "+ New", exact: true }).click();
+  await page.getByRole("menuitem", { name: /^New chat/ }).click();
+  await page.getByRole("button", { name: "Create session" }).click();
+  await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(1);
+  await expect.poll(members).toBe(before + 2);
+  // Later steps expect Default's chat alone, since deleting this workspace moves its items there.
+  const madeId = (await sidebar.locator("a[data-chat]").getAttribute("href"))!.split("/agents/")[1];
+  await fx.cli("agents", "stop", madeId);
+  await fx.cli("agents", "remove", madeId);
+  await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(0);
+  await goto(page, "#/epics");
+  await page.getByRole("button", nav("New Design")).first().click();
+  await startDesign("made-from-epics");
+  await expect.poll(members).toBe(before + 2);
+  await goto(page, "#/epics");
 
   // Hold from an Epics card: the row moves to the collapsed On hold section.
   await pick("Default workspace");

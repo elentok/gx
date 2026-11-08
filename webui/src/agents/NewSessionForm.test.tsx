@@ -5,7 +5,10 @@ import type { ProjectWorktrees, SessionResult } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { clearCommandListCache, type FetchCommands } from "../commands/useCommandList";
 import type { CreateSession, NewSessionBody } from "./newSession";
+import { ShellContext, type Shell } from "../shell/ShellContext";
 import { NewSessionForm } from "./NewSessionForm";
+
+const shellStub: Shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding: () => {}, claimHeader: () => () => {} };
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -21,7 +24,7 @@ const trees: ProjectWorktrees[] = [
 ];
 const accepted: SessionResult = { session: { id: "gx-7" } as never };
 
-function mount(over: { create?: CreateSession; connected?: boolean; prefillProject?: string; fetchCommands?: FetchCommands } = {}) {
+function mount(over: { create?: CreateSession; connected?: boolean; prefillProject?: string; fetchCommands?: FetchCommands; workspace?: string } = {}) {
   const posts: NewSessionBody[] = [];
   const create: CreateSession = over.create ?? (async (body) => (posts.push(body), accepted));
   const onCreated = vi.fn();
@@ -33,7 +36,9 @@ function mount(over: { create?: CreateSession; connected?: boolean; prefillProje
   } as unknown as Connection;
   renderThemed(
     <ConnectionContext.Provider value={conn}>
-      <NewSessionForm prefillProject={over.prefillProject} fetchTrees={async () => trees} create={create} fetchCommands={over.fetchCommands} onCreated={onCreated} onClose={onClose} />
+      <ShellContext.Provider value={over.workspace === undefined ? undefined : { ...shellStub, workspace: over.workspace }}>
+        <NewSessionForm prefillProject={over.prefillProject} fetchTrees={async () => trees} create={create} fetchCommands={over.fetchCommands} onCreated={onCreated} onClose={onClose} />
+      </ShellContext.Provider>
     </ConnectionContext.Provider>,
   );
   return { posts, onCreated, onClose };
@@ -65,6 +70,20 @@ test("the picker lists the root and worktrees, filters, and offers the create ro
   typeWorktree(wt, "gx-stats");
   expect(options()[0]).toBe("gx-stats/dev/gx-stats");
   expect(options().some((o) => o?.startsWith("+ Create"))).toBe(false);
+});
+
+test("the shell's active workspace rides on the create; no shell sends none", async () => {
+  const withShell = mount({ workspace: "research" });
+  await ready();
+  submit();
+  await waitFor(() => expect(withShell.posts).toHaveLength(1));
+  expect(withShell.posts[0].workspace).toBe("research");
+  cleanup();
+  const bare = mount();
+  await ready();
+  submit();
+  await waitFor(() => expect(bare.posts).toHaveLength(1));
+  expect(bare.posts[0]).not.toHaveProperty("workspace");
 });
 
 test("picking a dir posts dir", async () => {

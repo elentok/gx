@@ -22,6 +22,7 @@ import { removeDraftImage, uploadDraftImage, type RemoveDraftImage, type UploadD
 import { DraftImages } from "./DraftImages";
 import { imageFiles } from "./ComposerImages";
 import { ImageSlot, useDraftImages } from "./useDraftImages";
+import { useShell } from "../shell/ShellContext";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { clearUnsaved, NEW_DRAFT_KEY, readUnsaved, stashUnsaved } from "./unsaved";
 import { useDesignWrite } from "./SessionControls";
@@ -244,6 +245,7 @@ function DraftForm({
   onSwitch: (next: DesignDraft | null, leaving?: string) => void;
 }) {
   const sheetMode = !useWide();
+  const workspace = useShell()?.workspace;
   const slugInput = useRef<HTMLInputElement>(null);
   // A saved draft keeps its project; one whose project is gone is moved as a new draft would start.
   const kept = initial && projects.includes(initial.project) ? initial.project : undefined;
@@ -531,7 +533,7 @@ function DraftForm({
         try {
           // The draft id must be the one a save in flight is creating.
           await chain.current;
-          const res = await open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project, draft_id: server.current.id });
+          const res = await open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project, draft_id: server.current.id, ...(workspace ? { workspace } : {}) });
           if (!res.refused) {
             finished.current = true;
             settle();

@@ -5,6 +5,7 @@ import type { DesignDraft, DesignDraftSaveRequest } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { WriteError } from "../useWrite";
 import type { DraftResult } from "./drafts";
+import { ShellContext, type Shell } from "../shell/ShellContext";
 import type { OpenDesign } from "./open";
 import { NewDesignForm, type DraftsClient } from "./NewDesignForm";
 
@@ -278,6 +279,32 @@ test("Discard with text asks first; Keep returns, Discard deletes the saved draf
   await act(async () => {});
   expect(remove).toHaveBeenCalledWith("d1");
   expect(save).not.toHaveBeenCalled();
+});
+
+test("Start design carries the shell's active workspace; no shell sends none", async () => {
+  const shell: Shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding: () => {}, claimHeader: () => () => {}, workspace: "research" };
+  const inShell = vi.fn(ok);
+  await act(async () => {
+    renderThemed(
+      <ConnectionContext.Provider value={{ refresh: () => {} } as Connection}>
+        <ShellContext.Provider value={shell}>
+          <NewDesignForm projects={["gx"]} open={inShell} drafts={fakeDrafts().client} onStarted={() => {}} onClose={() => {}} />
+        </ShellContext.Provider>
+      </ConnectionContext.Provider>,
+    );
+  });
+  type("Epic slug", "a");
+  type("Rough idea", "an idea");
+  await act(async () => click("Start design"));
+  expect(inShell.mock.calls[0][0]).toMatchObject({ workspace: "research" });
+  cleanup();
+
+  const bare = vi.fn(ok);
+  await mount({ open: bare });
+  type("Epic slug", "a");
+  type("Rough idea", "an idea");
+  await act(async () => click("Start design"));
+  expect(bare.mock.calls[0][0]).not.toHaveProperty("workspace");
 });
 
 test("Start design posts the draft id and reports the address, and stops saving", async () => {

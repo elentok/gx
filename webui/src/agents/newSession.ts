@@ -3,7 +3,10 @@ import { postJson } from "../design/open";
 import type { CreateSessionRequest, ProjectWorktrees, SessionResult } from "../generated/server";
 
 /** The web create route takes only these fields of the full create request. */
-export type NewSessionBody = Pick<CreateSessionRequest, "project" | "dir" | "worktree" | "name" | "prompt" | "tier">;
+export type NewSessionBody = Pick<CreateSessionRequest, "project" | "dir" | "worktree" | "name" | "prompt" | "tier"> & {
+  /** The workspace the chat lands in; the web route reads it, the wire request has no such field. */
+  workspace?: string;
+};
 export type CreateSession = (body: NewSessionBody) => Promise<SessionResult>;
 export type FetchWorktrees = () => Promise<ProjectWorktrees[]>;
 
