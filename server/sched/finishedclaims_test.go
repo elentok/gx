@@ -3,6 +3,8 @@ package sched_test
 import (
 	"context"
 	"github.com/elentok/gx/server/runs"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -103,7 +105,21 @@ func TestPauseStuckFinishedClaims(t *testing.T) {
 
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty"})
 	h.Server.Scheduler().PauseStuckFinishedClaims(past)
-	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusPaused {
-		t.Errorf("run stuck in a wait: status = %q, err = %v, want paused", tk.Status, err)
+	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusClaimed {
+		t.Fatalf("tracked run in a wait: status = %q, err = %v, want claimed", tk.Status, err)
+	}
+
+	h.Server.Registry().Delete("proj:epic-a/01")
+	h.Server.Scheduler().PauseStuckFinishedClaims(past)
+	tk, err = schema.ParseTicket(path)
+	if err != nil || tk.Status != schema.StatusPaused {
+		t.Fatalf("untracked run: status = %q, err = %v, want paused", tk.Status, err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "agent reported finished at " + finishedAt.UTC().Format(time.RFC3339) + " but the server no longer tracks the run"; !strings.Contains(string(body), want) {
+		t.Errorf("ticket lacks %q:\n%s", want, body)
 	}
 }

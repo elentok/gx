@@ -258,6 +258,12 @@ test("a Retry refused because the agent is working offers Stop agent and retry, 
   await waitFor(() => expect(screen.queryByRole("button", { name: "Stop agent and retry" })).toBeNull());
 });
 
+test("a paused ticket whose run is still finishing says so and offers no Retry", async () => {
+  renderTicket(() => repair([], { run_finishing: true }));
+  expect(await screen.findByText("A run is still finishing. Recovery actions return when it settles.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+});
+
 test("a stale refusal refetches the detail", async () => {
   let fetched = 0;
   const fetchMock = vi.fn(

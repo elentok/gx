@@ -43,6 +43,7 @@ type Writer interface {
 type Runs interface {
 	StartedAtOf(address string) (time.Time, bool)
 	LaunchStepOf(address string) (label string, position, total int)
+	Has(address string) bool
 }
 
 // History reads a ticket's event history.

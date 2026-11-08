@@ -77,6 +77,8 @@ type fakeRuns struct{}
 
 func (fakeRuns) StartedAtOf(string) (time.Time, bool) { return time.Time{}, false }
 
+func (fakeRuns) Has(string) bool { return false }
+
 func (fakeRuns) LaunchStepOf(string) (string, int, int) { return "", 0, 0 }
 
 type fakePauses struct{}

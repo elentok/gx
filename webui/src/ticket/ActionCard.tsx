@@ -20,6 +20,7 @@ export function needsActionCard(detail: TicketDetail, sent: Sent | null): boolea
     !!detail.pause_text ||
     detail.actions.includes(ActionAnswer) ||
     detail.actions.some(isRecoverAction) ||
+    !!detail.run_finishing ||
     !!sent
   );
 }

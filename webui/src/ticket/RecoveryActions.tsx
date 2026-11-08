@@ -24,6 +24,8 @@ const WORKER_TIER = "worker";
 // A resume of a zero-commit pause with a live agent prompts it and leaves the pause in place.
 const PROMPTED_TOAST = "Sent to the running agent. The ticket stays paused until it finishes.";
 
+const RUN_FINISHING = "A run is still finishing. Recovery actions return when it settles.";
+
 // The buttons for the recovery verbs the detail lists. The server decides which show and what they say;
 // this holds no verb logic beyond where each one posts.
 export function RecoveryActions({
@@ -52,7 +54,7 @@ export function RecoveryActions({
   }
 
   const actions = detail.actions.filter(isRecoverAction);
-  if (actions.length === 0) return null;
+  if (actions.length === 0) return detail.run_finishing ? <Text>{RUN_FINISHING}</Text> : null;
 
   const send = (action: string, extra: Partial<RecoverBody> = {}) =>
     run(

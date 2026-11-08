@@ -46,11 +46,12 @@ func (s *Scheduler) PauseStuckFinishedClaims(now time.Time) {
 					continue
 				}
 				addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(e.Path), ID: it.Identifier}
-				if tr, ok := s.Registry.Tracked(addr.String()); ok && tr.Settling {
+				// A tracked run still owns the ticket: its own wait settles it.
+				if _, ok := s.Registry.Tracked(addr.String()); ok {
 					continue
 				}
 				run, _ := s.Registry.RunOf(addr.String())
-				reason := fmt.Sprintf("agent reported finished at %s but the ticket was never processed", t.IterationFinishedAt.UTC().Format(time.RFC3339))
+				reason := fmt.Sprintf("agent reported finished at %s but the server no longer tracks the run", t.IterationFinishedAt.UTC().Format(time.RFC3339))
 				if err := s.Writer.Pause(dir, addr, it.Path, events.IterationError, reason, run); err != nil {
 					s.Log.Warn("pause finished claim", "ticket", addr, "err", err)
 				}

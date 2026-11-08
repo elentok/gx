@@ -75,29 +75,42 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 	}
 	cases := []struct {
 		reason schema.PauseReason
-		want   []string
+		// tracked is what the run still being tracked leaves; want is the untracked list.
+		tracked []string
+		want    []string
 	}{
-		{schema.PauseIterationError, []string{wire.ActionRetry, wire.ActionStartOver}},
-		{schema.PauseMergeConflict, []string{wire.ActionMerge, wire.ActionStartOver}},
-		{schema.PauseStrandedCommits, []string{wire.ActionReopenAndRetry}},
-		{schema.PauseAmbiguousBase, []string{wire.ActionChooseBase}},
-		{schema.PauseBlockedPane, []string{wire.ActionRetry}},
-		{schema.PauseManual, []string{wire.ActionResume, wire.ActionStartOver}},
+		{schema.PauseIterationError, []string{}, []string{wire.ActionRetry, wire.ActionStartOver}},
+		{schema.PauseMergeConflict, []string{wire.ActionMerge}, []string{wire.ActionMerge, wire.ActionStartOver}},
+		{schema.PauseStrandedCommits, []string{wire.ActionReopenAndRetry}, []string{wire.ActionReopenAndRetry}},
+		{schema.PauseAmbiguousBase, []string{wire.ActionChooseBase}, []string{wire.ActionChooseBase}},
+		{schema.PauseBlockedPane, []string{wire.ActionRetry}, []string{wire.ActionRetry}},
+		{schema.PauseBackgroundTaskGate, []string{wire.ActionRetry}, []string{wire.ActionRetry}},
+		{schema.PauseManual, []string{wire.ActionResume, wire.ActionStartOver}, []string{wire.ActionResume, wire.ActionStartOver}},
 	}
-	for _, c := range cases {
-		if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
-			tk.Status, tk.PauseReason = schema.StatusPaused, c.reason
-		}); err != nil {
-			t.Fatal(err)
-		}
-		d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
-		if err != nil || !slices.Equal(d.Actions, c.want) {
-			t.Errorf("%s: actions = %v, %v; want %v", c.reason, d.Actions, err, c.want)
-		}
-		if c.reason == schema.PauseStrandedCommits && d.ActionInfo[wire.ActionReopenAndRetry].Label != "Reopen and retry" {
-			t.Errorf("stranded-commits label = %q", d.ActionInfo[wire.ActionReopenAndRetry].Label)
+	check := func(label string, want func(int) []string, finishing func(int) bool) {
+		for i, c := range cases {
+			if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
+				tk.Status, tk.PauseReason = schema.StatusPaused, c.reason
+			}); err != nil {
+				t.Fatal(err)
+			}
+			d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
+			if err != nil || !slices.Equal(d.Actions, want(i)) {
+				t.Errorf("%s %s: actions = %v, %v; want %v", label, c.reason, d.Actions, err, want(i))
+			}
+			if d.RunFinishing != finishing(i) {
+				t.Errorf("%s %s: run_finishing = %v, want %v", label, c.reason, d.RunFinishing, finishing(i))
+			}
+			if c.reason == schema.PauseStrandedCommits && d.ActionInfo[wire.ActionReopenAndRetry].Label != "Reopen and retry" {
+				t.Errorf("stranded-commits label = %q", d.ActionInfo[wire.ActionReopenAndRetry].Label)
+			}
 		}
 	}
+	check("tracked", func(i int) []string { return cases[i].tracked }, func(i int) bool {
+		return len(cases[i].tracked) < len(cases[i].want)
+	})
+	h.Server.Registry().Delete(answerAddr)
+	check("untracked", func(i int) []string { return cases[i].want }, func(int) bool { return false })
 }
 
 func TestDetail_FinishedCommitlessOffersMergeOnly(t *testing.T) {

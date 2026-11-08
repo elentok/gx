@@ -149,6 +149,9 @@ type TicketDetail struct {
 	// the resume sends the chosen one back as its base.
 	Bases   []string `json:"bases,omitempty"`
 	Actions []string `json:"actions"`
+	// RunFinishing is set when a paused ticket's run is still tracked and its
+	// recovery verbs wait for the run to settle.
+	RunFinishing bool `json:"run_finishing,omitempty"`
 	// Recommendation is set while the open pause round carries one.
 	Recommendation *DetailRecommendation `json:"recommendation,omitempty"`
 	// ActionInfo gives each entry of Actions its button label and tooltip, from

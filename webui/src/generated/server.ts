@@ -528,6 +528,11 @@ export interface TicketDetail {
   bases?: string[];
   actions: string[];
   /**
+   * RunFinishing is set when a paused ticket's run is still tracked and its
+   * recovery verbs wait for the run to settle.
+   */
+  run_finishing?: boolean;
+  /**
    * Recommendation is set while the open pause round carries one.
    */
   recommendation?: DetailRecommendation;

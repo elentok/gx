@@ -252,6 +252,15 @@ func (o *Ops) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Repair
 			return res, err
 		}
 	}
+	if o.d.Registry != nil {
+		addr := epicTicketAddress(epicPath, id)
+		if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil {
+			if tk, perr := schema.ParseTicket(t.Path); perr == nil && tk.PausedClass() != "" &&
+				tk.EffectiveReason().VerbNeedsUntrackedRun(schema.VerbStartOver) && o.d.Registry.Has(addr.String()) {
+				return repairRefusal(&repair.RefusalError{Reason: wire.ReasonIterationRunning, Message: "a run is still finishing in " + addr.String()}), nil
+			}
+		}
+	}
 	if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil && t.Type == string(schema.TypeTrunkConflict) {
 		addr := tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
 		res, err := o.d.Landing.StartOverTrunkConflict(req, rc.origin, addr, t)

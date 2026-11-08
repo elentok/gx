@@ -2,6 +2,7 @@ package epics
 
 import (
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/elentok/gx/server/queue"
@@ -100,6 +101,7 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 		return wire.TicketDetail{}, err
 	}
 	d.ActionInfo = actionInfo(d.Actions)
+	d.RunFinishing = s.runFinishing(ref.Addr.String(), t)
 	if len(rounds) == 0 {
 		return d, nil
 	}
@@ -135,7 +137,17 @@ func (s *Epics) DetailFor(addr string, t schema.Ticket, rounds []tickets.PauseRo
 			return nil, err
 		}
 	}
-	return detailActions(t, last, gone, card), nil
+	return detailActions(t, last, gone, s.Runs.Has(addr), card), nil
+}
+
+// runFinishing reports whether t is paused with its run still tracked, so
+// verbs that need an untracked run are withheld until it settles.
+func (s *Epics) runFinishing(addr string, t schema.Ticket) bool {
+	if t.PausedClass() == "" || !s.Runs.Has(addr) {
+		return false
+	}
+	row, ok := t.EffectiveReason().Row()
+	return ok && slices.ContainsFunc(row.Verbs, t.EffectiveReason().VerbNeedsUntrackedRun)
 }
 
 // brokenDetail is the small payload of a file that fails to parse: nothing the
@@ -228,7 +240,7 @@ func (s *Epics) PermissionCard(addr tickets.Address) (*wire.PermissionCard, erro
 
 // detailActions is what a person may do with the ticket right now. Approve
 // joins when the permission card can be approved from here.
-func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone bool, card *wire.PermissionCard) []string {
+func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone, tracked bool, card *wire.PermissionCard) []string {
 	actions := []string{}
 	if card != nil && card.RequestID != "" {
 		actions = append(actions, wire.ActionApprove)
@@ -246,6 +258,7 @@ func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone bool, 
 	approvable := len(actions) > 0
 	for _, v := range row.Verbs {
 		switch {
+		case tracked && t.EffectiveReason().VerbNeedsUntrackedRun(v):
 		case v == schema.VerbAllowDeny:
 			// Approve is added above, from the live card.
 		case v == schema.VerbAnswer && (latest == nil || latest.End != nil):

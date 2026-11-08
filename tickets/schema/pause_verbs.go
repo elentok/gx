@@ -66,6 +66,15 @@ func (v PauseVerb) Tooltip() string { return pauseVerbs[v].Tooltip }
 // Word is the verb as the detail's actions and the refusals spell it.
 func (v PauseVerb) Word() string { return pauseVerbs[v].Word }
 
+// VerbNeedsUntrackedRun reports whether v on a pause of kind r may run only once
+// the server no longer tracks the ticket's run. A repair-class pause is a fault
+// whose run is still settling; an answer-class one (the background-task gate
+// among them) is tracked by design. The offered actions and the write guard both
+// ask this, so the web never offers a verb the server refuses.
+func (r PauseReason) VerbNeedsUntrackedRun(v PauseVerb) bool {
+	return pauseClasses[r] == PauseClassRepair && (v == VerbRetry || v == VerbStartOver)
+}
+
 // VerbOfWord is the verb that Word spells as w.
 func VerbOfWord(w string) (PauseVerb, bool) {
 	for v, info := range pauseVerbs {
