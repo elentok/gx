@@ -148,6 +148,7 @@ type Prompter interface {
 	SendAction(dir, label string, action []string)
 	CancelAutoAdvance(id, why string) bool
 	AutoAdvanceDeadline(id string) time.Time
+	AutoQueueDeadline(id string) time.Time
 }
 
 // FirstPrompt is the first-prompt tracker of one watch.

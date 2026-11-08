@@ -124,8 +124,8 @@ func switchHandler[R any](p *Prompt, web bool, set func(R) (wire.SessionResult, 
 	}
 }
 
-// setAutoQueue flips a Design session's auto-queue switch. It starts nothing
-// yet.
+// setAutoQueue flips a Design session's auto-queue switch. Turning it on over a
+// ready map starts the countdown; turning it off cancels a running one.
 func (p *Prompt) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult, error) {
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
@@ -142,7 +142,15 @@ func (p *Prompt) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult, er
 	}); err != nil {
 		return wire.SessionResult{}, err
 	}
+	if req.On {
+		p.startAutoQueue(req.ID, meta.Ticket)
+	} else {
+		p.cancelAutoQueue(req.ID, "Auto-queue switched off")
+	}
 	p.events.Publish(wire.EventSessionChanged, req.ID)
+	if at := p.AutoQueueDeadline(req.ID); !at.IsZero() {
+		info.AutoQueueAt = &at
+	}
 	return wire.SessionResult{Session: &info}, nil
 }
 

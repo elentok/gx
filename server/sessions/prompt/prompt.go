@@ -109,6 +109,7 @@ type Prompt struct {
 	resumer *sessions.Resumer
 
 	autoAdvances autoAdvances
+	autoQueues   autoAdvances
 
 	// imageMu orders the numbering of a session's Prompt images.
 	imageMu sync.Mutex

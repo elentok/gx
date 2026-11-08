@@ -54,6 +54,9 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 	if at := mg.prompter.AutoAdvanceDeadline(m.ID); !at.IsZero() {
 		info.AutoAdvanceAt = &at
 	}
+	if at := mg.prompter.AutoQueueDeadline(m.ID); !at.IsZero() {
+		info.AutoQueueAt = &at
+	}
 	info.Failure = mg.chat.Failure(cm)
 	return info
 }
