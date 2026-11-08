@@ -24,6 +24,8 @@ const WORKER_TIER = "worker";
 // A resume of a zero-commit pause with a live agent prompts it and leaves the pause in place.
 const PROMPTED_TOAST = "Sent to the running agent. The ticket stays paused until it finishes.";
 
+const DISCARD_NOTICE = "Start over discards the branch's commits and runs the ticket again from the base. A backup branch keeps them.";
+
 const RUN_FINISHING = "A run is still finishing. Recovery actions return when it settles.";
 
 // The buttons for the recovery verbs the detail lists. The server decides which show and what they say;
@@ -176,6 +178,7 @@ function StartOverDialog({
   return (
     <Modal label={label} onClose={onClose} p="4" w="md" gap="3">
       {tooltip && <Text>{tooltip}</Text>}
+      <Text>{DISCARD_NOTICE}</Text>
       <ExpandableTextField
         label="Reason"
         title="Start over reason"

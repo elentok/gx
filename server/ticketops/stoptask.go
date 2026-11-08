@@ -18,6 +18,17 @@ func stopAgentTaskPrompt(taskID string) string {
 	return "Use the TaskStop tool with task_id " + taskID + " to stop that background agent task. Then end your turn with the single word stopped."
 }
 
+// taskFacts reads the live background task of a Claude run's session.
+func (o *Ops) taskFacts(run runs.TrackedRun) (backgroundtask.Facts, bool, error) {
+	home, err := o.d.Projects.EnvHome()
+	if err != nil {
+		return backgroundtask.Facts{}, false, err
+	}
+	rd := &backgroundtask.Reader{Home: home}
+	f, ok := rd.Facts(run.Session.SessionID, backgroundtask.DefaultOutputBase(), backgroundtask.ProcessFinder{Procs: syshealth.DefaultProcess()})
+	return f, ok, nil
+}
+
 // StopTask ends the live background task of a background-task-gate pause. A
 // shell task's process is signalled and nothing is typed: Claude writes its own
 // failed notice and wakes. An async Agent task is stopped by asking Claude to
@@ -29,12 +40,10 @@ func (o *Ops) StopTask(req wire.QueueRequest) (wire.QueueResult, error) {
 			r := queue.Refusal(wire.ReasonNotStoppable, "only a Claude task can be stopped")
 			return &r, nil
 		}
-		home, err := o.d.Projects.EnvHome()
+		f, ok, err := o.taskFacts(run)
 		if err != nil {
 			return nil, err
 		}
-		rd := &backgroundtask.Reader{Home: home}
-		f, ok := rd.Facts(run.Session.SessionID, backgroundtask.DefaultOutputBase(), backgroundtask.ProcessFinder{Procs: syshealth.DefaultProcess()})
 		if !ok {
 			r := queue.Refusal(wire.ReasonTaskUnidentified, "no live task found to stop")
 			return &r, nil

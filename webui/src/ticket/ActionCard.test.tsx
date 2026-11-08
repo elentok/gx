@@ -201,6 +201,7 @@ test("Start over asks for a reason first and never sends branch deletion", async
   fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
   const dialog = screen.getByRole("dialog", { name: "Start over" });
   expect(fetchMock).not.toHaveBeenCalled();
+  expect(within(dialog).getByText(/discards the branch's commits.*backup branch/i)).toBeTruthy();
   fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "wrong approach" } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Start over" }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalled());

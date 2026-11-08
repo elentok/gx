@@ -56,8 +56,8 @@ var retryPrompts = map[schema.PauseReason]string{
 	schema.PauseZeroCommit: zeroCommitPrompt,
 	schema.PauseBlockedPane: "A person reviewed your blocked prompt and wants you to continue. " +
 		"Carry on with the work.",
-	schema.PauseBackgroundTaskGate: "A person reviewed the background task you were waiting on and wants you to continue. " +
-		"Finish the work.",
+	schema.PauseBackgroundTaskGate: "A person reviewed your uncommitted changes and wants you to continue the ticket's work. " +
+		"Commit what belongs, discard what does not, then finish.",
 }
 
 // directLaunch is the Launch of a repair run without a server. It has no
