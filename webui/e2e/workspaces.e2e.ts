@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, test } from "./fixture";
+import { card, expect, nav, swipe, test } from "./fixture";
 
 const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash);
 
@@ -395,6 +395,13 @@ test("Workspaces", async ({ page, start }) => {
   await expect(sidebar).toBeHidden();
   await page.getByRole("button", nav("Show sidebar")).click();
   await expect(sidebar).toBeVisible();
+  // A vertical drag does nothing; a swipe left closes the sidebar.
+  await swipe(page, [200, 700], [200, 300]);
+  await expect(sidebar).toBeVisible();
+  await swipe(page, [250, 600], [100, 610]);
+  await expect(sidebar).toBeHidden();
+  await page.getByRole("button", nav("Show sidebar")).click();
+  await expect(sidebar).toBeVisible();
   await gear.click();
   await menuFocused();
   await page.getByRole("menuitem", nav("More settings...")).click();
@@ -431,6 +438,15 @@ test("Workspaces", async ({ page, start }) => {
   await expect(jump).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(jump).toHaveCount(0);
+  await expect(sidebar).toBeVisible();
+  // Swipe left closes it; the edge swipe does not open it outside a home-screen app.
+  await swipe(page, [200, 700], [200, 300]);
+  await expect(sidebar).toBeVisible();
+  await swipe(page, [250, 600], [100, 610]);
+  await expect(sidebar).toBeHidden();
+  await swipe(page, [5, 600], [150, 610]);
+  await expect(sidebar).toBeHidden();
+  await page.getByRole("button", nav("Show sidebar")).click();
   await expect(sidebar).toBeVisible();
   // A tap outside an open menu closes it; Move swaps in place with a Back row, Back returns.
   await rowMenu("paused-epic").click();

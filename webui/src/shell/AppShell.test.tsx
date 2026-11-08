@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { PageHeader } from "../page/PageHeader";
 import { renderThemed } from "../ui/render";
@@ -112,6 +112,92 @@ test.each(["desktop", "tablet", "phone"] as const)("%s: the header search button
   expect(await screen.findByRole("dialog", { name: "Jump to" })).toBeTruthy();
   fireEvent.keyDown(window, { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+function swipe(target: Element, from: [number, number], to: [number, number]) {
+  fireEvent.touchStart(target, { touches: [{ clientX: from[0], clientY: from[1] }] });
+  fireEvent.touchEnd(target, { changedTouches: [{ clientX: to[0], clientY: to[1] }] });
+}
+
+describe("swipe", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const standalone = () => vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: q === "(display-mode: standalone)",
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+
+  test.each(["tablet", "phone"] as const)("%s: swipe left on the sidebar or the scrim closes it", (device) => {
+    setup(device);
+    fireEvent.click(mascot()!);
+    swipe(sidebar(), [200, 300], [100, 310]);
+    expect(isOpen()).toBe(false);
+    fireEvent.click(mascot()!);
+    swipe(screen.getByTestId("scrim"), [300, 300], [200, 300]);
+    expect(isOpen()).toBe(false);
+  });
+
+  test.each([
+    ["under 40px", [200, 300], [165, 300]],
+    ["mostly vertical", [200, 300], [150, 500]],
+    ["rightward", [200, 300], [300, 300]],
+  ] as const)("a %s move does not close it", (_, from, to) => {
+    setup("phone");
+    fireEvent.click(mascot()!);
+    swipe(sidebar(), [...from], [...to]);
+    expect(isOpen()).toBe(true);
+  });
+
+  test("a tap on a row still navigates and closes through the click", () => {
+    setup("phone");
+    fireEvent.click(mascot()!);
+    const link = document.createElement("a");
+    sidebar().appendChild(link);
+    swipe(link, [100, 100], [102, 101]);
+    expect(isOpen()).toBe(true);
+    fireEvent.click(link);
+    expect(isOpen()).toBe(false);
+  });
+
+  test("a horizontal scroller that can still scroll that way swallows the gesture", () => {
+    setup("phone");
+    fireEvent.click(mascot()!);
+    const strip = document.createElement("div");
+    strip.style.overflowX = "auto";
+    Object.defineProperties(strip, { scrollWidth: { value: 500 }, clientWidth: { value: 200 } });
+    sidebar().appendChild(strip);
+    swipe(strip, [200, 300], [100, 300]);
+    expect(isOpen()).toBe(true);
+    // Scrolled to its end, the same swipe closes the sidebar.
+    strip.scrollLeft = 300;
+    swipe(strip, [200, 300], [100, 300]);
+    expect(isOpen()).toBe(false);
+  });
+
+  test("nothing swipes while docked", () => {
+    setup("desktop");
+    swipe(sidebar(), [200, 300], [100, 300]);
+    expect(isOpen()).toBe(true);
+  });
+
+  test.each([
+    ["without a standalone signal", false, false],
+    ["as a home-screen app", true, true],
+  ])("a rightward edge swipe %s", (_, isStandalone, opens) => {
+    if (isStandalone) standalone();
+    setup("phone");
+    swipe(document.body, [5, 300], [100, 300]);
+    expect(isOpen()).toBe(opens);
+  });
+
+  test("navigator.standalone counts as a standalone signal, and only from the edge", () => {
+    vi.stubGlobal("navigator", { ...navigator, standalone: true });
+    setup("phone");
+    swipe(document.body, [100, 300], [200, 300]);
+    expect(isOpen()).toBe(false);
+    swipe(document.body, [5, 300], [100, 300]);
+    expect(isOpen()).toBe(true);
+  });
 });
 
 test.each([

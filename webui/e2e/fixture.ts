@@ -423,6 +423,21 @@ export const test = base.extend<{
 /** A touch device: `test.use(touch)` in a describe block makes `(pointer: coarse)` match. */
 export const touch = { hasTouch: true, isMobile: true } as const;
 
+/** Drags one finger from `from` to `to` through CDP touch events, which work in a context without `hasTouch`. */
+export async function swipe(page: Page, from: [number, number], to: [number, number]) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true });
+  const at = (x: number, y: number) => [{ x, y }];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(...from) });
+  for (let i = 1; i <= 5; i++) {
+    const x = from[0] + ((to[0] - from[0]) * i) / 5;
+    const y = from[1] + ((to[1] - from[1]) * i) / 5;
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(x, y) });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
+}
+
 /** Matches a role's accessible name exactly. */
 export const nav = (name: string) => ({ name, exact: true });
 

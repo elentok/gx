@@ -23,6 +23,7 @@ import {
 } from "../workspaces/useActiveWorkspace";
 import { ManageWorkspaces } from "./ManageWorkspaces";
 import { useShortcuts } from "./useShortcuts";
+import { useSidebarSwipe } from "./useSidebarSwipe";
 import {
   NewWorkspaceDialog,
   WorkspaceSwitcher,
@@ -136,6 +137,13 @@ export function AppShell({
   );
   const aside = useRef<HTMLDivElement>(null);
   const onSidebarKeyDown = useSidebarKeys(aside, shell);
+  useSidebarSwipe({
+    docked,
+    open,
+    aside,
+    onOpen: () => setChoice({ device, open: true }),
+    onClose: shell.close,
+  });
   const conn = useConnectionContext();
   const { snapshot } = useConnectionState(conn);
   const { workspaces } = useWorkspaces(conn);
