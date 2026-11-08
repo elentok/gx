@@ -255,22 +255,23 @@ var _ agentrunner.LaunchPrompter = (*Runner)(nil)
 // working or blocked (or its seq moved), and the transcript's first user
 // record is the command (see claudeui.CheckLaunchDelivered, which also owns
 // the resends). A Codex prompt is proved by the rollout's first user record
-// instead, and herdr's status only shortens the wait. Other prompts, and
-// runners without the matching home, keep the PromptNudged path.
+// instead, and herdr's status only shortens the wait. Every Claude launch
+// prompt is first checked for vim editor mode. Other prompts, and runners
+// without the matching home, keep the PromptNudged path.
 func (r *Runner) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
 	kind := r.kindOf(s)
 	codex := kind == harness.Codex
-	if (codex && r.CodexHome == "") || (!codex && (r.Home == "" || kind != harness.Claude || !isSlashCommand(text))) {
-		return r.PromptNudged(s, text, onNudge)
-	}
-	if err := r.guard(s); err != nil {
-		return err
-	}
 	if !codex && !agentrunner.VimCheckSkipped(ctx) {
 		probe := harness.TypingIO{Session: s.SessionID, Log: r.log, Caller: "herdr-launch"}
 		if harness.CheckVimLaunch(herdrTypingIO(probe, s.ID, r.CLI.AgentRead, r.CLI.AgentSendKeys)) {
 			return &claudeui.VimEditorError{}
 		}
+	}
+	if (codex && r.CodexHome == "") || (!codex && (r.Home == "" || kind != harness.Claude || !isSlashCommand(text))) {
+		return r.PromptNudged(s, text, onNudge)
+	}
+	if err := r.guard(s); err != nil {
+		return err
 	}
 	turn, err := r.awaitNotBusy(s)
 	if err != nil {

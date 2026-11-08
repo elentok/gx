@@ -38,6 +38,49 @@ func TestPromptLaunch_VimFooterReturnsTheVimErrorAndSendsNothing(t *testing.T) {
 	}
 }
 
+func TestPromptLaunch_VimFooterOnPlainPromptOrNoHomeReturnsTheVimError(t *testing.T) {
+	for name, tc := range map[string]struct {
+		text   string
+		noHome bool
+	}{
+		"non-slash prompt":     {text: "fix the bug"},
+		"slash prompt no home": {text: launchText, noHome: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r, state, s, _ := startLaunch(t)
+			if tc.noHome {
+				r.Home = ""
+			}
+			s.SessionID += "-plain-" + name
+			harness.NoteEditorOverride(s.SessionID, nil)
+			if err := state.SetPaneText(s.Label, vimPane("-- NORMAL --")); err != nil {
+				t.Fatal(err)
+			}
+			err := agentrunner.PromptLaunch(context.Background(), r, s, tc.text, nil)
+			if _, ok := errors.AsType[*claudeui.VimEditorError](err); !ok {
+				t.Fatalf("PromptLaunch = %v, want *VimEditorError", err)
+			}
+			if got, _ := state.Received(s.Label); len(got) != 0 {
+				t.Fatalf("received = %q, want nothing typed", got)
+			}
+		})
+	}
+}
+
+func TestPromptLaunch_NonSlashPromptWithoutVimFooterSendsOnce(t *testing.T) {
+	r, state, s, _ := startLaunch(t)
+	harness.NoteEditorOverride(s.SessionID, nil)
+	if err := state.SetPaneText(s.Label, vimPane("? for shortcuts")); err != nil {
+		t.Fatal(err)
+	}
+	if err := agentrunner.PromptLaunch(context.Background(), r, s, "fix the bug", nil); err != nil {
+		t.Fatalf("PromptLaunch = %v, want nil", err)
+	}
+	if got, _ := state.Received(s.Label); !slices.Equal(got, []string{"fix the bug"}) {
+		t.Fatalf("received = %q, want one send", got)
+	}
+}
+
 func TestPromptLaunch_NoVimFooterSendsThePromptOnce(t *testing.T) {
 	r, state, s, home := startLaunch(t)
 	harness.NoteEditorOverride(s.SessionID, nil)
