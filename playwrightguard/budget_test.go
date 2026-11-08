@@ -15,7 +15,10 @@ import (
 // Composer image flows (+6): paste, drop and the file picker need real browser
 // clipboard/drag events and a server round trip to the session's image dir,
 // which jsdom tests cannot see.
-const maxFlows = 125
+// Cleanup flow (+1): the gear menu pages, the size scan, the unmerged-worktree
+// removal on disk and the one-off's prompt need the real server and a git
+// worktree on disk; component tests and server/cleanup tests cover each piece alone.
+const maxFlows = 126
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

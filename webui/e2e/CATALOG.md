@@ -29,7 +29,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (124). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (126). Before you add a flow, add a step to a flow on the same scenario
 (see `skills/gx-playwright-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -117,6 +117,8 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **`phone.e2e.ts`:** a card's meta sits below its title and the answer and fix buttons are full-width tap targets; **41. Phone, New Design sheet** (88% bottom sheet with grab handle, Close above the idea box; at 375px Discard at the footer's left edge and Start design at its right edge, each at natural width; with the idea empty the hint sits above the footer and Start keeps its width; a thumbnail click opens the viewer; Tab stays inside the dialog); **24. Phone, Design page** (Send is dimmed until an answer exists and named "Send" on a phone; at 390px the footer is one row of Add, Note, Auto, Send with 44px Add and Note; Auto menu shows Advance and Queue and Queue flips; at Branch the Queuing countdown strip sits above the footer with a Cancel at least 40px tall; Cmd/Ctrl+K opens a full-screen jump sheet).
 - **`modes.e2e.ts`:** at 760px the Epic page gets the wide layout and Cmd/Ctrl+K opens a popover jump menu (and 62. Card columns); at 390px the Design page's jump menu is a full-screen sheet.
 - **`menu.e2e.ts`:** the sidebar footer's limits tray (between the health meter and the gear; the bars read C and X, fill and tone follow the 5h usage) and its popover: a statusline report reaches the open popover; the amount rises while it is open; the open popover flips to limits and its output matches the no-server run; the narrow popover fits and updates live. The tray keeps its bars fresh while closed, so a closed popover still fetches.
+
+- **`cleanup.e2e.ts` 198. Cleanup:** scenario `cleanup`. The gear menu lists More settings, Cleanup and Tips and Tips opens its page; Cleanup shows the project and its groups, sizes fill in; Remove on the unmerged idle worktree asks first, Cancel removes nothing, Confirm removes the folder and the row leaves the group without a reload, the branch stays; "Start cleanup agent" files a one-off whose prompt names only the unresolved branches and done-but-unmerged epics.
 
 ## Stats, health, disk and checks (`stats`, `health`, `disk`, `check-lock`, `checks`)
 
