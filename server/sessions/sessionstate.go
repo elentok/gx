@@ -17,18 +17,18 @@ func SessionStateToken(s wire.SessionInfo) string {
 // SessionWriteDesignWeb is sessionWrite for the web mux: only a design session,
 // and only with the state token of the session the page saw.
 func (mg *Manager) SessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-	return sessionWriteAs(mg.CheckDesignWrite, do)
+	return sessionWriteAs(mg.CheckSteppedWrite, do)
 }
 
-// CheckDesignWrite returns the refusal for a web write on a session that is not
-// a design session or whose state moved since the page saw it.
-func (mg *Manager) CheckDesignWrite(req wire.SessionRequest) (wire.SessionResult, error) {
+// CheckSteppedWrite returns the refusal for a web write on a session that is not
+// a stepped session or whose state moved since the page saw it.
+func (mg *Manager) CheckSteppedWrite(req wire.SessionRequest) (wire.SessionResult, error) {
 	_, meta, res, err := mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if !meta.IsDesign() {
-		return Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+	if !meta.IsStepped() {
+		return Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a stepped session", req.ID)), nil
 	}
 	if req.State != SessionStateToken(meta.Info()) {
 		return Refusal(wire.ReasonStale, "the session changed; review its current state"), nil

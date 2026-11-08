@@ -351,7 +351,7 @@ func launchArgs(meta *Meta, claudeArgs, codexRoots []string) []string {
 		return nil
 	}
 	args := slices.Clone(claudeArgs)
-	if meta.IsDesign() {
+	if meta.IsStepped() {
 		args = agentrunner.WithDesignDisallowedTools(args)
 	}
 	// A configured flag wins over the tier for its knob.

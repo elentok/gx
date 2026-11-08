@@ -16,6 +16,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -59,7 +60,7 @@ func newClaudeFixture(t *testing.T) *readFixture {
 	t.Helper()
 	config := t.TempDir()
 	src := newFakeSource()
-	src.meta = Meta{ID: "s1", Harness: "claude", Dir: testCwd, ConversationID: testConv}
+	src.meta = Meta{ID: "s1", Harness: "claude", Dir: testCwd, ConversationID: testConv, Flow: FlowRef{Flow: tickets.FlowDesign, Key: "gx:epic/03"}}
 	return &readFixture{
 		src:    src,
 		config: config,

@@ -23,10 +23,11 @@ func (m TurnMark) TurnEnded() (bool, error) {
 	return transcript.TurnEnded(m.Path)
 }
 
-// DesignRef names the conversation and ticket of a Design session that just
-// went idle. Live marks a turn that ended while this server watched it, the
-// only kind that auto-advances.
+// DesignRef names the conversation, ticket and flow of a stepped session that
+// just went idle. Live marks a turn that ended while this server watched it,
+// the only kind that auto-advances. Ticket is a Design's map address.
 type DesignRef struct {
 	Conversation, Ticket string
+	Flow                 FlowRef
 	Live                 bool
 }

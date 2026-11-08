@@ -25,6 +25,7 @@ const RestoreCrashWindow = time.Minute
 // Meta is what the chat reads of a session's saved meta.
 type Meta struct {
 	ID, Harness, Project, Dir, Ticket, ConversationID string
+	Flow                                              FlowRef
 	Model, Effort                                     string
 	Status                                            wire.SessionStatus
 	Exit                                              string
@@ -41,8 +42,8 @@ type Source interface {
 	// CheckProjectDir returns a refusal when project or dir is not valid for a
 	// new session; nil means ok.
 	CheckProjectDir(project, dir string) (*wire.SessionResult, error)
-	// DesignFinal says whether the ticket's design is at its final step.
-	DesignFinal(ticket string) bool
+	// StepFinal says whether the flow is at a step with no Continue.
+	StepFinal(ref FlowRef) bool
 	// NoteFailure raises the banner of a session whose failure is new.
 	NoteFailure(id string)
 	// Stopped is closed when the session watches stop.
@@ -100,9 +101,9 @@ func New(d Deps) *Chat {
 
 // ReadSnapshot reads the chat at path, as the page would see it. sessionDir is
 // the session's state dir.
-func (c *Chat) ReadSnapshot(path string, kind agentrunner.Kind, ticket, sessionDir string) (Snapshot, error) {
-	final := c.src.DesignFinal(ticket)
-	return c.chats.Read(path, kind, final, Loader(kind, ticket, sessionDir, final))
+func (c *Chat) ReadSnapshot(path string, kind agentrunner.Kind, ref FlowRef, sessionDir string) (Snapshot, error) {
+	final := c.src.StepFinal(ref)
+	return c.chats.Read(path, kind, final, Loader(kind, ref, sessionDir, final))
 }
 
 func refuse(reason, msg string) wire.SessionResult {

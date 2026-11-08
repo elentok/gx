@@ -17,6 +17,7 @@ import (
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -40,7 +41,7 @@ func TestSessionInfo_FlowFieldsRoundTrip(t *testing.T) {
 // prompt prefix only by convention. This fails when either side drifts.
 func TestRunEndLine_MatchesAgentfakeDesignRunEnd(t *testing.T) {
 	t.Parallel()
-	got, ok := chat.RunEndNext("Thanks, that settles it.\n\n"+agentfake.DesignRunEnd, "gx:epic/03", "claude", false)
+	got, ok := chat.RunEndNext("Thanks, that settles it.\n\n"+agentfake.DesignRunEnd, designRef, "claude", false)
 	if !ok {
 		t.Fatalf("runEndLine does not match agentfake.DesignRunEnd %q", agentfake.DesignRunEnd)
 	}
@@ -49,9 +50,11 @@ func TestRunEndLine_MatchesAgentfakeDesignRunEnd(t *testing.T) {
 	}
 }
 
-func TestDesignContinueAction_UsesAgentfakeDesignPromptPrefix(t *testing.T) {
+var designRef = chat.FlowRef{Flow: tickets.FlowDesign, Key: "gx:epic/03"}
+
+func TestContinueAction_UsesAgentfakeDesignPromptPrefix(t *testing.T) {
 	t.Parallel()
-	action := chat.DesignContinueAction("gx:epic/03", "claude")
+	action := chat.ContinueAction(designRef, "claude")
 	if len(action) != 2 || !strings.HasPrefix(action[1], agentfake.DesignPromptPrefix) {
 		t.Errorf("action = %q, want second entry to start with %q", action, agentfake.DesignPromptPrefix)
 	}
@@ -70,12 +73,12 @@ func (s infoSource) ReadMeta(string) (chat.Meta, error) { return chat.Meta{}, er
 func (s infoSource) CheckProjectDir(string, string) (*wire.SessionResult, error) {
 	return nil, errors.New("unused")
 }
-func (s infoSource) DesignFinal(string) bool    { return false }
-func (s infoSource) NoteFailure(string)         {}
-func (s infoSource) Stopped() <-chan struct{}   { return nil }
-func (s infoSource) HasChatReader(string) bool  { return false }
-func (s infoSource) CodexHome() (string, error) { return s.codexHome, nil }
-func (s infoSource) Publish(string, string)     {}
+func (s infoSource) StepFinal(chat.FlowRef) bool { return false }
+func (s infoSource) NoteFailure(string)          {}
+func (s infoSource) Stopped() <-chan struct{}    { return nil }
+func (s infoSource) HasChatReader(string) bool   { return false }
+func (s infoSource) CodexHome() (string, error)  { return s.codexHome, nil }
+func (s infoSource) Publish(string, string)      {}
 
 // infoManager is a Manager with the session chat and prompt that New builds.
 func infoManager(env []string, codexHome string) *sessions.Manager {
@@ -215,14 +218,14 @@ func TestSessionInfoModel_ModelSwitchedNote(t *testing.T) {
 	}
 }
 
-func TestDesignContinueAction_ResetsEachHarnessItsOwnWay(t *testing.T) {
+func TestContinueAction_ResetsEachHarnessItsOwnWay(t *testing.T) {
 	t.Parallel()
 	for agent, want := range map[string][]string{
 		"claude": {"/clear", "/gx-design epic"},
 		"codex":  {"/new", "$gx-design epic"},
 		"fake":   {"/clear", "/gx-design epic"},
 	} {
-		if got := chat.DesignContinueAction("gx:epic/03", agent); !slices.Equal(got, want) {
+		if got := chat.ContinueAction(designRef, agent); !slices.Equal(got, want) {
 			t.Errorf("%s action = %q, want %q", agent, got, want)
 		}
 	}
@@ -236,7 +239,7 @@ func TestChatNext_NamesTheSessionsHarnessCommand(t *testing.T) {
 		harness.Claude: {"/clear", "/gx-design epic"},
 		harness.Codex:  {"/new", "$gx-design epic"},
 	} {
-		next := chat.ChatNext(msgs, kind, "gx:epic/03", false)
+		next := chat.ChatNext(msgs, kind, designRef, false)
 		if next == nil || !slices.Equal(next.Action.Action, want) {
 			t.Errorf("%s next = %+v, want action %q", kind, next, want)
 		}

@@ -42,7 +42,7 @@ func (f *fakeSource) ReadMeta(string) (Meta, error) { return f.meta, nil }
 func (f *fakeSource) CheckProjectDir(string, string) (*wire.SessionResult, error) {
 	return f.refusal, nil
 }
-func (f *fakeSource) DesignFinal(string) bool     { return f.final }
+func (f *fakeSource) StepFinal(FlowRef) bool      { return f.final }
 func (f *fakeSource) NoteFailure(id string)       { f.noted <- id }
 func (f *fakeSource) Stopped() <-chan struct{}    { return f.stopped }
 func (f *fakeSource) HasChatReader(h string) bool { return f.readers[h] }

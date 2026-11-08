@@ -54,13 +54,13 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if req.Continue && req.Promote {
 		return sessions.Refusal(wire.ReasonSessionBadRequest, "continue and promote cannot be combined"), nil
 	}
-	if req.Continue && !meta.IsDesign() {
-		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+	if req.Continue && !meta.IsStepped() {
+		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a stepped session", req.ID)), nil
 	}
 	if req.Promote {
 		// A Queue agent never gets here: SessionDir refuses its id as unknown.
-		if meta.IsDesign() {
-			return sessions.Refusal(wire.ReasonSessionNotPlain, fmt.Sprintf("session %s is a design session, not a plain one", req.ID)), nil
+		if meta.IsStepped() {
+			return sessions.Refusal(wire.ReasonSessionNotPlain, fmt.Sprintf("session %s is a stepped session, not a plain one", req.ID)), nil
 		}
 		// The server builds the command, so the prefix rule stays closed to the page.
 		req.Text = harness.SkillCommand(meta.Harness, "gx-promote-to-design", "")
@@ -107,7 +107,7 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if req.Continue {
 		// The server builds the slash commands, so the prefix rule stays closed
 		// to the page.
-		action := chat.DesignContinueAction(meta.Ticket, meta.Harness)
+		action := chat.ContinueAction(meta.FlowRef(), meta.Harness)
 		if res, refused := p.resumer.HandoffRefusal(meta, action); refused {
 			return res, nil
 		}
@@ -184,7 +184,7 @@ func (p *Prompt) lastChatMessageID(id, dir string, meta sessions.Meta) (string, 
 	if !ok {
 		return "", nil
 	}
-	snap, err := p.sessionChat.ReadSnapshot(path, kind, meta.Ticket, dir)
+	snap, err := p.sessionChat.ReadSnapshot(path, kind, meta.FlowRef(), dir)
 	if os.IsNotExist(err) || len(snap.Msgs) == 0 {
 		return "", nil
 	}

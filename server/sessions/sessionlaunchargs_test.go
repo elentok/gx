@@ -21,6 +21,7 @@ func TestLaunchArgs(t *testing.T) {
 		{"claude with a remote-control name", Meta{Harness: "claude", RemoteControl: "proj:loop/01"}, claudeArgs, []string{"--verbose", "--remote-control", "proj:loop/01"}},
 		{"claude without a name", Meta{Harness: "claude"}, claudeArgs, []string{"--verbose"}},
 		{"claude design bans AskUserQuestion", Meta{Harness: "claude", Flow: tickets.FlowDesign}, claudeArgs, []string{"--verbose", "--disallowedTools", "AskUserQuestion"}},
+		{"claude triage bans AskUserQuestion", Meta{Harness: "claude", Flow: tickets.FlowTriage, FlowKey: "proj"}, claudeArgs, []string{"--verbose", "--disallowedTools", "AskUserQuestion"}},
 		{"codex without a model or effort gets the shape only", Meta{Harness: "codex", RemoteControl: "proj:loop/01"}, claudeArgs, harness.CodexArgs(harness.CodexArgsInput{WritableRoots: roots})},
 		{"other harnesses get none", Meta{Harness: "agentfake"}, claudeArgs, nil},
 		{"claude light", Meta{Harness: "claude", Tier: "light", Model: "haiku"}, claudeArgs, []string{"--verbose", "--model", "haiku"}},

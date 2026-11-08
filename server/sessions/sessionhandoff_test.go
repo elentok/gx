@@ -144,6 +144,25 @@ func TestChartingHandoff_NothingRestartsOutsideAStrongestDesignLaunch(t *testing
 		other.continueSession(t)
 		wantResetInPlace(t, other, "worker")
 	})
+	t.Run("triage session", func(t *testing.T) {
+		f := startHandoff(t, "chart")
+		setMapStep(t, f.store, "resolve-tickets")
+		res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+		if err != nil || res.Session == nil {
+			t.Fatalf("create = %+v, %v", res, err)
+		}
+		id := res.Session.ID
+		conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
+		waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
+		report(t, conv, agentfake.Control{State: "idle"})
+		waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+		if link, err := f.h.Client.Sessions.Link(f.ctx, wire.LinkSessionRequest{ID: id, Flow: "triage", FlowKey: "proj"}); err != nil || link.Refused {
+			t.Fatalf("link = %+v, %v", link, err)
+		}
+		other := handoffFixture{designsFixture: f.designsFixture, id: id, conv: conv}
+		other.continueSession(t)
+		wantResetInPlace(t, other, "worker")
+	})
 }
 
 // wantResetInPlace waits for the fake agent to move to a new conversation on

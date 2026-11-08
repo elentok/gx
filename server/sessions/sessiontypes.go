@@ -142,6 +142,10 @@ func (m Meta) key() string {
 	return m.FlowKey
 }
 
+// FlowRef is the flow the session runs and its key; the zero value for a plain
+// session.
+func (m Meta) FlowRef() chat.FlowRef { return chat.FlowRef{Flow: m.Flow, Key: m.key()} }
+
 func (m Meta) ConvSession() convrecord.Session {
 	return convrecord.Session{ID: m.ID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, ConversationID: m.ConversationID, Design: m.IsDesign()}
 }
@@ -162,7 +166,7 @@ func (m Meta) CanAutoAdvance() bool {
 func (m Meta) ChatMeta() chat.Meta {
 	return chat.Meta{
 		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket,
-		ConversationID: m.ConversationID, Model: m.Model, Effort: m.Effort,
+		Flow: m.FlowRef(), ConversationID: m.ConversationID, Model: m.Model, Effort: m.Effort,
 		Status: m.Status, Exit: m.Exit, RestoreCrashed: m.RestoreCrashed,
 	}
 }

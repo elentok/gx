@@ -116,7 +116,7 @@ func switchHandler[R any](p *Prompt, web bool, set func(R) (wire.SessionResult, 
 			return
 		}
 		if web {
-			res, err := p.sessions.CheckDesignWrite(session(req))
+			res, err := p.sessions.CheckSteppedWrite(session(req))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -165,15 +165,15 @@ func (p *autoQueuer) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult
 	return wire.SessionResult{Session: &info}, nil
 }
 
-// setAutoAdvance flips a Design session's auto-advance switch. Turning it off
+// setAutoAdvance flips a stepped session's auto-advance switch. Turning it off
 // stops a running countdown.
 func (p advanceSwitch) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult, error) {
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if !meta.IsDesign() {
-		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+	if !meta.IsStepped() {
+		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a stepped session", req.ID)), nil
 	}
 	var info wire.SessionInfo
 	start := false

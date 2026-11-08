@@ -123,9 +123,9 @@ func chatRound(msgs []transcript.ChatMessage) []wire.SessionRoundCard {
 }
 
 // ChatNext is the run-end line of the agent's last turn, or nil.
-func ChatNext(msgs []transcript.ChatMessage, kind agentrunner.Kind, ticket string, final bool) *wire.SessionNext {
+func ChatNext(msgs []transcript.ChatMessage, kind agentrunner.Kind, ref FlowRef, final bool) *wire.SessionNext {
 	for _, text := range transcript.TrailingAgentTexts(msgs) {
-		if a, ok := RunEndNext(text, ticket, string(kind), final); ok {
+		if a, ok := RunEndNext(text, ref, string(kind), final); ok {
 			return &wire.SessionNext{Action: a}
 		}
 	}

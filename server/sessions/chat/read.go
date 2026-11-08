@@ -63,7 +63,7 @@ func (c *Chat) archiveRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cannot decode the archived rollout: "+err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	snap := SnapshotOf(read, harness.Codex, meta.Ticket, c.src.DesignFinal(meta.Ticket))
+	snap := SnapshotOf(read, harness.Codex, meta.Flow, c.src.StepFinal(meta.Flow))
 	wire.WriteJSON(w, wire.SessionChatResponse{
 		ConversationID: meta.ConversationID, Messages: snap.Msgs, Truncated: snap.Truncated,
 		Round: snap.Round, Next: snap.Next, Background: []wire.SessionBackgroundTask{},
@@ -91,7 +91,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		_, out.Archived = c.codexArchive(id, meta)
 	} else {
-		snap, err := c.ReadSnapshot(path, kind, meta.Ticket, dir)
+		snap, err := c.ReadSnapshot(path, kind, meta.Flow, dir)
 		switch {
 		case os.IsNotExist(err): // vanished since the lookup: no chat yet
 		case err != nil:

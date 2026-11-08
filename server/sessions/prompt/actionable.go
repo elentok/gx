@@ -62,16 +62,26 @@ const grillingReason = "Grilling: waiting for your answers"
 
 // designActionable is what a Design session's last assistant message asks of
 // the person: the grilling question wins over the run-end line.
-func designActionable(text, ticket, agent string, final bool) (wire.SessionActionable, bool) {
-	if grillround.HasMarker(text) {
+func designActionable(text string, ref chat.FlowRef, agent string, final bool) (wire.SessionActionable, bool) {
+	if ref.Flow == tickets.FlowDesign && grillround.HasMarker(text) {
 		return wire.SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
 	}
-	return chat.RunEndNext(text, ticket, agent, final)
+	return chat.RunEndNext(text, ref, agent, final)
 }
 
-// DesignFinal reports whether the map behind a design ticket is at Branch or
+// StepFinal reports whether the flow is at a step with no Continue. A Design
+// reads its map's progress. Until the Triage record is wired in, a Triage is
+// always final, so nothing auto-advances by accident.
+func (p *Prompt) StepFinal(ref chat.FlowRef) bool {
+	if ref.Flow != tickets.FlowDesign {
+		return true
+	}
+	return p.designFinal(ref.Key)
+}
+
+// designFinal reports whether the map behind a design ticket is at Branch or
 // Done, where no step follows. A map that cannot be read is not final.
-func (p *Prompt) DesignFinal(ticket string) bool {
+func (p *Prompt) designFinal(ticket string) bool {
 	addr := tickets.EpicAddress(ticket)
 	project, name, _ := strings.Cut(addr, ":")
 	epics, err := p.projects.Epics(project)
@@ -123,8 +133,10 @@ func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 	if !ok {
 		return
 	}
-	p.badRounds.FileBadRoundBlocks(id, design, text)
-	a, matched := designActionable(text, design.Ticket, meta.Harness, p.DesignFinal(design.Ticket))
+	if design.Flow.Flow == tickets.FlowDesign {
+		p.badRounds.FileBadRoundBlocks(id, design, text)
+	}
+	a, matched := designActionable(text, design.Flow, meta.Harness, p.StepFinal(design.Flow))
 	outcome := actionableNone
 	p.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		var next wire.SessionActionable

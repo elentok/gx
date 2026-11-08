@@ -77,16 +77,16 @@ func (c *Cache) Read(path string, kind agentrunner.Kind, final bool, load func(s
 // ImagesDir is the folder of a session's Prompt images, inside its state dir.
 const ImagesDir = "images"
 
-// Loader returns the load func for a session whose design ticket is ticket;
-// final is whether its map is at a step with no Continue. sessionDir is the
+// Loader returns the load func for a session running ref's flow; final is
+// whether the flow is at a step with no Continue. sessionDir is the
 // session's state dir, whose images folder the chat's saved images sit in.
-func Loader(kind agentrunner.Kind, ticket, sessionDir string, final bool) func(string) (Snapshot, error) {
+func Loader(kind agentrunner.Kind, ref FlowRef, sessionDir string, final bool) func(string) (Snapshot, error) {
 	return func(path string) (Snapshot, error) {
 		read, _, err := chatreader.ReadFile(kind, path, filepath.Join(sessionDir, ImagesDir))
 		if err != nil {
 			return Snapshot{}, err
 		}
-		snap := SnapshotOf(read, kind, ticket, final)
+		snap := SnapshotOf(read, kind, ref, final)
 		// Codex has no background markers: its Background flag comes from the status.
 		if kind == harness.Codex {
 			if snap.InFlight, err = codexsession.ReadInFlightTools(path); err != nil {
@@ -113,13 +113,13 @@ func Loader(kind agentrunner.Kind, ticket, sessionDir string, final bool) func(s
 }
 
 // SnapshotOf turns one read of a conversation into what the chat serves.
-func SnapshotOf(read chatreader.Result, kind agentrunner.Kind, ticket string, final bool) Snapshot {
+func SnapshotOf(read chatreader.Result, kind agentrunner.Kind, ref FlowRef, final bool) Snapshot {
 	loaded := read.Messages
 	// Read before the cap and the fence strip: both cut what the parsers need.
 	// An open round wins over the run-end line, as in designActionable.
 	snap := Snapshot{Round: chatRound(loaded), Unreadable: read.Unreadable, CodexVersion: read.CodexVersion}
 	if snap.Round == nil {
-		snap.Next = ChatNext(loaded, kind, ticket, final)
+		snap.Next = ChatNext(loaded, kind, ref, final)
 	}
 	if len(loaded) > maxChatMessages {
 		loaded, snap.Truncated = loaded[len(loaded)-maxChatMessages:], true

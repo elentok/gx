@@ -12,9 +12,13 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 )
+
+var designRef = chat.FlowRef{Flow: tickets.FlowDesign, Key: "gx:epic/03"}
 
 // codexPrompt is a Prompt that reads codex rollouts under home.
 func codexPrompt(home string) *Prompt {
@@ -43,7 +47,7 @@ func TestLastAssistantText_ReadsACodexRollout(t *testing.T) {
 	if !ok {
 		t.Fatal("lastAssistantText found no codex rollout")
 	}
-	a, matched := designActionable(text, "gx:epic/03", meta.Harness, false)
+	a, matched := designActionable(text, designRef, meta.Harness, false)
 	if !matched || len(a.Action) != 2 || a.Action[0] != "/new" {
 		t.Errorf("actionable = %+v, matched %v, want a Continue starting with /new", a, matched)
 	}

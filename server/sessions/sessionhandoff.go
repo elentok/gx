@@ -32,7 +32,7 @@ func (rs *Resumer) chartingHandoffDue(meta Meta, action []string) bool {
 	return meta.LaunchDesign && meta.IsDesign() &&
 		rs.mg.settings.Load().HasChatReader(meta.Harness) &&
 		meta.Tier == agent.TierStrongest &&
-		slices.Equal(action, chat.DesignContinueAction(meta.Ticket, meta.Harness)) &&
+		slices.Equal(action, chat.ContinueAction(meta.FlowRef(), meta.Harness)) &&
 		rs.mg.Maps.DesignLaunchTier(meta.Ticket) == agent.TierWorker
 }
 
