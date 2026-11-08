@@ -40,6 +40,9 @@ Pick tickets from the flag table. A ticket with no flags is **never** read.
 - **Then by severity** (paused-repair/paused-answer > conflict > overrun > the rest) until you reach the cap:
   `gx config get evolve.deep-read-cap` prints the effective cap.
 - Tickets flagged past the cap are not read; they appear as rows in step 4.
+- **A map**: its rows carry only the map flags (`spec-round-cap`, `re-review`, `scope-changed`,
+  `many-rounds`, `huh-cluster`), never queue flags. For each `huh-cluster` the output lists the
+  Huh? question text; the design session's digest holds the skill text that wrote it.
 
 Start every subagent in one turn, one per picked ticket, then wait for all of them (`general-purpose`, model from `gx agent model worker`,
 foreground; a second word is its `reasoning_effort`, see [Skill conventions](../gx-local-tracker.md#skill-conventions)). Each gets the ticket id, its flag row, and the digest paths for its sessions. Brief:

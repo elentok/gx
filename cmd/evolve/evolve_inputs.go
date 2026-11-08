@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
@@ -68,6 +69,10 @@ type InputsRow struct {
 	FixTickets []string `json:"fix_tickets,omitempty"`
 	Flags      []string `json:"flags"`
 	Severity   int      `json:"severity"`
+	// GrillingRounds and Words are a map ticket's counted Grilling rounds and
+	// words; both stay zero for a queue epic.
+	GrillingRounds int `json:"grilling_rounds,omitempty"`
+	Words          int `json:"words,omitempty"`
 	// Digests lists the session digests written into the table's DigestDir.
 	Digests []InputsDigest `json:"digests,omitempty"`
 }
@@ -93,11 +98,13 @@ type InputsTable struct {
 	// Launches are the launch-timed rows: each launch over events.SlowLaunch
 	// and the median when it is over.
 	Launches []LaunchRow `json:"launches"`
+	// HuhClusters lists the Huh? questions of each map ticket flagged huh-cluster.
+	HuhClusters []HuhCluster `json:"huh_clusters,omitempty"`
 }
 
 // buildInputsTable derives every row from frontmatter, the run log and the
 // merged set; none of it needs a transcript. merged may be nil (no repo).
-func buildInputsTable(t evolveTarget, evs []runlog.Event, merged map[string]bool) (InputsTable, error) {
+func buildInputsTable(t evolveTarget, evs []runlog.Event, merged map[string]bool, recs []conversations.Record) (InputsTable, error) {
 	e := t.epic
 	forkParents := e.ForkParents()
 
@@ -166,9 +173,14 @@ func buildInputsTable(t evolveTarget, evs []runlog.Event, merged map[string]bool
 			}
 			row.Events[countHuh] = huh
 		}
-		row.Flags = inputsFlags(tk, row, median)
-		row.Severity = inputsSeverity(row.Flags)
+		if !e.IsMap {
+			row.Flags = inputsFlags(tk, row, median)
+			row.Severity = inputsSeverity(row.Flags)
+		}
 		table.Rows = append(table.Rows, row)
+	}
+	if e.IsMap {
+		applyMapFlags(t, &table, recs)
 	}
 
 	sort.SliceStable(table.Rows, func(i, j int) bool { return table.Rows[i].Severity > table.Rows[j].Severity })
@@ -321,7 +333,13 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 			merged = nil
 		}
 	}
-	table, err := buildInputsTable(t, evs, merged)
+	var recs []conversations.Record
+	if t.epic.IsMap && env.convDir != "" {
+		if recs, err = conversations.List(env.convDir); err != nil {
+			return err
+		}
+	}
+	table, err := buildInputsTable(t, evs, merged, recs)
 	if err != nil {
 		return err
 	}
@@ -344,6 +362,9 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 		return cmdbase.WriteJSON(w, table)
 	}
 	if err := printInputsTable(w, table); err != nil {
+		return err
+	}
+	if err := printHuhClusters(w, table); err != nil {
 		return err
 	}
 	if err := printEpicChecks(w, table); err != nil {

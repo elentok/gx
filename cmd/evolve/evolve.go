@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
@@ -50,6 +51,9 @@ type evolveEnv struct {
 	// (rollouts) are where `evolve inputs` finds sessions; "" skips that source.
 	// tempDir is where its digest dir goes ("" = the OS temp dir).
 	homeDir, stateDir, codexHome, tempDir string
+	// convDir is the conversations record dir, where a map's grilling rounds and
+	// Huh? questions are read; "" skips them.
+	convDir string
 	// dataDir holds the check record and brief index; "" skips the check rows.
 	dataDir string
 	// stderr receives warnings that do not fail the verb; nil drops them.
@@ -411,6 +415,7 @@ func defaultEvolveEnv(d Deps) (evolveEnv, error) {
 	env.homeDir, _ = d.UserHomeDir()
 	env.stateDir, _ = d.Dirs().StateDir()
 	env.dataDir, _ = d.Dirs().DataDir()
+	env.convDir, _ = conversations.DirIn(d.Dirs())
 	env.codexHome = sessionlookup.RootsFrom(d.Env.Env).CodexHome
 	if cwd, err := os.Getwd(); err == nil {
 		if root, err := tickets.RootForDirs(d.Dirs(), cwd); err == nil {
