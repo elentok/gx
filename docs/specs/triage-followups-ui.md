@@ -27,7 +27,7 @@ A Triage has five steps: Verify, Plan, Approve, Write, Done. The agent verifies 
 15. As a person, I want no Finished card after a Triage, and the card to stay with the kept count and a Triage button when rows were kept, so that the Epics page does not clutter.
 16. As a person, I want a Triage started from a plain CLI session and stopped at Verify, Plan or Write to show on the card as "Stopped" with Continue, and one at Approve to show "Waiting for you" with "Review plan" (never "Stopped"), so that I can pick it up in the web.
 17. As a person, I want Continue on a stopped Triage to start a stepped session at the next step and never a second Triage, so that no work repeats.
-18. As a person, I want the Triage page at `/t/<project>` to look like the Design page (header, step line, ring, primary button, session strip, Progress panel, composer), so that I already know how to use it.
+18. As a person, I want the Triage page at `/triage/<project>` to look like the Design page (header, step line, ring, primary button, session strip, Progress panel, composer), so that I already know how to use it.
 19. As a person, I want Verify to run as a working step that saves each verdict as it returns, so that I can see the progress.
 20. As a person, I want Verify to span as many sessions as it needs and auto-advance to chain them, so that a long list needs no babysitting.
 21. As a person, I want a fresh session to verify only the rows with no verdict yet, so that a stopped Triage never redoes saved work.
@@ -73,7 +73,7 @@ A Triage has five steps: Verify, Plan, Approve, Write, Done. The agent verifies 
 - The `AskUserQuestion` ban stays on every stepped session, because the plan view replaces chat questions. A Triage has no Grilling round.
 
 **Session link.**
-- `gx agent link --triage <project>` sets the flow to `triage` and the key to the project name. A Design's key stays its map address. `gx agent step` is unchanged. A Triage session is placed in its workspace by project, never by epic.
+- `gx agent link --triage <project>` sets the flow to `triage` and the key to the project name. A Design's key stays its map address. `gx agent step` is unchanged. A Triage session has no `Ticket`, so it is placed under Other (`PlacementOther`), never under an epic. `gx agent link --triage` exits non-zero when it cannot link (not in a gx session, server not running, unknown project, or a Design session), because the skill reads failure as chat mode; the existing `gx agent link <ticket>` and `gx agent step` keep succeeding silently outside a session.
 - Triage sessions show the label "Triage" on the Agents page. "Triage" is added to the Agent group list, the poller and the web color map together (the color is the implementer's choice). The glossary already has **Flow** and **Stepped session**.
 
 **Triage record.**
@@ -101,20 +101,24 @@ A Triage has five steps: Verify, Plan, Approve, Write, Done. The agent verifies 
 - Unchanged: routing rules, "never grills", the correct-fix section, the `follow-ups-<date>` ready epic and map epics. The skill never queues the ready epic and points to the local tracker doc for verb syntax.
 
 **Server and wire.**
-- The Follow-ups card (one per project, absent when no open follow-up and no live Triage) takes the Triage state: count words of open follow-ups still in the epic, a five-step ring filled the way the Design epic card fills its ring, a state pill and a button per state. Placement order: a running session goes to Designing with Open (as `placeDesign` puts a running Design); then no session with rows `pending` goes to Designing with the ring at the stored step, the pill "Stopped" and Continue, like a stopped Design; then no session, no `pending` row and at least one `failed` row goes to Needs you with the pill "Waiting for you" and the button "Review failures" opening `/t/<project>`; and a Triage at Approve always goes to Needs you with the pill "Waiting for you" and the button "Review plan". A card with no Triage is in "Ready to design". "Stopped" never shows at Approve. The card stays while a Triage is not done (even at zero open follow-ups, reading "0 left"); after done it is absent at zero and present with the kept count when rows were kept. The card title links to `/t/<project>`.
+- The Follow-ups card (one per project, absent when no open follow-up and no live Triage) takes the Triage state: count words of open follow-ups still in the epic, a five-step ring filled the way the Design epic card fills its ring, a state pill and a button per state. Placement order, with Approve checked first: a Triage at Approve always goes to Needs you with the pill "Waiting for you" and the button "Review plan", even while a Plan session is still live for a moment; then a running session goes to Designing with Open (as `placeDesign` puts a running Design); then no session with a row `pending`, or with all rows written but the last pass not complete (a crash after the last row save), goes to Designing with the ring at the stored step, the pill "Stopped" and Continue (Continue reruns the last pass), like a stopped Design (a stopped Design shows no pill today, so the pill is new); then no session, no `pending` row and at least one `failed` row goes to Needs you with the pill "Waiting for you" and the button "Review failures" opening `/triage/<project>`. The ring percent is `(index of the stored step + share of the step's rows handled) / 4`, as a percent, Done = 100 (the mock numbers are illustrative). A card with no Triage is in "Ready to design". "Stopped" never shows at Approve. The card stays while a Triage is not done (even at zero open follow-ups, reading "0 left"); after done it is absent at zero and present with the kept count when rows were kept. The card title links to `/triage/<project>`.
+- gx stops an idle Triage session once its stored step is final (Approve, Done, or Write with no row `pending`), as `stopFinishedDesign` does for a Design. This is what "Plan ends its session" and "Approve: no session runs" mean, so the card reads "no session" at Approve and after a Write that left failed rows. It never stops a working session. It adds no pause kind.
+- "N left" is the number of snapshot rows whose follow-up is still in `follow-ups` as draft or open (kept rows count; follow-ups filed after the snapshot do not).
+- A project is in a workspace when at least one of its Design or Implementation cards is; a project with none is in the Default workspace. The count entry and the card carry that list, so a named workspace shows the card and the badge row of its projects.
+- The ledger rebuild that reads session `meta.json` reads `flow` too, so rebuilt Triage sessions stay in the Triage group. This is not a schema migration.
 - `wire.FollowUpCount` gains the bug/idea split, the Triage state and an "N left" field (shape and names are the implementer's choice). The card's count words and these counts feed both the card and the sidebar badge. The card is shown in named workspaces too.
 
 **Web.**
-- Route `/t/<project>` shows the live Triage, or the latest when none is live, with past Triages listed read-only below. `/d/<project:epic>` is untouched.
+- Route `/triage/<project>` shows the live Triage, or the latest when none is live, with past Triages listed read-only below. `/d/<project:epic>` is untouched.
 - Reused as they are: Progress step tree, session strip, composer Continue, auto-advance bar, session controls start and new-session. The Questions view is the current shared question component (`QuestionSheet`) used as it is. The mock's question card is only a placeholder for it. Design-only: tickets sub-tree, impl link, map image strip, Delete, Hold, workspace Move.
-- The sidebar gets an inbox button in the footer tray with a count badge (summed open follow-ups, "99+" cap, no number at zero, amber exactly when the card is in "Needs you") and a popover with one line per project. The sidebar list is untouched.
+- The sidebar gets an inbox button in the footer tray with a count badge (summed open follow-ups, "99+" cap, no number at zero, amber exactly when the card is in "Needs you") and a popover with one line per project. The sidebar list is untouched. A popover row for a project with no live Triage opens the Epics page with route state `focus` naming the card; the page opens the card's section (Ready to design is collapsed by default) and scrolls it into view.
 - The look is fixed by the two stored mocks (see Verification), not repeated here.
 
 ## Testing Decisions
 
 - A good test checks external behavior: what the record and the verbs accept and refuse, what the card and the page show, and what the Write step leaves in the ticket store. It does not check internal markers or component structure.
 - Highest seam: the Triage page and the Follow-ups card driven against the fixture server (a new Triage scenario seeded with follow-ups and a fake agent, the implementer picks the name), plus the `gx` verbs and the server verbs against a real ticket store in Go tests. The shared flow table, `meta` compatibility and the card builder are covered by Go tests on the server packages. Components (Review groups, Approve bar states, badge and popover) are covered by vitest.
-- Playwright budget (gx-playwright-e2es): the default is no new flow. Extend the existing Design page flows (`design.e2e.ts`, `design-page.e2e.ts`) with the checks that Design behavior is unchanged under the shared model. Add at most one new flow, for the Triage journey, because it needs the server round trip, SSE, fake agents and the phone layout, and a vitest or Go test cannot see those. Everything that is "what a component renders" goes to vitest. Name the vitest and Go tests considered in the commit.
+- Playwright budget (gx-playwright-e2es): the default is no new flow. Extend the existing Design page flows (`design.e2e.ts`, `design-page.e2e.ts`) with the checks that Design behavior is unchanged under the shared model. Add at most one new flow, for the Triage journey (`maxFlows` in `playwrightguard/budget_test.go` goes from 125 to 126, and `webui/e2e/CATALOG.md` says 124 today and is corrected), because it needs the server round trip, SSE, fake agents and the phone layout, and a vitest or Go test cannot see those. Everything that is "what a component renders" goes to vitest. Name the vitest and Go tests considered in the commit.
 - Prior art: `design.e2e.ts` and `design-page.e2e.ts` for stepped sessions, Progress and auto-advance; the Workspaces scenario flows for sidebar footer behavior; `phone.e2e.ts` for the phone Design page; Go tests on the epic card builder; the step-sync test for per-flow lists.
 - No epic or ticket schema change, so there is no migration step to test beyond a missing record folder reading as "no Triage" and old `design: true` metadata reading as the Design flow.
 
@@ -129,10 +133,10 @@ Run against a temporary gx server with the new Triage fixture scenario. CLI verb
 5. Story 5: Mock states c-few.
 6. Story 6: Mock states c-live.
 7. Story 7: Mock states c-named.
-8. Story 8: a popover row click lands on `/t/<project>` for a live Triage and on the Epics page card otherwise (new Triage flow plus Workspaces flow).
+8. Story 8: a popover row click lands on `/triage/<project>` for a live Triage and on the Epics page card otherwise (new Triage flow plus Workspaces flow).
 9. Story 9: Mock states c-light and c-phone.
 10. Story 10: CLI: `gx server epics` card words after a write drop by the written rows. Epics flow.
-11. Story 11: Triage on the card starts one and opens `/t/<project>`; clicking it again opens the live one; the one-live check refuses a second creation through the CLI verb and through the server start (Go test: record and snapshot exist before the session launches); Go test of two concurrent creates that end with one record, the second start opening the live one.
+11. Story 11: Triage on the card starts one and opens `/triage/<project>`; clicking it again opens the live one; the one-live check refuses a second creation through the CLI verb and through the server start (Go test: record and snapshot exist before the session launches); Go test of two concurrent creates that end with one record, the second start opening the live one.
 12. Story 12: Epics flow section check (Designing, Needs you, Ready to design) in the Triage flow.
 13. Story 13: same flow, the pill "Waiting for you" at Approve and, with a failed row, the button "Review failures"; Go test on the card builder and vitest on the badge cover the placement order: running goes to Designing with Open; no session with `pending` rows goes to Designing, "Stopped", Continue; no session, no `pending` row and a failed row goes to Needs you, "Waiting for you", "Review failures"; Approve always goes to Needs you. The writing-* fixture state names whether its session is running.
 14. Story 14: the Triage flow writes all rows in the fixture and checks the card shows "0 left" before Done.
@@ -177,23 +181,23 @@ New flows or scenarios to write (these become implementation tickets):
 - One new Triage journey flow (the only new flow), plus extra steps in the Design flows listed in Testing Decisions.
 
 **Mock states** (the Triage page mock):
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state verify-d, 960, scenario: Triage in Verify, parts: header, ring, header-button, progress
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state writing-d, 960, scenario: Triage in Write with two failed rows, parts: header, ring, header-button, progress
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state result-d, 960, scenario: Triage Done with two kept rows, parts: header, ring, header-button, progress
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state b-questions-d, 960, scenario: Triage at Approve with three open questions, parts: header, ring, header-button, view-switch, question-card, approve-bar, progress
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state b-review-d, 960, scenario: Triage at Approve with no open question, parts: header, ring, header-button, view-switch, action-group, approve-bar, progress
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state verify-p, 390, scenario: Triage in Verify, parts: header, ring, header-button
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state writing-p, 390, scenario: Triage in Write with two failed rows, parts: header, ring, header-button
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state result-p, 390, scenario: Triage Done with two kept rows, parts: header, ring, header-button
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state b-questions-p, 390, scenario: Triage at Approve with three open questions, parts: header, ring, header-button, view-switch, question-card, approve-bar
-- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html` state b-review-p, 390, scenario: Triage at Approve with no open question, parts: header, ring, header-button, view-switch, action-group, approve-bar
-- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html` state c-zero, 290, scenario: no open follow-up, parts: sidebar, followups-button
-- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html` state c-few, 290, scenario: a few open follow-ups in two projects, parts: sidebar, followups-button, followups-popover
-- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html` state c-many, 290, scenario: 45 open follow-ups, parts: sidebar, followups-button, followups-popover
-- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html` state c-live, 290, scenario: a live Triage waiting for Approve (amber badge), parts: sidebar, followups-button, followups-popover
-- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html` state c-named, 290, scenario: a named workspace with two projects, parts: sidebar, followups-button, followups-popover
-- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html` state c-light, 290, scenario: a few open follow-ups in the light theme, parts: sidebar, followups-button
-- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html` state c-phone, 390, scenario: a few open follow-ups at phone width, parts: sidebar, followups-button, followups-popover
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, verify-d, 960, scenario: Triage in Verify, parts: header, ring, header-button, progress
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, writing-d, 960, scenario: Triage in Write with two failed rows, parts: header, ring, header-button, progress
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, result-d, 960, scenario: Triage Done with two kept rows, parts: header, ring, header-button, progress
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, b-questions-d, 960, scenario: Triage at Approve with three open questions, parts: header, ring, header-button, view-switch, question-card, approve-bar, progress
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, b-review-d, 960, scenario: Triage at Approve with no open question, parts: header, ring, header-button, view-switch, action-group, approve-bar, progress
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, verify-p, 390, scenario: Triage in Verify, parts: header, ring, header-button
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, writing-p, 390, scenario: Triage in Write with two failed rows, parts: header, ring, header-button
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, result-p, 390, scenario: Triage Done with two kept rows, parts: header, ring, header-button
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, b-questions-p, 390, scenario: Triage at Approve with three open questions, parts: header, ring, header-button, view-switch, question-card, approve-bar
+- `$(gx tickets root)/triage-followups-ui/mocks/06-triage-page-mock.html`, b-review-p, 390, scenario: Triage at Approve with no open question, parts: header, ring, header-button, view-switch, action-group, approve-bar
+- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html`, c-zero, 290, scenario: no open follow-up, parts: sidebar, followups-button
+- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html`, c-few, 290, scenario: a few open follow-ups in two projects, parts: sidebar, followups-button, followups-popover
+- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html`, c-many, 290, scenario: 45 open follow-ups, parts: sidebar, followups-button, followups-popover
+- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html`, c-live, 290, scenario: a live Triage waiting for Approve (amber badge), parts: sidebar, followups-button, followups-popover
+- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html`, c-named, 290, scenario: a named workspace with two projects, parts: sidebar, followups-button, followups-popover
+- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html`, c-light, 290, scenario: a few open follow-ups in the light theme, parts: sidebar, followups-button
+- `$(gx tickets root)/triage-followups-ui/mocks/05-sidebar-count-mock.html`, c-phone, 390, scenario: a few open follow-ups at phone width, parts: sidebar, followups-button, followups-popover
 
 ## Out of Scope
 
@@ -208,5 +212,5 @@ New flows or scenarios to write (these become implementation tickets):
 ## Further Notes
 
 - Defaults (ticket 02): a Triage works on the follow-ups that existed when it started. Past Triages stay as history, one live per project.
-- The agent-launch-and-recovery epic adds the shared question component under a shared folder; until it lands, the Design page's current `QuestionSheet` is the one to use. The Triage page must use whichever exists, as it is.
+- The agent-launch-and-recovery epic adds the shared question component under a shared folder; until it lands, the Design page's current `QuestionSheet` (`webui/src/design/QuestionSheet.tsx`) is the one to use; the implementer finds the current copy with `rg` first. The Triage page must use whichever exists, as it is.
 - Decisions behind this spec are in the `gx:triage-followups-ui` map, tickets 01 to 10. The design coupling inventory is `docs/research/triage-followups-ui-01-design-coupling-inventory.md`.
