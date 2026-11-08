@@ -60,6 +60,17 @@ func TestMain(m *testing.M) {
 				return 1
 			}
 		}
+		if f := flag.Lookup("test.run"); f == nil || f.Value.String() == "" || strings.Contains(f.Value.String(), "Workspaces") {
+			var err error
+			workspaces, err = launchProc(func(func()) {}, "workspaces", nil)
+			if workspaces != nil {
+				defer workspaces.kill()
+			}
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "workspaces fixture:", err)
+				return 1
+			}
+		}
 		return m.Run()
 	}())
 }

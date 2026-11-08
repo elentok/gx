@@ -12,9 +12,22 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
+// The read-only TestWorkspacesScenario_* tests share one workspaces fixture,
+// which TestMain starts and stops: under a whole-package run, a fixture per
+// test loaded the machine enough to push them past their time limit.
+var workspaces *running
+
+func sharedWorkspaces(t *testing.T) *running {
+	t.Helper()
+	if workspaces == nil {
+		t.Skip("the workspaces fixture is not running: -run skipped the Workspaces tests")
+	}
+	return workspaces
+}
+
 func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *testing.T) {
 	t.Parallel()
-	r := start(t, "workspaces")
+	r := sharedWorkspaces(t)
 	// name|section|workspace. Queue agents appear once the server has launched the workers.
 	want := []string{
 		"ws-design|designing|gx bugs",
@@ -69,13 +82,11 @@ func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *test
 	}) {
 		t.Fatalf("agents list has %d sessions, want a chat, a Queue agent and a One-off agent", len(sessions))
 	}
-	r.stop(t)
 }
 
 func TestWorkspacesScenario_ServesClaudeLimitsAndTwoPausedEpicFixAgentsOneWorking(t *testing.T) {
 	t.Parallel()
-	r := start(t, "workspaces")
-	defer r.stop(t)
+	r := sharedWorkspaces(t)
 	var sum wire.UsageSummary
 	if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
 		t.Fatal(err)
@@ -108,7 +119,7 @@ func TestWorkspacesScenario_ServesClaudeLimitsAndTwoPausedEpicFixAgentsOneWorkin
 
 func TestWorkspacesScenario_SeedsFixAgentsAndAnInvestigateAgentInOtherAndUnderEpics(t *testing.T) {
 	t.Parallel()
-	r := start(t, "workspaces")
+	r := sharedWorkspaces(t)
 	// fix_of -> placement kind and epic.
 	wantFix := map[string]string{
 		"demo":                "other|",
@@ -160,5 +171,4 @@ func TestWorkspacesScenario_SeedsFixAgentsAndAnInvestigateAgentInOtherAndUnderEp
 		}
 		t.Fatalf("%s\nsessions:\n%s\nplacements: %+v", strings.Join(problems, "\n"), strings.Join(rows, "\n"), snap.Placements)
 	}
-	r.stop(t)
 }
