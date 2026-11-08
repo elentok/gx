@@ -540,6 +540,23 @@ test("Workspaces", async ({ page, start }) => {
   await expect(sidebar).toBeHidden();
   await page.getByRole("button", nav("Show sidebar")).click();
   await expect(sidebar).toBeVisible();
+  // The gear menu's dim covers the Hide sidebar toggle: a tap on the toggle and a swipe through the dim still close the menu and the sidebar.
+  const gearMenu = page.getByRole("menu");
+  await page.getByRole("button", nav("Menu")).click();
+  await expect(gearMenu).toBeVisible();
+  // Measured once the sidebar has finished sliding in.
+  const toggleBox = (await sidebar.getByRole("button", nav("Hide sidebar")).boundingBox())!;
+  await page.mouse.click(toggleBox.x + toggleBox.width / 2, toggleBox.y + toggleBox.height / 2);
+  await expect(gearMenu).toHaveCount(0);
+  await expect(sidebar).toBeHidden();
+  await page.getByRole("button", nav("Show sidebar")).click();
+  await page.getByRole("button", nav("Menu")).click();
+  await expect(gearMenu).toBeVisible();
+  await swipe(page, [380, 700], [250, 705]);
+  await expect(gearMenu).toHaveCount(0);
+  await expect(sidebar).toBeHidden();
+  await page.getByRole("button", nav("Show sidebar")).click();
+  await expect(sidebar).toBeVisible();
   // A tap outside an open menu closes it; Move swaps in place with a Back row, Back returns.
   await rowMenu("paused-epic").click();
   await expect(page.getByRole("menuitem", nav("Move to workspace"))).toBeVisible();

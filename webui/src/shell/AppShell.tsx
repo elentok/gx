@@ -148,6 +148,17 @@ export function AppShell({
     wasOpen.current = open;
   }, [open]);
   const aside = useRef<HTMLDivElement>(null);
+  const hideButton = useRef<HTMLButtonElement>(null);
+  // A menu's full-screen dim sits over the Hide sidebar toggle: a tap on the dim that lands on the toggle also hides the sidebar.
+  useEffect(() => {
+    const onDimClick = (e: MouseEvent) => {
+      if (!(e.target as Element | null)?.closest?.('[data-testid="menu-dim"]')) return;
+      const r = hideButton.current?.getBoundingClientRect();
+      if (r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) shell.close();
+    };
+    document.addEventListener("click", onDimClick);
+    return () => document.removeEventListener("click", onDimClick);
+  }, [shell]);
   const onSidebarKeyDown = useSidebarKeys(aside, shell);
   useSidebarSwipe({
     docked,
@@ -273,6 +284,7 @@ export function AppShell({
             </chakra.button>
             <chakra.button
               type="button"
+              ref={hideButton}
               aria-label="Hide sidebar"
               title="Hide sidebar"
               onClick={shell.close}

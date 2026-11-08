@@ -56,7 +56,7 @@ export function useSidebarSwipe(opts: {
       if (scrollsHorizontally(s.target, dx)) return;
       const { open, aside, onOpen, onClose } = latest.current;
       if (open) {
-        const inside = s.target && (aside.current?.contains(s.target) || s.target.closest('[data-testid="scrim"]'));
+        const inside = s.target && (aside.current?.contains(s.target) || s.target.closest('[data-testid="scrim"], [data-testid="menu-dim"]'));
         if (dx < 0 && inside) onClose();
       } else if (dx > 0 && s.x <= EDGE_PX && isStandalone()) {
         onOpen();

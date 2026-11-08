@@ -1,6 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { requestPromptFocus } from "../agents/promptFocus";
-import { isMod, isTextTarget } from "./keys";
+import { isTextTarget } from "./keys";
 import { hasLayer } from "../ui/modal/layers";
 import type { Shell } from "./ShellContext";
 
@@ -99,7 +99,8 @@ export function useSidebarKeys(aside: RefObject<HTMLElement | null>, shell: Shel
   const { sidebarOpen, toggle } = shell;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!isMod(e) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "b" || isTextTarget(e.target)) return;
+      // Either modifier, on any platform: a menu holding focus must not make Ctrl+B on a Mac a dead key.
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "b" || isTextTarget(e.target)) return;
       // A dialog opened from the sidebar owns the key.
       if (hasLayer()) return;
       e.preventDefault();

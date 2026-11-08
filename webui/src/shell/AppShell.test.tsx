@@ -98,6 +98,16 @@ describe("closing the sidebar closes its menus", () => {
     ["the scrim", () => fireEvent.click(screen.getByTestId("scrim"))],
     ["Ctrl+B", () => fireEvent.keyDown(window, { key: "b", ctrlKey: true })],
     ["a swipe", () => swipe(sidebar(), [200, 300], [100, 300])],
+    [
+      "a tap through the menu's dim on the toggle",
+      () => {
+        const toggle = screen.getByRole("button", { name: "Hide sidebar" });
+        toggle.getBoundingClientRect = () => ({ left: 300, right: 334, top: 10, bottom: 44 }) as DOMRect;
+        fireEvent.click(screen.getByTestId("menu-dim"), { clientX: 310, clientY: 20 });
+      },
+    ],
+    ["a swipe starting on the menu's dim", () => swipe(screen.getByTestId("menu-dim"), [300, 300], [200, 300])],
+    ["Ctrl+B with the menu focused", () => fireEvent.keyDown(screen.getByRole("menu"), { key: "b", ctrlKey: true })],
   ];
   test.each(closers)("%s closes an open gear menu", async (_, close) => {
     setup("phone");
