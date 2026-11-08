@@ -38,6 +38,12 @@ func (s *Tickets) Approve(ctx context.Context, address string) (wire.QueueResult
 	return s.t.queueWriteTo(ctx, "/v1/tickets/approve", wire.QueueRequest{Address: address})
 }
 
+// KeepWaiting puts a background-task-gate pause's live run back in the finish
+// wait for another cap.
+func (s *Tickets) KeepWaiting(ctx context.Context, address string) (wire.QueueResult, error) {
+	return s.t.queueWriteTo(ctx, "/v1/tickets/keep-waiting", wire.QueueRequest{Address: address})
+}
+
 // Retry starts a fresh agent on a ticket's branch, keeping its commits;
 // stop lets it stop a working leftover pane first.
 func (s *Tickets) Retry(ctx context.Context, address string, stop bool) (wire.QueueResult, error) {

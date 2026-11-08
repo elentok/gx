@@ -1,5 +1,6 @@
 import {
   ActionChooseBase,
+  ActionKeepWaiting,
   ActionMerge,
   ActionReopenAndRetry,
   ActionResume,
@@ -37,6 +38,7 @@ const ROUTES: Partial<Record<Action, string>> = {
   [ActionChooseBase]: "/v1/tickets/resume",
   [ActionReopenAndRetry]: "/v1/tickets/resume",
   [ActionRetry]: "/v1/tickets/retry",
+  [ActionKeepWaiting]: "/v1/tickets/keep-waiting",
   [ActionMerge]: "/v1/tickets/merge",
   [ActionStartOver]: "/v1/tickets/start-over",
 };
