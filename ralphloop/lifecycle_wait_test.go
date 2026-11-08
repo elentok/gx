@@ -219,17 +219,33 @@ func TestWaitIterationFinished_ClassifierOutageResendsContinueThenNudgesAnotherS
 }
 
 // While the outage shows, no stall nudge is typed and the wait records nothing
-// as the agent's choice; after the retries it hands back to the finish path.
+// as the agent's choice; after the retries the ticket pauses classifier-outage.
 func TestWaitIterationFinished_ClassifierOutageSkipsStallNudge(t *testing.T) {
 	t.Parallel()
 	d, r, one, _ := stallNudgeFixture(t, "", 30*time.Second)
 	d.ReadClassifierOutage = func(string, string) (int, error) { return 1, nil }
-	waitStallFixture(t, d, one)
+	err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-01"}, agentrunner.Session{Label: "iter-01", ID: "pane-1"})
+	if _, paused := errors.AsType[*supervise.BlockedPausedError](err); !paused {
+		t.Fatalf("WaitIterationFinished = %v, want a BlockedPausedError", err)
+	}
 	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue", "continue", "continue"}) {
 		t.Errorf("prompts = %q, want only the three re-sends", got)
 	}
 	if evs := stallNudgeEvents(t, one); len(evs) != 0 {
 		t.Errorf("stall-nudged events = %+v, want none", evs)
+	}
+	evs, _, rerr := runlog.ReadEvents(one.ScratchDir, one.Epic)
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	paused := 0
+	for _, ev := range evs {
+		if ev.Type == string(events.Paused) && ev.Kind == string(events.ClassifierOutage) {
+			paused++
+		}
+	}
+	if paused != 1 {
+		t.Errorf("classifier-outage pauses = %d, want 1", paused)
 	}
 }
 

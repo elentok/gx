@@ -58,6 +58,13 @@ var retryPrompts = map[schema.PauseReason]string{
 		"Carry on with the work.",
 	schema.PauseBackgroundTaskGate: "A person reviewed your uncommitted changes and wants you to continue the ticket's work. " +
 		"Commit what belongs, discard what does not, then finish.",
+	schema.PauseClassifierOutage: "continue",
+}
+
+// retryPromptsRepair is true for a repair-class pause whose live agent a retry
+// prompts: a classifier outage leaves the agent running, waiting on a "continue".
+func retryPromptsRepair(tk schema.Ticket) bool {
+	return tk.Status == schema.StatusPaused && tk.PauseReason == schema.PauseClassifierOutage
 }
 
 // directLaunch is the Launch of a repair run without a server. It has no
@@ -345,7 +352,7 @@ func (o *Ops) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairRes
 	if res, refused, err := o.resumeSelfReported(epicPath, id, rc.origin); refused || err != nil {
 		return res, err
 	}
-	if prompt, ok := retryPrompts[tk.PauseReason]; paused && ok {
+	if prompt, ok := retryPrompts[tk.PauseReason]; (paused || retryPromptsRepair(tk)) && ok {
 		prompted, err := o.promptLiveAgent(dir, addr, prompt)
 		if err != nil {
 			return repairRefusal(err), nil
@@ -527,7 +534,7 @@ func (o *Ops) PromptsOnRetry(address string) bool {
 		return false
 	}
 	tk, err := schema.ParseTicket(t.Path)
-	if err != nil || !tk.PausedAsking() {
+	if err != nil || !tk.PausedAsking() && !retryPromptsRepair(tk) {
 		return false
 	}
 	if _, ok := retryPrompts[tk.PauseReason]; !ok {

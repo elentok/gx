@@ -80,6 +80,17 @@ func TestPauseModelMismatch(t *testing.T) {
 	}
 }
 
+func TestPauseClassifierOutage(t *testing.T) {
+	r := PauseClassifierOutage
+	if !r.Valid() || r.Class() != PauseClassRepair || r.Label() != "Classifier gave no verdict" {
+		t.Errorf("valid=%v class=%q label=%q", r.Valid(), r.Class(), r.Label())
+	}
+	row, ok := r.Row()
+	if !ok || !slices.Equal(row.Verbs, []PauseVerb{VerbRetry}) {
+		t.Errorf("row = %+v, ok=%v", row, ok)
+	}
+}
+
 func TestPausedAskingAndForRepair(t *testing.T) {
 	cases := []struct {
 		reason         PauseReason

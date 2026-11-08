@@ -79,6 +79,29 @@ func TestGateRetry_DirtyWorktreePromptsTheLiveAgent(t *testing.T) {
 	}
 }
 
+// Retry of a classifier-outage pause re-sends "continue" to the live agent and
+// leaves the pause for the agent's next move to end, like any prompted retry.
+func TestClassifierOutageRetry_ResendsContinueToTheLiveAgent(t *testing.T) {
+	t.Parallel()
+	h, _, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	if err := h.Server.PauseAs(answerAddr, events.ClassifierOutage, "the classifier gave no verdict"); err != nil {
+		t.Fatal(err)
+	}
+	first, _, _ := fake.Find("epic-a-iter-01")
+
+	res, err := h.Client.Tickets.Retry(context.Background(), answerAddr, false)
+	if err != nil || res.Refused {
+		t.Fatalf("retry = %+v, %v; want accepted", res, err)
+	}
+	if again, ok, err := fake.Find("epic-a-iter-01"); err != nil || !ok || again.ID != first.ID {
+		t.Errorf("session = %+v, %v, %v; want the same live agent", again, ok, err)
+	}
+	if got := fake.Prompts("epic-a-iter-01"); len(got) != 1 || got[0] != "continue" {
+		t.Errorf("prompts = %q, want one continue", got)
+	}
+}
+
 // Start over on a gate pause stops the agent and keeps the branch's commits
 // under a backup ref.
 func TestGateStartOver_StopsTheAgentAndKeepsABackup(t *testing.T) {

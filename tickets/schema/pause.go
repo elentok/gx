@@ -41,6 +41,7 @@ const (
 	PauseNeedsRebase        PauseReason = "needs-rebase"
 	PauseConflictMarkers    PauseReason = "conflict-markers"
 	PauseModelMismatch      PauseReason = "model-mismatch"
+	PauseClassifierOutage   PauseReason = "classifier-outage"
 )
 
 // PauseClass says what a person does about a pause: answer a question, or
@@ -83,6 +84,7 @@ var pauseClasses = map[PauseReason]PauseClass{
 	PauseParentDefect:       PauseClassRepair,
 	PauseBudgetKilled:       PauseClassRepair,
 	PauseIterationError:     PauseClassRepair,
+	PauseClassifierOutage:   PauseClassRepair,
 }
 
 // pauseLabels is the one table of plain-words labels the TUI and the web show
@@ -102,6 +104,7 @@ var pauseLabels = map[PauseReason]string{
 	PauseAgentNameTaken:     "Could not start the agent",
 	PauseAgentPaneBusy:      "Could not start the agent",
 	PauseAgentPromptStalled: "Could not start the agent",
+	PauseClassifierOutage:   "Classifier gave no verdict",
 	// Background task.
 	PauseBackgroundTaskGate: "Background task still running",
 	// Merging.

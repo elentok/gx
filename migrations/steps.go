@@ -65,6 +65,11 @@ func init() {
 	Default.Register(Step{Name: "launch-stamp", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// classifier-outage: the pause reason is a new enum value; no older ticket
+	// carries it, so there is nothing to rewrite.
+	Default.Register(Step{Name: "classifier-outage", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

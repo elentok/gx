@@ -172,6 +172,8 @@ var pauseRows = map[PauseReason]PauseRow{
 	PauseAgentPaneBusy:      retryStartOver,
 	PauseAgentPromptStalled: retryStartOver,
 
+	PauseClassifierOutage: verbs(VerbRetry),
+
 	PauseTrunkMissing: mergeAgain,
 	PauseMergeError:   mergeAgain,
 	PauseNeedsRebase:  mergeAgain,

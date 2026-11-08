@@ -8,6 +8,7 @@ func TestPauseReasonLabelGroups(t *testing.T) {
 		"agent stopped or stuck": {
 			PauseZeroCommit, PauseMergeUnreported, PauseBlockedPane, PauseSpinning, PauseRetryExhausted,
 			PauseHandleMismatch, PauseDuplicateLive, PauseAgentNameTaken, PauseAgentPaneBusy, PauseAgentPromptStalled,
+			PauseClassifierOutage,
 		},
 		"background task": {PauseBackgroundTaskGate},
 		"merging": {

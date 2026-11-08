@@ -191,6 +191,9 @@ const (
 	// ModelMismatch is an implement launch that ran on a model other than the
 	// one its tier resolved to. Only a person knows if that was deliberate.
 	ModelMismatch Kind = "model-mismatch"
+	// ClassifierOutage is an agent whose auto-mode classifier gave no verdict
+	// through every re-send. Its own kind lets the run log and stats count outages.
+	ClassifierOutage Kind = "classifier-outage"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -210,6 +213,7 @@ var kinds = map[Kind]bool{
 	MergeConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
 	TrunkMissing: true, DirtyTrunk: true, MergeError: true, MergeUnreported: true,
 	NeedsRebase: true, ConflictMarkers: true, ModelMismatch: true,
+	ClassifierOutage: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

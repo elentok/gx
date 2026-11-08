@@ -360,6 +360,8 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 				}
 			}
 			continue
+		} else {
+			return pauseClassifierOutage(d, p, w, o)
 		}
 		confirmed, err := supervise.ConfirmFinished(d, in, s, until)
 		if err != nil {
@@ -391,8 +393,20 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 	}
 }
 
+// pauseClassifierOutage pauses the ticket once the re-sends are used up and
+// the classifier still gives no verdict.
+func pauseClassifierOutage(d deps.Deps, p supervise.LaunchParams, w IterationWorktree, o OneIteration) error {
+	reason := fmt.Sprintf("%s: the classifier gave no verdict after %d re-sends of %q", w.Label, len(classifierResendDelays), classifierResendText)
+	ticketops.PauseTicket(p.EventSink(), ticketops.PauseRequest{
+		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
+		Type: events.Paused, Kind: events.ClassifierOutage, Reason: reason,
+		Event: runlog.Event{Agent: p.Agent, Pane: p.Pane, AgentSession: supervise.RecordLiveSession(d, w.Label, o.Ticket.Path), Cwd: p.SessionCwd},
+	})
+	return &supervise.BlockedPausedError{Reason: reason}
+}
+
 // classifierResendDelays are the waits before each "continue" re-send during a
-// classifier outage; after the last the outage is left to the finish path.
+// classifier outage; after the last the ticket pauses classifier-outage.
 var classifierResendDelays = []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute}
 
 const classifierResendText = "continue"
