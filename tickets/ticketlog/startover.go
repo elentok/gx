@@ -38,7 +38,7 @@ func StartOver(path string, now time.Time, note, source string) error {
 		t.HadCodex = false
 		t.Compactions = 0
 		t.Commitless = false
-		*body = schema.DemotePauseSections(*body, now)
+		*body = schema.MarkVerifiedHistory(schema.DemotePauseSections(*body, now))
 		if note != "" {
 			*body = schema.AppendComment(*body, note)
 		}

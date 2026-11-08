@@ -94,6 +94,22 @@ func TestStartOver_RetiresOldRepairSection(t *testing.T) {
 	}
 }
 
+func TestStartOver_MarksVerifiedEntriesAsHistory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "05-thing.md")
+	body := schema.AppendVerified("# 05 — Thing\n", schema.VerifiedEntry{Story: "45", Verdict: "pass", Commit: "abc"})
+	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n"+body)
+
+	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
+		t.Fatalf("StartOver: %v", err)
+	}
+
+	raw, _ := os.ReadFile(path)
+	got := schema.ParseVerified(schema.ParseBody(string(raw)))
+	if len(got) != 1 || !got[0].History || got[0].Counts("abc") {
+		t.Fatalf("entries after start over = %+v", got)
+	}
+}
+
 func TestStartOver_NoteIsWrittenInSameWrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
