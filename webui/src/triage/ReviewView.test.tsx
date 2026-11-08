@@ -103,6 +103,43 @@ test("a ready row's destinations are the suggested epics, the open map epics and
   expect(save.mock.calls[0][0]).toMatchObject({ address: "gx:follow-ups/1", action: "ready", destination: "fresh" });
 });
 
+test("Evidence shows the verdict details read-only and closes without a save", () => {
+  const save = vi.fn();
+  const rows = [
+    rowOf(4, "close", {
+      verdict: "fixed",
+      evidence: "commit abc123 fixed it",
+      files: ["server/a.go"],
+      questions: [{ id: "q1", title: "Is it still needed?", kind: "yes-no" }],
+      destination: "sidebar",
+    }),
+  ];
+  render(<ReviewView project="gx" view={viewOf({ rows })} refetch={() => {}} save={save} />);
+  fireEvent.click(screen.getByRole("button", { name: /^Close/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
+  const dialog = screen.getByRole("dialog", { name: "Evidence for row 4" });
+  for (const text of ["fixed", "commit abc123 fixed it", "server/a.go", "Is it still needed?", "sidebar"]) expect(dialog.textContent).toContain(text);
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(save).not.toHaveBeenCalled();
+});
+
+test("Merge into lists only the ready and map rows", async () => {
+  const rows = [rowOf(1, "ready"), rowOf(2, "map", { destination: "queue" }), rowOf(3, "close"), rowOf(4, "keep"), rowOf(5, "merge", { destination: "gx:follow-ups/1" }), rowOf(6, "ready", { gone: true })];
+  render(<ReviewView project="gx" view={viewOf({ rows })} refetch={() => {}} save={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: /^Merge into another/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Destination for row 5" }));
+  await screen.findAllByRole("menuitem");
+  expect(screen.getAllByRole("menuitem").map((e) => e.textContent)).toEqual(["row 1", "row 2"]);
+});
+
+test("a row merged into a gone target is outlined", () => {
+  const rows = [rowOf(5, "merge", { destination: "gx:follow-ups/1", merge_orphan: true })];
+  render(<ReviewView project="gx" view={viewOf({ rows })} refetch={() => {}} save={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: /^Merge into another/ }));
+  expect(screen.getByText("row 5").closest("[data-orphan]")).not.toBeNull();
+});
+
 test("a stale refusal refetches", async () => {
   const save = vi.fn().mockResolvedValue({ refused: true, reason: "stale" });
   const refetch = vi.fn();

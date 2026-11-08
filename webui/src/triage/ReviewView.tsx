@@ -1,9 +1,10 @@
 import { Box, Text, chakra } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { postSaveTriageRow, type SaveTriageRow } from "../design/open";
 import type { TriageRow, TriageView } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
+import { Modal } from "../ui/modal/Modal";
 import { showToast } from "../ui/toaster";
 import { refusalText } from "../useWrite";
 import { GROUPS, destinationChoices, takesEpic, type ReviewAction } from "./destinations";
@@ -99,7 +100,52 @@ function Dropdown({ label, items, name }: { label: string; items: MenuEntry[]; n
   );
 }
 
+/** The verdict's details, read-only. A full-width sheet on a phone, a centred panel from the md breakpoint up. */
+function EvidenceSheet({ row, onClose }: { row: TriageRow; onClose: () => void }) {
+  const section = (title: string, body: ReactNode) => (
+    <Box>
+      <Text fontSize="sm" fontWeight="700" color="text.muted">
+        {title}
+      </Text>
+      {body}
+    </Box>
+  );
+  const destination = row.destination ?? "none";
+  return (
+    <Modal
+      label={`Evidence for ${row.title}`}
+      onClose={onClose}
+      backdrop={{ alignItems: { base: "flex-end", md: "center" }, p: { base: "0", md: "4" } }}
+      w="full"
+      maxW={{ base: "full", md: "560px" }}
+      maxH="80vh"
+      overflowY="auto"
+      display="flex"
+      flexDirection="column"
+      gap="3"
+      p="4"
+    >
+      <Text fontWeight="700">{row.title}</Text>
+      {section("Verdict", <Text>{row.verdict ?? "none"}</Text>)}
+      {section("Evidence", <Text whiteSpace="pre-wrap">{row.evidence ?? "none"}</Text>)}
+      {section(
+        "Files a fix would touch",
+        row.files?.length ? row.files.map((f) => <Text key={f} fontFamily="mono" fontSize="sm">{f}</Text>) : <Text>none</Text>,
+      )}
+      {section(
+        "Questions",
+        row.questions?.length ? row.questions.map((q) => <Text key={q.id}>{q.title}</Text>) : <Text>none</Text>,
+      )}
+      {section("Suggested destination", <Text>{destination}</Text>)}
+      <Button emphasis="secondary" size="sm" alignSelf="flex-end" onClick={onClose}>
+        Close
+      </Button>
+    </Modal>
+  );
+}
+
 function RowItem({ row, view, onEdit }: { row: TriageRow; view: TriageView; onEdit: (e: Edit) => void }) {
+  const [showEvidence, setShowEvidence] = useState(false);
   const [naming, setNaming] = useState(false);
   const [typed, setTyped] = useState("");
   const action = GROUPS.find((g) => g.action === row.action);
@@ -126,15 +172,17 @@ function RowItem({ row, view, onEdit }: { row: TriageRow; view: TriageView; onEd
       py="2"
       borderTopWidth="1px"
       borderColor="border"
-      boxShadow={row.person_changed ? "inset 0 0 0 2px var(--chakra-colors-tone-running-fg)" : undefined}
+      boxShadow={row.merge_orphan ? "inset 0 0 0 2px var(--chakra-colors-tone-failed-fg)" : row.person_changed ? "inset 0 0 0 2px var(--chakra-colors-tone-running-fg)" : undefined}
       data-changed={row.person_changed || undefined}
+      data-orphan={row.merge_orphan || undefined}
     >
       <Text flex="1" minW="0" fontSize="sm" truncate title={row.title}>
         {row.title}
       </Text>
-      <Button emphasis="secondary" size="sm" h="28px" px="2" fontSize="sm" flexShrink={0}>
+      <Button emphasis="secondary" size="sm" h="28px" px="2" fontSize="sm" flexShrink={0} onClick={() => setShowEvidence(true)}>
         Evidence
       </Button>
+      {showEvidence && <EvidenceSheet row={row} onClose={() => setShowEvidence(false)} />}
       <Dropdown name={`Action for ${row.title}`} label={action?.short ?? "Action"} items={actionItems} />
       {destItems.length > 0 && !naming && <Dropdown name={`Destination for ${row.title}`} label={current || "Destination"} items={destItems} />}
       {naming && (

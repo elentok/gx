@@ -49,6 +49,15 @@ test("it shows how many rows the person changed, and nothing at zero", () => {
   expect(screen.queryByText(/changed by you/)).toBeNull();
 });
 
+test("once every orphaned merge row is re-pointed it is enabled again", () => {
+  bar({ rows: [{ address: "gx:follow-ups/1", title: "a", merge_orphan: true }] });
+  expect(approveButton().disabled).toBe(true);
+  cleanup();
+  bar({ rows: [{ address: "gx:follow-ups/1", title: "a", action: "merge", destination: "gx:follow-ups/2" }] });
+  expect(screen.queryByText(/merge target is gone/)).toBeNull();
+  expect(approveButton().disabled).toBe(false);
+});
+
 test("an orphaned merge target disables it with the reason", () => {
   bar({ rows: [{ address: "gx:follow-ups/1", title: "a", merge_orphan: true }] });
   screen.getByText(/merge target is gone/);
