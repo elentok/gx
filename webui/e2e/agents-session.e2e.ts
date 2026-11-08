@@ -84,6 +84,33 @@ test("75. Read a session", async ({ page, start }) => {
   await ask(fixture, idle.id, "after recovery");
   await expect(page.getByText("while failing", { exact: true })).toHaveCount(1);
   await expect(page.getByText("after recovery", { exact: true })).toBeVisible();
+
+  // Tools in flight: the Working row names the newest call and counts the rest.
+  const tools = await sessions(await start("agents-tools"));
+  const row = page.getByRole("status").filter({ hasText: /^Working/ });
+  await go(page, `#/agents/${tools[0].id}`);
+  await expect(row).toHaveText("Working · running shell: make test");
+  await expect(row.getByRole("button")).toHaveCount(0);
+  await go(page, `#/agents/${tools[1].id}`);
+  await expect(row).toContainText("searching: InFlightTool");
+  const more = row.getByRole("button", { name: "(+2 more)" });
+  await expect(more).toBeVisible();
+  const popover = page.getByLabel("Other tools in flight");
+  await more.hover();
+  await expect(popover.getByRole("listitem")).toHaveText([/sub-agent\s*Survey the sessions code/, /shell\s*make test/]);
+  await page.mouse.move(0, 0);
+  await expect(popover).toHaveCount(0);
+  // Tab to the button opens it; Escape closes it.
+  await more.focus();
+  await expect(popover).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  // A tap opens it at the phone width.
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(more).toBeVisible();
+  await more.dispatchEvent("click");
+  await expect(popover).toBeVisible();
+  await expect(popover.getByRole("listitem")).toHaveCount(2);
 });
 
 // Moved to vitest: 77 and 81 (AgentsPage.composer.test.tsx), 82 (AgentsPage.sessionView.test.tsx),

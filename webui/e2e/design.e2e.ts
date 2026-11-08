@@ -206,6 +206,12 @@ test.describe("14. Working row", () => {
     const id = (await fixture.cli("agents", "list")).split("\t")[0].trim();
     await fixture.cliEnv({ GX_AGENT_SESSION: id }, "agent", "step", "spec");
     await expect(row).toHaveText(/Working: Spec/);
+
+    // The design chat's row names a shell call in flight.
+    await start("agents-tools");
+    await expect(card(page, "design-epic")).toBeVisible();
+    await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
+    await expect(page.getByRole("status").filter({ hasText: "Working" })).toContainText("running shell: make test");
   });
 });
 
