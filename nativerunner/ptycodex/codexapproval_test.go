@@ -1,4 +1,4 @@
-package nativerunner_test
+package ptycodex
 
 import (
 	"errors"
@@ -118,7 +118,10 @@ func TestPtyCodexApproval_HookDenyPassesTheReason(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForScreen(t, client, "denied: use fd instead")
+	eventually(t, "the denial on screen", func() bool {
+		rows, _, err := client.Screen(10)
+		return err == nil && strings.Contains(strings.Join(rows, "\n"), "denied: use fd instead")
+	})
 	runs, err := codex.ReadCodexHookLog(home, "perm-deny")
 	if err != nil {
 		t.Fatal(err)

@@ -1,4 +1,4 @@
-package nativerunner_test
+package ptycodex
 
 import (
 	"errors"

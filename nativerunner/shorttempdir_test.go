@@ -2,11 +2,8 @@ package nativerunner_test
 
 import (
 	"os"
-	"strings"
 	"testing"
 	"time"
-
-	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // shortTempDir keeps holder.sock under the unix socket path limit, which a
@@ -30,12 +27,4 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-}
-
-func waitForScreen(t *testing.T, c *holder.HolderClient, want string) {
-	t.Helper()
-	waitFor(t, "the screen shows "+want, func() bool {
-		rows, _, err := c.Screen(10)
-		return err == nil && strings.Contains(strings.Join(rows, "\n"), want)
-	})
 }
