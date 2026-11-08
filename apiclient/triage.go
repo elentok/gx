@@ -41,6 +41,28 @@ func (s *Triage) Abandon(ctx context.Context, req wire.TriageAbandonRequest) (wi
 	return res, err
 }
 
+// Approve approves project's Triage and starts its Write session. A refusal
+// is a result, not an error.
+func (s *Triage) Approve(ctx context.Context, req wire.TriageApproveRequest) (wire.TriageEditResult, error) {
+	var res wire.TriageEditResult
+	err := s.t.post(ctx, "/v1/triage/approve", req, &res)
+	return res, err
+}
+
+// Retry sets a failed row pending and starts a Write session unless one is live.
+func (s *Triage) Retry(ctx context.Context, req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
+	var res wire.TriageEditResult
+	err := s.t.post(ctx, "/v1/triage/retry", req, &res)
+	return res, err
+}
+
+// Keep marks a failed row kept for later.
+func (s *Triage) Keep(ctx context.Context, req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
+	var res wire.TriageEditResult
+	err := s.t.post(ctx, "/v1/triage/keep", req, &res)
+	return res, err
+}
+
 // Changed pings the server that project's Triage record was written by a
 // direct write, so the web hears of it at once.
 func (s *Triage) Changed(ctx context.Context, project string) error {

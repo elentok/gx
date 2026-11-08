@@ -46,9 +46,7 @@ func (t *Triage) open(req wire.TriageOpenRequest, web bool) (wire.SessionResult,
 	if err != nil {
 		return sessions.Refusal(wire.ReasonSessionBadRequest, err.Error()), nil
 	}
-	mu, _ := t.opens.LoadOrStore(project, &sync.Mutex{})
-	mu.(*sync.Mutex).Lock()
-	defer mu.(*sync.Mutex).Unlock()
+	defer t.lockProject(project)()
 
 	store := triagerec.NewStore(dir)
 	rec, err := store.LoadLive()
@@ -88,6 +86,19 @@ func (t *Triage) open(req wire.TriageOpenRequest, web bool) (wire.SessionResult,
 		}
 	}
 
+	return t.launch(project)
+}
+
+// lockProject serializes the launches for one project.
+func (t *Triage) lockProject(project string) func() {
+	mu, _ := t.opens.LoadOrStore(project, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	return mu.(*sync.Mutex).Unlock
+}
+
+// launch starts a Triage session in the project's trunk checkout. The skill
+// reads the record's step to know whether it verifies, plans or writes.
+func (t *Triage) launch(project string) (wire.SessionResult, error) {
 	checkout := ticketgit.TrunkCheckout(t.ticketStore, project)
 	if checkout == "" {
 		return sessions.Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%s has no trunk checkout", project)), nil

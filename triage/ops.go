@@ -260,6 +260,36 @@ func (r *Record) MergeOrphans() []string {
 	return out
 }
 
+// AllQuestions is the verdict's questions plus the plan's that are not already
+// among them.
+func (r *Row) AllQuestions() []Question {
+	qs := append([]Question{}, r.Questions...)
+	if r.Plan != nil {
+		for _, q := range r.Plan.Questions {
+			if !slices.ContainsFunc(qs, func(o Question) bool { return o.ID == q.ID }) {
+				qs = append(qs, q)
+			}
+		}
+	}
+	return qs
+}
+
+// OpenQuestions counts the unanswered questions of rows that are not gone.
+func (r *Record) OpenQuestions() int {
+	n := 0
+	for _, row := range r.Rows {
+		if row.gone() {
+			continue
+		}
+		for _, q := range row.AllQuestions() {
+			if row.Person.Answers[q.ID] == "" {
+				n++
+			}
+		}
+	}
+	return n
+}
+
 // Approve moves the step from approve to write: a compare-and-set on the
 // revision. A step past approve is "already approved"; an unchanged step with
 // a changed revision is stale. Rows merged into a row that stopped being a
@@ -270,6 +300,9 @@ func (s *Store) Approve(id string, revision int) (*Record, error) {
 		case tickets.StepApprove:
 			if orphans := rec.MergeOrphans(); len(orphans) > 0 {
 				return phaseErr("approve is refused: %v merge into a row that is no longer a ready or map epic", orphans)
+			}
+			if n := rec.OpenQuestions(); n > 0 {
+				return phaseErr("approve is refused: %d questions are still open", n)
 			}
 			rec.Step = tickets.StepWrite
 			return nil

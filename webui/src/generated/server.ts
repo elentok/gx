@@ -2947,13 +2947,17 @@ export const ReasonTriageNoFollowUps = "triage-no-follow-ups";
  */
 export const ReasonTriagePhase = "triage-phase";
 /**
+ * ReasonTriageAlreadyApproved: the Triage was approved by another call.
+ */
+export const ReasonTriageAlreadyApproved = "triage-already-approved";
+/**
  * ReasonTriageNoLive: the project has no live Triage.
  */
 export const ReasonTriageNoLive = "triage-no-live";
 /**
  * Refusal reasons of the triage open route, beside the session ones.
  */
-export type ReasonTriage = typeof ReasonTriageApprove | typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageNoLive;
+export type ReasonTriage = typeof ReasonTriageApprove | typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageAlreadyApproved | typeof ReasonTriageNoLive;
 /**
  * TriageOpenRequest is the body of POST /v1/triage/open. New stops the
  * Triage's live session and starts a fresh one; State is the token of the live
@@ -3037,6 +3041,22 @@ export interface TriageRowRequest {
   destination?: string;
   answers?: { [key: string]: string};
   keep_for_later?: boolean;
+}
+/**
+ * TriageApproveRequest is the body of POST /v1/triage/approve.
+ */
+export interface TriageApproveRequest {
+  project: string;
+  revision: number /* int */;
+}
+/**
+ * TriageRowActionRequest is the body of POST /v1/triage/retry and
+ * /v1/triage/keep: one failed row at step write.
+ */
+export interface TriageRowActionRequest {
+  project: string;
+  revision: number /* int */;
+  address: string;
 }
 /**
  * TriageAbandonRequest is the body of POST /v1/triage/abandon.

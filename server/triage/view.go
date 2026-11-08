@@ -256,17 +256,11 @@ func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (wire.TriageRow
 		WriteState: string(r.Write), NewAddress: r.NewAddress, Refusal: r.Refusal,
 		CanKeep: CanKeep(live, rec.Step, r), CanRetry: CanRetry(live, rec.Step, r),
 	}
-	qs := append([]triagerec.Question{}, r.Questions...)
 	if r.Plan != nil {
 		row.Action, row.Destination = r.Plan.Action, r.Plan.Destination
-		for _, q := range r.Plan.Questions {
-			if !hasQuestion(qs, q.ID) {
-				qs = append(qs, q)
-			}
-		}
 	}
 	open := 0
-	for _, q := range qs {
+	for _, q := range r.AllQuestions() {
 		row.Questions = append(row.Questions, wireQuestion(q))
 		if !row.Gone && r.Person.Answers[q.ID] == "" {
 			open++
@@ -284,15 +278,6 @@ func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (wire.TriageRow
 	}
 	row.PersonChanged = changed
 	return row, open, changed
-}
-
-func hasQuestion(qs []triagerec.Question, id string) bool {
-	for _, q := range qs {
-		if q.ID == id {
-			return true
-		}
-	}
-	return false
 }
 
 func wireQuestion(q triagerec.Question) wire.TriageQuestion {

@@ -158,6 +158,71 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 	abandon.Flags().IntVar(&abandonRevision, "revision", 0, "the record revision read")
 	cmd.AddCommand(abandon)
 
+	var approveJSON bool
+	var approveRevision int
+	approve := &cobra.Command{
+		Use:   "approve <project>",
+		Short: "approve a project's Triage plan and start its Write session",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Triage.Approve(ctx, wire.TriageApproveRequest{Project: args[0], Revision: approveRevision})
+			if err != nil {
+				return fmt.Errorf("server write failed: %w", err)
+			}
+			return editOut(c, res, approveJSON)
+		},
+	}
+	approve.Flags().BoolVar(&approveJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	approve.Flags().IntVar(&approveRevision, "revision", 0, "the record revision read")
+	cmd.AddCommand(approve)
+
+	for _, verb := range []string{"retry", "keep"} {
+		var asJSON bool
+		var revision int
+		keep := verb == "keep"
+		short := "set a failed row pending and start a Write session unless one is live"
+		if keep {
+			short = "keep a failed row's follow-up in follow-ups for later"
+		}
+		rowCmd := &cobra.Command{
+			Use:   verb + " <project> <address>",
+			Short: short,
+			Args:  cobra.ExactArgs(2),
+			RunE: func(c *cobra.Command, args []string) error {
+				ctx := c.Context()
+				if ctx == nil {
+					ctx = context.Background()
+				}
+				cl, err := d.Dial()()
+				if err != nil {
+					return err
+				}
+				req := wire.TriageRowActionRequest{Project: args[0], Revision: revision, Address: args[1]}
+				var res wire.TriageEditResult
+				if keep {
+					res, err = cl.Triage.Keep(ctx, req)
+				} else {
+					res, err = cl.Triage.Retry(ctx, req)
+				}
+				if err != nil {
+					return fmt.Errorf("server write failed: %w", err)
+				}
+				return editOut(c, res, asJSON)
+			},
+		}
+		rowCmd.Flags().BoolVar(&asJSON, "json", false, "emit the structured result (or refusal) as JSON")
+		rowCmd.Flags().IntVar(&revision, "revision", 0, "the record revision read")
+		cmd.AddCommand(rowCmd)
+	}
+
 	var showJSON bool
 	show := &cobra.Command{
 		Use:   "show <project>",

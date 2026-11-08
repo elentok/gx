@@ -20,6 +20,8 @@ const (
 	// ReasonTriagePhase: the record's step or the row's state does not allow a
 	// row or abandon write, or the merge target is not a ready or map row.
 	ReasonTriagePhase = "triage-phase"
+	// ReasonTriageAlreadyApproved: the Triage was approved by another call.
+	ReasonTriageAlreadyApproved = "triage-already-approved"
 	// ReasonTriageNoLive: the project has no live Triage.
 	ReasonTriageNoLive = "triage-no-live"
 )
@@ -97,6 +99,20 @@ type TriageRowRequest struct {
 	Destination  string            `json:"destination,omitempty"`
 	Answers      map[string]string `json:"answers,omitempty"`
 	KeepForLater bool              `json:"keep_for_later,omitempty"`
+}
+
+// TriageApproveRequest is the body of POST /v1/triage/approve.
+type TriageApproveRequest struct {
+	Project  string `json:"project"`
+	Revision int    `json:"revision"`
+}
+
+// TriageRowActionRequest is the body of POST /v1/triage/retry and
+// /v1/triage/keep: one failed row at step write.
+type TriageRowActionRequest struct {
+	Project  string `json:"project"`
+	Revision int    `json:"revision"`
+	Address  string `json:"address"`
 }
 
 // TriageAbandonRequest is the body of POST /v1/triage/abandon.
