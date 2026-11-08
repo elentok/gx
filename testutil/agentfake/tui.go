@@ -133,6 +133,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if err := t.mouseSeqKey(ev.Key); err != nil {
 				return 0, err
 			}
+		case ev.Key == '\r' && t.opts.hung:
 		case ev.Key == '\r':
 			// A raw LF is a line break in the input, as in claude, not Enter.
 			if err := t.submit(); err != nil {

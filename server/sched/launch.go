@@ -169,6 +169,12 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 				l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 			},
 			OnStarted: func() { l.setLaunchStep(ticket.String(), runs.StepSendingPrompt) },
+			// A name-taken failure is logged by the caller below.
+			OnFail: func(attempt int, kind events.Kind, err error) {
+				if kind == events.AgentPromptStalled {
+					l.LogEvent(ticket, runlog.Event{Type: string(events.LaunchFailed), Kind: string(kind), Label: label, Attempt: attempt, Reason: err.Error()})
+				}
+			},
 		})
 		return launched.Session, err
 	}

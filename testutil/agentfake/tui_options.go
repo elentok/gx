@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,6 +43,8 @@ type tuiOptions struct {
 	clearLeavesI bool
 	// clearIgnored makes every Ctrl+U a no-op (see TUIClearIgnoredEnv).
 	clearIgnored bool
+	// hung makes Enter a no-op as well (see TUIHangLaunchesEnv).
+	hung bool
 	// registryDelay, unknownSkill, noTurn and launchRecord are the skill-prompt
 	// knobs; see the TUI...Env consts.
 	registryDelay time.Duration
@@ -53,6 +57,24 @@ type tuiOptions struct {
 	model string
 	// settings is --settings: inline JSON or a path to a JSON file.
 	settings string
+}
+
+// hangThisLaunch counts this launch in the counter file of a
+// TUIHangLaunchesEnv spec and reports whether it is within the first n.
+func hangThisLaunch(spec string) bool {
+	n, file, ok := strings.Cut(spec, ":")
+	limit, err := strconv.Atoi(n)
+	if !ok || err != nil {
+		return false
+	}
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	prior, _ := f.Seek(0, io.SeekEnd)
+	_, _ = f.WriteString("x")
+	return int(prior) < limit
 }
 
 // parseTUIArgs accepts exactly the PTY runner's launch flags, so a new flag
@@ -90,7 +112,9 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		return tuiOptions{}, errors.New("agentfake: --session-id or --resume is required")
 	}
 	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
+	hung := hangThisLaunch(os.Getenv(TUIHangLaunchesEnv))
 	return tuiOptions{
+		hung:          hung,
 		plainScreen:   os.Getenv(TUIPlainScreenEnv) == "1",
 		sessionID:     *sessionID,
 		trust:         os.Getenv(TUITrustEnv) == "1",
@@ -99,7 +123,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		mouse:         os.Getenv(TUIMouseEnv) == "1",
 		draft:         os.Getenv(TUIDraftEnv),
 		clearLeavesI:  os.Getenv(TUIClearLeavesIEnv) == "1",
-		clearIgnored:  os.Getenv(TUIClearIgnoredEnv) == "1",
+		clearIgnored:  hung || os.Getenv(TUIClearIgnoredEnv) == "1",
 		registryDelay: registryDelay,
 		unknownSkill:  os.Getenv(TUIUnknownSkillEnv) == "1",
 		noTurn:        os.Getenv(TUINoTurnEnv) == "1",

@@ -4,13 +4,17 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/runnerbuild"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -21,6 +25,30 @@ const (
 	ptyPromptGrace  = 500 * time.Millisecond
 	ptyStopGrace    = 2 * time.Second
 )
+
+// launchGraceEnv carries WithLaunchGrace to buildPty through the server env.
+const launchGraceEnv = "GX_SERVERTEST_LAUNCH_GRACE"
+
+// WithLaunchGrace shortens how long the PTY runner resends a launch prompt the
+// transcript does not show, for a test whose fake never takes it.
+func WithLaunchGrace(d time.Duration) func(*server.Config) {
+	return WithEnv(launchGraceEnv + "=" + d.String())
+}
+
+// launchCaps is the launch proof's caps for env: a set WithLaunchGrace shortens
+// the grace and the resend interval with it.
+func launchCaps(env []string) claudeui.LaunchProofCaps {
+	for _, kv := range slices.Backward(env) {
+		if v, ok := strings.CutPrefix(kv, launchGraceEnv+"="); ok {
+			d, err := time.ParseDuration(v)
+			if err != nil {
+				return claudeui.LaunchProofCaps{}
+			}
+			return claudeui.LaunchProofCaps{Grace: d, UnknownGrace: d, ResendEvery: d / 4}
+		}
+	}
+	return claudeui.LaunchProofCaps{}
+}
 
 // ptyRunner is a nativerunner.Pty whose prompts run the harness's OnTurn hook.
 // It embeds the Pty so its optional interfaces (Reattach, Nudger) still promote.
@@ -116,6 +144,7 @@ func (h *Harness) buildPty() {
 		StartTimeout: ptyStartTimeout,
 		PromptGrace:  ptyPromptGrace,
 		StopGrace:    ptyStopGrace,
+		LaunchCaps:   launchCaps(env),
 	})
 	// The fake herdr executable is this binary too; the TUI env would make it
 	// answer as a Claude fake, so herdr is built over the plain env.

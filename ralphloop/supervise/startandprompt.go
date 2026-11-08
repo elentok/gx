@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -70,6 +71,7 @@ func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 		// Not fatal: Start still runs, it just can't be an adoption.
 		log.Printf("looking up %s before start: %v", opts.Label, err)
 	}
+	hungPanes := 0
 	for attempt := 1; ; attempt++ {
 		s, err := r.Start(opts)
 		if err != nil {
@@ -101,10 +103,22 @@ func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 		}
 		err = fmt.Errorf("sending initial prompt: %w", err)
 		fail(attempt, events.AgentPromptStalled, err)
+		if _, ok := errors.AsType[*claudeui.HungPaneError](err); ok {
+			hungPanes++
+		}
 		if stopErr := r.Stop(s); stopErr != nil {
 			log.Printf("stopping undelivered session %s: %v", s.Label, stopErr)
 		}
+		// Never a second agent beside a live one: a session that survives
+		// Stop ends the launch instead of being relaunched over.
+		if _, live, _ := r.Find(opts.Label); live {
+			err = fmt.Errorf("%w: %s is still live after stop, not relaunching", err, opts.Label)
+			return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: err}
+		}
 		if attempt == 2 {
+			if hungPanes == 2 {
+				err = fmt.Errorf("pane stopped taking keys, twice: %w", err)
+			}
 			return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: withSkillHint(err, prompt)}
 		}
 	}

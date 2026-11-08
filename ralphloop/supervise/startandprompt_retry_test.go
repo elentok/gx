@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/worktree"
@@ -205,6 +206,72 @@ func TestStartAndPrompt_PromptNotDeliveredTwice_FailsPromptStalledAndStopsBoth(t
 	if _, found, _ := r.Find(launchLabel); found {
 		t.Error("an undelivered session is still live, want both stopped")
 	}
+}
+
+func TestStartAndPrompt_HungPaneOnce_RelaunchesOnceAndSucceeds(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
+	r.FailNextPrompts(launchLabel, 1, &claudeui.HungPaneError{Screen: "> /gx-implement"})
+
+	res := launchOn(t, r)
+
+	if res.err != nil {
+		t.Fatalf("StartAndPrompt = %v, want the relaunch to succeed", res.err)
+	}
+	if got := r.Prompts(launchLabel); len(got) != 1 {
+		t.Errorf("delivered prompts = %v, want one on the fresh session", got)
+	}
+}
+
+func TestStartAndPrompt_HungPaneTwice_FailsPromptStalledWithScreenLines(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
+	r.FailNextPrompts(launchLabel, 2, &claudeui.HungPaneError{Screen: "frozen-line-here"})
+
+	res := launchOn(t, r)
+
+	assertLaunchFailure(t, res.err, events.AgentPromptStalled)
+	for _, want := range []string{"pane stopped taking keys, twice", "frozen-line-here"} {
+		if !strings.Contains(res.err.Error(), want) {
+			t.Errorf("error = %q, want it to contain %q", res.err, want)
+		}
+	}
+	if _, found, _ := r.Find(launchLabel); found {
+		t.Error("a hung session is still live after the failure")
+	}
+}
+
+func TestStartAndPrompt_HungPaneSurvivingStop_DoesNotRelaunch(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	starts := 0
+	r := unstoppableRunner{Runner: fakes.FakeRunner(d), starts: &starts}
+
+	res := launchOn(t, r)
+
+	assertLaunchFailure(t, res.err, events.AgentPromptStalled)
+	if starts != 1 {
+		t.Errorf("starts = %d, want 1: never a second agent beside a live one", starts)
+	}
+}
+
+// unstoppableRunner hangs every launch prompt and ignores Stop.
+type unstoppableRunner struct {
+	agentrunner.Runner
+	starts *int
+}
+
+func (u unstoppableRunner) Start(o agentrunner.StartOptions) (agentrunner.Session, error) {
+	*u.starts++
+	return u.Runner.Start(o)
+}
+
+func (u unstoppableRunner) Stop(agentrunner.Session) error { return nil }
+
+func (u unstoppableRunner) PromptLaunch(context.Context, agentrunner.Session, string, func(string)) error {
+	return &claudeui.HungPaneError{}
 }
 
 func TestStartAndPrompt_MissingCapability_CarriesDoctorHint(t *testing.T) {

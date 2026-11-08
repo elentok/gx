@@ -42,6 +42,11 @@ const (
 	// TUIClearIgnoredEnv, set to "1", makes every clear key do nothing and
 	// leaves the screen unchanged: a hung pane.
 	TUIClearIgnoredEnv = "GX_AGENTFAKE_TUI_CLEAR_IGNORED"
+	// TUIHangLaunchesEnv, "<n>:<counter file>", hangs the first n launches that
+	// share the counter file: the pane echoes typed text but takes neither
+	// Enter nor a clear key, so the screen stops changing. Later launches are
+	// healthy. The file counts launches across the fake's processes.
+	TUIHangLaunchesEnv = "GX_AGENTFAKE_TUI_HANG_LAUNCHES"
 	// TUIRegistryDelayEnv, a Go duration, keeps the skill registry empty for
 	// that long after start: a skill prompt typed earlier is an unknown command.
 	TUIRegistryDelayEnv = "GX_AGENTFAKE_TUI_REGISTRY_DELAY"
