@@ -264,28 +264,35 @@ func (l *Launcher) finishRun(rc runContext) {
 	if !rc.one.PausesAtOnce() {
 		go l.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
 	}
-	err := l.waitKeepingHolder(rc, addr)
+	err := l.finishWithRecovery(&rc, addr, func() { close(stop) })
+	l.settleRun(rc, err)
+}
+
+// finishWithRecovery waits for the run, relaunching a hung pane once and then a
+// dead holder once. stopWatch runs after the hung ladder, before the dead-holder
+// relaunch. rc follows any relaunch.
+func (l *Launcher) finishWithRecovery(rc *runContext, addr tickets.Address, stopWatch func()) error {
+	err := l.waitKeepingHolder(*rc, addr)
 	if _, hung := errors.AsType[*ralphloop.RelaunchRequest](err); hung {
-		err = l.relaunchHung(&rc, err)
+		err = l.relaunchHung(rc, err)
 		if err == nil {
-			err = l.waitKeepingHolder(rc, addr)
+			err = l.waitKeepingHolder(*rc, addr)
 			if _, again := errors.AsType[*ralphloop.RelaunchRequest](err); again {
-				l.stopHung(rc)
+				l.stopHung(*rc)
 				err = &supervise.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("pane stopped taking keys, twice: %w", err)}
 			}
 		}
 	}
-	close(stop)
+	stopWatch()
 	if errors.Is(err, agentrunner.ErrHolderDead) {
 		// One relaunch through the shared launch path before any pause.
-		if next, rerr := l.relaunchDeadHolder(rc, addr); rerr != nil {
+		if rerr := l.relaunchDeadHolder(rc); rerr != nil {
 			err = fmt.Errorf("holder dead (%v); relaunch failed: %w", err, rerr)
 		} else {
-			rc = next
-			err = l.waitKeepingHolder(rc, addr)
+			err = l.waitKeepingHolder(*rc, addr)
 		}
 	}
-	l.settleRun(rc, err)
+	return err
 }
 
 // canResume reports whether a launch under kind on runner can resume a session:
@@ -297,30 +304,12 @@ func canResume(kind agent.AgentKind, runner agentrunner.Runner) bool {
 // relaunchDeadHolder stops what is left of the run's session and launches the
 // agent again in the same worktree, resuming the session so its conversation
 // (and the ticket's recorded verdicts, which live in the ticket body) carry on.
-func (l *Launcher) relaunchDeadHolder(rc runContext, addr tickets.Address) (runContext, error) {
-	if err := rc.deps.Runner.Stop(rc.run.Session); err != nil {
-		l.Log.Warn("stop dead holder's session", "ticket", rc.ticketAddr, "err", err)
+func (l *Launcher) relaunchDeadHolder(rc *runContext) error {
+	resumeID := ""
+	if canResume(rc.one.Agent, rc.deps.Runner) {
+		resumeID = rc.run.Session.SessionID
 	}
-	ctx, release := l.Sessions.Watches.Context()
-	defer release()
-	one := rc.one
-	one.Context = ctx
-	one.ResumeSessionID = ""
-	if canResume(one.Agent, rc.deps.Runner) {
-		one.ResumeSessionID = rc.run.Session.SessionID
-	}
-	run, err := l.launch(rc.deps, addr, one, rc.wt.Path)
-	if err != nil {
-		return rc, err
-	}
-	one.Context = nil
-	if t, ok := l.Registry.Tracked(rc.ticketAddr); ok {
-		t.Run = run
-		l.Registry.Replace(t)
-	}
-	l.Events.Publish(wire.EventTicketChanged, rc.ticketAddr)
-	rc.one, rc.run = one, run
-	return rc, nil
+	return l.relaunch(rc, resumeID, nil)
 }
 
 // HolderReadoptCap is how many unanswered dials in a row a run with a live
@@ -332,26 +321,31 @@ const HolderReadoptCap = 5
 // re-adopt) and resumes the wait once a dial works. The run stays tracked and
 // is never relaunched; only the cap ends it.
 func (l *Launcher) waitKeepingHolder(rc runContext, addr tickets.Address) error {
-	failures := 0
+	failures := 0 // above zero, the loop is probing the session instead of waiting
 	holder.ArmUnreachableStatusDials()
 	for {
-		err := ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session)
-		if !errors.Is(err, holder.ErrHolderUnreachable) {
-			return err
-		}
-		for errors.Is(err, holder.ErrHolderUnreachable) {
-			failures++
-			if failures >= HolderReadoptCap {
-				l.markHolderUnreachable(addr, false)
-				return fmt.Errorf("dial failed %d times with the holder alive: %w", failures, err)
+		var err error
+		if failures == 0 {
+			err = ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session)
+			if !errors.Is(err, holder.ErrHolderUnreachable) {
+				return err
 			}
-			l.markHolderUnreachable(addr, true)
+		} else {
 			time.Sleep(cmp.Or(rc.deps.GuardPoll, supervise.SmartZonePollMs*time.Millisecond))
 			_, err = rc.deps.Runner.Status(rc.run.Session)
+			if !errors.Is(err, holder.ErrHolderUnreachable) {
+				// The probe answered, or found the session gone: the wait reports that.
+				l.markHolderUnreachable(addr, false)
+				failures = 0
+				continue
+			}
 		}
-		// The probe answered, or found the session gone: the wait reports that.
-		l.markHolderUnreachable(addr, false)
-		failures = 0
+		failures++
+		if failures >= HolderReadoptCap {
+			l.markHolderUnreachable(addr, false)
+			return fmt.Errorf("dial failed %d times with the holder alive: %w", failures, err)
+		}
+		l.markHolderUnreachable(addr, true)
 	}
 }
 
@@ -369,30 +363,47 @@ func (l *Launcher) markHolderUnreachable(addr tickets.Address, unreachable bool)
 
 // relaunchHung replaces the run's hung session with a fresh launch, once. The
 // old session must be gone before the new one starts: never two agents on one
-// ticket. rc.run and the registry follow the new session.
+// ticket.
 func (l *Launcher) relaunchHung(rc *runContext, hung error) error {
+	return l.relaunch(rc, rc.one.ResumeSessionID, func() error {
+		if _, live, _ := rc.deps.Runner.Find(rc.run.Session.Label); live {
+			return &supervise.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("%w: %s is still live after stop, not relaunching", hung, rc.run.Session.Label)}
+		}
+		return nil
+	})
+}
+
+// relaunch stops the run's session and launches the agent again in the same
+// worktree, resuming resumeID when set. afterStop, when non-nil, may veto the
+// launch. On success rc.run, rc.one and the registry follow the new session; on
+// failure rc is unchanged.
+func (l *Launcher) relaunch(rc *runContext, resumeID string, afterStop func() error) error {
 	if err := rc.deps.Runner.Stop(rc.run.Session); err != nil {
-		l.Log.Warn("stop hung session", "ticket", rc.ticketAddr, "err", err)
+		l.Log.Warn("stop session before relaunch", "ticket", rc.ticketAddr, "err", err)
 	}
-	if _, live, _ := rc.deps.Runner.Find(rc.run.Session.Label); live {
-		return &supervise.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("%w: %s is still live after stop, not relaunching", hung, rc.run.Session.Label)}
+	if afterStop != nil {
+		if err := afterStop(); err != nil {
+			return err
+		}
 	}
 	addr, _ := tickets.ParseAddress(rc.ticketAddr, tickets.AddressContext{}) // built by ClaimAndLaunch, always parses
 	// Cancelled at the server's stop, like the first launch.
 	ctx, release := l.Sessions.Watches.Context()
 	defer release()
-	launchOne := rc.one
-	launchOne.Context = ctx
-	run, err := l.launch(rc.deps, addr, launchOne, rc.wt.Path)
+	one := rc.one
+	one.Context = ctx
+	one.ResumeSessionID = resumeID
+	run, err := l.launch(rc.deps, addr, one, rc.wt.Path)
 	if err != nil {
 		return err
 	}
-	rc.run = run
+	one.Context = nil
 	if t, ok := l.Registry.Tracked(rc.ticketAddr); ok {
 		t.Run = run
 		l.Registry.Replace(t)
 	}
 	l.Events.Publish(wire.EventTicketChanged, rc.ticketAddr)
+	rc.one, rc.run = one, run
 	return nil
 }
 
