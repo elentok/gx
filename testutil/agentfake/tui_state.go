@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/term"
+	"github.com/elentok/gx/backgroundtask"
 )
 
 const EscKey = 0x1b
@@ -167,6 +169,10 @@ func (t *tui) writeBackgroundMarker(running bool) error {
 		line = `{"isSidechain":false,"type":"user","timestamp":"` + ts + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}` +
 			"\n" + `{"isSidechain":false,"type":"assistant","timestamp":"` + ts + `","message":{"role":"assistant","stop_reason":"end_turn","content":[]}}`
 	}
+	return t.appendTranscript(line)
+}
+
+func (t *tui) appendTranscript(lines string) error {
 	if err := os.MkdirAll(filepath.Dir(t.transcript), 0o755); err != nil {
 		return err
 	}
@@ -175,8 +181,42 @@ func (t *tui) writeBackgroundMarker(running bool) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.WriteString(line + "\n")
+	_, err = f.WriteString(lines + "\n")
 	return err
+}
+
+// BackgroundTaskLabel is the description of the launching tool call of a
+// BehaviourBackgroundTask task, which the gate card shows as its label.
+const BackgroundTaskLabel = "run the soak"
+
+// startBackgroundTask records the launch of a background shell task and gives
+// it what claude does: an output file under the task output base that a real
+// child process holds open as its stdout.
+func (t *tui) startBackgroundTask() error {
+	const taskID, toolUseID = "b1", "toolu_b1"
+	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	launch := `{"isSidechain":false,"type":"assistant","timestamp":"` + ts + `","message":{"role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","id":"` + toolUseID + `","name":"Bash","input":{"description":"` + BackgroundTaskLabel + `","command":"make soak","run_in_background":true}}]}}`
+	if err := t.appendTranscript(launch); err != nil {
+		return err
+	}
+	dir := filepath.Join(backgroundtask.DefaultOutputBase(), "fixture", t.pid.SessionID, "tasks")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	out, err := os.Create(filepath.Join(dir, taskID+".output"))
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	// The child outlives this call and a bounded sleep keeps a forgotten one
+	// from lingering.
+	child := exec.Command("sh", "-c", "for i in 1 2 3 4; do echo soak line $i; done; exec sleep 120")
+	child.Stdout = out
+	if err := child.Start(); err != nil {
+		return err
+	}
+	go func() { _ = child.Wait() }()
+	return t.writeBackgroundMarker(true)
 }
 
 // colored wraps s in red when the terminal supports color. Like claude

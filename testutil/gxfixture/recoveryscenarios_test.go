@@ -4,7 +4,7 @@ import "testing"
 
 func TestRecoveryScenarios_EachStartsAndPrintsItsJSON(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"hung-pane-twice", "hung-pane-once", "hung-pane-twice-codex", "codex-drops-prompt", "verify-notes", "summary-notes", "map-evolve"} {
+	for _, name := range []string{"hung-pane-twice", "hung-pane-once", "hung-pane-twice-codex", "codex-drops-prompt", "verify-notes", "summary-notes", "map-evolve", "live-task-gate", "live-task-gate-codex", "live-task-gate-dirty"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			r := start(t, name)

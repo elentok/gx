@@ -469,6 +469,9 @@ func (c *codexFake) submit(text string) error {
 		c.resumeWork = &agentfake.PendingWork{Cfg: cfg, Address: address}
 		return c.taskError(agentfake.CodexModelError, "model_not_found")
 	}
+	if agentfake.StartsBackgroundTask(cfg.Behaviour[address]) {
+		c.background = true
+	}
 	if u := cfg.CodexUsage; u != nil {
 		if err := c.tokenCount(u.UsedPercentage, u.ResetsAt); err != nil {
 			return err

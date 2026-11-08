@@ -123,7 +123,21 @@ const (
 	// or summary agent leaves in its ticket: a "## Verified" entry and an
 	// "## Iteration summaries" entry.
 	BehaviourNotes = "notes"
+	// BehaviourBackgroundTask makes the agent start a background task and end
+	// its turn with the task still running: it never reports. The Claude fake
+	// gives the task an output file and a real child process; the Codex fake
+	// shows its background-terminal title.
+	BehaviourBackgroundTask = "background-task"
+	// BehaviourBackgroundDirty is BehaviourBackgroundTask that also leaves an
+	// uncommitted file in the worktree.
+	BehaviourBackgroundDirty = "background-dirty"
 )
+
+// StartsBackgroundTask reports whether a worker behaviour ends its turn on a
+// running background task.
+func StartsBackgroundTask(behaviour string) bool {
+	return behaviour == BehaviourBackgroundTask || behaviour == BehaviourBackgroundDirty
+}
 
 // CodexModelError is the message the Codex fake ends a BehaviourError turn with,
 // as recorded in docs/specs/codex-support-fixtures/rollouts/error-bad-model.jsonl.
@@ -168,6 +182,10 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 			}
 			return askQuestion(cfg, address)
 		}
+	case BehaviourBackgroundTask:
+		return nil
+	case BehaviourBackgroundDirty:
+		return os.WriteFile(UncommittedFile, []byte("kept\n"), 0o644)
 	}
 	waitHold(cfg)
 	return finishTicket(cfg, address)

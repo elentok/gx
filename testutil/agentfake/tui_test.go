@@ -10,11 +10,14 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/backgroundtask"
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -723,6 +726,31 @@ func TestTUIClaude_RateLimitWorkerWritesTheErrorThenFinishesOnContinue(t *testin
 	f.typeLine("continue")
 	f.waitFor("worker started", func() bool { return fileExists(hold + StartedSuffix) })
 	f.waitStatus(StatusIdle, "")
+}
+
+func TestTUIClaude_BackgroundTaskWorkerLeavesALiveTaskWithOutputAndChild(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.writeWorkerConfig(WorkerConfig{Behaviour: map[string]string{"p:e/01": BehaviourBackgroundTask}})
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(backgroundtask.DefaultOutputBase(), "fixture", "sess-1")) })
+
+	f.typeLine("/gx-implement p:e/01")
+	f.waitStatus(StatusShell, "")
+
+	rd := &backgroundtask.Reader{Home: f.home}
+	var facts backgroundtask.Facts
+	f.waitFor("a live task with a running child", func() bool {
+		var ok bool
+		facts, ok = rd.Facts("sess-1", backgroundtask.DefaultOutputBase(), backgroundtask.ProcessFinder{Procs: syshealth.DefaultProcess()})
+		return ok && facts.Process.Alive
+	})
+	if facts.Label != BackgroundTaskLabel || facts.Process.PID == 0 || facts.Process.LastOutput.IsZero() {
+		t.Errorf("facts = %+v", facts)
+	}
+	if want := []string{"soak line 2", "soak line 3", "soak line 4"}; !slices.Equal(facts.Process.LastLines, want) {
+		t.Errorf("last lines = %v, want %v", facts.Process.LastLines, want)
+	}
+	_ = syscall.Kill(facts.Process.PID, syscall.SIGKILL)
 }
 
 func TestTUIClaude_QuestionMenuWorkerBlocksOnANonApprovableDialogUntilEsc(t *testing.T) {
