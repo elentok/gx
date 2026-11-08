@@ -332,6 +332,20 @@ test("Workspaces", async ({ page, start }) => {
   // A ticket's Fix agent nests under its epic, not under Other.
   await sidebar.getByRole("button", nav("Expand paused-epic")).click();
   await expect(row("fix-demo_cpaused-epic_s01")).toBeVisible();
+  // The scenario already has a Fix agent for the ticket and the project, so Start is refused: the dialog stays with the reason.
+  // The started path (dialog closes, agent's page opens) is in the pause, migration and restart-run flows.
+  const fixDialog = page.getByRole("dialog", nav("Fix it with an agent"));
+  await goto(page, "#/e/demo:paused-epic");
+  await page.getByRole("button", nav("Fix it with an agent")).first().click();
+  await fixDialog.getByRole("button", nav("Start gx agent")).click();
+  await expect(fixDialog.getByRole("alert")).toContainText("already fixing");
+  await fixDialog.getByRole("button", nav("Close")).click();
+  await page.getByRole("button", { name: "Fix agent", exact: true }).click();
+  await fixDialog.getByRole("button", nav("Start gx agent")).click();
+  await expect(fixDialog.getByRole("alert")).toContainText("already fixing");
+  await fixDialog.getByRole("button", nav("Close")).click();
+  await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible();
+  await goto(page, "#/epics");
 
   // Manage workspaces: order, rename, reorder, delete naming its members; Default has no controls.
   const manage = page.getByRole("dialog", nav("Manage workspaces"));

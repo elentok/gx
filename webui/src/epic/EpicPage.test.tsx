@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicDetail, EpicList, EpicListRow, PendingRow, Workspace } from "../generated/server";
+import type { EpicDetail, EpicList, EpicListRow, PendingRow, SessionInfo, Workspace } from "../generated/server";
 import { appRoutes } from "../routes";
 import type { FixAgent } from "./fixAgent";
 import { renderThemed } from "../ui/render";
@@ -71,6 +71,7 @@ function render(
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
+  return router;
 }
 
 const joined = row("blog-impl", { addresses: ["gx:blog-impl", "gx:blog"], card_kind: "design" });
@@ -369,19 +370,16 @@ test("the fix dialog shows the row's fix_prompt, with or without a reason", asyn
   expect((await openFixDialog()).getByText("/gx-investigate gx:blog/01 is paused for repair")).toBeTruthy();
 });
 
-test.each([
-  [false, "Agent started. View it in the gx TUI Agents tab"],
-  [true, "Agent started. View it in the gx TUI Agents tab or in the Claude app"],
-])("starting the fix agent (remote control %s) says it started and drops Start", async (remote, text) => {
+test("starting the fix agent closes the dialog and opens the agent's page", async () => {
   const calls: unknown[] = [];
-  live([repairRow()], "loop", async (body) => {
+  const router = live([repairRow()], "loop", async (body) => {
     calls.push(body);
-    return { remote_control: remote };
+    return { remote_control: false, session: { id: "fix-01" } as SessionInfo };
   });
   const dialog = await openFixDialog();
   fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }));
-  expect(await dialog.findByText(text)).toBeTruthy();
-  expect(dialog.queryByRole("button", { name: "Start gx agent" })).toBeNull();
+  await waitFor(() => expect(router.state.location.pathname).toBe("/agents/fix-01"));
+  expect(screen.queryByRole("dialog", { name: "Fix it with an agent" })).toBeNull();
   expect(calls).toEqual([{ address: "gx:blog/01", state: "tok-1" }]);
 });
 
@@ -389,7 +387,7 @@ test("a refused fix agent shows the message and keeps Copy and Start", async () 
   live([repairRow()], "loop", async () => ({ remote_control: false, refused: true, message: "Already investigating" }));
   const dialog = await openFixDialog();
   fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }));
-  expect(await screen.findByText("Already investigating")).toBeTruthy();
+  expect(await dialog.findByText("Already investigating")).toBeTruthy();
   expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy();
   expect(dialog.getByRole("button", { name: "Start gx agent" })).toBeTruthy();
 });

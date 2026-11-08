@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { EpicListRow, SessionPlacement, Workspace } from "../generated/server";
-import { ACTIVE_KEY, readStoredWorkspace, resolveActive, writeStoredWorkspace } from "./active";
+import { ACTIVE_KEY, readStoredWorkspace, resolveActive, routePending, writeStoredWorkspace } from "./active";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -54,6 +54,14 @@ describe("resolveActive", () => {
   test("an item in a deleted workspace falls back to Default", () => expect(resolve("/e/demo:gone", null)).toBe("Main"));
   test("a stored workspace that is gone falls back to Default", () => expect(resolve("/stats", "Deleted")).toBe("Main"));
   test("nothing stored resolves to Default", () => expect(resolve("/stats", null)).toBe("Main"));
+});
+
+describe("routePending", () => {
+  const pending = (route: string) => routePending({ route, placements });
+  test("an agent the snapshot does not know is pending", () => expect(pending("/agents/new")).toBe(true));
+  test.each(["/agents/oth", "/agents/chat1", "/e/demo:blog", "/agents", "/stats"])("a known or non-agent route is not: %s", (route) =>
+    expect(pending(route)).toBe(false),
+  );
 });
 
 describe("stored workspace", () => {

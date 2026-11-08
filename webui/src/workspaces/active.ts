@@ -57,6 +57,14 @@ function itemWorkspace({ route, rows, placements }: ResolveInput): string | null
   }
 }
 
+/** An agent route whose placement the snapshot does not know yet (a just-started agent): not found, unlike found without a workspace. */
+export function routePending({ route, placements }: Pick<ResolveInput, "route" | "placements">): boolean {
+  const [, kind, ...rest] = route.split("/");
+  if (kind !== "agents") return false;
+  const id = decodeURIComponent(rest.join("/"));
+  return id !== "" && !placements.some((x) => x.session === id);
+}
+
 /** The active workspace: the open item's, else the stored one, and Default when that is gone. */
 export function resolveActive(input: ResolveInput): string {
   const exists = (name: string | null): name is string => name !== null && input.workspaces.some((w) => w.name === name);

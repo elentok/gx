@@ -1,10 +1,10 @@
 import { ChakraProvider } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { FixAgent } from "../epic/fixAgent";
-import type { MigrationFailure, RetryMigrationResult } from "../generated/server";
+import type { MigrationFailure, RetryMigrationResult, SessionInfo } from "../generated/server";
 import { DetailPage } from "../page/DetailPage";
 import { AppShell } from "../shell/AppShell";
 import { renderThemed } from "../ui/render";
@@ -99,19 +99,29 @@ test("a retry refusal shows its message", async () => {
   expect(await screen.findByText("project gx is migrating")).toBeTruthy();
 });
 
-test("Fix agent opens the dialog and Start posts the project", async () => {
+const Where = () => <p data-testid="where">{useLocation().pathname}</p>;
+const inRouter = (f?: FixAgent) => (
+  <MemoryRouter>
+    <FailedMigrationStrip fixAgent={f} />
+    <Where />
+  </MemoryRouter>
+);
+
+test("Fix agent opens the dialog; Start posts the project, closes it and opens the agent's page", async () => {
   const calls: unknown[] = [];
-  setup([fail("gx", "bad schema")], (f) => <FailedMigrationStrip fixAgent={f} />, async (body) => {
+  setup([fail("gx", "bad schema")], inRouter, async (body) => {
     calls.push(body);
-    return { remote_control: false };
+    return { remote_control: false, session: { id: "fix-gx" } as SessionInfo };
   });
   fireEvent.click(screen.getByRole("button", { name: "Fix agent" }));
   fireEvent.click(await screen.findByRole("button", { name: "Start gx agent" }));
-  await waitFor(() => expect(calls).toEqual([{ project: "gx" }]));
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/agents/fix-gx"));
+  expect(calls).toEqual([{ project: "gx" }]);
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-test("a name-taken refusal shows the already-fixing toast", async () => {
-  setup([fail("gx", "bad schema")], (f) => <FailedMigrationStrip fixAgent={f} />, async () => ({
+test("a name-taken refusal keeps the dialog open with the reason", async () => {
+  setup([fail("gx", "bad schema")], inRouter, async () => ({
     remote_control: false,
     refused: true,
     reason: "name-taken",
@@ -120,6 +130,8 @@ test("a name-taken refusal shows the already-fixing toast", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Fix agent" }));
   fireEvent.click(await screen.findByRole("button", { name: "Start gx agent" }));
   expect(await screen.findByText("an agent is already fixing gx")).toBeTruthy();
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  expect(screen.getByTestId("where").textContent).toBe("/");
 });
 
 test("a row disappears when the snapshot drops it", () => {

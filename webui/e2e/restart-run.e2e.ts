@@ -92,7 +92,8 @@ test("139. Restart with a failed migration", async ({ page, context, start }) =>
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("The migration of project broken failed with:");
 
     await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
-    await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab")).toBeVisible();
+    await expect(page).toHaveURL(/#\/agents\//);
+    await expect(fixDialog(page)).toHaveCount(0);
     await expect.poll(async () => (await sessions(fixture)).length).toBe(sessionsBefore + 1);
     const started = (await sessions(fixture)).at(-1)!;
     const path = (await fixture.cli("tickets", "show", "broken:broken-epic/01")).match(/^path: (.+)$/m)![1];
@@ -113,14 +114,12 @@ test("139. Restart with a failed migration", async ({ page, context, start }) =>
     await second.goto(new URL(page.url()).origin);
     await strip(second).getByRole("button", nav("Fix agent")).click();
     await fixDialog(second).getByRole("button", nav("Start gx agent")).click();
-    await expect(toasts(second).filter({ hasText: "an agent is already fixing broken" })).toBeVisible();
+    // The refusal stays in the dialog.
+    await expect(fixDialog(second).getByRole("alert")).toContainText("an agent is already fixing broken");
     expect((await sessions(fixture)).length).toBe(sessionsBefore + 1);
     await second.close();
     await page.goBack();
     await expect(strip(page)).toBeVisible();
-    // The strip lives in the shell, so its dialog stays open across the hash changes.
-    await fixDialog(page).getByRole("button", nav("Close")).click();
-    await expect(fixDialog(page)).toHaveCount(0);
   });
 
   await test.step("fixing the project and Retry migration clears the strip", async () => {

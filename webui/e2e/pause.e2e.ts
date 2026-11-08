@@ -166,9 +166,10 @@ test.describe("55. Fix it with an agent", () => {
     await expect(fixDialog(page).getByRole("button", nav("Copied"))).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(fixPrompt);
 
+    const epicUrl = page.url();
     await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
-    await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab")).toBeVisible();
-    await expect(fixDialog(page).getByRole("button", nav("Start gx agent"))).toHaveCount(0);
+    await expect(page).toHaveURL(/#\/agents\//);
+    await expect(fixDialog(page)).toHaveCount(0);
     await expect.poll(async () => (await sessions(fixture)).length).toBe(before + 1);
     const started = (await sessions(fixture)).at(-1)!;
     expect(started.harness).toBe("claude");
@@ -176,11 +177,11 @@ test.describe("55. Fix it with an agent", () => {
 
     // A reload would fail the test, so the second visit is a fresh page on the same server.
     const second = await context.newPage();
-    await second.goto(page.url());
+    await second.goto(epicUrl);
     await openFixDialog(second);
     await fixDialog(second).getByRole("button", nav("Start gx agent")).click();
-    // The refusal is a toast, outside the dialog.
-    await expect(toasts(second).filter({ hasText: "an agent is already fixing demo:paused-epic/07" })).toBeVisible();
+    // The refusal stays in the dialog.
+    await expect(fixDialog(second).getByRole("alert")).toContainText("an agent is already fixing demo:paused-epic/07");
     expect((await sessions(fixture)).length).toBe(before + 1);
   });
 });
@@ -203,13 +204,14 @@ test.describe("116. Retry on a question menu", () => {
 });
 
 test.describe("56. Fix it with an agent, remote control", () => {
-  test("names the Claude app", async ({ page, start }) => {
+  test("opens the new agent's page", async ({ page, start }) => {
     const fixture = await start("paused", { config: { "agents.fix-agent-remote-control": "true" } });
     await fixture.cli("server", "queue", "add", "demo:paused-epic");
 
     await page.getByRole("link", { name: "paused-epic", exact: true }).click();
     await openFixDialog(page);
     await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
-    await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab or in the Claude app")).toBeVisible();
+    await expect(page).toHaveURL(/#\/agents\//);
+    await expect(fixDialog(page)).toHaveCount(0);
   });
 });

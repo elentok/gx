@@ -223,7 +223,7 @@ test("173. Failed start and Migration block", async ({ start, page }) => {
       const dir = await migrateDir(page);
       await brokenStrip(page).getByRole("button", { name: "Fix agent" }).click();
       await page.getByRole("dialog").getByRole("button", { name: "Start gx agent" }).click();
-      await expect(page.getByText("Agent started.")).toBeVisible();
+      await expect(page).toHaveURL(/#\/agents\//);
       // The fake agent runs no command: run the one the session is told to run.
       await fixture.cli("tickets", "migrate", dir);
     });

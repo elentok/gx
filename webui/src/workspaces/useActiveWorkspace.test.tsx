@@ -2,7 +2,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test } from "vitest";
 import type { Connection, ConnectionState } from "../connection";
-import type { EpicList, EpicListRow, Workspace } from "../generated/server";
+import type { EpicList, EpicListRow, SessionPlacement, Workspace } from "../generated/server";
 import { ACTIVE_KEY } from "./active";
 import { useActiveWorkspace } from "./useActiveWorkspace";
 
@@ -27,7 +27,11 @@ function fakeConnection(workspaces: Workspace[]) {
     state = { ...state, snapshot: { ...state.snapshot, workspaces: next } } as ConnectionState;
     act(() => listeners.forEach((fn) => fn()));
   };
-  return { conn, setWorkspaces };
+  const setPlacements = (placements: SessionPlacement[]) => {
+    state = { ...state, snapshot: { ...state.snapshot, placements } } as ConnectionState;
+    act(() => listeners.forEach((fn) => fn()));
+  };
+  return { conn, setWorkspaces, setPlacements };
 }
 
 function Probe({ conn }: { conn: Connection }) {
@@ -84,4 +88,28 @@ test("picking a workspace on an item page sticks until another item is opened", 
   await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Main"));
   expect(localStorage.getItem(ACTIVE_KEY)).toBe("Main");
   list.epics = [];
+});
+
+test("an agent opened before its placement is known stays pending and applies the epic's workspace once it arrives", async () => {
+  list.epics = [epicRow("blog", "Side")];
+  localStorage.setItem(ACTIVE_KEY, "Main");
+  const { setPlacements } = setup([MAIN, SIDE], "/agents/fix1");
+  await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Main"));
+
+  setPlacements([{ session: "fix1", kind: "epic", epic: "demo:blog" }]);
+
+  await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Side"));
+  expect(localStorage.getItem(ACTIVE_KEY)).toBe("Side");
+  list.epics = [];
+});
+
+test("an agent placed in Other leaves the workspace unchanged", async () => {
+  localStorage.setItem(ACTIVE_KEY, "Side");
+  const { setPlacements } = setup([MAIN, SIDE], "/agents/fix2");
+  await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Side"));
+
+  setPlacements([{ session: "fix2", kind: "other" }]);
+
+  await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Side"));
+  expect(localStorage.getItem(ACTIVE_KEY)).toBe("Side");
 });

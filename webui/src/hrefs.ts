@@ -15,3 +15,6 @@ export const SETTINGS_HREF = "#/settings";
 
 /** A session's label is its id. */
 export const agentHref = (label: string) => `${AGENTS_HREF}/${label}`;
+
+/** The router path of an agent's page, for navigate(). */
+export const agentPath = (label: string) => agentHref(label).slice(1);
