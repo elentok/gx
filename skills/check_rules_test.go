@@ -38,6 +38,13 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"verify-epic verified", "gx-verify-epic/SKILL.md", []string{
 			"### Verified section", "`## Verified`", "`- <story> — <verdict> @ <commit>`", "equals the current HEAD",
 		}},
+		{"iteration summaries", "gx-local-tracker.md", []string{
+			"## Iteration summaries", "`Did`, `Went wrong`, `Decisions`, `Left`", "labelled `gx`", "never blocks finishing",
+		}},
+		{"implement iteration summaries", "gx-implement/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
+		{"verify-epic iteration summaries", "gx-verify-epic/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
+		{"merge iteration summaries", "gx-merge/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
+		{"code-review iteration summaries", "gx-code-review/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
 		{"research", "gx-research/SKILL.md", []string{"`gx check`"}},
 		{"investigate", "gx-investigate/SKILL.md", []string{"`gx check`"}},
 		{"to-tickets", "gx-to-tickets/SKILL.md", []string{"iteration hint", "`gx brief`", "`go_symbol_references`", "verified at {{commit}}", "not verified", "Generated files", "`make web-types`", "Test environment", "@vitest-environment", "Playwright filters", "Mock path", "must fail to compile or fail", "Examples against the helper"}},

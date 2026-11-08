@@ -208,5 +208,8 @@ Continue to Step 5.
   rebase finished and `<target>` is an ancestor of the branch, then does the
   ff.
 
+In ticket mode, before you report `finished`, append your entry to `## Iteration summaries` as
+[gx-local-tracker.md](../gx-local-tracker.md#iteration-summaries) describes.
+
 Finish with zero background shells: read and stop (TaskStop) any background shell that is
 still open before reporting.

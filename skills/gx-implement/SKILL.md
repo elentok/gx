@@ -256,6 +256,9 @@ Don't re-run the test to get raw output.
 
 Claiming already writes `status: claimed` for you — never write it yourself.
 
+Before you report `finished`, append your entry to `## Iteration summaries` as
+[gx-local-tracker.md](../gx-local-tracker.md#iteration-summaries) describes.
+
 Commit first. Report `finished` only after the commit has succeeded, in a later tool call - never in
 the same parallel block as the commit. A rejected commit (a hook, a failed check) next to a
 `finished` report leaves the ticket finished with nothing committed.

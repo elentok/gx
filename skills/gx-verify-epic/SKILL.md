@@ -287,4 +287,7 @@ or touched code of other passed stories. Only a fix round raises N.
 - **Inline fix or tickets opened**: commit first if you fixed inline. Report `finished` in a later
   tool call, without `--commitless` only if you committed.
 
+Before you report `finished`, append your entry to `## Iteration summaries` as
+[gx-local-tracker.md](../gx-local-tracker.md#iteration-summaries) describes.
+
 `--status done` is never yours to set. gx decides it after you report `finished`.

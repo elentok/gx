@@ -185,6 +185,8 @@ If the consultant deferred zero findings, skip this step.
   - **Consultant triage**, verbatim from step 4.
   - **Final disposition** of each finding: the fix ticket it became; for a deferred finding, the
     follow-up it became, was appended to, or was dropped against; or why it was rejected.
+- Append your entry to `## Iteration summaries` as
+  [gx-local-tracker.md](../gx-local-tracker.md#iteration-summaries) describes.
 - `gx tickets set <addr> --iteration-status finished --commitless true` — this skill never commits
   code of its own, so `commitless: true` is always correct here, not just the no-findings case.
   `--status done` will be refused on a `ralph-loop/*` branch (merge status is gx's alone to set);

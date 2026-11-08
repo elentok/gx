@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -96,17 +97,18 @@ const trunkConflictNote = "This is a trunk-conflict ticket. You are in the check
 
 // launchNote is what the agent is told on top of the skill command.
 func launchNote(t tickets.Ticket, cwd string) string {
-	if t.Type == string(schema.TypeTrunkConflict) {
-		return trunkConflictNote
-	}
-	if t.IsVerify() {
-		head, err := git.RevParse(cwd, "HEAD")
-		if err != nil {
-			return ""
+	var note string
+	switch {
+	case t.Type == string(schema.TypeTrunkConflict):
+		note = trunkConflictNote
+	case t.IsVerify():
+		if head, err := git.RevParse(cwd, "HEAD"); err == nil {
+			note = srvrecovery.VerifyResumeNote(t, head)
 		}
-		return srvrecovery.VerifyResumeNote(t, head)
+	default:
+		note = srvrecovery.InvestigatePrompt(t)
 	}
-	return srvrecovery.InvestigatePrompt(t)
+	return strings.Join(slices.DeleteFunc([]string{note, srvrecovery.SummariesNote(t)}, func(s string) bool { return s == "" }), "\n\n")
 }
 
 // evolveDirs are the dirs a retro's `gx tickets` verbs write to outside the

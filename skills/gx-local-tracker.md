@@ -503,6 +503,16 @@ is **write-conditional**: it is enforced by the write path that sets the status,
 Enforcing it at load time would reject a hand-authored ticket that never wrote the section, making the
 loader fail on a file it merely observes rather than one it produced.
 
+## Iteration summaries
+
+Every iteration agent, of any ticket type, appends one entry to its own ticket's `## Iteration
+summaries` section before it reports `finished`. The entry is a `### <session id> — <RFC 3339 time> —
+agent` heading and four bullets: `Did`, `Went wrong`, `Decisions`, `Left`, one line each. Rewrite the
+whole section with `gx tickets section <addr> "Iteration summaries" -`, keeping the earlier entries.
+gx appends its own entry, labelled `gx`, listing what it did (resends, relaunches, a re-adopted
+holder, a nudge). A missing summary never blocks finishing or pauses the ticket. A relaunched
+session's prompt lists the earlier summaries; read them before you start.
+
 ## Mid-flight forking
 
 A ticket can be forked while work is in progress, when it turns out to be larger than its budget or

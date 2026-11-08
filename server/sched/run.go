@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -355,6 +356,10 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 	if errors.As(err, &mismatch) {
 		l.Writer.PauseModelMismatch(rc.one.ScratchDir, rc.one.Ticket.Path, addr, rc.run, mismatch)
 		return
+	}
+	// Best effort: a missing summary never blocks finishing or pauses the ticket.
+	if serr := srvrecovery.RecordGxSummary(one.ScratchDir, addr, one.Ticket.Path, run.Session.SessionID, time.Now()); serr != nil {
+		l.Log.Warn("write gx iteration summary", "ticket", ticketAddr, "err", serr)
 	}
 	var out ralphloop.FinishOutcome
 	if err == nil {
