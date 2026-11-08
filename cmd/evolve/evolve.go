@@ -354,7 +354,7 @@ func New(d Deps) *cobra.Command {
 			return runEvolveRun(ctx, e, c.OutOrStdout(), c.ErrOrStderr(), args[0], force)
 		},
 	}
-	run.Flags().BoolVar(&force, "force", false, "run again for an epic that was already evolved")
+	run.Flags().BoolVar(&force, "force", false, "run again for an epic that was already evolved, or evolve a map that is not done")
 
 	var skipForce bool
 	skip := &cobra.Command{

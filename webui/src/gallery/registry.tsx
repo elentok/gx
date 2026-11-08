@@ -6,6 +6,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import canned from "../canned-snapshot.json";
 import { authEntries } from "./authEntries";
 import { designFooterEntries } from "./designFooterEntries";
+import { questionEntries } from "./questionEntries";
 import { shellEntries } from "./shellEntries";
 import { ConnectionContext, type Connection } from "../connection";
 import { DraftSwitcher } from "../design/DraftSwitcher";
@@ -18,7 +19,6 @@ import { CoarsePointerContext, type Device, DeviceContext, WideContext } from ".
 import { EpicPage } from "../epic/EpicPage";
 import { ErrorCard } from "../ErrorBoundary";
 import { EpicCard } from "../epics/EpicCard";
-import type { DesignDraftItem, EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult } from "../generated/server";
 import { JumpRow } from "../nav/JumpMenu";
 import { Arc } from "../ui/arc/Arc";
 import { StatusIcon, STATUS_LABELS, type StatusKind } from "../ui/status-icon/StatusIcon";
@@ -33,7 +33,6 @@ import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { InfoTip } from "../ui/info-tip/InfoTip";
-import { Question, QuestionDots } from "../ui/question-sheet/Question";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import { LargeEditor } from "../ui/expandable-text/LargeEditor";
 import { ModeText } from "../ui/expandable-text/ModeText";
@@ -52,7 +51,7 @@ import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { StickyTopContainer } from "../ui/top-bar/StickyTopContainer";
 import { Tray } from "../ui/tray/Tray";
-import type { Health, HealthState, LimitWindow, UsageLimits, UsageLimitWindow, UsageSpend, UsageSummary } from "../generated/server";
+import type { DesignDraftItem, EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult, Health, HealthState, LimitWindow, UsageLimits, UsageLimitWindow, UsageSpend, UsageSummary } from "../generated/server";
 import { UsageModeLimits, UsageModeSpending } from "../generated/server";
 import { LimitsBlock } from "../usage/LimitsBlock";
 import { LimitsTray } from "../usage/LimitsTray";
@@ -456,53 +455,7 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "with text", node: <ExpandableTextField label="With text" title="Note" rows={3} value={"A note\nover two lines"} onChange={() => {}} /> },
     ],
   },
-  {
-    name: "Question",
-    cases: [
-      {
-        label: "options",
-        node: (
-          <Question
-            card={{
-              label: "1",
-              title: "Pick one",
-              kind: "options",
-              recommended: "a",
-              options: [
-                { id: "a", label: "First", consequence: "Ships today" },
-                { id: "b", label: "Second" },
-              ],
-            }}
-            answer={{ choice: "b" }}
-            onChange={() => {}}
-            onPicked={() => {}}
-          />
-        ),
-      },
-      {
-        label: "yes-no",
-        node: (
-          <Question
-            card={{ label: "2", title: "Proceed?", kind: "yes-no", yes: "Go ahead", no: "Stop here" }}
-            answer={{}}
-            onChange={() => {}}
-            onPicked={() => {}}
-          />
-        ),
-      },
-      {
-        label: "dots",
-        node: (
-          <QuestionDots
-            round={[{ label: "1" }, { label: "2" }, { label: "3" }]}
-            answers={{ "1": { choice: "a" } }}
-            current={1}
-            onPick={() => {}}
-          />
-        ),
-      },
-    ],
-  },
+  ...questionEntries,
   {
     name: "LargeEditor",
     cases: [
