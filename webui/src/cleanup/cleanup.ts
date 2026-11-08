@@ -1,7 +1,8 @@
 import { apiFetch } from "../apiFetch";
 import type { Connection } from "../connection";
-import type { CleanupEpic, CleanupReport, CleanupWorktree } from "../generated/server";
+import type { CleanupEpic, CleanupReport, CleanupWorktree, CleanupWriteRequest, CleanupWriteResult } from "../generated/server";
 import { useFetched } from "../useFetched";
+import { WriteError } from "../useWrite";
 
 export type { CleanupEpic, CleanupReport, CleanupWorktree };
 
@@ -10,6 +11,21 @@ export type FetchCleanup = (project: string) => Promise<CleanupReport>;
 export const fetchCleanup: FetchCleanup = async (project) => {
   const res = await apiFetch(`/v1/cleanup?${new URLSearchParams({ project })}`);
   if (!res.ok) throw new Error(`cleanup: HTTP ${res.status}`);
+  return res.json();
+};
+
+export type CleanupAction = "remove-worktree" | "remove-unmerged-worktree" | "delete-branch" | "archive-epic" | "agent";
+
+export type PostCleanup = (action: CleanupAction, body: CleanupWriteRequest) => Promise<CleanupWriteResult>;
+
+// Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
+export const postCleanup: PostCleanup = async (action, body) => {
+  const res = await apiFetch(`/v1/cleanup/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`);
   return res.json();
 };
 

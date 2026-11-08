@@ -1,4 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
+import { useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { useConnectionContext } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
@@ -7,41 +8,95 @@ import { PageHeader } from "../page/PageHeader";
 import { PageIcon } from "../page/PageIcon";
 import { SectionHeading } from "../page/SectionHeading";
 import { Button } from "../ui/button/Button";
+import { Modal } from "../ui/modal/Modal";
 import { Spinner } from "../ui/spinner/Spinner";
-import { formatBytes, groupReport, useCleanup, type CleanupGroup, type FetchCleanup } from "./cleanup";
+import { refusalText, useWrite } from "../useWrite";
+import { formatBytes, groupReport, postCleanup as defaultPost, useCleanup, type CleanupAction, type CleanupGroup, type FetchCleanup, type PostCleanup } from "./cleanup";
 
-function Group({ group }: { group: CleanupGroup }) {
+interface Acts {
+  pending: boolean;
+  /** The refusal text kept on a row, by row key. */
+  refused: Record<string, string>;
+  act: (key: string, action: CleanupAction, branch?: string, epic?: string) => void;
+  confirmUnmerged: (branch: string) => void;
+}
+
+function UnmergedDialog({ branch, onConfirm, onClose }: { branch: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <Modal label="Remove unmerged worktree" onClose={onClose} w="md" p="4" gap="3">
+      <Text fontWeight="600">{`Remove the worktree of ${branch}?`}</Text>
+      <Text>Ignored files such as node_modules and build output are lost. The branch stays.</Text>
+      <Box display="flex" gap="2" justifyContent="flex-end">
+        <Button tone="deadlocked" onClick={onConfirm}>
+          Confirm remove
+        </Button>
+        <Button emphasis="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+      </Box>
+    </Modal>
+  );
+}
+
+function Row({ rowKey, name, acts, children }: { rowKey: string; name: string; acts: Acts; children?: ReactNode }) {
+  return (
+    <Box as="li" display="flex" flexDirection="column" wordBreak="break-all">
+      <Box display="flex" justifyContent="space-between" alignItems="center" gap="3">
+        <Text>{name}</Text>
+        <Box display="flex" alignItems="center" gap="3" flexShrink="0">
+          {children}
+        </Box>
+      </Box>
+      {acts.refused[rowKey] && (
+        <Text role="alert" color="text.muted" fontSize="sm">
+          {acts.refused[rowKey]}
+        </Text>
+      )}
+    </Box>
+  );
+}
+
+function Group({ group, acts }: { group: CleanupGroup; acts: Acts }) {
   const id = `cleanup-${group.id}`;
+  const agent = group.id === "agent";
+  const button = (label: string, onClick: () => void) => (
+    <Button emphasis="ghost" disabled={acts.pending} onClick={onClick}>
+      {label}
+    </Button>
+  );
   return (
     <Box mt="6" role="region" aria-labelledby={id}>
-      <SectionHeading id={id} tone={group.id === "agent" ? "waiting" : "running"}>
+      <SectionHeading id={id} tone={agent ? "waiting" : "running"}>
         {group.title}
       </SectionHeading>
       <Text color="text.muted" fontSize="sm" mb="2">
         {group.hint}
       </Text>
+      {agent && button("Start cleanup agent", () => acts.act("agent", "agent"))}
       <Box as="ul" listStyleType="none" p="0" display="flex" flexDirection="column" gap="1">
         {group.worktrees.map((w) => (
-          <Box as="li" key={w.branch} display="flex" justifyContent="space-between" gap="3" wordBreak="break-all">
-            <Text>{w.branch}</Text>
+          <Row key={w.branch} rowKey={w.branch} name={w.branch} acts={acts}>
             {w.size_bytes !== undefined && (
-              <Text color="text.muted" flexShrink="0" data-testid="cleanup-size">
+              <Text color="text.muted" data-testid="cleanup-size">
                 {formatBytes(w.size_bytes)}
               </Text>
             )}
-          </Box>
+            {group.id === "merged-worktrees" && !w.dirty && button("Remove", () => acts.act(w.branch, "remove-worktree", w.branch))}
+            {group.id === "merged-branches" && button("Delete branch", () => acts.act(w.branch, "delete-branch", w.branch))}
+            {group.id === "unmerged-worktrees" && button("Remove", () => acts.confirmUnmerged(w.branch))}
+          </Row>
         ))}
         {group.epics.map((e) => (
-          <Box as="li" key={`epic:${e.name}`} wordBreak="break-all">
-            <Text>{e.name}</Text>
-          </Box>
+          <Row key={`epic:${e.name}`} rowKey={`epic:${e.name}`} name={e.name} acts={acts}>
+            {group.id === "done-epics" && button("Archive", () => acts.act(`epic:${e.name}`, "archive-epic", undefined, e.name))}
+          </Row>
         ))}
       </Box>
     </Box>
   );
 }
 
-export function CleanupPage({ fetchCleanup, fetchEpics }: { fetchCleanup?: FetchCleanup; fetchEpics?: FetchEpicList }) {
+export function CleanupPage({ fetchCleanup, fetchEpics, postCleanup = defaultPost }: { fetchCleanup?: FetchCleanup; fetchEpics?: FetchEpicList; postCleanup?: PostCleanup }) {
   const conn = useConnectionContext();
   const [params, setParams] = useSearchParams();
   const { list } = useEpicList(fetchEpics, conn);
@@ -49,6 +104,23 @@ export function CleanupPage({ fetchCleanup, fetchEpics }: { fetchCleanup?: Fetch
   const project = params.get("project") ?? projects[0] ?? "";
   const { report, failed, retry } = useCleanup(project, fetchCleanup, conn);
   const groups = report ? groupReport(report) : [];
+  const { run, pending } = useWrite({ toastRefusal: false });
+  const [refused, setRefused] = useState<Record<string, string>>({});
+  const [confirming, setConfirming] = useState<string>();
+
+  const act: Acts["act"] = (key, action, branch, epic) => {
+    setConfirming(undefined);
+    setRefused((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== key)));
+    void run(
+      async () => {
+        const res = await postCleanup(action, { project, branch, epic });
+        if (res.refused) setRefused((r) => ({ ...r, [key]: refusalText(res) }));
+        return res;
+      },
+      { onDone: retry },
+    );
+  };
+  const acts: Acts = { pending, refused, act, confirmUnmerged: setConfirming };
 
   return (
     <DetailPage title={{ kind: "Cleanup" }}>
@@ -88,8 +160,9 @@ export function CleanupPage({ fetchCleanup, fetchEpics }: { fetchCleanup?: Fetch
           Nothing to clean up
         </Text>
       ) : (
-        groups.map((g) => <Group key={g.id} group={g} />)
+        groups.map((g) => <Group key={g.id} group={g} acts={acts} />)
       )}
+      {confirming && <UnmergedDialog branch={confirming} onConfirm={() => act(confirming, "remove-unmerged-worktree", confirming)} onClose={() => setConfirming(undefined)} />}
     </DetailPage>
   );
 }

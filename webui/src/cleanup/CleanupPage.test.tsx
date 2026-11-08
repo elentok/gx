@@ -5,7 +5,7 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { CleanupReport, CleanupWorktree, EpicList } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
-import type { FetchCleanup } from "./cleanup";
+import type { FetchCleanup, PostCleanup } from "./cleanup";
 
 afterEach(() => {
   cleanup();
@@ -59,8 +59,8 @@ const reportOf = (project: string, size?: number): CleanupReport => ({
   attic_refs: [],
 });
 
-function renderCleanup(fetchCleanup: FetchCleanup, path = "/cleanup", conn: Connection = eventConn().conn) {
-  const router = createMemoryRouter(appRoutes({ cleanup: fetchCleanup, epicList }), { initialEntries: [path] });
+function renderCleanup(fetchCleanup: FetchCleanup, path = "/cleanup", conn: Connection = eventConn().conn, cleanupWrite?: PostCleanup) {
+  const router = createMemoryRouter(appRoutes({ cleanup: fetchCleanup, epicList, cleanupWrite }), { initialEntries: [path] });
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
@@ -69,7 +69,7 @@ function renderCleanup(fetchCleanup: FetchCleanup, path = "/cleanup", conn: Conn
   return router;
 }
 
-const names = (region: string) => within(screen.getByRole("region", { name: region })).getAllByRole("listitem").map((li) => li.textContent);
+const names = (region: string) => within(screen.getByRole("region", { name: region })).getAllByRole("listitem").map((li) => li.querySelector("p")?.textContent);
 
 test("shows a spinner before data, then the groups, safe cases first", async () => {
   let resolve!: (r: CleanupReport) => void;
@@ -113,4 +113,84 @@ test("the project picker switches the read", async () => {
   fireEvent.change(screen.getByLabelText("Project"), { target: { value: "web" } });
   await screen.findByText("web/merged-wt");
   await waitFor(() => expect(fetchCleanup).toHaveBeenLastCalledWith("web"));
+});
+
+const rowButton = (region: string, name: string) => within(screen.getByRole("region", { name: region })).getByRole("button", { name });
+
+// A fetcher whose report loses the named branch or epic once a write was accepted.
+function shrinking() {
+  let written = false;
+  const fetchCleanup: FetchCleanup = async (p) => {
+    const r = reportOf(p);
+    return written ? { ...r, epics: [], worktrees: [] } : r;
+  };
+  const post = vi.fn<PostCleanup>(async () => {
+    written = true;
+    return {};
+  });
+  return { fetchCleanup, post };
+}
+
+test.each([
+  ["Merged worktrees", "Remove", "remove-worktree", { project: "gx", branch: "gx/merged-wt" }],
+  ["Merged branches", "Delete branch", "delete-branch", { project: "gx", branch: "gx/merged-branch" }],
+  ["Done epics", "Archive", "archive-epic", { project: "gx", epic: "old-epic" }],
+])("%s: the button posts %s and the list refreshes", async (region, label, action, body) => {
+  const { fetchCleanup, post } = shrinking();
+  renderCleanup(fetchCleanup, "/cleanup", undefined, post);
+  await screen.findByRole("region", { name: region });
+  fireEvent.click(rowButton(region, label));
+  await waitFor(() => expect(post).toHaveBeenCalledWith(action, expect.objectContaining(body)));
+  await waitFor(() => expect(screen.queryByRole("region", { name: region })).toBeNull());
+});
+
+test("the unmerged Remove warns, Cancel posts nothing, Confirm posts", async () => {
+  const { fetchCleanup, post } = shrinking();
+  renderCleanup(fetchCleanup, "/cleanup", undefined, post);
+  await screen.findByRole("region", { name: "Unmerged idle worktrees" });
+  fireEvent.click(rowButton("Unmerged idle worktrees", "Remove"));
+  expect((await screen.findByText(/Ignored files such as node_modules and build output are lost/)).textContent).toContain("The branch stays");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByText(/Ignored files/)).toBeNull());
+  expect(post).not.toHaveBeenCalled();
+  fireEvent.click(rowButton("Unmerged idle worktrees", "Remove"));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm remove" }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith("remove-unmerged-worktree", expect.objectContaining({ project: "gx", branch: "gx/unmerged" })));
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Unmerged idle worktrees" })).toBeNull());
+});
+
+test("a refused row stays with git's text", async () => {
+  const post = vi.fn<PostCleanup>(async () => ({ refused: true, reason: "cleanup-git-refused", message: "fatal: contains modified files" }));
+  renderCleanup(async (p) => reportOf(p), "/cleanup", undefined, post);
+  await screen.findByRole("region", { name: "Merged worktrees" });
+  fireEvent.click(rowButton("Merged worktrees", "Remove"));
+  expect((await screen.findByRole("alert")).textContent).toBe("fatal: contains modified files");
+  expect(names("Merged worktrees")[0]).toContain("gx/merged-wt");
+});
+
+test("dirty and live worktrees get no Remove button", async () => {
+  const report: CleanupReport = {
+    ...reportOf("gx"),
+    epics: [],
+    worktrees: [
+      wt("gx/dirty-merged", { path: "/w/3", recommendation: "delete", merged: true, dirty: true }),
+      wt("gx/dirty", { path: "/w/4", dirty: true }),
+      wt("gx/live", { path: "/w/5", active: true }),
+    ],
+  };
+  renderCleanup(async () => report);
+  await screen.findByText("gx/dirty-merged");
+  expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+});
+
+test("the agent button posts, and is absent when the group is empty", async () => {
+  const post = vi.fn<PostCleanup>(async () => ({}));
+  renderCleanup(async (p) => reportOf(p), "/cleanup", undefined, post);
+  await screen.findByRole("region", { name: "Needs the cleanup agent" });
+  fireEvent.click(rowButton("Needs the cleanup agent", "Start cleanup agent"));
+  await waitFor(() => expect(post).toHaveBeenCalledWith("agent", expect.objectContaining({ project: "gx" })));
+  cleanup();
+  renderCleanup(async (p) => ({ ...reportOf(p), epics: [], worktrees: [] }));
+  await screen.findByText("Nothing to clean up");
+  expect(screen.queryByRole("button", { name: "Start cleanup agent" })).toBeNull();
 });
