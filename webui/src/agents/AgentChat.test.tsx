@@ -57,7 +57,7 @@ test("a busy session names the tool in flight", async () => {
     session({ status: { state: "working" } }),
     chat({ current: { kind: "shell", label: "make test" }, others: [{ kind: "search", label: "foo" }] }),
   );
-  expect(await screen.findByText(/Working · running shell: make test/)).toBeTruthy();
+  expect((await screen.findByRole("status")).textContent).toMatch(/Working · running shell: make test/);
   expect(screen.getByRole("button", { name: "(+1 more)" })).toBeTruthy();
 });
 

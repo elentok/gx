@@ -19,8 +19,10 @@ const KIND_WORDS: Record<string, string> = {
 export function InFlightTools({ current, others = [] }: { current: SessionInFlightTool; others?: SessionInFlightTool[] }) {
   const [open, setOpen] = useState(false);
   return (
-    <>
-      {`${VERBS[current.kind] ?? ""}${current.label}`}
+    <Box as="span" display="flex" minW="0" gap="1">
+      <Text as="span" minW="0" truncate>
+        {`${VERBS[current.kind] ?? ""}${current.label}`}
+      </Text>
       {others.length > 0 && (
         <>
           {" "}
@@ -36,6 +38,8 @@ export function InFlightTools({ current, others = [] }: { current: SessionInFlig
               <chakra.button
                 type="button"
                 color="text.dim"
+                flexShrink="0"
+                whiteSpace="nowrap"
                 textDecoration="underline dotted"
                 cursor="pointer"
                 onClick={() => setOpen(true)}
@@ -80,6 +84,6 @@ export function InFlightTools({ current, others = [] }: { current: SessionInFlig
           </Popover.Root>
         </>
       )}
-    </>
+    </Box>
   );
 }

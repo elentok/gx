@@ -240,7 +240,7 @@ test("the background strip lists running tasks",async () => {
 test("a busy turn names the tool in flight", async () => {
   const current = { kind: "agent", label: "survey" };
   renderChat([session({ status: { state: "working" } })], okChat(chatOf([msg({ text: "hi" })], { current })));
-  expect(await screen.findByText("Working · waiting for sub-agent: survey")).toBeTruthy();
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Working · waiting for sub-agent: survey"));
 });
 
 test("a busy turn names the background tasks it waits on, also in the Questions view", async () => {
@@ -251,11 +251,11 @@ test("a busy turn names the background tasks it waits on, also in the Questions 
   ];
   const working = [session({ status: { state: "working" } })];
   renderChat(working, okChat(chatOf([msg({ text: "hi" })], { background })));
-  expect(await screen.findByText("Working · waiting on 1 shell, 2 subagents")).toBeTruthy();
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Working · waiting on 1 shell, 2 subagents"));
   cleanup();
   renderChat(working, roundChat({ background }));
   await screen.findByRole("group", { name: "Questions" });
-  expect(screen.getByText("Working · waiting on 1 shell, 2 subagents")).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toBe("Working · waiting on 1 shell, 2 subagents");
 });
 
 test("an event for the session refetches and a new conversation replaces the chat", async () => {

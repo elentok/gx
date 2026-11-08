@@ -280,17 +280,18 @@ export function WorkingRow({
       color="text.muted"
     >
       <ChakraSpinner size="sm" />
-      <Text as="span">
-        Working
-        {step && `: ${step}`}
-        {title && ` · ${title}`}
-        {current && (
-          <>
-            {" · "}
-            <InFlightTools current={current} others={others} />
-          </>
+      {/* A flex row with minW 0, so a long tool label truncates (InFlightTools) instead of widening the page. */}
+      <Text as="span" display="flex" minW="0" flex="1">
+        <Text as="span" flexShrink="0">
+          Working
+          {step && `: ${step}`}
+          {title && ` · ${title}`}
+          {current && " · "}
+        </Text>
+        {current && <InFlightTools current={current} others={others} />}
+        {background.length > 0 && (
+          <Text as="span" flexShrink="0" whiteSpace="pre">{` · waiting on ${backgroundSummary(background)}`}</Text>
         )}
-        {background.length > 0 && ` · waiting on ${backgroundSummary(background)}`}
       </Text>
     </Box>
   );
