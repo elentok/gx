@@ -207,6 +207,7 @@ func TestPty_DraftsGxDidNotTypeStay(t *testing.T) {
 	}{
 		"longer draft after an i press": {"ix", true},
 		"one-letter i gx did not type":  {"i", false},
+		"a person's whole draft":        {"old draft", false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -256,19 +257,5 @@ func TestPty_ClearIgnoredOnGxI_IsHungPane(t *testing.T) {
 	var hung *claudeui.HungPaneError
 	if !errors.As(err, &hung) || !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("Prompt = %v; want a HungPaneError that is ErrNotDelivered", err)
-	}
-}
-
-func TestPty_DraftThatStaysIsNotTypedOver(t *testing.T) {
-	t.Parallel()
-	p := draftPty(t)
-	p.PromptGrace = 200 * time.Millisecond
-	s := startPersonInputPty(t, p)
-
-	if err := p.Prompt(s, "do it"); !errors.Is(err, agentrunner.ErrNotDelivered) {
-		t.Fatalf("Prompt = %v; want ErrNotDelivered", err)
-	}
-	if got := fakeKeysTyped(t, p, s); got != "" {
-		t.Errorf("keys typed = %q; want none over a draft", got)
 	}
 }

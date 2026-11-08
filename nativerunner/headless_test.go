@@ -372,39 +372,42 @@ func TestHeadless_WaitTimesOutWhileWorking(t *testing.T) {
 	if st.State != agentrunner.StateWorking || st.Turn != 1 {
 		t.Errorf("status = %+v, want working turn 1", st)
 	}
-}
-
-func TestHeadless_RequiresActionIsBlocked(t *testing.T) {
-	h := newHarness(t)
-	s := h.start(t, "epic-07")
-
-	if err := h.runner.Prompt(s, "block"); err != nil {
+	// Stop on a working agent interrupts the turn before it kills the process.
+	if err := h.runner.Stop(s); err != nil {
 		t.Fatal(err)
 	}
-	st, err := h.runner.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if st.Turn != 1 {
-		t.Errorf("Turn = %d, want 1", st.Turn)
-	}
-	if err := h.runner.Prompt(s, "hello"); !errors.Is(err, agentrunner.ErrNotReady) {
-		t.Errorf("Prompt while blocked = %v, want ErrNotReady", err)
+	if !strings.Contains(h.out(t), `"control_response"`) {
+		t.Error("Stop sent SIGTERM without interrupting the turn first")
 	}
 }
 
-func TestHeadless_ExitedClaudeIsDone(t *testing.T) {
-	h := newHarness(t)
-	s := h.start(t, "epic-07")
+func TestHeadless_BlockedAndExitedStatesRefuseFurtherPrompts(t *testing.T) {
+	for _, tc := range []struct {
+		prompt  string
+		state   agentrunner.State
+		wantErr error
+	}{
+		{"block", agentrunner.StateBlocked, agentrunner.ErrNotReady},
+		{"exit", agentrunner.StateDone, agentrunner.ErrNotDelivered},
+	} {
+		t.Run(tc.prompt, func(t *testing.T) {
+			h := newHarness(t)
+			s := h.start(t, "epic-07")
 
-	if err := h.runner.Prompt(s, "exit"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.runner.Wait(s, []agentrunner.State{agentrunner.StateDone}, 5*time.Second); err != nil {
-		t.Fatal(err)
-	}
-	if err := h.runner.Prompt(s, "again"); !errors.Is(err, agentrunner.ErrNotDelivered) {
-		t.Errorf("Prompt after exit = %v, want ErrNotDelivered", err)
+			if err := h.runner.Prompt(s, tc.prompt); err != nil {
+				t.Fatal(err)
+			}
+			st, err := h.runner.Wait(s, []agentrunner.State{tc.state}, 5*time.Second)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.state == agentrunner.StateBlocked && st.Turn != 1 {
+				t.Errorf("Turn = %d, want 1", st.Turn)
+			}
+			if err := h.runner.Prompt(s, "hello"); !errors.Is(err, tc.wantErr) {
+				t.Errorf("Prompt in %v = %v, want %v", tc.state, err, tc.wantErr)
+			}
+		})
 	}
 }
 
@@ -506,23 +509,10 @@ func TestHeadless_InterruptEndsTurnAndKeepsSession(t *testing.T) {
 	if !strings.Contains(h.out(t), `"control_response"`) {
 		t.Error("claude never answered the interrupt control request")
 	}
-}
-
-func TestHeadless_CompactRunsInSameSession(t *testing.T) {
-	h := newHarness(t)
-	s := h.start(t, "epic-07")
-
-	if err := h.runner.Prompt(s, "hang"); err != nil {
-		t.Fatal(err)
-	}
-	if err := h.runner.Interrupt(s); err != nil {
-		t.Fatal(err)
-	}
-	h.waitTurn(t, s, 1)
 	if err := h.runner.Prompt(s, "/compact"); err != nil {
 		t.Fatalf("Prompt /compact: %v", err)
 	}
-	if st := h.waitTurn(t, s, 2); st.SessionID != s.SessionID {
+	if st := h.waitTurn(t, s, 3); st.SessionID != s.SessionID {
 		t.Errorf("session after /compact = %q, want %q", st.SessionID, s.SessionID)
 	}
 }
@@ -566,21 +556,6 @@ func TestHeadless_FinishWaitsForBackgroundTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.waitTurn(t, s, 1)
-}
-
-func TestHeadless_StopInterruptsAWorkingAgentFirst(t *testing.T) {
-	h := newHarness(t)
-	s := h.start(t, "epic-07")
-
-	if err := h.runner.Prompt(s, "hang"); err != nil {
-		t.Fatal(err)
-	}
-	if err := h.runner.Stop(s); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(h.out(t), `"control_response"`) {
-		t.Error("Stop sent SIGTERM without interrupting the turn first")
-	}
 }
 
 func (h *harness) out(t *testing.T) string {

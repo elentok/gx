@@ -433,27 +433,6 @@ func TestPty_StuckPromptNudgesAndRetypesOnce(t *testing.T) {
 	}
 }
 
-func TestPty_MultiLinePromptKeepsRawLF(t *testing.T) {
-	t.Parallel()
-	p := newPty(t)
-	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer p.Stop(s)
-
-	if err := p.Prompt(s, "one\ntwo"); err != nil {
-		t.Fatalf("Prompt = %v", err)
-	}
-	in, err := os.ReadFile(agentfake.TUIInputPath(ptyHome(p), s.SessionID))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := "one\ntwo\r"; string(in) != want {
-		t.Errorf("keys typed = %q; want raw LF between lines and one Enter: %q", in, want)
-	}
-}
-
 func TestPty_BlockedReasonIsWaitingFor(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
@@ -479,13 +458,10 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 	}
 	defer p.Stop(s)
 
-	data, err := os.ReadFile(filepath.Join(p.Root, "e-01", nativerunner.MetaFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var meta nativerunner.Meta
-	if err := json.Unmarshal(data, &meta); err != nil {
-		t.Fatal(err)
+	meta := readPtyMeta(t, p)
+	sock := filepath.Join(p.Root, "e-01", holder.HolderSocketFile)
+	if _, err := os.Stat(sock); err != nil {
+		t.Fatalf("holder.sock while running: %v", err)
 	}
 	if meta.Runner != "pty" || meta.SessionID != s.SessionID || meta.Cwd != cwd {
 		t.Errorf("meta = %+v; want runner pty, session %s, cwd %s", meta, s.SessionID, cwd)
@@ -528,6 +504,31 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 			t.Errorf("claude cmdline %q lacks %q", claude.Cmdline, want)
 		}
 	}
+	if err := p.Prompt(s, "one\ntwo"); err != nil {
+		t.Fatalf("Prompt = %v", err)
+	}
+	if got := fakeKeysTyped(t, p, s); got != "one\ntwo\r" {
+		t.Errorf("keys typed = %q; want raw LF between lines and one Enter", got)
+	}
+	if err := p.Stop(s); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(sock); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("holder.sock after Stop: %v; want gone", err)
+	}
+}
+
+func readPtyMeta(t *testing.T, p *nativerunner.Pty) nativerunner.Meta {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(p.Root, "e-01", nativerunner.MetaFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta nativerunner.Meta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		t.Fatal(err)
+	}
+	return meta
 }
 
 func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {
@@ -542,14 +543,7 @@ func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {
 	if s.SessionID != prev {
 		t.Errorf("SessionID = %q, want the resumed %q", s.SessionID, prev)
 	}
-	data, err := os.ReadFile(filepath.Join(p.Root, "e-01", nativerunner.MetaFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var meta nativerunner.Meta
-	if err := json.Unmarshal(data, &meta); err != nil {
-		t.Fatal(err)
-	}
+	meta := readPtyMeta(t, p)
 	claude, _, _ := nativerunner.PS.Lookup(meta.PID)
 	if !strings.Contains(claude.Cmdline, "--resume "+prev) || strings.Contains(claude.Cmdline, "--session-id") {
 		t.Errorf("claude cmdline %q, want --resume %s and no --session-id", claude.Cmdline, prev)
@@ -583,14 +577,9 @@ func TestPty_ExitBeforeExitCodeFileIsClaudeExited(t *testing.T) {
 	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.HasSuffix(err.Error(), ": claude exited (code 3)") || strings.Contains(err.Error(), "holder failed") {
 		t.Fatalf("died = %v; want session died: claude exited (code 3)", err)
 	}
-}
-
-func TestPty_UnreachableHolderIsNotSessionDied(t *testing.T) {
-	t.Parallel()
-	p := &nativerunner.Pty{Root: t.TempDir()}
-	err := nativerunner.Died(p, "e-01", fmt.Errorf("status: %w", holder.ErrHolderUnreachable))
+	err = nativerunner.Died(p, "e-01", fmt.Errorf("status: %w", holder.ErrHolderUnreachable))
 	if !errors.Is(err, holder.ErrHolderUnreachable) || errors.Is(err, agentrunner.ErrSessionDied) {
-		t.Fatalf("died = %v; want ErrHolderUnreachable and not ErrSessionDied", err)
+		t.Fatalf("unreachable holder: died = %v; want ErrHolderUnreachable and not ErrSessionDied", err)
 	}
 }
 
@@ -602,14 +591,7 @@ func TestPty_HolderCrashIsSessionDied(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer p.Stop(s)
-	data, err := os.ReadFile(filepath.Join(p.Root, "e-01", nativerunner.MetaFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var meta nativerunner.Meta
-	if err := json.Unmarshal(data, &meta); err != nil {
-		t.Fatal(err)
-	}
+	meta := readPtyMeta(t, p)
 	if err := syscall.Kill(meta.HolderPID, syscall.SIGKILL); err != nil {
 		t.Fatal(err)
 	}
@@ -629,25 +611,6 @@ func TestPty_HolderCrashIsSessionDied(t *testing.T) {
 		if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.Contains(err.Error(), "holder") {
 			t.Errorf("%s = %v; want session died naming the holder", verb.name, err)
 		}
-	}
-}
-
-func TestPty_StopRemovesHolderSock(t *testing.T) {
-	t.Parallel()
-	p := newPty(t)
-	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	sock := filepath.Join(p.Root, "e-01", holder.HolderSocketFile)
-	if _, err := os.Stat(sock); err != nil {
-		t.Fatalf("holder.sock while running: %v", err)
-	}
-	if err := p.Stop(s); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(sock); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("holder.sock after Stop: %v; want gone", err)
 	}
 }
 
