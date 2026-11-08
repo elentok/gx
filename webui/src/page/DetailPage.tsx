@@ -3,6 +3,7 @@ import { type ReactNode, useEffect } from "react";
 import { useActionableCount } from "../agents/useActionableCount";
 import { PageContainer } from "../ui/PageContainer";
 import { formatTitle, type PageTitle } from "./title";
+import { FILL_HEIGHT_VAR, useFillHeight } from "./useFillHeight";
 
 // The only place that writes `document.title`. Writes on mount and whenever the string changes;
 // the next page sets its own, so nothing is restored.
@@ -25,8 +26,9 @@ export function DetailPage({
   children: ReactNode;
 }) {
   usePageTitle(title);
+  useFillHeight(fill);
   return (
-    <Box {...(fill && { h: "100dvh", display: "flex", flexDirection: "column" })}>
+    <Box {...(fill && { h: `var(${FILL_HEIGHT_VAR}, 100dvh)`, overflow: "hidden", display: "flex", flexDirection: "column" })}>
       <PageContainer fill={fill}>{children}</PageContainer>
     </Box>
   );
