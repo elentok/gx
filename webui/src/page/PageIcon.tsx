@@ -4,6 +4,7 @@ const PATHS = {
   epics: "M3 3.5h10M3 6.5h10M3 9.5h10M3 12.5h6",
   stats: "M3.5 13V8M8 13V3M12.5 13V6",
   cleanup: "M3.5 4.5h9M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5M7 7v4M9 7v4",
+  tips: "M8 2.5a4 4 0 0 0-2 7.5v1.5h4V10a4 4 0 0 0-2-7.5zM6.5 13.5h3",
   settings: "M3 5h10M3 11h10M6 3v4M10 9v4",
   ticket: "M3 4h10v8H3zM6 7h4M6 9.5h3",
   agent: "M3 3.5h10v7H8l-3 2.5v-2.5H3z",

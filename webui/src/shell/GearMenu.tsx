@@ -3,7 +3,7 @@ import { useState } from "react";
 import { postAfk as defaultPostAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { SortActivity, SortDefault, SortName, SortNeedsYou, type Workspace } from "../generated/server";
-import { CLEANUP_HREF, SETTINGS_HREF } from "../hrefs";
+import { CLEANUP_HREF, SETTINGS_HREF, TIPS_HREF } from "../hrefs";
 import { RestartDialog } from "../restart/RestartDialog";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { showToast } from "../ui/toaster";
@@ -119,6 +119,14 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
             label: "Cleanup",
             onSelect: () => {
               window.location.hash = CLEANUP_HREF;
+              shell?.closeSliding();
+            },
+          },
+          {
+            value: "tips",
+            label: "Tips",
+            onSelect: () => {
+              window.location.hash = TIPS_HREF;
               shell?.closeSliding();
             },
           },

@@ -10,6 +10,7 @@ export const designHref = (address: string) => `#/d/${address}`;
 export const STATS_HREF = "#/stats";
 
 export const CLEANUP_HREF = "#/cleanup";
+export const TIPS_HREF = "#/tips";
 
 export const AGENTS_HREF = "#/agents";
 

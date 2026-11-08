@@ -1,6 +1,6 @@
 // Pages pass a `PageTitle` to the page frame, which writes `document.title`.
 // `name` is the epic slug or ticket title; the list pages have none, and an empty one renders as none.
-export type PageTitle = { kind: "Epics" | "Stats" | "Agents" | "Epic" | "Design" | "Ticket" | "Settings" | "Cleanup"; name?: string };
+export type PageTitle = { kind: "Epics" | "Stats" | "Agents" | "Epic" | "Design" | "Ticket" | "Settings" | "Cleanup" | "Tips"; name?: string };
 
 const SEPARATOR = " · ";
 

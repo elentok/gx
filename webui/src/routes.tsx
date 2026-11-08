@@ -24,6 +24,8 @@ import { EpicsPage } from "./epics/EpicsPage";
 import type { FetchEpicList } from "./epics/list";
 import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup";
 import { CleanupPage } from "./cleanup/CleanupPage";
+import type { FetchTips } from "./tips/tips";
+import { TipsPage } from "./tips/TipsPage";
 import type { FetchStats } from "./stats/stats";
 import { StatsPage } from "./stats/StatsPage";
 import type { FetchDetail } from "./ticket/detail";
@@ -99,6 +101,7 @@ export interface RouteFetchers {
   stats?: FetchStats;
   cleanup?: FetchCleanup;
   cleanupWrite?: PostCleanup;
+  tips?: FetchTips;
   chat?: FetchChat;
   prompt?: PostPrompt;
   focus?: PostFocus;
@@ -122,6 +125,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} fetchTrees={fetchers.worktrees} createSession={fetchers.createSession} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/cleanup", element: <CleanupPage fetchCleanup={fetchers.cleanup} postCleanup={fetchers.cleanupWrite}fetchEpics={fetchers.epicList} /> },
+    { path: "/tips", element: <TipsPage fetchTips={fetchers.tips} /> },
     { path: "/settings", element: <SettingsPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} fetchAgents={fetchers.agentSettings} signOut={fetchers.signOut} /> },
     { path: "/settings/logins", element: <WebLoginsPage fetchList={fetchers.logins} /> },
     { path: "/settings/logins/:id", element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
