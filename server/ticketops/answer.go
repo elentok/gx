@@ -42,6 +42,9 @@ func answerFrame(seq int, answer, note string) string {
 // the consequence the person agreed to, not a bare Yes that fits two readings.
 // Other kinds, and a yes-no question with no consequence line, pass through.
 func yesNoReply(q ticketlog.Question, answer string) string {
+	if answer == "" {
+		return wire.NoOptionPicked
+	}
 	if q.Kind != ticketlog.QuestionYesNo {
 		return answer
 	}
@@ -80,7 +83,8 @@ func validateAnswer(q ticketlog.Question, req wire.QueueRequest) (answer, note s
 			return "", "", &r
 		}
 	}
-	if answer == "" {
+	// A choice question may be answered by a note alone; free text needs its text.
+	if answer == "" && (q.Kind == ticketlog.QuestionText || note == "") {
 		r := queue.Refusal(wire.ReasonEmptyAnswer, "an answer is required")
 		return "", "", &r
 	}

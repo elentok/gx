@@ -18,7 +18,9 @@ const (
 	ReasonNotAnswerable = "not-answerable"
 	ReasonBadChoice     = "bad-choice"
 	ReasonEmptyAnswer   = "empty-answer"
-	ReasonTooLong       = "too-long"
+	// NoOptionPicked words a yes-no or options answer that is a note alone.
+	NoOptionPicked = "no option picked"
+	ReasonTooLong  = "too-long"
 )
 
 // Outcomes of the answer verb.

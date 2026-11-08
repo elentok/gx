@@ -36,7 +36,8 @@ export function AnswerForm({
   if (!latest || !detail.actions.includes(ActionAnswer) || sentSeq === latest.seq) return null;
 
   const isText = latest.kind !== "yes-no" && latest.kind !== "options";
-  const ready = isAnswered(answer);
+  // A choice question may be answered by a note alone; free text needs its text.
+  const ready = isAnswered(answer) || (!isText && !!answer.note?.trim());
 
   const send = async () => {
     if (!ready || pending) return;
@@ -47,7 +48,7 @@ export function AnswerForm({
       const body = {
         address: detail.address,
         state: detail.state ?? "",
-        ...(answer.huh ? { text: HUH_MESSAGE } : isText ? { text: answer.text } : { choice: answer.choice }),
+        ...(answer.huh ? { text: HUH_MESSAGE } : isText ? { text: answer.text } : answer.choice ? { choice: answer.choice } : {}),
         ...(!isText && answer.note?.trim() ? { note: answer.note } : {}),
       };
       const res = await post(body);

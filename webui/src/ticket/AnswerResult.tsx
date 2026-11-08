@@ -26,7 +26,7 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
         <Text>{sentWords(sent)}</Text>
         {sent.outcome === OutcomeDelivered && <Badge tone="running">Agent is working</Badge>}
       </Box>
-      {answer && (answer.choice || answer.text) && <Text>{answer.choice ?? answer.text}</Text>}
+      {answer && <Text>{answer.choice || answer.text || "no option picked"}</Text>}
       {answer?.note && <Text color="fg.muted">{answer.note}</Text>}
     </Box>
   );

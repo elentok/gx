@@ -308,6 +308,9 @@ func roundChat(r wire.DetailRound) []wire.ChatMessage {
 		if reply == "" {
 			reply = r.Answer.Text
 		}
+		if reply == "" {
+			reply = wire.NoOptionPicked
+		}
 		msgs = append(msgs, wire.ChatMessage{From: r.Answer.Source, Text: reply})
 	}
 	return msgs

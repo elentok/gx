@@ -27,6 +27,21 @@ const NOTE_FIELD = `Note text for question ${seq}`;
 const openNote = () => fireEvent.click(screen.getByRole("button", { name: `Note on question ${seq}` }));
 const noteField = () => screen.getByLabelText(NOTE_FIELD) as HTMLTextAreaElement;
 
+test("a note alone enables Send and posts no choice", async () => {
+  const post = vi.fn<(b: AnswerBody) => ReturnType<PostAnswer>>(ok);
+  renderThemed(<AnswerForm detail={withLatest({ kind: "yes-no" })} post={post} />);
+  const send = screen.getByRole("button", { name: "Send answer" }) as HTMLButtonElement;
+  expect(send.disabled).toBe(true);
+  openNote();
+  fireEvent.change(noteField(), { target: { value: "   " } });
+  expect(send.disabled).toBe(true);
+  fireEvent.change(noteField(), { target: { value: "neither" } });
+  expect(send.disabled).toBe(false);
+  fireEvent.click(send);
+  await waitFor(() => expect(post).toHaveBeenCalled());
+  expect(post.mock.calls[0][0]).toStrictEqual({ address: "gx:demo/12", state: "tok-1", note: "neither" });
+});
+
 test("yes-no renders Yes and No with nothing selected, and posts the choice, state and note", async () => {
   const post = vi.fn<(b: AnswerBody) => ReturnType<PostAnswer>>(ok);
   renderThemed(<AnswerForm detail={withLatest({ kind: "yes-no" })} post={post} />);

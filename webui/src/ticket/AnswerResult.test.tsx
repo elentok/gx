@@ -32,6 +32,13 @@ test("queued shows the amber answered state, the answer and the queue position",
   expect(screen.getByText("go")).toBeTruthy();
 });
 
+test("a note-only answer reads no option picked", () => {
+  const noteOnly: TicketDetail = { ...answered, latest: { ...answered.latest!, answer: { source: "web", note: "neither" } } };
+  renderThemed(<AnswerResult detail={noteOnly} sent={sentOf(seq, base.address, { outcome: "delivered" })} />);
+  expect(screen.getByText("no option picked")).toBeTruthy();
+  expect(screen.getByText("neither")).toBeTruthy();
+});
+
 test("adopted says the agent had already finished", () => {
   renderThemed(<AnswerResult detail={answered} sent={sentOf(seq, base.address, { outcome: "adopted" })} />);
   expect(screen.getByText("Answer sent · the agent had already finished")).toBeTruthy();

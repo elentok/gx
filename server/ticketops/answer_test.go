@@ -57,6 +57,26 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 	}
 }
 
+func TestAnswer_NoteAloneDeliversNoOptionPicked(t *testing.T) {
+	t.Parallel()
+	h, ticketPath, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
+	res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{
+		Address: answerAddr, State: state, Note: "neither fits", Source: "cli",
+	})
+	if err != nil || res.Refused || res.Outcome != wire.OutcomeDelivered {
+		t.Fatalf("answer = %+v, %v; want delivered", res, err)
+	}
+	want := "Reply from the user to your question 1: no option picked\nneither fits"
+	if prompts := fake.Prompts("epic-a-iter-01"); len(prompts) != 1 || prompts[0] != want {
+		t.Errorf("prompts = %q, want [%q]", prompts, want)
+	}
+	if got := answerEvents(t, ticketPath); len(got) != 1 || got[0].Choice != "" || got[0].Note != "neither fits" {
+		t.Errorf("answers = %+v; want an empty choice and the note", got)
+	}
+}
+
 func TestAnswer_NotAnswerable(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
