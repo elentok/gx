@@ -217,6 +217,15 @@ func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
 	return address, cfg, true
 }
 
+// isAsk reports whether the behaviour's turn is a single gx ask call.
+func isAsk(behaviour string) bool {
+	switch behaviour {
+	case BehaviourAsk, BehaviourAskOptions, BehaviourWriteAsk:
+		return true
+	}
+	return false
+}
+
 // work does the ticket's work off the input loop, then sends the turn's end
 // down the control channel like a test would.
 func (t *tui) work(cfg WorkerConfig, address string) {
@@ -233,10 +242,10 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	} else if err := WorkTicket(cfg, address); err != nil {
 		fmt.Fprintln(os.Stderr, "fakeclaude worker:", err)
 	}
-	if b := cfg.Behaviour[address]; b == BehaviourAsk || b == BehaviourWriteAsk || failing {
-		// An ask is one gx call, and an outage turn is one appended record, so
-		// under load the whole turn can fit between two polls of the pid file: the
-		// launch then sees no turn and pauses as agent_prompt_stalled.
+	// An ask is one gx call, and an outage turn is one appended record, so under
+	// load the whole turn can fit between two polls of the pid file: the launch
+	// then sees no turn and pauses as agent_prompt_stalled.
+	if isAsk(cfg.Behaviour[address]) || failing {
 		time.Sleep(max(0, stallTurnLength-time.Since(began)))
 	}
 	if cfg.Behaviour[address] == BehaviourFail {

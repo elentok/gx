@@ -126,6 +126,24 @@ func TestWorkTicket_AskOptionsSendsOptionsWithConsequences(t *testing.T) {
 	}
 }
 
+// A turn that is one gx ask must be held open by the TUI fake, or the launch's
+// turn poll can miss it.
+func TestIsAsk_EveryBehaviourThatAsksHoldsTheTurn(t *testing.T) {
+	for _, b := range []string{BehaviourAsk, BehaviourAskOptions, BehaviourWriteAsk} {
+		cfg, gxLog := WorkerEnv(t)
+		cfg.Behaviour = map[string]string{"p:e/01": b}
+		if err := WorkTicket(cfg, "p:e/01"); err != nil {
+			t.Fatalf("%s: %v", b, err)
+		}
+		if !strings.Contains(readLog(t, gxLog), "tickets ask p:e/01") {
+			t.Fatalf("%s: no ask in the gx log", b)
+		}
+		if !isAsk(b) {
+			t.Errorf("isAsk(%q) = false, want true", b)
+		}
+	}
+}
+
 func TestWorkTicket_RefuseAskCommitsGetsRefusedThenAsks(t *testing.T) {
 	cfg, gxLog := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourRefuseAsk}
