@@ -91,7 +91,7 @@ func (p *Prompt) AutoAdvanceDeadline(id string) time.Time { return p.autoAdvance
 // config.
 func (p *Prompt) StartAutoAdvance(id string) bool {
 	delay := cmp.Or(p.cfg.AutoAdvanceDelay, DefaultAutoAdvanceDelay)
-	if delay < 0 || p.designHeld(id) {
+	if delay < 0 || (advanceSwitch{p}).designHeld(id) {
 		return false
 	}
 	c := p.autoAdvances.begin(id, time.Now().Add(delay))
@@ -109,14 +109,18 @@ func (p *Prompt) StartAutoAdvance(id string) bool {
 			return
 		}
 		p.events.Publish(wire.EventSessionChanged, id)
-		p.sendAutoAdvance(id)
+		advanceSwitch{p}.sendAutoAdvance(id)
 	})
 	return true
 }
 
+// advanceSwitch holds the auto-advance switch's private methods, keeping
+// Prompt's own method count down.
+type advanceSwitch struct{ *Prompt }
+
 // designHeld reports whether the session is a Design session whose Design is
 // held. Holding exits those sessions, so this is the backstop.
-func (p *Prompt) designHeld(id string) bool {
+func (p advanceSwitch) designHeld(id string) bool {
 	if p.held == nil {
 		return false
 	}
@@ -141,7 +145,7 @@ func (p *Prompt) CancelAutoAdvance(id, why string) bool {
 
 // cancelAutoAdvanceRoute is the cancel route: it stops a running countdown and
 // is a no-op with none.
-func (p *Prompt) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionResult, error) {
+func (p advanceSwitch) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionResult, error) {
 	_, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
@@ -153,7 +157,7 @@ func (p *Prompt) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionRe
 
 // sendAutoAdvance sends the Continue action if the session still waits on it
 // with the switch on.
-func (p *Prompt) sendAutoAdvance(id string) {
+func (p advanceSwitch) sendAutoAdvance(id string) {
 	_, meta, res, err := p.sessions.SessionDir(id)
 	if res.Refused || err != nil || !meta.CanAutoAdvance() {
 		return

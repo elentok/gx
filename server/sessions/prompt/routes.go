@@ -31,18 +31,18 @@ func Routes(get func() *Prompt) []wire.Route {
 		{
 			Pattern:    "POST /v1/sessions/auto-advance",
 			Web:        wire.WebWrite,
-			Handler:    func(w http.ResponseWriter, r *http.Request) { get().autoAdvanceHandler(false)(w, r) },
-			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().autoAdvanceHandler(true)(w, r) },
+			Handler:    func(w http.ResponseWriter, r *http.Request) { advanceSwitch{get()}.autoAdvanceHandler(false)(w, r) },
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { advanceSwitch{get()}.autoAdvanceHandler(true)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/sessions/auto-advance/cancel",
 			Web:     wire.WebWrite,
 			Handler: func(w http.ResponseWriter, r *http.Request) {
-				sessions.SessionWrite(get().cancelAutoAdvanceRoute)(w, r)
+				sessions.SessionWrite(advanceSwitch{get()}.cancelAutoAdvanceRoute)(w, r)
 			},
 			WebHandler: func(w http.ResponseWriter, r *http.Request) {
 				p := get()
-				p.sessions.SessionWriteDesignWeb(p.cancelAutoAdvanceRoute)(w, r)
+				p.sessions.SessionWriteDesignWeb(advanceSwitch{p}.cancelAutoAdvanceRoute)(w, r)
 			},
 		},
 		{
@@ -93,8 +93,8 @@ func Routes(get func() *Prompt) []wire.Route {
 
 // autoAdvanceHandler serves the switch. With web set, a guard runs first and a
 // refusal from it is the response.
-func (p *Prompt) autoAdvanceHandler(web bool) http.HandlerFunc {
-	return switchHandler(p, web, p.setAutoAdvance, func(r wire.AutoAdvanceRequest) wire.SessionRequest {
+func (p advanceSwitch) autoAdvanceHandler(web bool) http.HandlerFunc {
+	return switchHandler(p.Prompt, web, p.setAutoAdvance, func(r wire.AutoAdvanceRequest) wire.SessionRequest {
 		return wire.SessionRequest{ID: r.ID, State: r.State}
 	})
 }
@@ -167,7 +167,7 @@ func (p *autoQueuer) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult
 
 // setAutoAdvance flips a Design session's auto-advance switch. Turning it off
 // stops a running countdown.
-func (p *Prompt) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult, error) {
+func (p advanceSwitch) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult, error) {
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
