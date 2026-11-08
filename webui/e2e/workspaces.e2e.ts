@@ -8,7 +8,8 @@ const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location
 test("Workspaces", async ({ page, start }) => {
   const fx = await start("workspaces");
   const sidebar = page.getByRole("complementary", nav("Sidebar"));
-  const row = (title: string) => sidebar.getByRole("link", { name: new RegExp(`^${title}(?![\\w-])`) });
+  // A Fix agent's link is named "Fix agent <name>": its wrench icon carries the label.
+  const row = (title: string) => sidebar.getByRole("link", { name: new RegExp(`^(Fix agent )?${title}(?![\\w-])`) });
   const switcher = page.getByRole("button", { name: /^Workspace:/ });
   // The first Escape can land before a menu takes focus, and a closing menu keeps covering the sidebar until it is gone.
   // A click on a submenu item that lands before the menu has taken focus does not open it.
