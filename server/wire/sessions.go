@@ -110,6 +110,10 @@ type SessionChatResponse struct {
 	Round          []SessionRoundCard      `json:"round" tstype:"SessionRoundCard[] | null"`
 	Next           *SessionNext            `json:"next"`
 	Background     []SessionBackgroundTask `json:"background"`
+	// Current is the newest tool call in flight and Others the older ones,
+	// newest first; both are absent when nothing is in flight.
+	Current *SessionInFlightTool  `json:"current,omitempty"`
+	Others  []SessionInFlightTool `json:"others,omitempty"`
 	// Failure is the session's, as on its SessionInfo.
 	Failure *SessionFailure `json:"failure,omitempty"`
 	// Unreadable marks a Codex conversation that has turns but no message gx
@@ -317,6 +321,13 @@ type SessionBackgroundTask struct {
 	Kind      string `json:"kind"` // transcript.BackgroundTaskShell, ...Monitor or ...Agent
 	Label     string `json:"label"`
 	StartedAt string `json:"started_at"`
+}
+
+// SessionInFlightTool is a tool call the agent is running right now. Kind is
+// transcript.InFlightShell, ...Agent, ...Search or ...Other.
+type SessionInFlightTool struct {
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
 }
 
 // SessionScreenResponse is a session's screen as plain text rows, without

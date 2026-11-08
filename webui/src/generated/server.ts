@@ -2191,6 +2191,12 @@ export interface SessionChatResponse {
   next?: SessionNext;
   background: SessionBackgroundTask[];
   /**
+   * Current is the newest tool call in flight and Others the older ones,
+   * newest first; both are absent when nothing is in flight.
+   */
+  current?: SessionInFlightTool;
+  others?: SessionInFlightTool[];
+  /**
    * Failure is the session's, as on its SessionInfo.
    */
   failure?: SessionFailure;
@@ -2438,6 +2444,14 @@ export interface SessionBackgroundTask {
   kind: string; // transcript.BackgroundTaskShell, ...Monitor or ...Agent
   label: string;
   started_at: string;
+}
+/**
+ * SessionInFlightTool is a tool call the agent is running right now. Kind is
+ * transcript.InFlightShell, ...Agent, ...Search or ...Other.
+ */
+export interface SessionInFlightTool {
+  kind: string;
+  label: string;
 }
 /**
  * SessionScreenResponse is a session's screen as plain text rows, without

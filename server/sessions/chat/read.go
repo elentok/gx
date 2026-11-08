@@ -101,6 +101,14 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 			out.Messages, out.Truncated = snap.Msgs, snap.Truncated
 			out.Round, out.Next, out.Background = snap.Round, snap.Next, snap.Background(time.Now())
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
+			for i, t := range snap.InFlight {
+				tool := wire.SessionInFlightTool{Kind: t.Kind, Label: t.Label}
+				if i == 0 {
+					out.Current = &tool
+				} else {
+					out.Others = append(out.Others, tool)
+				}
+			}
 		}
 	}
 	wire.WriteJSON(w, out)

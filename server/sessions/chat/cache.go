@@ -43,6 +43,8 @@ type Snapshot struct {
 	Round     []wire.SessionRoundCard
 	Next      *wire.SessionNext
 	Tasks     []transcript.BackgroundTaskMarker
+	// InFlight is the current turn's unanswered tool calls, newest first.
+	InFlight []transcript.InFlightTool
 	// Unreadable and CodexVersion are set for a Codex rollout gx cannot read.
 	Unreadable   bool
 	CodexVersion string
@@ -98,6 +100,9 @@ func Loader(kind agentrunner.Kind, ticket, sessionDir string, final bool) func(s
 			if mk.Status != transcript.BackgroundTaskResolved {
 				snap.Tasks = append(snap.Tasks, mk)
 			}
+		}
+		if snap.InFlight, err = transcript.ReadInFlightTools(path); err != nil {
+			return Snapshot{}, err
 		}
 		return snap, nil
 	}

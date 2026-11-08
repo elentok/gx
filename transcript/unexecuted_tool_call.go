@@ -35,6 +35,9 @@ type contentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 	Name string `json:"name"`
+	// ID is a tool_use block's id; ToolUseID is the id a tool_result answers.
+	ID        string `json:"id"`
+	ToolUseID string `json:"tool_use_id"`
 	// Input is a tool_use block's arguments.
 	Input json.RawMessage `json:"input"`
 }

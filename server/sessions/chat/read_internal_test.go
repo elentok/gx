@@ -519,6 +519,30 @@ func TestRead_BackgroundListsLiveTasksAndDropsAgedOutOnes(t *testing.T) {
 	}
 }
 
+func TestRead_InFlightCarriesUnmatchedCalls(t *testing.T) {
+	t.Parallel()
+	prompt := `{"type":"user","message":{"content":"go"}}`
+	use := func(id, cmd string) string {
+		return fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":%q,"name":"Bash","input":{"command":%q}}]}}`, id, cmd)
+	}
+	result := func(id string) string {
+		return fmt.Sprintf(`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":%q,"content":"ok"}]}}`, id)
+	}
+
+	got := chatOf(t, prompt, use("a", "one"), use("b", "two"), use("c", "three"), result("a"))
+	if got.Current == nil || got.Current.Kind != "shell" || got.Current.Label != "three" {
+		t.Errorf("current = %+v, want shell three", got.Current)
+	}
+	if len(got.Others) != 1 || got.Others[0].Label != "two" {
+		t.Errorf("others = %+v, want [two]", got.Others)
+	}
+
+	got = chatOf(t, prompt, use("a", "one"), result("a"))
+	if got.Current != nil || got.Others != nil {
+		t.Errorf("current/others = %+v/%+v, want neither", got.Current, got.Others)
+	}
+}
+
 func TestPoll_UnchangedTranscriptPublishesNothing(t *testing.T) {
 	t.Parallel()
 	f := newClaudeFixture(t)
