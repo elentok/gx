@@ -29,7 +29,7 @@ import { useComposerImages } from "./useComposerImages";
 import { NoteBox } from "./NoteBox";
 import type { PostPrompt } from "./prompt";
 import type { Answers } from "../ui/question-sheet/round";
-import { roundPrompt, unansweredOf } from "./round";
+import { huhOf, roundPrompt, unansweredOf } from "./round";
 import { SendPopover } from "./SendPopover";
 import { usePromptSend } from "./usePromptSend";
 import { useWide } from "../useWide";
@@ -116,7 +116,8 @@ export function Composer({
   const inRound = round.length > 0;
   const sendRound = () => {
     setGapsOpen(false);
-    return send({ text: roundPrompt(round, answers, text), ...images.payload }, () => {
+    const huh = huhOf(round, answers);
+    return send({ text: roundPrompt(round, answers, text), ...(huh.length ? { huh } : {}), ...images.payload }, () => {
       setText("");
       images.clear();
       onRoundSent?.();

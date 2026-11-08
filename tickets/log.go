@@ -89,10 +89,12 @@ type LogEvent struct {
 	LegacyKind string `json:"park_kind,omitempty"`
 
 	// pause.answer, pause.permission and pause.closed
-	Question int              `json:"question,omitempty"`
-	Source   string           `json:"source,omitempty"`
-	Choice   string           `json:"choice,omitempty"`
-	Note     string           `json:"note,omitempty"`
+	Question int    `json:"question,omitempty"`
+	Source   string `json:"source,omitempty"`
+	Choice   string `json:"choice,omitempty"`
+	Note     string `json:"note,omitempty"`
+	// Huh marks a pause.answer sent as Huh?: the person could not follow the question.
+	Huh      bool             `json:"huh,omitempty"`
 	Decision string           `json:"decision,omitempty"`
 	Shown    *PermissionShown `json:"shown,omitempty"`
 	Reason   string           `json:"reason,omitempty"`

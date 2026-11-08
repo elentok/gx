@@ -294,6 +294,10 @@ func detailRound(r tickets.PauseRound, full bool) wire.DetailRound {
 	}
 	if r.End.Type == tickets.EventPauseAnswer {
 		out.Answer = &wire.DetailAnswer{Source: r.End.Source, Choice: r.End.Choice, Text: r.End.Text, Note: r.End.Note}
+		if r.End.Huh {
+			// A choice question's Huh? logs no text; the history shows what the agent heard.
+			out.Answer.Text = wire.HuhMessage
+		}
 	} else {
 		out.ClosedReason = r.End.Reason
 	}

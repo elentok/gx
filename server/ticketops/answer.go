@@ -62,6 +62,17 @@ func yesNoReply(q ticketlog.Question, answer string) string {
 // text to deliver and log: the choice (or the free text) and the note.
 func validateAnswer(q ticketlog.Question, req wire.QueueRequest) (answer, note string, bad *wire.QueueResult) {
 	note = strings.TrimSpace(wire.NormalizeAnswer(req.Note))
+	if req.Huh {
+		// Huh? stands in for the answer on any kind; free text takes no note.
+		if q.Kind == ticketlog.QuestionText {
+			note = ""
+		}
+		if utf8.RuneCountInString(note) > maxAnswerChars {
+			r := queue.Refusal(wire.ReasonTooLong, fmt.Sprintf("an answer or note is limited to %d characters", maxAnswerChars))
+			return "", "", &r
+		}
+		return wire.HuhMessage, note, nil
+	}
 	switch q.Kind {
 	case ticketlog.QuestionText:
 		answer, note = strings.TrimSpace(wire.NormalizeAnswer(req.Text)), ""
@@ -150,7 +161,11 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 				if err != nil {
 					return tickets.LogEvent{}, err
 				}
-				err = runner.Prompt(run.Session, answerFrame(open.Seq, yesNoReply(q, answer), note))
+				reply := yesNoReply(q, answer)
+				if req.Huh {
+					reply = answer
+				}
+				err = runner.Prompt(run.Session, answerFrame(open.Seq, reply, note))
 				switch {
 				case errors.Is(err, agentrunner.ErrNotReady):
 					return refuse(queue.Refusal(wire.ReasonAgentNotReady, err.Error()))
@@ -165,9 +180,12 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 					}
 				}
 			}
-			ev := tickets.LogEvent{Type: tickets.EventPauseAnswer, Source: req.Source, How: tickets.HowAnswer, Question: open.Seq, Choice: answer, Note: note}
+			ev := tickets.LogEvent{Type: tickets.EventPauseAnswer, Source: req.Source, How: tickets.HowAnswer, Question: open.Seq, Choice: answer, Note: note, Huh: req.Huh}
 			if q.Kind == ticketlog.QuestionText {
 				ev.Choice, ev.Text = "", answer
+			}
+			if req.Huh {
+				ev.Choice = ""
 			}
 			return ev, nil
 		})

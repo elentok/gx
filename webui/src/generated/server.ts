@@ -2338,6 +2338,17 @@ export interface SessionPromptRequest {
    * each before Text. The 32 KB cap counts Text only.
    */
   images?: string[];
+  /**
+   * Huh names the Grilling questions of the round that Text sends as Huh?.
+   */
+  huh?: SessionHuh[];
+}
+/**
+ * SessionHuh is a question sent as Huh?: the card's body and title.
+ */
+export interface SessionHuh {
+  question: string;
+  title: string;
 }
 /**
  * SessionRoundOption is one choice of an options card.

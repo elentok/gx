@@ -52,6 +52,17 @@ func (r *Recorder) Record(s Session) {
 	}
 }
 
+// SaveHuh adds the Design-round questions sent as Huh? to the session's current
+// conversation record.
+func (r *Recorder) SaveHuh(s Session, items []conversations.HuhItem) {
+	if r == nil || s.ConversationID == "" || len(items) == 0 {
+		return
+	}
+	if err := conversations.AppendHuh(r.Dir, s.ConversationID, items); err != nil {
+		r.Log.Warn("record huh", "session", s.ID, "err", err)
+	}
+}
+
 // SaveTotals saves the tokens and cost of the ended conversation on its record,
 // so stamps never re-read a transcript that may have aged out. An unreadable
 // transcript leaves the record without totals.

@@ -20,7 +20,9 @@ const (
 	ReasonEmptyAnswer   = "empty-answer"
 	// NoOptionPicked words a yes-no or options answer that is a note alone.
 	NoOptionPicked = "no option picked"
-	ReasonTooLong  = "too-long"
+	// HuhMessage is what the agent hears when the person could not follow its question.
+	HuhMessage    = "I could not follow this question. Could you explain it another way?"
+	ReasonTooLong = "too-long"
 )
 
 // Outcomes of the answer verb.

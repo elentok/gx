@@ -1,6 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { HUH_MESSAGE } from "../design/round";
 import { ActionAnswer, type TicketDetail } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { Question } from "../ui/question-sheet/Question";
@@ -44,11 +43,10 @@ export function AnswerForm({
     setPending(true);
     setError("");
     try {
-      // The server takes no Huh? field: it travels as the free-text answer.
       const body = {
         address: detail.address,
         state: detail.state ?? "",
-        ...(answer.huh ? { text: HUH_MESSAGE } : isText ? { text: answer.text } : answer.choice ? { choice: answer.choice } : {}),
+        ...(answer.huh ? { huh: true } : isText ? { text: answer.text } : answer.choice ? { choice: answer.choice } : {}),
         ...(!isText && answer.note?.trim() ? { note: answer.note } : {}),
       };
       const res = await post(body);

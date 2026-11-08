@@ -38,6 +38,17 @@ type Record struct {
 	// counted; an empty list means counted, no rounds. No omitempty: it would
 	// turn the empty list back into absent.
 	Grilling []GrillingItem `json:"grilling"`
+	// Huh lists the questions of a Design round the person sent as Huh?. Records
+	// written before it existed lack it.
+	Huh []HuhItem `json:"huh,omitempty"`
+}
+
+// HuhItem is one Design-round question the person answered with Huh?.
+type HuhItem struct {
+	Question  string    `json:"question"`
+	Title     string    `json:"title"`
+	MessageID string    `json:"message_id"`
+	At        time.Time `json:"at"`
 }
 
 // GrillingItem is one counted Grilling round or closing summary.
@@ -118,8 +129,29 @@ func Save(root string, r Record) error {
 		if r.Grilling == nil {
 			r.Grilling = prev.Grilling
 		}
+		if r.Huh == nil {
+			r.Huh = prev.Huh
+		}
 		r.Design = r.Design || prev.Design
 	}
+	return write(path, r)
+}
+
+// AppendHuh adds items to the Huh list of conversation id. A conversation with
+// no record is skipped.
+func AppendHuh(root, id string, items []HuhItem) error {
+	path, err := recordPath(root, id)
+	if err != nil {
+		return err
+	}
+	r, err := read(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	r.Huh = append(r.Huh, items...)
 	return write(path, r)
 }
 

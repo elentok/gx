@@ -276,6 +276,14 @@ type SessionPromptRequest struct {
 	// Images are the ids of saved Prompt images, in attach order. gx pastes
 	// each before Text. The 32 KB cap counts Text only.
 	Images []string `json:"images,omitempty"`
+	// Huh names the Grilling questions of the round that Text sends as Huh?.
+	Huh []SessionHuh `json:"huh,omitempty"`
+}
+
+// SessionHuh is a question sent as Huh?: the card's body and title.
+type SessionHuh struct {
+	Question string `json:"question"`
+	Title    string `json:"title"`
 }
 
 // SessionRoundOption is one choice of an options card.

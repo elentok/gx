@@ -110,6 +110,19 @@ func TestReadLog_SkipsTornLastLine(t *testing.T) {
 	}
 }
 
+func TestReadLog_HuhFlagIsAdditive(t *testing.T) {
+	path := logTicketPath(t)
+	writeFile(t, LogPath(path), `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"pause.answer","question":1,"choice":"a"}`+"\n"+
+		`{"seq":2,"ts":"2026-01-01T00:00:01Z","type":"pause.answer","question":2,"huh":true}`+"\n")
+	events, err := ReadLog(path)
+	if err != nil || len(events) != 2 {
+		t.Fatalf("ReadLog = %v, %v; want 2 events", events, err)
+	}
+	if events[0].Huh || !events[1].Huh {
+		t.Errorf("huh = %v, %v; want false (old line), true", events[0].Huh, events[1].Huh)
+	}
+}
+
 // Read shim: a log written before the rename keeps its old event types and
 // kind field, and reads back in the current spelling.
 func TestReadLog_FoldsOldEventTypesAndKind(t *testing.T) {

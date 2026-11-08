@@ -74,6 +74,8 @@ type QueueRequest struct {
 	// the body. A free-text answer uses Text.
 	Choice string `json:"choice,omitempty"`
 	Note   string `json:"note,omitempty"`
+	// Huh answers with the fixed Huh? message instead of a choice or text.
+	Huh    bool   `json:"huh,omitempty"`
 	State  string `json:"state,omitempty"`
 	Source string `json:"source,omitempty"`
 }

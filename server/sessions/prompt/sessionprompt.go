@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
@@ -136,12 +137,23 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 		if err := p.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
 			return wire.SessionResult{}, err
 		}
+		p.sessions.Conv.SaveHuh(meta.ConvSession(), huhItems(req, time.Now()))
 	}
 	if err := runlog.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
 		p.log.Warn("logging session prompt", "session", req.ID, "err", err)
 	}
 	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
+}
+
+// huhItems is the record of each question the round sent as Huh?; the round's
+// message is the last one the page saw.
+func huhItems(req wire.SessionPromptRequest, at time.Time) []conversations.HuhItem {
+	var out []conversations.HuhItem
+	for _, h := range req.Huh {
+		out = append(out, conversations.HuhItem{Question: h.Question, Title: h.Title, MessageID: req.LastMessage, At: at})
+	}
+	return out
 }
 
 // notePersonTyped records a person's input on a session: it stops a running

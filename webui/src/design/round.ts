@@ -1,7 +1,11 @@
 import type { SessionRoundCard } from "../generated/server";
 import { choicesOf, isAnswered, nameOf, type Answer, type Answers } from "../ui/question-sheet/round";
 
-export const HUH_MESSAGE = "I don't understand the question, please explain in a clearer way";
+export const HUH_MESSAGE = "I could not follow this question. Could you explain it another way?";
+
+/** The cards of the round the person answered with Huh?, for the conversation record. */
+export const huhOf = (round: SessionRoundCard[], answers: Answers) =>
+  round.filter((c) => answers[c.label]?.huh).map((c) => ({ question: c.body, title: c.title }));
 
 /** The answer as the prompt words it: the Huh? message, the picked option's label, or the typed text. */
 export const answerText = (c: SessionRoundCard, a: Answer) => {

@@ -2,7 +2,6 @@ import { ChakraProvider } from "@chakra-ui/react";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import canned from "../canned-detail.json";
-import { HUH_MESSAGE } from "../design/round";
 import type { DetailRound, TicketDetail } from "../generated/server";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
@@ -92,13 +91,14 @@ test("a round of one shows no dots, count, Prev/Next or fold button, but Huh? an
   expect(screen.queryByRole("button", { name: /Fold questions|Open questions/ })).toBeNull();
 });
 
-test("Huh? sends the standard explain-it-again message", async () => {
+test("Huh? posts the huh flag, not the message, and posts nothing before Send", async () => {
   const post = vi.fn<(b: AnswerBody) => ReturnType<PostAnswer>>(ok);
   renderThemed(<AnswerForm detail={withLatest({ kind: "text" })} post={post} />);
   fireEvent.click(screen.getByRole("button", { name: "Huh?" }));
+  expect(post).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
   await waitFor(() => expect(post).toHaveBeenCalled());
-  expect(post).toHaveBeenCalledWith({ address: "gx:demo/12", state: "tok-1", text: HUH_MESSAGE });
+  expect(post).toHaveBeenCalledWith({ address: "gx:demo/12", state: "tok-1", huh: true });
 });
 
 test("text posts the typed text", async () => {

@@ -29,6 +29,7 @@ import { WriteError } from "../useWrite";
 import type { FetchChat } from "./chat";
 import { Composer } from "./Composer";
 import type { PostPrompt } from "./prompt";
+import { HUH_MESSAGE } from "./round";
 
 afterEach(() => {
   cleanup();
@@ -845,6 +846,20 @@ test("Send answers the whole round in one prompt", async () => {
     text: "Q1 - T1: Alpha\n  Note: because\nQ2 - T2: No - Nope\nQ3 - T3: free text\n\nNote:\noverall",
     last_message: "m9",
   });
+});
+
+test("Huh? puts the fixed message in the prompt, names the question for the record, and sends nothing on the click", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: round() }) });
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Huh?" }));
+  expect(post).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  const body = post.mock.calls[0][0];
+  expect(body.text).toContain(`Q1 - T1: ${HUH_MESSAGE}`);
+  expect(body.huh).toEqual([{ question: round()[0].body, title: "T1" }]);
 });
 
 // Q1 answered, Q2 and Q3 not; Send is clicked and the popover is open.

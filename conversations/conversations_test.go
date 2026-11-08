@@ -25,6 +25,28 @@ func TestGrillingAndDesignRoundTrip(t *testing.T) {
 	}
 }
 
+func TestHuhRoundTripsAndOldRecordLoads(t *testing.T) {
+	root := t.TempDir()
+	if err := conversations.Save(root, conversations.Record{ID: "c1"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := conversations.Read(root, "c1"); got.Huh != nil {
+		t.Fatalf("old record has Huh %+v, want nil", got.Huh)
+	}
+	items := []conversations.HuhItem{{Question: "q", Title: "t", MessageID: "m1", At: at}}
+	if err := conversations.AppendHuh(root, "c1", items); err != nil {
+		t.Fatal(err)
+	}
+	// A re-link save must keep the list.
+	if err := conversations.Save(root, conversations.Record{ID: "c1", Ticket: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := conversations.Read(root, "c1")
+	if !reflect.DeepEqual(got.Huh, items) {
+		t.Errorf("Huh = %+v, want %+v", got.Huh, items)
+	}
+}
+
 func TestEmptyGrillingStaysCounted(t *testing.T) {
 	root := t.TempDir()
 	if err := conversations.Save(root, conversations.Record{ID: "c1"}); err != nil {
