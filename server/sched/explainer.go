@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/disk"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -94,4 +96,62 @@ func (x *Explainer) explainIn(epics []tickets.Epic, addr tickets.Address) (wire.
 		}
 	}
 	return wire.Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: "no ticket " + addr.String()}
+}
+
+// Hold is why a ticket is held from claiming: the explain verdict and
+// reason that name the wait.
+type Hold struct {
+	Verdict string
+	Reason  string
+}
+
+// ClaimHold asks whether a ticket of agent in project is held from claiming.
+// The claim pass and the schedule verdict both ask it, so a rule added here
+// holds the ticket and explains the wait. The usage gate comes last, so a
+// rate-limit hold's reason wins; a handoff restart (an answered ticket) is
+// never gated.
+func (x *Explainer) ClaimHold(project string, t tickets.Ticket, rh harnesschoice.ResolvedHarness) (Hold, bool) {
+	agent := rh.Harness
+	if reason := x.Harness.QueueMissingReason(project, rh); reason != "" {
+		return Hold{Verdict: wire.VerdictHarnessMissing, Reason: reason}, true
+	}
+	if reason, held := x.Herdr.Holds(x.Harness.LaunchRunner(project, agent)); held {
+		return Hold{Verdict: wire.VerdictHerdrDown, Reason: reason}, true
+	}
+	if limited, held := x.Registry.RateLimitHeld(string(agent)); held {
+		return Hold{Verdict: RateLimitVerdict(limited.RateLimitReset)}, true
+	}
+	if AnsweredSession(t) == "" {
+		if v, held := x.Limits.UsageGate(agent, time.Now()); held {
+			return Hold{Verdict: v}, true
+		}
+	}
+	return Hold{}, false
+}
+
+// CheckWaitingLabel is the status label of a claimed ticket whose `gx check
+// --full` waits for the check lock, or "". It is a label only: no pause kind,
+// no status change.
+//
+// Mechanism: the waiting file the check writes names the worktree it checks
+// (check.Waiting.Root); the ticket's tracked run knows its worktree (Cwd), so
+// the two meet on that path. check.ReadWaiting drops a waiter whose process is
+// gone, so a killed waiter never leaves a label, and a run with no tracked
+// ticket matches nothing.
+func (x *Explainer) CheckWaitingLabel(address string) string {
+	t, ok := x.Registry.Tracked(address)
+	if !ok || t.Cwd == "" {
+		return ""
+	}
+	cwd := projects.CanonicalDir(t.Cwd)
+	for _, w := range check.ReadWaiting(x.StateDir) {
+		if w.Root == "" || projects.CanonicalDir(w.Root) != cwd {
+			continue
+		}
+		if w.HeldBy == "" {
+			return "waiting for the check lock"
+		}
+		return "waiting for the check lock, held by " + w.HeldBy
+	}
+	return ""
 }
