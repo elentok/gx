@@ -287,6 +287,9 @@ func TestCleanupWrite_UnmergedWorktreeWithALiveSessionIsRefused(t *testing.T) {
 	if _, err := os.Stat(wt); err != nil {
 		t.Errorf("worktree gone: %v", err)
 	}
+	if got := actionsByBranch(t, h)["feature-x"]; got != "" {
+		t.Errorf("live-session row action = %q, want none", got)
+	}
 }
 
 func TestCleanupRead_ChangesNothing(t *testing.T) {

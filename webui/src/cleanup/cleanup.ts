@@ -44,22 +44,16 @@ export interface CleanupGroup {
   epics: CleanupEpic[];
 }
 
-// Safe cases first. A row lands in the first group it fits, so each shows once.
+// Safe cases first. The server decides each row's action; this only buckets by it.
 export function groupReport(report: CleanupReport): CleanupGroup[] {
-  const merged = (w: CleanupWorktree) => w.recommendation === "delete" && !w.active;
-  const unmergedIdle = (w: CleanupWorktree) => !w.active && !w.dirty && !!w.path && !w.recommendation;
+  const wts = (action: string) => report.worktrees.filter((w) => w.action === action);
+  const epics = (action: string) => report.epics.filter((e) => e.action === action);
   const groups: CleanupGroup[] = [
-    { id: "merged-worktrees", title: "Merged worktrees", hint: "Remove the worktree", worktrees: report.worktrees.filter((w) => merged(w) && w.path), epics: [] },
-    { id: "merged-branches", title: "Merged branches", hint: "Delete the branch", worktrees: report.worktrees.filter((w) => merged(w) && !w.path), epics: [] },
-    { id: "done-epics", title: "Done epics", hint: "Archive the epic", worktrees: [], epics: report.epics.filter((e) => e.all_done && e.merged_to_main) },
-    { id: "unmerged-worktrees", title: "Unmerged idle worktrees", hint: "Remove the worktree and keep the branch", worktrees: report.worktrees.filter(unmergedIdle), epics: [] },
-    {
-      id: "agent",
-      title: "Needs the cleanup agent",
-      hint: "Start a cleanup agent",
-      worktrees: report.worktrees.filter((w) => w.agent_group && !unmergedIdle(w)),
-      epics: report.epics.filter((e) => e.agent_group),
-    },
+    { id: "merged-worktrees", title: "Merged worktrees", hint: "Remove the worktree", worktrees: wts("merged-remove"), epics: [] },
+    { id: "merged-branches", title: "Merged branches", hint: "Delete the branch", worktrees: wts("merged-delete"), epics: [] },
+    { id: "done-epics", title: "Done epics", hint: "Archive the epic", worktrees: [], epics: epics("archive") },
+    { id: "unmerged-worktrees", title: "Unmerged idle worktrees", hint: "Remove the worktree and keep the branch", worktrees: wts("unmerged-remove"), epics: [] },
+    { id: "agent", title: "Needs the cleanup agent", hint: "Start a cleanup agent", worktrees: wts("agent"), epics: epics("agent") },
   ];
   return groups.filter((g) => g.worktrees.length + g.epics.length > 0);
 }

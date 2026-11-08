@@ -96,12 +96,12 @@ func TestCleanupAgent_ReportMarksTheAgentGroup(t *testing.T) {
 	}
 	marked := map[string]bool{}
 	for _, wt := range rep.Worktrees {
-		if wt.AgentGroup {
+		if wt.Action == wire.CleanupActionAgent {
 			marked[wt.Branch] = true
 		}
 	}
 	for _, e := range rep.Epics {
-		if e.AgentGroup {
+		if e.Action == wire.CleanupActionAgent {
 			marked[e.Name] = true
 		}
 	}

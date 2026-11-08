@@ -67,11 +67,23 @@ export interface CleanupEpic {
   has_code_review_ticket: boolean;
   code_review_done: boolean;
   /**
-   * AgentGroup marks a done epic that has not landed: no button decides it,
-   * so the cleanup agent does.
+   * Action is the one thing the page offers for the epic: CleanupActionArchive,
+   * CleanupActionAgent, or empty for none.
    */
-  agent_group?: boolean;
+  action?: string;
 }
+export const CleanupActionMergedRemove = "merged-remove";
+export const CleanupActionMergedDelete = "merged-delete";
+export const CleanupActionUnmergedRemove = "unmerged-remove";
+export const CleanupActionArchive = "archive";
+/**
+ * CleanupActionAgent marks a row no button can decide, so the cleanup agent does.
+ */
+export const CleanupActionAgent = "agent";
+/**
+ * The per-row cleanup actions the server decides. The page only buckets by them.
+ */
+export type CleanupAction = typeof CleanupActionMergedRemove | typeof CleanupActionMergedDelete | typeof CleanupActionUnmergedRemove | typeof CleanupActionArchive | typeof CleanupActionAgent;
 /**
  * CleanupWorktree is one branch or detached worktree in the cleanup scan.
  * SizeBytes is absent until the background size read for Path has landed.
@@ -92,10 +104,10 @@ export interface CleanupWorktree {
   recommendation?: string;
   size_bytes?: number /* uint64 */;
   /**
-   * AgentGroup marks an idle branch the scan cannot call (no recommendation),
-   * so the cleanup agent decides it.
+   * Action is one of the CleanupAction values, or empty when the row has no
+   * button (detached, live session, active and unmerged).
    */
-  agent_group?: boolean;
+  action?: string;
 }
 /**
  * CleanupReport is the cleanup read route's result for one project.

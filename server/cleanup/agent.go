@@ -39,12 +39,12 @@ func (c *Cleanup) StartAgent(project string) (wire.OneOffResult, error) {
 	}
 	var branches, epics []string
 	for _, wt := range rep.Worktrees {
-		if wt.AgentGroup {
+		if wt.Action == wire.CleanupActionAgent {
 			branches = append(branches, wt.Branch)
 		}
 	}
 	for _, e := range rep.Epics {
-		if e.AgentGroup {
+		if e.Action == wire.CleanupActionAgent {
 			epics = append(epics, e.Name)
 		}
 	}

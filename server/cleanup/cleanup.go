@@ -103,33 +103,77 @@ func (c *Cleanup) Report(project string) (wire.CleanupReport, error) {
 		rep.Epics = append(rep.Epics, wire.CleanupEpic{
 			Name: e.Name, AllDone: e.AllDone, MergedToTrunk: e.MergedToTrunk,
 			HasCodeReviewTicket: e.HasCodeReviewTicket, CodeReviewDone: e.CodeReviewDone,
-			AgentGroup: e.AllDone && !e.MergedToTrunk,
+			Action: epicAction(e),
 		})
 	}
 	var missing []string
-	c.mu.Lock()
 	for _, wt := range res.Worktrees {
+		live := ""
+		if wt.Path != "" {
+			if live, err = c.liveSessionIn(wt.Path); err != nil {
+				return wire.CleanupReport{}, err
+			}
+		}
 		out := wire.CleanupWorktree{
 			Branch: wt.Branch, Path: wt.Path, Kind: wt.Kind, Active: wt.Active, Dirty: wt.Dirty, Head: wt.Head,
 			Epic: wt.Epic, TicketID: wt.TicketID, TicketDone: wt.TicketDone, Merged: wt.Merged,
 			MergedToTrunk: wt.MergedToTrunk, DeleteMode: wt.DeleteMode, Recommendation: wt.Recommendation,
-			AgentGroup: !wt.Active && wt.Recommendation == "" && wt.Branch != "",
+			Action: worktreeAction(wt, live != ""),
 		}
-		if wt.Path != "" {
-			if n, ok := c.sizes[wt.Path]; ok {
-				out.SizeBytes = &n
-			} else if !c.inflight[wt.Path] {
-				c.inflight[wt.Path] = true
-				missing = append(missing, wt.Path)
-			}
-		}
+		out.SizeBytes, missing = c.sizeOf(wt.Path, missing)
 		rep.Worktrees = append(rep.Worktrees, out)
 	}
-	c.mu.Unlock()
 	for _, p := range missing {
 		go c.measure(project, p)
 	}
 	return rep, nil
+}
+
+// epicAction: a done epic archives once landed on trunk, else the agent decides it.
+func epicAction(e cleanupscan.EpicScan) string {
+	switch {
+	case !e.AllDone:
+		return ""
+	case e.MergedToTrunk:
+		return wire.CleanupActionArchive
+	}
+	return wire.CleanupActionAgent
+}
+
+// worktreeAction decides the row's one button, once, for the page and the agent
+// prompt. A proven merge ignores Active and TicketDone, as the write routes do.
+// Detached rows get none: the write routes find rows by branch.
+func worktreeAction(wt cleanupscan.WorktreeScan, live bool) string {
+	switch {
+	case wt.Branch == "":
+		return ""
+	case wt.DeleteMode != cleanupscan.DeleteNone && wt.Path == "":
+		return wire.CleanupActionMergedDelete
+	case wt.DeleteMode != cleanupscan.DeleteNone:
+		return wire.CleanupActionMergedRemove
+	case wt.Path != "" && !wt.Dirty && !live:
+		return wire.CleanupActionUnmergedRemove
+	case wt.Path != "" || wt.Active:
+		return ""
+	}
+	return wire.CleanupActionAgent
+}
+
+// sizeOf returns path's cached size, or queues path to be measured.
+func (c *Cleanup) sizeOf(path string, missing []string) (*uint64, []string) {
+	if path == "" {
+		return nil, missing
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if n, ok := c.sizes[path]; ok {
+		return &n, missing
+	}
+	if !c.inflight[path] {
+		c.inflight[path] = true
+		missing = append(missing, path)
+	}
+	return nil, missing
 }
 
 // Invalidate drops the cached sizes, so the next read measures again. A removal

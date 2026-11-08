@@ -47,14 +47,16 @@ const wt = (branch: string, over: Partial<CleanupWorktree> = {}): CleanupWorktre
 const reportOf = (project: string, size?: number): CleanupReport => ({
   project,
   epics: [
-    { name: "old-epic", all_done: true, merged_to_main: true, has_code_review_ticket: false, code_review_done: false },
-    { name: "stuck-epic", all_done: true, merged_to_main: false, has_code_review_ticket: false, code_review_done: false, agent_group: true },
+    { name: "old-epic", all_done: true, merged_to_main: true, has_code_review_ticket: false, code_review_done: false, action: "archive" },
+    { name: "stuck-epic", all_done: true, merged_to_main: false, has_code_review_ticket: false, code_review_done: false, action: "agent" },
   ],
   worktrees: [
-    wt(`${project}/merged-wt`, { path: "/w/1", recommendation: "delete", merged: true, delete_mode: "-d", size_bytes: size }),
-    wt(`${project}/merged-branch`, { recommendation: "delete", merged: true, delete_mode: "-d" }),
-    wt(`${project}/unmerged`, { path: "/w/2" }),
-    wt(`${project}/mystery`, { agent_group: true }),
+    wt(`${project}/merged-wt`, { path: "/w/1", action: "merged-remove", size_bytes: size }),
+    wt(`${project}/merged-branch`, { action: "merged-delete" }),
+    wt(`${project}/unmerged`, { path: "/w/2", action: "unmerged-remove" }),
+    wt(`${project}/mystery`, { action: "agent" }),
+    wt(`${project}/live`, { path: "/w/3" }),
+    wt(`${project}/detached`, { branch: "", path: "/w/4", kind: "detached" }),
   ],
   attic_refs: [],
 });
@@ -173,7 +175,7 @@ test("dirty and live worktrees get no Remove button", async () => {
     ...reportOf("gx"),
     epics: [],
     worktrees: [
-      wt("gx/dirty-merged", { path: "/w/3", recommendation: "delete", merged: true, dirty: true }),
+      wt("gx/dirty-merged", { path: "/w/3", action: "merged-remove", dirty: true }),
       wt("gx/dirty", { path: "/w/4", dirty: true }),
       wt("gx/live", { path: "/w/5", active: true }),
     ],

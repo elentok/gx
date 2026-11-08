@@ -11,10 +11,20 @@ type CleanupEpic struct {
 	MergedToTrunk       bool   `json:"merged_to_main"`
 	HasCodeReviewTicket bool   `json:"has_code_review_ticket"`
 	CodeReviewDone      bool   `json:"code_review_done"`
-	// AgentGroup marks a done epic that has not landed: no button decides it,
-	// so the cleanup agent does.
-	AgentGroup bool `json:"agent_group,omitempty"`
+	// Action is the one thing the page offers for the epic: CleanupActionArchive,
+	// CleanupActionAgent, or empty for none.
+	Action string `json:"action,omitempty"`
 }
+
+// The per-row cleanup actions the server decides. The page only buckets by them.
+const (
+	CleanupActionMergedRemove   = "merged-remove"
+	CleanupActionMergedDelete   = "merged-delete"
+	CleanupActionUnmergedRemove = "unmerged-remove"
+	CleanupActionArchive        = "archive"
+	// CleanupActionAgent marks a row no button can decide, so the cleanup agent does.
+	CleanupActionAgent = "agent"
+)
 
 // CleanupWorktree is one branch or detached worktree in the cleanup scan.
 // SizeBytes is absent until the background size read for Path has landed.
@@ -33,9 +43,9 @@ type CleanupWorktree struct {
 	DeleteMode     string  `json:"delete_mode,omitempty"`
 	Recommendation string  `json:"recommendation,omitempty"`
 	SizeBytes      *uint64 `json:"size_bytes,omitempty"`
-	// AgentGroup marks an idle branch the scan cannot call (no recommendation),
-	// so the cleanup agent decides it.
-	AgentGroup bool `json:"agent_group,omitempty"`
+	// Action is one of the CleanupAction values, or empty when the row has no
+	// button (detached, live session, active and unmerged).
+	Action string `json:"action,omitempty"`
 }
 
 // CleanupReport is the cleanup read route's result for one project.
