@@ -12,9 +12,11 @@ import (
 	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/backgroundtask"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -241,6 +243,32 @@ func (o *Ops) LiveTask(address string) (live, stoppable bool, err error) {
 	}
 	live = st.Background
 	return live, live && agent.AgentFor(run.Agent) == agent.AgentClaude, nil
+}
+
+// TaskCard reads the facts of the live task of address's Claude agent for its
+// gate card, or nil when there is no run, no session id or no outstanding task.
+func (o *Ops) TaskCard(address string) (*wire.BackgroundTaskCard, error) {
+	run, ok := o.d.Registry.Tracked(address)
+	if !ok || run.Session.SessionID == "" || agent.AgentFor(run.Agent) != agent.AgentClaude {
+		return nil, nil
+	}
+	home, err := o.d.Projects.EnvHome()
+	if err != nil {
+		return nil, err
+	}
+	rd := &backgroundtask.Reader{Home: home}
+	f, ok := rd.Facts(run.Session.SessionID, backgroundtask.DefaultOutputBase(), backgroundtask.ProcessFinder{Procs: syshealth.DefaultProcess()})
+	if !ok {
+		return nil, nil
+	}
+	card := &wire.BackgroundTaskCard{Label: f.Label, StartedAt: f.StartedAt, Alive: f.Process.Alive, LastLines: f.Process.LastLines}
+	if card.LastLines == nil {
+		card.LastLines = []string{}
+	}
+	if !f.Process.LastOutput.IsZero() {
+		card.LastOutputAt = &f.Process.LastOutput
+	}
+	return card, nil
 }
 
 // AgentGone reports that no live agent is waiting on address: its run is not

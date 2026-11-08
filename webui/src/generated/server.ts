@@ -444,6 +444,17 @@ export interface PermissionCard {
   hint?: string;
 }
 /**
+ * BackgroundTaskCard is what a background-task-gate card shows of the live
+ * task. LastOutputAt is unset when the output file was not found.
+ */
+export interface BackgroundTaskCard {
+  label: string;
+  started_at: string;
+  alive: boolean;
+  last_output_at?: string;
+  last_lines: string[];
+}
+/**
  * ChatMessage is one message of the latest round's exchange.
  */
 export interface ChatMessage {
@@ -535,6 +546,10 @@ export interface TicketDetail {
    * Permission is empty until a headless or pty agent reports a pending prompt.
    */
   permission?: PermissionCard;
+  /**
+   * Task is set on a background-task-gate pause while a live task is found.
+   */
+  task?: BackgroundTaskCard;
   chat: ChatMessage[];
   /**
    * Runs is one line per run, oldest first; a map ticket has none.

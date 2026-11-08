@@ -96,6 +96,16 @@ type PermissionCard struct {
 	Hint string `json:"hint,omitempty"`
 }
 
+// BackgroundTaskCard is what a background-task-gate card shows of the live
+// task. LastOutputAt is unset when the output file was not found.
+type BackgroundTaskCard struct {
+	Label        string     `json:"label"`
+	StartedAt    time.Time  `json:"started_at"`
+	Alive        bool       `json:"alive"`
+	LastOutputAt *time.Time `json:"last_output_at,omitempty"`
+	LastLines    []string   `json:"last_lines"`
+}
+
 // ChatMessage is one message of the latest round's exchange.
 type ChatMessage struct {
 	From string `json:"from"` // "agent", "gx", or the answer's source
@@ -159,7 +169,9 @@ type TicketDetail struct {
 	Latest *DetailRound  `json:"latest,omitempty"`
 	// Permission is empty until a headless or pty agent reports a pending prompt.
 	Permission *PermissionCard `json:"permission,omitempty"`
-	Chat       []ChatMessage   `json:"chat"`
+	// Task is set on a background-task-gate pause while a live task is found.
+	Task *BackgroundTaskCard `json:"task,omitempty"`
+	Chat []ChatMessage       `json:"chat"`
 	// Runs is one line per run, oldest first; a map ticket has none.
 	Runs []DetailRun `json:"runs"`
 	// HasScreen is set when the latest run's agent ran in a pty, so

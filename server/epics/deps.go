@@ -100,6 +100,7 @@ type Deps struct {
 	CheckWaitingLabel func(address string) string
 	AgentGone         func(address string) (bool, error)
 	LiveTask          func(address string) (BackgroundTask, error)
+	TaskCard          func(address string) (*wire.BackgroundTaskCard, error)
 	AmbiguousBlockers func(addr tickets.Address) []string
 	DesignUncharted   func(epicAddr string, e tickets.Epic) (bool, error)
 }

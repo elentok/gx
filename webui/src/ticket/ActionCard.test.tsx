@@ -356,6 +356,37 @@ test("a prompted Retry on a zero-commit card shows that the ticket stays paused"
   expect(fetchMock).toHaveBeenCalledWith("/v1/tickets/retry", expect.anything());
 });
 
+test("a gate card with a live task names the task and shows how it is doing", async () => {
+  renderTicket(() =>
+    repair(["retry"], {
+      pause_reason: "background-task-gate",
+      pause_text: "",
+      task: {
+        label: "run the soak",
+        started_at: new Date(Date.now() - 125 * 60000).toISOString(),
+        alive: true,
+        last_output_at: "2026-11-08T10:00:00Z",
+        last_lines: ["a", "b", "c"],
+      },
+    }),
+  );
+  const task = await screen.findByRole("group", { name: "Background task" });
+  expect(task.textContent).toContain("A background task is still running.");
+  expect(task.textContent).toContain("run the soak");
+  expect(task.textContent).toContain("Running for 2h 5m");
+  expect(task.textContent).toContain("process alive");
+  expect(task.textContent).toContain("last output");
+  expect(within(task).getByLabelText("Last output").textContent).toBe("a\nb\nc");
+});
+
+test("a gate card without a task shows its real cause and no task", async () => {
+  renderTicket(() => repair(["retry"], { pause_reason: "background-task-gate", pause_text: "Uncommitted work with 2 commits ahead." }));
+  const c = await screen.findByRole("group", { name: "Action card" });
+  expect(c.textContent).toContain("Uncommitted work with 2 commits ahead.");
+  expect(screen.queryByRole("group", { name: "Background task" })).toBeNull();
+  expect(c.textContent).not.toContain("still running");
+});
+
 test("a prompted Resume shows that the ticket stays paused", async () => {
   const body = { data: { ticket: "12", status: "prompted", message: "the agent is still running and was asked to continue" } };
   stubFetch(vi.fn(async () => new Response(JSON.stringify(body))));

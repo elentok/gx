@@ -37,17 +37,16 @@ type BackgroundProcess struct {
 // directory and matches it to a live process by that file as the process's
 // stdout. Root pid 0 spans the whole table: the file match is unique per task.
 func readBackgroundProcess(sessionID, taskID string) (BackgroundProcess, error) {
-	pattern := filepath.Join("/tmp", fmt.Sprintf("claude-%d", os.Getuid()), "*", sessionID, "tasks", taskID+".output")
-	paths, err := filepath.Glob(pattern)
-	if err != nil || len(paths) != 1 {
-		return BackgroundProcess{}, err
+	path := backgroundtask.OutputPath(backgroundtask.DefaultOutputBase(), sessionID, taskID)
+	if path == "" {
+		return BackgroundProcess{}, nil
 	}
-	m, err := backgroundtask.ProcessFinder{Procs: syshealth.DefaultProcess()}.Match(0, paths[0], "")
+	m, err := backgroundtask.ProcessFinder{Procs: syshealth.DefaultProcess()}.Match(0, path, "")
 	if err != nil {
 		return BackgroundProcess{}, err
 	}
 	out := BackgroundProcess{Known: true, Alive: m.Alive}
-	if info, err := os.Stat(paths[0]); err == nil {
+	if info, err := os.Stat(path); err == nil {
 		out.OutputBytes = info.Size()
 	}
 	return out, nil

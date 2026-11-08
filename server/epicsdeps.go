@@ -35,6 +35,7 @@ func (s *Server) epicsDeps() epics.Deps {
 			live, stoppable, err := s.ops.LiveTask(address)
 			return epics.BackgroundTask{Live: live, Stoppable: stoppable}, err
 		},
+		TaskCard:          func(address string) (*wire.BackgroundTaskCard, error) { return s.ops.TaskCard(address) },
 		AmbiguousBlockers: func(addr tickets.Address) []string { return s.ops.AmbiguousBlockers(addr) },
 		DesignUncharted:   s.designs.Uncharted,
 	}

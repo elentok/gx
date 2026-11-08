@@ -6,6 +6,7 @@ import { AnswerResult } from "./AnswerResult";
 import { PermissionCard } from "./PermissionCard";
 import { isRecoverAction } from "./recover";
 import { RecoveryActions } from "./RecoveryActions";
+import { TaskCard } from "./TaskCard";
 import { TicketReading } from "./TicketReading";
 
 const hasOpenQuestion = (detail: TicketDetail) => detail.latest?.outcome === "open";
@@ -18,6 +19,7 @@ export function needsActionCard(detail: TicketDetail, sent: Sent | null): boolea
     detail.answered ||
     !!detail.permission ||
     !!detail.pause_text ||
+    !!detail.task ||
     detail.actions.includes(ActionAnswer) ||
     detail.actions.some(isRecoverAction) ||
     !!detail.run_finishing ||
@@ -80,6 +82,7 @@ export function ActionCard({
           {detail.pause_text}
         </Text>
       )}
+      <TaskCard detail={detail} />
       <TicketReading detail={detail} />
       <PermissionCard detail={detail} onDone={refetch} onStale={refetch} />
       <AnswerResult detail={detail} sent={sent} />

@@ -92,6 +92,11 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 			return wire.TicketDetail{}, err
 		}
 	}
+	if t.PauseReason == schema.PauseBackgroundTaskGate {
+		if d.Task, err = s.TaskCard(ref.Addr.String()); err != nil {
+			return wire.TicketDetail{}, err
+		}
+	}
 	d.State = detailState(evs, t)
 	if rec := tickets.RecommendationOf(evs); rec != nil && t.PausedClass() != "" {
 		d.Recommendation = &wire.DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -85,8 +86,12 @@ func (f ProcessFinder) Match(rootPID int, outputPath, command string) (ProcessMa
 	return m, nil
 }
 
-// descendants lists every process below root, root excluded.
+// descendants lists every process below root, root excluded. Root 0 is the
+// whole table: its chain can break at a process gx may not read.
 func descendants(all []syshealth.Process, root int) []syshealth.Process {
+	if root == 0 {
+		return slices.DeleteFunc(slices.Clone(all), func(p syshealth.Process) bool { return p.Unreadable })
+	}
 	kids := map[int][]syshealth.Process{}
 	for _, p := range all {
 		if !p.Unreadable {
