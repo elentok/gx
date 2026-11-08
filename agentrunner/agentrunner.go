@@ -301,6 +301,20 @@ type LaunchPrompter interface {
 	PromptLaunch(ctx context.Context, s Session, text string, onNudge func(decision string)) error
 }
 
+type skipVimCheckKey struct{}
+
+// WithoutVimCheck marks ctx so a LaunchPrompter skips its vim-mode launch
+// check: the caller already relaunched once and types the prompt anyway.
+func WithoutVimCheck(ctx context.Context) context.Context {
+	return context.WithValue(ctx, skipVimCheckKey{}, true)
+}
+
+// VimCheckSkipped reports whether ctx came from WithoutVimCheck.
+func VimCheckSkipped(ctx context.Context) bool {
+	skip, _ := ctx.Value(skipVimCheckKey{}).(bool)
+	return skip
+}
+
 // PromptLaunch sends a launch prompt, which must start a turn. A runner
 // without LaunchPrompter falls back to PromptNudged.
 func PromptLaunch(ctx context.Context, r Runner, s Session, text string, onNudge func(decision string)) error {

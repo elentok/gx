@@ -35,6 +35,15 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 		return err
 	}
 	codex := ss.kind == harness.Codex
+	if !codex && !agentrunner.VimCheckSkipped(ctx) {
+		io := HolderTypingIO(ss.holder)
+		io.Session = s.SessionID
+		io.Log = p.log
+		io.Caller = "pty-launch"
+		if harness.CheckVimLaunch(io) {
+			return &claudeui.VimEditorError{}
+		}
+	}
 	if (codex && harness.CodexHomeIn(p.Env) == "") || (!codex && (home == "" || (ss.kind != "" && ss.kind != harness.Claude) || !isSlashCommand(text))) {
 		return p.PromptNudged(s, text, onNudge)
 	}

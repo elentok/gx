@@ -72,6 +72,7 @@ func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 		log.Printf("looking up %s before start: %v", opts.Label, err)
 	}
 	hungPanes := 0
+	vimRelaunched := false
 	for attempt := 1; ; attempt++ {
 		s, err := r.Start(opts)
 		if err != nil {
@@ -93,11 +94,28 @@ func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 		if err != nil {
 			log.Printf("reading %s status before initial prompt: %v", opts.Label, err)
 		}
-		err = agentrunner.PromptLaunch(ctx, r, s, prompt, func(decision string) {
+		onNudge := func(decision string) {
 			if hooks.OnNudge != nil {
 				hooks.OnNudge(attempt, decision)
 			}
-		})
+		}
+		err = agentrunner.PromptLaunch(ctx, r, s, prompt, onNudge)
+		// A vim footer after the normal-mode override gets one relaunch of its
+		// own, outside the attempt count. A second one is logged and the prompt
+		// typed anyway, leaving a pane that hangs to the recovery below.
+		if _, ok := errors.AsType[*claudeui.VimEditorError](err); ok {
+			log.Printf("launching %s: %v", opts.Label, err)
+			if vimRelaunched {
+				err = agentrunner.PromptLaunch(agentrunner.WithoutVimCheck(ctx), r, s, prompt, onNudge)
+			} else {
+				vimRelaunched = true
+				if err := stopForRelaunch(r, s, opts.Label); err != nil {
+					return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)}
+				}
+				attempt--
+				continue
+			}
+		}
 		if !errors.Is(err, agentrunner.ErrNotDelivered) {
 			return Launched{Session: s, Baseline: status.Turn}, withDoctorHint(err)
 		}
@@ -106,13 +124,8 @@ func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 		if _, ok := errors.AsType[*claudeui.HungPaneError](err); ok {
 			hungPanes++
 		}
-		if stopErr := r.Stop(s); stopErr != nil {
-			log.Printf("stopping undelivered session %s: %v", s.Label, stopErr)
-		}
-		// Never a second agent beside a live one: a session that survives
-		// Stop ends the launch instead of being relaunched over.
-		if _, live, _ := r.Find(opts.Label); live {
-			err = fmt.Errorf("%w: %s is still live after stop, not relaunching", err, opts.Label)
+		if stopErr := stopForRelaunch(r, s, opts.Label); stopErr != nil {
+			err = fmt.Errorf("%w: %w", err, stopErr)
 			return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: err}
 		}
 		if attempt == 2 {
@@ -122,6 +135,18 @@ func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 			return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: withSkillHint(err, prompt)}
 		}
 	}
+}
+
+// stopForRelaunch stops s and fails when the label is still live: never a
+// second agent beside a live one.
+func stopForRelaunch(r agentrunner.Runner, s agentrunner.Session, label string) error {
+	if stopErr := r.Stop(s); stopErr != nil {
+		log.Printf("stopping undelivered session %s: %v", s.Label, stopErr)
+	}
+	if _, live, _ := r.Find(label); live {
+		return fmt.Errorf("%s is still live after stop, not relaunching", label)
+	}
+	return nil
 }
 
 // withSkillHint names the missing skill and the fix on an unknown-skill
