@@ -75,6 +75,13 @@ const openMenu = async () => {
   return screen.findByRole("menu");
 };
 
+test("the switcher is a boxed button with a ▾ and the inset focus ring", async () => {
+  setup();
+  const trigger = await screen.findByRole("button", { name: /^Workspace:/ });
+  expect(trigger.getAttribute("data-focus-ring")).toBe("inset");
+  expect(trigger.textContent).toContain("▾");
+});
+
 test("the menu lists every workspace in order with its Needs-you count; picking one switches the rows and storage", async () => {
   setup();
   await body().findByRole("link", { name: /p:alpha/ });

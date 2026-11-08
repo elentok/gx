@@ -84,6 +84,7 @@ export function WorkspaceSwitcher({
 }) {
   const activeNeeds = workspaces.find((w) => w.name === active)?.needs_you;
   return (
+    <Box px="2" pb="2">
     <GxMenu
       placement="bottom-start"
       items={[
@@ -119,30 +120,33 @@ export function WorkspaceSwitcher({
           alignItems="center"
           gap="2"
           w="100%"
-          h="40px"
+          h="36px"
           px="3"
           color="text"
           fontFamily="inherit"
-          fontSize="17px"
+          fontSize="15px"
           fontWeight="600"
           cursor="pointer"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="8px"
+          data-focus-ring="inset"
           _hover={{ bg: "surface.raised" }}
         >
           <Box as="span" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
             {active}
-          </Box>
-          <Box as="span" flex="none" color="text.dim" display="grid">
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-              <path d="m3 4.5 3 3 3-3" />
-            </svg>
           </Box>
           {activeNeeds ? (
             <Box as="span" ml="auto" flex="none" color="tone.waiting.fg" fontSize="12px" fontWeight="500">
               {activeNeeds} needs you
             </Box>
           ) : null}
+          <Box as="span" ml={activeNeeds ? undefined : "auto"} flex="none" color="text.dim" aria-hidden>
+            ▾
+          </Box>
         </chakra.button>
       }
     />
+    </Box>
   );
 }
