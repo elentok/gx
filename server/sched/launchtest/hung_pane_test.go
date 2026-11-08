@@ -3,6 +3,7 @@ package launchtest_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,16 +17,22 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+var hungHarnesses = []string{"claude", "codex"}
+
 // hungLaunch queues proj:epic-a/01 on the real PTY runner over the fake claude
-// whose first hangs launches stop taking keys.
-func hungLaunch(t *testing.T, hangs int) (*servertest.Harness, string, <-chan wire.Event) {
+// or codex whose first hangs launches stop taking keys.
+func hungLaunch(t *testing.T, harness string, hangs int) (*servertest.Harness, string, <-chan wire.Event) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	counter := filepath.Join(t.TempDir(), "launches")
+	env := []string{fmt.Sprintf("%s=%d:%s", agentfake.TUIHangLaunchesEnv, hangs, counter)}
+	if harness == "codex" {
+		env = append(env, "PATH="+servertest.FakeCodexDir(t)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	}
 	h := servertest.StartWithStore(t, store,
-		servertest.WithEnv(fmt.Sprintf("%s=%d:%s", agentfake.TUIHangLaunchesEnv, hangs, counter)),
+		servertest.WithEnv(env...),
 		servertest.WithLaunchGrace(3*time.Second))
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	t.Cleanup(cancel)
@@ -37,15 +44,23 @@ func hungLaunch(t *testing.T, hangs int) (*servertest.Harness, string, <-chan wi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", harness); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	return h, filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"), evs
 }
 
 func TestLaunch_HungPaneOnceIsStoppedAndRelaunchedOnce(t *testing.T) {
-	t.Parallel()
-	h, _, evs := hungLaunch(t, 1)
+	for _, harness := range hungHarnesses {
+		t.Run(harness, func(t *testing.T) {
+			t.Parallel()
+			hungOnce(t, harness)
+		})
+	}
+}
+
+func hungOnce(t *testing.T, harness string) {
+	h, _, evs := hungLaunch(t, harness, 1)
 	// The first attempt's start is announced too; the launch is done once the
 	// hung attempt is logged and one agent is live.
 	servertest.WaitForEvent(context.Background(), t, evs, wire.EventIterationStarted, "proj:epic-a/01")
@@ -67,8 +82,16 @@ func TestLaunch_HungPaneOnceIsStoppedAndRelaunchedOnce(t *testing.T) {
 }
 
 func TestLaunch_HungPaneTwicePausesPromptStalledWithTheTwiceWording(t *testing.T) {
-	t.Parallel()
-	h, ticketPath, _ := hungLaunch(t, 2)
+	for _, harness := range hungHarnesses {
+		t.Run(harness, func(t *testing.T) {
+			t.Parallel()
+			hungTwice(t, harness)
+		})
+	}
+}
+
+func hungTwice(t *testing.T, harness string) {
+	h, ticketPath, _ := hungLaunch(t, harness, 2)
 	servertest.WaitStatus(t, ticketPath, schema.StatusPaused)
 
 	tk, err := schema.ParseTicket(ticketPath)

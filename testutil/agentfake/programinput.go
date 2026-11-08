@@ -106,6 +106,8 @@ type InputBox struct {
 	leaveI, logClear bool
 	// configPath is the settings file ActionVimToggle writes.
 	configPath string
+	// Hung makes Enter and Ctrl+U no-ops (see TUIHangLaunchesEnv).
+	Hung bool
 }
 
 func NewInputBox(out io.Writer, draft string) *InputBox {
@@ -172,6 +174,8 @@ func (b *InputBox) Draw() {
 func (b *InputBox) Key(k byte) (submitted string, ok bool) {
 	last := len(b.Lines) - 1
 	switch {
+	case b.Hung && (k == '\r' || k == 0x15):
+		return "", false
 	case b.normal:
 		if k == 'i' {
 			b.normal = false

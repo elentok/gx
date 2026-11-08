@@ -205,6 +205,7 @@ func runCodex() (int, error) {
 		ctlPath: filepath.Join(dir, id+".ctl"),
 	}
 	c.box.Marker = codexMarker
+	c.box.Hung = agentfake.HangThisLaunch(os.Getenv(agentfake.TUIHangLaunchesEnv))
 	if err := c.openRollout(home, opts.resume != ""); err != nil {
 		return 0, err
 	}

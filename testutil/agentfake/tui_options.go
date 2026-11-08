@@ -59,9 +59,10 @@ type tuiOptions struct {
 	settings string
 }
 
-// hangThisLaunch counts this launch in the counter file of a
-// TUIHangLaunchesEnv spec and reports whether it is within the first n.
-func hangThisLaunch(spec string) bool {
+// HangThisLaunch counts this launch in the counter file of a
+// TUIHangLaunchesEnv spec and reports whether it is within the first n. The
+// Claude and Codex fakes share the spec.
+func HangThisLaunch(spec string) bool {
 	n, file, ok := strings.Cut(spec, ":")
 	limit, err := strconv.Atoi(n)
 	if !ok || err != nil {
@@ -112,7 +113,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		return tuiOptions{}, errors.New("agentfake: --session-id or --resume is required")
 	}
 	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
-	hung := hangThisLaunch(os.Getenv(TUIHangLaunchesEnv))
+	hung := HangThisLaunch(os.Getenv(TUIHangLaunchesEnv))
 	return tuiOptions{
 		hung:          hung,
 		plainScreen:   os.Getenv(TUIPlainScreenEnv) == "1",
