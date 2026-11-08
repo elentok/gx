@@ -2,6 +2,8 @@ package spec
 
 import (
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/codex"
@@ -55,12 +57,18 @@ var (
 	// ClassifierOutage: every turn ends on a "no verdict" tool error, so the
 	// re-sends run out and the ticket pauses as classifier-outage.
 	ClassifierOutage = recoveryEpic("classifier-outage-epic", servertest.TicketOpts{}, false,
-		agentfake.TUIClassifierOutageEnv+"=1")
+		agentfake.TUIClassifierOutageEnv+"=1", ralphloop.ClassifierResendDelayEnv+"=1ms")
+	// HolderUnreachable: every holder status call gets no dial answer, so past
+	// HolderReadoptCap the ticket pauses as iteration-error with the holder alive.
+	HolderUnreachable = recoveryEpic("holder-dead-epic", servertest.TicketOpts{}, false,
+		holder.UnreachableStatusDialsEnv+"=100000")
 )
 
-// backgroundEpic is recoveryEpic whose agent runs behaviour on its ticket.
+// backgroundEpic is recoveryEpic whose agent runs behaviour on its ticket, and
+// whose live-task hold cap is short enough to reach the pause, yet long enough
+// that a recovery shows the pause cleared before the relaunched agent hits it again.
 func backgroundEpic(name string, opts servertest.TicketOpts, codexHarness bool, behaviour string) scenario {
-	sc := recoveryEpic(name, opts, codexHarness)
+	sc := recoveryEpic(name, opts, codexHarness, supervise.BackgroundTaskHoldCapEnv+"=45s")
 	sc.Behaviour = map[string]string{project + ":" + name + "/01": behaviour}
 	return sc
 }

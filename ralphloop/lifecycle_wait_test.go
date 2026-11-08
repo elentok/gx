@@ -191,6 +191,20 @@ func TestWaitIterationFinished_NudgeRereadsSignalAndWaitsWhenTaskIsLive(t *testi
 	}
 }
 
+func TestClassifierResendDelay_EnvReplacesEveryDelay(t *testing.T) {
+	for i, want := range classifierResendDelays {
+		if got := classifierResendDelay(i); got != want {
+			t.Errorf("delay %d = %s, want %s", i, got, want)
+		}
+	}
+	t.Setenv(ClassifierResendDelayEnv, "5ms")
+	for i := range classifierResendDelays {
+		if got := classifierResendDelay(i); got != 5*time.Millisecond {
+			t.Errorf("delay %d = %s, want 5ms", i, got)
+		}
+	}
+}
+
 // A classifier outage is re-sent "continue" after 1, 2 and 4 minutes in the same
 // session; the unchanged stall nudge only comes once the outage has cleared.
 func TestWaitIterationFinished_ClassifierOutageResendsContinueThenNudgesAnotherStall(t *testing.T) {

@@ -3,6 +3,7 @@ package supervise
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -190,7 +191,7 @@ func WaitForFinish(d deps.Deps, p LaunchParams, sessionID string) error {
 			// never sees it idle: the same cap that bounds a Claude hold bounds this.
 			if st, statusErr := d.Runner.Status(p.SessionOrDefault()); statusErr == nil && st.Background {
 				codexHeldMs += pollMs
-				if codexHeldMs >= int(BackgroundTaskHoldCap/time.Millisecond) {
+				if codexHeldMs >= int(holdCap()/time.Millisecond) {
 					return pauseBackgroundTaskHold(p, sessionID, nil, nil)
 				}
 			} else {
@@ -766,7 +767,7 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 				continue
 			}
 		}
-		if heldMs >= int(BackgroundTaskHoldCap/time.Millisecond) {
+		if heldMs >= int(holdCap()/time.Millisecond) {
 			return false, pauseBackgroundTaskHold(p, sessionID, reading.Tasks, held)
 		}
 		pollMs := SmartZonePollMs
@@ -829,6 +830,18 @@ func BackgroundTaskLive(d deps.Deps, p LaunchParams, sessionID string) bool {
 // BackgroundTaskHoldCap is the one cap on every live-task hold: a task, or a
 // turn a task woke, that outlasts it pauses the ticket instead of waiting on.
 const BackgroundTaskHoldCap = 60 * time.Minute
+
+// BackgroundTaskHoldCapEnv replaces the cap with a Go duration: the fixture's
+// knob, since an hour is out of reach of a browser flow.
+const BackgroundTaskHoldCapEnv = "GX_BACKGROUND_TASK_HOLD_CAP"
+
+// holdCap is the cap in force: the env's duration when it parses, else the const.
+func holdCap() time.Duration {
+	if d, err := time.ParseDuration(os.Getenv(BackgroundTaskHoldCapEnv)); err == nil && d > 0 {
+		return d
+	}
+	return BackgroundTaskHoldCap
+}
 
 // BackgroundTaskCheckEvery is how often a held task's process state is read.
 const BackgroundTaskCheckEvery = 10 * time.Minute
@@ -899,7 +912,7 @@ func pauseBackgroundTaskHold(p LaunchParams, sessionID string, tasks []transcrip
 	}
 	for id := range held {
 		named = id
-		if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: paused after %s", id, BackgroundTaskHoldCap)); err != nil {
+		if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: paused after %s", id, holdCap())); err != nil {
 			return err
 		}
 	}
@@ -907,7 +920,7 @@ func pauseBackgroundTaskHold(p LaunchParams, sessionID string, tasks []transcrip
 	if named == "" {
 		subject = "its background terminal"
 	}
-	reason := fmt.Sprintf("%s still waited on %s after %s", p.Label, subject, BackgroundTaskHoldCap)
+	reason := fmt.Sprintf("%s still waited on %s after %s", p.Label, subject, holdCap())
 	ticketops.PauseTicket(p.EventSink(), ticketops.PauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
 		Type: events.Paused, Kind: events.BackgroundTaskGate, Reason: reason,

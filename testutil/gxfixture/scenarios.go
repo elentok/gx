@@ -253,6 +253,7 @@ var scenarios = map[string]scenario{
 	"live-task-gate-codex":  spec.LiveTaskGateCodex,
 	"live-task-gate-dirty":  spec.LiveTaskGateDirty,
 	"slow-holder":           spec.SlowHolder,
+	"holder-unreachable":    spec.HolderUnreachable,
 	"codex-drops-prompt":    spec.CodexDropsPrompt,
 	"verify-notes":          spec.VerifyNotes,
 	"summary-notes":         spec.SummaryNotes,

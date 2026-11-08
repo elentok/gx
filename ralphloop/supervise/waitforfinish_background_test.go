@@ -213,6 +213,23 @@ func TestWaitForFinish_HoldCapPausesATaskAfterTheReportAndAnOpenTurn(t *testing.
 	}
 }
 
+// The env knob shortens the cap, so a short value pauses after one poll.
+func TestWaitForFinish_HoldCapEnvShortensTheCap(t *testing.T) {
+	t.Setenv(BackgroundTaskHoldCapEnv, "1ms")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
+	var sleeps int
+	reading := transcript.BackgroundTaskReading{AwaitingTurnEnd: true}
+	d := fakes.IdleBackgroundTaskDeps(func(string, string) (transcript.BackgroundTaskReading, error) { return reading, nil }, &sleeps)
+
+	err := WaitForFinish(d, finishedTicket(t, scratchDir, time.Now().Add(-time.Minute)), "sess-30")
+	if _, ok := errors.AsType[*BlockedPausedError](err); !ok {
+		t.Fatalf("WaitForFinish error = %v, want a pause", err)
+	}
+	if want := 2; sleeps != want {
+		t.Errorf("Sleep calls = %d, want %d (debounce plus one poll)", sleeps, want)
+	}
+}
+
 // A Codex agent has no transcript marker, so the Claude gate never reads or
 // holds: a Codex turn that ends with a terminal running finishes at turn end.
 func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {

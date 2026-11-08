@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"os"
 	"path/filepath"
 	"slices"
 	"time"
@@ -352,7 +353,7 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 		if !outage {
 			outageResends = 0
 		} else if outageResends < len(classifierResendDelays) {
-			in.Sleep(d, classifierResendDelays[outageResends])
+			in.Sleep(d, classifierResendDelay(outageResends))
 			outageResends++
 			if classifierOutage(d, p, s) {
 				if err := d.Runner.Prompt(s, classifierResendText); err != nil && !errors.Is(err, agentrunner.ErrNotReady) {
@@ -408,6 +409,18 @@ func pauseClassifierOutage(d deps.Deps, p supervise.LaunchParams, w IterationWor
 // classifierResendDelays are the waits before each "continue" re-send during a
 // classifier outage; after the last the ticket pauses classifier-outage.
 var classifierResendDelays = []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute}
+
+// ClassifierResendDelayEnv replaces every re-send delay with one Go duration:
+// the fixture's knob, since seven minutes is out of reach of a browser flow.
+const ClassifierResendDelayEnv = "GX_CLASSIFIER_RESEND_DELAY"
+
+// classifierResendDelay is the wait before re-send number i (from zero).
+func classifierResendDelay(i int) time.Duration {
+	if d, err := time.ParseDuration(os.Getenv(ClassifierResendDelayEnv)); err == nil && d >= 0 {
+		return d
+	}
+	return classifierResendDelays[i]
+}
 
 const classifierResendText = "continue"
 

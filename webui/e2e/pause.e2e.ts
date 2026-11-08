@@ -10,8 +10,9 @@ const openTicket = (page: Page, id: string, epic = "paused-epic") =>
 
 // The wait loop pauses an agent that stays blocked for its 15 s dwell.
 const dwell = { timeout: 30_000 };
-// A recovery scenario's agent has to launch, hang or end its turn before the pause appears.
-const gateWait = { timeout: 90_000 };
+// A recovery scenario's agent has to launch, hang (two launches, each with a launch-proof grace) or
+// end its turn before the pause appears.
+const gateWait = { timeout: 150_000 };
 // The header pill; the Runs list repeats the label in a longer line.
 const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: true });
 
@@ -111,14 +112,33 @@ test.describe("3. Pause reasons and recovery", () => {
     const retry = async () => {
       await recovery(page).getByRole("button", nav("Retry")).click();
     };
-    const cleared = (reason: string) => expect(page.getByText(reason)).toHaveCount(0, { timeout: 30_000 });
+    // The Runs list keeps a past pause's text, so a lifted pause shows as the recovery card going away.
+    const cleared = () => expect(recovery(page)).toHaveCount(0, { timeout: 30_000 });
 
     // 6: the relaunch hangs too; the pause names the cause and Retry ends it.
     await recover("hung-pane-twice", "hung-epic", "Could not start the agent", ["Retry", "Start over"], async () => {
       await expect(page.getByText(/pane stopped taking keys, twice/).first()).toBeVisible();
       await retry();
-      await cleared("Could not start the agent");
+      await cleared();
     });
+
+    // 70, 64, 28: a live Claude task. Keep waiting lifts the pause (the short hold cap pauses it again),
+    // and Retry keeps the commits and ends it.
+    const gate = "Background task still running";
+    await recover("live-task-gate", "live-task-epic", gate, ["Keep waiting", "Stop task", "Retry", "Start over"], async () => {
+      await expect(page.getByText("run the soak").first()).toBeVisible();
+      await recovery(page).getByRole("button", nav("Keep waiting")).click();
+      await cleared();
+      await expect(recovery(page)).toBeVisible(gateWait);
+      await retry();
+      await cleared();
+    });
+
+    // 64: with a dirty worktree a live task still offers all four.
+    await recover("live-task-gate-dirty", "live-task-dirty-epic", gate, ["Keep waiting", "Stop task", "Retry", "Start over"]);
+
+    // 16/68: the holder is alive but never answers; the run fails with Retry and Start over.
+    await recover("holder-unreachable", "holder-dead-epic", "Run failed", ["Retry", "Start over"]);
   });
 
   test("Unknown skill", async ({ page, start }) => {
