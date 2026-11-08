@@ -131,13 +131,25 @@ func (s *Epics) DetailFor(addr string, t schema.Ticket, rounds []tickets.PauseRo
 		last = &rounds[len(rounds)-1]
 	}
 	gone := false
+	var task BackgroundTask
 	if t.PausedClass() != "" {
 		var err error
 		if gone, err = s.AgentGone(addr); err != nil {
 			return nil, err
 		}
+		if t.PauseReason == schema.PauseBackgroundTaskGate {
+			if task, err = s.LiveTask(addr); err != nil {
+				return nil, err
+			}
+		}
 	}
-	return detailActions(t, last, gone, s.Runs.Has(addr), card), nil
+	return detailActions(t, last, gone, s.Runs.Has(addr), task, card), nil
+}
+
+// BackgroundTask is a fresh read of the live-task signal of a ticket's agent.
+// Stoppable is set for an agent whose task gx can stop (Claude only).
+type BackgroundTask struct {
+	Live, Stoppable bool
 }
 
 // runFinishing reports whether t is paused with its run still tracked, so
@@ -240,7 +252,7 @@ func (s *Epics) PermissionCard(addr tickets.Address) (*wire.PermissionCard, erro
 
 // detailActions is what a person may do with the ticket right now. Approve
 // joins when the permission card can be approved from here.
-func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone, tracked bool, card *wire.PermissionCard) []string {
+func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone, tracked bool, task BackgroundTask, card *wire.PermissionCard) []string {
 	actions := []string{}
 	if card != nil && card.RequestID != "" {
 		actions = append(actions, wire.ActionApprove)
@@ -263,6 +275,8 @@ func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone, track
 			// Approve is added above, from the live card.
 		case v == schema.VerbAnswer && (latest == nil || latest.End != nil):
 		case v == schema.VerbResume && t.PauseReason == schema.PauseSelfReported && !agentGone:
+		case v == schema.VerbKeepWaiting && !task.Live:
+		case v == schema.VerbStopTask && !(task.Live && task.Stoppable):
 		case v == schema.VerbRetry && t.PauseReason == schema.PauseBlockedPane && approvable:
 		default:
 			actions = append(actions, v.Word())

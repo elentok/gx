@@ -350,9 +350,14 @@ export const ActionStashMerge = "stash-merge";
  */
 export const ActionResumeOnWorker = "resume-on-worker";
 /**
+ * ActionKeepWaiting and ActionStopTask answer a background-task-gate pause whose task still lives.
+ */
+export const ActionKeepWaiting = "keep-waiting";
+export const ActionStopTask = "stop-task";
+/**
  * Actions the detail route offers. The server decides them; the UI renders them.
  */
-export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionResume | typeof ActionRetry | typeof ActionStartOver | typeof ActionMerge | typeof ActionChooseBase | typeof ActionReopenAndRetry | typeof ActionStashMerge | typeof ActionResumeOnWorker;
+export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionResume | typeof ActionRetry | typeof ActionStartOver | typeof ActionMerge | typeof ActionChooseBase | typeof ActionReopenAndRetry | typeof ActionStashMerge | typeof ActionResumeOnWorker | typeof ActionKeepWaiting | typeof ActionStopTask;
 export const RoundOpen = "open";
 export const RoundAnswered = "answered";
 export const RoundClosed = "closed";

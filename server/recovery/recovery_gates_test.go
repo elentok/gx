@@ -44,6 +44,10 @@ type gateRaise struct {
 	ticket    string
 	question  string // text of the ticket log's events
 	worktree  string
+
+	// released is whether R10 released the gate; stillTracked whether the run
+	// is still in the registry, as it is when nothing settled it.
+	released, stillTracked bool
 }
 
 // raiseGateHeld raises a held background-task gate on ticket 01 with the
@@ -74,6 +78,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	var got gateRaise
 	waitFor(t, func() bool {
 		if h.Server.Registry().IsGateReleased(addr) {
+			got.released = true
 			h.Server.SettleReleasedRun(addr)
 		}
 		got.log, _, _ = runlog.ReadEvents(dir, "epic-a")
@@ -88,6 +93,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 		}
 		return done
 	})
+	_, got.stillTracked = h.Server.Registry().Tracked(addr)
 	ticketPath := filepath.Join(dir, "epic-a", "issues", "01-first.md")
 	data, _ := os.ReadFile(ticketPath)
 	got.ticket, got.worktree = string(data), worktree
@@ -114,9 +120,9 @@ func dirtyAfter(t *testing.T, prepare func(string)) func(string) {
 	}
 }
 
-// R10 releases the gate on an idle agent whether or not the worktree has
-// commits: the finish then merges them or pauses zero-commit on its own.
-func TestRecovery_R10ReleasesAnIdleAgentsGateAndLetsTheFinishRun(t *testing.T) {
+// R10 releases nothing for an idle agent whose worktree is clean or has no
+// commits: only the finish wait's process check releases a gate.
+func TestRecovery_R10KeepsAnIdleAgentsGateHeld(t *testing.T) {
 	t.Parallel()
 	for _, runner := range []string{"herdr", "headless"} {
 		for _, tc := range []struct {
@@ -133,7 +139,10 @@ func TestRecovery_R10ReleasesAnIdleAgentsGateAndLetsTheFinishRun(t *testing.T) {
 					t.Errorf("applied = %+v, escalated = %v; want R10 ok", got.applied, got.escalated)
 				}
 				if strings.Contains(got.ticket, "background-task-gate") {
-					t.Errorf("R10 paused a finish it should have let run:\n%s", got.ticket)
+					t.Errorf("R10 paused a gate it should have left held:\n%s", got.ticket)
+				}
+				if !got.stillTracked || got.released {
+					t.Errorf("run tracked = %v, gate released = %v; want tracked and held", got.stillTracked, got.released)
 				}
 			})
 		}

@@ -17,6 +17,9 @@ const (
 	ActionStashMerge     = "stash-merge"
 	// ActionResumeOnWorker ends a model-mismatch pause; the web posts a resume with tier=worker.
 	ActionResumeOnWorker = "resume-on-worker"
+	// ActionKeepWaiting and ActionStopTask answer a background-task-gate pause whose task still lives.
+	ActionKeepWaiting = "keep-waiting"
+	ActionStopTask    = "stop-task"
 )
 
 // Outcomes of a pause round.

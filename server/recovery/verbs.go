@@ -116,10 +116,10 @@ func (rec *Recovery) AgentState(addr tickets.Address) (state agentrunner.State, 
 	return st.State, st.Waiting(), nil
 }
 
-// recoveryReleaseGate releases a held gate on an idle agent. Zero commits and
-// a clean worktree with commits ahead both let the finish run as it would:
-// paused zero-commit, or merged. A dirty worktree with commits ahead must not
-// merge unfinished work, so its finish pauses background-task-gate instead.
+// recoveryReleaseGate releases a held gate only for a dirty worktree with
+// commits ahead: the finish must not merge unfinished work, so it pauses
+// background-task-gate instead. Every other idle agent keeps its gate, for the
+// finish wait's own process check to release.
 func (rec *Recovery) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
 	return rec.d.Writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		run, ok := rec.d.Registry.Tracked(ref.Addr.String())
@@ -148,7 +148,11 @@ func (rec *Recovery) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call)
 				pause = gatePauseReason(dirty)
 			}
 		}
-		rec.d.Registry.ReleaseGate(ref.Addr.String(), pause)
+		// Only the finish wait releases a gate for a task that ended; an idle
+		// agent whose task may still run is left holding.
+		if pause != "" {
+			rec.d.Registry.ReleaseGate(ref.Addr.String(), pause)
+		}
 		return wire.QueueResult{}, nil
 	})
 }
@@ -184,6 +188,9 @@ var finishPoll = time.Second
 // recoveryFinish holds no ticket lock while it waits: the merge it waits for
 // needs it.
 func (rec *Recovery) recoveryFinish(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
+	if !rec.d.Registry.IsGateReleased(req.Address) {
+		return wire.QueueResult{}, nil
+	}
 	if !rec.d.Registry.WaitGone(req.Address, finishWaitTimeout, finishPoll) {
 		return queue.Refusal(wire.ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
 	}

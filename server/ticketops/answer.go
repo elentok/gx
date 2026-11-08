@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -217,6 +218,29 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 		o.d.Index.Rescan()
 		return wire.QueueResult{Outcome: wire.OutcomeDelivered}, nil
 	})
+}
+
+// LiveTask reads the agent's background-task signal fresh from its runner. live
+// is false when the run or its session is gone. stoppable is set for Claude, the
+// only agent whose task gx can stop; a Codex task reports as working.
+func (o *Ops) LiveTask(address string) (live, stoppable bool, err error) {
+	run, ok := o.d.Registry.Tracked(address)
+	if !ok {
+		return false, false, nil
+	}
+	runner, err := o.d.Harness.RunnerOf(run.Run)
+	if err != nil {
+		return false, false, err
+	}
+	st, err := runner.Status(run.Session)
+	if errors.Is(err, agentrunner.ErrNotFound) || errors.Is(err, agentrunner.ErrSessionDied) {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, err
+	}
+	live = st.Background
+	return live, live && agent.AgentFor(run.Agent) == agent.AgentClaude, nil
 }
 
 // AgentGone reports that no live agent is waiting on address: its run is not

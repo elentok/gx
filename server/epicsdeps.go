@@ -31,6 +31,10 @@ func (s *Server) epicsDeps() epics.Deps {
 		AutoFFMerge:       func(project string) bool { return s.merger.AutoFFMerge(project) },
 		CheckWaitingLabel: func(address string) string { return s.explain.CheckWaitingLabel(address) },
 		AgentGone:         func(address string) (bool, error) { return s.ops.AgentGone(address) },
+		LiveTask: func(address string) (epics.BackgroundTask, error) {
+			live, stoppable, err := s.ops.LiveTask(address)
+			return epics.BackgroundTask{Live: live, Stoppable: stoppable}, err
+		},
 		AmbiguousBlockers: func(addr tickets.Address) []string { return s.ops.AmbiguousBlockers(addr) },
 		DesignUncharted:   s.designs.Uncharted,
 	}

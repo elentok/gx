@@ -140,14 +140,13 @@ func r14ParentDefect() Entry {
 }
 
 // r10BackgroundGateHeld is a finish gated on a background task nothing ever
-// reported ended, so the gate never releases. The run log cannot tell that
-// from a task still running: the remedy, not a predicate, must re-check the
-// agent is idle (a fresh read, never a cached status) before release-gate
-// force-releases the gate and the ordinary finish path runs. release-gate
-// decides what that finish does: merges commits, pauses zero-commit, or pauses a
-// dirty worktree with commits ahead as background-task-gate. That pause is a
-// paused (answer), never a held-gate event, so R10 cannot match it again. Medium
-// authority because releasing early finishes an agent that is still working.
+// reported ended. The run log cannot tell that from a task still running, so
+// R10 releases nothing: the finish wait's process check is the only releaser.
+// The remedy re-checks the agent is idle (a fresh read, never a cached status)
+// and release-gate releases only a dirty worktree with commits ahead, whose
+// finish pauses background-task-gate with the real cause. That pause is a paused
+// (answer), never a held-gate event, so R10 cannot match it again. A cap-paused
+// ticket has a closed hold and R10 takes no action on it.
 func r10BackgroundGateHeld() Entry {
 	return Entry{
 		ID: "R10", Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Enabled: true,

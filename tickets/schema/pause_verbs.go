@@ -23,6 +23,11 @@ const (
 	// VerbResumeOnWorker ends a model-mismatch pause by running the ticket
 	// again on the model its tier resolved to.
 	VerbResumeOnWorker PauseVerb = "resume-on-worker"
+
+	// VerbKeepWaiting and VerbStopTask answer a background-task-gate pause
+	// while the task still lives.
+	VerbKeepWaiting PauseVerb = "keep-waiting"
+	VerbStopTask    PauseVerb = "stop-task"
 )
 
 // PauseReceiver says who gets the reply to an answer-class pause.
@@ -55,6 +60,9 @@ var pauseVerbs = map[PauseVerb]VerbInfo{
 	VerbStashMerge:  {Word: "stash-merge", Label: "Stash, merge and restore", Tooltip: "Set your changes aside, merge, then put them back. Conflicts are left for you to fix."},
 
 	VerbResumeOnWorker: {Word: "resume-on-worker", Label: "Resume on worker", Tooltip: "Lift the pause and run the ticket again on the model its tier names."},
+
+	VerbKeepWaiting: {Word: "keep-waiting", Label: "Keep waiting", Tooltip: "Wait for the background task another 60 minutes. The agent is left alone."},
+	VerbStopTask:    {Word: "stop-task", Label: "Stop task", Tooltip: "Stop the background task and let the ticket finish."},
 }
 
 // Label is v's button text, or "" for an unknown verb.
@@ -143,7 +151,7 @@ var pauseRows = map[PauseReason]PauseRow{
 	PauseAmbiguousBase:      verbs(VerbChooseBase).from(ReceiverAgent),
 	PauseZeroCommit:         verbs(VerbRetry).from(ReceiverAgent),
 	PauseBlockedPane:        verbs(VerbAllowDeny, VerbRetry).from(ReceiverAgent),
-	PauseBackgroundTaskGate: verbs(VerbRetry).from(ReceiverAgent),
+	PauseBackgroundTaskGate: verbs(VerbKeepWaiting, VerbStopTask, VerbRetry, VerbStartOver).from(ReceiverGx),
 	PauseStrandedCommits:    verbs(VerbReopenRetry).from(ReceiverAgent),
 	PauseManual:             verbs(VerbResume, VerbStartOver).from(ReceiverGx),
 	PauseDirtyTrunk:         verbs(VerbStashMerge, VerbMergeAgain).from(ReceiverGx),

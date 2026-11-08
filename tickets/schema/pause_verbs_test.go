@@ -51,6 +51,7 @@ func TestPauseRows_TableMatchesSpec(t *testing.T) {
 		{PauseSelfReported, PauseClassAnswer, ReceiverAgent, []PauseVerb{VerbAnswer, VerbResume}},
 		{PauseManual, PauseClassAnswer, ReceiverGx, []PauseVerb{VerbResume, VerbStartOver}},
 		{PauseDirtyTrunk, PauseClassAnswer, ReceiverGx, []PauseVerb{VerbStashMerge, VerbMergeAgain}},
+		{PauseBackgroundTaskGate, PauseClassAnswer, ReceiverGx, []PauseVerb{VerbKeepWaiting, VerbStopTask, VerbRetry, VerbStartOver}},
 		{PauseNeedsRebase, PauseClassRepair, "", []PauseVerb{VerbMergeAgain}},
 		{PauseConflictMarkers, PauseClassRepair, "", []PauseVerb{VerbRetry, VerbStartOver}},
 	}

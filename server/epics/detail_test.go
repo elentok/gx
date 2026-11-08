@@ -84,7 +84,7 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 		{schema.PauseStrandedCommits, []string{wire.ActionReopenAndRetry}, []string{wire.ActionReopenAndRetry}},
 		{schema.PauseAmbiguousBase, []string{wire.ActionChooseBase}, []string{wire.ActionChooseBase}},
 		{schema.PauseBlockedPane, []string{wire.ActionRetry}, []string{wire.ActionRetry}},
-		{schema.PauseBackgroundTaskGate, []string{wire.ActionRetry}, []string{wire.ActionRetry}},
+		{schema.PauseBackgroundTaskGate, []string{wire.ActionRetry, wire.ActionStartOver}, []string{wire.ActionRetry, wire.ActionStartOver}},
 		{schema.PauseManual, []string{wire.ActionResume, wire.ActionStartOver}, []string{wire.ActionResume, wire.ActionStartOver}},
 	}
 	check := func(label string, want func(int) []string, finishing func(int) bool) {
@@ -111,6 +111,52 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 	})
 	h.Server.Registry().Delete(answerAddr)
 	check("untracked", func(i int) []string { return cases[i].want }, func(int) bool { return false })
+}
+
+// A gate pause's live-task verbs follow a fresh read of the agent's task: Stop
+// task needs a task gx can stop, which only a Claude run has.
+func TestDetail_GatePauseVerbsFollowTheLiveTask(t *testing.T) {
+	t.Parallel()
+	h, ticketPath, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "task still running"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
+		tk.Status, tk.PauseReason = schema.StatusPaused, schema.PauseBackgroundTaskGate
+	}); err != nil {
+		t.Fatal(err)
+	}
+	setAgent := func(agent string) {
+		run, ok := h.Server.Registry().Tracked(answerAddr)
+		if !ok {
+			t.Fatal("run not tracked")
+		}
+		run.Agent = agent
+		h.Server.Registry().Put(run)
+	}
+	cases := []struct {
+		name  string
+		agent string
+		task  bool
+		want  []string
+	}{
+		{"claude, live task", "claude", true, []string{wire.ActionKeepWaiting, wire.ActionStopTask, wire.ActionRetry, wire.ActionStartOver}},
+		{"codex, live task", "codex", true, []string{wire.ActionKeepWaiting, wire.ActionRetry, wire.ActionStartOver}},
+		{"claude, no live task", "claude", false, []string{wire.ActionRetry, wire.ActionStartOver}},
+		{"codex, no live task", "codex", false, []string{wire.ActionRetry, wire.ActionStartOver}},
+	}
+	for _, c := range cases {
+		setAgent(c.agent)
+		fake.SetBackgroundTask("epic-a-iter-01", c.task)
+		d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
+		if err != nil || !slices.Equal(d.Actions, c.want) {
+			t.Errorf("%s: actions = %v, %v; want %v", c.name, d.Actions, err, c.want)
+		}
+		if got := d.ActionInfo[wire.ActionKeepWaiting]; c.task && got.Label != "Keep waiting" {
+			t.Errorf("%s: keep-waiting info = %+v", c.name, got)
+		}
+	}
 }
 
 func TestDetail_FinishedCommitlessOffersMergeOnly(t *testing.T) {
