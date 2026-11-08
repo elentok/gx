@@ -83,7 +83,7 @@ func (r *ptyRegistry) tracked(label string) (agentrunner.Session, bool) {
 // trackSilent registers a live-pid holder that doesn't answer as a dead
 // session, so every call on it fails with ErrSessionDied.
 func (r *ptyRegistry) trackSilent(ss *ptySession) agentrunner.Session {
-	ss.died = agentrunner.SessionDied("holder socket is silent")
+	ss.died = agentrunner.HolderDied("holder socket is silent")
 	close(ss.exited)
 	r.mu.Lock()
 	defer r.mu.Unlock()

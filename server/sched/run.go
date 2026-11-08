@@ -163,7 +163,7 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 	// the Handoff carries it over. launch drops a Codex id whose rollout is gone.
 	earlier := l.Harness.EarlierRunHarness(ticket)
 	switchedHarness := earlier != "" && earlier != string(agentKind)
-	if (agentKind == agent.AgentClaude || agentKind == agent.AgentCodex) && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
+	if canResume(agentKind, deps.Runner) && !switchedHarness {
 		one.ResumeSessionID = answered
 	}
 	mode := l.Landing.IterationModeFor(ticket, t)
@@ -266,7 +266,51 @@ func (l *Launcher) finishRun(rc runContext) {
 	}
 	err := l.waitKeepingHolder(rc, addr)
 	close(stop)
+	if errors.Is(err, agentrunner.ErrHolderDead) {
+		// One relaunch through the shared launch path before any pause.
+		if next, rerr := l.relaunchDeadHolder(rc, addr); rerr != nil {
+			err = fmt.Errorf("holder dead (%v); relaunch failed: %w", err, rerr)
+		} else {
+			rc = next
+			err = l.waitKeepingHolder(rc, addr)
+		}
+	}
 	l.settleRun(rc, err)
+}
+
+// canResume reports whether a launch under kind on runner can resume a session:
+// only Claude and Codex on the pty runner do; every other launch starts cold.
+func canResume(kind agent.AgentKind, runner agentrunner.Runner) bool {
+	return (kind == agent.AgentClaude || kind == agent.AgentCodex) && runner.Name() == string(agentrunner.ChoicePTY)
+}
+
+// relaunchDeadHolder stops what is left of the run's session and launches the
+// agent again in the same worktree, resuming the session so its conversation
+// (and the ticket's recorded verdicts, which live in the ticket body) carry on.
+func (l *Launcher) relaunchDeadHolder(rc runContext, addr tickets.Address) (runContext, error) {
+	if err := rc.deps.Runner.Stop(rc.run.Session); err != nil {
+		l.Log.Warn("stop dead holder's session", "ticket", rc.ticketAddr, "err", err)
+	}
+	ctx, release := l.Sessions.Watches.Context()
+	defer release()
+	one := rc.one
+	one.Context = ctx
+	one.ResumeSessionID = ""
+	if canResume(one.Agent, rc.deps.Runner) {
+		one.ResumeSessionID = rc.run.Session.SessionID
+	}
+	run, err := l.launch(rc.deps, addr, one, rc.wt.Path)
+	if err != nil {
+		return rc, err
+	}
+	one.Context = nil
+	if t, ok := l.Registry.Tracked(rc.ticketAddr); ok {
+		t.Run = run
+		l.Registry.Replace(t)
+	}
+	l.Events.Publish(wire.EventTicketChanged, rc.ticketAddr)
+	rc.one, rc.run = one, run
+	return rc, nil
 }
 
 // HolderReadoptCap is how many unanswered dials in a row a run with a live

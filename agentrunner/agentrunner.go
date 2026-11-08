@@ -235,6 +235,15 @@ func SessionDied(reason string) error {
 	return fmt.Errorf("%w: %s", ErrSessionDied, reason)
 }
 
+// ErrHolderDead marks a session that died because its holder did, not because
+// the agent exited: the scheduler relaunches those once before pausing.
+var ErrHolderDead = errors.New("holder dead")
+
+// HolderDied is SessionDied for a dead holder; it also matches ErrHolderDead.
+func HolderDied(reason string) error {
+	return fmt.Errorf("%w: %w", ErrHolderDead, SessionDied(reason))
+}
+
 type Runner interface {
 	// Name identifies the runner kind; it is recorded on every run it hosts.
 	Name() string

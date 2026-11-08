@@ -273,7 +273,7 @@ func (p *Pty) died(ss *ptySession, err error) error {
 	if rerr == nil {
 		return agentrunner.SessionDied(fmt.Sprintf("claude exited (code %s)", strings.TrimSpace(string(code))))
 	}
-	return agentrunner.SessionDied(fmt.Sprintf("holder failed: %v", err))
+	return agentrunner.HolderDied(fmt.Sprintf("holder failed: %v", err))
 }
 
 // Status maps claude's pid status file, as the holder last read it.
