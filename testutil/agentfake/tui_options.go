@@ -53,6 +53,8 @@ type tuiOptions struct {
 	launchRecord  bool
 	// plainScreen draws the "> " screen instead of the input box (see TUIPlainScreenEnv).
 	plainScreen bool
+	// classifierOutage fails every worker turn (see TUIClassifierOutageEnv).
+	classifierOutage bool
 	// model is --model, reported on every reply.
 	model string
 	// settings is --settings: inline JSON or a path to a JSON file.
@@ -115,22 +117,23 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
 	hung := HangThisLaunch(os.Getenv(TUIHangLaunchesEnv))
 	return tuiOptions{
-		hung:          hung,
-		plainScreen:   os.Getenv(TUIPlainScreenEnv) == "1",
-		sessionID:     *sessionID,
-		trust:         os.Getenv(TUITrustEnv) == "1",
-		dropKey:       os.Getenv(TUITrustDropKeyEnv) == "1",
-		noPidFile:     os.Getenv(TUINoPidFileEnv) == "1",
-		mouse:         os.Getenv(TUIMouseEnv) == "1",
-		draft:         os.Getenv(TUIDraftEnv),
-		clearLeavesI:  os.Getenv(TUIClearLeavesIEnv) == "1",
-		clearIgnored:  hung || os.Getenv(TUIClearIgnoredEnv) == "1",
-		registryDelay: registryDelay,
-		unknownSkill:  os.Getenv(TUIUnknownSkillEnv) == "1",
-		noTurn:        os.Getenv(TUINoTurnEnv) == "1",
-		launchRecord:  os.Getenv(TUILaunchRecordEnv) != "0",
-		model:         cmp.Or(*model, ReportedModel),
-		settings:      settings,
+		hung:             hung,
+		plainScreen:      os.Getenv(TUIPlainScreenEnv) == "1",
+		classifierOutage: os.Getenv(TUIClassifierOutageEnv) == "1",
+		sessionID:        *sessionID,
+		trust:            os.Getenv(TUITrustEnv) == "1",
+		dropKey:          os.Getenv(TUITrustDropKeyEnv) == "1",
+		noPidFile:        os.Getenv(TUINoPidFileEnv) == "1",
+		mouse:            os.Getenv(TUIMouseEnv) == "1",
+		draft:            os.Getenv(TUIDraftEnv),
+		clearLeavesI:     os.Getenv(TUIClearLeavesIEnv) == "1",
+		clearIgnored:     hung || os.Getenv(TUIClearIgnoredEnv) == "1",
+		registryDelay:    registryDelay,
+		unknownSkill:     os.Getenv(TUIUnknownSkillEnv) == "1",
+		noTurn:           os.Getenv(TUINoTurnEnv) == "1",
+		launchRecord:     os.Getenv(TUILaunchRecordEnv) != "0",
+		model:            cmp.Or(*model, ReportedModel),
+		settings:         settings,
 	}, nil
 }
 

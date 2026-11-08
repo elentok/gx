@@ -63,6 +63,10 @@ const (
 	// TUIPlainScreenEnv, set to "1", draws the plain "> " screen instead of the
 	// input box claudeui.InputBox recognises.
 	TUIPlainScreenEnv = "GX_AGENTFAKE_TUI_PLAIN_SCREEN"
+	// TUIClassifierOutageEnv, set to "1", makes every worker turn fail as claude
+	// does when the auto-mode classifier is down: the turn ends on a "no verdict"
+	// tool error and the ticket is never worked.
+	TUIClassifierOutageEnv = "GX_AGENTFAKE_TUI_CLASSIFIER_OUTAGE"
 )
 
 // UnknownCommandText is what claude draws, and records, for a skill it doesn't know.

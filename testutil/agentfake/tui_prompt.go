@@ -216,7 +216,11 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	// be too late; claude also refreshes it mid-turn.
 	t.runStatusLine()
 	began := time.Now()
-	if err := WorkTicket(cfg, address); err != nil {
+	if t.opts.classifierOutage {
+		if path, err := t.transcriptPath(); err == nil {
+			_ = appendClassifierNoVerdict(path)
+		}
+	} else if err := WorkTicket(cfg, address); err != nil {
 		fmt.Fprintln(os.Stderr, "fakeclaude worker:", err)
 	}
 	if b := cfg.Behaviour[address]; b == BehaviourAsk || b == BehaviourWriteAsk {
@@ -237,6 +241,18 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 		return
 	}
 	_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
+}
+
+// appendClassifierNoVerdict appends one failed tool call: the assistant's call
+// and the "no verdict" error that answers it.
+func appendClassifierNoVerdict(path string) error {
+	const id = "toolu_noverdict"
+	call := []any{map[string]any{"type": "tool_use", "id": id, "name": "Bash", "input": map[string]any{"command": "gx tickets show"}}}
+	failure := []any{map[string]any{"type": "tool_result", "tool_use_id": id, "is_error": true, "content": "Error: auto mode classifier gave no verdict"}}
+	if err := appendMessage(path, "assistant", call); err != nil {
+		return err
+	}
+	return appendMessage(path, "user", failure)
 }
 
 // fastTurn runs an armed fast turn: working, then done, with no busy status.
