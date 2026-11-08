@@ -1,12 +1,14 @@
 package ticketwrite
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/recovery"
@@ -90,6 +92,10 @@ func (w *Writer) Relaunch(req wire.QueueRequest, qc queue.Ctx) (wire.QueueResult
 		if d, held := h.FreshHeldDisk(ref.Addr.Project); held {
 			return queue.Refusal(wire.ReasonDiskLow, disk.LowReason(d)), nil
 		}
+		// A holder that never answers can't be attached to, so the retry replaces it.
+		if _, _, err := h.SettleLive([]tickets.Address{ref.Addr}, true, wire.ReasonAgentWorking, isSilent); err != nil {
+			return wire.QueueResult{}, err
+		}
 		if res, refused, err := h.SettleLive([]tickets.Address{ref.Addr}, req.Stop, wire.ReasonAgentWorking, isWorking); refused || err != nil {
 			return res, err
 		}
@@ -127,6 +133,12 @@ func (w *Writer) Relaunch(req wire.QueueRequest, qc queue.Ctx) (wire.QueueResult
 
 // isWorking is a session not idle or done; an unknown state counts as working,
 // so it is never killed without --stop.
+// isSilent is a session whose holder is alive but did not answer the status probe.
+func isSilent(r agentrunner.Runner, sess agentrunner.Session) bool {
+	_, err := r.Status(sess)
+	return errors.Is(err, holder.ErrHolderUnreachable)
+}
+
 func isWorking(r agentrunner.Runner, sess agentrunner.Session) bool {
 	st, err := r.Status(sess)
 	return err != nil || !st.Waiting()

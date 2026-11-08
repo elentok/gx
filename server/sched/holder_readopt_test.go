@@ -44,7 +44,12 @@ func startUnreachable(t *testing.T) (h *servertest.Harness, base string, pty rig
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "the ticket to launch", func() bool { return len(pty.Prompts(readoptLabel)) > 0 })
-	t.Cleanup(func() { pty.SetCallErr(readoptLabel, nil) })
+	t.Cleanup(func() {
+		// A test that stops the session leaves nothing to clear.
+		if _, ok, _ := pty.Find(readoptLabel); ok {
+			pty.SetCallErr(readoptLabel, nil)
+		}
+	})
 	pty.SetCallErr(readoptLabel, fmt.Errorf("status: %w", holder.ErrHolderUnreachable))
 	return h, hs.WebURL, pty, store + "/proj/epic-a/issues/01-held.md"
 }

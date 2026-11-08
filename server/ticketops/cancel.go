@@ -134,8 +134,26 @@ func (o *Ops) SettleLive(addrs []tickets.Address, stop bool, reason string, bloc
 		if err := l.runner.Stop(l.sess); err != nil {
 			return wire.QueueResult{}, false, fmt.Errorf("stop %s: %w", l.addr, err)
 		}
+		if !o.confirmGone(l.addr) {
+			return wire.QueueResult{}, false, fmt.Errorf("%s is still alive after stop", l.addr)
+		}
 	}
 	return wire.QueueResult{}, false, nil
+}
+
+// confirmGone waits for addr's session to leave its runner, so a launch right
+// after a stop never meets the old agent.
+func (o *Ops) confirmGone(addr tickets.Address) bool {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, _, ok, err := o.d.Harness.LiveSession(addr); err == nil && !ok {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // cancelTargets is the ticket plus its fork descendants that are not terminal.

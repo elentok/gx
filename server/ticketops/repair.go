@@ -261,6 +261,13 @@ func (o *Ops) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Repair
 			}
 		}
 	}
+	if o.d.Registry != nil {
+		// A fresh launch must never meet the old agent, so it is stopped and confirmed gone first.
+		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
+		if _, _, err := o.SettleLive([]tickets.Address{epicTicketAddress(epicPath, id)}, true, wire.ReasonTicketLive, anyLive); err != nil {
+			return wire.RepairResult{}, err
+		}
+	}
 	if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil && t.Type == string(schema.TypeTrunkConflict) {
 		addr := tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
 		res, err := o.d.Landing.StartOverTrunkConflict(req, rc.origin, addr, t)
