@@ -87,20 +87,7 @@ func capFinishedOneOffs(rows []wire.EpicListRow, limit int) []wire.EpicListRow {
 // has no open follow-up and no live Triage. The epic itself never gets a plain
 // card. rec is the project's live Triage record (nil for none).
 func followUpsCard(project string, e tickets.Epic, rec *triage.Record, sessionLive bool) (wire.EpicListRow, bool) {
-	var bugs, ideas, other int
-	for _, t := range e.Tickets {
-		if t.Status != string(schema.StatusDraft) && t.Status != string(schema.StatusOpen) {
-			continue
-		}
-		switch t.Category {
-		case string(schema.CategoryBug):
-			bugs++
-		case string(schema.CategoryIdea):
-			ideas++
-		default:
-			other++
-		}
-	}
+	bugs, ideas, other := splitFollowUps(e)
 	live := rec != nil && rec.State == triage.StateLive
 	if bugs+ideas+other == 0 && !live {
 		return wire.EpicListRow{}, false
@@ -121,6 +108,59 @@ func followUpsCard(project string, e tickets.Epic, rec *triage.Record, sessionLi
 		row.RingProgress = triagePercent(rec)
 	}
 	return row, true
+}
+
+// splitFollowUps counts the draft and open tickets of a follow-ups epic by
+// category; one with no category is "other".
+func splitFollowUps(e tickets.Epic) (bugs, ideas, other int) {
+	for _, t := range e.Tickets {
+		if t.Status != string(schema.StatusDraft) && t.Status != string(schema.StatusOpen) {
+			continue
+		}
+		switch t.Category {
+		case string(schema.CategoryBug):
+			bugs++
+		case string(schema.CategoryIdea):
+			ideas++
+		default:
+			other++
+		}
+	}
+	return bugs, ideas, other
+}
+
+// followUpCount is the sidebar entry of a project's follow-ups epic, absent when
+// it has no open follow-up and no live Triage. Workspaces are filled by the caller.
+func followUpCount(project string, e tickets.Epic, rec *triage.Record, sessionLive bool) (wire.FollowUpCount, bool) {
+	bugs, ideas, other := splitFollowUps(e)
+	live := rec != nil && rec.State == triage.StateLive
+	if bugs+ideas+other == 0 && !live {
+		return wire.FollowUpCount{}, false
+	}
+	c := wire.FollowUpCount{Project: project, Open: bugs + ideas + other, Bugs: bugs, Ideas: ideas, Other: other, Triage: wire.FollowUpTriageNone}
+	if !live {
+		return c, true
+	}
+	switch p := PlaceTriage(project, rec, sessionLive); {
+	case p.Section == wire.SectionNeedsYou:
+		c.Triage = wire.FollowUpTriageWaiting
+	case p.Pill == PillStopped:
+		c.Triage = wire.FollowUpTriageStopped
+	default:
+		c.Triage = wire.FollowUpTriageRunning
+	}
+	open := map[string]bool{}
+	for _, t := range e.Tickets {
+		if t.Status == string(schema.StatusDraft) || t.Status == string(schema.StatusOpen) {
+			open[project+":"+followUpsEpicName+"/"+t.Identifier] = true
+		}
+	}
+	for _, r := range rec.Rows {
+		if open[r.Address] {
+			c.Left++
+		}
+	}
+	return c, true
 }
 
 // followUpWords reads "5 bugs, 2 ideas"; follow-ups with no category count as "other".

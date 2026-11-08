@@ -249,7 +249,7 @@ test("no epics shows the empty state with a New Design button", async () => {
 });
 
 test("the follow-ups counts line is gone", async () => {
-  await loaded(listOf([row("x")], { follow_ups: [{ project: "gx", open: 3 }] }));
+  await loaded(listOf([row("x")], { follow_ups: [{ project: "gx", open: 3, bugs: 3, ideas: 0, other: 0, triage: "none", left: 0 }] }));
   expect(screen.queryByText(/Follow-ups/)).toBeNull();
 });
 

@@ -119,13 +119,38 @@ type EpicListRow struct {
 	// Workspace is the workspace of a Design or epic card; empty on One-off and
 	// Follow-ups cards. A joined card reads its Design's.
 	Workspace string `json:"workspace,omitempty"`
+	// Workspaces is set on a Follow-ups card only: the workspaces of its project.
+	Workspaces []string `json:"workspaces,omitempty"`
 }
 
-// FollowUpCount is the number of draft and open tickets in one project's
-// follow-ups epic.
+// FollowUpTriage is the Triage state a project's sidebar badge shows. Waiting is
+// exactly "the Follow-ups card is in Needs you".
+type FollowUpTriage string
+
+// Spelled as literals for tygo; see the comment on EpicListState.
+const (
+	FollowUpTriageNone    FollowUpTriage = "none"
+	FollowUpTriageRunning FollowUpTriage = "running"
+	FollowUpTriageWaiting FollowUpTriage = "waiting"
+	FollowUpTriageStopped FollowUpTriage = "stopped"
+)
+
+// FollowUpCount is one project's follow-ups epic as the sidebar badge and popover
+// show it. Bugs, Ideas and Other (no category) sum to Open.
 type FollowUpCount struct {
 	Project string `json:"project"`
 	Open    int    `json:"open"`
+	Bugs    int    `json:"bugs"`
+	Ideas   int    `json:"ideas"`
+	Other   int    `json:"other"`
+	// Triage is the state of the project's live Triage.
+	Triage FollowUpTriage `json:"triage"`
+	// Left is the number of Triage snapshot rows whose follow-up is still draft or
+	// open; zero without a live Triage.
+	Left int `json:"left"`
+	// Workspaces are the workspaces of the project's Design and Implementation
+	// cards, or just the Default workspace when it has none.
+	Workspaces []string `json:"workspaces,omitempty"`
 }
 
 // EpicList is the /v1/epics payload.
@@ -134,7 +159,7 @@ type EpicList struct {
 	// Projects is every project, including those with no epics: the project
 	// pickers list them all.
 	Projects []string `json:"projects,omitempty"`
-	// FollowUps lists only the projects with at least one open follow-up.
+	// FollowUps lists the projects with an open follow-up or a live Triage.
 	FollowUps []FollowUpCount `json:"follow_ups"`
 	// RecentlyFinished is config server.recently-finished: how many Finished cards
 	// the page shows before a filter.

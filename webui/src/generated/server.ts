@@ -1133,14 +1133,47 @@ export interface EpicListRow {
    * Follow-ups cards. A joined card reads its Design's.
    */
   workspace?: string;
+  /**
+   * Workspaces is set on a Follow-ups card only: the workspaces of its project.
+   */
+  workspaces?: string[];
 }
 /**
- * FollowUpCount is the number of draft and open tickets in one project's
- * follow-ups epic.
+ * FollowUpTriage is the Triage state a project's sidebar badge shows. Waiting is
+ * exactly "the Follow-ups card is in Needs you".
+ */
+export const FollowUpTriageNone = "none";
+export const FollowUpTriageRunning = "running";
+export const FollowUpTriageWaiting = "waiting";
+export const FollowUpTriageStopped = "stopped";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export type FollowUpTriage = typeof FollowUpTriageNone | typeof FollowUpTriageRunning | typeof FollowUpTriageWaiting | typeof FollowUpTriageStopped;
+/**
+ * FollowUpCount is one project's follow-ups epic as the sidebar badge and popover
+ * show it. Bugs, Ideas and Other (no category) sum to Open.
  */
 export interface FollowUpCount {
   project: string;
   open: number /* int */;
+  bugs: number /* int */;
+  ideas: number /* int */;
+  other: number /* int */;
+  /**
+   * Triage is the state of the project's live Triage.
+   */
+  triage: FollowUpTriage;
+  /**
+   * Left is the number of Triage snapshot rows whose follow-up is still draft or
+   * open; zero without a live Triage.
+   */
+  left: number /* int */;
+  /**
+   * Workspaces are the workspaces of the project's Design and Implementation
+   * cards, or just the Default workspace when it has none.
+   */
+  workspaces?: string[];
 }
 /**
  * EpicList is the /v1/epics payload.
@@ -1153,7 +1186,7 @@ export interface EpicList {
    */
   projects?: string[];
   /**
-   * FollowUps lists only the projects with at least one open follow-up.
+   * FollowUps lists the projects with an open follow-up or a live Triage.
    */
   follow_ups: FollowUpCount[];
   /**

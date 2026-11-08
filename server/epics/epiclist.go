@@ -133,22 +133,23 @@ func (s *Epics) cardList() (wire.EpicList, error) {
 		if err != nil {
 			continue
 		}
-		for _, e := range epics {
-			if e.Name == followUpsEpicName {
-				if open := openFollowUps(e); open > 0 {
-					list.FollowUps = append(list.FollowUps, wire.FollowUpCount{Project: project, Open: open})
-				}
-			}
-		}
 		rec, err := triage.NewStore(dir).LoadLive()
 		if err != nil {
 			s.Log.Warn("follow-ups card: read triage", "project", project, "err", err)
+		}
+		for _, e := range epics {
+			if e.Name == followUpsEpicName {
+				if c, ok := followUpCount(project, e, rec, triageLive[project]); ok {
+					list.FollowUps = append(list.FollowUps, c)
+				}
+			}
 		}
 		list.Epics = append(list.Epics, s.projectCards(project, epics, designs, rec, triageLive, qidx)...)
 	}
 	list.RecentlyFinished = s.Settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
 	s.applyWorkspaces(list.Epics)
+	s.applyFollowUpWorkspaces(list.Epics, list.FollowUps)
 	sortCards(list.Epics, func(r wire.EpicListRow) int { return r.QueueSlot })
 	return list, nil
 }
@@ -205,15 +206,34 @@ func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[s
 	return rows
 }
 
-// openFollowUps counts the draft and open tickets of a follow-ups epic.
-func openFollowUps(e tickets.Epic) int {
-	n := 0
-	for _, t := range e.Tickets {
-		if t.Status == string(schema.StatusDraft) || t.Status == string(schema.StatusOpen) {
-			n++
+// applyFollowUpWorkspaces gives each Follow-ups card and count entry the
+// workspaces of its project: those of its Design and Implementation cards, or the
+// Default workspace when it has none. Call it after applyWorkspaces.
+func (s *Epics) applyFollowUpWorkspaces(rows []wire.EpicListRow, counts []wire.FollowUpCount) {
+	if s.Workspaces == nil {
+		return
+	}
+	byProject := map[string][]string{}
+	for _, r := range rows {
+		if r.Workspace != "" && !slices.Contains(byProject[r.Project], r.Workspace) {
+			byProject[r.Project] = append(byProject[r.Project], r.Workspace)
 		}
 	}
-	return n
+	of := func(project string) []string {
+		if ws := byProject[project]; len(ws) > 0 {
+			return ws
+		}
+		// A project name is never a member key, so this is the Default workspace.
+		return []string{s.Workspaces.Workspace(project)}
+	}
+	for i := range rows {
+		if rows[i].CardKind == wire.CardKindFollowUps {
+			rows[i].Workspaces = of(rows[i].Project)
+		}
+	}
+	for i := range counts {
+		counts[i].Workspaces = of(counts[i].Project)
+	}
 }
 
 // unmergedBlockers returns the addresses of the epics in e's blocked_by that
