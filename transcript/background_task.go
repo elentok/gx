@@ -165,9 +165,41 @@ type backgroundTaskLine struct {
 		AgentID string `json:"agentId"`
 		// A TaskOutput result: {retrieval_status, task: {task_id, ...}}.
 		RetrievalStatus string `json:"retrieval_status"`
+		Task            struct {
+			TaskID string `json:"task_id"`
+		} `json:"task"`
 		// A TaskStop result: {message, task_id}.
 		StoppedTaskID string `json:"task_id"`
 	} `json:"toolUseResult"`
+}
+
+// resolvedByStructuredID returns the one task id a TaskStop or TaskOutput
+// tool_result names in its structured fields. These results resolve only by
+// that id, never by a raw-line match: a TaskStop of the agent's own poll loop
+// echoes a live task's id in its message and command.
+func (l backgroundTaskLine) resolvedByStructuredID() string {
+	if l.ToolUseResult.Task.TaskID != "" {
+		return l.ToolUseResult.Task.TaskID
+	}
+	return l.ToolUseResult.StoppedTaskID
+}
+
+// isToolResult reports whether a user line carries a tool_result item.
+func (l backgroundTaskLine) isToolResult() bool {
+	var m struct {
+		Content []struct {
+			Type string `json:"type"`
+		} `json:"content"`
+	}
+	if json.Unmarshal(l.Message, &m) != nil {
+		return false
+	}
+	for _, c := range m.Content {
+		if c.Type == "tool_result" {
+			return true
+		}
+	}
+	return false
 }
 
 // reportsOnTasks reports whether a line is the CLI reporting on a task. It is
@@ -216,10 +248,9 @@ const interimNotificationNote = "the result below may be interim"
 // backgrounded-shell-command start markers (a tool_result carrying
 // backgroundTaskId) and, for each, whether it was later resolved. A marker
 // resolves as soon as its task id string appears anywhere on a later
-// non-sidechain line the CLI wrote to report on tasks (see reportsOnTasks) —
-// regardless of that line's JSON nesting — because the CLI necessarily refers
-// to a task by its id wherever it reports on it, whatever shape that report
-// takes.
+// non-sidechain notification, attachment or queue-operation line (see
+// reportsOnTasks). A TaskStop or TaskOutput tool_result resolves only by its
+// structured task id (resolvedByStructuredID), never by a raw-line match.
 // Sidechain-scoped markers (isSidechain: true) are excluded entirely, both
 // as start markers and as resolution lines — a subagent's background task
 // belongs to the subagent's lifetime, never the parent iteration's, so a
@@ -323,7 +354,13 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		if entry.reportsOnTasks() && !strings.Contains(raw, interimNotificationNote) {
 			for _, taskID := range order {
 				m := markers[taskID]
-				if containsTaskIDToken(raw, taskID) {
+				var matches bool
+				if entry.isToolResult() {
+					matches = entry.resolvedByStructuredID() == taskID
+				} else {
+					matches = containsTaskIDToken(raw, taskID)
+				}
+				if matches {
 					m.resolved = true
 					awaitingTurnEnd = true
 					lastResolvedAt, _ = time.Parse(time.RFC3339Nano, entry.Timestamp)

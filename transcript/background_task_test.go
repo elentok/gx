@@ -120,6 +120,24 @@ func TestReadBackgroundTasks_ResolvedViaTaskStop(t *testing.T) {
 	}
 }
 
+func TestReadBackgroundTasks_TaskStopOfAnotherTaskDoesNotResolveLiveTask(t *testing.T) {
+	// The agent stops its own poll loop; the result's message and command
+	// echo the live task's id, but task_id names only the stopped poll loop.
+	stop := `{"isSidechain":false,"type":"user","timestamp":"2026-08-12T15:05:00.000000000Z","message":{"content":[{"tool_use_id":"tool-stop","type":"tool_result","content":"stopped"}]},"toolUseResult":{"message":"Successfully stopped task: poll-1 (until [ -s /tmp/tasks/live-1.output ]; do sleep 1; done)","task_id":"poll-1","command":"until [ -s /tmp/tasks/live-1.output ]; do sleep 1; done"}}`
+	path := writeTranscript(t,
+		startMarkerLine("live-1", "tool-1", "2026-08-12T15:00:00.000000000Z"),
+		stop,
+	)
+
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatalf("ReadBackgroundTasks() error = %v", err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status == BackgroundTaskResolved {
+		t.Errorf("Markers = %+v, want live-1 still outstanding", reading.Markers)
+	}
+}
+
 func TestReadBackgroundTasks_OutstandingFresh(t *testing.T) {
 	path := writeTranscript(t,
 		startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z"),
