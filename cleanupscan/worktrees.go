@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/git/history"
-	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
@@ -43,6 +41,10 @@ type WorktreeScan struct {
 
 	// MergedToTrunk is set for Kind == "feature" and "other".
 	MergedToTrunk bool `json:"merged_to_main,omitempty"`
+
+	// DeleteMode is the `git branch` flag that deletes the branch ("-d" or
+	// "-D"), empty when it is not proven merged.
+	DeleteMode string `json:"delete_mode,omitempty"`
 
 	// Recommendation is "delete", "merge", or "" (no action proposed).
 	// Always "" when Active is true.
@@ -126,11 +128,12 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 			}
 		}
 
-		merged, err := iterationMerged(repo, branch, epicName)
+		check, err := CheckMerged(repo, branch, epicName)
 		if err != nil {
 			return WorktreeScan{}, err
 		}
-		scan.Merged = merged
+		scan.Merged = check.Merged
+		scan.DeleteMode = check.DeleteMode
 
 		if !scan.Active && scan.TicketDone && scan.Merged {
 			scan.Recommendation = "delete"
@@ -145,47 +148,17 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 		scan.Kind = "other"
 	}
 
-	merged, err := pr.IsCommitMergedToTrunk(repo.Root, repo.Trunk, branch)
+	check, err := CheckMerged(repo, branch, "")
 	if err != nil {
 		return WorktreeScan{}, err
 	}
-	scan.MergedToTrunk = merged
-	if !scan.Active && merged {
+	scan.MergedToTrunk = check.Merged
+	scan.DeleteMode = check.DeleteMode
+	if !scan.Active && check.Merged {
 		scan.Recommendation = "delete"
 	}
 
 	return scan, nil
-}
-
-// iterationMerged reports whether branch's commits are already cherry-picked
-// into the epic's feature branch (epicName), or already reachable from trunk
-// — either way there's nothing left to merge. Checked as an ancestor first
-// (the common case where the branch was never diverged/rebased away), then
-// via patch-id equivalence (git cherry), since CherryPickRange produces
-// fresh commit hashes on the feature branch that are never literally
-// reachable from the source iteration branch.
-func iterationMerged(repo git.Repo, branch, epicName string) (bool, error) {
-	if git.IsLocalBranch(repo.Root, epicName) {
-		anc, err := git.IsAncestor(repo.Root, branch, epicName)
-		if err != nil {
-			return false, err
-		}
-		if anc {
-			return true, nil
-		}
-
-		if base, err := git.MergeBase(repo.Root, branch, epicName); err == nil {
-			applied, err := history.PatchesApplied(repo.Root, epicName, base, branch)
-			if err != nil {
-				return false, err
-			}
-			if applied {
-				return true, nil
-			}
-		}
-	}
-
-	return pr.IsCommitMergedToTrunk(repo.Root, repo.Trunk, branch)
 }
 
 // isActiveWork reports whether branch has a commit within worktreeActiveWindow,

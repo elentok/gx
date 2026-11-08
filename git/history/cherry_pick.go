@@ -1,6 +1,8 @@
 package history
 
 import (
+	"bytes"
+
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/internal/run"
 	"os"
@@ -78,6 +80,55 @@ func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
 	}
 	ahead, err := git.CommitsAhead(dir, base, branch)
 	return ahead > 0, err
+}
+
+// SquashApplied reports whether the combined base..branch diff has the same
+// patch id as a single commit in base..upstream — a squash merge of one or
+// several commits, which `git cherry` cannot see because it compares commit by
+// commit. An empty range reports false (nothing to compare).
+func SquashApplied(dir, upstream, base, branch string) (bool, error) {
+	ahead, err := git.CommitsAhead(dir, base, branch)
+	if err != nil || ahead == 0 {
+		return false, err
+	}
+	diff, _, err := run.RunRaw(dir, run.NonInteractiveEnv(), "diff", base, branch)
+	if err != nil {
+		return false, err
+	}
+	want, err := patchIDs(dir, diff)
+	if err != nil || len(want) != 1 {
+		return false, err
+	}
+	log, _, err := run.RunRaw(dir, run.NonInteractiveEnv(), "log", "-p", "--format=%H", base+".."+upstream)
+	if err != nil {
+		return false, err
+	}
+	got, err := patchIDs(dir, log)
+	if err != nil {
+		return false, err
+	}
+	for _, id := range got {
+		if id == want[0] {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// patchIDs pipes patch text through `git patch-id --stable` and returns the
+// patch id of each patch in it.
+func patchIDs(dir string, patch []byte) ([]string, error) {
+	out, _, err := run.RunWith(dir, run.NonInteractiveEnv(), run.RunOptions{Stdin: bytes.NewReader(patch)}, "patch-id", "--stable")
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for line := range strings.SplitSeq(out, "\n") {
+		if id, _, ok := strings.Cut(strings.TrimSpace(line), " "); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
 }
 
 // Trailer is one "key: value" commit-message trailer line, see

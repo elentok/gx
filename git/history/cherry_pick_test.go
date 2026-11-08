@@ -287,3 +287,35 @@ func TestCherryPickInProgress_FalseOutsideCherryPick(t *testing.T) {
 		t.Error("CherryPickInProgress() = true, want false outside a cherry-pick")
 	}
 }
+
+func TestSquashApplied(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	got, err := history.SquashApplied(dir, "HEAD", base, "HEAD")
+	if err != nil || got {
+		t.Fatalf("empty range = %v, %v; want false, nil", got, err)
+	}
+
+	testutil.MustGitExported(t, dir, "checkout", "-b", "feat")
+	for _, f := range []string{"a.txt", "b.txt"} {
+		testutil.WriteFile(t, dir, f, f+"\n")
+		testutil.CommitAll(t, dir, "add "+f)
+	}
+	testutil.MustGitExported(t, dir, "checkout", "-")
+	got, err = history.SquashApplied(dir, "HEAD", base, "feat")
+	if err != nil || got {
+		t.Fatalf("before squash = %v, %v; want false, nil", got, err)
+	}
+
+	testutil.MustGitExported(t, dir, "merge", "--squash", "feat")
+	testutil.CommitAll(t, dir, "squash")
+	got, err = history.SquashApplied(dir, "HEAD", base, "feat")
+	if err != nil || !got {
+		t.Fatalf("after squash = %v, %v; want true, nil", got, err)
+	}
+}
