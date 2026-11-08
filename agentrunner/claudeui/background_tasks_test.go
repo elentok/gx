@@ -28,7 +28,8 @@ func TestBackgroundTasks(t *testing.T) {
 		want  bool
 	}{
 		{"outstanding fresh", []string{startMarker("task-1", now.Add(-time.Minute))}, true},
-		{"resolved", []string{startMarker("task-1", now.Add(-time.Minute)), notification("task-1", now)}, false},
+		{"resolved and the woken turn ended", []string{startMarker("task-1", now.Add(-time.Minute)), notification("task-1", now.Add(-time.Second)), `{"isSidechain":false,"type":"assistant","timestamp":"` + now.Format(time.RFC3339Nano) + `","message":{"stop_reason":"end_turn","content":[{"type":"text","text":"."}]}}`}, false},
+		{"resolved, woken turn still running", []string{startMarker("task-1", now.Add(-time.Minute)), notification("task-1", now)}, true},
 		{"aged out", []string{startMarker("task-1", now.Add(-transcript.BackgroundTaskAgedOutCap-time.Minute))}, false},
 		{"no task", []string{`{"type":"assistant","message":{}}`}, false},
 		{"no transcript", nil, false},

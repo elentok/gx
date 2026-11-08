@@ -3,6 +3,7 @@ package harness
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/backgroundtask"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -138,6 +140,8 @@ type PidWatcher struct {
 	transcript struct {
 		conversationID, path string
 		size                 int64
+		// bgSize is the size the background cross-check last read; -1 reads again.
+		bgSize int64
 		// A session left idle with no prompt never writes its transcript, so
 		// the search for it backs off rather than globbing every poll.
 		searchID   string
@@ -153,6 +157,9 @@ type PidWatcher struct {
 	// one, still the transcript's last word early in a turn, isn't news.
 	lastLimit time.Time
 	onChange  func()
+	log       *slog.Logger
+	// disagreeLogged latches the one stale-shell log line per session.
+	disagreeLogged bool
 	// readyPidAt and readyOSCAt are when those signals first showed the input
 	// ready; ready latches the signal Ready reported first.
 	readyPidAt, readyOSCAt time.Time
@@ -168,6 +175,8 @@ type pidState struct {
 	program *ProgramReport
 	// rateLimit is the transcript's rate limit, held until the next Working.
 	rateLimit *transcript.APIError
+	// bgStale is a `shell` that the transcript showed no task for.
+	bgStale bool
 }
 
 // pidStartSlack is how far before the spawn claude's startedAt may fall and
@@ -178,16 +187,19 @@ const pidStartSlack = 2 * time.Second
 // that crashed left it, and the OS has since reused its pid.
 // The transcripts are a sibling of sessionsDir, under the same config dir.
 func newPidWatcher(sessionsDir string, pid int, spawned time.Time) *PidWatcher {
-	return &PidWatcher{
+	w := &PidWatcher{
 		path:        filepath.Join(sessionsDir, strconv.Itoa(pid)+".json"),
 		pid:         pid,
 		sessionsDir: sessionsDir,
 		projectsDir: filepath.Join(filepath.Dir(sessionsDir), "projects"),
 		notBefore:   spawned.Add(-pidStartSlack).UnixMilli(),
 		now:         time.Now,
+		log:         slog.Default(),
 		find:        transcript.FindByIDIn,
 		parents:     processParents,
 	}
+	w.transcript.bgSize = -1
+	return w
 }
 
 // watch polls the file until stop closes.
@@ -240,6 +252,49 @@ func (w *PidWatcher) poll() {
 		w.changed()
 	}
 	w.pollTranscript(f.SessionID)
+	w.pollBackground(f.SessionID)
+}
+
+// pollBackground cross-checks a pid-file `shell` against the transcript: a
+// transcript that reads cleanly with no outstanding task clears it as stale
+// (backgroundtask.Resolve decides), logged once per session. The read happens
+// only while the pid file says shell, and again only when the transcript's
+// size changes.
+func (w *PidWatcher) pollBackground(conversationID string) {
+	t := &w.transcript
+	w.mu.Lock()
+	shell := w.live.last.Status == ClaudeShell
+	w.mu.Unlock()
+	if !shell {
+		w.setBackgroundStale(false)
+		t.bgSize = -1
+		return
+	}
+	if conversationID != t.conversationID {
+		return
+	}
+	info, err := os.Stat(t.path)
+	if err != nil || info.Size() == t.bgSize {
+		return
+	}
+	t.bgSize = info.Size()
+	tr, rerr := transcript.ReadBackgroundTasks(t.path, transcript.BackgroundTaskAgedOutCap, w.now())
+	reading := backgroundtask.Resolve(backgroundtask.PidShell, tr, rerr)
+	if reading.Disagree && !w.disagreeLogged {
+		w.disagreeLogged = true
+		w.log.Warn("pid file says shell but the transcript shows no background task; clearing +bg", "session", conversationID)
+	}
+	w.setBackgroundStale(reading.Disagree)
+}
+
+func (w *PidWatcher) setBackgroundStale(stale bool) {
+	w.mu.Lock()
+	changed := w.live.bgStale != stale
+	w.live.bgStale = stale
+	w.mu.Unlock()
+	if changed {
+		w.changed()
+	}
 }
 
 type pidFile struct {
@@ -456,6 +511,9 @@ func (w *PidWatcher) Status() Status {
 	// only the pid file's shell state does.
 	if !ok || (st.program.State == "done" && st.seen && st.last.Status == ClaudeShell) {
 		s = pidFileStatus(st)
+	}
+	if s.Background && st.bgStale {
+		s = Status{State: Idle}
 	}
 	if st.rateLimit != nil && s.State != Blocked {
 		return Status{State: RateLimited, Message: st.rateLimit.Message}

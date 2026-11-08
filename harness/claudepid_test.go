@@ -1,10 +1,13 @@
 package harness
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -322,6 +325,41 @@ func rateLimitWatcher(t *testing.T, spawned time.Time) (w *PidWatcher, sessions,
 	transcriptPath = filepath.Join(project, "conv-1.jsonl")
 	appendLine(t, transcriptPath, "")
 	return newPidWatcher(sessions, 4242, spawned), sessions, transcriptPath
+}
+
+func TestPidWatcher_CleanTranscriptClearsStaleShell(t *testing.T) {
+	spawned := time.Now()
+	w, sessions, path := rateLimitWatcher(t, spawned)
+	var logs bytes.Buffer
+	w.log = slog.New(slog.NewTextHandler(&logs, nil))
+
+	writePidFile(t, sessions, spawned, `,"status":"shell"`)
+	w.poll()
+	if got := w.Status(); got.State != Idle || got.Background {
+		t.Fatalf("shell with a clean transcript: Status = %+v, want Idle without +bg", got)
+	}
+	// Another poll, a new line, a status flap: still one line.
+	appendLine(t, path, `{"type":"assistant","message":{}}`)
+	w.poll()
+	writePidFile(t, sessions, spawned, `,"status":"busy"`)
+	w.poll()
+	writePidFile(t, sessions, spawned, `,"status":"shell"`)
+	w.poll()
+	if got := strings.Count(logs.String(), "clearing +bg"); got != 1 {
+		t.Fatalf("disagreement logged %d times, want 1:\n%s", got, logs.String())
+	}
+}
+
+func TestPidWatcher_ShellWithOutstandingTaskStaysBackground(t *testing.T) {
+	spawned := time.Now()
+	w, sessions, path := rateLimitWatcher(t, spawned)
+	appendLine(t, path, `{"isSidechain":false,"timestamp":"`+time.Now().Format(time.RFC3339Nano)+`","toolUseResult":{"backgroundTaskId":"task-1"}}`)
+
+	writePidFile(t, sessions, spawned, `,"status":"shell"`)
+	w.poll()
+	if got := w.Status(); got.State != Working || !got.Background {
+		t.Fatalf("shell with an outstanding task: Status = %+v, want Working +bg", got)
+	}
 }
 
 func TestPidWatcher_TranscriptSearchBacksOff(t *testing.T) {

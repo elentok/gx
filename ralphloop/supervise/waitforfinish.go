@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/backgroundtask"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
@@ -648,19 +649,19 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 	held := map[string]bool{}
 	gated := false
 	for {
-		reading, err := d.ReadBackgroundTasks(p.SessionCwd, sessionID)
+		tr, err := d.ReadBackgroundTasks(p.SessionCwd, sessionID)
 		if err != nil {
 			return true, nil
 		}
+		reading := backgroundtask.Resolve(backgroundtask.PidUnknown, tr, nil)
 
 		// The pane can still read idle while a notification-woken turn runs
 		// quick tool calls, so the transcript's turn end decides, not herdr.
-		outstanding := reading.AwaitingTurnEnd
-		gated = gated || outstanding
-		for _, m := range reading.Markers {
+		outstanding := reading.Live
+		gated = gated || reading.AwaitingTurnEnd
+		for _, m := range reading.Tasks {
 			switch m.Status {
 			case transcript.BackgroundTaskOutstandingFresh:
-				outstanding = true
 				if !held[m.TaskID] {
 					held[m.TaskID] = true
 					gated = true
