@@ -423,7 +423,7 @@ func New(cfg Config) (*Server, error) {
 			ActionStepStartTimeout: cfg.ActionStepStartTimeout, ActionSlashSettle: cfg.ActionSlashSettle,
 		},
 		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings,
-		Projects: s.projects, BadRounds: s.recovery, Held: s.workspaces.IsHeld,
+		Projects: s.projects, BadRounds: s.recovery, Held: s.workspaces.IsHeld, Queue: s.queue,
 	})
 	s.sessions = newManager(s)
 	s.sessions.Maps.OnDesignStart = s.clearHold

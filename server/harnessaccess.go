@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/sched"
+	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
@@ -75,6 +76,10 @@ func (s *Server) pruneEpicMembers() {
 // Workspaces is the workspace and hold store. Tests outside the package read
 // their seams through here.
 func (s *Server) Workspaces() *workspaces.Store { return s.workspaces }
+
+// Prompt is the prompt code. Tests outside the package read the auto-queue
+// seams through here.
+func (s *Server) Prompt() *sessprompt.Prompt { return s.prompt }
 
 // Harness is the server's harness choice. Tests outside the package read it
 // through here.

@@ -192,8 +192,11 @@ func addFeatureWorktree(d deps.Deps, o OneIteration, path string) error {
 // epicHasRun reports whether any ticket of the epic has launched: its run log
 // holds an iteration-started event. An unreadable log counts as run, so a
 // launch never rewrites an epic branch it cannot show is fresh.
-func epicHasRun(o OneIteration) bool {
-	evs, _, err := runlog.ReadEvents(o.ScratchDir, o.Epic)
+func epicHasRun(o OneIteration) bool { return EpicHasRun(o.ScratchDir, o.Epic) }
+
+// EpicHasRun is epicHasRun for a project's scratch dir and an epic name.
+func EpicHasRun(scratchDir, epic string) bool {
+	evs, _, err := runlog.ReadEvents(scratchDir, epic)
 	if err != nil {
 		return true
 	}
