@@ -346,68 +346,124 @@ from `webui/e2e/CATALOG.md`.
    strips.
 8. **Story 8.** Check: run the fixture with `GX_AUTO_ADVANCE_DELAY` set; Auto-queue's deadline is
    that long after Branch.
-9. **Story 10, 11.** Check: set the impl epic to draft before the countdown ends; nothing is
+9. **Story 1, 9.** Flow: Design page "Auto-advance" flow, extended. Check: with the switch on and a
+   Design that reaches Branch, the countdown ends and the impl epic shows as queued
+   (`gx server queue` lists it).
+10. **Story 10, 11.** Check: set the impl epic to draft before the countdown ends; nothing is
    queued and the session's banner names the reason. Same for a follow-ups epic, for an epic the
    person queued by hand during the countdown, and for a Design held during the countdown.
-10. **Story 12, 18.** CLI: the verb to set Auto-queue on a Design session exits 0 with `refused:
+11. **Story 10, 11.** Check: set the impl epic to draft before the countdown ends; nothing is
+   queued and the session's banner names the reason. Same for a follow-ups epic, for an epic the
+   person queued by hand during the countdown, and for a Design held during the countdown.
+12. **Story 12, 18.** CLI: the verb to set Auto-queue on a Design session exits 0 with `refused:
     false`, and on a non-Design session answers `refused: true` with a reason (`--json`).
-11. **Story 13.** Check: epic ready, switch on: the countdown shows at once. One case per failing
+13. **Story 13.** Check: epic ready, switch on: the countdown shows at once. One case per failing
     readiness condition, each with the switch turned on and each expecting no countdown and no
     banner: the Design is past Branch, the epic is queued, the epic has run, the epic is not open,
     the Design is held. One more case: the switch is already on, the Design reaches Branch while the
     epic is already queued, and no countdown starts.
-12. **Story 14.** Check: switch off during a countdown: the countdown ends and a banner shows.
-13. **Story 15, 16.** Check: flip on, restart the fixture server (`restart` flows' helper): the
+14. **Story 14.** Check: switch off during a countdown: the countdown ends and a banner shows.
+15. **Story 15, 16.** Check: flip on, restart the fixture server (`restart` flows' helper): the
     switch is still on and no countdown shows. Also restart with a Design at Branch, the switch on
     and the impl epic unqueued: after the restart no countdown starts and nothing is queued.
     With two Design sessions on one map, the newest one's switch decides.
-14. **Story 17.** Check: an impl epic with `base:` set is queued by the countdown like any other.
-15. **Story 19, 20.** Check: the `ui/agents` actions test shows "Auto-queue: on/off" and "Cancel
+16. **Story 15, 16.** Check: flip on, restart the fixture server (`restart` flows' helper): the
+    switch is still on and no countdown shows. Also restart with a Design at Branch, the switch on
+    and the impl epic unqueued: after the restart no countdown starts and nothing is queued.
+    With two Design sessions on one map, the newest one's switch decides.
+17. **Story 17.** Check: an impl epic with `base:` set is queued by the countdown like any other.
+18. **Story 12, 18.** CLI: the verb to set Auto-queue on a Design session exits 0 with `refused:
+    false`, and on a non-Design session answers `refused: true` with a reason (`--json`).
+19. **Story 19, 20.** Check: the `ui/agents` actions test shows "Auto-queue: on/off" and "Cancel
     auto-queue" for a Design session only.
-16. **Story 21.** CLI: the set and cancel verbs print the session result and exit 0; the route-to-verb
+20. **Story 19, 20.** Check: the `ui/agents` actions test shows "Auto-queue: on/off" and "Cancel
+    auto-queue" for a Design session only.
+21. **Story 21.** CLI: the set and cancel verbs print the session result and exit 0; the route-to-verb
     parity test passes.
-17. **Story 23, 49.** Flow: new Cleanup flow: the gear menu lists Cleanup and Tips next to Settings
+22. **Story 2, 22.** Check: a fresh Design session reports `auto_queue` false in
+   `gx agents` JSON; with the switch never turned on, reaching Branch queues nothing.
+23. **Story 23, 49.** Flow: new Cleanup flow: the gear menu lists Cleanup and Tips next to Settings
     and each opens its page.
-18. **Story 24, 25.** Flow: new Cleanup flow on the new `cleanup` scenario: pick a project, see the
+24. **Story 24, 25.** Flow: new Cleanup flow on the new `cleanup` scenario: pick a project, see the
     groups.
-19. **Story 26, 27.** Check: the page renders with sizes empty, then shows them. Component test with
+25. **Story 24, 25.** Flow: new Cleanup flow on the new `cleanup` scenario: pick a project, see the
+    groups.
+26. **Story 26, 27.** Check: the page renders with sizes empty, then shows them. Component test with
     a delayed read; the flow waits for a size.
-20. **Story 28, 29.** Check: archive a done merged epic: it leaves the list and `gx tickets epics`
+27. **Story 26, 27.** Check: the page renders with sizes empty, then shows them. Component test with
+    a delayed read; the flow waits for a size.
+28. **Story 28, 29.** Check: archive a done merged epic: it leaves the list and `gx tickets epics`
     no longer lists it. A queued epic answers `refused: true` through the verb.
-21. **Story 30, 31.** Check: Remove on a merged worktree: the folder and the branch are gone
+29. **Story 28, 29.** Check: archive a done merged epic: it leaves the list and `gx tickets epics`
+    no longer lists it. A queued epic answers `refused: true` through the verb.
+30. **Story 30, 31.** Check: Remove on a merged worktree: the folder and the branch are gone
     (`git worktree list`, `git branch`).
-22. **Story 32.** Check: Delete on a merged branch with no worktree removes it.
-23. **Story 33, 34.** Check: a cherry-picked iteration branch is deleted with `-D`; a branch with one
+31. **Story 30, 31.** Check: Remove on a merged worktree: the folder and the branch are gone
+    (`git worktree list`, `git branch`).
+32. **Story 32.** Check: Delete on a merged branch with no worktree removes it.
+33. **Story 33, 34.** Check: a cherry-picked iteration branch is deleted with `-D`; a branch with one
     extra commit has no button and shows in the agent group. A squash-merged branch, of one commit
     and of several, is deleted with `-D`, with and without a worktree. A branch merged by ancestry
     into trunk is deleted with `-d`. An iteration branch merged by ancestry into an epic branch that
     is not on trunk is deleted with `-D` and git does not refuse it.
-24. **Story 35, 36.** Flow: Remove on an unmerged clean idle worktree shows the warning and a
+34. **Story 33, 34.** Check: a cherry-picked iteration branch is deleted with `-D`; a branch with one
+    extra commit has no button and shows in the agent group. A squash-merged branch, of one commit
+    and of several, is deleted with `-D`, with and without a worktree. A branch merged by ancestry
+    into trunk is deleted with `-d`. An iteration branch merged by ancestry into an epic branch that
+    is not on trunk is deleted with `-D` and git does not refuse it.
+35. **Story 35, 36.** Flow: Remove on an unmerged clean idle worktree shows the warning and a
     confirm; Cancel removes nothing; Confirm removes the folder and leaves the branch.
-25. **Story 37.** Check: a dirty worktree and one with a live session show no Remove button, and the
+36. **Story 35, 36.** Flow: Remove on an unmerged clean idle worktree shows the warning and a
+    confirm; Cancel removes nothing; Confirm removes the folder and leaves the branch.
+37. **Story 37.** Check: a dirty worktree and one with a live session show no Remove button, and the
     write verb refuses them.
-26. **Story 38.** Check: scan JSON includes an iteration branch of an archived epic with a delete
+38. **Story 38.** Check: scan JSON includes an iteration branch of an archived epic with a delete
     recommendation.
-27. **Story 39, 40.** Check: scan JSON lists a detached worktree and the `one-offs` epic is not done
+39. **Story 39, 40.** Check: scan JSON lists a detached worktree and the `one-offs` epic is not done
     but unmerged.
-28. **Story 41, 42.** Check: hold the worktree lock in a test and the write waits; a row git refuses
+40. **Story 39, 40.** Check: scan JSON lists a detached worktree and the `one-offs` epic is not done
+    but unmerged.
+41. **Story 41, 42.** Check: hold the worktree lock in a test and the write waits; a row git refuses
     stays with git's reason in the result.
-29. **Story 43, 44, 45.** Flow: the agent button starts a one-off (`gx server queue` or the Agents
+42. **Story 41, 42.** Check: hold the worktree lock in a test and the write waits; a row git refuses
+    stays with git's reason in the result.
+43. **Story 43, 44, 45.** Flow: the agent button starts a one-off (`gx server queue` or the Agents
     page shows it) whose prompt names only the unresolved branches and done-but-unmerged epics; the
     button is absent when none exist. The one-off reaches needs-answer at the skill's confirm, and
     the web Answer card on its ticket page answers it and ends the pause.
-30. **Story 46.** Flow: after a write the row is gone without a page reload.
-31. **Story 47.** CLI: `gx server` scan and write verbs print `--json`; `gx cleanup scan` still
+44. **Story 43, 44, 45.** Flow: the agent button starts a one-off (`gx server queue` or the Agents
+    page shows it) whose prompt names only the unresolved branches and done-but-unmerged epics; the
+    button is absent when none exist. The one-off reaches needs-answer at the skill's confirm, and
+    the web Answer card on its ticket page answers it and ends the pause.
+45. **Story 43, 44, 45.** Flow: the agent button starts a one-off (`gx server queue` or the Agents
+    page shows it) whose prompt names only the unresolved branches and done-but-unmerged epics; the
+    button is absent when none exist. The one-off reaches needs-answer at the skill's confirm, and
+    the web Answer card on its ticket page answers it and ends the pause.
+46. **Story 46.** Flow: after a write the row is gone without a page reload.
+47. **Story 47.** CLI: `gx server` scan and write verbs print `--json`; `gx cleanup scan` still
     prints its text and `--json`; the parity test passes.
-32. **Story 48.** Check: with the page open and no press, no worktree or branch changes.
-33. **Story 50, 51, 52, 53.** Flow: Tips page on macOS fixture: the Spotlight tip is listed with the
+48. **Story 48.** Check: with the page open and no press, no worktree or branch changes.
+49. **Story 23, 49.** Flow: new Cleanup flow: the gear menu lists Cleanup and Tips next to Settings
+    and each opens its page.
+50. **Story 50, 51, 52, 53.** Flow: Tips page on macOS fixture: the Spotlight tip is listed with the
     System Settings steps, the registered project's real folder, and no "done" badge. A component
     test covers the text; the folder needs the fixture's project registry.
-34. **Story 54.** Check: a component test with an empty list shows "no tips for this machine"; a
+51. **Story 50, 51, 52, 53.** Flow: Tips page on macOS fixture: the Spotlight tip is listed with the
+    System Settings steps, the registered project's real folder, and no "done" badge. A component
+    test covers the text; the folder needs the fixture's project registry.
+52. **Story 50, 51, 52, 53.** Flow: Tips page on macOS fixture: the Spotlight tip is listed with the
+    System Settings steps, the registered project's real folder, and no "done" badge. A component
+    test covers the text; the folder needs the fixture's project registry.
+53. **Story 50, 51, 52, 53.** Flow: Tips page on macOS fixture: the Spotlight tip is listed with the
+    System Settings steps, the registered project's real folder, and no "done" badge. A component
+    test covers the text; the folder needs the fixture's project registry.
+54. **Story 54.** Check: a component test with an empty list shows "no tips for this machine"; a
     server test with a non-macOS platform returns an empty list.
-35. **Story 55, 56.** Check: the tips route returns exactly one tip on macOS and the list is the only
+55. **Story 55, 56.** Check: the tips route returns exactly one tip on macOS and the list is the only
     source (a test adds a fake entry and sees it served).
-36. **Story 57.** CLI: the tips verb prints `--json` and exits 0; the parity test passes.
+56. **Story 55, 56.** Check: the tips route returns exactly one tip on macOS and the list is the only
+    source (a test adds a fake entry and sees it served).
+57. **Story 57.** CLI: the tips verb prints `--json` and exits 0; the parity test passes.
 
 New flows or scenarios to write (these become implementation tickets): a `cleanup` fixture scenario
 (a project with a merged worktree, a cherry-picked iteration branch, a branch with an unmatched
