@@ -137,6 +137,19 @@ test("the follow-ups badge has no number at zero, and is amber for a waiting ent
   vi.unstubAllGlobals();
 });
 
+test("the follow-ups badge takes its colours from theme tokens, so a light theme restyles it", async () => {
+  stubList([followUps({ triage: "waiting", left: 2 })]);
+  setupWithRouter();
+  const button = await screen.findByRole("button", { name: "Follow-ups · 3 open" });
+  const badge = button.querySelector("span")!;
+  const css = [...document.querySelectorAll("style")].map((s) => s.textContent).join("\n");
+  const rule = css.match(new RegExp(`\\.${badge.className.split(" ").join("\\.")}\\s*\\{[^}]*\\}`))?.[0] ?? "";
+  expect(rule).toContain("var(--chakra-colors-tone-waiting-fg)");
+  expect(rule).toContain("var(--chakra-colors-surface)");
+  expect(rule).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+  vi.unstubAllGlobals();
+});
+
 test("the health button and the gear carry a title tooltip", () => {
   setup({ mode: "running", health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") } });
   expect(screen.getByRole("button", { name: /^System health:/ }).getAttribute("title")).toMatch(/^System health:/);

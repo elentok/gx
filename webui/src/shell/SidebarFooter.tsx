@@ -121,15 +121,18 @@ function FollowUpsButton({ workspace }: { workspace?: string }) {
               as="span"
               aria-hidden
               position="absolute"
-              top="0"
-              right="0"
-              px="1.5"
-              lineHeight="1.4"
+              top="-3px"
+              right="-3px"
+              minW="18px"
+              h="18px"
+              px="5px"
+              textAlign="center"
+              lineHeight="18px"
               borderRadius="full"
               bg={badgeWaiting(counts) ? "tone.waiting.fg" : "tone.running.fg"}
               color="surface"
-              fontSize="xs"
-              fontWeight="600"
+              fontSize="11px"
+              fontWeight="700"
             >
               {badgeText(total)}
             </Text>
