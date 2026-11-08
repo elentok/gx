@@ -63,7 +63,7 @@ test.describe("3. Pause reasons and recovery", () => {
     }
 
     await step("paused-epic", "03", "Waiting for your answer", async () => {
-      await page.getByRole("textbox", { name: "Your answer" }).fill("go ahead");
+      await page.getByRole("textbox", { name: /^Answer to question/ }).fill("go ahead");
       await page.getByRole("button", nav("Send answer")).click();
     });
     await step("paused-epic", "04", "Ambiguous base", async () => {

@@ -1,26 +1,11 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { ActionAnswer, type DetailOption, type TicketDetail } from "../generated/server";
-import { Badge } from "../ui/badge/Badge";
+import { HUH_MESSAGE } from "../design/round";
+import { ActionAnswer, type TicketDetail } from "../generated/server";
 import { Button } from "../ui/button/Button";
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
+import { Question } from "../ui/question-sheet/Question";
+import { isAnswered, type Answer, type QuestionCard } from "../ui/question-sheet/round";
 import { postAnswer, ReasonStale, sentOf, type PostAnswer, type Sent } from "./answer";
-
-interface Choice {
-  id: string;
-  label: string;
-  consequence?: string;
-}
-
-function choicesOf(latest: NonNullable<TicketDetail["latest"]>): Choice[] {
-  if (latest.kind === "yes-no") {
-    return [
-      { id: "yes", label: "Yes", consequence: latest.yes },
-      { id: "no", label: "No", consequence: latest.no },
-    ];
-  }
-  return (latest.options ?? []).map((o: DetailOption) => o);
-}
 
 // The sticky answer area. The server decides whether it shows (the detail's actions).
 export function AnswerForm({
@@ -36,9 +21,7 @@ export function AnswerForm({
   onStale?: () => void;
 }) {
   const { latest } = detail;
-  const [choice, setChoice] = useState("");
-  const [text, setText] = useState("");
-  const [note, setNote] = useState("");
+  const [answer, setAnswer] = useState<Answer>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [sentSeq, setSentSeq] = useState<number | null>(null);
@@ -47,25 +30,25 @@ export function AnswerForm({
   // A new question clears the pick and the text; the note stays so a stale refusal loses nothing.
   if (seenState !== detail.state) {
     setSeenState(detail.state);
-    setChoice("");
-    setText("");
+    setAnswer((a) => ({ note: a.note }));
   }
 
   if (!latest || !detail.actions.includes(ActionAnswer) || sentSeq === latest.seq) return null;
 
   const isText = latest.kind !== "yes-no" && latest.kind !== "options";
-  const ready = isText ? text.trim() !== "" : choice !== "";
+  const ready = isAnswered(answer);
 
   const send = async () => {
     if (!ready || pending) return;
     setPending(true);
     setError("");
     try {
+      // The server takes no Huh? field: it travels as the free-text answer.
       const body = {
         address: detail.address,
         state: detail.state ?? "",
-        ...(isText ? { text } : { choice }),
-        ...(!isText && note.trim() ? { note } : {}),
+        ...(answer.huh ? { text: HUH_MESSAGE } : isText ? { text: answer.text } : { choice: answer.choice }),
+        ...(!isText && answer.note?.trim() ? { note: answer.note } : {}),
       };
       const res = await post(body);
       if ("refused" in res) {
@@ -84,6 +67,17 @@ export function AnswerForm({
     }
   };
 
+  const card: QuestionCard = {
+    label: String(latest.seq),
+    title: latest.summary,
+    body: latest.text,
+    kind: latest.kind ?? "text",
+    yes: latest.yes,
+    no: latest.no,
+    options: latest.options,
+    recommended: latest.recommended,
+  };
+
   return (
     <Box
       position="sticky"
@@ -95,59 +89,12 @@ export function AnswerForm({
       gap="2"
       aria-label="Answer"
       role="form"
+      borderWidth="1px"
+      borderColor="tone.waiting.fg"
+      borderRadius="12px"
+      px="3"
     >
-      {isText ? (
-        <ExpandableTextField
-          label="Your answer"
-          title="Your answer"
-          placeholder="Your answer"
-          value={text}
-          disabled={pending}
-          onChange={setText}
-        />
-      ) : (
-        choicesOf(latest).map((c) => (
-          <Button
-            key={c.id}
-            emphasis={choice === c.id ? "main" : "secondary"}
-            aria-pressed={choice === c.id}
-            disabled={pending}
-            onClick={() => setChoice(c.id)}
-            width="full"
-            height="auto"
-            py="3"
-            justifyContent="flex-start"
-            flexDirection="column"
-            alignItems="flex-start"
-          >
-            <Text as="span">
-              {c.label}
-              {latest.recommended === c.id && (
-                <>
-                  {" "}
-                  <Badge tone="waiting">Recommended</Badge>
-                </>
-              )}
-            </Text>
-            {c.consequence && (
-              <Text as="span" fontSize="sm" fontWeight="normal" whiteSpace="normal" textAlign="start">
-                {c.consequence}
-              </Text>
-            )}
-          </Button>
-        ))
-      )}
-      {/* A free-text answer is the note already. */}
-      {!isText && (
-        <ExpandableTextField
-          label="Note (optional)"
-          title="Note on your answer"
-          placeholder="Note (optional)"
-          value={note}
-          disabled={pending}
-          onChange={setNote}
-        />
-      )}
+      <Question card={card} answer={answer} onChange={setAnswer} onPicked={() => {}} />
       {error && <Text role="alert">{error}</Text>}
       <Button emphasis="main" alignSelf="flex-end" disabled={!ready || pending} onClick={send}>
         Send answer
