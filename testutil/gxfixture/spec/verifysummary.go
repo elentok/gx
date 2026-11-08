@@ -32,6 +32,8 @@ var (
 				{"01", "evolve-closed-map", servertest.TicketOpts{Type: "evolve", Unique: "evolve:" + project + "/closed-map"}},
 			}},
 		},
+		// A one-off gets an Epics-page card only once it is queued, running or done.
+		Queue: []string{project + ":" + tickets.OneOffsEpic + "/01"},
 		EpicMeta: map[string]string{
 			project + ":closed-map": "status: done\nkind: map\ncompleted_at: 2026-01-01T10:00:00Z\n" +
 				"evolved_at: 2026-01-01T11:00:00Z\nevolve_ticket: " + project + ":" + tickets.OneOffsEpic + "/01\n",

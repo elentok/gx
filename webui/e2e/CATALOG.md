@@ -44,7 +44,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `epics.e2e.ts`
 
-- **2. Epic looks right:** `mixed-epic` card, epic page ring, stats line and ticket cards before and after queueing.
+- **2. Epic looks right:** `mixed-epic` card, epic page ring, stats line and ticket cards before and after queueing; then the `summary-notes` ticket's "Latest summary" block (and no such text on its Epics card) and the `map-evolve` evolve ticket as a top-level one-off card.
 - **7. Epic completion:** the epic page when the last ticket finishes.
 - **6. Queue an epic, and outside changes show up:** Queue button disabled while `/v1/queue/add` runs, then the card moves to Implementing; changes made outside the page appear.
 

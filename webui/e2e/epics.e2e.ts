@@ -67,6 +67,32 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   await expect(mixed.getByText("4/7")).toBeVisible();
   await expect(mixed.getByTestId("pill")).toBeVisible();
   await expect(mixed.getByTestId("reason")).toBeVisible();
+
+  // 49: the ticket detail shows the Latest summary block; the Epics-page card carries none of it.
+  await test.step("ticket detail shows Latest summary, the Epics card does not", async () => {
+    await start("summary-notes");
+    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:summary-epic/01");
+    const summary = page.getByRole("region", { name: "Latest summary" });
+    await expect(summary).toBeVisible({ timeout: 90_000 });
+    // The agent's four parts, then gx's own entry.
+    await expect(summary.getByRole("term")).toHaveText(["Did:", "Went wrong:", "Decisions:", "Left:", "Did:", "Went wrong:", "Decisions:", "Left:"]);
+    await expect(summary.getByRole("definition").first()).toHaveText("Verified the fake story.");
+    await expect(summary.getByRole("definition").nth(4)).toHaveText("launched the agent and settled the run");
+    await page.getByRole("link", { name: /^Epics/ }).click();
+    const finished = await section(page, "Finished");
+    await expect(finished.getByRole("link", { name: "summary-epic" })).toBeVisible();
+    await expect(card(page, "summary-epic").getByText("Latest summary")).toHaveCount(0);
+  });
+
+  // 63: the evolve ticket of a closed design map is a top-level one-off, like a queue epic's evolve.
+  await test.step("evolve ticket of a closed map shows as a one-off", async () => {
+    await start("map-evolve");
+    await expect(page.getByRole("heading", { name: "Epics", level: 1 })).toBeVisible();
+    // The evolve one-off is its own top-level card that links to the ticket, beside the closed map's.
+    const evolve = page.locator('a[href$="/t/demo:one-offs/01"]');
+    await expect(evolve.first()).toBeVisible({ timeout: 60_000 });
+    await expect(evolve.first()).toHaveText("evolve-closed-map");
+  });
 });
 
 test("7. Epic completion", async ({ page, start }) => {
