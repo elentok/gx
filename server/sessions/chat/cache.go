@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/chatreader"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/wire"
@@ -88,6 +89,9 @@ func Loader(kind agentrunner.Kind, ticket, sessionDir string, final bool) func(s
 		snap := SnapshotOf(read, kind, ticket, final)
 		// Codex has no background markers: its Background flag comes from the status.
 		if kind == harness.Codex {
+			if snap.InFlight, err = codexsession.ReadInFlightTools(path); err != nil {
+				return Snapshot{}, err
+			}
 			return snap, nil
 		}
 		// A zero now keeps every unresolved marker fresh; the cache serves the

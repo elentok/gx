@@ -76,6 +76,7 @@ type chatRolloutLine struct {
 		Type       string `json:"type"`
 		Role       string `json:"role"`
 		Name       string `json:"name"`
+		CallID     string `json:"call_id"`
 		Arguments  string `json:"arguments"`
 		Input      string `json:"input"`
 		CLIVersion string `json:"cli_version"`

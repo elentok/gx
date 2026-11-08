@@ -261,6 +261,21 @@ func TestRead_CodexRolloutHasTheClaudeShape(t *testing.T) {
 	}
 }
 
+func TestRead_InFlightCarriesCodexCalls(t *testing.T) {
+	t.Parallel()
+	f := newCodexFixture(t)
+	writeLines(t, f.path,
+		`{"ordinal":0,"type":"event_msg","payload":{"type":"task_started"}}`,
+		`{"ordinal":1,"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"a","arguments":"{\"cmd\":\"one\"}"}}`,
+		`{"ordinal":2,"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"b","arguments":"{\"cmd\":\"two\"}"}}`,
+		`{"ordinal":3,"type":"response_item","payload":{"type":"function_call_output","call_id":"a","output":"ok"}}`,
+	)
+	got := f.chat(t, "/v1/sessions/chat")
+	if got.Current == nil || got.Current.Kind != "shell" || got.Current.Label != "two" || len(got.Others) != 0 {
+		t.Errorf("current/others = %+v/%+v, want shell two and no others", got.Current, got.Others)
+	}
+}
+
 func TestRead_CodexTurnsWithoutMessagesAreUnreadable(t *testing.T) {
 	t.Parallel()
 	f := newCodexFixture(t)

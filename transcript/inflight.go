@@ -40,6 +40,10 @@ func NewInFlightTool(name string, in map[string]any) InFlightTool {
 	switch name {
 	case "Bash":
 		kind, value = InFlightShell, arg("command")
+	case "exec_command":
+		kind, value = InFlightShell, arg("cmd")
+	case "web_search":
+		kind, value = InFlightSearch, arg("query")
 	case "Agent", "Task":
 		kind, value = InFlightAgent, arg("description", "subagent_type")
 	case "Grep", "Glob":
