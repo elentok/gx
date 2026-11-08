@@ -33,32 +33,26 @@ const openMenu = async (page: Page) => {
 
 const bar = (page: Page, letter: string) => page.getByRole("button", nav("Usage limits")).locator(`[data-meter=${letter}]`);
 
-test.describe("117b. Limits tray bars", () => {
-  test("letters C and X; fill and tone follow usage", async ({ page, start }) => {
-    const fixture = await start("limits", { shape: "fresh" });
-    await expect(bar(page, "C")).toHaveText("C");
-    await expect(bar(page, "X")).toHaveText("X");
-    await expect(bar(page, "C")).toHaveAttribute("data-tone", "done");
-    await expect(bar(page, "C")).toHaveAttribute("data-percent", "34");
-
-    await report(fixture, payload(85, 90));
-    await expect(bar(page, "C")).toHaveAttribute("data-tone", "waiting");
-    await expect(bar(page, "C")).toHaveAttribute("data-percent", "85");
-  });
-});
-
 const row = (page: Page, name: string) => page.getByRole("group", { name });
 
 // Rows, tones, order, tooltips and the other render states live in webui/src/usage/*.test.tsx.
 test.describe("117. Limits block", () => {
   test("a statusline report reaches the open menu", async ({ page, start }) => {
     const fixture = await start("limits", { shape: "fresh" });
+    await expect(bar(page, "C")).toHaveText("C");
+    await expect(bar(page, "X")).toHaveText("X");
+    await expect(bar(page, "C")).toHaveAttribute("data-tone", "done");
+    await expect(bar(page, "C")).toHaveAttribute("data-percent", "34");
     await openMenu(page);
     await expect(row(page, "5h limit").getByText("34%")).toBeVisible();
 
     await report(fixture, payload(55, 96));
     await expect(row(page, "5h limit").getByText("55%")).toBeVisible();
     await expect(row(page, "Weekly limit").getByText("96%")).toBeVisible();
+
+    await report(fixture, payload(85, 90));
+    await expect(bar(page, "C")).toHaveAttribute("data-tone", "waiting");
+    await expect(bar(page, "C")).toHaveAttribute("data-percent", "85");
   });
 });
 
