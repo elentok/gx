@@ -6,12 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 // installBinaries builds or resolves the gx, fakeclaude and (when wanted) fakecodex
@@ -106,7 +108,9 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 	if sc.UnknownSkill {
 		f.env = append(f.env, agentfake.TUIUnknownSkillEnv+"=1")
 	}
-	f.env = append(f.env, sc.Env...)
+	for _, kv := range sc.Env {
+		f.env = append(f.env, strings.ReplaceAll(kv, spec.RootToken, f.root))
+	}
 	return nil
 }
 
