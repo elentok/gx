@@ -43,6 +43,40 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 	changed.Flags().BoolVar(&jsonOut, "json", false, "emit the acknowledged project as JSON")
 	cmd.AddCommand(changed)
 
+	var openJSON, openNew bool
+	open := &cobra.Command{
+		Use:   "open <project>",
+		Short: "start a project's Triage, or print the session of the live one",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Triage.Open(ctx, wire.TriageOpenRequest{Project: args[0], New: openNew})
+			if err != nil {
+				return fmt.Errorf("server write failed: %w", err)
+			}
+			if openJSON {
+				return cmdbase.WriteStamped(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+			}
+			if res.Refused {
+				return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+			}
+			if res.Session != nil {
+				_, err = fmt.Fprintln(c.OutOrStdout(), res.Session.ID)
+			}
+			return err
+		},
+	}
+	open.Flags().BoolVar(&openJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	open.Flags().BoolVar(&openNew, "new", false, "stop the live session and start a fresh one")
+	cmd.AddCommand(open)
+
 	var showJSON bool
 	show := &cobra.Command{
 		Use:   "show <project>",

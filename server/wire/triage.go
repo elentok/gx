@@ -10,6 +10,24 @@ type TriageChangedRequest struct {
 	Project string `json:"project"`
 }
 
+// Refusal reasons of the triage open route, beside the session ones.
+const (
+	// ReasonTriageApprove: the Triage waits at the approve step, where the page
+	// is the way on and no session runs.
+	ReasonTriageApprove = "triage-at-approve"
+	// ReasonTriageNoFollowUps: the project has no open follow-up to triage.
+	ReasonTriageNoFollowUps = "triage-no-follow-ups"
+)
+
+// TriageOpenRequest is the body of POST /v1/triage/open. New stops the
+// Triage's live session and starts a fresh one; State is the token of the live
+// session the web saw, required on the web mux for New.
+type TriageOpenRequest struct {
+	Project string `json:"project"`
+	New     bool   `json:"new,omitempty"`
+	State   string `json:"state,omitempty"`
+}
+
 // TriageChangedResult acknowledges a ping.
 type TriageChangedResult struct {
 	Project string `json:"project"`

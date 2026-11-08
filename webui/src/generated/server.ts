@@ -2933,6 +2933,29 @@ export interface TriageChangedRequest {
   project: string;
 }
 /**
+ * ReasonTriageApprove: the Triage waits at the approve step, where the page
+ * is the way on and no session runs.
+ */
+export const ReasonTriageApprove = "triage-at-approve";
+/**
+ * ReasonTriageNoFollowUps: the project has no open follow-up to triage.
+ */
+export const ReasonTriageNoFollowUps = "triage-no-follow-ups";
+/**
+ * Refusal reasons of the triage open route, beside the session ones.
+ */
+export type ReasonTriage = typeof ReasonTriageApprove | typeof ReasonTriageNoFollowUps;
+/**
+ * TriageOpenRequest is the body of POST /v1/triage/open. New stops the
+ * Triage's live session and starts a fresh one; State is the token of the live
+ * session the web saw, required on the web mux for New.
+ */
+export interface TriageOpenRequest {
+  project: string;
+  new?: boolean;
+  state?: string;
+}
+/**
  * TriageChangedResult acknowledges a ping.
  */
 export interface TriageChangedResult {

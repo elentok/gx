@@ -25,6 +25,10 @@ type SessionCtx struct {
 	// LaunchDesign marks a launch by a design path (Start design, New Design):
 	// the tier follows the map's step, and the meta saves LaunchDesign.
 	LaunchDesign bool
+	// Flow and FlowKey make the session a stepped session of another flow
+	// (a Triage: flow triage, key the project name).
+	Flow    tickets.Flow
+	FlowKey string
 }
 
 // sessionMeta is what a session's state dir records about it.

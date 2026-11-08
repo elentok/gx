@@ -142,6 +142,9 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 	if sc.design || (req.Ticket != "" && mg.Maps.OnMapEpic(req.Ticket)) {
 		meta.Flow = tickets.FlowDesign
 	}
+	if sc.Flow != "" {
+		meta.Flow, meta.FlowKey = sc.Flow, sc.FlowKey
+	}
 	mg.applyTier(&meta, tier)
 	dir, err := mg.saveNewSession(&meta, req.UniqueName)
 	if errors.Is(err, errSessionNameTaken) {

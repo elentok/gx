@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	triagerec "github.com/elentok/gx/triage"
@@ -31,6 +32,10 @@ type Triage struct {
 	projects    *projects.Registry
 	events      *broker.Broker
 	sessions    func() ([]wire.SessionInfo, error)
+	// manager comes later than Triage, as for Designs: see GiveSessions.
+	manager *sessions.Manager
+	// opens maps a project name to the *sync.Mutex serializing triage open.
+	opens sync.Map
 
 	// seen maps a project name to the live record's id and revision at the
 	// last look, "" when it had none.
@@ -50,6 +55,12 @@ func Routes(get func() *Triage) []wire.Route {
 			Pattern: "GET /v1/triage",
 			Web:     wire.WebRead,
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().readHandler(w, r) },
+		},
+		{
+			Pattern:    "POST /v1/triage/open",
+			Web:        wire.WebWrite,
+			Handler:    func(w http.ResponseWriter, r *http.Request) { get().openHandler(false)(w, r) },
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().openHandler(true)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/changed",

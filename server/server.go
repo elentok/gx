@@ -458,6 +458,7 @@ func New(cfg Config) (*Server, error) {
 	s.sessions.OnSessionGone = s.dropSessionMember
 	s.designs.GiveSessions(s.sessions)
 	s.prompt.GiveSessions(s.sessions)
+	s.triage.GiveSessions(s.sessions)
 	s.rec.GiveSessions(s.sessions)
 	s.resumer = newResumer(s)
 	s.fixAgent = fixagent.New(fixAgentHost{sessionHost{s}})

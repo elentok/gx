@@ -19,6 +19,14 @@ func (s *Triage) Show(ctx context.Context, project string) (wire.TriageView, err
 	return v, err
 }
 
+// Open starts project's Triage or returns the live session. A refusal is a
+// result (Refused set), not an error.
+func (s *Triage) Open(ctx context.Context, req wire.TriageOpenRequest) (wire.SessionResult, error) {
+	var res wire.SessionResult
+	err := s.t.post(ctx, "/v1/triage/open", req, &res)
+	return res, err
+}
+
 // Changed pings the server that project's Triage record was written by a
 // direct write, so the web hears of it at once.
 func (s *Triage) Changed(ctx context.Context, project string) error {

@@ -192,6 +192,9 @@ func (s *Store) snapshot() []Row {
 	return rows
 }
 
+// HasFollowUps reports whether the project has a draft or open follow-up.
+func (s *Store) HasFollowUps() bool { return len(s.snapshot()) > 0 }
+
 // Create starts a Triage at the verify step. It refuses with *LiveError when
 // the project already has a live one. A live marker whose record is missing
 // (a crash between the two writes) is stale and replaced.
