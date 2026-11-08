@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/elentok/gx/server/budget"
+	"github.com/elentok/gx/server/cleanup"
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/epics"
@@ -49,6 +50,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		queue.Routes(func() *queue.Queue { return s.queue }, func() *queue.OneOffs { return s.oneOffs }, func() *queue.AFK { return s.afk }, func() *queue.ViMode { return s.viMode }),
 		workspaces.Routes(func() *workspaces.Store { return s.workspaces }, func() []wire.Workspace { ws, _ := s.workspacesWithNeedsYou(); return ws }),
 		harnesschoice.Routes(func() *harnesschoice.Harness { return s.harness }),
+		cleanup.Routes(func() *cleanup.Cleanup { return s.cleanup }),
 		disk.Routes(func() *disk.Disk { return s.disks }),
 		health.Routes(func() *health.Health { return s.health }),
 		limits.Routes(func() *limits.Limits { return s.limits }),

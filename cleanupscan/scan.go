@@ -67,19 +67,28 @@ func scanAtticRefs(repo git.Repo) ([]string, error) {
 // (tickets.Load already excludes .archive and other dot-prefixed directories)
 // and computes the repo-wide housekeeping report.
 func Scan(dirs config.Dirs, cwd string) (Result, error) {
+	cfg, err := dirs.Load()
+	if err != nil {
+		return Result{}, err
+	}
+	return ScanIn(cfg.TicketStore.Path, cwd)
+}
+
+// ScanIn is Scan over an explicit ticket store.
+func ScanIn(storePath, cwd string) (Result, error) {
 	info, err := git.IdentifyDir(cwd)
 	if err != nil {
 		return Result{}, fmt.Errorf("not inside a git repo: %w", err)
 	}
 	// A "merged?" check against an unresolved trunk can't be trusted, so
 	// stop before reporting anything the gx-cleanup skill would delete on.
-	openRepo, err := ticketgit.OpenRepoDirs(dirs, cwd)
+	openRepo, err := ticketgit.OpenRepoIn(storePath, cwd)
 	if err != nil {
 		return Result{}, err
 	}
 	repo := *openRepo
 
-	root, err := tickets.RootForDirs(dirs, cwd)
+	root, err := tickets.RootIn(storePath, cwd)
 	if err != nil {
 		return Result{}, err
 	}

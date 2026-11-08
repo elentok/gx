@@ -28,6 +28,7 @@ import (
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
+	"github.com/elentok/gx/server/cleanup"
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/epics"
@@ -103,6 +104,7 @@ type Server struct {
 	projects *projects.Registry
 	migrator *projects.Migrator
 	checks   *projects.Checks
+	cleanup  *cleanup.Cleanup
 
 	queue      *queue.Queue
 	afk        *queue.AFK
@@ -370,6 +372,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.settings.Store(&cfg.Settings)
 	s.settings.SetAppliers(lifecycle.ReloadAppliers(reloadHost{s}))
+	s.cleanup = cleanup.New(cleanup.Deps{TicketStore: cfg.TicketStore, Env: cfg.Env, Events: events})
 	s.disks = disk.New(disk.Deps{
 		Config: disk.Config{
 			FreeSpace: cfg.FreeSpace, GoCacheDir: cfg.GoCacheDir, DiskPollInterval: cfg.DiskPollInterval,

@@ -28,6 +28,13 @@ func (r *Reads) ProjectWorktrees(ctx context.Context) ([]wire.ProjectWorktrees, 
 	return p, err
 }
 
+// Cleanup is project's cleanup scan with the worktree sizes that are ready.
+func (r *Reads) Cleanup(ctx context.Context, project string) (wire.CleanupReport, error) {
+	var rep wire.CleanupReport
+	err := r.t.get(ctx, "/v1/cleanup?"+url.Values{"project": {project}}.Encode(), &rep)
+	return rep, err
+}
+
 // AddProject registers a project. A refusal is a result (Refused set), not an
 // error.
 func (r *Reads) AddProject(ctx context.Context, req wire.AddProjectRequest) (wire.AddProjectResult, error) {

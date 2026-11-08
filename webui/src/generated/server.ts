@@ -50,6 +50,54 @@ export interface KindCheck {
 }
 
 //////////
+// source: cleanup.go
+
+/**
+ * EventCleanupSizeChanged is emitted when a worktree's disk size lands; the
+ * event's address is the project.
+ */
+export const EventCleanupSizeChanged = "cleanup-size-changed";
+/**
+ * CleanupEpic is one epic's classification in the cleanup scan.
+ */
+export interface CleanupEpic {
+  name: string;
+  all_done: boolean;
+  merged_to_main: boolean;
+  has_code_review_ticket: boolean;
+  code_review_done: boolean;
+}
+/**
+ * CleanupWorktree is one branch or detached worktree in the cleanup scan.
+ * SizeBytes is absent until the background size read for Path has landed.
+ */
+export interface CleanupWorktree {
+  branch: string;
+  path?: string;
+  kind: string; // "iteration", "feature", "other", "detached"
+  active: boolean;
+  dirty?: boolean;
+  head?: string;
+  epic?: string;
+  ticket_id?: string;
+  ticket_done?: boolean;
+  merged?: boolean;
+  merged_to_main?: boolean;
+  delete_mode?: string;
+  recommendation?: string;
+  size_bytes?: number /* uint64 */;
+}
+/**
+ * CleanupReport is the cleanup read route's result for one project.
+ */
+export interface CleanupReport {
+  project: string;
+  epics: CleanupEpic[];
+  worktrees: CleanupWorktree[];
+  attic_refs: string[];
+}
+
+//////////
 // source: designdrafts.go
 
 /**

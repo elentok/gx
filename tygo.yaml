@@ -4,6 +4,7 @@ packages:
     output_path: "webui/src/generated/server.ts"
     include_files:
       - checkstatus.go
+      - cleanup.go
       - designdrafts.go
       - designs.go
       - detail.go
