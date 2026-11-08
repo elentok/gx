@@ -20,6 +20,7 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   unread: {},
   actionable: {},
   auto_advance: true,
+  auto_queue: false,
   ...over,
 });
 const openMenu = async () => fireEvent.click(screen.getByRole("button", { name: "More actions" }));

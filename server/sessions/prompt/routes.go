@@ -46,6 +46,12 @@ func Routes(get func() *Prompt) []wire.Route {
 			},
 		},
 		{
+			Pattern:    "POST /v1/sessions/auto-queue",
+			Web:        wire.WebWrite,
+			Handler:    func(w http.ResponseWriter, r *http.Request) { get().autoQueueHandler(false)(w, r) },
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().autoQueueHandler(true)(w, r) },
+		},
+		{
 			Pattern: "POST /v1/sessions/images",
 			Web:     wire.WebWrite,
 			RawBody: true,
@@ -77,14 +83,29 @@ func Routes(get func() *Prompt) []wire.Route {
 // autoAdvanceHandler serves the switch. With web set, a guard runs first and a
 // refusal from it is the response.
 func (p *Prompt) autoAdvanceHandler(web bool) http.HandlerFunc {
+	return switchHandler(p, web, p.setAutoAdvance, func(r wire.AutoAdvanceRequest) wire.SessionRequest {
+		return wire.SessionRequest{ID: r.ID, State: r.State}
+	})
+}
+
+// autoQueueHandler serves the auto-queue switch, guarded like autoAdvanceHandler.
+func (p *Prompt) autoQueueHandler(web bool) http.HandlerFunc {
+	return switchHandler(p, web, p.setAutoQueue, func(r wire.AutoQueueRequest) wire.SessionRequest {
+		return wire.SessionRequest{ID: r.ID, State: r.State}
+	})
+}
+
+// switchHandler decodes a switch request. With web set, a guard runs first and
+// a refusal from it is the response.
+func switchHandler[R any](p *Prompt, web bool, set func(R) (wire.SessionResult, error), session func(R) wire.SessionRequest) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req wire.AutoAdvanceRequest
+		var req R
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if web {
-			res, err := p.sessions.CheckDesignWrite(wire.SessionRequest{ID: req.ID, State: req.State})
+			res, err := p.sessions.CheckDesignWrite(session(req))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -94,13 +115,35 @@ func (p *Prompt) autoAdvanceHandler(web bool) http.HandlerFunc {
 				return
 			}
 		}
-		res, err := p.setAutoAdvance(req)
+		res, err := set(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		wire.WriteJSON(w, res)
 	}
+}
+
+// setAutoQueue flips a Design session's auto-queue switch. It starts nothing
+// yet.
+func (p *Prompt) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult, error) {
+	dir, meta, res, err := p.sessions.SessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	if !meta.Design {
+		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+	}
+	var info wire.SessionInfo
+	if err := p.sessions.UpdateSessionMeta(dir, req.ID, func(m *sessions.Meta) bool {
+		m.AutoQueue = req.On
+		info = m.Info()
+		return true
+	}); err != nil {
+		return wire.SessionResult{}, err
+	}
+	p.events.Publish(wire.EventSessionChanged, req.ID)
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // setAutoAdvance flips a Design session's auto-advance switch. Turning it off

@@ -452,6 +452,9 @@ _Avoid_: unread (a read session can still be actionable).
 
 **Auto-advance** — the server sends a Design session's Continue by itself after a countdown.
 
+**Auto-queue** — a per-session switch on a Design session, off by default and kept in the session meta. It
+is the sibling of Auto-advance; on its own it starts nothing.
+
 **Chain** — a design run moving on to the next step or map ticket in the same session.
 
 **Action** — the prompts an agent attaches to an Actionable it raised, which gx can send into the

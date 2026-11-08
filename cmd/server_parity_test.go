@@ -122,6 +122,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/sessions/interrupt":           "agents interrupt",
 	"POST /v1/sessions/auto-advance":        "agents auto-advance",
 	"POST /v1/sessions/auto-advance/cancel": "agents auto-advance-cancel",
+	"POST /v1/sessions/auto-queue":          "agents auto-queue",
 	"POST /v1/designs/open":                 "designs open",
 	"POST /v1/designs/delete":               "designs delete",
 	"POST /v1/designs/worktree":             "designs worktree",

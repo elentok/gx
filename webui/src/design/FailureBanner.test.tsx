@@ -27,6 +27,7 @@ const session = (state: string, failure?: SessionFailure, harness = "claude"): S
   unread: {},
   actionable: {},
   auto_advance: true,
+  auto_queue: false,
   failure,
 });
 

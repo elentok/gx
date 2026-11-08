@@ -84,6 +84,8 @@ type Meta struct {
 	// AutoAdvanceOff is the inverse of the switch, so a meta written before the
 	// switch existed reads as on.
 	AutoAdvanceOff bool `json:"auto_advance_off,omitempty"`
+	// AutoQueue is the auto-queue switch; off unless the person turned it on.
+	AutoQueue bool `json:"auto_queue,omitempty"`
 	// AutoSends counts the auto-advance sends since the person last gave input.
 	// A restart keeps it: a restart never sends, so only the next run end reads it.
 	AutoSends int `json:"auto_sends,omitempty"`
@@ -141,6 +143,7 @@ func (m Meta) Info() wire.SessionInfo {
 		Unread:          m.Unread,
 		Actionable:      m.Actionable,
 		AutoAdvance:     !m.AutoAdvanceOff,
+		AutoQueue:       m.AutoQueue,
 		ReportedStep:    m.ReportedStep,
 		ReportedTitle:   m.ReportedTitle,
 		RebaseNote:      m.RebaseNote,

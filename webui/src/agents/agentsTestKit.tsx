@@ -19,6 +19,7 @@ export const session = (id: string, project: string, over: Partial<SessionInfo> 
   unread: {},
   actionable: {},
   auto_advance: true,
+  auto_queue: false,
   ...over,
 });
 

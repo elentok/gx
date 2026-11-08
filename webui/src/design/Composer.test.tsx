@@ -52,6 +52,7 @@ const session = (
   unread: {},
   actionable: {},
   auto_advance: true,
+  auto_queue: false,
   ...auto,
 });
 

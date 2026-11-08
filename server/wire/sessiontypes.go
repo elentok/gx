@@ -45,6 +45,11 @@ type SessionInfo struct {
 	// AutoAdvanceAt is when the running countdown sends the Continue; unset
 	// with none running.
 	AutoAdvanceAt *time.Time `json:"auto_advance_at,omitempty"`
+	// AutoQueue is the session's auto-queue switch; off unless the person turned
+	// it on. AutoQueueAt is when the running countdown ends; unset with none
+	// running.
+	AutoQueue   bool       `json:"auto_queue"`
+	AutoQueueAt *time.Time `json:"auto_queue_at,omitempty"`
 	// ReportedStep is the Design step the agent says it is running, and
 	// ReportedTitle the ticket it is on during Resolve tickets. Both clear when
 	// the session goes idle.

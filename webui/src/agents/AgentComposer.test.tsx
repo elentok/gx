@@ -26,6 +26,7 @@ const session = (state = "idle"): SessionInfo => ({
   unread: {},
   actionable: {},
   auto_advance: true,
+  auto_queue: false,
 });
 
 function render(over: { s?: SessionInfo; connected?: boolean; post?: PostPrompt; reason?: string; wide?: boolean } = {}) {

@@ -162,6 +162,14 @@ func (s *Sessions) SetAutoAdvance(ctx context.Context, id string, on bool) (wire
 	return res, err
 }
 
+// SetAutoQueue turns a Design session's auto-queue switch on or off. A refusal
+// is a result (Refused set), not an error.
+func (s *Sessions) SetAutoQueue(ctx context.Context, id string, on bool) (wire.SessionResult, error) {
+	var res wire.SessionResult
+	err := s.t.post(ctx, "/v1/sessions/auto-queue", wire.AutoQueueRequest{ID: id, On: on}, &res)
+	return res, err
+}
+
 // CancelAutoAdvance stops a session's running auto-advance countdown. A refusal
 // is a result (Refused set), not an error.
 func (s *Sessions) CancelAutoAdvance(ctx context.Context, id string) (wire.SessionResult, error) {

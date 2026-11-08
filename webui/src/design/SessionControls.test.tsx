@@ -38,6 +38,7 @@ const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   unread: {},
   actionable: {},
   auto_advance: true,
+  auto_queue: false,
   ...over,
 });
 

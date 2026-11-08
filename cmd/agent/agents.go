@@ -31,7 +31,7 @@ func NewAgents(d Deps) *cobra.Command {
 		newAgentsSessionCmd(d, "resume", "resume an Exited session's conversation", (*apiclient.Sessions).Resume),
 		newAgentsSessionCmd(d, "run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Sessions).RunAction),
 		newAgentsSessionCmd(d, "focus", "show a session in the most recently focused TUI", (*apiclient.Sessions).Focus),
-		newAgentsReportFocusCmd(d), newAgentsPromptCmd(d), newAgentsImageCmd(d), newAgentsAutoAdvanceCmd(d), newAgentsFixCmd(d),
+		newAgentsReportFocusCmd(d), newAgentsPromptCmd(d), newAgentsImageCmd(d), newAgentsAutoAdvanceCmd(d), newAgentsAutoQueueCmd(d), newAgentsFixCmd(d),
 		newAgentsSessionCmd(d, "auto-advance-cancel", "stop a design session's running auto-advance countdown", (*apiclient.Sessions).CancelAutoAdvance))
 	return cmd
 }
@@ -58,6 +58,31 @@ func newAgentsAutoAdvanceCmd(d Deps) *cobra.Command {
 func runAgentsAutoAdvance(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string, on bool) error {
 	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
 		return cl.Sessions.SetAutoAdvance(ctx, id, on)
+	})
+}
+
+func newAgentsAutoQueueCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:       "auto-queue <id> <on|off>",
+		Short:     "turn a design session's auto-queue on or off",
+		Args:      cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
+		ValidArgs: []string{"on", "off"},
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			return runAgentsAutoQueue(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0], args[1] == "on")
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+func runAgentsAutoQueue(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string, on bool) error {
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
+		return cl.Sessions.SetAutoQueue(ctx, id, on)
 	})
 }
 

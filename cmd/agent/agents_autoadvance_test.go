@@ -30,3 +30,22 @@ func TestAgentsAutoAdvance_JSON(t *testing.T) {
 		t.Errorf("auto-advance off = %+v, want %s", res, wire.ReasonSessionNotDesign)
 	}
 }
+
+func TestAgentsAutoQueue_JSON(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	created, err := h.Client.Sessions.Create(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || created.Session == nil {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
+	var out bytes.Buffer
+	if err := runAgentsAutoQueue(context.Background(), h.Client, &out, true, created.Session.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	var res wire.SessionResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+		t.Fatalf("output %q: %v", out.String(), err)
+	}
+	if !res.Refused || res.Reason != wire.ReasonSessionNotDesign {
+		t.Errorf("auto-queue on = %+v, want %s", res, wire.ReasonSessionNotDesign)
+	}
+}

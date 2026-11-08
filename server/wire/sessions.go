@@ -51,6 +51,14 @@ type AutoAdvanceRequest struct {
 	Off   bool   `json:"off,omitempty"`
 }
 
+// AutoQueueRequest is the body of POST /v1/sessions/auto-queue. State is the
+// web's session state token.
+type AutoQueueRequest struct {
+	ID    string `json:"id"`
+	State string `json:"state,omitempty"`
+	On    bool   `json:"on,omitempty"`
+}
+
 // SessionChatMessage is one visible message of a session's conversation. ID is
 // the transcript line's uuid.
 type SessionChatMessage struct {

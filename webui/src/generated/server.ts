@@ -1953,6 +1953,15 @@ export interface AutoAdvanceRequest {
   off?: boolean;
 }
 /**
+ * AutoQueueRequest is the body of POST /v1/sessions/auto-queue. State is the
+ * web's session state token.
+ */
+export interface AutoQueueRequest {
+  id: string;
+  state?: string;
+  on?: boolean;
+}
+/**
  * SessionChatMessage is one visible message of a session's conversation. ID is
  * the transcript line's uuid.
  */
@@ -2348,6 +2357,13 @@ export interface SessionInfo {
    * with none running.
    */
   auto_advance_at?: string;
+  /**
+   * AutoQueue is the session's auto-queue switch; off unless the person turned
+   * it on. AutoQueueAt is when the running countdown ends; unset with none
+   * running.
+   */
+  auto_queue: boolean;
+  auto_queue_at?: string;
   /**
    * ReportedStep is the Design step the agent says it is running, and
    * ReportedTitle the ticket it is on during Resolve tickets. Both clear when
