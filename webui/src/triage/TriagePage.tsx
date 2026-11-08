@@ -21,6 +21,7 @@ import { triageModel } from "../stepped/model";
 import { SteppedPage } from "../stepped/SteppedPage";
 import { useWide } from "../useWide";
 import { QuestionsView } from "./QuestionsView";
+import { ReviewView } from "./ReviewView";
 import { useTriage,type FetchTriage } from "./useTriage";
 
 /** The injected fetchers and actions the Triage page talks to the server through. */
@@ -146,7 +147,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
       }
       chatTop={() => (
         <>
-          {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} questions={<QuestionsView project={project} view={view} refetch={refetch} save={deps.saveRow} />} />}
+          {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} questions={<QuestionsView project={project} view={view} refetch={refetch} save={deps.saveRow} />} review={<ReviewView project={project} view={view} refetch={refetch} save={deps.saveRow} />} />}
           {live.length > 0 && (
           <Box
             display="flex"
