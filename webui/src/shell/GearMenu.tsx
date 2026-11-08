@@ -103,8 +103,8 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
         items={[
           toggle("AFK", "afk", afk, postAfk),
           toggle("Vi mode", "vimode", viMode, postViMode),
-          { kind: "separator" },
           sort,
+          { kind: "separator" },
           { value: "restart", label: "Restart server", onSelect: () => setRestartOpen(true) },
           {
             value: "settings",

@@ -41,6 +41,18 @@ test("lists AFK, Vi mode, Sort, Restart server and More settings in order, with 
   expect(screen.queryByText("Claude limits")).toBeNull();
 });
 
+test("one divider separates AFK, Vi mode and Sort from Restart server and More settings", async () => {
+  setup({}, { activeWorkspace: research });
+  await screen.findByRole("menuitemcheckbox", { name: "AFK" });
+  const menu = screen.getByRole("menu");
+  const separators = menu.querySelectorAll('[role="separator"]');
+  expect(separators).toHaveLength(1);
+  const sort = screen.getByRole("menuitem", { name: /Sort · research/ });
+  const restart = screen.getByRole("menuitem", { name: "Restart server" });
+  expect(sort.compareDocumentPosition(separators[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(restart.compareDocumentPosition(separators[0]) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+});
+
 test("the AFK and Vi mode items post the opposite of the snapshot", async () => {
   const postAfk = vi.fn(async () => {});
   const postViMode = vi.fn(async () => {});
