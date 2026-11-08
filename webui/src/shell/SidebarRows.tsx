@@ -29,7 +29,7 @@ const rowStyle = {
   textDecoration: "none",
   color: "inherit",
   _hover: { bg: "sidebar.hover" },
-  _focusVisible: { outline: "2px solid", outlineColor: "border.focus", outlineOffset: "-2px" },
+  "data-focus-ring": "inset",
 } as const;
 
 const statusColor = (status: SidebarStatus, dim?: boolean) => (dim || status.tone === "muted" ? "text.faint" : `tone.${status.tone}.fg`);

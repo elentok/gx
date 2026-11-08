@@ -724,7 +724,9 @@ const spaces: Workspace[] = [
   { name: "Work", members: 1 },
 ];
 const menuLabels = async () => {
-  fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+  // The sidebar lists the same epic with its own More actions button; the page's is the one outside it.
+  const pageButton = async () => (await screen.findAllByRole("button", { name: "More actions" })).find((b) => !b.closest("aside"))!;
+  fireEvent.click(await waitFor(pageButton));
   return (await screen.findAllByRole("menuitem")).map((i) => i.textContent);
 };
 

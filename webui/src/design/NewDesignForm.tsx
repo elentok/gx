@@ -74,7 +74,6 @@ function newDraftProject(projects: string[], filterProject?: string, lastProject
   return known(filterProject) || known(lastProject) || projects[0] || "";
 }
 
-const focusRing = { borderColor: "tone.running.fg", boxShadow: "0 0 0 3px {colors.tone.running.bg}" };
 const field = {
   fontSize: "16px",
   color: "text",
@@ -83,7 +82,6 @@ const field = {
   borderColor: "transparent",
   borderRadius: "8px",
   _placeholder: { color: "text.dim" },
-  _focusVisible: { outline: "none", ...focusRing },
 } as const;
 
 const sheetProps = {

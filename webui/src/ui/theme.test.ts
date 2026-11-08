@@ -13,6 +13,13 @@ describe("theme", () => {
     expect(system.token(`colors.tone.${tone}.bg`)).toBeTruthy();
   });
 
+  it("defines one global focus-visible ring plus the inset sidebar form", () => {
+    const css = themeConfig.globalCss as Record<string, any>;
+    expect(css[":focus-visible"].boxShadow).toContain("{colors.tone.running.fg}");
+    expect(css[":focus-visible"].outline).toContain("none");
+    expect(css["[data-focus-ring='inset']:focus-visible"].boxShadow).toContain("inset 0 0 0 2px");
+  });
+
   it.each(KINDS)("has fg and bg tokens for kind %s", (kind) => {
     expect(system.token(`colors.kind.${kind}.fg`)).toBeTruthy();
     expect(system.token(`colors.kind.${kind}.bg`)).toBeTruthy();

@@ -192,6 +192,7 @@ export function AppShell({
           data-device={device}
           data-open={open}
           bg="sidebar"
+          css={{ "--gx-focus-gap": "{colors.sidebar}" }}
           borderRightWidth="1px"
           borderColor="border"
           display="flex"

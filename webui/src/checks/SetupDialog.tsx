@@ -94,11 +94,6 @@ function KindRow({ row, check, onChange }: { row: Row; check: ProjectChecks["kin
               bg={on ? "tone.running.bg" : "transparent"}
               borderLeftWidth={m.mode === MODES[0].mode ? "0" : "1px"}
               borderColor="border"
-              _focusWithin={{
-                outline: "2px solid",
-                outlineColor: "tone.running.fg",
-                outlineOffset: "-2px",
-              }}
             >
               <chakra.input
                 type="radio"

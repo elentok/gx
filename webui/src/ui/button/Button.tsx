@@ -43,7 +43,6 @@ export function Button({ emphasis = "main", tone = "done", size = "md", children
       cursor="pointer"
       transition="background 0.1s, filter 0.1s"
       _active={{ transform: "translateY(1px)" }}
-      _focusVisible={{ outline: "2px solid", outlineColor: fg, outlineOffset: "2px" }}
       _disabled={{ opacity: 0.5, cursor: "default", pointerEvents: "none" }}
       {...style}
       {...rest}

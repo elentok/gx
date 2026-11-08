@@ -106,11 +106,6 @@ export function SendPopover({
                     py="2"
                     cursor="pointer"
                     _hover={{ bg: "tone.done.bg" }}
-                    _focusVisible={{
-                      outline: "2px solid",
-                      outlineColor: "tone.done.fg",
-                      outlineOffset: "-2px",
-                    }}
                   >
                     <Text
                       as="span"

@@ -28,7 +28,6 @@ export function Field({
         borderColor={error ? "tone.paused.fg" : "border"}
         borderRadius="md"
         fontSize="base"
-        _focus={{ outline: "none", borderColor: "tone.running.fg" }}
         {...input}
       />
       {hint && (

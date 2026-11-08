@@ -200,7 +200,6 @@ export function Menu({
           placeholder={placeholder}
           h="40px"
           fontSize="16px"
-          _focusVisible={{ borderColor: "tone.running.fg", boxShadow: "none", outline: "none" }}
           value={query}
           role="combobox"
           aria-expanded

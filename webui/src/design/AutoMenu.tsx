@@ -75,11 +75,6 @@ export function AutoMenu({
         bg="transparent"
         cursor="pointer"
         _hover={{ bg: "tone.muted.bg" }}
-        _focusVisible={{
-          outline: "2px solid",
-          outlineColor: "tone.muted.fg",
-          outlineOffset: "2px",
-        }}
       >
         {switches.map((s) => (
           <Box

@@ -41,6 +41,22 @@ export const themeConfig = defineConfig({
     "input, textarea, select": {
       "@media (pointer: coarse)": { fontSize: "16px !important" },
     },
+    // The one keyboard focus ring: a 2px gap in the surrounding surface, then a 2px blue ring.
+    // !important because recipes and component styles sit above globalCss. The sidebar sets
+    // --gx-focus-gap to its own colour; full-width sidebar rows opt into the inset form.
+    ":focus-visible": {
+      outline: "none !important",
+      boxShadow: "0 0 0 2px var(--gx-focus-gap, {colors.surface}), 0 0 0 4px {colors.tone.running.fg} !important",
+    },
+    // A menu holds focus itself and marks the keyboard-highlighted item, so the ring belongs to that item.
+    "[role='menu']:focus-visible": { boxShadow: "none !important" },
+    "[role='menu']:focus-visible [role='menuitem'][data-highlighted]": {
+      boxShadow: "0 0 0 2px {colors.surface.raised}, 0 0 0 4px {colors.tone.running.fg} !important",
+    },
+    "[data-focus-ring='inset']:focus-visible": {
+      borderRadius: "8px",
+      boxShadow: "inset 0 0 0 2px {colors.tone.running.fg} !important",
+    },
     // Registered so the live Card's border gradient can animate its angle. The cast is because
     // Chakra types globalCss values as style objects, which @property's descriptors are not.
     "@property --gx-orbit-angle": { syntax: "'<angle>'", inherits: "false", initialValue: "0deg" } as SystemStyleObject,

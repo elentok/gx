@@ -33,6 +33,28 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("ready-epic")).toBeVisible();
   await expect(row("ws-design")).toHaveCount(0);
 
+  // One global ring for keyboard focus: inset on a sidebar row, gap plus blue ring elsewhere, never after a click.
+  const blue = "rgb(108, 180, 255)";
+  const ring = new RegExp(`${blue.replace(/[()]/g, "\\$&")} 0px 0px 0px 4px`);
+  await row("ready-epic").focus();
+  await expect(row("ready-epic")).toHaveCSS("box-shadow", new RegExp(`${blue.replace(/[()]/g, "\\$&")} 0px 0px 0px 2px inset`));
+  const iconButton = card(page, "ready-epic").getByRole("button", nav("More actions"));
+  await iconButton.focus();
+  await expect(iconButton).toHaveCSS("box-shadow", ring);
+  const epicCard = card(page, "ready-epic");
+  await epicCard.getByRole("link", nav("ready-epic")).focus();
+  await expect(epicCard.getByRole("link", nav("ready-epic"))).toHaveCSS("box-shadow", ring);
+  await switcher.focus();
+  await expect(switcher).toHaveCSS("box-shadow", ring);
+  await page.keyboard.press("Enter");
+  await menuFocused();
+  await expect(page.getByRole("menuitem").first()).toHaveCSS("box-shadow", ring);
+  await closeMenus();
+  await pick("Default workspace");
+  await expect(switcher).toHaveCSS("box-shadow", "none");
+  await page.keyboard.press("Tab");
+  await expect(page.locator(":focus")).toHaveCSS("box-shadow", /rgb\(108, 180, 255\) 0px 0px 0px (2px inset|4px)/);
+
   // Clicking an epic row only navigates; the chevron expands and collapses its agents, and a page visit leaves the row as left.
   // Counted inside the epic's own item, so a row still loading elsewhere cannot skew the count.
   const links = row("inv-epic").locator("xpath=ancestor::li[1]").getByRole("link");

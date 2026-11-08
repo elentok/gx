@@ -11,7 +11,6 @@ const dots = (
 );
 
 const hovered = { bg: "surface.raised", color: "text" } as const;
-const focused = { outline: "2px solid", outlineColor: "tone.running.fg", outlineOffset: "2px" } as const;
 const opened = { ...hovered, boxShadow: "inset 0 0 0 1px var(--chakra-colors-border)" } as const;
 
 /**
@@ -37,10 +36,9 @@ export function MoreActionsButton({ pinned, ...rest }: { pinned?: "hover" | "foc
       // A phone's hit area is 44px around the 40px circle.
       _before={phone ? { content: '""', position: "absolute", inset: "-2px" } : undefined}
       {...(pinned === "hover" && hovered)}
-      {...(pinned === "focus" && focused)}
+      {...(pinned === "focus" && { boxShadow: "0 0 0 2px {colors.surface}, 0 0 0 4px {colors.tone.running.fg}" })}
       {...(pinned === "open" && opened)}
       _hover={hovered}
-      _focusVisible={focused}
       _open={opened}
       _expanded={opened}
       {...rest}
