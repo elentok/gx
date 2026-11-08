@@ -98,8 +98,9 @@ test.describe("61. Page modes at 760px", () => {
     await goto(page, "#/d/demo:design-epic");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.keyboard.press("ControlOrMeta+k");
-    const sheet = page.getByRole("dialog", nav("Jump to"));
-    await expect(sheet).toBeVisible();
-    expect(await sheet.boundingBox()).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
+    // The jump menu is a popover on phones too, inset 16px from the sides.
+    const menu = page.getByRole("dialog", nav("Jump to"));
+    await expect(menu).toBeVisible();
+    expect(await menu.boundingBox()).toMatchObject({ x: 16, width: 358 });
   });
 });
