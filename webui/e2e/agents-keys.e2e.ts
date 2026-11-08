@@ -42,6 +42,20 @@ async function openScreen(page: Page, id: string) {
   await expect(screenDialog(page).getByLabel("Screen rows")).toBeVisible();
 }
 
+/** The row holding `text` is drawn in the changed-row weight. */
+const expectMarkedRow = async (page: Page, text: string) => {
+  const row = screenDialog(page).getByLabel("Screen rows").locator("span").filter({ hasText: text }).last();
+  await expect(row).toBeVisible();
+  await expect(row).toHaveCSS("font-weight", "700");
+};
+
+/** The key leaves the screen as it was: the modal says so and no row is marked. */
+const expectScreenUnchanged = async (page: Page, key: string) => {
+  await keyButton(page, key).click();
+  await expect(screenDialog(page).getByRole("status")).toHaveText("Screen unchanged");
+  await expect(screenDialog(page).getByLabel("Screen rows").locator("span").filter({ hasText: /\S/ }).first()).not.toHaveCSS("font-weight", "700");
+};
+
 test("156. Key bar and Type field in the screen view", async ({ page, start }) => {
   const fixture = await start("agents-failures");
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -52,15 +66,28 @@ test("156. Key bar and Type field in the screen view", async ({ page, start }) =
   const reads = countScreenReads(page);
   await openScreen(page, stalled.id);
 
-  // Type sends the text and no Enter; Enter is a key of its own. Each send reads the screen again.
+  // Type sends the text and no Enter; Enter is a key of its own. The reply carries the settled
+  // screen with no Refresh click and no further read. A working fake draws no typed text, so the
+  // screen it settles on is the one the page already shows.
   let before = await fixture.input(conv);
   let seen = reads();
   await typeBox(page).fill("hello");
   await typeButton(page).click();
   await expect.poll(() => readSince(fixture, conv, before)).toBe("hello");
   await expect(typeBox(page)).toHaveValue("");
-  await expect.poll(reads).toBeGreaterThan(seen);
+  await expect(screenDialog(page).getByRole("status")).toHaveText("Screen unchanged");
+  expect(reads()).toBe(seen);
   expect(await readSince(fixture, conv, before)).not.toContain("\r");
+
+  // A key that leaves the screen as it was says so too, and nothing is marked.
+  await expectScreenUnchanged(page, "Left");
+  expect(reads()).toBe(seen);
+
+  // Refresh is one plain read, with no key sent.
+  before = await fixture.input(conv);
+  await screenDialog(page).getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect.poll(reads).toBe(seen + 1);
+  expect(await readSince(fixture, conv, before)).toBe("");
 
   // Ctrl+C ends the stalled turn and closes the notice, so it goes last.
   for (const [name, , bytes] of KEYS) {
@@ -68,7 +95,10 @@ test("156. Key bar and Type field in the screen view", async ({ page, start }) =
     seen = reads();
     await keyButton(page, name).click();
     await expect.poll(() => readSince(fixture, conv, before)).toBe(bytes);
-    if (name !== "Ctrl+C") await expect.poll(reads).toBeGreaterThan(seen);
+    // Each key's response carries the rows, so the page does not read the screen again.
+    if (name === "Ctrl+C") continue;
+    await expect(keyButton(page, name)).toBeEnabled();
+    expect(reads()).toBe(seen);
   }
 
   await expect.poll(() => stateOf(fixture, stalled.id)).toBe("idle");
@@ -107,6 +137,8 @@ test("156. Error-blocked session, Type and Enter get out", async ({ page, start 
   await page.getByRole("button", { name: "Screen", exact: true }).click();
   await typeBox(page).fill("go on");
   await typeButton(page).click();
+  // The typed text shows on the settled screen, marked, with no Refresh.
+  await expectMarkedRow(page, "go on");
   await keyButton(page, "Enter").click();
   await expect.poll(() => stateOf(fixture, errored.id)).not.toBe("blocked");
 });
@@ -145,6 +177,14 @@ test("160. Phone, key input and Blocked notices", async ({ page, start }) => {
   await expect(rows).toContainText("long-row");
   expect(await rows.evaluate((el) => el.scrollWidth > el.clientWidth && getComputedStyle(el).overflowX !== "visible")).toBe(true);
   expect(await pageFits()).toBe(true);
+
+  // The dialog hides typed text, so Type settles on the rows already shown: the modal says so, with no Refresh.
+  const reads = countScreenReads(page);
+  await typeBox(page).fill("go on");
+  await typeButton(page).click();
+  await expect(screenDialog(page).getByRole("status")).toHaveText("Screen unchanged");
+  expect(reads()).toBe(0);
+  await expect(rows).toContainText("long-row");
 
   // The keys are at least 44px tall and wrap onto more than one line.
   const ys = new Set<number>();

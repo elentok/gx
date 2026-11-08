@@ -16,6 +16,8 @@ func AgentsFailuresScenario() scenario {
 	return scenario{
 		Chat:           true,
 		StallThreshold: "3s",
+		// The screen view settles on a redraw that lands a moment after the key.
+		Env: []string{agentfake.TUIRedrawDelayEnv + "=40ms"},
 		Sessions: []sessionSpec{
 			{Project: project, Prompt: agentfake.ChatSlowMarker + " a stuck turn", Failure: wire.FailureKindStalled},
 			{Project: project, Prompt: "hello", Read: true, Failure: wire.FailureKindAuth,
