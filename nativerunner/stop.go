@@ -16,6 +16,19 @@ func signalGroup(procs ProcessTable, pid int, start, sessionID string, sig sysca
 	}
 }
 
+// killLeftovers SIGKILLs what claude's session left running after claude
+// itself exited (background tasks). A group that no longer has members is not
+// signalled, and while one has, its id cannot be reused by another process.
+// A task that detached into its own session is out of reach.
+func (p *Pty) killLeftovers(ss *ptySession) {
+	if ss.claudePID <= 0 {
+		return
+	}
+	if err := syscall.Kill(-ss.claudePID, syscall.SIGKILL); err == nil && p.log != nil {
+		p.log.Info("killed leftover background tasks", "session", ss.session.SessionID, "pgid", ss.claudePID)
+	}
+}
+
 // awaitExit waits at most grace for exited. A pid signalGroup skipped may
 // never exit, so a stop can't block on it forever.
 func awaitExit(exited <-chan struct{}, grace time.Duration, pid int) error {

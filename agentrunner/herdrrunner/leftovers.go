@@ -91,8 +91,12 @@ func (r *Runner) signalAlive(left []leftover, sig syscall.Signal) {
 		kill = syscall.Kill
 	}
 	for _, l := range left {
-		if alive[l] {
-			_ = kill(l.pid, sig)
+		if !alive[l] {
+			continue
+		}
+		err := kill(l.pid, sig)
+		if r.log != nil {
+			r.log.Info("killed leftover background task", "pid", l.pid, "signal", sig.String(), "err", err)
 		}
 	}
 }

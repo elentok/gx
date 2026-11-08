@@ -15,5 +15,11 @@ func LaunchCommand(p *Pty, opts agentrunner.StartOptions, dir, sessionID string)
 	return p.launcher().launchCommand(opts, dir, sessionID)
 }
 
+// KillLeftovers runs the stop path's leftover kill for a session whose claude
+// led process group pgid.
+func KillLeftovers(p *Pty, pgid int) {
+	p.killLeftovers(&ptySession{claudePID: pgid})
+}
+
 // PS is the real process table.
 var PS ProcessTable = psTable{}

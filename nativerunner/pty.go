@@ -404,6 +404,7 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 		}
 	}
 
+	p.killLeftovers(ss)
 	p.reg.remove(s.Label)
 	return p.Cleanup(s.Label)
 }

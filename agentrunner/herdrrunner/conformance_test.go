@@ -1,9 +1,13 @@
 package herdrrunner_test
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"os"
+	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -16,6 +20,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -467,6 +472,47 @@ func TestStop_TerminatesLeftoverDescendants(t *testing.T) {
 	want := []sent{{600, syscall.SIGTERM}, {600, syscall.SIGKILL}}
 	if !slices.Equal(got, want) {
 		t.Fatalf("signals = %v, want %v", got, want)
+	}
+}
+
+// A real sleeping descendant of the pane shell is dead after Stop, and the
+// kill is logged.
+func TestStop_KillsRealLeftoverAndLogsIt(t *testing.T) {
+	shell := exec.Command("sh", "-c", "sleep 60 & wait")
+	if err := shell.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = shell.Process.Kill(); _ = shell.Wait() })
+
+	r, state, s := startAgent(t, "claude", nil)
+	state.Register("pane", "process-info", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"process_info": map[string]any{"shell_pid": shell.Process.Pid}}, herdrfake.Identities{}, nil
+	})
+	r.Sleep = func(time.Duration) {}
+	var buf bytes.Buffer
+	r.SetLog(slog.New(slog.NewTextHandler(&buf, nil)))
+
+	// The sleep is forked a moment after the shell starts.
+	var child []byte
+	testutil.WaitFor(t, 5*time.Second, "the shell to fork its sleep", func() bool {
+		child, _ = exec.Command("pgrep", "-P", strconv.Itoa(shell.Process.Pid)).Output()
+		return len(child) > 0
+	})
+	pid, err := strconv.Atoi(strings.Fields(string(child))[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.Stop(s); err != nil {
+		t.Fatal(err)
+	}
+	// SIGKILL follows the grace, so the sleep is gone; a zombie of the shell's
+	// child is reaped once the shell dies.
+	_ = shell.Process.Kill()
+	_ = shell.Wait()
+	testutil.WaitFor(t, 5*time.Second, "the leftover to die", func() bool { return syscall.Kill(pid, 0) != nil })
+	if !strings.Contains(buf.String(), "killed leftover background task") {
+		t.Errorf("log = %q; want the kill logged", buf.String())
 	}
 }
 

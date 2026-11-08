@@ -1,9 +1,12 @@
 package nativerunner_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -29,6 +32,33 @@ func (m *movedProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
 }
 
 func alive(pid int) bool { return syscall.Kill(pid, 0) == nil }
+
+// A background task outlives claude in claude's process group; the stop path
+// kills it and logs the kill.
+func TestPty_KillLeftoversKillsBackgroundTaskAndLogsIt(t *testing.T) {
+	cmd := exec.Command("sleep", "60")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(done) }()
+	t.Cleanup(func() { _ = cmd.Process.Kill() })
+
+	var buf bytes.Buffer
+	p := newPty(t)
+	p.SetLog(slog.New(slog.NewTextHandler(&buf, nil)))
+	nativerunner.KillLeftovers(p, cmd.Process.Pid)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("leftover task still alive after the stop")
+	}
+	if !strings.Contains(buf.String(), "killed leftover background tasks") {
+		t.Errorf("log = %q; want the kill logged", buf.String())
+	}
+}
 
 func TestPty_CleanupRefusesWhileHolderLive(t *testing.T) {
 	p := newPty(t)
