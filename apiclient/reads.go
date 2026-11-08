@@ -60,6 +60,14 @@ func (r *Reads) ArchiveCleanupEpic(ctx context.Context, req wire.CleanupWriteReq
 	return res, err
 }
 
+// StartCleanupAgent starts a one-off /gx-cleanup on the rows no button can
+// decide. A refusal is a result (Refused set), not an error.
+func (r *Reads) StartCleanupAgent(ctx context.Context, req wire.CleanupWriteRequest) (wire.OneOffResult, error) {
+	var res wire.OneOffResult
+	err := r.t.post(ctx, "/v1/cleanup/agent", req, &res)
+	return res, err
+}
+
 // DeleteCleanupBranch deletes a merged branch that has no worktree. A refusal
 // is a result (Refused set), not an error.
 func (r *Reads) DeleteCleanupBranch(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {

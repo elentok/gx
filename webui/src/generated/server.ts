@@ -66,6 +66,11 @@ export interface CleanupEpic {
   merged_to_main: boolean;
   has_code_review_ticket: boolean;
   code_review_done: boolean;
+  /**
+   * AgentGroup marks a done epic that has not landed: no button decides it,
+   * so the cleanup agent does.
+   */
+  agent_group?: boolean;
 }
 /**
  * CleanupWorktree is one branch or detached worktree in the cleanup scan.
@@ -86,6 +91,11 @@ export interface CleanupWorktree {
   delete_mode?: string;
   recommendation?: string;
   size_bytes?: number /* uint64 */;
+  /**
+   * AgentGroup marks an idle branch the scan cannot call (no recommendation),
+   * so the cleanup agent decides it.
+   */
+  agent_group?: boolean;
 }
 /**
  * CleanupReport is the cleanup read route's result for one project.
@@ -118,6 +128,11 @@ export const ReasonCleanupNotDone = "cleanup-not-done";
  * Reasons a cleanup write refuses.
  */
 export type ReasonCleanup = typeof ReasonCleanupUnknown | typeof ReasonCleanupNotMerged | typeof ReasonCleanupHasWorktree | typeof ReasonCleanupNoWorktree | typeof ReasonCleanupGitRefused | typeof ReasonCleanupDirty | typeof ReasonCleanupLive | typeof ReasonCleanupQueued | typeof ReasonCleanupNotDone;
+/**
+ * ReasonCleanupNothingForAgent is the refusal when no row belongs to the agent
+ * group.
+ */
+export const ReasonCleanupNothingForAgent = "cleanup-nothing-for-agent";
 /**
  * CleanupWriteResult is a cleanup write's answer. A refusal is a result, not
  * an error; Message then holds the reason, git's own when git refused.

@@ -373,7 +373,8 @@ func New(cfg Config) (*Server, error) {
 	s.settings.Store(&cfg.Settings)
 	s.settings.SetAppliers(lifecycle.ReloadAppliers(reloadHost{s}))
 	s.cleanup = cleanup.New(cleanup.Deps{TicketStore: cfg.TicketStore, Env: cfg.Env, Events: events,
-		Sessions: func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
+		Sessions:     func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
+		SubmitOneOff: s.oneOffs.Submit,
 		EpicQueued: func(project, epic string) bool {
 			return s.queue.RootQueued(queue.RootRef{Project: project, Epic: epic})
 		}})

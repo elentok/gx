@@ -42,6 +42,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/cleanup/delete-branch":            "server cleanup-delete",
 	"POST /v1/cleanup/remove-unmerged-worktree": "server cleanup-remove-unmerged",
 	"POST /v1/cleanup/archive-epic":             "server cleanup-archive",
+	"POST /v1/cleanup/agent":                    "server cleanup-agent",
 	"GET /v1/disk/status":                       "server disk status",
 	"POST /v1/disk/clean":                       "server disk clean",
 	"GET /v1/health":                            "server health",

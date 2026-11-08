@@ -35,6 +35,8 @@ type Deps struct {
 	Sessions func() ([]wire.SessionInfo, error)
 	// EpicQueued reports whether the epic's root is in the ralph-loop queue.
 	EpicQueued func(project, epic string) bool
+	// SubmitOneOff starts a one-off agent ticket.
+	SubmitOneOff func(wire.OneOffRequest) (wire.OneOffResult, error)
 }
 
 // Cleanup is the cleanup read route's state: the size cache.
@@ -63,6 +65,7 @@ func Routes(c func() *Cleanup) []wire.Route {
 		{Pattern: "POST /v1/cleanup/remove-worktree", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().removeWrite(w, r) }},
 		{Pattern: "POST /v1/cleanup/remove-unmerged-worktree", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().removeUnmergedWrite(w, r) }},
 		{Pattern: "POST /v1/cleanup/archive-epic", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().archiveWrite(w, r) }},
+		{Pattern: "POST /v1/cleanup/agent", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().agentWrite(w, r) }},
 		{Pattern: "POST /v1/cleanup/delete-branch", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().deleteWrite(w, r) }},
 	}
 }
@@ -97,7 +100,11 @@ func (c *Cleanup) Report(project string) (wire.CleanupReport, error) {
 	}
 	rep := wire.CleanupReport{Project: project, Epics: []wire.CleanupEpic{}, Worktrees: []wire.CleanupWorktree{}, AtticRefs: res.AtticRefs}
 	for _, e := range res.Epics {
-		rep.Epics = append(rep.Epics, wire.CleanupEpic(e))
+		rep.Epics = append(rep.Epics, wire.CleanupEpic{
+			Name: e.Name, AllDone: e.AllDone, MergedToTrunk: e.MergedToTrunk,
+			HasCodeReviewTicket: e.HasCodeReviewTicket, CodeReviewDone: e.CodeReviewDone,
+			AgentGroup: e.AllDone && !e.MergedToTrunk,
+		})
 	}
 	var missing []string
 	c.mu.Lock()
@@ -106,6 +113,7 @@ func (c *Cleanup) Report(project string) (wire.CleanupReport, error) {
 			Branch: wt.Branch, Path: wt.Path, Kind: wt.Kind, Active: wt.Active, Dirty: wt.Dirty, Head: wt.Head,
 			Epic: wt.Epic, TicketID: wt.TicketID, TicketDone: wt.TicketDone, Merged: wt.Merged,
 			MergedToTrunk: wt.MergedToTrunk, DeleteMode: wt.DeleteMode, Recommendation: wt.Recommendation,
+			AgentGroup: !wt.Active && wt.Recommendation == "" && wt.Branch != "",
 		}
 		if wt.Path != "" {
 			if n, ok := c.sizes[wt.Path]; ok {

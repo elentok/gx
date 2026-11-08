@@ -11,6 +11,9 @@ type CleanupEpic struct {
 	MergedToTrunk       bool   `json:"merged_to_main"`
 	HasCodeReviewTicket bool   `json:"has_code_review_ticket"`
 	CodeReviewDone      bool   `json:"code_review_done"`
+	// AgentGroup marks a done epic that has not landed: no button decides it,
+	// so the cleanup agent does.
+	AgentGroup bool `json:"agent_group,omitempty"`
 }
 
 // CleanupWorktree is one branch or detached worktree in the cleanup scan.
@@ -30,6 +33,9 @@ type CleanupWorktree struct {
 	DeleteMode     string  `json:"delete_mode,omitempty"`
 	Recommendation string  `json:"recommendation,omitempty"`
 	SizeBytes      *uint64 `json:"size_bytes,omitempty"`
+	// AgentGroup marks an idle branch the scan cannot call (no recommendation),
+	// so the cleanup agent decides it.
+	AgentGroup bool `json:"agent_group,omitempty"`
 }
 
 // CleanupReport is the cleanup read route's result for one project.
@@ -60,6 +66,10 @@ const (
 	ReasonCleanupQueued      = "cleanup-queued"
 	ReasonCleanupNotDone     = "cleanup-not-done"
 )
+
+// ReasonCleanupNothingForAgent is the refusal when no row belongs to the agent
+// group.
+const ReasonCleanupNothingForAgent = "cleanup-nothing-for-agent"
 
 // CleanupWriteResult is a cleanup write's answer. A refusal is a result, not
 // an error; Message then holds the reason, git's own when git refused.
