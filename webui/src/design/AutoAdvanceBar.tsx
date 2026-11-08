@@ -7,6 +7,7 @@ import {
   stateToken,
   type CancelAutoAdvance,
   type SetAutoAdvance,
+  type SetAutoQueue,
 } from "./open";
 import { AutoMenu, type AutoMenuState } from "./AutoMenu";
 
@@ -74,6 +75,7 @@ export function AutoAdvanceBar({
   disabled,
   run,
   setAutoAdvance,
+  setAutoQueue,
   cancelAutoAdvance,
   menu,
   phone = false,
@@ -84,6 +86,7 @@ export function AutoAdvanceBar({
   disabled: boolean;
   run: RunCall;
   setAutoAdvance: SetAutoAdvance;
+  setAutoQueue: SetAutoQueue;
   cancelAutoAdvance: CancelAutoAdvance;
   menu: AutoMenuState;
 }) {
@@ -112,10 +115,17 @@ export function AutoAdvanceBar({
           {
             label: "Auto-queue",
             short: phone ? "Queue" : undefined,
-            description:
-              "Queue the implementation epic when it's ready. Coming soon.",
-            on: false,
-            disabled: true,
+            description: "Queue the implementation epic when it's ready.",
+            on: session.auto_queue,
+            disabled,
+            onFlip: () =>
+              run(() =>
+                setAutoQueue({
+                  id: session.id,
+                  state,
+                  on: !session.auto_queue,
+                }),
+              ),
           },
         ]}
       />

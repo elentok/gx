@@ -537,13 +537,40 @@ test("the Note dot shows with an open note or text on the phone, and never on a 
   expect(document.querySelector("[data-part=note-dot]")).toBeNull();
 });
 
-test("Auto-queue shows in the menu, off and disabled", async () => {
+test("Auto-queue shows in the menu enabled and off, posts the flip, and has no Coming soon", async () => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
   render({});
-  const queue = within(await openAuto()).getByRole("switch", {
-    name: "Auto-queue off",
-  });
+  const menu = within(await openAuto());
+  const queue = menu.getByRole("switch", { name: "Auto-queue off" });
   expect(queue.getAttribute("aria-checked")).toBe("false");
-  expect((queue as HTMLButtonElement).disabled).toBe(true);
+  expect((queue as HTMLButtonElement).disabled).toBe(false);
+  expect(document.body.textContent).not.toContain("Coming soon");
+  fireEvent.click(queue);
+  await waitFor(() =>
+    expect(postedTo(fetchSpy, "/v1/sessions/auto-queue")).toMatchObject({
+      id: "s-a",
+      on: true,
+    }),
+  );
+  fetchSpy.mockRestore();
+});
+
+test("Auto-queue reads the session's real state and posts the flip off", async () => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({ auto: { auto_queue: true } });
+  const queue = within(await openAuto()).getByRole("switch", {
+    name: "Auto-queue on",
+  });
+  expect(queue.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(queue);
+  await waitFor(() =>
+    expect(postedTo(fetchSpy, "/v1/sessions/auto-queue").on).toBe(false),
+  );
+  fetchSpy.mockRestore();
 });
 
 test("without a countdown there is no countdown text or Cancel", async () => {

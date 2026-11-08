@@ -1,5 +1,6 @@
 import type {
   AutoAdvanceRequest,
+  AutoQueueRequest,
   DesignDeleteRequest,
   DesignOpenRequest,
   SessionInfo,
@@ -61,6 +62,8 @@ export const postAutoAdvance: SetAutoAdvance = postJson(
 export const postCancelAutoAdvance: CancelAutoAdvance = postJson(
   "/v1/sessions/auto-advance/cancel",
 );
+export type SetAutoQueue = (body: AutoQueueRequest) => Promise<SessionResult>;
+export const postAutoQueue: SetAutoQueue = postJson("/v1/sessions/auto-queue");
 
 /** The server's SessionStateToken: id, state and the status time in Unix nanoseconds. */
 export function stateToken(s: SessionInfo): string {

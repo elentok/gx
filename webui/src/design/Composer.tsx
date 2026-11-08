@@ -12,12 +12,14 @@ import { AutoAdvanceBar, AutoCountdown, type RunCall } from "./AutoAdvanceBar";
 import type { AutoMenuState } from "./AutoMenu";
 import {
   postAutoAdvance,
+  postAutoQueue,
   postCancelAutoAdvance,
   postInterruptSession,
   stateToken,
   type CancelAutoAdvance,
   type InterruptSession,
   type SetAutoAdvance,
+  type SetAutoQueue,
 } from "./open";
 import { codexSkillHint } from "./chat";
 import { ComposerImages } from "./ComposerImages";
@@ -41,6 +43,7 @@ export function Composer({
   post,
   interrupt = postInterruptSession,
   setAutoAdvance = postAutoAdvance,
+  setAutoQueue = postAutoQueue,
   cancelAutoAdvance = postCancelAutoAdvance,
   onStale,
   round = [],
@@ -59,6 +62,7 @@ export function Composer({
   post?: PostPrompt;
   interrupt?: InterruptSession;
   setAutoAdvance?: SetAutoAdvance;
+  setAutoQueue?: SetAutoQueue;
   cancelAutoAdvance?: CancelAutoAdvance;
   /** The conversation moved under the person: refetch the chat, keep the draft. */
   onStale?: () => void;
@@ -210,6 +214,7 @@ export function Composer({
       disabled={!connected || pending}
       run={run}
       setAutoAdvance={setAutoAdvance}
+      setAutoQueue={setAutoQueue}
       cancelAutoAdvance={cancelAutoAdvance}
       menu={autoMenu}
       phone={!wide}
