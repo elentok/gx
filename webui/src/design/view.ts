@@ -23,3 +23,11 @@ export const designSession = (address: string, sessions: SessionInfo[]): Session
 /** Whether the Design has any session, live or Exited. Removed sessions are not in the list. */
 export const hasDesignSession = (address: string, sessions: SessionInfo[]) =>
   sessions.some((s) => designOf(s) === address);
+
+const onFlow = (flow: string, key: string) => (s: SessionInfo) => s.flow === flow && s.flow_key === key;
+
+/** A stepped session by flow and key (a Triage has no ticket): the newest live one, else the newest Exited one. */
+export const flowSession = (flow: string, key: string, sessions: SessionInfo[]): SessionInfo | undefined => {
+  const mine = sessions.filter(onFlow(flow, key));
+  return mine.filter((s) => s.status.state !== "exited").sort(byNewestRun)[0] ?? mine.sort(byNewest)[0];
+};

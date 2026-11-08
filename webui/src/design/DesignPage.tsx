@@ -23,14 +23,14 @@ import type {
 } from "./open";
 import type { PostPrompt } from "./prompt";
 import { AgentLine } from "./AgentLine";
+import { ImplLink, Tickets, showsImplLink } from "./Progress";
+import { designModel } from "../stepped/model";
 import {
-  ImplLink,
   Progress,
   StepLine,
   StepsSheet,
-  showsImplLink,
   summaryLine,
-} from "./Progress";
+} from "../stepped/Progress";
 import type { FetchScreen } from "./screen";
 import {
   DesignActionsMenu,
@@ -128,15 +128,8 @@ function DesignBody({
   const [selected, setSelected] = useState<string>();
   const [toggle, setToggle] = useState<{ key: string; on: boolean }>();
   const [stepsOpen, setStepsOpen] = useState(false);
-  const done = detail?.steps?.some(
-    (s) => s.step === "done" && s.state === "done",
-  );
-  const current = detail?.steps?.find((s) => s.state === "current");
-  // Continue's subtitle: the next ticket while tickets resolve, else the step.
-  const nextTitle =
-    (current?.step === "resolve-tickets" &&
-      detail?.rows.find((r) => r.current)?.title) ||
-    current?.label;
+  const model = detail && designModel(detail);
+  const { done, current, nextTitle } = model ?? {};
   const name = slugOf(address);
   // Below desktop the chat takes the full width: the footer's Add, Note, Auto, countdown and Send need it on one line.
   // The steps then open from the header like on a phone.
@@ -187,9 +180,10 @@ function DesignBody({
   );
   return (
     <>
-      {stepsOpen && detail && (
+      {stepsOpen && model && (
         <StepsSheet
-          detail={detail}
+          model={model}
+          rows={<Tickets rows={model.tickets} />}
           ring={ring("compact")}
           onClose={() => setStepsOpen(false)}
         />
@@ -201,12 +195,12 @@ function DesignBody({
           icon={<PageIcon kind="design" />}
           caret
           subtitle={
-            detail && (
+            model && (
               <>
                 {stepsInline ? (
-                  summaryLine(detail)
+                  summaryLine(model)
                 ) : (
-                  <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />
+                  <StepLine model={model} onOpen={() => setStepsOpen(true)} />
                 )}
                 {card?.section === SectionOnHold && " · On hold"}
               </>
@@ -313,7 +307,9 @@ function DesignBody({
             minH="0"
             overflowY="auto"
           >
-            {detail && <Progress detail={detail} />}
+            {model && (
+              <Progress model={model} rows={<Tickets rows={model.tickets} />} />
+            )}
           </Box>
         )}
       </Box>
