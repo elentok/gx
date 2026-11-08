@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server/servertest"
@@ -47,5 +48,24 @@ func TestAgentsAutoQueue_JSON(t *testing.T) {
 	}
 	if !res.Refused || res.Reason != wire.ReasonSessionNotDesign {
 		t.Errorf("auto-queue on = %+v, want %s", res, wire.ReasonSessionNotDesign)
+	}
+}
+
+func TestAgentsAutoQueueCancel_PrintsTheSessionResult(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	created, err := h.Client.Sessions.Create(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || created.Session == nil {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
+	var out bytes.Buffer
+	if err := runAgentsSessionWrite(context.Background(), h.Client, &out, true, (*apiclient.Sessions).CancelAutoQueue, created.Session.ID); err != nil {
+		t.Fatal(err)
+	}
+	var res wire.SessionResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+		t.Fatalf("output %q: %v", out.String(), err)
+	}
+	if res.Refused || res.Session == nil || res.Session.ID != created.Session.ID {
+		t.Errorf("auto-queue cancel = %+v, want the session %s", res, created.Session.ID)
 	}
 }

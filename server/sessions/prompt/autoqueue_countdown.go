@@ -100,3 +100,18 @@ func (p *Prompt) cancelAutoQueue(id, why string) bool {
 	p.sessions.TriggerBanner(id, sound.Attention, why)
 	return true
 }
+
+// cancelAutoQueueRoute is the cancel route: it stops a running countdown and is
+// a no-op with none. It leaves the auto-advance countdown alone.
+func (p *Prompt) cancelAutoQueueRoute(req wire.SessionRequest) (wire.SessionResult, error) {
+	_, meta, res, err := p.sessions.SessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	p.cancelAutoQueue(req.ID, "Auto-queue cancelled")
+	info := meta.Info()
+	if at := p.AutoQueueDeadline(req.ID); !at.IsZero() {
+		info.AutoQueueAt = &at
+	}
+	return wire.SessionResult{Session: &info}, nil
+}

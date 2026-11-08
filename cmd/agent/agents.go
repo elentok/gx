@@ -32,7 +32,8 @@ func NewAgents(d Deps) *cobra.Command {
 		newAgentsSessionCmd(d, "run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Sessions).RunAction),
 		newAgentsSessionCmd(d, "focus", "show a session in the most recently focused TUI", (*apiclient.Sessions).Focus),
 		newAgentsReportFocusCmd(d), newAgentsPromptCmd(d), newAgentsImageCmd(d), newAgentsAutoAdvanceCmd(d), newAgentsAutoQueueCmd(d), newAgentsFixCmd(d),
-		newAgentsSessionCmd(d, "auto-advance-cancel", "stop a design session's running auto-advance countdown", (*apiclient.Sessions).CancelAutoAdvance))
+		newAgentsSessionCmd(d, "auto-advance-cancel", "stop a design session's running auto-advance countdown", (*apiclient.Sessions).CancelAutoAdvance),
+		newAgentsSessionCmd(d, "auto-queue-cancel", "stop a design session's running auto-queue countdown", (*apiclient.Sessions).CancelAutoQueue))
 	return cmd
 }
 

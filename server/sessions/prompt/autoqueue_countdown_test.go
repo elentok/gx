@@ -171,6 +171,75 @@ func TestAutoQueue_SwitchOffCancelsTheCountdownWithABanner(t *testing.T) {
 	}
 }
 
+func TestAutoQueue_CancelStopsTheCountdownWithABannerAndKeepsTheSwitch(t *testing.T) {
+	t.Parallel()
+	f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
+	setAutoQueue(t, f, true)
+	if servertest.SessionSnapshot(t, f).AutoQueueAt == nil {
+		t.Fatal("no countdown running")
+	}
+	if res, err := f.H.Client.Sessions.CancelAutoQueue(f.Ctx, f.ID); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil || !got.AutoQueue {
+		t.Errorf("session = switch %v at %v, want on with no countdown", got.AutoQueue, got.AutoQueueAt)
+	}
+	waitForBanner(t, f, "Auto-queue cancelled")
+}
+
+func TestAutoQueue_CancelWithNoCountdownIsANoOpThatReturnsTheSession(t *testing.T) {
+	t.Parallel()
+	f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
+	res, err := f.H.Client.Sessions.CancelAutoQueue(f.Ctx, f.ID)
+	if err != nil || res.Refused || res.Session == nil || res.Session.ID != f.ID {
+		t.Fatalf("cancel = %+v, %v, want the session", res, err)
+	}
+	for _, b := range f.H.Banners.Sent() {
+		if strings.Contains(b.Body+b.Title, "Auto-queue cancelled") {
+			t.Errorf("banner %+v sent with no countdown", b)
+		}
+	}
+}
+
+func TestAutoQueue_CancelLeavesAutoAdvanceAndAutoAdvanceCancelLeavesAutoQueue(t *testing.T) {
+	t.Parallel()
+	f, store := startReadyMap(t, mapCase{step: "spec", implStatus: "open"})
+	writeAssistantMessage(t, f.Path, runEndText)
+	endTurn(t, f)
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	setAutoQueue(t, f, true)
+	writeMapCase(t, store, mapCase{name: "map", step: "branch", implStatus: "open"})
+	prompt := f.H.Server.Prompt()
+	if !servertest.Poll(5*time.Second, func() bool { reason, err := prompt.AutoQueueNotReady("proj", "map"); return err == nil && reason == "" }) {
+		t.Fatal("the map never became ready")
+	}
+	prompt.DesignReachedBranch("proj", "map")
+	if got := servertest.SessionSnapshot(t, f); got.AutoAdvanceAt == nil || got.AutoQueueAt == nil {
+		t.Fatalf("countdowns: advance at %v, queue at %v, want both running", got.AutoAdvanceAt, got.AutoQueueAt)
+	}
+
+	if res, err := f.H.Client.Sessions.CancelAutoQueue(f.Ctx, f.ID); err != nil || res.Refused {
+		t.Fatalf("cancel auto-queue = %+v, %v", res, err)
+	}
+	got := servertest.SessionSnapshot(t, f)
+	if got.AutoQueueAt != nil || got.AutoAdvanceAt == nil {
+		t.Fatalf("after cancelling auto-queue: queue at %v, advance at %v, want only advance running", got.AutoQueueAt, got.AutoAdvanceAt)
+	}
+
+	setAutoQueue(t, f, false)
+	setAutoQueue(t, f, true)
+	if servertest.SessionSnapshot(t, f).AutoQueueAt == nil {
+		t.Fatal("no auto-queue countdown after switching it back on")
+	}
+	if res, err := f.H.Client.Sessions.CancelAutoAdvance(f.Ctx, f.ID); err != nil || res.Refused {
+		t.Fatalf("cancel auto-advance = %+v, %v", res, err)
+	}
+	got = servertest.SessionSnapshot(t, f)
+	if got.AutoAdvanceAt != nil || got.AutoQueueAt == nil {
+		t.Errorf("after cancelling auto-advance: queue at %v, advance at %v, want only queue running", got.AutoQueueAt, got.AutoAdvanceAt)
+	}
+}
+
 func TestAutoQueue_SwitchOffLeavesAutoAdvanceCountingDown(t *testing.T) {
 	t.Parallel()
 	store := servertest.StoreWithMapStep(t, "spec")

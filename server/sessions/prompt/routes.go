@@ -46,6 +46,17 @@ func Routes(get func() *Prompt) []wire.Route {
 			},
 		},
 		{
+			Pattern: "POST /v1/sessions/auto-queue/cancel",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) {
+				sessions.SessionWrite(get().cancelAutoQueueRoute)(w, r)
+			},
+			WebHandler: func(w http.ResponseWriter, r *http.Request) {
+				p := get()
+				p.sessions.SessionWriteDesignWeb(p.cancelAutoQueueRoute)(w, r)
+			},
+		},
+		{
 			Pattern:    "POST /v1/sessions/auto-queue",
 			Web:        wire.WebWrite,
 			Handler:    func(w http.ResponseWriter, r *http.Request) { get().autoQueueHandler(false)(w, r) },

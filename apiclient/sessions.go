@@ -178,6 +178,14 @@ func (s *Sessions) CancelAutoAdvance(ctx context.Context, id string) (wire.Sessi
 	return res, err
 }
 
+// CancelAutoQueue stops a session's running auto-queue countdown. A refusal is
+// a result (Refused set), not an error.
+func (s *Sessions) CancelAutoQueue(ctx context.Context, id string) (wire.SessionResult, error) {
+	var res wire.SessionResult
+	err := s.t.post(ctx, "/v1/sessions/auto-queue/cancel", wire.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
 // Remove deletes an Exited session's state dir. A refusal is a result (Refused
 // set), not an error.
 func (s *Sessions) Remove(ctx context.Context, id string) (wire.SessionResult, error) {
