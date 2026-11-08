@@ -770,6 +770,10 @@ export interface EpicDetailRow extends HarnessLabel {
   claimed_at?: string;
   launch_step?: LaunchStep;
   /**
+   * HolderUnreachable is set while gx retries a holder that is alive but did not answer.
+   */
+  holder_unreachable?: boolean;
+  /**
    * ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
    */
   closed_at?: string;

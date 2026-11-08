@@ -76,7 +76,7 @@ function EpicBody({ detail, now, designLive, fixAgent }: { detail: EpicDetail; n
     <>
       <Box mt="28px" display="flex" flexDirection="column" gap="8px">
         {nestLive(detail.rows).map(({ row: r, indent }) => (
-          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} fixAgent={fixAgent} verdict={verdictText(pending, r.address, r.launch_step)} />
+          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} fixAgent={fixAgent} verdict={r.holder_unreachable ? "holder unreachable, retrying" : verdictText(pending, r.address, r.launch_step)} />
         ))}
       </Box>
       <DoneGroup rows={detail.rows.filter(isFolded)} ctx={ctx} heads={detail.rows.every(isFolded)} />

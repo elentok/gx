@@ -226,6 +226,12 @@ test("a claimed row shows no verdict line", async () => {
   expect((await cardOf("01")).querySelector("[data-verdict]")).toBeNull();
 });
 
+test("a claimed row shows 'holder unreachable, retrying' only while the state is on", async () => {
+  live([tk("01", { rendered_status: "claimed", holder_unreachable: true }), tk("02", { rendered_status: "claimed" })]);
+  expect((await cardOf("01")).querySelector("[data-verdict]")?.textContent).toBe("holder unreachable, retrying");
+  expect((await cardOf("02")).querySelector("[data-verdict]")).toBeNull();
+});
+
 test("a fork's card is indented and the running card has the spinning dot", async () => {
   live([tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }), tk("02", { parent: "gx:blog/01" })]);
   expect((await cardOf("02")).getAttribute("data-indent")).toBe("1");

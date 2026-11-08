@@ -30,6 +30,8 @@ type EpicDetailRow struct {
 	HadCodex   bool       `json:"had_codex,omitempty"`
 	ClaimedAt  time.Time  `json:"claimed_at,omitzero"`
 	LaunchStep LaunchStep `json:"launch_step,omitzero"`
+	// HolderUnreachable is set while gx retries a holder that is alive but did not answer.
+	HolderUnreachable bool `json:"holder_unreachable,omitempty"`
 	// ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
 	ClosedAt time.Time `json:"closed_at,omitzero"`
 	// Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".
