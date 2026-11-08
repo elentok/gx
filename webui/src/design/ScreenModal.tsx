@@ -1,10 +1,13 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
 import { refusalText, useWrite } from "../useWrite";
 import { postKeys, type PostKeys } from "./keys";
 import { fetchScreen, type FetchScreen } from "./screen";
+import { changedRows, sameScreen } from "./screenDiff";
+
+const FADE_MS = 3000;
 
 // Label on the button, name the keys route takes.
 const KEYS: [label: string, key: string][] = [
@@ -42,14 +45,22 @@ export function ScreenModal({
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState("");
   const { run, pending, refusal, error: sendError } = useWrite({ toastRefusal: false });
+  // The rows a key is compared against, kept in a ref so a Refresh between keys is the baseline too.
+  const rowsRef = useRef<string[] | undefined>(undefined);
+  const fadeRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [marked, setMarked] = useState<number[]>([]);
+  const [unchanged, setUnchanged] = useState(false);
+  useEffect(() => () => clearTimeout(fadeRef.current), []);
 
   const load = async () => {
     setLoading(true);
     setError("");
     try {
       const res = await fetcher(target);
-      if (res.kind === "ok") setRows(res.detail.rows);
-      else setError("This session has no screen.");
+      if (res.kind === "ok") {
+        rowsRef.current = res.detail.rows;
+        setRows(res.detail.rows);
+      } else setError("This session has no screen.");
     } catch {
       setError("Could not load the screen. Try Refresh.");
     } finally {
@@ -62,11 +73,25 @@ export function ScreenModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
 
+  const show = (next: string[]) => {
+    const prev = rowsRef.current;
+    rowsRef.current = next;
+    setRows(next);
+    setMarked(prev ? changedRows(prev, next) : []);
+    setUnchanged(!!prev && sameScreen(prev, next));
+    clearTimeout(fadeRef.current);
+    fadeRef.current = setTimeout(() => {
+      setMarked([]);
+      setUnchanged(false);
+    }, FADE_MS);
+  };
+
   const send = (body: { key?: string; text?: string }, after?: () => void) =>
-    run(() => poster({ id: target, ...body }), {
-      onDone: () => {
+    run(() => poster({ id: target, settle: true, ...body }), {
+      onDone: (res) => {
         after?.();
-        void load();
+        if (res.rows) show(res.rows);
+        else void load();
       },
     });
 
@@ -101,9 +126,23 @@ export function ScreenModal({
           borderRadius="8px"
           bg="surface.raised"
         >
-          {rows.join("\n")}
+          {rows.map((row, i) => (
+            <Box
+              key={i}
+              as="span"
+              display="block"
+              color={marked.includes(i) ? "tone.waiting.fg" : undefined}
+              fontWeight={marked.includes(i) ? "700" : undefined}
+              transition="color 0.6s, font-weight 0.6s"
+            >
+              {row || " "}
+            </Box>
+          ))}
         </Box>
       )}
+      <Text role="status" fontSize="xs" color="text.dim" m="0">
+        {unchanged ? "Screen unchanged" : ""}
+      </Text>
       {keys && (
         <>
           <Box display="flex" flexDirection="column" gap="1.5" aria-label="Keys" role="group">
