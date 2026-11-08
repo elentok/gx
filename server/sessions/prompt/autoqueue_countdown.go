@@ -20,6 +20,18 @@ func mapOf(ticket string) (project, mapName string) {
 	return project, mapName
 }
 
+// DesignReachedBranch starts the countdown on the map's newest Design session
+// when that session's switch is on. A readiness failure starts nothing.
+func (p *Prompt) DesignReachedBranch(project, mapName string) {
+	info, found, err := p.NewestDesignSession(project, mapName)
+	if err != nil || !found || !info.AutoQueue {
+		return
+	}
+	if p.startAutoQueue(info.ID, info.Ticket) {
+		p.events.Publish(wire.EventSessionChanged, info.ID)
+	}
+}
+
 // startAutoQueue starts the session's countdown when its map is ready now. It
 // starts nothing, and says nothing, when the delay is off, one already runs or
 // the readiness check fails.

@@ -189,7 +189,13 @@ func (s *Designs) ScanCleanups() {
 			}
 			step := tickets.DesignStep(tickets.LoadEpicTicketMD(e.Path).DesignStep)
 			project, epic := tickets.ProjectName(dir), filepath.Base(e.Path)
-			prev, _ := s.designSteps.Swap(project+":"+epic, step)
+			prev, loaded := s.designSteps.Swap(project+":"+epic, step)
+			// A map first seen by this run (loaded false) never triggers: a Design
+			// already at Branch when the server starts gets no countdown, and the
+			// person queues it by hand.
+			if loaded && prev != step && step == tickets.StepBranch && s.onBranch != nil {
+				s.onBranch(project, epic)
+			}
 			if prev != step && step == tickets.StepBranch && readyOK {
 				s.sendReady(project, epic, counts)
 			}

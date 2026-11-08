@@ -31,6 +31,9 @@ type Deps struct {
 	WebURL func() string
 	// Workspaces places a promoted Design in its chat's workspace; nil skips it.
 	Workspaces Workspaces
+	// OnBranch is called when a map's design step moves to Branch inside a
+	// running server; nil skips it.
+	OnBranch func(project, epic string)
 }
 
 // Workspaces is the slice of the workspace store a promoted Design uses.
@@ -53,6 +56,7 @@ type Designs struct {
 	chat       *notify.ServerChat
 	webURL     func() string
 	workspaces Workspaces
+	onBranch   func(project, epic string)
 	// seeded: the Ready seed mark has been settled this run.
 	seeded atomic.Bool
 	// sessions comes later than Designs: the Manager calls CleanupDesign back,
@@ -71,7 +75,8 @@ func New(d Deps) *Designs {
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
 		chat: d.Chat, webURL: d.WebURL, workspaces: d.Workspaces,
-		drafts: drafts.New(d.StateDir),
+		onBranch: d.OnBranch,
+		drafts:   drafts.New(d.StateDir),
 	}
 }
 

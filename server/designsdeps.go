@@ -9,6 +9,8 @@ func (s *Server) designsDeps() designs.Deps {
 		StateDir: s.cfg.StateDir,
 		Idx:      s.idx, Projects: s.projects, Events: s.events, Guards: s.guards,
 		Chat: s.chat, WebURL: s.WebURL, Workspaces: s.workspaces,
+		// s.prompt is built after Designs, so it is read when the callback runs.
+		OnBranch: func(project, epic string) { s.prompt.DesignReachedBranch(project, epic) },
 	}
 }
 

@@ -115,6 +115,7 @@ var allowed = map[string]int{
 	"server/sessions/prompt/autoadvance_countdown_test.go":    7, // negative waits: a countdown would start and end in the window; includes a held Design
 	"server/sessions/prompt/autoadvance_guard_test.go":        2,
 	"server/sessions/prompt/autoqueue_countdown_test.go":      2, // negative waits: a countdown would end in the window and queue nothing
+	"server/sessions/prompt/autoqueue_trigger_test.go":        2, // negative waits: a countdown would start and end in the window
 	"server/sessions/prompt/keys_test.go":                     2, // negative waits: no nudge follows a person's key; a guarded key keeps the countdown
 	"server/sessions/prompt/sessionprompt_test.go":            5, // four negative waits: no nudge or Continue follows a typed / command; a failure is not raised within the grace window
 	"server/sessions/prompt/design_question_test.go":          1, // negative wait: no Question follows within a few chat flushes
