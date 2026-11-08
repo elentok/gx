@@ -45,10 +45,14 @@ type Record struct {
 
 // HuhItem is one Design-round question the person answered with Huh?.
 type HuhItem struct {
-	Question  string    `json:"question"`
-	Title     string    `json:"title"`
-	MessageID string    `json:"message_id"`
-	At        time.Time `json:"at"`
+	Question  string `json:"question"`
+	Title     string `json:"title"`
+	MessageID string `json:"message_id"`
+	// Harness and Session name the session that sent it, so an item reads on its
+	// own. Items written before they existed lack them.
+	Harness string    `json:"harness,omitempty"`
+	Session string    `json:"session,omitempty"`
+	At      time.Time `json:"at"`
 }
 
 // GrillingItem is one counted Grilling round or closing summary.

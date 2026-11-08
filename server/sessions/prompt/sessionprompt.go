@@ -137,7 +137,7 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 		if err := p.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
 			return wire.SessionResult{}, err
 		}
-		p.sessions.Conv.SaveHuh(meta.ConvSession(), huhItems(req, time.Now()))
+		p.sessions.Conv.SaveHuh(meta.ConvSession(), huhItems(req, meta, time.Now()))
 	}
 	if err := runlog.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
 		p.log.Warn("logging session prompt", "session", req.ID, "err", err)
@@ -148,10 +148,10 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 
 // huhItems is the record of each question the round sent as Huh?; the round's
 // message is the last one the page saw.
-func huhItems(req wire.SessionPromptRequest, at time.Time) []conversations.HuhItem {
+func huhItems(req wire.SessionPromptRequest, meta sessions.Meta, at time.Time) []conversations.HuhItem {
 	var out []conversations.HuhItem
 	for _, h := range req.Huh {
-		out = append(out, conversations.HuhItem{Question: h.Question, Title: h.Title, MessageID: req.LastMessage, At: at})
+		out = append(out, conversations.HuhItem{Question: h.Question, Title: h.Title, MessageID: req.LastMessage, Harness: meta.Harness, Session: meta.ID, At: at})
 	}
 	return out
 }
