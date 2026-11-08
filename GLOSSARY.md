@@ -625,6 +625,13 @@ fixes, or an area map epic for what needs deciding) or closed with a reason. A p
 plan once before anything is written. Like a Design, a Triage moves through steps in one or more
 sessions. _Avoid_: resolve follow-ups, follow-ups review.
 
+**Flow** — the kind of stepped work a session runs: a Design or a Triage. Each flow has its own step
+list, final step and skill. _Avoid_: wizard (it implies a person clicking through screens), workflow.
+
+**Stepped session** — an interactive session that runs a **Flow**: a design session or a Triage
+session. Both show Progress, offer Continue between steps and can auto-advance, except where a step
+needs the person (the Triage plan).
+
 **Retro** — a look back at one finished loop epic's run, judging the tooling and process (not the
 project's code) and filing follow-ups for what went wrong. An epic gets at most one retro; once it
 has run, or was skipped, the epic counts as retro'd. _Avoid_: evolve run, scan.
@@ -645,7 +652,7 @@ Budget ledger it holds tokens as well as dollars, and its totals still differ fr
 usage table, token log.
 
 **Agent group** — the label that says what a session's work was for in the Token ledger: Queue,
-Design, One-off or Other. _Avoid_: kind, agent kind (**Harness** keeps those words), category.
+Design, Triage, One-off or Other. _Avoid_: kind, agent kind (**Harness** keeps those words), category.
 
 ## Ticket Forking
 
