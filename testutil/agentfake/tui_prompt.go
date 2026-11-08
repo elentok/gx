@@ -191,7 +191,9 @@ func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
 	if len(fields) < 2 || !strings.HasPrefix(fields[0], "/") {
 		return "", WorkerConfig{}, false
 	}
-	address := fields[len(fields)-1]
+	// The address is the first argument: a relaunch appends earlier iteration
+	// summaries after it.
+	address := fields[1]
 	if fields[0] == "/gx-investigate" {
 		// A fix agent's prompt ends in free text, not a ticket address. A queued
 		// investigate ticket's launch sets the env to its address and waits for a turn.
