@@ -616,7 +616,14 @@ missing or painful). The category is not the ticket's type: the type still picks
 it. A follow-up leaves the epic in one of two ways: it is **resolved** into a real epic, or it is
 **closed** with a reason (fixed already, obsolete, duplicate, not worth it) and kept in the project's
 **follow-ups archive** so the same finding is not filed again. A ticket stays a follow-up after it
-moves. What makes it one is the epic it was filed in. _Avoid_: process, triage (for the whole run).
+moves. What makes it one is the epic it was filed in. _Avoid_: process (for one follow-up leaving
+the epic).
+
+**Triage** — one run that empties a project's `follow-ups` epic: each follow-up is checked against
+the code, duplicates are merged, and every one is either resolved into a real epic (a ready epic of
+fixes, or an area map epic for what needs deciding) or closed with a reason. A person approves the
+plan once before anything is written. Like a Design, a Triage moves through steps in one or more
+sessions. _Avoid_: resolve follow-ups, follow-ups review.
 
 **Retro** — a look back at one finished loop epic's run, judging the tooling and process (not the
 project's code) and filing follow-ups for what went wrong. An epic gets at most one retro; once it
