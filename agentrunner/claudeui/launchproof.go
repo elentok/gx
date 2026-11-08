@@ -101,6 +101,13 @@ func LaunchRecorded(home, sessionID, text string) (bool, error) {
 	return ok && launchedBy(content, text), err
 }
 
+// LaunchRecordedIn is LaunchRecorded for a transcript at path. known is false
+// when the transcript has no person message yet.
+func LaunchRecordedIn(path, text string) (recorded, known bool, err error) {
+	content, known, err := firstPerson(path)
+	return known && launchedBy(content, text), known, err
+}
+
 // LaunchRecordedAt is LaunchRecorded over a Locator.
 func LaunchRecordedAt(loc *transcript.Locator, text string) (bool, error) {
 	content, ok, err := FirstUserRecordAt(loc)

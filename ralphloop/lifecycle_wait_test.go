@@ -204,7 +204,7 @@ func TestWaitIterationFinished_CodexBackToWorkDuringDelayGetsNoErrorAndOneNudge(
 func TestWaitIterationFinished_NoUserRecordResendsSkillPrompt(t *testing.T) {
 	t.Parallel()
 	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
-	d.ReadHasUserRecord = func(string, string) (bool, bool, error) { return false, true, nil }
+	d.ReadLaunchRecorded = func(agent.AgentKind, string, string, string) (bool, bool, error) { return false, true, nil }
 	waitStallFixture(t, d, one)
 	want := agent.SkillPrompt(one.Agent, agent.LaunchSkill(one.Ticket, agent.DefaultWorkerSkill), ticketAddress(one.Ticket))
 	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != want {
@@ -215,10 +215,35 @@ func TestWaitIterationFinished_NoUserRecordResendsSkillPrompt(t *testing.T) {
 	}
 }
 
+// A first person record that is not the launch prompt counts as a lost launch.
+func TestWaitIterationFinished_MismatchedFirstRecordResendsLaunchPrompt(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	d.ReadLaunchRecorded = func(agent.AgentKind, string, string, string) (bool, bool, error) { return false, true, nil }
+	waitStallFixture(t, d, one)
+	want := agent.SkillPrompt(one.Agent, agent.LaunchSkill(one.Ticket, agent.DefaultWorkerSkill), ticketAddress(one.Ticket))
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != want {
+		t.Errorf("prompts = %q, want the launch prompt %q", got, want)
+	}
+}
+
+// A Codex session with no rollout never gets the generic nudge.
+func TestWaitIterationFinished_CodexNoRolloutResendsLaunchPrompt(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	one.Agent = agent.AgentCodex
+	d.ReadLaunchRecorded = func(agent.AgentKind, string, string, string) (bool, bool, error) { return false, false, nil }
+	waitStallFixture(t, d, one)
+	want := agent.SkillPrompt(one.Agent, agent.LaunchSkill(one.Ticket, agent.DefaultWorkerSkill), ticketAddress(one.Ticket))
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != want {
+		t.Errorf("prompts = %q, want the launch prompt %q", got, want)
+	}
+}
+
 func TestWaitIterationFinished_UserRecordKeepsGenericNudge(t *testing.T) {
 	t.Parallel()
 	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
-	d.ReadHasUserRecord = func(string, string) (bool, bool, error) { return true, true, nil }
+	d.ReadLaunchRecorded = func(agent.AgentKind, string, string, string) (bool, bool, error) { return true, true, nil }
 	waitStallFixture(t, d, one)
 	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != supervise.StallNudgeText {
 		t.Errorf("prompts = %q, want the generic nudge", got)

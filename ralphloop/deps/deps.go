@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/git"
@@ -168,10 +169,11 @@ type Deps struct {
 	// used by finishIteration's zero-commit path to distinguish that bare
 	// model glitch from a genuine stall before pausing paused (answer).
 	ReadUnexecutedToolCall func(cwd, sessionID string) (bool, error)
-	// ReadHasUserRecord reports whether the Claude Code session's transcript
-	// holds a user record; known is false while there is no transcript to
-	// read. Nil counts as a record, which keeps the generic stall nudge.
-	ReadHasUserRecord func(cwd, sessionID string) (has, known bool, err error)
+	// ReadLaunchRecorded reports whether the session's transcript (Claude) or
+	// rollout (Codex) has the launch prompt as its first person record; known
+	// is false while there is no transcript to read or it has no person
+	// record. Nil counts as recorded, which keeps the generic stall nudge.
+	ReadLaunchRecorded func(agentKind agent.AgentKind, cwd, sessionID, prompt string) (recorded, known bool, err error)
 	// ReadCodexContext returns the latest context-token count for the Codex
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
@@ -367,21 +369,23 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			}
 			return transcript.ReadUnexecutedToolCall(path)
 		},
-		ReadHasUserRecord: func(cwd, sessionID string) (bool, bool, error) {
+		ReadLaunchRecorded: func(agentKind agent.AgentKind, cwd, sessionID, prompt string) (bool, bool, error) {
+			if agentKind == agent.AgentCodex {
+				if overrides.CodexHome == "" {
+					return false, false, nil
+				}
+				path, ok, err := codexsession.RolloutPathIn(overrides.CodexHome, sessionID)
+				if err != nil || !ok {
+					return false, false, err
+				}
+				first, ok, err := codexsession.FirstPrompt(path, 0)
+				return ok && strings.HasPrefix(first.Text, strings.TrimSpace(prompt)), ok, err
+			}
 			path, found := transcriptPath(overrides.Home, cwd, sessionID)
 			if !found {
 				return false, false, nil
 			}
-			msgs, ok, err := transcript.ReadChat(path, "")
-			if err != nil || !ok {
-				return false, ok, err
-			}
-			for _, m := range msgs {
-				if m.Role == transcript.ChatRolePerson {
-					return true, true, nil
-				}
-			}
-			return false, true, nil
+			return claudeui.LaunchRecordedIn(path, prompt)
 		},
 		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
 			if overrides.CodexHome == "" {

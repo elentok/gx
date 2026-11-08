@@ -430,22 +430,25 @@ func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w It
 	return true, true, err
 }
 
-// stallNudgeText is the launch prompt again for a session whose transcript has
-// no user record (it never got its task), else the generic nudge. An unreadable
-// or missing transcript keeps the generic text.
+// stallNudgeText is the launch prompt again for a session whose first person
+// record is not the launch prompt (it never got its task), else the generic
+// nudge. A Codex session with no rollout never got its task either, so it is
+// never given the generic nudge; for Claude an unreadable or missing
+// transcript keeps the generic text.
 func stallNudgeText(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) string {
-	if d.ReadHasUserRecord == nil {
+	if d.ReadLaunchRecorded == nil {
 		return supervise.StallNudgeText
 	}
 	status, err := d.Runner.Status(s)
 	if err != nil || status.SessionID == "" {
 		return supervise.StallNudgeText
 	}
-	has, known, err := d.ReadHasUserRecord(w.Path, status.SessionID)
-	if err != nil || !known || has {
+	launch := agent.SkillPrompt(o.Agent, agent.LaunchSkill(o.Ticket, agent.DefaultWorkerSkill), ticketAddress(o.Ticket))
+	recorded, known, err := d.ReadLaunchRecorded(o.Agent, w.Path, status.SessionID, launch)
+	if err != nil || recorded || (!known && o.Agent != agent.AgentCodex) {
 		return supervise.StallNudgeText
 	}
-	return agent.SkillPrompt(o.Agent, agent.LaunchSkill(o.Ticket, agent.DefaultWorkerSkill), ticketAddress(o.Ticket))
+	return launch
 }
 
 // agentReported reports whether the ticket carries an agent report: a question
