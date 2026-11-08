@@ -10,7 +10,9 @@ import type { FetchAgentSettings } from "./settings/agents";
 import { AgentsSettingsPage } from "./settings/AgentsSettingsPage";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
-import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./design/open";
+import type { DeleteDesign, OpenDesign, OpenFlow, ResumeSession, StopSession } from "./design/open";
+import { TriagePage } from "./triage/TriagePage";
+import type { FetchTriage } from "./triage/useTriage";
 import type { PostFocus } from "./design/focus";
 import type { PostPrompt } from "./design/prompt";
 import type { FetchScreen } from "./design/screen";
@@ -85,7 +87,29 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
   );
 }
 
+function TriageRoute({ fetchers }: { fetchers: RouteFetchers }) {
+  const project = useParams()["*"];
+  if (!project) return <Navigate to="/epics" replace />;
+  return (
+    <TriagePage
+      project={project}
+      deps={{
+        fetchTriage: fetchers.triage,
+        fetchChat: fetchers.chat,
+        post: fetchers.prompt,
+        open: fetchers.openTriage,
+        stop: fetchers.stop,
+        resume: fetchers.resume,
+        fetchScreen: fetchers.screen,
+        focus: fetchers.focus,
+      }}
+    />
+  );
+}
+
 export interface RouteFetchers {
+  triage?: FetchTriage;
+  openTriage?: OpenFlow;
   openDesign?: OpenDesign;
   deleteDesign?: DeleteDesign;
   stop?: StopSession;
@@ -135,6 +159,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     { path: "/settings/agents", element: <AgentsSettingsPage fetchSettings={fetchers.agentSettings} /> },
     { path: "/settings/*", element: <UnknownSettingsPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
+    { path: "/triage/*", element: <TriageRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
     {
       path: "/e/*",

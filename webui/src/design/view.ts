@@ -26,8 +26,10 @@ export const hasDesignSession = (address: string, sessions: SessionInfo[]) =>
 
 const onFlow = (flow: string, key: string) => (s: SessionInfo) => s.flow === flow && s.flow_key === key;
 
-/** A stepped session by flow and key (a Triage has no ticket): the newest live one, else the newest Exited one. */
-export const flowSession = (flow: string, key: string, sessions: SessionInfo[]): SessionInfo | undefined => {
-  const mine = sessions.filter(onFlow(flow, key));
-  return mine.filter((s) => s.status.state !== "exited").sort(byNewestRun)[0] ?? mine.sort(byNewest)[0];
-};
+/** A stepped flow's live sessions by flow and key (a Triage has no ticket), latest run start first. */
+export const liveFlowSessions = (flow: string, key: string, sessions: SessionInfo[]): SessionInfo[] =>
+  sessions.filter((s) => onFlow(flow, key)(s) && s.status.state !== "exited").sort(byNewestRun);
+
+/** A stepped session by flow and key: the newest live one, else the newest Exited one. */
+export const flowSession = (flow: string, key: string, sessions: SessionInfo[]): SessionInfo | undefined =>
+  liveFlowSessions(flow, key, sessions)[0] ?? sessions.filter(onFlow(flow, key)).sort(byNewest)[0];

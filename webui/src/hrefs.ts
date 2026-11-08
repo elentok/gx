@@ -7,6 +7,9 @@ export const ticketHref = (address: string) => `#${ticketPath(address)}`;
 /** A Design is its map epic's canonical address (ADR 0027). */
 export const designHref = (address: string) => `#/d/${address}`;
 
+/** A Triage is its project's, so the address is the project name. */
+export const triageHref = (project: string) => `#/triage/${project}`;
+
 export const STATS_HREF = "#/stats";
 
 export const CLEANUP_HREF = "#/cleanup";

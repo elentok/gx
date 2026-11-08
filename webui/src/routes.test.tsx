@@ -92,6 +92,15 @@ test("/settings/agents renders the Agents page with the Default harness control"
   expect(screen.getByRole("button", { name: "Codex" })).toBeTruthy();
 });
 
+test("#/triage/gx renders the Triage page and a ticket address still renders the ticket page", async () => {
+  renderAt("/triage/gx", okFor, undefined, undefined, { triage: async () => ({ kind: "not-found" }) });
+  await screen.findByText("No Triage for gx");
+  expect(title()).toBe("gx · Triage · gx");
+  cleanup();
+  renderAt("/t/gx:e/01", okFor);
+  await screen.findByText("Title of gx:e/01");
+});
+
 test("the epic page titles the tab by its slug while loading", async () => {
   renderAt("/e/gx:e", okFor, undefined, () => pending());
   await waitFor(() => expect(title()).toBe("e · Epic · gx"));

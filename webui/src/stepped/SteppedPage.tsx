@@ -52,6 +52,8 @@ export interface SteppedPageProps {
   actions: SteppedActions;
   startLabel: string;
   startFailure?: string;
+  /** Replaces the Start button: a flow's primary header button, given the session the page shows. */
+  headerButton?: (session?: SessionInfo) => ReactNode;
   /** What the busy row names: the step the agent reported and, for a ticket step, its title. */
   working: (session?: SessionInfo) => { step?: string; title?: string };
   // Design-only parts, each rendered only when given.
@@ -71,8 +73,9 @@ function SessionStrip({
   onSelect,
   startFailure,
   startLabel,
+  headerButton,
   designMenu,
-}: Pick<SteppedPageProps, "address" | "live" | "actions" | "startFailure" | "startLabel" | "designMenu"> & {
+}: Pick<SteppedPageProps, "address" | "live" | "actions" | "startFailure" | "startLabel" | "headerButton" | "designMenu"> & {
   session?: SessionInfo;
   onSelect: (id: string) => void;
 }) {
@@ -81,7 +84,11 @@ function SessionStrip({
   return (
     <Box display="flex" alignItems="center" justifyContent="flex-end" gap="3">
       <Failure>{reason ?? ""}</Failure>
-      {!session && <StartDesignButton address={address} open={actions.open} label={startLabel} />}
+      {headerButton ? (
+        headerButton(session)
+      ) : (
+        !session && <StartDesignButton address={address} open={actions.open} label={startLabel} />
+      )}
       <DesignActionsMenu
         address={address}
         shown={session}
@@ -112,6 +119,7 @@ export function SteppedPage({
   actions,
   startLabel,
   startFailure,
+  headerButton,
   working,
   subtitleSuffix,
   metaLink,
@@ -187,6 +195,7 @@ export function SteppedPage({
                 onSelect={setSelected}
                 startFailure={startFailure}
                 startLabel={startLabel}
+                headerButton={headerButton}
                 designMenu={designMenu}
               />
             </>
