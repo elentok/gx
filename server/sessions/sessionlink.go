@@ -34,6 +34,9 @@ func (rs *Resumer) SessionLinkWrite(w http.ResponseWriter, r *http.Request) {
 // map epic. An existing Design flag stays: a new design session links to an
 // epic Chart has not written yet.
 func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult, error) {
+	if req.Flow == string(tickets.FlowTriage) {
+		return rs.linkTriage(req)
+	}
 	if req.Ticket == "" {
 		return Refusal(wire.ReasonSessionBadRequest, "a link needs a ticket address"), nil
 	}
@@ -53,6 +56,34 @@ func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult,
 			m.Flow = tickets.FlowDesign
 		}
 		rs.mg.Conv.Record(m.ConvSession())
+		info = m.Info()
+		return true
+	}); err != nil {
+		return wire.SessionResult{}, err
+	}
+	return wire.SessionResult{Session: &info}, nil
+}
+
+// linkTriage makes the session a Triage on a project. The key is the bare
+// project name and the session gets no ticket. A Design session is refused:
+// it already runs a flow.
+func (rs *Resumer) linkTriage(req wire.LinkSessionRequest) (wire.SessionResult, error) {
+	if req.FlowKey == "" {
+		return Refusal(wire.ReasonSessionBadRequest, "a triage link needs a project"), nil
+	}
+	if _, err := rs.mg.Maps.projects.Dir(req.FlowKey); err != nil {
+		return Refusal(wire.ReasonSessionBadRequest, err.Error()), nil
+	}
+	dir, meta, res, err := rs.mg.SessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	if meta.IsDesign() {
+		return Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("session %s is a Design session", req.ID)), nil
+	}
+	var info wire.SessionInfo
+	if err := rs.mg.UpdateSessionMeta(dir, req.ID, func(m *Meta) bool {
+		m.Flow, m.FlowKey = tickets.FlowTriage, req.FlowKey
 		info = m.Info()
 		return true
 	}); err != nil {

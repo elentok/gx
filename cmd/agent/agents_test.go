@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
@@ -354,6 +355,47 @@ func TestAgentLink(t *testing.T) {
 	}
 	if err := runAgentLink(ctx, noServer, &out, false, wire.LinkSessionRequest{Ticket: "x"}); err != nil || out.Len() == 0 {
 		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
+	}
+}
+
+func TestAgentLinkTriage(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
+	ctx := context.Background()
+	created, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || created.Session == nil {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
+	client := func() (*apiclient.Client, error) { return h.Client, nil }
+
+	var out bytes.Buffer
+	if err := runAgentLinkTriage(ctx, client, &out, created.Session.ID, "proj"); err != nil {
+		t.Fatal(err)
+	}
+	list, err := h.Client.Sessions.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got wire.SessionInfo
+	for _, s := range list {
+		if s.ID == created.Session.ID {
+			got = s
+		}
+	}
+	if got.Flow != "triage" || got.FlowKey != "proj" || got.Ticket != "" {
+		t.Errorf("session = %+v; want flow triage keyed proj with no ticket", got)
+	}
+
+	if err := runAgentLinkTriage(ctx, client, &out, created.Session.ID, "nope"); err == nil {
+		t.Error("unknown project linked; want an error")
+	}
+	if err := runAgentLinkTriage(ctx, client, &out, "", "proj"); err == nil {
+		t.Error("outside a session linked; want an error")
+	}
+	down := func() (*apiclient.Client, error) { return nil, syscall.ECONNREFUSED }
+	if err := runAgentLinkTriage(ctx, down, &out, created.Session.ID, "proj"); err == nil {
+		t.Error("server down linked; want an error")
 	}
 }
 

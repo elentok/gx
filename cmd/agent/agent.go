@@ -115,7 +115,7 @@ func newAgentContextWindowCmd(d Deps) *cobra.Command {
 	cmd.Flags().StringVar(&agent, "agent", "", `override auto-detection: "claude" or "codex"`)
 	cmd.Flags().StringVar(&session, "session", "", "override the session id (requires --agent; skips env-var detection)")
 	cmd.Flags().StringVar(&cwd, "cwd", "", "override the working directory used for identity matching")
-	cmd.Flags().StringVar(&fits, "fits", "", "design step to chain into: exit 0 if the context has room for it, 1 if not")
+	cmd.Flags().StringVar(&fits, "fits", "", "design or triage step to chain into: exit 0 if the context has room for it, 1 if not")
 	return cmd
 }
 

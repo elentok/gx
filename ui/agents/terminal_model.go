@@ -41,7 +41,7 @@ func (m Model) syncAttach() (Model, tea.Cmd) {
 func (m Model) dialAttach(attempt int) (Model, tea.Cmd) {
 	m.attach.Close()
 	s := m.sessions[m.cursor]
-	a := &terminal.Attachment{ID: s.ID, Status: s.Status, Attempt: attempt, ReadOnly: s.Queue || s.Design}
+	a := &terminal.Attachment{ID: s.ID, Status: s.Status, Attempt: attempt, ReadOnly: s.Queue || stepped(s)}
 	m.attach = a
 	// A Queue agent's holder lives under the agents root, not the sessions dir.
 	dir, dial := cmp.Or(s.Holder, filepath.Join(m.term.SessionsDir, s.ID)), m.dial

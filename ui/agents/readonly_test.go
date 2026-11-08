@@ -66,7 +66,7 @@ func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
 }
 
 func TestReadOnly_QueueAndDesignAgentsDropKeysAndPaste(t *testing.T) {
-	for name, info := range map[string]wire.SessionInfo{"queue": {Queue: true}, "design": {Design: true}} {
+	for name, info := range map[string]wire.SessionInfo{"queue": {Queue: true}, "design": {Design: true}, "triage": {Flow: "triage", FlowKey: "gx"}} {
 		t.Run(name, func(t *testing.T) {
 			m, fa := readOnlyTerminal(t, info)
 			if !m.terminalFocused {

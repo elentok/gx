@@ -141,7 +141,11 @@ type MarkActionableRequest struct {
 // and its Session ticket's address.
 type LinkSessionRequest struct {
 	ID     string `json:"id"`
-	Ticket string `json:"ticket"`
+	Ticket string `json:"ticket,omitempty"`
+	// Flow and FlowKey link the session to a flow that has no ticket: "triage"
+	// with the project name. Ticket must then be empty.
+	Flow    string `json:"flow,omitempty"`
+	FlowKey string `json:"flow_key,omitempty"`
 }
 
 // ReportStepRequest is the body of `gx agent step`: the caller's session, the

@@ -154,6 +154,9 @@ func (a *sessionActions) unlock(s wire.SessionInfo, att *terminal.Attachment) te
 		return nil
 	}
 	prompt := "This Design agent is waiting on gx-design. Typing into it can derail the hand-off. Unlock input?"
+	if s.Flow == "triage" {
+		prompt = "gx is driving this Triage agent. Typing into it can derail the hand-off. Unlock input?"
+	}
 	if s.Queue {
 		prompt = "gx is driving this Queue agent. Typing into it can derail the queue. Unlock input?"
 	}
@@ -238,7 +241,7 @@ func sessionMenuItems(s wire.SessionInfo) []contextmenu.Item[wire.SessionInfo] {
 		item("Mark read", "", "mark-read", reason(s.Unread.Unread, "nothing unread")),
 		item("Run Action", "a", "a", reason(len(actionSteps(s.Actionable)) > 0, "no action")),
 	)
-	if s.Queue || s.Design {
+	if s.Queue || stepped(s) {
 		items = append(items, item("Unlock input", "i", "unlock", reason(live, "exited")))
 	}
 	if s.Design {

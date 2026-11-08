@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ralphloop/agent"
@@ -17,24 +19,47 @@ import (
 
 // stepGrowth is the padded median context growth of each design step. The
 // grill-findings through branch steps run as one block, so they share a value.
-var stepGrowth = map[tickets.DesignStep]int{
-	tickets.StepSpec:           25_000,
-	tickets.StepReview:         20_000,
-	tickets.StepResolveTickets: 50_000,
-	tickets.StepChart:          60_000,
-	tickets.StepGrillFindings:  80_000,
-	tickets.StepCreateTickets:  80_000,
-	tickets.StepBranch:         80_000,
-	tickets.StepDone:           0,
+// The Triage steps verify and write are estimates, not measurements: verify
+// reads each follow-up and its code, so it is sized like the design Review
+// step doubled; write drafts the resulting tickets, sized like Resolve
+// tickets. Replace them with measured medians once Triage runs have data.
+// "done" is shared by both flows.
+var stepGrowth = map[string]int{
+	string(tickets.StepSpec):           25_000,
+	string(tickets.StepReview):         20_000,
+	string(tickets.StepResolveTickets): 50_000,
+	string(tickets.StepChart):          60_000,
+	string(tickets.StepGrillFindings):  80_000,
+	string(tickets.StepCreateTickets):  80_000,
+	string(tickets.StepBranch):         80_000,
+	tickets.StepVerify:                 40_000,
+	tickets.StepWrite:                  50_000,
+	string(tickets.StepDone):           0,
+}
+
+// checkFitsStep refuses a step that is neither a Design nor a Triage step.
+func checkFitsStep(step string) error {
+	if _, ok := stepGrowth[step]; ok {
+		return nil
+	}
+	valid := make([]string, 0, len(stepGrowth))
+	for _, f := range []tickets.Flow{tickets.FlowDesign, tickets.FlowTriage} {
+		spec, _ := tickets.FlowSpecFor(f)
+		for _, s := range spec.Steps {
+			if _, ok := stepGrowth[s]; ok && !slices.Contains(valid, s) {
+				valid = append(valid, s)
+			}
+		}
+	}
+	return fmt.Errorf("step %q; want one of %s", step, strings.Join(valid, ", "))
 }
 
 // runAgentFits prints the used tokens, the step's growth and the ceiling, and
 // returns an ExitError{1} when the step would not stay under the ceiling.
 // Any other error means the caller should treat the answer as "stop".
 func runAgentFits(d Deps, out io.Writer, agentKind, session, cwd, stepName string) error {
-	step, ok := tickets.ParseDesignStep(stepName)
-	if !ok {
-		return tickets.CheckDesignStep(stepName)
+	if err := checkFitsStep(stepName); err != nil {
+		return err
 	}
 	if id := d.Getenv(holder.AgentSessionEnv); id != "" {
 		on, err := d.ReadAutoAdvance(id)
@@ -54,11 +79,11 @@ func runAgentFits(d Deps, out io.Writer, agentKind, session, cwd, stepName strin
 	if err != nil {
 		return err
 	}
-	growth := stepGrowth[step]
+	growth := stepGrowth[stepName]
 	ceiling := agent.SmartZoneCeiling
 	fmt.Fprintf(out, "used=%d growth=%d ceiling=%d\n", used, growth, ceiling)
 	// A session that has used nothing always fits: stopping cannot save any context.
-	if step != tickets.StepDone && used > 0 && used+growth >= ceiling {
+	if stepName != string(tickets.StepDone) && used > 0 && used+growth >= ceiling {
 		return &cmdbase.ExitError{Code: 1}
 	}
 	return nil

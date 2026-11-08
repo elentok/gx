@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/spf13/cobra"
 )
@@ -163,18 +164,52 @@ func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, e
 // session's Session ticket.
 func newAgentLinkCmd(d Deps) *cobra.Command {
 	var jsonOut bool
+	var triage string
 	cmd := &cobra.Command{
-		Use:   "link <ticket-address>",
-		Short: "set this gx session's ticket (a map epic's marks it a design session); outside one, do nothing",
-		Args:  cobra.ExactArgs(1),
+		Use:   "link <ticket-address> | --triage <project>",
+		Short: "set this gx session's ticket (a map epic's marks it a design session); outside one, do nothing. --triage links the session to a project's Triage and fails when it cannot",
+		Args: func(c *cobra.Command, args []string) error {
+			if c.Flags().Changed("triage") {
+				return cobra.NoArgs(c, args)
+			}
+			return cobra.ExactArgs(1)(c, args)
+		},
 		RunE: func(c *cobra.Command, args []string) error {
-			req := wire.LinkSessionRequest{ID: os.Getenv(holder.AgentSessionEnv), Ticket: args[0]}
 			ctx := ctxOrBackground(c.Context())
-			return runAgentLink(ctx, d.Dial(), c.OutOrStdout(), jsonOut, req)
+			id := os.Getenv(holder.AgentSessionEnv)
+			if c.Flags().Changed("triage") {
+				return runAgentLinkTriage(ctx, d.Dial(), c.OutOrStdout(), id, triage)
+			}
+			return runAgentLink(ctx, d.Dial(), c.OutOrStdout(), jsonOut, wire.LinkSessionRequest{ID: id, Ticket: args[0]})
 		},
 	}
+	cmd.Flags().StringVar(&triage, "triage", "", "link the session to this project's Triage; exits non-zero when it cannot (not in a session, no server, unknown project, a Design session)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	return cmd
+}
+
+// runAgentLinkTriage sets the session's flow to triage keyed by project. Unlike
+// runAgentLink it never succeeds silently: the triage skill reads success as
+// web mode and failure as chat mode.
+func runAgentLinkTriage(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, id, project string) error {
+	if id == "" {
+		return fmt.Errorf("not in a gx session (%s unset)", holder.AgentSessionEnv)
+	}
+	cl, err := client()
+	if err != nil {
+		return err
+	}
+	res, err := cl.Sessions.Link(ctx, wire.LinkSessionRequest{ID: id, Flow: string(tickets.FlowTriage), FlowKey: project})
+	if err != nil {
+		return fmt.Errorf("link triage: %w", err)
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	if res.Session != nil {
+		_, err = fmt.Fprintln(w, res.Session.ID)
+	}
+	return err
 }
 
 // runAgentLink sends req, or, with no session id or no server, prints a note

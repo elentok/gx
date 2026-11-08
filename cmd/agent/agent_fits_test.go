@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 func fitsDeps(stdout *bytes.Buffer, used int) Deps {
@@ -86,6 +87,29 @@ func TestExecute_AgentContextWindow_FitsUnknownStepErrors(t *testing.T) {
 	var exitErr *cmdbase.ExitError
 	if err == nil || errors.As(err, &exitErr) {
 		t.Fatalf("err = %v, want a plain error", err)
+	}
+	for _, want := range []string{"chart", "verify", "write"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err %q does not list %q", err, want)
+		}
+	}
+}
+
+func TestExecute_AgentContextWindow_FitsTriageSteps(t *testing.T) {
+	t.Parallel()
+	ceiling := agent.SmartZoneCeiling
+	for _, step := range []string{"verify", "write"} {
+		growth := stepGrowth[step]
+		if growth <= 0 {
+			t.Fatalf("%s growth = %d, want a positive value", step, growth)
+		}
+		for _, tc := range []struct{ used, want int }{{ceiling - growth - 1, 0}, {ceiling - growth, 1}} {
+			var stdout bytes.Buffer
+			got, err := fitsExit(t, []string{"agent", "context-window", "--fits", step}, fitsDeps(&stdout, tc.used))
+			if err != nil || got != tc.want {
+				t.Errorf("%s@%d: exit %d, %v; want %d", step, tc.used, got, err, tc.want)
+			}
+		}
 	}
 }
 

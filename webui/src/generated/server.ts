@@ -2670,7 +2670,13 @@ export interface MarkActionableRequest {
  */
 export interface LinkSessionRequest {
   id: string;
-  ticket: string;
+  ticket?: string;
+  /**
+   * Flow and FlowKey link the session to a flow that has no ticket: "triage"
+   * with the project name. Ticket must then be empty.
+   */
+  flow?: string;
+  flow_key?: string;
 }
 /**
  * ReportStepRequest is the body of `gx agent step`: the caller's session, the

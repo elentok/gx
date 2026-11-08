@@ -21,6 +21,10 @@ const (
 	groupDesign
 )
 
+// stepped reports whether the server drives s through a flow (Design or
+// Triage), so the TUI treats it read-only.
+func stepped(s wire.SessionInfo) bool { return s.Design || s.Flow != "" }
+
 func groupOf(s wire.SessionInfo) agentGroup {
 	switch {
 	case s.Queue:
