@@ -61,6 +61,15 @@ describe("buildSidebar", () => {
     expect(s.rows[1].agents.map((a) => a.id)).toEqual(["s2"]);
   });
 
+  it("flags a Fix agent only; a Queue agent and a chat are not", () => {
+    const rows = [row("p:a", { addresses: ["p:a"] })];
+    const sessions = [session("s1", "p", { name: "fixer", fix_of: "p:a/03" }), session("s2", "p", { name: "q", queue: true }), session("s3", "p")];
+    const placements = [place("s1", "epic", { epic: "p:a" }), place("s2", "epic", { epic: "p:a" }), place("s3", "other")];
+    const s = buildSidebar({ ...base, rows, sessions, placements });
+    expect(Object.fromEntries(s.rows[0].agents.map((a) => [a.id, a.fix]))).toEqual({ s1: true, s2: false });
+    expect(s.other[0].fix).toBe(false);
+  });
+
   it("maps Needs you, Working and dimmed server words", () => {
     const rows = [
       row("p:a", { section: SectionNeedsYou }),

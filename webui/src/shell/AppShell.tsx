@@ -161,7 +161,7 @@ export function AppShell({
           aria-label="Sidebar"
           data-device={device}
           data-open={open}
-          bg="surface"
+          bg="sidebar"
           borderRightWidth="1px"
           borderColor="border"
           display="flex"

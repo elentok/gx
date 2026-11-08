@@ -51,10 +51,17 @@ const state = {
   snapshot: {
     needs_you_total: 1,
     workspaces,
-    sessions: [session("s1", "builder"), session("s2", "scratch")],
+    sessions: [
+      session("s1", "builder"),
+      session("s2", "scratch"),
+      { ...session("s3", "fix flaky test"), fix_of: "p:blog/02", status: { state: "blocked" } },
+      { ...session("s4", "fix lint"), fix_of: "p:blog/03", status: { state: "working" } },
+    ],
     placements: [
       { session: "s1", kind: "epic", epic: "p:blog" },
       { session: "s2", kind: "other" },
+      { session: "s3", kind: "epic", epic: "p:blog" },
+      { session: "s4", kind: "epic", epic: "p:blog" },
     ],
   },
   connected: true,
@@ -227,6 +234,7 @@ export const shellEntries: GalleryEntry[] = [
       sidebarCase("phone, slide-over open", "phone", noop),
       sidebarCase("desktop, Other open", "desktop", clickSections("Other")),
       sidebarCase("phone, Other open", "phone", clickSections("Other")),
+      sidebarCase("desktop, Fix agent rows", "desktop", clickLabel("Expand Blog")),
       sidebarCase("desktop, On hold collapsed", "desktop", noop),
       sidebarCase("desktop, On hold expanded", "desktop", clickSections("On hold")),
     ],

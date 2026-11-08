@@ -28,14 +28,15 @@ const rowStyle = {
   px: "3",
   textDecoration: "none",
   color: "inherit",
-  _hover: { bg: "surface.raised" },
+  _hover: { bg: "sidebar.hover" },
   _focusVisible: { outline: "2px solid", outlineColor: "border.focus", outlineOffset: "-2px" },
 } as const;
 
+const statusColor = (status: SidebarStatus, dim?: boolean) => (dim || status.tone === "muted" ? "text.faint" : `tone.${status.tone}.fg`);
+
 function Status({ status, dim }: { status: SidebarStatus; dim?: boolean }) {
-  const color = dim || status.tone === "muted" ? "text.faint" : `tone.${status.tone}.fg`;
   return (
-    <Box as="span" fontSize="12px" color={color} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
+    <Box as="span" fontSize="12px" color={statusColor(status, dim)} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
       {status.words}
     </Box>
   );
@@ -46,6 +47,16 @@ function ChatIcon() {
     <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="var(--chakra-colors-chat)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label="Chat" role="img">
       <path d="M5 7.5a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 21 7.5v7a2.5 2.5 0 0 1-2.5 2.5H12l-4 3.5V17h-.5A2.5 2.5 0 0 1 5 14.5v-7z" />
     </svg>
+  );
+}
+
+function WrenchIcon({ status }: { status: SidebarStatus }) {
+  return (
+    <Box as="span" data-testid="fix-wrench" flex="none" display="grid" color={statusColor(status)}>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label="Fix agent" role="img">
+        <path d="M13.5 3a4 4 0 0 0-3.6 5.5L3.5 15a1.8 1.8 0 0 0 2.5 2.5l6.5-6.4A4 4 0 0 0 17 6.5l-2.5 2.5-2-.5-.5-2z" />
+      </svg>
+    </Box>
   );
 }
 
@@ -75,6 +86,7 @@ function Chevron({ open, onToggle, label }: { open: boolean; onToggle: () => voi
 function AgentLink({ agent }: { agent: SidebarAgent }) {
   return (
     <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} {...rowStyle} pl="10" minH="36px">
+      {agent.fix && <WrenchIcon status={agent.status} />}
       <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" fontSize="13px">
         {agent.label}
       </Box>
@@ -120,7 +132,7 @@ function Row({ row, current, active, workspaces, sessions }: { row: SidebarRow; 
   };
   return (
     <li className="group">
-      <Box display="flex" alignItems="center" pl="1" bg={current ? "surface.raised" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
+      <Box display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
         <Box w="20px" flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
@@ -130,7 +142,7 @@ function Row({ row, current, active, workspaces, sessions }: { row: SidebarRow; 
           ) : (
             <Box position="relative" flex="none">
               <ProgressRing progress={row.ring ?? 0} kind={row.kind} size="sidebar" tone={row.status.tone} live={row.status.tone === "running"} />
-              <Box data-testid="kind-dot" position="absolute" right="-2px" bottom="-2px" boxSize="8px" borderRadius="full" borderWidth="1.5px" borderColor="surface" bg={`kind.${row.kind}.fg`} />
+              <Box data-testid="kind-dot" position="absolute" right="-2px" bottom="-2px" boxSize="8px" borderRadius="full" borderWidth="1.5px" borderColor="sidebar" bg={`kind.${row.kind}.fg`} />
             </Box>
           )}
           <Box as="span" flex="1" minW="0" fontSize="14px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">

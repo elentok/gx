@@ -50,6 +50,8 @@ const placements: SessionPlacement[] = [
   { session: "s2", kind: "other" },
   { session: "s3", kind: "chat", workspace: "Default" },
   { session: "s4", kind: "epic", epic: "p:shop" },
+  { session: "s5", kind: "epic", epic: "p:blog" },
+  { session: "s6", kind: "epic", epic: "p:blog" },
 ];
 
 function Page() {
@@ -67,6 +69,8 @@ function setup(device: Device, path = "/") {
         session("s2", "p", { name: "scratch" }),
         session("s3", "p", { name: "talk" }),
         session("s4", "p", { name: "designer" }),
+        session("s5", "p", { name: "fixer", fix_of: "p:blog/03", status: { state: "working" } }),
+        session("s6", "p", { name: "queuer", queue: true }),
       ],
       placements,
     },
@@ -106,6 +110,18 @@ test("clicking an epic row navigates and leaves it collapsed; the chevron toggle
   expect(body().getByRole("link", { name: /builder/ })).toBeTruthy();
   fireEvent.click(body().getByRole("button", { name: "Collapse Blog" }));
   expect(body().queryByRole("link", { name: /builder/ })).toBeNull();
+});
+
+test("a Fix agent row shows the wrench in its status colour; Queue and plain agent rows have none", async () => {
+  setup("desktop", "/");
+  await body().findByRole("link", { name: /Blog/ });
+  fireEvent.click(body().getByRole("button", { name: "Expand Blog" }));
+  const fixer = within(body().getByRole("link", { name: /fixer/ }));
+  const working = getComputedStyle(fixer.getByText("Working")).color;
+  expect(working).not.toBe("");
+  expect(getComputedStyle(fixer.getByTestId("fix-wrench")).color).toBe(working);
+  expect(within(body().getByRole("link", { name: /queuer/ })).queryByTestId("fix-wrench")).toBeNull();
+  expect(within(body().getByRole("link", { name: /builder/ })).queryByTestId("fix-wrench")).toBeNull();
 });
 
 test("opening another page leaves an expanded row expanded", async () => {

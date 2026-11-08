@@ -31,6 +31,13 @@ test("the Other case opens the Other section", async () => {
   expect(await screen.findByRole("link", { name: /scratch/ })).toBeTruthy();
 });
 
+test("the Fix agent rows case shows a wrench on each Fix agent row only", async () => {
+  render("Sidebar", "desktop, Fix agent rows");
+  await screen.findByRole("link", { name: /fix lint/ });
+  expect(screen.getAllByTestId("fix-wrench")).toHaveLength(2);
+  expect(screen.getByRole("link", { name: /builder/ }).querySelector("[data-testid=fix-wrench]")).toBeNull();
+});
+
 test("the On hold expanded case lists the held row", async () => {
   render("Sidebar", "desktop, On hold expanded");
   expect(await screen.findByRole("link", { name: /Old/ })).toBeTruthy();

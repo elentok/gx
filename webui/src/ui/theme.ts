@@ -58,6 +58,7 @@ export const themeConfig = defineConfig({
     tokens: {
       colors: {
         surface: { DEFAULT: { value: "#0a0d11" }, raised: { value: "#141920" } },
+        sidebar: { DEFAULT: { value: "#11161d" }, hover: { value: "rgba(255, 255, 255, 0.06)" }, current: { value: "rgba(108, 180, 255, 0.14)" } },
         overlay: { value: "rgba(0, 0, 0, 0.7)" },
         hairline: { DEFAULT: { value: "#252c36" }, folded: { value: "#1d232c" } },
         text: {
