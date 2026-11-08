@@ -7,6 +7,7 @@ import { EpicRing } from "../epic/EpicRing";
 import { PageHeader } from "../page/PageHeader";
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
 import { PageIcon } from "../page/PageIcon";
+import { useKeyboardOpen } from "../page/useKeyboardOpen";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import { hasChat, roundKeyOf, useSessionChat, type FetchChat } from "./chat";
@@ -140,6 +141,7 @@ function DesignBody({
   // Below desktop the chat takes the full width: the footer's Add, Note, Auto, countdown and Send need it on one line.
   // The steps then open from the header like on a phone.
   const sideColumn = useDevice() === "desktop";
+  const keyboardOpen = useKeyboardOpen();
   const stepsInline = wide && sideColumn;
   // The card speaks for this page only while its active (first) address is this Design.
   const card = epics.find((e) => e.addresses?.[0] === address);
@@ -192,7 +194,8 @@ function DesignBody({
           onClose={() => setStepsOpen(false)}
         />
       )}
-      <Box mt="4" mb="3" flex="none">
+      {/* With the keyboard up the header would take most of the visible height; the question needs it. */}
+      <Box mt="4" mb="3" flex="none" display={keyboardOpen && !sideColumn ? "none" : undefined}>
         <PageHeader
           title={name}
           icon={<PageIcon kind="design" />}
@@ -271,6 +274,8 @@ function DesignBody({
           role="region"
           minW="0"
           minH="0"
+          // The question card keeps a floor height (QuestionSheet); on a very short viewport the region scrolls.
+          overflowY="auto"
           display="flex"
           flexDirection="column"
           gap="3"

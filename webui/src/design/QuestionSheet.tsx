@@ -107,7 +107,8 @@ export function QuestionSheet({
       overflow="hidden"
       display="flex"
       flexDirection="column"
-      minH="0"
+      // In the Questions view the card never shrinks below a readable height, even with the keyboard up.
+      minH={questions ? "220px" : "0"}
       flex={questions ? "1" : undefined}
     >
       <Box
