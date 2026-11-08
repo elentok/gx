@@ -52,6 +52,8 @@ type tuiOptions struct {
 	clearLeavesI bool
 	// clearIgnored makes every Ctrl+U a no-op (see TUIClearIgnoredEnv).
 	clearIgnored bool
+	// redrawDelay holds back the redraw after a typed key or clear (see TUIRedrawDelayEnv).
+	redrawDelay time.Duration
 	// hung makes Enter a no-op as well (see TUIHangLaunchesEnv).
 	hung bool
 	// registryDelay, unknownSkill, noTurn and launchRecord are the skill-prompt
@@ -124,6 +126,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		return tuiOptions{}, errors.New("agentfake: --session-id or --resume is required")
 	}
 	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
+	redrawDelay, _ := time.ParseDuration(os.Getenv(TUIRedrawDelayEnv))
 	hung := HangThisLaunch(os.Getenv(TUIHangLaunchesEnv))
 	return tuiOptions{
 		hung:             hung,
@@ -137,6 +140,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		draft:            os.Getenv(TUIDraftEnv),
 		clearLeavesI:     os.Getenv(TUIClearLeavesIEnv) == "1",
 		clearIgnored:     hung || os.Getenv(TUIClearIgnoredEnv) == "1",
+		redrawDelay:      redrawDelay,
 		registryDelay:    registryDelay,
 		unknownSkill:     os.Getenv(TUIUnknownSkillEnv) == "1",
 		noTurn:           os.Getenv(TUINoTurnEnv) == "1",

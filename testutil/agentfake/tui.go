@@ -97,6 +97,15 @@ type TuiEvent struct {
 
 func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 	events := TuiEvents(in, ctl)
+	// A delayed redraw is posted back to the loop as a resize event so the loop
+	// stays the only writer to the PTY.
+	redraws := make(chan TuiEvent)
+	redraw := t.draw
+	if t.opts.redrawDelay > 0 {
+		redraw = func() {
+			time.AfterFunc(t.opts.redrawDelay, func() { redraws <- TuiEvent{Resized: true} })
+		}
+	}
 	if t.opts.mouse {
 		fmt.Fprint(t.out, "\x1b[?1049h\x1b[?1000h\x1b[?1006h")
 	}
@@ -106,7 +115,16 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 	} else if err := t.startSession(); err != nil {
 		return 0, err
 	}
-	for ev := range events {
+	for {
+		var ev TuiEvent
+		select {
+		case e, ok := <-events:
+			if !ok {
+				return 0, nil
+			}
+			ev = e
+		case ev = <-redraws:
+		}
 		switch {
 		case ev.Err != nil:
 			// The PTY closed: claude exits cleanly.
@@ -159,14 +177,13 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 				t.opts.clearLeavesI = false
 				t.typed.WriteByte('i')
 			}
-			t.draw()
+			redraw()
 		default:
 			t.typed.WriteByte(ev.Key)
 			// Echoed as claude does, the terminal's cursor after it.
-			t.draw()
+			redraw()
 		}
 	}
-	return 0, nil
 }
 
 func PtyClosed(err error) bool {

@@ -42,6 +42,10 @@ const (
 	// TUIClearIgnoredEnv, set to "1", makes every clear key do nothing and
 	// leaves the screen unchanged: a hung pane.
 	TUIClearIgnoredEnv = "GX_AGENTFAKE_TUI_CLEAR_IGNORED"
+	// TUIRedrawDelayEnv, a Go duration, redraws the screen that long after a
+	// typed key or clear key, as a real agent does: a screen read right after
+	// the key still shows the old rows.
+	TUIRedrawDelayEnv = "GX_AGENTFAKE_TUI_REDRAW_DELAY"
 	// TUIHangLaunchesEnv, "<n>:<counter file>", hangs the first n launches that
 	// share the counter file: the pane echoes typed text but takes neither
 	// Enter nor a clear key, so the screen stops changing. Later launches are
