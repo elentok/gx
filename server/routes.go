@@ -28,6 +28,7 @@ import (
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/tips"
+	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
@@ -66,6 +67,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		srvrecovery.Routes(func() *srvrecovery.Recovery { return s.recovery }),
 		epics.Routes(func() *epics.Epics { return s.epics }),
 		designs.Routes(func() *designs.Designs { return s.designs }),
+		triage.Routes(func() *triage.Triage { return s.triage }),
 		sessprompt.Routes(func() *sessprompt.Prompt { return s.prompt }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
 		sched.Routes(func() *sched.Scheduler { return s.scheduler }, func() *sched.Explainer { return s.explain }),

@@ -25,6 +25,7 @@ packages:
       - sessiontypes.go
       - stats.go
       - tips.go
+      - triage.go
       - usagesummary.go
       - verdicts.go
       - workspaces.go

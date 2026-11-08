@@ -212,6 +212,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/designs/` holds the Design sessions (open, worktree, delete, and the cleanup the Manager
   and the rescan call back), with `Routes()` for `designs/open`, `designs/delete` and
   `designs/worktree`;
+  `server/triage/` publishes `triage-changed` (address: the project name) for the live Triage
+  record, on a server write, on the `triage/changed` ping and on a rescan that sees a new
+  revision (the store watcher only reacts to `.md` files);
   `server/sessions/prompt/` holds the session prompts: the auto-advance countdown, turn settle,
   draft clearing, the start clock, prompt send and keys, the first prompt, and the actions and
   actionables, with `Routes()` for all six prompt routes (`sessions/auto-advance` and `/cancel`

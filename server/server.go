@@ -47,6 +47,7 @@ import (
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/tips"
+	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
@@ -145,8 +146,10 @@ type Server struct {
 	fixAgent *fixagent.FixAgent
 	// designs opens, cleans up and deletes the Design sessions; the Manager calls it back.
 	designs *designs.Designs
-	focus   *sessions.FocusReports
-	epics   *epics.Epics
+	// triage publishes triage-changed for the live Triage records.
+	triage *triage.Triage
+	focus  *sessions.FocusReports
+	epics  *epics.Epics
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -437,6 +440,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
 	s.designs = designs.New(s.designsDeps())
+	s.triage = triage.New(triage.Deps{TicketStore: cfg.TicketStore, Projects: s.projects, Events: events})
 	s.prompt = sessprompt.New(sessprompt.Deps{
 		Cfg: sessprompt.Config{
 			AutoAdvanceDelay: cfg.AutoAdvanceDelay, TurnSettleTimeout: cfg.TurnSettleTimeout,
@@ -468,6 +472,7 @@ func New(cfg Config) (*Server, error) {
 	s.idx.OnRescan(s.rec.ScanLateFinishes)
 	s.idx.OnRescan(s.oneOffs.Sweep)
 	s.idx.OnRescan(s.designs.ScanCleanups)
+	s.idx.OnRescan(s.triage.ScanRevisions)
 	s.idx.OnRescan(s.pruneEpicMembers)
 	s.idx.SetReady(s.startup.MigrationsEnded)
 	s.routes = assembleRoutes(s)

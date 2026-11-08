@@ -2918,6 +2918,28 @@ export interface Tip {
 }
 
 //////////
+// source: triage.go
+
+/**
+ * EventTriageChanged is emitted with the project name as its address when a
+ * project's live Triage record changed.
+ */
+export const EventTriageChanged = "triage-changed";
+/**
+ * TriageChangedRequest is the body of POST /v1/triage/changed: a CLI verb's
+ * "this project's Triage record changed" ping.
+ */
+export interface TriageChangedRequest {
+  project: string;
+}
+/**
+ * TriageChangedResult acknowledges a ping.
+ */
+export interface TriageChangedResult {
+  project: string;
+}
+
+//////////
 // source: usagesummary.go
 
 export const UsageModeLimits = "limits";

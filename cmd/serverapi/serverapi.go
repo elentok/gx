@@ -30,5 +30,6 @@ func Commands(d Deps) []*cobra.Command {
 		newServerWorkspacesCmd(d),
 		newServerHoldCmd(d),
 		newServerUnholdCmd(d),
+		newServerTriageCmd(d),
 	}
 }

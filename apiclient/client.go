@@ -38,6 +38,7 @@ type Client struct {
 	Queue    *Queue
 	Reads    *Reads
 	Admin    *Admin
+	Triage   *Triage
 }
 
 // AsTUI marks the client's writes as coming from the TUI; an unmarked client
@@ -125,7 +126,7 @@ func New(socketPath string) *Client {
 			return d.DialContext(ctx, "unix", socketPath)
 		},
 	}}}
-	return &Client{transport: t, Sessions: &Sessions{t: t}, Web: &Web{t: t}, Tickets: &Tickets{t: t}, Queue: &Queue{t: t}, Reads: &Reads{t: t}, Admin: &Admin{t: t}}
+	return &Client{transport: t, Sessions: &Sessions{t: t}, Web: &Web{t: t}, Tickets: &Tickets{t: t}, Queue: &Queue{t: t}, Reads: &Reads{t: t}, Admin: &Admin{t: t}, Triage: &Triage{t: t}}
 }
 
 // Handshake returns the server's API version and build id.
