@@ -11,7 +11,7 @@ import { designHref, STATS_HREF } from "../hrefs";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
 import { LimitsTray } from "../usage/LimitsTray";
-import { badgeLine, badgeTotal, badgeWaiting } from "../workspaces/followUpsBadge";
+import { badgeLine, badgeText, badgeTotal, badgeWaiting, inWorkspace } from "../workspaces/followUpsBadge";
 import { GearMenu } from "./GearMenu";
 import { useShell } from "./ShellContext";
 
@@ -63,12 +63,12 @@ function Indicator({ label, tone, children }: { label: string; tone: "waiting" |
 const InboxIcon = () => icon(<path d="M3 11l2-6h10l2 6v4H3zM3 11h4l1 2h4l1-2h4" />);
 
 /** The inbox button: the summed follow-ups as a badge, and a popover with a line per project. */
-function FollowUpsButton() {
+function FollowUpsButton({ workspace }: { workspace?: string }) {
   const conn = useConnectionContext();
   const navigate = useNavigate();
   const shell = useShell();
   const { list } = useEpicList(undefined, conn);
-  const counts = list?.follow_ups ?? [];
+  const counts = inWorkspace(list?.follow_ups ?? [], workspace);
   const total = badgeTotal(counts);
   const label = total ? `Follow-ups · ${total} open` : "Follow-ups";
   const lines = counts.map(badgeLine);
@@ -131,7 +131,7 @@ function FollowUpsButton() {
               fontSize="xs"
               fontWeight="600"
             >
-              {total}
+              {badgeText(total)}
             </Text>
           ) : null}
         </chakra.button>
@@ -170,7 +170,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       <FooterLink href={EPICS_HREF} label="Epics" badge={needsYou}>
         <EpicsIcon />
       </FooterLink>
-      <FollowUpsButton />
+      <FollowUpsButton workspace={activeWorkspace?.name} />
       <FooterLink href={STATS_HREF} label="Stats and health">
         <StatsIcon />
       </FooterLink>

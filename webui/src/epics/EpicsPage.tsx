@@ -140,7 +140,7 @@ export function EpicsPage({
   const setupProject = checks?.projects.find((p) => p.project === settingUp);
   // The choice lives in this page's state only; a workspace that is gone acts as "All workspaces".
   const filterWorkspace = workspaces.some((w) => w.name === workspace) ? workspace : undefined;
-  const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProjects, filterWorkspace) : [];
+  const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProjects, filterWorkspace, list.follow_ups) : [];
   const shown = sections.filter((s) => s.rows.length > 0);
   const chooseProjects = (chosen: string[]) => {
     setStoredProjects(chosen);

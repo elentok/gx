@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { expect, test } from "vitest";
 import type { FollowUpCount } from "../generated/server";
-import { badgeLine, badgeTotal, badgeWaiting } from "./followUpsBadge";
+import { badgeLine, badgeText, badgeTotal, badgeWaiting, inWorkspace } from "./followUpsBadge";
 
 const count = (over: Partial<FollowUpCount> = {}): FollowUpCount => ({
   project: "gx",
@@ -36,6 +36,26 @@ test("a running or waiting Triage reads Triage · N left and opens the Triage pa
 
 test("a stopped Triage is not live: the line is the plain count", () => {
   expect(badgeLine(count({ triage: "stopped", left: 4 }))).toMatchObject({ live: false, path: "/epics" });
+});
+
+test("the badge shows no number at zero, the number to 99 and 99+ above", () => {
+  expect(badgeText(0)).toBe("");
+  expect(badgeText(99)).toBe("99");
+  expect(badgeText(100)).toBe("99+");
+});
+
+test("a workspace covers only the projects listing it; no workspace covers all", () => {
+  const counts = [
+    count({ project: "a", workspaces: ["Default"] }),
+    count({ project: "b", workspaces: ["Side"] }),
+    count({ project: "c", workspaces: ["Default", "Side"] }),
+    count({ project: "d" }),
+  ];
+  const projects = (w?: string) => inWorkspace(counts, w).map((c) => c.project);
+  expect(projects("Side")).toEqual(["b", "c"]);
+  expect(projects("Default")).toEqual(["a", "c"]);
+  expect(projects()).toEqual(["a", "b", "c", "d"]);
+  expect(badgeTotal(inWorkspace(counts, "Side"))).toBe(6);
 });
 
 test("the badge is amber for a waiting entry only", () => {

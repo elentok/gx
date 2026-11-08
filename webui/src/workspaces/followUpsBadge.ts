@@ -4,8 +4,15 @@ import { triageHref } from "../hrefs";
 /** The Epics page card a line focuses, as route state `focus`; the card carries the same value as data-focus. */
 export const followUpsFocus = (project: string) => `follow-ups:${project}`;
 
+/** The projects whose Follow-ups card shows in a workspace; no workspace means all of them. */
+export const inWorkspace = (counts: FollowUpCount[], workspace?: string) =>
+  workspace === undefined ? counts : counts.filter((c) => c.workspaces?.includes(workspace));
+
 /** The badge: open follow-ups summed over the projects. */
 export const badgeTotal = (counts: FollowUpCount[]) => counts.reduce((sum, c) => sum + c.open, 0);
+
+/** The badge's number: none at zero, capped at 99+. */
+export const badgeText = (total: number) => (total === 0 ? "" : total > 99 ? "99+" : String(total));
 
 /** Amber while any Triage waits for Approve. */
 export const badgeWaiting = (counts: FollowUpCount[]) => counts.some((c) => c.triage === FollowUpTriageWaiting);

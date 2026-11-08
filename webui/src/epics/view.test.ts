@@ -48,6 +48,19 @@ test("a workspace filter keeps that workspace's cards and drops cards with none"
   expect(names(sectionsOf(epics, "", undefined, undefined, undefined), "ready-to-queue")).toEqual(["a", "b", "oneoff"]);
 });
 
+test("a named workspace shows the Follow-ups card of a project in it and not of another", () => {
+  const card = (project: string) => row("Follow-ups", { project, card_kind: "follow-ups" });
+  const epics = [card("gx"), card("webapp")];
+  const counts = [
+    { project: "gx", open: 1, bugs: 1, ideas: 0, other: 0, triage: "none" as const, left: 0, workspaces: ["Side"] },
+    { project: "webapp", open: 1, bugs: 1, ideas: 0, other: 0, triage: "none" as const, left: 0, workspaces: ["Default"] },
+  ];
+  const projects = (w?: string) => sectionsOf(epics, "", undefined, undefined, w, counts).flatMap((s) => s.rows.map((r) => r.project));
+  expect(projects("Side")).toEqual(["gx"]);
+  expect(projects("Default")).toEqual(["webapp"]);
+  expect(projects(undefined)).toEqual(["gx", "webapp"]);
+});
+
 test("the text filter matches held cards", () => {
   const epics = [row("held-one", { section: "on-hold" }), row("other", { section: "on-hold" })];
   expect(names(sectionsOf(epics, "one"), "on-hold")).toEqual(["held-one"]);

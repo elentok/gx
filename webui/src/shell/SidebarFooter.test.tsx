@@ -118,6 +118,25 @@ test("a line opens the Epics page with the card focus, and a live Triage line op
   vi.unstubAllGlobals();
 });
 
+test("the follow-ups badge has no number at zero, and is amber for a waiting entry only", async () => {
+  stubList([followUps({ open: 0, bugs: 0, ideas: 0 })]);
+  setupWithRouter();
+  const zero = await screen.findByRole("button", { name: "Follow-ups" });
+  expect(zero.textContent).toBe("");
+  cleanup();
+  stubList([followUps({ triage: "waiting", left: 2 })]);
+  setupWithRouter();
+  const waiting = await screen.findByRole("button", { name: "Follow-ups · 3 open" });
+  expect(waiting.querySelector("span")?.className).not.toBe(undefined);
+  const waitingClass = waiting.querySelector("span")!.className;
+  cleanup();
+  stubList([followUps({ triage: "running", left: 2 })]);
+  setupWithRouter();
+  const running = await screen.findByRole("button", { name: "Follow-ups · 3 open" });
+  expect(running.querySelector("span")!.className).not.toBe(waitingClass);
+  vi.unstubAllGlobals();
+});
+
 test("the health button and the gear carry a title tooltip", () => {
   setup({ mode: "running", health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") } });
   expect(screen.getByRole("button", { name: /^System health:/ }).getAttribute("title")).toMatch(/^System health:/);
