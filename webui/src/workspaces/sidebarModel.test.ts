@@ -10,6 +10,7 @@ import {
   SectionNeedsYou,
   SectionOnHold,
   type EpicListRow,
+  type SessionInfo,
   type SessionPlacement,
 } from "../generated/server";
 import { session } from "../agents/agentsTestKit";
@@ -185,6 +186,53 @@ describe("buildSidebar", () => {
       const s = buildSidebar({ ...base, rows, sessions, placements, sort: "name" });
       expect(s.rows[0].agents.map((a) => a.id)).toEqual(["s2", "s1"]);
       expect(s.other.map((a) => a.id)).toEqual(["o2", "o1"]);
+    });
+
+    describe("nested agents, Other and On hold under every Sort", () => {
+      const at = (iso: string) => ({ status_changed_at: iso }) as Partial<SessionInfo>;
+      const ids = (xs: { id: string }[]) => xs.map((x) => x.id);
+      const agentFixture = () => {
+        const sessions = [
+          session("a-none", "p", { name: "m", ...at("") }),
+          session("b-old", "p", { name: "z", ...at("2026-01-01T00:00:00Z") }),
+          session("c-new", "p", { name: "n", ...at("2026-02-01T00:00:00Z") }),
+          session("d-need", "p", { name: "q", actionable: { reason: "Pick" }, ...at("") }),
+        ];
+        const ep = (id: string) => place(id, "epic", { epic: "p:a" });
+        const oth = (id: string) => place(id, "other");
+        return {
+          rows: [row("p:a", {})],
+          sessions,
+          nested: sessions.map((s) => ep(s.id)),
+          other: sessions.map((s) => oth(s.id)),
+        };
+      };
+      const expected = {
+        activity: ["c-new", "b-old", "a-none", "d-need"],
+        name: ["a-none", "c-new", "d-need", "b-old"],
+        "needs-you": ["d-need", "a-none", "c-new", "b-old"],
+      };
+
+      for (const sort of ["activity", "name", "needs-you"] as const) {
+        it(`${sort}: nested agents and Other share one order, no-time rows included`, () => {
+          const f = agentFixture();
+          const s = buildSidebar({ ...base, rows: f.rows, sessions: f.sessions, placements: f.nested, sort });
+          expect(ids(s.rows[0].agents)).toEqual(expected[sort]);
+          const o = buildSidebar({ ...base, rows: [], sessions: f.sessions, placements: f.other, sort });
+          expect(ids(o.other)).toEqual(expected[sort]);
+        });
+
+        it(`${sort}: On hold rows sort by the same rule, with and without a time`, () => {
+          const rows = [
+            row("p:h-none", { name: "mid", section: SectionOnHold }),
+            row("p:h-old", { name: "zed", section: SectionOnHold, last_activity_at: "2026-01-01T00:00:00Z" }),
+            row("p:h-new", { name: "alpha", section: SectionOnHold, last_activity_at: "2026-02-01T00:00:00Z" }),
+          ];
+          const s = buildSidebar({ ...base, rows, sessions: [], placements: [], sort });
+          expect(keys(s.held)).toEqual(sort === "activity" ? ["p:h-new", "p:h-old", "p:h-none"] : ["p:h-new", "p:h-none", "p:h-old"]);
+          expect(s.held.every((r) => r.number === undefined && r.agents.length === 0)).toBe(true);
+        });
+      }
     });
 
     it("a Design row opens the Design page, an epic its title link", () => {
