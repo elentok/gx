@@ -1,5 +1,5 @@
 // Package backgroundtask is the one reading of "a background task is live"
-// that the finish wait, the stall nudge, the zero-commit park and the TUI
+// that the finish wait, the stall nudge, the zero-commit hold and the TUI
 // +bg label all share.
 package backgroundtask
 
