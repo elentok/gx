@@ -249,6 +249,7 @@ var scenarios = map[string]scenario{
 	"keep-worktree":         spec.KeepWorktree,
 	"keep-agent":            spec.KeepAgent,
 	"keep-cleanup":          spec.KeepCleanup,
+	"cleanup":               spec.Cleanup,
 	"cache-gate":            cacheGate,
 	"cache-gate-custom":     cacheGateCustom,
 	"launch-held":           launchHeld,

@@ -1,13 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cleanupscan"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
@@ -143,5 +146,61 @@ func TestKeepCleanupScenario_MergingTheEpicRemovesALeftoverIterationWorktree(t *
 	}
 	r.gx(t, "server", "epics", "merge", "demo:keep-epic")
 	r.waitWorktreeGone(t, path, "after the epic merge")
+	r.stop(t)
+}
+
+func TestCleanupScenario_EveryCaseIsInGitAndTheScanClassifiesIt(t *testing.T) {
+	t.Parallel()
+	r := start(t, "cleanup")
+	for _, branch := range []string{"merged-wt", "idle-wt", "dirty-wt"} {
+		if !strings.Contains(r.worktrees(t), "branch refs/heads/"+branch+"\n") {
+			t.Errorf("no worktree on %s:\n%s", branch, r.worktrees(t))
+		}
+	}
+	cmd := exec.Command(gxBin, "cleanup", "scan", "--json")
+	cmd.Dir = r.repo()
+	// r.Env has no PATH, and the scan shells out to git.
+	cmd.Env = append(slices.Clone(r.Env), "PATH="+os.Getenv("PATH"))
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("gx cleanup scan: %v\n%s", err, stderr.String())
+	}
+	var scan cleanupscan.Result
+	if err := json.Unmarshal(out, &scan); err != nil {
+		t.Fatal(err)
+	}
+	branches := map[string]cleanupscan.WorktreeScan{}
+	for _, w := range scan.Worktrees {
+		branches[w.Branch] = w
+	}
+	const pick, unmatched = "ralph-loop/cleanup-epic-item-01", "ralph-loop/cleanup-epic-item-02"
+	for branch, want := range map[string]struct {
+		rec   string
+		dirty bool
+	}{
+		"merged-wt": {rec: "delete"}, pick: {rec: "delete"}, "squash-one": {rec: "delete"},
+		unmatched: {}, "idle-wt": {}, "dirty-wt": {dirty: true}, "unmerged-epic": {},
+	} {
+		got, ok := branches[branch]
+		if !ok {
+			t.Errorf("scan lacks %s: %s", branch, out)
+			continue
+		}
+		if got.Recommendation != want.rec || got.Dirty != want.dirty {
+			t.Errorf("%s = recommendation %q dirty %t, want %q %t", branch, got.Recommendation, got.Dirty, want.rec, want.dirty)
+		}
+	}
+	epics := map[string]cleanupscan.EpicScan{}
+	for _, e := range scan.Epics {
+		epics[e.Name] = e
+	}
+	if e := epics["merged-epic"]; !e.AllDone || !e.MergedToTrunk {
+		t.Errorf("merged-epic = %+v, want done and merged", e)
+	}
+	if e := epics["unmerged-epic"]; !e.AllDone || e.MergedToTrunk {
+		t.Errorf("unmerged-epic = %+v, want done and unmerged", e)
+	}
 	r.stop(t)
 }
