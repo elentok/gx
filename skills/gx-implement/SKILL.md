@@ -79,7 +79,12 @@ Then, while working:
   use it. The guard hook rejects these calls, and a batched call may be half-applied by then. A
   heredoc that hangs is invisible; a file edit that fails says why.
 - **Never run a command that can read stdin**: give `rg`/`grep` an explicit path (`rg foo .`),
-  never a bare `cat`. Stdin never closes here, so it hangs forever.
+  never a bare `cat`. Stdin never closes here, so it hangs forever. In a shell loop that reads
+  files, redirect with `</dev/null`.
+- **A WIP commit before a long background run is allowed.** The finishing commit still needs
+  `gx check` first.
+- **Classifier "no verdict" error: retry the same command once.** If it fails again, report the
+  blocker once and stop retrying.
 - **Finish with zero background shells.** If a call was moved to the background, read its output,
   then stop it (see the Tool names table in [gx-local-tracker](../gx-local-tracker.md)) before
   reporting finished. ralph-loop will not merge a ticket while one is open.

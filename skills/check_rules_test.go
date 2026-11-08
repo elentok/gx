@@ -48,6 +48,12 @@ func TestCheckRulesAnchors(t *testing.T) {
 			"**Make one Edit per contiguous region, not one per line.**",
 			"**Send file edits to one file one after another, never in parallel.**",
 		}},
+		{"implement wip, stdin and retry", "gx-implement/SKILL.md", []string{
+			"**A WIP commit before a long background run is allowed.**",
+			"`</dev/null`",
+			"The finishing commit still needs `gx check` first.",
+			"retry the same command once",
+		}},
 		{"follow-up", "gx-follow-up/SKILL.md", []string{"search the candidates for that test name first"}},
 		{"evolve", "gx-evolve/SKILL.md", []string{
 			"### Check rows", "### Launch rows", "`slower:`", "`flake:`", "](../gx-follow-up/SKILL.md)", "Category `bug`", "Category `idea`",
