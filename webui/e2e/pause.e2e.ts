@@ -10,6 +10,8 @@ const openTicket = (page: Page, id: string, epic = "paused-epic") =>
 
 // The wait loop pauses an agent that stays blocked for its 15 s dwell.
 const dwell = { timeout: 30_000 };
+// A recovery scenario's agent has to launch, hang or end its turn before the pause appears.
+const gateWait = { timeout: 90_000 };
 // The header pill; the Runs list repeats the label in a longer line.
 const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: true });
 
@@ -18,7 +20,7 @@ const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: t
 // Resume needs ticket 08, which Start over consumes.
 test.describe("3. Pause reasons and recovery", () => {
   test("every pause reason recovers", async ({ page, start }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(600_000);
     const fixture = await start("paused");
     await fixture.cli("server", "queue", "add", "demo:paused-epic");
 
@@ -97,6 +99,26 @@ test.describe("3. Pause reasons and recovery", () => {
       await page.getByRole("button", nav("Allow once")).click();
     });
     await expect(stuck(page)).toHaveCount(0);
+
+    // Each recovery scenario is its own server, started in turn on the same page.
+    const recover = async (scenario: string, epic: string, reason: string, buttons: string[], act?: () => Promise<void>) => {
+      await start(scenario);
+      await openTicket(page, "01", epic);
+      await expect(page.getByText(reason).first()).toBeVisible(gateWait);
+      await expect(recovery(page).getByRole("button")).toHaveText(buttons.map((b) => new RegExp(`^${b}(\\s*Recommended)?$`)));
+      await act?.();
+    };
+    const retry = async () => {
+      await recovery(page).getByRole("button", nav("Retry")).click();
+    };
+    const cleared = (reason: string) => expect(page.getByText(reason)).toHaveCount(0, { timeout: 30_000 });
+
+    // 6: the relaunch hangs too; the pause names the cause and Retry ends it.
+    await recover("hung-pane-twice", "hung-epic", "Could not start the agent", ["Retry", "Start over"], async () => {
+      await expect(page.getByText(/pane stopped taking keys, twice/).first()).toBeVisible();
+      await retry();
+      await cleared("Could not start the agent");
+    });
   });
 
   test("Unknown skill", async ({ page, start }) => {

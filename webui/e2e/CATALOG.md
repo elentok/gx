@@ -95,7 +95,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `pause.e2e.ts`
 
-- **Every pause reason recovers.**
+- **Every pause reason recovers.** Also starts the `hung-pane-twice` scenario: the pause says the pane stopped taking keys twice, offers Retry and Start over, and Retry ends it.
 - **Unknown skill.**
 - **A model-mismatch pause resumes on the worker tier.**
 - **Copy, start, and refuse a second agent.**
