@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/transcript"
@@ -33,7 +34,8 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if err != nil {
 		return err
 	}
-	if home == "" || (ss.kind != "" && ss.kind != harness.Claude) || !isSlashCommand(text) {
+	codex := ss.kind == harness.Codex
+	if (codex && harness.CodexHomeIn(p.Env) == "") || (!codex && (home == "" || (ss.kind != "" && ss.kind != harness.Claude) || !isSlashCommand(text))) {
 		return p.PromptNudged(s, text, onNudge)
 	}
 	turn, err := p.turns().awaitNotBusy(ss)
@@ -48,8 +50,17 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if err := pr.awaitEmptyInput(p.promptGrace()); err != nil {
 		return notDelivered(err)
 	}
+	// A resumed Codex launch appends to its old rollout, so the offset is taken
+	// before the first send.
+	var firstUser func() (string, bool, error)
+	if codex {
+		firstUser = p.codexFirstUser(ss)
+	}
 	if err := pr.Submit(text); err != nil {
 		return notDelivered(err)
+	}
+	if codex {
+		return p.proveCodexLaunch(ctx, pr, firstUser, text, onNudge)
 	}
 	projects, err := harness.ClaudeProjectsDirIn(p.Env)
 	if err != nil {
@@ -96,6 +107,63 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 		return fmt.Errorf("%w: %q started no turn", agentrunner.ErrNotDelivered, text)
 	}
 	return nil
+}
+
+// codexFirstUser returns the Codex proof's FirstUser: the first user record of
+// the launch's rollout after the offset taken now. The rollout is found by
+// session id once the SessionStart hook saved it, else by cwd and start time.
+func (p *Pty) codexFirstUser(ss *ptySession) func() (string, bool, error) {
+	codexHome := harness.CodexHomeIn(p.Env)
+	dir := filepath.Join(p.Root, ss.session.Label)
+	since := time.Now().Add(-time.Second)
+	locate := func() (string, bool, error) {
+		if id := harness.ReadCodexSessionID(dir); id != "" {
+			return codexsession.RolloutPathIn(codexHome, id)
+		}
+		return codexsession.LocateRollout(codexHome, ss.cwd, since)
+	}
+	var offset int64
+	if path, ok, err := locate(); err == nil && ok {
+		if info, err := os.Stat(path); err == nil {
+			offset = info.Size()
+		}
+	}
+	return func() (string, bool, error) {
+		path, ok, err := locate()
+		if err != nil || !ok {
+			return "", false, err
+		}
+		prompt, ok, err := codexsession.FirstPrompt(path, offset)
+		return prompt.Text, ok, err
+	}
+}
+
+// proveCodexLaunch is the Claude proof over the rollout: the prompt counts as
+// delivered once the rollout holds a matching user record, and is resent in
+// the session while it does not.
+func (p *Pty) proveCodexLaunch(ctx context.Context, pr *ptyPrompter, firstUser func() (string, bool, error), text string, onNudge func(string)) error {
+	proof := claudeui.LaunchProof{
+		FirstUser: firstUser,
+		Pane: func() (string, error) {
+			if err := pr.cancelled(); err != nil {
+				return "", err
+			}
+			return pr.Screen()
+		},
+		Resend: func() error { return pr.Submit(text) },
+		Report: func(d claudeui.NudgeDecision) {
+			if onNudge != nil {
+				onNudge(string(d))
+			}
+		},
+		Now:   time.Now,
+		Sleep: time.Sleep,
+	}
+	err := claudeui.CheckLaunchDelivered(ctx, proof, text, p.launcher().launchCaps())
+	if errors.Is(err, errPersonInput) {
+		return fmt.Errorf("%w: %q: a person typed before the rollout showed the prompt", agentrunner.ErrDeliveryUnconfirmed, text)
+	}
+	return err
 }
 
 // ptyLauncher starts and watches holders. It holds copies of the Pty settings

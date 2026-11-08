@@ -425,6 +425,10 @@ func (c *codexFake) workerPrompt(text string) (string, agentfake.WorkerConfig, b
 // submit starts the turn a typed prompt asks for. A skill prompt does the
 // ticket's work as the worker config says.
 func (c *codexFake) submit(text string) error {
+	if os.Getenv(CodexDropPromptEnv) == "1" && strings.HasPrefix(text, "$") {
+		// The prompt vanishes: no user record, no turn.
+		return nil
+	}
 	if w := c.resumeWork; w != nil {
 		c.resumeWork = nil
 		if err := c.startTurn(text); err != nil {

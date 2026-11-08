@@ -153,7 +153,7 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 			if holdsText(pane, text) {
 				return &HungPaneError{Screen: pane}
 			}
-			return fmt.Errorf("%w: %q: no user record for the command after %s", agentrunner.ErrNotDelivered, text, caps.Grace)
+			return fmt.Errorf("%w: %q: no user record after %s", agentrunner.ErrNotDelivered, text, caps.Grace)
 		}
 
 		if lastSend.IsZero() || now.Sub(lastSend) >= caps.ResendEvery {

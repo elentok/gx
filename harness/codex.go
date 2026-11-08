@@ -150,8 +150,11 @@ func (h codexHarness) Watch(_ int, _ time.Time, scr Screen, _ <-chan struct{}) (
 	return w, nil
 }
 
-// codexHomeFrom is Codex's home as the child reads it: CODEX_HOME, else
+// CodexHomeIn is Codex's home as a child with env reads it: CODEX_HOME, else
 // ~/.codex; "" with neither set.
+func CodexHomeIn(env []string) string { return codexHomeFrom(env) }
+
+// codexHomeFrom is CodexHomeIn.
 func codexHomeFrom(env []string) string {
 	if dir := LookupEnv(env, "CODEX_HOME"); dir != "" {
 		return dir

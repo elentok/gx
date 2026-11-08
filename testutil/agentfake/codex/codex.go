@@ -24,6 +24,10 @@ import (
 // since real Codex has no --session-id to pass.
 const CodexIDEnv = "GX_AGENTFAKE_CODEX_ID"
 
+// CodexDropPromptEnv, set to "1", makes the fake drop every "$" skill prompt:
+// it writes no user record and starts no turn.
+const CodexDropPromptEnv = "GX_AGENTFAKE_CODEX_DROP_PROMPT"
+
 // CodexVersion is the Codex release the fake imitates; a test fixes it.
 const CodexVersion = "0.166.0"
 
