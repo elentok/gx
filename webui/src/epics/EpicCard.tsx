@@ -13,6 +13,7 @@ import {
   CardActionTriage,
   CardActionUnhold,
   CardKindDesign,
+  CardKindFollowUps,
   CardKindImplementation,
   SectionNeedsYou,
   SectionOnHold,
@@ -20,6 +21,7 @@ import {
   type EpicListRow,
   type Workspace,
 } from "../generated/server";
+import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { ItemMenu, itemOfCard, postUnhold, type ItemWriters } from "../workspaces/itemActions";
 import { designHref, epicHref, ticketHref } from "../hrefs";
 import { postOpenDesign, type OpenDesign } from "../design/open";
@@ -162,6 +164,7 @@ export function EpicCard({
     <Box
       data-kind={kind}
       data-section={row.section}
+      data-focus={row.card_kind === CardKindFollowUps ? followUpsFocus(row.project) : undefined}
       opacity={held ? 0.6 : undefined}
       bg="surface.raised"
       borderWidth="1px"

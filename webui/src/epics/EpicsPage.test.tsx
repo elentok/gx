@@ -474,3 +474,23 @@ test("cards without a time start no clock", async () => {
   await loaded(timed());
   expect(vi.getTimerCount()).toBeGreaterThan(untimed);
 });
+
+test("route state focus opens Ready to design and scrolls to the Follow-ups card", async () => {
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  const list = listOf([
+    row("need", { section: "needs-you" }),
+    row("follow-ups", { kind: "map", card_kind: "follow-ups", section: "ready-to-design", project: "gx" }),
+  ]);
+  const router = createMemoryRouter(appRoutes({ epicList: async () => list }), {
+    initialEntries: [{ pathname: "/epics", state: { focus: "follow-ups:gx" } }],
+  });
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  );
+  await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+  expect(document.querySelector('[data-focus="follow-ups:gx"]')).not.toBeNull();
+  expect(screen.getByRole("button", { name: /Ready to design/ }).getAttribute("aria-expanded")).toBe("true");
+});

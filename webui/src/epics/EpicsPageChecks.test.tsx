@@ -149,7 +149,7 @@ test("Not now hides the banner and calls no write", async () => {
   const b = await banner();
   fireEvent.click(within(b).getByRole("button", { name: "Not now" }));
   expect(screen.queryByRole("region", { name: "Missing check config" })).toBeNull();
-  // The shell's limits tray reads usage through this mock; only writes matter here.
-  expect(fetchMock.mock.calls.filter(([url]) => url !== "/v1/usage/summary")).toEqual([]);
+  // The shell's limits tray and follow-ups button read through this mock; only writes matter here.
+  expect(fetchMock.mock.calls.filter(([url]) => url !== "/v1/usage/summary" && url !== "/v1/epics")).toEqual([]);
   expect(localStorage.length).toBe(0);
 });

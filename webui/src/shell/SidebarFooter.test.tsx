@@ -73,6 +73,51 @@ test("the limits tray renders without a health snapshot, and nothing renders wit
   vi.unstubAllGlobals();
 });
 
+const followUps = (over: Record<string, unknown>) => ({ project: "gx", open: 3, bugs: 2, ideas: 1, other: 0, triage: "none", left: 0, ...over });
+
+function stubList(follow_ups: unknown[]) {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: [], follow_ups }))));
+}
+
+function setupWithRouter(snapshot: Record<string, unknown> = {}) {
+  const state = { snapshot, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  const router = createMemoryRouter([
+    { path: "/", element: <SidebarFooter /> },
+    { path: "/epics", element: <div>epics page</div> },
+    { path: "/triage/:project", element: <div>triage page</div> },
+  ]);
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  );
+  return router;
+}
+
+test("the follow-ups button sums the projects and its popover has a line per project", async () => {
+  stubList([followUps({ open: 12, bugs: 8, ideas: 4 }), followUps({ project: "webapp", open: 4, bugs: 3, ideas: 1 })]);
+  setupWithRouter();
+  fireEvent.click(await screen.findByRole("button", { name: "Follow-ups · 16 open" }));
+  expect(await screen.findByRole("menuitem", { name: /gx.*8 bugs · 4 ideas/ })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: /webapp.*3 bugs · 1 idea/ })).toBeTruthy();
+  vi.unstubAllGlobals();
+});
+
+test("a line opens the Epics page with the card focus, and a live Triage line opens the Triage page", async () => {
+  stubList([followUps({}), followUps({ project: "webapp", triage: "waiting", left: 12 })]);
+  const router = setupWithRouter();
+  fireEvent.click(await screen.findByRole("button", { name: /^Follow-ups/ }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /webapp.*Triage · 12 left/ }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/triage/webapp"));
+  await router.navigate("/");
+  fireEvent.click(await screen.findByRole("button", { name: /^Follow-ups/ }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /gx.*2 bugs/ }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/epics"));
+  expect(router.state.location.state).toEqual({ focus: "follow-ups:gx" });
+  vi.unstubAllGlobals();
+});
+
 test("the health button and the gear carry a title tooltip", () => {
   setup({ mode: "running", health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") } });
   expect(screen.getByRole("button", { name: /^System health:/ }).getAttribute("title")).toMatch(/^System health:/);

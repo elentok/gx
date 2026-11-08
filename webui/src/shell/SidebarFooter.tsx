@@ -8,9 +8,10 @@ import { NewDesignForm } from "../design/NewDesignForm";
 import { useEpicList } from "../epics/list";
 import type { Workspace } from "../generated/server";
 import { designHref, STATS_HREF } from "../hrefs";
-import { GxMenu } from "../ui/menu/Menu";
+import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
 import { LimitsTray } from "../usage/LimitsTray";
+import { badgeLine, badgeTotal, badgeWaiting } from "../workspaces/followUpsBadge";
 import { GearMenu } from "./GearMenu";
 import { useShell } from "./ShellContext";
 
@@ -59,6 +60,87 @@ function Indicator({ label, tone, children }: { label: string; tone: "waiting" |
   );
 }
 
+const InboxIcon = () => icon(<path d="M3 11l2-6h10l2 6v4H3zM3 11h4l1 2h4l1-2h4" />);
+
+/** The inbox button: the summed follow-ups as a badge, and a popover with a line per project. */
+function FollowUpsButton() {
+  const conn = useConnectionContext();
+  const navigate = useNavigate();
+  const shell = useShell();
+  const { list } = useEpicList(undefined, conn);
+  const counts = list?.follow_ups ?? [];
+  const total = badgeTotal(counts);
+  const label = total ? `Follow-ups · ${total} open` : "Follow-ups";
+  const lines = counts.map(badgeLine);
+  const heading: MenuEntry = {
+    kind: "content",
+    value: "heading",
+    content: (
+      <Text px="3" py="1" fontSize="xs" letterSpacing="0.08em" textTransform="uppercase" color="text.muted">
+        Follow-ups
+      </Text>
+    ),
+  };
+  const items: MenuEntry[] = lines.length
+    ? [heading, ...lines.map((l): MenuEntry => ({
+        value: l.project,
+        label: (
+          <Box as="span" display="flex" alignItems="center" gap="3" minW="240px">
+            {l.live && <Box as="span" aria-hidden boxSize="16px" borderRadius="full" borderWidth="2px" borderColor="tone.waiting.fg" />}
+            <Text as="span" flex="1">
+              {l.project}
+            </Text>
+            <Text as="span" fontSize="xs" fontWeight="400" color="text.muted">
+              {l.text}
+            </Text>
+            {l.live ? (
+              <Text as="span" px="2" borderRadius="6px" borderWidth="1px" borderColor="border" fontSize="xs">
+                Open
+              </Text>
+            ) : (
+              <Text as="span" px="2" borderRadius="full" bg="surface" borderWidth="1px" borderColor="border" fontSize="xs">
+                {l.count}
+              </Text>
+            )}
+          </Box>
+        ),
+        onSelect: () => {
+          navigate(l.path, l.state && { state: l.state });
+          shell?.closeSliding();
+        },
+      }))]
+    : [{ kind: "content", value: "none", content: <Text px="3" py="1" color="text.muted">No follow-ups</Text> }];
+  return (
+    <GxMenu
+      placement="top-end"
+      trigger={
+        <chakra.button type="button" title={label} aria-label={label} {...buttonStyle}>
+          <InboxIcon />
+          {total ? (
+            <Text
+              as="span"
+              aria-hidden
+              position="absolute"
+              top="0"
+              right="0"
+              px="1.5"
+              lineHeight="1.4"
+              borderRadius="full"
+              bg={badgeWaiting(counts) ? "tone.waiting.fg" : "tone.running.fg"}
+              color="surface"
+              fontSize="xs"
+              fontWeight="600"
+            >
+              {total}
+            </Text>
+          ) : null}
+        </chakra.button>
+      }
+      items={items}
+    />
+  );
+}
+
 type Dialog = "design" | "agent" | null;
 
 export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { onNewWorkspace?: () => void; activeWorkspace?: Workspace }) {
@@ -73,7 +155,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       <GxMenu
         placement="top-start"
         trigger={
-          <chakra.button type="button" h="34px" px="3" borderRadius="8px" bg="surface.raised" borderWidth="1px" borderColor="hairline" color="text" cursor="pointer">
+          <chakra.button type="button" h="34px" px="3" flex="none" whiteSpace="nowrap" borderRadius="8px" bg="surface.raised" borderWidth="1px" borderColor="hairline" color="text" cursor="pointer">
             + New
           </chakra.button>
         }
@@ -88,6 +170,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       <FooterLink href={EPICS_HREF} label="Epics" badge={needsYou}>
         <EpicsIcon />
       </FooterLink>
+      <FollowUpsButton />
       <FooterLink href={STATS_HREF} label="Stats and health">
         <StatsIcon />
       </FooterLink>

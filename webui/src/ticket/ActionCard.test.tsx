@@ -101,9 +101,9 @@ const repair = (actions: (keyof typeof info)[], extra: Partial<TicketDetail> = {
   action_info: info,
   ...extra,
 });
-// The shell's limits tray polls usage on its own; keep that out of the mock the tests assert on.
+// The shell's limits tray and follow-ups button read on their own; keep that out of the mock the tests assert on.
 function stubFetch(mock: ReturnType<typeof vi.fn>) {
-  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => (url.startsWith("/v1/usage/") ? Promise.resolve(new Response("", { status: 500 })) : mock(url, init)));
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => (url.startsWith("/v1/usage/") || url === "/v1/epics" ?Promise.resolve(new Response("", { status: 500 })) : mock(url, init)));
 }
 const posted = (fetchMock: ReturnType<typeof vi.fn>) =>
   fetchMock.mock.calls.map(([url, init]) => [url, JSON.parse((init as RequestInit).body as string)]);

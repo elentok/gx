@@ -1,6 +1,6 @@
 import { Box, chakra, Input, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { MissingBanner } from "../checks/MissingBanner";
 import { SetupDialog } from "../checks/SetupDialog";
 import { postSaveChecks, type SaveChecks } from "../checks/setup";
@@ -8,8 +8,9 @@ import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status";
 import { useConnectionContext } from "../connection";
 import type { OpenDesign } from "../design/open";
 import { NewDesignForm } from "../design/NewDesignForm";
-import type { Workspace } from "../generated/server";
+import { CardKindFollowUps, type Workspace } from "../generated/server";
 import { designHref } from "../hrefs";
+import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
 import { PageIcon } from "../page/PageIcon";
@@ -157,6 +158,26 @@ export function EpicsPage({
       if (!next.delete(key)) next.add(key);
       return next;
     });
+  // Route state `focus` names a card (the sidebar's follow-ups popover): open its section once, then scroll to it.
+  const focus = (useLocation().state as { focus?: string } | null)?.focus;
+  const focused = useRef<string | undefined>(undefined);
+  const [scrollTo, setScrollTo] = useState<string>();
+  useEffect(() => {
+    if (!focus || !list || focused.current === focus) return;
+    const row = list.epics.find((e) => e.card_kind === CardKindFollowUps && followUpsFocus(e.project) === focus);
+    if (!row) return;
+    focused.current = focus;
+    const section = sections.find((s) => s.key === row.section);
+    if (section?.collapsedByDefault) setToggled((t) => new Set(t).add(section.key));
+    setScrollTo(focus);
+  }, [focus, list, sections]);
+  useEffect(() => {
+    if (!scrollTo) return;
+    const card = [...document.querySelectorAll("[data-focus]")].find((el) => el.getAttribute("data-focus") === scrollTo);
+    if (!card) return;
+    card.scrollIntoView?.({ block: "center" });
+    setScrollTo(undefined);
+  }, [scrollTo, toggled, list]);
   const newDesign = (
     <Button emphasis="main" flexShrink="0" whiteSpace="nowrap" onClick={() => setDesigning(true)}>
       New Design
