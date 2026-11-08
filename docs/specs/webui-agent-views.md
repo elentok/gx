@@ -100,7 +100,8 @@ instead of a silent setting; it does not claim to have found the cause.
 31. As a person, I want the vim check to relaunch at most once per launch, so that a stuck setting
     cannot loop. The existing hung-pane recovery keeps its own budget and outcome.
 32. As a person, I want gx, when a footer persists after the relaunch, to log again, type the prompt
-    anyway and rely on the hung-pane recovery, so that the launch still moves on.
+    anyway and rely on the existing fallback (the hung-pane recovery for Queue agents, the
+    first-prompt Actionable for web sessions), so that the launch still moves on.
 33. As a person, I want the vim check to add no pause kind and no new way into an existing one, so
     that the queue and the Agents tab show nothing new to learn. A persistent footer on a pane that
     also hangs may end in the existing `agent_prompt_stalled` launch failure, which the hung-pane
@@ -150,8 +151,9 @@ instead of a silent setting; it does not claim to have found the cause.
   about 1.5 s, and returns the settled rows in the response. The browser does no timing.
 - The settle covers every session the keys route accepts. That route dials only a holder
   (`holder.DialHolder`) and refuses Queue agents, so these are holder-backed Claude and Codex
-  sessions. The settle reads the holder screen through the same `liveRows` helper the screen route
-  uses (`server/sessions/chat/screen.go`); the keys route reads no screen today.
+  sessions. The settle reads `c.Screen(0)` on the holder client the keys route already dialed (the
+  read `liveRows` in `server/sessions/chat/screen.go` wraps). `liveRows` is unexported and re-dials
+  the holder on every call, so the settle does not use it. The keys route reads no screen today.
 - The settle runs after `Watches.MetaMu` is released, so it never blocks status updates or other
   session routes. It is ignored for `only_blocked` and `permission` requests, which keep today's
   behavior. The settled rows go in a new optional `SessionResult.rows` field; types are regenerated
@@ -171,8 +173,12 @@ instead of a silent setting; it does not claim to have found the cause.
   `server/sessions/prompt/firstprompt.go`). It runs after Ready and before the prompt is typed. Codex
   and the headless runner skip it (Codex is unaffected by the hang; the headless runner has no editor).
 - The check builds on the existing `harness` footer helpers (`harness/vimprobe.go`: `footerHasInsert`,
-  `settledRows`) and runs only when the launch applied the `editorMode: normal` override
-  (`Meta.EditorModeNormal`). `ReadyToType` keeps its mid-session `/config` toggle behavior; today's
+  `settledRows`) and runs only when the launch applied the `editorMode: normal` override. The
+  gate is `harness.EditorOverrideApplied(session)`, which every Claude launch sets through
+  `harness/claude.go` (`NoteLaunchedArgs` or `NoteEditorOverride`). `Meta.EditorModeNormal` is not
+  the gate: it exists only in `nativerunner`, and the herdr runner and web sessions lack it.
+  `footerHasInsert` matches only the INSERT marker, so a new `footerHasVim` helper beside it matches
+  both markers below the input row; `ReadyToType` keeps using `footerHasInsert`. `ReadyToType` keeps its mid-session `/config` toggle behavior; today's
   probe treats `-- INSERT --` as good news there, and this launch check is separate from it.
 - The check reads the screen with a settled read (two equal reads, as `settledRows` does) so a
   half-drawn frame is not misread. It trips on either vim footer (`-- INSERT --` or `-- NORMAL --`).
@@ -180,12 +186,24 @@ instead of a silent setting; it does not claim to have found the cause.
 - On a trip: log an event, relaunch Claude once, then continue the launch as usual. Who relaunches:
   the check returns a typed error from the prompt step, and the caller that already owns stop and
   relaunch does the single relaunch. That is the supervisor launch loop
-  (`ralphloop/supervise/startandprompt.go`) for Queue agents on either runner, and the session manager's
-  existing restart path for web sessions. A relaunch is a new session id, Meta and transcript.
+  (`ralphloop/supervise/startandprompt.go`) for Queue agents on either runner. A Queue relaunch is a
+  new session id, Meta and transcript. Web sessions have no suitable restart today: the only holder
+  restart, `Resumer.restartOnWorker`, is design-handoff specific (it switches to the worker tier and
+  rewrites `FirstPrompt`). This epic adds a Manager restart, factored out of the holder-restart half
+  of `restartOnWorker` (SaveTotals, new ConversationID, clearOldHolder, Run++, startSessionHolder,
+  new watch), that keeps the tier and `FirstPrompt` so the new watch's `firstPrompt` types it again.
+  A web session keeps its id and Meta; it gets a new run and a new conversation. The caller holds
+  `MetaMu` as `restartOnWorker` expects.
+- In `StartAndPrompt` the vim relaunch is its own one-shot flag, not counted in the existing
+  two-attempt `attempt` loop, and it reuses the same Stop plus "still live after stop" guard.
 - If a footer is still shown after the relaunch: log the event again, type the prompt anyway and rely
-  on the hung-pane recovery. The vim check relaunches at most once per launch. It adds no pause kind
-  and no new way into an existing one: a pane that also hangs already ends in the existing
-  `agent_prompt_stalled` launch failure today.
+  on the fallback. The vim check relaunches at most once per launch. It adds no pause kind and no new
+  way into an existing one. The outcome differs by path. A Queue agent whose pane also hangs ends in
+  the existing hung-pane recovery and `agent_prompt_stalled` launch failure (`HungPaneError` is handled
+  only in `ralphloop/supervise/startandprompt.go` and `ralphloop/lifecycle.go`). A web session whose
+  first prompt is not delivered ends in the existing first-prompt Actionable (`firstPrompt.failed`,
+  "prompt not delivered"). Worst case on a Queue agent: the vim relaunch plus the two hung-pane
+  attempts, at most three launches.
 - The existing launch with `editorMode: normal` stays; the check makes it a verified invariant
   rather than an assumed one. A unit test also asserts the final claude argv carries exactly one
   `--settings` with `editorMode: normal`.
@@ -217,7 +235,7 @@ launches happen. It does not check internal calls or timing constants beyond the
 - **Vim-mode check, Go.** New fake-Claude knobs "vim wedge" (draws a vim footer and stops taking
   keys) and "ignore the editor-mode override", added as `GX_AGENTFAKE_TUI_*` env knobs beside
   `TUIClearIgnoredEnv` and `TUIClearLeavesIEnv` in `testutil/agentfake/tui_control.go`. Cases, each on
-  all three launch paths: no footer means one launch and the prompt typed; a footer once means one
+  all three launch paths (the fakes also drive the Manager restart for web sessions): no footer means one launch and the prompt typed; a footer once means one
   relaunch then the prompt typed; a footer after the relaunch means two logged events, the prompt
   typed anyway and no further vim relaunch. Codex launch shows no check. The argv unit test above.
 - **Fallback test.** A launch where the footer persists and the pane hangs ends in the existing
@@ -269,7 +287,7 @@ Run against a temporary gx server after the epic is built. Catalog flows are in 
     asserts the response has no settled rows. Chat quick keys in `agents-commands-send` 153 still
     pass.
 25. Holder-backed sessions. Go test with a fake holder for a Claude and a Codex session through the
-    keys route; the settle reads the holder screen through `liveRows`.
+    keys route; the test asserts only the returned `SessionResult.rows`.
 26. Check before the prompt. Go test with the fake-Claude "vim wedge" knob: the prompt is not typed
     into the wedged first Claude.
 27. All three launch paths. The same Go test table runs on the native PTY launcher, the herdr runner
@@ -279,13 +297,17 @@ Run against a temporary gx server after the epic is built. Catalog flows are in 
     the event in the server log of a temporary server started with the "ignore the editor-mode
     override" knob.
 30. After Ready, before typing. Go test asserts order: Ready, check, relaunch, prompt.
-31. At most one vim relaunch. Go test: footer on every launch yields exactly one vim relaunch (two
-    launches) from the vim check.
+31. At most one vim relaunch. Go test: footer on every launch yields exactly one vim relaunch from
+    the vim check. Cases 29 and 31 use a wedge that clears after the relaunch. A separate case with a
+    pane that also hangs states the total: at most three launches, ending in `agent_prompt_stalled`.
 32. Persistent footer. Go test: two events logged, prompt typed anyway. The follow-on recovery is the
-    fallback test, using the `hung-pane-*` fixture scenarios.
+    fallback test, using the `hung-pane-*` fixture scenarios. A web-session case ends in the existing
+    first-prompt Actionable, not `agent_prompt_stalled`.
 33. No new pause. Go test: the persistent-footer case adds no pause kind. With a hanging pane too, it
     ends in the existing `agent_prompt_stalled` launch failure, ended by the Retry button on the parked
-    ticket.
+    ticket. A web session ends in the existing first-prompt Actionable instead; no new kind.
+    A Go test on the new Manager restart asserts the web session keeps its id, tier and `FirstPrompt`,
+    with a new run and conversation.
 34. Codex untouched. Go test: a Codex launch triggers no check and no relaunch.
 35. Healthy path. Go test: no footer yields one launch and no event, with one settled read.
 
