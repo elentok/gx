@@ -447,6 +447,30 @@ test("Workspaces", async ({ page, start }) => {
     await fx.cli("server", "workspaces", "sort", "Default workspace", order);
     await expect(focusedRow).toHaveAttribute("href", lastName);
   }
+
+  // Under "By last activity", Alt+1 opens the first row of the sorted list.
+  await fx.cli("server", "workspaces", "sort", "Default workspace", "activity");
+  await goto(page, "#/epics");
+  const sortedFirst = (await sidebar.getByRole("link").first().getAttribute("href"))!.slice(1);
+  await page.keyboard.press("Alt+1");
+  await expect.poll(() => new URL(page.url()).hash.slice(1)).toBe(sortedFirst);
+  await fx.cli("server", "workspaces", "sort", "Default workspace", "needs-you");
+  await goto(page, "#/epics");
+
+  // A row menu opens from the keyboard: Tab from the row to its menu button, Enter, arrow to an item, Enter.
+  const heldBefore = Number(/\d+/.exec((await onHold.textContent())!)![0]);
+  const held = onHold.locator("xpath=following::a[1]");
+  await onHold.click();
+  await held.focus();
+  await page.keyboard.press("Tab");
+  await expect(held.locator("xpath=..").getByRole("button", nav("More actions"))).toBeFocused();
+  await page.keyboard.press("Enter");
+  await menuFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", nav("Take off hold"))).toHaveAttribute("data-highlighted", "");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(onHold).toHaveText(`On hold (${heldBefore - 1})`);
   await pick("scratch");
   await openSort("scratch");
   await expect(sortOptions.nth(0)).toHaveAttribute("aria-checked", "true");
