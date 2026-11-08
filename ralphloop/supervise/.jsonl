@@ -1,0 +1,1 @@
+{"seq":1,"ts":"2026-11-08T08:45:57.547996Z","type":"pause.question","by":"gx","pause_kind":"background-task-gate","summary":"The agent ended its turn with a background task still running. Reopen the ticket?","text":"The agent ended its turn with a background task still running. Reopen the ticket?\n\niter-30 still waited on background task task-1 after 1h0m0s"}

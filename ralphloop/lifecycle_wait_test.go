@@ -51,6 +51,48 @@ func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 	}
 }
 
+// An unreported finish with a live task is checked every 10 minutes from state
+// only: one still-waiting line per check and nothing typed to the agent, until
+// the process is gone with no notification.
+func TestWaitIterationFinished_LiveTaskLogsStillWaitingAndTypesNothing(t *testing.T) {
+	t.Parallel()
+	scratch := fixture.EpicScratchDir(t, "epic")
+	var sleeps, checks int
+	d := fakes.IdleBackgroundTaskDeps(func(string, string) (transcript.BackgroundTaskReading, error) {
+		return transcript.BackgroundTaskReading{Markers: []transcript.BackgroundTaskMarker{
+			{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh},
+		}}, nil
+	}, &sleeps)
+	d.ReadBackgroundProcess = func(string, string) (deps.BackgroundProcess, error) {
+		checks++
+		return deps.BackgroundProcess{Known: true, Alive: checks <= 2}, nil
+	}
+	runner := fakes.IdleRunner("iter-27")
+	d.Runner = runner
+
+	one := OneIteration{Agent: agent.AgentClaude, ScratchDir: scratch, Epic: "epic"}
+	wt := IterationWorktree{Label: "iter-27", Path: "/repo/iter-27"}
+	if err := WaitIterationFinished(d, one, wt, agentrunner.Session{Label: "iter-27", ID: "pane-1"}); err != nil {
+		t.Fatalf("WaitIterationFinished: %v", err)
+	}
+	evs, _, err := runlog.ReadEvents(scratch, "epic")
+	if err != nil {
+		t.Fatalf("ReadEvents: %v", err)
+	}
+	var waiting int
+	for _, ev := range evs {
+		if ev.Type == string(events.BackgroundTaskStillWaiting) {
+			waiting++
+		}
+	}
+	if waiting != 2 {
+		t.Errorf("still-waiting lines = %d, want 2", waiting)
+	}
+	if got := runner.Prompts("iter-27"); len(got) != 0 {
+		t.Errorf("prompts typed to the agent = %q, want none", got)
+	}
+}
+
 // A first idle that the debounce disproves (the agent went back to work) must
 // not end the wait.
 func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {

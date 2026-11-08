@@ -13,14 +13,45 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/backgroundtask"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/metrics"
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/transcript"
 )
+
+// BackgroundProcess is one background task's process state. Known is false
+// when the task's output file or process table could not be read, which is
+// never evidence that the process is gone.
+type BackgroundProcess struct {
+	Known       bool
+	Alive       bool
+	OutputBytes int64
+}
+
+// readBackgroundProcess finds the task's .output file under claude's task
+// directory and matches it to a live process by that file as the process's
+// stdout. Root pid 0 spans the whole table: the file match is unique per task.
+func readBackgroundProcess(sessionID, taskID string) (BackgroundProcess, error) {
+	pattern := filepath.Join("/tmp", fmt.Sprintf("claude-%d", os.Getuid()), "*", sessionID, "tasks", taskID+".output")
+	paths, err := filepath.Glob(pattern)
+	if err != nil || len(paths) != 1 {
+		return BackgroundProcess{}, err
+	}
+	m, err := backgroundtask.ProcessFinder{Procs: syshealth.DefaultProcess()}.Match(0, paths[0], "")
+	if err != nil {
+		return BackgroundProcess{}, err
+	}
+	out := BackgroundProcess{Known: true, Alive: m.Alive}
+	if info, err := os.Stat(paths[0]); err == nil {
+		out.OutputBytes = info.Size()
+	}
+	return out, nil
+}
 
 // Deps are the external side-effecting operations the loop drives: herdr
 // socket-API calls, git worktree/cherry-picking, and the smart-zone
@@ -160,6 +191,10 @@ type Deps struct {
 	// running (see waitForBackgroundTasks). Codex has no equivalent transcript
 	// signal, so callers only ever invoke this for agent.AgentClaude.
 	ReadBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error)
+	// ReadBackgroundProcess reads, from process state only, whether one
+	// background task's process still runs. Nil, or Known false, never
+	// releases a held task early.
+	ReadBackgroundProcess func(sessionID, taskID string) (BackgroundProcess, error)
 	// GateReleased reports whether recovery force-released this iteration's
 	// held background-task gate. Nil never releases.
 	GateReleased func() bool
@@ -362,6 +397,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			}
 			return transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, time.Now())
 		},
+		ReadBackgroundProcess: readBackgroundProcess,
 		ReadUnexecutedToolCall: func(cwd, sessionID string) (bool, error) {
 			path, found := transcriptPath(overrides.Home, cwd, sessionID)
 			if !found {

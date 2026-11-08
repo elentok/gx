@@ -661,7 +661,9 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 	held := map[string]bool{}
 	ignored := map[string]bool{}
 	gated := false
+	gone := map[string]bool{}
 	heldMs := 0
+	nextCheckMs := int(BackgroundTaskCheckEvery / time.Millisecond)
 	for {
 		tr, err := d.ReadBackgroundTasks(p.SessionCwd, sessionID)
 		if err != nil {
@@ -681,6 +683,9 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 		}
 		stillFresh := reading.AwaitingTurnEnd
 		for _, m := range reading.Tasks {
+			if gone[m.TaskID] && m.Status == transcript.BackgroundTaskOutstandingFresh {
+				continue
+			}
 			if m.Status == transcript.BackgroundTaskOutstandingFresh && !reportedAt.IsZero() && m.StartedAt.Before(reportedAt) {
 				delete(held, m.TaskID)
 				if !ignored[m.TaskID] {
@@ -740,6 +745,16 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 			return confirmed, nil
 		}
 
+		if heldMs >= nextCheckMs {
+			nextCheckMs += int(BackgroundTaskCheckEvery / time.Millisecond)
+			released, err := checkHeldTasks(d, p, sessionID, held, gone)
+			if err != nil {
+				return false, err
+			}
+			if released {
+				continue
+			}
+		}
 		if heldMs >= int(BackgroundTaskHoldCap/time.Millisecond) {
 			return false, pauseBackgroundTaskHold(p, sessionID, reading.Tasks, held)
 		}
@@ -762,6 +777,52 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 // BackgroundTaskHoldCap is the one cap on every live-task hold: a task, or a
 // turn a task woke, that outlasts it pauses the ticket instead of waiting on.
 const BackgroundTaskHoldCap = 60 * time.Minute
+
+// BackgroundTaskCheckEvery is how often a held task's process state is read.
+const BackgroundTaskCheckEvery = 10 * time.Minute
+
+// checkHeldTasks reads each held task's process state and logs a still-waiting
+// line; it types nothing to the agent and never kills a task. A task whose
+// process is gone with no notification in the transcript is released, since
+// nothing will ever resolve it. A quiet output file is never a reason.
+func checkHeldTasks(d deps.Deps, p LaunchParams, sessionID string, held, gone map[string]bool) (bool, error) {
+	released := false
+	for id := range held {
+		reason := fmt.Sprintf("background task %s: state unknown", id)
+		if d.ReadBackgroundProcess != nil {
+			if proc, err := d.ReadBackgroundProcess(sessionID, id); err == nil && proc.Known {
+				if !proc.Alive && !notified(d, p, sessionID, id) {
+					delete(held, id)
+					gone[id] = true
+					released = true
+					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: process gone, no notification", id)); err != nil {
+						return false, err
+					}
+					continue
+				}
+				reason = fmt.Sprintf("background task %s: process alive=%t, output %d bytes", id, proc.Alive, proc.OutputBytes)
+			}
+		}
+		if err := p.LogGateEvent(events.BackgroundTaskStillWaiting, sessionID, id, "still waiting, "+reason); err != nil {
+			return false, err
+		}
+	}
+	return released, nil
+}
+
+// notified reports whether the transcript now shows the task resolved.
+func notified(d deps.Deps, p LaunchParams, sessionID, taskID string) bool {
+	tr, err := d.ReadBackgroundTasks(p.SessionCwd, sessionID)
+	if err != nil {
+		return true
+	}
+	for _, m := range tr.Markers {
+		if m.TaskID == taskID {
+			return m.Status == transcript.BackgroundTaskResolved
+		}
+	}
+	return false
+}
 
 // finishedReportTime is when the agent reported finished, or zero when the
 // ticket carries no finished report (or cannot be read).

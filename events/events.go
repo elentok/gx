@@ -30,6 +30,8 @@ const (
 	BackgroundTaskGateHeld     Type = "background-task-gate-held"
 	BackgroundTaskGateReleased Type = "background-task-gate-released"
 	BackgroundTaskGateExpired  Type = "background-task-gate-expired"
+	// BackgroundTaskStillWaiting is a periodic state-only check of a held task.
+	BackgroundTaskStillWaiting Type = "background-task-still-waiting"
 	PausedRateLimit            Type = "paused-rate-limit"
 	Resumed                    Type = "resumed"
 	VerifyCapStopped           Type = "verify-cap-stopped"
