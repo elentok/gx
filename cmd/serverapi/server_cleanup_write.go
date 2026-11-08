@@ -19,6 +19,10 @@ func newServerCleanupRemoveCmd(d Deps) *cobra.Command {
 	return newServerCleanupWriteCmd(d, "cleanup-remove", "Remove a merged branch's worktree, then the branch", (*apiclient.Reads).RemoveCleanupWorktree)
 }
 
+func newServerCleanupRemoveUnmergedCmd(d Deps) *cobra.Command {
+	return newServerCleanupWriteCmd(d, "cleanup-remove-unmerged", "Remove an unmerged branch's clean, idle worktree and keep the branch", (*apiclient.Reads).RemoveUnmergedCleanupWorktree)
+}
+
 func newServerCleanupDeleteCmd(d Deps) *cobra.Command {
 	return newServerCleanupWriteCmd(d, "cleanup-delete", "Delete a merged branch that has no worktree", (*apiclient.Reads).DeleteCleanupBranch)
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -105,14 +104,14 @@ func (s *Reconciler) liveWorkIn(root queue.RootRef, path string) string {
 		return "sessions could not be listed: " + err.Error()
 	} else {
 		for _, in := range sessions {
-			if in.Status.State != wire.SessionExited && dirInside(in.Dir, path) {
+			if in.Status.State != wire.SessionExited && worktree.DirInside(in.Dir, path) {
 				return "session " + in.ID + " is live in it"
 			}
 		}
 	}
 	for _, t := range s.registry.List() {
 		// An older server saved no cwd: any live run of the epic may be inside.
-		inside := dirInside(t.Cwd, path) || (t.Cwd == "" && t.Root == root.String())
+		inside := worktree.DirInside(t.Cwd, path) || (t.Cwd == "" && t.Root == root.String())
 		if inside && (t.State == runs.Launching || s.runLive(t.Run)) {
 			return "run " + t.Address + " is live in it"
 		}
@@ -129,17 +128,6 @@ func (s *Reconciler) runLive(run runs.Run) bool {
 	}
 	st, err := runner.Status(run.Session)
 	return err == nil && (st.State != agentrunner.StateDone || runner.Name() == runs.RunnerHerdr)
-}
-
-// dirInside reports whether dir is path or below it, through symlinks and by
-// whole path elements.
-func dirInside(dir, path string) bool {
-	rd, rp, ok := resolvePair(dir, path)
-	if !ok {
-		return false
-	}
-	rel, err := filepath.Rel(rp, rd)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // sameDir reports whether a and b are one directory, through symlinks (macOS

@@ -43,6 +43,15 @@ func (r *Reads) RemoveCleanupWorktree(ctx context.Context, req wire.CleanupWrite
 	return res, err
 }
 
+// RemoveUnmergedCleanupWorktree removes an unmerged branch's worktree when it
+// is clean and idle, and keeps the branch. A refusal is a result (Refused set),
+// not an error.
+func (r *Reads) RemoveUnmergedCleanupWorktree(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
+	var res wire.CleanupWriteResult
+	err := r.t.post(ctx, "/v1/cleanup/remove-unmerged-worktree", req, &res)
+	return res, err
+}
+
 // DeleteCleanupBranch deletes a merged branch that has no worktree. A refusal
 // is a result (Refused set), not an error.
 func (r *Reads) DeleteCleanupBranch(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {

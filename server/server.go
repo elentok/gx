@@ -372,7 +372,8 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.settings.Store(&cfg.Settings)
 	s.settings.SetAppliers(lifecycle.ReloadAppliers(reloadHost{s}))
-	s.cleanup = cleanup.New(cleanup.Deps{TicketStore: cfg.TicketStore, Env: cfg.Env, Events: events})
+	s.cleanup = cleanup.New(cleanup.Deps{TicketStore: cfg.TicketStore, Env: cfg.Env, Events: events,
+		Sessions: func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() }})
 	s.disks = disk.New(disk.Deps{
 		Config: disk.Config{
 			FreeSpace: cfg.FreeSpace, GoCacheDir: cfg.GoCacheDir, DiskPollInterval: cfg.DiskPollInterval,

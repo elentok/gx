@@ -41,17 +41,27 @@ func (c *Cleanup) write(w http.ResponseWriter, r *http.Request, do func(project,
 
 // RemoveWorktree removes a merged branch's worktree, then deletes the branch.
 func (c *Cleanup) RemoveWorktree(project, branch string) (wire.CleanupWriteResult, error) {
-	return c.act(project, branch, true)
+	return c.act(project, branch, func(root, branch string) (wire.CleanupWriteResult, error) {
+		return c.actLocked(root, branch, true)
+	})
 }
 
 // DeleteBranch deletes a merged branch that has no worktree.
 func (c *Cleanup) DeleteBranch(project, branch string) (wire.CleanupWriteResult, error) {
-	return c.act(project, branch, false)
+	return c.act(project, branch, func(root, branch string) (wire.CleanupWriteResult, error) {
+		return c.actLocked(root, branch, false)
+	})
 }
 
-// act re-scans under the worktree lock and writes only if the row still passes
-// its merged check. Nothing here forces: git's refusal stays the row's reason.
-func (c *Cleanup) act(project, branch string, withWorktree bool) (wire.CleanupWriteResult, error) {
+// RemoveUnmergedWorktree removes the worktree of an unmerged branch that is
+// clean and idle, and keeps the branch.
+func (c *Cleanup) RemoveUnmergedWorktree(project, branch string) (wire.CleanupWriteResult, error) {
+	return c.act(project, branch, c.removeUnmergedLocked)
+}
+
+// act runs do under the worktree lock. do re-scans and writes only if the row
+// still passes its check. Nothing here forces: git's refusal stays the reason.
+func (c *Cleanup) act(project, branch string, do func(root, branch string) (wire.CleanupWriteResult, error)) (wire.CleanupWriteResult, error) {
 	dir, err := tickets.ProjectDirByName(c.d.TicketStore, project)
 	if err != nil {
 		return wire.CleanupWriteResult{}, err
@@ -64,22 +74,77 @@ func (c *Cleanup) act(project, branch string, withWorktree bool) (wire.CleanupWr
 	err = worktree.WithWorktreeLock(func() error {
 		defer c.Invalidate()
 		var err error
-		res, err = c.actLocked(root, branch, withWorktree)
+		res, err = do(root, branch)
 		return err
 	})
 	return res, err
 }
 
-func (c *Cleanup) actLocked(root, branch string, withWorktree bool) (wire.CleanupWriteResult, error) {
+func (c *Cleanup) scanRow(root, branch string) (*cleanupscan.WorktreeScan, error) {
 	scan, err := cleanupscan.ScanIn(c.d.TicketStore, root)
+	if err != nil {
+		return nil, err
+	}
+	for i := range scan.Worktrees {
+		if branch != "" && scan.Worktrees[i].Branch == branch {
+			return &scan.Worktrees[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// removeUnmergedLocked refuses a dirty worktree and one a live session works
+// in. A recent commit does not block it.
+func (c *Cleanup) removeUnmergedLocked(root, branch string) (wire.CleanupWriteResult, error) {
+	row, err := c.scanRow(root, branch)
 	if err != nil {
 		return wire.CleanupWriteResult{}, err
 	}
-	var row *cleanupscan.WorktreeScan
-	for i := range scan.Worktrees {
-		if branch != "" && scan.Worktrees[i].Branch == branch {
-			row = &scan.Worktrees[i]
+	switch {
+	case row == nil:
+		return refuse(wire.ReasonCleanupUnknown, "no such branch any more"), nil
+	case row.Path == "":
+		return refuse(wire.ReasonCleanupNoWorktree, "the branch has no worktree"), nil
+	case row.Dirty:
+		return refuse(wire.ReasonCleanupDirty, "the worktree has uncommitted changes"), nil
+	}
+	live, err := c.liveSessionIn(row.Path)
+	if err != nil {
+		return wire.CleanupWriteResult{}, err
+	}
+	if live != "" {
+		return refuse(wire.ReasonCleanupLive, "session "+live+" is live in the worktree"), nil
+	}
+	repo, err := git.FindRepo(root)
+	if err != nil {
+		return wire.CleanupWriteResult{}, err
+	}
+	if err := git.RemoveWorktree(*repo, row.Path, false); err != nil {
+		return refuse(wire.ReasonCleanupGitRefused, err.Error()), nil
+	}
+	return wire.CleanupWriteResult{WorktreeRemoved: true}, nil
+}
+
+func (c *Cleanup) liveSessionIn(path string) (string, error) {
+	if c.d.Sessions == nil {
+		return "", nil
+	}
+	sessions, err := c.d.Sessions()
+	if err != nil {
+		return "", err
+	}
+	for _, s := range sessions {
+		if s.Status.State != wire.SessionExited && worktree.DirInside(s.Dir, path) {
+			return s.ID, nil
 		}
+	}
+	return "", nil
+}
+
+func (c *Cleanup) actLocked(root, branch string, withWorktree bool) (wire.CleanupWriteResult, error) {
+	row, err := c.scanRow(root, branch)
+	if err != nil {
+		return wire.CleanupWriteResult{}, err
 	}
 	switch {
 	case row == nil:

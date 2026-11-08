@@ -109,10 +109,12 @@ export const ReasonCleanupNotMerged = "cleanup-not-merged";
 export const ReasonCleanupHasWorktree = "cleanup-has-worktree";
 export const ReasonCleanupNoWorktree = "cleanup-no-worktree";
 export const ReasonCleanupGitRefused = "cleanup-git-refused";
+export const ReasonCleanupDirty = "cleanup-dirty";
+export const ReasonCleanupLive = "cleanup-live-session";
 /**
  * Reasons a cleanup write refuses.
  */
-export type ReasonCleanup = typeof ReasonCleanupUnknown | typeof ReasonCleanupNotMerged | typeof ReasonCleanupHasWorktree | typeof ReasonCleanupNoWorktree | typeof ReasonCleanupGitRefused;
+export type ReasonCleanup = typeof ReasonCleanupUnknown | typeof ReasonCleanupNotMerged | typeof ReasonCleanupHasWorktree | typeof ReasonCleanupNoWorktree | typeof ReasonCleanupGitRefused | typeof ReasonCleanupDirty | typeof ReasonCleanupLive;
 /**
  * CleanupWriteResult is a cleanup write's answer. A refusal is a result, not
  * an error; Message then holds the reason, git's own when git refused.

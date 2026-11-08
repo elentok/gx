@@ -2,6 +2,8 @@ package worktree
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/elentok/gx/agentrunner"
@@ -19,6 +21,21 @@ func WithWorktreeLock(fn func() error) error {
 	Lock.Lock()
 	defer Lock.Unlock()
 	return fn()
+}
+
+// DirInside reports whether dir is path or below it, through symlinks and by
+// whole path elements. An empty or unresolvable side is not inside.
+func DirInside(dir, path string) bool {
+	if dir == "" || path == "" {
+		return false
+	}
+	rd, errD := filepath.EvalSymlinks(dir)
+	rp, errP := filepath.EvalSymlinks(path)
+	if errD != nil || errP != nil {
+		return false
+	}
+	rel, err := filepath.Rel(rp, rd)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // BranchExists reports whether branch is a resolvable ref in dir's repo,

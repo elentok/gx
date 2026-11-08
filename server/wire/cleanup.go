@@ -54,6 +54,8 @@ const (
 	ReasonCleanupHasWorktree = "cleanup-has-worktree"
 	ReasonCleanupNoWorktree  = "cleanup-no-worktree"
 	ReasonCleanupGitRefused  = "cleanup-git-refused"
+	ReasonCleanupDirty       = "cleanup-dirty"
+	ReasonCleanupLive        = "cleanup-live-session"
 )
 
 // CleanupWriteResult is a cleanup write's answer. A refusal is a result, not

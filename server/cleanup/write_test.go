@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 func gitIn(t *testing.T, dir string, args ...string) string {
@@ -222,6 +223,69 @@ func TestCleanupWrite_WaitsForTheWorktreeLock(t *testing.T) {
 		}
 	case <-time.After(30 * time.Second):
 		t.Fatal("write never ran after the lock was released")
+	}
+}
+
+func removeUnmerged(t *testing.T, h *servertest.Harness) wire.CleanupWriteResult {
+	t.Helper()
+	res, err := h.Client.Reads.RemoveUnmergedCleanupWorktree(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestCleanupWrite_UnmergedCleanIdleWorktreeIsRemovedAndTheBranchKept(t *testing.T) {
+	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature-x")
+	commitFile(t, wt, "recent.txt")
+	h := startCleanup(t, repo)
+
+	if res := removeUnmerged(t, h); res.Refused || !res.WorktreeRemoved {
+		t.Fatalf("res = %+v", res)
+	}
+	if _, err := os.Stat(wt); !os.IsNotExist(err) {
+		t.Errorf("worktree folder still there: %v", err)
+	}
+	if !strings.Contains(branches(t, repo), "feature-x") {
+		t.Errorf("branch was deleted")
+	}
+}
+
+func TestCleanupWrite_UnmergedDirtyWorktreeIsRefused(t *testing.T) {
+	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature-x")
+	commitFile(t, wt, "recent.txt")
+	if err := os.WriteFile(filepath.Join(wt, "dirty.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := startCleanup(t, repo)
+
+	if res := removeUnmerged(t, h); !res.Refused || res.Reason != wire.ReasonCleanupDirty {
+		t.Fatalf("res = %+v", res)
+	}
+	if _, err := os.Stat(wt); err != nil {
+		t.Errorf("worktree gone: %v", err)
+	}
+}
+
+func TestCleanupWrite_UnmergedWorktreeWithALiveSessionIsRefused(t *testing.T) {
+	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature-x")
+	commitFile(t, wt, "recent.txt")
+	store := t.TempDir()
+	if err := servertest.WriteEpic(store, "proj", ""); err != nil {
+		t.Fatal(err)
+	}
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
+	res, err := h.Client.Sessions.Create(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: wt, Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+
+	if got := removeUnmerged(t, h); !got.Refused || got.Reason != wire.ReasonCleanupLive {
+		t.Fatalf("res = %+v", got)
+	}
+	if _, err := os.Stat(wt); err != nil {
+		t.Errorf("worktree gone: %v", err)
 	}
 }
 
