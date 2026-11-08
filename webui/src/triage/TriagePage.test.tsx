@@ -113,6 +113,18 @@ test("Continue is disabled while a session runs and enabled once it is stopped, 
   await waitFor(() => expect(openTriage).toHaveBeenCalledWith({ epic: "gx" }));
 });
 
+test("at Approve the header has Approve and no Continue, and the Progress tree lists Questions and Review", async () => {
+  const detail = viewOf({ steps: stepsAt(2), open_questions: 0, action_counts: { ready: 2 }, revision: 3 });
+  render([session("idle")], { triage: async () => ({ kind: "ok", detail }) });
+  const header = (await screen.findByRole("button", { name: "Approve" })) as HTMLButtonElement;
+  expect(header.disabled).toBe(false);
+  expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Approve and write" })).toBeTruthy();
+  const sub = document.querySelector('[data-step="approve"]')?.textContent ?? "";
+  expect(sub).toContain("Questions");
+  expect(sub).toContain("Review");
+});
+
 test("with no session the header button reads Start", async () => {
   render([]);
   expect(((await screen.findByRole("button", { name: "Start" })) as HTMLButtonElement).disabled).toBe(false);

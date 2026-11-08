@@ -36,8 +36,11 @@ export function Row({ glyph, tone, children }: { glyph: string; tone: Tone; chil
   );
 }
 
+/** Sub-rows under a step, by step id. */
+export type StepRows = Partial<Record<string, ReactNode>>;
+
 /** `rows` is a flow's own sub-tree, shown under the Resolve tickets step (Design only). */
-function Steps({ model, rows }: { model: SteppedModel; rows?: ReactNode }) {
+function Steps({ model, rows, stepRows }: { model: SteppedModel; rows?: ReactNode; stepRows?: StepRows }) {
   return (
     <Box as="ol" fontSize="sm" listStyleType="none" m="0" p="0" display="flex" flexDirection="column" gap="1">
       {model.steps.map((s) => {
@@ -50,6 +53,7 @@ function Steps({ model, rows }: { model: SteppedModel; rows?: ReactNode }) {
               </Text>
             </Row>
             {s.step === RESOLVE_TICKETS && rows}
+            {stepRows?.[s.step]}
           </Box>
         );
       })}
@@ -110,11 +114,13 @@ export function StepsSheet({
   model,
   ring,
   rows,
+  stepRows,
   onClose,
 }: {
   model: SteppedModel;
   ring: ReactNode;
   rows?: ReactNode;
+  stepRows?: StepRows;
   onClose: () => void;
 }) {
   return (
@@ -128,17 +134,17 @@ export function StepsSheet({
           Close
         </Button>
       </Box>
-      <Steps model={model} rows={rows} />
+      <Steps model={model} rows={rows} stepRows={stepRows} />
     </BottomSheet>
   );
 }
 
 /** The desktop Progress sidebar: the flow's steps, and `rows` under Resolve tickets. */
-export function Progress({ model, rows }: { model: SteppedModel; rows?: ReactNode }) {
+export function Progress({ model, rows, stepRows }: { model: SteppedModel; rows?: ReactNode; stepRows?: StepRows }) {
   // A panel like the Designs sidebar, only as tall as its steps.
   return (
     <Box bg="surface.raised" px="3" py="4">
-      <Steps model={model} rows={rows} />
+      <Steps model={model} rows={rows} stepRows={stepRows} />
     </Box>
   );
 }

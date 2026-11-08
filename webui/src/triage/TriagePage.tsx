@@ -2,7 +2,7 @@ import { Box, Spinner as ChakraSpinner, Text, chakra } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { flowSession, liveFlowSessions } from "../design/view";
-import { postAbandonTriage, postOpenTriage, type AbandonTriage, type OpenFlow, type ResumeSession, type StopSession } from "../design/open";
+import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type OpenFlow, type ResumeSession, type StopSession } from "../design/open";
 import { useDesignWrite } from "../design/SessionControls";
 import type { FetchChat } from "../design/chat";
 import type { PostFocus } from "../design/focus";
@@ -11,6 +11,7 @@ import type { FetchScreen } from "../design/screen";
 import { TriageAbandoned, TriageNone, type SessionInfo, type TriageView } from "../generated/server";
 import { Modal } from "../ui/modal/Modal";
 import { TriageHistory } from "./History";
+import { ApproveShell, approveSubRows, useApprove, useApproveView } from "./ApproveShell";
 import { DetailPage } from "../page/DetailPage";
 import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
@@ -32,9 +33,11 @@ export interface TriageDeps {
   fetchScreen?: FetchScreen;
   focus?: PostFocus;
   abandon?: AbandonTriage;
+  approve?: ApproveTriage;
 }
 
 const FLOW = "triage";
+const APPROVE = "approve";
 
 /** Start, or Continue once a session exists. The open route returns the live Triage, so it never starts a second one. */
 function HeaderButton({ project, session, open = postOpenTriage }: { project: string; session?: SessionInfo; open?: OpenFlow }) {
@@ -81,8 +84,11 @@ function AbandonDialog({
   );
 }
 
-function TriageBody({ project, view, deps }: { project: string; view: TriageView; deps: TriageDeps }) {
+function TriageBody({ project, view, deps, refetch }: { project: string; view: TriageView; deps: TriageDeps; refetch: () => void }) {
   const [abandoning, setAbandoning] = useState(false);
+  const approveView = useApproveView(view.revision, view.open_questions);
+  const approval = useApprove({ project, view, refetch, approve: deps.approve, carryReview: approveView.carryReview });
+  const atApprove = view.steps.some((s) => s.step === APPROVE && s.state === "current");
   const wide = useWide();
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -117,7 +123,18 @@ function TriageBody({ project, view, deps }: { project: string; view: TriageView
       current={flowSession(FLOW, project, sessions)}
       actions={deps}
       startLabel="Start"
-      headerButton={(session) => <HeaderButton project={project} session={session} open={deps.open} />}
+      headerButton={(session) =>
+        atApprove ? (
+          <Button tone="done" disabled={!!approval.blocked || approval.pending} onClick={approval.approve}>
+            {approval.pending && <ChakraSpinner size="sm" />}
+            Approve
+          </Button>
+        ) : (
+          <HeaderButton project={project} session={session} open={deps.open} />
+        )
+      }
+      noContinue={atApprove}
+      stepRows={atApprove ? { [APPROVE]: approveSubRows(view, approveView.view) } : undefined}
       working={() => ({ step: model.current?.label })}
       subtitleSuffix={view.step_note && ` · ${view.step_note}`}
       metaLink={
@@ -125,8 +142,10 @@ function TriageBody({ project, view, deps }: { project: string; view: TriageView
           Triage of {project}:follow-ups ↗
         </chakra.a>
       }
-      chatTop={() =>
-        live.length > 0 && (
+      chatTop={() => (
+        <>
+          {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} />}
+          {live.length > 0 && (
           <Box
             display="flex"
             alignItems="center"
@@ -141,8 +160,9 @@ function TriageBody({ project, view, deps }: { project: string; view: TriageView
             <Box aria-hidden w="8px" h="8px" borderRadius="full" bg="tone.running.fg" />
             Triage session running · verdicts saved {verdictsSaved(view)}
           </Box>
-        )
-      }
+          )}
+        </>
+      )}
       />
     </>
   );
@@ -159,7 +179,7 @@ export function TriagePage({ project, deps = {} }: { project: string; deps?: Tri
 // The body reads `useWide`, so it renders inside DetailPage's page mode.
 function TriagePageBody({ project, deps }: { project: string; deps: TriageDeps }) {
   const conn = useConnectionContext();
-  const { detail, notFound } = useTriage(project, conn, deps.fetchTriage);
+  const { detail, notFound, refetch } = useTriage(project, conn, deps.fetchTriage);
   // An abandoned latest record is no Triage to work on; it stays in history.
   if (notFound || detail?.state === TriageNone || detail?.state === TriageAbandoned)
     return (
@@ -169,5 +189,5 @@ function TriagePageBody({ project, deps }: { project: string; deps: TriageDeps }
       </Box>
     );
   if (!detail) return <Spinner label="Loading Triage" />;
-  return <TriageBody project={project} view={detail} deps={deps} />;
+  return <TriageBody project={project} view={detail} deps={deps} refetch={refetch} />;
 }

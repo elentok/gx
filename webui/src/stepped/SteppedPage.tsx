@@ -15,7 +15,7 @@ import { useKeyboardOpen } from "../page/useKeyboardOpen";
 import type { MenuEntry } from "../ui/menu/Menu";
 import { useDevice } from "../useWide";
 import type { SteppedModel } from "./model";
-import { Progress, StepLine, StepsSheet, summaryLine } from "./Progress";
+import { Progress, StepLine, StepsSheet, summaryLine, type StepRows } from "./Progress";
 
 /** The injected actions the frame talks to the server through. */
 export interface SteppedActions {
@@ -62,6 +62,10 @@ export interface SteppedPageProps {
   metaLink?: ReactNode;
   chatTop?: (ctx: { questions: boolean }) => ReactNode;
   ticketRows?: ReactNode;
+  /** Sub-rows under any step (Triage: Questions and Review under Approve). */
+  stepRows?: StepRows;
+  /** The step offers no Continue: the person acts on the page itself. */
+  noContinue?: boolean;
   designMenu?: DesignMenu;
   /** Extra items for the ⋯ menu, beside Copy ID. */
   menuItems?: MenuEntry[];
@@ -132,6 +136,8 @@ export function SteppedPage({
   metaLink,
   chatTop,
   ticketRows,
+  stepRows,
+  noContinue,
   designMenu,
   menuItems,
   footer,
@@ -158,7 +164,7 @@ export function SteppedPage({
   return (
     <>
       {stepsOpen && model && (
-        <StepsSheet model={model} rows={ticketRows} ring={ring?.("compact")} onClose={() => setStepsOpen(false)} />
+        <StepsSheet model={model} rows={ticketRows} stepRows={stepRows} ring={ring?.("compact")} onClose={() => setStepsOpen(false)} />
       )}
       {/* With the keyboard up the header would take most of the visible height; the question needs it. */}
       <Box mt="4" mb="3" flex="none" display={keyboardOpen && !sideColumn ? "none" : undefined}>
@@ -236,7 +242,7 @@ export function SteppedPage({
           {chatTop?.({ questions })}
           <DesignChat
             session={session}
-            chat={chat}
+            chat={noContinue && chat ? { ...chat, next: undefined } : chat}
             refetch={refetchChat}
             post={actions.post}
             done={model?.done}
@@ -249,7 +255,7 @@ export function SteppedPage({
         </Box>
         {stepsInline && (
           <Box aria-label="Progress" role="region" gridRow={1} gridColumn={2} minH="0" overflowY="auto">
-            {model && <Progress model={model} rows={ticketRows} />}
+            {model && <Progress model={model} rows={ticketRows} stepRows={stepRows} />}
           </Box>
         )}
       </Box>
