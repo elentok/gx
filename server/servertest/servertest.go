@@ -66,8 +66,11 @@ type Harness struct {
 	tb testing.TB
 	// failStart, stops and stopGate back FailNextStart, Stops and BlockStops.
 	failStart atomic.Pointer[error]
-	stops     atomic.Int32
-	stopGate  atomic.Pointer[chan struct{}]
+	// failPrompts and failPromptErr back FailNextPrompts.
+	failPrompts   atomic.Int32
+	failPromptErr atomic.Pointer[error]
+	stops         atomic.Int32
+	stopGate      atomic.Pointer[chan struct{}]
 
 	startsMu sync.Mutex
 	starts   []AgentStart

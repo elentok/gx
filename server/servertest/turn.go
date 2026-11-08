@@ -153,6 +153,28 @@ func (h *Harness) FailNextStart(err error) {
 	}
 }
 
+// FailNextPrompts makes the next n plain prompts (not launch prompts, such as
+// the stall nudge) fail with err before anything is typed. PTY only.
+func (h *Harness) FailNextPrompts(n int, err error) {
+	if h.ptyOnly("FailNextPrompts") {
+		h.failPromptErr.Store(&err)
+		h.failPrompts.Store(int32(n))
+	}
+}
+
+// takeFailedPrompt reports the error the next plain prompt fails with, if any.
+func (h *Harness) takeFailedPrompt() error {
+	for {
+		n := h.failPrompts.Load()
+		if n <= 0 {
+			return nil
+		}
+		if h.failPrompts.CompareAndSwap(n, n-1) {
+			return *h.failPromptErr.Load()
+		}
+	}
+}
+
 // Stops is how many times the server stopped an agent. PTY only.
 func (h *Harness) Stops() int {
 	if !h.ptyOnly("Stops") {

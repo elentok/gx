@@ -263,6 +263,24 @@ func TestWaitIterationFinished_InputNotEmptyTwicePauses(t *testing.T) {
 	}
 }
 
+// A pane that stopped taking keys is not retried like a busy input: the wait
+// asks for a relaunch, and no generic nudge failure comes back.
+func TestWaitIterationFinished_HungPaneAsksForRelaunch(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	r.FailNextPrompts("iter-01", 2, &claudeui.HungPaneError{Screen: "> frozen"})
+	err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-01"}, agentrunner.Session{Label: "iter-01", ID: "pane-1"})
+	if _, ok := errors.AsType[*RelaunchRequest](err); !ok {
+		t.Fatalf("err = %v, want a relaunch request", err)
+	}
+	if !strings.Contains(err.Error(), "pane hung") || strings.Contains(err.Error(), "stall nudge for") {
+		t.Errorf("err = %q, want the hung-pane error without the generic nudge failure text", err)
+	}
+	if evs, _, _ := runlog.ReadEvents(one.ScratchDir, one.Epic); len(evs) != 0 {
+		t.Errorf("events = %+v, want no retry logged for a hung pane", evs)
+	}
+}
+
 func TestWaitIterationFinished_ZeroDelayDisablesNudge(t *testing.T) {
 	t.Parallel()
 	d, r, one, _ := stallNudgeFixture(t, "", 0)

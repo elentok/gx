@@ -374,6 +374,13 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 	}
 }
 
+// RelaunchRequest is the wait's answer to a pane that stopped taking keys: the
+// caller stops the session and launches a fresh one. Err is the hung-pane error.
+type RelaunchRequest struct{ Err error }
+
+func (e *RelaunchRequest) Error() string { return e.Err.Error() }
+func (e *RelaunchRequest) Unwrap() error { return e.Err }
+
 // nudgeIfStalled waits out the stall delay, then types the stall nudge into an
 // agent that is still idle with no open question and no finished report.
 // again tells the caller to wait for the agent to settle once more: after the
@@ -395,6 +402,11 @@ func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w It
 	}
 	text := stallNudgeText(d, o, w, s)
 	err = d.Runner.Prompt(s, text)
+	// A hung pane matches ErrInputNotEmpty too, but a retry types into the
+	// same dead pane: only a fresh session helps.
+	if _, hung := errors.AsType[*claudeui.HungPaneError](err); hung {
+		return false, false, &RelaunchRequest{Err: err}
+	}
 	// A not-delivered prompt started no turn, so one retry cannot double-send.
 	if errors.Is(err, agentrunner.ErrNotDelivered) && errors.Is(err, claudeui.ErrInputNotEmpty) {
 		_ = runlog.AppendEvent(o.ScratchDir, o.Epic, runlog.Event{

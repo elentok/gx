@@ -265,6 +265,16 @@ func (l *Launcher) finishRun(rc runContext) {
 		go l.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
 	}
 	err := l.waitKeepingHolder(rc, addr)
+	if _, hung := errors.AsType[*ralphloop.RelaunchRequest](err); hung {
+		err = l.relaunchHung(&rc, err)
+		if err == nil {
+			err = l.waitKeepingHolder(rc, addr)
+			if _, again := errors.AsType[*ralphloop.RelaunchRequest](err); again {
+				l.stopHung(rc)
+				err = &supervise.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("pane stopped taking keys, twice: %w", err)}
+			}
+		}
+	}
 	close(stop)
 	if errors.Is(err, agentrunner.ErrHolderDead) {
 		// One relaunch through the shared launch path before any pause.
@@ -354,6 +364,42 @@ func (l *Launcher) markHolderUnreachable(addr tickets.Address, unreachable bool)
 		l.LogEvent(addr, runlog.Event{Type: string(events.HolderUnreachable), Ticket: addr.ID, Address: addr.String(), Reason: "holder unreachable, retrying"})
 	}
 	l.Events.Publish(wire.EventTicketChanged, addr.String())
+}
+
+// relaunchHung replaces the run's hung session with a fresh launch, once. The
+// old session must be gone before the new one starts: never two agents on one
+// ticket. rc.run and the registry follow the new session.
+func (l *Launcher) relaunchHung(rc *runContext, hung error) error {
+	if err := rc.deps.Runner.Stop(rc.run.Session); err != nil {
+		l.Log.Warn("stop hung session", "ticket", rc.ticketAddr, "err", err)
+	}
+	if _, live, _ := rc.deps.Runner.Find(rc.run.Session.Label); live {
+		return &supervise.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("%w: %s is still live after stop, not relaunching", hung, rc.run.Session.Label)}
+	}
+	addr, _ := tickets.ParseAddress(rc.ticketAddr, tickets.AddressContext{}) // built by ClaimAndLaunch, always parses
+	// Cancelled at the server's stop, like the first launch.
+	ctx, release := l.Sessions.Watches.Context()
+	defer release()
+	launchOne := rc.one
+	launchOne.Context = ctx
+	run, err := l.launch(rc.deps, addr, launchOne, rc.wt.Path)
+	if err != nil {
+		return err
+	}
+	rc.run = run
+	if t, ok := l.Registry.Tracked(rc.ticketAddr); ok {
+		t.Run = run
+		l.Registry.Replace(t)
+	}
+	l.Events.Publish(wire.EventTicketChanged, rc.ticketAddr)
+	return nil
+}
+
+// stopHung closes a session that hung a second time.
+func (l *Launcher) stopHung(rc runContext) {
+	if err := rc.deps.Runner.Stop(rc.run.Session); err != nil {
+		l.Log.Warn("stop twice-hung session", "ticket", rc.ticketAddr, "err", err)
+	}
 }
 
 // BlockWatchPoll bounds each Wait of watchBlocked. A herdr Wait is one herdr
@@ -468,7 +514,11 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 	if err != nil {
 		l.Log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
 		// Pause it: a claimed ticket nobody is working on is stuck, not failed.
-		if perr := l.Writer.Pause(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, markedIterationReason(err, err.Error()), run); perr != nil {
+		kind, reason := events.IterationError, markedIterationReason(err, err.Error())
+		if k, ok := supervise.LaunchFailureKind(err); ok {
+			kind, reason = k, err.Error()
+		}
+		if perr := l.Writer.Pause(one.ScratchDir, addr, one.Ticket.Path, kind, reason, run); perr != nil {
 			l.Log.Warn("pause failed finish", "ticket", ticketAddr, "err", perr)
 		}
 		l.Events.Publish(wire.EventIterationFailed, ticketAddr)

@@ -84,6 +84,9 @@ func (r *ptyRunner) Stop(s agentrunner.Session) error {
 }
 
 func (r *ptyRunner) Prompt(s agentrunner.Session, text string) error {
+	if err := r.h.takeFailedPrompt(); err != nil {
+		return err
+	}
 	return r.PromptNudged(s, text, nil)
 }
 
