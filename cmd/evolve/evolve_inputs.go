@@ -38,6 +38,7 @@ const (
 	flagSlowLaunch    = "slow-launch"
 	flagMetricsAbsent = "metrics-missing"
 	flagFixTickets    = "has-fix-tickets"
+	flagHuh           = countHuh
 )
 
 // Severity tiers for the deep-read cap, highest first.
@@ -155,6 +156,16 @@ func buildInputsTable(t evolveTarget, evs []runlog.Event, merged map[string]bool
 			row.Parent = *tk.Parent
 		}
 		row.Sessions, row.ConflictSessions, row.Events = digestTicketEvents(sc.SessionIDs, byTicket[tk.Identifier])
+		huh, err := huhAnswers(tk.Path)
+		if err != nil {
+			return InputsTable{}, fmt.Errorf("ticket %s: %w", tk.Identifier, err)
+		}
+		if huh > 0 {
+			if row.Events == nil {
+				row.Events = map[string]int{}
+			}
+			row.Events[countHuh] = huh
+		}
 		row.Flags = inputsFlags(tk, row, median)
 		row.Severity = inputsSeverity(row.Flags)
 		table.Rows = append(table.Rows, row)
@@ -199,6 +210,25 @@ const (
 	countPausedRepair = "paused-repair"
 )
 
+// countHuh is the Events count key, and the flag name, for answers sent as
+// Huh?. They come from the ticket log, not the run log.
+const countHuh = "huh"
+
+// huhAnswers counts the pause.answer events of the ticket's log sent as Huh?.
+func huhAnswers(ticketPath string) (int, error) {
+	evs, err := tickets.ReadLog(ticketPath)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, ev := range evs {
+		if ev.Type == tickets.EventPauseAnswer && ev.Huh {
+			n++
+		}
+	}
+	return n, nil
+}
+
 // eventCountKey is the per-type count key of ev: its type, except a pause,
 // which is counted under its class.
 func eventCountKey(ev runlog.Event) string {
@@ -240,6 +270,7 @@ func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
 	add(median > 0 && row.ElapsedSeconds > 2*median, flagSlow)
 	add(tk.Status == string(schema.StatusDone) && !tk.Commitless && (row.ActualContext == 0 || row.ElapsedSeconds == 0), flagMetricsAbsent)
 	add(len(row.FixTickets) > 0, flagFixTickets)
+	add(row.Events[countHuh] > 0, flagHuh)
 	return flags
 }
 

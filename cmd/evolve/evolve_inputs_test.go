@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
+	"github.com/elentok/gx/tickets"
 )
 
 func inputsFixture(t *testing.T) *evolveFixture {
@@ -109,6 +110,36 @@ func TestEvolveInputs_FlagsAndSeverityOrder(t *testing.T) {
 	}
 	if rows["06"].Parent != "05" || !reflect.DeepEqual(rows["05"].FixTickets, []string{"06"}) {
 		t.Errorf("parent/fix edges wrong: %+v %+v", rows["06"], rows["05"])
+	}
+}
+
+func TestEvolveInputs_HuhAnswerFlagsAndCounts(t *testing.T) {
+	t.Parallel()
+	f := inputsFixture(t)
+	log := `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"pause.question","by":"agent","handoff":"h","summary":"Which one?"}` + "\n" +
+		`{"seq":2,"ts":"2026-01-01T00:00:01Z","type":"pause.answer","question":1,"huh":true}` + "\n"
+	if err := os.WriteFile(tickets.LogPath(filepath.Join(f.epic, "issues", "02-b.md")), []byte(log), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runEvolveInputs(f.env, &out, "proj:epic", true); err != nil {
+		t.Fatal(err)
+	}
+	var table InputsTable
+	if err := json.Unmarshal(out.Bytes(), &table); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range table.Rows {
+		switch r.ID {
+		case "02":
+			if r.Events["huh"] != 1 || !slices.Contains(r.Flags, "huh") {
+				t.Errorf("ticket 02 huh count/flags = %d/%v", r.Events["huh"], r.Flags)
+			}
+		default:
+			if _, ok := r.Events["huh"]; ok || slices.Contains(r.Flags, "huh") {
+				t.Errorf("ticket %s carries huh: %v %v", r.ID, r.Events, r.Flags)
+			}
+		}
 	}
 }
 
