@@ -190,4 +190,6 @@ type SessionResult struct {
 	// epic but whose session did not start: the Design exists, Refused is false.
 	EpicCreated bool   `json:"epic_created,omitempty"`
 	StartError  string `json:"start_error,omitempty"`
+	// Rows is the settled screen of a keys request that set Settle.
+	Rows []string `json:"rows,omitempty"`
 }

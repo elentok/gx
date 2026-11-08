@@ -185,6 +185,9 @@ type Config struct {
 	// ActionSlashSettle is how long a slash step must stay Idle after typing
 	// to count as done; zero means prompt.DefaultActionSlashSettle.
 	ActionSlashSettle time.Duration
+	// KeysSettleStep and KeysSettleCap are the read interval and the limit of
+	// a keys request's settle; zero means the prompt.DefaultKeysSettle ones.
+	KeysSettleStep, KeysSettleCap time.Duration
 	// FirstPromptStartTimeout bounds the Starting time, counted from launch,
 	// before a pending first prompt is handed to a person; zero means
 	// DefaultFirstPromptStartTimeout.

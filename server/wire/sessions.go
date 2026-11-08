@@ -206,6 +206,9 @@ type SessionKeysRequest struct {
 	// must be the dialog on screen.
 	Permission string `json:"permission,omitempty"`
 	RequestID  string `json:"request_id,omitempty"`
+	// Settle asks for the screen after the send, read until it stops changing,
+	// in SessionResult.Rows. OnlyBlocked and Permission requests ignore it.
+	Settle bool `json:"settle,omitempty"`
 }
 
 // Kinds of SessionPermissionResponse.

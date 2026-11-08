@@ -443,6 +443,7 @@ func New(cfg Config) (*Server, error) {
 			TicketStore: cfg.TicketStore, FirstPromptStartTimeout: cfg.FirstPromptStartTimeout,
 			PromptGrace: cfg.PromptGrace, LaunchProofCaps: cfg.LaunchProofCaps,
 			ActionStepStartTimeout: cfg.ActionStepStartTimeout, ActionSlashSettle: cfg.ActionSlashSettle,
+			KeysSettleStep: cfg.KeysSettleStep, KeysSettleCap: cfg.KeysSettleCap,
 		},
 		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings,
 		Projects: s.projects, BadRounds: s.recovery, Held: s.workspaces.IsHeld, Queue: s.queue,

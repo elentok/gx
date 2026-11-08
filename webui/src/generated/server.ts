@@ -2305,6 +2305,11 @@ export interface SessionKeysRequest {
    */
   permission?: string;
   request_id?: string;
+  /**
+   * Settle asks for the screen after the send, read until it stops changing,
+   * in SessionResult.Rows. OnlyBlocked and Permission requests ignore it.
+   */
+  settle?: boolean;
 }
 export const PermissionKindPrompt = "prompt";
 export const PermissionKindPlan = "plan";
@@ -2734,6 +2739,10 @@ export interface SessionResult {
    */
   epic_created?: boolean;
   start_error?: string;
+  /**
+   * Rows is the settled screen of a keys request that set Settle.
+   */
+  rows?: string[];
 }
 
 //////////

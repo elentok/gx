@@ -25,6 +25,10 @@ const (
 	// DefaultActionSlashSettle is how long a slash step stays Idle after
 	// typing before it counts as done.
 	DefaultActionSlashSettle = time.Second
+	// DefaultKeysSettleStep and DefaultKeysSettleCap pace a keys request's
+	// settle: two equal reads a step apart, or the cap.
+	DefaultKeysSettleStep = 100 * time.Millisecond
+	DefaultKeysSettleCap  = 1500 * time.Millisecond
 )
 
 // Errors that end an Action or a send without raising an Actionable.
@@ -58,6 +62,9 @@ type Config struct {
 	// ActionSlashSettle is how long a slash step must stay Idle after typing
 	// to count as done; zero means DefaultActionSlashSettle.
 	ActionSlashSettle time.Duration
+	// KeysSettleStep and KeysSettleCap are the read interval and the limit of
+	// a keys request's settle; zero means the Default one.
+	KeysSettleStep, KeysSettleCap time.Duration
 }
 
 // RunOpts hooks an action run into a person's own input. OnTyped runs once a
