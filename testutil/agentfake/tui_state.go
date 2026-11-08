@@ -156,14 +156,16 @@ func (t *tui) exit(code int) error {
 }
 
 // writeBackgroundMarker appends the transcript line claude writes when a
-// background task starts, or its completion notification.
+// background task starts, or its completion notification followed by the
+// assistant turn end that the probe waits for.
 func (t *tui) writeBackgroundMarker(running bool) error {
 	const taskID, toolUseID = "b1", "toolu_b1"
 	ts := time.Now().UTC().Format(time.RFC3339Nano)
 	line := `{"isSidechain":false,"type":"user","timestamp":"` + ts + `","message":{"content":[{"tool_use_id":"` + toolUseID + `","type":"tool_result","content":"...","is_error":false}]},"toolUseResult":{"stdout":"","backgroundTaskId":"` + taskID + `"}}`
 	if !running {
 		content := `<task-notification>\n<task-id>` + taskID + `</task-id>\n<tool-use-id>` + toolUseID + `</tool-use-id>\n<status>completed</status>\n</task-notification>`
-		line = `{"isSidechain":false,"type":"user","timestamp":"` + ts + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
+		line = `{"isSidechain":false,"type":"user","timestamp":"` + ts + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}` +
+			"\n" + `{"isSidechain":false,"type":"assistant","timestamp":"` + ts + `","message":{"role":"assistant","stop_reason":"end_turn","content":[]}}`
 	}
 	if err := os.MkdirAll(filepath.Dir(t.transcript), 0o755); err != nil {
 		return err
