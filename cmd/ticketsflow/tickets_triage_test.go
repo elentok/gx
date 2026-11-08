@@ -1,11 +1,15 @@
 package ticketsflow
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/triage"
 )
 
 // triageProject is a project with two open follow-ups.
@@ -28,6 +32,9 @@ type triageShown struct {
 		Address string `json:"address"`
 		Verdict string `json:"verdict"`
 		Write   string `json:"write"`
+		Plan    *struct {
+			Action string `json:"action"`
+		} `json:"plan"`
 	} `json:"rows"`
 }
 
@@ -61,6 +68,166 @@ func triagePending(t *testing.T, repo string) []string {
 		addrs = append(addrs, r.Address)
 	}
 	return addrs
+}
+
+// runInStdin is runIn with stdin.
+func runInStdin(t *testing.T, cwd, stdin string, args ...string) (string, error) {
+	t.Helper()
+	var stdout bytes.Buffer
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), func() (string, error) { return cwd, nil })
+	d.Stdin = strings.NewReader(stdin)
+	err := execute(t, args, d)
+	return stdout.String(), err
+}
+
+// triageAtApprove creates a record, verifies both rows and saves a plan for
+// them, optionally with a quick question on the first row.
+func triageAtApprove(t *testing.T, repo string, withQuestion bool) triageShown {
+	t.Helper()
+	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
+		t.Fatal(err)
+	}
+	rows := triagePending(t, repo)
+	for _, addr := range rows {
+		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	q := ""
+	if withQuestion {
+		q = `,"questions":[{"id":"q1","text":"which?","kind":"quick","default":"a"}]`
+	}
+	plan := `[{"rowId":"` + rows[0] + `","action":"ready","destination":"x"` + q + `},{"rowId":"` + rows[1] + `","action":"ready"}]`
+	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	return triageShow(t, repo)
+}
+
+func TestTriage_PlanSaveMovesToApproveAndDropsGoneRows(t *testing.T) {
+	repo := triageProject(t)
+	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
+		t.Fatal(err)
+	}
+	rows := triagePending(t, repo)
+	for _, addr := range rows {
+		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	plan := `[{"rowId":"` + rows[0] + `","action":"ready"},{"rowId":"` + rows[1] + `","action":"ready"}]`
+	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan", "--gone", rows[1]); err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	s := triageShow(t, repo)
+	if s.Next != "approve" || s.Step != "approve" {
+		t.Errorf("after plan next/step = %q/%q, want approve/approve", s.Next, s.Step)
+	}
+	for _, r := range s.Rows {
+		if r.Address == rows[1] && (r.Write != "gone" || r.Plan != nil) {
+			t.Errorf("gone row write/plan = %q/%v, want gone/none", r.Write, r.Plan)
+		}
+		if r.Address == rows[0] && r.Plan == nil {
+			t.Error("planned row has no plan")
+		}
+	}
+}
+
+func TestTriage_RowRefusals(t *testing.T) {
+	repo := triageProject(t)
+	// A record still at verify refuses a row save.
+	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
+		t.Fatal(err)
+	}
+	s0 := triageShow(t, repo)
+	_, err := runIn(t, repo, "tickets", "triage", "row", "--row", s0.Rows[0].Address, "--revision", strconv.Itoa(s0.Revision))
+	if err == nil {
+		t.Error("row at step verify accepted")
+	}
+	for _, addr := range triagePending(t, repo) {
+		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	plan := `[{"rowId":"` + s0.Rows[0].Address + `","action":"ready"},{"rowId":"` + s0.Rows[1].Address + `","action":"ready"}]`
+	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
+		t.Fatal(err)
+	}
+	s := triageShow(t, repo)
+	row := s.Rows[0].Address
+	rev := strconv.Itoa(s.Revision)
+
+	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "map"); err == nil {
+		t.Error("row without --revision accepted")
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "map", "--revision", "99"); err == nil {
+		t.Error("row with a stale revision accepted")
+	}
+	out, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "map", "--revision", rev)
+	if err != nil || strings.TrimSpace(out) != strconv.Itoa(s.Revision+1) {
+		t.Fatalf("row save = %q, %v, want revision %d", out, err, s.Revision+1)
+	}
+}
+
+func TestTriage_ApproveTwiceSaysAlreadyApproved(t *testing.T) {
+	repo := triageProject(t)
+	s := triageAtApprove(t, repo, false)
+	rev := strconv.Itoa(s.Revision)
+	out, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", rev)
+	if err != nil || strings.TrimSpace(out) != strconv.Itoa(s.Revision+1)+" write" {
+		t.Fatalf("approve = %q, %v, want %d write", out, err, s.Revision+1)
+	}
+	_, err = runIn(t, repo, "tickets", "triage", "approve", "--revision", rev)
+	if err == nil || !strings.Contains(err.Error(), "already approved") {
+		t.Errorf("second approve = %v, want already approved", err)
+	}
+}
+
+func TestTriage_ApproveAfterRowSaveWithOldRevisionIsStale(t *testing.T) {
+	repo := triageProject(t)
+	s := triageAtApprove(t, repo, false)
+	rev := strconv.Itoa(s.Revision)
+	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", s.Rows[0].Address, "--action", "map", "--revision", rev); err != nil {
+		t.Fatal(err)
+	}
+	_, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", rev)
+	if !errors.Is(err, triage.ErrStaleRevision) {
+		t.Errorf("approve with old revision = %v, want stale", err)
+	}
+}
+
+func TestTriage_ApproveRefusedWhileQuestionOpen(t *testing.T) {
+	repo := triageProject(t)
+	s := triageAtApprove(t, repo, true)
+	_, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision))
+	if err == nil || !strings.Contains(err.Error(), "open") {
+		t.Errorf("approve with open question = %v, want refusal", err)
+	}
+	if got := triageShow(t, repo); got.Step != "approve" {
+		t.Errorf("step = %q, want approve", got.Step)
+	}
+}
+
+func TestTriage_AbandonRefusedAtWrite(t *testing.T) {
+	repo := triageProject(t)
+	s := triageAtApprove(t, repo, false)
+	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "abandon"); err == nil {
+		t.Error("abandon at write accepted")
+	}
+}
+
+func TestTriage_AbandonAtApproveEndsTheLiveRecord(t *testing.T) {
+	repo := triageProject(t)
+	triageAtApprove(t, repo, false)
+	if _, err := runIn(t, repo, "tickets", "triage", "abandon"); err != nil {
+		t.Fatalf("abandon: %v", err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "pending"); err == nil {
+		t.Error("a live record remains after abandon")
+	}
 }
 
 func TestTriage_CreateThenSecondCreateRefusesNamingLive(t *testing.T) {

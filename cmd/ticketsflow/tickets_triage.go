@@ -78,7 +78,8 @@ func newTicketsTriageCmd(d Deps) *cobra.Command {
 		Use:   "triage",
 		Short: "work with the Triage record of a project's follow-ups",
 	}
-	cmd.AddCommand(newTriageCreateCmd(d), newTriageShowCmd(d), newTriagePendingCmd(d), newTriageVerdictCmd(d))
+	cmd.AddCommand(newTriageCreateCmd(d), newTriageShowCmd(d), newTriagePendingCmd(d), newTriageVerdictCmd(d),
+		newTriagePlanCmd(d), newTriageRowCmd(d), newTriageApproveCmd(d), newTriageAbandonCmd(d))
 	return cmd
 }
 
