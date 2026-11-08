@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/triage"
 )
 
 // oneOffCards lists the cards of e's one-off tickets, none when e holds none. A
@@ -83,8 +84,9 @@ func capFinishedOneOffs(rows []wire.EpicListRow, limit int) []wire.EpicListRow {
 }
 
 // followUpsCard is the one card of a project's follow-ups epic, absent when it
-// has no open follow-up. The epic itself never gets a plain card.
-func followUpsCard(project string, e tickets.Epic) (wire.EpicListRow, bool) {
+// has no open follow-up and no live Triage. The epic itself never gets a plain
+// card. rec is the project's live Triage record (nil for none).
+func followUpsCard(project string, e tickets.Epic, rec *triage.Record, sessionLive bool) (wire.EpicListRow, bool) {
 	var bugs, ideas, other int
 	for _, t := range e.Tickets {
 		if t.Status != string(schema.StatusDraft) && t.Status != string(schema.StatusOpen) {
@@ -99,16 +101,26 @@ func followUpsCard(project string, e tickets.Epic) (wire.EpicListRow, bool) {
 			other++
 		}
 	}
-	if bugs+ideas+other == 0 {
+	live := rec != nil && rec.State == triage.StateLive
+	if bugs+ideas+other == 0 && !live {
 		return wire.EpicListRow{}, false
 	}
+	words := followUpWords(bugs, ideas, other)
+	if words == "" {
+		words = "0 left"
+	}
+	p := PlaceTriage(project, rec, sessionLive)
 	address := queue.RootRef{Project: project, Epic: followUpsEpicName}.String()
-	return wire.EpicListRow{
+	row := wire.EpicListRow{
 		Address: address, Project: project, Name: followUpsEpicName, Kind: wire.EpicKindLoop,
 		State: wire.EpicListFollowUps, Addresses: []string{address}, CardKind: wire.CardKindFollowUps,
-		Section: wire.SectionReadyToDesign, StatusWords: followUpWords(bugs, ideas, other),
-		Actions: []wire.CardAction{{Kind: wire.CardActionTriage, Label: "Triage", Target: project}},
-	}, true
+		Section: p.Section, StatePill: p.Pill, StatusWords: words,
+		Actions: []wire.CardAction{p.Action},
+	}
+	if live {
+		row.RingProgress = triagePercent(rec)
+	}
+	return row, true
 }
 
 // followUpWords reads "5 bugs, 2 ideas"; follow-ups with no category count as "other".

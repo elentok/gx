@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/triage"
 )
 
 // followUpsEpicName is every project's contributor outbox epic.
@@ -123,6 +124,7 @@ func (s *Epics) cardList() (wire.EpicList, error) {
 	}
 	list := wire.EpicList{Epics: []wire.EpicListRow{}, FollowUps: []wire.FollowUpCount{}}
 	designs := s.designActivities()
+	triageLive := s.triageSessions()
 	qidx := s.newQueueIndex()
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
@@ -138,7 +140,11 @@ func (s *Epics) cardList() (wire.EpicList, error) {
 				}
 			}
 		}
-		list.Epics = append(list.Epics, s.projectCards(project, epics, designs, qidx)...)
+		rec, err := triage.NewStore(dir).LoadLive()
+		if err != nil {
+			s.Log.Warn("follow-ups card: read triage", "project", project, "err", err)
+		}
+		list.Epics = append(list.Epics, s.projectCards(project, epics, designs, rec, triageLive, qidx)...)
 	}
 	list.RecentlyFinished = s.Settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
@@ -150,7 +156,7 @@ func (s *Epics) cardList() (wire.EpicList, error) {
 // projectCards builds one project's cards: follow-ups, one-offs, loop and map
 // epics, then pending Design cards. A listed map's card shows its -impl epic,
 // so that epic gets no row of its own.
-func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, qidx queueIndex) []wire.EpicListRow {
+func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, rec *triage.Record, triageLive map[string]bool, qidx queueIndex) []wire.EpicListRow {
 	merged := map[string]bool{}
 	byName := map[string]tickets.Epic{}
 	for _, e := range epics {
@@ -172,7 +178,7 @@ func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[s
 
 	var rows []wire.EpicListRow
 	if fu, ok := byName[followUpsEpicName]; ok {
-		if row, ok := followUpsCard(project, fu); ok {
+		if row, ok := followUpsCard(project, fu, rec, triageLive[project]); ok {
 			rows = append(rows, row)
 		}
 	}
