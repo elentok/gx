@@ -93,6 +93,15 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     await expect(evolve.first()).toBeVisible({ timeout: 60_000 });
     await expect(evolve.first()).toHaveText("evolve-closed-map");
   });
+
+  // 14: a holder that drops its status dials while the run waits shows a retrying card, then clears.
+  await test.step("ticket card shows holder unreachable, retrying, then clears", async () => {
+    await start("slow-holder", { config: { "recovery.enabled": "false" } });
+    await page.evaluate((hash) => (location.hash = hash), "#/e/demo:slow-holder-epic");
+    const retrying = page.getByText("holder unreachable, retrying");
+    await expect(retrying).toBeVisible({ timeout: 60_000 });
+    await expect(retrying).toHaveCount(0, { timeout: 60_000 });
+  });
 });
 
 test("7. Epic completion", async ({ page, start }) => {

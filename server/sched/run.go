@@ -333,6 +333,7 @@ const HolderReadoptCap = 5
 // is never relaunched; only the cap ends it.
 func (l *Launcher) waitKeepingHolder(rc runContext, addr tickets.Address) error {
 	failures := 0
+	holder.ArmUnreachableStatusDials()
 	for {
 		err := ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session)
 		if !errors.Is(err, holder.ErrHolderUnreachable) {

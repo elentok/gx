@@ -769,12 +769,20 @@ var ErrHolderUnreachable = errors.New("holder unreachable")
 // per call.
 const UnreachableStatusDialsEnv = "GX_HOLDER_UNREACHABLE_STATUS_DIALS"
 
-var unreachableStatusDials atomic.Int64
+var (
+	unreachableStatusDials atomic.Int64
+	unreachableArmed       atomic.Bool
+)
+
+// ArmUnreachableStatusDials starts the env knob's count. The launch makes its
+// own status calls and must not spend the drops, so the run arms the knob when
+// it starts waiting for the finish.
+func ArmUnreachableStatusDials() { unreachableArmed.Store(true) }
 
 // statusDialDropped reports whether this status call is one of the first n the
-// env asks to fail.
+// env asks to fail, counting from the arming.
 func statusDialDropped(op string) bool {
-	if op != opStatus {
+	if op != opStatus || !unreachableArmed.Load() {
 		return false
 	}
 	n, err := strconv.Atoi(os.Getenv(UnreachableStatusDialsEnv))

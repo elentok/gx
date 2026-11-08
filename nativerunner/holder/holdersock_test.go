@@ -539,6 +539,10 @@ func TestHolderClient_UnreachableStatusDialsEnv_FailsFirstStatusCallsThenWorks(t
 	_, c, _ := startHolder(t, echoChild)
 	holder.ResetUnreachableStatusDials(t)
 	t.Setenv(holder.UnreachableStatusDialsEnv, "2")
+	if _, _, err := c.Status(); err != nil {
+		t.Fatalf("Status before arming = %v; want nil (launch-time calls are not dropped)", err)
+	}
+	holder.ArmUnreachableStatusDials()
 	for i := range 2 {
 		if _, _, err := c.Status(); !errors.Is(err, holder.ErrHolderUnreachable) {
 			t.Fatalf("Status %d = %v; want ErrHolderUnreachable", i, err)

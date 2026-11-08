@@ -58,10 +58,15 @@ func SetHolderDial(t *testing.T, dial func(network, addr string, timeout time.Du
 	t.Cleanup(func() { holderDial, dialBackoff = oldDial, oldBackoff })
 }
 
-// ResetUnreachableStatusDials restarts the count the env knob works from.
+// ResetUnreachableStatusDials restarts the count the env knob works from and
+// disarms it.
 func ResetUnreachableStatusDials(t *testing.T) {
-	unreachableStatusDials.Store(0)
-	t.Cleanup(func() { unreachableStatusDials.Store(0) })
+	reset := func() {
+		unreachableStatusDials.Store(0)
+		unreachableArmed.Store(false)
+	}
+	reset()
+	t.Cleanup(reset)
 }
 
 const FrameInterval = defaultFrameInterval
