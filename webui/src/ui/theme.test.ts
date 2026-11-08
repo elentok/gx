@@ -30,6 +30,7 @@ describe("theme", () => {
     ["codex", "#b48cff"],
     ["blue", "#6cb4ff"],
     ["purple", "#b48cff"],
+    ["amber", "#e8c25a"],
     ["green", "#5fd39a"],
     ["muted", "#6b7584"],
   ])("has chart color %s", (name, value) => {

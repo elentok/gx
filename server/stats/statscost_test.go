@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/tokenledger"
@@ -168,6 +169,27 @@ func TestStatsCostSourceHarnessSplitAndTotals(t *testing.T) {
 	}
 	if q.Tokens.NoData {
 		t.Error("a Codex-bearing day must not be no-data")
+	}
+}
+
+func TestStatsCostSourceTriageGroup(t *testing.T) {
+	got := pickCostSource(costSourceInput{
+		Days: []string{"d1"},
+		costLedger: costLedger{
+			FirstLive: "d1",
+			Rows:      []tokenledger.Row{costRow("d1", "p", tokenledger.GroupTriage, "claude", 12, 1)},
+		},
+		Design: costSeries{{}},
+		Impl:   costSeries{{}},
+	})
+	if g := got[0].Groups[tokenledger.GroupTriage]; g.Tokens.Value != 12 {
+		t.Errorf("Triage = %+v, want 12 tokens", g)
+	}
+	if o := got[0].Groups[tokenledger.GroupOther]; o.Tokens.Value != 0 {
+		t.Errorf("Other = %+v, want Triage not folded in", o)
+	}
+	if !slices.Contains(costGroups, tokenledger.GroupTriage) {
+		t.Error("costGroups lacks Triage")
 	}
 }
 

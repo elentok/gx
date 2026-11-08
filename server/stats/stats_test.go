@@ -318,7 +318,7 @@ func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
 	for _, g := range all.Cost.Groups {
 		order = append(order, g.Group)
 	}
-	if want := []string{"Queue", "Design", "One-off", "Other"}; !slices.Equal(order, want) {
+	if want := []string{"Queue", "Design", "Triage", "One-off", "Other"}; !slices.Equal(order, want) {
 		t.Errorf("cost group order = %v, want %v", order, want)
 	}
 	if q := costGroupOf(t, all, tokenledger.GroupQueue); last(q.Tokens).Value != 150 || last(q.Spend).Value != 1 || q.Harness[len(q.Harness)-1]["codex"].Tokens != 50 {

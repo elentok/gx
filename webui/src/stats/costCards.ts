@@ -11,7 +11,7 @@ const sum = (values: number[]) => values.reduce((a, v) => a + v, 0);
 export const amounts = (a: StatsAmount[]) => a.map((d) => (d.no_data ? null : d.value));
 export const sumNullable = (values: (number | null)[]) => sum(values.map((v) => v ?? 0));
 
-const GROUP_COLORS: Record<string, ChartColor> = { Queue: "blue", Design: "purple", "One-off": "green", Other: "muted" };
+const GROUP_COLORS: Record<string, ChartColor> = { Queue: "blue", Design: "purple", Triage: "amber", "One-off": "green", Other: "muted" };
 const compactFormat = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 0 });
 export const compact = (n: number) => (n < 1000 ? String(Math.round(n)) : compactFormat.format(n));
 

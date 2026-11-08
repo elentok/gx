@@ -30,6 +30,7 @@ const (
 const (
 	GroupQueue  = "Queue"
 	GroupDesign = "Design"
+	GroupTriage = "Triage"
 	GroupOneOff = "One-off"
 	GroupOther  = "Other"
 )

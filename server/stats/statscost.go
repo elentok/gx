@@ -86,7 +86,7 @@ type dayCost struct {
 }
 
 var costGroups = []string{
-	tokenledger.GroupQueue, tokenledger.GroupDesign, tokenledger.GroupOneOff, tokenledger.GroupOther,
+	tokenledger.GroupQueue, tokenledger.GroupDesign, tokenledger.GroupTriage, tokenledger.GroupOneOff, tokenledger.GroupOther,
 }
 
 // pickCostSource picks one source per day: live rows from the first live day,

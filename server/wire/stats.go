@@ -46,7 +46,7 @@ type StatsCostGroup struct {
 	Harness []map[string]StatsHarnessAmount `json:"harness"`
 }
 
-// StatsCost is the Tokens and spend section: Queue, Design, One-off and Other.
+// StatsCost is the Tokens and spend section: Queue, Design, Triage, One-off and Other.
 // Sources names each day's source (live, rebuilt or stamp). Partial is set when
 // any day is not live.
 type StatsCost struct {

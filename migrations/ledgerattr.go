@@ -69,6 +69,7 @@ type attrSessionMeta struct {
 	Project string `json:"project"`
 	Ticket  string `json:"ticket"`
 	Design  bool   `json:"design"`
+	Flow    string `json:"flow"`
 }
 
 // Attribute reads the data that survives for the ticket-store project at root,
@@ -145,7 +146,10 @@ func Attribute(dirs config.Dirs, root string) (Attributions, error) {
 			continue
 		}
 		group := tokenledger.GroupOther
-		if m.Design {
+		switch {
+		case m.Flow == string(tickets.FlowTriage):
+			group = tokenledger.GroupTriage
+		case m.Design:
 			group = tokenledger.GroupDesign
 		}
 		set(m.ID, group, proj, m.Harness)

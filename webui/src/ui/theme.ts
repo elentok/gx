@@ -93,6 +93,7 @@ export const themeConfig = defineConfig({
           codex: { value: "#b48cff" },
           blue: { value: "#6cb4ff" },
           purple: { value: "#b48cff" },
+          amber: { value: "#e8c25a" },
           green: { value: "#5fd39a" },
           muted: { value: "#6b7584" },
         },

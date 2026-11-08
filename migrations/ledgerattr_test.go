@@ -51,6 +51,7 @@ func TestAttributeGroupSources(t *testing.T) {
 		}
 	}
 	testutil.WriteFile(t, data, "sessions/s1/meta.json", `{"id":"meta-design","harness":"claude","project":"proj","design":true}`)
+	testutil.WriteFile(t, data, "sessions/s2/meta.json", `{"id":"meta-triage","harness":"claude","project":"proj","flow":"triage"}`)
 
 	got, err := Attribute(dirs, root)
 	if err != nil {
@@ -58,7 +59,7 @@ func TestAttributeGroupSources(t *testing.T) {
 	}
 	want := map[string]string{
 		"q1": tokenledger.GroupQueue, "o1": tokenledger.GroupOneOff, "m1": tokenledger.GroupDesign,
-		"d1": tokenledger.GroupDesign, "meta-design": tokenledger.GroupDesign, "x1": tokenledger.GroupOther,
+		"d1": tokenledger.GroupDesign, "meta-design": tokenledger.GroupDesign, "meta-triage": tokenledger.GroupTriage, "x1": tokenledger.GroupOther,
 	}
 	for id, group := range want {
 		if a := got.Of(id); a.Group != group || a.Project != "proj" {

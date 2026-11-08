@@ -47,6 +47,7 @@ type InteractiveSession struct {
 	Project        string
 	Dir            string
 	Ticket         string
+	Flow           tickets.Flow
 	ConversationID string
 	Stopped        bool
 	Exit           string
@@ -262,6 +263,9 @@ func (l *Limits) interactiveTokenSession(m InteractiveSession) (tokenSession, bo
 		ts.path = transcript.PathIn(home, m.Dir, m.ConversationID)
 	}
 	ts.group = l.tokenPoll.groupOf(ts.key, func() string {
+		if m.Flow == tickets.FlowTriage {
+			return tokenledger.GroupTriage
+		}
 		if m.Ticket != "" && l.tokenHost.OnMapEpic(m.Ticket) {
 			return tokenledger.GroupDesign
 		}

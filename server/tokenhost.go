@@ -26,7 +26,7 @@ func (h tokenHost) Sessions() ([]limits.InteractiveSession, error) {
 	out := make([]limits.InteractiveSession, len(metas))
 	for i, m := range metas {
 		out[i] = limits.InteractiveSession{
-			ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket,
+			ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket, Flow: m.Flow,
 			ConversationID: m.ConversationID, Stopped: m.Stopped, Exit: m.Exit,
 		}
 	}

@@ -471,6 +471,17 @@ func TestTokenPoll_InteractiveSessionGroups(t *testing.T) {
 	}
 }
 
+func TestTokenPoll_TriageSessionLandsInTriage(t *testing.T) {
+	t.Parallel()
+	f := newSessionFixture(t)
+	f.add(t, "t", "claude", "proj", "", map[string]any{"flow": "triage", "flow_key": "proj"})
+	f.poll(t, "t", "claude", 100, 150)
+	rows := f.rows(t)
+	if r := rows["proj/Triage/claude"]; r.Tokens != 50 || len(rows) != 1 {
+		t.Fatalf("rows = %+v, want 50 Triage tokens only", rows)
+	}
+}
+
 func TestTokenPoll_InteractiveGroupIsFixedAtFirstSight(t *testing.T) {
 	t.Parallel()
 	f := newSessionFixture(t)

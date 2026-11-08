@@ -12,7 +12,7 @@ export interface DaySeries {
   values: (number | null)[];
 }
 
-export type ChartColor = "claude" | "codex" | "blue" | "purple" | "green" | "muted";
+export type ChartColor = "claude" | "codex" | "blue" | "purple" | "amber" | "green" | "muted";
 
 // "dim" draws a lighter bar; "hatch" draws it lighter with diagonal stripes over it.
 export type DayStyle = "dim" | "hatch";

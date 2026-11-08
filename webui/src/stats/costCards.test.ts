@@ -25,6 +25,12 @@ test("one no-data group nulls the whole day and the card is partial", () => {
   expect(props.partial).toBe(true);
 });
 
+test("the Triage group has its own colour", () => {
+  const cost = { groups: [{ group: "Triage", tokens: [amount(7)], spend: [], harness: [] }], sources: [], partial: false };
+  const [series] = tokens(statsOf(cost, ["a"])).series;
+  expect(series.color).toBe("amber");
+});
+
 test("sources dim rebuilt and stamp days and note them; live and missing stay plain", () => {
   const cost = { groups: [], sources: ["live", "rebuilt", "stamp"], partial: false };
   const props = tokens(statsOf(cost, ["a", "b", "c", "d"]));
