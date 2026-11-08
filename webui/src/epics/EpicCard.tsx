@@ -20,7 +20,7 @@ import {
   type EpicListRow,
   type Workspace,
 } from "../generated/server";
-import { ItemMenu, postUnhold, type ItemWriters } from "../workspaces/itemActions";
+import { ItemMenu, itemOfCard, postUnhold, type ItemWriters } from "../workspaces/itemActions";
 import { designHref, epicHref, ticketHref } from "../hrefs";
 import { postOpenDesign, type OpenDesign } from "../design/open";
 import { Button } from "../ui/button/Button";
@@ -217,17 +217,7 @@ export function EpicCard({
         </Box>
         {row.workspace && (
           <Box ml="auto" flex="none">
-            <ItemMenu
-              item={{
-                key: row.address,
-                name: row.name,
-                kind: row.card_kind === CardKindDesign ? "design" : "epic",
-                workspace: row.workspace,
-                queued: row.queued,
-                held,
-              }}
-              workspaces={workspaces}
-            />
+            <ItemMenu item={itemOfCard(row)!} workspaces={workspaces} />
           </Box>
         )}
       </Box>

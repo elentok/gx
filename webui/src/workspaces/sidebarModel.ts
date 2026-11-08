@@ -55,6 +55,8 @@ export interface SidebarRow {
   held?: boolean;
   /** The card's epic (or a Design's -impl) holds a queue item; Hold is then disabled. */
   queued?: boolean;
+  /** A chat's session, for its menu's Stop and Remove. */
+  session?: SessionInfo;
   agents: SidebarAgent[];
 }
 
@@ -175,7 +177,7 @@ export function buildSidebar({ rows, sessions, placements, workspace, sort }: Si
     .map(({ s }): Sortable<SidebarRow> => {
       const status = sessionStatus(s);
       return {
-        item: { key: s.id, kind: "chat", title: s.name || s.id, href: agentHref(s.id), status, agents: [] },
+        item: { key: s.id, kind: "chat", title: s.name || s.id, href: agentHref(s.id), status, session: s, agents: [] },
         name: s.name || s.id,
         needsYou: status.words === NEEDS_YOU,
         at: sessionAt(s),

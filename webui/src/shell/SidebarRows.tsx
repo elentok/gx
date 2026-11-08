@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { buildSidebar, type SidebarAgent, type SidebarRow, type SidebarStatus } from "../workspaces/sidebarModel";
-import type { SessionInfo, Workspace } from "../generated/server";
+import type { Workspace } from "../generated/server";
 import { ItemMenu, type ItemRef } from "../workspaces/itemActions";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
@@ -95,36 +95,47 @@ function AgentLink({ agent }: { agent: SidebarAgent }) {
   );
 }
 
-/** The menu-button slot: the row's Alt+n number while Alt is held, the "..." menu otherwise. Only this leaf watches Alt. */
+/**
+ * The menu-button slot: the row's Alt+n number replaces the "..." button while Alt is held. Only this leaf watches Alt.
+ * The menu stays mounted either way, so Alt never closes it or the dialogs it opened; only the trigger is hidden.
+ */
 function MenuSlot({ number, item, workspaces, onRemoved }: { number?: number; item: ItemRef; workspaces: Workspace[]; onRemoved: () => void }) {
-  const altHeld = useAltHeld();
-  if (altHeld && number !== undefined) {
-    return (
-      <Box as="span" data-testid="row-number" display="grid" placeItems="center" boxSize="28px" fontSize="12px" color="text.dim">
-        {number}
-      </Box>
-    );
-  }
+  const showNumber = useAltHeld() && number !== undefined;
   return (
-    // Shown on hover and focus; always on a touch screen, which has no hover.
-    <Box opacity="0" _groupHover={{ opacity: 1 }} _focusWithin={{ opacity: 1 }} css={{ "@media (hover: none)": { opacity: 1 } }}>
-      <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} />
+    <Box position="relative">
+      {showNumber && (
+        <Box as="span" data-testid="row-number" position="absolute" inset="0" display="grid" placeItems="center" fontSize="12px" color="text.dim">
+          {number}
+        </Box>
+      )}
+      {/* Shown on hover and focus; always on a touch screen, which has no hover. */}
+      <Box
+        opacity="0"
+        visibility={showNumber ? "hidden" : undefined}
+        _groupHover={{ opacity: 1 }}
+        _focusWithin={{ opacity: 1 }}
+        css={{ "@media (hover: none)": { opacity: 1 } }}
+      >
+        <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} />
+      </Box>
     </Box>
   );
 }
 
-function Row({ row, current, active, workspaces, sessions }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[]; sessions: SessionInfo[] }) {
+const itemKind = (kind: SidebarRow["kind"]): ItemRef["kind"] => (kind === "chat" || kind === "design" ? kind : "epic");
+
+function Row({ row, current, active, workspaces }: { row: SidebarRow; current: boolean; active: string; workspaces: Workspace[] }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const nested = row.agents.length > 0;
   const item: ItemRef = {
     key: row.key,
     name: row.title,
-    kind: row.kind === "chat" ? "chat" : row.kind === "design" ? "design" : "epic",
+    kind: itemKind(row.kind),
     workspace: active,
     queued: row.queued,
     held: row.held,
-    session: row.kind === "chat" ? sessions.find((s) => s.id === row.key) : undefined,
+    session: row.session,
   };
   // The removed chat's page is gone; leave it for the agents list, as the agent page does.
   const onRemoved = () => {
@@ -191,7 +202,6 @@ export function useSidebarModel(fetcher: FetchEpicList | undefined, active: stri
   const conn = useConnectionContext();
   const { list } = useEpicList(fetcher, conn);
   const snapshot = useConnectionState(conn).snapshot;
-  const pathname = useLocation().pathname;
   if (!list?.epics) return undefined;
   const sort = snapshot?.workspaces?.find((w) => w.name === active)?.sort;
   return buildSidebar({ rows: list.epics, sessions: snapshot?.sessions ?? [], placements: snapshot?.placements ?? [], workspace: active, sort });
@@ -201,17 +211,16 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
   const { workspaces } = useWorkspaces(useConnectionContext());
   const pathname = useLocation().pathname;
   const model = useSidebarModel(fetcher, active);
-  const sessions = useConnectionState(useConnectionContext()).snapshot?.sessions ?? [];
   if (!model) return null;
   return (
     <>
       {model.rows.map((r) => (
-        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} sessions={sessions} />
+        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
       ))}
       {model.held.length > 0 && (
         <Section id="hold" title={`On hold (${model.held.length})`}>
           {model.held.map((r) => (
-            <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} sessions={sessions} />
+            <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
           ))}
         </Section>
       )}

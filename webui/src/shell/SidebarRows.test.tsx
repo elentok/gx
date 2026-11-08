@@ -206,6 +206,54 @@ test("removing the open chat from its row confirms, then leaves its page", async
   await waitFor(() => expect(screen.getByTestId("page-path").textContent).toBe("/agents"));
 });
 
+const altDown = () => fireEvent.keyDown(window, { key: "Alt", altKey: true });
+const altUp = () => fireEvent.keyUp(window, { key: "Alt" });
+
+test("Alt with a row menu open leaves it open; the number shows, and releasing restores the button", async () => {
+  setup("desktop");
+  const shop = await body().findByRole("link", { name: /Shop/ });
+  const li = within(shop.closest("li")!);
+  fireEvent.click(li.getByRole("button", { name: "More actions" }));
+  await screen.findAllByRole("menuitem");
+  altDown();
+  expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
+  expect(li.getByTestId("row-number").textContent).toBe("2");
+  altUp();
+  expect(li.queryByTestId("row-number")).toBeNull();
+  expect(li.getByRole("button", { name: "More actions" })).toBeTruthy();
+});
+
+test("Alt with the Hold dialog open leaves it open", async () => {
+  const fetchMock = vi.fn(async (url: string) =>
+    new Response(
+      JSON.stringify(
+        String(url).includes("/v1/workspaces/hold") ? { held: [], refused: true, reason: "hold-live-sessions", sessions: ["designer"] } : { epics: rows, follow_ups: [] },
+      ),
+      { status: 200 },
+    ),
+  );
+  setup("desktop");
+  vi.stubGlobal("fetch", fetchMock);
+  const shop = await body().findByRole("link", { name: /Shop/ });
+  fireEvent.click(within(shop.closest("li")!).getByRole("button", { name: "More actions" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Hold" }));
+  await screen.findByText(/Holding Shop ends its live sessions/);
+  altDown();
+  expect(screen.getByText(/Holding Shop ends its live sessions/)).toBeTruthy();
+  altUp();
+});
+
+test("Alt with a chat's Remove confirmation open leaves it open", async () => {
+  setup("desktop");
+  const chat = await body().findByRole("link", { name: /^Chat talk/ });
+  fireEvent.click(within(chat.closest("li")!).getByRole("button", { name: "More actions" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+  await screen.findByText("Stop and remove talk? Its session is deleted.");
+  altDown();
+  expect(screen.getByText("Stop and remove talk? Its session is deleted.")).toBeTruthy();
+  altUp();
+});
+
 test("on a tablet a row click closes the sidebar", async () => {
   setup("tablet");
   fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
