@@ -46,6 +46,17 @@ describe("GxMenu on the phone", () => {
     expect(getComputedStyle(within(menu).getByRole("menuitem", { name: "A" })).minHeight).toBe("48px");
   });
 
+  it("follows the button when its row moves while open", async () => {
+    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+    Object.defineProperty(window, "innerWidth", { value: 390, configurable: true });
+    const spy = layout({ top: 100, bottom: 136, left: 300, right: 336 });
+    const menu = await open(phone(sub));
+    await waitFor(() => expect(menu.style.top).toBe("140px"));
+    spy.mockRestore();
+    layout({ top: 200, bottom: 236, left: 300, right: 336 });
+    await waitFor(() => expect(menu.style.top).toBe("240px"));
+  });
+
   it("flips above when there is no room below", async () => {
     Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
     layout({ top: 700, bottom: 736, left: 300, right: 336 });

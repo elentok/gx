@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useRef } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { session } from "../agents/agentsTestKit";
@@ -8,6 +9,8 @@ import { CardKindImplementation, SectionImplementing, SectionOnHold, type EpicLi
 import { renderThemed } from "../ui/render";
 import { DeviceContext } from "../useWide";
 import { AppShell } from "./AppShell";
+import type { Shell } from "./ShellContext";
+import { useSidebarKeys } from "./SidebarKeys";
 
 vi.mock("../agents/promptFocus", () => ({ requestPromptFocus: vi.fn(), usePromptFocus: () => {} }));
 
@@ -153,6 +156,60 @@ test("a click on a chat row sends no focus request", async () => {
   await setup(true);
   fireEvent.click(body().getByRole("link", { name: /talk/ }));
   expect(requestPromptFocus).not.toHaveBeenCalled();
+});
+
+function Harness({ keys }: { keys: string[] }) {
+  const aside = useRef<HTMLElement>(null);
+  useSidebarKeys(aside, { sidebarOpen: true, toggle: () => {} } as unknown as Shell);
+  return (
+    <aside ref={aside}>
+      <ul data-nav-list="" tabIndex={-1} data-testid="list">
+        {keys.map((k) => (
+          <li key={k}>
+            <a href={`#/${k}`} data-nav={`row:${k}`}>
+              {k}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+
+const link = (name: string) => screen.getByRole("link", { name });
+
+test("a reorder keeps focus on the same row, and the tab stop with it", async () => {
+  const { rerender } = render(<Harness keys={["a", "b", "c"]} />);
+  link("b").focus();
+  rerender(<Harness keys={["c", "b", "a"]} />);
+  await waitFor(() => expect(document.activeElement).toBe(link("b")));
+  rerender(<Harness keys={["b", "a", "c"]} />);
+  await waitFor(() => expect(document.activeElement).toBe(link("b")));
+  expect(["a", "b", "c"].map((k) => link(k).tabIndex)).toEqual([-1, 0, -1]);
+});
+
+test("when the focused row leaves, focus lands on the row at its old index, clamped, then on the list", async () => {
+  const { rerender } = render(<Harness keys={["a", "b", "c"]} />);
+  link("b").focus();
+  rerender(<Harness keys={["a", "c"]} />);
+  await waitFor(() => expect(document.activeElement).toBe(link("c")));
+  rerender(<Harness keys={["a"]} />);
+  await waitFor(() => expect(document.activeElement).toBe(link("a")));
+  rerender(<Harness keys={[]} />);
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("list")));
+});
+
+test("a reorder does not steal focus from outside the sidebar", async () => {
+  const { rerender } = render(<Harness keys={["a", "b"]} />);
+  link("a").focus();
+  const input = document.createElement("input");
+  document.body.appendChild(input);
+  input.focus();
+  await Promise.resolve();
+  rerender(<Harness keys={["b", "a"]} />);
+  await Promise.resolve();
+  expect(document.activeElement).toBe(input);
+  input.remove();
 });
 
 test("vim keys do nothing outside the sidebar or in a text field", async () => {

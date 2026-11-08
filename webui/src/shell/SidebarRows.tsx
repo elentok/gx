@@ -74,7 +74,7 @@ function Chevron({ open, onToggle, label }: { open: boolean; onToggle: () => voi
 
 function AgentLink({ agent }: { agent: SidebarAgent }) {
   return (
-    <chakra.a href={agent.href} {...{ [NAV_ATTR]: "" }} {...rowStyle} pl="10" minH="36px">
+    <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} {...rowStyle} pl="10" minH="36px">
       <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" fontSize="13px">
         {agent.label}
       </Box>
@@ -124,7 +124,7 @@ function Row({ row, current, active, workspaces, sessions }: { row: SidebarRow; 
         <Box w="20px" flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
-        <chakra.a href={row.href} {...{ [NAV_ATTR]: "", ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
+        <chakra.a href={row.href} {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
           {row.kind === "chat" ? (
             <ChatIcon />
           ) : (
@@ -155,11 +155,11 @@ function Row({ row, current, active, workspaces, sessions }: { row: SidebarRow; 
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <li>
-      <chakra.button type="button" {...{ [NAV_ATTR]: "" }} aria-expanded={open} onClick={() => setOpen(!open)} display="flex" alignItems="center" gap="1" w="100%" px="3" minH="36px" color="text.dim" fontSize="12px" cursor="pointer">
+      <chakra.button type="button" {...{ [NAV_ATTR]: `section:${id}` }} aria-expanded={open} onClick={() => setOpen(!open)} display="flex" alignItems="center" gap="1" w="100%" px="3" minH="36px" color="text.dim" fontSize="12px" cursor="pointer">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: open ? "rotate(90deg)" : "none" }}>
           <path d="M4.5 2.5 8 6l-3.5 3.5" />
         </svg>
@@ -197,14 +197,14 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
         <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} sessions={sessions} />
       ))}
       {model.held.length > 0 && (
-        <Section title={`On hold (${model.held.length})`}>
+        <Section id="hold" title={`On hold (${model.held.length})`}>
           {model.held.map((r) => (
             <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} sessions={sessions} />
           ))}
         </Section>
       )}
       {model.other.length > 0 && (
-        <Section title="Other">
+        <Section id="other" title="Other">
           {model.other.map((a) => (
             <li key={a.id}>
               <AgentLink agent={a} />

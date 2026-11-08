@@ -367,6 +367,17 @@ test("Workspaces", async ({ page, start }) => {
   await expect(sortOptions.nth(2)).toHaveAttribute("aria-checked", "true");
   await closeMenus();
   await fx.cli("server", "workspaces", "sort", "Default workspace", "needs-you");
+
+  // Rows reorder live and keyboard focus stays on the same row: the last row, which moves furthest when the order flips.
+  const navRows = sidebar.locator("a[data-nav]");
+  const last = navRows.last();
+  await last.focus();
+  const lastName = (await last.getAttribute("href"))!;
+  const focusedRow = sidebar.locator("a[data-nav]:focus");
+  for (const order of ["name", "activity", "needs-you"]) {
+    await fx.cli("server", "workspaces", "sort", "Default workspace", order);
+    await expect(focusedRow).toHaveAttribute("href", lastName);
+  }
   await pick("scratch");
   await openSort("scratch");
   await expect(sortOptions.nth(0)).toHaveAttribute("aria-checked", "true");

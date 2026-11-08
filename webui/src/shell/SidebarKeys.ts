@@ -9,36 +9,58 @@ const NAV = `[${NAV_ATTR}]`;
 /** Marks a chat row's anchor: Enter on it also focuses the chat's prompt. */
 export const CHAT_ATTR = "data-chat";
 
+/** Marks the sidebar's list: the focus target when no row is left. */
+export const LIST_ATTR = "data-nav-list";
+
 const items = (root: HTMLElement) => Array.from(root.querySelectorAll<HTMLElement>(NAV));
+const keyOf = (it: HTMLElement) => it.getAttribute(NAV_ATTR) ?? "";
 
 /**
  * One tab stop for the whole sidebar: the focused row (or the first) has tabindex 0, the rest -1.
- * The rows come and go with the epic list, so a mutation observer re-applies it.
+ * The stop is tracked by the stop's key (the NAV_ATTR value), not its element or position, so rows
+ * reordering as data changes keep it. Moving a focused node blurs it, so after a mutation focus is put
+ * back on the same key; when that key is gone it lands on the row now at the old index (clamped), or
+ * on the list when empty.
  */
 function useRovingFocus(root: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = root.current;
     if (!el) return;
-    let stop: HTMLElement | undefined;
+    let stop = "";
+    let keys: string[] = [];
+    // Set while focus is in a stop; cleared once focus has left on purpose (not by a reorder).
+    let focused = false;
     const apply = () => {
       const all = items(el);
-      if (!stop || !all.includes(stop)) stop = all[0];
-      for (const it of all) it.tabIndex = it === stop ? 0 : -1;
+      const next = all.map(keyOf);
+      let target = all.find((it) => keyOf(it) === stop);
+      if (!target) target = all[Math.max(Math.min(keys.indexOf(stop), all.length - 1), 0)];
+      stop = target ? keyOf(target) : "";
+      keys = next;
+      for (const it of all) it.tabIndex = it === target ? 0 : -1;
+      if (focused && !el.contains(document.activeElement)) {
+        (target ?? el.querySelector<HTMLElement>(`[${LIST_ATTR}]`))?.focus();
+      }
     };
     const onFocusIn = (e: FocusEvent) => {
       const t = e.target instanceof HTMLElement ? e.target.closest<HTMLElement>(NAV) : null;
+      focused = !!t;
       if (t) {
-        stop = t;
+        stop = keyOf(t);
         apply();
       }
     };
+    // A reorder's blur is followed by the observer's microtask, queued earlier than this one.
+    const onFocusOut = () => queueMicrotask(() => (focused = el.contains(document.activeElement)));
     apply();
     const observer = new MutationObserver(apply);
     observer.observe(el, { childList: true, subtree: true });
     el.addEventListener("focusin", onFocusIn);
+    el.addEventListener("focusout", onFocusOut);
     return () => {
       observer.disconnect();
       el.removeEventListener("focusin", onFocusIn);
+      el.removeEventListener("focusout", onFocusOut);
     };
   }, [root]);
 }

@@ -86,6 +86,21 @@ export function PhoneMenu({ trigger, items, onClosed, closeSignal }: MenuProps) 
   useLayoutEffect(() => {
     if (anchor && !placed && panel.current) setPlaced(place(anchor.rect, panel.current.getBoundingClientRect().height));
   }, [anchor, placed]);
+  // The button's row can move while the menu is open (live reorder): follow the button, not the rect captured at open.
+  const isPlaced = !!placed;
+  useEffect(() => {
+    if (!anchor || !isPlaced) return;
+    let last = anchor.rect;
+    let frame = requestAnimationFrame(function follow() {
+      const rect = anchor.el.getBoundingClientRect();
+      if (panel.current && (rect.top !== last.top || rect.left !== last.left)) {
+        last = rect;
+        setPlaced(place(rect, panel.current.getBoundingClientRect().height));
+      }
+      frame = requestAnimationFrame(follow);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [anchor, isPlaced]);
   // A browser refuses to focus the panel while it is still hidden, so wait until it is placed.
   useEffect(() => {
     if (anchor && placed) panel.current?.focus();

@@ -13,7 +13,7 @@ import { JumpPalette } from "./JumpPalette";
 import { MascotToggle } from "./MascotToggle";
 import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
-import { useSidebarKeys } from "./SidebarKeys";
+import { LIST_ATTR, useSidebarKeys } from "./SidebarKeys";
 import { SidebarRows } from "./SidebarRows";
 import {
   useActiveWorkspace,
@@ -259,6 +259,9 @@ export function AppShell({
             minH="0"
             overflowY="auto"
             data-testid="sidebar-body"
+            {...{ [LIST_ATTR]: "" }}
+            tabIndex={-1}
+            outline="none"
           >
             <SidebarRows fetcher={fetchEpicList} active={active} />
           </Box>
