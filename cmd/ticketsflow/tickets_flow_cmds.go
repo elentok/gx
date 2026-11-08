@@ -31,6 +31,7 @@ func Commands(d Deps) []*cobra.Command {
 		newTicketsFollowUpCmd(d),
 		newTicketsEpicCmd(d),
 		newTicketsFilterRunLogCmd(d),
+		newTicketsTriageCmd(d),
 	}
 }
 
