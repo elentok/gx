@@ -9,6 +9,7 @@ import type {
   TriageAbandonRequest,
   TriageApproveRequest,
   TriageEditResult,
+  TriageRowRequest,
 } from "../generated/server";
 import { apiFetch } from "../apiFetch";
 import { WriteError } from "../useWrite";
@@ -53,7 +54,9 @@ const postTriageStart = postJson("/v1/triage/open");
 export const postOpenTriage: OpenFlow = ({ epic, ...rest }) => postTriageStart({ project: epic, ...rest });
 export type AbandonTriage = (body: TriageAbandonRequest) => Promise<TriageEditResult>;
 export const postAbandonTriage: AbandonTriage = postJson<TriageEditResult>("/v1/triage/abandon");
-export type ApproveTriage = (body: TriageApproveRequest) => Promise<TriageEditResult>;
+export type SaveTriageRow = (body: TriageRowRequest) => Promise<TriageEditResult>;
+export const postSaveTriageRow: SaveTriageRow = postJson<TriageEditResult>("/v1/triage/row");
+export type ApproveTriage =(body: TriageApproveRequest) => Promise<TriageEditResult>;
 export const postApproveTriage: ApproveTriage = postJson<TriageEditResult>("/v1/triage/approve");
 export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete");
 export const postStopSession: StopSession = postJson("/v1/sessions/stop");

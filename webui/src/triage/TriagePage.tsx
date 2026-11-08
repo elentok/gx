@@ -2,7 +2,7 @@ import { Box, Spinner as ChakraSpinner, Text, chakra } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { flowSession, liveFlowSessions } from "../design/view";
-import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type OpenFlow, type ResumeSession, type StopSession } from "../design/open";
+import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type OpenFlow, type ResumeSession, type SaveTriageRow, type StopSession } from "../design/open";
 import { useDesignWrite } from "../design/SessionControls";
 import type { FetchChat } from "../design/chat";
 import type { PostFocus } from "../design/focus";
@@ -20,7 +20,8 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { triageModel } from "../stepped/model";
 import { SteppedPage } from "../stepped/SteppedPage";
 import { useWide } from "../useWide";
-import { useTriage, type FetchTriage } from "./useTriage";
+import { QuestionsView } from "./QuestionsView";
+import { useTriage,type FetchTriage } from "./useTriage";
 
 /** The injected fetchers and actions the Triage page talks to the server through. */
 export interface TriageDeps {
@@ -34,6 +35,7 @@ export interface TriageDeps {
   focus?: PostFocus;
   abandon?: AbandonTriage;
   approve?: ApproveTriage;
+  saveRow?: SaveTriageRow;
 }
 
 const FLOW = "triage";
@@ -144,7 +146,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
       }
       chatTop={() => (
         <>
-          {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} />}
+          {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} questions={<QuestionsView project={project} view={view} refetch={refetch} save={deps.saveRow} />} />}
           {live.length > 0 && (
           <Box
             display="flex"
