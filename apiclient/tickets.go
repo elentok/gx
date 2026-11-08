@@ -44,6 +44,11 @@ func (s *Tickets) KeepWaiting(ctx context.Context, address string) (wire.QueueRe
 	return s.t.queueWriteTo(ctx, "/v1/tickets/keep-waiting", wire.QueueRequest{Address: address})
 }
 
+// StopTask ends the background task a background-task-gate pause waits on.
+func (s *Tickets) StopTask(ctx context.Context, address string) (wire.QueueResult, error) {
+	return s.t.queueWriteTo(ctx, "/v1/tickets/stop-task", wire.QueueRequest{Address: address})
+}
+
 // Retry starts a fresh agent on a ticket's branch, keeping its commits;
 // stop lets it stop a working leftover pane first.
 func (s *Tickets) Retry(ctx context.Context, address string, stop bool) (wire.QueueResult, error) {

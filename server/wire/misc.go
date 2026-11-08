@@ -66,6 +66,14 @@ const (
 	ReasonNotDelivered = "reason-not-delivered"
 )
 
+// Refusal reasons of the stop-task verb.
+const (
+	// ReasonNotStoppable: only a Claude session's task can be stopped.
+	ReasonNotStoppable = "not-stoppable"
+	// ReasonTaskUnidentified: no single process could be matched to the task.
+	ReasonTaskUnidentified = "task-unidentified"
+)
+
 // Refusal reasons of the nudge verb.
 const (
 	ReasonTextRequired     = "text-required"

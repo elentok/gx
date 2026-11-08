@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -19,6 +20,13 @@ import (
 // finish wait. The wait starts over with a fresh cap; no agent is launched and
 // nothing is killed. A task that has ended meanwhile releases the wait as usual.
 func (o *Ops) KeepWaiting(req wire.QueueRequest) (wire.QueueResult, error) {
+	return o.gateVerb(req, "kept waiting by a person", nil)
+}
+
+// gateVerb answers a background-task-gate pause on its live run: act (when
+// set) runs first and may refuse, then the pause round ends, a fresh held
+// event is logged and the finish wait starts over with a fresh cap.
+func (o *Ops) gateVerb(req wire.QueueRequest, heldReason string, act func(run runs.TrackedRun, taskID string) (*wire.QueueResult, error)) (wire.QueueResult, error) {
 	return o.d.Writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		address := ref.Addr.String()
 		t, err := schema.ParseTicket(ref.Ticket.Path)
@@ -41,17 +49,26 @@ func (o *Ops) KeepWaiting(req wire.QueueRequest) (wire.QueueResult, error) {
 		if !ok {
 			return queue.Refusal(wire.ReasonAgentGone, address+" has no live agent to keep waiting for"), nil
 		}
-		if err := tickets.EndOpenRound(ref.Ticket.Path, req.Source, tickets.HowResume, ticketops.CloseResumed); err != nil {
-			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
-		}
 		taskID, err := pausedTaskID(ref)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
+		if act != nil {
+			refusal, err := act(run, taskID)
+			if err != nil || refusal != nil {
+				if refusal != nil {
+					return *refusal, nil
+				}
+				return wire.QueueResult{}, err
+			}
+		}
+		if err := tickets.EndOpenRound(ref.Ticket.Path, req.Source, tickets.HowResume, ticketops.CloseResumed); err != nil {
+			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
+		}
 		held := run.Run.PauseEvent()
 		held.Time, held.Type = time.Now(), string(events.BackgroundTaskGateHeld)
 		held.Ticket, held.Address, held.TaskID = ref.Addr.ID, address, taskID
-		held.Reason = "background task " + taskID + ": kept waiting by a person"
+		held.Reason = "background task " + taskID + ": " + heldReason
 		if err := runlog.AppendEvent(ref.ProjectDir, ref.Addr.Epic, held); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("log held gate of %s: %w", ref.Addr, err)
 		}

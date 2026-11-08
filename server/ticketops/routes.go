@@ -37,6 +37,11 @@ func Routes(get func() *Ops) []wire.Route {
 			Handler:    func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().KeepWaiting)(rw, r) },
 			WebHandler: func(rw http.ResponseWriter, r *http.Request) { queue.HandlerWeb(get().KeepWaiting)(rw, r) },
 		},
+		{
+			Pattern: "POST /v1/tickets/stop-task", Web: wire.WebWrite,
+			Handler:    func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().StopTask)(rw, r) },
+			WebHandler: func(rw http.ResponseWriter, r *http.Request) { queue.HandlerWeb(get().StopTask)(rw, r) },
+		},
 		repairRoute("merge", get, (*Ops).mergeInQueue),
 		repairRoute("start-over", get, (*Ops).startOverInQueue),
 		repairRoute("resume", get, (*Ops).repairResume),

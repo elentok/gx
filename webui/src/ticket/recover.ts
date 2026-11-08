@@ -7,6 +7,7 @@ import {
   ActionResumeOnWorker,
   ActionRetry,
   ActionStartOver,
+  ActionStopTask,
   type Action,
 } from "../generated/server";
 import { apiFetch } from "../apiFetch";
@@ -39,6 +40,7 @@ const ROUTES: Partial<Record<Action, string>> = {
   [ActionReopenAndRetry]: "/v1/tickets/resume",
   [ActionRetry]: "/v1/tickets/retry",
   [ActionKeepWaiting]: "/v1/tickets/keep-waiting",
+  [ActionStopTask]: "/v1/tickets/stop-task",
   [ActionMerge]: "/v1/tickets/merge",
   [ActionStartOver]: "/v1/tickets/start-over",
 };

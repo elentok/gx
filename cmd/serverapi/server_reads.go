@@ -334,6 +334,20 @@ func newServerTicketsCmd(d Deps) *cobra.Command {
 	keepWaiting.Flags().BoolVar(&keepWaitingJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(keepWaiting)
 
+	var stopTaskJSON bool
+	stopTask := &cobra.Command{
+		Use:   "stop-task <project:epic/NN>",
+		Short: "end the background task a ticket paused on",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return cmdbase.ServerQueueWrite(d.Dial(), c, stopTaskJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+				return cl.Tickets.StopTask(ctx, args[0])
+			})
+		},
+	}
+	stopTask.Flags().BoolVar(&stopTaskJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(stopTask)
+
 	// relaunch is the old name of retry, kept hidden for one release.
 	for _, name := range []string{"retry", "relaunch"} {
 		var retryJSON, retryStop bool
