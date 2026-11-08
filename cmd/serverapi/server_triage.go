@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -76,6 +77,86 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 	open.Flags().BoolVar(&openJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	open.Flags().BoolVar(&openNew, "new", false, "stop the live session and start a fresh one")
 	cmd.AddCommand(open)
+
+	editOut := func(c *cobra.Command, res wire.TriageEditResult, asJSON bool) error {
+		if asJSON {
+			return cmdbase.WriteStamped(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+		}
+		if res.Refused {
+			return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+		}
+		_, err := fmt.Fprintln(c.OutOrStdout(), res.Revision)
+		return err
+	}
+
+	var rowJSON, rowKeep bool
+	var rowAction, rowDest string
+	var rowAnswers []string
+	var rowRevision int
+	row := &cobra.Command{
+		Use:   "row <project> <address>",
+		Short: "save a row's action, destination, answers or Keep for later on the record revision read",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			answers := map[string]string{}
+			for _, a := range rowAnswers {
+				id, text, ok := strings.Cut(a, "=")
+				if !ok {
+					return fmt.Errorf("--answer %q is not id=text", a)
+				}
+				answers[id] = text
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Triage.SaveRow(ctx, wire.TriageRowRequest{
+				Project: args[0], Revision: rowRevision, Address: args[1], Action: rowAction,
+				Destination: rowDest, Answers: answers, KeepForLater: rowKeep,
+			})
+			if err != nil {
+				return fmt.Errorf("server write failed: %w", err)
+			}
+			return editOut(c, res, rowJSON)
+		},
+	}
+	row.Flags().BoolVar(&rowJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	row.Flags().IntVar(&rowRevision, "revision", 0, "the record revision read")
+	row.Flags().StringVar(&rowAction, "action", "", "ready, map, merge, close or keep")
+	row.Flags().StringVar(&rowDest, "destination", "", "epic, new map epic name, or the row address merged into")
+	row.Flags().StringArrayVar(&rowAnswers, "answer", nil, "a question answer as id=text (repeatable)")
+	row.Flags().BoolVar(&rowKeep, "keep-for-later", false, "keep the follow-up for later")
+	cmd.AddCommand(row)
+
+	var abandonJSON bool
+	var abandonRevision int
+	abandon := &cobra.Command{
+		Use:   "abandon <project>",
+		Short: "abandon a project's live Triage and move it to history",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Triage.Abandon(ctx, wire.TriageAbandonRequest{Project: args[0], Revision: abandonRevision})
+			if err != nil {
+				return fmt.Errorf("server write failed: %w", err)
+			}
+			return editOut(c, res, abandonJSON)
+		},
+	}
+	abandon.Flags().BoolVar(&abandonJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	abandon.Flags().IntVar(&abandonRevision, "revision", 0, "the record revision read")
+	cmd.AddCommand(abandon)
 
 	var showJSON bool
 	show := &cobra.Command{

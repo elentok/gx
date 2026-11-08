@@ -17,6 +17,11 @@ const (
 	ReasonTriageApprove = "triage-at-approve"
 	// ReasonTriageNoFollowUps: the project has no open follow-up to triage.
 	ReasonTriageNoFollowUps = "triage-no-follow-ups"
+	// ReasonTriagePhase: the record's step or the row's state does not allow a
+	// row or abandon write, or the merge target is not a ready or map row.
+	ReasonTriagePhase = "triage-phase"
+	// ReasonTriageNoLive: the project has no live Triage.
+	ReasonTriageNoLive = "triage-no-live"
 )
 
 // TriageOpenRequest is the body of POST /v1/triage/open. New stops the
@@ -76,6 +81,37 @@ type TriageRow struct {
 	Refusal       string `json:"refusal,omitempty"`
 	CanKeep       bool   `json:"can_keep,omitempty"`
 	CanRetry      bool   `json:"can_retry,omitempty"`
+	// MergeOrphan marks a row set to merge into a row that is no longer a
+	// ready or map epic; approve stays refused until it is re-pointed.
+	MergeOrphan bool `json:"merge_orphan,omitempty"`
+}
+
+// TriageRowRequest is the body of POST /v1/triage/row. It replaces the row's
+// person fields; Revision is the record revision the web read. Destination is
+// an epic, a typed new map epic name, or the address of the row merged into.
+type TriageRowRequest struct {
+	Project      string            `json:"project"`
+	Revision     int               `json:"revision"`
+	Address      string            `json:"address"`
+	Action       string            `json:"action,omitempty"`
+	Destination  string            `json:"destination,omitempty"`
+	Answers      map[string]string `json:"answers,omitempty"`
+	KeepForLater bool              `json:"keep_for_later,omitempty"`
+}
+
+// TriageAbandonRequest is the body of POST /v1/triage/abandon.
+type TriageAbandonRequest struct {
+	Project  string `json:"project"`
+	Revision int    `json:"revision"`
+}
+
+// TriageEditResult is the result of a row or abandon write. A refusal is a
+// result (Refused set); the web reloads on ReasonStale.
+type TriageEditResult struct {
+	Refused  bool   `json:"refused,omitempty"`
+	Reason   string `json:"reason,omitempty"`
+	Message  string `json:"message,omitempty"`
+	Revision int    `json:"revision,omitempty"`
 }
 
 // TriageDestination is one choice for where a row goes.

@@ -3,6 +3,7 @@ package triage
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 
@@ -168,9 +169,11 @@ func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageV
 	v.Steps = steps(rec.Step)
 	v.CanAbandon = CanAbandon(isLive, rec.Step, stopped)
 
+	orphans := rec.MergeOrphans()
 	var verdicts, plans, written int
 	for _, r := range rec.Rows {
 		row, open, changed := buildRow(rec, r, isLive)
+		row.MergeOrphan = isLive && slices.Contains(orphans, r.Address)
 		v.Rows = append(v.Rows, row)
 		v.OpenQuestions += open
 		if changed {

@@ -27,6 +27,20 @@ func (s *Triage) Open(ctx context.Context, req wire.TriageOpenRequest) (wire.Ses
 	return res, err
 }
 
+// SaveRow stores a row's person fields. A refusal is a result, not an error.
+func (s *Triage) SaveRow(ctx context.Context, req wire.TriageRowRequest) (wire.TriageEditResult, error) {
+	var res wire.TriageEditResult
+	err := s.t.post(ctx, "/v1/triage/row", req, &res)
+	return res, err
+}
+
+// Abandon ends project's live Triage. A refusal is a result, not an error.
+func (s *Triage) Abandon(ctx context.Context, req wire.TriageAbandonRequest) (wire.TriageEditResult, error) {
+	var res wire.TriageEditResult
+	err := s.t.post(ctx, "/v1/triage/abandon", req, &res)
+	return res, err
+}
+
 // Changed pings the server that project's Triage record was written by a
 // direct write, so the web hears of it at once.
 func (s *Triage) Changed(ctx context.Context, project string) error {

@@ -2942,9 +2942,18 @@ export const ReasonTriageApprove = "triage-at-approve";
  */
 export const ReasonTriageNoFollowUps = "triage-no-follow-ups";
 /**
+ * ReasonTriagePhase: the record's step or the row's state does not allow a
+ * row or abandon write, or the merge target is not a ready or map row.
+ */
+export const ReasonTriagePhase = "triage-phase";
+/**
+ * ReasonTriageNoLive: the project has no live Triage.
+ */
+export const ReasonTriageNoLive = "triage-no-live";
+/**
  * Refusal reasons of the triage open route, beside the session ones.
  */
-export type ReasonTriage = typeof ReasonTriageApprove | typeof ReasonTriageNoFollowUps;
+export type ReasonTriage = typeof ReasonTriageApprove | typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageNoLive;
 /**
  * TriageOpenRequest is the body of POST /v1/triage/open. New stops the
  * Triage's live session and starts a fresh one; State is the token of the live
@@ -3009,6 +3018,42 @@ export interface TriageRow {
   refusal?: string;
   can_keep?: boolean;
   can_retry?: boolean;
+  /**
+   * MergeOrphan marks a row set to merge into a row that is no longer a
+   * ready or map epic; approve stays refused until it is re-pointed.
+   */
+  merge_orphan?: boolean;
+}
+/**
+ * TriageRowRequest is the body of POST /v1/triage/row. It replaces the row's
+ * person fields; Revision is the record revision the web read. Destination is
+ * an epic, a typed new map epic name, or the address of the row merged into.
+ */
+export interface TriageRowRequest {
+  project: string;
+  revision: number /* int */;
+  address: string;
+  action?: string;
+  destination?: string;
+  answers?: { [key: string]: string};
+  keep_for_later?: boolean;
+}
+/**
+ * TriageAbandonRequest is the body of POST /v1/triage/abandon.
+ */
+export interface TriageAbandonRequest {
+  project: string;
+  revision: number /* int */;
+}
+/**
+ * TriageEditResult is the result of a row or abandon write. A refusal is a
+ * result (Refused set); the web reloads on ReasonStale.
+ */
+export interface TriageEditResult {
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+  revision?: number /* int */;
 }
 /**
  * TriageDestination is one choice for where a row goes.

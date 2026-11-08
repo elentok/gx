@@ -202,18 +202,75 @@ func (s *Store) SetPerson(id string, revision int, address string, f PersonField
 		if f.Action != "" && !slices.Contains(planActions, f.Action) {
 			return phaseErr("unknown action %q", f.Action)
 		}
+		prev := row.Person
 		row.Person = f
+		if action, dest := row.Effective(); action == "merge" {
+			if err := rec.checkMergeTarget(row.Address, dest); err != nil {
+				row.Person = prev
+				return err
+			}
+		}
 		return nil
 	})
 }
 
+// Effective is the action and destination a row would be written with: the
+// person's choice over the plan's, Keep for later over both.
+func (r *Row) Effective() (action, dest string) {
+	if r.Plan != nil {
+		action, dest = r.Plan.Action, r.Plan.Destination
+	}
+	if r.Person.Action != "" {
+		action = r.Person.Action
+	}
+	if r.Person.Destination != "" {
+		dest = r.Person.Destination
+	}
+	if r.Person.KeepForLater {
+		action = "keep"
+	}
+	return action, dest
+}
+
+// checkMergeTarget accepts only another row, not gone, whose action is ready
+// or map.
+func (r *Record) checkMergeTarget(from, target string) error {
+	if target == from {
+		return phaseErr("row %s cannot merge into itself", from)
+	}
+	row, err := r.row(target)
+	if err != nil || row.gone() {
+		return phaseErr("merge target %q is not a row of this triage", target)
+	}
+	if action, _ := row.Effective(); action != "ready" && action != "map" {
+		return phaseErr("merge target %s is %s, not a ready or map epic", target, action)
+	}
+	return nil
+}
+
+// MergeOrphans lists the rows set to merge into a row that no longer is a
+// ready or map epic.
+func (r *Record) MergeOrphans() []string {
+	var out []string
+	for _, row := range r.Rows {
+		if action, dest := row.Effective(); action == "merge" && !row.gone() && r.checkMergeTarget(row.Address, dest) != nil {
+			out = append(out, row.Address)
+		}
+	}
+	return out
+}
+
 // Approve moves the step from approve to write: a compare-and-set on the
 // revision. A step past approve is "already approved"; an unchanged step with
-// a changed revision is stale.
+// a changed revision is stale. Rows merged into a row that stopped being a
+// ready or map epic must be re-pointed first.
 func (s *Store) Approve(id string, revision int) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
 		switch rec.Step {
 		case tickets.StepApprove:
+			if orphans := rec.MergeOrphans(); len(orphans) > 0 {
+				return phaseErr("approve is refused: %v merge into a row that is no longer a ready or map epic", orphans)
+			}
 			rec.Step = tickets.StepWrite
 			return nil
 		case tickets.StepVerify, tickets.StepPlan:
