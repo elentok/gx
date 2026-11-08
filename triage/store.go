@@ -68,10 +68,11 @@ type Question struct {
 
 // PlanRow is the agent's proposed action for a row.
 type PlanRow struct {
-	RowID       string   `json:"rowId"`
-	Action      string   `json:"action"`
-	Destination string   `json:"destination,omitempty"`
-	OverlapWith []string `json:"overlapWith,omitempty"`
+	RowID       string     `json:"rowId"`
+	Action      string     `json:"action"`
+	Destination string     `json:"destination,omitempty"`
+	Questions   []Question `json:"questions,omitempty"`
+	OverlapWith []string   `json:"overlapWith,omitempty"`
 }
 
 // PersonFields are what the person decided for a row.
@@ -260,7 +261,10 @@ func (s *Store) Save(rec *Record) error {
 		return err
 	}
 	defer unlock()
+	return s.saveLocked(rec)
+}
 
+func (s *Store) saveLocked(rec *Record) error {
 	cur, err := s.Load(rec.ID)
 	if err != nil {
 		return err
