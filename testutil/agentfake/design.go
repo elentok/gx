@@ -24,8 +24,8 @@ const DesignRunEnd = "✅ Design: the scripted run is over. Next: continue in a 
 var DesignRoundQuestions = [][]string{{"8", "8b"}, {"9"}}
 
 const (
-	yesNoBlock   = "```gx-question\ntype: yes-no\nrecommended: yes\n```"
-	optionsBlock = "```gx-question\ntype: options\nrecommended: a\noptions:\n  - id: a\n    label: SQLite\n  - id: b\n    label: Files\n```"
+	yesNoBlock   = "```gx-question\ntype: yes-no\nrecommended: yes\nyes: Runs the step now.\nno: Holds the step back.\n```"
+	optionsBlock = "```gx-question\ntype: options\nrecommended: a\noptions:\n  - id: a\n    label: SQLite\n    consequence: One file, no server to run.\n  - id: b\n    label: Files\n    consequence: Plain files, easy to diff.\n```"
 )
 
 var designRounds = []string{

@@ -89,6 +89,9 @@ const (
 	BehaviourFinish = "finish"
 	// BehaviourAsk pauses the ticket with a question and commits nothing.
 	BehaviourAsk = "ask"
+	// BehaviourAskOptions is BehaviourAsk with a lettered options question whose
+	// options carry consequences.
+	BehaviourAskOptions = "ask-options"
 	// BehaviourWriteAsk leaves an uncommitted file in the worktree and asks. A
 	// relaunch that still sees the file finishes the ticket instead, so the
 	// worktree's survival is what lets it end.
@@ -149,6 +152,14 @@ const DefaultRateLimitReset = time.Minute
 
 const askBody = "## Question\nWhich option should the fake worker take?\n\n## Handoff\nNo files touched; the fake worker waits for an answer.\n"
 
+// askOptionsBody is askBody with an options block whose options carry
+// consequences.
+const askOptionsBody = "## Question\nWhich option should the fake worker take?\n\n" +
+	"```gx-question\ntype: options\nrecommended: a\noptions:\n" +
+	"  - id: a\n    label: Keep the cache\n    consequence: Reuses the warm cache and finishes sooner.\n" +
+	"  - id: b\n    label: Rebuild it\n    consequence: Starts clean and takes longer.\n```\n\n" +
+	"## Handoff\nNo files touched; the fake worker waits for an answer.\n"
+
 // LoadWorkerConfig reads WorkerConfigFile from dir.
 func LoadWorkerConfig(dir string) (WorkerConfig, error) {
 	var cfg WorkerConfig
@@ -172,7 +183,9 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 	case BehaviourFail:
 		return nil
 	case BehaviourAsk:
-		return askQuestion(cfg, address)
+		return askQuestion(cfg, address, askBody)
+	case BehaviourAskOptions:
+		return askQuestion(cfg, address, askOptionsBody)
 	case BehaviourRefuseAsk:
 		return refuseThenAsk(cfg, address)
 	case BehaviourWriteAsk:
@@ -180,7 +193,7 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 			if err := os.WriteFile(UncommittedFile, []byte("kept\n"), 0o644); err != nil {
 				return err
 			}
-			return askQuestion(cfg, address)
+			return askQuestion(cfg, address, askBody)
 		}
 	case BehaviourBackgroundTask:
 		return nil
@@ -199,10 +212,10 @@ func waitHold(cfg WorkerConfig) {
 	}
 }
 
-func askQuestion(cfg WorkerConfig, address string) error {
+func askQuestion(cfg WorkerConfig, address, body string) error {
 	cmd := exec.Command(cfg.Gx, "tickets", "ask", address, "--body", "-")
 	cmd.Env = append(os.Environ(), cfg.Env...)
-	cmd.Stdin = strings.NewReader(askBody)
+	cmd.Stdin = strings.NewReader(body)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("gx tickets ask: %w\n%s", err, out)
 	}
@@ -249,7 +262,7 @@ func refuseThenAsk(cfg WorkerConfig, address string) error {
 	if out, err := cmd.CombinedOutput(); err == nil {
 		return fmt.Errorf("gx tickets set: the finish guard accepted a finish with no check run\n%s", out)
 	}
-	return askQuestion(cfg, address)
+	return askQuestion(cfg, address, askBody)
 }
 
 func commitWork(address string) error {

@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
+import { HUH_MESSAGE } from "../src/design/round";
 import { card, expect, holdRoute, nav, section, sessionRows, test, type Fixture } from "./fixture";
+import { expectOption } from "./question";
 
 // The card's title opens the epic page, whose Start button starts the session and moves on.
 // The Design page before the start is reached by its route.
@@ -40,9 +42,19 @@ test.describe("5. Start a design session and answer a round", () => {
     await expect(page.getByText("Two questions before the spec.")).toBeVisible();
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
     await page.getByRole("group", nav("View")).getByRole("button", { name: /^Questions/ }).click();
+    // 50, 51, 52, 55, 56: letter, label, id and consequence per option, Huh? and Note, at both widths.
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expectOption(questions, { letter: "A", label: "SQLite", id: "a", consequence: "One file, no server to run." });
+      await expectOption(questions, { letter: "B", label: "Files", id: "b", consequence: "Plain files, easy to diff." });
+      await expect(questions.getByRole("button", { name: "Huh?" })).toBeVisible();
+      await expect(questions.getByRole("button", { name: "Note on question 8" })).toBeVisible();
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
     await questions.getByRole("button", { name: /SQLite/ }).click();
     await expect(questions.getByText("Q8b - Migrate at startup?")).toBeVisible();
-    await questions.getByRole("button", { name: /Yes/ }).click();
+    await expect(questions.getByRole("button", { name: "Yes", exact: true })).toHaveAccessibleDescription("Runs the step now.");
+    await questions.getByRole("button", { name: "Huh?" }).click();
     await expect(questions.getByText("2 of 2 answered")).toBeVisible();
     const release = await holdRoute(page, "**/v1/sessions/prompt");
     await page.getByRole("button", nav("Send answers")).click();
@@ -51,7 +63,7 @@ test.describe("5. Start a design session and answer a round", () => {
 
     // The agent got the answers: the chat shows them as the person's message.
     await expect(page.getByText("Q8 - Which store?: SQLite").first()).toBeVisible();
-    await expect(page.getByText("Q8b - Migrate at startup?: Yes").first()).toBeVisible();
+    await expect(page.getByText(`Q8b - Migrate at startup?: ${HUH_MESSAGE}`).first()).toBeVisible();
     const cont = page.getByRole("button", { name: /^Continue/ });
     await expect(cont).toBeVisible();
 

@@ -383,7 +383,7 @@ var scenarios = map[string]scenario{
 			{ID: "07", Slug: "fails", Opts: servertest.TicketOpts{}},
 		}}},
 		Behaviour: map[string]string{
-			project + ":mixed-epic/06": agentfake.BehaviourAsk,
+			project + ":mixed-epic/06": agentfake.BehaviourAskOptions,
 			project + ":mixed-epic/07": agentfake.BehaviourFail,
 		},
 	},

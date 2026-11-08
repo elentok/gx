@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func readLog(t *testing.T, path string) string {
@@ -105,6 +107,22 @@ func TestWorkTicket_AskSendsAQuestionAndCommitsNothing(t *testing.T) {
 	got := readLog(t, gxLog)
 	if !strings.Contains(got, "tickets ask p:e/01 --body -") || !strings.Contains(got, "## Question") || !strings.Contains(got, "## Handoff") {
 		t.Errorf("gx log = %q, want a question with a handoff", got)
+	}
+}
+
+func TestWorkTicket_AskOptionsSendsOptionsWithConsequences(t *testing.T) {
+	cfg, gxLog := WorkerEnv(t)
+	cfg.Behaviour = map[string]string{"p:e/01": BehaviourAskOptions}
+	if err := WorkTicket(cfg, "p:e/01"); err != nil {
+		t.Fatal(err)
+	}
+	body := strings.SplitN(readLog(t, gxLog), "\n", 2)[1]
+	q, err := ticketlog.ParseQuestionStrict(body)
+	if err != nil {
+		t.Fatalf("ParseQuestionStrict: %v", err)
+	}
+	if q.Summary != "Which option should the fake worker take?" || len(q.Options) != 2 || q.Options[0].Consequence == "" || q.Options[1].Consequence == "" {
+		t.Errorf("question = %+v, want the summary and two options with consequences", q)
 	}
 }
 

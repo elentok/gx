@@ -1,10 +1,12 @@
+import { HUH_MESSAGE } from "../src/design/round";
 import { card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
+import { expectOption } from "./question";
 
 test("2. Epic looks right", async ({ page, start, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   // 06 asks while 02 merges. With a live paused sibling the run only re-reads the epic on its 30s pause poll,
   // so 03 can start up to 30s after 02 merges, and 03's own merge waits out the debounce after that.
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   // Recovery would fork an investigation off the failed ticket and turn it into a waiting parent.
   await start("mixed", { config: { "recovery.enabled": "false" } });
   const mixed = card(page, "mixed-epic");
@@ -63,10 +65,53 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   const failed = page.locator('[data-tone="deadlocked"]').filter({ has: page.getByRole("link", { name: "fails" }) });
   await expect(failed.getByText("needs-repair · Run failed")).toBeVisible({ timeout: 45_000 });
 
+  // 50, 51, 52: the ticket page's question lists each option with letter, id and consequence, and offers Huh? and a Note.
+  await test.step("agent question: options, Huh? and Note at both widths", async () => {
+    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:mixed-epic/06");
+    const form = page.getByRole("form", { name: "Answer" });
+    const send = form.getByRole("button", { name: "Send answer" });
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expectOption(form, { letter: "A", label: "Keep the cache", id: "a", consequence: "Reuses the warm cache and finishes sooner." });
+      await expectOption(form, { letter: "B", label: "Rebuild it", id: "b", consequence: "Starts clean and takes longer." });
+      await expect(form.getByRole("button", { name: "Huh?" })).toBeVisible();
+      await expect(form.getByRole("button", { name: /^Note on question/ })).toBeVisible();
+      await expect(send).toBeDisabled();
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+  });
+
   await page.getByRole("link", { name: /^Epics/ }).click();
   await expect(mixed.getByText("4/7")).toBeVisible();
   await expect(mixed.getByTestId("pill")).toBeVisible();
   await expect(mixed.getByTestId("reason")).toBeVisible();
+
+  // 55, 56: a note alone answers a choice question and the history reads "no option picked". The fake agent
+  // asks once per ticket, so this answers 06 after the Epics-page checks above, which count it as asking.
+  await test.step("agent question: note-only answer", async () => {
+    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:mixed-epic/06");
+    const form = page.getByRole("form", { name: "Answer" });
+    const send = form.getByRole("button", { name: "Send answer" });
+    await form.getByRole("button", { name: /^Note on question/ }).click();
+    await expect(send).toBeDisabled();
+    await form.getByRole("textbox", { name: /^Note text for question/ }).fill("Ask me again tomorrow");
+    await expect(send).toBeEnabled();
+    await send.click();
+    const result = page.getByRole("status", { name: "Answer result" });
+    await expect(result.getByText("no option picked")).toBeVisible();
+    await expect(result.getByText("Ask me again tomorrow")).toBeVisible();
+  });
+
+  // 55: Huh? sends the fixed message, on a ticket that has not been answered yet.
+  await test.step("agent question: Huh? sends the fixed message", async () => {
+    await start("chat-tickets");
+    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:ask-epic/01");
+    const form = page.getByRole("form", { name: "Answer" });
+    await form.getByRole("button", { name: "Huh?" }).click({ timeout: 60_000 });
+    await form.getByRole("button", { name: "Send answer" }).click();
+    await expect(page.getByRole("status", { name: "Answer result" }).getByText(HUH_MESSAGE)).toBeVisible();
+  });
 
   // 49: the ticket detail shows the Latest summary block; the Epics-page card carries none of it.
   await test.step("ticket detail shows Latest summary, the Epics card does not", async () => {
