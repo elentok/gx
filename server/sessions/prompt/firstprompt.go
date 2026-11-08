@@ -215,12 +215,15 @@ func (f *firstPrompt) Start(signal, prompt string) {
 }
 
 func (f *firstPrompt) deliver(prompt string) error {
-	if strings.HasPrefix(prompt, "/") {
-		return f.deliverSlash(prompt)
-	}
 	c, err := holder.DialHolder(f.dir)
 	if err != nil {
 		return err
+	}
+	if f.vimRestarted(c, prompt) {
+		return nil
+	}
+	if strings.HasPrefix(prompt, "/") {
+		return f.deliverSlash(prompt)
 	}
 	_, turn, err := c.Status()
 	if err != nil {
@@ -245,6 +248,28 @@ func (f *firstPrompt) deliver(prompt string) error {
 		return nil
 	}
 	return err
+}
+
+// vimRestarted runs the vim launch check for a claude session and, on a trip
+// in a run that has not been restarted yet, hands the prompt to a fresh
+// conversation. It reports true when it did, so the caller types nothing: the
+// new watch's first prompt does. After the restart a trip is only logged (by
+// the check) and the prompt is typed anyway, leaving a pane that hangs to the
+// existing "prompt not delivered" Actionable.
+func (f *firstPrompt) vimRestarted(c *holder.HolderClient, prompt string) bool {
+	meta, err := sessions.ReadMeta(f.dir)
+	if err != nil || (meta.Harness != "" && meta.Harness != string(harness.Claude)) {
+		return false
+	}
+	if !harness.CheckVimLaunch(f.p.projects.TypingIO(f.dir, c, "first-prompt")) {
+		return false
+	}
+	if meta.VimRelaunchRun != 0 && meta.VimRelaunchRun == f.run {
+		return false
+	}
+	f.log.Warn("vim footer after launch, restarting once")
+	f.p.sessions.RestartFresh(f.dir, f.id, prompt)
+	return true
 }
 
 // errSessionBlocked means the first prompt was never typed because the session
