@@ -55,7 +55,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **Cancel stops the send and Continue stays.**
 - **An all-defaulted round:** one "Accept these defaults" card and a grilling Actionable.
 - **Shows the step and ticket, then follows the step report.**
-- **Auto-advance:** shows while working and idle; off, then on starts the countdown and a fresh round follows.
+- **Auto-advance:** shows while working and idle; off, then on starts the countdown and a fresh round follows; then the Auto-queue row is enabled and off, flips on, the Branch step shows "Queuing in Ns" with Cancel auto-queue, and the epic is queued at the end.
 - **Stopped session card:** live asks first, a stopped card moves to Ready to design, the menu and the banner start a new session.
 - **Delete design:** appears when the session stops with the page open, and Delete removes the design.
 - **50. Design epic page.**
@@ -114,7 +114,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 ## Layout and navigation (`jump`, `phone`, `modes`, `menu`)
 
 - **`jump.e2e.ts` 22. Back link count, then the phone layout:** the sidebar footer's Epics badge counts every card that needs you on any page and follows the server; the page title is not a button; Cmd/Ctrl+K opens the jump menu on the Epics and Agents pages; on a phone the sidebar slides in over the page and keeps the badge.
-- **`phone.e2e.ts`:** a card's meta sits below its title and the answer and fix buttons are full-width tap targets; **41. Phone, New Design sheet** (88% bottom sheet with grab handle, Close above the idea box; at 375px Discard at the footer's left edge and Start design at its right edge, each at natural width; with the idea empty the hint sits above the footer and Start keeps its width; a thumbnail click opens the viewer; Tab stays inside the dialog); **24. Phone, Design page** (Send is dimmed until an answer exists and named "Send" on a phone; at 390px the footer is one row of Add, Note, Auto, Send with 44px Add and Note; Cmd/Ctrl+K opens a full-screen jump sheet).
+- **`phone.e2e.ts`:** a card's meta sits below its title and the answer and fix buttons are full-width tap targets; **41. Phone, New Design sheet** (88% bottom sheet with grab handle, Close above the idea box; at 375px Discard at the footer's left edge and Start design at its right edge, each at natural width; with the idea empty the hint sits above the footer and Start keeps its width; a thumbnail click opens the viewer; Tab stays inside the dialog); **24. Phone, Design page** (Send is dimmed until an answer exists and named "Send" on a phone; at 390px the footer is one row of Add, Note, Auto, Send with 44px Add and Note; Auto menu shows Advance and Queue and Queue flips; at Branch the Queuing countdown strip sits above the footer with a Cancel at least 40px tall; Cmd/Ctrl+K opens a full-screen jump sheet).
 - **`modes.e2e.ts`:** at 760px the Epic page gets the wide layout and Cmd/Ctrl+K opens a popover jump menu (and 62. Card columns); at 390px the Design page's jump menu is a full-screen sheet.
 - **`menu.e2e.ts`:** the sidebar footer's limits tray (between the health meter and the gear; the bars read C and X, fill and tone follow the 5h usage) and its popover: a statusline report reaches the open popover; the amount rises while it is open; the open popover flips to limits and its output matches the no-server run; the narrow popover fits and updates live. The tray keeps its bars fresh while closed, so a closed popover still fetches.
 

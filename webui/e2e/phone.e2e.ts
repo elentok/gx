@@ -133,7 +133,7 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
 });
 
 test("24. Phone, Design page", async ({ page, start }) => {
-  await start("design");
+  const fixture = await start("design", { autoAdvanceDelay: "9s" });
 
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
   await page.getByRole("button", nav("Start design session")).click();
@@ -210,6 +210,20 @@ test("24. Phone, Design page", async ({ page, start }) => {
   const centers = boxes.map((b) => b.y + b.height / 2);
   for (const c of centers) expect(c).toBeCloseTo(centers[0], 0);
   for (let i = 1; i < boxes.length; i++) expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width);
+
+  // Auto-queue: the menu shows "Queue" and flips; the countdown strip sits above the footer with a 40px+ Cancel.
+  await auto.click();
+  const menu = page.getByRole("dialog", nav("Auto"));
+  await expect(menu.getByRole("switch", { name: "Auto-queue off" })).toBeEnabled();
+  await menu.getByRole("switch", { name: "Auto-queue off" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: /Auto-queue on$/ })).toHaveText("AdvanceQueue");
+  await fixture.cli("tickets", "set", "demo:design-epic", "--design-step", "branch");
+  const strip = page.locator('[data-part="countdown-strip"]');
+  await expect(strip).toContainText(/Queuing in \ds/);
+  const cancel = strip.getByRole("button", nav("Cancel auto-queue"));
+  expect((await cancel.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+  expect((await strip.boundingBox())!.y + (await strip.boundingBox())!.height).toBeLessThanOrEqual((await send.boundingBox())!.y + 1);
 
   // Cmd/Ctrl+K opens the jump menu as a full-screen sheet; its close button closes it.
   await page.keyboard.press("ControlOrMeta+k");
