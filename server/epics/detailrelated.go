@@ -16,6 +16,7 @@ func (s *Epics) detailStats(ref queue.TicketRef) *wire.DetailStats {
 	if at, ok := s.Runs.StartedAtOf(ref.Addr.String()); ok && ref.Epic.RenderedStatus(t) == tickets.StatusClaimed {
 		st.ClaimedAt = at
 		st.LaunchStep = s.launchStep(ref.Addr.String())
+		st.HolderUnreachable = s.Runs.HolderUnreachableOf(ref.Addr.String())
 	}
 	return st
 }

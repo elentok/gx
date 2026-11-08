@@ -75,6 +75,7 @@ func (*fakeProjects) LaunchHarness(string) string { return "claude" }
 
 type fakeRuns struct{}
 
+func (fakeRuns) HolderUnreachableOf(string) bool      { return false }
 func (fakeRuns) StartedAtOf(string) (time.Time, bool) { return time.Time{}, false }
 
 func (fakeRuns) Has(string) bool { return false }

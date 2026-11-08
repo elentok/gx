@@ -413,6 +413,15 @@ func (r *Runner) SetAnswerErr(label string, err error) {
 	r.byLabel(label).answerErr = err
 }
 
+// SetCallErr makes every Status and Wait of label fail with err until cleared
+// with nil, as a holder that does not answer its dial does.
+func (r *Runner) SetCallErr(label string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.byLabel(label).diedErr = err
+	r.notify()
+}
+
 // SetPromptErr makes every Prompt to label fail with err until cleared with
 // nil.
 func (r *Runner) SetPromptErr(label string, err error) {

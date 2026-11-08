@@ -100,6 +100,9 @@ type TrackedRun struct {
 	// restart re-derives the hold from the runner's rate-limit check.
 	RateLimited    bool      `json:"-"`
 	RateLimitReset time.Time `json:"-"`
+	// HolderUnreachable marks a run whose holder is alive but did not answer
+	// its dial; the settle loop retries. Never saved: a restart re-adopts.
+	HolderUnreachable bool `json:"-"`
 	// LaunchStep is the launch step the run is in, "" once the launch ended.
 	// Never saved: a restart reclaims or hands back a launch.
 	LaunchStep LaunchStep `json:"-"`
@@ -480,6 +483,28 @@ func (r *Registry) MarkRateLimit(address string, limited bool, resetAt time.Time
 		t.RateLimited, t.RateLimitReset = limited, resetAt
 		r.runs[address] = t
 	}
+}
+
+// MarkHolderUnreachable sets or clears the unreachable-holder state of the run
+// at address. It reports whether the state changed.
+func (r *Registry) MarkHolderUnreachable(address string, unreachable bool) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.runs[address]
+	if !ok || t.HolderUnreachable == unreachable {
+		return false
+	}
+	t.HolderUnreachable = unreachable
+	r.runs[address] = t
+	return true
+}
+
+// HolderUnreachableOf reports whether the run at address is retrying an
+// unreachable holder.
+func (r *Registry) HolderUnreachableOf(address string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.runs[address].HolderUnreachable
 }
 
 // RateLimitedRuns are the held runs, ordered by address.

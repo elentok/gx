@@ -42,6 +42,7 @@ type Writer interface {
 // Runs knows when a run started and which launch step it is in.
 type Runs interface {
 	StartedAtOf(address string) (time.Time, bool)
+	HolderUnreachableOf(address string) bool
 	LaunchStepOf(address string) (label string, position, total int)
 	Has(address string) bool
 }

@@ -1,6 +1,7 @@
 package sched
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
@@ -262,9 +264,52 @@ func (l *Launcher) finishRun(rc runContext) {
 	if !rc.one.PausesAtOnce() {
 		go l.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
 	}
-	err := ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session)
+	err := l.waitKeepingHolder(rc, addr)
 	close(stop)
 	l.settleRun(rc, err)
+}
+
+// HolderReadoptCap is how many unanswered dials in a row a run with a live
+// holder takes before it pauses.
+const HolderReadoptCap = 5
+
+// waitKeepingHolder is WaitIterationFinished that survives a holder which is
+// alive but does not answer: each tick it probes the session again (the
+// re-adopt) and resumes the wait once a dial works. The run stays tracked and
+// is never relaunched; only the cap ends it.
+func (l *Launcher) waitKeepingHolder(rc runContext, addr tickets.Address) error {
+	failures := 0
+	for {
+		err := ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session)
+		if !errors.Is(err, holder.ErrHolderUnreachable) {
+			return err
+		}
+		for errors.Is(err, holder.ErrHolderUnreachable) {
+			failures++
+			if failures >= HolderReadoptCap {
+				l.markHolderUnreachable(addr, false)
+				return fmt.Errorf("dial failed %d times with the holder alive: %w", failures, err)
+			}
+			l.markHolderUnreachable(addr, true)
+			time.Sleep(cmp.Or(rc.deps.GuardPoll, supervise.SmartZonePollMs*time.Millisecond))
+			_, err = rc.deps.Runner.Status(rc.run.Session)
+		}
+		// The probe answered, or found the session gone: the wait reports that.
+		l.markHolderUnreachable(addr, false)
+		failures = 0
+	}
+}
+
+// markHolderUnreachable sets or clears the card's retrying state, logging the
+// event once per hold.
+func (l *Launcher) markHolderUnreachable(addr tickets.Address, unreachable bool) {
+	if !l.Registry.MarkHolderUnreachable(addr.String(), unreachable) {
+		return
+	}
+	if unreachable {
+		l.LogEvent(addr, runlog.Event{Type: string(events.HolderUnreachable), Ticket: addr.ID, Address: addr.String(), Reason: "holder unreachable, retrying"})
+	}
+	l.Events.Publish(wire.EventTicketChanged, addr.String())
 }
 
 // BlockWatchPoll bounds each Wait of watchBlocked. A herdr Wait is one herdr

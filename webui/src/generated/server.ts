@@ -589,6 +589,11 @@ export interface DetailStats {
   elapsed?: number /* int */;
   claimed_at?: string;
   launch_step?: LaunchStep;
+  /**
+   * HolderUnreachable is set while gx retries a holder that is alive but did
+   * not answer; the card reads "holder unreachable, retrying".
+   */
+  holder_unreachable?: boolean;
   cost?: number /* float64 */;
   had_codex?: boolean;
   context_window?: number /* int */;
