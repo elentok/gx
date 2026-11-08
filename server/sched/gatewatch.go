@@ -15,7 +15,7 @@ const (
 	// log, and the server must stay cheap while idle.
 	gateWatchInterval = time.Minute
 	// gateHeldQuietPeriod is how long a hold stands before it counts as stuck.
-	// Well under the loop's own aged-out cap, so the raise comes first.
+	// Well under the loop's hold cap, so the raise comes first.
 	gateHeldQuietPeriod = 15 * time.Minute
 )
 

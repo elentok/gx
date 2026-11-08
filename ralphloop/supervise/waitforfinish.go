@@ -12,6 +12,8 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -657,7 +659,9 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 	}
 
 	held := map[string]bool{}
+	ignored := map[string]bool{}
 	gated := false
+	heldMs := 0
 	for {
 		tr, err := d.ReadBackgroundTasks(p.SessionCwd, sessionID)
 		if err != nil {
@@ -667,9 +671,29 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 
 		// The pane can still read idle while a notification-woken turn runs
 		// quick tool calls, so the transcript's turn end decides, not herdr.
-		outstanding := reading.Live
+		var outstanding bool
 		gated = gated || reading.AwaitingTurnEnd
+		// A finished report with an ended turn settles the agent: a task that
+		// started before the report is not waited on.
+		reportedAt := finishedReportTime(p)
+		if reading.AwaitingTurnEnd {
+			reportedAt = time.Time{}
+		}
+		stillFresh := reading.AwaitingTurnEnd
 		for _, m := range reading.Tasks {
+			if m.Status == transcript.BackgroundTaskOutstandingFresh && !reportedAt.IsZero() && m.StartedAt.Before(reportedAt) {
+				delete(held, m.TaskID)
+				if !ignored[m.TaskID] {
+					ignored[m.TaskID] = true
+					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("agent reported finished, task %s ignored", m.TaskID)); err != nil {
+						return false, err
+					}
+				}
+				continue
+			}
+			if m.Status == transcript.BackgroundTaskOutstandingFresh {
+				stillFresh = true
+			}
 			switch m.Status {
 			case transcript.BackgroundTaskOutstandingFresh:
 				if !held[m.TaskID] {
@@ -689,12 +713,13 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 			case transcript.BackgroundTaskOutstandingAgedOut:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					if err := p.LogGateEvent(events.BackgroundTaskGateExpired, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID)); err != nil {
+					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("background task %s aged out", m.TaskID)); err != nil {
 						return false, err
 					}
 				}
 			}
 		}
+		outstanding = stillFresh
 		if outstanding && d.GateReleased != nil && d.GateReleased() {
 			for id := range held {
 				if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: recovery forced the release", id)); err != nil {
@@ -715,6 +740,9 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 			return confirmed, nil
 		}
 
+		if heldMs >= int(BackgroundTaskHoldCap/time.Millisecond) {
+			return false, pauseBackgroundTaskHold(p, sessionID, reading.Tasks, held)
+		}
 		pollMs := SmartZonePollMs
 		if p.FinishTimeoutMs > 0 {
 			remaining := p.FinishTimeoutMs - *elapsedMs
@@ -727,7 +755,48 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 		}
 		d.Sleep(time.Duration(pollMs) * time.Millisecond)
 		*elapsedMs += pollMs
+		heldMs += pollMs
 	}
+}
+
+// BackgroundTaskHoldCap is the one cap on every live-task hold: a task, or a
+// turn a task woke, that outlasts it pauses the ticket instead of waiting on.
+const BackgroundTaskHoldCap = 60 * time.Minute
+
+// finishedReportTime is when the agent reported finished, or zero when the
+// ticket carries no finished report (or cannot be read).
+func finishedReportTime(p LaunchParams) time.Time {
+	if p.TicketPath == "" {
+		return time.Time{}
+	}
+	t, err := schema.ParseTicket(p.TicketPath)
+	if err != nil || t.IterationStatus != schema.IterationStatusFinished {
+		return time.Time{}
+	}
+	return t.IterationFinishedAt
+}
+
+// pauseBackgroundTaskHold ends a hold that reached the cap: it closes each held
+// task with a released event, so the gate watcher sees no hold on a paused
+// ticket, then pauses the ticket naming the task.
+func pauseBackgroundTaskHold(p LaunchParams, sessionID string, tasks []transcript.BackgroundTaskMarker, held map[string]bool) error {
+	named := ""
+	if len(tasks) > 0 {
+		named = tasks[len(tasks)-1].TaskID
+	}
+	for id := range held {
+		named = id
+		if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: paused after %s", id, BackgroundTaskHoldCap)); err != nil {
+			return err
+		}
+	}
+	reason := fmt.Sprintf("%s still waited on background task %s after %s", p.Label, named, BackgroundTaskHoldCap)
+	ticketops.PauseTicket(p.EventSink(), ticketops.PauseRequest{
+		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
+		Type: events.Paused, Kind: events.BackgroundTaskGate, Reason: reason,
+		Event: runlog.Event{Agent: p.Agent, Pane: p.Pane, AgentSession: sessionID, Cwd: p.SessionCwd, TaskID: named},
+	})
+	return &BlockedPausedError{Reason: reason}
 }
 
 // contextOccupancy reads the selected agent's own local session data. A

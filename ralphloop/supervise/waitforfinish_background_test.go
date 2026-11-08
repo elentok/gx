@@ -1,6 +1,7 @@
 package supervise
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -121,48 +122,94 @@ func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 	}
 }
 
-// TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough covers the ~2h cap:
-// once a held marker reads outstanding-aged-out, the gate stops holding on
-// it and WaitForFinish falls through to a plain finish, logging gate-expired
-// (never gate-released) for that marker.
-func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
+// finishedTicket writes a claimed ticket whose agent reported finished at at,
+// with the ticket's path set on the returned params.
+func finishedTicket(t *testing.T, scratchDir string, at time.Time) LaunchParams {
+	t.Helper()
+	p := backgroundTaskGateParams(scratchDir)
+	p.TicketPath = fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\niteration_status: finished\niteration_finished_at: "+
+		at.UTC().Format(time.RFC3339)+"\n---\n# Ticket\n")
+	return p
+}
+
+func gateEventTypes(t *testing.T, scratchDir string) []string {
+	t.Helper()
+	evs, _, err := runlog.ReadEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("ReadEvents: %v", err)
+	}
+	var out []string
+	for _, ev := range evs {
+		out = append(out, ev.Type+" "+ev.TaskID+" "+ev.Reason)
+	}
+	return out
+}
+
+// A finished report with an ended turn skips a task that started before the
+// report and logs a released event for it.
+func TestWaitForFinish_FinishedReportSkipsAnOlderTask(t *testing.T) {
 	t.Parallel()
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	var sleeps, reads int
-	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
-		reads++
-		status := transcript.BackgroundTaskOutstandingFresh
-		if reads >= 2 {
-			status = transcript.BackgroundTaskOutstandingAgedOut
-		}
-		return transcript.BackgroundTaskReading{
-			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}},
-		}, nil
+	reportedAt := time.Now().Add(-time.Minute).Truncate(time.Second)
+	var sleeps int
+	read := func(string, string) (transcript.BackgroundTaskReading, error) {
+		return transcript.BackgroundTaskReading{Markers: []transcript.BackgroundTaskMarker{
+			{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh, StartedAt: reportedAt.Add(-time.Hour)},
+		}}, nil
 	}
-	d := fakes.IdleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	d := fakes.IdleBackgroundTaskDeps(read, &sleeps)
 
-	if err := WaitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
-		t.Fatalf("WaitForFinish: %v, want the aged-out marker to fall through to a plain finish", err)
+	if err := WaitForFinish(d, finishedTicket(t, scratchDir, reportedAt), "sess-30"); err != nil {
+		t.Fatalf("WaitForFinish: %v", err)
 	}
+	want := string(eventsc.BackgroundTaskGateReleased) + " task-1 agent reported finished, task task-1 ignored"
+	got := gateEventTypes(t, scratchDir)
+	if !slices.Contains(got, want) {
+		t.Errorf("events = %q, want %q", got, want)
+	}
+}
 
-	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
-	if err != nil || !ok {
-		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
+// A task started after the report and an open turn each hold, and each pauses
+// background-task-gate at the one cap, with no expired event after it.
+func TestWaitForFinish_HoldCapPausesATaskAfterTheReportAndAnOpenTurn(t *testing.T) {
+	t.Parallel()
+	cases := map[string]transcript.BackgroundTaskReading{
+		"later task": {Markers: []transcript.BackgroundTaskMarker{
+			{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh, StartedAt: time.Now().Add(time.Hour)},
+		}},
+		"open turn": {AwaitingTurnEnd: true, Markers: []transcript.BackgroundTaskMarker{
+			{TaskID: "task-1", Status: transcript.BackgroundTaskResolved, StartedAt: time.Now().Add(-time.Hour)},
+		}},
 	}
-	var expired, released int
-	for _, ev := range events {
-		switch ev.Type {
-		case string(eventsc.BackgroundTaskGateExpired):
-			expired++
-		case string(eventsc.BackgroundTaskGateReleased):
-			released++
-		}
-	}
-	if expired != 1 {
-		t.Errorf("gate-expired events = %d, want exactly 1", expired)
-	}
-	if released != 0 {
-		t.Errorf("gate-released events = %d, want 0: this marker aged out, it never resolved", released)
+	for name, reading := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			scratchDir := fixture.EpicScratchDir(t, "epic")
+			var sleeps int
+			d := fakes.IdleBackgroundTaskDeps(func(string, string) (transcript.BackgroundTaskReading, error) { return reading, nil }, &sleeps)
+			p := finishedTicket(t, scratchDir, time.Now().Add(-time.Minute))
+
+			err := WaitForFinish(d, p, "sess-30")
+			if _, ok := errors.AsType[*BlockedPausedError](err); !ok {
+				t.Fatalf("WaitForFinish error = %v, want a pause", err)
+			}
+			if want := int(BackgroundTaskHoldCap/(SmartZonePollMs*time.Millisecond)) + 1; sleeps != want {
+				t.Errorf("Sleep calls = %d, want %d (debounce plus one per poll up to the cap)", sleeps, want)
+			}
+			evs, _, _ := runlog.ReadEvents(scratchDir, "epic")
+			var paused bool
+			for _, ev := range evs {
+				if ev.Type == string(eventsc.BackgroundTaskGateExpired) {
+					t.Errorf("unexpected expired event %+v", ev)
+				}
+				if ev.Type == string(eventsc.Paused) && ev.Kind == string(eventsc.BackgroundTaskGate) && ev.TaskID == "task-1" {
+					paused = true
+				}
+			}
+			if !paused {
+				t.Errorf("events = %q, want a background-task-gate pause naming task-1", gateEventTypes(t, scratchDir))
+			}
+		})
 	}
 }
 

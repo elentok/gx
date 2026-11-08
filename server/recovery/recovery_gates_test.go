@@ -451,6 +451,7 @@ func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
 	}{
 		{"busy pane", "working", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute)}},
 		{"released gate", "idle", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.BackgroundTaskGateReleased, 2*time.Minute)}},
+		{"legacy expired gate from an old run log", "idle", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.BackgroundTaskGateExpired, 2*time.Minute)}},
 		{"gate recovery forced open", "idle", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), {
 			Type: string(events.BackgroundTaskGateReleased), TaskID: "task-1", Reason: "background task task-1: recovery forced the release", Time: gateWatchStart.Add(2 * time.Minute),
 		}}},
