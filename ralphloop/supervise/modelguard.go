@@ -54,7 +54,7 @@ func NewModelGuard(d deps.Deps, p LaunchParams, since time.Time) *ModelGuard {
 		return nil
 	}
 	if p.Model == "" {
-		p.LogAgentEvent(string(events.ModelMismatch), "", "model check skipped: the tier resolves to no model")
+		_ = p.LogAgentEvent(string(events.ModelMismatch), "", "model check skipped: the tier resolves to no model") // constructor has no error return; the note is advisory
 		return nil
 	}
 	return &ModelGuard{expected: p.Model, since: since}
@@ -94,6 +94,8 @@ func (g *ModelGuard) Tick(d deps.Deps, p LaunchParams, sessionID string) error {
 	if ModelMatches(turns.Model, g.expected) {
 		return nil
 	}
-	p.LogAgentEvent(string(events.ModelMismatch), sessionID, fmt.Sprintf("ran %s, expected %s", turns.Model, g.expected))
+	if err := p.LogAgentEvent(string(events.ModelMismatch), sessionID, fmt.Sprintf("ran %s, expected %s", turns.Model, g.expected)); err != nil {
+		return err
+	}
 	return &ModelMismatchError{Ran: turns.Model, Expected: g.expected}
 }

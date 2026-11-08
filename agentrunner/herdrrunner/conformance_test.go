@@ -474,10 +474,10 @@ func TestStatus_FinishedAgentIgnoresBackgroundTasks(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		finished bool
-		want     agentrunner.State
+		want     bool
 	}{
-		{"finished", true, agentrunner.StateIdle},
-		{"unfinished", false, agentrunner.StateWorking},
+		{"finished", true, false},
+		{"unfinished", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, _, s := startAgent(t, "claude", nil)
@@ -487,8 +487,8 @@ func TestStatus_FinishedAgentIgnoresBackgroundTasks(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if st.State != tc.want {
-				t.Fatalf("state = %q, want %q", st.State, tc.want)
+			if st.State != agentrunner.StateIdle || st.Background != tc.want {
+				t.Fatalf("status = %+v, want idle with Background=%v", st, tc.want)
 			}
 		})
 	}
@@ -522,26 +522,15 @@ func TestStatus_NoBackgroundTaskSkipsFinished(t *testing.T) {
 	}
 }
 
-// An agent herdr shows idle but a background task keeps working answers every
-// wait at once; Wait must not re-ask at its 20ms pace, since each round spawns
-// herdr twice and parses the transcript (a busy loop for the task's lifetime).
-func TestWait_BackgroundTaskPollsSlowly(t *testing.T) {
+// An agent herdr shows idle with a background task still running is idle plus
+// Background, so Wait returns at once and the finish wait does the holding.
+func TestWait_BackgroundTaskReturnsIdleWithBackground(t *testing.T) {
 	r, _, s := startAgent(t, "claude", nil)
-	probes := 0
-	r.BackgroundTasks = func(agentrunner.Session) bool {
-		probes++
-		return true
-	}
-	now := time.Now()
-	r.Now = func() time.Time { return now }
-	r.Sleep = func(d time.Duration) { now = now.Add(d) }
+	r.BackgroundTasks = func(agentrunner.Session) bool { return true }
 
-	_, err := r.Wait(s, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, 10*time.Second)
-	if !errors.Is(err, agentrunner.ErrTimeout) {
-		t.Fatalf("Wait = %v, want ErrTimeout", err)
-	}
-	if probes > 10 {
-		t.Fatalf("probed background tasks %d times in 10s, want at most 10", probes)
+	st, err := r.Wait(s, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, 10*time.Second)
+	if err != nil || st.State != agentrunner.StateIdle || !st.Background {
+		t.Fatalf("Wait = %+v, %v; want idle with Background", st, err)
 	}
 }
 

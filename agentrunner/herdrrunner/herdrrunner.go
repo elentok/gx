@@ -801,7 +801,7 @@ func (r *Runner) status(s agentrunner.Session) (agentrunner.Status, error) {
 		}
 		// Finished scans every ticket, so ask it only once a background task exists.
 		if r.BackgroundTasks != nil && r.BackgroundTasks(probed) && !(r.Finished != nil && r.Finished(s)) {
-			st.State = agentrunner.StateWorking
+			st.Background = true
 		}
 	}
 	return st, nil

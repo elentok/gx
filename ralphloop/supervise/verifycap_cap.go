@@ -50,7 +50,9 @@ func (c *VerifyCap) Tick(d deps.Deps, p LaunchParams, sessionID string) (stopped
 	c.state.Fired = true
 
 	reason := fmt.Sprintf("context occupancy %d exceeds the verify cap %d", occupancy, c.limit)
-	p.LogAgentEvent(string(events.VerifyCapStopped), sessionID, reason)
+	if err := p.LogAgentEvent(string(events.VerifyCapStopped), sessionID, reason); err != nil {
+		return true, err
+	}
 	p.EventSink().VerifyCapStopped(p.Ticket)
 
 	prompt := fmt.Sprintf(
@@ -59,7 +61,9 @@ func (c *VerifyCap) Tick(d deps.Deps, p LaunchParams, sessionID string) (stopped
 		c.limit, agent.VerifySkill,
 	)
 	if err := d.Runner.Prompt(p.SessionOrDefault(), prompt); err != nil {
-		p.LogAgentEvent(string(events.VerifyCapStopped), sessionID, fmt.Sprintf("sending the verify cap prompt to %s: %v", p.Label, err))
+		if lerr := p.LogAgentEvent(string(events.VerifyCapStopped), sessionID, fmt.Sprintf("sending the verify cap prompt to %s: %v", p.Label, err)); lerr != nil {
+			return true, lerr
+		}
 	}
 	return true, nil
 }

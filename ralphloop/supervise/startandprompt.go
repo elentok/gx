@@ -200,8 +200,7 @@ func AdoptedLaunch(d deps.Deps, p LaunchParams) (string, error) {
 	reportStarted(d, p, sessionID, 0)
 	if AlreadyFinished(string(status.State)) {
 		if !noActivitySinceLaunch(p.ScratchDir, p.EpicName, sessionID, status.Turn) {
-			p.LogLifecycleEvent(p.FinishEvent, sessionID)
-			return sessionID, nil
+			return sessionID, p.LogLifecycleEvent(p.FinishEvent, sessionID)
 		}
 		if err := PromptIdle(d, p, p.Prompt); err != nil {
 			return "", fmt.Errorf("sending initial prompt to stalled adopted session: %w", err)

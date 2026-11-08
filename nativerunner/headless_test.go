@@ -558,9 +558,9 @@ func TestHeadless_FinishWaitsForBackgroundTasks(t *testing.T) {
 	if err := h.runner.Prompt(s, "background"); err != nil {
 		t.Fatal(err)
 	}
-	st, err := h.runner.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 200*time.Millisecond)
-	if !errors.Is(err, agentrunner.ErrTimeout) || st.State != agentrunner.StateWorking {
-		t.Fatalf("Wait idle with a background task = %+v, %v; want working, ErrTimeout", st, err)
+	st, err := h.runner.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 5*time.Second)
+	if err != nil || !st.Background {
+		t.Fatalf("Wait idle with a background task = %+v, %v; want idle with Background", st, err)
 	}
 	if err := os.WriteFile(filepath.Join(h.cwd, bgDoneFile), nil, 0o644); err != nil {
 		t.Fatal(err)

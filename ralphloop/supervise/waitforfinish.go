@@ -135,8 +135,7 @@ func WaitForFinish(d deps.Deps, p LaunchParams, sessionID string) error {
 					elapsedMs = 0
 					continue
 				}
-				p.LogLifecycleEvent(p.FinishEvent, sessionID)
-				return nil
+				return p.LogLifecycleEvent(p.FinishEvent, sessionID)
 			}
 			// The last recovery gave up gated and the transcript still records no
 			// boundary, so this "finished" is that same uncorroborated claim
@@ -159,8 +158,7 @@ func WaitForFinish(d deps.Deps, p LaunchParams, sessionID string) error {
 					elapsedMs = 0
 					continue
 				}
-				p.LogLifecycleEvent(p.FinishEvent, sessionID)
-				return nil
+				return p.LogLifecycleEvent(p.FinishEvent, sessionID)
 			}
 			if recovery.recordGatedGiveUp() {
 				return gatedGiveUpsExhausted(p.Label, recovery.gatedGiveUps, errCompactNeverConfirmed)
@@ -306,7 +304,9 @@ func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
 // doc comment.
 func recoverSmartZoneBreach(d deps.Deps, p LaunchParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.EventSink().SmartZoneCompactStarted(p.Ticket)
-	p.LogAgentEvent(string(events.PausedSmartZone), sessionID, reason)
+	if err := p.LogAgentEvent(string(events.PausedSmartZone), sessionID, reason); err != nil {
+		return false, err
+	}
 
 	baseline := newStickyBaseline(d, p, sessionID)
 
@@ -317,7 +317,9 @@ func recoverSmartZoneBreach(d deps.Deps, p LaunchParams, sessionID, reason strin
 	}
 	if err != nil {
 		p.EventSink().SmartZoneRecovered(p.Ticket)
-		p.LogAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
+		if lerr := p.LogAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err)); lerr != nil {
+			return false, lerr
+		}
 		if errors.Is(err, errCompactNeverConfirmed) {
 			return false, err
 		}
@@ -325,9 +327,13 @@ func recoverSmartZoneBreach(d deps.Deps, p LaunchParams, sessionID, reason strin
 	}
 	switch completion {
 	case compactTimeoutConfirmed:
-		p.LogAgentEvent(string(events.SmartZoneWaitExpired), sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
+		if err := p.LogAgentEvent(string(events.SmartZoneWaitExpired), sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label)); err != nil {
+			return false, err
+		}
 	case compactGateConfirmed:
-		p.LogAgentEvent(string(events.SmartZoneGateReleased), sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary merged", p.Label))
+		if err := p.LogAgentEvent(string(events.SmartZoneGateReleased), sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary merged", p.Label)); err != nil {
+			return false, err
+		}
 	}
 
 	p.EventSink().SmartZoneFinishingUp(p.Ticket)
@@ -340,12 +346,16 @@ func recoverSmartZoneBreach(d deps.Deps, p LaunchParams, sessionID, reason strin
 	)
 	if err := d.Runner.Prompt(p.SessionOrDefault(), finishText); err != nil {
 		p.EventSink().SmartZoneRecovered(p.Ticket)
-		p.LogAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err))
+		if lerr := p.LogAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err)); lerr != nil {
+			return false, lerr
+		}
 		return false, nil
 	}
 
 	p.EventSink().SmartZoneRecovered(p.Ticket)
-	p.LogLifecycleEvent(string(events.Resumed), sessionID)
+	if err := p.LogLifecycleEvent(string(events.Resumed), sessionID); err != nil {
+		return false, err
+	}
 	return true, nil
 }
 
@@ -665,23 +675,31 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 				if !held[m.TaskID] {
 					held[m.TaskID] = true
 					gated = true
-					p.LogGateEvent(events.BackgroundTaskGateHeld, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
+					if err := p.LogGateEvent(events.BackgroundTaskGateHeld, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID)); err != nil {
+						return false, err
+					}
 				}
 			case transcript.BackgroundTaskResolved:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
+					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID)); err != nil {
+						return false, err
+					}
 				}
 			case transcript.BackgroundTaskOutstandingAgedOut:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					p.LogGateEvent(events.BackgroundTaskGateExpired, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
+					if err := p.LogGateEvent(events.BackgroundTaskGateExpired, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID)); err != nil {
+						return false, err
+					}
 				}
 			}
 		}
 		if outstanding && d.GateReleased != nil && d.GateReleased() {
 			for id := range held {
-				p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: recovery forced the release", id))
+				if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: recovery forced the release", id)); err != nil {
+					return false, err
+				}
 			}
 			clear(held)
 			outstanding = false

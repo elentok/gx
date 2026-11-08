@@ -31,6 +31,9 @@ const (
 	ActionStall = "stall"
 	// ActionBackground starts (Running) or ends a background task.
 	ActionBackground = "background"
+	// ActionShell ends the turn like ActionFinish but writes the pid status
+	// `shell`, as claude does while a background task runs (TUI fake only).
+	ActionShell = "shell"
 	// ActionFast makes the TUI fake's next turn start and end at once, so a
 	// poll of its pid file sees no busy edge; only the OSC reports show it.
 	ActionFast = "fast"

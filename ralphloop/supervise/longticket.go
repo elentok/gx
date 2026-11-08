@@ -38,6 +38,6 @@ func (g *LongTicketGuard) Tick(d deps.Deps, p LaunchParams, sessionID string) {
 		return
 	}
 	g.fired = true
-	p.LogAgentEvent(eventLongTicket, sessionID, fmt.Sprintf("%d assistant turns, threshold %d", turns.Count, g.threshold))
+	_ = p.LogAgentEvent(eventLongTicket, sessionID, fmt.Sprintf("%d assistant turns, threshold %d", turns.Count, g.threshold)) // Tick has no error return; the alert below still fires
 	p.OnLongTicket(turns.Count)
 }

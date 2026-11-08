@@ -65,6 +65,8 @@ func (t *tui) handleControl(c Control) error {
 		// command runs, and a slow one must not look like a missed prompt.
 		go t.runStatusLine()
 		return nil
+	case ActionShell:
+		return t.setStatus(StatusShell, "")
 	case ActionBlock:
 		waitingFor := c.WaitingFor
 		if waitingFor == "" {

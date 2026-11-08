@@ -85,15 +85,17 @@ type LaunchParams struct {
 
 // LogLifecycleEvent appends eventType to p's run-log with p's Ticket/Pane/
 // Tab, plus agentSession if known. A no-op if eventType is "".
-func (p LaunchParams) LogLifecycleEvent(eventType, agentSession string) {
+func (p LaunchParams) LogLifecycleEvent(eventType, agentSession string) error {
 	if eventType == "" {
-		return
+		return nil
 	}
-	p.LogAgentEvent(eventType, agentSession, "")
+	return p.LogAgentEvent(eventType, agentSession, "")
 }
 
-func (p LaunchParams) LogAgentEvent(eventType, agentSession, reason string) {
-	_ = runlog.AppendEvent(p.ScratchDir, p.EpicName, p.AgentEvent(eventType, agentSession, reason))
+// LogAgentEvent returns the run-log write error: a dropped gate event is what
+// made a held background task invisible.
+func (p LaunchParams) LogAgentEvent(eventType, agentSession, reason string) error {
+	return runlog.AppendEvent(p.ScratchDir, p.EpicName, p.AgentEvent(eventType, agentSession, reason))
 }
 
 func (p LaunchParams) AgentEvent(eventType, agentSession, reason string) runlog.Event {
@@ -109,10 +111,10 @@ func (p LaunchParams) AgentEvent(eventType, agentSession, reason string) runlog.
 }
 
 // LogGateEvent is LogAgentEvent for a background-task gate event on taskID.
-func (p LaunchParams) LogGateEvent(eventType events.Type, agentSession, taskID, reason string) {
+func (p LaunchParams) LogGateEvent(eventType events.Type, agentSession, taskID, reason string) error {
 	ev := p.AgentEvent(string(eventType), agentSession, reason)
 	ev.TaskID = taskID
-	_ = runlog.AppendEvent(p.ScratchDir, p.EpicName, ev)
+	return runlog.AppendEvent(p.ScratchDir, p.EpicName, ev)
 }
 
 // LogAgentStartEvent is LogLifecycleEvent for the launch-time start event

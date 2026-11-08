@@ -108,10 +108,11 @@ func (t *tracker) status() agentrunner.Status {
 		st.State = agentrunner.StateBlocked
 		st.BlockedReason = t.permission.reason()
 		st.Pending = t.permission.pending()
-	case t.busy() || t.bgTasks > 0:
+	case t.busy():
 		st.State = agentrunner.StateWorking
 	default:
 		st.State = agentrunner.StateIdle
+		st.Background = t.bgTasks > 0
 	}
 	return st
 }

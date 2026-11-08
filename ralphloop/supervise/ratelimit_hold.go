@@ -65,7 +65,9 @@ func HoldRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time
 		reason = fmt.Sprintf("rate limit detected, resets %s", resetAt.UTC().Format(time.RFC3339))
 	}
 	p.EventSink().IterationPaused(p.Ticket, p.Label, runlog.PauseRateLimit, reason)
-	p.LogAgentEvent(string(events.PausedRateLimit), sessionID, reason)
+	if err := p.LogAgentEvent(string(events.PausedRateLimit), sessionID, reason); err != nil {
+		return err
+	}
 	for {
 		if onRateLimit != nil {
 			onRateLimit(true, resetAt)
@@ -104,6 +106,5 @@ func HoldRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time
 		onRateLimit(false, time.Time{})
 	}
 	p.EventSink().IterationResumed(p.Ticket, p.Label, runlog.PauseRateLimit)
-	p.LogLifecycleEvent(string(events.Resumed), sessionID)
-	return nil
+	return p.LogLifecycleEvent(string(events.Resumed), sessionID)
 }

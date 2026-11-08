@@ -168,6 +168,24 @@ func TestPty_BackgroundTasksFallbackReadsEnvHome(t *testing.T) {
 	}
 }
 
+// A pid file reporting `shell` (idle with a background task) is Idle plus
+// Background, so Wait returns and the finish wait does the holding.
+func TestPty_ShellStatusIsIdleWithBackground(t *testing.T) {
+	t.Parallel()
+	p := newPty(t)
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionShell})
+	// The session starts idle, so poll for the flag the control sets.
+	waitFor(t, "Idle with Background", func() bool {
+		st, err := p.Status(s)
+		return err == nil && st.State == agentrunner.StateIdle && st.Background
+	})
+}
+
 // ptyOn returns a fresh pty runner over root, as after a server restart.
 func ptyOn(root, exe string) *nativerunner.Pty {
 	return &nativerunner.Pty{

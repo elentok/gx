@@ -269,9 +269,9 @@ func finishWaitsForBackgroundTask(t *testing.T, h Harness) {
 	prompt(t, h.Runner, s, "do it")
 	h.BackgroundTask(t, s, true)
 	h.FinishTurn(t, s)
-	st, err := h.Runner.Wait(s, idleOrDone, 50*time.Millisecond)
-	if !errors.Is(err, agentrunner.ErrTimeout) || st.State != agentrunner.StateWorking {
-		t.Fatalf("Wait with a background task = %+v, %v; want working, ErrTimeout", st, err)
+	st, err := h.Runner.Wait(s, idleOrDone, waitTimeout)
+	if err != nil || st.State != agentrunner.StateIdle || !st.Background {
+		t.Fatalf("Wait with a background task = %+v, %v; want idle with Background", st, err)
 	}
 	h.BackgroundTask(t, s, false)
 	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {

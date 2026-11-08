@@ -111,6 +111,7 @@ const (
 	StatusBusy    = "busy"
 	StatusIdle    = "idle"
 	StatusWaiting = "waiting"
+	StatusShell   = "shell"
 )
 
 // PidFile is the shape of claude's ~/.claude/sessions/<pid>.json, limited to

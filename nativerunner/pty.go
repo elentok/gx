@@ -306,6 +306,8 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 		// finish gate sees the task, logs the hold and lets recovery raise it.
 		st.State = agentrunner.StateIdle
 		st.Background = p.turns().backgroundTasks(ss.session)
+	case harness.ClaudeShell:
+		st.State, st.Background = agentrunner.StateIdle, true
 	case ClaudeWaiting:
 		st.State, st.BlockedReason = agentrunner.StateBlocked, claude.WaitingFor
 		// Only here, on demand: the screen is never read on a timer for it.

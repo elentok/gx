@@ -36,12 +36,12 @@ type session struct {
 	answers         []agentrunner.Answer
 }
 
-// view is the status callers see: a running background task keeps an idle
-// session working, as on a real runner.
+// view is the status callers see: a running background task leaves an idle
+// session idle with Background set, as on a real runner.
 func (ss *session) view() agentrunner.Status {
 	st := ss.status
 	if ss.bgTask && st.State == agentrunner.StateIdle {
-		st.State = agentrunner.StateWorking
+		st.Background = true
 	}
 	return st
 }
