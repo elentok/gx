@@ -56,6 +56,23 @@ test("the Epics badge shows the server total and is absent at zero", () => {
   expect(screen.getByRole("link", { name: "Epics" })).toBeTruthy();
 });
 
+function stubUsage(ok: boolean) {
+  const summary = { mode: "limits", limits: { five_hour: { used_percentage: 10, resets_at: Date.now() / 1000 + 3600, received_at: Date.now() / 1000 } } };
+  vi.stubGlobal("fetch", vi.fn(async () => (ok ? new Response(JSON.stringify(summary)) : new Response("", { status: 500 }))));
+}
+
+test("the limits tray renders without a health snapshot, and nothing renders without usage", async () => {
+  stubUsage(true);
+  setup({ mode: "running" });
+  expect(await screen.findByRole("button", { name: "Usage limits" })).toBeTruthy();
+  cleanup();
+  stubUsage(false);
+  setup({ mode: "running" });
+  await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+  expect(screen.queryByRole("button", { name: "Usage limits" })).toBeNull();
+  vi.unstubAllGlobals();
+});
+
 test("the health button and the gear carry a title tooltip", () => {
   setup({ mode: "running", health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") } });
   expect(screen.getByRole("button", { name: /^System health:/ }).getAttribute("title")).toMatch(/^System health:/);

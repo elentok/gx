@@ -101,6 +101,10 @@ const repair = (actions: (keyof typeof info)[], extra: Partial<TicketDetail> = {
   action_info: info,
   ...extra,
 });
+// The shell's limits tray polls usage on its own; keep that out of the mock the tests assert on.
+function stubFetch(mock: ReturnType<typeof vi.fn>) {
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => (url.startsWith("/v1/usage/") ? Promise.resolve(new Response("", { status: 500 })) : mock(url, init)));
+}
 const posted = (fetchMock: ReturnType<typeof vi.fn>) =>
   fetchMock.mock.calls.map(([url, init]) => [url, JSON.parse((init as RequestInit).body as string)]);
 
@@ -123,7 +127,7 @@ test("stranded-commits reads Reopen and retry", async () => {
 
 test("Retry posts the state token and shows a success toast", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({})));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => repair(["retry", "start-over"]));
   fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
   expect(await screen.findByText("Retry started")).toBeTruthy();
@@ -133,7 +137,7 @@ test("Retry posts the state token and shows a success toast", async () => {
 test("Retry is disabled while the call runs", async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  vi.stubGlobal("fetch", vi.fn(async () => {
+  stubFetch(vi.fn(async () => {
     await gate;
     return new Response(JSON.stringify({}));
   }));
@@ -147,7 +151,7 @@ test("Retry is disabled while the call runs", async () => {
 
 test("Resume posts to the resume route and shows a success toast", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: { ticket: "12", status: "open" } })));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => repair(["resume", "start-over"], { pause_reason: "manual" }));
   fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
   expect(await screen.findByText("Resumed")).toBeTruthy();
@@ -156,7 +160,7 @@ test("Resume posts to the resume route and shows a success toast", async () => {
 
 test("a model-mismatch pause shows both models and one Resume on worker button that posts tier=worker", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: { ticket: "12", status: "open" } })));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() =>
     repair(["resume-on-worker"], {
       pause_reason: "model-mismatch",
@@ -183,7 +187,7 @@ test("other pauses show no Resume on worker button", async () => {
 
 test("Merge again posts to the merge route", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => repair(["merge", "start-over"], { pause_reason: "merge-conflict" }));
   fireEvent.click(await screen.findByRole("button", { name: "Merge again" }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalled());
@@ -192,7 +196,7 @@ test("Merge again posts to the merge route", async () => {
 
 test("Start over asks for a reason first and never sends branch deletion", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => repair(["retry", "start-over"]));
   fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
   const dialog = screen.getByRole("dialog", { name: "Start over" });
@@ -208,7 +212,7 @@ test("Start over asks for a reason first and never sends branch deletion", async
 
 test("Start over closes on Escape and drops the reason; Cancel closes; the field expands", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => repair(["retry", "start-over"]));
   fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
   let dialog = screen.getByRole("dialog", { name: "Start over" });
@@ -226,7 +230,7 @@ test("Start over closes on Escape and drops the reason; Cancel closes; the field
 
 test("Start over's Confirm is disabled until a reason is typed", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => repair(["retry", "start-over"]));
   fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
   const dialog = screen.getByRole("dialog", { name: "Start over" });
@@ -245,7 +249,7 @@ test("a Retry refused because the agent is working offers Stop agent and retry, 
       new Response(JSON.stringify({ refused: true, reason: "agent-working", message: "agent is still working" })),
     )
     .mockResolvedValueOnce(new Response(JSON.stringify({})));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => repair(["retry", "start-over"]));
   fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
   fireEvent.click(await screen.findByRole("button", { name: "Stop agent and retry" }));
@@ -259,7 +263,7 @@ test("a stale refusal refetches the detail", async () => {
   const fetchMock = vi.fn(
     async () => new Response(JSON.stringify({ refused: true, reason: "stale", message: "The pause changed." })),
   );
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => {
     fetched++;
     return repair(["retry", "start-over"]);
@@ -286,8 +290,7 @@ test("an Answered ticket keeps the last question and the answer", async () => {
 
 test("a sent answer keeps its result on screen after the refetch", async () => {
   let detail = base;
-  vi.stubGlobal(
-    "fetch",
+  stubFetch(
     vi.fn(async () => {
       detail = {
         ...base,
@@ -340,7 +343,7 @@ test("a round the agent was prompted on shows the Prompt sent line", async () =>
 test("a prompted Retry on a zero-commit card shows that the ticket stays paused", async () => {
   const body = { data: { ticket: "12", status: "prompted", message: "the agent is still running and was asked to continue" } };
   const fetchMock = vi.fn(async () => new Response(JSON.stringify(body)));
-  vi.stubGlobal("fetch", fetchMock);
+  stubFetch(fetchMock);
   renderTicket(() => repair(["retry"], { pause_reason: "zero-commit" }));
   fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
   expect(await screen.findByText("Sent to the running agent. The ticket stays paused until it finishes.")).toBeTruthy();
@@ -349,7 +352,7 @@ test("a prompted Retry on a zero-commit card shows that the ticket stays paused"
 
 test("a prompted Resume shows that the ticket stays paused", async () => {
   const body = { data: { ticket: "12", status: "prompted", message: "the agent is still running and was asked to continue" } };
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body))));
+  stubFetch(vi.fn(async () => new Response(JSON.stringify(body))));
   renderTicket(() => repair(["resume"], { pause_reason: "zero-commit" }));
   fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
   expect(await screen.findByText("Sent to the running agent. The ticket stays paused until it finishes.")).toBeTruthy();

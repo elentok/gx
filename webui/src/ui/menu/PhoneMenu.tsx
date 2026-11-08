@@ -11,6 +11,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { useOnCloseSignal } from "../closeSignal";
 import type { MenuEntry, MenuProps, SubmenuItem } from "./Menu";
 
 const WIDTH = 280;
@@ -74,14 +75,7 @@ export function PhoneMenu({ trigger, items, onClosed, closeSignal }: MenuProps) 
     onClosed?.();
   };
 
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    reset();
-  }, [closeSignal]);
+  useOnCloseSignal(closeSignal, reset);
 
   useLayoutEffect(() => {
     if (anchor && !placed && panel.current) setPlaced(place(anchor.rect, panel.current.getBoundingClientRect().height));

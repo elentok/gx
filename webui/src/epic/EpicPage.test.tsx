@@ -581,8 +581,10 @@ test("the stash button posts to its route with the state token", async () => {
       detail: { state: "paused", land_block_reason: "Trunk has local changes", actions: ["stash-merge", "merge"] },
     });
     fireEvent.click(await screen.findByRole("button", { name: "Stash, merge and restore" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    const [path, init] = fetchMock.mock.calls[0];
+    // The shell's limits tray also polls usage through this mock.
+    const stashCall = () => fetchMock.mock.calls.find(([url]) => url !== "/v1/usage/summary");
+    await waitFor(() => expect(stashCall()).toBeTruthy());
+    const [path, init] = stashCall()!;
     expect(path).toBe("/v1/epics/stash-merge");
     expect(JSON.parse(init.body)).toEqual({ address: "gx:blog-impl", state: "paused" });
   } finally {

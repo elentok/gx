@@ -469,5 +469,8 @@ test("a repaint of the same payload at a later time shows the later label", asyn
 test("cards without a time start no clock", async () => {
   fakeClock(T0);
   await loaded(listOf([row("busy", { section: "implementing" })]));
-  expect(vi.getTimerCount()).toBe(0);
+  const untimed = vi.getTimerCount();
+  cleanup();
+  await loaded(timed());
+  expect(vi.getTimerCount()).toBeGreaterThan(untimed);
 });

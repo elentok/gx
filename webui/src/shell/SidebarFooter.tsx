@@ -91,12 +91,8 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       <FooterLink href={STATS_HREF} label="Stats and health">
         <StatsIcon />
       </FooterLink>
-      {health && (
-        <>
-          <Tray health={health} connected={connected} />
-          <LimitsTray conn={conn} />
-        </>
-      )}
+      {health && <Tray health={health} connected={connected} />}
+      <LimitsTray conn={conn} />
       {unhealthy && (
         <Indicator label="System health is high or critical" tone="waiting">
           <WarningIcon />

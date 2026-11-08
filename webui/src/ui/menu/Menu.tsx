@@ -1,7 +1,7 @@
 import { Box, Menu as ChakraMenu, Portal, Text } from "@chakra-ui/react";
-import { Fragment, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { Fragment, useState, type ReactElement, type ReactNode } from "react";
 import { useWide } from "../../useWide";
-import { useCloseSignal } from "../closeSignal";
+import { useCloseSignal, useOnCloseSignal } from "../closeSignal";
 import { PhoneMenu } from "./PhoneMenu";
 
 interface ItemBase {
@@ -205,14 +205,7 @@ export interface MenuProps {
 
 function WideMenu({ trigger, items, onClosed, closeSignal, placement = "bottom-end" }: MenuProps) {
   const [open, setOpen] = useState(false);
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    setOpen(false);
-  }, [closeSignal]);
+  useOnCloseSignal(closeSignal, () => setOpen(false));
   return (
     <ChakraMenu.Root
       open={open}
