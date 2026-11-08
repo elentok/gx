@@ -827,7 +827,7 @@ test("Send answers the whole round in one prompt", async () => {
   render({ post, chat: chatOf({ round: round() }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
-  fireEvent.click(s.getByRole("button", { name: "Nope" }));
+  fireEvent.click(s.getByRole("button", { name: "No" }));
   fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), {
     target: { value: "free text" },
   });
@@ -894,7 +894,7 @@ test("Send with gaps opens a popover listing the unanswered questions; Send anyw
 test("one gap says 'question is unanswered'", async () => {
   const { s } = await sendWithGaps(vi.fn<PostPrompt>(async () => ok));
   fireEvent.click(s.getByRole("button", { name: "Question 2" }));
-  fireEvent.click(s.getByRole("button", { name: "Sure" }));
+  fireEvent.click(s.getByRole("button", { name: "Yes" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   expect(
@@ -975,7 +975,7 @@ test("a popover row opens the sheet at that question and focuses its first contr
   );
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      within(screen.getByRole("group", { name: "Questions" })).getByRole("button", { name: "Sure" }),
+      within(screen.getByRole("group", { name: "Questions" })).getByRole("button", { name: "Yes" }),
     ),
   );
   expect(post).not.toHaveBeenCalled();
@@ -1032,7 +1032,8 @@ test("question bodies and option labels render their markdown", async () => {
   expect(within(s).getAllByRole("listitem")).toHaveLength(2);
   const option = within(s).getByRole("button", { name: "Use designs/open" });
   expect(within(option).getByText("designs/open").tagName).toBe("CODE");
-  expect(option.querySelector("p, div")).toBeNull();
+  const label = document.getElementById(option.getAttribute("aria-labelledby") ?? "");
+  expect(label?.querySelector("p, div")).toBeNull();
 });
 
 test("a finished turn with a background task still takes answers", async () => {
@@ -1270,7 +1271,7 @@ test("images: Send answers carries the ready images", async () => {
   render({ post, chat: chatOf({ round: round() }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
-  fireEvent.click(s.getByRole("button", { name: "Nope" }));
+  fireEvent.click(s.getByRole("button", { name: "No" }));
   fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), { target: { value: "x" } });
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));

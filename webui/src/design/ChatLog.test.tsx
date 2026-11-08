@@ -460,7 +460,7 @@ test("picking an option marks the circle answered and advances; Prev and Next mo
   fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
   expect(within(sheet).getByRole("button", { name: "Question 1, answered" }).textContent).toBe("✓");
   expect(within(sheet).getByRole("button", { name: "Question 2" }).getAttribute("aria-current")).toBe("step");
-  expect(within(sheet).getByRole("button", { name: "Sure" })).toBeTruthy();
+  expect(within(sheet).getByRole("button", { name: "Yes" })).toBeTruthy();
 
   fireEvent.click(within(sheet).getByRole("button", { name: "← Prev" }));
   expect(within(sheet).getByRole("button", { name: "Question 1, answered" }).getAttribute("aria-current")).toBe("step");

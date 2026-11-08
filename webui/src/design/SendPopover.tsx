@@ -2,7 +2,7 @@ import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react";
 import { useEffect, useRef, type RefObject } from "react";
 import type { SessionRoundCard } from "../generated/server";
 import { Button } from "../ui/button/Button";
-import { nameOf } from "./round";
+import { nameOf } from "../ui/question-sheet/round";
 
 // Send with unanswered questions: a list of the gaps anchored on Send. A row jumps to its question; Send anyway sends.
 export function SendPopover({

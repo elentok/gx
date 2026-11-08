@@ -2,7 +2,7 @@ import { Box } from "@chakra-ui/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConnectionContext, type Connection } from "../connection";
 import { Composer } from "../design/Composer";
-import type { Answers } from "../design/round";
+import type { Answers } from "../ui/question-sheet/round";
 import type { SessionInfo, SessionRoundCard } from "../generated/server";
 import { DeviceContext, WideContext, type Device } from "../useWide";
 import type { GalleryEntry } from "./registry";

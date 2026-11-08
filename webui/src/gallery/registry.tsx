@@ -33,6 +33,7 @@ import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { InfoTip } from "../ui/info-tip/InfoTip";
+import { Question, QuestionDots } from "../ui/question-sheet/Question";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import { LargeEditor } from "../ui/expandable-text/LargeEditor";
 import { ModeText } from "../ui/expandable-text/ModeText";
@@ -453,6 +454,53 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "closed", node: <ExpandableTextField label="Closed" title="Note" rows={3} placeholder="Note" value="" onChange={() => {}} /> },
       { label: "disabled", node: <ExpandableTextField label="Disabled" title="Note" rows={3} placeholder="Note" disabled value="" onChange={() => {}} /> },
       { label: "with text", node: <ExpandableTextField label="With text" title="Note" rows={3} value={"A note\nover two lines"} onChange={() => {}} /> },
+    ],
+  },
+  {
+    name: "Question",
+    cases: [
+      {
+        label: "options",
+        node: (
+          <Question
+            card={{
+              label: "1",
+              title: "Pick one",
+              kind: "options",
+              recommended: "a",
+              options: [
+                { id: "a", label: "First", consequence: "Ships today" },
+                { id: "b", label: "Second" },
+              ],
+            }}
+            answer={{ choice: "b" }}
+            onChange={() => {}}
+            onPicked={() => {}}
+          />
+        ),
+      },
+      {
+        label: "yes-no",
+        node: (
+          <Question
+            card={{ label: "2", title: "Proceed?", kind: "yes-no", yes: "Go ahead", no: "Stop here" }}
+            answer={{}}
+            onChange={() => {}}
+            onPicked={() => {}}
+          />
+        ),
+      },
+      {
+        label: "dots",
+        node: (
+          <QuestionDots
+            round={[{ label: "1" }, { label: "2" }, { label: "3" }]}
+            answers={{ "1": { choice: "a" } }}
+            current={1}
+            onPick={() => {}}
+          />
+        ),
+      },
     ],
   },
   {

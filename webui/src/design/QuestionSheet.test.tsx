@@ -4,10 +4,46 @@ import { afterEach, describe, expect, test } from "vitest";
 import type { SessionRoundCard } from "../generated/server";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
-import { Question, QuestionSheet } from "./QuestionSheet";
-import { HUH_MESSAGE, roundPrompt, type Answers } from "./round";
+import { Question } from "../ui/question-sheet/Question";
+import type { Answers } from "../ui/question-sheet/round";
+import { QuestionSheet } from "./QuestionSheet";
+import { HUH_MESSAGE, roundPrompt } from "./round";
 
 afterEach(cleanup);
+
+test("an options row shows letter, label, muted id and the consequence line", () => {
+  renderThemed(
+    <Question
+      card={card({
+        kind: "options",
+        options: [
+          { id: "alpha", label: "First", consequence: "Ships today" },
+          { id: "beta", label: "Second" },
+        ],
+      })}
+      answer={{}}
+      onChange={() => {}}
+      onPicked={() => {}}
+    />,
+  );
+  const rows = screen.getAllByRole("button", { pressed: false });
+  expect(rows[0].textContent).toBe("AFirstalphaShips today");
+  expect(rows[1].textContent).toBe("BSecondbeta");
+});
+
+test("yes-no buttons read Yes and No with the consequence under them", () => {
+  renderThemed(
+    <Question
+      card={card({ kind: "yes-no", yes: "Go ahead", no: "Stop here" })}
+      answer={{}}
+      onChange={() => {}}
+      onPicked={() => {}}
+    />,
+  );
+  const rows = screen.getAllByRole("button", { pressed: false });
+  expect(rows[0].textContent).toBe("YesGo ahead");
+  expect(rows[1].textContent).toBe("NoStop here");
+});
 
 const card = (over: Partial<SessionRoundCard> = {}): SessionRoundCard => ({
   label: "1",

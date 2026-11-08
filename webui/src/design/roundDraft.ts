@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readRoundDraft, writeRoundDraft } from "../drafts";
-import type { Answers } from "./round";
+import type { Answers } from "../ui/question-sheet/round";
 
 type RoundDraftData = { answers: Answers; index: number; scroll: number };
 

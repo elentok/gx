@@ -16,7 +16,7 @@ import {
 } from "./FailureBanner";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
-import { isAnswered } from "./round";
+import { isAnswered } from "../ui/question-sheet/round";
 import { type RoundDraft, useRoundDraft } from "./roundDraft";
 
 // The sheet and the composer share the round's answers (see useRoundDraft: they survive a reload).
