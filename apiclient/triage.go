@@ -2,6 +2,7 @@ package apiclient
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/elentok/gx/server/wire"
 )
@@ -9,6 +10,13 @@ import (
 // Triage is the sub-client for Triage calls. It shares Client's transport.
 type Triage struct {
 	t *transport
+}
+
+// Show reads project's Triage view.
+func (s *Triage) Show(ctx context.Context, project string) (wire.TriageView, error) {
+	var v wire.TriageView
+	err := s.t.get(ctx, "/v1/triage?"+url.Values{"project": {project}}.Encode(), &v)
+	return v, err
 }
 
 // Changed pings the server that project's Triage record was written by a

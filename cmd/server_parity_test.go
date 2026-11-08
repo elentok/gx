@@ -135,6 +135,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/designs/open":                     "designs open",
 	"POST /v1/designs/delete":                   "designs delete",
 	"POST /v1/triage/changed":                   "server triage changed",
+	"GET /v1/triage":                            "server triage show",
 	"POST /v1/designs/worktree":                 "designs worktree",
 	"GET /v1/designs/drafts":                    "designs drafts list",
 	"GET /v1/designs/drafts/read":               "designs drafts show",

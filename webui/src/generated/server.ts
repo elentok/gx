@@ -2938,6 +2938,135 @@ export interface TriageChangedRequest {
 export interface TriageChangedResult {
   project: string;
 }
+/**
+ * TriageState is where a Triage record is in its life; none means the project
+ * has had no Triage.
+ */
+export type TriageState = string;
+export const TriageLive: TriageState = "live";
+export const TriageDone: TriageState = "done";
+export const TriageAbandoned: TriageState = "abandoned";
+export const TriageNone: TriageState = "none";
+/**
+ * TriageQuestion is one question about a row. Title is the first line of the
+ * question and Body the rest.
+ */
+export interface TriageQuestion {
+  id: string;
+  title: string;
+  body?: string;
+  kind: string;
+  options?: string[];
+  recommended?: string;
+}
+/**
+ * TriageRow is one follow-up with everything the Triage learned about it.
+ */
+export interface TriageRow {
+  address: string;
+  title: string;
+  category?: string;
+  verdict?: string;
+  evidence?: string;
+  files?: string[];
+  questions?: TriageQuestion[];
+  /**
+   * Answers maps a question id to the person's answer.
+   */
+  answers?: { [key: string]: string};
+  /**
+   * Action and Destination are the plan's, replaced by the person's when set.
+   */
+  action?: string;
+  destination?: string;
+  person_changed?: boolean;
+  gone?: boolean;
+  write_state?: string;
+  new_address?: string;
+  refusal?: string;
+  can_keep?: boolean;
+  can_retry?: boolean;
+}
+/**
+ * TriageDestination is one choice for where a row goes.
+ */
+export interface TriageDestination {
+  /**
+   * Kind is "suggested", "map-epic" or "new-map-epic".
+   */
+  kind: string;
+  value?: string;
+  label: string;
+}
+/**
+ * TriageResultItem is one row in a result group.
+ */
+export interface TriageResultItem {
+  address: string;
+  title: string;
+  /**
+   * Target is the epic or ticket the row went to; Reason is the close reason.
+   */
+  target?: string;
+  reason?: string;
+}
+/**
+ * TriageResultGroup is the done rows of one action. Action is one of ready,
+ * map, merge, close, keep.
+ */
+export interface TriageResultGroup {
+  action: string;
+  items: TriageResultItem[];
+}
+/**
+ * TriageResult is what a finished Triage did.
+ */
+export interface TriageResult {
+  /**
+   * ReadyEpic is the epic the ready rows went to.
+   */
+  ready_epic?: string;
+  groups: TriageResultGroup[];
+}
+/**
+ * TriageHistoryItem is one past Triage.
+ */
+export interface TriageHistoryItem {
+  id: string;
+  state: TriageState;
+  started_at: string;
+  rows: number /* int */;
+  result: TriageResult;
+}
+/**
+ * TriageView is the payload of GET /v1/triage?project=: the live Triage of the
+ * project, else the latest, plus the past ones.
+ */
+export interface TriageView {
+  project: string;
+  id?: string;
+  state: TriageState;
+  flow: string;
+  steps: MapStep[];
+  /**
+   * StepNote describes progress inside the current step.
+   */
+  step_note?: string;
+  ring_percent: number /* int */;
+  revision?: number /* int */;
+  rows: TriageRow[];
+  open_questions: number /* int */;
+  action_counts: { [key: string]: number /* int */};
+  changed_rows: number /* int */;
+  destinations: TriageDestination[];
+  ready_epic?: string;
+  /**
+   * Result is set once the Triage is done.
+   */
+  result?: TriageResult;
+  can_abandon: boolean;
+  history: TriageHistoryItem[];
+}
 
 //////////
 // source: usagesummary.go

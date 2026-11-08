@@ -3,10 +3,12 @@ package serverapi
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
@@ -40,5 +42,24 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 	}
 	changed.Flags().BoolVar(&jsonOut, "json", false, "emit the acknowledged project as JSON")
 	cmd.AddCommand(changed)
+
+	var showJSON bool
+	show := &cobra.Command{
+		Use:   "show <project>",
+		Short: "show a project's Triage as the web page reads it",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return cmdbase.ServerRead(d.Dial(), c.Context(), showJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (wire.TriageView, error) {
+					return cl.Triage.Show(ctx, args[0])
+				},
+				func(w io.Writer, v wire.TriageView) error {
+					_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d rows\t%s\n", v.Project, v.State, v.StepNote, len(v.Rows), v.ID)
+					return err
+				})
+		},
+	}
+	show.Flags().BoolVar(&showJSON, "json", false, "emit the whole view as JSON")
+	cmd.AddCommand(show)
 	return cmd
 }

@@ -21,13 +21,16 @@ type Deps struct {
 	TicketStore string
 	Projects    *projects.Registry
 	Events      *broker.Broker
+	// Sessions lists the sessions, to tell whether a Triage's session stopped.
+	Sessions func() ([]wire.SessionInfo, error)
 }
 
-// Triage publishes triage-changed.
+// Triage publishes triage-changed and serves the Triage view.
 type Triage struct {
 	ticketStore string
 	projects    *projects.Registry
 	events      *broker.Broker
+	sessions    func() ([]wire.SessionInfo, error)
 
 	// seen maps a project name to the live record's id and revision at the
 	// last look, "" when it had none.
@@ -37,12 +40,17 @@ type Triage struct {
 
 // New builds Triage from d.
 func New(d Deps) *Triage {
-	return &Triage{ticketStore: d.TicketStore, projects: d.Projects, events: d.Events, seen: map[string]string{}}
+	return &Triage{ticketStore: d.TicketStore, projects: d.Projects, events: d.Events, sessions: d.Sessions, seen: map[string]string{}}
 }
 
-// Routes lists the ping route. The getter is called per request.
+// Routes lists the ping and read routes. The getter is called per request.
 func Routes(get func() *Triage) []wire.Route {
 	return []wire.Route{
+		{
+			Pattern: "GET /v1/triage",
+			Web:     wire.WebRead,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().readHandler(w, r) },
+		},
 		{
 			Pattern: "POST /v1/triage/changed",
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().changedHandler(w, r) },

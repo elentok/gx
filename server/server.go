@@ -440,7 +440,8 @@ func New(cfg Config) (*Server, error) {
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
 	s.designs = designs.New(s.designsDeps())
-	s.triage = triage.New(triage.Deps{TicketStore: cfg.TicketStore, Projects: s.projects, Events: events})
+	s.triage = triage.New(triage.Deps{TicketStore: cfg.TicketStore, Projects: s.projects, Events: events,
+		Sessions: func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() }})
 	s.prompt = sessprompt.New(sessprompt.Deps{
 		Cfg: sessprompt.Config{
 			AutoAdvanceDelay: cfg.AutoAdvanceDelay, TurnSettleTimeout: cfg.TurnSettleTimeout,
