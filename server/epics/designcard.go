@@ -28,13 +28,13 @@ func designPercent(m tickets.Epic, step wire.ProgressStep) int {
 	if total <= 0 {
 		return 0
 	}
-	return min(100, (slices.Index(tickets.DesignSteps, step)+closed)*100/total)
+	return min(100, (slices.Index(designProgressSteps, step)+closed)*100/total)
 }
 
 // reachedBranch reports whether a map's design is at Branch or later, which is
 // when a joined card shows the -impl epic.
 func reachedBranch(step wire.ProgressStep) bool {
-	return slices.Index(tickets.DesignSteps, step) >= slices.Index(tickets.DesignSteps, wire.ProgressBranch)
+	return slices.Index(designProgressSteps, step) >= slices.Index(designProgressSteps, wire.ProgressBranch)
 }
 
 // designSection is the section of the map's own Design card, whether or not a

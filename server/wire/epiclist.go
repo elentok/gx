@@ -1,7 +1,6 @@
 package wire
 
 import (
-	"github.com/elentok/gx/tickets"
 	"time"
 )
 
@@ -31,11 +30,18 @@ const (
 	EpicListFollowUps EpicListState = "follow-ups"
 )
 
-// ProgressStep is the step a map's design has reached; see mapProgress. The
-// tickets package owns the list of steps. The constants below are literals,
-// not tickets.Step*, because tygo cannot resolve another package's constant;
-// TestProgressStepsMatchTickets keeps them in sync.
-type ProgressStep = tickets.DesignStep
+// ProgressStep is the step a flow has reached (Design or Triage); see
+// mapProgress. The tickets package owns the per-flow step lists. The constants
+// below are literals, not tickets.Step*, because tygo cannot resolve another
+// package's constant; TestProgressStepsMatchTickets keeps them in sync.
+type ProgressStep string
+
+const (
+	ProgressVerify  ProgressStep = "verify"
+	ProgressPlan    ProgressStep = "plan"
+	ProgressApprove ProgressStep = "approve"
+	ProgressWrite   ProgressStep = "write"
+)
 
 const (
 	ProgressChart          ProgressStep = "chart"

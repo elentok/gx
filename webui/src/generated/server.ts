@@ -1013,12 +1013,16 @@ export const EpicListNoOpenTickets: EpicListState = "no-open-tickets";
  */
 export const EpicListFollowUps: EpicListState = "follow-ups";
 /**
- * ProgressStep is the step a map's design has reached; see mapProgress. The
- * tickets package owns the list of steps. The constants below are literals,
- * not tickets.Step*, because tygo cannot resolve another package's constant;
- * TestProgressStepsMatchTickets keeps them in sync.
+ * ProgressStep is the step a flow has reached (Design or Triage); see
+ * mapProgress. The tickets package owns the per-flow step lists. The constants
+ * below are literals, not tickets.Step*, because tygo cannot resolve another
+ * package's constant; TestProgressStepsMatchTickets keeps them in sync.
  */
 export type ProgressStep = string;
+export const ProgressVerify: ProgressStep = "verify";
+export const ProgressPlan: ProgressStep = "plan";
+export const ProgressApprove: ProgressStep = "approve";
+export const ProgressWrite: ProgressStep = "write";
 export const ProgressChart: ProgressStep = "chart";
 export const ProgressResolveTickets: ProgressStep = "resolve-tickets";
 export const ProgressSpec: ProgressStep = "spec";

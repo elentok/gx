@@ -38,7 +38,7 @@ func MapProgress(m tickets.Epic) wire.ProgressStep {
 		return wire.ProgressDone
 	}
 	if step, ok := tickets.ParseDesignStep(m.DesignStep); ok {
-		return step
+		return wire.ProgressStep(step)
 	}
 	return wire.ProgressChart
 }

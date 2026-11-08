@@ -17,12 +17,31 @@ import (
 
 func TestProgressStepsMatchTickets(t *testing.T) {
 	t.Parallel()
-	got := []wire.ProgressStep{
+	design := []wire.ProgressStep{
 		wire.ProgressChart, wire.ProgressResolveTickets, wire.ProgressSpec, wire.ProgressReview,
 		wire.ProgressGrillFindings, wire.ProgressCreateTickets, wire.ProgressBranch, wire.ProgressDone,
 	}
-	if !slices.Equal(got, tickets.DesignSteps) {
-		t.Fatalf("server.Progress* = %v, want tickets.DesignSteps = %v", got, tickets.DesignSteps)
+	triage := []wire.ProgressStep{
+		wire.ProgressVerify, wire.ProgressPlan, wire.ProgressApprove, wire.ProgressWrite, wire.ProgressDone,
+	}
+	asStrings := func(steps []wire.ProgressStep) []string {
+		out := make([]string, len(steps))
+		for i, s := range steps {
+			out[i] = string(s)
+		}
+		return out
+	}
+	for flow, got := range map[tickets.Flow][]wire.ProgressStep{tickets.FlowDesign: design, tickets.FlowTriage: triage} {
+		spec, err := tickets.FlowSpecFor(flow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(asStrings(got), spec.Steps) {
+			t.Fatalf("%s: wire.Progress* = %v, want flow table = %v", flow, got, spec.Steps)
+		}
+	}
+	if !slices.Equal(asStrings(design), tickets.DesignStepNames()) {
+		t.Fatalf("wire design = %v, want tickets.DesignSteps = %v", design, tickets.DesignSteps)
 	}
 }
 

@@ -10,6 +10,15 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// designProgressSteps is tickets.DesignSteps as wire steps.
+var designProgressSteps = func() []wire.ProgressStep {
+	out := make([]wire.ProgressStep, len(tickets.DesignSteps))
+	for i, s := range tickets.DesignSteps {
+		out[i] = wire.ProgressStep(s)
+	}
+	return out
+}()
+
 // progressLabels is the label of each Progress step.
 var progressLabels = map[wire.ProgressStep]string{
 	wire.ProgressChart:          "Chart",
@@ -28,7 +37,7 @@ func mapSteps(m tickets.Epic, byName map[string]tickets.Epic) []wire.MapStep {
 	current := queue.MapProgress(m)
 	steps := make([]wire.MapStep, 0, len(tickets.DesignSteps))
 	state := wire.MapStepDone
-	for _, step := range tickets.DesignSteps {
+	for _, step := range designProgressSteps {
 		label := progressLabels[step]
 		switch {
 		case step == current && current == wire.ProgressDone:
