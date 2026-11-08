@@ -1,6 +1,7 @@
 package serverapi
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -21,6 +22,33 @@ func newServerCleanupRemoveCmd(d Deps) *cobra.Command {
 
 func newServerCleanupRemoveUnmergedCmd(d Deps) *cobra.Command {
 	return newServerCleanupWriteCmd(d, "cleanup-remove-unmerged", "Remove an unmerged branch's clean, idle worktree and keep the branch", (*apiclient.Reads).RemoveUnmergedCleanupWorktree)
+}
+
+func newServerCleanupArchiveCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	var project, epic string
+	c := &cobra.Command{
+		Use:   "cleanup-archive",
+		Short: "Archive a done epic that has landed on trunk",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runServerCleanupWrite(ctx, cl, c.OutOrStdout(), (*apiclient.Reads).ArchiveCleanupEpic, wire.CleanupWriteRequest{Project: project, Epic: epic}, jsonOut)
+		},
+	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
+	c.Flags().StringVar(&project, "project", "", "the project")
+	c.Flags().StringVar(&epic, "epic", "", "the epic")
+	_ = c.MarkFlagRequired("project")
+	_ = c.MarkFlagRequired("epic")
+	return c
 }
 
 func newServerCleanupDeleteCmd(d Deps) *cobra.Command {
@@ -69,7 +97,7 @@ func runServerCleanupWrite(ctx context.Context, cl *apiclient.Client, w io.Write
 			return err
 		}
 	} else if !res.Refused {
-		if _, err := fmt.Fprintf(w, "cleaned %s\n", req.Branch); err != nil {
+		if _, err := fmt.Fprintf(w, "cleaned %s\n", cmp.Or(req.Branch, req.Epic)); err != nil {
 			return err
 		}
 	}

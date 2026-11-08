@@ -52,6 +52,14 @@ func (r *Reads) RemoveUnmergedCleanupWorktree(ctx context.Context, req wire.Clea
 	return res, err
 }
 
+// ArchiveCleanupEpic archives a done epic that has landed on trunk. A refusal
+// is a result (Refused set), not an error.
+func (r *Reads) ArchiveCleanupEpic(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
+	var res wire.CleanupWriteResult
+	err := r.t.post(ctx, "/v1/cleanup/archive-epic", req, &res)
+	return res, err
+}
+
 // DeleteCleanupBranch deletes a merged branch that has no worktree. A refusal
 // is a result (Refused set), not an error.
 func (r *Reads) DeleteCleanupBranch(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {

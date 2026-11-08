@@ -14,20 +14,36 @@ import (
 )
 
 func (c *Cleanup) removeWrite(w http.ResponseWriter, r *http.Request) {
-	c.write(w, r, c.RemoveWorktree)
+	c.write(w, r, byBranch(c.RemoveWorktree))
 }
 
 func (c *Cleanup) deleteWrite(w http.ResponseWriter, r *http.Request) {
-	c.write(w, r, c.DeleteBranch)
+	c.write(w, r, byBranch(c.DeleteBranch))
 }
 
-func (c *Cleanup) write(w http.ResponseWriter, r *http.Request, do func(project, branch string) (wire.CleanupWriteResult, error)) {
+func (c *Cleanup) removeUnmergedWrite(w http.ResponseWriter, r *http.Request) {
+	c.write(w, r, byBranch(c.RemoveUnmergedWorktree))
+}
+
+func (c *Cleanup) archiveWrite(w http.ResponseWriter, r *http.Request) {
+	c.write(w, r, func(req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
+		return c.ArchiveEpic(req.Project, req.Epic)
+	})
+}
+
+func byBranch(do func(project, branch string) (wire.CleanupWriteResult, error)) func(wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
+	return func(req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
+		return do(req.Project, req.Branch)
+	}
+}
+
+func (c *Cleanup) write(w http.ResponseWriter, r *http.Request, do func(wire.CleanupWriteRequest) (wire.CleanupWriteResult, error)) {
 	var req wire.CleanupWriteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := do(req.Project, req.Branch)
+	res, err := do(req)
 	if err != nil {
 		code := http.StatusInternalServerError
 		if _, ok := errors.AsType[*tickets.AddressError](err); ok {

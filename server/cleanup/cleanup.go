@@ -33,6 +33,8 @@ type Deps struct {
 	Size func(ctx context.Context, path string) (uint64, error)
 	// Sessions lists every session, for refusing a worktree one still works in.
 	Sessions func() ([]wire.SessionInfo, error)
+	// EpicQueued reports whether the epic's root is in the ralph-loop queue.
+	EpicQueued func(project, epic string) bool
 }
 
 // Cleanup is the cleanup read route's state: the size cache.
@@ -59,7 +61,8 @@ func Routes(c func() *Cleanup) []wire.Route {
 	return []wire.Route{
 		{Pattern: "GET /v1/cleanup", Web: wire.WebRead, Handler: func(w http.ResponseWriter, r *http.Request) { c().read(w, r) }},
 		{Pattern: "POST /v1/cleanup/remove-worktree", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().removeWrite(w, r) }},
-		{Pattern: "POST /v1/cleanup/remove-unmerged-worktree", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().write(w, r, c().RemoveUnmergedWorktree) }},
+		{Pattern: "POST /v1/cleanup/remove-unmerged-worktree", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().removeUnmergedWrite(w, r) }},
+		{Pattern: "POST /v1/cleanup/archive-epic", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().archiveWrite(w, r) }},
 		{Pattern: "POST /v1/cleanup/delete-branch", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { c().deleteWrite(w, r) }},
 	}
 }

@@ -41,10 +41,11 @@ type CleanupReport struct {
 }
 
 // CleanupWriteRequest names the branch a cleanup write acts on. Remove takes a
-// branch that has a worktree, Delete one that has none.
+// branch that has a worktree, Delete one that has none. Archive takes an Epic.
 type CleanupWriteRequest struct {
 	Project string `json:"project"`
-	Branch  string `json:"branch"`
+	Branch  string `json:"branch,omitempty"`
+	Epic    string `json:"epic,omitempty"`
 }
 
 // Reasons a cleanup write refuses.
@@ -56,6 +57,8 @@ const (
 	ReasonCleanupGitRefused  = "cleanup-git-refused"
 	ReasonCleanupDirty       = "cleanup-dirty"
 	ReasonCleanupLive        = "cleanup-live-session"
+	ReasonCleanupQueued      = "cleanup-queued"
+	ReasonCleanupNotDone     = "cleanup-not-done"
 )
 
 // CleanupWriteResult is a cleanup write's answer. A refusal is a result, not
