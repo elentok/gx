@@ -70,34 +70,25 @@ async function refreshShell(cache: Cache, shellURL: string, origin: string, resp
   await cache.put(shellURL, new Response(html, { headers: response.headers }));
 }
 
-const TIMED_OUT = Symbol("timed out");
-
 export function createFetchHandler(deps: WorkerDeps) {
   const timeoutMs = deps.shellTimeoutMs ?? SHELL_TIMEOUT_MS;
   const open = () => deps.caches.open(deps.cacheName);
 
   async function shell(event: FetchEventLike, shellURL: string, origin: string): Promise<Response> {
     const cache = await open();
-    const network = deps.fetch(shellURL, { cache: "no-cache" }).then(async (r) => {
-      if (r.status === 200) await refreshShell(cache, shellURL, origin, r.clone());
-      return r;
-    });
-    // A slow answer still refreshes the copy; keep the worker alive for it.
-    event.waitUntil(network.catch(() => undefined));
-    const timeout = new Promise<typeof TIMED_OUT>((resolve) => setTimeout(() => resolve(TIMED_OUT), timeoutMs));
-    let first: Response | typeof TIMED_OUT | Error;
-    try {
-      first = await Promise.race([network, timeout]);
-    } catch (e) {
-      first = e instanceof Error ? e : new Error(String(e));
-    }
-    if (first instanceof Response && first.status === 200) return first;
-    const cached = await cache.match(shellURL);
-    if (cached) return cached;
+    const network = deps.fetch(shellURL, { cache: "no-cache" });
+    // The refresh is a side effect: it never delays or fails the answer. A slow
+    // answer still refreshes the copy, so keep the worker alive for it.
+    event.waitUntil(
+      network
+        .then((r) => (r.status === 200 ? refreshShell(cache, shellURL, origin, r.clone()) : undefined))
+        .catch(() => undefined),
+    );
+    const timeout = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), timeoutMs));
+    const first = await Promise.race([network.catch(() => undefined), timeout]);
+    if (first?.status === 200) return first;
     // No copy to fall back on: hand back whatever the network gives.
-    if (first instanceof Error) throw first;
-    if (first === TIMED_OUT) return network;
-    return first;
+    return (await cache.match(shellURL)) ?? network;
   }
 
   async function cacheFirst(request: Request): Promise<Response> {

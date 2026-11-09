@@ -13,7 +13,7 @@ const ORIGIN = "https://gx.test";
 const SHELL_URL = `${ORIGIN}/`;
 const HTML = `<html><script src="/assets/app-1.js"></script><link href="/assets/app-1.css"></html>`;
 
-function fakeCaches() {
+function fakeCaches(failPut = false) {
   const store = new Map<string, Response>();
   const cache = {
     async match(req: string | Request) {
@@ -21,6 +21,7 @@ function fakeCaches() {
       return hit?.clone();
     },
     async put(req: string | Request, res: Response) {
+      if (failPut) throw new Error("quota exceeded");
       store.set(typeof req === "string" ? req : req.url, res);
     },
   };
@@ -29,8 +30,8 @@ function fakeCaches() {
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
-function setup(fetchImpl: Fetch) {
-  const { store, caches } = fakeCaches();
+function setup(fetchImpl: Fetch, opts: { failPut?: boolean } = {}) {
+  const { store, caches } = fakeCaches(opts.failPut);
   const fetchSpy = vi.fn(fetchImpl);
   const onFetch = createFetchHandler({ caches, fetch: fetchSpy, cacheName: "t" });
   const send = (path: string, init: { method?: string; mode?: RequestMode } = {}) => {
@@ -77,6 +78,14 @@ describe("service worker fetch rules", () => {
     await settle();
     expect(await store.get(SHELL_URL)!.text()).toBe(HTML);
     expect(fetchSpy).toHaveBeenCalledWith(SHELL_URL, { cache: "no-cache" });
+  });
+
+  it("still answers a 200 when the cache write rejects", async () => {
+    const { store, send } = setup(async () => html(), { failPut: true });
+    await seedAssets(store);
+    const { answer, settle } = send("/", { mode: "navigate" });
+    expect(await (await answer)!.text()).toBe(HTML);
+    await settle();
   });
 
   it("answers from the cache after 1.5s, then refreshes when the slow request lands", async () => {
