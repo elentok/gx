@@ -35,10 +35,9 @@ test.each([
 
 test("the answered card has no AGENT or WEB bubble", () => {
   renderThemed(<AnswerResult detail={answered} sent={sentAs("delivered")} />);
-  expect(screen.queryByText("AGENT")).toBeNull();
-  expect(screen.queryByText("WEB")).toBeNull();
-  expect(screen.queryByText("SENT")).toBeNull();
-  expect(screen.queryByText("Answered")).toBeNull();
+  // The bubble labels render lowercase and CSS capitalizes them, so match any case.
+  expect(screen.queryByText(/^(agent|web)$/i)).toBeNull();
+  expect(screen.queryByText(/^(sent|answered)$/i)).toBeNull();
 });
 
 test("the card reads label, detail, question, answer in order, with the answer once", () => {
