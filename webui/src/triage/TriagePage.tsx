@@ -26,7 +26,7 @@ import type { PostEpicWrite } from "../epics/queue";
 import { QuestionsView } from "./QuestionsView";
 import { ReviewView } from "./ReviewView";
 import { WriteView, rowsWritten } from "./WriteView";
-import { useTriage,type FetchTriage } from "./useTriage";
+import { useTriage, type FetchTriage } from "./useTriage";
 
 /** The injected fetchers and actions the Triage page talks to the server through. */
 export interface TriageDeps {

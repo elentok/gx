@@ -59,15 +59,17 @@ export interface SteppedPageProps {
   beforeRing?: ReactNode;
   /** What the busy row names: the step the agent reported and, for a ticket step, its title. */
   working: (session?: SessionInfo) => { step?: string; title?: string };
-  // Design-only parts, each rendered only when given.
+  // Optional parts, each rendered only when given.
   subtitleSuffix?: ReactNode;
   metaLink?: ReactNode;
   chatTop?: (ctx: { questions: boolean }) => ReactNode;
+  // Design only.
   ticketRows?: ReactNode;
   /** Sub-rows under any step (Triage: Questions and Review under Approve). */
   stepRows?: StepRows;
   /** The step offers no Continue: the person acts on the page itself. */
   noContinue?: boolean;
+  // Design only.
   designMenu?: DesignMenu;
   /** Extra items for the ⋯ menu, beside Copy ID. */
   menuItems?: MenuEntry[];
