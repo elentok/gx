@@ -316,7 +316,7 @@ test("a sent answer keeps its result on screen after the refetch", async () => {
   fireEvent.change(await screen.findByLabelText(/^Answer to question/), { target: { value: "Redis" } });
   fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
   const result = await screen.findByRole("status", { name: "Answer result" });
-  expect(result.textContent).toContain("Answer sent · queued");
+  expect(result.textContent).toContain("Queued ·");
   await waitFor(() => expect(screen.queryByLabelText(/^Answer to question/)).toBeNull());
   expect(screen.getByRole("status", { name: "Answer result" })).toBeTruthy();
   expect(card()).toBeTruthy();

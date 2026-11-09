@@ -98,7 +98,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     await form.getByRole("textbox", { name: /^Note text for question/ }).fill("Ask me again tomorrow");
     await expect(send).toBeEnabled();
     await send.click();
-    const result = page.getByRole("status", { name: "Answer result" });
+    const result = page.getByRole("group", { name: "Answered question" });
     await expect(result.getByText("no option picked")).toBeVisible();
     await expect(result.getByText("Ask me again tomorrow")).toBeVisible();
   });

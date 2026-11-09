@@ -2,7 +2,6 @@ import { Box, Text } from "@chakra-ui/react";
 import { ActionAnswer, type TicketDetail } from "../generated/server";
 import type { Sent } from "./answer";
 import { AnswerForm } from "./AnswerForm";
-import { AnswerResult } from "./AnswerResult";
 import { PermissionCard } from "./PermissionCard";
 import { isRecoverAction } from "./recover";
 import { RecoveryActions } from "./RecoveryActions";
@@ -83,9 +82,8 @@ export function ActionCard({
         </Text>
       )}
       <TaskCard detail={detail} />
-      <TicketReading detail={detail} />
+      <TicketReading detail={detail} sent={sent} />
       <PermissionCard detail={detail} onDone={refetch} onStale={refetch} />
-      <AnswerResult detail={detail} sent={sent} />
       <AnswerForm
         detail={detail}
         onSent={(s) => {

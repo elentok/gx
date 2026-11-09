@@ -2,6 +2,8 @@ import { Box, Text } from "@chakra-ui/react";
 import type { DetailRound, TicketDetail } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { Card } from "../ui/card/Card";
+import type { Sent } from "./answer";
+import { AnswerResult } from "./AnswerResult";
 import { Collapsible } from "./Collapsible";
 
 const Label = ({ children }: { children: string }) => (
@@ -18,14 +20,15 @@ function EarlierRound({ round }: { round: DetailRound }) {
   );
 }
 
-// The reading view; the answer area (ticket 49) and permission card (ticket 52) join it later.
-export function TicketReading({ detail }: { detail: TicketDetail }) {
+// The reading view, or the compact card once the latest round has an answer.
+export function TicketReading({ detail, sent = null }: { detail: TicketDetail; sent?: Sent | null }) {
   const { latest } = detail;
   const asker = latest?.by === "gx" ? "GX ASKS" : "THE AGENT ASKS";
 
   return (
     <Box mt="4" display="flex" flexDirection="column" gap="4">
-      {latest && (
+      {latest?.answer && <AnswerResult detail={detail} sent={sent} />}
+      {latest && !latest.answer && (
         <>
           <Box>
             <Label>{asker}</Label>
