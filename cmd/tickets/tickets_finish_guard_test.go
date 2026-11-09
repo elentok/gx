@@ -182,6 +182,27 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		}
 	})
 
+	t.Run("refusal names the open follow-up that mentions the failed test", func(t *testing.T) {
+		f := newFinishFixture(t)
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+		issues := filepath.Join(f.projectDir, "follow-ups", "issues")
+		if err := os.MkdirAll(issues, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testutil.WriteFile(t, filepath.Join(f.projectDir, "follow-ups"), "ticket.md", "---\nstatus: open\n---\n\n# Follow-ups\n")
+		cmdtest.WriteTicketFile(t, filepath.Join(issues, "07-hang.md"), "---\nid: \"07\"\nstatus: open\ntype: research\n---\n\n# check-lock hangs\n\n## Problem\nTestScenarios_Start/check-lock hangs.\n")
+		cmdtest.WriteTicketFile(t, filepath.Join(issues, "08-done.md"), "---\nid: \"08\"\nstatus: done\ntype: research\n---\n\n# TestScenarios_Start is fixed\n")
+		f.record(t, check.ExitFail, "", "TestScenarios_Start/check-lock")
+		err := f.finish(t)
+		if err == nil || !strings.Contains(err.Error(), "known flake: p:follow-ups/07") || strings.Contains(err.Error(), "follow-ups/08") {
+			t.Fatalf("want a refusal naming only p:follow-ups/07, got %v", err)
+		}
+		f.record(t, check.ExitFail, "", "TestUnrelated")
+		if err := f.finish(t); err == nil || strings.Contains(err.Error(), "known flake") {
+			t.Fatalf("unmatched test: want a refusal without a known-flake line, got %v", err)
+		}
+	})
+
 	t.Run("refusal for several failures names --known-failures", func(t *testing.T) {
 		f := newFinishFixture(t)
 		cmdtest.CommitFile(t, f.wt, "a.txt", "a")

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/worktree"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
 )
@@ -115,6 +116,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		if need > 1 {
 			hint = "; if they are already red on the base, file one follow-up for the family and pass --known-failures <addr> instead"
 		}
+		hint += knownFlakeHint(epicDir, failedTests(*failing))
 		return fmt.Errorf("%s: the last `gx check` run failed %d test(s); pass --check-failures with at least %d follow-up address(es), got %d%s", label, need, need, len(addrs), hint)
 	}
 	cwd, err := getwd()
@@ -127,6 +129,35 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		}
 	}
 	return nil
+}
+
+// knownFlakeHint names the open follow-ups whose title or Problem mentions a
+// failed test (the full name, or its parent when it is a subtest), so an agent
+// passes the address instead of re-diagnosing a failure that is already filed.
+func knownFlakeHint(epicDir string, failed []string) string {
+	projectDir := filepath.Dir(epicDir)
+	epic := tickets.LoadEpic(projectDir, tickets.FollowUpsEpic)
+	var b strings.Builder
+	for _, name := range failed {
+		needles := []string{name}
+		if parent, _, ok := strings.Cut(name, "/"); ok {
+			needles = append(needles, parent)
+		}
+		for _, t := range epic.Tickets {
+			if t.IsDone() || t.IsCancelled() {
+				continue
+			}
+			haystack := t.Title + "\n" + schema.Section(t.Body, "Problem")
+			if slices.ContainsFunc(needles, func(n string) bool { return strings.Contains(haystack, n) }) {
+				a := tickets.Address{Project: filepath.Base(projectDir), Epic: tickets.FollowUpsEpic, ID: t.Identifier}
+				fmt.Fprintf(&b, "\nknown flake: %s (%s)", a, name)
+			}
+		}
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return b.String() + "\nrerun `gx check` once, then pass the address via --check-failures (or --known-failures for a family red on the base)"
 }
 
 // splitAddrs reads a comma-separated address flag, trimmed and de-duplicated.
