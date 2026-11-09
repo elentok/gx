@@ -492,7 +492,7 @@ test("Workspaces", async ({ page, start }) => {
   const gear = page.getByRole("button", nav("Menu"));
   const gearItems = page.getByRole("menu").locator('[role^="menuitem"]');
   await gear.click();
-  await expect(gearItems).toHaveText([/^AFK$/, /^Vi mode$/, /^Sort · Default workspace/, /^Restart server$/, /^More settings\.\.\.$/, /^Cleanup/, /^Tips$/]);
+  await expect(gearItems).toHaveText([/^AFK$/, /^Vi mode$/, /^Sort · Default workspace/, /^Restart server$/, /^More settings\.\.\.$/, /^Cleanup/, /^Tips$/, /^Force refresh$/]);
   const sortOptions = page.getByRole("menuitemradio");
   const openSort = async (workspace: string) => {
     await closeMenus();
