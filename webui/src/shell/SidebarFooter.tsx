@@ -1,18 +1,16 @@
-import { Box, chakra, Portal, Text } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { Box, chakra, Text } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { fetchWorktrees, postCreateSession } from "../agents/newSession";
-import { NewSessionForm } from "../agents/NewSessionForm";
 import { useConnectionContext, useConnectionState } from "../connection";
-import { NewDesignForm } from "../design/NewDesignForm";
 import { useEpicList } from "../epics/list";
 import type { Workspace } from "../generated/server";
-import { designHref, STATS_HREF } from "../hrefs";
+import { STATS_HREF } from "../hrefs";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
 import { LimitsTray } from "../usage/LimitsTray";
 import { badgeLine, badgeText, badgeTotal, badgeWaiting, inWorkspace } from "../workspaces/followUpsBadge";
 import { GearMenu } from "./GearMenu";
+import { openNewAgent, openNewDesign } from "./newItemOpen";
 import { useShell } from "./ShellContext";
 
 const EPICS_HREF = "#/epics";
@@ -144,12 +142,9 @@ function FollowUpsButton({ workspace }: { workspace?: string }) {
   );
 }
 
-type Dialog = "design" | "agent" | null;
-
 export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { onNewWorkspace?: () => void; activeWorkspace?: Workspace }) {
   const conn = useConnectionContext();
   const { snapshot, connected } = useConnectionState(conn);
-  const [dialog, setDialog] = useState<Dialog>(null);
   const health = snapshot?.health;
   const unhealthy = !!health && [health.cpu, health.memory, health.disk].some((m) => m.state === "high" || m.state === "critical");
   const needsYou = snapshot?.needs_you_total ?? 0;
@@ -163,8 +158,8 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
           </chakra.button>
         }
         items={[
-          { value: "design", label: "New design", onSelect: () => setDialog("design") },
-          { value: "agent", label: "New chat", onSelect: () => setDialog("agent") },
+          { value: "design", label: "New design", onSelect: () => openNewDesign() },
+          { value: "agent", label: "New chat", onSelect: openNewAgent },
           { kind: "separator" },
           { value: "workspace", label: "New workspace…", onSelect: onNewWorkspace },
         ]}
@@ -195,45 +190,6 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
         </Indicator>
       )}
       <GearMenu activeWorkspace={activeWorkspace} />
-      <Portal>
-        {dialog === "design" && <DesignDialog onClose={() => setDialog(null)} />}
-        {dialog === "agent" && <AgentDialog onClose={() => setDialog(null)} />}
-      </Portal>
     </Box>
-  );
-}
-
-function DesignDialog({ onClose }: { onClose: () => void }) {
-  const navigate = useNavigate();
-  const shell = useShell();
-  const { list } = useEpicList();
-  const projects = [...new Set([...(list?.projects ?? []), ...(list?.epics ?? []).map((e) => e.project)])].sort();
-  return (
-    <NewDesignForm
-      projects={projects}
-      onStarted={(address, startFailure) => {
-        onClose();
-        navigate(designHref(address).slice(1), { state: { startFailure } });
-        shell?.closeSliding();
-      }}
-      onClose={onClose}
-    />
-  );
-}
-
-function AgentDialog({ onClose }: { onClose: () => void }) {
-  const navigate = useNavigate();
-  const shell = useShell();
-  return (
-    <NewSessionForm
-      fetchTrees={fetchWorktrees}
-      create={postCreateSession}
-      onClose={onClose}
-      onCreated={(id) => {
-        onClose();
-        navigate(`/agents/${id}`);
-        shell?.closeSliding();
-      }}
-    />
   );
 }

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
@@ -6,8 +6,12 @@ import { PageHeader } from "../page/PageHeader";
 import { renderThemed } from "../ui/render";
 import { DeviceContext, type Device } from "../useWide";
 import { AppShell } from "./AppShell";
+import { closeNewItem, openNewAgent, openNewDesign } from "./newItemOpen";
 
-afterEach(cleanup);
+afterEach(() => {
+  closeNewItem();
+  cleanup();
+});
 
 function setup(device: Device, needsYou = 0) {
   const state = { snapshot: { needs_you_total: needsYou, build: "v1.2.3" }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
@@ -130,6 +134,23 @@ describe("closing the sidebar closes its menus", () => {
     swipe(sidebar(), [200, 300], [100, 300]);
     expect(isOpen()).toBe(true);
     expect(screen.getByRole("dialog")).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  test("the shared opener opens each form over the page, and closing leaves the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("worktrees") ? [] : { epics: [], follow_ups: [], projects: [] }), { status: 200 })),
+    );
+    setup("desktop");
+    for (const open of [() => openNewDesign({ filterProject: "gx" }), openNewAgent]) {
+      act(open);
+      await screen.findByRole("dialog");
+      expect(screen.getByText("item")).toBeTruthy();
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(screen.getByText("item")).toBeTruthy();
+    }
     vi.unstubAllGlobals();
   });
 });

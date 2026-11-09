@@ -15,6 +15,7 @@ import { isMac } from "../platform";
 import { JumpPalette } from "./JumpPalette";
 import { setJumpOpen } from "./jumpOpen";
 import { MascotToggle } from "./MascotToggle";
+import { NewItemHost } from "./NewItemHost";
 import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
 import { LIST_ATTR, useSidebarKeys } from "./SidebarKeys";
@@ -358,6 +359,7 @@ export function AppShell({
           {children ?? <Outlet />}
         </Box>
         <JumpPalette fetcher={fetchEpicList} active={active} />
+        <NewItemHost />
       </Box>
     </ShellContext.Provider>
   );
