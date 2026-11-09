@@ -164,6 +164,15 @@ func TestReadProjectUnsetVCSFallsBackToGit(t *testing.T) {
 		if resp.Project.VCS != want {
 			t.Errorf("vcs for %s = %q, want %q", doc, resp.Project.VCS, want)
 		}
+		// The Identity row renders the entry, so it must carry the same value.
+		e := entryByKey(t, resp, "vcs")
+		shown := string(e.Value)
+		if !e.Set {
+			shown = string(e.Default)
+		}
+		if shown != `"`+want+`"` {
+			t.Errorf("vcs entry for %s shows %s, want %q", doc, shown, want)
+		}
 	}
 }
 
