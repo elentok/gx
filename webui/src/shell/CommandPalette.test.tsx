@@ -24,7 +24,7 @@ function Where() {
 
 const projects = ["alpha", "beta", "gamma"];
 
-function setup({ narrow = false, mac = false, path = "/stats" } = {}) {
+function setup({ narrow = false, mac = false, path = "/stats", afk = false } = {}) {
   vi.spyOn(navigator, "platform", "get").mockReturnValue(mac ? "MacIntel" : "Linux x86_64");
   vi.stubGlobal(
     "fetch",
@@ -39,7 +39,7 @@ function setup({ narrow = false, mac = false, path = "/stats" } = {}) {
     }),
   );
   if (narrow) vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
-  const state = { snapshot: { sessions: [session("s1", "gamma")], placements: [], workspaces: [] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const state = { snapshot: { sessions: [session("s1", "gamma")], placements: [], workspaces: [], afk }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const router = createMemoryRouter(
     [
@@ -134,7 +134,7 @@ test("Escape and a click outside close without running anything", () => {
 test("rows are in fixed order, hold no epic or session rows, and filter fuzzily", () => {
   setup();
   press({ key: "e", ctrlKey: true });
-  expect(names()).toEqual(["New design", "New chat", "Go to Epics", "Go to Agents", "Go to Stats", "Go to Settings"]);
+  expect(names()).toEqual(["New design", "New chat", "Go to Epics", "Go to Agents", "Go to Stats", "Go to Settings", "Toggle AFK"]);
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "go ep" } });
   expect(names()[0]).toBe("Go to Epics");
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "newdes" } });
@@ -184,6 +184,21 @@ test.each([
   press({ key: "e", ctrlKey: true });
   fireEvent.click(screen.getAllByRole("option").find((o) => o.textContent?.startsWith(title))!);
   expect(where()).toBe(path);
+});
+
+test.each([
+  [true, "AFK is on", false],
+  [false, "AFK is off", true],
+])("Toggle AFK with afk=%s says %s and posts on=%s once, then closes", async (afk, subtitle, on) => {
+  setup({ afk });
+  press({ key: "e", ctrlKey: true });
+  const row = screen.getAllByRole("option").find((o) => o.textContent?.startsWith("Toggle AFK"))!;
+  expect(row.textContent).toContain(subtitle);
+  fireEvent.click(row);
+  expect(palette()).toBeNull();
+  const posts = () => vi.mocked(fetch).mock.calls.filter(([u]) => String(u).includes("/v1/afk"));
+  await waitFor(() => expect(posts()).toHaveLength(1));
+  expect(JSON.parse(String(posts()[0][1]?.body))).toEqual({ on });
 });
 
 test("full screen at a phone width", () => {

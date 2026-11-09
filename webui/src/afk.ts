@@ -14,8 +14,8 @@ export async function postAfk(on: boolean): Promise<void> {
 }
 
 // Sets AFK to the opposite of what the last snapshot showed. A failed write leaves the toggle as it was.
-export function toggleAfk(current: boolean | undefined): void {
-  void postAfk(!current).catch((err) =>
+export function toggleAfk(current: boolean | undefined, post: (on: boolean) => Promise<void> = postAfk): void {
+  void post(!current).catch((err) =>
     showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." }),
   );
 }

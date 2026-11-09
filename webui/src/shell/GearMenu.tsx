@@ -1,6 +1,6 @@
 import { Box, Button } from "@chakra-ui/react";
 import { useState } from "react";
-import { postAfk as defaultPostAfk } from "../afk";
+import { postAfk as defaultPostAfk, toggleAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { SortActivity, SortDefault, SortName, SortNeedsYou, type Workspace } from "../generated/server";
 import { CLEANUP_HREF, SETTINGS_HREF, TIPS_HREF } from "../hrefs";
@@ -51,7 +51,7 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
   const [restartOpen, setRestartOpen] = useState(false);
   const afk = snapshot?.afk ?? false;
   const viMode = snapshot?.vi_mode ?? false;
-  const toggle = (label: string, value: string, on: boolean, post: (on: boolean) => Promise<void>): MenuEntry => ({
+  const toggle = (label: string, value: string, on: boolean, flip: () => void): MenuEntry => ({
     kind: "checkbox",
     value,
     label,
@@ -59,7 +59,7 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
     closeOnSelect: false,
     hint: <MenuSwitch on={on} />,
     inlineHint: true,
-    onCheckedChange: () => guarded(post(!on)),
+    onCheckedChange: flip,
   });
   const sort: MenuEntry = activeWorkspace
     ? {
@@ -101,8 +101,8 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
           </Button>
         }
         items={[
-          toggle("AFK", "afk", afk, postAfk),
-          toggle("Vi mode", "vimode", viMode, postViMode),
+          toggle("AFK", "afk", afk, () => toggleAfk(afk, postAfk)),
+          toggle("Vi mode", "vimode", viMode, () => guarded(postViMode(!viMode))),
           sort,
           { kind: "separator" },
           { value: "restart", label: "Restart server", onSelect: () => setRestartOpen(true) },

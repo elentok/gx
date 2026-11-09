@@ -1,6 +1,8 @@
 import { Box } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router";
+import { toggleAfk } from "../afk";
+import { useConnectionContext, useConnectionState } from "../connection";
 import { AGENTS_HREF, EPICS_HREF, SETTINGS_HREF, STATS_HREF } from "../hrefs";
 import { Menu, type ListSection } from "../nav/JumpMenu";
 import { isMac } from "../platform";
@@ -15,6 +17,7 @@ export interface Command {
   title: string;
   /** Extra words the filter matches besides the title. */
   words?: string;
+  subtitle?: string;
   run: () => void;
 }
 
@@ -22,6 +25,7 @@ export interface Command {
 export function useCommands(): Command[] {
   const navigate = useNavigate();
   const shell = useShell();
+  const afk = useConnectionState(useConnectionContext()).snapshot?.afk ?? false;
   return useMemo(() => {
     const goto = (id: string, title: string, href: string): Command => ({
       id,
@@ -38,8 +42,9 @@ export function useCommands(): Command[] {
       goto("go-agents", "Go to Agents", AGENTS_HREF),
       goto("go-stats", "Go to Stats", STATS_HREF),
       goto("go-settings", "Go to Settings", SETTINGS_HREF),
+      { id: "toggle-afk", title: "Toggle AFK", subtitle: afk ? "AFK is on" : "AFK is off", run: () => toggleAfk(afk) },
     ];
-  }, [navigate, shell]);
+  }, [navigate, shell, afk]);
 }
 
 /** Cmd+E on a Mac, Ctrl+E elsewhere, on every page, in text fields too. Same layout as the jump palette. */
@@ -73,7 +78,7 @@ export function CommandPalette() {
         rows: commands.map((c) => ({
           key: c.id,
           title: c.title,
-          subtitle: "",
+          subtitle: c.subtitle ?? "",
           href: "",
           searchText: [c.title, c.words].filter(Boolean).join(" "),
           onSelect: c.run,
