@@ -142,7 +142,18 @@ const (
 	// BehaviourBackgroundDirty is BehaviourBackgroundTask that also leaves an
 	// uncommitted file in the worktree.
 	BehaviourBackgroundDirty = "background-dirty"
+	// BehaviourStorm makes the agent fork StormDescendants processes and keep
+	// working, as a test command that forks out of control would. It never
+	// reports, so only a kill ends it.
+	BehaviourStorm = "storm"
 )
+
+// StormDescendants is how many processes BehaviourStorm forks. A scenario sets
+// its watchdog threshold below it.
+const StormDescendants = 20
+
+// stormHold bounds how long a storming agent lingers if nothing kills it.
+const stormHold = 5 * time.Minute
 
 // StartsBackgroundTask reports whether a worker behaviour ends its turn on a
 // running background task.
@@ -218,6 +229,14 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 			}
 			return askQuestion(cfg, address, askBody)
 		}
+	case BehaviourStorm:
+		var tree *exec.Cmd
+		if err := spawnDescendantsInto(&tree, StormDescendants, 1); err != nil {
+			return err
+		}
+		time.Sleep(stormHold)
+		stopDescendantsIn(&tree)
+		return nil
 	case BehaviourBackgroundTask:
 		return nil
 	case BehaviourBackgroundDirty:

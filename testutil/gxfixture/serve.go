@@ -38,6 +38,7 @@ type runningServer struct {
 type seeded struct {
 	agentTranscript  string
 	checkWaitingFile string
+	outsideTreePID   int
 	transcripts      map[string]string
 }
 
@@ -279,6 +280,12 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 			return s, err
 		}
 	}
+	if sc.OutsideTree > 0 {
+		// Started by the fixture, not the server, so no agent's tree holds it.
+		if s.outsideTreePID, err = agentfake.SpawnDescendants(sc.OutsideTree, 1); err != nil {
+			return s, err
+		}
+	}
 	if sc.Spend {
 		if s.agentTranscript, err = f.agentTranscript(ctx); err != nil {
 			return s, err
@@ -383,7 +390,7 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 
 // buildOutput assembles what the fixture prints.
 func (f *fixture) buildOutput(sc scenario, rs *runningServer, s seeded) spec.Output {
-	res := spec.Output{WebURL: rs.webURL, CookieName: rs.in.CookieName, Cookie: rs.in.Cookie, Password: rs.password, TOTPSecret: rs.in.TOTPSecret, TOTPStep: rs.in.TOTPStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: f.gx, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: rs.logPath, AgentTranscript: s.agentTranscript, CheckWaitingFile: s.checkWaitingFile}
+	res := spec.Output{WebURL: rs.webURL, CookieName: rs.in.CookieName, Cookie: rs.in.Cookie, Password: rs.password, TOTPSecret: rs.in.TOTPSecret, TOTPStep: rs.in.TOTPStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: f.gx, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: rs.logPath, AgentTranscript: s.agentTranscript, CheckWaitingFile: s.checkWaitingFile, OutsideTreePID: s.outsideTreePID}
 	if sc.RateLimitFromUsage {
 		res.RateLimitReleaseFile = f.rateLimitReleaseFile()
 	}

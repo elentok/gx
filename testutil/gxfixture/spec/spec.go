@@ -168,6 +168,9 @@ type Scenario struct {
 	// DeadSessions is how many prompt-less sessions are created together, after Sessions,
 	// then all crashed, so a large dead set seeds fast.
 	DeadSessions int
+	// OutsideTree starts a process tree of this many sleepers once the server is
+	// up, outside any agent of gx; it lives as long as the fixture.
+	OutsideTree int
 	// Commands is what the fakes' list probes answer; nil leaves them empty.
 	Commands *agentfake.ProbeConfig
 	// Codex installs the fake codex on PATH without the --fakecodex flag, for a

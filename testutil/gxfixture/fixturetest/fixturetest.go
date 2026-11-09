@@ -24,6 +24,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -354,6 +355,26 @@ func (r *Running) ProcessCounts(t *testing.T) (holders, agents int) {
 		}
 	}
 	return holders, agents
+}
+
+// Sleepers counts the live processes of the fake agents' forked trees on the
+// host. Compare it with a count taken before the storm: another fixture's
+// tree would add to it.
+func (r *Running) Sleepers(t *testing.T) int {
+	t.Helper()
+	psCmd := exec.Command("ps", "-axww", "-o", "command=")
+	psCmd.Env = os.Environ()
+	out, err := psCmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for line := range strings.SplitSeq(string(out), "\n") {
+		if strings.TrimSpace(line) == agentfake.SleeperCommand {
+			n++
+		}
+	}
+	return n
 }
 
 // SetDisk replaces a fake-disk control file through a rename, as a flow does.

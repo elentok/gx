@@ -67,6 +67,9 @@ type Output struct {
 	// worktree directory is unique per sibling session and stable across calls, so
 	// concurrent sessions never share a browser.
 	BrowserSession string `json:"browser_session,omitempty"`
+	// OutsideTreePID is the root of the process tree an OutsideTree scenario
+	// started outside gx; empty elsewhere.
+	OutsideTreePID int `json:"outside_tree_pid,omitempty"`
 	// FeatureWorktree is demo's `feature` worktree, in scenarios that make one.
 	FeatureWorktree string `json:"feature_worktree,omitempty"`
 }

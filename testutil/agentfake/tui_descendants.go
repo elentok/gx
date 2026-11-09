@@ -20,6 +20,10 @@ const ActionDescendants = "descendants"
 // ActionStopDescendants kills the tree an ActionDescendants started.
 const ActionStopDescendants = "stopdescendants"
 
+// SleeperCommand is the command line of each process of a descendants tree, as
+// ps shows it, for a test that counts them.
+const SleeperCommand = "sleep 100000"
+
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
@@ -29,7 +33,7 @@ func shellQuote(s string) string {
 func descendantLevel(count, depth int) string {
 	var b strings.Builder
 	for range count {
-		b.WriteString("sleep 100000 & ")
+		b.WriteString(SleeperCommand + " & ")
 	}
 	if depth > 1 {
 		b.WriteString("sh -c ")
@@ -38,6 +42,16 @@ func descendantLevel(count, depth int) string {
 	}
 	b.WriteString("wait")
 	return b.String()
+}
+
+// SpawnDescendants starts the tree under the calling process; it ends when
+// the caller does. A fixture uses it for a tree that gx did not launch.
+func SpawnDescendants(count, depth int) (pid int, err error) {
+	var cmd *exec.Cmd
+	if err := spawnDescendantsInto(&cmd, count, depth); err != nil {
+		return 0, err
+	}
+	return cmd.Process.Pid, nil
 }
 
 func (t *tui) spawnDescendants(count, depth int) error {
