@@ -61,7 +61,18 @@ it("takes focus from an element outside the dialog, such as a closing menu's ite
 
 it("does not steal focus from a field the person already moved to", () => {
   mount(<Dialog />, "desktop");
+  const other = screen.getByLabelText("Other");
+  act(() => {
+    other.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    other.focus();
+  });
+  act(() => showLate());
+  expect(document.activeElement).toBe(other);
+});
+
+it("takes focus from an element inside the dialog that got it without the person", () => {
+  mount(<Dialog />, "desktop");
   act(() => screen.getByLabelText("Other").focus());
   act(() => showLate());
-  expect(document.activeElement).toBe(screen.getByLabelText("Other"));
+  expect(document.activeElement).toBe(screen.getByLabelText("First"));
 });
