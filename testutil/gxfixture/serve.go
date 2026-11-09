@@ -132,6 +132,18 @@ func controlFIFOs(root string) []string {
 	return paths
 }
 
+// awaitNewFIFO waits for a control FIFO outside before, i.e. for the fake the
+// last launch started. It gives up silently after 30s; the callers then behave as before.
+func awaitNewFIFO(root string, before []string) {
+	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		for _, p := range controlFIFOs(root) {
+			if !slices.Contains(before, p) {
+				return
+			}
+		}
+	}
+}
+
 // workFixAgent makes the Fix agent of session id read Working. Nothing maps a
 // session to its fake's control FIFO, so it arms every fake that started after
 // the FIFOs in before (the Fix agent's among them), then types a slash prompt;
@@ -197,6 +209,9 @@ func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
 			return fmt.Errorf("fix agent %v refused: %s", req, res.Message)
 		}
 		if !slices.Contains(sc.WorkingFixAgents, req.Address) {
+			// Its fake may start late; until its FIFO exists, the next Fix agent's
+			// "every new fake" arming would take it for its own and turn this one Working.
+			awaitNewFIFO(f.root, before)
 			continue
 		}
 		if err := workFixAgent(ctx, f.root, cl, res.Session.ID, before); err != nil {
