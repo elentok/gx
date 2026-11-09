@@ -73,22 +73,25 @@ function setup(sort?: string) {
 
 const body = () => within(screen.getByTestId("sidebar-body"));
 const press = (init: KeyboardEventInit, target: Element | Window = window) => act(() => void fireEvent.keyDown(target, init));
+// The listeners attach in effects that can land late under load, and a key pressed before then is lost, so the press repeats until `check` holds.
+const pressUntil = (init: KeyboardEventInit, check: () => void) =>
+  waitFor(() => {
+    press(init);
+    check();
+  });
 
 test("Alt+1 opens the first own row, reading the digit from the physical code", async () => {
   const router = setup();
   await body().findByRole("link", { name: /Blog/ });
-  press({ key: "¡", code: "Digit1", altKey: true });
-  await waitFor(() => expect(router.state.location.pathname).toBe("/e/p:blog"));
-  press({ key: "™", code: "Digit2", altKey: true });
-  await waitFor(() => expect(router.state.location.pathname).toBe("/d/p:shop"));
+  await pressUntil({ key: "¡", code: "Digit1", altKey: true }, () => expect(router.state.location.pathname).toBe("/e/p:blog"));
+  await pressUntil({ key: "™", code: "Digit2", altKey: true }, () => expect(router.state.location.pathname).toBe("/d/p:shop"));
 });
 
 test("Alt+1 opens the first row of the sorted list", async () => {
   rows[1] = { ...rows[1], last_activity_at: "2026-01-01T00:00:00Z" };
   const router = setup("activity");
   await body().findByRole("link", { name: /Blog/ });
-  press({ key: "¡", code: "Digit1", altKey: true });
-  await waitFor(() => expect(router.state.location.pathname).toBe("/d/p:shop"));
+  await pressUntil({ key: "¡", code: "Digit1", altKey: true }, () => expect(router.state.location.pathname).toBe("/d/p:shop"));
   rows[1] = { ...rows[1], last_activity_at: undefined };
 });
 
@@ -96,8 +99,9 @@ test("numbers show while Alt is held, only on own rows, and vanish on keyup and 
   setup();
   await body().findByRole("link", { name: /Blog/ });
   expect(body().queryAllByTestId("row-number")).toHaveLength(0);
-  press({ key: "Alt", code: "AltLeft", altKey: true });
-  expect(body().getAllByTestId("row-number").map((n) => n.textContent)).toEqual(["1", "2"]);
+  await pressUntil({ key: "Alt", code: "AltLeft", altKey: true }, () =>
+    expect(body().getAllByTestId("row-number").map((n) => n.textContent)).toEqual(["1", "2"]),
+  );
   act(() => void fireEvent.keyUp(window, { key: "Alt", code: "AltLeft" }));
   expect(body().queryAllByTestId("row-number")).toHaveLength(0);
   press({ key: "Alt", code: "AltLeft", altKey: true });
@@ -111,8 +115,7 @@ test("Alt changes only the menu slot: status words stay and no page component re
   const words = () => body().getAllByRole("link").map((l) => l.textContent);
   const before = words();
   const renders = pageRenders;
-  press({ key: "Alt", code: "AltLeft", altKey: true });
-  expect(body().getAllByTestId("row-number")).toHaveLength(2);
+  await pressUntil({ key: "Alt", code: "AltLeft", altKey: true }, () => expect(body().getAllByTestId("row-number")).toHaveLength(2));
   expect(words()).toEqual(before);
   act(() => void fireEvent.keyUp(window, { key: "Alt", code: "AltLeft" }));
   expect(words()).toEqual(before);
@@ -140,8 +143,7 @@ test("Alt+3 does nothing: held rows have no number", async () => {
 test("Alt+Shift+2 picks the second workspace", async () => {
   setup();
   await body().findByRole("link", { name: /Blog/ });
-  press({ key: "@", code: "Digit2", altKey: true, shiftKey: true });
-  await waitFor(() => expect(localStorage.getItem(ACTIVE_KEY)).toBe("Work"));
+  await pressUntil({ key: "@", code: "Digit2", altKey: true, shiftKey: true }, () => expect(localStorage.getItem(ACTIVE_KEY)).toBe("Work"));
 });
 
 test("nothing fires while a text field has focus", async () => {

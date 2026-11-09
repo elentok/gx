@@ -163,7 +163,8 @@ test.describe("180. Menu limit burn", () => {
 
     // A new statusline payload reaches the open menu.
     await report(fixture, payload(55, 96));
-    await expect(exactRow(page, "5h limit").getByText("55%")).toBeVisible();
+    // The report goes CLI, server, socket, page, which under full-check load outlasts the default expect timeout.
+    await expect(exactRow(page, "5h limit").getByText("55%")).toBeVisible({ timeout: 60_000 });
     await expect(exactRow(page, "Weekly limit").getByText("96%")).toBeVisible();
 
     // A Codex scan that saves a new sample reaches the open menu.

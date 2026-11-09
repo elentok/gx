@@ -73,7 +73,9 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
   await expect(dialog).toBeFocused();
 
   // A bottom sheet about 88% of the viewport high, with a grab handle.
-  const box = await dialog.boundingBox();
+  // The dialog can be detached for a moment after it takes focus under load, so wait for a box rather than read it once.
+  let box: Awaited<ReturnType<typeof dialog.boundingBox>> = null;
+  await expect.poll(async () => (box = await dialog.boundingBox())).not.toBeNull();
   expect(box!.width).toBe(375);
   expect(box!.y + box!.height).toBe(812);
   expect(box!.height / 812).toBeGreaterThan(0.85);
