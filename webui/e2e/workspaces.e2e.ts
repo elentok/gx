@@ -159,7 +159,7 @@ test("Workspaces", async ({ page, start }) => {
   await goto(page, "#/epics");
 
   // Enter on a chat row focuses its prompt; a click opens the chat and leaves the prompt alone.
-  const chatRow = sidebar.locator("a[data-chat]");
+  const chatRow = sidebar.locator("a[data-chat]").first();
   const prompt = page.getByRole("form", nav("Composer")).getByRole("textbox");
   await chatRow.focus();
   await page.keyboard.press("Enter");
@@ -270,7 +270,7 @@ test("Workspaces", async ({ page, start }) => {
 
   // A chat row shows in its workspace only.
   await pick("Default workspace");
-  await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(1);
+  await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(2); // one per project
   await pick("research");
   await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(0);
 

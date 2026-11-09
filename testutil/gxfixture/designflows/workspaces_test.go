@@ -40,13 +40,18 @@ func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *test
 		"design-new|ready-to-design|Default workspace",
 		"follow-ups|ready-to-design|", // a project card, in no workspace
 		"finished-a|finished|Default workspace",
+		"side:side-design|ready-to-design|Default workspace", // the second project's Design
 	}
 	var got []string
 	var missing []string
 	testutil.Poll(40*time.Second, 500*time.Millisecond, func() bool {
 		got = got[:0]
 		for _, c := range r.cardsOf(t) {
-			got = append(got, c.Name+"|"+string(c.Section)+"|"+c.Workspace)
+			name := c.Name
+			if c.Project != "demo" {
+				name = c.Project + ":" + c.Name
+			}
+			got = append(got, name+"|"+string(c.Section)+"|"+c.Workspace)
 		}
 		missing = slices.DeleteFunc(slices.Clone(want), func(w string) bool { return slices.Contains(got, w) })
 		return len(missing) == 0
@@ -79,9 +84,12 @@ func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *test
 		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &sessions); err != nil {
 			t.Fatal(err)
 		}
-		return len(sessions) >= 3
+		// The second project's chat, for New chat's project list.
+		return len(sessions) >= 3 && slices.ContainsFunc(sessions, func(si wire.SessionInfo) bool {
+			return si.Project == "side" && !si.Queue && si.FixOf == ""
+		})
 	}) {
-		t.Fatalf("agents list has %d sessions, want a chat, a Queue agent and a One-off agent", len(sessions))
+		t.Fatalf("agents list has %d sessions, want a chat, a Queue agent, a One-off agent and a chat in project side", len(sessions))
 	}
 }
 
@@ -144,6 +152,7 @@ func TestWorkspacesScenario_SeedsFixAgentsAndAnInvestigateAgentInOtherAndUnderEp
 		}
 		fixes := map[string]wire.SessionPlacement{}
 		var investigate []wire.SessionPlacement
+		var nested *wire.SessionPlacement
 		for _, si := range sessions {
 			if si.FixOf != "" {
 				fixes[si.FixOf] = placed[si.ID]
@@ -151,6 +160,13 @@ func TestWorkspacesScenario_SeedsFixAgentsAndAnInvestigateAgentInOtherAndUnderEp
 			if si.Queue && (strings.HasPrefix(si.Ticket, "demo:one-offs/01") || strings.HasPrefix(si.Ticket, "demo:inv-epic/02")) {
 				investigate = append(investigate, placed[si.ID])
 			}
+			if si.Queue && strings.HasPrefix(si.Ticket, "demo:inv-epic/02") {
+				p := placed[si.ID]
+				nested = &p
+			}
+		}
+		if nested == nil || nested.Kind != "epic" || nested.Epic != "demo:inv-epic" {
+			problems = append(problems, "want the inv-epic/02 Queue agent nested under demo:inv-epic")
 		}
 		for fixOf, want := range wantFix {
 			if got := fixes[fixOf].Kind + "|" + fixes[fixOf].Epic; got != want {

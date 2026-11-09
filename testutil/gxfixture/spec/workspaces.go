@@ -6,6 +6,9 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// sideProject is the second project of the workspaces scenario.
+const sideProject = "side"
+
 // Workspace names the workspaces scenario creates, besides the Default workspace.
 const (
 	WorkspaceBugs     = "gx bugs"
@@ -20,6 +23,14 @@ const (
 // Other holds a project-level Fix agent (a failed migration), a Fix agent on a
 // paused One-off, and the Investigate agent of another paused One-off. A Fix
 // agent on paused-epic/01 and the Investigate agent of inv-epic nest under their epics.
+//
+// A second project, "side", has its own repo, a Design (side-design) and a chat, so
+// two projects can be told apart (New chat lists both).
+//
+// Footer indicators: the health warning, the paused and the offline indicator can
+// all show on one page, steered by the flow: setHealth (webui/e2e/fixture.ts,
+// writes the fake CPU and memory file under HealthDir; any scenario has it),
+// `gx server queue pause`, and blockEvents (webui/e2e/fixture.ts) for offline.
 func WorkspacesScenario() scenario {
 	const (
 		liveDesign = project + ":ws-design"
@@ -47,6 +58,8 @@ func WorkspacesScenario() scenario {
 				{"01", "broken", servertest.TicketOpts{PauseReason: "iteration-error"}},
 				{"02", "investigate", servertest.TicketOpts{Type: "investigate", Parent: "01"}},
 			}},
+			// A second project (own repo, so New chat lists it) with a Design and a chat.
+			{sideProject, "side-design", nil},
 			// One card per remaining section.
 			{project, "paused-epic", []ticket{
 				{"01", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}},
@@ -64,18 +77,21 @@ func WorkspacesScenario() scenario {
 			}},
 		},
 		EpicMeta: map[string]string{
-			project + ":ws-design":    "status: open\nkind: map\n",
-			project + ":held-design":  "status: open\nkind: map\n",
-			project + ":design-new":   "status: open\nkind: map\n",
-			project + ":one-offs":     "status: draft\n",
-			project + ":finished-a":   "status: open\ncompleted_at: 2026-01-01T10:00:00Z\nmerged_at: 2026-01-01T11:00:00Z\n",
-			project + ":ws-impl-epic": "status: open\nstarted_at: 2026-01-01T10:00:00Z\n",
+			project + ":ws-design":       "status: open\nkind: map\n",
+			project + ":held-design":     "status: open\nkind: map\n",
+			project + ":design-new":      "status: open\nkind: map\n",
+			sideProject + ":side-design": "status: open\nkind: map\n",
+			project + ":one-offs":        "status: draft\n",
+			project + ":finished-a":      "status: open\ncompleted_at: 2026-01-01T10:00:00Z\nmerged_at: 2026-01-01T11:00:00Z\n",
+			project + ":ws-impl-epic":    "status: open\nstarted_at: 2026-01-01T10:00:00Z\n",
 		},
 		DesignSteps: map[string]string{
-			liveDesign:              string(tickets.StepResolveTickets),
-			heldDesign:              string(tickets.StepResolveTickets),
-			project + ":design-new": string(tickets.StepChart),
+			liveDesign:                   string(tickets.StepResolveTickets),
+			heldDesign:                   string(tickets.StepResolveTickets),
+			project + ":design-new":      string(tickets.StepChart),
+			sideProject + ":side-design": string(tickets.StepChart),
 		},
+		OwnRepos:    []string{sideProject},
 		DesignByMap: map[string][]string{liveDesign: {agentfake.DesignTurnPlain}},
 		OpenDesigns: []string{liveDesign},
 		Hold:        true,
@@ -90,7 +106,10 @@ func WorkspacesScenario() scenario {
 		// paused-epic holds two Fix agents: 01 needs you (Idle), 02 is Working.
 		FixAgents:        []string{project + ":one-offs/04", project + ":paused-epic/01", project + ":paused-epic/02"},
 		WorkingFixAgents: []string{project + ":paused-epic/02"},
-		Sessions:         []sessionSpec{{Project: project, Prompt: "hello", Read: true}},
+		Sessions: []sessionSpec{
+			{Project: project, Prompt: "hello", Read: true},
+			{Project: sideProject, Prompt: "hello", Read: true},
+		},
 		Steps: [][]string{
 			{"server", "workspaces", "create", WorkspaceBugs},
 			{"server", "workspaces", "create", WorkspaceResearch},
