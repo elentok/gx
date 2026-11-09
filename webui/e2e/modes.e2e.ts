@@ -100,6 +100,7 @@ test.describe("61. Page modes at 760px", () => {
     await page.keyboard.press("ControlOrMeta+k");
     const sheet = page.getByRole("dialog", nav("Jump to"));
     await expect(sheet).toBeVisible();
-    expect(await sheet.boundingBox()).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
+    // The phone/wide switch follows a media query, so the box can read as the inset popover until it settles.
+    await expect.poll(() => sheet.boundingBox()).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
   });
 });
