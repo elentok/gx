@@ -233,6 +233,17 @@ test("the title is the name, else the slug, else the idea's first words", async 
   expect(screen.getByText("words", { selector: "span" })).toBeTruthy();
 });
 
+test("Close is a text button at the right end of the top bar, after the status, with no ×", async () => {
+  await mount();
+  const close = screen.getByRole("button", { name: "Close" });
+  expect(close.textContent).toBe("Close");
+  expect(close.title).toBe("Close (keeps the draft)");
+  expect(screen.getByRole("dialog").textContent).not.toContain("×");
+  const bar = close.parentElement!;
+  expect(bar.lastElementChild).toBe(close);
+  expect(bar.contains(screen.getByLabelText("Epic slug"))).toBe(false);
+});
+
 test("Close, Escape and a backdrop click close and save at once", async () => {
   vi.useFakeTimers();
   const { onClose, save } = await mount();

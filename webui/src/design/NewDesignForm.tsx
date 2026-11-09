@@ -583,6 +583,22 @@ function DraftForm({
             {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
           </Text>
         )}
+        <chakra.button
+          type="button"
+          aria-label="Close"
+          title="Close (keeps the draft)"
+          onClick={close}
+          color="text.dim"
+          fontSize="sm"
+          fontWeight="600"
+          h="36px"
+          px="2"
+          flexShrink="0"
+          borderRadius="8px"
+          _hover={{ bg: "surface", color: "text" }}
+        >
+          Close
+        </chakra.button>
       </Box>
       {naming !== undefined && (
         <Box display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
@@ -654,22 +670,6 @@ function DraftForm({
           value={draft.slug}
           onChange={(e) => patch({ slug: e.target.value })}
         />
-        <chakra.button
-          type="button"
-          aria-label="Close"
-          title="Close (keeps the draft)"
-          onClick={close}
-          color="text.dim"
-          fontSize="xl"
-          lineHeight="1"
-          w="36px"
-          h="36px"
-          flexShrink="0"
-          borderRadius="8px"
-          _hover={{ bg: "surface", color: "text" }}
-        >
-          ×
-        </chakra.button>
       </Box>
       {moved && (
         <Text fontSize="sm" color="text.dim" px="3" pt="2" flexShrink="0">

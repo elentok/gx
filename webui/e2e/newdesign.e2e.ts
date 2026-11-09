@@ -25,8 +25,16 @@ test("26. New Design form", async ({ page, start }) => {
   const filter = await page.getByRole("searchbox", nav("Filter epics")).boundingBox();
   const at = await page.getByRole("button", nav("New Design")).boundingBox();
   expect(at!.x).toBeGreaterThanOrEqual(filter!.x + filter!.width);
+  await page.setViewportSize({ width: 1440, height: 900 });
   const dialog = await openDialog(page);
   const { slug, idea, project } = fields(dialog);
+
+  // Close is a text button at the right end of the top bar, and there is no "×".
+  const closeBtn = dialog.getByRole("button", nav("Close"));
+  await expect(closeBtn).toHaveText("Close");
+  await expect(dialog).not.toContainText("×");
+  const [dlg, closeAt] = [(await dialog.boundingBox())!, (await closeBtn.boundingBox())!];
+  expect(Math.abs(closeAt.x + closeAt.width - (dlg.x + dlg.width - 12))).toBeLessThanOrEqual(2);
 
   // The select lists every project, even one with no epics ("scratch"); the one-project rule is in NewDesignForm.test.
   // The idea box takes the space left, over a third of the dialog beside the header and the image row.
@@ -240,9 +248,16 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(fields(theirImgs).slug).toHaveValue("ready-epic");
     await expect(open(theirImgs)).toHaveCount(2);
     await page2.keyboard.press("Escape");
+    // Closing the viewer returns to the sheet: no new epic, and no Start request.
+    const starts: string[] = [];
+    page.on("request", (r) => r.url().includes("/v1/designs/open") && starts.push(r.url()));
+    const epicsBefore = await fixture.cli("server", "epics");
     await open(imgs).first().click();
     await page.getByRole("button", { name: /^Close ✕/ }).click();
     await expect(page.getByRole("button", { name: /^Close ✕/ })).toBeHidden();
+    await expect(imgs).toBeVisible();
+    expect(await fixture.cli("server", "epics")).toBe(epicsBefore);
+    expect(starts).toEqual([]);
 
     // Discard with text and images asks, then removes the draft and its folder.
     const draftId = (await fixture.cli("designs", "drafts", "list")).split("\t")[0]!;

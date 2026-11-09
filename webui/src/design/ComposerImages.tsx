@@ -30,6 +30,7 @@ export function AttachButton({ onClick }: { onClick: () => void }) {
   const icon = useAttachIcon();
   return (
     <Button
+      type="button"
       emphasis="secondary"
       aria-label="Add image"
       title={icon ? "Add image" : undefined}

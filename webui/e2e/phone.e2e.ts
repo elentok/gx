@@ -78,20 +78,30 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
   expect(box!.height / 812).toBeLessThan(0.91);
   await expect(dialog.getByTestId("grab-handle")).toBeVisible();
 
-  // Close sits in the header, above the idea box.
+  // Close is a text button at the right end of the top bar, above the idea box, and there is no "×".
   const startBtn = dialog.getByRole("button", nav("Start design"));
   const discardBtn = dialog.getByRole("button", nav("Discard"));
-  const close = await dialog.getByRole("button", nav("Close")).boundingBox();
+  const closeBtn = dialog.getByRole("button", nav("Close"));
+  const close = (await closeBtn.boundingBox())!;
   const idea = await dialog.getByRole("textbox", nav("Rough idea")).boundingBox();
-  expect(close!.y + close!.height).toBeLessThanOrEqual(idea!.y);
+  expect(close.y + close.height).toBeLessThanOrEqual(idea!.y);
+  await expect(closeBtn).toHaveText("Close");
+  expect(Math.abs(close.x + close.width - (box!.x + box!.width - 12))).toBeLessThanOrEqual(2);
+  await expect(dialog).not.toContainText("×");
 
-  // The footer is Discard at its left edge and Start design at its right edge, each at natural width.
+  // The footer is the paperclip, Discard, and Start design at its right edge, each at natural width.
   await expect(startBtn).toBeVisible();
   const footer = discardBtn.locator("xpath=..");
-  const [foot, d, s] = [(await footer.boundingBox())!, (await discardBtn.boundingBox())!, (await startBtn.boundingBox())!];
+  const clip = dialog.getByRole("button", nav("Add image"));
+  const [foot, d, s, c] = [(await footer.boundingBox())!, (await discardBtn.boundingBox())!, (await startBtn.boundingBox())!, (await clip.boundingBox())!];
   const pad = 12;
-  expect(d.x).toBeCloseTo(foot.x + pad, 0);
+  expect(c.x).toBeCloseTo(foot.x + pad, 0);
+  expect(c.x + c.width).toBeLessThanOrEqual(d.x);
   expect(s.x + s.width).toBeCloseTo(foot.x + foot.width - pad, 0);
+  // No tile (the paperclip is the only Add image), no limits line, and with an empty draft no image row.
+  await expect(dialog.getByRole("button", nav("Add image"))).toHaveCount(1);
+  await expect(dialog.locator('[data-mock-part="image-line"]')).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Open image" })).toHaveCount(0);
   // Natural width: the label plus the button's padding, far short of the stretched half the footer once gave it.
   const content = await startBtn.evaluate((el) => {
     const range = document.createRange();
@@ -111,12 +121,12 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
   expect(h.y + h.height).toBeLessThanOrEqual(foot2.y);
   expect((await startBtn.boundingBox())!.width).toBeCloseTo(s.width, 0);
 
-  // A thumbnail click opens the image viewer.
-  await dialog.getByRole("textbox", nav("Rough idea")).evaluate((el, b64) => {
-    const data = new DataTransfer();
-    data.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], "pasted.png", { type: "image/png" }));
-    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
-  }, PNG.toString("base64"));
+  // A file picked through the paperclip gets a thumbnail; a click opens the viewer and closing it starts no design.
+  const starts: string[] = [];
+  page.on("request", (r) => r.url().includes("/v1/designs/open") && starts.push(r.url()));
+  const chooser = page.waitForEvent("filechooser");
+  await clip.click();
+  await (await chooser).setFiles({ name: "picked.png", mimeType: "image/png", buffer: PNG });
   const open = dialog.getByRole("button", { name: "Open image" });
   await expect(open).toHaveCount(1);
   await open.click();
@@ -124,6 +134,20 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
   await expect(closeViewer).toBeVisible();
   await closeViewer.click();
   await expect(closeViewer).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/#\/epics$/);
+  expect(starts).toEqual([]);
+
+  // At 744px (tablet) Close is still at the right end of the top bar and the paperclip is still in the footer.
+  await page.setViewportSize({ width: 744, height: 1000 });
+  const wide = (await dialog.boundingBox())!;
+  const closeAt = (await closeBtn.boundingBox())!;
+  expect(Math.abs(closeAt.x + closeAt.width - (wide.x + wide.width - 12))).toBeLessThanOrEqual(2);
+  await expect(dialog).not.toContainText("×");
+  await expect(dialog.getByRole("button", nav("Add image"))).toHaveCount(1);
+  const [d2, c2] = [(await discardBtn.boundingBox())!, (await clip.boundingBox())!];
+  expect(c2.x + c2.width).toBeLessThanOrEqual(d2.x);
+  await page.setViewportSize({ width: 375, height: 812 });
 
   // Tab keeps focus inside the dialog.
   for (let i = 0; i < 12; i++) {
