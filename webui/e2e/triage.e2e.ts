@@ -5,7 +5,7 @@ const step = (page: import("@playwright/test").Page, name: string, state: string
 
 test.describe("199. Triage journey", () => {
   test("start, Verify chain, Plan, the card and the sidebar popover", async ({ page, start }) => {
-    const fixture = await start("triage", { shape: "journey", autoAdvanceDelay: "3s" });
+    const fixture = await start("triage", { shape: "journey", autoAdvanceDelay: "3s", reloads: 1 });
     const followUps = card(page, "follow-ups");
 
     // Ready to design: count words and a Triage button.
@@ -164,7 +164,9 @@ test.describe("199. Triage journey", () => {
       await expect(step(page, "write", "current")).toBeVisible();
       await expect(step(second, "write", "current")).toBeVisible();
       const reasons = (await Promise.all(answered)).map((r) => (r.refused ? r.reason : "approved"));
-      expect(reasons.sort()).toEqual(["approved", "triage-already-approved"]);
+      // The loser is refused as already approved, or as stale when the winner's write reached it first.
+      expect(reasons.filter((r) => r === "approved")).toHaveLength(1);
+      expect(reasons.find((r) => r !== "approved")).toMatch(/^(triage-already-approved|stale)$/);
       // Only one Write session was launched, whichever tab won.
       await expect(page.getByRole("link", { name: /^Chat triage (?!Exited)/ })).toHaveCount(1);
     } finally {
@@ -215,5 +217,95 @@ test.describe("199. Triage journey", () => {
     await expect
       .poll(() => fixture.cli("tickets", "show", "demo:triage-ready/02"))
       .toMatch(/Fix it in the parser or the caller\?: parser[\s\S]*Keep the old flag\?: no/);
+
+    // Done: the result groups, each with links where rows moved.
+    for (const title of ["Ready epic", "Map epics", "Merged"]) {
+      await expect(result.getByRole("region", nav(title)).getByRole("link").first()).toBeVisible();
+    }
+    for (const title of ["Closed", "Kept for later"]) await expect(result.getByRole("region", nav(title))).toBeVisible();
+
+    // The card keeps the kept count and no Finished card appears. Nothing is queued until the click.
+    await page.evaluate(() => (location.hash = "#/epics"));
+    await expect(page.getByRole("region", { name: /^Finished/ }).getByText("follow-ups")).toHaveCount(0);
+    await section(page, "Ready to design");
+    await expect(followUps.getByText("demo · 1 idea")).toBeVisible();
+    const queued = () => fixture.cli("server", "queue", "items");
+    expect(await queued()).not.toContain("triage-ready");
+
+    // The Queue button sits left of the ring, and queues the ready epic.
+    await page.evaluate(() => (location.hash = "#/triage/demo"));
+    const queue = page.getByRole("button", nav("Queue epic"));
+    await expect(queue).toBeVisible();
+    const actions = page.getByTestId("page-header-actions");
+    const queueBox = (await queue.boundingBox())!;
+    const ringBox = (await actions.locator("[data-kind]").boundingBox())!;
+    expect(queueBox.x + queueBox.width).toBeLessThanOrEqual(ringBox.x);
+    await queue.click();
+    await expect.poll(queued).toContain("triage-ready");
+    await expect(page.getByRole("button", nav("Queue epic"))).toHaveCount(0);
+    const queuedChip = actions.getByText(/queued|running|ready/i).first();
+    const queuedText = await queuedChip.textContent();
+
+    // The queued state survives a reload, and a second tab shows it too.
+    await page.reload();
+    await expect(page.getByRole("button", nav("Queue epic"))).toHaveCount(0);
+    await expect(actions.getByText(queuedText!, { exact: true }).first()).toBeVisible();
+    const tab = await page.context().newPage();
+    await tab.goto(page.url());
+    await expect(tab.getByRole("region", nav("Triage result"))).toBeVisible();
+    await expect(tab.getByRole("button", nav("Queue epic"))).toHaveCount(0);
+    await expect(tab.getByTestId("page-header-actions").getByText(queuedText!, { exact: true }).first()).toBeVisible();
+    await tab.close();
+
+    // History and Abandon: a second Triage starts from the card, and Abandon changes no ticket.
+    await page.evaluate(() => (location.hash = "#/epics"));
+    const again = await section(page, "Ready to design");
+    await again.getByRole("button", nav("Triage")).click();
+    await expect(page).toHaveURL(/#\/triage\/demo$/);
+    await expect(step(page, "plan", "current")).toBeVisible();
+    const ticketsBefore = await fixture.cli("tickets", "list", "demo:follow-ups");
+    await actions.getByRole("button", nav("More actions")).click();
+    await page.getByRole("menuitem", nav("Abandon Triage")).click();
+    const abandoned = page.waitForResponse((r) => r.url().includes("/v1/triage/abandon"));
+    await page.getByRole("dialog", nav("Abandon Triage")).getByRole("button", nav("Abandon")).click();
+    expect((await (await abandoned).json()).refused).toBeUndefined();
+    const past = page.getByRole("region", nav("Past Triages"));
+    await expect(past.locator("[data-history-item]")).toHaveCount(2);
+    expect(await fixture.cli("tickets", "list", "demo:follow-ups")).toBe(ticketsBefore);
+    // Newest first: the abandoned Triage, then the done one.
+    await expect(past.locator("[data-history-item]").nth(0)).toContainText("abandoned");
+    await expect(past.locator("[data-history-item]").nth(1)).toContainText("done");
+
+    // The card shows a plain Triage button again.
+    await page.evaluate(() => (location.hash = "#/epics"));
+    await expect((await section(page, "Ready to design")).getByRole("button", nav("Triage"))).toBeVisible();
+
+    // The Agents page labels the Triage sessions.
+    await page.evaluate(() => (location.hash = "#/agents"));
+    await page.getByRole("link", { name: /^Chat triage/ }).first().click();
+    await expect(page.getByRole("link", nav("Open triage page →"))).toBeVisible();
+
+    // Phone: a third Triage at Approve has no Progress panel and no sideways scroll.
+    await page.evaluate(() => (location.hash = "#/epics"));
+    await (await section(page, "Ready to design")).getByRole("button", nav("Triage")).click();
+    await expect(step(page, "approve", "current")).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    const sideways = () => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    await expect(page.getByRole("region", nav("Progress"))).toHaveCount(0);
+    expect(await sideways()).toBe(false);
+    const view = page.getByRole("group", nav("View"));
+    await expect(view.getByRole("button", { name: /^Questions/ })).toBeVisible();
+    await view.getByRole("button", { name: /^Review/ }).click();
+    await expect(view.getByRole("button", { name: /^Review/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("group", nav("Approve")).getByRole("button", nav("Approve and write"))).toBeVisible();
+    expect(await sideways()).toBe(false);
+
+    // The sidebar drawer shows the badge and popover without scrolling sideways.
+    await page.getByRole("button", nav("Show sidebar")).click();
+    const drawerInbox = page.getByRole("button", { name: /^Follow-ups · \d+ open$/ });
+    await expect(drawerInbox).toBeVisible();
+    await drawerInbox.click();
+    await expect(page.getByRole("menuitem", { name: /demo/ })).toBeVisible();
+    expect(await sideways()).toBe(false);
   });
 });
