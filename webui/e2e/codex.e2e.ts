@@ -217,11 +217,12 @@ test("122. Codex design run", async ({ page, start }) => {
   const fixture = await start("codex-design", { autoAdvanceDelay: "1h" });
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
 
-  // The header meta line holds no agent; the menu's Agent block names the harness and the model, with the tier.
+  // The header meta line holds no agent; the footer line names the harness and the model, the menu's Agent block the tier.
   await expect(page.getByTestId("page-header-meta")).not.toContainText(/Codex|Light|Worker|Strongest/);
+  await expect(page.getByText(/^Codex \S+ · \S+$/)).toBeVisible();
   await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).click();
   const agentMenu = page.getByRole("menu", nav("More actions"));
-  await expect(agentMenu.getByText(/^Codex \S+ · \S+ effort$/)).toBeVisible();
+  await expect(agentMenu.getByText(/Codex/)).toHaveCount(0);
   await expect(agentMenu.getByText(/^(Light|Worker|Strongest)$/)).toBeVisible();
   await page.keyboard.press("Escape");
 

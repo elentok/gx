@@ -65,18 +65,17 @@ test.describe("72. Design actions menu", () => {
     expect(box.x + box.width).toBeGreaterThan(trigger.x);
 
     await expect(menu.getByText("Live sessions · 2")).toBeVisible();
-    // The header has no meta line, so the Agent block carries the model with its effort and the tier, at any width.
+    // The model lives in the composer footer, so the Agent block holds no Model row at any width.
     await expect(menu.getByText("Agent", { exact: true })).toBeVisible();
-    await expect(menu.getByText("Model", { exact: true })).toBeVisible();
     await expect(menu.getByText("Tier", { exact: true })).toBeVisible();
-    await expect(menu.getByText("Effort", { exact: true })).toHaveCount(0);
+    await expect(menu.getByText("Model", { exact: true })).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
     await page.setViewportSize({ width: 375, height: 800 });
     await moreActions(page).click();
-    await expect(menu.getByText("Model", { exact: true })).toBeVisible();
     await expect(menu.getByText("Tier", { exact: true })).toBeVisible();
-    await expect(menu.getByText("Effort", { exact: true })).toHaveCount(0);
+    await expect(menu.getByText("Effort", { exact: true })).toBeVisible();
+    await expect(menu.getByText("Model", { exact: true })).toHaveCount(0);
     // Escape goes to the menu once focus is inside it.
     await expect(async () => {
       await page.keyboard.press("Escape");

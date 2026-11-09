@@ -302,11 +302,13 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await expect(topBar).toBeVisible();
   await expect(more).toHaveCount(1);
 
-  // The ⋯ menu holds the model row and the link to the design epic.
+  // The ⋯ menu holds Effort, Tier and the link to the design epic; the model is in the footer, without effort.
   await more.click();
   const actions = page.getByRole("menu", nav("More actions"));
-  await expect(actions.getByText("Model", { exact: true })).toBeVisible();
-  await expect(actions.getByText("Model", { exact: true }).locator("..")).toHaveText("ModelClaude Sonnet · medium effort");
+  await expect(actions.getByText("Effort", { exact: true })).toBeVisible();
+  await expect(actions.getByText("Tier", { exact: true })).toBeVisible();
+  await expect(actions.getByText("Model", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Claude Sonnet", { exact: true })).toBeVisible();
   await actions.getByRole("menuitem", { name: /^Open design epic/ }).click();
   await expect(page).toHaveURL(/#\/e\/demo:design-epic$/);
   await page.goBack();
