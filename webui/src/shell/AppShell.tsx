@@ -238,117 +238,117 @@ export function AppShell({
           }}
         >
           <CloseSignalContext.Provider value={closeSignal}>
-          <Box
-            display="flex"
-            alignItems="center"
-            gap="2"
-            pt="10px"
-            pr="2"
-            pb="6px"
-            pl="3"
-          >
-            <Image
-              src="/gx-logo-wide.png"
-              alt="gx"
-              h="26px"
-              w="auto"
-              draggable={false}
-            />
-            {snapshot?.build && (
-              <Box
-                as="span"
-                color="text.faint"
-                fontSize="12px"
-                minW="0"
-                whiteSpace="nowrap"
-                overflow="hidden"
-                textOverflow="ellipsis"
-                title={snapshot.build}
-                data-testid="server-build"
+            <Box
+              display="flex"
+              alignItems="center"
+              gap="2"
+              pt="10px"
+              pr="2"
+              pb="6px"
+              pl="3"
+            >
+              <Image
+                src="/gx-logo-wide.png"
+                alt="gx"
+                h="26px"
+                w="auto"
+                draggable={false}
+              />
+              {snapshot?.build && (
+                <Box
+                  as="span"
+                  color="text.faint"
+                  fontSize="12px"
+                  minW="0"
+                  whiteSpace="nowrap"
+                  overflow="hidden"
+                  textOverflow="ellipsis"
+                  title={snapshot.build}
+                  data-testid="server-build"
+                >
+                  {snapshot.build}
+                </Box>
+              )}
+              <Box flex="1" />
+              <chakra.button
+                type="button"
+                aria-label="Search"
+                title={isMac() ? "Search (⌘K)" : "Search (Ctrl+K)"}
+                onClick={() => setJumpOpen(true)}
+                boxSize="34px"
+                borderRadius="8px"
+                display="grid"
+                placeItems="center"
+                color="text.dim"
+                cursor="pointer"
+                _hover={{ bg: "surface.raised" }}
               >
-                {snapshot.build}
-              </Box>
-            )}
-            <Box flex="1" />
-            <chakra.button
-              type="button"
-              aria-label="Search"
-              title={isMac() ? "Search (⌘K)" : "Search (Ctrl+K)"}
-              onClick={() => setJumpOpen(true)}
-              boxSize="34px"
-              borderRadius="8px"
-              display="grid"
-              placeItems="center"
-              color="text.dim"
-              cursor="pointer"
-              _hover={{ bg: "surface.raised" }}
+                <SearchIcon />
+              </chakra.button>
+              <chakra.button
+                type="button"
+                ref={hideButton}
+                aria-label="Hide sidebar"
+                title="Hide sidebar"
+                onClick={shell.close}
+                boxSize="34px"
+                borderRadius="8px"
+                display="grid"
+                placeItems="center"
+                color="text.dim"
+                cursor="pointer"
+                _hover={{ bg: "surface.raised" }}
+              >
+                <PanelIcon />
+              </chakra.button>
+            </Box>
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              active={active}
+              onPick={setActive}
+              onNew={() => setNewWorkspace(true)}
+              onManage={() => {
+                setManageWorkspaces(true);
+                onManageWorkspaces();
+              }}
+            />
+            <Box
+              as="ul"
+              listStyleType="none"
+              m="0"
+              p="0"
+              flex="1"
+              minH="0"
+              overflowY="auto"
+              data-testid="sidebar-body"
+              {...{ [LIST_ATTR]: "" }}
+              tabIndex={-1}
+              outline="none"
             >
-              <SearchIcon />
-            </chakra.button>
-            <chakra.button
-              type="button"
-              ref={hideButton}
-              aria-label="Hide sidebar"
-              title="Hide sidebar"
-              onClick={shell.close}
-              boxSize="34px"
-              borderRadius="8px"
-              display="grid"
-              placeItems="center"
-              color="text.dim"
-              cursor="pointer"
-              _hover={{ bg: "surface.raised" }}
-            >
-              <PanelIcon />
-            </chakra.button>
-          </Box>
-          <WorkspaceSwitcher
-            workspaces={workspaces}
-            active={active}
-            onPick={setActive}
-            onNew={() => setNewWorkspace(true)}
-            onManage={() => {
-              setManageWorkspaces(true);
-              onManageWorkspaces();
-            }}
-          />
-          <Box
-            as="ul"
-            listStyleType="none"
-            m="0"
-            p="0"
-            flex="1"
-            minH="0"
-            overflowY="auto"
-            data-testid="sidebar-body"
-            {...{ [LIST_ATTR]: "" }}
-            tabIndex={-1}
-            outline="none"
-          >
-            <SidebarRows fetcher={fetchEpicList} active={active} />
-          </Box>
-          <SidebarFooter
-            onNewWorkspace={() => setNewWorkspace(true)}
-            activeWorkspace={resolved ? workspaces.find((w) => w.name === active) : undefined}
-          />
-          <Portal>
-            {manageWorkspaces && (
-              <ManageWorkspaces
-                workspaces={workspaces}
-                onClose={() => setManageWorkspaces(false)}
-              />
-            )}
-            {newWorkspace && (
-              <NewWorkspaceDialog
-                create={createWorkspace}
-                onClose={() => setNewWorkspace(false)}
-                onCreated={(name) => {
-                  setCreated(name);
-                  setNewWorkspace(false);
-                }}
-              />
-            )}
-          </Portal>
+              <SidebarRows fetcher={fetchEpicList} active={active} />
+            </Box>
+            <SidebarFooter
+              onNewWorkspace={() => setNewWorkspace(true)}
+              activeWorkspace={resolved ? workspaces.find((w) => w.name === active) : undefined}
+            />
+            <Portal>
+              {manageWorkspaces && (
+                <ManageWorkspaces
+                  workspaces={workspaces}
+                  onClose={() => setManageWorkspaces(false)}
+                />
+              )}
+              {newWorkspace && (
+                <NewWorkspaceDialog
+                  create={createWorkspace}
+                  onClose={() => setNewWorkspace(false)}
+                  onCreated={(name) => {
+                    setCreated(name);
+                    setNewWorkspace(false);
+                  }}
+                />
+              )}
+            </Portal>
           </CloseSignalContext.Provider>
         </Box>
         <Box flex="1" minW="0">
