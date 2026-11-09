@@ -9,6 +9,8 @@ import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
 import { LimitsTray } from "../usage/LimitsTray";
 import { badgeLine, badgeText, badgeTotal, badgeWaiting, inWorkspace } from "../workspaces/followUpsBadge";
+import { useDevice } from "../useWide";
+import { FooterButton, interactiveStyle } from "./FooterButton";
 import { GearMenu } from "./GearMenu";
 import { openNewAgent, openNewDesign } from "./newItemOpen";
 import { useShell } from "./ShellContext";
@@ -25,35 +27,26 @@ const WarningIcon = () => icon(<path d="M10 3 18 17H2L10 3ZM10 8v4M10 14.5v.01" 
 const PausedIcon = () => icon(<path d="M7 5v10M13 5v10" />);
 const OfflineIcon = () => icon(<path d="M3 3l14 14M5 9a7 7 0 0 1 4-2M15 9a7 7 0 0 0-2-1.5M8 12.5a3 3 0 0 1 4 0M10 16v.01" />);
 
-const buttonStyle = {
-  position: "relative",
-  boxSize: "34px",
-  borderRadius: "8px",
-  display: "grid",
-  placeItems: "center",
-  color: "text.dim",
-  cursor: "pointer",
-  _hover: { bg: "surface.raised" },
-} as const;
-
 function FooterLink({ href, label, badge, children }: { href: string; label: string; badge?: number; children: ReactNode }) {
   return (
-    <chakra.a href={href} title={label} aria-label={badge ? `${label} · ${badge} ${badge === 1 ? "needs" : "need"} you` : label} {...buttonStyle}>
+    <FooterButton
+      as="a"
+      href={href}
+      title={label}
+      aria-label={badge ? `${label} · ${badge} ${badge === 1 ? "needs" : "need"} you` : label}
+      badge={badge ? { tone: "waiting", text: badge } : undefined}
+      {...interactiveStyle}
+    >
       {children}
-      {badge ? (
-        <Text as="span" aria-hidden position="absolute" top="0" right="0" px="1.5" lineHeight="1.4" borderRadius="full" bg="tone.waiting.fg" color="surface" fontSize="xs" fontWeight="600">
-          {badge}
-        </Text>
-      ) : null}
-    </chakra.a>
+    </FooterButton>
   );
 }
 
 function Indicator({ label, tone, children }: { label: string; tone: "waiting" | "paused" | "muted"; children: ReactNode }) {
   return (
-    <Box role="img" title={label} aria-label={label} color={`tone.${tone}.fg`} boxSize="34px" display="grid" placeItems="center">
+    <FooterButton as="div" role="img" title={label} aria-label={label} color={`tone.${tone}.fg`}>
       {children}
-    </Box>
+    </FooterButton>
   );
 }
 
@@ -111,30 +104,14 @@ function FollowUpsButton({ workspace }: { workspace?: string }) {
     <GxMenu
       placement="top-end"
       trigger={
-        <chakra.button type="button" title={label} aria-label={label} {...buttonStyle}>
+        <FooterButton
+          title={label}
+          aria-label={label}
+          badge={total ? { tone: badgeWaiting(counts) ? "waiting" : "running", text: badgeText(total) } : undefined}
+          {...interactiveStyle}
+        >
           <InboxIcon />
-          {total ? (
-            <Text
-              as="span"
-              aria-hidden
-              position="absolute"
-              top="-3px"
-              right="-3px"
-              minW="18px"
-              h="18px"
-              px="5px"
-              textAlign="center"
-              lineHeight="18px"
-              borderRadius="full"
-              bg={badgeWaiting(counts) ? "tone.waiting.fg" : "tone.running.fg"}
-              color="surface"
-              fontSize="11px"
-              fontWeight="700"
-            >
-              {badgeText(total)}
-            </Text>
-          ) : null}
-        </chakra.button>
+        </FooterButton>
       }
       items={items}
     />
@@ -147,8 +124,36 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
   const health = snapshot?.health;
   const unhealthy = !!health && [health.cpu, health.memory, health.disk].some((m) => m.state === "high" || m.state === "critical");
   const needsYou = snapshot?.needs_you_total ?? 0;
+  const desktop = useDevice() === "desktop";
+  const indicators = (
+    <>
+      {unhealthy && (
+        <Indicator label="System health is high or critical" tone="waiting">
+          <WarningIcon />
+        </Indicator>
+      )}
+      {snapshot?.mode === "paused" && (
+        <Indicator label="Server queue is paused" tone="paused">
+          <PausedIcon />
+        </Indicator>
+      )}
+      {!connected && (
+        <Indicator label="Disconnected from the server" tone="muted">
+          <OfflineIcon />
+        </Indicator>
+      )}
+    </>
+  );
+  const anyIndicator = unhealthy || snapshot?.mode === "paused" || !connected;
   return (
-    <Box as="footer" flex="none" display="flex" alignItems="center" gap="1" p="2" borderTopWidth="1px" borderColor="border">
+    <Box as="footer" flex="none" display="flex" flexDirection="column" gap="1" p="2" borderTopWidth="1px" borderColor="border">
+      {/* At the 280px sidebar the optional indicators cannot share the row without shrinking a box, so they take a line above it. */}
+      {desktop && anyIndicator && (
+        <Box display="flex" flexWrap="wrap" gap="1" data-part="indicators">
+          {indicators}
+        </Box>
+      )}
+      <Box display="flex" alignItems="center" gap="1">
       <GxMenu
         placement="top-start"
         trigger={
@@ -173,22 +178,9 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       </FooterLink>
       {health && <Tray health={health} connected={connected} />}
       <LimitsTray conn={conn} />
-      {unhealthy && (
-        <Indicator label="System health is high or critical" tone="waiting">
-          <WarningIcon />
-        </Indicator>
-      )}
-      {snapshot?.mode === "paused" && (
-        <Indicator label="Server queue is paused" tone="paused">
-          <PausedIcon />
-        </Indicator>
-      )}
-      {!connected && (
-        <Indicator label="Disconnected from the server" tone="muted">
-          <OfflineIcon />
-        </Indicator>
-      )}
+      {!desktop && indicators}
       <GearMenu activeWorkspace={activeWorkspace} />
+      </Box>
     </Box>
   );
 }

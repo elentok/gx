@@ -167,3 +167,41 @@ test("the health button and the gear carry a title tooltip", () => {
   expect(screen.getByRole("button", { name: /^System health:/ }).getAttribute("title")).toMatch(/^System health:/);
   expect(screen.getByRole("button", { name: "Menu" }).getAttribute("title")).toBe("Menu");
 });
+
+const ruleOf = (el: Element) => {
+  const css = [...document.querySelectorAll("style")].map((s) => s.textContent).join("\n");
+  // A menu trigger carries extra classes, so match each class's own rule.
+  return el.className
+    .split(" ")
+    .map((c) => css.match(new RegExp(`\\.${c}\\s*\\{[^}]*\\}`))?.[0] ?? "")
+    .join("");
+};
+
+test("the Epics and Follow-ups badges share size, font and corner; Epics is amber", async () => {
+  stubList([followUps({ triage: "running", left: 2 })]);
+  setupWithRouter({ needs_you_total: 2 });
+  const epics = (await screen.findByRole("link", { name: "Epics · 2 need you" })).querySelector("[data-part=badge]")!;
+  const follow = (await screen.findByRole("button", { name: "Follow-ups · 3 open" })).querySelector("[data-part=badge]")!;
+  const shared = (el: Element) => ruleOf(el).match(/(min-width|height|font-size|font-weight|top|right|border-radius):[^;]*/g)?.sort();
+  expect(shared(epics)).toEqual(shared(follow));
+  expect(ruleOf(epics)).toContain("var(--chakra-colors-tone-waiting-fg)");
+  expect(ruleOf(follow)).toContain("var(--chakra-colors-tone-running-fg)");
+  vi.unstubAllGlobals();
+});
+
+test("every footer box has the same fixed size and never shrinks", () => {
+  setup({ mode: "paused", needs_you_total: 1, health: { cpu: meter("normal"), memory: meter("critical"), disk: meter("normal") } }, false);
+  const boxes = [
+    screen.getByRole("link", { name: /^Epics/ }),
+    screen.getByRole("button", { name: /^Follow-ups/ }),
+    screen.getByRole("link", { name: "Stats and health" }),
+    screen.getByRole("button", { name: "Menu" }),
+    screen.getByTitle("System health is high or critical"),
+    screen.getByTitle("Server queue is paused"),
+    screen.getByTitle("Disconnected from the server"),
+  ];
+  const sizes = boxes.map((b) => ruleOf(b).match(/(width|height|min-width|min-height|flex):[^;]*/g)?.sort());
+  expect(sizes[0]).toContain("flex:none");
+  expect(sizes[0]).toContain("width:25px");
+  boxes.forEach((b, i) => expect([b.getAttribute("aria-label"), sizes[i]]).toEqual([b.getAttribute("aria-label"), sizes[0]]));
+});

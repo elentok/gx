@@ -130,3 +130,12 @@ test("Restart server opens the restart dialog", async () => {
   fireEvent.click(await screen.findByRole("menuitem", { name: "Restart server" }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
+
+test("the Menu trigger is a burger: three horizontal lines and no circle", () => {
+  setup();
+  const svg = screen.getByRole("button", { name: "Menu", hidden: true }).querySelector("svg")!;
+  expect(svg.querySelector("circle")).toBeNull();
+  const paths = [...svg.querySelectorAll("path")].map((p) => p.getAttribute("d"));
+  expect(paths).toHaveLength(3);
+  for (const d of paths) expect(d).toMatch(/^M[\d.]+ [\d.]+h[\d.]+$/);
+});

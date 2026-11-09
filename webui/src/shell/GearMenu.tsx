@@ -1,4 +1,4 @@
-import { Box, Button } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { useState } from "react";
 import { postAfk as defaultPostAfk, toggleAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -10,6 +10,7 @@ import { showToast } from "../ui/toaster";
 import { postViMode as defaultPostViMode } from "../vimode";
 import { WriteError } from "../useWrite";
 import { postWorkspace } from "../workspaces/postWorkspace";
+import { FooterButton, interactiveStyle } from "./FooterButton";
 import { useShell } from "./ShellContext";
 
 interface Props {
@@ -35,11 +36,12 @@ function guarded(write: Promise<unknown>) {
   );
 }
 
-function GearIcon() {
+function BurgerIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="10" cy="10" r="2.5" />
-      <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" />
+      <path d="M3.5 5h13" />
+      <path d="M3.5 10h13" />
+      <path d="M3.5 15h13" />
     </svg>
   );
 }
@@ -83,22 +85,9 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
       <GxMenu
         placement="top-end"
         trigger={
-          <Button
-            type="button"
-            aria-label="Menu"
-            title="Menu"
-            variant="ghost"
-            cursor="pointer"
-            color="text.dim"
-            boxSize="34px"
-            minW="0"
-            p="0"
-            borderRadius="8px"
-            _hover={{ bg: "surface.raised" }}
-            _open={{ bg: "surface.raised" }}
-          >
-            <GearIcon />
-          </Button>
+          <FooterButton aria-label="Menu" title="Menu" {...interactiveStyle}>
+            <BurgerIcon />
+          </FooterButton>
         }
         items={[
           toggle("AFK", "afk", afk, () => toggleAfk(afk, postAfk)),
