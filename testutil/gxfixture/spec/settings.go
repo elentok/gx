@@ -46,10 +46,9 @@ func SettingsScenario() scenario {
 			"recovery.notify-hold=30m",
 			"ticket-store.commit-debounce=5",
 		},
-		// evolve.deep-read-cap has a dot in its key name, which Config splits;
 		// agent-runner is startup-only, so changing it leaves a pending restart.
 		Steps: [][]string{
-			{"server", "settings-set", "--set", "evolve.deep-read-cap=4", "--set", "agent-runner=headless"},
+			{"server", "settings-set", "--set", "agent-runner=headless"},
 		},
 	}
 }

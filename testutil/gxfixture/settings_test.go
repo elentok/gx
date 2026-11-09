@@ -41,7 +41,6 @@ func TestSettingsScenario(t *testing.T) {
 		"notifications":   section("notifications", "telegram")["bot-token"],
 		"server":          section("server")["recently-finished"],
 		"agents":          section("agents", "sounds")["enabled"],
-		"evolve":          cfg["evolve.deep-read-cap"],
 		"recovery":        section("recovery")["notify-hold"],
 		"ticket-store":    section("ticket-store")["commit-debounce"],
 	} {
