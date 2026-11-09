@@ -6,6 +6,8 @@ import { useEpicList, type FetchEpicList } from "../epics/list";
 import { buildSidebar, type SidebarAgent, type SidebarRow, type SidebarStatus } from "../workspaces/sidebarModel";
 import type { Workspace } from "../generated/server";
 import { ItemMenu, type ItemRef } from "../workspaces/itemActions";
+import { SessionActions } from "../agents/SessionActions";
+import { canManage } from "../agents/sessionWrites";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { CHAT_ATTR, NAV_ATTR } from "./SidebarKeys";
@@ -104,8 +106,11 @@ function MenuSpacer() {
 /** A nested agent row on the parent row's columns: empty chevron cell, icon slot (wrench for a Fix agent), title, status, menu slot. */
 function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
   const current = agent.href === `#${useLocation().pathname}`;
+  const navigate = useNavigate();
+  // A Queue agent is gx-driven: no menu, just the spacer that keeps the status column aligned.
+  const managed = canManage(agent.session);
   return (
-    <Box position="relative" display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
+    <Box className="group" position="relative" display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
       <Box data-testid="nested-guide" aria-hidden position="absolute" left={GUIDE_X} top="0" bottom={last ? "50%" : "0"} w="1.5px" bg="border" />
       <Box w={`${CHEVRON_W}px`} flex="none" />
       <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2" minH="36px">
@@ -115,7 +120,15 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
         </Box>
         <Status status={agent.status} />
       </chakra.a>
-      <MenuSpacer />
+      {managed ? (
+        <Box flex="none">
+          <MenuSlot>
+            <SessionActions session={agent.session} onRemoved={() => current && navigate("/agents")} />
+          </MenuSlot>
+        </Box>
+      ) : (
+        <MenuSpacer />
+      )}
     </Box>
   );
 }
@@ -123,8 +136,9 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
 /**
  * The menu-button slot: the row's Alt+n number replaces the "..." button while Alt is held. Only this leaf watches Alt.
  * The menu stays mounted either way, so Alt never closes it or the dialogs it opened; only the trigger is hidden.
+ * The button shows on its own row's hover (the row frame carries the "group" class), so a nested row and its parent never share one.
  */
-function MenuSlot({ number, item, workspaces, onRemoved }: { number?: number; item: ItemRef; workspaces: Workspace[]; onRemoved: () => void }) {
+function MenuSlot({ number, children }: { number?: number; children: ReactNode }) {
   const showNumber = useAltHeld() && number !== undefined;
   return (
     <Box position="relative">
@@ -141,7 +155,7 @@ function MenuSlot({ number, item, workspaces, onRemoved }: { number?: number; it
         _focusWithin={{ opacity: 1 }}
         css={{ "@media (hover: none)": { opacity: 1 } }}
       >
-        <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} />
+        {children}
       </Box>
     </Box>
   );
@@ -167,8 +181,8 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
     if (current) navigate("/agents");
   };
   return (
-    <li className="group">
-      <Box display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
+    <li>
+      <Box className="group" display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
         <Box w="20px" flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
@@ -189,7 +203,9 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
           <Status status={row.status} dim={row.held} />
         </chakra.a>
         <Box flex="none">
-          <MenuSlot number={row.number} item={item} workspaces={workspaces} onRemoved={onRemoved} />
+          <MenuSlot number={row.number}>
+            <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} />
+          </MenuSlot>
         </Box>
       </Box>
       {nested && open && (

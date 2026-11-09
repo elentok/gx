@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { session } from "../agents/agentsTestKit";
+import { SessionActions } from "../agents/SessionActions";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import {
   CardKindDesign,
@@ -66,7 +67,7 @@ function setup(device: Device, path = "/") {
       workspaces: [{ name: "Default", default: true, members: 0 }, { name: "Work", members: 0 }],
       sessions: [
         session("s1", "p", { name: "builder" }),
-        session("s2", "p", { name: "scratch" }),
+        session("s2", "p", { name: "scratch", status: { state: "exited" } }),
         session("s3", "p", { name: "talk" }),
         session("s4", "p", { name: "designer" }),
         session("s5", "p", { name: "fixer", fix_of: "p:blog/03", status: { state: "working" } }),
@@ -224,18 +225,77 @@ test("a row's ... menu opens and Move posts the other workspace", async () => {
   });
 });
 
-test("a chat row's menu offers Stop and Remove; nested agent rows have no menu button", async () => {
+test("a chat row's menu offers Move, Stop and Remove", async () => {
   setup("desktop");
   const chat = await body().findByRole("link", { name: /^Chat talk/ });
   fireEvent.click(within(chat.closest("li")!).getByRole("button", { name: "More actions" }));
   await screen.findAllByRole("menuitem");
   expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Move to workspace›", "Stop", "Remove"]);
-  cleanup();
-  setup("desktop");
+});
+
+const menuLabels = () => screen.getAllByRole("menuitem").map((i) => i.textContent);
+const expandBlog = async () => {
   await body().findByRole("link", { name: /Blog/ });
   fireEvent.click(body().getByRole("button", { name: "Expand Blog" }));
-  const agent = body().getByRole("link", { name: /builder/ });
-  expect(within(agent.closest("li")!).queryByRole("button", { name: "More actions" })).toBeNull();
+};
+
+test("a nested agent's menu equals the agent page's, with Stop only while live; no Move or Promote", async () => {
+  setup("desktop");
+  await expandBlog();
+  fireEvent.click(within(body().getByRole("link", { name: /builder/ }).parentElement!).getByRole("button", { name: "More actions" }));
+  await screen.findAllByRole("menuitem");
+  const nested = menuLabels();
+  expect(nested).toContain("Stop");
+  expect(nested).toContain("Remove");
+  expect(nested.join()).not.toMatch(/Move|Promote|Hold/);
+  cleanup();
+  renderThemed(<SessionActions session={session("s1", "p", { name: "builder" })} onRemoved={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  await screen.findAllByRole("menuitem");
+  expect(menuLabels()).toEqual(nested);
+});
+
+test("an exited nested agent has no Stop; a Queue agent has no menu button", async () => {
+  setup("desktop");
+  await expandBlog();
+  expect(within(body().getByRole("link", { name: /queuer/ }).parentElement!).queryByRole("button", { name: "More actions" })).toBeNull();
+  fireEvent.click(body().getByRole("button", { name: "Other" }));
+  const scratch = within(body().getByRole("link", { name: /scratch/ }).parentElement!);
+  fireEvent.click(scratch.getByRole("button", { name: "More actions" }));
+  await screen.findAllByRole("menuitem");
+  expect(menuLabels()).toContain("Remove");
+  expect(menuLabels()).not.toContain("Stop");
+});
+
+test("removing the open nested agent from its row confirms, then goes to the agents list", async () => {
+  const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
+    const u = String(url);
+    if (u.includes("/v1/sessions/stop")) return new Response(JSON.stringify({ session: session("s1", "p", { status: { state: "exited" } }) }), { status: 200 });
+    if (u.includes("/v1/sessions/remove")) return new Response(JSON.stringify({}), { status: 200 });
+    return new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 });
+  });
+  setup("desktop", "/agents/s1");
+  vi.stubGlobal("fetch", fetchMock);
+  await expandBlog();
+  fireEvent.click(within(body().getByRole("link", { name: /builder/ }).parentElement!).getByRole("button", { name: "More actions" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/v1/sessions/remove"))).toBe(true));
+  await waitFor(() => expect(screen.getByTestId("page-path").textContent).toBe("/agents"));
+});
+
+test("each row is its own hover group; a nested row never shows a number", async () => {
+  setup("desktop");
+  await expandBlog();
+  const parentFrame = body().getByRole("link", { name: /Blog/ }).parentElement!;
+  const nestedFrame = body().getByRole("link", { name: /builder/ }).parentElement!;
+  expect(parentFrame.classList.contains("group")).toBe(true);
+  expect(nestedFrame.classList.contains("group")).toBe(true);
+  expect(parentFrame.contains(nestedFrame)).toBe(false);
+  expect(parentFrame.closest("li")!.classList.contains("group")).toBe(false);
+  fireEvent.keyDown(window, { key: "Alt", altKey: true });
+  await waitFor(() => expect(within(parentFrame).getByTestId("row-number")).toBeTruthy());
+  expect(within(nestedFrame).queryByTestId("row-number")).toBeNull();
 });
 
 test("removing the open chat from its row confirms, then leaves its page", async () => {
