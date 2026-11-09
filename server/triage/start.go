@@ -114,14 +114,18 @@ func (t *Triage) launch(project string) (wire.SessionResult, error) {
 	}, sessions.SessionCtx{Flow: tickets.FlowTriage, FlowKey: project})
 }
 
+// isLiveTriage reports whether in is a Triage session of project that has not exited.
+func isLiveTriage(in wire.SessionInfo, project string) bool {
+	return in.Flow == string(tickets.FlowTriage) && in.FlowKey == project && in.Status.State != wire.SessionExited
+}
+
 // liveSession is the project's Triage session that has not exited and has the
 // latest RunStartedAt, or nil.
 func liveSession(list []wire.SessionInfo, project string) *wire.SessionInfo {
 	var live *wire.SessionInfo
 	for i := range list {
 		in := &list[i]
-		if in.Flow == string(tickets.FlowTriage) && in.FlowKey == project && in.Status.State != wire.SessionExited &&
-			(live == nil || !in.RunStartedAt.Before(live.RunStartedAt)) {
+		if isLiveTriage(*in, project) && (live == nil || !in.RunStartedAt.Before(live.RunStartedAt)) {
 			live = in
 		}
 	}

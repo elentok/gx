@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -29,8 +28,7 @@ func (t *Triage) StopFinished(project string) {
 		return
 	}
 	for _, in := range infos {
-		if in.Flow != string(tickets.FlowTriage) || in.FlowKey != project ||
-			in.Status.State == wire.SessionExited || !in.Status.Promptable() {
+		if !isLiveTriage(in, project) || !in.Status.Promptable() {
 			continue
 		}
 		if res, err := t.manager.StopSession(wire.SessionRequest{ID: in.ID}); err != nil || res.Refused {

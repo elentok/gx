@@ -9,48 +9,59 @@ import (
 	triagerec "github.com/elentok/gx/triage"
 )
 
-func (t *Triage) approveHandler(w http.ResponseWriter, r *http.Request) {
-	var req wire.TriageApproveRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	res, err := t.approve(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	wire.WriteJSON(w, res)
-}
-
-func (t *Triage) sendBackHandler(w http.ResponseWriter, r *http.Request) {
-	var req wire.TriageSendBackRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	res, err := t.sendBack(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	wire.WriteJSON(w, res)
-}
-
-func rowActionHandler(action func(wire.TriageRowActionRequest) (wire.TriageEditResult, error)) http.HandlerFunc {
+// jsonHandler decodes the request body into Req (400 on failure), calls fn
+// (500 on error) and writes its result as JSON.
+func jsonHandler[Req, Res any](fn func(Req) (Res, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req wire.TriageRowActionRequest
+		var req Req
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		res, err := action(req)
+		res, err := fn(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		wire.WriteJSON(w, res)
 	}
+}
+
+// refusalError lets an edit's apply func refuse the edit with a result.
+type refusalError struct{ res wire.TriageEditResult }
+
+func (e *refusalError) Error() string { return e.res.Message }
+
+func refusal(reason, msg string) error { return &refusalError{refusedEdit(reason, msg)} }
+
+// edit loads the project's live record, runs apply on it and turns a record
+// rule error or a refusalError into a refusal result. A saved edit publishes
+// triage-changed and returns the new revision.
+func (t *Triage) edit(project string, apply func(*triagerec.Store, *triagerec.Record) (*triagerec.Record, error)) (wire.TriageEditResult, error) {
+	store, rec, noLive, err := t.liveRecord(project)
+	if err != nil || noLive != nil {
+		return orRefusal(noLive), err
+	}
+	saved, err := apply(store, rec)
+	if res, handled := editRefusal(err); handled {
+		return res, nil
+	} else if err != nil {
+		return wire.TriageEditResult{}, err
+	}
+	t.Changed(project)
+	return wire.TriageEditResult{Revision: saved.Revision}, nil
+}
+
+// editAndLaunch is edit followed, when the edit saved, by launchWrite.
+func (t *Triage) editAndLaunch(project string, skipIfLive bool, apply func(*triagerec.Store, *triagerec.Record) (*triagerec.Record, error)) (wire.TriageEditResult, error) {
+	res, err := t.edit(project, apply)
+	if err != nil || res.Refused {
+		return res, err
+	}
+	if err := t.launchWrite(project, skipIfLive); err != nil {
+		return wire.TriageEditResult{}, err
+	}
+	return res, nil
 }
 
 // liveRecord loads the project's live record, or a refusal result.
@@ -74,80 +85,36 @@ func (t *Triage) liveRecord(project string) (*triagerec.Store, *triagerec.Record
 // approve wins the record's compare-and-set and only then starts the Write
 // session, so of two approves (web or chat) exactly one writes.
 func (t *Triage) approve(req wire.TriageApproveRequest) (wire.TriageEditResult, error) {
-	store, rec, refusal, err := t.liveRecord(req.Project)
-	if err != nil || refusal != nil {
-		return orRefusal(refusal), err
-	}
-	saved, err := store.Approve(rec.ID, req.Revision)
-	if errors.Is(err, triagerec.ErrAlreadyApproved) {
-		return refusedEdit(wire.ReasonTriageAlreadyApproved, err.Error()), nil
-	}
-	if res, handled := editRefusal(err); handled {
-		return res, nil
-	} else if err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	t.Changed(req.Project)
-	if err := t.launchWrite(req.Project, false); err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	return wire.TriageEditResult{Revision: saved.Revision}, nil
+	return t.editAndLaunch(req.Project, false, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
+		saved, err := store.Approve(rec.ID, req.Revision)
+		if errors.Is(err, triagerec.ErrAlreadyApproved) {
+			return nil, refusal(wire.ReasonTriageAlreadyApproved, err.Error())
+		}
+		return saved, err
+	})
 }
 
 // sendBack returns the record to Plan with the person's answers kept, and starts
 // the session that asks again. Like approve, it wins the record's compare-and-set
 // first, so a double click makes one round.
 func (t *Triage) sendBack(req wire.TriageSendBackRequest) (wire.TriageEditResult, error) {
-	store, rec, refusal, err := t.liveRecord(req.Project)
-	if err != nil || refusal != nil {
-		return orRefusal(refusal), err
-	}
-	saved, err := store.SendBack(rec.ID, req.Revision)
-	if res, handled := editRefusal(err); handled {
-		return res, nil
-	} else if err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	t.Changed(req.Project)
-	if err := t.launchWrite(req.Project, false); err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	return wire.TriageEditResult{Revision: saved.Revision}, nil
+	return t.editAndLaunch(req.Project, false, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
+		return store.SendBack(rec.ID, req.Revision)
+	})
 }
 
 // retry sets a failed row pending and starts a Write session unless one is live.
 func (t *Triage) retry(req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
-	store, rec, refusal, err := t.liveRecord(req.Project)
-	if err != nil || refusal != nil {
-		return orRefusal(refusal), err
-	}
-	saved, err := store.Retry(rec.ID, req.Revision, req.Address)
-	if res, handled := editRefusal(err); handled {
-		return res, nil
-	} else if err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	t.Changed(req.Project)
-	if err := t.launchWrite(req.Project, true); err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	return wire.TriageEditResult{Revision: saved.Revision}, nil
+	return t.editAndLaunch(req.Project, true, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
+		return store.Retry(rec.ID, req.Revision, req.Address)
+	})
 }
 
 // keep marks a failed row kept while its follow-up is still in follow-ups.
 func (t *Triage) keep(req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
-	store, rec, refusal, err := t.liveRecord(req.Project)
-	if err != nil || refusal != nil {
-		return orRefusal(refusal), err
-	}
-	saved, err := store.KeepForLater(rec.ID, req.Revision, req.Address)
-	if res, handled := editRefusal(err); handled {
-		return res, nil
-	} else if err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	t.Changed(req.Project)
-	return wire.TriageEditResult{Revision: saved.Revision}, nil
+	return t.edit(req.Project, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
+		return store.KeepForLater(rec.ID, req.Revision, req.Address)
+	})
 }
 
 func orRefusal(r *wire.TriageEditResult) wire.TriageEditResult {

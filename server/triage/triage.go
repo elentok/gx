@@ -65,32 +65,32 @@ func Routes(get func() *Triage) []wire.Route {
 		{
 			Pattern: "POST /v1/triage/row",
 			Web:     wire.WebWrite,
-			Handler: func(w http.ResponseWriter, r *http.Request) { get().rowHandler(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().saveRow)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/abandon",
 			Web:     wire.WebWrite,
-			Handler: func(w http.ResponseWriter, r *http.Request) { get().abandonHandler(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().abandon)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/approve",
 			Web:     wire.WebWrite,
-			Handler: func(w http.ResponseWriter, r *http.Request) { get().approveHandler(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().approve)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/send-back",
 			Web:     wire.WebWrite,
-			Handler: func(w http.ResponseWriter, r *http.Request) { get().sendBackHandler(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().sendBack)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/retry",
 			Web:     wire.WebWrite,
-			Handler: func(w http.ResponseWriter, r *http.Request) { rowActionHandler(get().retry)(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().retry)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/keep",
 			Web:     wire.WebWrite,
-			Handler: func(w http.ResponseWriter, r *http.Request) { rowActionHandler(get().keep)(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().keep)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/changed",
