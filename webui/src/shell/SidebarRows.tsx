@@ -11,7 +11,7 @@ import { canManage } from "../agents/sessionWrites";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { CHAT_ATTR, NAV_ATTR } from "./SidebarKeys";
-import { useWide } from "../useWide";
+import { useMoreActionsSize } from "../ui/menu/MoreActionsButton";
 import { useAltHeld } from "./useShortcuts";
 
 /** The epic address of the open page, or "". */
@@ -86,9 +86,19 @@ function Chevron({ open, onToggle, label }: { open: boolean; onToggle: () => voi
   );
 }
 
-// A row's frame: 4px left padding, 3px edge, then the chevron cell. The nested guide line sits under the icon column.
+// A row's frame: 3px edge, 4px left padding, then the chevron cell. The nested guide line sits under the icon column.
+// `left` on an absolute child is measured from the padding edge, so the 3px border is not counted.
 const CHEVRON_W = 20;
-const GUIDE_X = `calc(4px + 3px + ${CHEVRON_W}px + var(--chakra-spacing-2) + 13px - 0.75px)`;
+const GUIDE_X = `calc(4px + ${CHEVRON_W}px + var(--chakra-spacing-2) + 13px - 0.75px)`;
+
+/** The frame both a top-level row and a nested agent row share: hover group, current background and edge. */
+function RowFrame({ current, children }: { current: boolean; children: ReactNode }) {
+  return (
+    <Box className="group" position="relative" display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
+      {children}
+    </Box>
+  );
+}
 
 function IconSlot({ children }: { children?: ReactNode }) {
   return (
@@ -100,7 +110,7 @@ function IconSlot({ children }: { children?: ReactNode }) {
 
 /** Reserves the menu button's width (the nested row has no menu yet), so status words line up with the parent's. */
 function MenuSpacer() {
-  return <Box data-testid="menu-spacer" flex="none" w={useWide() ? "36px" : "40px"} />;
+  return <Box data-testid="menu-spacer" flex="none" w={useMoreActionsSize()} />;
 }
 
 /** A nested agent row on the parent row's columns: empty chevron cell, icon slot (wrench for a Fix agent), title, status, menu slot. */
@@ -110,7 +120,7 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
   // A Queue agent is gx-driven: no menu, just the spacer that keeps the status column aligned.
   const managed = canManage(agent.session);
   return (
-    <Box className="group" position="relative" display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
+    <RowFrame current={current}>
       <Box data-testid="nested-guide" aria-hidden position="absolute" left={GUIDE_X} top="0" bottom={last ? "50%" : "0"} w="1.5px" bg="border" />
       <Box w={`${CHEVRON_W}px`} flex="none" />
       <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2" minH="36px">
@@ -129,7 +139,7 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
       ) : (
         <MenuSpacer />
       )}
-    </Box>
+    </RowFrame>
   );
 }
 
@@ -182,8 +192,8 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
   };
   return (
     <li>
-      <Box className="group" display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
-        <Box w="20px" flex="none">
+      <RowFrame current={current}>
+        <Box w={`${CHEVRON_W}px`} flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
         <chakra.a href={row.href} {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
@@ -207,7 +217,7 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
             <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} />
           </MenuSlot>
         </Box>
-      </Box>
+      </RowFrame>
       {nested && open && (
         <Box as="ul" listStyleType="none" m="0" p="0">
           {row.agents.map((a, i) => (

@@ -13,12 +13,18 @@ const dots = (
 const hovered = { bg: "surface.raised", color: "text" } as const;
 const opened = { ...hovered, boxShadow: "inset 0 0 0 1px var(--chakra-colors-border)" } as const;
 
+/** The button's diameter; anything that reserves its space (a sidebar row's menu spacer) reads it here. */
+export function useMoreActionsSize(): string {
+  return useWide() ? "36px" : "40px";
+}
+
 /**
  * The page header's round "More actions" trigger for a `GxMenu`. `pinned` holds it in a state, so the
  * gallery can show hover, focus and open side by side.
  */
 export function MoreActionsButton({ pinned, ...rest }: { pinned?: "hover" | "focus" | "open" } & ComponentProps<typeof chakra.button>) {
   const phone = !useWide();
+  const size = useMoreActionsSize();
   return (
     <chakra.button
       type="button"
@@ -27,8 +33,8 @@ export function MoreActionsButton({ pinned, ...rest }: { pinned?: "hover" | "foc
       display="grid"
       placeItems="center"
       boxSizing="border-box"
-      w={phone ? "40px" : "36px"}
-      h={phone ? "40px" : "36px"}
+      w={size}
+      h={size}
       borderRadius="full"
       color="text.dim"
       position="relative"

@@ -199,6 +199,14 @@ test("Workspaces", async ({ page, start }) => {
   await expect(queueAgent.locator("[data-testid=icon-slot] svg")).toHaveCount(0);
   await expect(working.locator("[data-testid=icon-slot] svg")).toHaveCount(1);
   const parentMenu = frameButton(row("paused-epic"));
+  // The guide line runs under the parent's icon column: same centre x, not 3px right of it.
+  const centre = async (l: Locator) => {
+    await expect(l).toBeVisible();
+    const box = (await l.boundingBox())!;
+    return box.x + box.width / 2;
+  };
+  const guide = itemOf("paused-epic").locator("[data-testid=nested-guide]").first();
+  expect(Math.abs((await centre(guide)) - (await centre(row("paused-epic").locator("[data-testid=icon-slot]"))))).toBeLessThanOrEqual(0.5);
   expect(await x(titleOf(working))).toBe(await x(titleOf(row("paused-epic"))));
   // The words differ in length, so their right edges are the shared column.
   expect(await right(wordsOf(working))).toBe(await right(wordsOf(row("paused-epic"))));
