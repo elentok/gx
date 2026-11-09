@@ -465,6 +465,18 @@
       },
       "type": "object"
     },
+    "skills": {
+      "additionalProperties": false,
+      "properties": {
+        "code-review": {
+          "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
+        },
+        "implement": {
+          "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
+        }
+      },
+      "type": "object"
+    },
     "stage-diff-context-lines": {
       "description": "TUI only, not shown on the web page"
     },
