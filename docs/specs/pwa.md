@@ -120,37 +120,50 @@ Prior art: the static-serving and login Go tests under the web server package; t
 
 ## Verification
 
-A verify ticket runs these against a temporary gx server after the epic is built. Checks use the `gx-ui-check` flow runner on the fixture, plus a real-device pass.
+A verify ticket runs these against a temporary gx server after the epic is built. Checks use the `gx-ui-check` flow runner on the fixture, plus a real-device pass. One entry per user story, numbered as the story is.
 
-1. Stories 1, 2, 9, 10, 11, 25, 29: the PWA steps on the existing `mixed` flow check the manifest link and fields (name, short_name, id, start_url, scope, display, colours). Server check: `curl -ks https://<web_url>/<manifest>` returns 200 and `Content-Type: application/manifest+json`. Real-device: iPhone Home Screen install opens standalone with the gx icon and name.
-2. Story 3: Mock states line `a-steps-ios`. New vitest component tests for iOS and iPadOS detection (including the iPad Mac user agent) showing the Share steps.
-3. Story 4: new vitest component test for the macOS Safari steps text (File, then Add to Dock). Real-device: macOS Safari Add to Dock.
-4. Story 5: Mock states line `a-menu-chromium`. Real-device: desktop Chrome and Edge with gx's root CA trusted; Android Chrome best-effort.
-5. Story 6: Mock states line `a-menu-installed`; the Install row vitest tests cover it with standalone faked.
-6. Story 7: new vitest component test (no prompt, no steps: no row).
-7. Story 8: Real-device: icon looks right on the iPhone Home Screen, the Mac Dock and a Chrome install (no clipped ears on the maskable icon). Server check: the icon files named by the manifest return 200 as PNG.
-8. Stories 12, 13, 14: the PWA steps on the existing `mixed` flow open the page, wait for the worker to register, stop the fixture server (`stopServer`), open the app in a new page of the same browser context (the cold open, so no per-tab copy exists; the server stop is the flow's last step), and check the shell, the Offline strip, the empty state, and that no agent or epic data shows. Reconnect (13) is checked by a new `AuthGate` vitest test (app mounts after a failed auth read; a later 401 shows the login screen) plus the existing connection vitest tests, and a real-device check: stop and start the server with the installed app open.
-9. Stories 15, 16, 17: vitest worker tests (timeout then cache, a slow request refreshing the copy, a changed build replacing the copy). Real-device: upgrade a running server to a new build and reopen the installed app.
-10. Story 18: vitest worker tests (no `respondWith` for `/v1/*` and non-GET; nothing stored). The PWA steps sign in with the worker active and check the event stream still updates the page. Go test: non-public `/v1/` routes answer 401 signed out.
-11. Story 19: existing `login` flow still passes with the worker allowed in its PWA step (a 401 signs the page out).
-12. Story 20: the PWA step in the existing `login` flow: the sign-in screen shows with a worker registered, after a reload.
-13. Stories 21, 22, 23, 24: Mock states lines `a-menu-chromium`, `a-menu-installed` and `a-refreshing`; the PWA steps click Force refresh with no confirmation and check the toast, that the old registration and a cache entry planted before the click are gone, that exactly one reload happened (the page then registers a fresh worker as at start-up), and that the row shows in a plain tab and with standalone faked (vitest for the visibility part). While the connection is down, Force refresh shows the "Can't reach gx" toast and leaves the worker and caches alone (vitest).
-14. Story 26: Real-device: the iPhone and macOS Safari install work on both a hostname origin and an IP origin (ticket 07 results are the baseline).
-15. Story 27: Real-device: Chrome on a Mac without gx's root trusted still shows the normal web page.
-16. Story 28: existing `workspaces` flow (edge swipe, standalone) and `phone` flows still pass.
-17. Story 30: `go test` for the web server package and `pnpm vitest run` for the worker tests pass.
-18. Story 31: the human-in-the-loop verify ticket lists the real-device checks: iPhone Home Screen install, macOS Safari Add to Dock, desktop Chrome and Edge with gx's root CA trusted, Android Chrome best-effort. It also confirms `skipWaiting` and `clients.claim` behaviour on iOS.
-19. Story 32: new vitest component test (security-error registration failure shows the hint with the root-trust link; no failure shows no hint). Real-device: Chrome on a Mac without gx's root trusted shows the hint.
-20. Story 33: new vitest component test (after a dismissed prompt the row is hidden until a new install-available event).
+1. Story 1: the PWA steps on the existing `mixed` flow check the manifest link and fields (name, short_name, id, start_url, scope, display, colours). Server check: `curl -ks https://<web_url>/<manifest>` returns 200 and `Content-Type: application/manifest+json`. Real-device: iPhone Home Screen install shows the gx icon and name.
+2. Story 2: Real-device: the iPhone Home Screen app opens standalone, with no Safari address bar or toolbar. The manifest's `display` is checked by the PWA steps in story 1.
+3. Story 3: Mock states line `a-steps-ios`. New vitest component tests for iOS and iPadOS detection (including the iPad Mac user agent) showing the Share steps.
+4. Story 4: new vitest component test for the macOS Safari steps text (File, then Add to Dock). Real-device: macOS Safari Add to Dock.
+5. Story 5: Mock states line `a-menu-chromium`. Real-device: desktop Chrome and Edge with gx's root CA trusted; Android Chrome best-effort.
+6. Story 6: Mock states line `a-menu-installed`; the Install row vitest tests cover it with standalone faked.
+7. Story 7: new vitest component test (no prompt, no steps: no row).
+8. Story 8: Real-device: icon looks right on the iPhone Home Screen, the Mac Dock and a Chrome install (no clipped ears on the maskable icon). Server check: the icon files named by the manifest return 200 as PNG.
+9. Story 9: the PWA steps on the existing `mixed` flow check the manifest `name` and `short_name` are "gx". Real-device: the launcher and window title read "gx".
+10. Story 10: the manifest `id` is `/` (PWA steps on the `mixed` flow). Real-device: two gx servers on different ports install as two apps.
+11. Story 11: the PWA steps check `theme_color` and `background_color` are `#0a0d11`. Real-device: no white flash on open.
+12. Story 12: the PWA steps on the existing `mixed` flow open the page, wait for the worker to register, stop the fixture server (`stopServer`), open the app in a new page of the same browser context (the cold open, so no per-tab copy exists; the server stop is the flow's last step), and check the shell, the Offline strip and the empty state "Can't reach gx. Retrying…".
+13. Story 13: new `AuthGate` vitest test (app mounts after a failed auth read; a later 401 shows the login screen) plus the existing connection vitest tests. Real-device: stop and start the server with the installed app open.
+14. Story 14: the PWA steps in story 12 check that no agent or epic data shows on the cold open.
+15. Story 15: vitest worker tests (a changed build replacing the cached copy). Real-device: upgrade a running server to a new build and reopen the installed app.
+16. Story 16: vitest worker tests (a slow request answered from the cached copy after 1.5 s).
+17. Story 17: vitest worker tests (a slow request landing with a 200 refreshing the cached copy).
+18. Story 18: vitest worker tests (no `respondWith` for `/v1/*` and non-GET; nothing stored). The PWA steps sign in with the worker active and check the event stream still updates the page. Go test: non-public `/v1/` routes answer 401 signed out.
+19. Story 19: existing `login` flow still passes with the worker allowed in its PWA step (a 401 signs the page out).
+20. Story 20: the PWA step in the existing `login` flow: the sign-in screen shows with a worker registered, after a reload.
+21. Story 21: Mock states lines `a-menu-chromium`, `a-menu-installed` and `a-refreshing`; the PWA steps click Force refresh and check the old registration and a cache entry planted before the click are gone, and that exactly one reload happened (the page then registers a fresh worker as at start-up). While the connection is down, Force refresh shows the "Can't reach gx" toast and leaves the worker and caches alone (vitest).
+22. Story 22: the PWA steps click Force refresh with no confirmation and check the toast "Clearing the cache and reloading…".
+23. Story 23: the Force refresh row shows in a plain browser tab (PWA steps on the `mixed` flow).
+24. Story 24: the Force refresh row shows with standalone faked (vitest).
+25. Story 25: the PWA steps check the manifest `start_url` and `scope` are `/`.
+26. Story 26: Real-device: the iPhone and macOS Safari install work on both a hostname origin and an IP origin (ticket 07 results are the baseline).
+27. Story 27: Real-device: Chrome on a Mac without gx's root trusted still shows the normal web page.
+28. Story 28: existing `workspaces` flow (edge swipe, standalone) and `phone` flows still pass.
+29. Story 29: server check: `curl -ks https://<web_url>/<manifest>`, `/sw.js` and an icon each return 200 from the running binary with no login cookie.
+30. Story 30: `go test` for the web server package and `pnpm vitest run` for the worker tests pass.
+31. Story 31: the real-device verify ticket lists the real-device checks: iPhone Home Screen install, macOS Safari Add to Dock, desktop Chrome and Edge with gx's root CA trusted, Android Chrome best-effort. It also confirms `skipWaiting` and `clients.claim` behaviour on iOS.
+32. Story 32: new vitest component test (security-error registration failure shows the hint with the root-trust link; no failure shows no hint). Real-device: Chrome on a Mac without gx's root trusted shows the hint.
+33. Story 33: new vitest component test (after a dismissed prompt the row is hidden until a new install-available event).
 
 New flows or scenarios to write: no new Playwright flow. The PWA steps join an existing `mixed` flow and the existing `login` flow; the fixture needs no new scenario. The steps fake the install-available event and standalone mode in the page only where Playwright is the seam; the Install row states are otherwise vitest. A spike ticket first proves worker registration in the fixture. The Mock states below use existing scenarios, so none is new. The root-trust hint and the offline empty state have no stored mock state: both are built from the existing gear-menu row and page empty-state styles, and the verify ticket checks them in the fixture. The vitest and Go tests above are new implementation tickets, and the Playwright `serviceWorkers: "block"` default and the gx-ui-check runner change are one more.
 
 **Mock states** (mock file `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html`, variant A):
 
-- `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html`, state `a-menu-chromium`, width 390, fixture scenario `mixed` (the install event faked in the page), parts `header`, `footer`, `gear-button`, `gear-menu`, `install-row`, `force-refresh-row`.
-- `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html`, state `a-steps-ios`, width 390, fixture scenario `mixed` (Safari on iPhone faked by user agent in the page), parts `install-steps`.
-- `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html`, state `a-menu-installed`, width 390, fixture scenario `mixed` (standalone faked), parts `header`, `footer`, `gear-button`, `gear-menu`, `force-refresh-row`.
-- `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html`, state `a-refreshing`, width 390, fixture scenario `mixed`, parts `header`, `footer`, `gear-button`, `refresh-toast`.
+- `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html` · `a-menu-chromium` · width 390 · scenario `mixed` (the install event faked in the page) · parts `header`, `footer`, `gear-button`, `gear-menu`, `install-row`, `force-refresh-row`.
+- `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html` · `a-steps-ios` · width 390 · scenario `mixed` (Safari on iPhone faked by user agent in the page) · parts `install-steps`.
+- `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html` · `a-menu-installed` · width 390 · scenario `mixed` (standalone faked) · parts `header`, `footer`, `gear-button`, `gear-menu`, `force-refresh-row`.
+- `$(gx tickets root)/pwa/mocks/06-install-and-refresh-menu.html` · `a-refreshing` · width 390 · scenario `mixed` · parts `header`, `footer`, `gear-button`, `refresh-toast`.
 
 ## Out of Scope
 
