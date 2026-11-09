@@ -1,0 +1,90 @@
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { session } from "../agents/agentsTestKit";
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
+import { renderThemed } from "../ui/render";
+import { NewItemHost } from "./NewItemHost";
+import { closeNewItem, openNewAgent, openNewDesign, setPageProject } from "./newItemOpen";
+
+afterEach(() => {
+  closeNewItem();
+  setPageProject(undefined);
+  cleanup();
+  localStorage.clear();
+  vi.unstubAllGlobals();
+});
+
+const projects = ["alpha", "beta", "gamma"];
+const epics = [
+  { address: "beta:feat", addresses: ["beta:old-feat"], project: "beta" },
+  { address: "gamma:other", project: "gamma" },
+];
+
+function mount(path: string) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => {
+      const u = String(url);
+      const body = u.includes("worktrees")
+        ? projects.map((project) => ({ project, root: `/${project}`, worktrees: [], tiers: {} }))
+        : u.includes("drafts")
+          ? []
+          : { epics, follow_ups: [], projects };
+      return new Response(JSON.stringify(body), { status: 200 });
+    }),
+  );
+  const state = { snapshot: { sessions: [session("s1", "gamma")] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  const router = createMemoryRouter([{ path: "*", element: <NewItemHost /> }], { initialEntries: [path] });
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  );
+}
+
+const selected = async () => ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value;
+const projectIs = async (want: string) => waitFor(async () => expect(await selected()).toBe(want));
+
+describe("the project a new blank draft starts on", () => {
+  test.each([
+    ["/e/beta:feat", "beta"],
+    ["/e/beta:old-feat", "beta"],
+    ["/d/gamma:other", "gamma"],
+    ["/agents/s1", "gamma"],
+  ])("from %s both forms start on %s", async (path, want) => {
+    mount(path);
+    act(() => openNewDesign());
+    await projectIs(want);
+    act(closeNewItem);
+    act(openNewAgent);
+    await projectIs(want);
+  });
+
+  test.each(["/stats", "/settings"])("on %s the forms keep today's rule", async (path) => {
+    mount(path);
+    act(() => openNewDesign());
+    await projectIs("alpha");
+    act(closeNewItem);
+    act(openNewAgent);
+    await projectIs("alpha");
+  });
+
+  test("the Epics page's filtered project wins over the route", async () => {
+    mount("/e/beta:feat");
+    setPageProject("gamma");
+    act(() => openNewDesign());
+    await projectIs("gamma");
+    act(closeNewItem);
+    act(openNewAgent);
+    await projectIs("gamma");
+  });
+
+  test("a restored chat draft with text keeps its own project", async () => {
+    localStorage.setItem("gx.newSession.draft", JSON.stringify({ project: "alpha", prompt: "hello" }));
+    mount("/e/beta:feat");
+    act(openNewAgent);
+    await projectIs("alpha");
+  });
+});
