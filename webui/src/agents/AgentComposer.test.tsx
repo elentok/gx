@@ -66,9 +66,11 @@ test("the footer shows the model, plus the badge once there is a count", () => {
   expect(screen.queryByRole("button", { name: "Context" })).toBeNull();
   unmount();
   renderThemed(
-    <WideContext.Provider value={true}>
-      <AgentComposer session={{ ...session(), context_tokens: 70_000, context_level: "green" }} connected ceiling={200_000} />
-    </WideContext.Provider>,
+    <MemoryRouter>
+      <WideContext.Provider value={true}>
+        <AgentComposer session={{ ...session(), context_tokens: 70_000, context_level: "green" }} connected ceiling={200_000} />
+      </WideContext.Provider>
+    </MemoryRouter>,
   );
   expect(screen.getByRole("button", { name: "Context" }).textContent).toBe("70K");
 });
