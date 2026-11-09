@@ -30,6 +30,8 @@ type PtyOverride struct {
 	PromptGrace  time.Duration
 	StopGrace    time.Duration
 	LaunchCaps   claudeui.LaunchProofCaps
+	// ProcHeadroom is the live watchdog.ulimit-headroom; see Pty.ProcHeadroom.
+	ProcHeadroom func() int
 }
 
 // New returns the runner for choice c, plus runnerFor, which builds any runner
@@ -71,6 +73,7 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 				p.PromptGrace = pty.PromptGrace
 				p.StopGrace = pty.StopGrace
 				p.LaunchCaps = pty.LaunchCaps
+				p.ProcHeadroom = pty.ProcHeadroom
 			}
 			r = p
 		default:

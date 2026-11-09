@@ -187,6 +187,8 @@ type ptyLauncher struct {
 	startTimeout time.Duration
 	// capsOverride is Pty.LaunchCaps: set fields replace the default caps.
 	capsOverride claudeui.LaunchProofCaps
+	// procCap is the cap for a launch now; zero means uncapped.
+	procCap func() int
 }
 
 // launcher snapshots the settings the launch group reads.
@@ -200,7 +202,19 @@ func (p *Pty) launcher() ptyLauncher {
 		poll:         p.pollInterval(),
 		startTimeout: p.startTimeout(),
 		capsOverride: p.LaunchCaps,
+		procCap:      p.procCap,
 	}
+}
+
+func (p *Pty) procCap() int {
+	if p.ProcHeadroom == nil {
+		return 0
+	}
+	count := p.ProcCount
+	if count == nil {
+		count = DefaultProcCount
+	}
+	return ProcCap(count, p.ProcHeadroom(), p.log)
 }
 
 // launchCaps is the launch proof's caps with LaunchCaps' set fields applied.
@@ -406,10 +420,16 @@ func (l ptyLauncher) spawn(opts agentrunner.StartOptions, dir, sessionID string)
 	if err != nil {
 		return nil, err
 	}
+	var limit int
+	if l.procCap != nil {
+		limit = l.procCap()
+	}
 	args := slices.Concat(holderArgv[1:],
 		// The holder takes the session id too, so its cmdline passes the
 		// liveness check like the agent's.
-		[]string{"--session-id", sessionID, "--harness", string(kind), "--dir", dir, "--", launch.Name},
+		[]string{"--session-id", sessionID, "--harness", string(kind), "--dir", dir},
+		ProcCapArgs(limit),
+		[]string{"--", launch.Name},
 		launch.Args)
 	cmd := exec.Command(holderArgv[0], args...)
 	cmd.Dir = opts.Cwd

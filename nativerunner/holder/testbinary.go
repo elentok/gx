@@ -75,7 +75,11 @@ func serveTestHolder() {
 	if i := slices.Index(args, "--harness"); i >= 0 {
 		kind = agentrunner.Kind(args[i+1])
 	}
-	if err := RunHarnessHolder(dir, kind, HolderOptions{}, args[slices.Index(args, "--")+1:]); err != nil {
+	var opts HolderOptions
+	if i := slices.Index(args, "--proc-cap"); i >= 0 {
+		opts.ProcCap, _ = strconv.Atoi(args[i+1])
+	}
+	if err := RunHarnessHolder(dir, kind, opts, args[slices.Index(args, "--")+1:]); err != nil {
 		// Like the real command, whose error cobra prints.
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)

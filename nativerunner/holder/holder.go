@@ -79,6 +79,8 @@ type HolderOptions struct {
 	Cols, Rows int
 	// Trust answers the harness's trust dialog while the child starts.
 	Trust bool
+	// ProcCap is the process limit the child's tree runs under; zero is none.
+	ProcCap int
 	// Env (KEY=VALUE) is appended to the child's env.
 	Env []string
 }
@@ -123,6 +125,12 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	defer logFile.Close()
 	// The probe reads the holder's own env, which is the child's.
 	harness.NoteLaunchedArgs(opts.SessionID, argv[1:], nil)
+
+	// Set before the child starts so the agent and its tests inherit it. A
+	// failure launches uncapped: the cap is a safety net, not a gate.
+	if err := ApplyProcCap(opts.ProcCap); err != nil {
+		slog.New(slog.NewJSONHandler(logFile, nil)).Warn("launching uncapped: cannot set process limit", "cap", opts.ProcCap, "err", err)
+	}
 
 	cols, rows := opts.size()
 	ptmx, tty, err := pty.Open()

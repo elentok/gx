@@ -328,6 +328,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 			"--cols", strconv.Itoa(cols), "--rows", strconv.Itoa(rows),
 			"--dir", dir,
 		},
+		mg.procCapArgs(),
 		trustFlag(meta.MadeWorktree),
 		[]string{"--", launch.Name},
 		launch.Args)
@@ -340,6 +341,16 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 	// Reap the holder; it outlives the server otherwise.
 	go func() { _ = cmd.Wait() }()
 	return nil
+}
+
+// procCapArgs is the holder's cap flag for a launch now, from the live
+// headroom setting.
+func (mg *Manager) procCapArgs() []string {
+	count := mg.cfg.ProcCount
+	if count == nil {
+		count = nativerunner.DefaultProcCount
+	}
+	return nativerunner.ProcCapArgs(nativerunner.ProcCap(count, mg.settings.Load().Watchdog.UlimitHeadroom, mg.log))
 }
 
 // launchArgs is the extra harness args of a launch or resume. Only Claude and

@@ -20,11 +20,14 @@ import (
 
 // SessionsConfig is the slice of the server Config the Manager reads.
 type SessionsConfig struct {
-	SessionsDir             string
-	ConversationsDir        string
-	TicketStore             string
-	Env                     []string
-	Holder                  []string
+	SessionsDir      string
+	ConversationsDir string
+	TicketStore      string
+	Env              []string
+	Holder           []string
+	// ProcCount counts processes for the holder's cap; nil means
+	// nativerunner.DefaultProcCount.
+	ProcCount               func() (int, error)
 	Notifier                osnotify.Notifier
 	Player                  sound.Player
 	SessionBannerDelay      time.Duration

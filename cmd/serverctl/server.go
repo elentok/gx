@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -162,16 +163,21 @@ func runServer(ctx context.Context, d Deps) error {
 	if err != nil {
 		return err
 	}
-	var ptyOverride *runnerbuild.PtyOverride
+	// The runners are built before the server, so the live headroom is read
+	// through srvRef once the server exists; before that the config's value.
+	var srvRef atomic.Pointer[server.Server]
+	ptyOverride := &runnerbuild.PtyOverride{ProcHeadroom: func() int {
+		if s := srvRef.Load(); s != nil {
+			return s.Settings().Load().Watchdog.UlimitHeadroom
+		}
+		return cfg.Watchdog.UlimitHeadroom
+	}}
 	// Test hook: gxfixture widens how long a launch prompt may sit on an unknown
 	// command, so a skill registry that fills late can still deliver it.
 	if v := os.Getenv("GX_LAUNCH_UNKNOWN_GRACE"); v != "" {
 		grace, err := time.ParseDuration(v)
 		if err != nil {
 			return fmt.Errorf("GX_LAUNCH_UNKNOWN_GRACE: %w", err)
-		}
-		if ptyOverride == nil {
-			ptyOverride = &runnerbuild.PtyOverride{}
 		}
 		ptyOverride.LaunchCaps = claudeui.LaunchProofCaps{UnknownGrace: grace, Grace: 3 * grace}
 	}
@@ -319,6 +325,7 @@ func runServer(ctx context.Context, d Deps) error {
 	if err != nil {
 		return err
 	}
+	srvRef.Store(srv)
 	if ctx == nil {
 		ctx = context.Background()
 	}

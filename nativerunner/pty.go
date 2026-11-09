@@ -62,6 +62,11 @@ type Pty struct {
 	// LaunchCaps bound a launch prompt's transcript proof; a zero field means
 	// the default.
 	LaunchCaps claudeui.LaunchProofCaps
+	// ProcHeadroom is read at each launch: the holder's process tree may
+	// grow this far above the process count at that moment. Nil means no cap.
+	ProcHeadroom func() int
+	// ProcCount counts processes for the cap; nil means DefaultProcCount.
+	ProcCount func() (int, error)
 
 	// log receives the vim probe's decisions (see SetLog); nil logs nothing.
 	log *slog.Logger

@@ -140,6 +140,7 @@ func runTestHolder(args []string) error {
 	fs.IntVar(&opts.Rows, "rows", 0, "")
 	fs.StringVar(&dir, "dir", "", "")
 	fs.BoolVar(&opts.Trust, "trust", false, "")
+	fs.IntVar(&opts.ProcCap, "proc-cap", 0, "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
