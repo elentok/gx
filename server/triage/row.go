@@ -40,17 +40,9 @@ func (t *Triage) abandonHandler(w http.ResponseWriter, r *http.Request) {
 
 // saveRow stores a row's person fields on the record revision the caller read.
 func (t *Triage) saveRow(req wire.TriageRowRequest) (wire.TriageEditResult, error) {
-	dir, err := t.projects.Dir(req.Project)
-	if err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	store := triagerec.NewStore(dir)
-	rec, err := store.LoadLive()
-	if err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	if rec == nil {
-		return refusedEdit(wire.ReasonTriageNoLive, req.Project+" has no live Triage"), nil
+	store, rec, refusal, err := t.liveRecord(req.Project)
+	if err != nil || refusal != nil {
+		return orRefusal(refusal), err
 	}
 	saved, err := store.SetPerson(rec.ID, req.Revision, req.Address, triagerec.PersonFields{
 		Action: req.Action, Destination: req.Destination, Answers: req.Answers, KeepForLater: req.KeepForLater,
@@ -67,17 +59,9 @@ func (t *Triage) saveRow(req wire.TriageRowRequest) (wire.TriageEditResult, erro
 // abandon ends the Triage's live sessions and marks the record abandoned,
 // under the same offer rule the view uses. It writes nothing to tickets.
 func (t *Triage) abandon(req wire.TriageAbandonRequest) (wire.TriageEditResult, error) {
-	dir, err := t.projects.Dir(req.Project)
-	if err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	store := triagerec.NewStore(dir)
-	rec, err := store.LoadLive()
-	if err != nil {
-		return wire.TriageEditResult{}, err
-	}
-	if rec == nil {
-		return refusedEdit(wire.ReasonTriageNoLive, req.Project+" has no live Triage"), nil
+	store, rec, refusal, err := t.liveRecord(req.Project)
+	if err != nil || refusal != nil {
+		return orRefusal(refusal), err
 	}
 	if rec.Revision != req.Revision {
 		return refusedEdit(wire.ReasonStale, triagerec.ErrStaleRevision.Error()), nil

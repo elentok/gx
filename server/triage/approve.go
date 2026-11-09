@@ -23,20 +23,14 @@ func (t *Triage) approveHandler(w http.ResponseWriter, r *http.Request) {
 	wire.WriteJSON(w, res)
 }
 
-func (t *Triage) rowActionHandler(keep bool) http.HandlerFunc {
+func rowActionHandler(action func(wire.TriageRowActionRequest) (wire.TriageEditResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req wire.TriageRowActionRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		var res wire.TriageEditResult
-		var err error
-		if keep {
-			res, err = t.keep(req)
-		} else {
-			res, err = t.retry(req)
-		}
+		res, err := action(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

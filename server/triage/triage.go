@@ -80,12 +80,12 @@ func Routes(get func() *Triage) []wire.Route {
 		{
 			Pattern: "POST /v1/triage/retry",
 			Web:     wire.WebWrite,
-			Handler: func(w http.ResponseWriter, r *http.Request) { get().rowActionHandler(false)(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { rowActionHandler(get().retry)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/keep",
 			Web:     wire.WebWrite,
-			Handler: func(w http.ResponseWriter, r *http.Request) { get().rowActionHandler(true)(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { rowActionHandler(get().keep)(w, r) },
 		},
 		{
 			Pattern: "POST /v1/triage/changed",
