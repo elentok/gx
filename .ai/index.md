@@ -62,6 +62,11 @@ A new config key must reach the settings page or be excluded with a reason:
 - Ticket agents run changed-file `gx check` and never `gx check --full`. The epic's verify ticket,
   the proof and the person run `gx check --full`; the verify ticket runs it and the soak in the
   background and polls.
+- `gx check --full` outlasts the 600 s shell cap, so start it with `run_in_background` from the first
+  call, never foreground, piped or in a `( ... ) > file` wrapper. Load Monitor's schema with
+  ToolSearch, wait with Monitor (no `sleep`/`until`/`pgrep` loops), read the output file once it
+  ends, and stop the shell with TaskStop before reporting finished. Run it once: reuse the Results
+  of sibling tickets rather than re-running it.
 - Never run `go clean -cache` directly, use `gx brief go-clean-cache`.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
 - Run every `go test` with `-exec "$PWD/scripts/proc-cap"` (the Makefile does). It caps your user's

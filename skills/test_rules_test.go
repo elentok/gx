@@ -67,6 +67,7 @@ func TestGxImplementTestRules(t *testing.T) {
 		"`gx-playwright-e2es`",
 	)
 	checkAnchors(t, "../.ai/index.md", "`gx check --full`", "skills/gx-test-guidelines.md", "GOMAXPROCS", "claudeenv", "envguard")
+	checkAnchors(t, "../.ai/index.md", "start it with `run_in_background` from the first call", "TaskStop")
 }
 
 func TestUnrelatedFlakyFlowRule(t *testing.T) {
