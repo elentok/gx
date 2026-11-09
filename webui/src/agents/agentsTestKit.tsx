@@ -5,6 +5,7 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { SessionInfo } from "../generated/server";
 import type { SessionChatResponse } from "../generated/server";
 import { appRoutes, type RouteFetchers } from "../routes";
+import { closeNewItem } from "../shell/newItemOpen";
 import { renderThemed } from "../ui/render";
 import { WideContext } from "../useWide";
 
@@ -27,10 +28,14 @@ export const focusPosts: { session: string }[] = [];
 
 // Call once at the top of each AgentsPage test file: it registers the shared cleanup and fetch stub.
 export function useAgentsPageHooks() {
-  afterEach(cleanup);
+  afterEach(() => {
+    closeNewItem();
+    cleanup();
+  });
   beforeEach(() => {
     localStorage.clear();
     focusPosts.length = 0;
+    createBodies.length = 0;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: string, init: { body: string }) => {
@@ -109,5 +114,20 @@ const entryTrees = [
   { project: "p", root: "/dev/p", worktrees: [], tiers: {} },
   { project: "q", root: "/dev/q", worktrees: [], tiers: {} },
 ];
-export const entryOptions = { worktrees: async () => entryTrees, chat: async () => ({ kind: "not-found" as const }) };
+export const entryOptions = { chat: async () => ({ kind: "not-found" as const }) };
+
+// The shell's New chat host reads worktrees and posts the create through fetch, not through page props.
+export const createBodies: unknown[] = [];
+export const stubNewSession = (created?: SessionInfo) =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: { body: string }) => {
+      if (url === "/v1/projects/worktrees") return new Response(JSON.stringify(entryTrees));
+      if (url === "/v1/sessions/create") {
+        createBodies.push(JSON.parse(init!.body));
+        return new Response(JSON.stringify({ session: created }));
+      }
+      return new Response("{}");
+    }),
+  );
 export const formProject = async () => ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value;

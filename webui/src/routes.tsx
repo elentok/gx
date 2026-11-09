@@ -1,6 +1,5 @@
 import { createHashRouter, Navigate, redirect, useLocation, useParams, type RouteObject } from "react-router";
 import { AgentsPage } from "./agents/AgentsPage";
-import type { CreateSession, FetchWorktrees } from "./agents/newSession";
 import type { AuthState } from "./auth/authState";
 import { AppShell } from "./shell/AppShell";
 import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages";
@@ -135,8 +134,6 @@ export interface RouteFetchers {
   prompt?: PostPrompt;
   focus?: PostFocus;
   fixAgent?: FixAgent;
-  worktrees?: FetchWorktrees;
-  createSession?: CreateSession;
   authState?: () => Promise<AuthState>;
   logins?: FetchLogins;
   agentSettings?: FetchAgentSettings;
@@ -151,7 +148,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
   return [
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} saveChecks={fetchers.saveChecks} /> },
     // "/agents/*" also matches "/agents"; the splat is the session label.
-    { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} fetchTrees={fetchers.worktrees} createSession={fetchers.createSession} /> },
+    { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/cleanup", element: <CleanupPage fetchCleanup={fetchers.cleanup} postCleanup={fetchers.cleanupWrite}fetchEpics={fetchers.epicList} /> },
     { path: "/tips", element: <TipsPage fetchTips={fetchers.tips} /> },

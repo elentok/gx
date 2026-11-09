@@ -1,16 +1,15 @@
 import { Box, Heading, Kbd, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { FetchChat } from "../design/chat";
 import { useFocusReport } from "../design/focus";
 import type { FetchScreen } from "../design/screen";
 import { DetailPage } from "../page/DetailPage";
+import { openNewAgent } from "../shell/newItemOpen";
 import { Button } from "../ui/button/Button";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useWide } from "../useWide";
-import type { CreateSession, FetchWorktrees } from "./newSession";
-import { NewSessionForm } from "./NewSessionForm";
 import { SessionView } from "./SessionView";
 
 const LAST_KEY = "gx.agents.last";
@@ -64,19 +63,8 @@ function EmptyState({ empty, onNew }: { empty: boolean; onNew: () => void }) {
 
 // The snapshot is cached by snapshotCache, so a reload repaints from it before the stream lands.
 // The cache may predate the session list, so only a live snapshot may redirect or call a label gone.
-export function AgentsPage({
-  fetchChat,
-  fetchScreen,
-  fetchTrees,
-  createSession,
-}: {
-  fetchChat?: FetchChat;
-  fetchScreen?: FetchScreen;
-  fetchTrees?: FetchWorktrees;
-  createSession?: CreateSession;
-}) {
+export function AgentsPage({ fetchChat, fetchScreen }: { fetchChat?: FetchChat; fetchScreen?: FetchScreen }) {
   const selected = useParams()["*"] || undefined;
-  const [creating, setCreating] = useState(false);
   const wide = useWide();
   const navigate = useNavigate();
   const conn = useConnectionContext();
@@ -101,20 +89,9 @@ export function AgentsPage({
       ) : (
         <Box as="main" flex="1" minH="0" minW="0">
           {gone && <GoneNotice id={selected!} />}
-          {!selected && <EmptyState empty={sessions.length === 0} onNew={() => setCreating(true)} />}
+          {!selected && <EmptyState empty={sessions.length === 0} onNew={openNewAgent} />}
           {session && <SessionView session={session} fetchChat={fetchChat} fetchScreen={fetchScreen} />}
         </Box>
-      )}
-      {creating && (
-        <NewSessionForm
-          fetchTrees={fetchTrees}
-          create={createSession}
-          onClose={() => setCreating(false)}
-          onCreated={(id) => {
-            setCreating(false);
-            navigate(`/agents/${id}`);
-          }}
-        />
       )}
     </DetailPage>
   );

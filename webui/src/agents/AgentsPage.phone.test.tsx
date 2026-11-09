@@ -1,6 +1,6 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
-import { entryOptions, render, session, useAgentsPageHooks } from "./agentsTestKit";
+import { entryOptions, render, session, stubNewSession, useAgentsPageHooks } from "./agentsTestKit";
 
 useAgentsPageHooks();
 
@@ -27,6 +27,7 @@ test("phone: a plain session's header has no design link", () => {
 });
 
 test("phone: the empty panel's New session button opens the form as a sheet", async () => {
+  stubNewSession();
   render([session("s-1", "gx", { name: "plain" })], "/agents", true, entryOptions, false);
   fireEvent.click(screen.getByRole("button", { name: "New session" }));
   const form = await screen.findByRole("dialog", { name: "New session" });
