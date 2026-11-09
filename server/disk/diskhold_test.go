@@ -251,6 +251,7 @@ func TestDiskHold_ResumeStartsTicketAndNotifiesOnce(t *testing.T) {
 	r.disks.SetFree(repo, 3*gb)
 	r.queue(t, "proj:epic-a/01")
 	r.explainWhen(t, "proj:epic-a/01", wire.VerdictDiskLow)
+	r.heldAndSettled(t)
 	r.disks.SetFree(repo, 10*gb)
 	servertest.Await(t, r.started(1))
 	servertest.Await(t, func() bool { return r.resume() >= 1 })
@@ -267,7 +268,7 @@ func TestDiskHold_TwoProjectsOnOneDiskGiveOneEntryAndOneNotice(t *testing.T) {
 	r := startHoldRig(t, map[string]string{"a": a, "b": b}, 10*gb)
 	r.disks.Put(a, "shared", "/shared", 3*gb)
 	r.disks.Put(b, "shared", "/shared", 3*gb)
-	got := waitDisks(t, r, func(d []wire.DiskStatus) bool { return len(d) == 1 })
+	got := r.heldAndSettled(t)
 	if !got[0].Held || len(got[0].Projects) != 2 {
 		t.Errorf("entry = %+v, want one held disk with both projects", got[0])
 	}
@@ -278,6 +279,14 @@ func TestDiskHold_TwoProjectsOnOneDiskGiveOneEntryAndOneNotice(t *testing.T) {
 	if n := r.resume(); n != 1 {
 		t.Errorf("resume notices = %d, want 1", n)
 	}
+}
+
+// heldAndSettled waits for the one disk to be held with its automatic clean
+// over. A recovery reading that lands mid-clean ends the hold through the clean
+// notice, so the resume notice only follows a reading taken after the clean.
+func (r *holdRig) heldAndSettled(t *testing.T) []wire.DiskStatus {
+	t.Helper()
+	return waitDisks(t, r, func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held && !d[0].Cleaning })
 }
 
 func waitDisks(t *testing.T, r *holdRig, pred func([]wire.DiskStatus) bool) []wire.DiskStatus {
