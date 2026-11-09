@@ -74,8 +74,9 @@ type SessionInfo struct {
 	// ModelSwitched is set when Model is not the one the launch tier chose, so
 	// the person switched it by hand. Never set for a launch with no explicit model.
 	ModelSwitched bool `json:"model_switched,omitempty"`
-	// ContextTokens and ContextLevel are the context occupancy of a Claude
-	// session's newest reply; both are absent while there is no reading.
+	// ContextTokens and ContextLevel are the context occupancy of a Claude or
+	// Codex session or a Queue agent, from its newest reply; both are absent
+	// while there is no reading.
 	ContextTokens *int               `json:"context_tokens,omitempty"`
 	ContextLevel  agent.ContextLevel `json:"context_level,omitempty"`
 }

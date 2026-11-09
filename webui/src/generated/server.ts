@@ -2657,8 +2657,9 @@ export interface SessionInfo {
    */
   model_switched?: boolean;
   /**
-   * ContextTokens and ContextLevel are the context occupancy of a Claude
-   * session's newest reply; both are absent while there is no reading.
+   * ContextTokens and ContextLevel are the context occupancy of a Claude or
+   * Codex session or a Queue agent, from its newest reply; both are absent
+   * while there is no reading.
    */
   context_tokens?: number /* int */;
   context_level?: any /* agent.ContextLevel */;
