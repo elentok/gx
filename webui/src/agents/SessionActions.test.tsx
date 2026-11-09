@@ -40,6 +40,17 @@ test("Remove on a live session stops it, then removes it with the fresh token", 
   expect(remove).toHaveBeenCalledWith({ id: "s-a", state: stateToken(exited(live)) });
 });
 
+test("Remove forgets the session as the Agents page's last agent, so the page does not restore it", async () => {
+  localStorage.setItem("gx.agents.last", "s-a");
+  const live = session();
+  const done = exited(live);
+  renderThemed(<SessionActions session={done} onRemoved={() => {}} remove={vi.fn(async () => ({ session: done }))} />);
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(localStorage.getItem("gx.agents.last")).toBeNull());
+});
+
 test("an exited session offers Remove but no Stop", async () => {
   renderThemed(<SessionActions session={exited(session())} onRemoved={() => {}} />);
   await openMenu();

@@ -6,6 +6,7 @@ import { useWrite } from "../useWrite";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
 import type { MenuEntry } from "../ui/menu/Menu";
+import { forgetLast } from "./lastAgent";
 import { canManage, isExited, postRemoveSession, removeSession, type RemoveSession } from "./sessionWrites";
 
 /** Stop (while live) and Remove menu items for a session a person manages, plus Remove's confirmation. Shared by the agent page and the sidebar's chat rows. */
@@ -35,7 +36,12 @@ export function useSessionManage(
           disabled={pending}
           onClick={() => {
             setConfirming(false);
-            run(() => removeSession(session, { stop, remove }), { onDone: onRemoved });
+            run(() => removeSession(session, { stop, remove }), {
+              onDone: () => {
+                forgetLast(session.id);
+                onRemoved();
+              },
+            });
           }}
         >
           Remove

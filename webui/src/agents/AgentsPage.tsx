@@ -12,23 +12,7 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { useWide } from "../useWide";
 import { SessionView } from "./SessionView";
 
-const LAST_KEY = "gx.agents.last";
-
-function readLast(): string | null {
-  try {
-    return localStorage.getItem(LAST_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeLast(id: string) {
-  try {
-    localStorage.setItem(LAST_KEY, id);
-  } catch {
-    // Storage is a convenience; the page works without it.
-  }
-}
+import { readLast, writeLast } from "./lastAgent";
 
 function GoneNotice({ id }: { id: string }) {
   return (

@@ -669,4 +669,75 @@ test("Workspaces", async ({ page, start }) => {
   await unblock();
   await switcher.click();
   await expect(page.getByRole("menuitem", { name: /^archive/ })).toBeVisible();
+  await closeMenus();
+
+  // The footer's boxes are one size with their icons centered, at 1280px and 390px, and the badges agree.
+  const footer = sidebar.locator("footer");
+  const epicsBox = footer.getByRole("link", { name: /^Epics/ });
+  const followUpsBox = footer.getByRole("button", { name: /^Follow-ups/ });
+  const statsBox = footer.getByRole("link", { name: /^Stats/ });
+  const gearBox = footer.getByRole("button", nav("Menu"));
+  const boxes = [epicsBox, followUpsBox, statsBox, gearBox];
+  const measure = async (locator: Locator) => {
+    await expect(locator).toBeVisible();
+    return (await locator.boundingBox())!;
+  };
+  const checkBoxes = async () => {
+    const sizes = [];
+    for (const box of boxes) {
+      const b = await measure(box);
+      const i = await measure(box.locator("svg"));
+      expect(i.x + i.width / 2).toBeCloseTo(b.x + b.width / 2, 0);
+      expect(i.y + i.height / 2).toBeCloseTo(b.y + b.height / 2, 0);
+      sizes.push([b.width, b.height, b.y]);
+    }
+    for (const s of sizes) expect(s).toEqual(sizes[0]);
+    return sizes[0][0];
+  };
+  const badgeOf = async (box: Locator) => {
+    const badge = box.locator('[data-part="badge"]');
+    await expect(badge).toBeVisible();
+    const b = (await badge.boundingBox())!;
+    const p = (await box.boundingBox())!;
+    const css = await badge.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return [s.fontSize, s.fontWeight, s.lineHeight];
+    });
+    return { w: b.width, h: b.height, top: b.y - p.y, right: p.x + p.width - (b.x + b.width), css };
+  };
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(epicsBox).toHaveCSS("width", "25px");
+  expect(await checkBoxes()).toBe(25);
+  expect(await badgeOf(epicsBox)).toEqual(await badgeOf(followUpsBox));
+  // The burger icon is three horizontal paths and no circle.
+  await expect(gearBox.locator("svg path")).toHaveCount(3);
+  await expect(gearBox.locator("svg circle")).toHaveCount(0);
+  for (const d of await gearBox.locator("svg path").evaluateAll((ps) => ps.map((p) => p.getAttribute("d")!))) expect(d).toMatch(/^M[\d.]+ [\d.]+h[\d.]+$/);
+
+  // With the health warning, paused and offline indicators all shown, no box shrinks and nothing overflows the sidebar.
+  const width = await checkBoxes();
+  await fx.setHealth("cpu=75 mem=85");
+  await fx.cli("server", "queue", "pause");
+  const indicators = footer.getByRole("img", { name: /^(System health is high or critical|Server queue is paused|Disconnected from the server)$/ });
+  await expect(indicators).toHaveCount(2);
+  await fx.stopServer();
+  await expect(indicators).toHaveCount(3);
+  const sidebarBox = (await measure(sidebar))!;
+  expect(sidebarBox.width).toBeLessThanOrEqual(280);
+  expect(await checkBoxes()).toBe(width);
+  for (let n = 0; n < 3; n++) {
+    const b = await measure(indicators.nth(n));
+    expect(b.width).toBe(width);
+    expect(b.x + b.width).toBeLessThanOrEqual(sidebarBox.x + sidebarBox.width);
+  }
+  await expect(footer).toBeVisible();
+  expect(await footer.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+
+  // Repeat at 390px.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(sidebar).toBeVisible();
+  await expect(epicsBox).toHaveCSS("width", "34px");
+  expect(await checkBoxes()).toBe(34);
+  // The touch footer keeps its boxes at 34px with every indicator shown; only the 280px sidebar is held to fit.
+  for (let n = 0; n < 3; n++) expect((await measure(indicators.nth(n))).width).toBe(34);
 });
