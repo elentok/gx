@@ -183,6 +183,14 @@ test("typing finds held, Ready to design, Finished items, agents and other works
   expect(names()).toEqual(["quiet-oneoff"]);
 });
 
+test("a fuzzy query that is not a substring finds an epic", async () => {
+  setup();
+  await open();
+  await waitFor(() => expect(names()).toContain("blog"));
+  type("bg");
+  expect(names()[0]).toBe("blog");
+});
+
 test("Enter opens the cursor row", async () => {
   setup();
   await open();

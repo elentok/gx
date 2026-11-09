@@ -93,6 +93,26 @@ test("typing searches the caller's search text, reveals hidden sections, and Ent
   await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/x/alpha"));
 });
 
+test("typing matches fuzzily and case-insensitively, best match first, and an empty filter keeps the caller's order", async () => {
+  const sections: ListSection[] = [
+    { key: "s", title: "S", rows: [plain("x", { title: "New design", searchText: "New design" }), plain("a-b-c"), plain("abc")] },
+  ];
+  const router = createMemoryRouter([
+    { path: "*", element: <Menu sections={sections} label="Pick" placeholder="Filter" phone={false} onClose={() => {}} /> },
+  ]);
+  renderThemed(<RouterProvider router={router} />);
+  const input = await screen.findByRole("combobox", { name: "Pick" });
+  expect(names()).toEqual(["New design", "a-b-c", "abc"]);
+  fireEvent.change(input, { target: { value: "nd" } });
+  expect(names()).toEqual(["New design"]);
+  fireEvent.change(input, { target: { value: "NEWDES" } });
+  expect(names()).toEqual(["New design"]);
+  fireEvent.change(input, { target: { value: "abc" } });
+  expect(names()).toEqual(["abc", "a-b-c"]);
+  fireEvent.change(input, { target: { value: "" } });
+  expect(names()).toEqual(["New design", "a-b-c", "abc"]);
+});
+
 test("on a phone the menu has a close button", async () => {
   let closed = 0;
   setupMenu({ phone: true, onClose: () => closed++ });

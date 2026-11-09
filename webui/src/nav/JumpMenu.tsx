@@ -7,6 +7,7 @@ import { titleHref } from "../epics/cardLinks";
 import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring";
 import { Button } from "../ui/button/Button";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
+import { fuzzyScore } from "./fuzzy";
 
 /**
  * A Design opens on its Design page, a card whose Answer link the server set
@@ -40,10 +41,21 @@ export type ListSection = {
   hiddenUntilSearch?: boolean;
 };
 
+/** The rows that match, best match first; Array.sort is stable, so ties keep the caller's order. */
+function rankRows(rows: ListRowData[], q: string): ListRowData[] {
+  return rows
+    .flatMap((r) => {
+      const score = fuzzyScore(r.searchText, q);
+      return score === null ? [] : [{ r, score }];
+    })
+    .sort((a, b) => a.score - b.score)
+    .map((x) => x.r);
+}
+
 function visibleSections(sections: ListSection[], query: string): ListSection[] {
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
   return sections
-    .map((s) => (q ? { ...s, rows: s.rows.filter((r) => r.searchText.toLowerCase().includes(q)) } : s))
+    .map((s) => (q ? { ...s, rows: rankRows(s.rows, q) } : s))
     .filter((s) => s.rows.length > 0 && (q !== "" || !s.hiddenUntilSearch));
 }
 
