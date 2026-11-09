@@ -96,11 +96,11 @@ func (s *Sessions) DesignImage(ctx context.Context, epic, id string) ([]byte, st
 // RemoveDesignDraftImage deletes one image of a draft. A refusal is a result.
 func (s *Sessions) RemoveDesignDraftImage(ctx context.Context, id, image string) (wire.SessionImageResult, error) {
 	var res wire.SessionImageResult
-	err := s.t.post(ctx, "/v1/designs/drafts/images/delete", wire.SessionImageRequest{ID: id, Image: image}, &res)
+	err := s.t.post(ctx, "/v1/designs/drafts/images/delete", wire.DraftImageRequest{ID: id, Image: image}, &res)
 	return res, err
 }
 
-// DeleteDesignDraft deletes a draft. A draft already gone is not an error.
+// DeleteDesignDraftdeletes a draft. A draft already gone is not an error.
 func (s *Sessions) DeleteDesignDraft(ctx context.Context, id string) (wire.DesignDraftSaveResult, error) {
 	var res wire.DesignDraftSaveResult
 	err := s.t.post(ctx, "/v1/designs/drafts/delete", wire.DesignDraftDeleteRequest{ID: id}, &res)

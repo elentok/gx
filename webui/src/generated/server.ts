@@ -295,6 +295,14 @@ export interface DesignOpenRequest {
   draft_id?: string;
 }
 /**
+ * DraftImageRequest is the body of POST /v1/designs/drafts/images/delete: ID is
+ * the draft, Image the id an upload returned.
+ */
+export interface DraftImageRequest {
+  id: string;
+  image: string;
+}
+/**
  * DesignWorktreeRequest is the body of POST /v1/designs/worktree. Epic is a map
  * epic's address ("project:epic"). ExcludeSession is the caller's own gx
  * session, which does not count as another live design session in the rebase.
@@ -2887,10 +2895,6 @@ export interface SettingsEntry {
   global_key?: string;
   global_value?: unknown;
 }
-
-//////////
-// source: settingswrite.go
-
 /**
  * SettingChange sets Key to Value, or removes Key when Remove is set. Key is
  * the display key path (SettingsEntry.Key).

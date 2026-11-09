@@ -34,6 +34,13 @@ type DesignOpenRequest struct {
 	DraftID string `json:"draft_id,omitempty"`
 }
 
+// DraftImageRequest is the body of POST /v1/designs/drafts/images/delete: ID is
+// the draft, Image the id an upload returned.
+type DraftImageRequest struct {
+	ID    string `json:"id"`
+	Image string `json:"image"`
+}
+
 // DesignWorktreeRequest is the body of POST /v1/designs/worktree. Epic is a map
 // epic's address ("project:epic"). ExcludeSession is the caller's own gx
 // session, which does not count as another live design session in the rebase.

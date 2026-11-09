@@ -103,7 +103,7 @@ func (s *Designs) draftImageUpload(w http.ResponseWriter, r *http.Request) {
 
 // draftImageRemove serves POST /v1/designs/drafts/images/delete.
 func (s *Designs) draftImageRemove(w http.ResponseWriter, r *http.Request) {
-	var req wire.SessionImageRequest
+	var req wire.DraftImageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
