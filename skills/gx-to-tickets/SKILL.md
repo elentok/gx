@@ -436,8 +436,9 @@ line word for word, packs the parts, and appends the verify entries and their bo
 publish manifest. Publish the manifest once, together with the implement tickets. `gx tickets
 verify-plan --table` prints the estimates. Do not copy them into the skill or the tickets.
 
-Implement tickets keep their own rule: add 10000 to `expected_context_window` per mock state in the
-ticket's `## Mock check`, and allow at most 4 mock states per implement ticket. Both the 10000 and the
+Implement tickets keep their own rule: add 14000 to `expected_context_window` per mock state in the
+ticket's `## Mock check` (it covers seeding, fixture start and web-build, so name the seeding mechanism
+in the ticket), and allow at most 4 mock states per implement ticket. Both the 14000 and the
 cap count mock states: one state section of the mock file, one name at one width. Over the cap,
 split the ticket. The first ticket builds the parts and checks the first 4 states. A follow-on
 implement ticket, blocked by the first, checks the remaining states and fixes what differs.

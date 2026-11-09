@@ -14,7 +14,7 @@ const (
 	CLICheckTokens       = 3_000
 	GoTestRunTokens      = 4_000
 	SkillQuoteTokens     = 2_000
-	MockStateTokens      = 8_000
+	MockStateTokens      = 14_000 // includes seeding, fixture start and web-build for the state
 	VerifyPartBaseTokens = 15_000 // fixture start and the ticket read
 	VerifyCollectTokens  = 30_000
 )

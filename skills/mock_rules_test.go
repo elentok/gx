@@ -103,7 +103,7 @@ func TestMockRulesAnchors(t *testing.T) {
 			"- Mock file: `<full path>`",
 			"gx tickets verify-plan <project:epic> --plan <file>",
 			"verify-plan --table` prints the estimates",
-			"add 10000 to `expected_context_window` per mock state",
+			"add 14000 to `expected_context_window` per mock state",
 			"at most 4 mock states per implement ticket",
 			"checks the first 4 states",
 		}},
