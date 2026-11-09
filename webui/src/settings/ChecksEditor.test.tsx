@@ -80,9 +80,18 @@ describe("ChecksEditor", () => {
   it("adds and removes an always command", async () => {
     const v = setup({ test: { full: "f" } });
     type(v, "Add always command for test", "go vet");
-    fireEvent.click(v.getByRole("button", { name: "Add command" }));
+    fireEvent.keyDown(v.getByLabelText("Add always command for test"), { key: "Enter" });
     await save(v);
     expect(v.onWrite).toHaveBeenCalledWith([{ key: "checks", value: { test: { full: "f", always: ["go vet"] } } }]);
+  });
+
+  it("one command with a limit reloads as one command", async () => {
+    const v = setup({ test: { changed: "go test ./...", full: "go test ./...", limits: { suite: "4m" } } });
+    const group = v.getByRole("group", { name: "test mode" });
+    const pressed = Array.from(group.querySelectorAll("button")).filter((b) => b.getAttribute("aria-pressed") === "true");
+    expect(pressed.map((b) => b.textContent)).toEqual(["one command"]);
+    expect((v.getByLabelText("test command") as HTMLInputElement).value).toBe("go test ./...");
+    expect((v.getByLabelText("suite limit") as HTMLInputElement).value).toBe("4m");
   });
 
   it("shows the repo-file notice with the flag", () => {

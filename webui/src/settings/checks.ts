@@ -69,10 +69,13 @@ function parseForm(raw: unknown): CheckForm {
     form.mode = "one";
     form.command = raw;
   } else if (isRecord(raw)) {
-    form.mode = "pair";
     form.changed = str(raw.changed);
     form.full = str(raw.full);
     if (Array.isArray(raw.always)) form.always = raw.always.filter((a): a is string => typeof a === "string");
+    // formValue writes "one command" with limits as equal changed/full; read that back as "one".
+    const isOne = form.full !== "" && form.changed === form.full && form.always.length === 0;
+    form.mode = isOne ? "one" : "pair";
+    if (isOne) form.command = form.full;
     parseLimits(form, raw.limits);
   }
   return form;

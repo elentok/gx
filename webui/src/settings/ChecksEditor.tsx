@@ -67,19 +67,25 @@ function AlwaysList({ kind, items, onChange }: { kind: CheckKind; items: string[
         value={text}
         onChange={(e) => setText(e.currentTarget.value)}
         onKeyDown={(e) => e.key === "Enter" && add()}
-        maxW="200px"
-        {...inputProps}
+        onBlur={add}
+        w="150px"
+        h="26px"
+        px="2.5"
+        borderWidth="1px"
+        borderColor="border"
+        borderStyle="dashed"
+        borderRadius="full"
+        bg="transparent"
+        color="text"
+        fontSize="12.5px"
       />
-      <Button size="sm" disabled={text.trim() === ""} onClick={add}>
-        Add command
-      </Button>
     </Box>
   );
 }
 
 function Limits({ form, onChange }: { form: CheckForm; onChange: (patch: Partial<CheckForm>) => void }) {
   return (
-    <Box display="grid" gridTemplateColumns={`repeat(${form.slowIsMap ? 2 + SLOW_TOOLS.length : 3}, minmax(0, 1fr))`} gap="3">
+    <Box display="grid" gridTemplateColumns={`repeat(${form.slowIsMap ? 2 + SLOW_TOOLS.length : 3}, minmax(0, 1fr))`} gap="1.5">
       <LimitField label="suite" value={form.suite} onChange={(suite) => onChange({ suite })} />
       <LimitField label="hang" value={form.hang} onChange={(hang) => onChange({ hang })} />
       {form.slowIsMap ? (
@@ -107,7 +113,7 @@ const LimitField = ({ label, value, onChange }: { label: string; value: string; 
 
 function KindCard({ kind, form, error, onChange }: { kind: CheckKind; form: CheckForm; error?: string; onChange: (patch: Partial<CheckForm>) => void }) {
   return (
-    <Box display="grid" gap="2" p="3" borderWidth="1px" borderColor="border" borderRadius="10px" bg="surface" data-testid={`check-${kind}`}>
+    <Box display="grid" gap="2" p="2.5" borderWidth="1px" borderColor="border" borderRadius="10px" bg="surface" data-testid={`check-${kind}`}>
       <Box display="flex" gap="2" alignItems="center">
         <Text as="h4" fontWeight="600">
           {kind}
@@ -177,14 +183,14 @@ export function ChecksEditor({ entry, repoChecksFile, onWrite }: { entry?: Setti
         {entry?.set && <Box title="Changed from default" w="7px" h="7px" borderRadius="full" bg="tone.running.fg" />}
       </Box>
       <Text fontSize="13px" color="text.muted" maxW="62ch">
-        {entry?.description ?? "Commands `gx check` runs."}
+        {entry?.description ?? "Commands `gx check` runs."} A .gx/checks.json in the repo wins over this.
       </Text>
       {repoChecksFile && (
         <Text role="note" data-testid="repo-checks-notice" fontSize="sm" bg="tone.waiting.bg" color="tone.waiting.fg" px="3" py="2" borderRadius="md">
           This repo has a .gx/checks.json, which wins over these settings. Edits below have no effect.
         </Text>
       )}
-      <Box data-mock-part="checks-editor">
+      <Box data-mock-part="checks-editor" display="grid" gap="2">
         {CHECK_KINDS.map((kind) => (
           <KindCard key={kind} kind={kind} form={model[kind]} error={errors[kind]} onChange={(patch) => edit(kind, patch)} />
         ))}
