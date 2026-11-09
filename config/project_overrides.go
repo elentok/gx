@@ -5,27 +5,41 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/elentok/gx/config/registry"
 )
 
-// projectKeys is the whitelist of project.json keys: name/repo identify the
-// project, the rest override config.json. A nested map whitelists the sub-keys
-// of an object key; nil means the key is a leaf or free-form below.
-var projectKeys = map[string]map[string]bool{
-	"$schema":         nil,
-	"name":            nil,
-	"repo":            nil,
-	"vcs":             nil,
-	"trunk":           nil,
-	"landing":         nil,
-	"auto-ff-merge":   nil,
-	"max-agents":      nil,
-	"agents":          nil,
-	"skills":          nil,
-	"notifications":   nil,
-	"evolve":          nil,
-	"checks":          nil,
-	"execution-queue": {"max-agents-per-epic": true, "max-one-off-agents": true},
-	"disk-space":      {"cleanup-command": true},
+// projectKeys is the whitelist of project.json keys, derived from the registry's
+// project paths plus the exclusions still accepted in project.json. A nested
+// map whitelists the sub-keys of an object key; nil means the key is a leaf or
+// free-form below.
+var projectKeys = deriveProjectKeys(registry.Default())
+
+func deriveProjectKeys(r *registry.Registry) map[string]map[string]bool {
+	keys := map[string]map[string]bool{}
+	add := func(p registry.KeyPath) {
+		top := p[0]
+		if len(p) == 1 {
+			keys[top] = nil
+			return
+		}
+		if sub, seen := keys[top]; seen && sub == nil {
+			return
+		}
+		if keys[top] == nil {
+			keys[top] = map[string]bool{}
+		}
+		keys[top][p[1]] = true
+	}
+	for _, e := range r.ForProject() {
+		add(e.ProjectPath())
+	}
+	for _, x := range registry.Exclusions() {
+		if x.Project {
+			add(x.Key)
+		}
+	}
+	return keys
 }
 
 // checkProjectKeys rejects any key outside the whitelist, naming it. Global-only

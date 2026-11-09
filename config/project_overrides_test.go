@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/config/registry"
 )
 
 func writeProjectJSON(t *testing.T, body string) string {
@@ -44,6 +46,66 @@ func TestReadProjectFile_AcceptsWhitelist(t *testing.T) {
 	}`)
 	if _, err := ReadProjectFile(dir); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestProjectKeys_DerivedFromRegistry(t *testing.T) {
+	// The whitelist is two levels deep: deeper registry paths count by their first two segments.
+	want := map[string]bool{}
+	addWant := func(p registry.KeyPath) {
+		want[registry.KeyPath(p[:min(len(p), 2)]).String()] = true
+	}
+	for _, e := range registry.Default().ForProject() {
+		addWant(e.ProjectPath())
+	}
+	for _, x := range registry.Exclusions() {
+		if x.Project {
+			addWant(x.Key)
+		}
+	}
+	got := map[string]bool{}
+	for top, sub := range projectKeys {
+		if sub == nil {
+			got[top] = true
+		}
+		for k := range sub {
+			got[top+"."+k] = true
+		}
+	}
+	// A key is covered when listed exactly or when a shorter prefix is a free-form leaf.
+	for k := range want {
+		top, _, _ := strings.Cut(k, ".")
+		if !got[k] && !(got[top] && projectKeys[top] == nil) {
+			t.Errorf("registry project key %q missing from whitelist", k)
+		}
+	}
+	for k := range got {
+		covered := want[k]
+		for w := range want {
+			if strings.HasPrefix(w, k+".") || strings.HasPrefix(k, w+".") {
+				covered = true
+			}
+		}
+		if !covered {
+			t.Errorf("whitelist key %q not in registry", k)
+		}
+	}
+}
+
+func TestReadProjectFile_AcceptsIgnoredAgentsKeysAndNotifications(t *testing.T) {
+	dir := writeProjectJSON(t, `{
+		"agents": {"banners": {},"sounds": {"done": "x"}, "leader-key": ["a"]},
+		"notifications": {"slack": {"webhook-url": "u"}}
+	}`)
+	if _, err := ReadProjectFile(dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadProjectFile_RefusesGlobalOnlyServerKey(t *testing.T) {
+	_, err := ReadProjectFile(writeProjectJSON(t, `{"server": {"port": 1}}`))
+	if err == nil || !strings.Contains(err.Error(), "server") {
+		t.Errorf("want error naming server, got %v", err)
 	}
 }
 
