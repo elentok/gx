@@ -95,6 +95,8 @@ Put the switcher in a single shared component so both sub-shapes can reuse it. L
 
 Surface the URL (and the `?variant=` keys). The user will flip through whenever they get to it. The interesting feedback is usually **"I want the header from B with the sidebar from C"**, which is the actual design they want.
 
+When the prototype resolves a map ticket (a `gx-design` run), end the turn by asking the pick as a `gx-grilling` round: a `type: options` question with the recommended variant, printed as a `❓ **Q1**` card with a `gx-question` block, after the link, as the last thing in the turn. Plain prose ("Do you agree with B?") raises no card and the session is not marked Actionable.
+
 ### 5a. Store the approved mock
 
 Applies to a UI prototype that resolves a map ticket. The session that resolves the ticket runs this step just before it records the Resolution. LOGIC.md and TUI mocks have no such step.

@@ -344,3 +344,19 @@ func TestGxWayfinderLetsCallerAllowMoreTickets(t *testing.T) {
 		t.Error("gx-wayfinder/SKILL.md still has the old one-ticket rule")
 	}
 }
+
+func TestPrototypeHandOverAsksPickAsGrillingRound(t *testing.T) {
+	for _, path := range []string{"gx-prototype/UI.md", "gx-prototype/LOGIC.md"} {
+		text := collapseSpace(readFile(t, path))
+		if !strings.Contains(text, "`gx-grilling` round") && !strings.Contains(text, "gx-grilling` round") {
+			t.Errorf("%s hand-over must ask as a gx-grilling round", path)
+		}
+		if !strings.Contains(text, "`gx-question` block") {
+			t.Errorf("%s hand-over must name the gx-question block", path)
+		}
+	}
+	design := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	if !strings.Contains(design, "a prototype ticket is one") {
+		t.Error("gx-design Asking questions must name the prototype ticket as HITL")
+	}
+}
