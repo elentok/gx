@@ -20,7 +20,9 @@ import (
 // command reload never starts a watcher behind a test's back.
 func WriteConfig(t *testing.T, path, store string, fields map[string]any) {
 	t.Helper()
-	all := map[string]any{"ticket-store": map[string]any{"path": store}}
+	// runner-wait is the harness's own 100ms, so a file that leaves it out
+	// does not read as a startup-only change.
+	all := map[string]any{"ticket-store": map[string]any{"path": store}, "runner-wait": "100ms"}
 	for k, v := range fields {
 		all[k] = v
 	}

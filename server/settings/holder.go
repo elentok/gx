@@ -23,10 +23,9 @@ type Publisher interface {
 // against it, to warn about a key that needs a restart.
 type Startup struct {
 	TicketStore string
-	TCPListen   bool
-	WebAddr     string
-	WebDevURL   string
-	AgentRunner string
+	// Config holds the values the server started with, at least for every
+	// registry key flagged Restart; startupOnlyChanges reads those by key path.
+	Config config.Config
 }
 
 // Options wires a Holder to the root.

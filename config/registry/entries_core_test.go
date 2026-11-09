@@ -39,7 +39,7 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("server", "recently-finished"), typ: TypeNumber, section: s},
 		{key: Key("server", "web", "listen"), typ: TypeString, section: s, restart: true, risky: true},
 		{key: Key("server", "web", "dev-frontend"), typ: TypeBool, section: s, restart: true, risky: true},
-		{key: Key("server", "web", "dev-url"), typ: TypeString, section: s, risky: true},
+		{key: Key("server", "web", "dev-url"), typ: TypeString, section: s, restart: true, risky: true},
 		{key: Key("server", "web", "allowed-hosts"), typ: TypeStringList, section: s, risky: true},
 		{key: Key("server", "web", "totp"), typ: TypeBool, section: s, risky: true},
 		{key: Key("cpu-watchdog", "enabled"), typ: TypeBool, section: s},

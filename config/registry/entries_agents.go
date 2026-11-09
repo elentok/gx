@@ -64,7 +64,7 @@ func agentsEntries() []Entry {
 		Description: "The skills that review an epic's code."})
 	add(a, Entry{Key: Key("agent-runner"), Type: TypeEnum, Enum: runnerChoices(), Restart: true,
 		Description: "How gx runs agents: auto picks for you, or choose herdr, headless or pty."})
-	add(a, Entry{Key: Key("runner-wait"), Type: TypeDuration,
+	add(a, Entry{Key: Key("runner-wait"), Type: TypeDuration, Restart: true,
 		Description: "How long an agent runner waits on its guards before giving up."})
 
 	e := SectionEvolveRecovery

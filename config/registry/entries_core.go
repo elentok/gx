@@ -76,7 +76,7 @@ func coreEntries() []Entry {
 	add(s, risky(Entry{Key: Key("server", "web", "dev-frontend"), Type: TypeBool, Restart: true,
 		Description: "Serve the web page from a development frontend server instead of the built files."},
 		"The web page will load from the development server. If it is not running, the page stays blank."))
-	add(s, risky(Entry{Key: Key("server", "web", "dev-url"), Type: TypeString,
+	add(s, risky(Entry{Key: Key("server", "web", "dev-url"), Type: TypeString, Restart: true,
 		Description: "The address of the development frontend server."},
 		"If this address is wrong, the web page stays blank while the development frontend is on."))
 	add(s, risky(Entry{Key: Key("server", "web", "allowed-hosts"), Type: TypeStringList,

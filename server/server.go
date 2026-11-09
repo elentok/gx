@@ -368,10 +368,7 @@ func New(cfg Config) (*Server, error) {
 		ConfigPath: cfg.ConfigPath,
 		Startup: settings.Startup{
 			TicketStore: cfg.TicketStore,
-			TCPListen:   cfg.TCPAddr != "",
-			WebAddr:     cfg.WebAddr,
-			WebDevURL:   cfg.WebDevURL,
-			AgentRunner: cfg.AgentRunner,
+			Config:      startupConfig(cfg),
 		},
 		WatchDebounce: cfg.ConfigWatchDebounce,
 		Notifier:      cfg.Notifier,
@@ -547,6 +544,24 @@ func (s *Server) TCPAddr() string {
 		return ""
 	}
 	return s.tcp.Addr().String()
+}
+
+// startupConfig is the values the server started with, for every registry key
+// flagged Restart. Anything the server was not handed stays at its default.
+func startupConfig(cfg Config) config.Config {
+	c := config.Default()
+	c.TicketStore.Path = cfg.TicketStore
+	c.Server.TCPListen = cfg.TCPAddr != ""
+	c.Server.Web.Listen = cfg.WebAddr
+	c.Server.Web.DevFrontend = cfg.WebDevURL != ""
+	c.Server.Web.DevURL = cfg.WebDevURL
+	if cfg.AgentRunner != "" {
+		c.AgentRunner = cfg.AgentRunner
+	}
+	if cfg.RunnerWait > 0 {
+		c.RunnerWait = cfg.RunnerWait
+	}
+	return c
 }
 
 // DefaultMergeStopTimeout is how long a stop waits for a merge in flight.

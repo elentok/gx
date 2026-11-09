@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/config/registry"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 )
@@ -182,32 +183,13 @@ func changedKeys(old, next Settings) []string {
 // startupOnlyChanges compares the startup-only keys with the values the
 // server started with, so a warning repeats on every reload until restart.
 func (h *Holder) startupOnlyChanges(cfg config.Config) []string {
-	start := h.opts.Startup
 	var keys []string
-	if cfg.TicketStore.Path != start.TicketStore {
-		keys = append(keys, "ticket-store.path")
-	}
-	if cfg.Server.TCPListen != start.TCPListen {
-		keys = append(keys, "server.tcp-listen")
-	}
-	if cfg.Server.Web.Listen != start.WebAddr {
-		keys = append(keys, "server.web.listen")
-	}
-	if cfg.Server.Web.DevFrontendURL() != start.WebDevURL {
-		keys = append(keys, "server.web.dev-frontend")
-	}
-	if runnerChoice(cfg.AgentRunner) != runnerChoice(start.AgentRunner) {
-		keys = append(keys, "agent-runner")
+	for _, e := range registry.Default().All() {
+		if e.Restart && !reflect.DeepEqual(config.ValueAt(cfg, e.Key), config.ValueAt(h.opts.Startup.Config, e.Key)) {
+			keys = append(keys, e.Key.String())
+		}
 	}
 	return keys
-}
-
-// runnerChoice treats an unset agent-runner as auto, its documented default.
-func runnerChoice(setting string) agentrunner.Choice {
-	if setting == "" {
-		return agentrunner.ChoiceAuto
-	}
-	return agentrunner.Choice(setting)
 }
 
 func refuseReload(reason, message string) wire.ReloadResult {

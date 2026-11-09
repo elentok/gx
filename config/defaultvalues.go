@@ -47,7 +47,27 @@ func DefaultValue(path registry.KeyPath) (any, bool) {
 	if e, ok := registry.Default().Lookup(path); ok && e.WriteOnly() {
 		return nil, false
 	}
-	cfg := Default()
+	if node, ok := valueAt(Default(), path); ok {
+		return node, true
+	}
+	return emptyDefault(path)
+}
+
+// ValueAt is the value of a registry key path in cfg, shaped as the config
+// file would hold it; nil when cfg holds none. Comparing two configs through
+// it needs no per-key code.
+func ValueAt(cfg Config, path registry.KeyPath) any {
+	// The effective dev URL, so a dev-url that is ignored while dev-frontend
+	// is off never counts as a change.
+	if path.String() == "server.web.dev-url" {
+		return cfg.Server.Web.DevFrontendURL()
+	}
+	node, _ := valueAt(cfg, path)
+	return node
+}
+
+// valueAt reports false when cfg holds no value at path.
+func valueAt(cfg Config, path registry.KeyPath) (any, bool) {
 	if f, ok := hiddenDefaults[path.String()]; ok {
 		return f(cfg), true
 	}
@@ -62,16 +82,13 @@ func DefaultValue(path registry.KeyPath) (any, bool) {
 	for _, seg := range path {
 		m, ok := node.(map[string]any)
 		if !ok {
-			return emptyDefault(path)
+			return nil, false
 		}
 		if node, ok = m[seg]; !ok {
-			return emptyDefault(path)
+			return nil, false
 		}
 	}
-	if node == nil {
-		return emptyDefault(path)
-	}
-	return node, true
+	return node, node != nil
 }
 
 // emptyDefault is the default of a key the marshalled Config leaves out or
