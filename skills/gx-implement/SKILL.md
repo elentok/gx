@@ -200,10 +200,21 @@ If you deliberately narrow, skip or change something the spec or ticket asked fo
 `## Spec deviations` section of the ticket body (`gx tickets section <addr> "Spec deviations"
 <content|->`). One bullet per deviation: what the spec said, what you did instead, and why.
 [gx-code-review](../gx-code-review/SKILL.md) collects these so its reviewers don't report a known
-narrowing as a bug. Only deliberate decisions belong here — not bugs or unfinished work.
+narrowing as a bug. Only deliberate decisions belong here — not bugs or unfinished work, with
+one exception below.
+
+Record an entry whenever you:
+
+- weaken or loosen an assertion (for example `toBe(0)` becomes a relative count);
+- do not meet a requested shape or placement (for example "in one place" ends up in two);
+- skip or substitute a ticket instruction (for example "choose a harmless item" and you pick another).
 
 A changed test form counts: if the ticket's Decisions or seams name a form (table test,
 server-level test, ...) and you write another, record it here.
+
+An unresolved product bug you hit and did not fix also gets an entry here (or a follow-up), with
+what you tried. Write the entry, and say so before finishing. Disclose it here, never only in the
+final message: code review and the collect tickets cannot see the final message.
 
 ## Comments: fewer, and no numbers in them
 

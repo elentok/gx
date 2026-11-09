@@ -70,6 +70,9 @@ func TestCheckRulesAnchors(t *testing.T) {
 			"The finishing commit still needs `gx check` first.",
 			"retry the same command once",
 		}},
+		{"implement spec deviation triggers", "gx-implement/SKILL.md", []string{
+			"weaken or loosen an assertion", "unresolved product bug", "say so before finishing", "never only in the final message",
+		}},
 		{"follow-up", "gx-follow-up/SKILL.md", []string{"search the candidates for that test name first"}},
 		{"evolve", "gx-evolve/SKILL.md", []string{
 			"### Check rows", "### Launch rows", "`slower:`", "`flake:`", "](../gx-follow-up/SKILL.md)", "Category `bug`", "Category `idea`",
