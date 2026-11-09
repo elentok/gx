@@ -3,6 +3,7 @@ package brief
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -16,6 +17,11 @@ import (
 )
 
 const playwrightConfig = "e2e/playwright.config.ts"
+
+const playwrightUsage = `usage: gx brief -C webui playwright [file.e2e.ts] [flow numbers...] [playwright test flags]
+  gx brief -C webui playwright disk.e2e.ts 76 77   run flows 76 and 77 of disk.e2e.ts
+  Bare numbers become one -g filter on "N. " titles; do not mix them with -g.
+  List flow titles: gx brief -C webui playwright --list disk.e2e.ts`
 
 // buildWeb builds the web UI. It is a variable so tests do not run make.
 var buildWeb = func(env []string, root string) error {
@@ -39,6 +45,9 @@ func (Playwright) Name() string { return "playwright" }
 // dist/index.html triggers `make web-build`; the global setup rebuilds a
 // stale dist, so building here only covers a missing one.
 func (Playwright) Plan(env []string, dir string, args []string) (Invocation, error) {
+	if slices.ContainsFunc(args, func(a string) bool { return a == "--help" || a == "-h" }) {
+		return Invocation{}, errors.New(playwrightUsage)
+	}
 	bin, err := findNodeBin(dir, "playwright")
 	if err != nil {
 		return Invocation{}, err

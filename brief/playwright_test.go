@@ -126,6 +126,16 @@ func TestPlaywrightPlan_AddsConfigAndLineReporter(t *testing.T) {
 	}
 }
 
+func TestPlaywrightPlan_HelpPrintsUsageInsteadOfRunningTheSuite(t *testing.T) {
+	dir := playwrightDir(t, true)
+	for _, flag := range []string{"--help", "-h"} {
+		_, err := Playwright{}.Plan(nil, dir, []string{flag})
+		if err == nil || !strings.Contains(err.Error(), "usage: gx brief -C webui playwright") {
+			t.Errorf("%s: err = %v, want usage", flag, err)
+		}
+	}
+}
+
 func TestPlaywrightPlan_BareFlowNumbersBecomeOneAnchoredGrep(t *testing.T) {
 	dir := playwrightDir(t, true)
 	os.MkdirAll(filepath.Join(dir, "dist"), 0o755)

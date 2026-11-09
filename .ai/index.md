@@ -92,7 +92,7 @@ A new config key must reach the settings page or be excluded with a reason:
   - `gx brief -C webui tsc`
   - e2e flows: `gx brief -C webui playwright disk.e2e.ts 76 77`. Bare flow numbers become one `-g`
     pattern. Never write `-g "^76\."`: Playwright matches `-g` against `[project] › file › title`,
-    so a `^` anchor finds no tests. It adds the config and the line reporter, and runs
+    so a `^` anchor finds no tests. `--help` prints usage; `--list` shows flow titles. It adds the config and the line reporter, and runs
     `make web-build` only when `webui/dist/index.html` is missing.
 - Unix socket paths are capped near 100 bytes, and `t.TempDir()` can exceed that. Holder-socket
   tests (anything that binds `holder.sock`) need a short `TMPDIR` or a short state root; use
