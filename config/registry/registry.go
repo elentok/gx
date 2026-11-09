@@ -77,6 +77,19 @@ type Entry struct {
 	ProjectOnly        bool
 	// ProjectKey is the project's own key path where it differs from Key.
 	ProjectKey KeyPath
+	// GlobalKey links a project-only entry to the global key it caps or
+	// overrides, for "global cap of X" text.
+	GlobalKey KeyPath
+	// ReadOnly: shown but never written by the page.
+	ReadOnly bool
+}
+
+// ProjectPath is the key path in project.json.
+func (e Entry) ProjectPath() KeyPath {
+	if len(e.ProjectKey) > 0 {
+		return e.ProjectKey
+	}
+	return e.Key
 }
 
 // WriteOnly reports whether the value is never read back (secrets).
@@ -87,8 +100,10 @@ func (e Entry) AppliesToProject() bool { return e.ProjectOverridable || e.Projec
 
 // Exclusion names a config key deliberately left out of the registry.
 type Exclusion struct {
-	Key    KeyPath
-	Reason string
+	Key KeyPath
+	// Project: the key is excluded from project.json, not config.json.
+	Project bool
+	Reason  string
 }
 
 // Registry is an ordered set of entries.
@@ -129,6 +144,46 @@ func (r *Registry) InSection(s Section) []Entry {
 	for _, e := range r.entries {
 		if e.Section == s {
 			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// Default is the registry of every setting.
+func Default() *Registry {
+	var all []Entry
+	all = append(all, coreEntries()...)
+	all = append(all, agentsEntries()...)
+	all = append(all, projectEntries()...)
+	return New(all...)
+}
+
+// ProjectSection is one section of a project's view.
+type ProjectSection struct {
+	Section Section
+	Entries []Entry
+}
+
+// ProjectView groups the entries that apply to a project: Project first, then
+// each other section that holds one, Checks last. Notifications never shows.
+func (r *Registry) ProjectView() []ProjectSection {
+	order := []Section{SectionProject}
+	for _, s := range Sections() {
+		if s != SectionProject && s != SectionChecks && s != SectionNotifications {
+			order = append(order, s)
+		}
+	}
+	order = append(order, SectionChecks)
+	var out []ProjectSection
+	for _, s := range order {
+		var es []Entry
+		for _, e := range r.InSection(s) {
+			if e.AppliesToProject() {
+				es = append(es, e)
+			}
+		}
+		if len(es) > 0 {
+			out = append(out, ProjectSection{Section: s, Entries: es})
 		}
 	}
 	return out
