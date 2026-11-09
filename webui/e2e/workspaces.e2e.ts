@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { sessions } from "./agentsKit";
 import { blockEvents, card, expect, nav, sessionRows, swipe, test, touch } from "./fixture";
 
 const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash);
@@ -708,6 +709,58 @@ test("Workspaces", async ({ page, start }) => {
     await closeDialog();
   }
   await page.setViewportSize({ width: 1280, height: 900 });
+
+  // New chat and New design start on the page's project, then the Epics filter's single project, then the last used one.
+  // Every check opens a blank form: the previous one is closed with nothing typed, so no draft carries over.
+  const chatForm = page.getByRole("dialog", { name: "New session" });
+  const designForm = dialog.getByRole("textbox", nav("Epic slug"));
+  const chatProject = chatForm.getByRole("combobox", nav("Project"));
+  const designProject = dialog.getByRole("combobox", nav("Project"));
+  const formsShow = async (project: string) => {
+    await newItem("New chat");
+    await expect(chatProject).toHaveValue(project);
+    await closeDialog();
+    await newItem("New design");
+    await expect(designForm).toBeVisible();
+    await expect(designProject).toHaveValue(project);
+    await closeDialog();
+  };
+  const sideChat = (await sessions(fx)).find((s) => s.project === "side" && !s.design)!;
+  await goto(page, "#/d/side:side-design");
+  await expect(page.getByRole("heading", { name: /side-design/ }).first()).toBeVisible();
+  await formsShow("side");
+  await goto(page, `#/agents/${sideChat.id}`);
+  await expect(page).toHaveURL(new RegExp(`#/agents/${sideChat.id}$`));
+  await newItem("New chat");
+  await expect(chatProject).toHaveValue("side");
+  await closeDialog();
+
+  // On the Epics page, a filter that picks the one project decides.
+  await goto(page, "#/epics");
+  await page.getByRole("button", nav("Project")).click();
+  const projectList = page.getByRole("dialog", nav("Projects"));
+  const allProjects = projectList.getByRole("button", nav("All projects"));
+  if (await allProjects.isEnabled()) await allProjects.click();
+  await projectList.getByRole("checkbox", nav("side")).check();
+  await page.keyboard.press("Escape");
+  await expect(projectList).toHaveCount(0);
+  await formsShow("side");
+
+  // With the filter cleared, a chat created in the second project becomes the last used one, which a Stats page form starts on.
+  await page.getByRole("button", nav("Project")).click();
+  await projectList.getByRole("button", nav("All projects")).click();
+  await page.keyboard.press("Escape");
+  await expect(projectList).toHaveCount(0);
+  await goto(page, "#/stats");
+  await newItem("New chat");
+  await expect(chatProject).toHaveValue("demo");
+  await chatProject.selectOption("side");
+  await chatForm.getByRole("textbox", nav("Name")).fill("side-made");
+  await chatForm.getByRole("textbox", nav("First prompt")).fill("hi");
+  await chatForm.getByRole("button", nav("Create session")).click();
+  await expect(chatForm).toHaveCount(0);
+  await goto(page, "#/stats");
+  await formsShow("side");
 
   // The footer's boxes are one size with their icons centered, at 1280px and 390px, and the badges agree.
   const footer = sidebar.locator("footer");
