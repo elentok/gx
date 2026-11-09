@@ -46,6 +46,7 @@ type Cleanup struct {
 	mu       sync.Mutex
 	sizes    map[string]uint64
 	inflight map[string]bool
+	gen      int // bumped by Invalidate
 }
 
 // New builds Cleanup.
@@ -181,16 +182,21 @@ func (c *Cleanup) sizeOf(path string, missing []string) (*uint64, []string) {
 func (c *Cleanup) Invalidate() {
 	c.mu.Lock()
 	c.sizes = map[string]uint64{}
+	c.gen++
 	c.mu.Unlock()
 }
 
 func (c *Cleanup) measure(project, path string) {
 	ctx, cancel := context.WithTimeout(context.Background(), duTimeout)
 	defer cancel()
+	c.mu.Lock()
+	gen := c.gen
+	c.mu.Unlock()
 	n, err := c.d.Size(ctx, path)
 	c.mu.Lock()
 	delete(c.inflight, path)
-	if err == nil {
+	// A size measured before an Invalidate may predate the removal.
+	if err == nil && gen == c.gen {
 		c.sizes[path] = n
 	}
 	c.mu.Unlock()
