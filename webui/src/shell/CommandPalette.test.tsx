@@ -3,12 +3,14 @@ import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { session } from "../agents/agentsTestKit";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
+import { CardActionAnswer, CardKindFollowUps, CardKindImplementation, CardKindOneOff, SectionNeedsYou, type EpicListRow } from "../generated/server";
 import { Modal } from "../ui/modal/Modal";
 import { renderThemed } from "../ui/render";
 import { CommandPalette } from "./CommandPalette";
 import { JumpPalette } from "./JumpPalette";
 import { NewItemHost } from "./NewItemHost";
 import { closeNewItem } from "./newItemOpen";
+import { ShellContext, type Shell } from "./ShellContext";
 
 afterEach(() => {
   closeNewItem();
@@ -24,7 +26,21 @@ function Where() {
 
 const projects = ["alpha", "beta", "gamma"];
 
-function setup({ narrow = false, mac = false, path = "/stats", afk = false } = {}) {
+const card = (name: string, day: number, over: Partial<EpicListRow> = {}): EpicListRow =>
+  ({
+    address: `p:${name}`,
+    project: "p",
+    name,
+    workspace: "Default",
+    card_kind: CardKindImplementation,
+    section: SectionNeedsYou,
+    waiting_since: `2026-01-0${day}T00:00:00Z`,
+    ...over,
+  }) as EpicListRow;
+
+const defaultEpics = [{ address: "beta:feat", project: "beta" }] as EpicListRow[];
+
+function setup({ narrow = false, mac = false, path = "/stats", afk = false, epics = defaultEpics, follow_ups = [] as unknown[] } = {}) {
   vi.spyOn(navigator, "platform", "get").mockReturnValue(mac ? "MacIntel" : "Linux x86_64");
   vi.stubGlobal(
     "fetch",
@@ -34,7 +50,7 @@ function setup({ narrow = false, mac = false, path = "/stats", afk = false } = {
         ? projects.map((project) => ({ project, root: `/${project}`, worktrees: [], tiers: {} }))
         : u.includes("drafts")
           ? []
-          : { epics: [{ address: "beta:feat", project: "beta" }], follow_ups: [], projects };
+          : { epics, follow_ups, projects };
       return new Response(JSON.stringify(body), { status: 200 });
     }),
   );
@@ -49,7 +65,9 @@ function setup({ narrow = false, mac = false, path = "/stats", afk = false } = {
           <>
             <input aria-label="field" />
             <JumpPalette active="Default" />
-            <CommandPalette />
+            <ShellContext.Provider value={{ workspace: "Default", closeSliding() {} } as Shell}>
+              <CommandPalette />
+            </ShellContext.Provider>
             <NewItemHost />
             <Where />
           </>
@@ -134,7 +152,7 @@ test("Escape and a click outside close without running anything", () => {
 test("rows are in fixed order, hold no epic or session rows, and filter fuzzily", () => {
   setup();
   press({ key: "e", ctrlKey: true });
-  expect(names()).toEqual(["New design", "New chat", "Go to Epics", "Go to Agents", "Go to Stats", "Go to Settings", "Toggle AFK"]);
+  expect(names()).toEqual(["New design", "New chat", "Next question", "Go to Epics", "Go to Agents", "Go to Stats", "Go to Settings", "Toggle AFK"]);
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "go ep" } });
   expect(names()[0]).toBe("Go to Epics");
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "newdes" } });
@@ -146,8 +164,8 @@ test("rows are in fixed order, hold no epic or session rows, and filter fuzzily"
 const projectSelect = async () => ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value;
 
 test.each([
-  ["nd", "/stats", "alpha"],
-  ["nd", "/e/beta:feat", "beta"],
+  ["ndes", "/stats", "alpha"],
+  ["ndes", "/e/beta:feat", "beta"],
   ["nc", "/stats", "alpha"],
   ["nc", "/agents/s1", "gamma"],
 ])("typing %s then Enter on %s opens the form on %s over the same page", async (filter, path, project) => {
@@ -168,7 +186,7 @@ test("Down and Enter run the chosen command", () => {
   setup();
   press({ key: "e", ctrlKey: true });
   const box = screen.getByRole("combobox");
-  for (let i = 0; i < 3; i++) fireEvent.keyDown(box, { key: "ArrowDown" });
+  for (let i = 0; i < 4; i++) fireEvent.keyDown(box, { key: "ArrowDown" });
   fireEvent.keyDown(box, { key: "Enter" });
   expect(where()).toBe("/agents");
   expect(palette()).toBeNull();
@@ -199,6 +217,56 @@ test.each([
   const posts = () => vi.mocked(fetch).mock.calls.filter(([u]) => String(u).includes("/v1/afk"));
   await waitFor(() => expect(posts()).toHaveLength(1));
   expect(JSON.parse(String(posts()[0][1]?.body))).toEqual({ on });
+});
+
+const nextRow = () => screen.getAllByRole("option").find((o) => o.textContent?.startsWith("Next question"))!;
+
+const waiting = [
+  card("old", 1),
+  card("new", 3, { actions: [{ kind: CardActionAnswer, link: "#/answer/new" }] as EpicListRow["actions"] }),
+  card("mid", 2),
+  card("far", 9, { workspace: "Work" }),
+];
+
+test("Next question: from a plain page Enter opens the newest card's Answer link", async () => {
+  setup({ epics: waiting });
+  await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+  press({ key: "e", ctrlKey: true });
+  await waitFor(() => expect(nextRow().textContent).toContain("new · 3 waiting"));
+  const box = screen.getByRole("combobox");
+  fireEvent.change(box, { target: { value: "needs you" } });
+  expect(names()).toEqual(["Next question"]);
+  fireEvent.keyDown(box, { key: "Enter" });
+  expect(where()).toBe("/answer/new");
+  expect(palette()).toBeNull();
+});
+
+test("Next question: from a card's page it goes to the next one, a plain card to its page", async () => {
+  setup({ epics: waiting, path: "/e/p:mid" });
+  press({ key: "e", ctrlKey: true });
+  await waitFor(() => expect(nextRow().textContent).toContain("old · 3 waiting"));
+  fireEvent.click(nextRow());
+  expect(where()).toBe("/e/p:old");
+});
+
+test.each([
+  ["a One-off card", card("chore", 2, { card_kind: CardKindOneOff, address: "p:t1" }), "chore · 1 waiting"],
+  ["a Follow-ups card", card("", 2, { card_kind: CardKindFollowUps, name: "", waiting_since: undefined }), "p · 1 waiting"],
+])("Next question subtitle names %s", async (_n, row, subtitle) => {
+  setup({ epics: [row], follow_ups: [{ project: "p", workspaces: ["Default"] }] });
+  press({ key: "e", ctrlKey: true });
+  await waitFor(() => expect(nextRow().textContent).toContain(subtitle));
+});
+
+test("Next question with nothing waiting stays in place and Enter leaves the route", async () => {
+  setup({ epics: [card("away", 1, { workspace: "Work" })] });
+  press({ key: "e", ctrlKey: true });
+  await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+  expect(nextRow().textContent).toContain("Nothing needs you");
+  const box = screen.getByRole("combobox");
+  fireEvent.change(box, { target: { value: "next" } });
+  fireEvent.keyDown(box, { key: "Enter" });
+  expect(where()).toBe("/stats");
 });
 
 test("full screen at a phone width", () => {
