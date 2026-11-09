@@ -111,6 +111,12 @@
         "fix-agent-remote-control": {
           "description": "accepted in project.json, ignored"
         },
+        "focus-sidebar-key": {
+          "description": "accepted in project.json, ignored"
+        },
+        "leader-key": {
+          "description": "accepted in project.json, ignored"
+        },
         "restore-sessions-on-start": {
           "description": "accepted in project.json, ignored"
         },
