@@ -6,6 +6,7 @@ import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 /** A 5-row note that scrolls itself into view when it mounts. */
 export function NoteBox({
   name,
+  fieldName,
   title,
   value,
   placeholder,
@@ -19,6 +20,8 @@ export function NoteBox({
 }: {
   /** What the note is on, for its labels: "question 2". */
   name: string;
+  /** The textarea's form name; see ExpandableTextField. */
+  fieldName: string;
   /** The large editor's title. */
   title: string;
   value: string;
@@ -45,6 +48,7 @@ export function NoteBox({
       <ExpandableTextField
         rows={5}
         label={label ?? `Note text for ${name}`}
+        name={fieldName}
         title={title}
         value={value}
         placeholder={placeholder}

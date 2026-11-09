@@ -69,6 +69,9 @@ test("fields are named and inputs are 16px", async () => {
   expect(dialog.getAttribute("aria-modal")).toBe("true");
   for (const name of ["Epic slug", "Rough idea"]) expect(getComputedStyle(screen.getByRole("textbox", { name })).fontSize).toBe("16px");
   expect(getComputedStyle(screen.getByRole("combobox", { name: "Project" })).fontSize).toBe("16px");
+  const idea = screen.getByRole("textbox", { name: "Rough idea" });
+  expect(idea.getAttribute("autocomplete")).toBe("off");
+  expect(idea.getAttribute("name")).toBe("design-idea");
   for (const name of ["Start design", "Discard", "Close"]) expect(screen.getByRole("button", { name })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
 });

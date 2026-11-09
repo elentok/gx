@@ -31,6 +31,9 @@ test("the deny note has an expand button; its editor shares the text and pending
   let release: () => void = () => {};
   const post = vi.fn<(b: DecisionBody) => ReturnType<PostDecision>>(() => new Promise((r) => (release = () => r({}))));
   renderThemed(<PermissionCard detail={withCard(card)} post={post} />);
+  const area = screen.getByLabelText("Note for Deny (optional)");
+  expect(area.getAttribute("autocomplete")).toBe("off");
+  expect(area.getAttribute("name")).toBe("permission-deny-note");
   fireEvent.click(screen.getByRole("button", { name: EXPAND }));
   await typeInLargeEditor("Note for Deny", "from editor");
   expect((screen.getByLabelText("Note for Deny (optional)") as HTMLTextAreaElement).value).toBe("from editor");

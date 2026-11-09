@@ -115,6 +115,7 @@ export function Question({
             size="sm"
             rows={big ? 5 : 2}
             label={`Answer to question ${card.label}`}
+            name="question-answer"
             title={`Answer to ${nameOf(card)} - ${card.title}`}
             placeholder="Your answer"
             value={answer.text ?? ""}
@@ -173,6 +174,7 @@ export function Question({
       {noteOpen && (
         <NoteBox
           name={`question ${card.label}`}
+          fieldName="question-note"
           title={`Note on ${nameOf(card)} - ${card.title}`}
           placeholder="Note on this question"
           bg="surface"

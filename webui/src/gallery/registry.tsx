@@ -450,9 +450,9 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "ExpandableTextField",
     cases: [
-      { label: "closed", node: <ExpandableTextField label="Closed" title="Note" rows={3} placeholder="Note" value="" onChange={() => {}} /> },
-      { label: "disabled", node: <ExpandableTextField label="Disabled" title="Note" rows={3} placeholder="Note" disabled value="" onChange={() => {}} /> },
-      { label: "with text", node: <ExpandableTextField label="With text" title="Note" rows={3} value={"A note\nover two lines"} onChange={() => {}} /> },
+      { label: "closed", node: <ExpandableTextField label="Closed" name="gallery-note" title="Note" rows={3} placeholder="Note" value="" onChange={() => {}} /> },
+      { label: "disabled", node: <ExpandableTextField label="Disabled" name="gallery-note" title="Note" rows={3} placeholder="Note" disabled value="" onChange={() => {}} /> },
+      { label: "with text", node: <ExpandableTextField label="With text" name="gallery-note" title="Note" rows={3} value={"A note\nover two lines"} onChange={() => {}} /> },
     ],
   },
   ...questionEntries,

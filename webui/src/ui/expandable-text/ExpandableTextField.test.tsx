@@ -25,6 +25,7 @@ function Harness({
   return (
     <ExpandableTextField
       label="Note"
+      name="test-note"
       title={TITLE}
       rows={3}
       placeholder="Type"
@@ -35,10 +36,21 @@ function Harness({
   );
 }
 
+test("the textarea turns AutoFill off and has a name", () => {
+  renderThemed(<Harness />);
+  const area = field();
+  expect(area.getAttribute("autocomplete")).toBe("off");
+  expect(area.getAttribute("name")).toBe("test-note");
+  for (const attr of ["autocorrect", "autocapitalize", "spellcheck", "inputmode"]) {
+    expect(area.hasAttribute(attr)).toBe(false);
+  }
+});
+
 test("the textarea gets value, rows, label, placeholder and disabled", () => {
   renderThemed(
     <ExpandableTextField
       label="Note"
+      name="test-note"
       title={TITLE}
       rows={3}
       placeholder="Type"
@@ -90,6 +102,7 @@ test("the editor shows a new value prop and keeps the caret: no copy", async () 
         <button onClick={() => setText("hello world!")}>Set new</button>
         <ExpandableTextField
           label="Note"
+          name="test-note"
           title={TITLE}
           value={text}
           onChange={onChange}
@@ -134,6 +147,7 @@ test("the selection goes to the editor on open and back to the field on close", 
   renderThemed(
     <ExpandableTextField
       label="Note"
+      name="test-note"
       title={TITLE}
       value="hello world"
       onChange={() => {}}
@@ -181,7 +195,7 @@ function Keys({
   const [text, setText] = useState("hello world");
   return (
     <form onKeyDown={onKeyDown}>
-      <ExpandableTextField label="Note" title={TITLE} value={text} onChange={setText} disabled={disabled} onSubmit={onSubmit} />
+      <ExpandableTextField label="Note" name="test-note" title={TITLE} value={text} onChange={setText} disabled={disabled} onSubmit={onSubmit} />
     </form>
   );
 }
@@ -310,6 +324,7 @@ function Completing({ harness }: { harness: string }) {
   return (
     <ExpandableTextField
       label="Note"
+      name="test-note"
       title={TITLE}
       value={text}
       onChange={setText}

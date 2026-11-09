@@ -11,6 +11,7 @@ test("is five rows tall and scrolls into view when it opens", () => {
   renderThemed(
     <NoteBox
       name="question 2"
+      fieldName="question-note"
       title="Note on Q2 - Pick"
       placeholder="Note"
       value=""
@@ -22,4 +23,7 @@ test("is five rows tall and scrolls into view when it opens", () => {
     5,
   );
   expect(scrollIntoView).toHaveBeenCalled();
+  const area = screen.getByLabelText("Note text for question 2");
+  expect(area.getAttribute("autocomplete")).toBe("off");
+  expect(area.getAttribute("name")).toBe("question-note");
 });

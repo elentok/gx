@@ -285,6 +285,7 @@ export function Composer({
         {open && (
           <NoteBox
             name="the composer"
+            fieldName="design-note"
             label="Message"
             title={inRound ? "Note on this round" : "Message to the agent"}
             placeholder={inRound ? "A note on this round" : "A message to the agent"}

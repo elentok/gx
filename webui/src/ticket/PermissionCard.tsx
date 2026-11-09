@@ -89,6 +89,7 @@ export function PermissionCard({
         <>
           <ExpandableTextField
             label="Note for Deny (optional)"
+            name="permission-deny-note"
             title="Note for Deny"
             placeholder="Note for Deny (optional)"
             value={note}

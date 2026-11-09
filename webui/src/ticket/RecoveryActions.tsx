@@ -181,6 +181,7 @@ function StartOverDialog({
       <Text>{DISCARD_NOTICE}</Text>
       <ExpandableTextField
         label="Reason"
+        name="recovery-reason"
         title="Start over reason"
         placeholder="Why start over?"
         value={reason}

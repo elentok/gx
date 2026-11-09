@@ -45,6 +45,16 @@ test("yes-no buttons read Yes and No with the consequence under them", () => {
   expect(rows[1].textContent).toBe("NoStop here");
 });
 
+test("a text answer and a note turn AutoFill off and get distinct names", () => {
+  renderThemed(<Question card={card({ kind: "text" })} answer={{ note: "n" }} onChange={() => {}} onPicked={() => {}} />);
+  const answer = screen.getByLabelText("Answer to question 1");
+  const note = screen.getByLabelText("Note text for question 1");
+  expect(answer.getAttribute("autocomplete")).toBe("off");
+  expect(note.getAttribute("autocomplete")).toBe("off");
+  expect(answer.getAttribute("name")).toBe("question-answer");
+  expect(note.getAttribute("name")).toBe("question-note");
+});
+
 const card = (over: Partial<SessionRoundCard> = {}): SessionRoundCard => ({
   label: "1",
   title: "Pick",

@@ -48,6 +48,8 @@ const send = () => screen.getByRole("button", { name: "Send" });
 test("the box is open with Send beside it and none of the design parts", () => {
   render({ reason: "Why it is off" });
   expect(box()).toBeTruthy();
+  expect(box().getAttribute("autocomplete")).toBe("off");
+  expect(box().getAttribute("name")).toBe("chat-message");
   expect(send()).toBeTruthy();
   expect(screen.getByText("Why it is off")).toBeTruthy();
   for (const name of [/Auto/, /Continue/, /Interrupt/, /Note/]) {

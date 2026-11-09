@@ -23,6 +23,8 @@ interface FieldProps {
   rows?: number;
   /** The field's accessible name. */
   label: string;
+  /** The textarea's name: stable and not card-like or contact-like, so the browser offers no AutoFill. */
+  name: string;
   /** The large editor's title. Its accessible name is "<title> text". */
   title: string;
   placeholder?: string;
@@ -69,6 +71,7 @@ function Field({
   onChange,
   rows,
   label,
+  name,
   title,
   placeholder,
   disabled,
@@ -131,6 +134,8 @@ function Field({
         pe="46px"
         resize="none"
         aria-label={label}
+        name={name}
+        autoComplete="off"
         placeholder={placeholder}
         disabled={disabled}
         value={value}

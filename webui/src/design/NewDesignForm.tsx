@@ -688,6 +688,8 @@ function DraftForm({
       )}
       <chakra.textarea
         aria-label="Rough idea"
+        name="design-idea"
+        autoComplete="off"
         {...field}
         flex="1"
         minH="0"
