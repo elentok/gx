@@ -99,11 +99,11 @@ The model name leaves the page header (Agents, Triage) and the Design page's men
 
 New flows or scenarios to write: a `context-window` fixture scenario with a Claude session at each of the four levels, a fresh session with no reply, a finished session (also on Design and Triage, where the composer is hidden), a NoChat session, a /compact session, a session with no transcript, a Codex session, a Queue agent, a Design session and a Triage session, so the steps above run on one scenario, in one new named flow (see Testing Decisions). Only the model-relocation assertions change in existing flows.
 
-Mock states:
+**Mock states**
 
-- `$(gx tickets root)/context-window/mocks/02-composer-row-layout.html`, state `desktop`, width 980, fixture scenario `context-window` (new, Design page, session at 128K), parts: header, text-box, footer-line, model, context-badge, button-row, main-button.
-- `$(gx tickets root)/context-window/mocks/02-composer-row-layout.html`, state `tablet`, width 640, fixture scenario `context-window` (new), parts: header, text-box, footer-line, model, context-badge, button-row, main-button.
-- `$(gx tickets root)/context-window/mocks/02-composer-row-layout.html`, state `phone`, width 380, fixture scenario `context-window` (new), parts: header, text-box, footer-line, model (without effort), context-badge, button-row, main-button.
+- `$(gx tickets root)/context-window/mocks/02-composer-row-layout.html`, `desktop`, width 980, fixture scenario `context-window` (new, Design page, session at 128K), parts: header, text-box, footer-line, model, context-badge, button-row, main-button.
+- `$(gx tickets root)/context-window/mocks/02-composer-row-layout.html`, `tablet`, width 640, fixture scenario `context-window` (new), parts: header, text-box, footer-line, model, context-badge, button-row, main-button.
+- `$(gx tickets root)/context-window/mocks/02-composer-row-layout.html`, `phone`, width 380, fixture scenario `context-window` (new), parts: header, text-box, footer-line, model (without effort), context-badge, button-row, main-button.
 
 ## Out of Scope
 
