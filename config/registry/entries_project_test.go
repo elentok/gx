@@ -40,6 +40,15 @@ func TestProjectView(t *testing.T) {
 	if ev.Type != TypeBool || ev.Section != SectionEvolveRecovery {
 		t.Errorf("project evolve = %+v", ev)
 	}
+	if m.Label != "Max live agents for this project" || m.Override != OverrideCap {
+		t.Errorf("max-agents label/override = %q/%q", m.Label, m.Override)
+	}
+	if ev.Label != "Evolve for this project" || ev.Override != OverrideFollowsGlobal {
+		t.Errorf("evolve label/override = %q/%q", ev.Label, ev.Override)
+	}
+	if totp, _ := Default().Lookup(Key("server", "web", "totp")); !totp.RiskyOffOnly {
+		t.Errorf("server.web.totp must be risky only when turned off")
+	}
 }
 
 func TestProjectOnlyEntries(t *testing.T) {

@@ -7,9 +7,7 @@ import { Modal } from "../ui/modal/Modal";
 import { refusalText, useWrite } from "../useWrite";
 import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi";
 
-export { entryLabel };
-
-export function valueText(e: SettingsEntry): string {
+function valueText(e: SettingsEntry): string {
   if (e.type === "secret") return e.set ? "Set" : "Not set";
   return displayValue(e.set ? e.value : e.default);
 }
@@ -267,15 +265,12 @@ const SAVED_MS = 2000;
 
 // Turning the one-time code on makes the page safer, so only turning it off (or resetting away a set value) asks.
 const needsConfirm = (e: SettingsEntry, change: SettingChange) =>
-  !!e.risky && !(e.key === "server.web.totp" && "value" in change && change.value === true);
-
-const CAP_KEY = "project.max-agents";
-const EVOLVE_KEY = "project.evolve";
+  !!e.risky && !(e.risky_off_only && "value" in change && change.value === true);
 
 /** In a project, a key with a global counterpart is inherited until the project file holds it. */
 function projectTexts(e: SettingsEntry, project: string) {
   const global = displayValue(e.global_value);
-  if (e.key === CAP_KEY) {
+  if (e.override === "cap") {
     return {
       inherit: (
         <>
@@ -288,7 +283,7 @@ function projectTexts(e: SettingsEntry, project: string) {
   }
   return {
     inherit:
-      e.key === EVOLVE_KEY ? (
+      e.override === "follows-global" ? (
         <>
           Follows global mode (<b>{global}</b>)
         </>
@@ -353,7 +348,8 @@ export function SettingsRow({
   const texts = overridable ? projectTexts(entry, project) : undefined;
   const inherited = overridable && !entry.set;
   // Turning a project's evolve switch back on removes the key: unset follows the global mode.
-  const saveValue = (value: unknown) => send(entry.key === EVOLVE_KEY && value === true ? removeChange(entry.key) : setChange(entry.key, value));
+  const followsGlobal = entry.override === "follows-global";
+  const saveValue = (value: unknown) => send(followsGlobal && value === true ? removeChange(entry.key) : setChange(entry.key, value));
   return (
     <Box px="3.5" py="3" display="grid" gap="1.5" _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}>
       <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
@@ -397,7 +393,7 @@ export function SettingsRow({
             emphasis="secondary"
             tone="muted"
             disabled={write.pending}
-            onClick={() => send(setChange(entry.key, entry.key === EVOLVE_KEY ? false : entry.global_value))}
+            onClick={() => send(setChange(entry.key, followsGlobal ? false : entry.global_value))}
           >
             {texts.start}
           </Button>

@@ -230,7 +230,8 @@ describe("SettingsRow", () => {
   });
 
   describe("risky keys", () => {
-    const risky = (over: Partial<SettingsEntry>) => entry({ risky: true, confirm_text: "This is risky.", ...over });
+    const risky = (over: Partial<SettingsEntry>) =>
+      entry({ risky: true, risky_off_only: over.key === "server.web.totp", confirm_text: "This is risky.", ...over });
     const cases: [string, Partial<SettingsEntry>, (v: ReturnType<typeof setup>) => void, unknown][] = [
       ["server.web.listen", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
       ["server.web.dev-url", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
@@ -293,9 +294,31 @@ describe("SettingsRow", () => {
     const per = (over: Partial<SettingsEntry>) =>
       entry({ key: "execution-queue.max-agents-per-epic", global_key: "execution-queue.max-agents-per-epic", global_value: 3, ...over });
     const cap = (over: Partial<SettingsEntry>) =>
-      entry({ key: "project.max-agents", path: ["project", "max-agents"], global_key: "execution-queue.max-agents", global_value: 6, ...over });
+      entry({
+        key: "project.max-agents",
+        path: ["project", "max-agents"],
+        label: "Max live agents for this project",
+        override: "cap",
+        global_key: "execution-queue.max-agents",
+        global_value: 6,
+        ...over,
+      });
     const evolve = (over: Partial<SettingsEntry>) =>
-      entry({ key: "project.evolve", path: ["project", "evolve"], type: "bool", global_key: "evolve", global_value: true, ...over });
+      entry({
+        key: "project.evolve",
+        path: ["project", "evolve"],
+        label: "Evolve for this project",
+        override: "follows-global",
+        type: "bool",
+        global_key: "evolve",
+        global_value: true,
+        ...over,
+      });
+
+    it("the project rows read the registry's labels", () => {
+      expect(inProject(cap({})).getByText("Max live agents for this project")).toBeTruthy();
+      expect(inProject(evolve({})).getByText("Evolve for this project")).toBeTruthy();
+    });
 
     it("an unset key shows the global value; Override writes that value", async () => {
       const v = inProject(per({}));

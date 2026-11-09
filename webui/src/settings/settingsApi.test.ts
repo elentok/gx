@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import type { SettingsEntry } from "../generated/server";
-import { changedCount, draftHint, fetchSettings, groupBySection, postSettings, removeChange, rowState, searchEntries, setChange } from "./settingsApi";
+import { entryLabel, fetchSettings, groupBySection, numberListHint, postSettings, removeChange, searchEntries, setChange } from "./settingsApi";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -13,7 +13,6 @@ test("groups entries by section in the order sent and counts the keys the file h
     ["Budget", ["a", "c"], 1],
     ["Server", ["b", "d"], 1],
   ]);
-  expect(changedCount([entry("a", "x", true), entry("b", "x", true), entry("c", "x", false)])).toBe(2);
 });
 
 test("search matches name, key path and description case-insensitively; blank matches nothing", () => {
@@ -29,25 +28,19 @@ test("search matches name, key path and description case-insensitively; blank ma
   expect(keys("nope")).toEqual([]);
 });
 
-test("a row is set when the file holds the key, even at its default value", () => {
-  expect(rowState({ set: true })).toBe("set");
-  expect(rowState({ set: false })).toBe("default");
-});
-
 test("change builders", () => {
   expect(setChange("a.b", 3)).toEqual({ key: "a.b", value: 3 });
   expect(removeChange("a.b")).toEqual({ key: "a.b", remove: true });
 });
 
-test("draft hints", () => {
-  expect(draftHint("number-list", "1, 2.5,3")).toBeUndefined();
-  expect(draftHint("number-list", "1, x")).toBe('"x" is not a number');
-  expect(draftHint("duration", "1h30m")).toBeUndefined();
-  expect(draftHint("duration", "5")).toBeDefined();
-  expect(draftHint("size", "50G")).toBeUndefined();
-  expect(draftHint("size", "500 MB")).toBeUndefined();
-  expect(draftHint("size", "lots")).toBeDefined();
-  expect(draftHint("string", "anything")).toBeUndefined();
+test("number list hint names the first bad item", () => {
+  expect(numberListHint("1, 2.5,3")).toBeUndefined();
+  expect(numberListHint("1, x")).toBe('"x" is not a number');
+});
+
+test("a registry label wins over the key's last segment", () => {
+  expect(entryLabel({ ...entry("project.evolve", "Evolve", false), label: "Evolve for this project" })).toBe("Evolve for this project");
+  expect(entryLabel(entry("execution-queue.max-agents", "Execution queue", false))).toBe("Max agents");
 });
 
 test("fetchSettings asks for the target and throws on a failed status", async () => {

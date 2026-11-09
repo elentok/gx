@@ -144,6 +144,9 @@ func TestReadProjectListsOnlyProjectKeys(t *testing.T) {
 	if !cap.Set || string(cap.Value) != "2" || cap.GlobalKey != "execution-queue.max-agents" || string(cap.GlobalValue) != "6" {
 		t.Errorf("max-agents = %+v", cap)
 	}
+	if cap.Label != "Max live agents for this project" || cap.Override != "cap" {
+		t.Errorf("max-agents label/override = %q/%q", cap.Label, cap.Override)
+	}
 	over := entryByKey(t, resp, "disk-space.cleanup-command")
 	if over.Set || string(over.GlobalValue) != `["x"]` {
 		t.Errorf("cleanup-command = %+v", over)

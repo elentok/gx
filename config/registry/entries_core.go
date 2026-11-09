@@ -82,7 +82,7 @@ func coreEntries() []Entry {
 	add(s, risky(Entry{Key: Key("server", "web", "allowed-hosts"), Type: TypeStringList,
 		Description: "Host names the web page accepts requests for."},
 		"A wrong list can lock you out of the web page, and a broad one lets other sites reach it."))
-	add(s, Entry{Key: Key("server", "web", "totp"), Type: TypeBool, Risky: true,
+	add(s, Entry{Key: Key("server", "web", "totp"), Type: TypeBool, Risky: true, RiskyOffOnly: true,
 		ConfirmText: "Turning off the one-time code lets anyone who can reach the web page sign in.",
 		Description: "Ask for a one-time code when signing in to the web page."})
 	add(s, Entry{Key: Key("cpu-watchdog", "enabled"), Type: TypeBool,

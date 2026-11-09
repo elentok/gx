@@ -2855,6 +2855,19 @@ export interface SettingsEntry {
   confirm_text?: string;
   read_only?: boolean;
   /**
+   * Label replaces the name derived from the key path.
+   */
+  label?: string;
+  /**
+   * RiskyOffOnly: only turning the value off (or resetting it) asks to confirm.
+   */
+  risky_off_only?: boolean;
+  /**
+   * Override is how a project row relates to its global key: "cap",
+   * "follows-global", or absent for a value that replaces the global one.
+   */
+  override?: string;
+  /**
    * Set: the target's file holds the key. Absent means the default (or the
    * global value, in a project) applies.
    */

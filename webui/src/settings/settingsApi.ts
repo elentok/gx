@@ -31,18 +31,11 @@ export const setChange = (key: string, value: unknown): SettingChange => ({ key,
 
 export const removeChange = (key: string): SettingChange => ({ key, remove: true });
 
-/** "changed" means the target's file holds the key, whatever its value. */
-export type RowState = "default" | "set";
-
-export const rowState = (e: Pick<SettingsEntry, "set">): RowState => (e.set ? "set" : "default");
-
 export interface SectionGroup {
   section: string;
   entries: SettingsEntry[];
   changed: number;
 }
-
-export const changedCount = (entries: Pick<SettingsEntry, "set">[]): number => entries.filter((e) => e.set).length;
 
 /** Groups entries by section, sections and entries keeping the order the server sent. */
 export function groupBySection(entries: SettingsEntry[]): SectionGroup[] {
@@ -59,8 +52,9 @@ export function groupBySection(entries: SettingsEntry[]): SectionGroup[] {
   return [...groups.values()];
 }
 
-/** The row's display name: the last path segment, spaced and capitalised. */
+/** The row's display name: the registry's label, else the last path segment, spaced and capitalised. */
 export const entryLabel = (e: SettingsEntry) => {
+  if (e.label) return e.label;
   const text = (e.path[e.path.length - 1] ?? e.key).replace(/-/g, " ");
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -75,8 +69,6 @@ export function searchEntries(entries: SettingsEntry[], query: string): Settings
 // Hints are for the browser only; the server's check decides. Each returns an error sentence or undefined.
 
 const NUMBER = /^-?\d+(\.\d+)?$/;
-const DURATION = /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$/;
-const SIZE = /^\d+(\.\d+)?\s*([kmgtp]i?b?)?$/i;
 
 export function numberListHint(draft: string): string | undefined {
   const bad = draft
@@ -84,20 +76,4 @@ export function numberListHint(draft: string): string | undefined {
     .map((s) => s.trim())
     .find((s) => !NUMBER.test(s));
   return bad === undefined ? undefined : `"${bad}" is not a number`;
-}
-
-export function durationHint(draft: string): string | undefined {
-  return DURATION.test(draft.trim()) ? undefined : "Use a duration such as 30s, 5m or 1h30m";
-}
-
-export function sizeHint(draft: string): string | undefined {
-  return SIZE.test(draft.trim()) ? undefined : "Use a size such as 500M or 50G";
-}
-
-/** The hint for a draft of the given entry type; types with no browser-side rule have none. */
-export function draftHint(type: string, draft: string): string | undefined {
-  if (type === "number-list") return numberListHint(draft);
-  if (type === "duration") return durationHint(draft);
-  if (type === "size") return sizeHint(draft);
-  return undefined;
 }

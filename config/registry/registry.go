@@ -58,6 +58,20 @@ func Sections() []Section {
 	return out
 }
 
+// OverrideMode is how a project row relates to its global key.
+type OverrideMode string
+
+const (
+	// OverrideValue (the zero value): the project holds its own value that
+	// replaces the global one.
+	OverrideValue OverrideMode = ""
+	// OverrideCap: the project holds a cap that sits under the global value.
+	OverrideCap OverrideMode = "cap"
+	// OverrideFollowsGlobal: a bool that is on by following the global
+	// setting; the project file holds the key only to turn it off.
+	OverrideFollowsGlobal OverrideMode = "follows-global"
+)
+
 // Entry describes one setting. The registry holds no default.
 type Entry struct {
 	Key         KeyPath
@@ -70,6 +84,13 @@ type Entry struct {
 	Restart     bool     // startup-only: takes effect after a restart
 	Risky       bool
 	ConfirmText string // shown before saving a risky entry
+	// RiskyOffOnly: only turning a bool off (or resetting a set value) is
+	// risky; turning it on makes things safer and saves without asking.
+	RiskyOffOnly bool
+	// Label overrides the row's name where the key's last segment reads badly.
+	Label string
+	// Override says how a project's row behaves for a key with a GlobalKey.
+	Override OverrideMode
 
 	// ProjectOverridable: a project may override this global key.
 	// ProjectOnly: the key exists only in a project config.

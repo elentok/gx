@@ -44,6 +44,13 @@ type SettingsEntry struct {
 	Risky       bool     `json:"risky,omitempty"`
 	ConfirmText string   `json:"confirm_text,omitempty"`
 	ReadOnly    bool     `json:"read_only,omitempty"`
+	// Label replaces the name derived from the key path.
+	Label string `json:"label,omitempty"`
+	// RiskyOffOnly: only turning the value off (or resetting it) asks to confirm.
+	RiskyOffOnly bool `json:"risky_off_only,omitempty"`
+	// Override is how a project row relates to its global key: "cap",
+	// "follows-global", or absent for a value that replaces the global one.
+	Override string `json:"override,omitempty"`
 	// Set: the target's file holds the key. Absent means the default (or the
 	// global value, in a project) applies.
 	Set bool `json:"set"`
