@@ -1,5 +1,23 @@
 package spec
 
+import "github.com/elentok/gx/tickets"
+
+// noChatProject runs the fixture-only NoChat harness by default, so its Design and
+// Triage sessions have no chat reader.
+const noChatProject = "nochat"
+
+// addNoChatAgents adds a plain Agents session on the NoChat harness, and a project
+// that defaults to it with its own Design session. Its Triage opens in the caller.
+func addNoChatAgents(sc *scenario) {
+	const mapAddr = "design-nochat"
+	sc.Sessions = append(sc.Sessions, sessionSpec{Project: project, Harness: "nochat"})
+	sc.Epics = append(sc.Epics, epic{noChatProject, mapAddr, nil})
+	sc.DesignSteps[noChatProject+":"+mapAddr] = string(tickets.StepResolveTickets)
+	sc.OwnRepos = append(sc.OwnRepos, noChatProject)
+	sc.ProjectExtra[noChatProject] = `,"agents":{"default-harness":"nochat"}`
+	sc.OpenDesigns = append(sc.OpenDesigns, noChatProject+":"+mapAddr)
+}
+
 // ContextWindowScenario lists the sessions the context-window flows read. The
 // keyed ones (Output.Transcripts) take another usage line from a flow.
 func ContextWindowScenario() scenario {
@@ -29,7 +47,10 @@ func ContextWindowScenario() scenario {
 	}
 	addQueueAgent(&sc)
 	addDesignAgents(&sc)
-	sc.Epics = append(sc.Epics, followUps(project, 1, 0))
-	sc.StepsAfterSessions = append(sc.StepsAfterSessions, []string{"server", "triage", "open", project})
+	addNoChatAgents(&sc)
+	sc.Epics = append(sc.Epics, followUps(project, 1, 0), followUps(noChatProject, 1, 0))
+	sc.StepsAfterSessions = append(sc.StepsAfterSessions,
+		[]string{"server", "triage", "open", project},
+		[]string{"server", "triage", "open", noChatProject})
 	return sc
 }

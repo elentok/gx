@@ -6,6 +6,8 @@ import { ask, chatOf, composer, freshVisit, go, row, sessions, sidebar } from ".
 import { expect, nav, test, type Fixture } from "./fixture";
 
 const MODEL = /^(Claude|Codex) \S+/;
+// A NoChat session's model text is not a Claude or Codex name, so only a two-word label is pinned.
+const NOCHAT_MODEL = /^\S+ \S+/;
 
 const footer = (page: Page) => page.getByTestId("footer-line");
 const badge = (page: Page) => footer(page).locator("[data-tone]");
@@ -109,6 +111,18 @@ test("202. Context badge (stories 1 to 28)", async ({ page, start }) => {
   await badge(page).hover();
   await expect(page.getByRole("tooltip")).toHaveText("90K of 130K smart zone");
   await page.mouse.move(0, 0);
+
+  // Story 27: a NoChat harness shows the model and no badge on Agents, Design and Triage, and its snapshot row has no count.
+  const noChat = (await sessions(fixture)).filter((s) => !s.queue && s.harness === "nochat");
+  expect(noChat.map((s) => s.flow ?? "agents").sort()).toEqual(["agents", "design", "triage"]);
+  for (const s of noChat) expect(s.context_tokens ?? null).toBeNull();
+  const noChatRoutes = { agents: `#/agents/${noChat.find((s) => !s.flow)!.id}`, design: "#/d/nochat:design-nochat", triage: "#/triage/nochat" };
+  for (const route of Object.values(noChatRoutes)) {
+    await go(page, route);
+    // Design and Triage show a notice in place of the composer for a NoChat harness.
+    await expect(footer(page)).toContainText(NOCHAT_MODEL);
+    await expect(badge(page)).toHaveCount(0);
+  }
 
   // Story 18: a Queue agent's session view has the badge; its sidebar row has none.
   const queue = all.find((s) => s.queue)!;
