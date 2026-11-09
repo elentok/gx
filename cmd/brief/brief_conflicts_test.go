@@ -34,7 +34,7 @@ func TestBrief_ConflictsListsUnmergedFilesWithMarkerLines(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit = %d, out:\n%s", code, out)
 	}
-	for _, want := range []string{"a.txt", "merge", "2:<<<<<<<", "4:=======", "6:>>>>>>>"} {
+	for _, want := range []string{"a.txt", "merge", "2:<<<<<<<", "3| main", "4:=======", "5| side", "6:>>>>>>>"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -309,6 +310,24 @@ func TestDefaultDepsWithOverrides_HomeOverridesOccupancyAndCompactionReads(t *te
 	}
 	if !ok || count != 1 {
 		t.Errorf("ReadCompactions() = (%d, %t), want (1, true)", count, ok)
+	}
+}
+
+func TestRebaseOntoOrAbort_ConflictNamesTheConflictingFiles(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "base\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.MustGitExported(t, repo, "checkout", "-b", "side")
+	testutil.WriteFile(t, repo, "a.txt", "side\n")
+	testutil.CommitAll(t, repo, "side")
+	testutil.MustGitExported(t, repo, "checkout", "main")
+	testutil.WriteFile(t, repo, "a.txt", "main\n")
+	testutil.CommitAll(t, repo, "main")
+	testutil.MustGitExported(t, repo, "checkout", "side")
+
+	err := rebaseOntoOrAbort(repo, "main")
+	if err == nil || !strings.Contains(err.Error(), "aborted") || !strings.Contains(err.Error(), "a.txt") {
+		t.Fatalf("err = %v, want an aborted-rebase error naming a.txt", err)
 	}
 }
 

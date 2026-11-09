@@ -31,7 +31,11 @@ func Conflicts(dir string, w io.Writer) int {
 	fmt.Fprintf(w, "%d unmerged file(s) (%s)\n", len(unmerged), op)
 	for _, f := range unmerged {
 		fmt.Fprintln(w, f)
-		for _, m := range markerLines(filepath.Join(top, f)) {
+		lines := conflictLines(filepath.Join(top, f))
+		if len(lines) == 0 {
+			fmt.Fprintln(w, "  (no conflict markers: auto-resolved or a non-content conflict; compare `git diff :2: :3:`)")
+		}
+		for _, m := range lines {
 			fmt.Fprintf(w, "  %s\n", m)
 		}
 	}
@@ -64,8 +68,10 @@ func inProgressOp(top string) string {
 	return "no merge in progress"
 }
 
-// markerLines returns "N:<marker>" for each conflict marker line in a file.
-func markerLines(path string) []string {
+// conflictLines returns every line of each conflict hunk, from its <<<<<<<
+// marker to its >>>>>>> marker. A marker line is "N:<marker>"; a line between
+// markers (ours, the diff3 base, theirs) is "N| <text>".
+func conflictLines(path string) []string {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil
@@ -74,13 +80,27 @@ func markerLines(path string) []string {
 	var out []string
 	sc := bufio.NewScanner(f)
 	sc.Buffer(nil, 1<<20)
+	inHunk := false
 	for n := 1; sc.Scan(); n++ {
 		line := sc.Text()
-		for _, m := range []string{"<<<<<<<", "=======", ">>>>>>>"} {
+		marker := ""
+		for _, m := range []string{"<<<<<<<", "|||||||", "=======", ">>>>>>>"} {
 			if strings.HasPrefix(line, m) {
-				out = append(out, fmt.Sprintf("%d:%s", n, m))
+				marker = m
 			}
 		}
+		switch {
+		case marker == "<<<<<<<":
+			inHunk = true
+		case marker == ">>>>>>>":
+			inHunk = false
+		case marker == "" && inHunk:
+			out = append(out, fmt.Sprintf("%d| %s", n, line))
+			continue
+		case marker == "":
+			continue
+		}
+		out = append(out, fmt.Sprintf("%d:%s", n, marker))
 	}
 	if sc.Err() != nil {
 		return nil

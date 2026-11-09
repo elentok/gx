@@ -699,8 +699,13 @@ func rebaseOntoOrAbort(dir, onto string) error {
 		return nil
 	}
 	if inProgress, _ := history.RebaseInProgress(dir); inProgress {
+		// Read the conflicting paths before the abort discards them.
+		conflicted, _, _ := git.Run(dir, git.NonInteractiveEnv(), "diff", "--name-only", "--diff-filter=U")
 		if abortErr := history.AbortRebase(dir); abortErr != nil {
 			return fmt.Errorf("the rebase conflicted and could not be aborted: %w", abortErr)
+		}
+		if files := strings.Fields(conflicted); len(files) > 0 {
+			return fmt.Errorf("the rebase conflicted and was aborted (conflicting files: %s)", strings.Join(files, ", "))
 		}
 		return errors.New("the rebase conflicted and was aborted")
 	}
