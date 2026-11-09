@@ -91,3 +91,22 @@ test("a row with no number takes its position, and a clash gets a prime", () => 
   ];
   expect(roundOf(odd).map((c) => c.label)).toEqual(["1.1", "2.1", "2'.1"]);
 });
+
+test("a quick question with options is a choice card with its default recommended; yes and no is a yes-no card", () => {
+  const pick = cardOf({ id: "q1", title: "Where?", kind: "quick", options: ["parser", "caller"], recommended: "parser" }, "1.1");
+  expect(pick).toEqual({
+    label: "1.1",
+    title: "Where?",
+    body: "",
+    kind: "options",
+    options: [
+      { id: "parser", label: "parser" },
+      { id: "caller", label: "caller" },
+    ],
+    recommended: "parser",
+  });
+  expect(cardOf({ id: "q2", title: "Keep it?", kind: "quick", options: ["yes", "no"], recommended: "no" }, "1.2").kind).toBe("yes-no");
+  expect(cardOf({ id: "d1", title: "Which store?", kind: "design" }, "1.3").kind).toBe("text");
+  const row: TriageRow[] = [{ address: "gx:follow-ups/01", title: "a", questions: [{ id: "q1", title: "t", kind: "quick", options: ["x", "y"] }], answers: { q1: "y" } }];
+  expect(answersOf(row)).toEqual({ "1.1": { choice: "y" } });
+});

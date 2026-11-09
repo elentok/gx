@@ -56,8 +56,8 @@ and write nothing. Each gets the ticket address and this brief:
 filed. Do not reproduce it and do not run tests. When a quick fix and a clean, correct fix both
 exist, suggest the correct one. Report: (1) verdict `relevant`, `fixed` or
 `obsolete`, with evidence (a commit, a file and line, a log line); (2) the files a fix would touch;
-(3) 0–N blocking questions, each tagged `quick` (one-line answer from the user) or `design` (a
-decision with trade-offs); (4) a suggested destination: ready epic as `implement`, or map epic as
+(3) 0–N blocking questions, each tagged `quick` (a pick from 2–4 concrete options: give the options
+and which one you recommend) or `design` (a decision with trade-offs); (4) a suggested destination: ready epic as `implement`, or map epic as
 `grilling` or `research`. If you cannot decide, say `relevant`. Under 300 words."
 
 You save each verdict the moment its subagent returns, with `gx tickets triage verdict`. An undecided
@@ -73,6 +73,18 @@ on stdin). Compare verdicts only; don't re-read tickets.
 
 **Dedupe is part of Plan.** For items describing the same problem, keep the **oldest**. The newer
 ones are `merge into X` rows; the merge itself (the "seen again" entry, the close) waits for Write.
+
+**Questions are for a person to answer one by one in the web view.** The verdict's questions are raw
+findings. In the plan, every one comes back under the same id as the final question:
+
+- A `quick` question is a plain question that stands alone, with no recommendation in its text, then
+  `options` (2–4 concrete answers, short enough to read as buttons) and `default`, the recommended option
+  and one of the options. A yes or no question has the options `yes` and `no`. The first line of `text`
+  is the question; further lines say what the fix changes, so it can be answered without opening the
+  ticket.
+- A `design` question needs no options or default.
+- `gx tickets triage plan` refuses a quick question without options and a default, and a verdict
+  question that is missing from the plan.
 
 One row per item with its action and suggested destination:
 

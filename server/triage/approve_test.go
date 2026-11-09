@@ -77,7 +77,8 @@ func TestApprove_OpenQuestionIsRefused(t *testing.T) {
 	}))
 	rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: b}))
 	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: a, Action: "ready"}, {RowID: b, Action: "ready"},
+		{RowID: a, Action: "ready", Questions: []triagerec.Question{{ID: "q1", Text: "which?", Kind: triagerec.QuestionQuick, Options: []string{"x", "y"}, Default: "x"}}},
+		{RowID: b, Action: "ready"},
 	}, nil))
 	res := approve(t, f, approveReq(rec))
 	if !res.Refused || res.Reason != wire.ReasonTriagePhase {

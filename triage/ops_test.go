@@ -340,3 +340,47 @@ func TestAbandon(t *testing.T) {
 		})
 	}
 }
+
+func TestPlan_QuickQuestionsNeedOptionsAndADefault(t *testing.T) {
+	good := Question{ID: "q1", Text: "Fix it where?", Kind: QuestionQuick, Options: []string{"parser", "caller"}, Default: "parser"}
+	cases := map[string]Question{
+		"no options":        {ID: "q1", Text: "Fix it where?", Kind: QuestionQuick, Default: "parser"},
+		"one option":        {ID: "q1", Text: "Fix it where?", Kind: QuestionQuick, Options: []string{"parser"}, Default: "parser"},
+		"five options":      {ID: "q1", Text: "t", Kind: QuestionQuick, Options: []string{"a", "b", "c", "d", "e"}, Default: "a"},
+		"no default":        {ID: "q1", Text: "t", Kind: QuestionQuick, Options: []string{"a", "b"}},
+		"default off list":  {ID: "q1", Text: "t", Kind: QuestionQuick, Options: []string{"a", "b"}, Default: "Use the recommended answer in the question text"},
+		"duplicate options": {ID: "q1", Text: "t", Kind: QuestionQuick, Options: []string{"a", "a"}, Default: "a"},
+	}
+	for name, q := range cases {
+		t.Run(name, func(t *testing.T) {
+			s, rec := atPlan(t)
+			if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil); err == nil {
+				t.Fatal("want the plan refused")
+			}
+		})
+	}
+	s, rec := atPlan(t)
+	design := Question{ID: "d1", Text: "Which store?", Kind: QuestionDesign}
+	must(t, rec, nil)
+	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "map", Questions: []Question{good, design}}, {RowID: rowB, Action: "close"}}, nil); err != nil {
+		t.Fatalf("a quick question with options and a design question: %v", err)
+	}
+}
+
+func TestPlan_EveryVerdictQuestionComesBackInThePlan(t *testing.T) {
+	s, rec := project(t)
+	rec, err := s.SaveVerdict(rec.ID, rec.Revision, Verdict{Address: rowA, Verdict: VerdictRelevant, Questions: []Question{{ID: "q1", Text: "raw?", Kind: QuestionQuick}}})
+	rec = must(t, rec, err)
+	rec, err = s.SaveVerdict(rec.ID, rec.Revision, Verdict{Address: rowB, Verdict: VerdictRelevant})
+	rec = must(t, rec, err)
+	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready"}, {RowID: rowB, Action: "close"}}, nil); err == nil {
+		t.Fatal("want the plan refused: the verdict question has no plan question")
+	}
+	q := Question{ID: "q1", Text: "Fix it where?", Kind: QuestionQuick, Options: []string{"parser", "caller"}, Default: "parser"}
+	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil)
+	rec = must(t, rec, err)
+	got := rec.Rows[0].AllQuestions()
+	if len(got) != 1 || got[0].Text != "Fix it where?" || got[0].Default != "parser" {
+		t.Fatalf("the plan question should replace the verdict's: %+v", got)
+	}
+}

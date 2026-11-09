@@ -101,7 +101,7 @@ func triageAtApprove(t *testing.T, repo string, withQuestion bool) triageShown {
 	}
 	q := ""
 	if withQuestion {
-		q = `,"questions":[{"id":"q1","text":"which?","kind":"quick","default":"a"}]`
+		q = `,"questions":[{"id":"q1","text":"which?","kind":"quick","options":["a","b"],"default":"a"}]`
 	}
 	plan := `[{"rowId":"` + rows[0] + `","action":"ready","destination":"x"` + q + `},{"rowId":"` + rows[1] + `","action":"ready"}]`
 	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {

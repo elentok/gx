@@ -30,8 +30,10 @@ func newTriagePlanCmd(d Deps) *cobra.Command {
 		Short: "save the plan rows read as JSON on stdin and print the new revision",
 		Long: "Usage: gx tickets triage plan [--gone <address>]... [--revision <n>] [--project <p>]\n\n" +
 			"Read a JSON array of plan rows on stdin: [{\"rowId\", \"action\", \"destination\", \"questions\":\n" +
-			"[{\"id\", \"text\", \"kind\", \"default\"}], \"overlapWith\"}]. Rows named by --gone are marked gone and\n" +
-			"their plan rows are left out. When every other row has a plan the stored step moves to approve.",
+			"[{\"id\", \"text\", \"kind\", \"options\", \"default\"}], \"overlapWith\"}]. A quick question needs 2 to 4\n" +
+			"options and a default that is one of them (the recommended one); a design question needs neither. Every\n" +
+			"verdict question comes back here under its id, worded as the final question. Rows named by --gone are\n" +
+			"marked gone and their plan rows are left out. When every other row has a plan the stored step moves to approve.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			t, err := resolveTriage(d, project)

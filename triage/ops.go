@@ -176,6 +176,9 @@ func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string)
 			if row.gone() {
 				continue
 			}
+			if err := checkQuestions(row, p); err != nil {
+				return err
+			}
 			p := p
 			row.Plan = &p
 		}
@@ -260,18 +263,61 @@ func (r *Record) MergeOrphans() []string {
 	return out
 }
 
-// AllQuestions is the verdict's questions plus the plan's that are not already
-// among them.
+// AllQuestions is the verdict's questions plus the plan's. A plan question
+// replaces the verdict's of the same id: the plan words the final question and
+// gives its options and recommendation.
 func (r *Row) AllQuestions() []Question {
 	qs := append([]Question{}, r.Questions...)
 	if r.Plan != nil {
 		for _, q := range r.Plan.Questions {
-			if !slices.ContainsFunc(qs, func(o Question) bool { return o.ID == q.ID }) {
+			if i := slices.IndexFunc(qs, func(o Question) bool { return o.ID == q.ID }); i >= 0 {
+				qs[i] = q
+			} else {
 				qs = append(qs, q)
 			}
 		}
 	}
 	return qs
+}
+
+// Question option limits: a quick question is a pick from a short list.
+const (
+	minOptions = 2
+	maxOptions = 4
+)
+
+// checkQuestions refuses a plan row whose questions the person could not answer
+// from the Questions view: every verdict question must come back in the plan, and
+// every quick question needs 2 to 4 distinct options and a recommended default
+// that is one of them. A design question travels with its ticket and needs neither.
+func checkQuestions(row *Row, p PlanRow) error {
+	for _, vq := range row.Questions {
+		if !slices.ContainsFunc(p.Questions, func(q Question) bool { return q.ID == vq.ID }) {
+			return phaseErr("row %s: verdict question %s is not in the plan; repeat it with its options and a default", p.RowID, vq.ID)
+		}
+	}
+	for _, q := range p.Questions {
+		if q.Kind != QuestionQuick {
+			continue
+		}
+		if q.Text == "" {
+			return phaseErr("row %s question %s: the text is empty", p.RowID, q.ID)
+		}
+		opts := map[string]bool{}
+		for _, o := range q.Options {
+			if o == "" || opts[o] {
+				return phaseErr("row %s question %s: options must be non-empty and distinct", p.RowID, q.ID)
+			}
+			opts[o] = true
+		}
+		if len(q.Options) < minOptions || len(q.Options) > maxOptions {
+			return phaseErr("row %s question %s: a quick question needs %d to %d options, got %d", p.RowID, q.ID, minOptions, maxOptions, len(q.Options))
+		}
+		if !opts[q.Default] {
+			return phaseErr("row %s question %s: the default %q must be one of the options (the recommended one)", p.RowID, q.ID, q.Default)
+		}
+	}
+	return nil
 }
 
 // OpenQuestions counts the unanswered questions of rows that are not gone.

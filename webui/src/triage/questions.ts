@@ -31,11 +31,22 @@ export function rowNumbers(rows: TriageRow[]): Map<string, string> {
 export const labelOf = (nums: Map<string, string>, row: TriageRow, q: TriageQuestion) =>
   `${nums.get(row.address)}.${q.id.replace(/^q/i, "")}`;
 
+/**
+ * The card kind a record question shows as. The agent tags a question quick or design; what the person can do
+ * follows from its options: yes and no is a yes-no card, any other list a choice card, none a text box.
+ */
+function cardKind(q: TriageQuestion): string {
+  const opts = q.options ?? [];
+  if (opts.length === 2 && opts.includes("yes") && opts.includes("no")) return "yes-no";
+  return opts.length > 0 ? "options" : q.kind === "yes-no" ? "yes-no" : "text";
+}
+
 /** A record question as a round card. The label is its row-qualified name; the plan's default is the recommended mark. */
 export function cardOf(q: TriageQuestion, label: string, context?: string): TriageCard {
-  const card: TriageCard = { label, title: q.title, body: q.body ?? "", kind: q.kind };
+  const kind = cardKind(q);
+  const card: TriageCard = { label, title: q.title, body: q.body ?? "", kind };
   if (context) card.context = context;
-  if (q.kind === "options") card.options = (q.options ?? []).map((o) => ({ id: o, label: o }));
+  if (kind === "options") card.options = (q.options ?? []).map((o) => ({ id: o, label: o }));
   if (q.recommended) card.recommended = q.recommended;
   return card;
 }
@@ -59,7 +70,7 @@ export function answersOf(rows: TriageRow[]): Answers {
       const at = saved.lastIndexOf(NOTE_MARK);
       const [text, note] = at < 0 ? [saved, undefined] : [saved.slice(0, at), saved.slice(at + NOTE_MARK.length)];
       const a: Answer = {};
-      const picks = q.kind === "yes-no" ? ["yes", "no"] : (q.options ?? []);
+      const picks = cardKind(q) === "yes-no" ? ["yes", "no"] : (q.options ?? []);
       if (text === HUH_MESSAGE) a.huh = true;
       else if (picks.includes(text)) a.choice = text;
       else a.text = text;
