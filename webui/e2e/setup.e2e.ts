@@ -94,8 +94,8 @@ test("101. Setup and login with TOTP off", async ({ page, start }) => {
   await signedIn(page);
 
   await page.evaluate(() => (window.location.hash = "#/settings"));
-  await expect(page.getByRole("link", { name: "Change password" })).toBeVisible();
-  await expect(page.getByText("Reset authenticator")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /^Password/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Authenticator/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Sign out of this device" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();

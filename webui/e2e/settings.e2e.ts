@@ -10,7 +10,7 @@ const loginRows = (page: Page) => page.locator('a[href^="#/settings/logins/"]');
 async function openWebLogins(page: Page) {
   await menuButton(page).click();
   await page.getByRole("menuitem", nav("More settings...")).click();
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page).toHaveURL(/#\/settings\/s\//);
   await page.getByRole("link", { name: /^Web logins/ }).click();
   await expect(page.getByRole("heading", { name: "Web logins" })).toBeVisible();
 }
@@ -28,9 +28,10 @@ async function signInElsewhere(browser: Browser, url: string, password: string, 
 
 const signedInPage = (other: Page) => expect(other.getByRole("heading", { name: "Sign in" })).toHaveCount(0);
 
-async function openAccountPage(page: Page, link: string) {
+async function openAccountPage(page: Page, link: RegExp) {
   await menuButton(page).click();
   await page.getByRole("menuitem", nav("More settings...")).click();
+  await expect(page).toHaveURL(/#\/settings\/s\//);
   await page.getByRole("link", { name: link }).click();
 }
 
@@ -101,14 +102,14 @@ test("108. Change password", async ({ page, start }) => {
   const fixture = await start("web-logins");
   const newPassword = "a brand new passphrase";
 
-  await openAccountPage(page, "Change password");
+  await openAccountPage(page, /^Password/);
   await expect(page.getByText("The 3 other devices will be signed out.")).toBeVisible();
   await page.getByLabel("Current password").fill(fixture.password);
   await page.getByLabel("Code from your authenticator app").fill(await fixture.nextTotpCode());
   await page.locator('[data-mock-part="new-password"] input').fill(newPassword);
   await page.locator('[data-mock-part="new-password-again"] input').fill(newPassword);
   await page.getByRole("button", { name: "Change password" }).click();
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page).toHaveURL(/#\/settings\/s\/execution-queue$/);
 
   await openWebLogins(page);
   await expect(loginRows(page)).toHaveCount(1);
@@ -129,7 +130,7 @@ test("109. Reset authenticator", async ({ page, start }) => {
   const oldSecret = fixture.totpSecret;
 
   const begin = async () => {
-    await openAccountPage(page, "Reset authenticator");
+    await openAccountPage(page, /^Authenticator/);
     await page.getByLabel("Current password").fill(fixture.password);
     await page.getByLabel("Code from the current app").fill(await fixture.nextTotpCode());
     await page.getByRole("button", { name: "Next" }).click();
@@ -156,7 +157,7 @@ test("109. Reset authenticator", async ({ page, start }) => {
     fixture.useTotpSecret(newKey);
     await page.getByLabel("Code from the new app").fill(await fixture.nextTotpCode());
     await page.getByRole("button", { name: "Save new authenticator" }).click();
-    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page).toHaveURL(/#\/settings\/s\//);
 
     await openWebLogins(page);
     await expect(loginRows(page)).toHaveCount(1);

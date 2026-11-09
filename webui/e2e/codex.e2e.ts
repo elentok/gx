@@ -5,7 +5,7 @@ import { expect, nav, openMenu, test } from "./fixture";
 async function openAgentsSettings(page: Page) {
   await openMenu(page);
   await page.getByRole("menuitem", nav("More settings...")).click();
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page).toHaveURL(/#\/settings(\/s\/.*)?$/);
   await page.getByRole("link", { name: /^Agents/ }).click();
   await expect(page.getByRole("heading", { name: "Agents", exact: true })).toBeVisible();
 }
