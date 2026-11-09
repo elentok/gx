@@ -53,6 +53,11 @@ provisional Destination, the review, the create-tickets quiz of step 7), read [g
 and print each round in the format `gx-grilling` defines. gx marks the session
 Actionable itself when it sees a round, so call nothing to raise it.
 
+Every question to the person is a round, not only the occasions listed above. That includes the
+question that ends a prototype or mock ("Do you agree with B?", "Which look do you want?"): print
+it as a `❓ **Q1**` card with a `gx-question` block, after the link to the mock. A question in plain
+prose gets no card, so the person sees only the chat and gx never marks the session Actionable.
+
 The questions must be the last thing in the turn: no tool call, and no text, after them. The UI can
 hide earlier text of a turn once later tool calls or text follow it, so questions printed before a
 trailing call go unseen. Never pad the end with a tool call or a closing line.
