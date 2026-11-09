@@ -170,6 +170,12 @@ interactive prompt. Commit whatever is green first, then run `gx tickets ask` (w
 are in the tracker) and end your turn. This is not a fork — the same ticket resumes once a person
 answers.
 
+**Do not ask to confirm your own in-scope recommendation.** When the action you would recommend is
+to file a follow-up for work you could not reach (and it is in scope), file it and finish, and say so
+in the final message. A rubber-stamp question stalls the ticket while the wait counts into its
+elapsed time. Ask only for a real fork, where the right answer is not obvious or the cost is
+irreversible.
+
 ## Mock check
 
 If the ticket has a `## Mock check` section, run it before you report finished. Find it by that
