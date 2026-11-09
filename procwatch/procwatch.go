@@ -5,8 +5,10 @@
 package procwatch
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"syscall"
 	"time"
 
@@ -91,8 +93,16 @@ type Watcher struct {
 	// Roots returns the pids to watch, asked on every poll.
 	Roots  func() []int
 	Report func(Storm)
+	// Foreign, when set, is called once for each tree gx did not launch that
+	// goes over the threshold, and again only after it dropped back under. UID
+	// is the user whose processes count as foreign trees. The trees under the
+	// pids Roots returns are not foreign.
+	Foreign func(Storm)
+	UID     int
 	// Reader defaults to syshealth.DefaultProcess.
 	Reader syshealth.ProcessReader
+
+	noticed map[int]bool // foreign roots over the threshold at the last poll
 }
 
 func (w *Watcher) config() Config {
@@ -123,22 +133,69 @@ func (w *Watcher) Run(ctx context.Context) {
 
 func (w *Watcher) poll(reader syshealth.ProcessReader) {
 	cfg := w.config()
-	if cfg.Threshold <= 0 || w.Roots == nil || w.Report == nil {
+	if cfg.Threshold <= 0 || w.Roots == nil || (w.Report == nil && w.Foreign == nil) {
 		return
 	}
 	roots := w.Roots()
-	if len(roots) == 0 {
+	if len(roots) == 0 && w.Foreign == nil {
 		return
 	}
 	table, err := reader.Read()
 	if err != nil {
 		return
 	}
-	for _, root := range roots {
-		if n := Count(table.Processes, root); n > cfg.Threshold {
-			w.Report(Storm{Root: root, Descendants: n})
+	if w.Report != nil {
+		for _, root := range roots {
+			if n := Count(table.Processes, root); n > cfg.Threshold {
+				w.Report(Storm{Root: root, Descendants: n})
+			}
 		}
 	}
+	if w.Foreign != nil {
+		over := map[int]bool{}
+		for _, st := range ForeignStorms(table.Processes, w.UID, roots, cfg.Threshold) {
+			over[st.Root] = true
+			if !w.noticed[st.Root] {
+				w.Foreign(st)
+			}
+		}
+		w.noticed = over
+	}
+}
+
+// ForeignStorms returns the trees of uid whose root's parent is not a process
+// of uid (launchd, say) and that have more than threshold descendants outside
+// every tree under gxRoots. A terminal holding a gx tree counts only its own
+// other processes.
+func ForeignStorms(procs []syshealth.Process, uid int, gxRoots []int, threshold int) []Storm {
+	byPID := index(procs)
+	gx := map[int]bool{}
+	for _, r := range gxRoots {
+		gx[r] = true
+		for _, d := range Descendants(procs, r) {
+			gx[d.PID] = true
+		}
+	}
+	var storms []Storm
+	for _, p := range byPID {
+		if p.UID != uid || gx[p.PID] {
+			continue
+		}
+		if parent, ok := byPID[p.PPID]; ok && parent.UID == uid && parent.StartUnix <= p.StartUnix {
+			continue
+		}
+		n := 0
+		for _, d := range Descendants(procs, p.PID) {
+			if !gx[d.PID] {
+				n++
+			}
+		}
+		if n > threshold {
+			storms = append(storms, Storm{Root: p.PID, Descendants: n})
+		}
+	}
+	slices.SortFunc(storms, func(a, b Storm) int { return cmp.Compare(a.Root, b.Root) })
+	return storms
 }
 
 // maxRounds bounds Kill when a zombie its parent never reaps keeps the tree

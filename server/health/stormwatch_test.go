@@ -2,6 +2,7 @@ package health_test
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -236,6 +237,41 @@ func TestStorm_SessionTreeUnderThresholdIsLeftAlone(t *testing.T) {
 		if s.ID == id && s.Status.State == wire.SessionExited {
 			t.Error("session exited under the threshold")
 		}
+	}
+}
+
+func TestStorm_ForeignTreeIsNotifiedOnceAndLeftAlone(t *testing.T) {
+	t.Parallel()
+	uid := os.Getuid()
+	// A tree gx did not launch, staged through the fake table: a real one
+	// cannot have a parent the uid does not own.
+	row := func(pid, ppid, uid int) syshealth.Process {
+		return syshealth.Process{PID: pid, PPID: ppid, UID: uid, StartUnix: 100}
+	}
+	procs := []syshealth.Process{row(1, 0, 0), row(10, 1, uid)}
+	for i := range 6 {
+		procs = append(procs, row(11+i, 10, uid))
+	}
+	bystander := startTree(t, 2)
+	waitTreeSize(t, bystander, 2)
+	store := t.TempDir()
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Settings.Watchdog.MaxTreeProcesses = 3
+		c.Settings.Watchdog.Interval = 50 * time.Millisecond
+	})
+	h.Processes.Set(procs...)
+
+	testutil.WaitFor(t, 10*time.Second, "the notification", func() bool { return len(h.Banners.Sent()) > 0 })
+	time.Sleep(300 * time.Millisecond) // negative wait: a second notice would arrive within a few polls
+	sent := h.Banners.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("banners = %+v, want exactly one", sent)
+	}
+	if !strings.Contains(sent[0].Body, "did not start it") || !strings.Contains(sent[0].Body, "did not touch it") {
+		t.Errorf("banner = %+v, want it to say gx did not start or touch the tree", sent[0])
+	}
+	if !anyAlive(treePIDs(t, bystander)) {
+		t.Error("a process outside gx was killed")
 	}
 }
 

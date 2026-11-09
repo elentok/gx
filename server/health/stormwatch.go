@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/elentok/gx/agentrunner"
@@ -65,7 +66,46 @@ func (s *Health) KeepStormWatched(ctx context.Context) {
 		Roots:  s.stormRoots,
 		Report: s.stormFound,
 	}
+	foreign := &procwatch.Watcher{
+		Settings: w.Settings,
+		Roots:    s.launchedRoots,
+		Foreign:  s.foreignStormFound,
+		UID:      os.Getuid(),
+		Reader:   s.cfg.ProcessSource,
+	}
+	go foreign.Run(ctx)
 	w.Run(ctx)
+}
+
+// launchedRoots is the roots of the last stormRoots poll: every tree gx
+// launched, which a foreign tree's count leaves out.
+func (s *Health) launchedRoots() []int {
+	s.storm.mu.Lock()
+	defer s.storm.mu.Unlock()
+	var roots []int
+	for pid := range s.storm.byRoot {
+		roots = append(roots, pid)
+	}
+	for pid := range s.storm.bySess {
+		roots = append(roots, pid)
+	}
+	return roots
+}
+
+// foreignStormFound only notifies: gx did not start the tree and kills nothing
+// it did not start.
+func (s *Health) foreignStormFound(st procwatch.Storm) {
+	threshold := s.settings.Load().Watchdog.MaxTreeProcesses
+	s.log.Warn("process storm: foreign tree", "root", st.Root, "processes", st.Descendants, "threshold", threshold)
+	note := osnotify.Notification{
+		Title: "Process storm outside gx",
+		Body: fmt.Sprintf("The process tree of pid %d has %d processes (limit %d). gx did not start it and did not touch it.",
+			st.Root, st.Descendants, threshold),
+		Group: stormBannerGroup,
+	}
+	if err := s.notifier.Notify(context.Background(), note); err != nil {
+		s.log.Warn("process storm: foreign banner", "err", err)
+	}
 }
 
 func (s *Health) stormRoots() []int {

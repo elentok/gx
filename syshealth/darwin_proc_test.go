@@ -31,6 +31,9 @@ func TestDarwinProcessReaderReal(t *testing.T) {
 	if self == nil || self.Unreadable {
 		t.Fatalf("own pid %d missing or unreadable", os.Getpid())
 	}
+	if self.UID != os.Getuid() {
+		t.Errorf("own uid = %d, want %d", self.UID, os.Getuid())
+	}
 	if self.PPID != os.Getppid() || self.Comm == "" {
 		t.Errorf("own row ppid %d comm %q, want ppid %d and a comm", self.PPID, self.Comm, os.Getppid())
 	}

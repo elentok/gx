@@ -102,14 +102,33 @@ func (r *LinuxProcessReader) readPid(pid int, boot int64) Process {
 	if err != nil {
 		return Process{PID: pid, Unreadable: true}
 	}
+	uid, err := r.readUID(pid)
+	if err != nil {
+		return Process{PID: pid, Unreadable: true}
+	}
 	return Process{
 		PID:       pid,
 		PPID:      st.PPID,
+		UID:       uid,
 		StartUnix: boot + int64(st.StartTicks/linuxTickRate),
 		CPUTicks:  st.CPUTicks,
 		MemBytes:  st.RSSPages * uint64(r.PageSize),
 		Comm:      st.Comm,
 	}
+}
+
+// readUID takes the real uid from the "Uid:" line of /proc/<pid>/status.
+func (r *LinuxProcessReader) readUID(pid int) (int, error) {
+	b, err := fs.ReadFile(r.FS, fmt.Sprintf("%d/status", pid))
+	if err != nil {
+		return 0, err
+	}
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if f := strings.Fields(line); len(f) >= 2 && f[0] == "Uid:" {
+			return strconv.Atoi(f[1])
+		}
+	}
+	return 0, fmt.Errorf("/proc/%d/status: no Uid line", pid)
 }
 
 // Argv reads /proc/<pid>/cmdline. It returns nil when the pid is gone,

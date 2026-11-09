@@ -6,6 +6,8 @@ import "runtime"
 type Process struct {
 	PID  int
 	PPID int
+	// UID is the owning user id.
+	UID int
 	// StartUnix is the process start in Unix seconds.
 	StartUnix int64
 	// CPUTicks is cumulative CPU time (user + system) in ticks of the

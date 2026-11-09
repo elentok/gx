@@ -92,6 +92,7 @@ func readDarwinPid(pid int, numer, denom uint64) Process {
 	return Process{
 		PID:       pid,
 		PPID:      int(bi.pbi_ppid),
+		UID:       int(bi.pbi_uid),
 		StartUnix: int64(bi.pbi_start_tvsec),
 		CPUTicks:  ns / (1e9 / darwinTickRate),
 		MemBytes:  mem,

@@ -74,7 +74,9 @@ func TestLinuxProcessReader(t *testing.T) {
 		"self":      {Data: []byte("not a pid")},
 		"1/stat":    {Data: []byte(statLine(1, "init", 0, 5, 5, 250, 10))},
 		"1/cmdline": {Data: []byte("/sbin/init\x00--flag\x00")},
+		"1/status":  {Data: []byte("Name:\tinit\nUid:\t0\t0\t0\t0\n")},
 		"2/stat":    {Data: []byte(statLine(2, "a b)", 1, 1, 0, 0, 1))},
+		"2/status":  {Data: []byte("Name:\ta\nUid:\t501\t501\t501\t501\n")},
 		// pid 3 vanished: its dir exists but has no stat file.
 		"3/cmdline": {Data: []byte("x")},
 	}
@@ -88,7 +90,7 @@ func TestLinuxProcessReader(t *testing.T) {
 	}
 	want := []Process{
 		{PID: 1, PPID: 0, StartUnix: 1002, CPUTicks: 10, MemBytes: 40960, Comm: "init"},
-		{PID: 2, PPID: 1, StartUnix: 1000, CPUTicks: 1, MemBytes: 4096, Comm: "a b)"},
+		{PID: 2, PPID: 1, UID: 501, StartUnix: 1000, CPUTicks: 1, MemBytes: 4096, Comm: "a b)"},
 		{PID: 3, Unreadable: true},
 	}
 	if !reflect.DeepEqual(table.Processes, want) {
@@ -148,6 +150,9 @@ func TestLinuxProcessReaderReal(t *testing.T) {
 	}
 	if self == nil || self.Unreadable {
 		t.Fatalf("own pid %d missing or unreadable", os.Getpid())
+	}
+	if self.UID != os.Getuid() {
+		t.Errorf("own uid = %d, want %d", self.UID, os.Getuid())
 	}
 
 	status, err := os.ReadFile("/proc/self/status")
