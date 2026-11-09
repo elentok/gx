@@ -2797,6 +2797,85 @@ export interface SessionResult {
 }
 
 //////////
+// source: settingspage.go
+
+/**
+ * SettingsReadRequest asks for the settings of one target. Project is empty
+ * for the global config file.
+ */
+export interface SettingsReadRequest {
+  project?: string;
+}
+/**
+ * SettingsReadResponse is the registry entries that apply to a target, with
+ * their current values.
+ */
+export interface SettingsReadResponse {
+  /**
+   * Project is nil for a global read.
+   */
+  project?: SettingsProject;
+  entries: SettingsEntry[];
+  /**
+   * PendingRestart lists the startup-only keys changed since the server started.
+   */
+  pending_restart?: string[];
+}
+/**
+ * SettingsProject is a project's identity and the facts the page shows
+ * beside its settings.
+ */
+export interface SettingsProject {
+  name: string;
+  repo?: string;
+  vcs?: string;
+  /**
+   * RepoChecksFile: the repo holds .gx/checks.json, which wins over the
+   * project's checks.
+   */
+  repo_checks_file: boolean;
+}
+/**
+ * SettingsEntry is one setting: what it is and what the target's file holds.
+ */
+export interface SettingsEntry {
+  /**
+   * Key is the display key path; Path is its segments.
+   */
+  key: string;
+  path: string[];
+  type: string;
+  section: string;
+  description: string;
+  enum?: string[];
+  min?: number /* float64 */;
+  integer?: boolean;
+  restart?: boolean;
+  risky?: boolean;
+  confirm_text?: string;
+  read_only?: boolean;
+  /**
+   * Set: the target's file holds the key. Absent means the default (or the
+   * global value, in a project) applies.
+   */
+  set: boolean;
+  /**
+   * Value is the file's value; never sent for a secret.
+   */
+  value?: unknown;
+  /**
+   * Default is the built-in default, when the key has one.
+   */
+  default?: unknown;
+  /**
+   * GlobalKey and GlobalValue are, in a project read, the global key the
+   * entry overrides or caps and that key's current effective value.
+   */
+  global_key?: string;
+  global_value?: unknown;
+}
+
+//////////
 // source: stats.go
 
 /**

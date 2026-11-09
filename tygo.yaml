@@ -23,6 +23,7 @@ packages:
       - restart.go
       - sessions.go
       - sessiontypes.go
+      - settingspage.go
       - stats.go
       - tips.go
       - triage.go
@@ -31,4 +32,5 @@ packages:
       - workspaces.go
     type_mappings:
       time.Time: "string"
+      json.RawMessage: "unknown"
     enum_style: "union"

@@ -76,7 +76,7 @@ func TestWriterHandEditBetweenLoadAndSaveSurvives(t *testing.T) {
 	}
 }
 
-func TestWriterConcurrentWritesBothLand(t *testing.T) {
+func TestWriterConcurrentWritesBothSurvive(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.json")
 	writeFile(t, path, `{}`)
