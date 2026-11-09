@@ -173,9 +173,10 @@ func (r *Registry) InSection(s Section) []Entry {
 // Default is the registry of every setting.
 func Default() *Registry {
 	var all []Entry
+	// Project entries first: within a section the project's own row leads the project view.
+	all = append(all, projectEntries()...)
 	all = append(all, coreEntries()...)
 	all = append(all, agentsEntries()...)
-	all = append(all, projectEntries()...)
 	return New(all...)
 }
 

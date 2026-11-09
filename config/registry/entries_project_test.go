@@ -51,6 +51,14 @@ func TestProjectView(t *testing.T) {
 	}
 }
 
+func TestProjectViewLeadsExecutionQueueWithCap(t *testing.T) {
+	for _, ps := range Default().ProjectView() {
+		if ps.Section == SectionExecutionQueue && ps.Entries[0].Key.String() != "project.max-agents" {
+			t.Errorf("first execution-queue row = %v, want project.max-agents", ps.Entries[0].Key)
+		}
+	}
+}
+
 func TestProjectOnlyEntries(t *testing.T) {
 	r := Default()
 	for _, k := range []string{"name", "repo", "vcs"} {

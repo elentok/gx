@@ -105,7 +105,8 @@ func projectInfo(name string, doc []byte) (*wire.SettingsProject, error) {
 	if err != nil {
 		return nil, err
 	}
-	info := &wire.SettingsProject{Name: name}
+	// An unset vcs means git: only a repo-less project writes "none".
+	info := &wire.SettingsProject{Name: name, VCS: "git"}
 	if pf.Name != nil {
 		info.Name = *pf.Name
 	}

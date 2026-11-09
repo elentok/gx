@@ -153,6 +153,20 @@ func TestReadProjectListsOnlyProjectKeys(t *testing.T) {
 	}
 }
 
+func TestReadProjectUnsetVCSFallsBackToGit(t *testing.T) {
+	t.Parallel()
+	for doc, want := range map[string]string{`{"name":"proj"}`: "git", `{"name":"proj","vcs":"none"}`: "none"} {
+		w, _ := readFixture(t, `{}`, doc)
+		resp, err := w.Read(Target{Project: "proj"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.Project.VCS != want {
+			t.Errorf("vcs for %s = %q, want %q", doc, resp.Project.VCS, want)
+		}
+	}
+}
+
 func TestReadProjectChecksRepoFileFlag(t *testing.T) {
 	t.Parallel()
 	w, repo := readFixture(t, `{}`, `{"name":"proj","repo":"REPO"}`)
