@@ -9,7 +9,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { clearCommandListCache } from "../commands/useCommandList";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
-import { WideContext } from "../useWide";
+import { DeviceContext, WideContext } from "../useWide";
 import {
   ConnectionContext,
   type Connection,
@@ -177,7 +177,15 @@ function render(opts: {
       <RouterProvider router={router} />
     </ConnectionContext.Provider>
   );
-  renderThemed(opts.wide === undefined ? app : <WideContext.Provider value={opts.wide}>{app}</WideContext.Provider>);
+  renderThemed(
+    opts.wide === undefined ? (
+      app
+    ) : (
+      <DeviceContext.Provider value={opts.wide ? "desktop" : "phone"}>
+        <WideContext.Provider value={opts.wide}>{app}</WideContext.Provider>
+      </DeviceContext.Provider>
+    ),
+  );
 }
 
 const openNote = async () => {

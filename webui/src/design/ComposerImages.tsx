@@ -2,6 +2,7 @@ import { Box } from "@chakra-ui/react";
 import { useRef, type ClipboardEvent, type DragEvent, type ReactNode } from "react";
 import { LuPaperclip } from "react-icons/lu";
 import { Button } from "../ui/button/Button";
+import { useDevice } from "../useWide";
 import { MAX_IMAGES, MSG_MAX_IMAGES } from "./imageLimits";
 import { ImageStrip } from "./ImageStrip";
 import type { ComposerImages as State } from "./useComposerImages";
@@ -21,9 +22,30 @@ function lineText(state: State): { text: string; red: boolean } | undefined {
   return undefined;
 }
 
+/** The one attach rule: phone and tablet get an icon-only paperclip, desktop the labelled control. */
+export const useAttachIcon = (): boolean => useDevice() !== "desktop";
+
+/** The attach button for `useAttachIcon`; the New Design sheet reuses it. */
+export function AttachButton({ onClick }: { onClick: () => void }) {
+  const icon = useAttachIcon();
+  return (
+    <Button
+      emphasis="secondary"
+      aria-label="Add image"
+      title={icon ? "Add image" : undefined}
+      {...(icon ? { w: "44px", h: "44px", px: "0", justifyContent: "center" } : {})}
+      flex="none"
+      onClick={onClick}
+    >
+      <LuPaperclip size={icon ? 20 : undefined} />
+      {!icon && " Add"}
+    </Button>
+  );
+}
+
 /**
  * Thumbnail row above `children` (the text box), Add and the status line beside `send`. Paste and drop anywhere inside add images.
- * `phone` makes Add an icon and moves the status line above the row.
+ * Add follows `useAttachIcon`; `phone` moves the status line above the row.
  */
 export function ComposerImages({
   state,
@@ -68,17 +90,7 @@ export function ComposerImages({
         </Box>
       )}
       <Box display="flex" gap="2" alignItems="center">
-        <Button
-          emphasis="secondary"
-          aria-label="Add image"
-          title={phone ? "Add image" : undefined}
-          {...(phone ? { w: "44px", h: "44px", px: "0", justifyContent: "center" } : {})}
-          flex="none"
-          onClick={() => input.current?.click()}
-        >
-          <LuPaperclip size={phone ? 20 : undefined} />
-          {!phone && " Add"}
-        </Button>
+        <AttachButton onClick={() => input.current?.click()} />
         <input
           ref={input}
           type="file"

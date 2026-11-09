@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { renderThemed } from "../ui/render";
+import { DeviceContext } from "../useWide";
 import { ComposerImages } from "./ComposerImages";
 import { MSG_TOO_LARGE } from "./imageLimits";
 import { deleteSessionImage, uploadSessionImage } from "./sessionImages";
@@ -77,6 +78,23 @@ test("the hidden input feeds the same attach function and has no capture", () =>
   const file = png();
   fireEvent.change(input, { target: { files: [file] } });
   expect(s.addFiles).toHaveBeenCalledWith([file]);
+});
+
+test.each([
+  ["phone", false],
+  ["tablet", false],
+  ["desktop", true],
+] as const)("Add is %s: labelled is %s", (device, labelled) => {
+  renderThemed(
+    <DeviceContext.Provider value={device}>
+      <ComposerImages state={state([])} send={<button>Send</button>}>
+        <textarea aria-label="Message" />
+      </ComposerImages>
+    </DeviceContext.Provider>,
+  );
+  const add = screen.getByRole("button", { name: "Add image" });
+  expect(add.textContent?.includes("Add")).toBe(labelled);
+  expect(add.getAttribute("title")).toBe(labelled ? null : "Add image");
 });
 
 test("thumbnails show uploading, failed with retry, and remove", () => {
