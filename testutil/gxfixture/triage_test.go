@@ -293,8 +293,13 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 	v = r.waitTriage(t, "no open question", func(v wire.TriageView) bool { return v.OpenQuestions == 0 })
 	r.gx(t, "server", "triage", "approve", project, "--revision", fmt.Sprint(v.Revision))
 
-	// The Write session leaves the scripted row failed and the rest done.
-	failedRow := project + ":follow-ups/01"
+	// The Write session leaves the scripted rows failed and the rest done: the
+	// first fails before its move and the second after it. The fifth is a keep
+	// in the plan, so its scripted failure never fires.
+	failedRows := map[string]string{
+		project + ":follow-ups/01": agentfake.TriageRefusalBeforeMove,
+		project + ":follow-ups/02": agentfake.TriageRefusalAfterMove,
+	}
 	v = r.waitTriage(t, "the Write session to end", func(v wire.TriageView) bool {
 		failed, written := 0, 0
 		for _, row := range v.Rows {
@@ -305,19 +310,31 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 				written++
 			}
 		}
-		return failed == 1 && written == 4
+		return failed == len(failedRows) && written == 3
 	})
 	// The last pass saves after the last row, so wait for the session to end
 	// before retrying: a Retry while one is live starts no new session.
 	r.waitNoSession(t)
 	v = r.triageView(t)
 	for _, row := range v.Rows {
-		if row.WriteState == "failed" && (row.Address != failedRow || row.Refusal != agentfake.TriageRefusalBeforeMove) {
-			t.Errorf("failed row %s with refusal %q, want %s with %q", row.Address, row.Refusal, failedRow, agentfake.TriageRefusalBeforeMove)
+		if want, scripted := failedRows[row.Address]; row.WriteState == "failed" && (!scripted || row.Refusal != want) {
+			t.Errorf("failed row %s with refusal %q, want one of %v", row.Address, row.Refusal, failedRows)
 		}
 	}
 
-	r.gx(t, "server", "triage", "retry", project, failedRow, "--revision", fmt.Sprint(v.Revision))
+	// Each Retry runs its own Write session; the Triage is done after the last.
+	for address := range failedRows {
+		r.gx(t, "server", "triage", "retry", project, address, "--revision", fmt.Sprint(r.triageView(t).Revision))
+		r.waitTriage(t, "the retry of "+address, func(v wire.TriageView) bool {
+			for _, row := range v.Rows {
+				if row.Address == address {
+					return row.WriteState == "done"
+				}
+			}
+			return false
+		})
+		r.waitNoSession(t)
+	}
 	v = r.waitTriage(t, "the Triage to be done", func(v wire.TriageView) bool { return v.State == wire.TriageDone })
 	if v.Result == nil {
 		t.Fatal("a done Triage has no result")

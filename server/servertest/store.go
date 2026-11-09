@@ -64,6 +64,8 @@ type TicketOpts struct {
 	ModelRan, ModelExpected string
 	// Category is the ticket's category: frontmatter field ("bug", "idea"), omitted when empty.
 	Category string
+	// OriginalAddress is the original_address stamp that survives a move, omitted when empty.
+	OriginalAddress string
 	// Unique is the ticket's unique: frontmatter field (a one-off's dedupe key), omitted when empty.
 	Unique string
 	// ClaimedAt, DoneAt and CancelledAt are RFC 3339 stamps, omitted when empty.
@@ -150,6 +152,9 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	}
 	if opts.Category != "" {
 		fm += "category: " + opts.Category + "\n"
+	}
+	if opts.OriginalAddress != "" {
+		fm += "original_address: " + opts.OriginalAddress + "\n"
 	}
 	if opts.Unique != "" {
 		fm += "unique: " + opts.Unique + "\n"

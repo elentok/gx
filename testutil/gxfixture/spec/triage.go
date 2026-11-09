@@ -171,12 +171,13 @@ func TriageScenario(shape string) (Scenario, bool) {
 			}}}
 		})
 	case "journey":
-		// Verify takes two sessions, and the first ready row fails once at Write.
+		// Verify takes two sessions; at Write the first and fifth rows fail once before their move and the second once after it.
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 3, 2)}
 			sc.TriageAgent = &agentfake.TriageConfig{
 				VerifyBatch:    3,
-				FailBeforeMove: []string{project + ":" + tickets.FollowUpsEpic + "/01"},
+				FailBeforeMove: []string{project + ":" + tickets.FollowUpsEpic + "/01", project + ":" + tickets.FollowUpsEpic + "/05"},
+				FailAfterMove:  []string{project + ":" + tickets.FollowUpsEpic + "/02"},
 			}
 		})
 	}
@@ -189,7 +190,9 @@ func followUps(project string, bugs, ideas int) Epic {
 	add := func(category string, n int) {
 		for range n {
 			id := fmt.Sprintf("%02d", len(e.Tickets)+1)
-			e.Tickets = append(e.Tickets, Ticket{id, fmt.Sprintf("%s-%s", category, id), servertest.TicketOpts{Category: category}})
+			// Stamped like a ticket made by `tickets add`, so a Triage finds it again after a move.
+			address := fmt.Sprintf("%s:%s/%s", project, tickets.FollowUpsEpic, id)
+			e.Tickets = append(e.Tickets, Ticket{id, fmt.Sprintf("%s-%s", category, id), servertest.TicketOpts{Category: category, OriginalAddress: address}})
 		}
 	}
 	add("bug", bugs)
