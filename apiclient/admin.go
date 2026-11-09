@@ -109,6 +109,14 @@ func (a *Admin) Settings(ctx context.Context, target string) (wire.SettingsReadR
 	return resp, err
 }
 
+// SetSettings applies key changes to a target's file together or not at all.
+// A refusal is a result (Refused set), not an error.
+func (a *Admin) SetSettings(ctx context.Context, req wire.SettingsWriteRequest) (wire.SettingsWriteResult, error) {
+	var res wire.SettingsWriteResult
+	err := a.t.post(ctx, "/v1/settings", req, &res)
+	return res, err
+}
+
 // SetDefaultHarness writes the Default harness. A refusal is a result (Refused
 // set), not an error.
 func (a *Admin) SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {

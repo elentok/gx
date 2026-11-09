@@ -53,7 +53,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		queue.Routes(func() *queue.Queue { return s.queue }, func() *queue.OneOffs { return s.oneOffs }, func() *queue.AFK { return s.afk }, func() *queue.ViMode { return s.viMode }),
 		workspaces.Routes(func() *workspaces.Store { return s.workspaces }, func() []wire.Workspace { ws, _ := s.workspacesWithNeedsYou(); return ws }),
 		harnesschoice.Routes(func() *harnesschoice.Harness { return s.harness }),
-		settingsapi.Routes(func() *settingsapi.Writer { return s.settingsWriter }, func() []string { return s.pendingRestart() }),
+		settingsapi.Routes(func() *settingsapi.Writer { return s.settingsWriter }, func() []string { return s.pendingRestart() }, func() wire.ReloadResult { return s.settings.Reload(settings.TriggerWeb) }),
 		cleanup.Routes(func() *cleanup.Cleanup { return s.cleanup }),
 		disk.Routes(func() *disk.Disk { return s.disks }),
 		health.Routes(func() *health.Health { return s.health }),

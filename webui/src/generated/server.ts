@@ -2876,6 +2876,48 @@ export interface SettingsEntry {
 }
 
 //////////
+// source: settingswrite.go
+
+/**
+ * SettingChange sets Key to Value, or removes Key when Remove is set. Key is
+ * the display key path (SettingsEntry.Key).
+ */
+export interface SettingChange {
+  key: string;
+  value?: unknown;
+  remove?: boolean;
+}
+/**
+ * SettingsWriteRequest applies Changes together or not at all. Project is
+ * empty for the global config file.
+ */
+export interface SettingsWriteRequest {
+  project?: string;
+  changes: SettingChange[];
+}
+/**
+ * SettingsWriteResult says what a write did. A refusal is a result: it names
+ * the failing keys, and nothing was written.
+ */
+export interface SettingsWriteResult {
+  refused?: boolean;
+  keys?: string[];
+  reason?: string;
+  /**
+   * Values holds each changed key's saved value; null for a removed key.
+   */
+  values?: { [key: string]: unknown};
+  /**
+   * RestartNeeded lists the startup-only keys that wait for a restart.
+   */
+  restart_needed?: string[];
+  /**
+   * Notices are messages to show after the save, such as the harness switch.
+   */
+  notices?: string[];
+}
+
+//////////
 // source: stats.go
 
 /**
