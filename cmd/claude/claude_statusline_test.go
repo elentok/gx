@@ -257,8 +257,10 @@ func TestTokenColorThresholds(t *testing.T) {
 		{name: "yellow at 75k", tokens: 75000, want: ui.ColorYellow},
 		{name: "yellow below 100k", tokens: 99999, want: ui.ColorYellow},
 		{name: "orange at 100k", tokens: 100000, want: ui.ColorOrange},
-		{name: "orange below 150k", tokens: 149999, want: ui.ColorOrange},
-		{name: "red at 150k", tokens: 150000, want: ui.ColorRed},
+		{name: "orange at 120k", tokens: 120000, want: ui.ColorOrange},
+		{name: "orange below 130k", tokens: 129999, want: ui.ColorOrange},
+		{name: "red at 130k", tokens: 130000, want: ui.ColorRed},
+		{name: "red at 149,999", tokens: 149999, want: ui.ColorRed},
 	}
 
 	for _, tc := range cases {

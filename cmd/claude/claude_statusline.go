@@ -14,6 +14,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ui"
 )
 
@@ -380,15 +381,15 @@ func contextProgressValue(percent, tokens float64) string {
 	return fmt.Sprintf("%s%s%s %s", claudeLeftBracket, bar, claudeRightBracket, percentText)
 }
 
-// tokenColor escalates through gx's palette as context usage grows, giving an
-// extra warning step (yellow) between blf's original green/orange/red.
+// tokenColor escalates through gx's palette as context usage grows; the
+// edges come from the shared agent.LevelForTokens scale.
 func tokenColor(tokens float64) color.Color {
-	switch {
-	case tokens < 75000:
+	switch agent.LevelForTokens(int(tokens)) {
+	case agent.LevelGreen:
 		return ui.ColorGreen
-	case tokens < 100000:
+	case agent.LevelYellow:
 		return ui.ColorYellow
-	case tokens < 150000:
+	case agent.LevelOrange:
 		return ui.ColorOrange
 	default:
 		return ui.ColorRed

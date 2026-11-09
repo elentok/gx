@@ -168,3 +168,24 @@ func TestTierValid(t *testing.T) {
 		}
 	}
 }
+
+func TestLevelForTokens(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		tokens int
+		want   ContextLevel
+	}{
+		{0, LevelGreen},
+		{74_999, LevelGreen},
+		{75_000, LevelYellow},
+		{99_999, LevelYellow},
+		{100_000, LevelOrange},
+		{129_999, LevelOrange},
+		{130_000, LevelRed},
+	}
+	for _, tc := range cases {
+		if got := LevelForTokens(tc.tokens); got != tc.want {
+			t.Errorf("LevelForTokens(%d) = %q, want %q", tc.tokens, got, tc.want)
+		}
+	}
+}

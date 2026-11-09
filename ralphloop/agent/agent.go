@@ -23,6 +23,36 @@ const DefaultSmartZone = SmartZoneCeiling
 // context-window --fits` shares it so chaining decisions match the pause point.
 const SmartZoneCeiling = 130_000
 
+// ContextLevel names a band of the context-token scale.
+type ContextLevel string
+
+const (
+	LevelGreen  ContextLevel = "green"
+	LevelYellow ContextLevel = "yellow"
+	LevelOrange ContextLevel = "orange"
+	LevelRed    ContextLevel = "red"
+)
+
+const (
+	contextYellowFrom = 75_000
+	contextOrangeFrom = 100_000
+)
+
+// LevelForTokens maps a context-token count to its level; red starts at
+// SmartZoneCeiling.
+func LevelForTokens(tokens int) ContextLevel {
+	switch {
+	case tokens < contextYellowFrom:
+		return LevelGreen
+	case tokens < contextOrangeFrom:
+		return LevelYellow
+	case tokens < SmartZoneCeiling:
+		return LevelOrange
+	default:
+		return LevelRed
+	}
+}
+
 // DefaultWorkerSkill is the skill each iteration invokes when none is
 // configured.
 const DefaultWorkerSkill = "gx-implement"
