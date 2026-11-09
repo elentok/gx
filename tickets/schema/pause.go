@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -42,7 +43,15 @@ const (
 	PauseConflictMarkers    PauseReason = "conflict-markers"
 	PauseModelMismatch      PauseReason = "model-mismatch"
 	PauseClassifierOutage   PauseReason = "classifier-outage"
+	PauseProcessStorm       PauseReason = "process-storm"
 )
+
+// ProcessStormReason is the pause detail for a run the watchdog killed: what
+// happened and why gx waits for a person.
+func ProcessStormReason(count, threshold int) string {
+	return fmt.Sprintf("The run's process tree grew to %d processes, over the threshold of %d, so gx stopped it. "+
+		"gx cannot recover alone: a retry would run the same code and storm again.", count, threshold)
+}
 
 // PauseClass says what a person does about a pause: answer a question, or
 // repair a fault. Every rule that used to key on the stored needs-answer /
@@ -85,6 +94,7 @@ var pauseClasses = map[PauseReason]PauseClass{
 	PauseBudgetKilled:       PauseClassRepair,
 	PauseIterationError:     PauseClassRepair,
 	PauseClassifierOutage:   PauseClassRepair,
+	PauseProcessStorm:       PauseClassRepair,
 }
 
 // pauseLabels is the one table of plain-words labels the TUI and the web show
@@ -121,6 +131,7 @@ var pauseLabels = map[PauseReason]string{
 	PauseParentDefect: "Parent ticket missing or wrong",
 	// Limits and other.
 	PauseBudgetKilled:   "Daily budget reached",
+	PauseProcessStorm:   "Too many processes",
 	PauseIterationError: "Run failed",
 	PauseManual:         "Paused by you",
 	PauseModelMismatch:  "Wrong model",

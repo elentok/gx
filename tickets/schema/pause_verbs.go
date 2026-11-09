@@ -162,6 +162,7 @@ var pauseRows = map[PauseReason]PauseRow{
 	PauseMergeConflict:   verbs(VerbMergeAgain, VerbStartOver),
 	PauseAmbiguousMerge:  retryStartOver,
 	PauseBudgetKilled:    retryStartOver,
+	PauseProcessStorm:    retryStartOver,
 	PauseConflictMarkers: retryStartOver,
 
 	PauseIterationError:     retryStartOver,

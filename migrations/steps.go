@@ -70,6 +70,10 @@ func init() {
 	Default.Register(Step{Name: "classifier-outage", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// process-storm: a new pause reason enum value; no older ticket carries it.
+	Default.Register(Step{Name: "process-storm", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

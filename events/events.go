@@ -194,6 +194,9 @@ const (
 	// ClassifierOutage is an agent whose auto-mode classifier gave no verdict
 	// through every re-send. Its own kind lets the run log and stats count outages.
 	ClassifierOutage Kind = "classifier-outage"
+	// ProcessStorm is a run the watchdog killed because its process tree grew
+	// past the threshold. A retry would run the same code and storm again.
+	ProcessStorm Kind = "process-storm"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -213,7 +216,7 @@ var kinds = map[Kind]bool{
 	MergeConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
 	TrunkMissing: true, DirtyTrunk: true, MergeError: true, MergeUnreported: true,
 	NeedsRebase: true, ConflictMarkers: true, ModelMismatch: true,
-	ClassifierOutage: true,
+	ClassifierOutage: true, ProcessStorm: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

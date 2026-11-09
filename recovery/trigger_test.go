@@ -16,6 +16,7 @@ func TestFailure_Triggers(t *testing.T) {
 		{"repair iteration error", events.Paused, events.IterationError, true},
 		{"repair manual pause", events.Paused, events.Manual, false},
 		{"repair budget-killed", events.Paused, events.BudgetKilled, false},
+		{"repair process-storm", events.Paused, events.ProcessStorm, false},
 		{"answer zero-commit", events.Paused, events.ZeroCommit, true},
 		{"answer blocked-pane", events.Paused, events.BlockedPane, true},
 		{"answer self-reported", events.Paused, events.SelfReported, false},

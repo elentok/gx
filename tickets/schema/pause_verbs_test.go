@@ -91,6 +91,26 @@ func TestPauseClassifierOutage(t *testing.T) {
 	}
 }
 
+func TestPauseProcessStorm(t *testing.T) {
+	r := PauseProcessStorm
+	if !r.Valid() || r.Class() != PauseClassRepair || r.Label() == "" {
+		t.Errorf("valid=%v class=%q label=%q", r.Valid(), r.Class(), r.Label())
+	}
+	row, ok := r.Row()
+	if !ok || !slices.Equal(row.Verbs, []PauseVerb{VerbRetry, VerbStartOver}) {
+		t.Errorf("row = %+v, ok=%v", row, ok)
+	}
+}
+
+func TestProcessStormReason(t *testing.T) {
+	got := ProcessStormReason(812, 500)
+	for _, want := range []string{"812", "500", "cannot recover alone"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("reason %q lacks %q", got, want)
+		}
+	}
+}
+
 func TestPausedAskingAndForRepair(t *testing.T) {
 	cases := []struct {
 		reason         PauseReason

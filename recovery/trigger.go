@@ -28,7 +28,8 @@ type Failure struct {
 }
 
 // Triggers reports whether a failure of this shape may start recovery at all:
-// every repair-class pause except budget-killed (a deliberate stop), an
+// every repair-class pause except budget-killed (a deliberate stop),
+// process-storm (a retry would storm again), an
 // answer-class zero-commit or blocked-pane pause, a deadlock, a held
 // background-task gate (R10) and a ticket-graph defect a scan found (R14).
 // Self-reported and manual pauses and commitless finishes are a person's or the ticket's own
@@ -42,7 +43,7 @@ func (f Failure) Triggers() bool {
 		if f.Kind.AwaitsAnswer() {
 			return f.Kind == events.ZeroCommit || f.Kind == events.BlockedPane
 		}
-		return f.Kind != events.BudgetKilled && f.Kind != events.Manual
+		return f.Kind != events.BudgetKilled && f.Kind != events.ProcessStorm && f.Kind != events.Manual
 	case events.Deadlocked:
 		return true
 	}
