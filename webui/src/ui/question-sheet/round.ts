@@ -18,6 +18,8 @@ export interface QuestionCard {
   options?: QuestionChoice[];
   recommended?: string;
   note?: string;
+  /** What the question is about, shown muted above its title. */
+  context?: string;
 }
 
 /** The title a card shows for its question: "Q8", or "Q8b". */

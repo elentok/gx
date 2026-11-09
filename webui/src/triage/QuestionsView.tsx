@@ -14,7 +14,7 @@ const REASON_STALE = "stale";
 const TYPING_MS = 600;
 
 /** The row's person fields as the save replaces them wholesale: keep what the person already set, change the answers. */
-function saveBody(project: string, revision: number, row: TriageRow, answers: Answers) {
+function saveBody(project: string, revision: number, rows: TriageRow[], row: TriageRow, answers: Answers) {
   return {
     project,
     revision,
@@ -22,7 +22,7 @@ function saveBody(project: string, revision: number, row: TriageRow, answers: An
     action: row.person_changed && row.action !== "keep" ? row.action : undefined,
     destination: row.person_changed ? row.destination : undefined,
     keep_for_later: row.action === "keep" || undefined,
-    answers: rowAnswers(row, answers),
+    answers: rowAnswers(rows, row, answers),
   };
 }
 
@@ -63,7 +63,7 @@ export function QuestionsView({
     saved.current = now;
     queue.current = queue.current.then(async () => {
       for (const row of dirty) {
-        const res = await save(saveBody(project, latest.current.revision, row, now));
+        const res = await save(saveBody(project, latest.current.revision, rows, row, now));
         if (res.refused) {
           if (res.reason !== REASON_STALE) showToast({ type: "error", title: refusalText(res) });
           else showToast({ type: "warning", title: "The plan changed. Your answers were reloaded." });

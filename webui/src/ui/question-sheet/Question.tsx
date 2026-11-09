@@ -98,6 +98,11 @@ export function Question({
   const lettered = card.kind !== "yes-no";
   return (
     <Box display="flex" flexDirection="column" gap={big ? "3" : "2"}>
+      {card.context && (
+        <Text fontSize="xs" color="text.dim">
+          {card.context}
+        </Text>
+      )}
       <Markdown
         inline
         fontSize={big ? "title" : "subtitle"}

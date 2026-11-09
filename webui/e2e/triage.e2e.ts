@@ -72,9 +72,10 @@ test.describe("199. Triage journey", () => {
     // Answering in the question component enables the bar and moves the page to Review.
     const questions = page.getByRole("group", nav("Questions"));
     await expect(questions).toBeVisible();
-    for (const [id, answer] of [["q1", "parser"], ["q2", "no"], ["d1", "the sqlite store"]]) {
+    // A question is named by its row number and its id: row 01 q1 is 1.1.
+    for (const [id, answer] of [["1.1", "parser"], ["1.2", "no"], ["2.d1", "the sqlite store"]]) {
       await questions.getByRole("textbox", nav(`Answer to question ${id}`)).fill(answer);
-      if (id !== "d1") await questions.getByRole("button", nav("Next →")).click();
+      if (id !== "2.d1") await questions.getByRole("button", nav("Next →")).click();
     }
 
     // Review: the bar enables, nothing is changed yet.
