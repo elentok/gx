@@ -673,6 +673,10 @@ var scenarios = map[string]scenario{
 	// the Agents tab holds a Claude, a Codex and a model-switched Claude session.
 	// Start it with --fakecodex for codex on PATH. See spec.DefaultHarnessScenario.
 	"default-harness": spec.DefaultHarnessScenario(),
+
+	// settings: a config with non-default values, three projects and a pending
+	// restart. See spec.SettingsScenario.
+	"settings": spec.SettingsScenario(),
 	// codex-queue: Default harness claude; two running tickets (Codex, Claude) and
 	// three waiting (follows default, pinned to Codex, ran on Claude). See spec.CodexQueueScenario.
 	"codex-queue": spec.CodexQueueScenario(),
