@@ -212,11 +212,20 @@ func ReadChatFrom(r io.Reader, imagesDir string) (msgs []ChatMessage, err error)
 // line is megabytes of base64, which a bufio.Scanner limit would reject. fn
 // must not keep the slice.
 func ForEachLine(r io.Reader, fn func(line []byte)) error {
+	return forEachLineUntil(r, func(line []byte) bool {
+		fn(line)
+		return true
+	})
+}
+
+// forEachLineUntil is ForEachLine with an early exit: it stops reading as
+// soon as fn returns false.
+func forEachLineUntil(r io.Reader, fn func(line []byte) bool) error {
 	br := bufio.NewReaderSize(r, 64*1024)
 	for {
 		raw, err := br.ReadBytes('\n')
-		if len(raw) > 0 {
-			fn(raw)
+		if len(raw) > 0 && !fn(raw) {
+			return nil
 		}
 		if err == io.EOF {
 			return nil

@@ -3,6 +3,7 @@ package transcript
 import (
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -38,6 +39,21 @@ func jsonString(s string) string {
 		panic(err)
 	}
 	return string(b)
+}
+
+func TestReadUnexecutedToolCall_LineOver10MBIsNotAnError(t *testing.T) {
+	path := writeTranscript(t,
+		realUserTurnLine(strings.Repeat("x", 11*1024*1024)),
+		assistantTextLine("Agent({\n  description: \"do the thing\",\n"),
+	)
+
+	matched, err := ReadUnexecutedToolCall(path)
+	if err != nil {
+		t.Fatalf("ReadUnexecutedToolCall() error = %v, want nil for an oversized line", err)
+	}
+	if !matched {
+		t.Errorf("matched = false, want true")
+	}
 }
 
 func TestReadUnexecutedToolCall_MatchesLoneUnexecutedCallText(t *testing.T) {

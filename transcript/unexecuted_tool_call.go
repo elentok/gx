@@ -1,7 +1,6 @@
 package transcript
 
 import (
-	"bufio"
 	"encoding/json"
 	"os"
 	"regexp"
@@ -104,36 +103,33 @@ func ReadUnexecutedToolCall(path string) (bool, error) {
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
-
 	var turnLines []unexecutedToolCallLine
 	totalNonBlank := 0
 	parsedOK := 0
 
-	for scanner.Scan() {
-		raw := strings.TrimSpace(scanner.Text())
+	scanErr := ForEachLine(f, func(lineBytes []byte) {
+		raw := strings.TrimSpace(string(lineBytes))
 		if raw == "" {
-			continue
+			return
 		}
 		totalNonBlank++
 
 		var entry unexecutedToolCallLine
 		if err := json.Unmarshal([]byte(raw), &entry); err != nil {
-			continue
+			return
 		}
 		parsedOK++
 
 		if entry.IsSidechain {
-			continue
+			return
 		}
 		if entry.isRealUserTurn() {
 			turnLines = turnLines[:0]
-			continue
+			return
 		}
 		turnLines = append(turnLines, entry)
-	}
-	if scanErr := scanner.Err(); scanErr != nil {
+	})
+	if scanErr != nil {
 		return false, scanErr
 	}
 	if totalNonBlank > 0 && parsedOK == 0 {

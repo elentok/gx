@@ -7,6 +7,7 @@ package transcript
 import (
 	"cmp"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -345,25 +346,30 @@ func FirstLineTimestamp(path string) (time.Time, bool, error) {
 	}
 	defer f.Close()
 
+	return firstTimestampIn(f)
+}
+
+// firstTimestampIn stops reading at the first line with a parseable timestamp:
+// Elapsed calls it on every refresh, so reading the whole transcript would
+// cost more as the session grows.
+func firstTimestampIn(r io.Reader) (time.Time, bool, error) {
 	var first time.Time
 	found := false
-	scanErr := ForEachLine(f, func(lineBytes []byte) {
-		if found {
-			return
-		}
+	scanErr := forEachLineUntil(r, func(lineBytes []byte) bool {
 		raw := strings.TrimSpace(string(lineBytes))
 		if raw == "" {
-			return
+			return true
 		}
 		var entry transcriptLine
 		if jsonErr := json.Unmarshal([]byte(raw), &entry); jsonErr != nil {
-			return
+			return true
 		}
 		ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
 		if tsErr != nil {
-			return
+			return true
 		}
 		first, found = ts, true
+		return false
 	})
 	if scanErr != nil {
 		return time.Time{}, false, scanErr

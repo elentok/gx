@@ -1,11 +1,14 @@
 package transcript
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 )
 
@@ -504,6 +507,22 @@ func TestFirstLineTimestamp_ReturnsEarliestParseableLine(t *testing.T) {
 	want := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	if !ts.Equal(want) {
 		t.Errorf("FirstLineTimestamp() = %v, want %v", ts, want)
+	}
+}
+
+func TestFirstTimestampIn_StopsReadingAfterFirstTimestamp(t *testing.T) {
+	// A read past the first line fails, so reading on would surface as an error.
+	r := io.MultiReader(
+		strings.NewReader(`{"type":"user","timestamp":"2026-01-01T00:00:00.000Z","message":{}}`+"\n"),
+		iotest.ErrReader(errors.New("read past the first line")),
+	)
+
+	ts, ok, err := firstTimestampIn(r)
+	if err != nil {
+		t.Fatalf("firstTimestampIn() error = %v, want nil: it read past the first timestamp", err)
+	}
+	if !ok || !ts.Equal(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("firstTimestampIn() = (%v, %v)", ts, ok)
 	}
 }
 
