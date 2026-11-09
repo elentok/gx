@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection } from "../connection";
 import type { DesignDraft, DesignDraftSaveRequest } from "../generated/server";
 import { renderThemed } from "../ui/render";
+import { DeviceContext, type Device } from "../useWide";
 import { WriteError } from "../useWrite";
 import type { DraftResult } from "./drafts";
 import { ShellContext, type Shell } from "../shell/ShellContext";
@@ -45,15 +46,17 @@ function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
   return { client, save, remove, setLastProject, uploadImage, removeImage };
 }
 
-async function mount(over: Partial<Parameters<typeof NewDesignForm>[0]> = {}, latest?: Partial<DesignDraft>, lastProject = "") {
+async function mount(over: Partial<Parameters<typeof NewDesignForm>[0]> = {}, latest?: Partial<DesignDraft>, lastProject = "", device?: Device) {
   const onClose = vi.fn();
   const onStarted = vi.fn();
   const fake = fakeDrafts(latest, lastProject);
   await act(async () => {
     renderThemed(
-      <ConnectionContext.Provider value={{ refresh: () => {} } as Connection}>
-        <NewDesignForm projects={["gx", "blog"]} open={ok} drafts={fake.client} onStarted={onStarted} onClose={onClose} {...over} />
-      </ConnectionContext.Provider>,
+      <DeviceContext.Provider value={device}>
+        <ConnectionContext.Provider value={{ refresh: () => {} } as Connection}>
+          <NewDesignForm projects={["gx", "blog"]} open={ok} drafts={fake.client} onStarted={onStarted} onClose={onClose} {...over} />
+        </ConnectionContext.Provider>
+      </DeviceContext.Provider>,
     );
   });
   return { onClose, onStarted, ...fake };
@@ -931,6 +934,26 @@ test("Add image picks files, and the line counts them", async () => {
   expect(screen.getByText(LIMITS)).toBeTruthy();
   addImages(png("a.png"), png("b.png"));
   await waitFor(() => expect(screen.getByText("2 of 10 images")).toBeTruthy());
+});
+
+test.each(["phone", "tablet"] as const)("on %s the paperclip leads the footer; no tile, limits line or empty row", async (device) => {
+  await mount({}, { slug: "x" }, "", device);
+  const footer = screen.getByRole("button", { name: "Discard" }).parentElement!;
+  expect(footer.firstElementChild).toBe(screen.getByRole("button", { name: "Add image" }));
+  expect(screen.queryByText(LIMITS)).toBeNull();
+  expect(screen.queryByLabelText("Images")).toBeNull();
+  addImages(png("a.png"), png("b.png"));
+  await waitFor(() => expect(screen.getByText("2 of 10 images")).toBeTruthy());
+  expect(screen.getByLabelText("Images")).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "Add image" })).toHaveLength(1);
+});
+
+test("on desktop the tile and limits line stay and the footer has no paperclip", async () => {
+  await mount({}, { slug: "x" }, "", "desktop");
+  const footer = screen.getByRole("button", { name: "Discard" }).parentElement!;
+  expect(footer.contains(screen.getByRole("button", { name: "Add image" }))).toBe(false);
+  expect(screen.getByLabelText("Images")).toBeTruthy();
+  expect(screen.getByText(LIMITS)).toBeTruthy();
 });
 
 test("a refused file is a failed tile with its reason and Remove, never retried or uploaded", async () => {

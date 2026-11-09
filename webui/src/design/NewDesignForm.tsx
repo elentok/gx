@@ -20,7 +20,7 @@ import {
 } from "./drafts";
 import { removeDraftImage, uploadDraftImage, type RemoveDraftImage, type UploadDraftImage } from "./draftImageApi";
 import { DraftImages } from "./DraftImages";
-import { imageFiles } from "./ComposerImages";
+import { AttachButton, imageFiles, useAttachIcon } from "./ComposerImages";
 import { ImageSlot, useDraftImages } from "./useDraftImages";
 import { useShell } from "../shell/ShellContext";
 import { postOpenDesign, type OpenDesign } from "./open";
@@ -295,6 +295,8 @@ function DraftForm({
     if (!server.current.id) throw new Error(MSG_NEEDS_TEXT);
     return server.current.id;
   };
+  const fileInput = useRef<HTMLInputElement>(null);
+  const attachIcon = useAttachIcon();
   const imgs = useDraftImages({
     slot,
     draftId: () => server.current.id,
@@ -708,8 +710,20 @@ function DraftForm({
           void imgs.addFiles(files);
         }}
       />
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        data-testid="image-input"
+        onChange={(e) => {
+          void imgs.addFiles(imageFiles(e.target.files));
+          e.target.value = "";
+        }}
+      />
       <Box flexShrink="0" px="3">
-        <DraftImages state={imgs} />
+        <DraftImages state={imgs} pick={() => fileInput.current?.click()} />
       </Box>
       {sheetMode && reason && !confirming && (
         <Text fontSize="12px" color="tone.waiting.fg" px="3" pb="2" flexShrink="0">
@@ -731,6 +745,7 @@ function DraftForm({
           </>
         ) : (
           <>
+            {attachIcon && <AttachButton onClick={() => fileInput.current?.click()} />}
             <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasWork ? setConfirming(true) : discard())}>
               Discard
             </Button>
