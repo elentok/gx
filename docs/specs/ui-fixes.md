@@ -158,19 +158,19 @@ New flows or scenarios to write (these become implementation tickets):
 - An added tablet (744px) step in flow 41 and in the agents composer flow (stories 6, 7, 18).
 - No new standalone flow is needed. The flow budget stays; every flow above is an added step in an existing flow.
 
-Mock states
+**Mock states**
 
-- `$(gx tickets root)/ui-fixes/mocks/04-design-page-phone-mock.html`, state `chat-closed-a`, width 390, scenario: the new Design-with-images scenario, parts: app-top-bar, title-block, more-menu, chat-log, log-images, footer.
-- `$(gx tickets root)/ui-fixes/mocks/04-design-page-phone-mock.html`, state `questions-keyboard-a`, width 390, scenario `design` (round one up, keyboard faked), parts: view-tabs, more-menu, question-box, footer. The app top bar, title block and images are absent.
-- `$(gx tickets root)/ui-fixes/mocks/04-design-page-phone-mock.html`, state `menu-open`, width 390, scenario `design`, parts: app-top-bar, title-block, more-menu, menu, menu-model (the Agent block), menu-epic-link.
-- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, state `delivered-phone`, width 390, scenario `mixed` (ticket demo:mixed-epic/06, answered while the agent is live), parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
-- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, state `delivered-desktop`, width 720, scenario `mixed`, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
-- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, state `queued-phone`, width 390, scenario: the new queued-outcome scenario, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
-- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, state `queued-desktop`, width 720, scenario: the new queued-outcome scenario, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
-- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, state `finished-phone`, width 390, scenario: the new adopted-outcome scenario, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
-- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, state `finished-desktop`, width 720, scenario: the new adopted-outcome scenario, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
-- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, state `note-phone`, width 390, scenario `mixed` (answer with a note), parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, note, status.
-- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, state `note-desktop`, width 720, scenario `mixed` (answer with a note), parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, note, status.
+- `$(gx tickets root)/ui-fixes/mocks/04-design-page-phone-mock.html`, `chat-closed-a`, width 390, scenario: the new Design-with-images scenario, parts: app-top-bar, title-block, more-menu, chat-log, log-images, footer.
+- `$(gx tickets root)/ui-fixes/mocks/04-design-page-phone-mock.html`, `questions-keyboard-a`, width 390, scenario `design` (round one up, keyboard faked), parts: view-tabs, more-menu, question-box, footer. The app top bar, title block and images are absent.
+- `$(gx tickets root)/ui-fixes/mocks/04-design-page-phone-mock.html`, `menu-open`, width 390, scenario `design`, parts: app-top-bar, title-block, more-menu, menu, menu-model (the Agent block), menu-epic-link.
+- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, `delivered-phone`, width 390, scenario `mixed` (ticket demo:mixed-epic/06, answered while the agent is live), parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
+- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, `delivered-desktop`, width 720, scenario `mixed`, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
+- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, `queued-phone`, width 390, scenario: the new queued-outcome scenario, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
+- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, `queued-desktop`, width 720, scenario: the new queued-outcome scenario, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
+- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, `finished-phone`, width 390, scenario: the new adopted-outcome scenario, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
+- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, `finished-desktop`, width 720, scenario: the new adopted-outcome scenario, parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, status.
+- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, `note-phone`, width 390, scenario `mixed` (answer with a note), parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, note, status.
+- `$(gx tickets root)/ui-fixes/mocks/05-answered-card-mock.html`, `note-desktop`, width 720, scenario `mixed` (answer with a note), parts: action-buttons, agent-label, agent-detail, show-more, agent-question, answer, note, status.
 
 ## Out of Scope
 
