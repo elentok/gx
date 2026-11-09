@@ -9,10 +9,13 @@ async function signIn(page: Page, password: string, code: string) {
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
+// The PWA steps need a registered worker, which only registers with the fixture's untrusted root ignored.
+test.use({ serviceWorkers: "allow", launchOptions: { args: ["--ignore-certificate-errors"] } });
+
 // Flows 103 (rate limit) and 104 (certificate help) run as steps of 102: same web-login scenario.
 // The rate limit runs last, in a second browser context, because the lockout would block the sign-in.
 test("102. Login (+103 rate limit, +104 certificate help)", async ({ page, start, browser }) => {
-  const fixture = await start("web-login");
+  const fixture = await start("web-login", { reloads: 1 });
   await page.evaluate(() => (window.location.hash = "#/stats"));
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
@@ -39,6 +42,12 @@ test("102. Login (+103 rate limit, +104 certificate help)", async ({ page, start
   const shown = await help.locator("p + div > span").allInnerTexts();
   expect(shown.join(" ")).toBe(printed);
 
+  // PWA: with a worker active, a signed-out reload shows the server's sign-in screen, not a cached page.
+  const workerState = () => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.state ?? "none");
+  await expect.poll(workerState).toBe("activated");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+
   // 102: sign in, hash preserved
   await signIn(page, fixture.password, "000000");
   await expect(page.getByText("Wrong password or code")).toBeVisible();
@@ -47,6 +56,11 @@ test("102. Login (+103 rate limit, +104 certificate help)", async ({ page, start
   await expect(page.getByRole("heading", { name: "Sign in" })).toHaveCount(0);
   expect(page.url()).toMatch(/#\/stats$/);
   await expect(page.getByRole("link", { name: "Stats and health", exact: true })).toBeVisible();
+
+  // PWA: a 401 from a data route still signs the page out with the worker active.
+  await page.context().clearCookies();
+  await page.evaluate(() => (window.location.hash = "#/"));
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
   // 103: rate limit, last
   const context = await browser.newContext({ ignoreHTTPSErrors: true });

@@ -150,7 +150,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 ## Auth and settings (`setup`, `login`, `reload`, `settings`)
 
 - **`setup.e2e.ts`:** **99. First-run setup**; **100. Setup from the QR link**; **101. Setup and login with TOTP off.**
-- **`login.e2e.ts` 102. Login (+103 rate limit, +104 certificate help).**
+- **`login.e2e.ts` 102. Login (+103 rate limit, +104 certificate help).** Also two PWA steps with a registered worker: a signed-out reload shows the sign-in screen, and a 401 still signs the page out (one declared reload).
 - **`reload.e2e.ts`:** one allowed reload passes and is counted.
 - **`settings.e2e.ts`:** **106. Sign out another device**; **107. Sign out of this device (+111 CLI revoke)**; **108. Change password**; **109. Reset authenticator**; **110. Web reset from the CLI**; **112. Add the authenticator after a CLI reset.**
 
