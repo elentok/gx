@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { CertContext, type CertContextValue } from "../auth/cert";
+import { TEST_CERT } from "../auth/testCert";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { Workspace } from "../generated/server";
 import { renderThemed } from "../ui/render";
@@ -16,7 +18,11 @@ vi.mock("../pwa/install", () => ({ useInstall: () => ({ ...install.state, prompt
 const forceRefresh = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("../pwa/forceRefresh", () => ({ forceRefresh }));
 
+const registration = vi.hoisted(() => ({ state: { state: "idle" } as { state: string; error?: string } }));
+vi.mock("../pwa/registerWorker", () => ({ useWorkerRegistration: () => registration.state }));
+
 afterEach(() => {
+  registration.state = { state: "idle" };
   forceRefresh.mockClear();
   install.state = { mode: "none", desktopCaption: false };
   install.promptInstall.mockClear();
@@ -27,14 +33,16 @@ afterEach(() => {
 
 const research: Workspace = { name: "research", sort: "activity" } as Workspace;
 
-function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}, closeSliding = () => {}, connected = true) {
+function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}, closeSliding = () => {}, connected = true, certValue: CertContextValue = {}) {
   const state = { snapshot, connected, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding, claimHeader: () => () => {} };
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <ShellContext.Provider value={shell}>
-        <GearMenu {...props} />
+        <CertContext.Provider value={certValue}>
+          <GearMenu {...props} />
+        </CertContext.Provider>
       </ShellContext.Provider>
     </ConnectionContext.Provider>,
   );
@@ -201,6 +209,36 @@ test("mac-safari mode shows File then Add to Dock", async () => {
   const text = (await screen.findByRole("dialog")).textContent ?? "";
   expect(text.indexOf("File")).toBeGreaterThan(-1);
   expect(text.indexOf("Add to Dock")).toBeGreaterThan(text.indexOf("File"));
+});
+
+test("a SecurityError registration failure replaces the Install row with a hint linking the certificate", async () => {
+  install.state = { mode: "prompt", desktopCaption: false };
+  registration.state = { state: "failed", error: "SecurityError" };
+  setup({}, {}, () => {}, true, { cert: TEST_CERT });
+  const link = await screen.findByRole("link", { name: "Install the certificate" });
+  expect(link.getAttribute("href")).toBe("/gx-root.cer");
+  expect(screen.queryByRole("menuitem", { name: /Install app/ })).toBeNull();
+});
+
+test("no registration failure shows no root-trust hint", async () => {
+  setup({}, {}, () => {}, true, { cert: TEST_CERT });
+  await screen.findByRole("menuitem", { name: "Tips" });
+  expect(screen.queryByRole("link", { name: "Install the certificate" })).toBeNull();
+});
+
+test("another registration error shows no root-trust hint and keeps the Install row", async () => {
+  install.state = { mode: "prompt", desktopCaption: false };
+  registration.state = { state: "failed", error: "TypeError" };
+  setup({}, {}, () => {}, true, { cert: TEST_CERT });
+  await screen.findByRole("menuitem", { name: /Install app/ });
+  expect(screen.queryByRole("link", { name: "Install the certificate" })).toBeNull();
+});
+
+test("the ios sheet text does not mention trust", async () => {
+  install.state = { mode: "ios", desktopCaption: false };
+  setup();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Install app/ }));
+  expect((await screen.findByRole("dialog")).textContent).not.toMatch(/trust/i);
 });
 
 test("the Menu trigger is a burger: three horizontal lines and no circle", () => {

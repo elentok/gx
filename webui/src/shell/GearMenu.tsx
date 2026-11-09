@@ -5,7 +5,9 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { SortActivity, SortDefault, SortName, SortNeedsYou, type Workspace } from "../generated/server";
 import { CLEANUP_HREF, SETTINGS_HREF, TIPS_HREF } from "../hrefs";
 import { forceRefresh } from "../pwa/forceRefresh";
+import { CertLink, useCert } from "../auth/cert";
 import { useInstall } from "../pwa/install";
+import { useWorkerRegistration } from "../pwa/registerWorker";
 import { RestartDialog } from "../restart/RestartDialog";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { showToast } from "../ui/toaster";
@@ -56,6 +58,8 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
   const [restartOpen, setRestartOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const install = useInstall();
+  const registration = useWorkerRegistration();
+  const { cert } = useCert();
   const afk = snapshot?.afk ?? false;
   const viMode = snapshot?.vi_mode ?? false;
   const toggle = (label: string, value: string, on: boolean, flip: () => void): MenuEntry => ({
@@ -85,8 +89,20 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
         ],
       }
     : { value: "sort", label: "Sort", disabled: true, onSelect: () => {} };
-  const installEntries: MenuEntry[] =
-    install.mode === "none"
+  const trustHint = registration.state === "failed" && registration.error === "SecurityError" && cert;
+  const installEntries: MenuEntry[] = trustHint
+    ? [
+        {
+          kind: "content",
+          value: "root-trust-hint",
+          content: (
+            <Box px="3" py="1.5" fontSize="sm" color="text.muted">
+              Can't install: this browser doesn't trust gx. <CertLink href={cert.cer_path}>Install the certificate</CertLink>
+            </Box>
+          ),
+        },
+      ]
+    : install.mode === "none"
       ? []
       : [
           {
