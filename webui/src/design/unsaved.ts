@@ -1,3 +1,6 @@
+import type { DesignDraft } from "../generated/server";
+import type { SaveDraft } from "./drafts";
+
 /** Text a failed autosave could not put on the server, kept per draft id until a save, Start or Discard settles it. */
 export interface UnsavedEntry {
   revision: number;
@@ -38,4 +41,30 @@ export function clearUnsaved(...ids: string[]) {
   const map = readUnsaved();
   for (const id of ids) delete map[id];
   write(map);
+}
+
+/** Why the form opened on a fallback entry instead of the latest draft. */
+export type Restored = "unsaved" | "conflict" | "gone";
+
+/**
+ * Saves each fallback entry to its draft with its revision. The first one that cannot settle
+ * (a refusal, or the server still down) is returned for the form to open on; its entry stays
+ * until the form saves, starts or discards it.
+ */
+export async function saveUnsaved(save: SaveDraft): Promise<{ draft: DesignDraft; state: Restored } | undefined> {
+  for (const [id, e] of Object.entries(readUnsaved())) {
+    const fields = { project: e.project, slug: e.slug, idea: e.idea, name: e.name };
+    let state: Restored;
+    try {
+      const res = await save({ id: id || undefined, ...fields, revision: e.revision });
+      if (res.kind === "ok" || res.kind === "deleted") {
+        clearUnsaved(id);
+        continue;
+      }
+      state = res.kind;
+    } catch {
+      state = "unsaved";
+    }
+    return { draft: { id, images: [], edited_at: "", ...fields, revision: e.revision }, state };
+  }
 }

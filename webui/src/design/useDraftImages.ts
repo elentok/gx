@@ -60,6 +60,26 @@ export class ImageSlot {
   }
 }
 
+/** The open draft's slot plus the slots of drafts left with an upload or failed tile, so returning to one finds it. */
+export class DraftSlots {
+  private kept = new Map<string, ImageSlot>();
+  private open: ImageSlot | undefined;
+  /** The slot of the draft the form is on; made from `images` on first use. */
+  current(images?: string[]) {
+    return (this.open ??= new ImageSlot(images));
+  }
+  /** Moves to `next`'s slot; `leaving` is the id of the draft being left. */
+  switchTo(next: { id: string; images: string[] } | null, leaving?: string) {
+    if (leaving && this.open?.pending) this.kept.set(leaving, this.open);
+    const back = next ? this.kept.get(next.id) : undefined;
+    if (next) {
+      this.kept.delete(next.id);
+      back?.syncSaved(next.images);
+    }
+    this.open = back ?? new ImageSlot(next?.images);
+  }
+}
+
 /**
  * Image state of a New Design draft: the server's ids plus the uploads this tab runs. `ensureDraft` resolves to the
  * draft's id, saving the text first when the draft has none yet; `draftId` reads the current id for urls and removes.

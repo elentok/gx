@@ -8,6 +8,7 @@ import {
   draftLabel,
   getLastProject,
   listDrafts,
+  openLatest,
   readDraft,
   saveDraft,
   setLastProject,
@@ -21,17 +22,19 @@ import {
 import { removeDraftImage, uploadDraftImage, type RemoveDraftImage, type UploadDraftImage } from "./draftImageApi";
 import { DraftImages } from "./DraftImages";
 import { AttachButton, imageFiles, useAttachIcon } from "./ComposerImages";
-import { ImageSlot, useDraftImages } from "./useDraftImages";
+import { DraftSlots, type DraftImages as DraftImagesState, type ImageSlot } from "./useDraftImages";
 import { useShell } from "../shell/ShellContext";
 import { postOpenDesign, type OpenDesign } from "./open";
-import { clearUnsaved, NEW_DRAFT_KEY, readUnsaved, stashUnsaved } from "./unsaved";
+import { saveUnsaved, type Restored } from "./unsaved";
+import { moveLegacyDraft } from "./legacyDraft";
 import { useDesignWrite } from "./SessionControls";
 import { useWide } from "../useWide";
-import { useLocation } from "react-router";
-import { useConnectionContext, useConnectionState } from "../connection";
 import { useFocusFirstField } from "../ui/modal/useFocusFirstField";
-import { defaultProject } from "../workspaces/defaultProject";
 import { DraftSwitcher } from "./DraftSwitcher";
+import { DraftBanner } from "./DraftBanner";
+import { hasText, type Fields } from "./draftFields";
+import { useDraftAutosave } from "./useDraftAutosave";
+import { useDraftSwitching, type SwitchDraft } from "./useDraftSwitching";
 
 /** The draft calls the form makes; the prop defaults to the real ones. */
 export interface DraftsClient {
@@ -56,21 +59,13 @@ const realDrafts: DraftsClient = {
   removeImage: removeDraftImage,
 };
 
-const MSG_NEEDS_TEXT = "Write the epic name or an idea first";
-
-const AUTOSAVE_MS = 800;
-const RETRY_MS = 5000;
-
-interface Fields {
-  slug: string;
-  idea: string;
-  project: string;
+/** Why Start is unavailable, or undefined when it is ready. */
+function startBlocker(draft: Fields, imgs: DraftImagesState): string | undefined {
+  if (!draft.slug.trim()) return "Name the epic to start.";
+  if (!draft.idea.trim()) return "Write an idea to start.";
+  if (imgs.failed) return `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`;
+  if (imgs.uploading) return "Wait for the upload to finish";
 }
-
-type SaveStatus = "none" | "saving" | "saved" | "unsaved";
-type Banner = "conflict" | "gone" | undefined;
-
-const hasText = (d: Partial<Fields>) => !!(d.slug?.trim() || d.idea?.trim());
 
 const field = {
   fontSize: "16px",
@@ -109,8 +104,7 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
   const [restored, setRestored] = useState<Restored>();
   // A new generation remounts the form on another draft.
   const [generation, setGeneration] = useState(0);
-  const slot = useRef<ImageSlot>(undefined);
-  const kept = useRef(new Map<string, ImageSlot>());
+  const slots = useRef(new DraftSlots());
   // The server's last project used; a server that cannot answer leaves the first project.
   const [lastProject, setLast] = useState("");
   const fetchLast = () => drafts.getLastProject().catch(() => "");
@@ -118,7 +112,7 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
     let live = true;
     (async () => {
       const last = await fetchLast();
-      const stuck = await saveUnsaved(drafts);
+      const stuck = await saveUnsaved(drafts.save);
       if (stuck) {
         if (live) {
           setLast(last);
@@ -127,12 +121,11 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
         }
         return;
       }
-      await moveLegacyDraft(drafts);
-      const [latest] = await drafts.list();
-      const res = latest ? await drafts.read(latest.id) : undefined;
+      await moveLegacyDraft(drafts.save);
+      const latest = await openLatest(drafts);
       if (live) {
         setLast(last);
-        setInitial(res?.kind === "ok" ? res.draft : null);
+        setInitial(latest);
       }
     })().catch(() => live && setInitial(null));
     return () => {
@@ -151,70 +144,17 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
       </BottomSheet>
     );
   }
-  slot.current ??= new ImageSlot(initial?.images);
-  const switchTo = async (next: DesignDraft | null, leaving?: string) => {
+  const slot = slots.current.current(initial?.images);
+  const switchTo: SwitchDraft = async (next, leaving) => {
     // An upload or failed tile stays with its draft, so returning finds it.
-    if (leaving && slot.current?.pending) kept.current.set(leaving, slot.current);
-    const back = next ? kept.current.get(next.id) : undefined;
-    if (next) kept.current.delete(next.id);
-    if (next) back?.syncSaved(next.images);
-    slot.current = back ?? new ImageSlot(next?.images);
+    slots.current.switchTo(next, leaving);
     // A blank draft starts on the project last picked, which this form may just have set.
     if (!next) setLast(await fetchLast());
     setRestored(undefined);
     setInitial(next);
     setGeneration((g) => g + 1);
   };
-  return <DraftForm key={generation} {...props} drafts={drafts} initial={initial} lastProject={lastProject} restored={restored} slot={slot.current} onSwitch={switchTo} />;
-}
-
-const LEGACY_DRAFT_KEY = "gx.newDesign.draft";
-
-/** Moves the pre-server localStorage draft to a server draft once. A refusal or failure keeps the key for the next open. */
-async function moveLegacyDraft(drafts: DraftsClient) {
-  let legacy: Partial<Fields> = {};
-  try {
-    const raw = localStorage.getItem(LEGACY_DRAFT_KEY);
-    if (raw === null) return;
-    try {
-      legacy = JSON.parse(raw) ?? {};
-    } catch {
-      // An unreadable key has no text.
-    }
-    if (hasText(legacy)) {
-      const res = await drafts.save({ project: legacy.project ?? "", slug: legacy.slug ?? "", idea: legacy.idea ?? "", revision: 0 });
-      if (res.kind !== "ok") return;
-    }
-    localStorage.removeItem(LEGACY_DRAFT_KEY);
-  } catch {
-    // Storage or the server is down; the key stays and the move retries.
-  }
-}
-
-/** Why the form opened on a fallback entry instead of the latest draft. */
-type Restored = "unsaved" | "conflict" | "gone";
-
-/**
- * Saves each fallback entry to its draft with its revision. The first one that cannot settle
- * (a refusal, or the server still down) is returned for the form to open on; its entry stays
- * until the form saves, starts or discards it.
- */
-async function saveUnsaved(drafts: DraftsClient): Promise<{ draft: DesignDraft; state: Restored } | undefined> {
-  for (const [id, e] of Object.entries(readUnsaved())) {
-    const fields = { project: e.project, slug: e.slug, idea: e.idea, name: e.name };
-    let state: Restored;
-    try {
-      const res = await drafts.save({ id: id || undefined, ...fields, revision: e.revision });
-      if (res.kind === "ok" || res.kind === "deleted") {
-        clearUnsaved(id);
-        continue;
-      }
-      state = res.kind;
-    } catch {
-      state = "unsaved";
-    }
-    return { draft: { id, images: [], edited_at: "", ...fields, revision: e.revision }, state };
-  }
+  return <DraftForm key={generation} {...props} drafts={drafts} initial={initial} lastProject={lastProject} restored={restored} slot={slot} onSwitch={switchTo} />;
 }
 
 function DraftForm({
@@ -234,8 +174,7 @@ function DraftForm({
   lastProject: string;
   restored?: Restored;
   slot: ImageSlot;
-  /** `leaving` is the id of the draft the form was on. */
-  onSwitch: (next: DesignDraft | null, leaving?: string) => void;
+  onSwitch: SwitchDraft;
 }) {
   const sheetMode = !useWide();
   const workspace = useShell()?.workspace;
@@ -249,308 +188,34 @@ function DraftForm({
     },
     [focusFirst],
   );
-  const { pathname } = useLocation();
-  const sessions = useConnectionState(useConnectionContext()).snapshot?.sessions ?? [];
-  // A saved draft keeps its project; one whose project is gone is moved as a new draft would start.
-  const kept = initial && projects.includes(initial.project) ? initial.project : undefined;
-  const [draft, setDraft] = useState<Fields>(() => ({
-    slug: initial?.slug ?? "",
-    idea: initial?.idea ?? "",
-    project: kept ?? defaultProject({ pathname, sessions, projects, lastProject }),
-  }));
-  const [movedFrom] = useState(() => (initial && !kept && initial.project ? initial.project : undefined));
-  const [moved, setMoved] = useState(movedFrom !== undefined);
-  const [status, setStatus] = useState<SaveStatus>(restored === "unsaved" ? "unsaved" : initial?.id && !restored ? "saved" : "none");
+  const autosave = useDraftAutosave({ drafts, initial, restored, projects, lastProject, slot });
+  const { draft, patch, pickProject, name, saveName, status, banner, bannerActions, moved, movedFrom, imgs } = autosave;
+  const { switchDraft, newDraft, deleteOther, loadDrafts } = useDraftSwitching({ drafts, autosave, onSwitch, focusSlug: () => slugInput.current?.focus() });
   const [confirming, setConfirming] = useState(false);
-  const [name, setName] = useState(initial?.name);
   // The name field under the title row; `undefined` is closed.
   const [naming, setNaming] = useState<string>();
-  // A name change is a text save even when the fields are unchanged.
-  const nameDirty = useRef(false);
   const { run, pending } = useDesignWrite();
-
-  const latest = useRef(draft);
-  // `synced` is the fields as the server last had them, so an unchanged form saves nothing. A restored entry never reached the server.
-  // A moved draft starts out of sync, so its first save writes the new project; `unedited` is the fields as moved, which that save stamps without a new edited-at.
-  const unedited = useRef(movedFrom !== undefined ? JSON.stringify(draft) : undefined);
-  const server = useRef({
-    id: initial?.id || undefined,
-    revision: initial?.revision ?? 0,
-    name: initial?.name,
-    synced: restored ? "" : JSON.stringify(movedFrom !== undefined ? { ...draft, project: movedFrom } : draft),
-  });
-  // Set after a failed save until one succeeds; a leave then keeps the text in localStorage.
-  const failing = useRef(restored === "unsaved");
-  // Fallback keys this form wrote or inherited, cleared together once the text is settled.
-  const stashed = useRef<string[]>(restored ? [initial?.id ?? NEW_DRAFT_KEY] : []);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const chain = useRef<Promise<void>>(Promise.resolve());
-  const finished = useRef(false);
-  // Set while Start is in flight: a save then could recreate the draft Start is about to delete.
-  const starting = useRef(false);
-  // The banner's ref twin, so a flush in flight sees it before a render.
-  const blocked = useRef<Banner>(restored === "conflict" || restored === "gone" ? restored : undefined);
-  const [banner, setBanner] = useState<Banner>(blocked.current);
-  /** The draft's id for an image upload; a draft that has none yet is saved first, which needs some text. */
-  const ensureDraft = async () => {
-    await chain.current;
-    if (!server.current.id) {
-      flush();
-      await chain.current;
-    }
-    if (!server.current.id) throw new Error(MSG_NEEDS_TEXT);
-    return server.current.id;
-  };
   const fileInput = useRef<HTMLInputElement>(null);
   const attachIcon = useAttachIcon();
-  const imgs = useDraftImages({
-    slot,
-    draftId: () => server.current.id,
-    ensureDraft,
-    upload: drafts.uploadImage,
-    remove: drafts.removeImage,
-  });
 
-  const persist = async () => {
-    if (finished.current || starting.current) return;
-    const s = server.current;
-    const fields = latest.current;
-    const key = JSON.stringify(fields);
-    if (key === s.synced && !nameDirty.current) return setStatus(s.id ? "saved" : "none");
-    if (!s.id && !fields.slug && !fields.idea && !s.name) return setStatus("none");
-    let res;
-    try {
-      res = await drafts.save({ id: s.id, ...fields, name: s.name, revision: s.revision, ...(key === unedited.current && { keep_edited_at: true }) });
-    } catch {
-      // The text stays in memory and is retried on the next keystroke and every RETRY_MS.
-      failing.current = true;
-      stash();
-      return setStatus("unsaved");
-    }
-    failing.current = false;
-    if (res.kind === "ok") {
-      unedited.current = undefined;
-      Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key });
-      nameDirty.current = false;
-      settle();
-      return setStatus("saved");
-    }
-    if (res.kind === "deleted") {
-      Object.assign(s, { id: undefined, revision: 0, name: undefined, synced: key });
-      nameDirty.current = false;
-      setName(undefined);
-      settle();
-      return setStatus("none");
-    }
-    raise(res.kind);
-  };
-
-  /** Keeps the unsaved text in localStorage for the next open. */
-  const stash = () => {
-    const s = server.current;
-    const key = s.id ?? NEW_DRAFT_KEY;
-    stashUnsaved(key, { revision: s.revision, ...latest.current, name: s.name });
-    if (!stashed.current.includes(key)) stashed.current.push(key);
-  };
-  /** The text reached the server, or Start or Discard took it over. */
-  const settle = () => {
-    clearUnsaved(...stashed.current);
-    stashed.current = [];
-  };
-
-  /** A refusal pauses autosave until the person picks a way out of the banner. */
-  const raise = (kind: "conflict" | "gone") => {
-    stash();
-    blocked.current = kind;
-    setBanner(kind);
-    setStatus("none");
-  };
-  /** Reads the server's copy; a draft that is gone raises the gone banner instead. */
-  const readServer = async () => {
-    const res = await drafts.read(server.current.id!);
-    if (res.kind === "ok") return res.draft;
-    raise("gone");
-  };
-  const resume = () => {
-    blocked.current = undefined;
-    setBanner(undefined);
-    flush();
-  };
-  const keepMine = async () => {
-    const theirs = await readServer();
-    if (theirs) {
-      server.current.revision = theirs.revision;
-      resume();
-    }
-  };
-  const loadTheirs = async () => {
-    const theirs = await readServer();
-    if (!theirs) return;
-    const next = { slug: theirs.slug, idea: theirs.idea, project: theirs.project };
-    Object.assign(server.current, { revision: theirs.revision, name: theirs.name, synced: JSON.stringify(next) });
-    latest.current = next;
-    nameDirty.current = false;
-    setName(theirs.name);
-    setDraft(next);
-    imgs.reset(theirs.images);
-    settle();
-    resume();
-  };
-  const keepAsNew = () => {
-    Object.assign(server.current, { id: undefined, revision: 0, synced: "" });
-    imgs.reset([]);
-    resume();
-  };
-
-  const flush = () => {
-    clearTimeout(timer.current);
-    if (finished.current || blocked.current) return;
-    chain.current = chain.current.then(persist).catch(() => setStatus("none"));
-  };
-  const stopSaving = () => {
-    finished.current = true;
-    clearTimeout(timer.current);
-    settle();
-  };
-
-  useEffect(() => {
-    const leave = () => {
-      // The save below may not finish before the page goes, so the fallback is written first.
-      if (!finished.current && (failing.current || blocked.current) && JSON.stringify(latest.current) !== server.current.synced) stash();
-      flush();
-    };
-    window.addEventListener("pagehide", leave);
-    return () => {
-      window.removeEventListener("pagehide", leave);
-      leave();
-    };
-    // flush reads refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (movedFrom !== undefined) flush();
-    // Once, on open; flush reads refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (status !== "unsaved") return;
-    const id = setInterval(flush, RETRY_MS);
-    return () => clearInterval(id);
-    // flush reads refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  const pickProject = (project: string) => {
-    setMoved(false);
-    patch({ project });
-    drafts.setLastProject(project).catch(() => {});
-  };
-  const patch = (p: Partial<Fields>) => {
-    const next = { ...draft, ...p };
-    setDraft(next);
-    latest.current = next;
-    setStatus(!blocked.current && (next.slug || next.idea || server.current.id) ? "saving" : "none");
-    clearTimeout(timer.current);
-    timer.current = setTimeout(flush, AUTOSAVE_MS);
-  };
   const close = () => {
-    flush();
+    autosave.flush();
     onClose();
   };
   const discard = () => {
-    stopSaving();
-    // Waits for an in-flight save, which is what gives a new draft its id.
-    chain.current = chain.current
-      .then(async () => {
-        if (server.current.id) await drafts.remove(server.current.id);
-      })
-      .catch(() => {});
+    autosave.discard();
     onClose();
   };
-
-  // A name or images keep a draft with no text from being blank.
-  const hasContent = () => hasText(latest.current) || !!server.current.name || imgs.count > 0;
-  /** Saves the open draft (a blank one is deleted instead), then calls `next` to open another. */
-  const leaveDraft = async (next: () => Promise<void>) => {
-    clearTimeout(timer.current);
-    if (hasContent()) {
-      flush();
-      await chain.current;
-    } else {
-      // A save in flight may be the one that gives the blank draft its id.
-      await chain.current;
-      if (server.current.id) await drafts.remove(server.current.id).catch(() => {});
-    }
-    await next();
-  };
-  const switchDraft = (id: string) =>
-    leaveDraft(async () => {
-      const res = await drafts.read(id);
-      if (res.kind !== "ok") return;
-      finished.current = true;
-      onSwitch(res.draft, server.current.id);
-    });
-  const newDraft = () => {
-    if (!hasContent()) return slugInput.current?.focus();
-    return leaveDraft(async () => {
-      finished.current = true;
-      onSwitch(null, server.current.id);
-    });
-  };
-  const saveName = (text: string) => {
-    const next = text.trim() || undefined;
+  const commitName = (text: string) => {
     setNaming(undefined);
-    if (next === server.current.name) return;
-    server.current.name = next;
-    nameDirty.current = true;
-    setName(next);
-    setStatus(!blocked.current && server.current.id ? "saving" : status);
-    flush();
-  };
-  /** Deletes a draft; deleting the open one opens the next most recent, or a blank one. */
-  const deleteOther = async (id: string) => {
-    if (id !== server.current.id) {
-      await drafts.remove(id);
-      return;
-    }
-    stopSaving();
-    await chain.current;
-    await drafts.remove(id);
-    const [next] = await drafts.list();
-    const res = next ? await drafts.read(next.id) : undefined;
-    onSwitch(res?.kind === "ok" ? res.draft : null);
-  };
-  const loadDrafts = async () => {
-    clearTimeout(timer.current);
-    if (!blocked.current) flush();
-    await chain.current;
-    return drafts.list();
+    saveName(text);
   };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const slug = draft.slug.trim();
     run(
-      async () => {
-        starting.current = true;
-        clearTimeout(timer.current);
-        try {
-          // The draft id must be the one a save in flight is creating.
-          await chain.current;
-          const res = await open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project, draft_id: server.current.id, ...(workspace ? { workspace } : {}) });
-          if (!res.refused) {
-            finished.current = true;
-            settle();
-          }
-          return res;
-        } finally {
-          starting.current = false;
-          // A failed Start keeps the draft, so the text typed meanwhile still saves.
-          flush();
-        }
-      },
+      () => autosave.start((draft_id) => open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project, draft_id, ...(workspace ? { workspace } : {}) })),
       {
         onDone: (res) => {
           // With start_error the map exists though no session started; the Design page offers the retry.
@@ -564,20 +229,12 @@ function DraftForm({
   // The title follows the name field while it is open.
   const shownName = naming !== undefined ? naming.trim() || undefined : name;
   const label = draft.slug || draft.idea || shownName ? draftLabel({ name: shownName, ...draft }) : draftLabel();
-  const reason = !draft.slug.trim()
-    ? "Name the epic to start."
-    : !draft.idea.trim()
-      ? "Write an idea to start."
-      : imgs.failed
-        ? `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`
-        : imgs.uploading
-          ? "Wait for the upload to finish"
-          : undefined;
+  const reason = startBlocker(draft, imgs);
 
   return (
     <BottomSheet {...sheetProps} onClose={close} as="form" onSubmit={submit}>
       <Box position="relative" display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
-        <DraftSwitcher label={label} currentId={server.current.id} load={loadDrafts} onPick={switchDraft} onNew={newDraft} onRename={() => setNaming(name ?? "")} onDelete={deleteOther} />
+        <DraftSwitcher label={label} currentId={autosave.internals.server.current.id} load={loadDrafts} onPick={switchDraft} onNew={newDraft} onRename={() => setNaming(name ?? "")} onDelete={deleteOther} />
         <Box flex="1" />
         {status !== "none" && (
           <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
@@ -623,11 +280,11 @@ function DraftForm({
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                saveName(naming);
+                commitName(naming);
               }
             }}
           />
-          <Button type="button" emphasis="ghost" tone="muted" onClick={() => saveName(naming)}>
+          <Button type="button" emphasis="ghost" tone="muted" onClick={() => commitName(naming)}>
             Done
           </Button>
         </Box>
@@ -681,18 +338,7 @@ function DraftForm({
           {movedFrom} no longer exists; moved to {draft.project}
         </Text>
       )}
-      {banner && (
-        <Box role="alert" display="flex" alignItems="center" flexWrap="wrap" gap="2" mx="3" mt="3" px="3" py="10px" borderRadius="8px" bg="tone.waiting.bg" color="tone.waiting.fg" fontSize="13px" flexShrink="0">
-          <Text flex="1" minW="0">
-            {banner === "conflict" ? "This draft changed on another device." : "This draft was deleted or started on another device."}
-          </Text>
-          {(banner === "conflict" ? [["Load theirs", loadTheirs] as const, ["Keep mine", keepMine] as const] : [["Keep as new draft", keepAsNew] as const]).map(([text, onClick]) => (
-            <chakra.button key={text} type="button" onClick={onClick} h="30px" px="10px" borderRadius="6px" borderWidth="1px" borderColor="currentColor" cursor="pointer">
-              {text}
-            </chakra.button>
-          ))}
-        </Box>
-      )}
+      {banner && <DraftBanner kind={banner} actions={bannerActions} />}
       <chakra.textarea
         aria-label="Rough idea"
         name="design-idea"

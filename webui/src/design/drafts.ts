@@ -70,6 +70,13 @@ export const readDraft: ReadDraft = async (id) =>
 export const saveDraft: SaveDraft = async (body) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/save`, body));
 
+/** The most recent draft, or null when there is none (or it cannot be read). */
+export async function openLatest(client: { list: ListDrafts; read: ReadDraft }): Promise<DesignDraft | null> {
+  const [latest] = await client.list();
+  const res = latest ? await client.read(latest.id) : undefined;
+  return res?.kind === "ok" ? res.draft : null;
+}
+
 export const deleteDraft: DeleteDraft = async (id) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/delete`, { id }));
 
