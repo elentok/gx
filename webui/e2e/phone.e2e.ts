@@ -234,6 +234,48 @@ test("24. Phone, Design page", async ({ page, start }) => {
   const centers = boxes.map((b) => b.y + b.height / 2);
   for (const c of centers) expect(c).toBeCloseTo(centers[0], 0);
   for (let i = 1; i < boxes.length; i++) expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width);
+  // The paperclip is at the left edge of the footer, which has no separator and 6px above, 8px below.
+  const footer = page.getByRole("form", nav("Composer"));
+  const footerBox = (await footer.boundingBox())!;
+  expect(boxes[0].x - footerBox.x).toBeLessThan(boxes[1].x - footerBox.x);
+  await expect(footer).toHaveCSS("border-top-width", "0px");
+  await expect(footer).toHaveCSS("padding-top", "6px");
+  await expect(footer).toHaveCSS("padding-bottom", "8px");
+
+  // Keyboard: a visual viewport 300px shorter while the question box is focused drops the top bar, title block
+  // and images and leaves the tabs with the ⋯; restoring the viewport and leaving focus brings them back.
+  const title = page.getByRole("heading", { level: 1 });
+  const more = page.getByRole("button", nav("More actions"));
+  await page.getByRole("button", nav("Note")).click();
+  const box = page.getByRole("textbox", nav("Message"));
+  await box.focus();
+  const setViewport = (shrink: number) =>
+    page.evaluate((px) => {
+      const vv = window.visualViewport!;
+      Object.defineProperty(vv, "height", { configurable: true, get: () => window.innerHeight - px });
+      vv.dispatchEvent(new Event("resize"));
+    }, shrink);
+  await expect(title).toBeVisible();
+  await setViewport(300);
+  await expect(title).toBeHidden();
+  await expect(page.getByLabel("Images")).toHaveCount(0);
+  await expect(view).toBeVisible();
+  await expect(more).toBeVisible();
+  await expect(view.locator("xpath=../..").getByRole("button", nav("More actions"))).toBeVisible();
+  await setViewport(0);
+  await box.blur();
+  await expect(title).toBeVisible();
+  await expect(more).toHaveCount(1);
+
+  // The ⋯ menu holds the model row and the link to the design epic.
+  await more.click();
+  const actions = page.getByRole("menu", nav("More actions"));
+  await expect(actions.getByText("Model", { exact: true })).toBeVisible();
+  await expect(actions.getByText("Model", { exact: true }).locator("..")).toHaveText("ModelClaude Sonnet · medium effort");
+  await actions.getByRole("menuitem", { name: /^Open design epic/ }).click();
+  await expect(page).toHaveURL(/#\/e\/demo:design-epic$/);
+  await page.goBack();
+  await expect(view).toBeVisible();
 
   // Auto-queue: the menu shows "Queue" and flips; the countdown strip sits above the footer with a 40px+ Cancel.
   await auto.click();

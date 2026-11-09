@@ -17,6 +17,20 @@ test.describe("72. Design actions menu", () => {
     await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
     await expect(page.getByRole("group", nav("Questions"))).toBeVisible();
 
+    // The footer reads Add image, Note, Auto, Send left to right, with no separator and 6px above, 8px below.
+    const footer = page.getByRole("form", nav("Composer"));
+    await expect(footer).toHaveCSS("border-top-width", "0px");
+    await expect(footer).toHaveCSS("padding-top", "6px");
+    await expect(footer).toHaveCSS("padding-bottom", "8px");
+    const names = [/^Add image$/, /^Note$/, /^Auto:/, /^Send/];
+    const xs: number[] = [];
+    for (const name of names) {
+      const b = footer.getByRole("button", { name });
+      await expect(b).toBeVisible();
+      xs.push((await b.boundingBox())!.x);
+    }
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
+
     const trigger = (await moreActions(page).boundingBox())!;
     // A round ghost button: 36px on desktop, no square border at rest.
     expect(trigger.width).toBe(36);
@@ -51,16 +65,18 @@ test.describe("72. Design actions menu", () => {
     expect(box.x + box.width).toBeGreaterThan(trigger.x);
 
     await expect(menu.getByText("Live sessions · 2")).toBeVisible();
-    // The Agent block reads Tier on desktop, Tier and Effort on a phone.
+    // The header has no meta line, so the Agent block carries the model with its effort and the tier, at any width.
     await expect(menu.getByText("Agent", { exact: true })).toBeVisible();
+    await expect(menu.getByText("Model", { exact: true })).toBeVisible();
     await expect(menu.getByText("Tier", { exact: true })).toBeVisible();
     await expect(menu.getByText("Effort", { exact: true })).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
     await page.setViewportSize({ width: 375, height: 800 });
     await moreActions(page).click();
+    await expect(menu.getByText("Model", { exact: true })).toBeVisible();
     await expect(menu.getByText("Tier", { exact: true })).toBeVisible();
-    await expect(menu.getByText("Effort", { exact: true })).toBeVisible();
+    await expect(menu.getByText("Effort", { exact: true })).toHaveCount(0);
     // Escape goes to the menu once focus is inside it.
     await expect(async () => {
       await page.keyboard.press("Escape");
@@ -96,12 +112,13 @@ test.describe("72. Design actions menu", () => {
 });
 
 test.describe("72b. Design menu before Start", () => {
-  test("the button exists before Start and the menu holds only Copy design ID and Hold", async ({ page, start }) => {
+  test("the button exists before Start and the menu holds only Open design epic, Move, Hold and Copy design ID", async ({ page, start }) => {
     await start("design");
     await openDesign(page);
     await moreActions(page).click();
     const menu = actionsMenu(page);
-    await expect(menu.getByRole("menuitem")).toHaveCount(3);
+    await expect(menu.getByRole("menuitem")).toHaveCount(4);
+    await expect(menu.getByRole("menuitem").first()).toHaveText("Open design epic ↗");
     await expect(menu.getByRole("menuitem", nav("Move to workspace"))).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: "Hold", exact: true })).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: /^Copy design ID/ })).toContainText("demo:design-epic");
