@@ -140,6 +140,9 @@ already shipped, what the epic was for) and the known spec deviations list from 
   - **approved** — worth a fix ticket in this epic;
   - **deferred** — real, but not worth fixing in this epic; it becomes a follow-up;
   - **rejected** — dropped.
+- Never reject a finding whose reason is to amend the spec or docs (for example "change the spec
+  wording rather than the code"): the edit still has to happen, and a rejection files nothing.
+  Verdict it **approved** or **deferred**, and name the spec or docs edit as the fix.
 - For each deferred finding, also give a target (`gx` for a gx tooling finding, else `<project>`)
   and a `category` (`bug` for a defect, else `idea`). Group deferred findings that name the same fix;
   a group counts as one problem, so it files as one follow-up.

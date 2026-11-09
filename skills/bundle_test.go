@@ -714,6 +714,17 @@ func TestCodeReviewDefinesDeferred(t *testing.T) {
 	}
 }
 
+// TestCodeReviewFilesSpecEditsAsDeferred pins that a finding resolved by
+// amending the spec or docs is deferred, not rejected: a rejection files
+// nothing, so the spec stayed wrong.
+func TestCodeReviewFilesSpecEditsAsDeferred(t *testing.T) {
+	raw := normalizeSpace(readFile(t, "gx-code-review/SKILL.md"))
+	want := normalizeSpace("Never reject a finding whose reason is to amend the spec or docs")
+	if !strings.Contains(raw, want) {
+		t.Errorf("gx-code-review must route spec/docs-edit findings to deferred: %q", want)
+	}
+}
+
 // TestCodeReviewReadsQualitySkillsByPath pins that quality subagents Read the
 // configured skill's SKILL.md: the default one sets disable-model-invocation,
 // so the Skill tool never lists it and the axis silently degraded.
