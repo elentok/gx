@@ -265,6 +265,8 @@ var scenarios = map[string]scenario{
 	"hung-pane-twice-codex": spec.HungPaneTwiceCodex,
 	"live-task-gate":        spec.LiveTaskGate,
 	"live-task-gate-codex":  spec.LiveTaskGateCodex,
+	"dead-run-empty":        spec.DeadRunEmpty,
+	"dead-run-work":         spec.DeadRunWithWork,
 	"dead-many":             spec.DeadManyScenario(),
 	"dead-question":         spec.DeadQuestionScenario(),
 	"dead-design":           spec.DeadDesignScenario(),
