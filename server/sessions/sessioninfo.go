@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop/agent"
@@ -48,14 +49,17 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 	cm := m.ChatMeta()
 	info := m.Info()
 	var tokens int
-	info.Model, tokens = mg.chat.ReportedModelAndContext(cm)
+	if m.Harness == string(harness.Codex) {
+		var turn codexsession.TurnModel
+		turn, tokens = mg.chat.ReportedCodex(cm)
+		info.Model, info.Effort = turn.Model, turn.Effort
+	} else {
+		info.Model, tokens = mg.chat.ReportedModelAndContext(cm)
+	}
 	if tokens > 0 {
 		info.ContextTokens, info.ContextLevel = &tokens, agent.LevelForTokens(tokens)
 	}
 	info.ModelSwitched = chat.ModelSwitched(m.Model, info.Model)
-	if m.Harness == string(harness.Codex) {
-		info.Effort = mg.chat.ReportedCodexTurn(cm).Effort
-	}
 	if at := mg.prompter.AutoAdvanceDeadline(m.ID); !at.IsZero() {
 		info.AutoAdvanceAt = &at
 	}

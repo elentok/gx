@@ -92,6 +92,8 @@ type Chat struct {
 	codexTurns FileCache[codexsession.TurnModel]
 	// codexContext caches the context tokens of each rollout's newest token_count.
 	codexContext FileCache[int]
+	// rolloutPath replaces codexsession.RolloutPathIn; tests count lookups with it.
+	rolloutPath func(home, conversationID string) (string, bool, error)
 }
 
 // New builds a Chat.

@@ -46,7 +46,8 @@ func (c *Chat) ReportedModel(m Meta) string {
 // zero when there is no reading (always for harnesses other than Claude and Codex).
 func (c *Chat) ReportedModelAndContext(m Meta) (model string, tokens int) {
 	if m.Harness == string(harness.Codex) {
-		return c.ReportedCodexTurn(m).Model, c.codexContextTokens(m)
+		turn, tokens := c.ReportedCodex(m)
+		return turn.Model, tokens
 	}
 	if m.Harness != string(harness.Claude) {
 		return m.Model, 0
@@ -68,14 +69,26 @@ func (c *Chat) ReportedModelAndContext(m Meta) (model string, tokens int) {
 // ReportedCodexTurn is the model and effort on the newest turn of a Codex
 // session's rollout, or the saved ones while there is no rollout or turn.
 func (c *Chat) ReportedCodexTurn(m Meta) codexsession.TurnModel {
+	turn, _ := c.ReportedCodex(m)
+	return turn
+}
+
+// ReportedCodex is ReportedCodexTurn plus the context tokens of the rollout's
+// newest token_count (zero while there is no rollout or reading), behind one
+// rollout path lookup. Callers wanting both use it, not the two reads apart.
+func (c *Chat) ReportedCodex(m Meta) (codexsession.TurnModel, int) {
 	saved := codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
 	home, err := c.src.CodexHome()
 	if err != nil {
-		return saved
+		return saved, 0
 	}
-	path, ok, err := codexsession.RolloutPathIn(home, m.ConversationID)
+	lookup := codexsession.RolloutPathIn
+	if c.rolloutPath != nil {
+		lookup = c.rolloutPath
+	}
+	path, ok, err := lookup(home, m.ConversationID)
 	if err != nil || !ok {
-		return saved
+		return saved, 0
 	}
 	turn, err := c.codexTurns.Read(path, func(p string) (codexsession.TurnModel, error) {
 		t, _, err := codexsession.ReadTurnModel(p)
@@ -84,20 +97,6 @@ func (c *Chat) ReportedCodexTurn(m Meta) codexsession.TurnModel {
 	if err != nil {
 		c.log.Warn("read codex turn model", "session", m.ID, "err", err)
 	}
-	return codexsession.TurnModel{Model: cmp.Or(turn.Model, m.Model), Effort: cmp.Or(turn.Effort, m.Effort)}
-}
-
-// codexContextTokens is the context tokens of a Codex session's newest
-// token_count, zero while there is no rollout or reading.
-func (c *Chat) codexContextTokens(m Meta) int {
-	home, err := c.src.CodexHome()
-	if err != nil {
-		return 0
-	}
-	path, ok, err := codexsession.RolloutPathIn(home, m.ConversationID)
-	if err != nil || !ok {
-		return 0
-	}
 	tokens, err := c.codexContext.Read(path, func(p string) (int, error) {
 		t, _, err := codexsession.ReadContextTokens(p)
 		return t, err
@@ -105,7 +104,7 @@ func (c *Chat) codexContextTokens(m Meta) int {
 	if err != nil {
 		c.log.Warn("read codex context tokens", "session", m.ID, "err", err)
 	}
-	return tokens
+	return codexsession.TurnModel{Model: cmp.Or(turn.Model, m.Model), Effort: cmp.Or(turn.Effort, m.Effort)}, tokens
 }
 
 // ModelSwitched reports that the model shown is not the one the launch tier
