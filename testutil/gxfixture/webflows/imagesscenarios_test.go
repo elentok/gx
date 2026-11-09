@@ -1,4 +1,4 @@
-package main
+package webflows
 
 import (
 	"encoding/json"
@@ -13,9 +13,9 @@ import (
 func TestAgentsImages_ClaudeAndCodexChatsListSavedImages(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-images")
-	defer r.stop(t)
+	defer r.Stop(t)
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	// Per message: saved images, then a placeholder flag.
@@ -23,7 +23,7 @@ func TestAgentsImages_ClaudeAndCodexChatsListSavedImages(t *testing.T) {
 	harnesses := map[string]int{}
 	for _, si := range list {
 		var chat wire.SessionChatResponse
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", si.ID, "--json")), &chat); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", si.ID, "--json")), &chat); err != nil {
 			t.Fatal(err)
 		}
 		var got []string
@@ -39,7 +39,7 @@ func TestAgentsImages_ClaudeAndCodexChatsListSavedImages(t *testing.T) {
 			continue
 		}
 		harnesses[si.Harness]++
-		entries, err := os.ReadDir(filepath.Join(fixtureRoot(r), "data", "gx", "sessions", si.ID, "images"))
+		entries, err := os.ReadDir(filepath.Join(r.Root(), "data", "gx", "sessions", si.ID, "images"))
 		if err != nil || len(entries) != 15 {
 			t.Errorf("session %s: saved images %d, err %v; want 15", si.ID, len(entries), err)
 		}

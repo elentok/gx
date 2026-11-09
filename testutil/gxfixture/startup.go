@@ -194,7 +194,7 @@ func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
 }
 
 // addScenarioOutput fills the Output fields that only some scenarios have.
-func (f *fixture) addScenarioOutput(res *Output, sc scenario, transcripts map[string]string) {
+func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts map[string]string) {
 	if sc.FakeGo || sc.FakeNpm {
 		res.GateDir = f.gateDir()
 	}

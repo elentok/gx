@@ -1,9 +1,10 @@
-package main
+package limitsflows
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -133,9 +134,9 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 				flags = []string{"--shape", tc.shape}
 			}
 			r := startWith(t, "limit-burn", nil, flags...)
-			defer r.stop(t)
+			defer r.Stop(t)
 			var sum wire.UsageSummary
-			if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
+			if err := json.Unmarshal([]byte(r.Gx(t, "usage", "summary", "--json")), &sum); err != nil {
 				t.Fatal(err)
 			}
 			tc.check(t, time.Now(), sum.Limits, readSeededHistory(t, r.StateDir))
@@ -145,7 +146,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 
 func TestLimitBurnFixture_StatsShape(t *testing.T) {
 	r := startWith(t, "limit-burn", nil, "--shape", "stats")
-	defer r.stop(t)
+	defer r.Stop(t)
 	st, err := apiclient.New(r.Socket).Reads.Stats(context.Background(), 30, "")
 	if err != nil {
 		t.Fatal(err)
@@ -230,7 +231,7 @@ func TestLimitBurnFixture_StatsShape(t *testing.T) {
 }
 
 func TestLimitBurnFixture_UnknownShapeNamesTheValidOnes(t *testing.T) {
-	out, err := exec.Command(fixtureBin, "--gx", gxBin, "--fakeclaude", fakeBin, "--shape", "bogus", "limit-burn").CombinedOutput()
+	out, err := exec.Command(fixturetest.FixtureBin, "--gx", fixturetest.GxBin, "--fakeclaude", fixturetest.FakeBin, "--shape", "bogus", "limit-burn").CombinedOutput()
 	if err == nil {
 		t.Fatal("unknown shape started")
 	}
@@ -245,7 +246,7 @@ func TestLimitBurnFixture_UnknownShapeNamesTheValidOnes(t *testing.T) {
 // a new Codex weekly sample.
 func TestLimitBurnFixture_AppendedTokenCountSavesACodexSample(t *testing.T) {
 	r := startWith(t, "limit-burn", nil)
-	defer r.stop(t)
+	defer r.Stop(t)
 	before := len(readSeededHistory(t, r.StateDir).Samples[wire.LimitIDCodexWeekly])
 
 	var rollout string
@@ -320,7 +321,7 @@ func todaysTokens(t *testing.T, socket string) map[string]float64 {
 
 func TestLimitBurnFixtureLive(t *testing.T) {
 	r := startWith(t, "limit-burn", nil, "--shape", "live")
-	defer r.stop(t)
+	defer r.Stop(t)
 	groups := map[string]string{"queue": "Queue", "design": "Design", "one_off": "One-off", "other": "Other"}
 	for key := range groups {
 		if r.Transcripts[key] == "" {

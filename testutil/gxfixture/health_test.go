@@ -31,7 +31,7 @@ func (r *running) waitHealth(t *testing.T, what string, ok func(wire.HealthRepor
 	var rep wire.HealthReport
 	// Each check runs a gx subprocess, so it polls slowly.
 	shown := testutil.Poll(15*time.Second, 100*time.Millisecond, func() bool {
-		if err := json.Unmarshal([]byte(r.gx(t, "server", "health", "--json")), &rep); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "server", "health", "--json")), &rep); err != nil {
 			t.Fatal(err)
 		}
 		return ok(rep)
@@ -44,7 +44,7 @@ func (r *running) waitHealth(t *testing.T, what string, ok func(wire.HealthRepor
 
 func TestHealth_TheControlFilesSteerTheMeters(t *testing.T) {
 	r := start(t, "health")
-	defer r.stop(t)
+	defer r.Stop(t)
 
 	r.setHealth(t, "cpu=90 mem=85 pressure=warn")
 	rep := r.waitHealth(t, "busy values", func(h wire.HealthReport) bool {
@@ -59,7 +59,7 @@ func TestHealth_TheControlFilesSteerTheMeters(t *testing.T) {
 		return h.CPU.State == wire.HealthStateUnknown && h.CPU.Reason == wire.HealthReasonUnavailable
 	})
 
-	r.setDisk(t, "free", "8G/500G")
+	r.SetDisk(t, "free", "8G/500G")
 	r.waitHealth(t, "8G free of 500G", func(h wire.HealthReport) bool {
 		return len(h.Disks.Disks) == 1 && h.Disks.Disks[0].FreeBytes == 8_000_000_000 && h.Disks.Disks[0].TotalBytes == 500_000_000_000
 	})
@@ -85,7 +85,7 @@ func (r *running) waitCauses(t *testing.T, what string, ok func(wire.HealthRepor
 
 func TestHealth_TheProcessTableNamesTheAgentByItsTicket(t *testing.T) {
 	r := start(t, "health")
-	defer r.stop(t)
+	defer r.Stop(t)
 
 	const addr = project + ":health-epic/01"
 	rep := r.waitCauses(t, "agent, process and other-users rows", func(h wire.HealthReport) bool {
@@ -122,7 +122,7 @@ func TestHealth_TheProcessTableNamesTheAgentByItsTicket(t *testing.T) {
 
 func TestHealth_EveryOtherScenarioStartsCalm(t *testing.T) {
 	r := start(t, "empty")
-	defer r.stop(t)
+	defer r.Stop(t)
 
 	got, err := os.ReadFile(filepath.Join(r.HealthDir, "system"))
 	if err != nil {

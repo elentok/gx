@@ -1,4 +1,4 @@
-package main
+package designflows
 
 import (
 	"os"
@@ -19,14 +19,14 @@ func TestRunningTicketTickScenario(t *testing.T) {
 			t.Fatalf("ticket %s: %+v, want claimed on %s", id, r.epicRow(t, "tick-epic", id), harness)
 		}
 	}
-	if got := r.ticketStatus(t, "demo:tick-epic/03"); got == "done" {
+	if got := r.TicketStatus(t, "demo:tick-epic/03"); got == "done" {
 		t.Fatalf("third ticket is %q before the release", got)
 	}
 	if err := os.Remove(r.HoldFile); err != nil {
 		t.Fatal(err)
 	}
-	r.waitStatus(t, "demo:tick-epic/03", "done")
-	r.stop(t)
+	r.WaitStatus(t, "demo:tick-epic/03", "done")
+	r.Stop(t)
 }
 
 func TestRecoveryScenarios_EachStartsAndPrintsItsJSON(t *testing.T) {
@@ -38,7 +38,7 @@ func TestRecoveryScenarios_EachStartsAndPrintsItsJSON(t *testing.T) {
 			if r.WebURL == "" {
 				t.Errorf("%s printed no web_url: %+v", name, r)
 			}
-			r.stop(t)
+			r.Stop(t)
 		})
 	}
 }

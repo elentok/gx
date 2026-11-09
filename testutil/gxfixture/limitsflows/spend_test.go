@@ -1,4 +1,4 @@
-package main
+package limitsflows
 
 import (
 	"encoding/json"
@@ -47,9 +47,9 @@ func TestSpendFixture_ShapesShowInTheSummary(t *testing.T) {
 				flags = []string{"--shape", tc.shape}
 			}
 			r := startWith(t, "spend", nil, flags...)
-			defer r.stop(t)
+			defer r.Stop(t)
 			var sum wire.UsageSummary
-			if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
+			if err := json.Unmarshal([]byte(r.Gx(t, "usage", "summary", "--json")), &sum); err != nil {
 				t.Fatal(err)
 			}
 			if sum.Mode != wire.UsageModeSpending {
@@ -62,13 +62,13 @@ func TestSpendFixture_ShapesShowInTheSummary(t *testing.T) {
 
 func TestSpendFixture_AppendedUsageRaisesTodaysTotal(t *testing.T) {
 	r := startWith(t, "spend", nil, "--shape", "short")
-	defer r.stop(t)
+	defer r.Stop(t)
 	if r.AgentTranscript == "" {
 		t.Fatal("no agent_transcript in the output")
 	}
 	total := func() float64 {
 		var b wire.BudgetStatus
-		if err := json.Unmarshal([]byte(r.gx(t, "budget", "status", "--json")), &b); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "budget", "status", "--json")), &b); err != nil {
 			t.Fatal(err)
 		}
 		return b.Total

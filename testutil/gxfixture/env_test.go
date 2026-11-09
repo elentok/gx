@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"io"
 	"net/http"
 	"os"
@@ -16,7 +18,7 @@ import (
 )
 
 func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
-	o := Output{
+	o := spec.Output{
 		WebURL: "https://127.0.0.1:1/a b", CookieName: "__Host-gx_login_1", Cookie: "c", StateDir: "/tmp/s", Socket: "/tmp/s.sock", HoldFile: "/tmp/h",
 		Gx: "/bin/gx", DiskDir: "/tmp/disk", HealthDir: "/tmp/health", Env: []string{"HOME=/tmp/it's/home", "XDG_DATA_HOME=/tmp/d"},
 	}
@@ -88,8 +90,8 @@ func TestFixture_NeverTouchesTheRealHomeOrState(t *testing.T) {
 	// The fixture would ask go for its caches, and go writes telemetry under HOME.
 	env = append(env, claudeenv.GoCacheEnv()...)
 	r := startWith(t, "ready", env)
-	r.gx(t, "server", "snapshot", "--json")
-	r.stop(t)
+	r.Gx(t, "server", "snapshot", "--json")
+	r.Stop(t)
 	entries, err := os.ReadDir(decoy)
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +104,7 @@ func TestFixture_NeverTouchesTheRealHomeOrState(t *testing.T) {
 func TestStart_AutoAdvanceDelayFlagIsAccepted(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "design", nil, "--auto-advance-delay", "50ms")
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestStart_MockDirServesTheDirectoryAndReportsMockURL(t *testing.T) {
@@ -124,7 +126,7 @@ func TestStart_MockDirServesTheDirectoryAndReportsMockURL(t *testing.T) {
 	if string(body) != "<p>mock</p>" {
 		t.Errorf("GET mock.html = %q", body)
 	}
-	r.stop(t)
+	r.Stop(t)
 	if resp, err := http.Get(r.MockURL + "mock.html"); err == nil {
 		resp.Body.Close()
 		t.Errorf("mock server still answers after SIGTERM")
@@ -134,7 +136,7 @@ func TestStart_MockDirServesTheDirectoryAndReportsMockURL(t *testing.T) {
 func TestStart_NoMockDirLeavesMockURLOut(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "empty", nil)
-	defer r.stop(t)
+	defer r.Stop(t)
 	if r.MockURL != "" {
 		t.Errorf("mock_url = %q, want empty without --mock-dir", r.MockURL)
 	}
@@ -153,7 +155,7 @@ func TestStart_BrowserSessionIsTheWorktreeDirectoryName(t *testing.T) {
 }
 
 func TestShellEnv_ExportsBrowserSessionWhenSet(t *testing.T) {
-	got := Output{BrowserSession: "wt-1"}.ShellEnv()
+	got := spec.Output{BrowserSession: "wt-1"}.ShellEnv()
 	if want := "export GXF_BROWSER_SESSION='wt-1'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}
@@ -170,14 +172,14 @@ func TestStart_LogFileIsTheServerLogAndExists(t *testing.T) {
 }
 
 func TestShellEnv_ExportsLogFileWhenSet(t *testing.T) {
-	got := Output{LogFile: "/tmp/r/server.out"}.ShellEnv()
+	got := spec.Output{LogFile: "/tmp/r/server.out"}.ShellEnv()
 	if want := "export GXF_LOG_FILE='/tmp/r/server.out'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}
 }
 
 func TestShellEnv_ExportsMockURLWhenSet(t *testing.T) {
-	got := Output{MockURL: "http://127.0.0.1:2/"}.ShellEnv()
+	got := spec.Output{MockURL: "http://127.0.0.1:2/"}.ShellEnv()
 	if want := "export GXF_MOCK_URL='http://127.0.0.1:2/'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}
@@ -209,12 +211,12 @@ func TestIsolatedEnv_DefaultsPlaywrightCacheToTheRealHomeNotTheTempOne(t *testin
 func TestStart_StallThresholdFlagIsAccepted(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "design", nil, "--stall-threshold", "2s")
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestStart_BadStallThresholdIsRefused(t *testing.T) {
 	t.Parallel()
-	out, err := exec.Command(fixtureBin, "--gx", gxBin, "--fakeclaude", fakeBin, "--stall-threshold", "soon", "design").CombinedOutput()
+	out, err := exec.Command(fixturetest.FixtureBin, "--gx", fixturetest.GxBin, "--fakeclaude", fixturetest.FakeBin, "--stall-threshold", "soon", "design").CombinedOutput()
 	if err == nil || !strings.Contains(string(out), "--stall-threshold") {
 		t.Fatalf("err = %v, output = %q, want a refusal naming --stall-threshold", err, out)
 	}

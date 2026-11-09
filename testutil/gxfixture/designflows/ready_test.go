@@ -1,4 +1,4 @@
-package main
+package designflows
 
 import (
 	"encoding/json"
@@ -20,14 +20,14 @@ func TestFinishingScenario_LastTicketFinishesAndMerges(t *testing.T) {
 	r := start(t, "finishing")
 	const last = "demo:finishing-epic/02"
 	deadline := time.Now().Add(90 * time.Second)
-	for r.ticketStatus(t, last) != "done" {
-		if status := r.ticketStatus(t, last); status == "needs-repair" || time.Now().After(deadline) {
-			t.Logf("history:\n%s", r.gx(t, "server", "tickets", "history", last))
+	for r.TicketStatus(t, last) != "done" {
+		if status := r.TicketStatus(t, last); status == "needs-repair" || time.Now().After(deadline) {
+			t.Logf("history:\n%s", r.Gx(t, "server", "tickets", "history", last))
 			t.Fatalf("ticket %s is %q, want done", last, status)
 		}
 		time.Sleep(time.Second)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestRefusedAskScenario_RefusedFinishThenAskPausesSelfReported(t *testing.T) {
@@ -35,15 +35,15 @@ func TestRefusedAskScenario_RefusedFinishThenAskPausesSelfReported(t *testing.T)
 	r := start(t, "refused-ask")
 	const addr = "demo:refused-epic/01"
 	// Each check runs a gx subprocess, so it polls once a second.
-	if !testutil.Poll(60*time.Second, time.Second, func() bool { return r.ticketStatus(t, addr) == "needs-answer" }) {
-		t.Logf("history:\n%s", r.gx(t, "server", "tickets", "history", addr))
-		t.Fatalf("ticket %s is %q, want needs-answer", addr, r.ticketStatus(t, addr))
+	if !testutil.Poll(60*time.Second, time.Second, func() bool { return r.TicketStatus(t, addr) == "needs-answer" }) {
+		t.Logf("history:\n%s", r.Gx(t, "server", "tickets", "history", addr))
+		t.Fatalf("ticket %s is %q, want needs-answer", addr, r.TicketStatus(t, addr))
 	}
-	d := r.detail(t, addr)
+	d := r.Detail(t, addr)
 	if d.PauseReason != "self-reported" || d.Latest == nil {
 		t.Errorf("pause_reason = %q, latest = %v; want self-reported with an open round", d.PauseReason, d.Latest)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 // waitBlockedSession waits for the ticket's agent to sit on a blocked pane. It
@@ -54,7 +54,7 @@ func (r *running) waitBlockedSession(t *testing.T, addr string) {
 	var list []wire.SessionInfo
 	if !testutil.Poll(60*time.Second, time.Second, func() bool {
 		list = nil
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
 		return slices.ContainsFunc(list, func(s wire.SessionInfo) bool {
@@ -69,42 +69,42 @@ func TestBlockedMenuScenario_QuestionMenuLeavesTheAgentBlocked(t *testing.T) {
 	t.Parallel()
 	r := start(t, "blocked-menu")
 	r.waitBlockedSession(t, "demo:menu-epic/01")
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestCodexBlockedScenario_PermissionRequestShowsAPendingCard(t *testing.T) {
 	t.Parallel()
 	r := start(t, "codex-blocked")
 	for _, addr := range []string{"demo:codex-blocked-epic/01", "demo:codex-denied-epic/01"} {
-		r.waitPermission(t, addr)
+		r.WaitPermission(t, addr)
 		r.waitBlockedSession(t, addr)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestCodexErrorScenario_ModelErrorLeavesTheAgentBlocked(t *testing.T) {
 	t.Parallel()
 	r := start(t, "codex-error")
 	r.waitBlockedSession(t, "demo:codex-error-epic/01")
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestRateLimitedScenario_StartsAndQueuesBothTickets(t *testing.T) {
 	t.Parallel()
 	r := start(t, "rate-limited")
 	for _, addr := range []string{"demo:limited-epic/01", "demo:waiting-epic/01"} {
-		if r.detail(t, addr).Address != addr {
+		if r.Detail(t, addr).Address != addr {
 			t.Fatalf("ticket %s missing", addr)
 		}
 	}
 	// The first worker's rate limit holds the second ticket's claim.
 	const waiting = "demo:waiting-epic/01"
 	if !testutil.Poll(60*time.Second, time.Second, func() bool {
-		return strings.Contains(r.gx(t, "server", "tickets", "explain", waiting), "rate-limited")
+		return strings.Contains(r.Gx(t, "server", "tickets", "explain", waiting), "rate-limited")
 	}) {
-		t.Fatalf("explain %s = %q, want the rate-limit hold", waiting, r.gx(t, "server", "tickets", "explain", waiting))
+		t.Fatalf("explain %s = %q, want the rate-limit hold", waiting, r.Gx(t, "server", "tickets", "explain", waiting))
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestUsageGatedScenario_ServerSeesTheUsageSample(t *testing.T) {
@@ -112,11 +112,11 @@ func TestUsageGatedScenario_ServerSeesTheUsageSample(t *testing.T) {
 	r := start(t, "usage-gated")
 	const gated = "demo:gated-epic/01"
 	if !testutil.Poll(60*time.Second, time.Second, func() bool {
-		return strings.Contains(r.gx(t, "server", "tickets", "explain", gated), "Claude usage: 99% of the weekly limit")
+		return strings.Contains(r.Gx(t, "server", "tickets", "explain", gated), "Claude usage: 99% of the weekly limit")
 	}) {
-		t.Fatalf("explain %s = %q, want the usage gate", gated, r.gx(t, "server", "tickets", "explain", gated))
+		t.Fatalf("explain %s = %q, want the usage gate", gated, r.Gx(t, "server", "tickets", "explain", gated))
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestCodexRateLimitedScenario_ServerSeesTheCodexSampleAndGatesOnlyCodex(t *testing.T) {
@@ -124,14 +124,14 @@ func TestCodexRateLimitedScenario_ServerSeesTheCodexSampleAndGatesOnlyCodex(t *t
 	r := start(t, "codex-rate-limited")
 	const gated = "demo:codex-waiting-epic/01"
 	if !testutil.Poll(60*time.Second, time.Second, func() bool {
-		return strings.Contains(r.gx(t, "server", "tickets", "explain", gated), "Codex usage: 99%")
+		return strings.Contains(r.Gx(t, "server", "tickets", "explain", gated), "Codex usage: 99%")
 	}) {
-		t.Fatalf("explain %s = %q, want the Codex usage gate", gated, r.gx(t, "server", "tickets", "explain", gated))
+		t.Fatalf("explain %s = %q, want the Codex usage gate", gated, r.Gx(t, "server", "tickets", "explain", gated))
 	}
-	if out := r.gx(t, "server", "tickets", "explain", "demo:claude-running-epic/01"); strings.Contains(out, "usage:") {
+	if out := r.Gx(t, "server", "tickets", "explain", "demo:claude-running-epic/01"); strings.Contains(out, "usage:") {
 		t.Errorf("Claude ticket explain = %q, want no usage gate", out)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 const (
@@ -151,7 +151,7 @@ func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
 		{"06", "zero-commit", wire.ActionRetry},
 	}
 	for _, c := range cases {
-		d := r.detail(t, pausedEpic+c.id)
+		d := r.Detail(t, pausedEpic+c.id)
 		if d.PauseReason != c.reason || d.PauseLabel == "" {
 			t.Errorf("%s: reason %q label %q, want reason %q", c.id, d.PauseReason, d.PauseLabel, c.reason)
 		}
@@ -159,20 +159,20 @@ func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
 			t.Errorf("%s: actions = %v, want %q", c.id, d.Actions, c.action)
 		}
 	}
-	if bases := r.detail(t, pausedEpic+"04").Bases; !slices.Equal(bases, []string{"01", "02"}) {
+	if bases := r.Detail(t, pausedEpic+"04").Bases; !slices.Equal(bases, []string{"01", "02"}) {
 		t.Errorf("choose-base bases = %v, want 01 and 02", bases)
 	}
 
-	repair := r.detail(t, pausedEpic+"07")
+	repair := r.Detail(t, pausedEpic+"07")
 	if repair.PauseReason != "iteration-error" || repair.Status != "needs-repair" {
 		t.Errorf("repair ticket: reason %q status %q, want iteration-error and needs-repair", repair.PauseReason, repair.Status)
 	}
 
-	d := r.waitPermission(t, approveAddr)
+	d := r.WaitPermission(t, approveAddr)
 	if d.Permission.Tool != "Bash command" || d.Permission.Description != agentfake.PermissionCommand || !slices.Contains(d.Actions, wire.ActionApprove) {
 		t.Errorf("approve ticket: permission %+v actions %v, want the Bash prompt and approve", d.Permission, d.Actions)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 // roundTypes is the event type of each pause round in the ticket's log.
@@ -211,14 +211,14 @@ func TestPausedScenario_EachPauseHasTheRoundOfItsKind(t *testing.T) {
 			t.Errorf("%s rounds = %v, want [%s]", id, got, want)
 		}
 	}
-	if d := r.detail(t, pausedEpic+"09"); d.Recommendation == nil || d.Recommendation.Verb != wire.ActionRetry {
+	if d := r.Detail(t, pausedEpic+"09"); d.Recommendation == nil || d.Recommendation.Verb != wire.ActionRetry {
 		t.Errorf("09 recommendation = %+v, want retry", d.Recommendation)
 	}
 	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
 	if out, err := exec.Command("git", "-C", repo, "rev-parse", "--verify", "ralph-loop/paused-epic-item-05").CombinedOutput(); err != nil {
 		t.Errorf("05 has no iteration branch: %v\n%s", err, out)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestDirtyTrunkScenario_RootPausedOnADirtyCheckout(t *testing.T) {
@@ -241,13 +241,13 @@ func TestDirtyTrunkScenario_RootPausedOnADirtyCheckout(t *testing.T) {
 	if !found {
 		t.Error("no dirty-epic card")
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
 	t.Parallel()
 	r := start(t, "paused")
-	w := r.web(t)
+	w := r.Web(t)
 
 	// The route each verb's button posts to, as webui/src/ticket/recover.ts has it.
 	routes := map[string]string{
@@ -259,7 +259,7 @@ func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
 	}
 	ids := []string{"03", "04", "05", "06", "07", "08", "09"}
 	for _, id := range ids {
-		d := r.detail(t, pausedEpic+id)
+		d := r.Detail(t, pausedEpic+id)
 		if len(d.Actions) == 0 {
 			t.Fatalf("%s has no actions: %+v", id, d)
 		}
@@ -271,28 +271,28 @@ func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
 		case wire.ActionChooseBase:
 			body["base"] = "01"
 		}
-		w.post(t, routes[verb], body)
+		w.Post(t, routes[verb], body)
 	}
 	for _, id := range ids {
 		// A merge lands the ticket and a retry relaunches it, so only the pause is checked.
-		if d := r.detail(t, pausedEpic+id); d.Status == "needs-answer" || d.Status == "needs-repair" {
+		if d := r.Detail(t, pausedEpic+id); d.Status == "needs-answer" || d.Status == "needs-repair" {
 			t.Errorf("%s is still %q (reason %q) after its recovery", id, d.Status, d.PauseReason)
 		}
 	}
 
-	p := r.waitPermission(t, approveAddr).Permission
-	w.post(t, "/v1/agents/answer", map[string]any{"address": approveAddr, "decision": "allow", "request_id": p.RequestID})
-	if d := r.detail(t, approveAddr); d.Permission != nil {
+	p := r.WaitPermission(t, approveAddr).Permission
+	w.Post(t, "/v1/agents/answer", map[string]any{"address": approveAddr, "decision": "allow", "request_id": p.RequestID})
+	if d := r.Detail(t, approveAddr); d.Permission != nil {
 		t.Errorf("permission after approve = %+v, want it cleared", d.Permission)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 // checksOf is `gx server checks --json`, by project.
 func (r *running) checksOf(t *testing.T) map[string]wire.ProjectChecks {
 	t.Helper()
 	var st wire.ChecksStatus
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "checks", "--json")), &st); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "checks", "--json")), &st); err != nil {
 		t.Fatal(err)
 	}
 	out := map[string]wire.ProjectChecks{}
@@ -330,7 +330,7 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents")
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	type row struct {
@@ -360,7 +360,7 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 	}
 	chatLen := func(i int) int {
 		var chat wire.SessionChatResponse
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[i].ID, "--json")), &chat); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", list[i].ID, "--json")), &chat); err != nil {
 			t.Fatal(err)
 		}
 		return len(chat.Messages)
@@ -373,7 +373,7 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 	}
 
 	var projects []wire.ProjectWorktrees
-	if err := json.Unmarshal([]byte(r.gx(t, "project", "worktrees", "--json")), &projects); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "project", "worktrees", "--json")), &projects); err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range projects {
@@ -390,7 +390,7 @@ func TestQueueAgentsScenario_ListsAQueueAgentAndADesignAgent(t *testing.T) {
 	var queue, design []wire.SessionInfo
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
 		var list []wire.SessionInfo
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
 		queue, design = nil, nil
@@ -412,7 +412,7 @@ func TestAgentsFailuresScenario_OneSessionPerFailureKind(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-failures")
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	var kinds []string
@@ -446,7 +446,7 @@ func TestRejectedFirstPromptScenario_TheSessionShowsAnUnknownCommandFailure(t *t
 	t.Parallel()
 	r := start(t, "rejected-first-prompt")
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	if len(list) != 1 {
@@ -456,5 +456,5 @@ func TestRejectedFirstPromptScenario_TheSessionShowsAnUnknownCommandFailure(t *t
 	if !got.GxRaised || !strings.Contains(got.Reason, "Unknown command:") {
 		t.Errorf("actionable = %+v, want a gx-raised Unknown command reason", got)
 	}
-	r.stop(t)
+	r.Stop(t)
 }

@@ -1,7 +1,8 @@
-package main
+package limitsflows
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"os/exec"
 	"strings"
 	"testing"
@@ -61,9 +62,9 @@ func TestLimitsFixture_ShapesShowInTheSummary(t *testing.T) {
 				flags = []string{"--shape", tc.shape}
 			}
 			r := startWith(t, "limits", nil, flags...)
-			defer r.stop(t)
+			defer r.Stop(t)
 			var sum wire.UsageSummary
-			if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
+			if err := json.Unmarshal([]byte(r.Gx(t, "usage", "summary", "--json")), &sum); err != nil {
 				t.Fatal(err)
 			}
 			if sum.Mode != wire.UsageModeLimits {
@@ -82,7 +83,7 @@ func TestLimitsFixture_ShapesShowInTheSummary(t *testing.T) {
 }
 
 func TestLimitsFixture_UnknownShapeNamesTheValidOnes(t *testing.T) {
-	out, err := exec.Command(fixtureBin, "--gx", gxBin, "--fakeclaude", fakeBin, "--shape", "bogus", "limits").CombinedOutput()
+	out, err := exec.Command(fixturetest.FixtureBin, "--gx", fixturetest.GxBin, "--fakeclaude", fixturetest.FakeBin, "--shape", "bogus", "limits").CombinedOutput()
 	if err == nil {
 		t.Fatal("unknown shape started")
 	}

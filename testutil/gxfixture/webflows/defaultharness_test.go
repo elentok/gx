@@ -1,7 +1,8 @@
-package main
+package webflows
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,16 +16,11 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-func fixtureRoot(r *running) string { return filepath.Dir(filepath.Dir(r.StateDir)) }
-
-func (r *running) repo() string { return filepath.Join(fixtureRoot(r), "repo") }
-func (r *running) home() string { return filepath.Join(fixtureRoot(r), "home") }
-
 func TestDefaultHarnessScenario_SessionsProjectsAndAWaitingTicket(t *testing.T) {
 	t.Parallel()
-	r := startWith(t, "default-harness", nil, "--fakecodex", fakeCodexBin)
+	r := startWith(t, "default-harness", nil, "--fakecodex", fixturetest.FakeCodexBin)
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	harnesses := map[string]int{}
@@ -40,7 +36,7 @@ func TestDefaultHarnessScenario_SessionsProjectsAndAWaitingTicket(t *testing.T) 
 
 	// No wire field names the switch yet, so read the model the replies report.
 	var models []string
-	paths, _ := filepath.Glob(filepath.Join(fixtureRoot(r), "home", ".claude", "projects", "*", "*.jsonl"))
+	paths, _ := filepath.Glob(filepath.Join(r.Root(), "home", ".claude", "projects", "*", "*.jsonl"))
 	for _, p := range paths {
 		if u, ok, err := transcript.LastAssistantUsage(p); err == nil && ok {
 			models = append(models, u.Model)
@@ -52,7 +48,7 @@ func TestDefaultHarnessScenario_SessionsProjectsAndAWaitingTicket(t *testing.T) 
 
 	overrides := 0
 	for _, name := range []string{"demo", "dotfiles", "gx"} {
-		body, err := os.ReadFile(filepath.Join(fixtureRoot(r), "data", "gx", "tickets", name, "project.json"))
+		body, err := os.ReadFile(filepath.Join(r.Root(), "data", "gx", "tickets", name, "project.json"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,22 +63,22 @@ func TestDefaultHarnessScenario_SessionsProjectsAndAWaitingTicket(t *testing.T) 
 		t.Errorf("%d project overrides, want 1", overrides)
 	}
 
-	if got := r.ticketStatus(t, "demo:waiting-epic/01"); got != "open" {
+	if got := r.TicketStatus(t, "demo:waiting-epic/01"); got != "open" {
 		t.Errorf("waiting ticket status = %q, want open", got)
 	}
 }
 
 func TestFakeCodexFlag_InstallsCodexOnTheFixturePath(t *testing.T) {
 	t.Parallel()
-	with := startWith(t, "default-harness", nil, "--fakecodex", fakeCodexBin)
-	if _, err := os.Stat(filepath.Join(fixtureRoot(with), "bin", "codex")); err != nil {
+	with := startWith(t, "default-harness", nil, "--fakecodex", fixturetest.FakeCodexBin)
+	if _, err := os.Stat(filepath.Join(with.Root(), "bin", "codex")); err != nil {
 		t.Errorf("with --fakecodex: %v", err)
 	}
 	without := start(t, "empty")
-	if _, err := os.Stat(filepath.Join(fixtureRoot(without), "bin", "codex")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(without.Root(), "bin", "codex")); !os.IsNotExist(err) {
 		t.Errorf("without --fakecodex: codex stat = %v, want not exist", err)
 	}
-	if _, err := exec.LookPath(filepath.Join(fixtureRoot(with), "bin", "codex")); err != nil {
+	if _, err := exec.LookPath(filepath.Join(with.Root(), "bin", "codex")); err != nil {
 		t.Errorf("codex not runnable: %v", err)
 	}
 }

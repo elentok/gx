@@ -1,4 +1,4 @@
-package main
+package designflows
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ import (
 func (r *running) cardsOf(t *testing.T) []wire.EpicListRow {
 	t.Helper()
 	var list wire.EpicList
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "epics", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "epics", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	return list.Epics
@@ -122,7 +122,7 @@ func TestManyDoneScenario_FiveMergedWithDistinctCloseTimesAndOneOpen(t *testing.
 	if len(closed) != 5 || open != 1 {
 		t.Errorf("close times %v, open %d; want 5 distinct close times and 1 open", closed, open)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestUnitedScenario_HasADraftImplEpic(t *testing.T) {
@@ -136,7 +136,7 @@ func TestUnitedScenario_HasADraftImplEpic(t *testing.T) {
 	if !strings.Contains(string(meta), "status: draft\n") {
 		t.Errorf("publishing-epic-impl ticket.md:\n%s", meta)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestUnitedScenario_CarriesTheCardTimeStamps(t *testing.T) {
@@ -173,7 +173,7 @@ func TestUnitedScenario_CarriesTheCardTimeStamps(t *testing.T) {
 	if err != nil || time.Since(at) > time.Hour {
 		t.Errorf("ready-epic created_at %q is not minutes old (%v)", created, err)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
@@ -192,7 +192,7 @@ func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
 	}
 	for _, tt := range tests {
 		var st wire.Stats
-		if err := json.Unmarshal([]byte(r.gx(t, append([]string{"server", "stats", "--json"}, tt.args...)...)), &st); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, append([]string{"server", "stats", "--json"}, tt.args...)...)), &st); err != nil {
 			t.Fatal(err)
 		}
 		var words, questions float64
@@ -207,7 +207,7 @@ func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
 
 	// 30 days: index 0 is 29 days ago. Days 29..26 ago precede the earliest count.
 	var st wire.Stats
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "stats", "--json", "--range", "30")), &st); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "stats", "--json", "--range", "30")), &st); err != nil {
 		t.Fatal(err)
 	}
 	for i, w := range st.Grilling.Words {
@@ -219,5 +219,5 @@ func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
 	if w := st.Grilling.Words[29-24]; w.Value != 0 || w.NoData {
 		t.Errorf("24 days ago = %+v, want a zero bar", w)
 	}
-	r.stop(t)
+	r.Stop(t)
 }

@@ -279,7 +279,13 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   (`Scenario`, `Epic`, `Ticket`, `SessionSpec`) and the scenario definitions that need nothing from
   the fixture program live in the sub-package `testutil/gxfixture/spec`; `scenarios.go` keeps the
   registry and aliases the spec types. New scenario definitions that take no `fixture` go there too
-  (the package is near the `sizeguard` limits). The `cache-gate` and
+  (the package is near the `sizeguard` limits). `Output`, the JSON it prints, lives in `spec` too.
+  Its scenario tests run in the test-only packages `designflows`, `limitsflows` and `webflows`
+  (each with a `TestMain` calling `fixturetest.Run`); the harness they share (`Start`, the
+  `Running` type, the web client, the binary builds) is the importable `fixturetest`. Only tests
+  of the fixture program's own internals (`parseArgs`, `isolatedEnv`, the health and shutdown
+  files) stay in `package main`. A new flow test goes in the flows package for its area; a
+  helper two packages need goes in `fixturetest`. The `cache-gate` and
   `cache-gate-custom` scenarios (`cachegate.go`) output `gate_dir`: a fake `go` and `ps` in
   `bin/` (put it first on PATH), `go-hold` to hold a fake build, and `go-clean.log`. The
   `chat-capture` scenario (`chat.go`, endpoint in `chatcapture/`) outputs `chat_capture`: a JSONL

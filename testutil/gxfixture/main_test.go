@@ -40,23 +40,23 @@ func TestScenarios_StartAnswerAndStop(t *testing.T) {
 				t.Fatalf("output = %+v, want a cookie, a TOTP secret and the last step", r.Output)
 			}
 			snapshot := r.WebURL + "/v1/snapshot"
-			if code := r.get(t, snapshot, true); !signedOut && code != http.StatusOK {
+			if code := r.Get(t, snapshot, true); !signedOut && code != http.StatusOK {
 				t.Errorf("GET /v1/snapshot with the cookie = %d, want 200", code)
 			}
-			if code := r.get(t, snapshot, false); code == http.StatusOK {
+			if code := r.Get(t, snapshot, false); code == http.StatusOK {
 				t.Errorf("GET /v1/snapshot without the cookie = %d, want it refused", code)
 			}
 			var st struct {
 				Running bool `json:"running"`
 			}
-			if err := json.Unmarshal([]byte(r.gx(t, "server", "status", "--json")), &st); err != nil || !st.Running {
+			if err := json.Unmarshal([]byte(r.Gx(t, "server", "status", "--json")), &st); err != nil || !st.Running {
 				t.Fatalf("server status = %+v, %v; want running", st, err)
 			}
 			if _, err := os.Stat(r.Socket); err != nil {
 				t.Errorf("printed socket: %v", err)
 			}
 
-			r.stop(t)
+			r.Stop(t)
 			if _, err := os.Stat(filepath.Dir(filepath.Dir(r.StateDir))); !os.IsNotExist(err) {
 				t.Errorf("temp dir after SIGTERM: %v, want it removed", err)
 			}
@@ -76,10 +76,10 @@ func TestFixture_TOTPOffSignsInWithoutASecret(t *testing.T) {
 	if r.TOTPSecret != "" || r.TOTPStep != 0 {
 		t.Errorf("TOTP secret = %q, step = %d; want none with server.web.totp=false", r.TOTPSecret, r.TOTPStep)
 	}
-	if code := r.get(t, r.WebURL+"/v1/snapshot", true); code != http.StatusOK {
+	if code := r.Get(t, r.WebURL+"/v1/snapshot", true); code != http.StatusOK {
 		t.Errorf("GET /v1/snapshot with the cookie = %d, want 200", code)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestWebSetupScenario_LeavesTheSetupPendingAndSignedOut(t *testing.T) {
@@ -88,16 +88,16 @@ func TestWebSetupScenario_LeavesTheSetupPendingAndSignedOut(t *testing.T) {
 	if r.Cookie != "" || r.Password != "" || r.TOTPSecret != "" {
 		t.Errorf("output = %+v, want no cookie, password or secret", r.Output)
 	}
-	if code := r.get(t, r.WebURL+"/v1/snapshot", false); code != http.StatusUnauthorized {
+	if code := r.Get(t, r.WebURL+"/v1/snapshot", false); code != http.StatusUnauthorized {
 		t.Errorf("GET /v1/snapshot = %d, want 401", code)
 	}
 	var st struct {
 		WebSetupCode string `json:"web_setup_code"`
 	}
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "status", "--json")), &st); err != nil || st.WebSetupCode == "" {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "status", "--json")), &st); err != nil || st.WebSetupCode == "" {
 		t.Errorf("server status = %+v, %v; want a web_setup_code", st, err)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestWebLoginScenario_LogsInWithItsPasswordAndSecret(t *testing.T) {
@@ -122,7 +122,7 @@ func TestWebLoginScenario_LogsInWithItsPasswordAndSecret(t *testing.T) {
 			}
 			body["totp_code"] = code
 		}
-		client := r.webClient(t, false)
+		client := r.WebClient(t, false)
 		raw, _ := json.Marshal(body)
 		req, err := http.NewRequest(http.MethodPost, r.WebURL+"/v1/web/auth/login", strings.NewReader(string(raw)))
 		if err != nil {
@@ -149,14 +149,14 @@ func TestWebLoginScenario_LogsInWithItsPasswordAndSecret(t *testing.T) {
 		}(); code != http.StatusOK {
 			t.Errorf("totp off=%v: GET /v1/snapshot after login = %d, want 200", totpOff, code)
 		}
-		r.stop(t)
+		r.Stop(t)
 	}
 }
 
 func TestWebLoginsScenario_HasFourLoginsOneIdleSeventyDays(t *testing.T) {
 	t.Parallel()
 	r := start(t, "web-logins")
-	if code := r.get(t, r.WebURL+"/v1/snapshot", true); code != http.StatusOK {
+	if code := r.Get(t, r.WebURL+"/v1/snapshot", true); code != http.StatusOK {
 		t.Errorf("GET /v1/snapshot with the cookie = %d, want 200", code)
 	}
 	auth, err := webauth.OpenWebAuth(r.StateDir, time.Now)
@@ -176,5 +176,5 @@ func TestWebLoginsScenario_HasFourLoginsOneIdleSeventyDays(t *testing.T) {
 	if idle != 1 {
 		t.Errorf("logins idle for 69+ days = %d, want 1", idle)
 	}
-	r.stop(t)
+	r.Stop(t)
 }

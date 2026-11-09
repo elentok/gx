@@ -1,4 +1,4 @@
-package main
+package limitsflows
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ func (r *running) setRestart(t *testing.T, name, value string) {
 func (r *running) restartCheck(t *testing.T) wire.RestartCheckReport {
 	t.Helper()
 	var rep wire.RestartCheckReport
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "restart-check", "--json")), &rep); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "restart-check", "--json")), &rep); err != nil {
 		t.Fatal(err)
 	}
 	return rep
@@ -43,7 +43,7 @@ func TestRestartScenarios_TheFakeBinaryAnswersTheCheck(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.scenario, func(t *testing.T) {
 			r := start(t, tc.scenario)
-			defer r.stop(t)
+			defer r.Stop(t)
 			rep := r.restartCheck(t)
 			if rep.Status != wire.RestartCheckOK || rep.NewVersion != spec.DefaultNewVersion || !rep.Config.OK {
 				t.Fatalf("report = %+v, want ok with version %s", rep, spec.DefaultNewVersion)
@@ -66,7 +66,7 @@ func TestRestartScenarios_TheFakeBinaryAnswersTheCheck(t *testing.T) {
 
 func TestRestartAgents_CountsTheRunningAgent(t *testing.T) {
 	r := start(t, "restart-agents")
-	defer r.stop(t)
+	defer r.Stop(t)
 	deadline := time.Now().Add(15 * time.Second)
 	for r.restartCheck(t).Agents < 1 {
 		if time.Now().After(deadline) {
@@ -78,7 +78,7 @@ func TestRestartAgents_CountsTheRunningAgent(t *testing.T) {
 
 func TestRestartProjects_ReportsTheMigrationError(t *testing.T) {
 	r := start(t, "restart-projects")
-	defer r.stop(t)
+	defer r.Stop(t)
 	var broken *wire.RestartCheckProject
 	rep := r.restartCheck(t)
 	for i, p := range rep.Projects {
@@ -99,7 +99,7 @@ func TestRestartProjects_ReportsTheMigrationError(t *testing.T) {
 
 func TestRestartScenarios_ControlFilesSteerTheFake(t *testing.T) {
 	r := start(t, "restart-agents")
-	defer r.stop(t)
+	defer r.Stop(t)
 
 	r.setRestart(t, "check.json", `{"version":"v9","config":{"ok":false,"error":"bad config"},"projects":[]}`)
 	rep := r.restartCheck(t)
@@ -115,7 +115,7 @@ func TestRestartScenarios_ControlFilesSteerTheFake(t *testing.T) {
 
 func TestRestartMissing_TheBinaryIsUnreadable(t *testing.T) {
 	r := start(t, "restart-missing")
-	defer r.stop(t)
+	defer r.Stop(t)
 	if rep := r.restartCheck(t); rep.Status != wire.RestartCheckUnreadable {
 		t.Errorf("status = %q, want %q", rep.Status, wire.RestartCheckUnreadable)
 	}
@@ -123,7 +123,7 @@ func TestRestartMissing_TheBinaryIsUnreadable(t *testing.T) {
 
 func TestRestartFake_GxFileNamesTheBuildTheRestartRuns(t *testing.T) {
 	r := start(t, "restart-projects")
-	defer r.stop(t)
+	defer r.Stop(t)
 	next := filepath.Join(t.TempDir(), "next-gx")
 	if err := os.WriteFile(next, []byte("#!/bin/sh\necho next build \"$@\"\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -138,7 +138,7 @@ func TestRestartFake_GxFileNamesTheBuildTheRestartRuns(t *testing.T) {
 
 func TestRestartFake_StartFollowsTheStartFile(t *testing.T) {
 	r := start(t, "restart-projects") // startsUp is false
-	defer r.stop(t)
+	defer r.Stop(t)
 	bin := r.restartCheck(t).Binary
 	out, err := exec.Command(bin, "server", "restart", "--continue").CombinedOutput()
 	if err == nil || !strings.Contains(string(out), "start refused") {

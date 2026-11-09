@@ -1,6 +1,7 @@
-package main
+package limitsflows
 
 import (
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,24 +12,12 @@ import (
 	"github.com/elentok/gx/server"
 )
 
-// setDisk replaces a control file through a rename, as a flow does.
-func (r *running) setDisk(t *testing.T, name, value string) {
-	t.Helper()
-	tmp := filepath.Join(r.DiskDir, name+".tmp")
-	if err := os.WriteFile(tmp, []byte(value+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Rename(tmp, filepath.Join(r.DiskDir, name)); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func (r *running) waitDiskStatus(t *testing.T, want string) {
 	t.Helper()
 	var out string
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		out = r.gx(t, "server", "disk", "status")
+		out = r.Gx(t, "server", "disk", "status")
 		if strings.Contains(out, want) {
 			return
 		}
@@ -39,19 +28,19 @@ func (r *running) waitDiskStatus(t *testing.T, want string) {
 
 func TestDiskLow_TheFreeAndCleanFilesSteerTheDisk(t *testing.T) {
 	r := start(t, "disk-low")
-	defer r.stop(t)
+	defer r.Stop(t)
 
-	r.setDisk(t, "free", "15G")
+	r.SetDisk(t, "free", "15G")
 	r.waitDiskStatus(t, "fixture disk: 15G free")
 
-	r.setDisk(t, "clean", "25G")
-	out := r.gx(t, "server", "disk", "clean", "fixture disk")
+	r.SetDisk(t, "clean", "25G")
+	out := r.Gx(t, "server", "disk", "clean", "fixture disk")
 	if !strings.Contains(out, "25G free now") {
 		t.Errorf("clean output = %q, want 25G free now", out)
 	}
 
-	r.setDisk(t, "clean", "fail")
-	cmd := exec.Command(gxBin, "server", "disk", "clean", "fixture disk")
+	r.SetDisk(t, "clean", "fail")
+	cmd := exec.Command(fixturetest.GxBin, "server", "disk", "clean", "fixture disk")
 	cmd.Env = r.Env
 	failed, err := cmd.CombinedOutput()
 	if err == nil || !strings.Contains(string(failed), "clean failed") {
@@ -69,7 +58,7 @@ func TestDiskLow_TheFreeAndCleanFilesSteerTheDisk(t *testing.T) {
 
 func TestDisk_EveryOtherScenarioStartsAt100GWithNoDisk(t *testing.T) {
 	r := start(t, "ready")
-	defer r.stop(t)
+	defer r.Stop(t)
 
 	got, err := os.ReadFile(filepath.Join(r.DiskDir, "free"))
 	if err != nil {
@@ -80,7 +69,7 @@ func TestDisk_EveryOtherScenarioStartsAt100GWithNoDisk(t *testing.T) {
 	}
 	// The strip and hold depend on the watcher having read the disk.
 	time.Sleep(time.Second)
-	if out := r.gx(t, "server", "disk", "status"); strings.Contains(out, "[warned]") {
+	if out := r.Gx(t, "server", "disk", "status"); strings.Contains(out, "[warned]") {
 		t.Errorf("disk status warns:\n%s", out)
 	}
 }

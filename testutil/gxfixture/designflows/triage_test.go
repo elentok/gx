@@ -1,4 +1,4 @@
-package main
+package designflows
 
 import (
 	"cmp"
@@ -95,7 +95,7 @@ func currentStep(v wire.TriageView) string {
 func (r *running) epicList(t *testing.T) wire.EpicList {
 	t.Helper()
 	var list wire.EpicList
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "epics", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "epics", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	return list
@@ -104,7 +104,7 @@ func (r *running) epicList(t *testing.T) wire.EpicList {
 func (r *running) triageView(t *testing.T) wire.TriageView {
 	t.Helper()
 	var v wire.TriageView
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "triage", "show", project, "--json")), &v); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "triage", "show", project, "--json")), &v); err != nil {
 		t.Fatal(err)
 	}
 	return v
@@ -181,7 +181,7 @@ func (r *running) waitNoSession(t *testing.T) {
 func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "triage", nil, "--shape", "journey", "--auto-advance-delay", "100ms")
-	r.gx(t, "server", "triage", "open", project)
+	r.Gx(t, "server", "triage", "open", project)
 
 	// Verify takes two sessions: the fake saves three verdicts per session.
 	verified := func(v wire.TriageView) int {
@@ -211,10 +211,10 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 		if len(args) == 0 {
 			continue
 		}
-		r.gx(t, append([]string{"server", "triage", "row", project, row.Address, "--revision", fmt.Sprint(r.triageView(t).Revision)}, args...)...)
+		r.Gx(t, append([]string{"server", "triage", "row", project, row.Address, "--revision", fmt.Sprint(r.triageView(t).Revision)}, args...)...)
 	}
 	v = r.waitTriage(t, "no open question", func(v wire.TriageView) bool { return v.OpenQuestions == 0 })
-	r.gx(t, "server", "triage", "approve", project, "--revision", fmt.Sprint(v.Revision))
+	r.Gx(t, "server", "triage", "approve", project, "--revision", fmt.Sprint(v.Revision))
 
 	// The Write session leaves the scripted rows failed and the rest done: the
 	// first fails before its move and the second after it. The fifth is a keep
@@ -247,7 +247,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 
 	// Each Retry runs its own Write session; the Triage is done after the last.
 	for address := range failedRows {
-		r.gx(t, "server", "triage", "retry", project, address, "--revision", fmt.Sprint(r.triageView(t).Revision))
+		r.Gx(t, "server", "triage", "retry", project, address, "--revision", fmt.Sprint(r.triageView(t).Revision))
 		r.waitTriage(t, "the retry of "+address, func(v wire.TriageView) bool {
 			for _, row := range v.Rows {
 				if row.Address == address {

@@ -1,7 +1,8 @@
-package main
+package designflows
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,7 +28,7 @@ var askedStatus = tickets.StatusPausedAnswer.Word()
 // worktrees lists `git worktree list --porcelain` of the fixture repo.
 func (r *running) worktrees(t *testing.T) string {
 	t.Helper()
-	out, err := exec.Command("git", "-C", r.repo(), "worktree", "list", "--porcelain").CombinedOutput()
+	out, err := exec.Command("git", "-C", r.Repo(), "worktree", "list", "--porcelain").CombinedOutput()
 	if err != nil {
 		t.Fatalf("git worktree list: %v\n%s", err, out)
 	}
@@ -51,7 +52,7 @@ func (r *running) askedWorktree(t *testing.T) string {
 func TestKeepWorktreeScenario_TheAskedFileSurvivesTheAnswerAndASecondTicketRuns(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-worktree")
-	r.waitStatus(t, keepFirst, askedStatus)
+	r.WaitStatus(t, keepFirst, askedStatus)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s while the ticket waits:\n%s", agentfake.UncommittedFile, r.worktrees(t))
@@ -60,28 +61,28 @@ func TestKeepWorktreeScenario_TheAskedFileSurvivesTheAnswerAndASecondTicketRuns(
 		t.Errorf("no iteration branch while the ticket waits:\n%s", r.worktrees(t))
 	}
 	// The second ticket starts while the first waits.
-	r.waitStatus(t, keepSecond, "done")
+	r.WaitStatus(t, keepSecond, "done")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("the waiting ticket's worktree is gone after the second ticket ran: %v", err)
 	}
-	r.gx(t, "tickets", "answer", keepFirst, "--body", "go on")
+	r.Gx(t, "tickets", "answer", keepFirst, "--body", "go on")
 	// The relaunch finishes only when it still sees the file.
-	r.waitStatus(t, keepFirst, "done")
-	r.stop(t)
+	r.WaitStatus(t, keepFirst, "done")
+	r.Stop(t)
 }
 
 func TestKeepAgentScenario_TheUnmodifiedPtyFixtureKeepsTheAskedWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-agent")
-	r.waitStatus(t, keepFirst, askedStatus)
+	r.WaitStatus(t, keepFirst, askedStatus)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s:\n%s", agentfake.UncommittedFile, r.worktrees(t))
 	}
-	r.waitStatus(t, keepSecond, "done")
-	r.gx(t, "tickets", "answer", keepFirst, "--body", "go on")
-	r.waitStatus(t, keepFirst, "done")
-	r.stop(t)
+	r.WaitStatus(t, keepSecond, "done")
+	r.Gx(t, "tickets", "answer", keepFirst, "--body", "go on")
+	r.WaitStatus(t, keepFirst, "done")
+	r.Stop(t)
 }
 
 // worktreeListed reports whether `git worktree list` names path.
@@ -100,53 +101,53 @@ func (r *running) waitWorktreeGone(t *testing.T, path, after string) {
 func TestKeepCleanupScenario_ACommitlessAskKeepsItsWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-cleanup")
-	r.waitStatus(t, keepFirst, askedStatus)
+	r.WaitStatus(t, keepFirst, askedStatus)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s after the ask:\n%s", agentfake.UncommittedFile, r.worktrees(t))
 	}
-	r.waitStatus(t, keepSecond, "done")
+	r.WaitStatus(t, keepSecond, "done")
 	if !r.worktreeListed(t, path) {
 		t.Fatalf("the asked worktree %s left the list:\n%s", path, r.worktrees(t))
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestKeepCleanupScenario_CancellingThePausedTicketRemovesItsWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-cleanup")
-	r.waitStatus(t, keepFirst, askedStatus)
+	r.WaitStatus(t, keepFirst, askedStatus)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s before the cancel:\n%s", agentfake.UncommittedFile, r.worktrees(t))
 	}
-	r.gx(t, "server", "tickets", "cancel", keepFirst)
+	r.Gx(t, "server", "tickets", "cancel", keepFirst)
 	r.waitWorktreeGone(t, path, "after the cancel")
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestKeepCleanupScenario_MergingTheEpicRemovesALeftoverIterationWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-cleanup")
-	r.waitStatus(t, keepFirst, askedStatus)
-	r.waitStatus(t, keepSecond, "done")
+	r.WaitStatus(t, keepFirst, askedStatus)
+	r.WaitStatus(t, keepSecond, "done")
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s:\n%s", agentfake.UncommittedFile, r.worktrees(t))
 	}
 	// The cancel removes the worktree, so the leftover is put back by hand where
 	// the epic merge looks for it.
-	r.gx(t, "server", "tickets", "cancel", keepFirst)
+	r.Gx(t, "server", "tickets", "cancel", keepFirst)
 	r.waitWorktreeGone(t, path, "after the cancel")
-	if out, err := exec.Command("git", "-C", r.repo(), "worktree", "add", "--detach", path).CombinedOutput(); err != nil {
+	if out, err := exec.Command("git", "-C", r.Repo(), "worktree", "add", "--detach", path).CombinedOutput(); err != nil {
 		t.Fatalf("git worktree add: %v\n%s", err, out)
 	}
 	if !r.worktreeListed(t, path) {
 		t.Fatalf("the leftover %s is not listed before the merge:\n%s", path, r.worktrees(t))
 	}
-	r.gx(t, "server", "epics", "merge", "demo:keep-epic")
+	r.Gx(t, "server", "epics", "merge", "demo:keep-epic")
 	r.waitWorktreeGone(t, path, "after the epic merge")
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestCleanupScenario_EveryCaseIsInGitAndTheScanClassifiesIt(t *testing.T) {
@@ -157,8 +158,8 @@ func TestCleanupScenario_EveryCaseIsInGitAndTheScanClassifiesIt(t *testing.T) {
 			t.Errorf("no worktree on %s:\n%s", branch, r.worktrees(t))
 		}
 	}
-	cmd := exec.Command(gxBin, "cleanup", "scan", "--json")
-	cmd.Dir = r.repo()
+	cmd := exec.Command(fixturetest.GxBin, "cleanup", "scan", "--json")
+	cmd.Dir = r.Repo()
 	// r.Env has no PATH, and the scan shells out to git.
 	cmd.Env = append(slices.Clone(r.Env), "PATH="+os.Getenv("PATH"))
 	var stderr strings.Builder
@@ -202,5 +203,5 @@ func TestCleanupScenario_EveryCaseIsInGitAndTheScanClassifiesIt(t *testing.T) {
 	if e := epics["unmerged-epic"]; !e.AllDone || e.MergedToTrunk {
 		t.Errorf("unmerged-epic = %+v, want done and unmerged", e)
 	}
-	r.stop(t)
+	r.Stop(t)
 }

@@ -1,6 +1,7 @@
-package main
+package limitsflows
 
 import (
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +55,7 @@ func (r *running) stayFree(t *testing.T, want string) {
 func (r *running) cleanNow() <-chan string {
 	out := make(chan string, 1)
 	go func() {
-		cmd := exec.Command(gxBin, "server", "disk", "clean", "fixture disk")
+		cmd := exec.Command(fixturetest.GxBin, "server", "disk", "clean", "fixture disk")
 		cmd.Env = r.Env
 		b, _ := cmd.CombinedOutput()
 		out <- string(b)
@@ -64,10 +65,10 @@ func (r *running) cleanNow() <-chan string {
 
 func TestCacheGate_CleanNowWaitsForARegisteredBuild(t *testing.T) {
 	r := start(t, "cache-gate")
-	defer r.stop(t)
-	r.setDisk(t, "free", "15G")
+	defer r.Stop(t)
+	r.SetDisk(t, "free", "15G")
 	r.waitDiskStatus(t, "fixture disk: 15G free")
-	r.setDisk(t, "clean", "25G")
+	r.SetDisk(t, "clean", "25G")
 
 	release := gocachegate.Register(r.StateDir)
 	done := r.cleanNow()
@@ -86,11 +87,11 @@ func TestCacheGate_CleanNowWaitsForARegisteredBuild(t *testing.T) {
 
 func TestCacheGate_TheAutomaticCleanWaitsForARegisteredBuild(t *testing.T) {
 	r := start(t, "cache-gate")
-	defer r.stop(t)
-	r.setDisk(t, "clean", "25G")
+	defer r.Stop(t)
+	r.SetDisk(t, "clean", "25G")
 
 	release := gocachegate.Register(r.StateDir)
-	r.setDisk(t, "free", "5G")
+	r.SetDisk(t, "free", "5G")
 	r.stayFree(t, "5G")
 	release()
 
@@ -104,8 +105,8 @@ func TestCacheGate_ACustomCleanupCommandWaitsToo(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := startWith(t, "cache-gate-custom", nil, "--config", `disk-space.cleanup-command=["`+script+`"]`)
-	defer r.stop(t)
-	r.setDisk(t, "free", "15G")
+	defer r.Stop(t)
+	r.SetDisk(t, "free", "15G")
 	r.waitDiskStatus(t, "fixture disk: 15G free")
 
 	release := gocachegate.Register(r.StateDir)
@@ -128,10 +129,10 @@ func TestCacheGate_ACustomCleanupCommandWaitsToo(t *testing.T) {
 
 func TestCacheGate_AGoProcessHoldsTheClean(t *testing.T) {
 	r := start(t, "cache-gate")
-	defer r.stop(t)
-	r.setDisk(t, "free", "15G")
+	defer r.Stop(t)
+	r.SetDisk(t, "free", "15G")
 	r.waitDiskStatus(t, "fixture disk: 15G free")
-	r.setDisk(t, "clean", "25G")
+	r.SetDisk(t, "clean", "25G")
 
 	hold := filepath.Join(r.GateDir, "go-hold")
 	if err := os.WriteFile(hold, nil, 0o644); err != nil {
@@ -180,12 +181,12 @@ func TestCacheGate_AGoProcessHoldsTheClean(t *testing.T) {
 
 func TestCacheGate_GoCleanCacheWithTheServerStoppedWaitsForARegisteredBuild(t *testing.T) {
 	r := start(t, "cache-gate")
-	defer r.stop(t)
+	defer r.Stop(t)
 	// Only the server stops; the fixture keeps its state dir and fake go.
-	r.gx(t, "server", "stop")
+	r.Gx(t, "server", "stop")
 
 	release := gocachegate.Register(r.StateDir)
-	cmd := exec.Command(gxBin, "brief", "go-clean-cache")
+	cmd := exec.Command(fixturetest.GxBin, "brief", "go-clean-cache")
 	cmd.Dir = t.TempDir()
 	cmd.Env = append(append([]string{}, r.Env...), "PATH="+filepath.Join(r.GateDir, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
 	done := make(chan string, 1)

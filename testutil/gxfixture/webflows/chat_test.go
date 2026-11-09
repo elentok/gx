@@ -1,7 +1,8 @@
-package main
+package webflows
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"os"
 	"os/exec"
 	"strings"
@@ -18,7 +19,7 @@ func TestChatCaptureScenario_ANotifyPostLandsInTheCaptureFile(t *testing.T) {
 	if r.ChatCapture == "" {
 		t.Fatalf("output = %+v, want chat_capture", r.Output)
 	}
-	cmd := exec.Command(gxBin, "notify", "hello")
+	cmd := exec.Command(fixturetest.GxBin, "notify", "hello")
 	cmd.Env = r.Env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("gx notify: %v\n%s", err, out)

@@ -1,4 +1,4 @@
-package main
+package webflows
 
 import (
 	"encoding/json"
@@ -113,8 +113,8 @@ func TestChatBatchScenario_MessagesQueuedInOneTickArriveInOnePost(t *testing.T) 
 	// the capture the next tick is a few seconds away.
 	waitForParts(t, r, map[string][]string{"answer": {"ask-epic/01", "Answer"}})
 	before := slackPosts(r.ChatCapture)
-	r.gx(t, "server", "tickets", "pause", "demo:manual-epic/01", "--reason", "set aside for the batch check")
-	r.setDisk(t, "free", "5G")
+	r.Gx(t, "server", "tickets", "pause", "demo:manual-epic/01", "--reason", "set aside for the batch check")
+	r.SetDisk(t, "free", "5G")
 	waitForParts(t, r, map[string][]string{"batch": {"manual-epic/01", "Repair", "low disk space"}})
 	if got := slackPosts(r.ChatCapture) - before; got != 1 {
 		t.Fatalf("%d posts after the first, want 1", got)

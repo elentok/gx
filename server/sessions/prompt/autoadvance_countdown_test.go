@@ -163,50 +163,48 @@ func wantStopped(t *testing.T, f *grillingFixture, c *holder.HolderClient) {
 	}
 }
 
-func TestAutoAdvance_CancelStopsTheSend(t *testing.T) {
-	t.Parallel()
-	f, c := startCountdown(t)
-	if res, err := f.H.Client.Sessions.CancelAutoAdvance(f.Ctx, f.ID); err != nil || res.Refused {
-		t.Fatalf("cancel = %+v, %v", res, err)
-	}
-	wantStopped(t, f, c)
-}
-
-func TestAutoAdvance_PaneInputStopsTheSendAndKeepsContinue(t *testing.T) {
-	t.Parallel()
-	f, c := startCountdown(t)
-	clearByInput(t, f.H, f.ID)
-	wantStopped(t, f, c)
-}
-
-func TestAutoAdvance_PageNoteStopsTheSendAndKeepsContinue(t *testing.T) {
-	t.Parallel()
-	f, c := startCountdown(t)
-	if res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: "a note"}); err != nil || res.Refused {
-		t.Fatalf("prompt = %+v, %v", res, err)
-	}
-	wantStopped(t, f, c)
-}
-
-func TestAutoAdvance_ManualContinueStopsTheCountdown(t *testing.T) {
-	t.Parallel()
-	f, _ := startCountdown(t)
-	if res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true}); err != nil || res.Refused {
-		t.Fatalf("continue = %+v, %v", res, err)
-	}
-	if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
-		t.Errorf("countdown = %v after a manual Continue, want none", got.AutoAdvanceAt)
-	}
-}
-
-func TestAutoAdvance_RunActionStopsTheCountdown(t *testing.T) {
-	t.Parallel()
-	f, _ := startCountdown(t)
-	if res, err := f.H.Client.Sessions.RunAction(f.Ctx, f.ID); err != nil || res.Refused {
-		t.Fatalf("run action = %+v, %v", res, err)
-	}
-	if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
-		t.Errorf("countdown = %v after Run Action, want none", got.AutoAdvanceAt)
+func TestAutoAdvance_StopsTheCountdown(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		stop func(t *testing.T, f *grillingFixture)
+		// keepsContinue: the send stops and the run-end Continue stays raised
+		// with one banner; otherwise the action itself ends the countdown.
+		keepsContinue bool
+	}{
+		{"Cancel", func(t *testing.T, f *grillingFixture) {
+			if res, err := f.H.Client.Sessions.CancelAutoAdvance(f.Ctx, f.ID); err != nil || res.Refused {
+				t.Fatalf("cancel = %+v, %v", res, err)
+			}
+		}, true},
+		{"PaneInput", func(t *testing.T, f *grillingFixture) { clearByInput(t, f.H, f.ID) }, true},
+		{"PageNote", func(t *testing.T, f *grillingFixture) {
+			if res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: "a note"}); err != nil || res.Refused {
+				t.Fatalf("prompt = %+v, %v", res, err)
+			}
+		}, true},
+		{"ManualContinue", func(t *testing.T, f *grillingFixture) {
+			if res, err := f.H.Client.Sessions.Prompt(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true}); err != nil || res.Refused {
+				t.Fatalf("continue = %+v, %v", res, err)
+			}
+		}, false},
+		{"RunAction", func(t *testing.T, f *grillingFixture) {
+			if res, err := f.H.Client.Sessions.RunAction(f.Ctx, f.ID); err != nil || res.Refused {
+				t.Fatalf("run action = %+v, %v", res, err)
+			}
+		}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, c := startCountdown(t)
+			tc.stop(t, f)
+			if tc.keepsContinue {
+				wantStopped(t, f, c)
+				return
+			}
+			if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
+				t.Errorf("countdown = %v, want none", got.AutoAdvanceAt)
+			}
+		})
 	}
 }
 

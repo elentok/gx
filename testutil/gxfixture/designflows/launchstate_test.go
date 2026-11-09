@@ -1,4 +1,4 @@
-package main
+package designflows
 
 import (
 	"encoding/json"
@@ -21,19 +21,19 @@ const (
 func TestLaunchHeldScenario_TheTicketStaysClaimedAtInstallUntilTheHoldIsReleased(t *testing.T) {
 	t.Parallel()
 	r := start(t, "launch-held")
-	defer r.stop(t)
+	defer r.Stop(t)
 	started := filepath.Join(r.GateDir, "npm-started")
 	if !testutil.Poll(90*time.Second, 50*time.Millisecond, func() bool { _, err := os.Stat(started); return err == nil }) {
-		t.Fatalf("the install never started; ticket is %q", r.ticketStatus(t, launchTicket))
+		t.Fatalf("the install never started; ticket is %q", r.TicketStatus(t, launchTicket))
 	}
-	if got := r.ticketStatus(t, launchTicket); got != "claimed" {
+	if got := r.TicketStatus(t, launchTicket); got != "claimed" {
 		t.Fatalf("ticket = %q while the install is held, want claimed", got)
 	}
 
 	if err := os.Remove(filepath.Join(r.GateDir, "npm-hold")); err != nil {
 		t.Fatal(err)
 	}
-	r.waitStatus(t, launchTicket, "done")
+	r.WaitStatus(t, launchTicket, "done")
 }
 
 // Story 29: a failed launch pauses the ticket as iteration-error with the
@@ -41,11 +41,11 @@ func TestLaunchHeldScenario_TheTicketStaysClaimedAtInstallUntilTheHoldIsReleased
 func TestLaunchFailScenario_TheTicketPausesWithTheErrorAndNothingReadsLaunching(t *testing.T) {
 	t.Parallel()
 	r := start(t, "launch-fail")
-	defer r.stop(t)
+	defer r.Stop(t)
 	// The status moves on from paused once recovery escalates it, so wait on the reason.
 	var d wire.TicketDetail
 	if !testutil.Poll(90*time.Second, time.Second, func() bool {
-		d = r.detail(t, launchTicket)
+		d = r.Detail(t, launchTicket)
 		return d.PauseReason == "iteration-error"
 	}) {
 		t.Fatalf("pause reason = %q, want iteration-error", d.PauseReason)
@@ -58,7 +58,7 @@ func TestLaunchFailScenario_TheTicketPausesWithTheErrorAndNothingReadsLaunching(
 	}
 
 	var snap wire.Snapshot
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "snapshot", "--json")), &snap); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "snapshot", "--json")), &snap); err != nil {
 		t.Fatal(err)
 	}
 	for _, tk := range snap.Tickets {
@@ -76,8 +76,8 @@ func TestLaunchFailScenario_TheTicketPausesWithTheErrorAndNothingReadsLaunching(
 func TestEpicAtCapScenario_TheHeldTicketIsCappedAndLoweringTheCapNamesTheOverCap(t *testing.T) {
 	t.Parallel()
 	r := start(t, "epic-at-cap")
-	defer r.stop(t)
-	explain := func() string { return r.gx(t, "server", "tickets", "explain", capThird) }
+	defer r.Stop(t)
+	explain := func() string { return r.Gx(t, "server", "tickets", "explain", capThird) }
 	wait := func(want string) {
 		t.Helper()
 		if !testutil.Poll(90*time.Second, time.Second, func() bool { return strings.Contains(explain(), want) }) {
@@ -103,7 +103,7 @@ func TestEpicAtCapScenario_TheHeldTicketIsCappedAndLoweringTheCapNamesTheOverCap
 	if err := os.WriteFile(r.ConfigFile, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r.gx(t, "server", "reload-config")
+	r.Gx(t, "server", "reload-config")
 	wait("epic cap 2/1")
 }
 
@@ -116,7 +116,7 @@ const (
 func TestVimLaunchScenario_TheServerLogShowsTheVimCheckAndTheTicketStillFinishes(t *testing.T) {
 	t.Parallel()
 	r := start(t, "vim-launch")
-	r.waitStatus(t, vimLaunchTicket, "done")
+	r.WaitStatus(t, vimLaunchTicket, "done")
 	var log string
 	// A persistent footer fails the check on the launch and on its one relaunch.
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
@@ -126,7 +126,7 @@ func TestVimLaunchScenario_TheServerLogShowsTheVimCheckAndTheTicketStillFinishes
 	}) {
 		t.Fatalf("want at least two vim-check lines in %s, got:\n%s", r.LogFile, log)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestToolsScenario_ChatListsTheCallsInFlight(t *testing.T) {

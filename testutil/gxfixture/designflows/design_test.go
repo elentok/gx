@@ -1,8 +1,9 @@
-package main
+package designflows
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"maps"
 	"os"
 	"os/exec"
@@ -29,7 +30,7 @@ func TestDesignScenario_HasATimedDoneTicket(t *testing.T) {
 			t.Errorf("timed ticket lacks %q:\n%s", want, data)
 		}
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestDesignScenario_StampsTheMapsDesignStart(t *testing.T) {
@@ -43,7 +44,7 @@ func TestDesignScenario_StampsTheMapsDesignStart(t *testing.T) {
 	if !strings.Contains(string(meta), "design_started_at: ") || !strings.Contains(string(meta), "kind: map") {
 		t.Errorf("design-epic ticket.md:\n%s", meta)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestConfigFlag_WritesTheKeyIntoTheFixtureConfig(t *testing.T) {
@@ -69,7 +70,7 @@ func TestConfigFlag_WritesTheKeyIntoTheFixtureConfig(t *testing.T) {
 	if !cfg.Server.RemoteControl || cfg.Extra.Name != "hello" {
 		t.Errorf("config = %s, want server.remote-control true and extra.name hello", raw)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 const designAddr = "demo:design-epic"
@@ -77,7 +78,7 @@ const designAddr = "demo:design-epic"
 func (r *running) currentStep(t *testing.T) wire.ProgressStep {
 	t.Helper()
 	var d wire.EpicDetail
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "epics", "detail", designAddr, "--json")), &d); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "epics", "detail", designAddr, "--json")), &d); err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range d.Steps {
@@ -95,7 +96,7 @@ func (r *running) waitChat(t *testing.T, id string, ok func(wire.SessionChatResp
 	deadline := time.Now().Add(30 * time.Second)
 	for {
 		var chat wire.SessionChatResponse
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", id, "--json")), &chat); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", id, "--json")), &chat); err != nil {
 			t.Fatal(err)
 		}
 		if ok(chat) {
@@ -127,7 +128,7 @@ func (r *running) waitIdle(t *testing.T, id string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for {
 		var list []wire.SessionInfo
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
 		for _, s := range list {
@@ -157,7 +158,7 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 		t.Errorf("current step = %q, want resolve-tickets", step)
 	}
 	// The verb moves the step the page shows.
-	r.gx(t, "tickets", "set", designAddr, "--design-step", "spec")
+	r.Gx(t, "tickets", "set", designAddr, "--design-step", "spec")
 	r.waitStep(t, wire.ProgressSpec)
 	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
 	tracked, err := exec.Command("git", "-C", repo, "ls-files").Output()
@@ -166,7 +167,7 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 	}
 
 	var res wire.SessionResult
-	if err := json.Unmarshal([]byte(r.gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
 		t.Fatalf("designs open = %+v, %v", res, err)
 	}
 	id := res.Session.ID
@@ -187,13 +188,13 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 	r.waitIdle(t, id)
 	r.postWhenIdle(t, id, "/v1/sessions/prompt", map[string]any{"id": id, "continue": true, "last_message": chat.Messages[len(chat.Messages)-1].ID})
 	r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return slices.Equal(roundLabels(c), []string{"9"}) })
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestDesignTwoLiveScenario_TwoSessionsNewestPlaysRoundOne(t *testing.T) {
 	r := start(t, "design-two-live")
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	var live []wire.SessionInfo
@@ -213,14 +214,14 @@ func TestDesignTwoLiveScenario_TwoSessionsNewestPlaysRoundOne(t *testing.T) {
 	if got := roundLabels(chat); !slices.Equal(got, []string{"8", "8b"}) {
 		t.Errorf("round labels = %v, want 8 and 8b", got)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 // openDesign opens the design session of the scenario's map and returns its id.
 func (r *running) openDesign(t *testing.T) string {
 	t.Helper()
 	var res wire.SessionResult
-	if err := json.Unmarshal([]byte(r.gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
 		t.Fatalf("designs open = %+v, %v", res, err)
 	}
 	return res.Session.ID
@@ -233,12 +234,12 @@ func (r *running) promptWhenIdle(t *testing.T, id, text string) {
 	t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
-		cmd := exec.Command(gxBin, "agents", "prompt", id, text)
+		cmd := exec.Command(fixturetest.GxBin, "agents", "prompt", id, text)
 		cmd.Env = r.Env
 		if _, err := cmd.CombinedOutput(); err == nil {
 			for range 10 {
 				var chat wire.SessionChatResponse
-				if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", id, "--json")), &chat); err != nil {
+				if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", id, "--json")), &chat); err != nil {
 					t.Fatal(err)
 				}
 				for _, m := range chat.Messages {
@@ -268,17 +269,17 @@ func agentTexts(chat wire.SessionChatResponse) []string {
 func TestDesignBranchReadyScenario(t *testing.T) {
 	t.Parallel()
 	r := start(t, "design-branch-ready")
-	if got := r.gx(t, "tickets", "show", "demo:design-epic"); strings.Contains(got, "branch") {
+	if got := r.Gx(t, "tickets", "show", "demo:design-epic"); strings.Contains(got, "branch") {
 		t.Fatalf("map starts at Branch:\n%s", got)
 	}
-	r.gx(t, "tickets", "set", "demo:design-epic", "--design-step", "branch")
-	if got := r.gx(t, "tickets", "show", "demo:design-epic"); !strings.Contains(got, "branch") {
+	r.Gx(t, "tickets", "set", "demo:design-epic", "--design-step", "branch")
+	if got := r.Gx(t, "tickets", "show", "demo:design-epic"); !strings.Contains(got, "branch") {
 		t.Errorf("map not at Branch:\n%s", got)
 	}
 	if n := len(r.issueFiles(t, "demo", "design-epic-impl")); n != spec.DesignBranchReadyImplTickets {
 		t.Errorf("impl epic has %d tickets, want %d", n, spec.DesignBranchReadyImplTickets)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
@@ -310,7 +311,7 @@ func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
 					r.promptWhenIdle(t, id, fmt.Sprintf("go on (%d)", i))
 				}
 			}
-			r.stop(t)
+			r.Stop(t)
 		})
 	}
 }
@@ -323,7 +324,7 @@ func (r *running) designSessions(t *testing.T, tickets []string, ok func(wire.Se
 	got := map[string]wire.SessionInfo{}
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
 		list = nil
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
 		got = map[string]wire.SessionInfo{}
@@ -397,7 +398,7 @@ func TestDesignModelTiersScenario_TierPerMapAndLaunchArgs(t *testing.T) {
 		}
 		return s.Model == map[string]string{"strongest": spec.StrongestModel, "worker": spec.WorkerModel}[string(s.Tier)]
 	})
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestChartingHandoffScenario_ContinueRestartsOnWorkerOrFailsOnStaleSlug(t *testing.T) {
@@ -421,21 +422,21 @@ func TestChartingHandoffScenario_ContinueRestartsOnWorkerOrFailsOnStaleSlug(t *t
 	if models := r.launchModels(t); !slices.Contains(models, agentfake.StaleModel) {
 		t.Errorf("launch models = %v, want the stale one among them", models)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestDesignQuestionWaitScenario_ReleasingTheHoldMakesTheSessionWaitOnAGrillingRound(t *testing.T) {
 	t.Parallel()
 	r := start(t, "design-question-wait")
 	var res wire.SessionResult
-	if err := json.Unmarshal([]byte(r.gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
 		t.Fatalf("designs open = %+v, %v", res, err)
 	}
 	id := res.Session.ID
 
 	grilling := func() bool {
 		var list []wire.SessionInfo
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
 		for _, s := range list {
@@ -456,5 +457,5 @@ func TestDesignQuestionWaitScenario_ReleasingTheHoldMakesTheSessionWaitOnAGrilli
 	r.waitIdle(t, id)
 	// The Grilling flag trails the idle status by a poll.
 	testutil.WaitFor(t, 15*time.Second, "an idle session waiting on a Grilling round", grilling)
-	r.stop(t)
+	r.Stop(t)
 }

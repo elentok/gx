@@ -1,4 +1,4 @@
-package main
+package designflows
 
 import (
 	"context"
@@ -59,7 +59,7 @@ func TestCodexQueueScenario_TwoRunningThreeWaitingWithTheirNotes(t *testing.T) {
 		Address string `json:"address"`
 		Agent   string `json:"agent"`
 	}
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "queue", "items", "--json")), &items); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "queue", "items", "--json")), &items); err != nil {
 		t.Fatal(err)
 	}
 	agents := map[string]string{}
@@ -75,14 +75,14 @@ func TestCodexQueueScenario_TwoRunningThreeWaitingWithTheirNotes(t *testing.T) {
 			t.Errorf("queue item %s agent = %q (queued %v), want %q", addr, got, ok, agent)
 		}
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestCodexDesignScenario_SessionOnCodexLinkedToTheMapWithTheScriptedRound(t *testing.T) {
 	t.Parallel()
 	r := start(t, "codex-design")
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	var designs []wire.SessionInfo
@@ -94,7 +94,7 @@ func TestCodexDesignScenario_SessionOnCodexLinkedToTheMapWithTheScriptedRound(t 
 	if len(designs) != 1 || designs[0].Harness != "codex" || designs[0].Ticket != "demo:design-epic" {
 		t.Fatalf("design sessions = %+v, want one codex session on demo:design-epic", designs)
 	}
-	rollouts := filepath.Join(fixtureRoot(r), "home", ".codex", "sessions", "*", "*", "*", "rollout-*.jsonl")
+	rollouts := filepath.Join(r.Root(), "home", ".codex", "sessions", "*", "*", "*", "rollout-*.jsonl")
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
 		paths, _ := filepath.Glob(rollouts)
 		for _, p := range paths {
@@ -107,5 +107,5 @@ func TestCodexDesignScenario_SessionOnCodexLinkedToTheMapWithTheScriptedRound(t 
 		t.Errorf("no rollout under %s holds the scripted round", rollouts)
 	}
 	r.waitChat(t, designs[0].ID, func(c wire.SessionChatResponse) bool { return len(c.Messages) > 0 && c.Round != nil })
-	r.stop(t)
+	r.Stop(t)
 }

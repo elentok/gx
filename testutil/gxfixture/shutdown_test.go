@@ -29,7 +29,7 @@ func TestShutdownStopsHolderAndChild(t *testing.T) {
 			_ = syscall.Kill(-owner.pid, syscall.SIGKILL)
 		}
 	})
-	r.stop(t)
+	r.Stop(t)
 	for _, owner := range owners {
 		if !testutil.Poll(5*time.Second, 50*time.Millisecond, func() bool {
 			return syscall.Kill(owner.pid, 0) == syscall.ESRCH

@@ -1,7 +1,8 @@
-package main
+package designflows
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"os/exec"
 	"slices"
 	"strings"
@@ -18,7 +19,7 @@ import (
 func (r *running) sessionsOf(t *testing.T) []wire.SessionInfo {
 	t.Helper()
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	return list
@@ -41,7 +42,7 @@ func (r *running) seededSessions(t *testing.T) []wire.SessionInfo {
 func (r *running) commandNames(t *testing.T, args ...string) (names []string, degraded bool) {
 	t.Helper()
 	var res wire.SessionCommandsResponse
-	out := r.gx(t, append([]string{"agents", "commands", "--json"}, args...)...)
+	out := r.Gx(t, append([]string{"agents", "commands", "--json"}, args...)...)
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatalf("commands output %s: %v", out, err)
 	}
@@ -94,7 +95,7 @@ func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 	if strings.Contains(strings.Join(without, " "), spec.FeatureSkill) {
 		t.Errorf("base list %v holds %s", without, spec.FeatureSkill)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 // The agents-blocked scenario seeds two dozen sessions one by one, so the
@@ -170,7 +171,7 @@ func TestBlockedScenario_ChatsHoldThePillsAndOutput(t *testing.T) {
 	r := sharedBlocked(t)
 	list := r.seededSessions(t)
 	var chat wire.SessionChatResponse
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[8].ID, "--json")), &chat); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", list[8].ID, "--json")), &chat); err != nil {
 		t.Fatal(err)
 	}
 	pills := map[string]bool{}
@@ -190,7 +191,7 @@ func TestBlockedScenario_ChatsHoldThePillsAndOutput(t *testing.T) {
 		t.Errorf("chat has outputs=%d pills=%v, want one output and the /cost and /model pills", outputs, pills)
 	}
 	var codexChat wire.SessionChatResponse
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[9].ID, "--json")), &codexChat); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", list[9].ID, "--json")), &codexChat); err != nil {
 		t.Fatal(err)
 	}
 	if len(codexChat.Messages) != 1 || codexChat.Messages[0].Kind != transcript.ChatKindCommand || codexChat.Messages[0].Text != "/status" {
@@ -208,7 +209,7 @@ func TestCommandsScenario_FailedProbesAreDegraded(t *testing.T) {
 	if _, degraded := r.commandNames(t, list[0].ID); !degraded {
 		t.Error("claude list is not degraded")
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestCommandsScenario_SlowStartsAndFlagIsChecked(t *testing.T) {
@@ -217,8 +218,8 @@ func TestCommandsScenario_SlowStartsAndFlagIsChecked(t *testing.T) {
 	if len(r.seededSessions(t)) != leanSessionCount {
 		t.Error("slow scenario lacks the sessions")
 	}
-	r.stop(t)
-	out, err := exec.Command(fixtureBin, "--gx", gxBin, "--fakeclaude", fakeBin, "--command-list-age", "soon", "agents-commands").CombinedOutput()
+	r.Stop(t)
+	out, err := exec.Command(fixturetest.FixtureBin, "--gx", fixturetest.GxBin, "--fakeclaude", fixturetest.FakeBin, "--command-list-age", "soon", "agents-commands").CombinedOutput()
 	if err == nil || !strings.Contains(string(out), "--command-list-age") {
 		t.Errorf("bad age: err=%v out=%s", err, out)
 	}

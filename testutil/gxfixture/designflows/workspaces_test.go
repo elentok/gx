@@ -1,4 +1,4 @@
-package main
+package designflows
 
 import (
 	"encoding/json"
@@ -56,7 +56,7 @@ func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *test
 	}
 
 	var list wire.WorkspaceList
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "workspaces", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "workspaces", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	members := map[string]int{}
@@ -76,7 +76,7 @@ func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *test
 	var sessions []wire.SessionInfo
 	if !testutil.Poll(60*time.Second, time.Second, func() bool {
 		sessions = nil
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &sessions); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &sessions); err != nil {
 			t.Fatal(err)
 		}
 		return len(sessions) >= 3
@@ -89,7 +89,7 @@ func TestWorkspacesScenario_ServesClaudeLimitsAndTwoPausedEpicFixAgentsOneWorkin
 	t.Parallel()
 	r := sharedWorkspaces(t)
 	var sum wire.UsageSummary
-	if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "usage", "summary", "--json")), &sum); err != nil {
 		t.Fatal(err)
 	}
 	if sum.Mode != wire.UsageModeLimits || sum.Limits.FiveHour == nil || sum.Limits.SevenDay == nil {
@@ -103,7 +103,7 @@ func TestWorkspacesScenario_ServesClaudeLimitsAndTwoPausedEpicFixAgentsOneWorkin
 	var got map[string]string
 	if !testutil.Poll(60*time.Second, time.Second, func() bool {
 		var sessions []wire.SessionInfo
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &sessions); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &sessions); err != nil {
 			t.Fatal(err)
 		}
 		got = map[string]string{}
@@ -132,10 +132,10 @@ func TestWorkspacesScenario_SeedsFixAgentsAndAnInvestigateAgentInOtherAndUnderEp
 	var problems []string
 	testutil.Poll(60*time.Second, time.Second, func() bool {
 		sessions, problems = nil, nil
-		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &sessions); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &sessions); err != nil {
 			t.Fatal(err)
 		}
-		if err := json.Unmarshal([]byte(r.gx(t, "server", "snapshot", "--json")), &snap); err != nil {
+		if err := json.Unmarshal([]byte(r.Gx(t, "server", "snapshot", "--json")), &snap); err != nil {
 			t.Fatal(err)
 		}
 		placed := map[string]wire.SessionPlacement{}

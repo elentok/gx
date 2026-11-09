@@ -1,4 +1,4 @@
-package main
+package webflows
 
 import (
 	"encoding/json"
@@ -39,7 +39,7 @@ func appendAssistantLine(t *testing.T, r *running, inputTokens int) {
 func projectRepo(t *testing.T, r *running, name string) string {
 	t.Helper()
 	var list []wire.ProjectInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "project", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "project", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range list {
@@ -89,12 +89,12 @@ func TestChatServerScenario_StartAndDiskNoticesLandInTheCaptureFile(t *testing.T
 
 	// Low disk: the hold starts a clean on its own, and the idle clean script
 	// frees nothing. Space returning on an ordinary reading resumes dispatch.
-	r.setDisk(t, "free", "5G")
+	r.SetDisk(t, "free", "5G")
 	waitForParts(t, r, map[string][]string{
 		"disk-low":   {"Low disk space"},
 		"disk-clean": {"Disk clean finished"},
 	})
-	r.setDisk(t, "free", "25G")
+	r.SetDisk(t, "free", "25G")
 	waitForParts(t, r, map[string][]string{"disk-resume": {"Dispatch resumed"}})
 }
 

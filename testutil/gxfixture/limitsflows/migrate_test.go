@@ -1,7 +1,8 @@
-package main
+package limitsflows
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,7 +20,7 @@ func (r *running) migrating(t *testing.T) bool {
 		Running   bool `json:"running"`
 		Migrating bool `json:"migrating"`
 	}
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "status", "--json")), &st); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "status", "--json")), &st); err != nil {
 		t.Fatal(err)
 	}
 	if !st.Running {
@@ -30,7 +31,7 @@ func (r *running) migrating(t *testing.T) bool {
 
 // up reports whether a server answers; it never fails the test.
 func (r *running) up() bool {
-	cmd := exec.Command(gxBin, "server", "status", "--json")
+	cmd := exec.Command(fixturetest.GxBin, "server", "status", "--json")
 	cmd.Env = r.Env
 	out, err := cmd.Output()
 	var st struct {
@@ -117,7 +118,7 @@ func TestMigrateHeld_StaysMigratingUntilTheHoldFileIsRemoved(t *testing.T) {
 	}
 	r.waitMigrated(t)
 	r.wantMigratedFile(t, "old-epic")
-	waitUntil(t, "the ready ticket to leave open", func() bool { return r.ticketStatus(t, "demo:ready-epic/01") != "open" })
+	waitUntil(t, "the ready ticket to leave open", func() bool { return r.TicketStatus(t, "demo:ready-epic/01") != "open" })
 }
 
 func TestMigrateBroken_BrokenKeepsASavedFailureAndDemoRuns(t *testing.T) {
@@ -128,7 +129,7 @@ func TestMigrateBroken_BrokenKeepsASavedFailureAndDemoRuns(t *testing.T) {
 	if got["broken"] == "" || got["demo"] != "" {
 		t.Fatalf("failures = %v, want one for broken only", got)
 	}
-	waitUntil(t, "demo's ticket to be claimed", func() bool { return r.ticketStatus(t, "demo:demo-epic/01") != "open" })
+	waitUntil(t, "demo's ticket to be claimed", func() bool { return r.TicketStatus(t, "demo:demo-epic/01") != "open" })
 }
 
 func TestMigrateServerControl_KillStartAndInjectedFailingStep(t *testing.T) {
@@ -160,7 +161,7 @@ func TestMigrateScenarios_ServerStopsWithTheFixtureAfterARestart(t *testing.T) {
 	r.serverCtl(t, "start")
 	waitUntil(t, "the restarted server to answer", r.up)
 	pid := r.serverCtl(t, "pid")
-	r.stop(t)
+	r.Stop(t)
 	waitUntil(t, "the restarted server to stop", func() bool {
 		return exec.Command("kill", "-0", pid).Run() != nil
 	})

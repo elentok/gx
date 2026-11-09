@@ -1,4 +1,4 @@
-package main
+package designflows
 
 import (
 	"encoding/json"
@@ -29,7 +29,7 @@ const (
 func (r *running) events(t *testing.T, addr, typ string) []runlog.Event {
 	t.Helper()
 	var h wire.History
-	if err := json.Unmarshal([]byte(r.gx(t, "server", "tickets", "history", addr, "--json")), &h); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "tickets", "history", addr, "--json")), &h); err != nil {
 		t.Fatal(err)
 	}
 	var out []runlog.Event
@@ -56,15 +56,15 @@ func (r *running) waitEvents(t *testing.T, addr, typ string) []runlog.Event {
 // requireNotPaused fails the test when the ticket is in a paused state.
 func (r *running) requireNotPaused(t *testing.T, addr string) {
 	t.Helper()
-	if s := r.ticketStatus(t, addr); strings.HasPrefix(s, "needs-") {
-		t.Fatalf("ticket %s paused as %q:\n%s", addr, s, r.gx(t, "server", "tickets", "history", addr))
+	if s := r.TicketStatus(t, addr); strings.HasPrefix(s, "needs-") {
+		t.Fatalf("ticket %s paused as %q:\n%s", addr, s, r.Gx(t, "server", "tickets", "history", addr))
 	}
 }
 
 // agentInput is what the fake agent read off its terminal.
 func (r *running) agentInput(t *testing.T) string {
 	t.Helper()
-	paths, _ := filepath.Glob(agentfake.TUIInputPath(r.home(), "*"))
+	paths, _ := filepath.Glob(agentfake.TUIInputPath(r.Home(), "*"))
 	var all strings.Builder
 	for _, p := range paths {
 		data, err := os.ReadFile(p)
@@ -80,7 +80,7 @@ func (r *running) toggleVim(t *testing.T) {
 	t.Helper()
 	var ctl string
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
-		paths, _ := filepath.Glob(agentfake.TUIControlPath(r.home(), "*"))
+		paths, _ := filepath.Glob(agentfake.TUIControlPath(r.Home(), "*"))
 		if len(paths) == 1 {
 			ctl = paths[0]
 		}
@@ -98,7 +98,7 @@ func TestStallVimScenario_AToggleToVimGetsTheNudgeWithNoStrayCharacter(t *testin
 	r := start(t, "stall-vim")
 	// The agent's first turn is empty, so the stall nudge is the next prompt.
 	r.toggleVim(t)
-	r.waitStatus(t, stallVimTicket, "done")
+	r.WaitStatus(t, stallVimTicket, "done")
 	nudges := r.events(t, stallVimTicket, string(events.StallNudged))
 	if len(nudges) == 0 || nudges[0].Text != supervise.StallNudgeText {
 		t.Fatalf("stall-nudged events = %+v, want one with the nudge text", nudges)
@@ -110,13 +110,13 @@ func TestStallVimScenario_AToggleToVimGetsTheNudgeWithNoStrayCharacter(t *testin
 	if !strings.Contains(in, supervise.StallNudgeText) {
 		t.Errorf("the nudge text never reached the agent:\n%q", in)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestStallVimScenario_NormalSettingsGetTheNudgeWithNoStrayCharacter(t *testing.T) {
 	t.Parallel()
 	r := start(t, "stall-vim")
-	r.waitStatus(t, stallVimTicket, "done")
+	r.WaitStatus(t, stallVimTicket, "done")
 	in := r.agentInput(t)
 	if strings.Contains(in, "i"+supervise.StallNudgeText) {
 		t.Errorf("a stray i reached the input before the nudge:\n%q", in)
@@ -124,16 +124,16 @@ func TestStallVimScenario_NormalSettingsGetTheNudgeWithNoStrayCharacter(t *testi
 	if !strings.Contains(in, supervise.StallNudgeText) {
 		t.Errorf("the nudge text never reached the agent:\n%q", in)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestStallLeavesIScenario_TheNudgeRetrySucceedsAndTheTicketIsNotPaused(t *testing.T) {
 	t.Parallel()
 	r := start(t, "stall-leaves-i")
 	r.waitEvents(t, stallITicket, string(events.StallNudged))
-	r.waitStatus(t, stallITicket, "done")
+	r.WaitStatus(t, stallITicket, "done")
 	r.requireNotPaused(t, stallITicket)
-	r.stop(t)
+	r.Stop(t)
 }
 
 func TestLateRegistryScenario_TheLaunchPromptIsNudgedUntilATurnStarts(t *testing.T) {
@@ -141,8 +141,8 @@ func TestLateRegistryScenario_TheLaunchPromptIsNudgedUntilATurnStarts(t *testing
 	r := start(t, "late-registry")
 	r.waitEvents(t, lateRegistryTicket, string(events.PromptNudged))
 	// The ticket finishes only when a turn started once the registry filled.
-	r.waitStatus(t, lateRegistryTicket, "done")
-	r.stop(t)
+	r.WaitStatus(t, lateRegistryTicket, "done")
+	r.Stop(t)
 }
 
 func TestNoUserRecordScenario_TheStallNudgeCarriesTheOriginalSkillPrompt(t *testing.T) {
@@ -152,5 +152,5 @@ func TestNoUserRecordScenario_TheStallNudgeCarriesTheOriginalSkillPrompt(t *test
 	if !strings.HasPrefix(text, skillPromptSnippet) || !strings.Contains(text, noUserRecordTicket) {
 		t.Errorf("stall-nudged text = %q, want the original skill prompt for %s", text, noUserRecordTicket)
 	}
-	r.stop(t)
+	r.Stop(t)
 }
