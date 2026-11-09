@@ -323,7 +323,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.restarter = s.newRestarter()
 	s.initProjects()
-	s.settingsWriter = s.newSettingsWriter(cfg.ConfigPath)
+	s.settingsWriter = newSettingsWriter(cfg.ConfigPath, s.projects)
 	s.startup = lifecycle.NewStartup(startupHost{s}, log)
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
