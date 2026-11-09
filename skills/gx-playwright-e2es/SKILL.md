@@ -66,6 +66,24 @@ the run passes with zero tests.
 **Fix:** use `gx brief -C webui playwright <file> <flow numbers>`. It builds the pattern. Check that
 the run reports the tests you named.
 
+## An unrelated failing flow: rerun once, file it, stop
+
+**Why:** ticket 14 reran a whole flow file about 25 times, with hand-built filters, on a failure
+before its own steps. Ticket 23c ran `--repeat-each` at escalating counts on a flow that already
+had a follow-up. A flake costs a minute per run and the reruns prove nothing new.
+
+**Fix:** when a flow fails at a step before or outside your own steps:
+
+1. Rerun that flow **once** on your change, with `gx brief -C webui playwright`.
+2. If it fails the same way, file it with [gx-follow-up](../gx-follow-up/SKILL.md) (wording in
+   [gx-flake-tickets](../gx-flake-tickets.md)) and stop iterating on it. Do not add `--workers`,
+   `--repeat-each` or a clean-worktree baseline.
+3. If it passes, say so in one line. Call it flaky only with that evidence, not after a single rerun
+   you did not compare.
+
+Carry on with your own steps, and finish with `--check-failures` as
+[gx-failing-tests](../gx-failing-tests.md) says.
+
 ## Wait for the event, never for time
 
 **Why:** a fixed `waitForTimeout` is too short on a loaded runner and too long everywhere else.

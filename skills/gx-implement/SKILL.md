@@ -97,6 +97,8 @@ Then, while working:
   code. If it checks behaviour the ticket changed on purpose, fix the test: a flaky test waits for
   the event (poll with a timeout), never a fixed sleep. Never weaken, skip or delete an assertion
   just to get green. For any other failing test, follow [gx-failing-tests](../gx-failing-tests.md).
+- **A Playwright flow fails outside your own steps: rerun the flow once, then file it and stop.**
+  No `--repeat-each` loops and no baseline worktree. See `gx-playwright-e2es`.
 - **Never report a result you did not see.** If a check's output is missing or cut off, re-run it.
   Do not claim "no remaining imports" or "gofmt is clean" from silence.
 - **Read files with a file read (Read), not a shell command.** If a read ends in "(exporter

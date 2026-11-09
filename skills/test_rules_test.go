@@ -69,6 +69,16 @@ func TestGxImplementTestRules(t *testing.T) {
 	checkAnchors(t, "../.ai/index.md", "`gx check --full`", "skills/gx-test-guidelines.md", "GOMAXPROCS", "claudeenv", "envguard")
 }
 
+func TestUnrelatedFlakyFlowRule(t *testing.T) {
+	checkAnchors(t, "gx-playwright-e2es/SKILL.md",
+		"## An unrelated failing flow: rerun once, file it, stop",
+		"[gx-follow-up](../gx-follow-up/SKILL.md)",
+		"[gx-flake-tickets](../gx-flake-tickets.md)",
+		"`--repeat-each`",
+	)
+	checkAnchors(t, "gx-implement/SKILL.md", "gx-playwright-e2es", "rerun the flow once")
+}
+
 func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
 	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
 	guidelines := normalizeSpace(readFile(t, "gx-test-guidelines.md"))
