@@ -82,8 +82,9 @@ func (s *Server) Workspaces() *workspaces.Store { return s.workspaces }
 // seams through here.
 func (s *Server) Prompt() *sessprompt.Prompt { return s.prompt }
 
-// Triage gives tests the Triage seams (StopFinished).
-func (s *Server) Triage() *triage.Triage { return s.triage }
+// TriageOf gives tests the Triage seams (StopFinished). A function, not a
+// method, to keep Server under its method limit.
+func TriageOf(s *Server) *triage.Triage { return s.triage }
 
 // Harness is the server's harness choice. Tests outside the package read it
 // through here.

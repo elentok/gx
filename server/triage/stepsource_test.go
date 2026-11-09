@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -46,7 +47,7 @@ func TestStopFinished_WorkingSessionIsNeverStopped(t *testing.T) {
 	f, _ := servertest.StartTriageSession(t, "approve", false)
 	servertest.Report(t, f.Conv, agentfake.Control{State: "working"})
 	servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
-	f.H.Server.Triage().StopFinished("proj")
+	server.TriageOf(f.H.Server).StopFinished("proj")
 	if !stays(t, f, f.ID) {
 		t.Fatal("a working session was stopped")
 	}
