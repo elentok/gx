@@ -526,6 +526,11 @@ test("on the phone there is no strip without a countdown", async () => {
   render({ wide: false });
   await autoButton();
   expect(screen.queryByText(/Continuing in/)).toBeNull();
+  // An empty wrapper in the footer column would still add a flex gap above the row.
+  const column = screen.getByRole("button", { name: "Add image" }).parentElement!.parentElement!;
+  const empties = Array.from(column.children).filter((c) => c.childElementCount === 0 && c.textContent === "");
+  expect(empties.length).toBe(1);
+  for (const e of empties) expect(getComputedStyle(e).display).toBe("none");
 });
 
 test("on a wide screen the countdown stays inline, after Note and before Send", async () => {

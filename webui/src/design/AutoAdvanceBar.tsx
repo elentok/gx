@@ -94,7 +94,8 @@ export function AutoCountdown({
 }) {
   const state = stateToken(session);
   return (
-    <Box display="flex" flexDirection="column" gap="1">
+    // Hidden while empty so it adds no gap to the footer column it sits in.
+    <Box display="flex" flexDirection="column" gap="1" _empty={{ display: "none" }}>
       <CountdownRow
         at={session.auto_advance_at}
         text={(s) => `Continuing in ${s}s`}
