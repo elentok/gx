@@ -16,12 +16,21 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
    resolve; never `--abort`. Resolve each hunk with a file edit (Edit) on the marker block, never a scripted
    splice (python/sed heredocs, `cat >`).
 
-4. Run only the checks that touch the conflicted files: build and vet the packages they sit in, then
+   Inside a cherry-pick, `--ours` is HEAD (the branch being built on), and `--theirs` is the
+   cherry-picked commit. Never `git checkout --ours <file>` / `--theirs <file>` a whole file: it
+   drops the other side's changes. Before continuing a cherry-pick, run
+   `git show CHERRY_PICK_HEAD --stat` and confirm every file it changes still carries that
+   commit's change in the resolved tree, including files that did not conflict.
+
+4. Run only the checks that touch the conflicted files: build and vet every package the
+   cherry-picked or merged commit touches (not only the conflicted files' packages), then
    targeted tests (`-run <pattern>`) for the code the conflict changed. Never run a whole package
    or the full suite for a small conflict. Skip checks the original ticket already passed. Fix
    anything the merge broke. Run format checks only on the files the branch changed
    (`git diff --name-only <target>...HEAD`). A repo-wide `gofmt -l`
-   lists files the branch never touched; those are out of scope.
+   lists files the branch never touched; those are out of scope. Finally, reread the ticket's
+   stated goal and confirm it still holds in the resolved files; a build that passes does not
+   show the kept side is the right one.
 
 5. **Finish the merge/rebase.** Stage the resolved files by name (`git add <file>...`), never
    `git add -A` or a directory, then commit. If rebasing, continue the rebase
