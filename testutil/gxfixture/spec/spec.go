@@ -165,6 +165,9 @@ type Scenario struct {
 	Steps [][]string
 	// Sessions are created in order once the server is up, as `gx agents create` makes them.
 	Sessions []SessionSpec
+	// DeadSessions is how many prompt-less sessions are created together, after Sessions,
+	// then all crashed, so a large dead set seeds fast.
+	DeadSessions int
 	// Commands is what the fakes' list probes answer; nil leaves them empty.
 	Commands *agentfake.ProbeConfig
 	// Codex installs the fake codex on PATH without the --fakecodex flag, for a

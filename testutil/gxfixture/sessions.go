@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/ralphloop/agent"
@@ -43,6 +45,48 @@ func (f sessionSeeder) seedSessions(sc scenario) error {
 		}
 		if err := f.seedSession(sc, s); err != nil {
 			return fmt.Errorf("session in %s: %w", s.Project, err)
+		}
+	}
+	return f.seedDeadSessions(sc)
+}
+
+// seedDeadSessions creates sc.DeadSessions sessions concurrently, then crashes
+// every fake that is up. The crash goes to all control files, which is why it
+// cannot tell the sessions apart: one at a time costs seconds a session.
+func (f sessionSeeder) seedDeadSessions(sc scenario) error {
+	if sc.DeadSessions == 0 {
+		return nil
+	}
+	before := f.controlFiles()
+	errs := make([]error, sc.DeadSessions)
+	ids := make([]string, sc.DeadSessions)
+	var wg sync.WaitGroup
+	for i := range ids {
+		wg.Go(func() { ids[i], errs[i] = f.createSession(project, f.repoDir(sc, project), "", "") })
+	}
+	wg.Wait()
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := f.waitFor(id, wire.SessionIdle, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool { return si.Status.State == wire.SessionIdle }); err != nil {
+			return err
+		}
+	}
+	fresh := slices.DeleteFunc(f.controlFiles(), func(name string) bool { return slices.Contains(before, name) })
+	if len(fresh) != len(ids) {
+		return fmt.Errorf("want %d new control files, got %d", len(ids), len(fresh))
+	}
+	for _, name := range fresh {
+		if err := agentfake.SendTUIControl(filepath.Join(f.root, "home"), strings.TrimSuffix(name, ".ctl"), agentfake.Control{Action: agentfake.ActionExit, Code: 1}); err != nil {
+			return err
+		}
+	}
+	for _, id := range ids {
+		if err := f.waitFor(id, wire.SessionExited, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
+			return si.Status.State == wire.SessionExited
+		}); err != nil {
+			return err
 		}
 	}
 	return nil

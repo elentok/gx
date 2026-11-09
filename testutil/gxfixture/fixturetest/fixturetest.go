@@ -327,6 +327,35 @@ func (r *Running) Repo() string { return filepath.Join(r.Root(), "repo") }
 // Home is the fixture's HOME.
 func (r *Running) Home() string { return filepath.Join(r.Root(), "home") }
 
+// ProcessCounts counts the live agent-holder processes and the live agents (any
+// other process naming a session id) of the fixture's saved sessions.
+func (r *Running) ProcessCounts(t *testing.T) (holders, agents int) {
+	t.Helper()
+	var list []wire.SessionInfo
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
+		t.Fatal(err)
+	}
+	psCmd := exec.Command("ps", "-axww", "-o", "command=")
+	psCmd.Env = r.Env
+	ps, err := psCmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for line := range strings.SplitSeq(string(ps), "\n") {
+		for _, s := range list {
+			if !strings.Contains(line, s.ID) {
+				continue
+			}
+			if strings.Contains(line, "agent-holder") {
+				holders++
+			} else {
+				agents++
+			}
+		}
+	}
+	return holders, agents
+}
+
 // SetDisk replaces a fake-disk control file through a rename, as a flow does.
 func (r *Running) SetDisk(t *testing.T, name, value string) {
 	t.Helper()
