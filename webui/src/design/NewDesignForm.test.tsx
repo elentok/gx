@@ -860,6 +860,15 @@ test("the title follows the name field while typing, before Done", async () => {
   expect(screen.queryByRole("button", { name: /Check/ })).toBeNull();
 });
 
+test("a third draft typed and switched away from before the debounce fires is saved", async () => {
+  vi.useFakeTimers();
+  const { save } = await mount();
+  type("Epic slug", "third");
+  await openMenu(/third|New draft/);
+  await pick("New draft");
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: undefined, slug: "third" }));
+});
+
 test("a saved draft shows Saved right after a switch, with no edit", async () => {
   await mount({ drafts: twoDrafts().client });
   await openMenu(/alpha/);
