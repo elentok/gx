@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
@@ -50,7 +51,14 @@ func ResolveAddTarget(env cmdbase.Env, arg, parentFlag string) (epicPath, parent
 	}
 	_, t, findErr := FindTicket(dirs, cwd, arg)
 	if findErr != nil {
-		// Not an address either: let the epic path's own error surface.
+		// A bare slug that names no existing epic would be created relative to
+		// cwd. Only a registered project's tracker may hold it, so refuse when
+		// cwd belongs to none.
+		if !strings.ContainsRune(arg, filepath.Separator) {
+			if _, rootErr := tickets.RootForDirs(dirs, cwd); rootErr != nil {
+				return "", "", rootErr
+			}
+		}
 		return epicPath, parentFlag, nil
 	}
 	if parentFlag != "" {

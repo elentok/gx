@@ -161,7 +161,8 @@ conversation history.
   file by path, even to append a section.
 - **Allocate an ID atomically**: `gx tickets add <epic> [--parent <id>] --slug <descriptive-slug>` —
   picks the next free identifier under a filesystem lock (safe against a concurrent fork) and writes
-  the stub straight to `<id>-<slug>.md`. The epic argument may be `project:epic`. Filing into a
+  the stub straight to `<id>-<slug>.md`. The epic argument may be `project:epic`; pass the full form whenever you
+  have `cd`'d out of the worktree (e.g. into your scratchpad), because a bare epic name refuses there. Filing into a
   `follow-ups` epic with a plain `add` and no `category` refuses; use `follow-up add` instead.
 - **File a follow-up**: `gx tickets follow-up add <project:epic> --category bug|idea --body -`
   (or `category:` in the body frontmatter, never both). Skills never call it

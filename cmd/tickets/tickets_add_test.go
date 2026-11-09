@@ -431,6 +431,19 @@ func TestExecute_TicketsAdd_CrossProject(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsAdd_BareSlugOutsideProjectRefuses(t *testing.T) {
+	cmdtest.SetupShowProject(t)
+	cwd := t.TempDir()
+
+	_, err := runIn(t, cwd, "tickets", "add", "inbox", "--slug", "x", "--body", "# X\n")
+	if err == nil {
+		t.Fatal("bare epic slug outside any project: want an error, got none")
+	}
+	if _, statErr := os.Stat(filepath.Join(cwd, "inbox")); !os.IsNotExist(statErr) {
+		t.Errorf("stray tracker created in cwd: %v", statErr)
+	}
+}
+
 func TestExecute_TicketsAdd_FieldFlags(t *testing.T) {
 	repo, project := cmdtest.SetupShowProject(t)
 
