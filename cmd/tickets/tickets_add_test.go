@@ -478,6 +478,31 @@ func TestExecute_TicketsAdd_FieldFlagErrors(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsAdd_RefusesRetriedChild(t *testing.T) {
+	repo, project := cmdtest.SetupShowProject(t)
+	add := func(title string) error {
+		_, err := runIn(t, repo, "tickets", "add", "mine:inbox", "--slug", "x", "--parent", "01", "--body", "# "+title+"\n\ntext\n")
+		return err
+	}
+	if _, err := runIn(t, repo, "tickets", "add", "mine:inbox", "--slug", "parent"); err != nil {
+		t.Fatal(err)
+	}
+	if err := add("Fix it"); err != nil {
+		t.Fatal(err)
+	}
+	err := add("Fix it")
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeDuplicateTicket || !strings.Contains(ae.Msg, "mine:inbox/01a") {
+		t.Fatalf("retry err = %v, want %s naming mine:inbox/01a", err, tickets.CodeDuplicateTicket)
+	}
+	if err := add("Fix something else"); err != nil {
+		t.Errorf("different title refused: %v", err)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(project, "inbox", "issues", "01*.md")); len(matches) != 3 {
+		t.Errorf("files = %v, want 01 plus two children", matches)
+	}
+}
+
 func TestExecute_TicketsAdd_FollowUpsNeedsCategory(t *testing.T) {
 	repo, project := cmdtest.SetupShowProject(t)
 

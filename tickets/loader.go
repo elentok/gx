@@ -248,6 +248,10 @@ func TicketTitle(ticketPath string) string {
 	return title
 }
 
+// BodyTitle is the heading title of body for the ticket with identifier, "" when
+// it has none (the loader then falls back to the file name slug).
+func BodyTitle(body, identifier string) string { return headingTitle(body, identifier) }
+
 // ParseTicketFilename splits a "NN[suffix]-<slug>.md" filename into its
 // numeric sort key, full identifier, and a humanized title. The optional
 // suffix supports wayfinder's split tickets (for example 10a) and, one

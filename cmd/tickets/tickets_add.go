@@ -252,6 +252,12 @@ func CreateTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 		return "", nil, err
 	}
 
+	if body != nil && parent != "" {
+		if dup := liveSiblingWithTitle(*epic, parent, tickets.BodyTitle(*body, id)); dup != "" {
+			return "", nil, &tickets.AddressError{Code: tickets.CodeDuplicateTicket, Msg: fmt.Sprintf("%s already files this title under parent %s (a retried add?); nothing created", dup, parent)}
+		}
+	}
+
 	path := filepath.Join(epicPath, "issues", fmt.Sprintf("%s-%s.md", id, slug))
 	t := schema.Ticket{
 		ID:     schema.TicketID(id),
@@ -309,6 +315,25 @@ func CreateTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 		return "", nil, fmt.Errorf("ticket %s failed validation: %w", path, err)
 	}
 	return path, notices, nil
+}
+
+// liveSiblingWithTitle returns the address of a ticket under parent in epic
+// that is not done or cancelled and has title, or "". An empty title never
+// matches: untitled tickets are not duplicates of each other.
+func liveSiblingWithTitle(epic tickets.Epic, parent, title string) string {
+	if title == "" {
+		return ""
+	}
+	for _, s := range epic.Tickets {
+		if s.Parent == nil || *s.Parent != parent || s.Title != title {
+			continue
+		}
+		if s.Status == string(schema.StatusDone) || s.Status == string(schema.StatusCancelled) {
+			continue
+		}
+		return ticketref.TicketLabel(s.Path)
+	}
+	return ""
 }
 
 // printNotices writes each of a write's informational notices to w, if any.

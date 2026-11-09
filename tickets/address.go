@@ -23,6 +23,7 @@ const (
 	CodeStatusOverride    = "status-override"
 	CodeTypeOverride      = "type-override"
 	CodeEpicJSON          = "epic-json-unsupported" // `tickets show --json` on an epic
+	CodeDuplicateTicket   = "duplicate-ticket"      // `tickets add` of a title a live sibling under the same parent has
 
 	// `tickets move` refusals.
 	CodeMoveStatus       = "move-status"
