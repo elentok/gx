@@ -110,7 +110,7 @@ func (rs *Resumer) stopForRestart(dir, id string) {
 // restartOnWorker ends the old conversation like an agent exit, records a new
 // one and launches it under the worker tier. The caller holds metaMu.
 func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
-	return rs.restartConversation(dir, meta, old, func(meta *Meta) {
+	return rs.restartConversation(dir, meta, old, func(meta *Meta, _ int) {
 		rs.mg.applyTier(meta, agent.TierWorker)
 		meta.HandoffTier = true
 		meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
@@ -119,9 +119,10 @@ func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
 
 // restartConversation is the holder restart both restarts share: it ends the
 // old conversation like an agent exit, records a new one, lets change set what
-// the new launch differs in, and starts a fresh holder and watch. The caller
-// holds metaMu.
-func (rs *Resumer) restartConversation(dir string, meta *Meta, old string, change func(*Meta)) error {
+// the new launch differs in (it receives the run the launch will have, so no
+// caller guesses it), and starts a fresh holder and watch. The caller holds
+// metaMu.
+func (rs *Resumer) restartConversation(dir string, meta *Meta, old string, change func(meta *Meta, newRun int)) error {
 	m := rs.mg
 	m.Conv.SaveTotals(meta.ConvSession(), old)
 	conv, err := nativerunner.NewUUID()
@@ -129,7 +130,7 @@ func (rs *Resumer) restartConversation(dir string, meta *Meta, old string, chang
 		return err
 	}
 	meta.ConversationID = conv
-	change(meta)
+	change(meta, meta.Run+1)
 	meta.Actionable = wire.SessionActionable{}
 	m.Conv.Record(meta.ConvSession())
 	if err := clearOldHolder(dir); err != nil {
@@ -165,9 +166,9 @@ func (rs *Resumer) RestartFresh(dir, id, prompt string) {
 		m.log.Warn("restart: read meta", "session", id, "err", err)
 		return
 	}
-	if err := rs.restartConversation(dir, &meta, old, func(meta *Meta) {
+	if err := rs.restartConversation(dir, &meta, old, func(meta *Meta, newRun int) {
 		meta.FirstPrompt = prompt
-		meta.VimRelaunchRun = meta.Run + 1
+		meta.VimRelaunchRun = newRun
 	}); err != nil {
 		m.log.Warn("restart: restart", "session", id, "err", err)
 		m.endFailedStart(dir, &meta)
