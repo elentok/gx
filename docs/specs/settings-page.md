@@ -429,7 +429,7 @@ Server and CLI checks used by many stories:
   three secret values, and "set" markers for the secrets. Expected: status 200.
 - A write of a bad value (for example `execution-queue.max-agents` set to `"x"`) returns a refusal
   naming the key; the file is unchanged.
-- A write of `execution-queue.spin-window` set to `"5mm"` (global) is refused with the key and a
+- A write of `execution-queue.waiting-slot-grace` set to `"5mm"` (global) is refused with the key and a
   reason, and config.json is unchanged; the same key set to `"5m"` is saved.
 - `gx server settings --json` returns the same keys and values as the read endpoint, and
   `gx server settings-set --json` with a key change gives the same result as the write endpoint.
@@ -456,17 +456,17 @@ Per story:
 16. The duration field shows the `5m` hint and the size field the `50G` hint; saving `10m` writes `"10m"` to config.json. Mock states: `global-section`.
 17. Pick an enum value; config.json holds it. Mock states: `global-section`.
 18. Add and remove a tag; config.json holds the list. Mock states: `global-section`.
-19. Add `abc` to `budget.notification-thresholds`: refused; add `90`: saved. Mock states: `global-section`.
+19. No number list is live on the page (`budget.notification-thresholds` is a guard exclusion), so this runs at the registry and server API level, not in the browser: a `number-list` entry refuses `["abc"]` and accepts `[90]`. In the browser, the live string list `server.tab-env` takes `abc` as a tag (a string list has no item validator). Mock states: `global-section`.
 20. Change a key and its dot appears; reset it and the dot disappears. Mock states: `global-section`.
 21. Reset a changed key; the key is gone from config.json. Mock states: `global-section`.
 22. Save a key; "Saved" shows under the field and is gone after about 2s (allow 3s). Mock states: `restart-needed`.
 23. Save an invalid value; the draft stays and the error shows. Mock states: `refused-save`.
-24. Server API test and page: save `execution-queue.spin-window` as `"5mm"` and as `"0s"`, a size such as `"5x"`, an enum value that is not a member and a number below its minimum; each is refused with the key and a reason, nothing is written and nothing is clamped. Mock states: `refused-save`.
+24. Server API test and page: save `execution-queue.waiting-slot-grace` as `"5mm"` and as `"0s"`, a size such as `"5x"`, an enum value that is not a member and a number below its minimum; each is refused with the key and a reason, nothing is written and nothing is clamped. Mock states: `refused-save`.
 25. Server API test of refusals from `config.Parse` and `agentrunner.ValidateSetting`; nothing written.
 26. Server API test: a two-key change where one key is invalid is refused naming that key; a change that fails only combined names every key of the change.
 27. Open the page with a startup-only key unedited; "Needs restart" shows on exactly the registry's startup-only keys and on no live key. Mock states: `restart-needed`.
 28. Save a startup-only key; "Restart needed to apply" shows. Mock states: `restart-needed`.
-29. Save a live key; the server's reload applies it with no restart warning. For each key `FromConfig` does not carry (including `spin-window`, `spin-cycles`, `retry-storm-launches`, `evolve.deep-read-cap`, `skills.*`, `budget.notification-thresholds`, `runner-wait`), the audit result holds: it is live (the server uses the new value) or flagged startup-only (the page shows the restart marks).
+29. Save a live key; the server's reload applies it with no restart warning. For each key `FromConfig` does not carry (including `skills.*` and `runner-wait`; `spin-window`, `spin-cycles`, `retry-storm-launches`, `evolve.deep-read-cap` and `budget.notification-thresholds` are guard exclusions and not on the page), the audit result holds: it is live (the server uses the new value) or flagged startup-only (the page shows the restart marks).
 30. Server API test: one web save causes exactly one reload and no OS banner, even with `server.watch-config` on; two concurrent saves of different keys both land.
 31. Change each risky key and confirm the dialog names the risk; Cancel writes nothing, "Change it" writes. Mock states: `confirm-dialog`.
 32. Change `ticket-store.path`; the dialog says the old data is not moved. Mock states: `confirm-dialog`.
