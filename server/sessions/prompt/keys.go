@@ -64,46 +64,50 @@ func (p *Prompt) keysSession(req wire.SessionKeysRequest, source string) (wire.S
 	if req.Permission != "" && refusal == nil {
 		return p.answerSessionPermission(req, source)
 	}
-	dir, c, res, err := p.sendSessionKeys(req, source, seq, n, refusal)
-	if res.Refused || err != nil {
-		return res, err
+	sent, err := p.sendSessionKeys(req, source, seq, n, refusal)
+	if sent.res.Refused || err != nil {
+		return sent.res, err
 	}
 	if req.OnlyBlocked {
-		return p.waitLeftBlocked(req.ID, dir)
+		return p.waitLeftBlocked(req.ID, sent.dir)
 	}
-	if req.Settle {
+	if sent.settle != nil {
 		// After MetaMu is released, so the wait never holds up status updates.
-		res.Rows = p.settleRows(func() ([]string, error) {
-			rows, _, err := c.Screen(0)
-			return rows, err
-		})
+		sent.res.Rows = p.settleRows(sent.settle)
 	}
-	return res, nil
+	return sent.res, nil
+}
+
+// sentKeys is what a send leaves behind: the session dir, the result, and a
+// screen read for a settle (nil unless the request asked for one).
+type sentKeys struct {
+	dir    string
+	res    wire.SessionResult
+	settle func() ([]string, error)
 }
 
 // sendSessionKeys checks the request against the session and sends it, under
-// metaMu so the guard and the send see one status. It returns the holder
-// client it dialed, for a settle.
-func (p *Prompt) sendSessionKeys(req wire.SessionKeysRequest, source, seq string, n int, refusal *wire.SessionResult) (string, *holder.HolderClient, wire.SessionResult, error) {
+// metaMu so the guard and the send see one status.
+func (p *Prompt) sendSessionKeys(req wire.SessionKeysRequest, source, seq string, n int, refusal *wire.SessionResult) (sentKeys, error) {
 	p.sessions.Watches.MetaMu.Lock()
 	defer p.sessions.Watches.MetaMu.Unlock()
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
-		return dir, nil, res, err
+		return sentKeys{dir: dir, res: res}, err
 	}
 	if refusal != nil {
-		return dir, nil, *refusal, nil
+		return sentKeys{dir: dir, res: *refusal}, nil
 	}
 	st := meta.Info().Status
 	switch {
 	case !chat.AcceptsKeys(st.State):
-		return dir, nil, sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State)), nil
+		return sentKeys{dir: dir, res: sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State))}, nil
 	case req.OnlyBlocked && st.State != wire.SessionBlocked:
-		return dir, nil, sessions.Refusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", req.ID, st.State)), nil
+		return sentKeys{dir: dir, res: sessions.Refusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", req.ID, st.State))}, nil
 	}
 	c, err := holder.DialHolder(dir)
 	if err != nil {
-		return dir, nil, sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", req.ID)), nil
+		return sentKeys{dir: dir, res: sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", req.ID))}, nil
 	}
 	if req.Key != "" && req.OnlyBlocked {
 		// A guarded key (Close dialog) is no one typing into the session: a person's keys would wake
@@ -115,7 +119,7 @@ func (p *Prompt) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 		err = c.TypePersonTextBy(seq, false)
 	}
 	if err != nil {
-		return dir, nil, wire.SessionResult{}, fmt.Errorf("send keys to session %s: %w", req.ID, err)
+		return sentKeys{dir: dir}, fmt.Errorf("send keys to session %s: %w", req.ID, err)
 	}
 	action := "text"
 	if req.Key != "" {
@@ -130,11 +134,18 @@ func (p *Prompt) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 	}
 	if meta.IsStepped() && !req.OnlyBlocked {
 		if err := p.notePersonTyped(dir, meta, "Auto-advance stopped: you pressed a key"); err != nil {
-			return dir, nil, wire.SessionResult{}, err
+			return sentKeys{dir: dir}, err
 		}
 	}
 	info := meta.Info()
-	return dir, c, wire.SessionResult{Session: &info}, nil
+	sent := sentKeys{dir: dir, res: wire.SessionResult{Session: &info}}
+	if req.Settle {
+		sent.settle = func() ([]string, error) {
+			rows, _, err := c.Screen(0)
+			return rows, err
+		}
+	}
+	return sent, nil
 }
 
 // answerSessionPermission answers the permission dialog of a Blocked session.
