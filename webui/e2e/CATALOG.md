@@ -38,7 +38,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (126). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (127). Before you add a flow, add a step to a flow on the same scenario
 (see `skills/gx-playwright-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -176,3 +176,4 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **`agents-commands-send.e2e.ts`:** **153. Send a command, typed once or nudged, and /clear**; **154. Commands in a design session** (two flows: `/clear` and `/compact` with keys, Type and Close dialog; Continue with the countdown off).
 - **`agents-commands-output.e2e.ts`:** **155. Command output in the chat, cut at 12 lines**; **155. design page, with 159. /exit.**
 - **`agents-permission.e2e.ts`:** **157. Close dialog, Agents page and design page (+158 design Allow once and Deny)**; **158. Allow once and Deny, readable Claude prompt; refused; ignored Allow key; Codex hook and screen.**
+- **`triage.e2e.ts`:** **199. Triage journey** (`triage` shape `journey`, part 1: the Follow-ups card in Ready to design with Triage, the page opens and the card moves to Designing, a second click opens the same Triage; the Verify strip counts verdicts, the countdown chains a second session, Plan ends with no Continue and no countdown; the card is in Needs you with "Waiting for you" and "Review plan"; the sidebar badge shows the count, amber at Approve, and its popover line opens the Triage page).

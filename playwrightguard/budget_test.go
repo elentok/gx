@@ -18,7 +18,10 @@ import (
 // Cleanup flow (+1): the gear menu pages, the size scan, the unmerged-worktree
 // removal on disk and the one-off's prompt need the real server and a git
 // worktree on disk; component tests and server/cleanup tests cover each piece alone.
-const maxFlows = 126
+// Triage journey flow (+1): start, the Verify chain with its countdown, the Follow-ups
+// card moving between sections and the sidebar badge need the server round trip, SSE,
+// the fake Triage agent and a real browser; vitest and Go tests cannot see those together.
+const maxFlows = 127
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
