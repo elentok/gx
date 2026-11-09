@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -354,6 +355,26 @@ func guardHas(t *testing.T, in guardInput, wants ...string) {
 	for _, w := range wants {
 		if !strings.Contains(got, w) {
 			t.Errorf("problems %q lack %q", got, w)
+		}
+	}
+}
+
+func TestSettingsGuard_RuleDocumented(t *testing.T) {
+	data, err := os.ReadFile("../.ai/index.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := string(data)
+	_, section, ok := strings.Cut(doc, "## Adding a config key")
+	if !ok {
+		t.Fatal(".ai/index.md lacks the heading \"Adding a config key\"")
+	}
+	if i := strings.Index(section, "\n## "); i >= 0 {
+		section = section[:i]
+	}
+	for _, want := range []string{"config/registry", "-update", "TestSettingsGuard"} {
+		if !strings.Contains(section, want) {
+			t.Errorf("section lacks %q", want)
 		}
 	}
 }

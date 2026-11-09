@@ -32,6 +32,17 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   `go test ./migrations -run TestSchemaSnapshot -update-schema-snapshot`. The guard test fails
   until you do.
 
+## Adding a config key
+
+A new config key must reach the settings page or be excluded with a reason:
+
+1. Add its entry in `config/registry`, or an exclusion entry (with a reason) in
+   `config/registry/exclusions.go`.
+2. Regenerate the schemas:
+   `go test ./config/registry -run TestGeneratedSchemas -update`.
+3. Run the guard: `go test ./config -run TestSettingsGuard`. It names any key missing from the
+   registry.
+
 ## Testing
 
 - Test the packages you touched plus their direct importers (find importers with `findReferences`,
