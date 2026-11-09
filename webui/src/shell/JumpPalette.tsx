@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation } from "react-router";
 import { isActionable } from "../agents/rules";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -22,11 +22,11 @@ import {
 import { ItemMenu, itemOfCard, type ItemRef } from "../workspaces/itemActions";
 import { agentHref } from "../hrefs";
 import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMenu";
-import { hasLayer, useIsTopLayer } from "../ui/modal/layers";
 import { useWide } from "../useWide";
 import { cardStatus, sessionStatus, type SidebarStatus } from "../workspaces/sidebarModel";
 import { setJumpOpen, useJumpOpen } from "./jumpOpen";
 import { currentAddress } from "./SidebarRows";
+import { useDismissLayer } from "./useDismissLayer";
 
 const isCard = (r: EpicListRow) => r.card_kind === CardKindDesign || r.card_kind === CardKindImplementation;
 
@@ -165,7 +165,8 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
   const open = useJumpOpen();
   const setOpen = setJumpOpen;
   const root = useRef<HTMLDivElement>(null);
-  const isTop = useIsTopLayer(open);
+  const close = useCallback(() => setJumpOpen(false), []);
+  const { isTop, hasLayer } = useDismissLayer({ open, close, root, phone });
 
   useEffect(() => () => setJumpOpen(false), []);
 
@@ -174,20 +175,11 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         if (open ? isTop() : !hasLayer()) setOpen((o) => !o);
-      } else if (e.key === "Escape" && isTop()) setOpen(false);
-    };
-    const onDown = (e: MouseEvent) => {
-      // A row's menu and its dialogs sit in portals outside the popover.
-      if ((e.target as Element).closest?.('[role="menu"],[role="dialog"]')) return;
-      if (!phone && root.current && !root.current.contains(e.target as Node)) setOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onDown);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onDown);
-    };
-  }, [phone, open, isTop]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, isTop, hasLayer]);
 
   const rows = list?.epics;
   const sessions = snapshot?.sessions;

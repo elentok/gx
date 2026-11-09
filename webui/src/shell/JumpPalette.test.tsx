@@ -207,6 +207,16 @@ test("a click outside closes the popover, and a phone gets a Close button instea
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
+test("a mouse-down inside a menu portal outside the popover does not close it", async () => {
+  setup();
+  await open();
+  const menu = document.body.appendChild(document.createElement("div"));
+  menu.setAttribute("role", "menu");
+  fireEvent.mouseDown(menu);
+  expect(screen.getByRole("dialog", { name: "Jump to" })).toBeTruthy();
+  menu.remove();
+});
+
 test("on a phone the menu is a full screen with a Close button", async () => {
   setup({ narrow: true });
   await open();
