@@ -23,7 +23,7 @@ A **Command palette** on every page of the web UI: a centered, filterable list o
 13. As a person, I want Escape or a click outside the palette to close it without running anything, so that I can back out.
 14. As a person, I want to choose New design and get the New design form over my current page, so that I can start a Design without going to the Epics page.
 15. As a person, I want New design to pre-select the project of the epic, Design or session page I am on when it opens a new blank draft, so that I start in the project I am working in. A restored draft keeps its own project.
-16. As a person on any other page, I want New design to keep today's project rule, so that behaviour there does not change.
+16. As a person on any other page, I want New design to keep today's project rule, so that behaviour there does not change. While the Epics page is open, every opener (page button, "+ New", palette) uses the page's single-project filter.
 17. As a person, I want the app to go to the new Design only after it is created, so that closing or discarding the form leaves me where I was.
 18. As a person, I want to choose New chat and get the new-chat form over my current page, so that I can start a session from anywhere.
 19. As a person, I want New chat to pre-select the project of the page I am on in the same way (blank drafts only), so that both forms behave alike.
@@ -35,7 +35,7 @@ A **Command palette** on every page of the web UI: a centered, filterable list o
 25. As a person, I want Next question to open the right place for the card (the Answer link for a question, the card's own page otherwise), so that I land where I can act.
 26. As a person, I want Next question to cover every kind of Needs you card (permission prompts, paused tickets, blocked merges, epics awaiting merge, deadlocks, Design questions, Follow-ups reviews and one-off cards), so that nothing waiting on me is skipped.
 27. As a person, I want typing "needs you" to find Next question, so that I can find it by the section's name.
-28. As a person, I want the Next question row to show the target epic and how many are waiting, so that I know where Enter will take me.
+28. As a person, I want the Next question row to show the target card and how many are waiting, so that I know where Enter will take me.
 29. As a person with nothing in Needs you, I want the Next question row to stay and say "Nothing needs you", with Enter doing nothing, so that the list does not shift and I get a clear answer.
 30. As a person, I want Go to Epics, Go to Agents, Go to Stats and Go to Settings to navigate to those pages, so that I can move around by keyboard.
 31. As a person, I want Toggle AFK to flip AFK mode as the AFK switch in the gear menu does, so that I can switch it without reaching for the mouse.
@@ -52,7 +52,7 @@ A **Command palette** on every page of the web UI: a centered, filterable list o
 - The sidebar footer already renders both forms from its "+ New" menu and navigates only after create. Its dialog state is lifted into one shared app-level store. The palette, "+ New", the Epics page button and the Agents page button all open it. The page-level copies of the two forms on the Epics and Agents pages are deleted, so there is one instance of each. The Epics page's project filter becomes an input to the shared opener. The new-session form is labelled "New chat" in the palette, matching "+ New"; the Agents page button keeps its own label. The palette row has no aliases. Form behaviours, such as drafts, are unchanged.
 - After either form creates its item, the app navigates to it. Closing or discarding the form leaves the current page.
 - Project prefill: on an epic, Design or session page a new blank draft starts with that page's project, through the forms' existing prefill and filter inputs (no new props). A restored draft keeps its own project. On any other page the form keeps its current rule.
-- Next question reads the Needs you cards of the active workspace, the same cards the Epics page shows. It sorts them by the card's existing waiting-since time, newest first (the server's own order, oldest first, is unchanged; no server change). It takes the card after the one on screen and wraps, or the newest when the current page is not a Needs you card's page. The card on screen is the card whose link opens the current page, for every card kind (epic, Design, one-off, and the triage page for Follow-ups). It reuses the existing function that picks the right link for a card, including the Answer link. Its subtitle names the target epic and the active workspace's waiting count. Cards of other workspaces are not walked, and the count can differ from the sidebar footer badge, which counts every workspace. The empty case is described in the stories.
+- Next question reads the Needs you cards of the active workspace. Epic and Design cards count when their workspace is the active one; Follow-ups cards count through the same workspace check the Epics page uses; One-off cards always count, because they belong to no workspace. Follow-ups cards have no waiting-since time and sort last (the server's order reversed). It sorts them by the card's existing waiting-since time, newest first (the server's own order, oldest first, is unchanged; no server change). It takes the card after the one on screen and wraps, or the newest when the current page is not a Needs you card's page. The card on screen is the card whose link opens the current page, for every card kind (epic, Design, one-off, and the triage page for Follow-ups). It reuses the existing function that picks the right link for a card, including the Answer link. Its subtitle names the target card and the active workspace's waiting count. Cards of other workspaces are not walked, and the count can differ from the sidebar footer badge, which counts every workspace. The empty case is described in the stories.
 - Go to commands use the app's normal navigation. Toggle AFK and the AFK switch in the gear menu share one toggle path (the unused toggle helper is either used by the gear menu or deleted).
 - Names of the rows are fixed as written in the stories. Internal ids and the visible placeholder text of the filter box are the implementer's choice.
 - Nothing on screen shows the shortcut in this version: no top bar button, no hint text, no phone entry point.
@@ -62,7 +62,7 @@ A **Command palette** on every page of the web UI: a centered, filterable list o
 - A good test drives the palette as a person does (press the shortcut, type, press Enter) and asserts what appears and where the app goes, not the internal structure of the matcher or list.
 - Vitest component tests are the main seam. The existing tests for the Cmd+K list and for the New session form on the Agents page are the prior art. They cover: the shortcut per platform and its guards (text box, second press, another modal open); the command rows and their fixed order; fuzzy filtering and ranking, including the Cmd+K list using it; each command's effect with stubbed navigation; Next question for newest-first order, the row after the current epic, wrap, other pages, each Needs you card kind (including a Follow-ups card on the triage page), the active-workspace limit, subtitle and the empty state; form prefill rules, including a restored draft; and navigation only after create. The existing form tests move with the forms to the app level.
 - The matcher is a pure function and gets plain unit tests through the list's behaviour where possible.
-- One Playwright step, added to the existing jump flow, which already opens the Cmd/Ctrl+K list on the Epics and Agents pages. It covers what vitest cannot see: the shortcut opening the palette on several pages, and the palette staying at the full-screen layout at a phone width. No new flow is added; the flow budget stays as it is. If a step cannot be added there, the CATALOG and the budget guard are updated in the same ticket.
+- One Playwright step, added to the existing jump flow, which already opens the Cmd/Ctrl+K list on the Epics and Agents pages. It covers what vitest cannot see: the shortcut opening the palette on several pages, the shortcut in the Design page chat box, a second press closing it, the filter box focus and centering, the eight rows by name, Next question landing on a Needs you card, the gear menu AFK switch flipping after Toggle AFK, and the palette at the full-screen layout at 390px, all on the `united` scenario. No new flow is added; the flow budget stays as it is. If a step cannot be added there, the CATALOG and the budget guard are updated in the same ticket.
 - Toggle AFK and navigation commands are covered in vitest; no server rule changes, so no Go test is needed.
 ## Verification
 
@@ -81,20 +81,20 @@ A **Command palette** on every page of the web UI: a centered, filterable list o
 13. Story 13: vitest check of Escape and of a click outside.
 14. Story 14: vitest check that New design opens the form over the page and the page stays; the existing `26. New Design form` flow still passes with the form at app level, and the page-level copies are gone.
 15. Story 15: vitest check of prefill on an epic, Design and session page, and that a restored draft keeps its project.
-16. Story 16: vitest check of the unchanged rule on other pages.
+16. Story 16: vitest check of the unchanged rule on other pages, and of every opener using the page filter on the Epics page.
 17. Story 17: vitest check that navigation follows creation only; closing leaves the page.
 18. Story 18: vitest check that New chat opens the form over the page; the existing `85. Create session` flow still passes.
 19. Story 19: vitest check of prefill, blank draft only.
 20. Story 20: vitest check that navigation follows creation only.
-21. Story 21: the jump flow step on the `united` or `workspaces` scenario (which holds Needs you cards): Next question lands on a Needs you card of the active workspace; vitest check that cards of other workspaces are skipped.
+21. Story 21: the jump flow step on the `united` scenario (which holds Needs you cards): Next question lands on a Needs you card of the active workspace; vitest check that cards of other workspaces are skipped.
 22. Story 22: vitest check of newest-first order.
 23. Story 23: vitest check of the next row and wrap, including from a Design, a one-off and a Follow-ups triage page.
 24. Story 24: vitest check from a non-epic page.
 25. Story 25: vitest check that a question card opens its Answer link and another card opens its page.
 26. Story 26: vitest check over one card of each kind, including Design, Follow-ups and one-off cards.
 27. Story 27: vitest check that "needs you" finds Next question.
-28. Story 28: vitest check of the subtitle.
-29. Story 29: vitest check of the empty state and Enter doing nothing; the jump flow step on a scenario with no Needs you card shows "Nothing needs you".
+28. Story 28: vitest check of the subtitle, including a One-off and a Follow-ups card.
+29. Story 29: vitest check of the empty state and Enter doing nothing.
 30. Story 30: vitest check of the four Go to commands.
 31. Story 31: vitest check that the shared toggle is called; in the jump flow step open the gear menu and see the AFK switch flip.
 32. Story 32: the jump flow step at 390px shows the full-screen layout; existing modes-flow coverage of the Cmd+K sheet still passes.
