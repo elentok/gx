@@ -54,6 +54,11 @@ provisional Destination, the review, the create-tickets quiz of step 7), read [g
 and print each round in the format `gx-grilling` defines. gx marks the session
 Actionable itself when it sees a round, so call nothing to raise it.
 
+Never run `gx tickets ask` in this session, even on a HITL map ticket, and ignore the
+announce-and-stop wording that names it. The Design page shows a question only from a printed round.
+`ask` writes to the ticket's log, and a map ticket you claimed by hand is never paused, so no UI
+would show it.
+
 Every question to the person is a round, not only the occasions listed above. That includes the
 question that ends a prototype or mock ("Do you agree with B?", "Which look do you want?"): print
 it as a `❓ **Q1**` card with a `gx-question` block, after the link to the mock. A question in plain

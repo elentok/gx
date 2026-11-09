@@ -2,12 +2,14 @@ package serverapi
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // NewAskCmd is `gx tickets ask`: an agent's question, sent to the server
@@ -24,9 +26,16 @@ func NewAskCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return cmdbase.ServerQueueWrite(d.Dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			err = cmdbase.ServerQueueWrite(d.Dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.Ask(ctx, args[0], text)
 			})
+			if err != nil || jsonOut {
+				return err
+			}
+			// The server refuses a body that does not parse, so a success parses here too.
+			q, _ := ticketlog.ParseQuestionStrict(text)
+			_, err = fmt.Fprintf(c.OutOrStdout(), "asked %s: %s\n", args[0], q.Summary)
+			return err
 		},
 	}
 	cmd.Flags().StringVar(&body, "body", "-", "## Question and ## Handoff sections, or - to read them from stdin")

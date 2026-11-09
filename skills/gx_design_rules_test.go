@@ -84,6 +84,14 @@ func TestGxDesignEndsRunAfterChartAndDestination(t *testing.T) {
 	}
 }
 
+func TestGxDesignAsksThroughGrillingRoundsNotTicketsAsk(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	want := collapseSpace("Never run `gx tickets ask` in this session")
+	if !strings.Contains(text, want) {
+		t.Errorf("gx-design/SKILL.md lacks %q", want)
+	}
+}
+
 func TestGxDesignChartStepReadsInitialPromptImages(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
 	start := strings.Index(text, "The map has no `## Destination`")
