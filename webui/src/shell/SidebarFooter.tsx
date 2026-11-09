@@ -86,7 +86,7 @@ function FollowUpsButton({ workspace }: { workspace?: string }) {
         value: l.project,
         label: (
           <Box as="span" display="flex" alignItems="center" gap="3" minW="240px">
-            {l.live && <Box as="span" aria-hidden boxSize="16px" borderRadius="full" borderWidth="2px" borderColor="tone.waiting.fg" />}
+            {l.live && <Box as="span" aria-hidden boxSize="16px" borderRadius="full" borderWidth="2px" borderColor="tone.waiting.fg" borderTopColor="hairline" data-testid="triage-ring" />}
             <Text as="span" flex="1">
               {l.project}
             </Text>

@@ -150,6 +150,18 @@ test("the follow-ups badge takes its colours from theme tokens, so a light theme
   vi.unstubAllGlobals();
 });
 
+test("a live Triage line draws a partial ring: amber, with a hairline top arc", async () => {
+  stubList([followUps({ project: "webapp", triage: "waiting", left: 12 })]);
+  setupWithRouter();
+  fireEvent.click(await screen.findByRole("button", { name: /^Follow-ups/ }));
+  const ring = await screen.findByTestId("triage-ring");
+  const css = [...document.querySelectorAll("style")].map((s) => s.textContent).join("\n");
+  const rule = css.match(new RegExp(`\\.${ring.className.split(" ").join("\\.")}\\s*\\{[^}]*\\}`))?.[0] ?? "";
+  expect(rule).toMatch(/border-color:\s*var\(--chakra-colors-tone-waiting-fg\)/);
+  expect(rule).toMatch(/border-top-color:\s*var\(--chakra-colors-hairline\)/);
+  vi.unstubAllGlobals();
+});
+
 test("the health button and the gear carry a title tooltip", () => {
   setup({ mode: "running", health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") } });
   expect(screen.getByRole("button", { name: /^System health:/ }).getAttribute("title")).toMatch(/^System health:/);
