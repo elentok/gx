@@ -86,15 +86,16 @@ function Chevron({ open, onToggle, label }: { open: boolean; onToggle: () => voi
   );
 }
 
-// A row's frame: 3px edge, 4px left padding, then the chevron cell. The nested guide line sits under the icon column.
+// A row's frame (the mock's `padding 0 6px 0 4px`): 3px edge, 4px left padding, the chevron cell, then the icon slot.
+// The nested guide line sits in the icon column, 3px left of its centre so a Fix agent's wrench is not drawn over it.
 // `left` on an absolute child is measured from the padding edge, so the 3px border is not counted.
 const CHEVRON_W = 20;
-const GUIDE_X = `calc(4px + ${CHEVRON_W}px + var(--chakra-spacing-2) + 13px - 0.75px)`;
+const GUIDE_X = `calc(4px + ${CHEVRON_W}px + 13px - 3px - 0.75px)`;
 
 /** The frame both a top-level row and a nested agent row share: hover group, current background and edge. */
 function RowFrame({ current, children }: { current: boolean; children: ReactNode }) {
   return (
-    <Box className="group" position="relative" display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
+    <Box className="group" position="relative" display="flex" alignItems="center" pl="1" pr="6px" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
       {children}
     </Box>
   );
@@ -123,7 +124,7 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
     <RowFrame current={current}>
       <Box data-testid="nested-guide" aria-hidden position="absolute" left={GUIDE_X} top="0" bottom={last ? "50%" : "0"} w="1.5px" bg="border" />
       <Box w={`${CHEVRON_W}px`} flex="none" />
-      <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2" minH="36px">
+      <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" px="0" minH="36px">
         <IconSlot>{agent.fix && <WrenchIcon status={agent.status} />}</IconSlot>
         <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" fontSize="13px">
           {agent.label}
@@ -196,7 +197,7 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
         <Box w={`${CHEVRON_W}px`} flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
-        <chakra.a href={row.href} {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
+        <chakra.a href={row.href} {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" px="0">
           <IconSlot>
             {row.kind === "chat" ? (
               <ChatIcon />
