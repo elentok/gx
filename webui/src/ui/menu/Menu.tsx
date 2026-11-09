@@ -212,7 +212,7 @@ export interface MenuProps {
   placement?: "bottom-end" | "bottom-start" | "top-end" | "top-start";
 }
 
-const SETTLE_MS = 100;
+const SETTLE_MS = 2000;
 
 /**
  * Zag returns focus to the trigger after a close and offers no way to skip it, at a moment it does
@@ -225,8 +225,17 @@ function keepFocusInDialog() {
     const d = dialog();
     if (d && !d.contains(e.target as Node)) (d.querySelector<HTMLElement>("[data-first-field]") ?? d).focus();
   };
+  const stop = () => {
+    clearTimeout(timer);
+    document.removeEventListener("focusin", takeBack);
+    document.removeEventListener("pointerdown", stop, true);
+    document.removeEventListener("keydown", stop, true);
+  };
+  // The return can land late under load, so the window ends when the person acts, not only on a timer.
+  const timer = setTimeout(stop, SETTLE_MS);
   document.addEventListener("focusin", takeBack);
-  setTimeout(() => document.removeEventListener("focusin", takeBack), SETTLE_MS);
+  document.addEventListener("pointerdown", stop, true);
+  document.addEventListener("keydown", stop, true);
 }
 
 function WideMenu({ trigger, items, onClosed, onOpenChange, closeSignal, placement = "bottom-end" }: MenuProps) {

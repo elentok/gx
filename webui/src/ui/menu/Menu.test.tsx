@@ -344,6 +344,30 @@ describe("GxMenu focus after an item", () => {
       expect(dialog.contains(document.activeElement)).toBe(true);
     });
 
+    it(`takes back a focus return that lands late on the ${name} menu`, async () => {
+      const r = render(wide, true);
+      const menu = await open(r);
+      await waitFor(() => expect(document.activeElement).toBe(menu));
+      fireEvent.click(r.getByRole("menuitem", { name: "A" }));
+      const dialog = await r.findByRole("dialog", { name: "Dialog" });
+      await new Promise((res) => setTimeout(res, 300));
+      r.getByRole("button", { name: "Menu" }).focus();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
+    it(`leaves a person who pressed in the dialog alone on the ${name} menu`, async () => {
+      const r = render(wide, true);
+      const menu = await open(r);
+      await waitFor(() => expect(document.activeElement).toBe(menu));
+      fireEvent.click(r.getByRole("menuitem", { name: "A" }));
+      const dialog = await r.findByRole("dialog", { name: "Dialog" });
+      fireEvent.pointerDown(r.getByLabelText("Name"));
+      const trigger = r.getByRole("button", { name: "Menu" });
+      trigger.focus();
+      expect(document.activeElement).toBe(trigger);
+      expect(dialog).toBeTruthy();
+    });
+
     it(`still returns focus to the trigger when the item opens nothing on the ${name} menu`, async () => {
       const r = render(wide, false);
       const menu = await open(r);
