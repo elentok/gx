@@ -395,6 +395,15 @@ func TestRead_RoundParsesCardsAndStripsFences(t *testing.T) {
 	}
 }
 
+func TestRead_RoundCardCarriesLinks(t *testing.T) {
+	t.Parallel()
+	text := "❓ **Q1** - **Pick a variant?**: See the mock.\n\n```gx-question\ntype: yes-no\nlinks:\n  - label: Mock\n    url: https://claude.ai/artifact/abc\n```"
+	got := chatOf(t, assistantText("a1", text))
+	if len(got.Round) != 1 || len(got.Round[0].Links) != 1 || got.Round[0].Links[0].URL != "https://claude.ai/artifact/abc" || got.Round[0].Links[0].Label != "Mock" {
+		t.Fatalf("round = %+v, want the card's link", got.Round)
+	}
+}
+
 func TestRead_RoundDefaultsAreNotCards(t *testing.T) {
 	t.Parallel()
 	defaults := "\n\n**Decided unless you object**\n\n- Naming: use camelCase\n- Order: alphabetical"

@@ -75,6 +75,7 @@ export function AnswerForm({
     no: latest.no,
     options: latest.options,
     recommended: latest.recommended,
+    links: latest.links,
   };
 
   return (

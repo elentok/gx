@@ -465,6 +465,9 @@ options:               # options only: 2 to 6 entries
     consequence: I leave the handler as it is.   # optional
   - id: b
     label: Replace it
+links:                 # optional, any type: buttons on the card
+  - label: Open the mock
+    url: https://claude.ai/artifact/abc
 ```
 
 - `yes-no` has fixed labels "Yes" and "No". It takes optional one-line `yes:` and `no:` consequences.
@@ -472,6 +475,8 @@ options:               # options only: 2 to 6 entries
 - `recommended` names one value. The UI shows a "Recommended" badge and preselects nothing.
 - Wrap every `label`, `consequence`, `yes` and `no` value in double quotes. A bare value breaks the
   YAML when it holds `: `, ` #`, a backtick or a leading quote (`label: "Write `done: true`"`).
+- `links` takes a `label` and an `http://` or `https://` `url` per entry. Use it for a resource the
+  question depends on that words cannot carry, such as a mock's URL. The web card shows each as a button.
 - Every type allows a free-text note from the person.
 - `ask` fails with the reason on bad YAML, an unknown type, duplicate ids, or a `recommended` outside
   the options.

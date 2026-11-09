@@ -36,6 +36,12 @@ type QuestionOption struct {
 	Consequence string `yaml:"consequence"`
 }
 
+// QuestionLink is a resource the question depends on, such as a mock's URL.
+type QuestionLink struct {
+	Label string `yaml:"label"`
+	URL   string `yaml:"url"`
+}
+
 // Question is a parsed "## Question" + "## Handoff" body pair.
 type Question struct {
 	Summary     string
@@ -43,6 +49,7 @@ type Question struct {
 	Yes, No     string // yes-no consequences
 	Options     []QuestionOption
 	Recommended string
+	Links       []QuestionLink
 	// Detail is the question text after the summary line, without the block.
 	Detail  string
 	Handoff string
@@ -61,6 +68,7 @@ type questionBlock struct {
 	No          string           `yaml:"no"`
 	Options     []QuestionOption `yaml:"options"`
 	Recommended string           `yaml:"recommended"`
+	Links       []QuestionLink   `yaml:"links"`
 }
 
 // ParseQuestionStrict parses body for `gx tickets ask`: any problem with the
@@ -181,8 +189,25 @@ func applyBlock(q *Question, block string) error {
 	default:
 		return fmt.Errorf("unknown question type %q", b.Type)
 	}
+	if err := checkLinks(b.Links); err != nil {
+		return err
+	}
 	q.Kind, q.Yes, q.No = b.Type, b.Yes, b.No
-	q.Options, q.Recommended = b.Options, b.Recommended
+	q.Options, q.Recommended, q.Links = b.Options, b.Recommended, b.Links
+	return nil
+}
+
+// checkLinks needs a label and an http(s) URL on every link: the card renders
+// the URL as an href, so any other scheme must not reach it.
+func checkLinks(links []QuestionLink) error {
+	for _, l := range links {
+		if l.Label == "" || l.URL == "" {
+			return errors.New("every link needs a label and a url")
+		}
+		if !strings.HasPrefix(l.URL, "https://") && !strings.HasPrefix(l.URL, "http://") {
+			return fmt.Errorf("link url %q must start with http:// or https://", l.URL)
+		}
+	}
 	return nil
 }
 

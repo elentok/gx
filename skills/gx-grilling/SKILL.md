@@ -98,6 +98,7 @@ Make every question **self-contained**. The user reads only the question card, n
 - Never use a short label from earlier in the conversation (F5, P2, Q3, "option B") on its own. Name the thing itself: "the completion flow", not "F5". If the label helps, keep it next to the name: "Q3 (storage backend)".
 - This applies to the title, the body, the `➡️` line and every option label.
 - Put the context the answer depends on in the question body, in a line or two.
+- A resource the card cannot say in words, such as the URL of a mock, goes in the block's `links:` list (label and URL), so the card shows it as a button. Do this for every question about a mock.
 
 Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
 

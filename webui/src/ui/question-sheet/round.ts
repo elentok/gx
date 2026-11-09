@@ -17,6 +17,8 @@ export interface QuestionCard {
   no?: string;
   options?: QuestionChoice[];
   recommended?: string;
+  /** Resources the question depends on, such as a mock's URL. */
+  links?: { label: string; url: string }[];
   note?: string;
   /** What the question is about, shown muted above its title. */
   context?: string;

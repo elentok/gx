@@ -74,6 +74,9 @@ func ParseRoundSegment(seq int, seg string) ParsedRound {
 	for _, o := range q.Options {
 		c.Options = append(c.Options, wire.SessionRoundOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
 	}
+	for _, l := range q.Links {
+		c.Links = append(c.Links, wire.QuestionLink{Label: l.Label, URL: l.URL})
+	}
 	return res
 }
 

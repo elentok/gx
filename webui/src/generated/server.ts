@@ -381,6 +381,13 @@ export interface ActionInfo {
   tooltip: string;
 }
 /**
+ * QuestionLink is a link a question card shows as a button.
+ */
+export interface QuestionLink {
+  label: string;
+  url: string;
+}
+/**
  * DetailOption is one choice of an options question.
  */
 export interface DetailOption {
@@ -403,6 +410,7 @@ export interface DetailRound {
   handoff?: string;
   options?: DetailOption[];
   recommended?: string;
+  links?: QuestionLink[];
   yes?: string;
   no?: string;
   /**
@@ -2479,6 +2487,7 @@ export interface SessionRoundCard {
   no?: string;
   options?: SessionRoundOption[];
   recommended?: string;
+  links?: QuestionLink[];
   note?: string;
 }
 /**

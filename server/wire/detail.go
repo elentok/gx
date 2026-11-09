@@ -35,6 +35,12 @@ type ActionInfo struct {
 	Tooltip string `json:"tooltip"`
 }
 
+// QuestionLink is a link a question card shows as a button.
+type QuestionLink struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
+}
+
 // DetailOption is one choice of an options question.
 type DetailOption struct {
 	ID          string `json:"id"`
@@ -56,6 +62,7 @@ type DetailRound struct {
 	Handoff     string         `json:"handoff,omitempty"`
 	Options     []DetailOption `json:"options,omitempty"`
 	Recommended string         `json:"recommended,omitempty"`
+	Links       []QuestionLink `json:"links,omitempty"`
 	Yes         string         `json:"yes,omitempty"`
 	No          string         `json:"no,omitempty"`
 

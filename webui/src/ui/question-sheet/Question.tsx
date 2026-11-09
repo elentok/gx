@@ -115,6 +115,27 @@ export function Question({
         fontWeight="600"
       >{`${nameOf(card)} - ${card.title}`}</Markdown>
       {card.body && <Markdown fontSize={big ? "lg" : "md"}>{card.body}</Markdown>}
+      {card.links && card.links.length > 0 && (
+        <Box display="flex" flexWrap="wrap" gap="2">
+          {card.links.map((l) => (
+            // A new tab, so the draft and the place in the questions stay put.
+            <chakra.a
+              key={l.url}
+              href={l.url}
+              target="_blank"
+              rel="noreferrer"
+              fontSize="sm"
+              borderWidth="1px"
+              borderRadius="8px"
+              px="3"
+              py="1"
+              textDecoration="none"
+            >
+              {l.label} ↗
+            </chakra.a>
+          ))}
+        </Box>
+      )}
       {text ? (
         <>
           {card.note && (

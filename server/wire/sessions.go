@@ -311,6 +311,7 @@ type SessionRoundCard struct {
 	No          string               `json:"no,omitempty"`
 	Options     []SessionRoundOption `json:"options,omitempty"`
 	Recommended string               `json:"recommended,omitempty"`
+	Links       []QuestionLink       `json:"links,omitempty"`
 	Note        string               `json:"note,omitempty"`
 }
 

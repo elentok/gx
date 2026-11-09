@@ -330,6 +330,9 @@ func detailRound(r tickets.PauseRound, full bool) wire.DetailRound {
 	for _, o := range q.Options {
 		out.Options = append(out.Options, wire.DetailOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
 	}
+	for _, l := range q.Links {
+		out.Links = append(out.Links, wire.QuestionLink{Label: l.Label, URL: l.URL})
+	}
 	if r.End == nil {
 		return out
 	}

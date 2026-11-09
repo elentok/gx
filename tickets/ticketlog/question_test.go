@@ -56,6 +56,28 @@ func TestParseQuestion_Kinds(t *testing.T) {
 	}
 }
 
+func TestParseQuestion_Links(t *testing.T) {
+	body := questionBody("Which one?", "type: yes-no\nlinks:\n  - label: Mock\n    url: https://claude.ai/artifact/abc\n")
+	for name, q := range map[string]Question{"lenient": ParseQuestionLenient(body)} {
+		if len(q.Links) != 1 || q.Links[0].Label != "Mock" || q.Links[0].URL != "https://claude.ai/artifact/abc" {
+			t.Fatalf("%s: got %+v", name, q.Links)
+		}
+	}
+	strict, err := ParseQuestionStrict(body)
+	if err != nil || len(strict.Links) != 1 {
+		t.Fatalf("strict: %+v, %v", strict.Links, err)
+	}
+	for _, bad := range []string{
+		"type: text\nlinks:\n  - label: Mock\n    url: javascript:alert(1)\n",
+		"type: text\nlinks:\n  - label: Mock\n",
+		"type: text\nlinks:\n  - url: https://x.test\n",
+	} {
+		if _, err := ParseQuestionStrict(questionBody("Q?", bad)); err == nil {
+			t.Errorf("block %q: want an error", bad)
+		}
+	}
+}
+
 func TestParseQuestionStrict_Errors(t *testing.T) {
 	opts := func(n int) string {
 		s := "type: options\noptions:\n"
