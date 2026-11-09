@@ -71,7 +71,7 @@ function setup(device: Device, path = "/") {
         session("s3", "p", { name: "talk" }),
         session("s4", "p", { name: "designer" }),
         session("s5", "p", { name: "fixer", fix_of: "p:blog/03", status: { state: "working" } }),
-        session("s6", "p", { name: "queuer", queue: true }),
+        session("s6", "p", { name: "queuer", queue: true, tier: "worker" }),
       ],
       placements,
     },
@@ -284,15 +284,14 @@ test("removing the open nested agent from its row confirms, then goes to the age
   await waitFor(() => expect(screen.getByTestId("page-path").textContent).toBe("/agents"));
 });
 
-test("each row is its own hover group; a nested row never shows a number", async () => {
+test("a nested row owns its menu button apart from its parent; a nested row never shows a number", async () => {
   setup("desktop");
   await expandBlog();
   const parentFrame = body().getByRole("link", { name: /Blog/ }).parentElement!;
   const nestedFrame = body().getByRole("link", { name: /builder/ }).parentElement!;
-  expect(parentFrame.classList.contains("group")).toBe(true);
-  expect(nestedFrame.classList.contains("group")).toBe(true);
   expect(parentFrame.contains(nestedFrame)).toBe(false);
-  expect(parentFrame.closest("li")!.classList.contains("group")).toBe(false);
+  const menu = within(nestedFrame).getByRole("button", { name: "More actions" });
+  expect(parentFrame.contains(menu)).toBe(false);
   fireEvent.keyDown(window, { key: "Alt", altKey: true });
   await waitFor(() => expect(within(parentFrame).getByTestId("row-number")).toBeTruthy());
   expect(within(nestedFrame).queryByTestId("row-number")).toBeNull();

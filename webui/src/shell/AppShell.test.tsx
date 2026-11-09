@@ -361,6 +361,17 @@ describe("swipe", () => {
       expect(screen.getByRole("dialog")).toBeTruthy();
     });
 
+    test("an open jump menu blocks", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: [], follow_ups: [] }), { status: 200 })));
+      setup("phone");
+      fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+      await screen.findByRole("dialog", { name: "Jump to" });
+      expect(isOpen()).toBe(false);
+      swipe(document.body, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(false);
+      expect(screen.getByRole("dialog", { name: "Jump to" })).toBeTruthy();
+    });
+
     test("nothing opens while docked", () => {
       setup("desktop");
       swipe(document.body, [100, 300], [200, 300]);
