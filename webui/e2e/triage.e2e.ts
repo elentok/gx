@@ -81,7 +81,10 @@ test.describe("199. Triage journey", () => {
     const answerAll = async () => {
       await questions.getByRole("button", { name: "parser", exact: true }).click();
       await questions.getByRole("button", { name: "No", exact: true }).click();
-      await questions.getByRole("textbox", nav("Answer to question 2.d1")).fill("the sqlite store");
+      // Each pick saves and refetches; under load the next question renders late, so wait for it before typing.
+      const text = questions.getByRole("textbox", nav("Answer to question 2.d1"));
+      await expect(text).toBeEditable({ timeout: 40_000 });
+      await text.fill("the sqlite store", { timeout: 40_000 });
     };
     await answerAll();
 
@@ -260,18 +263,19 @@ test.describe("199. Triage journey", () => {
     await queue.click();
     await expect.poll(queued).toContain("triage-ready");
     await expect(page.getByRole("button", nav("Queue epic"))).toHaveCount(0);
-    const queuedChip = actions.getByText(/queued|running|ready/i).first();
-    const queuedText = await queuedChip.textContent();
+    // The chip text moves on (queued, then running) while the suite loads, so match the states, never a captured word.
+    const queuedChip = (where: typeof actions) => where.getByText(/^(queued|running|ready)$/i).first();
+    await expect(queuedChip(actions)).toBeVisible();
 
     // The queued state survives a reload, and a second tab shows it too.
     await page.reload();
     await expect(page.getByRole("button", nav("Queue epic"))).toHaveCount(0);
-    await expect(actions.getByText(queuedText!, { exact: true }).first()).toBeVisible();
+    await expect(queuedChip(actions)).toBeVisible();
     const tab = await page.context().newPage();
     await tab.goto(page.url());
     await expect(tab.getByRole("region", nav("Triage result"))).toBeVisible();
     await expect(tab.getByRole("button", nav("Queue epic"))).toHaveCount(0);
-    await expect(tab.getByTestId("page-header-actions").getByText(queuedText!, { exact: true }).first()).toBeVisible();
+    await expect(queuedChip(tab.getByTestId("page-header-actions"))).toBeVisible();
     await tab.close();
 
     // History and Abandon: a second Triage starts from the card, and Abandon changes no ticket.
