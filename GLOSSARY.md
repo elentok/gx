@@ -860,6 +860,14 @@ _Avoid_: landing (the merge itself is instant), rebasing.
 whose tickets are all done but whose branch may not have merged yet.
 _Avoid_: landed epic, closed epic.
 
+**Delivery** — a project setting: how a complete epic's branch reaches **Trunk**. `merge` (the
+default): gx merges the branch into local trunk itself. `pr`: gx pushes the branch and opens a pull
+request on GitHub; a person merges the PR there, and the epic becomes a **Merged epic** only once
+GitHub reports the PR merged. _Avoid_: land, landing (retired), merge mode.
+
+**Auto-PR** — in a project whose **Delivery** is `pr`, opening the PR as soon as the epic is
+complete, without the person pressing Create PR. The `pr` counterpart of auto-ff-merge.
+
 ## Launching External Programs
 
 gx runs external programs (`$EDITOR`, the comment editor, `lazygit`, `git commit`) in one of two
