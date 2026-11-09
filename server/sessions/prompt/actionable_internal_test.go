@@ -124,6 +124,50 @@ func TestDecideActionable(t *testing.T) {
 	}
 }
 
+// Every refusal names its reason, and a Grilling round (an open question, the
+// shape a prototype review takes) is never reported as advanceable.
+func TestRefusalReason(t *testing.T) {
+	t.Parallel()
+	cont := wire.SessionActionable{Reason: "next", Action: []string{"/clear"}, Derived: true}
+	grill := wire.SessionActionable{Reason: "q", Action: []string{"/clear"}, Derived: true, Grilling: true}
+	tests := []struct {
+		name string
+		meta sessions.Meta
+		a    wire.SessionActionable
+		live bool
+		want string
+	}{
+		{"open question", sessions.Meta{}, grill, true, "open-question"},
+		{"switch off", sessions.Meta{AutoAdvanceOff: true}, cont, true, "switch-off"},
+		{"no action", sessions.Meta{}, wire.SessionActionable{Reason: "r", Derived: true}, true, "no-action"},
+		{"not live", sessions.Meta{}, cont, false, "not-live"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := refusalReason(tt.meta, tt.a, tt.live); got != tt.want {
+				t.Errorf("refusalReason = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// The decision line carries the session, ticket, decision and reason.
+func TestLogAutoAdvance_WritesOneLinePerDecision(t *testing.T) {
+	t.Parallel()
+	var buf strings.Builder
+	p := New(Deps{Log: slog.New(slog.NewTextHandler(&buf, nil))})
+	p.logAutoAdvance("s1", "gx:epic/06", "refused", "open-question", "Q1 waits")
+	out := buf.String()
+	for _, want := range []string{"auto-advance decision", "session=s1", "ticket=gx:epic/06", "decision=refused", "reason=open-question"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log %q lacks %q", out, want)
+		}
+	}
+	if n := strings.Count(out, "\n"); n != 1 {
+		t.Errorf("log has %d lines, want 1", n)
+	}
+}
+
 // A message that ends on a prose question is a session waiting on the person:
 // the run-end line above it must not raise a Continue that auto-advance sends.
 func TestDesignActionable_EndingOnAProseQuestionRaisesNoContinue(t *testing.T) {

@@ -165,26 +165,33 @@ func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 	}
 	a, matched := designActionable(text, design.Flow, meta.Harness, p.StepFinal(design.Flow))
 	outcome := actionableNone
+	var refusal string
 	p.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		var next wire.SessionActionable
 		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: MaxAutoSends})
 		if outcome == actionableNone {
 			return false
 		}
+		refusal = refusalReason(*m, a, design.Live)
 		m.Actionable = next
 		return true
 	})
+	step := design.Flow.Key
 	switch outcome {
 	case actionableAdvance:
 		// A countdown that starts is silent: the person is told only if it does not send.
 		if p.StartAutoAdvance(id) {
+			p.logAutoAdvance(id, step, "taken", "ended-actionable", a.Reason)
 			p.events.Publish(wire.EventSessionChanged, id)
 			return
 		}
+		p.logAutoAdvance(id, step, "refused", "countdown-off-or-held", a.Reason)
 		p.sessions.TriggerBanner(id, sound.Attention, a.Reason)
 	case actionableCapped:
+		p.logAutoAdvance(id, step, "refused", "budget", a.Reason)
 		p.sessions.TriggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", MaxAutoSends, a.Reason))
 	case actionableRaised:
+		p.logAutoAdvance(id, step, "refused", refusal, a.Reason)
 		if a.Grilling {
 			p.sessions.TriggerQuestionBanner(id, sound.Attention, a.Reason, designQuestion(p.grillingRounds(id, meta), text))
 			return
@@ -283,6 +290,28 @@ func decideActionable(cur sessions.Meta, a wire.SessionActionable, matched bool,
 		return a, actionableCapped
 	}
 	return a, actionableAdvance
+}
+
+// refusalReason is why a raised Actionable on cur's meta does not start an
+// auto-advance countdown, in the order decideActionable checks.
+func refusalReason(cur sessions.Meta, a wire.SessionActionable, live bool) string {
+	switch {
+	case a.Grilling:
+		return "open-question"
+	case cur.AutoAdvanceOff:
+		return "switch-off"
+	case len(a.Action) == 0:
+		return "no-action"
+	case !live:
+		return "not-live"
+	}
+	return "not-advanceable"
+}
+
+// logAutoAdvance writes the one line per auto-advance decision, taken or
+// refused, so "why did it not advance" is as answerable as "why did it".
+func (p *Prompt) logAutoAdvance(id, ticket, decision, reason, runEnd string) {
+	p.log.Info("auto-advance decision", "session", id, "ticket", ticket, "decision", decision, "reason", reason, "run_end", runEnd)
 }
 
 // RaiseGxActionable saves an Actionable gx raises itself, replacing any
