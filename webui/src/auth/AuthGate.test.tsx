@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { signOut } from "../apiFetch";
 import { renderThemed } from "../ui/render";
@@ -72,6 +73,31 @@ test("the signed-in app has the cert context", async () => {
     </AuthGate>,
   );
   expect(await screen.findByText(`cert:${state.cer_path}`)).toBeTruthy();
+});
+
+test("the app is not remounted when unknown turns into signed-in", async () => {
+  const mounts = vi.fn();
+  const Child = () => {
+    useEffect(mounts, []);
+    return <p>the app</p>;
+  };
+  let fail = true;
+  renderThemed(
+    <AuthGate
+      fetchState={async () => {
+        if (fail) throw new Error("offline");
+        return stateOf("signed-in");
+      }}
+    >
+      <Child />
+    </AuthGate>,
+  );
+  await screen.findByText("the app");
+  fail = false;
+  act(() => signOut());
+  await waitFor(() => expect(screen.getByText("the app")).toBeTruthy());
+  await act(async () => {});
+  expect(mounts).toHaveBeenCalledOnce();
 });
 
 test("login asks for the setup code only when the state says so", async () => {

@@ -113,6 +113,14 @@ describe("with no saved event", () => {
   });
 });
 
+test("reading the snapshot does not recompute the state", async () => {
+  fakeNavigator(UA.iphone, "iPhone", 5);
+  const { getInstallState } = await load();
+  expect(getInstallState().mode).toBe("ios");
+  vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(display-mode: standalone)" }));
+  expect(getInstallState().mode).toBe("ios");
+});
+
 test("the hook re-renders without a reload when the mode changes", async () => {
   const { useInstall } = await load();
   const { result } = renderHook(() => useInstall());

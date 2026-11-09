@@ -29,7 +29,8 @@ export function AuthGate({
   useEffect(() => onSignedOut(refresh), [refresh]);
 
   if (!auth) return <Spinner label="Loading" />;
-  if (auth === "unknown") return <>{children}</>;
+  // Same Provider as signed-in, so the tree keeps its shape and the app is not remounted on the transition.
+  if (auth === "unknown") return <CertContext.Provider value={{}}>{children}</CertContext.Provider>;
   if (auth.state === "signed-in") return <CertContext.Provider value={{ cert: auth }}>{children}</CertContext.Provider>;
   return (
     <CertContext.Provider value={{ cert: auth }}>

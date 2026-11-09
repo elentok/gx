@@ -12,21 +12,23 @@ type PromptEvent = Event & {
 // A saved event can be prompted only once, so it is dropped as soon as it is used.
 let saved: PromptEvent | null = null;
 let installed = false;
-let current: InstallState = { mode: "none", desktopCaption: false };
+const NONE: InstallState = Object.freeze({ mode: "none", desktopCaption: false });
 const listeners = new Set<() => void>();
 
 function compute(): InstallState {
-  if (installed || isStandalone()) return { mode: "none", desktopCaption: false };
+  if (installed || isStandalone()) return NONE;
   if (saved) {
     const ua = navigator.userAgent;
     return { mode: "prompt", desktopCaption: /Chrome|Edg/.test(ua) && !/Android|Mobile/.test(ua) };
   }
-  const none = { mode: "none" as const, desktopCaption: false };
-  if (isIOS()) return { ...none, mode: "ios" };
+  if (isIOS()) return { ...NONE, mode: "ios" };
   const ua = navigator.userAgent;
-  if (isMac() && /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua)) return { ...none, mode: "mac-safari" };
-  return none;
+  if (isMac() && /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua)) return { ...NONE, mode: "mac-safari" };
+  return NONE;
 }
+
+// Node-environment tests import this module without a window.
+let current: InstallState = typeof window === "undefined" ? NONE : compute();
 
 /** Recomputes the state and wakes subscribers only when it changed, so the snapshot stays stable. */
 function refresh() {
@@ -37,7 +39,6 @@ function refresh() {
 }
 
 export function getInstallState(): InstallState {
-  refresh();
   return current;
 }
 
