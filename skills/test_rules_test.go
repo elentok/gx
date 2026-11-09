@@ -79,6 +79,15 @@ func TestUnrelatedFlakyFlowRule(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md", "gx-playwright-e2es", "rerun the flow once")
 }
 
+func TestFailingFlowReadsErrorContextFirst(t *testing.T) {
+	checkAnchors(t, "gx-playwright-e2es/SKILL.md",
+		"## A failing flow: read `error-context.md` before anything else",
+		"clean worktree at HEAD",
+		"`gx tickets ask`",
+	)
+	checkAnchors(t, "gx-implement/SKILL.md", "read its `error-context.md` first", "`gx-playwright-e2es`")
+}
+
 func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
 	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
 	guidelines := normalizeSpace(readFile(t, "gx-test-guidelines.md"))

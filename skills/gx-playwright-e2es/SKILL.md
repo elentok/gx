@@ -66,6 +66,21 @@ the run passes with zero tests.
 **Fix:** use `gx brief -C webui playwright <file> <flow numbers>`. It builds the pattern. Check that
 the run reports the tests you named.
 
+## A failing flow: read `error-context.md` before anything else
+
+**Why:** ticket 18 sat paused 4.9h on a question whose answer was in
+`test-results/<flow>/error-context.md`: an earlier ticket had renamed the link text the flow looked
+for. It had first built a clean worktree at HEAD, and the `node_modules` symlink broke `pnpm install`.
+Tickets 14 and 45b also lost time on hand-built baselines.
+
+**Fix:** on any Playwright failure, in this order:
+
+1. Read the failing flow's `test-results/*/error-context.md` (page snapshot at the failure) with
+   `rg -n` on its directory. It usually names the cause: a renamed label, a missing element.
+2. Only then reproduce. Never build a clean worktree at HEAD or stash your diff to get a baseline.
+   The rerun-once rule below is the whole baseline.
+3. Never run `gx tickets ask` about a failure before step 1.
+
 ## An unrelated failing flow: rerun once, file it, stop
 
 **Why:** ticket 14 reran a whole flow file about 25 times, with hand-built filters, on a failure
