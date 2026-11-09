@@ -38,6 +38,8 @@ export interface SidebarAgent {
   status: SidebarStatus;
   /** A Fix agent (session with fix_of set); drawn with a wrench. */
   fix?: boolean;
+  /** The session this row was built from, for the agent menu. */
+  session: SessionInfo;
 }
 
 export interface SidebarRow {
@@ -95,6 +97,7 @@ const agentRow = (s: SessionInfo): SidebarAgent => ({
   href: agentHref(s.id),
   status: sessionStatus(s),
   fix: !!s.fix_of,
+  session: s,
 });
 
 function cardRow(r: EpicListRow, agents: SidebarAgent[], held: boolean): SidebarRow {
