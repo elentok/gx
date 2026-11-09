@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func ifUse(id, name, input string, sidechain bool) string {
@@ -36,6 +37,37 @@ func assertInFlight(t *testing.T, got, want []InFlightTool) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("in flight = %v, want %v", got, want)
+	}
+}
+
+// An image record is one line of megabytes of base64; the readers behind the
+// chat Loader must still read the transcript around it.
+func TestLoaderReaders_LineOverTenMegabytes(t *testing.T) {
+	t.Parallel()
+	huge := `{"type":"user","timestamp":"2026-01-02T03:04:05Z","message":{"content":"` + strings.Repeat("x", 11*1024*1024) + `"}}`
+	path := filepath.Join(t.TempDir(), "t.jsonl")
+	body := strings.Join([]string{
+		`{"type":"user","timestamp":"2026-01-02T03:04:05Z","message":{"content":"go"}}`,
+		huge,
+		ifUse("a", "Bash", `{"command":"one"}`, false),
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := ReadInFlightTools(path); err != nil {
+		t.Errorf("ReadInFlightTools: %v", err)
+	} else {
+		assertInFlight(t, got, []InFlightTool{{Kind: "shell", Label: "one"}})
+	}
+	if _, err := ReadBackgroundTasks(path, time.Hour, time.Now()); err != nil {
+		t.Errorf("ReadBackgroundTasks: %v", err)
+	}
+	if lines, ok, err := ReadAll(path); err != nil || !ok || len(lines) == 0 {
+		t.Errorf("ReadAll = %d lines, ok=%v, err=%v", len(lines), ok, err)
+	}
+	if _, ok, err := FirstLineTimestamp(path); err != nil || !ok {
+		t.Errorf("FirstLineTimestamp ok=%v, err=%v", ok, err)
 	}
 }
 

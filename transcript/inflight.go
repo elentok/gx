@@ -1,7 +1,6 @@
 package transcript
 
 import (
-	"bufio"
 	"encoding/json"
 	"os"
 	"slices"
@@ -85,26 +84,23 @@ func ReadInFlightTools(path string) ([]InFlightTool, error) {
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
-
 	type open struct {
 		id   string
 		tool InFlightTool
 	}
 	var calls []open
-	for scanner.Scan() {
-		raw := strings.TrimSpace(scanner.Text())
+	err = ForEachLine(f, func(lineBytes []byte) {
+		raw := strings.TrimSpace(string(lineBytes))
 		if raw == "" {
-			continue
+			return
 		}
 		var line unexecutedToolCallLine
 		if json.Unmarshal([]byte(raw), &line) != nil || line.IsSidechain {
-			continue
+			return
 		}
 		if line.isRealUserTurn() {
 			calls = calls[:0]
-			continue
+			return
 		}
 		for _, b := range line.contentBlocks() {
 			switch {
@@ -113,16 +109,13 @@ func ReadInFlightTools(path string) ([]InFlightTool, error) {
 				_ = json.Unmarshal(b.Input, &in)
 				calls = append(calls, open{b.ID, NewInFlightTool(b.Name, in)})
 			case line.Type == "user" && b.Type == "tool_result":
-				for i, c := range calls {
-					if c.id == b.ToolUseID {
-						calls = append(calls[:i], calls[i+1:]...)
-						break
-					}
+				if i := slices.IndexFunc(calls, func(c open) bool { return c.id == b.ToolUseID }); i >= 0 {
+					calls = slices.Delete(calls, i, i+1)
 				}
 			}
 		}
-	}
-	if err := scanner.Err(); err != nil {
+	})
+	if err != nil {
 		return nil, err
 	}
 	out := make([]InFlightTool, 0, len(calls))

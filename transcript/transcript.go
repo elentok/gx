@@ -5,7 +5,6 @@
 package transcript
 
 import (
-	"bufio"
 	"cmp"
 	"encoding/json"
 	"os"
@@ -346,27 +345,30 @@ func FirstLineTimestamp(path string) (time.Time, bool, error) {
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
-	for scanner.Scan() {
-		raw := strings.TrimSpace(scanner.Text())
+	var first time.Time
+	found := false
+	scanErr := ForEachLine(f, func(lineBytes []byte) {
+		if found {
+			return
+		}
+		raw := strings.TrimSpace(string(lineBytes))
 		if raw == "" {
-			continue
+			return
 		}
 		var entry transcriptLine
 		if jsonErr := json.Unmarshal([]byte(raw), &entry); jsonErr != nil {
-			continue
+			return
 		}
 		ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
 		if tsErr != nil {
-			continue
+			return
 		}
-		return ts, true, nil
-	}
-	if scanErr := scanner.Err(); scanErr != nil {
+		first, found = ts, true
+	})
+	if scanErr != nil {
 		return time.Time{}, false, scanErr
 	}
-	return time.Time{}, false, nil
+	return first, found, nil
 }
 
 // Elapsed returns time.Now() minus the session's transcript's first-line
@@ -426,16 +428,14 @@ func ReadAll(path string) (lines []Line, ok bool, err error) {
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
-	for scanner.Scan() {
-		raw := strings.TrimSpace(scanner.Text())
+	scanErr := ForEachLine(f, func(lineBytes []byte) {
+		raw := strings.TrimSpace(string(lineBytes))
 		if raw == "" {
-			continue
+			return
 		}
 		var entry transcriptLine
 		if jsonErr := json.Unmarshal([]byte(raw), &entry); jsonErr != nil {
-			continue
+			return
 		}
 		line := Line{
 			Type:           entry.Type,
@@ -445,12 +445,12 @@ func ReadAll(path string) (lines []Line, ok bool, err error) {
 		}
 		ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
 		if tsErr != nil && !line.IsCompactBoundary() {
-			continue
+			return
 		}
 		line.Timestamp = ts
 		lines = append(lines, line)
-	}
-	if scanErr := scanner.Err(); scanErr != nil {
+	})
+	if scanErr != nil {
 		return nil, false, scanErr
 	}
 	return lines, true, nil

@@ -1,7 +1,6 @@
 package transcript
 
 import (
-	"bufio"
 	"encoding/json"
 	"maps"
 	"os"
@@ -310,9 +309,6 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
-
 	type markerState struct {
 		taskID    string
 		startedAt time.Time
@@ -331,21 +327,21 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 	totalNonBlank := 0
 	parsedOK := 0
 
-	for scanner.Scan() {
-		raw := strings.TrimSpace(scanner.Text())
+	scanErr := ForEachLine(f, func(lineBytes []byte) {
+		raw := strings.TrimSpace(string(lineBytes))
 		if raw == "" {
-			continue
+			return
 		}
 		totalNonBlank++
 
 		var entry backgroundTaskLine
 		if err := json.Unmarshal([]byte(raw), &entry); err != nil {
-			continue
+			return
 		}
 		parsedOK++
 
 		if entry.IsSidechain {
-			continue
+			return
 		}
 
 		// A report on an already-resolved task
@@ -388,7 +384,7 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		if taskID != "" {
 			ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
 			if tsErr != nil {
-				continue
+				return
 			}
 			if _, exists := markers[taskID]; !exists {
 				label := ""
@@ -402,8 +398,8 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 				order = append(order, taskID)
 			}
 		}
-	}
-	if scanErr := scanner.Err(); scanErr != nil {
+	})
+	if scanErr != nil {
 		return BackgroundTaskReading{}, scanErr
 	}
 	if totalNonBlank > 0 && parsedOK == 0 {
