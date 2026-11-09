@@ -99,28 +99,35 @@ Three fixes, so that neither a reboot nor a runaway test can take the laptop dow
 
 Run against a temporary gx server.
 
-- Story 1, 2, 3: start a server on a fixture with several saved sessions whose holders are dead; check with `gx agents` that none has a holder or `claude` process, and all show Exited (crashed). Flows: the agents-sidebar and agents-session flows from the catalog. New scenario to write: a fixture with 40 or more dead sessions and a count of `claude` processes after start (an implementation ticket).
-- Story 4: press Restore on one of the Exited sessions in the web UI; the session runs on its latest conversation. Flow: the existing restore flow in the agents flows.
-- Story 5: `gx agents` shows the dead session as Exited; the other surfaces use the same session state.
-- Story 6: a fixture session with a pending question and Unread, dead at stop: after start it is Exited and its Unread is unchanged. New scenario to write.
-- Story 7: a dead design session after start is Exited; opening the design page shows Restore.
-- Story 8: a claimed ticket run with a live agent before a restart is reattached after it (the restart-run flow).
-- Story 8a: kill a claimed run's agent and the server, start the server, and check the ticket is reopened when the run left nothing behind and paused `iteration-error` otherwise, and that no `claude` starts outside a fresh claim. New scenario to write in the fixture: a claimed run whose agent died with the server.
-- Story 9: restart the server with a live holder: the session keeps running and stays attached (the restart flow).
-- Story 10, 12: set `agents.restore-sessions-on-start` true (and, separately, the `resume-on-start` alias) and restart: dead sessions are resumed once.
-- Story 11: the changelog entry for the default change exists.
-- Story 13, 14, 16: a fixture iteration whose fake test command forks past a low `watchdog.max-tree-processes`; the tree is killed within a few polls, the ticket is paused with reason `process-storm`, one notification is sent, and the process count returns to baseline. New scenario to write: a fork-storm fake agent in the fixture.
-- Story 14, 15: after a `process-storm` pause, no recovery run and no investigate run starts for the ticket.
-- Story 15: the pause flow shows the `process-storm` card with the reason text and Retry and Start over buttons; pressing either ends the pause (the pause flow).
-- Story 17: a fork-storm interactive session is killed and notified, with no ticket pause. New scenario to write.
-- Story 18: a process tree started outside gx with more descendants than the threshold is left alive and notified once.
-- Story 19: set the three `watchdog` keys in the config; a reload changes the behaviour (the settings reload flow); the keys appear in `docs/config-schema.json`.
-- Story 20, 21: check the launch command of an agent, a test command and a herdr pane carries the cap; a fork past the cap fails with "Resource temporarily unavailable".
-- Story 22: `go test ./testmainguard` passes, and fails when a servertest importer lacks the hooks (the table test).
-- Story 23, 24, 25, 26: `gx server install`, then `gx server uninstall`: exit 0, output names the plist path, says a server was stopped and that agent holders keep running; `launchctl print gui/<uid>/com.elentok.gx.server` no longer finds the job; the plist is gone.
-- Story 27: `gx server uninstall` twice: the second prints "not installed" and exits 0.
-- Story 28: on Linux, `gx server uninstall` exits non-zero with the launchd-only message of `install`.
-- Story 29: `gx server install` after an uninstall succeeds and starts the job.
+1. Start a server on a fixture with several saved sessions whose holders are dead; check with `gx agents` that none has a holder or `claude` process, and all show Exited (crashed). Flows: the agents-sidebar and agents-session flows from the catalog. New scenario to write: a fixture with 40 or more dead sessions and a count of `claude` processes after start (an implementation ticket).
+2. Same fixture as story 1 (40 or more dead sessions): after start, the count of `claude` and holder processes is zero.
+3. Same fixture as story 1: after start, the Agents tab shows each dead session as Exited (crashed). Flows: the agents-sidebar and agents-session flows.
+4. Press Restore on one of the Exited sessions in the web UI; the session runs on its latest conversation. Flow: the existing restore flow in the agents flows.
+5. `gx agents` shows the dead session as Exited; the other surfaces use the same session state.
+6. A fixture session with a pending question and Unread, dead at stop: after start it is Exited and its Unread is unchanged. New scenario to write.
+7. A dead design session after start is Exited; opening the design page shows Restore.
+8. A claimed ticket run with a live agent before a restart is reattached after it (the restart-run flow). Also story 8a: kill a claimed run's agent and the server, start the server, and check the ticket is reopened when the run left nothing behind and paused `iteration-error` otherwise, and that no `claude` starts outside a fresh claim. New scenario to write in the fixture: a claimed run whose agent died with the server.
+9. Restart the server with a live holder: the session keeps running and stays attached (the restart flow).
+10. Set `agents.restore-sessions-on-start` true and restart: dead sessions are resumed once.
+11. The changelog entry for the default change exists.
+12. Set the `resume-on-start` alias true and restart: dead sessions are resumed once; an explicit value is kept across the upgrade.
+13. A fixture iteration whose fake test command forks past a low `watchdog.max-tree-processes`; the tree is killed within a few polls and the process count returns to baseline. New scenario to write: a fork-storm fake agent in the fixture.
+14. Same scenario as story 13: the ticket is paused with reason `process-storm`, and no recovery run and no investigate run starts for the ticket.
+15. The pause flow shows the `process-storm` card with the reason text and Retry and Start over buttons; pressing either ends the pause (the pause flow).
+16. Same scenario as story 13: one notification is sent, naming the ticket and the process count.
+17. A fork-storm interactive session is killed and notified, with no ticket pause. New scenario to write.
+18. A process tree started outside gx with more descendants than the threshold is left alive and notified once.
+19. Set the three `watchdog` keys in the config; a reload changes the behaviour (the settings reload flow); the keys appear in `docs/config-schema.json`.
+20. Check the launch command of an agent, a test command and a herdr pane carries the cap; a fork past the cap fails with "Resource temporarily unavailable".
+21. The schema description of `watchdog.ulimit-headroom` says the cap is fixed at launch and that a restart of the agent fixes forks that fail.
+22. `go test ./testmainguard` passes, and fails when a servertest importer lacks the hooks (the table test).
+23. `gx server install`, then `gx server uninstall`: exit 0; `launchctl print gui/<uid>/com.elentok.gx.server` no longer finds the job; the plist is gone.
+24. `gx server uninstall` while the server runs: the server is stopped and the output says so.
+25. `gx server uninstall` output names the plist path it removed.
+26. `gx server uninstall` output says that agent holders keep running.
+27. `gx server uninstall` twice: the second prints "not installed" and exits 0.
+28. On Linux, `gx server uninstall` exits non-zero with the launchd-only message of `install`.
+29. `gx server install` after an uninstall succeeds and starts the job.
 
 ## Out of Scope
 
