@@ -335,6 +335,18 @@ func TestGxGrillingCapsOptionsBlockAtSix(t *testing.T) {
 	}
 }
 
+func TestGxGrillingKeepsLetteredOptionsOutOfYesNo(t *testing.T) {
+	text := normalizeSpace(readFile(t, "gx-grilling/SKILL.md"))
+	for _, want := range []string{
+		"Word a `yes-no` question so that \"Yes\" is your recommended answer",
+		"Never mix lettered options into a `yes-no` question",
+	} {
+		if !strings.Contains(text, normalizeSpace(want)) {
+			t.Errorf("gx-grilling/SKILL.md lacks %q", want)
+		}
+	}
+}
+
 func TestGxWayfinderLetsCallerAllowMoreTickets(t *testing.T) {
 	text := readFile(t, "gx-wayfinder/SKILL.md")
 	if !strings.Contains(text, "unless the calling skill allows more") {
