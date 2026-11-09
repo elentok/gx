@@ -5,9 +5,8 @@ import { AppShell } from "./shell/AppShell";
 import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages";
 import { CertificatePage, SettingsPage, UnknownSettingsPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
 import type { FetchLogins } from "./settings/logins";
-import type { FetchAgentSettings } from "./settings/agents";
 import type { FetchSettings } from "./settings/settingsApi";
-import { AgentsSettingsPage } from "./settings/AgentsSettingsPage";
+import { sectionPath } from "./settings/SettingsShell";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
 import type { AbandonTriage, ApproveTriage, DeleteDesign, OpenDesign, OpenFlow, ResumeSession, StopSession } from "./design/open";
@@ -137,7 +136,6 @@ export interface RouteFetchers {
   fixAgent?: FixAgent;
   authState?: () => Promise<AuthState>;
   logins?: FetchLogins;
-  agentSettings?: FetchAgentSettings;
   settings?: FetchSettings;
   signOut?: () => void | Promise<void>;
 }
@@ -172,7 +170,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     { path: "/settings/password", element: <ChangePasswordPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
     { path: "/settings/authenticator", element: <AuthenticatorPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
     { path: "/settings/certificate", element: <CertificatePage fetchAuth={fetchers.authState} /> },
-    { path: "/settings/agents", element: <AgentsSettingsPage fetchSettings={fetchers.agentSettings} /> },
+    { path: "/settings/agents", element: <Navigate to={sectionPath("Agents")} replace /> },
     { path: "/settings/*", element: <UnknownSettingsPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/triage/*", element: <TriageRoute fetchers={fetchers} /> },

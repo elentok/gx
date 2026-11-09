@@ -84,12 +84,13 @@ test.each([
   await waitFor(() => expect(title()).toBe(expected));
 });
 
-test("/settings/agents renders the Agents page with the Default harness control", async () => {
-  renderAt("/settings/agents", okFor, undefined, undefined, {
-    agentSettings: async () => ({ default: "claude", runner: "auto", projects: [] }),
+test("/settings/agents redirects to the Agents section", async () => {
+  const { router } = renderAt("/settings/agents", okFor, undefined, undefined, {
+    settings: async () => ({ entries: [] }),
+    authState: async () => ({ totp_on: false, setup_code_required: false }) as never,
+    logins: async () => [],
   });
-  await screen.findByText("Default harness");
-  expect(screen.getByRole("button", { name: "Codex" })).toBeTruthy();
+  await waitFor(() => expect(router.state.location.pathname).toBe("/settings/s/agents"));
 });
 
 test("/settings lands on the first section and a section route shows that section's rows", async () => {

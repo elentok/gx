@@ -318,6 +318,7 @@ export function SettingsRow({
   const [draft, setDraft] = useState<string>();
   const [saved, setSaved] = useState(false);
   const [restartNeeded, setRestartNeeded] = useState(false);
+  const [notices, setNotices] = useState<string[]>([]);
   useEffect(() => {
     if (!saved) return;
     const timer = setTimeout(() => setSaved(false), SAVED_MS);
@@ -333,14 +334,17 @@ export function SettingsRow({
   const errorText = refused ? `Not saved: ${refusalText(refusal)}` : write.error && `Not saved: ${write.error}`;
 
   const [confirming, setConfirming] = useState<SettingChange>();
-  const run = (change: SettingChange) =>
+  const run = (change: SettingChange) => {
+    setNotices([]);
     void write.run(() => onWrite([change]), {
       onDone: (res) => {
         setDraft(undefined);
         setSaved(true);
+        setNotices(res.notices ?? []);
         if (res.restart_needed?.includes(entry.key)) setRestartNeeded(true);
       },
     });
+  };
   const send = (change: SettingChange) => (needsConfirm(entry, change) ? setConfirming(change) : run(change));
 
   const Control = CONTROLS[entry.type];
@@ -426,6 +430,11 @@ export function SettingsRow({
           <span aria-hidden>✓ </span>Saved
         </Text>
       )}
+      {notices.map((n) => (
+        <Text key={n} data-mock-part="switch-notice" role="note" fontSize="sm" bg="tone.waiting.bg" color="tone.waiting.fg" px="3" py="2" borderRadius="md">
+          {n}
+        </Text>
+      ))}
       <Text fontFamily="mono" fontSize="11px" color="text.dim">
         {entry.key}
       </Text>

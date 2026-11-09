@@ -6,15 +6,12 @@ async function openAgentsSettings(page: Page) {
   await openMenu(page);
   await page.getByRole("menuitem", nav("More settings...")).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  const row = page.getByRole("link", { name: /^Agents Default:/ });
-  await expect(row).toContainText("Default: Claude");
-  await row.click();
+  await page.getByRole("link", { name: /^Agents/ }).click();
   await expect(page.getByRole("heading", { name: "Agents", exact: true })).toBeVisible();
 }
 
 const control = (page: Page) => page.getByRole("group", { name: "Default harness" });
-const projectRow = (page: Page, project: string) =>
-  page.locator('[data-mock-part="project-list"] > div').filter({ has: page.getByText(project, { exact: true }) });
+const harnessButton = (page: Page, name: "claude" | "codex") => control(page).getByRole("button", { name, exact: true });
 
 test("117. Default harness setting", async ({ page, start }) => {
   const fixture = await start("default-harness");
@@ -22,31 +19,37 @@ test("117. Default harness setting", async ({ page, start }) => {
   await page.setViewportSize({ width: 600, height: 900 });
   await openAgentsSettings(page);
 
-  await expect(control(page).getByRole("button", { name: "Claude" })).toHaveAttribute("aria-pressed", "true");
+  // The old Agents page address still lands on the Agents section.
+  await go(page, "#/settings/agents");
+  await expect(page).toHaveURL(/#\/settings\/s\/agents$/);
+  await expect(page.getByRole("heading", { name: "Agents", exact: true })).toBeVisible();
+
+  await expect(harnessButton(page, "claude")).toHaveAttribute("aria-pressed", "true");
 
   // Switching reports how many waiting tickets follow and how many running agents keep Claude.
   // The running epic's ticket counts as waiting until its worker claims it.
   await expect
     .poll(async () => fixture.cli("tickets", "show", "demo:running-epic/01"), { timeout: 60_000 })
     .toMatch(/^status: claimed$/m);
-  await control(page).getByRole("button", { name: "Codex" }).click();
+  await harnessButton(page, "codex").click();
   await expect(page.locator('[data-mock-part="switch-notice"]')).toHaveText(
     /^Default is now Codex\. 1 waiting ticket and the next design step will use it\. \d+ running agents? keeps? Claude\.$/,
   );
-  await expect(control(page).getByRole("button", { name: "Codex" })).toHaveAttribute("aria-pressed", "true");
+  await expect(harnessButton(page, "codex")).toHaveAttribute("aria-pressed", "true");
   const global = await fixture.globalConfig();
   expect(global.agents["default-harness"]).toBe("codex");
   expect(global["agent-runner"], "other keys stay").toBe("pty");
   expect(global.server, "other keys stay").toBeTruthy();
 
   // A project override appears, then goes; the project's other keys stay.
-  await projectRow(page, "dotfiles").getByRole("button", { name: "Override" }).click();
-  await expect(projectRow(page, "dotfiles").getByRole("button", { name: "Remove override" })).toBeVisible();
-  await expect.poll(async () => (await fixture.projectConfig("dotfiles")).agents?.["default-harness"]).toBe("claude");
+  await go(page, "#/settings/p/dotfiles/s/agents");
+  await page.getByRole("button", { name: "Override for dotfiles" }).first().click();
+  await expect(page.getByText(/Use global value/).first()).toBeVisible();
+  await expect.poll(async () => (await fixture.projectConfig("dotfiles")).agents?.["default-harness"]).toBe("codex");
   const keys = Object.keys(await fixture.projectConfig("dotfiles")).filter((k) => k !== "agents");
   expect(keys.length, "other keys stay").toBeGreaterThan(0);
-  await projectRow(page, "dotfiles").getByRole("button", { name: "Remove override" }).click();
-  await expect(projectRow(page, "dotfiles").getByRole("button", { name: "Override" })).toBeVisible();
+  await page.getByText(/Use global value/).first().click();
+  await expect(page.getByRole("button", { name: "Override for dotfiles" }).first()).toBeVisible();
   await expect.poll(async () => (await fixture.projectConfig("dotfiles")).agents?.["default-harness"]).toBeUndefined();
   expect(Object.keys(await fixture.projectConfig("dotfiles"))).toEqual(expect.arrayContaining(keys));
 
@@ -91,8 +94,7 @@ test("117. Default harness setting", async ({ page, start }) => {
   await expect(await menu()).toContainText("switched by hand");
 });
 
-// 117b (tier without a model) and 117c (headless note) are vitest cases:
-// AgentsPage.sessionView.test.tsx and AgentsSettingsPage.test.tsx.
+// 117b (tier without a model) is a vitest case in AgentsPage.sessionView.test.tsx.
 
 const chips = (page: Page, epic: string) =>
   page.locator(`a[href$="/t/demo:${epic}/01"]`).filter({ hasNotText: "→" }).locator("[data-chips]");

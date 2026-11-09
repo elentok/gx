@@ -103,6 +103,36 @@ describe("SettingsRow", () => {
     expect(queryByText("Saved")).toBeNull();
   });
 
+  describe("default harness row", () => {
+    const harness = (over: Partial<SettingsEntry> = {}) =>
+      entry({ key: "agents.default-harness", path: ["agents", "default-harness"], type: "enum", enum: ["claude", "codex"], default: "claude", value: "claude", ...over });
+
+    it("shows the server's switch notice after the write", async () => {
+      const notice = "Codex is now the default. 2 waiting and 1 running agents keep Claude.";
+      const { getByRole, getByText, onWrite } = setup(harness(), { notices: [notice] });
+      fireEvent.click(getByRole("button", { name: "codex" }));
+      await flush();
+      expect(onWrite).toHaveBeenCalledWith([{ key: "agents.default-harness", value: "codex" }]);
+      expect(getByText(notice)).toBeTruthy();
+    });
+
+    it("a PATH refusal shows Not saved and keeps the previous value", async () => {
+      const { getByRole, getByText, queryByText } = setup(harness(), { refused: true, keys: ["agents.default-harness"], reason: "codex is not on PATH" });
+      fireEvent.click(getByRole("button", { name: "codex" }));
+      await flush();
+      expect(getByText("Not saved: codex is not on PATH")).toBeTruthy();
+      expect(queryByText("Saved")).toBeNull();
+      expect(getByRole("button", { name: "claude" }).getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("a project's override row writes agents.default-harness", async () => {
+      const view = renderThemed(
+        <SettingsRow entry={harness({ global_key: "agents.default-harness", global_value: "claude" })} pendingRestart={false} onWrite={vi.fn(async () => ({}))} project="gx" />,
+      );
+      expect(view.getByText("Override for gx")).toBeTruthy();
+    });
+  });
+
   it("does not mark a field that a multi-key refusal does not name", async () => {
     const { getByRole, queryByText } = setup(entry({}), { refused: true, keys: ["other.key"], reason: "bad" });
     fireEvent.change(getByRole("textbox"), { target: { value: "3" } });
