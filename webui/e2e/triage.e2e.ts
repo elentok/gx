@@ -316,6 +316,10 @@ test.describe("199. Triage journey", () => {
     await expect(view.getByRole("button", { name: /^Review/ })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("group", nav("Approve")).getByRole("button", nav("Approve and write"))).toBeVisible();
     expect(await sideways()).toBe(false);
+    // A row's title has the whole line on a phone, with its controls wrapped beneath, not squeezed to a letter beside them.
+    const rowTitle = page.locator('[data-part="row-title"]').first();
+    await expect(rowTitle).toBeVisible();
+    await expect.poll(async () => (await rowTitle.boundingBox())?.width ?? 0).toBeGreaterThan(280);
 
     // The sidebar drawer shows the badge and popover without scrolling sideways.
     await page.getByRole("button", nav("Show sidebar")).click();

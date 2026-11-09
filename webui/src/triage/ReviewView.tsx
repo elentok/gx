@@ -167,6 +167,7 @@ function RowItem({ row, view, onEdit }: { row: TriageRow; view: TriageView; onEd
     <Box
       display="flex"
       alignItems="center"
+      flexWrap="wrap"
       gap="2"
       px="3"
       py="2"
@@ -176,7 +177,18 @@ function RowItem({ row, view, onEdit }: { row: TriageRow; view: TriageView; onEd
       data-changed={row.person_changed || undefined}
       data-orphan={row.merge_orphan || undefined}
     >
-      <Text flex="1" minW="0" fontSize="sm" truncate title={row.title}>
+      {/* On a phone the title gets its own line, in full; the controls wrap beneath it. From md it shares the line and truncates. */}
+      <Text
+        data-part="row-title"
+        flex={{ base: "1 1 100%", md: "1" }}
+        minW="0"
+        fontSize="sm"
+        overflow="hidden"
+        textOverflow={{ md: "ellipsis" }}
+        whiteSpace={{ base: "normal", md: "nowrap" }}
+        overflowWrap="anywhere"
+        title={row.title}
+      >
         {row.title}
       </Text>
       <Button emphasis="secondary" size="sm" h="28px" px="2" fontSize="sm" flexShrink={0} onClick={() => setShowEvidence(true)}>
