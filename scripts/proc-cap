@@ -1,12 +1,32 @@
 #!/usr/bin/env bash
-# Run a command with a hard cap on this user's process count: current count
-# plus ${GX_PROC_HEADROOM:-200}. macOS counts every process of the uid, so a
-# fixed number would be below the baseline. A fork storm then fails with
+# Run a command with a cap on this user's process count: current count plus
+# ${GX_PROC_HEADROOM:-200}. macOS counts every process of the uid, so a fixed
+# number would be below the baseline. A fork storm then fails with
 # "Resource temporarily unavailable" instead of taking the laptop down.
 # Use it as `go test -exec "$PWD/scripts/proc-cap"`: a test binary that re-runs
 # itself (a missing TestMain hook) once crashed the machine with 4,658 processes.
+#
+# Usage: scripts/proc-cap COMMAND [ARG...]
+#
+# Only the soft limit is set, never above the hard limit, and a lower cap that
+# is already in force is kept. So a nested proc-cap, or one started after
+# another cap, is a no-op instead of "cannot modify limit". Never drop the
+# wrapper when it errors; `gx check` and `gx brief go-test` apply a cap
+# themselves, so do not wrap them.
 set -euo pipefail
+if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+	sed -n '/^# Usage:/,/^set -e/{/^#/p;}' "$0" | sed 's/^# \{0,1\}//'
+	[ $# -eq 0 ] && exit 2
+	exit 0
+fi
 base=$(ps -u "$(id -u)" -o pid= | wc -l)
 cap=$((base + ${GX_PROC_HEADROOM:-200}))
-ulimit -u "$cap"
+hard=$(ulimit -H -u)
+soft=$(ulimit -S -u)
+if [ "$hard" != unlimited ] && [ "$cap" -gt "$hard" ]; then
+	cap=$hard
+fi
+if [ "$soft" = unlimited ] || [ "$cap" -lt "$soft" ]; then
+	ulimit -S -u "$cap"
+fi
 exec "$@"
