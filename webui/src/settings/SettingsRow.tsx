@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
+import { Modal } from "../ui/modal/Modal";
 import { refusalText, useWrite } from "../useWrite";
 import { numberListHint, removeChange, setChange } from "./settingsApi";
 
@@ -267,6 +268,10 @@ const serverText = (e: SettingsEntry) => {
 
 const SAVED_MS = 2000;
 
+// Turning the one-time code on makes the page safer, so only turning it off (or resetting away a set value) asks.
+const needsConfirm = (e: SettingsEntry, change: SettingChange) =>
+  !!e.risky && !(e.key === "server.web.totp" && "value" in change && change.value === true);
+
 export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: SettingsEntry; pendingRestart: boolean; onWrite: WriteSetting }) {
   const write = useWrite({ toastRefusal: false });
   const [draft, setDraft] = useState<string>();
@@ -286,7 +291,8 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
   const refused = refusal !== undefined && (!refusal.keys?.length || refusal.keys.includes(entry.key));
   const errorText = refused ? `Not saved: ${refusalText(refusal)}` : write.error && `Not saved: ${write.error}`;
 
-  const send = (change: SettingChange) =>
+  const [confirming, setConfirming] = useState<SettingChange>();
+  const run = (change: SettingChange) =>
     void write.run(() => onWrite([change]), {
       onDone: (res) => {
         setDraft(undefined);
@@ -294,6 +300,7 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
         if (res.restart_needed?.includes(entry.key)) setRestartNeeded(true);
       },
     });
+  const send = (change: SettingChange) => (needsConfirm(entry, change) ? setConfirming(change) : run(change));
 
   const Control = CONTROLS[entry.type];
   const defaultText = displayValue(entry.default);
@@ -356,6 +363,31 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
       <Text fontFamily="mono" fontSize="11px" color="text.dim">
         {entry.key}
       </Text>
+      {confirming && (
+        <Modal label={`Change ${entryLabel(entry)}?`} onClose={() => setConfirming(undefined)} maxW="440px" p="5" gap="3" data-mock-part="confirm-dialog">
+          <Text as="h3" fontWeight="700" fontSize="16px">
+            Change {entryLabel(entry)}?
+          </Text>
+          <Text fontSize="sm">{entry.confirm_text}</Text>
+          <Text fontSize="13px" color="text.muted">
+            The value is checked before it is written. Nothing is saved until you confirm.
+          </Text>
+          <Box display="flex" gap="2" justifyContent="flex-end">
+            <Button emphasis="secondary" tone="muted" onClick={() => setConfirming(undefined)}>
+              Cancel
+            </Button>
+            <Button
+              tone="deadlocked"
+              onClick={() => {
+                run(confirming);
+                setConfirming(undefined);
+              }}
+            >
+              Change it
+            </Button>
+          </Box>
+        </Modal>
+      )}
     </Box>
   );
 }

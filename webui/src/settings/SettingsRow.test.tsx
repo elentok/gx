@@ -1,4 +1,4 @@
-import { act, fireEvent } from "@testing-library/react";
+import { act, fireEvent, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsEntry, SettingsWriteResult } from "../generated/server";
 import { renderThemed } from "../ui/render";
@@ -196,6 +196,60 @@ describe("SettingsRow", () => {
     it("a chat id string row shows in full", () => {
       const { getByRole } = setup(entry({ key: "notifications.telegram.chat-id", type: "string", set: true, value: "-1001234567890" }));
       expect((getByRole("textbox") as HTMLInputElement).value).toBe("-1001234567890");
+    });
+  });
+
+  describe("risky keys", () => {
+    const risky = (over: Partial<SettingsEntry>) => entry({ risky: true, confirm_text: "This is risky.", ...over });
+    const cases: [string, Partial<SettingsEntry>, (v: ReturnType<typeof setup>) => void, unknown][] = [
+      ["server.web.listen", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
+      ["server.web.dev-url", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
+      ["ticket-store.path", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
+      ["server.tcp-listen", { type: "bool", default: false }, (v) => fireEvent.click(v.getByRole("switch")), true],
+      ["server.web.dev-frontend", { type: "bool", default: false }, (v) => fireEvent.click(v.getByRole("switch")), true],
+      ["server.web.totp", { type: "bool", default: true, set: true, value: true }, (v) => fireEvent.click(v.getByRole("switch")), false],
+      ["server.web.allowed-hosts", { type: "string-list", default: [] }, (v) => {
+        fireEvent.change(v.getByRole("textbox"), { target: { value: "h" } });
+        fireEvent.click(v.getByRole("button", { name: "Add" }));
+      }, ["h"]],
+    ];
+
+    it.each(cases)("%s asks before writing; Cancel writes nothing, Change it writes", async (key, over, act1, value) => {
+      const v = setup(risky({ key, ...over }));
+      act1(v);
+      if (over.type === "string") fireEvent.click(v.getByRole("button", { name: "Save" }));
+      await flush();
+      expect(v.getByRole("dialog")).toBeTruthy();
+      expect(v.onWrite).not.toHaveBeenCalled();
+      fireEvent.click(within(v.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+      await flush();
+      expect(v.queryByRole("dialog")).toBeNull();
+      expect(v.onWrite).not.toHaveBeenCalled();
+
+      act1(v);
+      if (over.type === "string") fireEvent.click(v.getByRole("button", { name: "Save" }));
+      await flush();
+      fireEvent.click(v.getByRole("button", { name: "Change it" }));
+      await flush();
+      expect(v.onWrite).toHaveBeenCalledWith([{ key, value }]);
+      expect(v.queryByRole("dialog")).toBeNull();
+    });
+
+    it("turning the one-time code on needs no dialog", async () => {
+      const v = setup(risky({ key: "server.web.totp", type: "bool", default: true, set: true, value: false }));
+      fireEvent.click(v.getByRole("switch"));
+      await flush();
+      expect(v.queryByRole("dialog")).toBeNull();
+      expect(v.onWrite).toHaveBeenCalledWith([{ key: "server.web.totp", value: true }]);
+    });
+
+    it("shows the entry's confirm text, including that old ticket data is not moved", async () => {
+      const text = "Your existing tickets are not moved.";
+      const v = setup(risky({ key: "ticket-store.path", type: "string", confirm_text: text }));
+      fireEvent.change(v.getByRole("textbox"), { target: { value: "/new" } });
+      fireEvent.click(v.getByRole("button", { name: "Save" }));
+      await flush();
+      expect(v.getByRole("dialog").textContent).toContain("not moved");
     });
   });
 });
