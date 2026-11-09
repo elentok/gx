@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"os"
 	"time"
 
 	"github.com/elentok/gx/codexsession"
@@ -93,16 +94,84 @@ func (h TicketHarness) DiffersFromEarlierRun() bool {
 // frontmatter agent, the queue item of its root, its earlier run and the
 // Default harness. Every site that picks a harness for a ticket calls it.
 func (h *Harness) ResolveTicket(addr tickets.Address, t tickets.Ticket) TicketHarness {
-	earlier := h.EarlierRunHarness(addr)
+	return h.Labeler().resolveTicket(addr, t)
+}
+
+// Labeler resolves many tickets in one pass, reading each project's dir and
+// agents config and each epic's run-log once instead of once per ticket. It
+// is a snapshot of those inputs: build one per request, never keep it, and
+// use it from one goroutine.
+type Labeler struct {
+	h        *Harness
+	dirs     map[string]projectDir
+	defaults map[string]agent.AgentKind
+	events   map[string][]runlog.Event
+}
+
+type projectDir struct {
+	dir string
+	err error
+}
+
+// Labeler starts a fresh per-request resolution pass.
+func (h *Harness) Labeler() *Labeler {
+	return &Labeler{h: h, dirs: map[string]projectDir{}, defaults: map[string]agent.AgentKind{}, events: map[string][]runlog.Event{}}
+}
+
+func (l *Labeler) resolveTicket(addr tickets.Address, t tickets.Ticket) TicketHarness {
+	earlier := l.earlierRunHarness(addr)
 	return TicketHarness{
 		ResolvedHarness: Resolve(Inputs{
 			Frontmatter: t.Agent,
-			QueueItem:   h.queueItemAgent(addr),
+			QueueItem:   l.h.queueItemAgent(addr),
 			EarlierRun:  earlier,
-			Default:     string(h.DefaultHarness(addr.Project)),
+			Default:     string(l.defaultHarness(addr.Project)),
 		}),
 		EarlierRun: earlier,
 	}
+}
+
+func (l *Labeler) defaultHarness(project string) agent.AgentKind {
+	if d, ok := l.defaults[project]; ok {
+		return d
+	}
+	d := l.h.DefaultHarness(project)
+	l.defaults[project] = d
+	return d
+}
+
+func (l *Labeler) projectDir(project string) (string, error) {
+	if d, ok := l.dirs[project]; ok {
+		return d.dir, d.err
+	}
+	dir, err := l.h.projects.Dir(project)
+	l.dirs[project] = projectDir{dir, err}
+	return dir, err
+}
+
+// runEvents is the epic's run-log events, nil when unreadable.
+func (l *Labeler) runEvents(addr tickets.Address) []runlog.Event {
+	key := addr.Project + "\x00" + addr.Epic
+	if evs, ok := l.events[key]; ok {
+		return evs
+	}
+	var evs []runlog.Event
+	if dir, err := l.projectDir(addr.Project); err == nil {
+		if read, _, err := runlog.ReadEvents(dir, addr.Epic); err == nil {
+			evs = read
+		}
+	}
+	l.events[key] = evs
+	return evs
+}
+
+func (l *Labeler) earlierRunHarness(addr tickets.Address) string {
+	for _, r := range runlog.IterationSessions(l.runEvents(addr), addr.ID) {
+		if l.h.sessionRecorded(r) {
+			return string(r.Agent)
+		}
+	}
+	return ""
 }
 
 // queueItemAgent is the agent of the queue item for addr's root, "" when none
@@ -120,20 +189,7 @@ func (h *Harness) queueItemAgent(addr tickets.Address) string {
 // a transcript (Claude) or a rollout (Codex). A run that died before its first
 // prompt left neither, so it does not count and the ticket is never-run.
 func (h *Harness) EarlierRunHarness(addr tickets.Address) string {
-	dir, err := h.projects.Dir(addr.Project)
-	if err != nil {
-		return ""
-	}
-	evs, _, err := runlog.ReadEvents(dir, addr.Epic)
-	if err != nil {
-		return ""
-	}
-	for _, r := range runlog.IterationSessions(evs, addr.ID) {
-		if h.sessionRecorded(r) {
-			return string(r.Agent)
-		}
-	}
-	return ""
+	return h.Labeler().earlierRunHarness(addr)
 }
 
 func (h *Harness) sessionRecorded(r runlog.IterationSession) bool {
@@ -153,6 +209,13 @@ func (h *Harness) sessionRecordedUncached(r runlog.IterationSession) bool {
 		home, err := h.projects.EnvHome()
 		if err != nil {
 			return false
+		}
+		// The usual case sits at the cwd's own slug; the glob opens every
+		// project dir, so it only runs when that stat misses.
+		if r.Cwd != "" {
+			if _, err := os.Stat(transcript.PathIn(home, r.Cwd, r.Session)); err == nil {
+				return true
+			}
 		}
 		found, err := transcript.FindByID(home, r.Session)
 		return err == nil && len(found) > 0

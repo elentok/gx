@@ -50,9 +50,10 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	snap, agents := s.idx.SnapshotAgents()
 	snap.HerdrText, snap.HerdrUnavailable = s.herdr.Banner()
+	labeler := s.harness.Labeler()
 	for i, t := range snap.Tickets {
 		if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
-			snap.Tickets[i].HarnessLabel = s.harness.LabelFor(addr, agents[i], cmp.Or(t.RenderedStatus, t.Status))
+			snap.Tickets[i].HarnessLabel = labeler.LabelFor(addr, agents[i], cmp.Or(t.RenderedStatus, t.Status))
 		}
 		switch t.Status {
 		case string(schema.StatusClaimed):

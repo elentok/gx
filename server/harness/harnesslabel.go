@@ -22,6 +22,12 @@ func harnessDisplayName(h agent.AgentKind) string {
 // agent and the given rendered status. Only open, blocked and claimed tickets
 // carry one.
 func (h *Harness) LabelFor(addr tickets.Address, agentKind string, status string) wire.HarnessLabel {
+	return h.Labeler().LabelFor(addr, agentKind, status)
+}
+
+// LabelFor is Harness.LabelFor sharing this pass's reads across tickets.
+func (l *Labeler) LabelFor(addr tickets.Address, agentKind string, status string) wire.HarnessLabel {
+	h := l.h
 	switch status {
 	case tickets.StatusClaimed.Word():
 		run, ok := h.registry.RunOf(addr.String())
@@ -32,7 +38,7 @@ func (h *Harness) LabelFor(addr tickets.Address, agentKind string, status string
 		model, effort := h.projects.RunAgentConfig(addr.Project, kind, run)
 		return wire.HarnessLabel{Harness: run.Agent, Tier: string(agent.TierWorker), Model: model, Effort: effort}
 	case tickets.StatusOpen.Word(), tickets.StatusBlocked.Word():
-		r := h.ResolveTicket(addr, tickets.Ticket{Agent: agentKind})
+		r := l.resolveTicket(addr, tickets.Ticket{Agent: agentKind})
 		switch r.Source {
 		case HarnessFromFrontmatter, HarnessFromQueueItem:
 			return wire.HarnessLabel{Harness: string(r.Harness), HarnessNote: harnessNotePinned}
