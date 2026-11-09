@@ -98,6 +98,13 @@ stop does not wait for running tickets.`,
 			return runServerInstall(d.dirs(), c.OutOrStdout())
 		},
 	}, &cobra.Command{
+		Use:   "uninstall",
+		Short: "remove the launchd agent so the server no longer starts at login (macOS)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runServerUninstall(d.dirs(), c.OutOrStdout())
+		},
+	}, &cobra.Command{
 		Use:   "start",
 		Short: "install the skill bundle, then start the server detached from this terminal (no-op if already running)",
 		Args:  cobra.NoArgs,
@@ -585,6 +592,18 @@ func runServerInstall(dirs config.Dirs, w io.Writer) error {
 	}
 	_, err = fmt.Fprintf(w, "installed %s\n", a.plistPath())
 	return err
+}
+
+func runServerUninstall(dirs config.Dirs, w io.Writer) error {
+	stateDir, err := dirs.StateDir()
+	if err != nil {
+		return err
+	}
+	a, err := newLaunchdAgent(dirs, stateDir)
+	if err != nil {
+		return err
+	}
+	return a.Uninstall(w)
 }
 
 // runServerStartCmd installs the skill bundle, then starts the server. A

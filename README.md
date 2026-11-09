@@ -107,6 +107,7 @@ gx server start      # detached; no-op if it is already running
 gx server status     # pid, build, web URL, setup code while setup is pending
 gx server restart    # after upgrading gx
 gx server install    # macOS: start at login and after a crash
+gx server uninstall  # macOS: undo install (stops the server, agent holders keep running)
 ```
 
 Work with tickets, then queue them from the tickets UI or from the CLI:

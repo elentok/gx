@@ -3,8 +3,10 @@ package serverctl
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"html"
+	"io"
 	"maps"
 	"os"
 	"os/exec"
@@ -20,11 +22,16 @@ import (
 
 const launchdLabel = "com.elentok.gx.server"
 
+// errLaunchdOnly is what install and uninstall say off macOS.
+var errLaunchdOnly = errors.New("gx server install is only supported on macOS")
+
 // serviceManager is the seam for OS supervisors. Only launchd exists today;
 // a systemd user unit would be a second implementation.
 type serviceManager interface {
 	Installed() bool
 	Install() error
+	// Uninstall boots the job out, removes its definition and reports to w.
+	Uninstall(w io.Writer) error
 	Start() error
 	Stop() error
 	// Status describes the job as the supervisor sees it, for the report
@@ -65,7 +72,7 @@ func launchdEnviron(getenv func(string) string) map[string]string {
 
 func newLaunchdAgent(dirs config.Dirs, stateDir string) (*launchdAgent, error) {
 	if runtime.GOOS != "darwin" {
-		return nil, fmt.Errorf("gx server install is only supported on macOS")
+		return nil, errLaunchdOnly
 	}
 	home, err := dirs.Home()
 	if err != nil {
@@ -228,6 +235,38 @@ func (a *launchdAgent) Install() error {
 	}
 	_ = a.run("bootout", a.target()) // not loaded yet is fine
 	return a.bootstrap()
+}
+
+// Uninstall boots the job out (which stops a running server) and removes the
+// plist. It never runs `launchctl disable`, so a later Install needs no
+// `enable`. A loaded job whose plist is gone is still booted out.
+func (a *launchdAgent) Uninstall(w io.Writer) error {
+	loaded := true
+	if a.output != nil {
+		_, err := a.output("print", a.target())
+		loaded = err == nil
+	}
+	if loaded {
+		if err := a.run("bootout", a.target()); err != nil {
+			return err
+		}
+	}
+	removed := false
+	if err := os.Remove(a.plistPath()); err == nil {
+		removed = true
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if !loaded && !removed {
+		_, err := fmt.Fprintln(w, "not installed")
+		return err
+	}
+	stopped := "no server was running"
+	if loaded {
+		stopped = "stopped the running server"
+	}
+	_, err := fmt.Fprintf(w, "removed %s\n%s\nagent holders keep running\n", a.plistPath(), stopped)
+	return err
 }
 
 // bootstrapAttempts and bootstrapRetryDelay bound how long Install waits for a

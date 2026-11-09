@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/health"
 )
 
@@ -24,6 +26,129 @@ func newTestAgent(t *testing.T) (*launchdAgent, *[][]string) {
 			return nil
 		},
 	}, &calls
+}
+
+func uninstallAgent(t *testing.T, loaded bool) (*launchdAgent, *[][]string) {
+	t.Helper()
+	a, calls := newTestAgent(t)
+	a.output = func(args ...string) (string, error) {
+		if loaded {
+			return "state = running", nil
+		}
+		return "Could not find service", errors.New("exit status 113")
+	}
+	return a, calls
+}
+
+func installPlist(t *testing.T, a *launchdAgent) {
+	t.Helper()
+	if err := os.MkdirAll(a.agentsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(a.plistPath(), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLaunchdUninstall_BootsOutRemovesPlistAndReports(t *testing.T) {
+	a, calls := uninstallAgent(t, true)
+	installPlist(t, a)
+	var out strings.Builder
+
+	if err := a.Uninstall(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := [][]string{{"bootout", "gui/501/com.elentok.gx.server"}}; !reflect.DeepEqual(*calls, want) {
+		t.Errorf("launchctl calls = %v, want %v", *calls, want)
+	}
+	if a.Installed() {
+		t.Error("plist still present")
+	}
+	for _, want := range []string{a.plistPath(), "stopped the running server", "agent holders keep running"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output missing %q:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestLaunchdUninstall_NothingInstalledPrintsNotInstalled(t *testing.T) {
+	a, calls := uninstallAgent(t, false)
+	var out strings.Builder
+
+	if err := a.Uninstall(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.TrimSpace(out.String()) != "not installed" {
+		t.Errorf("output = %q, want \"not installed\"", out.String())
+	}
+	if len(*calls) != 0 {
+		t.Errorf("launchctl calls = %v, want none", *calls)
+	}
+}
+
+func TestLaunchdUninstall_LoadedJobWithoutPlistIsStillBootedOut(t *testing.T) {
+	a, calls := uninstallAgent(t, true)
+	var out strings.Builder
+
+	if err := a.Uninstall(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(*calls) != 1 || (*calls)[0][0] != "bootout" {
+		t.Errorf("launchctl calls = %v, want one bootout", *calls)
+	}
+	if strings.Contains(out.String(), "not installed") {
+		t.Errorf("output = %q", out.String())
+	}
+}
+
+func TestLaunchdUninstall_PlistWithoutLoadedJobSaysNoServerRan(t *testing.T) {
+	a, calls := uninstallAgent(t, false)
+	installPlist(t, a)
+	var out strings.Builder
+
+	if err := a.Uninstall(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(*calls) != 0 || a.Installed() {
+		t.Errorf("calls = %v, installed = %v", *calls, a.Installed())
+	}
+	if !strings.Contains(out.String(), "no server was running") {
+		t.Errorf("output = %q", out.String())
+	}
+}
+
+func TestLaunchdUninstall_InstallAfterwardsWorksWithoutDisableOrEnable(t *testing.T) {
+	a, calls := uninstallAgent(t, true)
+	installPlist(t, a)
+	if err := a.Uninstall(&strings.Builder{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := a.Install(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range *calls {
+		if c[0] == "disable" || c[0] == "enable" {
+			t.Errorf("unexpected launchctl %v", c)
+		}
+	}
+	if !a.Installed() {
+		t.Error("not installed after reinstall")
+	}
+}
+
+func TestNewLaunchdAgent_RefusesOffMacWithSharedMessage(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("refusal only happens off macOS")
+	}
+	if _, err := newLaunchdAgent(config.Dirs{}, ""); !errors.Is(err, errLaunchdOnly) {
+		t.Errorf("err = %v, want errLaunchdOnly", err)
+	}
 }
 
 func TestLaunchdInstall_WritesCrashOnlyKeepAliveAndRunAtLoad(t *testing.T) {
