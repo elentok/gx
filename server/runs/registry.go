@@ -155,9 +155,9 @@ type Registry struct {
 	// released are the runs whose background-task gate recovery forced open.
 	// In memory only: a reclaimed run starts with its gate closed again.
 	released map[string]gateRelease
-	// budgetStops are the runs the budget hard limit is stopping, true once
-	// one path has paused it budget-killed. In memory only.
-	budgetStops map[string]bool
+	// stops are the runs gx is stopping on purpose, each with why and whether
+	// one path has already paused it. In memory only.
+	stops map[string]*stopMark
 }
 
 // Open returns the registry and the handles the previous server left behind.
@@ -414,31 +414,32 @@ func (r *Registry) GateReleased(address string) func() bool {
 	}
 }
 
-// MarkBudgetStop records that the budget hard limit is stopping the run at
-// address, before its agent is interrupted.
-func (r *Registry) MarkBudgetStop(address string) {
+// MarkStop records that gx is stopping the run at address for stop, before
+// its agent is interrupted. The first mark wins.
+func (r *Registry) MarkStop(address string, stop Stop) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.budgetStops == nil {
-		r.budgetStops = map[string]bool{}
+	if r.stops == nil {
+		r.stops = map[string]*stopMark{}
 	}
-	if _, ok := r.budgetStops[address]; !ok {
-		r.budgetStops[address] = false
+	if _, ok := r.stops[address]; !ok {
+		r.stops[address] = &stopMark{stop: stop}
 	}
 }
 
-// ClaimBudgetStop reports whether the run at address is being budget-stopped,
-// and whether this caller is the first to claim it, so the run is paused
-// budget-killed exactly once: by the kill or by the run's own settle.
-func (r *Registry) ClaimBudgetStop(address string) (stopping, first bool) {
+// ClaimStop reports whether the run at address is being stopped, why, and
+// whether this caller is the first to claim it, so the run is paused exactly
+// once: by the kill or by the run's own settle.
+func (r *Registry) ClaimStop(address string) (stop Stop, stopping, first bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	paused, ok := r.budgetStops[address]
+	m, ok := r.stops[address]
 	if !ok {
-		return false, false
+		return Stop{}, false, false
 	}
-	r.budgetStops[address] = true
-	return true, !paused
+	first = !m.paused
+	m.paused = true
+	return m.stop, true, first
 }
 
 // DeleteWatched drops the watched pane t, unless a run has since replaced it
@@ -460,7 +461,7 @@ func (r *Registry) Delete(address string) {
 func (r *Registry) deleteLocked(address string) {
 	delete(r.runs, address)
 	delete(r.released, address)
-	delete(r.budgetStops, address)
+	delete(r.stops, address)
 	r.save()
 }
 

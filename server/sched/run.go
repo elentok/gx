@@ -476,13 +476,14 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 	}()
 	// A run the budget hard limit is stopping never finishes, merges or pauses
 	// for its own reason: the first of it and the kill pauses it budget-killed.
-	if stopping, first := l.Registry.ClaimBudgetStop(ticketAddr); stopping {
-		if t, ok := l.Registry.Tracked(ticketAddr); ok && first {
-			if perr := l.Budget.PauseKilled(t); perr != nil {
-				l.Log.Error("budget kill", "ticket", ticketAddr, "err", perr)
-			}
+	if t, ok := l.Registry.Tracked(ticketAddr); ok {
+		stopping, perr := l.Budget.Stopper().SettleStop(t)
+		if perr != nil {
+			l.Log.Error("stop pause", "ticket", ticketAddr, "err", perr)
 		}
-		return
+		if stopping {
+			return
+		}
 	}
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by ClaimAndLaunch, always parses
 	if l.Recovery.PauseReleasedGate(one.ScratchDir, addr, one.Ticket.Path, run) {

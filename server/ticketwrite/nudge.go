@@ -90,10 +90,8 @@ func (w *Writer) WatchNudgedPane(ref queue.TicketRef, it LiveIter) {
 				break
 			}
 		}
-		if stopping, first := w.d.Registry.ClaimBudgetStop(t.Address); stopping && first {
-			if perr := w.d.Budget.PauseKilled(t); perr != nil {
-				w.d.Log.Error("budget kill", "ticket", t.Address, "err", perr)
-			}
+		if _, perr := w.d.Budget.Stopper().SettleStop(t); perr != nil {
+			w.d.Log.Error("stop pause", "ticket", t.Address, "err", perr)
 		}
 	})
 }

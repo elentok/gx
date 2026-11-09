@@ -6,7 +6,6 @@ package budget
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -16,7 +15,6 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/notify"
-	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/broker"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -303,7 +301,7 @@ func (b *Budget) killRuns(now time.Time, list []runs.TrackedRun) int {
 	deadline := now.Add(grace)
 	var wg sync.WaitGroup
 	for _, t := range list {
-		b.registry.MarkBudgetStop(t.Address)
+		b.registry.MarkStop(t.Address, runs.BudgetStop)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -319,36 +317,25 @@ func (b *Budget) killRuns(now time.Time, list []runs.TrackedRun) int {
 	wg.Wait()
 	time.Sleep(time.Until(deadline))
 	for _, t := range list {
-		if _, first := b.registry.ClaimBudgetStop(t.Address); !first {
-			continue // its run already settled and paused it
-		}
-		if err := b.PauseKilled(t); err != nil {
+		// A run that already settled has paused it; SettleStop then does nothing.
+		if _, err := b.Stopper().SettleStop(t); err != nil {
 			b.log.Error("budget kill", "ticket", t.Address, "err", err)
 		}
 	}
 	return len(list)
 }
 
-// PauseKilled stops the session through its runner, then pauses the ticket
-// stuck. A run that settles or is nudged during a kill uses it too.
-func (b *Budget) PauseKilled(t runs.TrackedRun) error {
-	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
-	if err != nil {
-		return err
+// Stopper is the shared stop-and-pause writer for runs gx stops on purpose.
+func (b *Budget) Stopper() *runs.Stopper {
+	return &runs.Stopper{
+		Registry: b.registry,
+		RunnerOf: b.harness.RunnerOf,
+		ProjectDir: func(project string) (string, error) {
+			dir, _, err := b.projects.Of(project)
+			return dir, err
+		},
+		PauseTicket: b.host.PauseTicket,
 	}
-	dir, _, err := b.projects.Of(addr.Project)
-	if err != nil {
-		return err
-	}
-	r, closeErr := b.harness.RunnerOf(t.Run)
-	if closeErr == nil {
-		closeErr = r.Stop(t.Session)
-	}
-	if err := tickets.EndOpenRound(t.TicketPath, tickets.SourceGx, tickets.HowAuto, ticketops.CloseBudgetKilled); err != nil {
-		closeErr = errors.Join(closeErr, err)
-	}
-	pauseErr := b.host.PauseTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached", t.Run)
-	return errors.Join(closeErr, pauseErr)
 }
 
 // KeepPolled polls the budget until ctx ends.
