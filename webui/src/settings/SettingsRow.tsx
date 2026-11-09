@@ -355,6 +355,7 @@ export function SettingsRow({
       <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
         <Text fontWeight="600">{entryLabel(entry)}</Text>
         {entry.set && entry.type !== "secret" && <Box title="Changed from default" w="7px" h="7px" borderRadius="full" bg="tone.running.fg" />}
+        {entry.risky && <Chip tone="waiting">Careful</Chip>}
         {entry.restart && (
           <Box data-mock-part="restart-badge">
             <Chip tone="waiting">{restartNeeded || pendingRestart ? "Restart needed to apply" : "Needs restart"}</Chip>

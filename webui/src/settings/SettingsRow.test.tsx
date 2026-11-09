@@ -266,6 +266,14 @@ describe("SettingsRow", () => {
       expect(v.queryByRole("dialog")).toBeNull();
     });
 
+    it("a risky row carries a Careful chip and a plain row does not", () => {
+      const v = setup(risky({ key: "server.web.listen", type: "string", default: "a" }));
+      expect(v.getByText("Careful")).toBeTruthy();
+      v.unmount();
+      const plain = setup(entry({ key: "server.log-retention", type: "string", default: "a" }));
+      expect(plain.queryByText("Careful")).toBeNull();
+    });
+
     it("turning the one-time code on needs no dialog", async () => {
       const v = setup(risky({ key: "server.web.totp", type: "bool", default: true, set: true, value: false }));
       fireEvent.click(v.getByRole("switch"));
