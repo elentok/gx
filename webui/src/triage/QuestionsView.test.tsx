@@ -112,3 +112,41 @@ test("after the record changes elsewhere, the next edit builds on the new answer
   await waitFor(() => expect(save).toHaveBeenCalled());
   expect(save.mock.calls.map((c) => [c[0].address, c[0].answers])).toEqual([["gx:follow-ups/02", { q1: "two" }]]);
 });
+
+test("typing a note keeps every character while saves and reloads cross", async () => {
+  // A stand-in server: each save bumps the revision; a refetch answers with the state it had when asked, a beat later.
+  const server = { revision: 4, answers: { "1": "yes" } as Record<string, string> };
+  const rowWith = (answers: Record<string, string>) => ({
+    address: "gx:follow-ups/1",
+    title: "a",
+    questions: [{ id: "1", title: "Ship it?", kind: "yes-no", recommended: "yes" }],
+    answers,
+  });
+  const snapshot = () => viewOf({ revision: server.revision, rows: [rowWith({ ...server.answers })] });
+  const save = vi.fn(async (body: { answers: Record<string, string> }) => {
+    await new Promise((r) => setTimeout(r, 15));
+    server.answers = { ...body.answers };
+    return { revision: ++server.revision };
+  });
+  let setView: (v: TriageView) => void = () => {};
+  function Harness() {
+    const [view, set] = useState(snapshot());
+    setView = set;
+    const refetch = () => {
+      const seen = snapshot();
+      setTimeout(() => setView(seen), 40);
+    };
+    return <QuestionsView project="gx" view={view} refetch={refetch} save={save as never} />;
+  }
+  render(<Harness />);
+  fireEvent.click(screen.getByRole("button", { name: "Note on question 1.1" }));
+  // Typing appends to what is on screen, as a person does.
+  for (const ch of "remember the budget") {
+    const box = screen.getByRole("textbox", { name: "Note text for question 1.1" }) as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: box.value + ch } });
+    await new Promise((r) => setTimeout(r, 12));
+  }
+  await new Promise((r) => setTimeout(r, 1500));
+  expect((screen.getByRole("textbox", { name: "Note text for question 1.1" }) as HTMLTextAreaElement).value).toBe("remember the budget");
+  expect(server.answers["1"]).toBe("yes\nNote: remember the budget");
+});

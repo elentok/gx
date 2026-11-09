@@ -40,15 +40,20 @@ export function QuestionsView({
 }) {
   const round = useMemo(() => roundOf(view.rows), [view.rows]);
   const [answers, setAnswers] = useState<Answers>(() => answersOf(view.rows));
-  // The revision our own saves produced: a view at any other revision changed elsewhere, so it replaces the draft.
-  const ownRevision = useRef(view.revision);
+  // The revisions our own saves produced: a view at any other revision changed elsewhere, so it replaces the draft.
+  const ownRevisions = useRef(new Set([view.revision]));
+  // Edits typed but not saved yet, or saves still in flight: the screen is ahead of any view that arrives meanwhile.
+  const inFlight = useRef(0);
   const latest = useRef({ rows: view.rows, answers, revision: view.revision ?? 0 });
   const saved = useRef(answers);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (view.revision === ownRevision.current) return;
-    ownRevision.current = view.revision;
+    if (ownRevisions.current.has(view.revision)) return;
+    // A view that crossed our edits on the way would erase what was just typed. The save that follows is refused
+    // as stale if the record really changed elsewhere, and that refusal reloads it.
+    if (inFlight.current > 0 || timer.current !== undefined) return;
+    ownRevisions.current.add(view.revision);
     const fresh = answersOf(view.rows);
     setAnswers(fresh);
     // The next edit builds on these, not on the draft the change replaced.
@@ -63,27 +68,35 @@ export function QuestionsView({
     const { rows, answers: now } = latest.current;
     const dirty = changedRows(rows, saved.current, now);
     saved.current = now;
+    timer.current = undefined;
+    inFlight.current++;
     queue.current = queue.current.then(async () => {
+      try {
+        await saveRows();
+      } finally {
+        inFlight.current--;
+      }
+      refetch();
+    });
+    async function saveRows() {
       for (const row of dirty) {
         const res = await save(saveBody(project, latest.current.revision, rows, row, now));
         if (res.refused) {
           if (res.reason !== REASON_STALE) showToast({ type: "error", title: refusalText(res) });
           else showToast({ type: "warning", title: "The plan changed. Your answers were reloaded." });
-          refetch();
           return;
         }
         if (res.revision !== undefined) {
           latest.current.revision = res.revision;
-          ownRevision.current = res.revision;
+          ownRevisions.current.add(res.revision);
         }
       }
-      refetch();
-    });
+    }
   };
 
   const onAnswers = (update: (all: Answers) => Answers) => {
     const next = update(latest.current.answers);
-    const typing = Object.keys(next).some((k) => next[k]?.text !== latest.current.answers[k]?.text);
+    const typing = Object.keys(next).some((k) => next[k]?.text !== latest.current.answers[k]?.text || next[k]?.note !== latest.current.answers[k]?.note);
     latest.current.answers = next;
     setAnswers(next);
     window.clearTimeout(timer.current);
