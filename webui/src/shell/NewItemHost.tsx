@@ -1,11 +1,9 @@
 import { Portal } from "@chakra-ui/react";
-import { useLocation, useNavigate } from "react-router";
-import { useConnectionContext, useConnectionState } from "../connection";
-import { currentAddress } from "./SidebarRows";
+import { useNavigate } from "react-router";
 import { fetchWorktrees, postCreateSession } from "../agents/newSession";
 import { NewSessionForm } from "../agents/NewSessionForm";
 import { NewDesignForm } from "../design/NewDesignForm";
-import { isCurrent, useEpicList } from "../epics/list";
+import { useEpicList } from "../epics/list";
 import { designHref } from "../hrefs";
 import { closeNewItem, useNewItemRequest } from "./newItemOpen";
 import { useShell } from "./ShellContext";
@@ -19,18 +17,6 @@ export function NewItemHost() {
       {request?.kind === "agent" && <AgentDialog />}
     </Portal>
   );
-}
-
-/** The project of the open epic, Design or session page; undefined elsewhere. An opener's own project (the Epics filter) wins over it. */
-function useRouteProject(): string | undefined {
-  const { pathname } = useLocation();
-  const { list } = useEpicList();
-  const snapshot = useConnectionState(useConnectionContext()).snapshot;
-  const address = currentAddress(pathname);
-  if (address) return list?.epics.find((row) => isCurrent(row, address))?.project;
-  const [, kind, id] = pathname.split("/");
-  if (kind === "agents" && id) return snapshot?.sessions?.find((s) => s.id === decodeURIComponent(id))?.project;
-  return undefined;
 }
 
 function DesignDialog() {

@@ -144,7 +144,7 @@ describe("closing the sidebar closes its menus", () => {
       vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("worktrees") ? [] : { epics: [], follow_ups: [], projects: [] }), { status: 200 })),
     );
     setup("desktop");
-    for (const open of [() => openNewDesign({ filterProject: "gx" }), openNewAgent]) {
+    for (const open of [() => openNewDesign(), openNewAgent]) {
       act(open);
       await screen.findByRole("dialog");
       expect(screen.getByText("item")).toBeTruthy();

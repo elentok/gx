@@ -7,7 +7,7 @@ import { postSaveChecks, type SaveChecks } from "../checks/setup";
 import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status";
 import { useConnectionContext } from "../connection";
 import { CardKindFollowUps, type Workspace } from "../generated/server";
-import { openNewDesign, setPageProject } from "../shell/newItemOpen";
+import { openNewDesign } from "../shell/newItemOpen";
 import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
@@ -150,11 +150,6 @@ export function EpicsPage({
     card.scrollIntoView?.({ block: "center" });
     setScrollTo(undefined);
   }, [scrollTo, toggled, list]);
-  const filterProject = filterProjects?.length === 1 ? filterProjects[0] : undefined;
-  useEffect(() => {
-    setPageProject(filterProject);
-    return () => setPageProject(undefined);
-  }, [filterProject]);
   const newDesign = (
     <Button emphasis="main" flexShrink="0" whiteSpace="nowrap" onClick={() => openNewDesign()}>
       New Design

@@ -6,11 +6,10 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { DesignDraft } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { NewItemHost } from "./NewItemHost";
-import { closeNewItem, openNewAgent, openNewDesign, setPageProject } from "./newItemOpen";
+import { closeNewItem, openNewAgent, openNewDesign } from "./newItemOpen";
 
 afterEach(() => {
   closeNewItem();
-  setPageProject(undefined);
   cleanup();
   localStorage.clear();
   vi.unstubAllGlobals();
