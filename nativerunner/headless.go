@@ -50,6 +50,11 @@ type Headless struct {
 	Procs ProcessTable
 	// N is the configured runner wait; zero means agentrunner.DefaultN.
 	N time.Duration
+	// ProcHeadroom is read at each launch: claude's process tree may grow this
+	// far above the process count at that moment. Nil means no cap.
+	ProcHeadroom func() int
+	// ProcCount counts processes for the cap; nil means DefaultProcCount.
+	ProcCount func() (int, error)
 
 	mu       sync.Mutex
 	sessions map[string]*headlessSession
@@ -222,7 +227,8 @@ func (h *Headless) spawn(opts agentrunner.StartOptions, sessionID string, f agen
 	if claude == "" {
 		claude = "claude"
 	}
-	cmd := exec.Command(claude, launchArgs(sessionID, opts.Args)...)
+	name, args := CappedCommand(LiveProcCap(h.ProcHeadroom, h.ProcCount, nil), claude, launchArgs(sessionID, opts.Args))
+	cmd := exec.Command(name, args...)
 	cmd.Dir = opts.Cwd
 	cmd.Env = LaunchEnv(os.Environ(), opts.Env)
 	cmd.Stdin = f.stdin

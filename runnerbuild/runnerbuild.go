@@ -31,6 +31,7 @@ type PtyOverride struct {
 	StopGrace    time.Duration
 	LaunchCaps   claudeui.LaunchProofCaps
 	// ProcHeadroom is the live watchdog.ulimit-headroom; see Pty.ProcHeadroom.
+	// The headless and herdr runners read it too.
 	ProcHeadroom func() int
 }
 
@@ -58,9 +59,16 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 		case agentrunner.ChoiceHerdr:
 			h := herdrrunner.NewIn(herdr.CLI{Env: env}, home, sessionlookup.RootsFrom(env).CodexHome)
 			h.N = n
+			if pty != nil {
+				h.ProcCap = func() int { return nativerunner.LiveProcCap(pty.ProcHeadroom, nil, nil) }
+			}
 			r = h
 		case agentrunner.ChoiceHeadless:
-			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
+			hl := &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
+			if pty != nil {
+				hl.ProcHeadroom = pty.ProcHeadroom
+			}
+			r = hl
 		case agentrunner.ChoicePTY:
 			p := &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n, Env: env}
 			if pty != nil {

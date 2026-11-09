@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/syshealth"
 )
 
@@ -59,6 +60,11 @@ type Runner struct {
 	// cleanup of a closed pane's leftovers. Nil means the real ones.
 	Procs  func() ([]syshealth.Process, error)
 	Signal func(pid int, sig syscall.Signal) error
+
+	// ProcCap is the process cap for an agent launched now; zero or nil means
+	// uncapped. The pane's shell gets it before the agent starts, so the agent
+	// and its children inherit it.
+	ProcCap func() int
 
 	// Home is the home of the Claude transcripts a launch prompt is proved
 	// against. Empty skips the transcript proof.
@@ -138,6 +144,14 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 	tab, err := r.CLI.TabCreate(herdr.TabCreateOptions{WorkspaceID: wsID, Cwd: opts.Cwd, Label: opts.Label, Env: opts.Env})
 	if err != nil {
 		return agentrunner.Session{}, err
+	}
+	if r.ProcCap != nil {
+		if limit := r.ProcCap(); limit > 0 {
+			if err := r.CLI.PaneRun(tab.RootPaneID, nativerunner.UlimitCommand(limit)); err != nil {
+				_ = r.CLI.TabClose(tab.TabID)
+				return agentrunner.Session{}, fmt.Errorf("cap the pane's processes: %w", err)
+			}
+		}
 	}
 	agent, err := r.CLI.AgentStart(herdr.AgentStartOptions{Name: opts.Label, Kind: string(opts.Kind), Pane: tab.RootPaneID, AgentArgs: opts.Args})
 	adopted := false

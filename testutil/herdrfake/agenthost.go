@@ -44,6 +44,13 @@ func RegisterAgentHost(s *State) {
 		return map[string]any{"tab": tabJSON(tab), "root_pane": map[string]string{"pane_id": pane.ID}},
 			Identities{WorkspaceID: wsID, TabID: tab.ID, PaneID: pane.ID}, nil
 	})
+	// A pane run is only recorded in the trace; the fake has no shell.
+	s.Register("pane", "run", func(s *State, argv []string) (any, Identities, error) {
+		if s.Panes[argv[2]] == nil {
+			return nil, Identities{}, fmt.Errorf("pane not found: %s", argv[2])
+		}
+		return map[string]any{}, Identities{PaneID: argv[2]}, nil
+	})
 	s.Register("tab", "list", func(s *State, argv []string) (any, Identities, error) {
 		wsID := flag(argv, "--workspace")
 		tabs := []map[string]any{}

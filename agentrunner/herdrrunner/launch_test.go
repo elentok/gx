@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,26 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
+
+// The pane's shell gets the cap before the agent starts in it.
+func TestStart_CapsThePaneBeforeTheAgentStarts(t *testing.T) {
+	state := herdrfake.NewState(t)
+	_, fakeEnv := herdrfake.StartAgentHostEnv(t, state)
+	r := newTestRunner(fakeEnv)
+	r.ProcCap = func() int { return 1234 }
+	if _, err := r.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
+		t.Fatal(err)
+	}
+	var seq []string
+	for _, e := range state.Trace() {
+		if len(e.Argv) >= 2 && (e.Argv[0] == "pane" && e.Argv[1] == "run" || e.Argv[0] == "agent" && e.Argv[1] == "start") {
+			seq = append(seq, strings.Join(e.Argv[:2], " ")+": "+strings.Join(e.Argv[2:], " "))
+		}
+	}
+	if len(seq) != 2 || !strings.HasPrefix(seq[0], "pane run: ") || !strings.HasSuffix(seq[0], " ulimit -u 1234") || !strings.HasPrefix(seq[1], "agent start: ") {
+		t.Fatalf("pane commands = %q, want the ulimit run, then agent start", seq)
+	}
+}
 
 const launchText = "/gx-implement gx:epic/01"
 

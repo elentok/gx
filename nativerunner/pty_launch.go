@@ -207,14 +207,7 @@ func (p *Pty) launcher() ptyLauncher {
 }
 
 func (p *Pty) procCap() int {
-	if p.ProcHeadroom == nil {
-		return 0
-	}
-	count := p.ProcCount
-	if count == nil {
-		count = DefaultProcCount
-	}
-	return ProcCap(count, p.ProcHeadroom(), p.log)
+	return LiveProcCap(p.ProcHeadroom, p.ProcCount, p.log)
 }
 
 // launchCaps is the launch proof's caps with LaunchCaps' set fields applied.

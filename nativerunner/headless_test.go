@@ -62,6 +62,8 @@ type launchRecord struct {
 	Args []string `json:"args"`
 	Env  []string `json:"env"`
 	Cwd  string   `json:"cwd"`
+	// ProcLimit is the fake's own RLIMIT_NPROC soft limit.
+	ProcLimit uint64 `json:"procLimit"`
 }
 
 // fakeRateLimitReset is the reset time the fake reports for "ratelimit".
@@ -78,7 +80,9 @@ const bgDoneFile = "bg-done"
 // compacts without a command lifecycle, and "exit" quits.
 func fakeClaude() {
 	cwd, _ := os.Getwd()
-	rec, _ := json.Marshal(launchRecord{Args: os.Args[1:], Env: os.Environ(), Cwd: cwd})
+	var lim unix.Rlimit
+	_ = unix.Getrlimit(unix.RLIMIT_NPROC, &lim)
+	rec, _ := json.Marshal(launchRecord{Args: os.Args[1:], Env: os.Environ(), Cwd: cwd, ProcLimit: lim.Cur})
 	_ = os.WriteFile(os.Getenv(fakeClaudeRecord), rec, 0o644)
 
 	var mu sync.Mutex
@@ -330,6 +334,29 @@ func mustEval(t *testing.T, p string) string {
 		t.Fatal(err)
 	}
 	return got
+}
+
+// The launched claude runs under the cap, and keeps its own argv: the
+// launch args are the same as without a cap.
+func TestHeadless_StartLaunchesClaudeUnderTheProcCap(t *testing.T) {
+	h := newHarness(t)
+	// Within the hard limit, or the shell cannot apply it.
+	var hard unix.Rlimit
+	if err := unix.Getrlimit(unix.RLIMIT_NPROC, &hard); err != nil {
+		t.Fatal(err)
+	}
+	limit := min(hard.Max, 3000)
+	h.runner.ProcHeadroom = func() int { return 10 }
+	h.runner.ProcCount = func() (int, error) { return int(limit) - 10, nil }
+	s := h.start(t, "epic-cap")
+
+	rec := h.launch(t)
+	if rec.ProcLimit != limit {
+		t.Errorf("claude's process limit = %d, want %d", rec.ProcLimit, limit)
+	}
+	if i := slices.Index(rec.Args, "--session-id"); i < 0 || rec.Args[i+1] != s.SessionID {
+		t.Errorf("args = %q, want the session id kept", rec.Args)
+	}
 }
 
 func TestHeadless_PromptRunsATurnAndSkipsUnknownLines(t *testing.T) {
