@@ -5,7 +5,7 @@ import type { FetchEpicList } from "../epics/list";
 import { useEpicList } from "../epics/list";
 import { useDevice } from "../useWide";
 import { GLOBAL_SECTIONS, sectionFromSlug, sectionPath, SettingsShellView } from "./SettingsShell";
-import { GLOBAL_TARGET, useSettings, type FetchSettings } from "./settingsApi";
+import { GLOBAL_TARGET, postSettings, useSettings, type FetchSettings, type PostSettings } from "./settingsApi";
 import { fetchAuthState, type AuthState } from "../auth/authState";
 import { CER_LABEL, Fingerprint, PROFILE_LABEL, type CertInfo } from "../auth/cert";
 import { SETTINGS_HREF } from "../hrefs";
@@ -272,8 +272,10 @@ export function SettingsPage({
   fetchAgents = fetchAgentSettings,
   fetchSettings,
   fetchEpics,
+  postChanges = postSettings,
   signOut = signOutThisDevice,
 }: {
+  postChanges?: PostSettings;
   fetchAuth?: () => Promise<AuthState>;
   fetchList?: FetchLogins;
   fetchAgents?: FetchAgentSettings;
@@ -302,6 +304,12 @@ export function SettingsPage({
             totpOn={auth.data.totp_on}
             authenticatorMissing={auth.data.setup_code_required}
             onSignOut={() => void signOut()}
+            pendingRestart={settings.data.pending_restart}
+            onWrite={async (changes) => {
+              const res = await postChanges(GLOBAL_TARGET, changes);
+              if (!res.refused) settings.retry();
+              return res;
+            }}
           />
         ) : (
           <Spinner label="Loading" />

@@ -7,6 +7,7 @@ import { PageIcon } from "../page/PageIcon";
 import { useDevice } from "../useWide";
 import { groupBySection } from "./settingsApi";
 import { Group } from "./parts";
+import { SettingsRow, type WriteSetting } from "./SettingsRow";
 
 /** The seven global sections, in sidebar order. */
 export const GLOBAL_SECTIONS = ["Execution queue", "Budget", "Notifications", "Server", "Agents", "Evolve and recovery", "Ticket store"] as const;
@@ -16,22 +17,6 @@ export const sectionSlug = (section: string) => section.toLowerCase().replace(/[
 export const sectionPath = (section: string) => `/settings/s/${sectionSlug(section)}`;
 
 export const sectionFromSlug = (slug: string | undefined) => GLOBAL_SECTIONS.find((s) => sectionSlug(s) === slug);
-
-const humanize = (segment: string) => {
-  const text = segment.replace(/-/g, " ");
-  return text.charAt(0).toUpperCase() + text.slice(1);
-};
-
-const entryLabel = (e: SettingsEntry) => humanize(e.path[e.path.length - 1] ?? e.key);
-
-function valueText(e: SettingsEntry): string {
-  if (e.type === "secret") return e.set ? "Set" : "Not set";
-  const v = e.set ? e.value : e.default;
-  if (v === undefined || v === null || v === "") return "—";
-  if (typeof v === "boolean") return v ? "on" : "off";
-  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
-  return typeof v === "object" ? JSON.stringify(v) : String(v);
-}
 
 const NavLink = chakra(Link);
 
@@ -70,6 +55,9 @@ export interface ShellProps {
   totpOn: boolean;
   authenticatorMissing?: boolean;
   onSignOut: () => void;
+  /** Startup-only keys changed since the server started. */
+  pendingRestart?: string[];
+  onWrite: WriteSetting;
 }
 
 function Sidebar({ entries, projects, section, totpOn, authenticatorMissing, onSignOut }: ShellProps) {
@@ -145,27 +133,8 @@ const AccountLink = ({ href, children }: { href: string; children: string }) => 
   </chakra.a>
 );
 
-function ReadOnlyRow({ entry }: { entry: SettingsEntry }) {
-  return (
-    <Box px="3.5" py="3" display="grid" gap="1.5" _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}>
-      <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
-        <Text fontWeight="600">{entryLabel(entry)}</Text>
-        <Box flex="1" />
-        <Text fontSize="sm" color="text.muted" data-testid="setting-value">
-          {valueText(entry)}
-        </Text>
-      </Box>
-      <Text fontSize="13px" color="text.muted" maxW="62ch">
-        {entry.description}
-      </Text>
-      <Text fontFamily="mono" fontSize="11px" color="text.dim">
-        {entry.key}
-      </Text>
-    </Box>
-  );
-}
-
 export function SettingsShellView(props: ShellProps) {
+  const { pendingRestart, onWrite } = props;
   const device = useDevice();
   const section = props.section ?? GLOBAL_SECTIONS[0];
   const rows = props.entries.filter((e) => e.section === section);
@@ -176,7 +145,7 @@ export function SettingsShellView(props: ShellProps) {
         <PageHeader title={section} icon={<PageIcon kind="settings" />} />
         <Group>
           {rows.map((e) => (
-            <ReadOnlyRow key={e.key} entry={e} />
+            <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} />
           ))}
         </Group>
       </Box>

@@ -28,7 +28,7 @@ const renderShell = (section?: string, onSignOut = () => {}, totpOn = true) =>
       <Routes>
         <Route
           path="*"
-          element={<SettingsShellView entries={entries} projects={["gx", "ripple"]} section={section} totpOn={totpOn} onSignOut={onSignOut} />}
+          element={<SettingsShellView entries={entries} projects={["gx", "ripple"]} section={section} totpOn={totpOn} onSignOut={onSignOut} onWrite={async () => ({})} />}
         />
       </Routes>
     </MemoryRouter>,
@@ -51,17 +51,17 @@ describe("SettingsShellView", () => {
   });
 
   it("shows the section's rows read-only: label, description, key path and value", () => {
-    const { getByText, queryByText } = renderShell("Execution queue");
+    const { getByText, getByLabelText, queryByText } = renderShell("Execution queue");
     expect(getByText("Max agents")).toBeTruthy();
     expect(getByText("Live agents across every project.")).toBeTruthy();
     expect(getByText("execution-queue.max-agents")).toBeTruthy();
-    expect(getByText("6")).toBeTruthy();
+    expect((getByLabelText("Max agents") as HTMLInputElement).value).toBe("6");
     expect(queryByText("Soft limit.")).toBeNull();
   });
 
   it("shows the default for a key the file does not hold", () => {
-    const { getByText } = renderShell("Budget");
-    expect(getByText("100")).toBeTruthy();
+    const { getByLabelText } = renderShell("Budget");
+    expect((getByLabelText("Soft") as HTMLInputElement).value).toBe("100");
   });
 
   it("lists the scope picker's projects after Global settings", () => {
