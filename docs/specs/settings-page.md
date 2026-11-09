@@ -540,19 +540,19 @@ New flows and scenarios to write (these become implementation tickets):
 scenario for every state; `web-logins` and `default-harness` fit none of the states (they serve the
 account-page and Agents-redirect flows above).
 
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `global-section`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page, reset-link.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `project-section`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page, overridden-chip, reset-link, inherits-global.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `project-identity`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `checks-editor`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page, checks-editor.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `refused-save`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page, reset-link, error-message.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `restart-needed`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page, restart-badge, reset-link, saved-message.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `confirm-dialog`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `search-results`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page, reset-link.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `secrets`, width 1000, scenario `settings`, parts: sidebar, scope-picker, search, page.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `ipad-section`, width 744, scenario `settings`, parts: sidebar, scope-picker, search, page, overridden-chip, reset-link, inherits-global.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `phone-home`, width 390, scenario `settings`, parts: page, search.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `phone-project`, width 390, scenario `settings`, parts: page.
-- `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, state `phone-section`, width 390, scenario `settings`, parts: page, overridden-chip, reset-link, inherits-global.
+- `global-section`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page, reset-link.
+- `project-section`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page, overridden-chip, reset-link, inherits-global.
+- `project-identity`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page.
+- `checks-editor`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page, checks-editor.
+- `refused-save`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page, reset-link, error-message.
+- `restart-needed`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page, restart-badge, reset-link, saved-message.
+- `confirm-dialog`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page.
+- `search-results`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page, reset-link.
+- `secrets`, width 1000, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page.
+- `ipad-section`, width 744, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: sidebar, scope-picker, search, page, overridden-chip, reset-link, inherits-global.
+- `phone-home`, width 390, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: page, search.
+- `phone-project`, width 390, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: page.
+- `phone-section`, width 390, scenario `settings`, mock `/Users/david/.local/share/gx/tickets/gx/settings-page/mocks/04-settings-page-layout.html`, parts: page, overridden-chip, reset-link, inherits-global.
 
 
 ## Out of Scope
