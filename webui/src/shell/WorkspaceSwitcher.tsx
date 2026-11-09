@@ -4,6 +4,7 @@ import type { Workspace, WorkspaceResult } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { GxMenu } from "../ui/menu/Menu";
 import { Modal } from "../ui/modal/Modal";
+import { useFocusFirstField } from "../ui/modal/useFocusFirstField";
 import { refusalText, useWrite } from "../useWrite";
 import { postWorkspace } from "../workspaces/postWorkspace";
 
@@ -22,6 +23,7 @@ export function NewWorkspaceDialog({
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
+  const focusFirst = useFocusFirstField();
   const { run, pending, refusal, error } = useWrite({ toastRefusal: false });
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -36,7 +38,7 @@ export function NewWorkspaceDialog({
           <Text fontWeight="600">New workspace</Text>
           <chakra.input
             aria-label="Workspace name"
-            autoFocus
+            ref={focusFirst}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Name"

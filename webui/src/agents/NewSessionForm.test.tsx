@@ -7,6 +7,7 @@ import { clearCommandListCache, type FetchCommands } from "../commands/useComman
 import type { CreateSession, NewSessionBody } from "./newSession";
 import { ShellContext, type Shell } from "../shell/ShellContext";
 import { NewSessionForm } from "./NewSessionForm";
+import { DeviceContext, type Device } from "../useWide";
 
 const shellStub: Shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding: () => {}, claimHeader: () => () => {} };
 
@@ -24,7 +25,7 @@ const trees: ProjectWorktrees[] = [
 ];
 const accepted: SessionResult = { session: { id: "gx-7" } as never };
 
-function mount(over: { create?: CreateSession; connected?: boolean; prefillProject?: string; fetchCommands?: FetchCommands; workspace?: string } = {}) {
+function mount(over: { create?: CreateSession; connected?: boolean; prefillProject?: string; fetchCommands?: FetchCommands; workspace?: string; device?: Device } = {}) {
   const posts: NewSessionBody[] = [];
   const create: CreateSession = over.create ?? (async (body) => (posts.push(body), accepted));
   const onCreated = vi.fn();
@@ -35,11 +36,13 @@ function mount(over: { create?: CreateSession; connected?: boolean; prefillProje
     subscribe: () => () => {},
   } as unknown as Connection;
   renderThemed(
-    <ConnectionContext.Provider value={conn}>
-      <ShellContext.Provider value={over.workspace === undefined ? undefined : { ...shellStub, workspace: over.workspace }}>
-        <NewSessionForm prefillProject={over.prefillProject} fetchTrees={async () => trees} create={create} fetchCommands={over.fetchCommands} onCreated={onCreated} onClose={onClose} />
-      </ShellContext.Provider>
-    </ConnectionContext.Provider>,
+    <DeviceContext.Provider value={over.device ?? "desktop"}>
+      <ConnectionContext.Provider value={conn}>
+        <ShellContext.Provider value={over.workspace === undefined ? undefined : { ...shellStub, workspace: over.workspace }}>
+          <NewSessionForm prefillProject={over.prefillProject} fetchTrees={async () => trees} create={create} fetchCommands={over.fetchCommands} onCreated={onCreated} onClose={onClose} />
+        </ShellContext.Provider>
+      </ConnectionContext.Provider>
+    </DeviceContext.Provider>,
   );
   return { posts, onCreated, onClose };
 }
@@ -58,6 +61,18 @@ test("fields and defaults: project prefilled, worktree is the project root", asy
   expect(wt.value).toBe("Project root");
   for (const name of ["Name", "First prompt"]) expect(screen.getByRole("textbox", { name })).toBeTruthy();
   for (const name of ["Cancel", "Create session"]) expect(screen.getByRole("button", { name })).toBeTruthy();
+});
+
+test("once the projects load, Name has focus on a wide device and Project and First prompt do not", async () => {
+  mount();
+  await ready();
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" }));
+});
+
+test("on a phone nothing in the form has focus", async () => {
+  mount({ device: "phone" });
+  await ready();
+  expect(screen.getByRole("dialog").contains(document.activeElement) && document.activeElement !== screen.getByRole("dialog")).toBe(false);
 });
 
 test("the picker lists the root and worktrees, filters, and offers the create row", async () => {

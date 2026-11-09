@@ -9,6 +9,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import type { ProjectWorktrees } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { BottomSheet } from "../ui/modal/BottomSheet";
+import { useFocusFirstField } from "../ui/modal/useFocusFirstField";
 import { refusalText, useWrite } from "../useWrite";
 import { useShell } from "../shell/ShellContext";
 import { Field, field } from "./formField";
@@ -79,6 +80,7 @@ export function NewSessionForm({
   onClose: () => void;
 }) {
   const [trees, setTrees] = useState<ProjectWorktrees[]>();
+  const focusFirst = useFocusFirstField();
   const [loadError, setLoadError] = useState(false);
   const [tier, setTier] = useState("worker");
   const { draft, update, clear } = useNewSessionDraft(prefillProject);
@@ -165,7 +167,7 @@ export function NewSessionForm({
             </Field>
             <WorktreePicker rows={rows} picked={picked} creating={draft.create} onPick={pick} />
             <Field label="Name" optional>
-              <chakra.input aria-label="Name" autoComplete="off" spellCheck={false} {...field} h="40px" placeholder={worktreeName} value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
+              <chakra.input ref={focusFirst} aria-label="Name" autoComplete="off" spellCheck={false} {...field} h="40px" placeholder={worktreeName} value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
             </Field>
             <Field label="Tier" caret>
               <chakra.select aria-label="Tier" value={tier} onChange={(e) => setTier(e.target.value)} {...field} h="40px" appearance="none" pr="8">

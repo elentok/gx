@@ -7,7 +7,7 @@ import { renderThemed } from "../ui/render";
 import { DeviceContext } from "../useWide";
 import { ACTIVE_KEY } from "../workspaces/active";
 import { AppShell } from "./AppShell";
-import type { CreateWorkspace } from "./WorkspaceSwitcher";
+import { NewWorkspaceDialog, type CreateWorkspace } from "./WorkspaceSwitcher";
 
 afterEach(() => {
   cleanup();
@@ -103,6 +103,18 @@ test("New workspace… posts the trimmed name, makes it active and closes the di
   await waitFor(() => expect(create).toHaveBeenCalledWith("Fresh"));
   await waitFor(() => expect(screen.queryByLabelText("Workspace name")).toBeNull());
   expect(localStorage.getItem(ACTIVE_KEY)).toBe("Fresh");
+});
+
+test.each([
+  ["desktop", true],
+  ["phone", false],
+] as const)("the New workspace dialog on a %s: Name focused is %s", (device, focused) => {
+  renderThemed(
+    <DeviceContext.Provider value={device}>
+      <NewWorkspaceDialog onCreated={() => {}} onClose={() => {}} />
+    </DeviceContext.Provider>,
+  );
+  expect(document.activeElement === screen.getByLabelText("Workspace name")).toBe(focused);
 });
 
 test("a clash refusal shows inline and keeps the dialog open", async () => {
