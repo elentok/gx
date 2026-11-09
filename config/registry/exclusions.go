@@ -17,6 +17,11 @@ func Exclusions() []Exclusion {
 	for _, k := range []string{"restore-sessions-on-start", "banners", "sounds", "claude-args", "fix-agent-remote-control", "leader-key", "focus-sidebar-key"} {
 		out = append(out, Exclusion{Key: Key("agents", k), Project: true, Reason: reasonIgnored})
 	}
+	// Only the TUI process reads these; the server hardcodes the skill names,
+	// so a web save would show "Saved" and change nothing.
+	for _, k := range []string{"implement", "code-review"} {
+		out = append(out, Exclusion{Key: Key("skills", k), Project: true, Reason: reasonInert})
+	}
 	for _, k := range []KeyPath{
 		Key("execution-queue", "retry-storm-launches"), Key("execution-queue", "spin-cycles"),
 		Key("execution-queue", "spin-window"), Key("budget", "notification-thresholds"),

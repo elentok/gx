@@ -58,10 +58,6 @@ func agentsEntries() []Entry {
 		Description: "Extra command-line arguments passed to every Claude session."})
 	add(a, Entry{Key: Key("agents", "fix-agent-remote-control"), Type: TypeBool,
 		Description: "Start Claude fix-agent sessions with remote control on."})
-	add(a, Entry{Key: Key("skills", "implement"), Type: TypeString, ProjectOverridable: true,
-		Description: "The skill agents run to implement a ticket."})
-	add(a, Entry{Key: Key("skills", "code-review"), Type: TypeStringList, ProjectOverridable: true,
-		Description: "The skills that review an epic's code."})
 	add(a, Entry{Key: Key("agent-runner"), Type: TypeEnum, Enum: runnerChoices(), Restart: true,
 		Description: "How gx runs agents: auto picks for you, or choose herdr, headless or pty."})
 	add(a, Entry{Key: Key("runner-wait"), Type: TypeDuration, Restart: true,

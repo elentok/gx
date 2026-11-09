@@ -196,15 +196,10 @@
       "additionalProperties": false,
       "properties": {
         "code-review": {
-          "description": "The skills that review an epic's code.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
         },
         "implement": {
-          "description": "The skill agents run to implement a ticket.",
-          "type": "string"
+          "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
         }
       },
       "type": "object"

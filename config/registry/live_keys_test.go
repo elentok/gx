@@ -27,7 +27,6 @@ agents.codex.model agents.codex.effort agents.codex.light.model agents.codex.lig
 agents.codex.strongest.model agents.codex.strongest.effort
 agents.restore-sessions-on-start agents.banners.enabled agents.sounds.enabled
 agents.sounds.done agents.sounds.attention agents.claude-args agents.fix-agent-remote-control
-skills.implement skills.code-review
 evolve recovery.enabled recovery.disabled recovery.follow-ups recovery.notify-hold
 ticket-store.commit-debounce ticket-store.push-remote
 `)

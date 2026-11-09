@@ -25,8 +25,6 @@ func TestAgentsEntries(t *testing.T) {
 		{key: Key("agents", "sounds", "attention"), typ: TypeString, section: a},
 		{key: Key("agents", "claude-args"), typ: TypeStringList, section: a},
 		{key: Key("agents", "fix-agent-remote-control"), typ: TypeBool, section: a},
-		{key: Key("skills", "implement"), typ: TypeString, section: a, projectOv: true},
-		{key: Key("skills", "code-review"), typ: TypeStringList, section: a, projectOv: true},
 		{key: Key("agent-runner"), typ: TypeEnum, section: a, restart: true},
 		{key: Key("runner-wait"), typ: TypeDuration, section: a, restart: true},
 		{key: Key("evolve"), typ: TypeEnum, section: ev},
