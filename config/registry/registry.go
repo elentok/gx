@@ -63,6 +63,7 @@ type Entry struct {
 	Key         KeyPath
 	Type        ValueType
 	Min         *float64 // a number's minimum
+	Integer     bool     // a number must be whole
 	Description string
 	Section     Section
 	Enum        []string // allowed values of a TypeEnum
