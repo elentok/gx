@@ -15,13 +15,13 @@ import (
 func TestDesignImages_ListsTheMapsAttachedImages(t *testing.T) {
 	t.Parallel()
 	r := start(t, "design-images")
-	defer r.stop(t)
-	listed := imagestore.List(filepath.Join(fixtureRoot(r), "data", "gx", "tickets", "demo", "design-epic", "images"))
+	defer r.Stop(t)
+	listed := imagestore.List(filepath.Join(r.Root(),"data", "gx", "tickets", "demo", "design-epic", "images"))
 	if len(listed) != spec.DesignImagesCount {
 		t.Errorf("attached images = %d, want %d", len(listed), spec.DesignImagesCount)
 	}
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	if len(list) == 0 {
