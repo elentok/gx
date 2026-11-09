@@ -14,9 +14,23 @@ afterEach(() => {
   cleanup();
 });
 
-function setup(device: Device, needsYou = 0) {
-  const state = { snapshot: { needs_you_total: needsYou, build: "v1.2.3" }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
-  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+let setState: (patch: Partial<ConnectionState>) => void;
+
+function setup(device: Device, needsYou = 0, override: Partial<ConnectionState> = {}) {
+  let state = { snapshot: { needs_you_total: needsYou, build: "v1.2.3" }, connected: true, loadedOnce: true, tick: 0, ...override } as unknown as ConnectionState;
+  const listeners = new Set<() => void>();
+  const conn = {
+    getState: () => state,
+    subscribe: (fn: () => void) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    onEvent: () => () => {},
+  } as unknown as Connection;
+  setState = (patch) => {
+    state = { ...state, ...patch };
+    listeners.forEach((fn) => fn());
+  };
   const router = createMemoryRouter(
     [
       {
@@ -49,6 +63,25 @@ function setup(device: Device, needsYou = 0) {
 const sidebar = () => document.querySelector<HTMLElement>('aside[aria-label="Sidebar"]')!;
 const isOpen = () => sidebar().getAttribute("data-open") === "true";
 const mascot = () => screen.queryByRole("button", { name: "Show sidebar" });
+
+describe("offline empty state", () => {
+  const EMPTY = "Can't reach gx. Retrying…";
+
+  test("shows in place of the page with no snapshot and no connection, and goes when a snapshot arrives", () => {
+    setup("desktop", 0, { snapshot: null, connected: false, loadedOnce: false });
+    expect(screen.getByText(EMPTY)).toBeTruthy();
+    expect(screen.queryByText("item")).toBeNull();
+    act(() => setState({ snapshot: { needs_you_total: 0, build: "v1.2.3" } as ConnectionState["snapshot"], connected: true, loadedOnce: true, liveSnapshot: true }));
+    expect(screen.queryByText(EMPTY)).toBeNull();
+    expect(screen.getByText("item")).toBeTruthy();
+  });
+
+  test("a snapshot while disconnected keeps the page", () => {
+    setup("desktop", 0, { connected: false });
+    expect(screen.queryByText(EMPTY)).toBeNull();
+    expect(screen.getByText("item")).toBeTruthy();
+  });
+});
 
 test("desktop docks the sidebar at 280px, with the brand, the build and a hide button", () => {
   setup("desktop");

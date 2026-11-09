@@ -8,6 +8,7 @@ import { FailedMigrationStrip } from "../restart/FailedMigrationStrip";
 import { NewVersionStrip, useBuildChanged } from "../restart/NewVersionStrip";
 import { MigratingStrip } from "../restart/MigratingStrip";
 import { CloseSignalContext } from "../ui/closeSignal";
+import { EmptyState } from "../ui/empty-state/EmptyState";
 import { hasLayer } from "../ui/modal/layers";
 import { Strip } from "../ui/strip/Strip";
 import { useDevice, type Device } from "../useWide";
@@ -170,7 +171,7 @@ export function AppShell({
     // A dialog opened from the sidebar keeps it open: the swipe belongs to the dialog.
     onClose: () => hasLayer() || shell.close(),
   });
-  const { snapshot } = useConnectionState(conn);
+  const { snapshot, connected } = useConnectionState(conn);
   const { workspaces } = useWorkspaces(conn);
   useShortcuts({ fetcher: fetchEpicList, active, setActive });
   const [newWorkspace, setNewWorkspace] = useState(false);
@@ -357,7 +358,7 @@ export function AppShell({
               <MascotToggle />
             </Box>
           )}
-          {children ?? <Outlet />}
+          {snapshot === null && !connected ? <EmptyState title="Can't reach gx. Retrying…" /> : (children ?? <Outlet />)}
         </Box>
         <JumpPalette fetcher={fetchEpicList} active={active} />
         <CommandPalette />
