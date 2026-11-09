@@ -1,13 +1,18 @@
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
+import { session } from "../agents/agentsTestKit";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { Modal } from "../ui/modal/Modal";
 import { renderThemed } from "../ui/render";
 import { CommandPalette } from "./CommandPalette";
 import { JumpPalette } from "./JumpPalette";
+import { NewItemHost } from "./NewItemHost";
+import { closeNewItem } from "./newItemOpen";
 
 afterEach(() => {
+  closeNewItem();
+  localStorage.clear();
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -17,11 +22,24 @@ function Where() {
   return <div data-testid="where">{useLocation().pathname}</div>;
 }
 
-function setup({ narrow = false, mac = false } = {}) {
+const projects = ["alpha", "beta", "gamma"];
+
+function setup({ narrow = false, mac = false, path = "/stats" } = {}) {
   vi.spyOn(navigator, "platform", "get").mockReturnValue(mac ? "MacIntel" : "Linux x86_64");
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: [], follow_ups: [] }), { status: 200 })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => {
+      const u = String(url);
+      const body = u.includes("worktrees")
+        ? projects.map((project) => ({ project, root: `/${project}`, worktrees: [], tiers: {} }))
+        : u.includes("drafts")
+          ? []
+          : { epics: [{ address: "beta:feat", project: "beta" }], follow_ups: [], projects };
+      return new Response(JSON.stringify(body), { status: 200 });
+    }),
+  );
   if (narrow) vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
-  const state = { snapshot: { sessions: [], placements: [], workspaces: [] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const state = { snapshot: { sessions: [session("s1", "gamma")], placements: [], workspaces: [] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const router = createMemoryRouter(
     [
@@ -32,12 +50,13 @@ function setup({ narrow = false, mac = false } = {}) {
             <input aria-label="field" />
             <JumpPalette active="Default" />
             <CommandPalette />
+            <NewItemHost />
             <Where />
           </>
         ),
       },
     ],
-    { initialEntries: ["/stats"] },
+    { initialEntries: [path] },
   );
   renderThemed(
     <ConnectionContext.Provider value={conn}>
@@ -115,16 +134,41 @@ test("Escape and a click outside close without running anything", () => {
 test("rows are in fixed order, hold no epic or session rows, and filter fuzzily", () => {
   setup();
   press({ key: "e", ctrlKey: true });
-  expect(names()).toEqual(["Go to Epics", "Go to Agents", "Go to Stats", "Go to Settings"]);
+  expect(names()).toEqual(["New design", "New chat", "Go to Epics", "Go to Agents", "Go to Stats", "Go to Settings"]);
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "go ep" } });
   expect(names()[0]).toBe("Go to Epics");
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "newdes" } });
+  expect(names()[0]).toBe("New design");
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "new chat" } });
+  expect(names()[0]).toBe("New chat");
+});
+
+const projectSelect = async () => ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value;
+
+test.each([
+  ["nd", "/stats", "alpha"],
+  ["nd", "/e/beta:feat", "beta"],
+  ["nc", "/stats", "alpha"],
+  ["nc", "/agents/s1", "gamma"],
+])("typing %s then Enter on %s opens the form on %s over the same page", async (filter, path, project) => {
+  setup({ path });
+  press({ key: "e", ctrlKey: true });
+  const box = screen.getByRole("combobox");
+  fireEvent.change(box, { target: { value: filter } });
+  fireEvent.keyDown(box, { key: "Enter" });
+  expect(palette()).toBeNull();
+  await waitFor(async () => expect(await projectSelect()).toBe(project));
+  expect(where()).toBe(path);
+  closeNewItem();
+  await waitFor(() => expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull());
+  expect(where()).toBe(path);
 });
 
 test("Down and Enter run the chosen command", () => {
   setup();
   press({ key: "e", ctrlKey: true });
   const box = screen.getByRole("combobox");
-  fireEvent.keyDown(box, { key: "ArrowDown" });
+  for (let i = 0; i < 3; i++) fireEvent.keyDown(box, { key: "ArrowDown" });
   fireEvent.keyDown(box, { key: "Enter" });
   expect(where()).toBe("/agents");
   expect(palette()).toBeNull();

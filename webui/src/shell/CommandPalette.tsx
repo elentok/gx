@@ -6,6 +6,7 @@ import { Menu, type ListSection } from "../nav/JumpMenu";
 import { isMac } from "../platform";
 import { useWide } from "../useWide";
 import { setCommandOpen, useCommandOpen } from "./commandOpen";
+import { openNewAgent, openNewDesign } from "./newItemOpen";
 import { useShell } from "./ShellContext";
 import { useDismissLayer } from "./useDismissLayer";
 
@@ -31,6 +32,8 @@ export function useCommands(): Command[] {
       },
     });
     return [
+      { id: "new-design", title: "New design", run: () => openNewDesign() },
+      { id: "new-chat", title: "New chat", run: () => openNewAgent() },
       goto("go-epics", "Go to Epics", EPICS_HREF),
       goto("go-agents", "Go to Agents", AGENTS_HREF),
       goto("go-stats", "Go to Stats", STATS_HREF),
