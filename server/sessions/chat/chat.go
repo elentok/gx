@@ -90,6 +90,8 @@ type Chat struct {
 	reportedUsage FileCache[transcript.Usage]
 	// codexTurns caches the model and effort on each rollout's newest turn.
 	codexTurns FileCache[codexsession.TurnModel]
+	// codexContext caches the context tokens of each rollout's newest token_count.
+	codexContext FileCache[int]
 }
 
 // New builds a Chat.

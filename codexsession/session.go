@@ -81,6 +81,13 @@ func LastContextTokensIn(home, cwd, sessionID string) (tokens int, ok bool, err 
 	return tokens, found, nil
 }
 
+// ReadContextTokens is the latest context-token count of the rollout at path,
+// for a caller that already found the file by session id. ok is false while the
+// rollout has no token_count.
+func ReadContextTokens(path string) (tokens int, ok bool, err error) {
+	return readContextTokens(path, "", "")
+}
+
 // VerifyIdentityIn reports whether the Codex home has rollout metadata for
 // sessionID launched in cwd. Token events are not required because a live
 // session may not have produced its first response yet.
@@ -386,7 +393,9 @@ func readContextTokens(path, cwd, sessionID string) (tokens int, ok bool, err er
 	}
 	defer f.Close()
 
-	matchingSession := false
+	// An empty sessionID is the path-based read: the caller already chose the file.
+	anySession := sessionID == ""
+	matchingSession := anySession
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	for scanner.Scan() {
@@ -395,7 +404,7 @@ func readContextTokens(path, cwd, sessionID string) (tokens int, ok bool, err er
 			continue
 		}
 		if line.Type == "session_meta" {
-			matchingSession = line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd)
+			matchingSession = anySession || line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd)
 			continue
 		}
 		if matchingSession && line.Type == "event_msg" && line.Payload.Type == "token_count" && line.Payload.Info.LastTokenUsage.InputTokens > 0 {

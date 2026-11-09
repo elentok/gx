@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -132,6 +133,20 @@ func TestQueueAgentChat_WriteRoutesRefuseAQueueAgentAsUnknown(t *testing.T) {
 		if err != nil || !res.Refused || res.Reason != wire.ReasonSessionUnknown {
 			t.Errorf("%s = %+v, %v; want a refusal as unknown session", name, res, err)
 		}
+	}
+}
+
+func TestQueueAgentRows_ReplyGivesCountAndLevel(t *testing.T) {
+	t.Parallel()
+	h, _, release := rigs.StartQueueChatTokens(t, "hello", 80000)
+	defer release()
+	servertest.WaitFor(t, 10*time.Second, "the row's context count", func() bool {
+		rows := rigs.QueueRows(t, h)
+		return len(rows) == 1 && rows[0].ContextTokens != nil
+	})
+	row := rigs.QueueRows(t, h)[0]
+	if *row.ContextTokens != 80000 || row.ContextLevel != agent.LevelYellow {
+		t.Errorf("context = %d/%q, want 80000/yellow", *row.ContextTokens, row.ContextLevel)
 	}
 }
 

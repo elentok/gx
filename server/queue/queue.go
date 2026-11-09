@@ -54,6 +54,9 @@ type Host interface {
 	RunnerForRun(run runs.Run) agentrunner.Runner
 	Runs() []runs.Run
 	CheckWaitingLabel(address string) string
+	// ContextTokens is the cached context count of the agent's conversation,
+	// zero while there is no reading.
+	ContextTokens(harness, dir, conversationID, state string) int
 	ListSessions() ([]wire.SessionInfo, error)
 	CheckExtraUsage(now time.Time) bool
 	StampEpic(root RootRef, epicPath string, keys ...string)

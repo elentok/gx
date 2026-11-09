@@ -98,20 +98,29 @@ func (t *Turn) Hold() (release func()) {
 
 // Transcript appends an assistant line saying text to the agent's conversation
 // transcript, where the server reads the agent's last words. PTY only.
-func (t *Turn) Transcript(text string) {
+func (t *Turn) Transcript(text string) { t.TranscriptWithTokens(text, 0) }
+
+// TranscriptWithTokens is Transcript on a reply that read inputTokens of
+// context; zero leaves the usage out. PTY only.
+func (t *Turn) TranscriptWithTokens(text string, inputTokens int) {
 	if t.unsupported("Transcript") {
 		return
 	}
 	now := time.Now().UTC()
+	message := map[string]any{
+		"role":    "assistant",
+		"content": []map[string]any{{"type": "text", "text": text}},
+	}
+	if inputTokens > 0 {
+		message["model"] = "claude-opus-5-5"
+		message["usage"] = map[string]any{"input_tokens": inputTokens}
+	}
 	line, _ := json.Marshal(map[string]any{
 		"type": "assistant",
 		// The chat read keys messages on uuid and orders them by timestamp.
 		"uuid":      fmt.Sprintf("turn-%d", now.UnixNano()),
 		"timestamp": now.Format(time.RFC3339Nano),
-		"message": map[string]any{
-			"role":    "assistant",
-			"content": []map[string]any{{"type": "text", "text": text}},
-		},
+		"message":   message,
 	})
 	// Recovery looks under HOME, the chat read under CLAUDE_CONFIG_DIR.
 	for _, path := range []string{

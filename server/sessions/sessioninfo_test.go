@@ -275,6 +275,52 @@ func TestSessionInfoModel_CodexReadsTheNewestRolloutTurn(t *testing.T) {
 	}
 }
 
+func TestSessionInfoContext_CodexRolloutGivesCountAndLevel(t *testing.T) {
+	t.Parallel()
+	tokenCount := func(tokens int) string {
+		return fmt.Sprintf(`{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":%d}}}}`, tokens)
+	}
+	for name, tc := range map[string]struct {
+		lines []string
+		want  int
+	}{
+		"newest token_count wins":   {[]string{tokenCount(30000), tokenCount(80000)}, 80000},
+		"zero reading is skipped":   {[]string{tokenCount(80000), tokenCount(0)}, 80000},
+		"no token_count gives none": {[]string{`{"type":"turn_context","payload":{"model":"gpt-6.1-sol"}}`}, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			home := t.TempDir()
+			dir := filepath.Join(home, "sessions", "2026", "10", "30")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "rollout-conv.jsonl"), []byte(strings.Join(tc.lines, "\n")+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			info := infoManager(nil, home).SessionInfo(sessions.Meta{Harness: "codex", ConversationID: "conv"})
+			if tc.want == 0 {
+				if info.ContextTokens != nil || info.ContextLevel != "" {
+					t.Errorf("context = %v/%q, want none", info.ContextTokens, info.ContextLevel)
+				}
+				return
+			}
+			if info.ContextTokens == nil || *info.ContextTokens != tc.want || info.ContextLevel != agent.LevelYellow {
+				t.Errorf("context = %v/%q, want %d/yellow", info.ContextTokens, info.ContextLevel, tc.want)
+			}
+		})
+	}
+}
+
+func TestSessionInfoContext_HarnessWithNoChatGivesNone(t *testing.T) {
+	t.Parallel()
+	meta := sessions.Meta{Harness: "shell", Dir: "/work/proj", ConversationID: "conv"}
+	info := modelTestServer(t, "/work/proj", replyWithUsage("claude-opus-5-5", 80000)).SessionInfo(meta)
+	if info.ContextTokens != nil || info.ContextLevel != "" {
+		t.Errorf("context = %v/%q, want none", info.ContextTokens, info.ContextLevel)
+	}
+}
+
 func TestSessionInfoModel_ModelSwitchedNote(t *testing.T) {
 	t.Parallel()
 	meta := func(model string) sessions.Meta {

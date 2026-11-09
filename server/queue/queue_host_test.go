@@ -22,6 +22,7 @@ func (f *fakeHost) DefaultHarness(string) agent.AgentKind     { return f.harness
 func (f *fakeHost) RunnerForRun(runs.Run) agentrunner.Runner  { return nil }
 func (f *fakeHost) Runs() []runs.Run                          { return f.live }
 func (f *fakeHost) CheckWaitingLabel(string) string           { return "" }
+func (f *fakeHost) ContextTokens(_, _, _, _ string) int       { return 0 }
 func (f *fakeHost) ListSessions() ([]wire.SessionInfo, error) { return nil, nil }
 func (f *fakeHost) EnsureDraftEpic(string) error              { return nil }
 func (f *fakeHost) StampEpic(RootRef, string, ...string)      {}

@@ -43,10 +43,10 @@ func (c *Chat) ReportedModel(m Meta) string {
 
 // ReportedModelAndContext is ReportedModel plus the context tokens of the
 // newest real assistant reply, from the same cached transcript read. tokens is
-// zero when there is no reading (always for Codex and other harnesses).
+// zero when there is no reading (always for harnesses other than Claude and Codex).
 func (c *Chat) ReportedModelAndContext(m Meta) (model string, tokens int) {
 	if m.Harness == string(harness.Codex) {
-		return c.ReportedCodexTurn(m).Model, 0
+		return c.ReportedCodexTurn(m).Model, c.codexContextTokens(m)
 	}
 	if m.Harness != string(harness.Claude) {
 		return m.Model, 0
@@ -85,6 +85,27 @@ func (c *Chat) ReportedCodexTurn(m Meta) codexsession.TurnModel {
 		c.log.Warn("read codex turn model", "session", m.ID, "err", err)
 	}
 	return codexsession.TurnModel{Model: cmp.Or(turn.Model, m.Model), Effort: cmp.Or(turn.Effort, m.Effort)}
+}
+
+// codexContextTokens is the context tokens of a Codex session's newest
+// token_count, zero while there is no rollout or reading.
+func (c *Chat) codexContextTokens(m Meta) int {
+	home, err := c.src.CodexHome()
+	if err != nil {
+		return 0
+	}
+	path, ok, err := codexsession.RolloutPathIn(home, m.ConversationID)
+	if err != nil || !ok {
+		return 0
+	}
+	tokens, err := c.codexContext.Read(path, func(p string) (int, error) {
+		t, _, err := codexsession.ReadContextTokens(p)
+		return t, err
+	})
+	if err != nil {
+		c.log.Warn("read codex context tokens", "session", m.ID, "err", err)
+	}
+	return tokens
 }
 
 // ModelSwitched reports that the model shown is not the one the launch tier

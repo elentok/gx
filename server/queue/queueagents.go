@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -73,6 +74,9 @@ func (q *Queue) queueAgentRow(t runs.TrackedRun) (wire.SessionInfo, bool) {
 	}
 	if st.State == agentrunner.StateBlocked {
 		info.Status.Message = st.BlockedReason
+	}
+	if tokens := q.host.ContextTokens(t.Agent, t.Cwd, t.Session.SessionID, info.Status.State); tokens > 0 {
+		info.ContextTokens, info.ContextLevel = &tokens, agent.LevelForTokens(tokens)
 	}
 	return info, true
 }

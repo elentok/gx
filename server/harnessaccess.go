@@ -11,9 +11,11 @@ import (
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/sched"
+	"github.com/elentok/gx/server/sessions/chat"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/webauth"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
 )
@@ -27,6 +29,17 @@ type queueHost struct {
 
 // CheckExtraUsage forwards to the budget, which owns the daily notice latch.
 func (h queueHost) CheckExtraUsage(now time.Time) bool { return h.budget.CheckExtraUsage(now) }
+
+// ContextTokens reads the agent's context count through the session chat's cache.
+func (h queueHost) ContextTokens(harness, dir, conversationID, state string) int {
+	if h.sessionChat == nil {
+		return 0
+	}
+	_, tokens := h.sessionChat.ReportedModelAndContext(chat.Meta{
+		Harness: harness, Dir: dir, ConversationID: conversationID, Status: wire.SessionStatus{State: state},
+	})
+	return tokens
+}
 
 // StampEpic forwards to the merger, which owns the epic stamps.
 func (h queueHost) StampEpic(root queue.RootRef, epicPath string, keys ...string) {

@@ -63,6 +63,13 @@ func StartQueueRows(t *testing.T, runner string) (*servertest.Harness, NamedFake
 // release ends the turn.
 func StartQueueChat(t *testing.T, text string) (*servertest.Harness, wire.SessionInfo, func()) {
 	t.Helper()
+	return StartQueueChatTokens(t, text, 0)
+}
+
+// StartQueueChatTokens is StartQueueChat with the agent's reply reporting
+// inputTokens of context.
+func StartQueueChatTokens(t *testing.T, text string, inputTokens int) (*servertest.Harness, wire.SessionInfo, func()) {
+	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
@@ -70,7 +77,7 @@ func StartQueueChat(t *testing.T, text string) (*servertest.Harness, wire.Sessio
 	var release func()
 	held := make(chan struct{})
 	h.OnTurn(func(turn *servertest.Turn) {
-		turn.Transcript(text)
+		turn.TranscriptWithTokens(text, inputTokens)
 		release = turn.Hold()
 		close(held)
 	})
