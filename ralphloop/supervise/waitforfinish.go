@@ -660,10 +660,8 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 		return true, nil
 	}
 
-	held := map[string]bool{}
-	ignored := map[string]bool{}
+	hs := newHoldState()
 	gated := false
-	gone := map[string]bool{}
 	heldMs := 0
 	nextCheckMs := int(BackgroundTaskCheckEvery / time.Millisecond)
 	for {
@@ -678,60 +676,48 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 		gated = gated || reading.AwaitingTurnEnd
 		// A finished report with an ended turn settles the agent: a task that
 		// started before the report is not waited on.
-		reportedAt := finishedReportTime(p)
-		if reading.AwaitingTurnEnd {
-			reportedAt = time.Time{}
-		}
+		reportedAt := reportCutoff(p, reading)
 		stillFresh := reading.AwaitingTurnEnd
 		for _, m := range reading.Tasks {
-			if gone[m.TaskID] && m.Status == transcript.BackgroundTaskOutstandingFresh {
-				continue
-			}
-			if m.Status == transcript.BackgroundTaskOutstandingFresh && !reportedAt.IsZero() && m.StartedAt.Before(reportedAt) {
-				delete(held, m.TaskID)
-				if !ignored[m.TaskID] {
-					ignored[m.TaskID] = true
-					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("agent reported finished, task %s ignored", m.TaskID)); err != nil {
+			id := m.TaskID
+			switch classifyTask(m, reportedAt, hs.isGone) {
+			case taskGone:
+			case taskIgnored:
+				if hs.ignore(id) {
+					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("agent reported finished, task %s ignored", id)); err != nil {
 						return false, err
 					}
 				}
-				continue
-			}
-			if m.Status == transcript.BackgroundTaskOutstandingFresh {
+			case taskLive:
 				stillFresh = true
-			}
-			switch m.Status {
-			case transcript.BackgroundTaskOutstandingFresh:
-				if !held[m.TaskID] {
-					held[m.TaskID] = true
+				if hs.hold(id) {
 					gated = true
-					if err := p.LogGateEvent(events.BackgroundTaskGateHeld, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID)); err != nil {
+					if err := p.LogGateEvent(events.BackgroundTaskGateHeld, sessionID, id, fmt.Sprintf("background task %s", id)); err != nil {
 						return false, err
 					}
 				}
-			case transcript.BackgroundTaskResolved:
-				if held[m.TaskID] {
-					delete(held, m.TaskID)
-					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID)); err != nil {
-						return false, err
-					}
+			default:
+				if m.Status != transcript.BackgroundTaskResolved && m.Status != transcript.BackgroundTaskOutstandingAgedOut {
+					continue
 				}
-			case transcript.BackgroundTaskOutstandingAgedOut:
-				if held[m.TaskID] {
-					delete(held, m.TaskID)
-					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("background task %s aged out", m.TaskID)); err != nil {
+				if hs.release(id) {
+					detail := fmt.Sprintf("background task %s", id)
+					if m.Status == transcript.BackgroundTaskOutstandingAgedOut {
+						detail += " aged out"
+					}
+					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, detail); err != nil {
 						return false, err
 					}
 				}
 			}
 		}
 		if stillFresh && d.GateReleased != nil && d.GateReleased() {
-			for id := range held {
+			for id := range hs.held {
 				if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: recovery forced the release", id)); err != nil {
 					return false, err
 				}
 			}
-			clear(held)
+			clear(hs.held)
 			stillFresh = false
 		}
 		if !stillFresh {
@@ -747,7 +733,7 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 
 		if heldMs >= nextCheckMs {
 			nextCheckMs += int(BackgroundTaskCheckEvery / time.Millisecond)
-			released, err := checkHeldTasks(d, p, sessionID, held, gone)
+			released, err := checkHeldTasks(d, p, sessionID, hs)
 			if err != nil {
 				return false, err
 			}
@@ -756,7 +742,7 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 			}
 		}
 		if heldMs >= int(holdCap()/time.Millisecond) {
-			return false, pauseBackgroundTaskHold(p, sessionID, reading.Tasks, held)
+			return false, pauseBackgroundTaskHold(p, sessionID, reading.Tasks, hs.held)
 		}
 		pollMs := SmartZonePollMs
 		if p.FinishTimeoutMs > 0 {

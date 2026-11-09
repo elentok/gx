@@ -38,23 +38,107 @@ func BackgroundTaskLive(d deps.Deps, p LaunchParams, sessionID string) bool {
 	if reading.AwaitingTurnEnd {
 		return true
 	}
-	reportedAt := finishedReportTime(p)
+	reportedAt := reportCutoff(p, reading)
+	processDead := func(id string) bool {
+		if d.ReadBackgroundProcess == nil {
+			return false
+		}
+		proc, err := d.ReadBackgroundProcess(sessionID, id)
+		return err == nil && proc.Known && !proc.Alive
+	}
 	for _, m := range reading.Tasks {
-		if m.Status != transcript.BackgroundTaskOutstandingFresh {
-			continue
+		if classifyTask(m, reportedAt, processDead) == taskLive {
+			return true
 		}
-		if !reportedAt.IsZero() && m.StartedAt.Before(reportedAt) {
-			continue
-		}
-		if d.ReadBackgroundProcess != nil {
-			if proc, err := d.ReadBackgroundProcess(sessionID, m.TaskID); err == nil && proc.Known && !proc.Alive {
-				continue
-			}
-		}
-		return true
 	}
 	return false
 }
+
+type taskClass int
+
+const (
+	// taskOther is any task that is not outstanding-fresh.
+	taskOther taskClass = iota
+	// taskGone is a fresh task whose process is known to be gone.
+	taskGone
+	// taskIgnored is a fresh task that started before the finished report.
+	taskIgnored
+	// taskLive is a fresh task a finish must wait on.
+	taskLive
+)
+
+// classifyTask is the one test of whether a task keeps a finish waiting, shared
+// by the gate wait and BackgroundTaskLive so the two cannot drift. gone says
+// whether a task's process is known dead; reportedAt is zero when no finished
+// report applies.
+func classifyTask(m transcript.BackgroundTaskMarker, reportedAt time.Time, gone func(id string) bool) taskClass {
+	if m.Status != transcript.BackgroundTaskOutstandingFresh {
+		return taskOther
+	}
+	if gone(m.TaskID) {
+		return taskGone
+	}
+	if !reportedAt.IsZero() && m.StartedAt.Before(reportedAt) {
+		return taskIgnored
+	}
+	return taskLive
+}
+
+// reportCutoff is the finished-report time that tasks must have started after.
+// A finished report with an ended turn settles the agent, but a turn still
+// running (AwaitingTurnEnd) voids the report.
+func reportCutoff(p LaunchParams, reading backgroundtask.Reading) time.Time {
+	if reading.AwaitingTurnEnd {
+		return time.Time{}
+	}
+	return finishedReportTime(p)
+}
+
+// holdState owns the sets one background-task gate wait tracks: the tasks it is
+// holding on, the ones it ignores because they predate the finished report, and
+// the ones whose process vanished.
+type holdState struct {
+	held, ignored, gone map[string]bool
+}
+
+func newHoldState() *holdState {
+	return &holdState{held: map[string]bool{}, ignored: map[string]bool{}, gone: map[string]bool{}}
+}
+
+// hold marks id held and reports whether it is newly held.
+func (s *holdState) hold(id string) bool {
+	if s.held[id] {
+		return false
+	}
+	s.held[id] = true
+	return true
+}
+
+// release drops id from the held set and reports whether it was held.
+func (s *holdState) release(id string) bool {
+	was := s.held[id]
+	delete(s.held, id)
+	return was
+}
+
+// ignore drops id from the held set, marks it ignored and reports whether that
+// is new.
+func (s *holdState) ignore(id string) bool {
+	delete(s.held, id)
+	if s.ignored[id] {
+		return false
+	}
+	s.ignored[id] = true
+	return true
+}
+
+// markGone moves id from held to gone.
+func (s *holdState) markGone(id string) {
+	delete(s.held, id)
+	s.gone[id] = true
+}
+
+func (s *holdState) isGone(id string) bool { return s.gone[id] }
 
 // BackgroundTaskHoldCap is the one cap on every live-task hold: a task, or a
 // turn a task woke, that outlasts it pauses the ticket instead of waiting on.
@@ -102,15 +186,14 @@ const BackgroundTaskCheckEvery = 10 * time.Minute
 // line; it types nothing to the agent and never kills a task. A task whose
 // process is gone with no notification in the transcript is released, since
 // nothing will ever resolve it. A quiet output file is never a reason.
-func checkHeldTasks(d deps.Deps, p LaunchParams, sessionID string, held, gone map[string]bool) (bool, error) {
+func checkHeldTasks(d deps.Deps, p LaunchParams, sessionID string, s *holdState) (bool, error) {
 	released := false
-	for id := range held {
+	for id := range s.held {
 		reason := fmt.Sprintf("background task %s: state unknown", id)
 		if d.ReadBackgroundProcess != nil {
 			if proc, err := d.ReadBackgroundProcess(sessionID, id); err == nil && proc.Known {
 				if !proc.Alive && !notified(d, p, sessionID, id) {
-					delete(held, id)
-					gone[id] = true
+					s.markGone(id)
 					released = true
 					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: process gone, no notification", id)); err != nil {
 						return false, err
