@@ -23,6 +23,17 @@ test("the header subtitle says Chat before the project", async () => {
   expect(screen.getByTestId("page-header-subtitle").textContent).toBe("Chat · proj");
 });
 
+test("a Triage session links to its project's triage page and a plain one does not", async () => {
+  render([session("s-1", "proj", { name: "one", flow: "triage", flow_key: "proj" })], "/agents/s-1", true, chatOf(chat()));
+  const link = await screen.findByRole("link", { name: /Open triage page/ });
+  expect(link.getAttribute("href")).toBe("#/triage/proj");
+  expect(screen.queryByRole("link", { name: /Open design page/ })).toBeNull();
+  cleanup();
+  render([session("s-2", "proj", { name: "two" })], "/agents/s-2", true, chatOf(chat()));
+  await screen.findByRole("heading", { name: /two/ });
+  expect(screen.queryByRole("link", { name: /Open triage page/ })).toBeNull();
+});
+
 test("renders messages, the truncation note and the background strip", async () => {
   render(
     [session("s-1", "p")],

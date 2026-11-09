@@ -9,6 +9,7 @@ test("actionableCount ignores Design and Queue sessions and counts a Fix agent",
     session("fix", "p", { ...asks, ticket: "gx:m/07" }),
     session("design", "p", { ...asks, design: true }),
     session("queue", "p", { ...asks, queue: true, status: { state: "blocked" } }),
+    session("triage", "p", { ...asks, flow: "triage", flow_key: "p", status: { state: "blocked" } }),
   ];
   expect(actionableCount(sessions)).toBe(2);
 });

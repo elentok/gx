@@ -6,9 +6,9 @@ import { hasChat, useSessionChat, type FetchChat } from "../design/chat";
 import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner";
 import { ScreenModal } from "../design/ScreenModal";
 import type { FetchScreen } from "../design/screen";
-import { designOf, promptable } from "../design/view";
+import { designOf, isTriage, promptable } from "../design/view";
 import type { SessionInfo } from "../generated/server";
-import { designHref } from "../hrefs";
+import { designHref, triageHref } from "../hrefs";
 import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
@@ -25,6 +25,14 @@ function DesignLink({ map, ml }: { map: string; ml?: string }) {
   return (
     <Link fontSize="sm" ml={ml} color="tone.running.fg" href={designHref(map)}>
       Open design page →
+    </Link>
+  );
+}
+
+function TriageLink({ project }: { project: string }) {
+  return (
+    <Link fontSize="sm" color="tone.running.fg" href={triageHref(project)}>
+      Open triage page →
     </Link>
   );
 }
@@ -50,6 +58,7 @@ function SessionHeader({
           <>
             <StatusMark session={s} />
             {map && <DesignLink map={map} />}
+            {isTriage(s) && <TriageLink project={s.project} />}
             {actions}
           </>
         }
@@ -112,9 +121,10 @@ function sendReason(s: SessionInfo, connected: boolean): string | undefined {
 }
 
 /** Which kind of gx-driven agent this is; undefined for a plain session. */
-function drivenKind(s: SessionInfo): "Queue" | "Design" | undefined {
+function drivenKind(s: SessionInfo): "Queue" | "Design" | "Triage" | undefined {
   if (s.queue) return "Queue";
   if (s.design) return "Design";
+  if (isTriage(s)) return "Triage";
 }
 
 /** The composer stays off for a gx-driven agent until a person confirms; selecting another session resets it. */

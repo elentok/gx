@@ -1,5 +1,6 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
 import { SessionExitCrashed, SessionWorking, type SessionInfo } from "../generated/server";
+import { isTriage } from "../design/view";
 import { hasAttentionMarks, isActionable, statusMark } from "./rules";
 
 /** The status glyph; Working is a spinner, as in the mock. */
@@ -23,6 +24,11 @@ export function SessionGlyphs({ session: s }: { session: SessionInfo }) {
       {s.design && (
         <Text as="span" role="img" aria-label="Design" fontSize="xs" color="kind.design.fg">
           ◆
+        </Text>
+      )}
+      {isTriage(s) && (
+        <Text as="span" role="img" aria-label="Triage" fontSize="xs" color="kind.design.fg">
+          ◇
         </Text>
       )}
     </>

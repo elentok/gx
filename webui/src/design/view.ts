@@ -3,6 +3,9 @@ import type { SessionInfo } from "../generated/server";
 /** A Design's session sits on a ticket of its map epic, or on the epic itself before Chart makes the map. */
 export const designOf = (s: SessionInfo) => (s.design && s.ticket ? s.ticket.split("/")[0] : undefined);
 
+/** A Triage's session is linked to its project by flow, not by a ticket. */
+export const isTriage = (s: SessionInfo) => s.flow === "triage";
+
 const byNewest = (a: SessionInfo, b: SessionInfo) => Date.parse(b.status_changed_at) - Date.parse(a.status_changed_at);
 
 const byNewestRun = (a: SessionInfo, b: SessionInfo) => Date.parse(b.run_started_at) - Date.parse(a.run_started_at);

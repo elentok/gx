@@ -254,6 +254,7 @@ test("Retry on an auth failure posts continue with the last message id", async (
 const driven = [
   { kind: "Queue", over: { queue: true } },
   { kind: "Design", over: { design: true } },
+  { kind: "Triage", over: { flow: "triage", flow_key: "p" } },
 ];
 
 test.each(driven)("a $kind agent opens with the composer off; confirm turns it on", async (c) => {

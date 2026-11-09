@@ -7,10 +7,11 @@ import {
   SessionWorking,
   type SessionInfo,
 } from "../generated/server";
+import { isTriage } from "../design/view";
 import type { Tone } from "../ui/tone";
 
-/** Queue and Design agents carry only a status mark: no Unread, no Actionable, no count. */
-export const hasAttentionMarks = (s: SessionInfo) => !s.queue && !s.design;
+/** Queue, Design and Triage agents carry only a status mark: no Unread, no Actionable, no count. */
+export const hasAttentionMarks = (s: SessionInfo) => !s.queue && !s.design && !isTriage(s);
 
 /** A Blocked session always waits on the person, with or without a recorded reason. */
 export const isActionable = (s: SessionInfo) => hasAttentionMarks(s) && (!!s.actionable.reason || s.status.state === SessionBlocked);

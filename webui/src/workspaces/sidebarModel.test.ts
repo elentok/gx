@@ -115,6 +115,13 @@ describe("buildSidebar", () => {
     expect(s.rows[0].ring).toBeUndefined();
   });
 
+  it("keeps a Triage session out of the chat rows: it sits under Other", () => {
+    const sessions = [session("t1", "p", { flow: "triage", flow_key: "p" })];
+    const s = buildSidebar({ ...base, rows: [], sessions, placements: [place("t1", "other")] });
+    expect(s.rows).toEqual([]);
+    expect(s.other.map((a) => a.id)).toEqual(["t1"]);
+  });
+
   it("numbers only own rows, 1 to 9", () => {
     const rows = Array.from({ length: 11 }, (_, i) => row(`p:e${i}`, {}));
     rows.push(row("p:h", { section: SectionOnHold }));
