@@ -4,7 +4,7 @@ import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../gener
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { refusalText, useWrite } from "../useWrite";
-import { removeChange, setChange } from "./settingsApi";
+import { numberListHint, removeChange, setChange } from "./settingsApi";
 
 export const entryLabel = (e: SettingsEntry) => {
   const text = (e.path[e.path.length - 1] ?? e.key).replace(/-/g, " ");
@@ -34,6 +34,7 @@ interface ControlProps {
   pending: boolean;
   setDraft: (d: string | undefined) => void;
   save: (value: unknown) => void;
+  remove: () => void;
 }
 
 const HINTS: Record<string, string> = { duration: "e.g. 30s, 5m, 2h", size: "e.g. 50G" };
@@ -130,8 +131,127 @@ function EnumControl({ entry, draft, pending, save }: ControlProps) {
   );
 }
 
+const listItems = (e: SettingsEntry): unknown[] => {
+  const v = e.set ? e.value : e.default;
+  return Array.isArray(v) ? v : [];
+};
+
+// Each add or remove saves the whole list; an empty list is a real value, not a reset.
+function ListControl({ entry, pending, save }: ControlProps) {
+  const numeric = entry.type === "number-list";
+  const items = listItems(entry);
+  const [text, setText] = useState("");
+  const [problem, setProblem] = useState<string>();
+  const add = () => {
+    const value = text.trim();
+    if (value === "") return;
+    const hint = numeric ? numberListHint(value) : undefined;
+    if (hint || (numeric && value.includes(","))) {
+      setProblem(hint ?? "Add one number at a time");
+      return;
+    }
+    setProblem(undefined);
+    setText("");
+    save([...items, numeric ? Number(value) : value]);
+  };
+  return (
+    <Box display="grid" gap="2" w="100%">
+      <Box display="flex" gap="1.5" flexWrap="wrap" data-testid="list-tags">
+        {items.length === 0 && (
+          <Text fontSize="sm" color="text.dim">
+            Empty list
+          </Text>
+        )}
+        {items.map((item, i) => (
+          <Box key={i} display="inline-flex" alignItems="center" gap="1.5" px="2.5" py="0.5" borderWidth="1px" borderColor="border" borderRadius="full" fontFamily="mono" fontSize="12.5px">
+            {String(item)}
+            <chakra.button type="button" aria-label={`Remove ${String(item)}`} disabled={pending} onClick={() => save(items.filter((_, j) => j !== i))} color="text.dim">
+              ×
+            </chakra.button>
+          </Box>
+        ))}
+      </Box>
+      <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
+        <chakra.input
+          type="text"
+          aria-label={`Add to ${entryLabel(entry)}`}
+          aria-invalid={problem ? true : undefined}
+          value={text}
+          borderColor={problem ? "tone.deadlocked.fg" : "border"}
+          onChange={(e) => setText(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          {...inputProps}
+        />
+        <Button size="sm" disabled={pending || text.trim() === ""} onClick={add}>
+          Add
+        </Button>
+      </Box>
+      {problem && (
+        <Text role="alert" fontSize="xs" color="tone.deadlocked.fg">
+          {problem}
+        </Text>
+      )}
+    </Box>
+  );
+}
+
+// The server never sends a secret's value; the field is write-only and emptied the moment it is sent.
+function SecretControl({ entry, pending, save, remove }: ControlProps) {
+  const [replacing, setReplacing] = useState(false);
+  const [text, setText] = useState("");
+  const done = () => {
+    setText("");
+    setReplacing(false);
+  };
+  return (
+    <>
+      <Chip tone={entry.set ? "done" : "muted"}>{entry.set ? "Set" : "Not set"}</Chip>
+      {replacing ? (
+        <>
+          <chakra.input
+            type="password"
+            autoComplete="off"
+            aria-label={`New ${entryLabel(entry)}`}
+            value={text}
+            onChange={(e) => setText(e.currentTarget.value)}
+            borderColor="border"
+            {...inputProps}
+          />
+          <Button
+            size="sm"
+            disabled={pending || text === ""}
+            onClick={() => {
+              save(text);
+              done();
+            }}
+          >
+            Save
+          </Button>
+          <Button size="sm" emphasis="ghost" tone="muted" onClick={done}>
+            Cancel
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button size="sm" emphasis="secondary" tone="muted" disabled={pending} onClick={() => setReplacing(true)}>
+            {entry.set ? "Replace" : "Set"}
+          </Button>
+          {entry.set && (
+            <Button size="sm" emphasis="secondary" tone="deadlocked" disabled={pending} onClick={remove}>
+              Clear
+            </Button>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
 /** The control for each entry type; a type with no entry here shows its value read-only. */
 const CONTROLS: Record<string, (p: ControlProps) => ReactNode> = {
+  "string-list": ListControl,
+  "number-list": ListControl,
+  secret: SecretControl,
   bool: BoolControl,
   number: TextControl,
   duration: TextControl,
@@ -181,14 +301,14 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
     <Box px="3.5" py="3" display="grid" gap="1.5" _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}>
       <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
         <Text fontWeight="600">{entryLabel(entry)}</Text>
-        {entry.set && <Box title="Changed from default" w="7px" h="7px" borderRadius="full" bg="tone.running.fg" />}
+        {entry.set && entry.type !== "secret" && <Box title="Changed from default" w="7px" h="7px" borderRadius="full" bg="tone.running.fg" />}
         {entry.restart && (
           <Box data-mock-part="restart-badge">
             <Chip tone="waiting">{restartNeeded || pendingRestart ? "Restart needed to apply" : "Needs restart"}</Chip>
           </Box>
         )}
         <Box flex="1" />
-        {entry.set && (
+        {entry.set && entry.type !== "secret" && (
           <chakra.button
             type="button"
             data-mock-part="reset-link"
@@ -215,6 +335,7 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
             pending={write.pending}
             setDraft={setDraft}
             save={(value) => send(setChange(entry.key, value))}
+            remove={() => send(removeChange(entry.key))}
           />
         </Box>
       ) : (

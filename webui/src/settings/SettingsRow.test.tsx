@@ -125,4 +125,77 @@ describe("SettingsRow", () => {
     await flush();
     expect(getByText("Restart needed to apply")).toBeTruthy();
   });
+
+  describe("lists", () => {
+    const listEntry = (over: Partial<SettingsEntry>) => entry({ key: "server.tab-env", type: "string-list", set: true, value: ["A=1", "B=2"], ...over });
+
+    it("add and remove send the whole list", async () => {
+      const { getByRole, onWrite } = setup(listEntry({}));
+      fireEvent.change(getByRole("textbox"), { target: { value: "C=3" } });
+      fireEvent.click(getByRole("button", { name: "Add" }));
+      await flush();
+      expect(onWrite).toHaveBeenLastCalledWith([{ key: "server.tab-env", value: ["A=1", "B=2", "C=3"] }]);
+      fireEvent.click(getByRole("button", { name: "Remove A=1" }));
+      await flush();
+      expect(onWrite).toHaveBeenLastCalledWith([{ key: "server.tab-env", value: ["B=2"] }]);
+    });
+
+    it("a number list refuses abc before the write and accepts 90", async () => {
+      const { getByRole, getByText, onWrite } = setup(listEntry({ key: "budget.notification-thresholds", type: "number-list", value: [50] }));
+      fireEvent.change(getByRole("textbox"), { target: { value: "abc" } });
+      fireEvent.click(getByRole("button", { name: "Add" }));
+      await flush();
+      expect(getByText('"abc" is not a number')).toBeTruthy();
+      expect(onWrite).not.toHaveBeenCalled();
+      fireEvent.change(getByRole("textbox"), { target: { value: "90" } });
+      fireEvent.click(getByRole("button", { name: "Add" }));
+      await flush();
+      expect(onWrite).toHaveBeenCalledWith([{ key: "budget.notification-thresholds", value: [50, 90] }]);
+    });
+
+    it("an empty set list shows as empty and removing the last tag sends []", async () => {
+      const { getByRole, onWrite } = setup(listEntry({ value: ["x"] }));
+      fireEvent.click(getByRole("button", { name: "Remove x" }));
+      await flush();
+      expect(onWrite).toHaveBeenCalledWith([{ key: "server.tab-env", value: [] }]);
+    });
+
+    it("an empty set list is an empty tag list with its dot and a Reset", () => {
+      const { getByText, getByTitle, getByRole } = setup(listEntry({ value: [], default: ["a"] }));
+      expect(getByText("Empty list")).toBeTruthy();
+      expect(getByTitle("Changed from default")).toBeTruthy();
+      expect(getByRole("button", { name: /Reset to default/ })).toBeTruthy();
+    });
+  });
+
+  describe("secrets", () => {
+    const secret = (set: boolean) => entry({ key: "notifications.telegram.bot-token", type: "secret", set });
+
+    it("shows Set or Not set", () => {
+      expect(setup(secret(true)).getByText("Set")).toBeTruthy();
+      expect(setup(secret(false)).getByText("Not set")).toBeTruthy();
+    });
+
+    it("Replace sends the new value and the token never reaches the DOM", async () => {
+      const { getByRole, getByLabelText, onWrite, container } = setup(secret(true));
+      fireEvent.click(getByRole("button", { name: "Replace" }));
+      fireEvent.change(getByLabelText(/New/), { target: { value: "tok-123" } });
+      fireEvent.click(getByRole("button", { name: "Save" }));
+      await flush();
+      expect(onWrite).toHaveBeenCalledWith([{ key: "notifications.telegram.bot-token", value: "tok-123" }]);
+      expect(container.innerHTML).not.toContain("tok-123");
+    });
+
+    it("Clear sends a remove", async () => {
+      const { getByRole, onWrite } = setup(secret(true));
+      fireEvent.click(getByRole("button", { name: "Clear" }));
+      await flush();
+      expect(onWrite).toHaveBeenCalledWith([{ key: "notifications.telegram.bot-token", remove: true }]);
+    });
+
+    it("a chat id string row shows in full", () => {
+      const { getByRole } = setup(entry({ key: "notifications.telegram.chat-id", type: "string", set: true, value: "-1001234567890" }));
+      expect((getByRole("textbox") as HTMLInputElement).value).toBe("-1001234567890");
+    });
+  });
 });
