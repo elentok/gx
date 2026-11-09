@@ -405,7 +405,7 @@ per project with open follow-ups). _Avoid_: tile, row (a row is the data behind 
 
 **Command palette** — the web UI's centered, filterable list of actions a person runs from any page
 with the keyboard, such as starting a Design or going to the next Needs-you card. It runs actions
-and never searches epics or sessions, which is what the jump menu and the session switcher do.
+and never searches epics or sessions, which is what the jump menu does.
 _Avoid_: switcher, jump menu.
 
 **Design session** — an interactive session with a **Session ticket**: where gx-design runs on a
