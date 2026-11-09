@@ -4,23 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/settingsapi"
 
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-const defaultHarnessKey = "default-harness"
 
 func refuseDefaultHarness(reason, msg string) (wire.SetDefaultHarnessResult, error) {
 	return wire.SetDefaultHarnessResult{Refused: true, Reason: reason, Message: msg}, nil
@@ -83,30 +78,27 @@ func (h *Harness) SetDefault(req wire.SetDefaultHarnessRequest) (wire.SetDefault
 	default:
 		return refuseDefaultHarness(wire.ReasonBadScope, "scope must be "+wire.DefaultHarnessGlobal+" or "+wire.DefaultHarnessProject)
 	}
-	if req.Harness != "" {
-		if program, missing := h.MissingProgram(req.Harness); missing {
-			return refuseDefaultHarness(wire.ReasonHarnessNotOnPath, program+" is not on PATH")
-		}
-	}
 
-	before := h.effectiveDefault(project)
-	if err := setAgentsKey(path, defaultHarnessKey, req.Harness); err != nil {
+	change := settingsapi.Change{Key: defaultHarnessPath, Remove: req.Harness == ""}
+	if req.Harness != "" {
+		change.Value, _ = json.Marshal(req.Harness)
+	}
+	if _, err := h.writer.Write(settingsapi.Target{Project: project}, []settingsapi.Change{change}); err != nil {
+		if ref, ok := errors.AsType[*settingsapi.Refusal](err); ok {
+			return refuseDefaultHarness(wire.ReasonHarnessNotOnPath, ref.Reason)
+		}
 		return wire.SetDefaultHarnessResult{}, err
 	}
-	if req.Scope == wire.DefaultHarnessGlobal {
-		if rr := h.settings.Reload(settings.TriggerCommand); rr.Refused {
-			return refuseDefaultHarness(rr.Reason, rr.Message)
-		}
+	out := h.hook.outcome()
+	if out.reloadRefused {
+		return refuseDefaultHarness(out.reloadReason, out.reloadMsg)
 	}
-	after := h.effectiveDefault(project)
 
-	res := wire.SetDefaultHarnessResult{Scope: req.Scope, Project: project, Harness: string(after), Path: path}
-	if before == after {
+	res := wire.SetDefaultHarnessResult{Scope: req.Scope, Project: project, Harness: string(out.after), Path: path}
+	if out.before == out.after {
 		return res, nil
 	}
-	res.Changed = true
-	res.Waiting, res.Running = h.switchCounts(project, after)
-	res.Notice = defaultHarnessNotice(project, after, res.Waiting, res.Running)
+	res.Changed, res.Waiting, res.Running, res.Notice = true, out.waiting, out.running, out.notice
 	return res, nil
 }
 
@@ -117,54 +109,6 @@ func (h *Harness) effectiveDefault(project string) agent.AgentKind {
 		return DefaultOrClaude(h.settings.Load().AgentsDefaultHarness)
 	}
 	return h.DefaultHarness(project)
-}
-
-// setAgentsKey sets agents.<key> in the JSON file at path, or removes it (and
-// the agents object once empty) when value is empty. It edits raw JSON so every
-// other key survives, and writes through a symlink to its target. A missing
-// file is created.
-func setAgentsKey(path, key, value string) error {
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
-		path = resolved
-	}
-	top := map[string]json.RawMessage{}
-	data, err := os.ReadFile(path)
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		if value == "" {
-			return nil
-		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
-		}
-	case err != nil:
-		return err
-	default:
-		if err := json.Unmarshal(data, &top); err != nil {
-			return fmt.Errorf("%s: %w", path, err)
-		}
-	}
-	agents := map[string]json.RawMessage{}
-	if raw, ok := top["agents"]; ok {
-		if err := json.Unmarshal(raw, &agents); err != nil {
-			return fmt.Errorf("%s: agents: %w", path, err)
-		}
-	}
-	if value == "" {
-		delete(agents, key)
-	} else {
-		agents[key], _ = json.Marshal(value)
-	}
-	if len(agents) == 0 {
-		delete(top, "agents")
-	} else {
-		top["agents"], _ = json.Marshal(agents)
-	}
-	out, err := json.MarshalIndent(top, "", "  ")
-	if err != nil {
-		return err
-	}
-	return fsutil.WriteFileAtomic(path, append(out, '\n'))
 }
 
 // switchCounts counts, in scope, the waiting tickets that will use the new

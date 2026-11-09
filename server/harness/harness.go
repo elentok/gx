@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/settingsapi"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -42,6 +43,8 @@ type Harness struct {
 	queue    *queue.Queue
 	registry *runs.Registry
 	settings *settings.Holder
+	writer   *settingsapi.Writer
+	hook     *settingsHook
 
 	// logGiven serializes GiveLog.
 	logGiven sync.Mutex
@@ -59,10 +62,18 @@ type Deps struct {
 	Queue    *queue.Queue
 	Registry *runs.Registry
 	Settings *settings.Holder
+	// Writer is the settings writer SetDefault saves through; New registers the
+	// Default harness hook on it.
+	Writer *settingsapi.Writer
 }
 
 // New is the harness choice: which harness and runner a ticket or session
 // launches under, and the Default harness setting.
 func New(d Deps) *Harness {
-	return &Harness{cfg: d.Config, host: d.Host, log: d.Log, idx: d.Index, projects: d.Projects, queue: d.Queue, registry: d.Registry, settings: d.Settings}
+	h := &Harness{cfg: d.Config, host: d.Host, log: d.Log, idx: d.Index, projects: d.Projects, queue: d.Queue, registry: d.Registry, settings: d.Settings, writer: d.Writer}
+	h.hook = &settingsHook{h: h}
+	if d.Writer != nil {
+		d.Writer.Hooks = h.hook
+	}
+	return h
 }

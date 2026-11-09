@@ -331,6 +331,7 @@ func New(cfg Config) (*Server, error) {
 			AgentRunner: cfg.AgentRunner, ConfigPath: cfg.ConfigPath,
 		},
 		Host: sessionHost{s}, Log: log, Index: idx, Projects: s.projects, Queue: q, Registry: registry, Settings: &s.settings,
+		Writer: s.settingsWriter,
 	})
 	// The ledger loads here, after the listeners, so a failure releases them as a runs failure does.
 	s.budget, err = budget.New(budget.Deps{

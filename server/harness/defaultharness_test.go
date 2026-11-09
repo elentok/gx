@@ -91,7 +91,7 @@ func TestDefaultHarness_ProjectWriteAndRemoveOverride(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{})
 	pj := filepath.Join(store, "proj", "project.json")
-	if err := os.WriteFile(pj, []byte(`{"vcs":"git","checks":{"test":false}}`), 0o644); err != nil {
+	if err := os.WriteFile(pj, []byte(`{"vcs":"none","checks":{"test":false}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store)
@@ -101,7 +101,7 @@ func TestDefaultHarness_ProjectWriteAndRemoveOverride(t *testing.T) {
 		t.Fatalf("set = %+v", res)
 	}
 	got := readJSONFile(t, pj)
-	if agentsKey(got) != "codex" || got["vcs"] != "git" || got["checks"] == nil || len(got["agents"].(map[string]any)) != 1 {
+	if agentsKey(got) != "codex" || got["vcs"] != "none" || got["checks"] == nil || len(got["agents"].(map[string]any)) != 1 {
 		t.Errorf("project.json = %v", got)
 	}
 	st, _ := h.Client.Admin.DefaultHarness(context.Background())
@@ -114,7 +114,7 @@ func TestDefaultHarness_ProjectWriteAndRemoveOverride(t *testing.T) {
 		t.Fatalf("remove = %+v", res)
 	}
 	got = readJSONFile(t, pj)
-	if _, ok := got["agents"]; ok || got["vcs"] != "git" || got["checks"] == nil {
+	if _, ok := got["agents"]; ok || got["vcs"] != "none" || got["checks"] == nil {
 		t.Errorf("project.json after remove = %v", got)
 	}
 	if res := rigs.SetHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "nope", Harness: "codex"}); !res.Refused || res.Reason != wire.ReasonUnknownProject {
@@ -129,7 +129,7 @@ func TestDefaultHarness_RefusesHarnessNotOnPath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	servertest.WriteConfig(t, path, store, nil)
 	pj := filepath.Join(store, "proj", "project.json")
-	if err := os.WriteFile(pj, []byte(`{"vcs":"git"}`), 0o644); err != nil {
+	if err := os.WriteFile(pj, []byte(`{"vcs":"none"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
@@ -144,6 +144,54 @@ func TestDefaultHarness_RefusesHarnessNotOnPath(t *testing.T) {
 		res := rigs.SetHarness(t, h, req)
 		if !res.Refused || res.Reason != wire.ReasonHarnessNotOnPath || !strings.Contains(res.Message, "codex is not on PATH") {
 			t.Errorf("%+v = %+v", req, res)
+		}
+	}
+	if after, _ := os.ReadFile(path); string(after) != string(cfgBefore) {
+		t.Errorf("config changed: %s", after)
+	}
+	if after, _ := os.ReadFile(pj); string(after) != string(pjBefore) {
+		t.Errorf("project.json changed: %s", after)
+	}
+}
+
+func TestDefaultHarness_GenericWriteEndpointRunsTheHook(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "waits", servertest.TicketOpts{})
+	path := filepath.Join(t.TempDir(), "config.json")
+	servertest.WriteConfig(t, path, store, nil)
+	pj := filepath.Join(store, "proj", "project.json")
+	if err := os.WriteFile(pj, []byte(`{"vcs":"none"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
+	set := func(project, harness string) wire.SettingsWriteResult {
+		t.Helper()
+		res, err := h.Client.Admin.SetSettings(context.Background(), wire.SettingsWriteRequest{
+			Project: project,
+			Changes: []wire.SettingChange{{Key: "agents.default-harness", Value: json.RawMessage(`"` + harness + `"`)}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+
+	res := set("proj", "codex")
+	if res.Refused || len(res.Notices) != 1 || !strings.Contains(res.Notices[0], "Default for proj is now Codex") {
+		t.Fatalf("project write = %+v", res)
+	}
+	got := readJSONFile(t, pj)
+	if agentsKey(got) != "codex" || got["vcs"] != "none" {
+		t.Errorf("project.json = %v", got)
+	}
+
+	h.Programs.Missing("claude")
+	cfgBefore, _ := os.ReadFile(path)
+	pjBefore, _ := os.ReadFile(pj)
+	for _, project := range []string{"", "proj"} {
+		if res := set(project, "claude"); !res.Refused || !strings.Contains(res.Reason, "claude is not on PATH") {
+			t.Errorf("project %q: %+v", project, res)
 		}
 	}
 	if after, _ := os.ReadFile(path); string(after) != string(cfgBefore) {
