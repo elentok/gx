@@ -1,77 +1,107 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/elentok/gx/main/docs/checks-schema.json",
-  "title": "gx checks",
-  "description": "A project's .gx/checks.json (or the checks key of project.json): the commands `gx check` runs. {files} in a command is replaced by the selected files.",
-  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
+  "definitions": {
+    "check": {
+      "description": "A command for both scopes, false to turn the kind off, or a pair of commands.",
+      "oneOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "const": false
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "always": {
+              "description": "Commands that also run in every non-full run (changed, staged, --since), through the same path as the scoped command. A --full run covers them already.",
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "changed": {
+              "description": "Command for a changed-files run. Absent: the gx default.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "full": {
+              "description": "Command for a --full run, with {files} set to every tracked file.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "limits": {
+              "additionalProperties": false,
+              "description": "Time limits for a test entry. A missing key turns that limit off.",
+              "properties": {
+                "hang": {
+                  "$ref": "#/definitions/duration"
+                },
+                "slow": {
+                  "description": "Per-test slow limit: one duration for every tool, or a map by tool.",
+                  "oneOf": [
+                    {
+                      "$ref": "#/definitions/duration"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "go": {
+                          "$ref": "#/definitions/duration"
+                        },
+                        "playwright": {
+                          "$ref": "#/definitions/duration"
+                        },
+                        "vitest": {
+                          "$ref": "#/definitions/duration"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  ]
+                },
+                "suite": {
+                  "$ref": "#/definitions/duration"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "full"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "duration": {
+      "description": "A positive Go duration such as \"20s\" or \"4m\".",
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "description": "A project's .gx/checks.json (or the checks key of project.json): the commands `gx check` runs. {files} in a command is replaced by the selected files.",
   "properties": {
     "$schema": {
       "type": "string"
     },
-    "format": { "$ref": "#/definitions/check" },
-    "lint": { "$ref": "#/definitions/check" },
-    "typecheck": { "$ref": "#/definitions/check" },
-    "test": { "$ref": "#/definitions/check" }
-  },
-  "definitions": {
-    "duration": {
-      "type": "string",
-      "description": "A positive Go duration such as \"20s\" or \"4m\".",
-      "minLength": 1
+    "format": {
+      "$ref": "#/definitions/check"
     },
-    "check": {
-      "description": "A command for both scopes, false to turn the kind off, or a pair of commands.",
-      "oneOf": [
-        { "type": "string", "minLength": 1 },
-        { "const": false },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["full"],
-          "properties": {
-            "changed": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Command for a changed-files run. Absent: the gx default."
-            },
-            "full": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Command for a --full run, with {files} set to every tracked file."
-            },
-            "always": {
-              "type": "array",
-              "items": { "type": "string", "minLength": 1 },
-              "description": "Commands that also run in every non-full run (changed, staged, --since), through the same path as the scoped command. A --full run covers them already."
-            },
-            "limits": {
-              "type": "object",
-              "additionalProperties": false,
-              "description": "Time limits for a test entry. A missing key turns that limit off.",
-              "properties": {
-                "suite": { "$ref": "#/definitions/duration" },
-                "hang": { "$ref": "#/definitions/duration" },
-                "slow": {
-                  "description": "Per-test slow limit: one duration for every tool, or a map by tool.",
-                  "oneOf": [
-                    { "$ref": "#/definitions/duration" },
-                    {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "go": { "$ref": "#/definitions/duration" },
-                        "vitest": { "$ref": "#/definitions/duration" },
-                        "playwright": { "$ref": "#/definitions/duration" }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        }
-      ]
+    "lint": {
+      "$ref": "#/definitions/check"
+    },
+    "test": {
+      "$ref": "#/definitions/check"
+    },
+    "typecheck": {
+      "$ref": "#/definitions/check"
     }
-  }
+  },
+  "title": "gx checks",
+  "type": "object"
 }
