@@ -1,9 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useRef } from "react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { session } from "../agents/agentsTestKit";
-import { requestPromptFocus } from "../agents/promptFocus";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { CardKindImplementation, SectionImplementing, SectionOnHold, SessionBlocked, type EpicListRow, type SessionPlacement } from "../generated/server";
 import { renderThemed } from "../ui/render";
@@ -12,10 +11,7 @@ import { AppShell } from "./AppShell";
 import type { Shell } from "./ShellContext";
 import { useSidebarKeys } from "./SidebarKeys";
 
-vi.mock("../agents/promptFocus", () => ({ requestPromptFocus: vi.fn(), usePromptFocus: () => {} }));
-
 afterEach(() => {
-  vi.mocked(requestPromptFocus).mockClear();
   cleanup();
   vi.unstubAllGlobals();
   localStorage.clear();
@@ -70,6 +66,7 @@ async function setup(withChat = false) {
     </DeviceContext.Provider>,
   );
   await within(screen.getByTestId("sidebar-body")).findByRole("link", { name: /Blog/ });
+  return router;
 }
 
 const body = () => within(screen.getByTestId("sidebar-body"));
@@ -141,21 +138,22 @@ test("Enter opens the focused row", async () => {
   await waitFor(() => expect(window.location.hash).toBe("#/e/p:shop"));
 });
 
-test("Enter on a chat sends the prompt focus request; on an epic row it only navigates", async () => {
-  await setup(true);
+test("Enter on a chat navigates with the prompt focus request; on an epic row it only navigates", async () => {
+  const router = await setup(true);
   focus(body().getByRole("link", { name: /Blog/ }));
   press("Enter");
   await waitFor(() => expect(window.location.hash).toBe("#/e/p:blog"));
-  expect(requestPromptFocus).not.toHaveBeenCalled();
+  expect(router.state.location.state).toBeNull();
   focus(body().getByRole("link", { name: /talk/ }));
   press("Enter");
-  expect(requestPromptFocus).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(router.state.location.state).toEqual({ focusPrompt: true }));
+  expect(router.state.location.pathname).toBe("/agents/s3");
 });
 
 test("a click on a chat row sends no focus request", async () => {
-  await setup(true);
+  const router = await setup(true);
   fireEvent.click(body().getByRole("link", { name: /talk/ }));
-  expect(requestPromptFocus).not.toHaveBeenCalled();
+  expect(router.state.location.state).toBeNull();
 });
 
 // A sidebar whose sessions and epic rows can change after mount; `change` swaps them and notifies as the server would.
@@ -247,7 +245,13 @@ test("an open row menu stays on its row through a reorder and closes when the ro
   await waitFor(() => expect(screen.queryAllByRole("menuitem")).toHaveLength(0));
 });
 
-function Harness({ keys }: { keys: string[] }) {
+const Harness = ({ keys }: { keys: string[] }) => (
+  <MemoryRouter>
+    <Rows keys={keys} />
+  </MemoryRouter>
+);
+
+function Rows({ keys }: { keys: string[] }) {
   const aside = useRef<HTMLElement>(null);
   useSidebarKeys(aside, { sidebarOpen: true, toggle: () => {} } as unknown as Shell);
   return (

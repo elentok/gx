@@ -1,34 +1,14 @@
 import { useEffect, type RefObject } from "react";
+import { useLocation } from "react-router";
 
-const EVENT = "gx:focus-prompt";
-let pending = false;
+/** Navigation state that asks the chat page it lands on to focus its prompt. A click carries none. */
+export const FOCUS_PROMPT_STATE = { focusPrompt: true };
 
-/**
- * Asks the chat page to focus its prompt. The request outlives the navigation that follows it: a composer that
- * mounts later takes it on mount, one already open takes it from the event. Any pointer press cancels it, so a
- * request nobody consumed cannot fire on a later click or tap.
- */
-export function requestPromptFocus() {
-  pending = true;
-  window.dispatchEvent(new Event(EVENT));
-}
-
-if (typeof window !== "undefined") {
-  window.addEventListener("pointerdown", () => (pending = false), true);
-}
-
-/** Focuses the textarea inside `container` when a request is pending, now or later. */
+/** Focuses the textarea inside `container` when this location was opened with a focus request. */
 export function usePromptFocus(container: RefObject<HTMLElement | null>) {
+  const { key, state } = useLocation();
+  const wanted = (state as { focusPrompt?: boolean } | null)?.focusPrompt === true;
   useEffect(() => {
-    const take = () => {
-      if (!pending) return;
-      const area = container.current?.querySelector("textarea");
-      if (!area) return;
-      pending = false;
-      area.focus();
-    };
-    take();
-    window.addEventListener(EVENT, take);
-    return () => window.removeEventListener(EVENT, take);
-  }, [container]);
+    if (wanted) container.current?.querySelector("textarea")?.focus();
+  }, [container, key, wanted]);
 }

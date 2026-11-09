@@ -1,6 +1,6 @@
 import { cleanup, createEvent, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
-import { requestPromptFocus } from "./promptFocus";
+import { FOCUS_PROMPT_STATE } from "./promptFocus";
 import { clearCommandListCache } from "../commands/useCommandList";
 import type { SessionChatResponse, SessionInfo } from "../generated/server";
 import { accepted, chat, chatOf, composerBox, prompts, refused, render, sendButton, session, stubPrompt, type, useAgentsPageHooks } from "./agentsTestKit";
@@ -20,19 +20,17 @@ test("a focus request focuses the prompt when the chat opens; without one it sta
   render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
   expect(document.activeElement).not.toBe(await composerBox());
   cleanup();
-  requestPromptFocus();
-  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
+  render([session("s-1", "p")], { pathname: "/agents/s-1", state: FOCUS_PROMPT_STATE }, true, chatOf(chat()));
   const box = await composerBox();
   await waitFor(() => expect(document.activeElement).toBe(box));
 });
 
-test("a focus request reaches a chat that is already open, once", async () => {
-  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
+test("a focus request does not outlive its navigation: a chat with no composer leaves nothing behind", async () => {
+  render([session("s-1", "p", { harness: "other" })], { pathname: "/agents/s-1", state: FOCUS_PROMPT_STATE }, true);
+  await screen.findByText("Chat works for Claude and Codex sessions only.");
+  cleanup();
+  render([session("s-2", "p")], "/agents/s-2", true, chatOf(chat()));
   const box = await composerBox();
-  requestPromptFocus();
-  expect(document.activeElement).toBe(box);
-  box.blur();
-  window.dispatchEvent(new Event("gx:focus-prompt"));
   expect(document.activeElement).not.toBe(box);
 });
 

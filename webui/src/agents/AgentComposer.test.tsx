@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import type { InterruptSession } from "../design/open";
 import type { PostPrompt } from "../design/prompt";
@@ -31,14 +32,16 @@ const session = (state = "idle"): SessionInfo => ({
 
 function render(over: { s?: SessionInfo; connected?: boolean; post?: PostPrompt; reason?: string; wide?: boolean } = {}) {
   return renderThemed(
-    <WideContext.Provider value={over.wide ?? true}>
-      <AgentComposer
-        session={over.s ?? session()}
-        connected={over.connected ?? true}
-        post={over.post}
-        reason={over.reason}
-      />
-    </WideContext.Provider>,
+    <MemoryRouter>
+      <WideContext.Provider value={over.wide ?? true}>
+        <AgentComposer
+          session={over.s ?? session()}
+          connected={over.connected ?? true}
+          post={over.post}
+          reason={over.reason}
+        />
+      </WideContext.Provider>
+    </MemoryRouter>,
   );
 }
 
@@ -75,9 +78,11 @@ test("Send is off when not connected, but the box stays editable", () => {
 test("a Working session swaps Send for Interrupt, posting the state token after a confirm; the box stays editable", async () => {
   const interrupt = vi.fn(async () => ({ ok: true })) as unknown as InterruptSession;
   renderThemed(
-    <WideContext.Provider value={true}>
-      <AgentComposer session={session("working")} connected interrupt={interrupt} />
-    </WideContext.Provider>,
+    <MemoryRouter>
+      <WideContext.Provider value={true}>
+        <AgentComposer session={session("working")} connected interrupt={interrupt} />
+      </WideContext.Provider>
+    </MemoryRouter>,
   );
   fireEvent.change(box(), { target: { value: "hi" } });
   expect((box() as HTMLTextAreaElement).value).toBe("hi");

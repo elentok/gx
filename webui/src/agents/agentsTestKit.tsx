@@ -47,7 +47,7 @@ export function useAgentsPageHooks() {
   afterEach(() => vi.unstubAllGlobals());
 }
 
-export function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!sessions, fetchers: RouteFetchers = {}, wide?: boolean) {
+export function render(sessions: SessionInfo[] | undefined, path: string | { pathname: string; state: unknown } = "/agents", live = !!sessions, fetchers: RouteFetchers = {}, wide?: boolean) {
   let state = { snapshot: sessions && { sessions }, connected: true, loadedOnce: !!sessions, liveSnapshot: live, streams: 1, tick: 0 } as unknown as ConnectionState;
   const listeners = new Set<() => void>();
   const handlers = new Set<(a?: string) => void>();

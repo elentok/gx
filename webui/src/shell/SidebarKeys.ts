@@ -1,5 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
-import { requestPromptFocus } from "../agents/promptFocus";
+import { useNavigate, type NavigateFunction } from "react-router";
+import { FOCUS_PROMPT_STATE } from "../agents/promptFocus";
 import { isTextTarget } from "./keys";
 import { hasLayer } from "../ui/modal/layers";
 import type { Shell } from "./ShellContext";
@@ -67,7 +68,7 @@ function useRovingFocus(root: RefObject<HTMLElement | null>) {
 }
 
 /** Moves between rows with Down/Up or j/k, expands with Right/l and collapses with Left/h; Enter opens the row. Only while a row has focus. */
-function onSidebarKey(root: HTMLElement, e: ReactKeyboardEvent) {
+function onSidebarKey(root: HTMLElement, e: ReactKeyboardEvent, navigate: NavigateFunction) {
   const target = e.target;
   if (e.altKey || e.metaKey || e.ctrlKey || isTextTarget(target)) return;
   if (!(target instanceof HTMLElement) || !target.matches(NAV)) return;
@@ -87,14 +88,16 @@ function onSidebarKey(root: HTMLElement, e: ReactKeyboardEvent) {
   }
   if (e.key === "Enter" && target.matches("a")) {
     e.preventDefault();
-    if (target.hasAttribute(CHAT_ATTR)) requestPromptFocus();
-    target.click();
+    const href = target.getAttribute("href");
+    if (target.hasAttribute(CHAT_ATTR) && href?.startsWith("#")) navigate(href.slice(1), { state: FOCUS_PROMPT_STATE });
+    else target.click();
   }
 }
 
 /** Cmd/Ctrl+B toggles the sidebar and focuses its tab stop when it opens; the returned handler is the aside's onKeyDown. */
 export function useSidebarKeys(aside: RefObject<HTMLElement | null>, shell: Shell) {
   useRovingFocus(aside);
+  const navigate = useNavigate();
   const focusOnOpen = useRef(false);
   const { sidebarOpen, toggle } = shell;
   useEffect(() => {
@@ -116,5 +119,5 @@ export function useSidebarKeys(aside: RefObject<HTMLElement | null>, shell: Shel
     const all = aside.current ? items(aside.current) : [];
     (all.find((i) => i.tabIndex === 0) ?? all[0])?.focus();
   }, [sidebarOpen, aside]);
-  return (e: ReactKeyboardEvent) => aside.current && onSidebarKey(aside.current, e);
+  return (e: ReactKeyboardEvent) => aside.current && onSidebarKey(aside.current, e, navigate);
 }
