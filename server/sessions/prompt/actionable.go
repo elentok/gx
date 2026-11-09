@@ -168,11 +168,10 @@ func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 	var refusal string
 	p.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		var next wire.SessionActionable
-		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: MaxAutoSends})
+		next, outcome, refusal = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: MaxAutoSends})
 		if outcome == actionableNone {
 			return false
 		}
-		refusal = refusalReason(*m, a, design.Live)
 		m.Actionable = next
 		return true
 	})
@@ -267,45 +266,38 @@ type actionablePolicy struct {
 // decideActionable is the pure decision behind DetectDesignActionable: the
 // Actionable cur's meta should hold after a turn that matched a (or did not),
 // and what to do about it. A GxRaised one, or a session not waiting for the
-// person, is never touched.
-func decideActionable(cur sessions.Meta, a wire.SessionActionable, matched bool, p actionablePolicy) (wire.SessionActionable, actionableOutcome) {
+// person, is never touched. An actionableRaised outcome comes with the reason
+// no countdown started, for the auto-advance log.
+func decideActionable(cur sessions.Meta, a wire.SessionActionable, matched bool, p actionablePolicy) (wire.SessionActionable, actionableOutcome, string) {
 	old := cur.Actionable
 	if !cur.Status.Promptable() || old.GxRaised {
-		return old, actionableNone
+		return old, actionableNone, ""
 	}
 	if !matched {
 		if !old.Derived {
-			return old, actionableNone
+			return old, actionableNone, ""
 		}
-		return wire.SessionActionable{}, actionableCleared
+		return wire.SessionActionable{}, actionableCleared, ""
 	}
 	if old.Derived && old.Reason == a.Reason && old.Grilling == a.Grilling {
-		return old, actionableNone
+		return old, actionableNone, ""
 	}
 	cur.Actionable = a
-	if !p.Live || !cur.CanAutoAdvance() {
-		return a, actionableRaised
-	}
-	if cur.AutoSends >= p.MaxAutoSends {
-		return a, actionableCapped
-	}
-	return a, actionableAdvance
-}
-
-// refusalReason is why a raised Actionable on cur's meta does not start an
-// auto-advance countdown, in the order decideActionable checks.
-func refusalReason(cur sessions.Meta, a wire.SessionActionable, live bool) string {
 	switch {
 	case a.Grilling:
-		return "open-question"
+		return a, actionableRaised, "open-question"
 	case cur.AutoAdvanceOff:
-		return "switch-off"
+		return a, actionableRaised, "switch-off"
 	case len(a.Action) == 0:
-		return "no-action"
-	case !live:
-		return "not-live"
+		return a, actionableRaised, "no-action"
+	case !p.Live:
+		return a, actionableRaised, "not-live"
+	case !cur.CanAutoAdvance():
+		return a, actionableRaised, "not-advanceable"
+	case cur.AutoSends >= p.MaxAutoSends:
+		return a, actionableCapped, ""
 	}
-	return "not-advanceable"
+	return a, actionableAdvance, ""
 }
 
 // logAutoAdvance writes the one line per auto-advance decision, taken or

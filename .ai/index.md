@@ -97,8 +97,9 @@ A new config key must reach the settings page or be excluded with a reason:
   - `gx brief -C webui tsc`
   - e2e flows: `gx brief -C webui playwright disk.e2e.ts 76 77`. Bare flow numbers become one `-g`
     pattern. Never write `-g "^76\."`: Playwright matches `-g` against `[project] › file › title`,
-    so a `^` anchor finds no tests. `--help` prints usage; `--list` shows flow titles. It adds the config and the line reporter, and runs
-    `make web-build` only when `webui/dist/index.html` is missing.
+    so a `^` anchor finds no tests. It adds the config and the line reporter, and runs
+    `make web-build` only when `webui/dist/index.html` is missing. `--help` prints usage; `--list`
+    shows flow titles.
 - Unix socket paths are capped near 100 bytes, and `t.TempDir()` can exceed that. Holder-socket
   tests (anything that binds `holder.sock`) need a short `TMPDIR` or a short state root; use
   `shortTempDir` in `nativerunner` and `nativerunner/holder` tests. The failure is `bind: invalid argument`.
@@ -322,7 +323,9 @@ declarations into a new file in the same package (for example `server/sessionsta
 per-type breach is fixed by splitting. The package measures (files, source lines, test lines, `Test`
 funcs) are totals over the whole directory, so splitting a file cannot lower them (a new file adds
 header lines): trim tests or move code to another package. Take the fix from sizeguard's line
-("pkg: measure N, limit M, over by K"), not from this paragraph. Defaults per package (a directory of tracked `.go` files, `_test` packages and `package main`
+("pkg: measure N, limit M, over by K"), not from this paragraph.
+
+Defaults per package (a directory of tracked `.go` files, `_test` packages and `package main`
 included): 50 files, 4,500 source lines, 5,000 test lines, 180 `Test` funcs. Per file: 1000 lines
 (test files count). Per type: 50 declared methods (test-file methods and promoted methods ignored).
 Its exception list is empty and stays that way unless a split is proven infeasible.

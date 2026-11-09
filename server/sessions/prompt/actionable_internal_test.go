@@ -113,7 +113,7 @@ func TestDecideActionable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			next, got := decideActionable(continueMeta(tt.cur), cont, tt.matched, tt.policy)
+			next, got, _ := decideActionable(continueMeta(tt.cur), cont, tt.matched, tt.policy)
 			if got != tt.want {
 				t.Fatalf("outcome = %v, want %v", got, tt.want)
 			}
@@ -126,26 +126,30 @@ func TestDecideActionable(t *testing.T) {
 
 // Every refusal names its reason, and a Grilling round (an open question, the
 // shape a prototype review takes) is never reported as advanceable.
-func TestRefusalReason(t *testing.T) {
+func TestDecideActionable_RefusalReason(t *testing.T) {
 	t.Parallel()
 	cont := wire.SessionActionable{Reason: "next", Action: []string{"/clear"}, Derived: true}
 	grill := wire.SessionActionable{Reason: "q", Action: []string{"/clear"}, Derived: true, Grilling: true}
 	tests := []struct {
-		name string
-		meta sessions.Meta
-		a    wire.SessionActionable
-		live bool
-		want string
+		name   string
+		edit   func(*sessions.Meta)
+		a      wire.SessionActionable
+		policy actionablePolicy
+		want   string
 	}{
-		{"open question", sessions.Meta{}, grill, true, "open-question"},
-		{"switch off", sessions.Meta{AutoAdvanceOff: true}, cont, true, "switch-off"},
-		{"no action", sessions.Meta{}, wire.SessionActionable{Reason: "r", Derived: true}, true, "no-action"},
-		{"not live", sessions.Meta{}, cont, false, "not-live"},
+		{"open question", nil, grill, actionablePolicy{Live: true, MaxAutoSends: 5}, "open-question"},
+		{"switch off", func(m *sessions.Meta) { m.AutoAdvanceOff = true }, cont, actionablePolicy{Live: true, MaxAutoSends: 5}, "switch-off"},
+		{"no action", nil, wire.SessionActionable{Reason: "r", Derived: true}, actionablePolicy{Live: true, MaxAutoSends: 5}, "no-action"},
+		{"not live", nil, cont, actionablePolicy{MaxAutoSends: 5}, "not-live"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := refusalReason(tt.meta, tt.a, tt.live); got != tt.want {
-				t.Errorf("refusalReason = %q, want %q", got, tt.want)
+			_, outcome, got := decideActionable(continueMeta(tt.edit), tt.a, true, tt.policy)
+			if outcome != actionableRaised {
+				t.Fatalf("outcome = %v, want actionableRaised", outcome)
+			}
+			if got != tt.want {
+				t.Errorf("refusal = %q, want %q", got, tt.want)
 			}
 		})
 	}
