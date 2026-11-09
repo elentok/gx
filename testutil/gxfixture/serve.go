@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -262,10 +263,8 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 			return s, err
 		}
 	}
-	for _, args := range sc.Steps {
-		if out, err := f.cli(args...); err != nil {
-			return s, fmt.Errorf("gx %s: %w\n%s", strings.Join(args, " "), err, out)
-		}
+	if err := f.runSteps(sc.Steps); err != nil {
+		return s, err
 	}
 	if err := f.startFixAgents(ctx, sc); err != nil {
 		return s, err
@@ -298,6 +297,9 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 			return s, err
 		}
 	}
+	if err := f.runSteps(sc.StepsAfterSessions); err != nil {
+		return s, err
+	}
 	if err := f.seedDesigns(ctx, sc); err != nil {
 		return s, err
 	}
@@ -306,7 +308,19 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 			return s, err
 		}
 	}
+	if len(f.keyedTranscripts) > 0 {
+		s.transcripts = maps.Clone(f.keyedTranscripts)
+	}
 	return s, nil
+}
+
+func (f *fixture) runSteps(steps [][]string) error {
+	for _, args := range steps {
+		if out, err := f.cli(args...); err != nil {
+			return fmt.Errorf("gx %s: %w\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+	return nil
 }
 
 // seedDesigns makes the plain, opened and linked design sessions.

@@ -196,6 +196,8 @@ type fixture struct {
 	env, cliEnv []string
 	// codex is true when the fake codex is on the fixture PATH.
 	codex bool
+	// keyedTranscripts are the transcript paths of the sessions that set SessionSpec.Key.
+	keyedTranscripts map[string]string
 	// restarted is true once the server exited on a web restart: the fixture stays up
 	// for the server that restart started, and stops that one at shutdown.
 	restarted bool

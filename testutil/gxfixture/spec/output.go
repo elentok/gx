@@ -55,7 +55,8 @@ type Output struct {
 	// RateLimitFromUsage scenario; the hold lasts until then. Empty elsewhere.
 	RateLimitReleaseFile string `json:"ratelimit_release_file,omitempty"`
 	// Transcripts are the limit-burn live shape's Claude transcript paths, keyed
-	// queue, one_off, design and other; the directories may not exist yet.
+	// queue, one_off, design and other, plus the sessions that set SessionSpec.Key;
+	// the directories may not exist yet.
 	Transcripts map[string]string `json:"transcripts,omitempty"`
 	// CodexSessionsDir holds the held Codex worker's rollout in the limit-burn
 	// scenario; empty elsewhere.

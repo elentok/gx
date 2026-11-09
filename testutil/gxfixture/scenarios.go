@@ -664,6 +664,10 @@ var scenarios = map[string]scenario{
 	// agents: eight sessions in demo (4), other (2) and site (2), one per row of
 	// the Agents mock, and a worktree in demo. See spec.AgentsScenario.
 	"agents": spec.AgentsScenario(),
+	// context-window: Claude sessions at each context level, a fresh, a finished, a
+	// no-chat, a /compact and a no-transcript session, Codex, Queue, Design and
+	// Triage agents. See spec.ContextWindowScenario.
+	"context-window": spec.ContextWindowScenario(),
 	// agents-tools: three Working Claude sessions with tool calls in flight. See spec.ToolsScenario.
 	"agents-tools": spec.ToolsScenario(),
 	// agents-promote: agents plus a Codex session with one message, a held Queue

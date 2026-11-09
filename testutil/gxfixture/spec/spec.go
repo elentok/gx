@@ -125,6 +125,9 @@ type Scenario struct {
 	// QueueAfterSessions queues sc.Queue once the sessions are seeded: a Queue
 	// agent's control file would otherwise break seedSession's before/after diff.
 	QueueAfterSessions bool
+	// StepsAfterSessions are `gx` commands run once the sessions are seeded, for
+	// what starts an agent (triage open) and so has the same control-file problem.
+	StepsAfterSessions [][]string
 	// QueueAfterUsage lists the epics queued once the server has stored a usage
 	// sample, so the usage gate is already up when they first try to claim.
 	QueueAfterUsage []string
@@ -267,6 +270,15 @@ type SessionSpec struct {
 	// Rejected says the agent rejects the first prompt (see Scenario.UnknownSkill):
 	// the session is settled once it raises the Unknown command Actionable.
 	Rejected bool
+	// Tokens is the context count the session reports: sent as agentfake.ActionUsage
+	// once the session is idle (Claude), or before the turn finishes (Codex).
+	Tokens int
+	// Finish ends the agent with exit code 0 once the session is idle (Crash exits with 1).
+	Finish bool
+	// Key records the session's transcript path in Output.Transcripts under this name.
+	Key string
+	// NoTranscript deletes the session's transcript file once it is seeded.
+	NoTranscript bool
 }
 
 // Draft is one seeded New Design draft: its text and how many images it holds.

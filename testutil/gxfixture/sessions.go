@@ -75,6 +75,11 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 		}
 	}
 	if codexTurn {
+		if s.Tokens > 0 {
+			if err := sendControl(agentfake.Control{Action: agentfake.ActionUsage, Tokens: s.Tokens}); err != nil {
+				return err
+			}
+		}
 		if err := sendControl(agentfake.Control{Action: agentfake.ActionFinish}); err != nil {
 			return err
 		}
@@ -98,9 +103,19 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 			return fmt.Errorf("actionable %s: %w\n%s", id, err, out)
 		}
 	}
+	if s.Tokens > 0 && s.Harness != "codex" {
+		if err := sendControl(agentfake.Control{Action: agentfake.ActionUsage, Tokens: s.Tokens}); err != nil {
+			return err
+		}
+		// The control travels on its own FIFO; give it time to land.
+		time.Sleep(300 * time.Millisecond)
+	}
 	control := s.Control
 	if s.Crash {
 		control = &agentfake.Control{Action: agentfake.ActionExit, Code: 1}
+	}
+	if s.Finish {
+		control = &agentfake.Control{Action: agentfake.ActionExit}
 	}
 	if control != nil {
 		if err := sendControl(*control); err != nil {
@@ -126,7 +141,7 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 			return err
 		}
 	}
-	if s.Crash {
+	if s.Crash || s.Finish {
 		if err := f.waitFor(id, wire.SessionExited, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
 			return si.Status.State == wire.SessionExited
 		}); err != nil {
@@ -150,8 +165,49 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 			return fmt.Errorf("mark-read %s: %v (refused %v: %s)", id, err, res.Refused, res.Reason)
 		}
 	}
+	if s.Key != "" || s.NoTranscript {
+		if err := f.recordTranscript(id, s); err != nil {
+			return err
+		}
+	}
 	if s.Images {
 		return f.seedImages(id, s.Harness)
+	}
+	return nil
+}
+
+// recordTranscript notes the Claude session's transcript path under its Key, and
+// removes the file for a NoTranscript session.
+func (f sessionSeeder) recordTranscript(id string, s sessionSpec) error {
+	raw, err := f.cli("agents", "chat", id, "--json")
+	if err != nil {
+		return fmt.Errorf("chat %s: %w\n%s", id, err, raw)
+	}
+	var chat wire.SessionChatResponse
+	if err := json.Unmarshal(raw, &chat); err != nil || chat.ConversationID == "" {
+		return fmt.Errorf("session %s has no conversation id in %s", id, raw)
+	}
+	var si wire.SessionInfo
+	list, err := apiclient.New(server.SocketPath(f.stateD)).Sessions.List(context.Background())
+	if err != nil {
+		return err
+	}
+	i := slices.IndexFunc(list, func(x wire.SessionInfo) bool { return x.ID == id })
+	if i < 0 {
+		return fmt.Errorf("session %s is not listed", id)
+	}
+	si = list[i]
+	path := transcript.PathIn(filepath.Join(f.root, "home"), si.Dir, chat.ConversationID)
+	if s.Key != "" {
+		if f.keyedTranscripts == nil {
+			f.keyedTranscripts = map[string]string{}
+		}
+		f.keyedTranscripts[s.Key] = path
+	}
+	if s.NoTranscript {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
 	return nil
 }
