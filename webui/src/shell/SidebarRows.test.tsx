@@ -112,6 +112,22 @@ test("clicking an epic row navigates and leaves it collapsed; the chevron toggle
   expect(body().queryByRole("link", { name: /builder/ })).toBeNull();
 });
 
+test("chat and epic icons sit in the same fixed, centering slot", async () => {
+  setup("desktop", "/");
+  const epic = within(await body().findByRole("link", { name: /Blog/ }));
+  const chat = within(await body().findByRole("link", { name: /talk/ }));
+  const slots = [epic.getByTestId("icon-slot"), chat.getByTestId("icon-slot")];
+  for (const slot of slots) {
+    const style = getComputedStyle(slot);
+    expect(style.width).toBe("26px");
+    expect(style.display).toBe("flex");
+    expect(style.justifyContent).toBe("center");
+    expect(style.alignItems).toBe("center");
+  }
+  expect(epic.getByTestId("kind-dot")).toBeTruthy();
+  expect(chat.getByLabelText("Chat")).toBeTruthy();
+});
+
 test("a Fix agent row shows the wrench in its status colour; Queue and plain agent rows have none", async () => {
   setup("desktop", "/");
   await body().findByRole("link", { name: /Blog/ });

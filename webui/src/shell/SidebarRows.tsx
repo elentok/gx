@@ -148,14 +148,16 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
         <chakra.a href={row.href} {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
-          {row.kind === "chat" ? (
-            <ChatIcon />
-          ) : (
-            <Box position="relative" flex="none">
-              <ProgressRing progress={row.ring ?? 0} kind={row.kind} size="sidebar" tone={row.status.tone} live={row.status.tone === "running"} />
-              <Box data-testid="kind-dot" position="absolute" right="-2px" bottom="-2px" boxSize="8px" borderRadius="full" borderWidth="1.5px" borderColor="sidebar" bg={`kind.${row.kind}.fg`} />
-            </Box>
-          )}
+          <Box data-testid="icon-slot" w="26px" flex="none" display="flex" alignItems="center" justifyContent="center">
+            {row.kind === "chat" ? (
+              <ChatIcon />
+            ) : (
+              <Box position="relative" flex="none">
+                <ProgressRing progress={row.ring ?? 0} kind={row.kind} size="sidebar" tone={row.status.tone} live={row.status.tone === "running"} />
+                <Box data-testid="kind-dot" position="absolute" right="-2px" bottom="-2px" boxSize="8px" borderRadius="full" borderWidth="1.5px" borderColor="sidebar" bg={`kind.${row.kind}.fg`} />
+              </Box>
+            )}
+          </Box>
           <Box as="span" flex="1" minW="0" fontSize="14px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
             {row.title}
           </Box>
