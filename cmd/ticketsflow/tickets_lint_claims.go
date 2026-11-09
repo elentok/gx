@@ -90,6 +90,8 @@ func lintEpicClaims(d Deps, cwd, commit, epicPath, manifestPath string, w io.Wri
 		GoTests: ticketspec.LoadGoTestNames(root),
 		Flows:   ticketspec.LoadFlowCatalog(root),
 		TopDirs: topLevelDirs(root),
+
+		Basenames: ticketspec.LoadBasenames(root),
 	}
 	report := ticketspec.LintClaims(entries, existing, env)
 	printLintReport(w, commit, report)

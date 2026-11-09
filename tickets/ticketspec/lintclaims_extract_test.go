@@ -15,7 +15,10 @@ func TestExtractClaims_Spans(t *testing.T) {
 		{"go selector", "`schema.StatusDraft` `tickets.Work`", nil},
 		{"glob", "`webui/e2e/*.spec.ts`", nil},
 		{"shell command", "`git rev-parse --short HEAD`", nil},
-		{"ext without slash", "`SKILL.md` `report_metrics.go`", nil},
+		{"ext without slash", "`SKILL.md` `report_metrics.go`", []Claim{
+			{Kind: ClaimBareFile, Text: "SKILL.md", File: "SKILL.md"},
+			{Kind: ClaimBareFile, Text: "report_metrics.go", File: "report_metrics.go"},
+		}},
 		{"number", "`0.83`", nil},
 		{"project:epic", "`gx:ticket-authoring-tools-impl`", nil},
 		{"url and tilde and dollar", "`https://x.io/a.md` `~/a/b.md` `$HOME/a.go`", nil},

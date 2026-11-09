@@ -83,6 +83,7 @@ func TestLintClaims_CommandsPathsPatternsFlows(t *testing.T) {
 	f := newLintFixture(t)
 	f.file("webui/e2e/CATALOG.md", "# Catalog\n\n## 5. Five\n\n## 7. Seven\n")
 	f.file("server/a_test.go", "package server\n\nfunc TestPublish(t *testing.T) {}\n")
+	f.file("skills/SKILL.md", "# skill\n")
 	f.ticket("01", "implement", "", "## Test seams\n\n"+
 		"`gx tickets nosuch` and `gx tickets add --nosuch`.\n"+
 		"`docs/nowhere.md`, `-run 'TestNoSuch'`, `-run 'TestPublish'`.\n"+
@@ -102,6 +103,24 @@ func TestLintClaims_CommandsPathsPatternsFlows(t *testing.T) {
 	if n := strings.Count(out, "miss: "); n != 6 {
 		t.Errorf("%d misses, want 6:\n%s", n, out)
 	}
+}
+
+func TestLintClaims_BareFileNamesAndCaseClashes(t *testing.T) {
+	f := newLintFixture(t)
+	f.file("web/DraftImages.tsx", "export {}\n")
+	f.file("web/CommandPalette.tsx", "export {}\n")
+	f.ticket("01", "implement", "", "## Where to look\n\n"+
+		"Edit `CommandMenu.tsx` and `CommandPalette.tsx`.\n\n## What to build\n\n"+
+		"Add `web/draftImages.ts` and `web/fresh.ts`.\n")
+	out, code := f.lint()
+	if code != 1 {
+		t.Errorf("exit = %d, want 1", code)
+	}
+	wantLines(t, out,
+		"miss: 01: CommandMenu.tsx: no such file anywhere in the repo",
+		"miss: 01: web/draftImages.ts: differs only by case from existing DraftImages.tsx")
+	wantLines(t, out, "planned: 01: web/fresh.ts")
+	wantNoLines(t, out, "CommandPalette.tsx:", "miss: 01: web/fresh.ts")
 }
 
 func TestLintClaims_WarningAloneExitsZero(t *testing.T) {

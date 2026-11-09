@@ -38,6 +38,8 @@ type LintEnv struct {
 	GoTests []string
 	Flows   map[int]bool
 	TopDirs []string
+	// Basenames is every file name in the repo; nil skips the bare-file check.
+	Basenames map[string]bool
 }
 
 // LintFinding is one line of the lint's output.
@@ -173,6 +175,11 @@ func claimProblems(c Claim, env LintEnv) []claimProblem {
 		return out
 	case ClaimPath, ClaimFileFunc:
 		return fileProblems(c, env)
+	case ClaimBareFile:
+		if env.Basenames == nil || env.Basenames[c.File] {
+			return nil
+		}
+		return []claimProblem{{c.Text + ": no such file anywhere in the repo", contains(c.File)}}
 	case ClaimTestPattern:
 		if env.GoTests == nil {
 			return nil
@@ -193,6 +200,11 @@ func fileProblems(c Claim, env LintEnv) []claimProblem {
 		if info, serr := os.Stat(path); serr == nil && info.IsDir() && c.Kind == ClaimPath {
 			return nil
 		}
+		// Never plannable: a file that collides by case breaks the build on a
+		// case-insensitive filesystem however the ticket words it.
+		if clash := caseClash(path); clash != "" {
+			return []claimProblem{{c.Text + ": differs only by case from existing " + clash, nil}}
+		}
 		return []claimProblem{{c.Text + ": no such file", contains(c.File)}}
 	}
 	if c.Kind == ClaimFileFunc && strings.HasSuffix(c.File, ".go") {
@@ -202,6 +214,42 @@ func fileProblems(c Claim, env LintEnv) []claimProblem {
 		}
 	}
 	return nil
+}
+
+// caseClash returns the name of a sibling of the missing path whose extensionless
+// name matches it case-insensitively (draftImages.ts beside DraftImages.tsx), or "".
+func caseClash(path string) string {
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		return ""
+	}
+	stem := func(n string) string { return strings.ToLower(strings.TrimSuffix(n, filepath.Ext(n))) }
+	want := stem(filepath.Base(path))
+	for _, e := range entries {
+		if !e.IsDir() && stem(e.Name()) == want {
+			return e.Name()
+		}
+	}
+	return ""
+}
+
+// LoadBasenames returns the set of file names anywhere under root.
+func LoadBasenames(root string) map[string]bool {
+	names := map[string]bool{}
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if skipWalkDirs[d.Name()] && p != root {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		names[d.Name()] = true
+		return nil
+	})
+	return names
 }
 
 func testPatternProblem(pattern string, tests []string) string {

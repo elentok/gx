@@ -17,6 +17,7 @@ const (
 	ClaimTestPattern ClaimKind = "test-pattern" // `-run 'TestX'`
 	ClaimFileFunc    ClaimKind = "file-func"    // `tickets/x.go:Func`
 	ClaimPath        ClaimKind = "path"         // `tickets/x.go`
+	ClaimBareFile    ClaimKind = "bare-file"    // `x.go`: a file name with no directory
 	ClaimLineRef     ClaimKind = "line-ref"     // `x.go:42` or prose "line 42"
 	ClaimFlow        ClaimKind = "flow"         // prose "flow 3" / "new flow 3"
 )
@@ -128,6 +129,9 @@ func classifySpan(span string, topDirs []string) (Claim, bool) {
 	}
 	if isPathSpan(span, topDirs) {
 		return Claim{Kind: ClaimPath, Text: span, File: span}, true
+	}
+	if !strings.Contains(span, "/") && hasKnownExt(span) {
+		return Claim{Kind: ClaimBareFile, Text: span, File: span}, true
 	}
 	return Claim{}, false
 }
