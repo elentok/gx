@@ -5,12 +5,9 @@ import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { Modal } from "../ui/modal/Modal";
 import { refusalText, useWrite } from "../useWrite";
-import { numberListHint, removeChange, setChange } from "./settingsApi";
+import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi";
 
-export const entryLabel = (e: SettingsEntry) => {
-  const text = (e.path[e.path.length - 1] ?? e.key).replace(/-/g, " ");
-  return text.charAt(0).toUpperCase() + text.slice(1);
-};
+export { entryLabel };
 
 export function valueText(e: SettingsEntry): string {
   if (e.type === "secret") return e.set ? "Set" : "Not set";

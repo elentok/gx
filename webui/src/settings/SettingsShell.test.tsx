@@ -1,4 +1,4 @@
-import { fireEvent } from "@testing-library/react";
+import { fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { SettingsEntry } from "../generated/server";
@@ -82,6 +82,41 @@ describe("SettingsShellView", () => {
       expect(getByRole("link", { name: new RegExp(name) }).getAttribute("href")).toBe(href);
     fireEvent.click(getByText("Sign out of this device"));
     expect(onSignOut).toHaveBeenCalledOnce();
+  });
+
+  describe("search", () => {
+    const type = (getByLabelText: (s: string) => HTMLElement, v: string) => fireEvent.change(getByLabelText("Search settings"), { target: { value: v } });
+
+    it("finds a key by name, key path or description word", () => {
+      const { getByLabelText, getByText, queryByText } = renderShell("Budget");
+      type(getByLabelText, "max agents");
+      expect(getByText("execution-queue.max-agents")).toBeTruthy();
+      type(getByLabelText, "BUDGET.SOFT");
+      expect(getByText("budget.soft")).toBeTruthy();
+      expect(queryByText("execution-queue.max-agents")).toBeNull();
+      type(getByLabelText, "theme");
+      expect(getByText("tui.theme")).toBeTruthy();
+    });
+
+    it("groups hits under section headings, replaces the page, and clearing returns to the section", () => {
+      const { container, getByLabelText, getByText, queryByText, getByRole } = renderShell("Budget");
+      type(getByLabelText, "o");
+      expect(getByRole("heading", { name: "Search" })).toBeTruthy();
+      const page = within(container.querySelector("[data-mock-part=page]") as HTMLElement);
+      expect(page.getByText("Execution queue")).toBeTruthy();
+      expect(page.getByText("Budget")).toBeTruthy();
+      expect(getByText("execution-queue.poll")).toBeTruthy();
+      type(getByLabelText, "");
+      expect(getByRole("heading", { name: "Budget" })).toBeTruthy();
+      expect(queryByText("execution-queue.poll")).toBeNull();
+      expect(getByText("budget.soft")).toBeTruthy();
+    });
+
+    it("shows an empty state when nothing matches", () => {
+      const { getByLabelText, getByText } = renderShell();
+      type(getByLabelText, "zzz");
+      expect(getByText("No settings match")).toBeTruthy();
+    });
   });
 
   it("has no Authenticator row while TOTP is off", () => {

@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import type { SettingsEntry } from "../generated/server";
-import { changedCount, draftHint, fetchSettings, groupBySection, postSettings, removeChange, rowState, setChange } from "./settingsApi";
+import { changedCount, draftHint, fetchSettings, groupBySection, postSettings, removeChange, rowState, searchEntries, setChange } from "./settingsApi";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -14,6 +14,19 @@ test("groups entries by section in the order sent and counts the keys the file h
     ["Server", ["b", "d"], 1],
   ]);
   expect(changedCount([entry("a", "x", true), entry("b", "x", true), entry("c", "x", false)])).toBe(2);
+});
+
+test("search matches name, key path and description case-insensitively; blank matches nothing", () => {
+  const es = [
+    { ...entry("execution-queue.max-agents", "Execution queue", false), description: "Live agents." },
+    { ...entry("budget.soft", "Budget", false), description: "Soft limit." },
+  ];
+  const keys = (q: string) => searchEntries(es, q).map((e) => e.key);
+  expect(keys("MAX AGENTS")).toEqual(["execution-queue.max-agents"]);
+  expect(keys("budget.")).toEqual(["budget.soft"]);
+  expect(keys("limit")).toEqual(["budget.soft"]);
+  expect(keys("  ")).toEqual([]);
+  expect(keys("nope")).toEqual([]);
 });
 
 test("a row is set when the file holds the key, even at its default value", () => {

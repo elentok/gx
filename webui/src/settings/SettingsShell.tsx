@@ -1,11 +1,13 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
+import { useState } from "react";
 import { Link } from "react-router";
 import type { SettingsEntry } from "../generated/server";
 import { SETTINGS_HREF } from "../hrefs";
 import { PageHeader } from "../page/PageHeader";
 import { PageIcon } from "../page/PageIcon";
+import { EmptyState } from "../ui/empty-state/EmptyState";
 import { useDevice } from "../useWide";
-import { groupBySection } from "./settingsApi";
+import { groupBySection, searchEntries } from "./settingsApi";
 import { Group } from "./parts";
 import { SettingsRow, type WriteSetting } from "./SettingsRow";
 
@@ -60,7 +62,16 @@ export interface ShellProps {
   onWrite: WriteSetting;
 }
 
-function Sidebar({ entries, projects, section, totpOn, authenticatorMissing, onSignOut }: ShellProps) {
+function Sidebar({
+  entries,
+  projects,
+  section,
+  totpOn,
+  authenticatorMissing,
+  onSignOut,
+  query,
+  onQuery,
+}: ShellProps & { query: string; onQuery: (q: string) => void }) {
   const changed = new Map(groupBySection(entries).map((g) => [g.section, g.changed]));
   return (
     <chakra.nav data-mock-part="sidebar" display="grid" gap="0.5" alignSelf="start">
@@ -89,6 +100,8 @@ function Sidebar({ entries, projects, section, totpOn, authenticatorMissing, onS
         type="text"
         aria-label="Search settings"
         placeholder="Search all settings"
+        value={query}
+        onChange={(e) => onQuery(e.target.value)}
         mt="2"
         w="100%"
         h="40px"
@@ -136,18 +149,30 @@ const AccountLink = ({ href, children }: { href: string; children: string }) => 
 export function SettingsShellView(props: ShellProps) {
   const { pendingRestart, onWrite } = props;
   const device = useDevice();
+  const [query, setQuery] = useState("");
+  const searching = query.trim() !== "";
   const section = props.section ?? GLOBAL_SECTIONS[0];
-  const rows = props.entries.filter((e) => e.section === section);
+  const row = (e: SettingsEntry) => <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} />;
+  const hits = searchEntries(props.entries, query);
   return (
     <Box display="grid" gridTemplateColumns={`${device === "desktop" ? 230 : 200}px minmax(0, 1fr)`} gap="14px" alignItems="start">
-      <Sidebar {...props} section={section} />
+      <Sidebar {...props} section={section} query={query} onQuery={setQuery} />
       <Box data-mock-part="page" maxW="720px">
-        <PageHeader title={section} icon={<PageIcon kind="settings" />} />
-        <Group>
-          {rows.map((e) => (
-            <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} />
-          ))}
-        </Group>
+        <PageHeader title={searching ? "Search" : section} icon={<PageIcon kind="settings" />} />
+        {!searching && <Group>{props.entries.filter((e) => e.section === section).map(row)}</Group>}
+        {searching && hits.length === 0 && <EmptyState title="No settings match">Nothing in global settings matches “{query.trim()}”.</EmptyState>}
+        {searching && hits.length > 0 && (
+          <>
+            <Text mt="4" fontSize="xs" letterSpacing="0.08em" textTransform="uppercase" color="text.muted" px="3">
+              {hits.length} {hits.length === 1 ? "match" : "matches"} in global settings
+            </Text>
+            {groupBySection(hits).map((g) => (
+              <Group key={g.section} label={g.section}>
+                {g.entries.map(row)}
+              </Group>
+            ))}
+          </>
+        )}
       </Box>
     </Box>
   );

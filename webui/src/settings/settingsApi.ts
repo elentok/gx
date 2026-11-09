@@ -59,6 +59,19 @@ export function groupBySection(entries: SettingsEntry[]): SectionGroup[] {
   return [...groups.values()];
 }
 
+/** The row's display name: the last path segment, spaced and capitalised. */
+export const entryLabel = (e: SettingsEntry) => {
+  const text = (e.path[e.path.length - 1] ?? e.key).replace(/-/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+/** Entries whose name, key path or description contains the query, case-insensitively; a blank query matches none. */
+export function searchEntries(entries: SettingsEntry[], query: string): SettingsEntry[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return entries.filter((e) => [entryLabel(e), e.key, e.description].some((s) => s.toLowerCase().includes(q)));
+}
+
 // Hints are for the browser only; the server's check decides. Each returns an error sentence or undefined.
 
 const NUMBER = /^-?\d+(\.\d+)?$/;
