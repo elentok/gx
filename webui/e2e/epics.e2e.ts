@@ -101,6 +101,19 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     const result = page.getByRole("group", { name: "Answered question" });
     await expect(result.getByText("no option picked")).toBeVisible();
     await expect(result.getByText("Ask me again tomorrow")).toBeVisible();
+    await expect(result.getByRole("status", { name: "Answer result" }).getByText("Delivered")).toBeVisible();
+  });
+
+  // 40: answering an agent that is gone queues the ticket; the card's status line says so.
+  await test.step("agent question: answer to a gone agent reads Queued", async () => {
+    await start("answer-queued");
+    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:queued-answer-epic/01");
+    const form = page.getByRole("form", { name: "Answer" });
+    await form.getByRole("textbox").fill("go on");
+    await form.getByRole("button", { name: "Send answer" }).click({ timeout: 60_000 });
+    const result = page.getByRole("group", { name: "Answered question" });
+    await expect(result.getByRole("status", { name: "Answer result" })).toContainText("Queued");
+    await expect(result.getByRole("status", { name: "Answer result" })).toContainText("in queue");
   });
 
   // 55: Huh? sends the fixed message, on a ticket that has not been answered yet.
@@ -110,7 +123,9 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     const form = page.getByRole("form", { name: "Answer" });
     await form.getByRole("button", { name: "Huh?" }).click({ timeout: 60_000 });
     await form.getByRole("button", { name: "Send answer" }).click();
-    await expect(page.getByRole("status", { name: "Answer result" }).getByText(HUH_MESSAGE)).toBeVisible();
+    const result = page.getByRole("group", { name: "Answered question" });
+    await expect(result.getByText(HUH_MESSAGE)).toHaveCount(1);
+    await expect(result.getByRole("status", { name: "Answer result" })).toBeVisible();
   });
 
   // 49: the ticket detail shows the Latest summary block; the Epics-page card carries none of it.
