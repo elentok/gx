@@ -1,5 +1,5 @@
 import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useCompletion, type CompletionConfig, type MenuKey } from "../../commands/useCompletion";
 import type { ViMode } from "./CodeEditor";
 import { LargeEditor, type EditorMenu, type Selection } from "./LargeEditor";
@@ -40,6 +40,8 @@ interface FieldProps {
   completion?: CompletionConfig;
   /** A status line inside the box, under the text. `null` keeps its room with no text; leave it out for no line. */
   note?: { text: string; red?: boolean } | null;
+  /** A line inside the box, under the text and the note. */
+  footer?: ReactNode;
 }
 
 /** A textarea with an expand button that opens a large editor on the same text. The parent owns the text; there is no copy and no save step. */
@@ -82,6 +84,7 @@ function Field({
   bg,
   menu,
   note,
+  footer,
 }: Omit<FieldProps, "completion"> & { menu?: Menu }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -129,7 +132,7 @@ function Field({
         lineHeight="1.5"
         display="block"
         pt="2.5"
-        pb={note === undefined ? "2.5" : "7"}
+        pb={footer ? (note === undefined ? "8" : "12") : note === undefined ? "2.5" : "7"}
         ps="3"
         pe="46px"
         resize="none"
@@ -149,7 +152,7 @@ function Field({
       {note !== undefined && (
         <Text
           position="absolute"
-          bottom="1.5"
+          bottom={footer ? "8" : "1.5"}
           left="3"
           right="46px"
           fontSize="xs"
@@ -160,6 +163,11 @@ function Field({
         >
           {note?.text}
         </Text>
+      )}
+      {footer && (
+        <Box position="absolute" bottom="1.5" left="3" right="3">
+          {footer}
+        </Box>
       )}
       {!selection && menu?.node}
       <chakra.button

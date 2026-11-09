@@ -60,6 +60,25 @@ test("the box is open with Send beside it and none of the design parts", () => {
   }
 });
 
+test("the footer shows the model, plus the badge once there is a count", () => {
+  const { unmount } = render({ s: { ...session(), model: "claude-opus-4-7", effort: "high" } });
+  expect(screen.getByText("Claude Opus 4.7 · high")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Context" })).toBeNull();
+  unmount();
+  renderThemed(
+    <WideContext.Provider value={true}>
+      <AgentComposer session={{ ...session(), context_tokens: 70_000, context_level: "green" }} connected ceiling={200_000} />
+    </WideContext.Provider>,
+  );
+  expect(screen.getByRole("button", { name: "Context" }).textContent).toBe("70K");
+});
+
+test("a session without chat shows the model alone, never a badge", () => {
+  render({ s: { ...session(), harness: "other", model: "claude-opus-4-7", context_tokens: 70_000, context_level: "green" } });
+  expect(screen.queryByRole("button", { name: "Context" })).toBeNull();
+  expect(screen.getByText("Claude Opus 4.7")).toBeTruthy();
+});
+
 test("Send is off while empty and on once there is text", () => {
   render();
   expect((send() as HTMLButtonElement).disabled).toBe(true);

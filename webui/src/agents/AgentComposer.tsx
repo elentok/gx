@@ -1,6 +1,7 @@
 import { Box, Spinner } from "@chakra-ui/react";
 import { useRef, useState } from "react";
-import { codexSkillHint } from "../design/chat";
+import { codexSkillHint, hasChat } from "../design/chat";
+import { FooterLine } from "../design/FooterLine";
 import { ComposerImages } from "../design/ComposerImages";
 import { InterruptPopover } from "../design/InterruptPopover";
 import { postInterruptSession, stateToken, type InterruptSession } from "../design/open";
@@ -26,7 +27,10 @@ export function AgentComposer({
   onStale,
   reason,
   onSent,
+  ceiling,
 }: {
+  /** The smart-zone ceiling from the snapshot; the badge needs it. */
+  ceiling?: number;
   session: SessionInfo;
   lastMessage?: string;
   connected: boolean;
@@ -139,6 +143,7 @@ export function AgentComposer({
           onChange={setText}
           onSubmit={onSubmit}
           note={line ?? null}
+          footer={<FooterLine session={session} ceiling={ceiling} modelOnly={!hasChat(session.harness)} />}
           completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
         />
       </ComposerImages>

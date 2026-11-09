@@ -14,7 +14,8 @@ test("the header names the session, status, dir and ticket, with the joined mode
   expect(header.getByText("Claude CLI default")).toBeTruthy();
   cleanup();
   render([session("s-2", "p", { name: "two", harness: "codex" })], "/agents/s-2", true, chatOf(chat()));
-  expect(await screen.findByText("Codex CLI default")).toBeTruthy();
+  const header2 = within((await screen.findByRole("heading", { name: /two/ })).closest("header")!);
+  expect(header2.getByText("Codex CLI default")).toBeTruthy();
 });
 
 test("the header subtitle says Chat before the project", async () => {
