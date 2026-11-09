@@ -230,6 +230,9 @@ func (r *runner) jsSteps(kind string, p *jsPackage) ([]step, string) {
 	}
 	switch kind {
 	case "format":
+		if !has("prettier") && len(p.files) > 0 {
+			return nil, r.rel(p.dir) + ": no prettier"
+		}
 		return runner("prettier", []string{"--write"}, p.files), ""
 	case "lint":
 		return runner("eslint", nil, p.files), ""

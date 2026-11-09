@@ -325,6 +325,23 @@ func TestCheck_JSPackageWithoutLockfileIsSkipped(t *testing.T) {
 	}
 }
 
+func TestCheck_JSPackageWithoutPrettierSaysNoPrettierInsteadOfNoMatchingFiles(t *testing.T) {
+	repo := checkRepo(t, `{}`)
+	tools := fakeTools(t, nil, "npm", "npx")
+	testutil.WriteFile(t, repo, "web/package.json", `{"devDependencies":{"eslint":"9"}}`)
+	testutil.WriteFile(t, repo, "web/package-lock.json", "")
+	testutil.WriteFile(t, repo, "web/node_modules/.keep", "")
+	testutil.WriteFile(t, repo, "web/a.ts", "export {}\n")
+
+	out, code := runCheckCmd(t, repo, "--kind", "format")
+	if code != 3 || !strings.Contains(out, "web: no prettier") || strings.Contains(out, "no matching files") {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+	if got := readLog(t, tools); got != "" {
+		t.Errorf("a tool ran:\n%s", got)
+	}
+}
+
 func TestCheck_JSToolListedOnlyInWorkspaceRootRuns(t *testing.T) {
 	repo := checkRepo(t, `{}`)
 	tools := fakeTools(t, nil, "pnpm")

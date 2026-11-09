@@ -345,6 +345,7 @@ Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
 - The web UI does not use prettier. Never run it: it reformats unrelated lines.
+  `gx check` says `webui: no prettier` on the format line for webui files; that is expected, not a pass.
 - Regenerate `webui/src/generated/server.ts` and `wire.ts` with `make web-types`. Wire types live in
   `server/wire` and generate `wire.ts`; `server.ts` re-exports it, so web code keeps importing
   `generated/server`. tygo cannot resolve a constant or alias from another package (it emits
