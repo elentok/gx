@@ -26,7 +26,10 @@ type Deps struct {
 // DefaultDeps is the production wiring: the zero value of every hook.
 func DefaultDeps() Deps { return Deps{} }
 
-const goCleanCache = "go-clean-cache"
+const (
+	goCleanCache = "go-clean-cache"
+	failures     = "failures"
+)
 
 // New builds the `brief` command.
 func New(d Deps) *cobra.Command {
@@ -47,6 +50,11 @@ the test file select flows (playwright disk.e2e.ts 76 77); -g is passed through.
 
 conflicts lists the unmerged files of an in-progress merge or rebase with the
 line numbers of their conflict markers (exit 1 while any remain, 0 when none).
+
+failures [log] prints every failing test of a brief log with its first lines, the
+whole list instead of the first few. Without a log path it reads the latest
+failed run (exit 1 while the log holds failures, 0 when none). Use it instead
+of rg over the log.
 
 go-clean-cache waits until no Go build runs, then runs go clean -cache. Use it
 instead of calling go clean -cache, which breaks running builds.
@@ -96,8 +104,8 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 		return c.Help()
 	}
 	tool, ok := brief.ToolByName(args[0])
-	if !ok && args[0] != "conflicts" && args[0] != goCleanCache {
-		// conflicts and go-clean-cache are not brief.Tools: they keep no log.
+	if !ok && args[0] != "conflicts" && args[0] != goCleanCache && args[0] != failures {
+		// conflicts, failures and go-clean-cache are not brief.Tools: they keep no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
 	}
 	cwd, err := d.Getwd()
@@ -118,6 +126,20 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 	stateDir, err := d.Dirs().StateDir()
 	if err != nil {
 		return err
+	}
+	if args[0] == failures {
+		dataDir, err := d.Dirs().DataDir()
+		if err != nil {
+			return err
+		}
+		logPath := ""
+		if len(args) > 1 {
+			logPath = args[1]
+		}
+		if code := brief.Failures(dataDir, logPath, c.OutOrStdout()); code != brief.ExitPass {
+			return &cmdbase.ExitError{Code: code}
+		}
+		return nil
 	}
 	if args[0] == goCleanCache {
 		if code := brief.GoCleanCache(dir, stateDir, d.Env.Env, d.CacheGate, c.OutOrStdout()); code != brief.ExitPass {

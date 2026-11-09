@@ -58,7 +58,11 @@ func (u Unit) String() string {
 
 // renderUnits prints the units under their location. Units of one location
 // must be adjacent.
-func renderUnits(w io.Writer, units []Unit) {
+func renderUnits(w io.Writer, units []Unit) { renderUnitsMax(w, units, maxFullUnits) }
+
+// renderUnitsMax is renderUnits with the number of units shown with text
+// chosen by the caller.
+func renderUnitsMax(w io.Writer, units []Unit, maxFull int) {
 	units, counts := collapseUnits(units)
 	prev := ""
 	for i, u := range units {
@@ -73,7 +77,7 @@ func renderUnits(w io.Writer, units []Unit) {
 		if counts[i] > 1 {
 			head += fmt.Sprintf(" (x%d)", counts[i])
 		}
-		if i >= maxFullUnits {
+		if i >= maxFull {
 			if loc := goFileLine.FindString(u.Text); loc != "" {
 				head += " " + loc
 			}
@@ -85,8 +89,8 @@ func renderUnits(w io.Writer, units []Unit) {
 			fmt.Fprintf(w, "    %s\n", l)
 		}
 	}
-	if len(units) > maxFullUnits {
-		fmt.Fprintf(w, "%d more failures are listed by name only; see the log for their text\n", len(units)-maxFullUnits)
+	if len(units) > maxFull {
+		fmt.Fprintf(w, "%d more failures are listed by name only; see the log for their text\n", len(units)-maxFull)
 	}
 }
 
