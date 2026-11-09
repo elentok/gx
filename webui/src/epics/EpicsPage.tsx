@@ -1,15 +1,13 @@
 import { Box, chakra, Input, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation } from "react-router";
 import { MissingBanner } from "../checks/MissingBanner";
 import { SetupDialog } from "../checks/SetupDialog";
 import { postSaveChecks, type SaveChecks } from "../checks/setup";
 import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status";
 import { useConnectionContext } from "../connection";
-import type { OpenDesign } from "../design/open";
-import { NewDesignForm } from "../design/NewDesignForm";
 import { CardKindFollowUps, type Workspace } from "../generated/server";
-import { designHref } from "../hrefs";
+import { openNewDesign, setPageProject } from "../shell/newItemOpen";
 import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
@@ -108,16 +106,13 @@ function SectionBlock({
 export function EpicsPage({
   fetchList,
   fetchChecks = fetchChecksStatus,
-  openDesign,
   saveChecks = postSaveChecks,
 }: {
   fetchList?: FetchEpicList;
   fetchChecks?: FetchChecksStatus;
-  openDesign?: OpenDesign;
   saveChecks?: SaveChecks;
 }) {
   const conn = useConnectionContext();
-  const navigate = useNavigate();
   const { list, failed, retry } = useEpicList(fetchList, conn);
   // A failed read shows no banner: it is not worth an error state.
   const { data: checks, retry: rereadChecks } = useFetched("checks", fetchChecks, conn);
@@ -125,7 +120,6 @@ export function EpicsPage({
   const [settingUp, setSettingUp] = useState<string>();
   const [query, setQuery] = useState("");
   const [toggled, setToggled] = useState<Set<string>>(new Set());
-  const [designing, setDesigning] = useState(false);
   const [workspace, setWorkspace] = useState<string>();
   const { workspaces } = useWorkspaces(conn);
   const [storedProjects, setStoredProjects] = useState(readStoredProjects);
@@ -178,8 +172,13 @@ export function EpicsPage({
     card.scrollIntoView?.({ block: "center" });
     setScrollTo(undefined);
   }, [scrollTo, toggled, list]);
+  const filterProject = filterProjects?.length === 1 ? filterProjects[0] : undefined;
+  useEffect(() => {
+    setPageProject(filterProject);
+    return () => setPageProject(undefined);
+  }, [filterProject]);
   const newDesign = (
-    <Button emphasis="main" flexShrink="0" whiteSpace="nowrap" onClick={() => setDesigning(true)}>
+    <Button emphasis="main" flexShrink="0" whiteSpace="nowrap" onClick={() => openNewDesign()}>
       New Design
     </Button>
   );
@@ -252,15 +251,6 @@ export function EpicsPage({
         ))
       )}
       {setupProject && <SetupDialog project={setupProject} save={saveChecks} onSaved={rereadChecks} onClose={() => setSettingUp(undefined)} />}
-      {designing && (
-        <NewDesignForm
-          projects={projects}
-          filterProject={filterProjects?.length === 1 ? filterProjects[0] : undefined}
-          open={openDesign}
-          onStarted={(address, startFailure) => navigate(designHref(address).slice(1), { state: { startFailure } })}
-          onClose={() => setDesigning(false)}
-        />
-      )}
     </DetailPage>
   );
 }

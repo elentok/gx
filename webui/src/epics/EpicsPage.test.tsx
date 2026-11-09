@@ -3,8 +3,8 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicList, EpicListRow } from "../generated/server";
-import type { OpenDesign } from "../design/open";
 import { appRoutes } from "../routes";
+import { closeNewItem, openNewDesign } from "../shell/newItemOpen";
 import { renderThemed } from "../ui/render";
 import type { FetchEpicList } from "./list";
 
@@ -17,7 +17,9 @@ vi.mock("../design/drafts", async (importOriginal) => ({
 }));
 
 afterEach(() => {
+  closeNewItem();
   cleanup();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -68,8 +70,8 @@ function eventConn() {
   return { conn: c, emit: () => listeners.forEach((l) => l()) };
 }
 
-function renderEpics(fetchList: FetchEpicList, withConn: Connection = conn, openDesign?: OpenDesign) {
-  const router = createMemoryRouter(appRoutes({ epicList: fetchList, openDesign }), { initialEntries: ["/epics"] });
+function renderEpics(fetchList: FetchEpicList, withConn: Connection = conn) {
+  const router = createMemoryRouter(appRoutes({ epicList: fetchList }), { initialEntries: ["/epics"] });
   const view = renderThemed(
     <ConnectionContext.Provider value={withConn}>
       <RouterProvider router={router} />
@@ -80,7 +82,19 @@ function renderEpics(fetchList: FetchEpicList, withConn: Connection = conn, open
 
 const filterBox = () => screen.findByRole("searchbox", { name: "Filter epics" });
 
+// The New Design host (in the shell) reads the list and posts through fetch, not the page's injected fetcher.
+const stubFetch = (list: EpicList, post: (body: unknown) => unknown = () => ({ refused: false })) =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") return new Response(JSON.stringify(post(JSON.parse(String(init.body)))), { status: 200 });
+      if (String(url).includes("/v1/epics")) return new Response(JSON.stringify(list), { status: 200 });
+      return new Response("not stubbed", { status: 404 });
+    }),
+  );
+
 const loaded = async (list: EpicList) => {
+  stubFetch(list);
   renderEpics(async () => list);
   await filterBox();
   await waitFor(() => expect(screen.queryByRole("status", { name: "Loading epics" })).toBeNull());
@@ -270,10 +284,10 @@ test("New Design opens the form in a dialog, Close closes it", async () => {
 });
 
 test("the New Design project starts on the page's filtered project", async () => {
-  localStorage.setItem("gx.epics.project", "blog");
+  localStorage.setItem("gx.epics.project", "gx");
   await loaded(listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]));
   fireEvent.click(screen.getByRole("button", { name: "New Design" }));
-  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
+  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("gx");
 });
 
 test("the New Design project ignores a filter of several projects", async () => {
@@ -283,9 +297,27 @@ test("the New Design project ignores a filter of several projects", async () => 
   expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
 });
 
+test("leaving the Epics page clears the filter the openers use", async () => {
+  // Unfiltered, the form starts on the first project ("blog"), so "gx" proves the filter reached it.
+  localStorage.setItem("gx.epics.project", "gx");
+  const list = listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]);
+  stubFetch(list);
+  const { router } = renderEpics(async () => list);
+  await filterBox();
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Loading epics" })).toBeNull());
+  act(() => openNewDesign());
+  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("gx");
+  act(() => closeNewItem());
+  await act(() => router.navigate("/agents"));
+  await waitFor(() => expect(screen.queryByRole("searchbox", { name: "Filter epics" })).toBeNull());
+  act(() => openNewDesign());
+  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
+});
+
 test("Start posts new_design and opens the new Design page", async () => {
-  const open = vi.fn(async () => ({ refused: false }) as never);
-  const { router } = renderEpics(async () => mixed(), conn, open);
+  const open = vi.fn(() => ({ refused: false }));
+  stubFetch(mixed(), open);
+  const { router } = renderEpics(async () => mixed());
   await filterBox();
   fireEvent.click(await screen.findByRole("button", { name: "New Design" }));
   fireEvent.change(await screen.findByRole("textbox", { name: "Epic slug" }), { target: { value: "fresh" } });

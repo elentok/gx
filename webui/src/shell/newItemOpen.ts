@@ -12,7 +12,13 @@ function set(next: NewItemRequest) {
   listeners.forEach((l) => l());
 }
 
-export const openNewDesign = (opts: { filterProject?: string } = {}) => set({ kind: "design", filterProject: opts.filterProject });
+// The project the open page filters to (the Epics page, while mounted); every opener starts a new draft on it.
+let pageProject: string | undefined;
+export const setPageProject = (project: string | undefined) => {
+  pageProject = project;
+};
+
+export const openNewDesign = (opts: { filterProject?: string } = {}) => set({ kind: "design", filterProject: opts.filterProject ?? pageProject });
 export const openNewAgent = () => set({ kind: "agent" });
 export const closeNewItem = () => set(null);
 
