@@ -244,6 +244,12 @@ A ticket is committed only after a green `gx check`, or with `--check-failures` 
 Committing after a failed run and re-running `gx check` prints a skip (exit 3), which does not clear
 the failure: the finish gate still sees the failed run.
 
+When the failures were already red before you started (a sibling ticket pushed `sizeguard` over a
+limit, a test family red on the base), do not rebuild a baseline worktree to prove it and do not
+file one follow-up per test. File one follow-up for the family (or find the open one, which the
+refusal message names) and finish with `--iteration-status finished --known-failures <addr>`;
+`--check-failures` is for one follow-up per failing test of your own run.
+
 Never run `gx check --full`. Ticket agents run changed-file `gx check`. The epic's verify ticket,
 the proof and the person run `gx check --full` (the verify ticket runs it and the soak in the
 background and polls).
