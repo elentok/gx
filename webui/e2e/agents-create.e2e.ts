@@ -27,6 +27,14 @@ test("85. Create session", async ({ page, start }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await go(page, "#/agents");
 
+  // The page's own "New session" button opens the same form, with Name focused (not Project or First prompt).
+  await page.getByRole("main").getByRole("button", { name: "New session", exact: true }).click();
+  await expect(newForm(page)).toBeVisible();
+  await expect(projectSelect(page)).not.toHaveValue("");
+  await expect(newForm(page).getByRole("textbox", { name: "Name", exact: true })).toBeFocused();
+  await newForm(page).getByRole("button", { name: "Close" }).click();
+  await expect(newForm(page)).toHaveCount(0);
+
   await openNewAgent(page, "demo");
   await expect(projectSelect(page)).toHaveValue("demo");
   await expect(worktreeBox(page)).toHaveValue("Project root");

@@ -25,9 +25,11 @@ test("26. New Design form", async ({ page, start }) => {
   const filter = await page.getByRole("searchbox", nav("Filter epics")).boundingBox();
   const at = await page.getByRole("button", nav("New Design")).boundingBox();
   expect(at!.x).toBeGreaterThanOrEqual(filter!.x + filter!.width);
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 800 });
   const dialog = await openDialog(page);
   const { slug, idea, project } = fields(dialog);
+  // The Epics page button lands focus in Epic slug.
+  await expect(slug).toBeFocused();
 
   // Close is a text button at the right end of the top bar, and there is no "×".
   const closeBtn = dialog.getByRole("button", nav("Close"));
