@@ -186,6 +186,16 @@ test.describe("3. Pause reasons and recovery", () => {
     await recover({ page, start }, "holder-unreachable", "holder-dead-epic", "Run failed", ["Retry", "Start over"]);
   });
 
+  // The watchdog killed a run whose process tree passed the threshold; the pause says gx cannot
+  // recover alone, and Retry ends it.
+  test("a process storm recovers", async ({ page, start }) => {
+    await recover({ page, start }, "process-storm", "storm-epic", "Too many processes", ["Retry", "Start over"], async () => {
+      await expect(page.getByText(/cannot recover alone/).first()).toBeVisible();
+      await retry(page);
+      await cleared(page);
+    });
+  });
+
   test("Unknown skill", async ({ page, start }) => {
     await start("unknown-skill");
     await page.evaluate((hash) => (location.hash = hash), "#/t/demo:unknown-epic/01");
