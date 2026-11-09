@@ -232,8 +232,8 @@ export function Composer({
       position="sticky"
       bottom="0"
       bg="surface"
-      borderTopWidth={wide ? "1px" : "0"}
-      py="3"
+      pt="6px"
+      pb="8px"
       display="flex"
       flexDirection="column"
       gap="2"

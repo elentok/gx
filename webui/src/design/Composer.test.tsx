@@ -371,6 +371,16 @@ test("on a phone the footer is one row: Add, Note, Auto, Send", async () => {
   await waitFor(() => expect(send.disabled).toBe(false));
 });
 
+test.each([false, true])("the footer has 6px above, 8px below and no separator (wide=%s)", async (wide) => {
+  render({ wide, chat: chatOf({ round: round() }) });
+  await autoButton();
+  const style = getComputedStyle(screen.getByRole("form", { name: "Composer" }));
+  expect(style.paddingTop).toBe("6px");
+  expect(style.paddingBottom).toBe("8px");
+  expect(style.borderTopWidth).not.toBe("1px");
+  expect(screen.getByRole("button", { name: "Add image" })).toBeTruthy();
+});
+
 test("on a wide screen the round button stays Send answers with the long Auto names", async () => {
   render({ wide: true, chat: chatOf({ round: round() }) });
   expect((await autoButton()).textContent).toBe("Auto-advanceAuto-queue");
