@@ -29,7 +29,7 @@ var (
 	// key), so the one relaunch also hangs and the ticket pauses as
 	// agent_prompt_stalled.
 	HungPaneTwice = recoveryEpic("hung-epic", servertest.TicketOpts{}, false,
-		agentfake.TUIHangLaunchesEnv+"=2:"+RootToken+"/hang-count")
+		agentfake.TUIHangLaunchesEnv+"=2:"+RootToken+"/hang-count", shortLaunchGrace)
 	// HungPaneOnce: only the first launch hangs; the relaunch is healthy.
 	HungPaneOnce = recoveryEpic("hung-once-epic", servertest.TicketOpts{}, false,
 		agentfake.TUIHangLaunchesEnv+"=1:"+RootToken+"/hang-count")
@@ -62,14 +62,18 @@ var (
 	// HolderUnreachable: every holder status call gets no dial answer, so past
 	// HolderReadoptCap the ticket pauses as iteration-error with the holder alive.
 	HolderUnreachable = recoveryEpic("holder-dead-epic", servertest.TicketOpts{}, false,
-		holder.UnreachableStatusDialsEnv+"=100000")
+		holder.UnreachableStatusDialsEnv+"=100000", "GX_GUARD_POLL=250ms")
 )
+
+// shortLaunchGrace shrinks the launch proof's resend window (three times this) so a hung launch
+// gives up in seconds, not the default half minute per launch.
+const shortLaunchGrace = "GX_LAUNCH_UNKNOWN_GRACE=3s"
 
 // backgroundEpic is recoveryEpic whose agent runs behaviour on its ticket, and
 // whose live-task hold cap is short enough to reach the pause, yet long enough
 // that a recovery shows the pause cleared before the relaunched agent hits it again.
 func backgroundEpic(name string, opts servertest.TicketOpts, codexHarness bool, behaviour string) scenario {
-	sc := recoveryEpic(name, opts, codexHarness, supervise.BackgroundTaskHoldCapEnv+"=45s")
+	sc := recoveryEpic(name, opts, codexHarness, supervise.BackgroundTaskHoldCapEnv+"=15s")
 	sc.Behaviour = map[string]string{project + ":" + name + "/01": behaviour}
 	return sc
 }
