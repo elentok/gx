@@ -393,8 +393,8 @@ func hasFlag(args []string, flag string) bool {
 
 // endFailedStart saves a session whose holder did not start as Exited
 // crashed. Left Starting, it has no holder and no watch: Remove and Resume
-// refuse it and the next server start would auto-resume a conversation that
-// never ran. The caller holds metaMu.
+// refuse it and a server start with agents.restore-sessions-on-start on would
+// auto-resume a conversation that never ran. The caller holds metaMu.
 func (mg *Manager) endFailedStart(dir string, meta *Meta) {
 	mg.recordSessionExit(meta, wire.SessionExitCrashed)
 	if err := WriteMeta(dir, *meta); err != nil {

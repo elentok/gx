@@ -18,8 +18,8 @@ func TestParseAgentsSessionKeysDefaultWhenAbsent(t *testing.T) {
 	if !slices.Equal(a.LeaderKey, []string{"ctrl+a"}) {
 		t.Errorf("LeaderKey = %v, want [ctrl+a]", a.LeaderKey)
 	}
-	if !a.ResumeOnStart || !a.Banners.Enabled || !a.Sounds.Enabled {
-		t.Errorf("ResumeOnStart/Banners/Sounds = %v/%v/%v, want all true", a.ResumeOnStart, a.Banners.Enabled, a.Sounds.Enabled)
+	if a.ResumeOnStart || !a.Banners.Enabled || !a.Sounds.Enabled {
+		t.Errorf("ResumeOnStart/Banners/Sounds = %v/%v/%v, want false/true/true", a.ResumeOnStart, a.Banners.Enabled, a.Sounds.Enabled)
 	}
 	if a.Sounds.Done != "" || a.Sounds.Attention != "" || a.ClaudeArgs != nil {
 		t.Errorf("Sounds/ClaudeArgs = %+v/%v, want built-in sounds and no args", a.Sounds, a.ClaudeArgs)
@@ -41,18 +41,25 @@ func TestParseAgentsDefaultHarness(t *testing.T) {
 }
 
 func TestParseAgentsResumeOnStartAlias(t *testing.T) {
-	cfg, err := Parse([]byte(`{"agents":{"resume-on-start":false}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.Agents.ResumeOnStart {
-		t.Error("old resume-on-start key = false was ignored")
-	}
-	cfg, err = Parse([]byte(`{"agents":{"resume-on-start":false,"restore-sessions-on-start":true}}`))
+	cfg, err := Parse([]byte(`{"agents":{"resume-on-start":true}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !cfg.Agents.ResumeOnStart {
+		t.Error("old resume-on-start key = true was ignored")
+	}
+	cfg, err = Parse([]byte(`{"agents":{"restore-sessions-on-start":true}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Agents.ResumeOnStart {
+		t.Error("restore-sessions-on-start = true was ignored")
+	}
+	cfg, err = Parse([]byte(`{"agents":{"resume-on-start":true,"restore-sessions-on-start":false}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Agents.ResumeOnStart {
 		t.Error("new key should win over the old alias")
 	}
 }
@@ -60,7 +67,7 @@ func TestParseAgentsResumeOnStartAlias(t *testing.T) {
 func TestParseAgentsSessionKeysSetValues(t *testing.T) {
 	cfg, err := Parse([]byte(`{"agents":{
 		"leader-key":"ctrl+b",
-		"restore-sessions-on-start":false,
+		"restore-sessions-on-start":true,
 		"banners":{"enabled":false},
 		"sounds":{"enabled":false,"done":"sounds/done.aiff","attention":"/abs/attention.aiff"},
 		"claude-args":["--verbose","--add-dir","/tmp"]
@@ -72,8 +79,8 @@ func TestParseAgentsSessionKeysSetValues(t *testing.T) {
 	if !slices.Equal(a.LeaderKey, []string{"ctrl+b"}) {
 		t.Errorf("LeaderKey = %v, want [ctrl+b]", a.LeaderKey)
 	}
-	if a.ResumeOnStart || a.Banners.Enabled || a.Sounds.Enabled {
-		t.Errorf("ResumeOnStart/Banners/Sounds = %v/%v/%v, want all false", a.ResumeOnStart, a.Banners.Enabled, a.Sounds.Enabled)
+	if !a.ResumeOnStart || a.Banners.Enabled || a.Sounds.Enabled {
+		t.Errorf("ResumeOnStart/Banners/Sounds = %v/%v/%v, want true/false/false", a.ResumeOnStart, a.Banners.Enabled, a.Sounds.Enabled)
 	}
 	if a.Sounds.Done != "sounds/done.aiff" || a.Sounds.Attention != "/abs/attention.aiff" {
 		t.Errorf("Sounds = %+v", a.Sounds)

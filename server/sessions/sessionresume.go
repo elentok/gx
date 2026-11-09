@@ -117,7 +117,8 @@ func clearOldHolder(dir string) error {
 // is watched again; the watch's first status, diffed against the saved one,
 // raises any Unread missed while the server was down. A holder that left an
 // exit, or of a session the person stopped, ended its session. Any other dead
-// holder is auto-resumed once.
+// holder ends Exited crashed, or is auto-resumed once when
+// agents.restore-sessions-on-start is on.
 func (rs *Resumer) RestoreSessions() {
 	list, err := rs.mg.ListSessions()
 	if err != nil {
@@ -150,6 +151,12 @@ func (rs *Resumer) RestoreSessions() {
 		}
 		dead = append(dead, info.ID)
 	}
+	if !rs.mg.settings.Load().AgentsResumeOnStart {
+		for _, id := range dead {
+			rs.endDeadSession(id)
+		}
+		return
+	}
 	rs.mg.Watches.Start(func() {
 		for i, id := range dead {
 			if i > 0 {
@@ -164,24 +171,41 @@ func (rs *Resumer) RestoreSessions() {
 	})
 }
 
+// endDeadSession ends a session whose holder died while it was live as Exited
+// crashed, launching nothing: the person restores it by hand.
+func (rs *Resumer) endDeadSession(id string) {
+	rs.mg.Watches.MetaMu.Lock()
+	defer rs.mg.Watches.MetaMu.Unlock()
+	dir, meta, ok := rs.deadSessionMeta(id)
+	if !ok {
+		return
+	}
+	rs.mg.log.Info("session not restored on start", "session", id)
+	rs.mg.endFailedStart(dir, &meta)
+}
+
+// deadSessionMeta reads a dead session's dir and meta, not ok when it is
+// unreadable or already ended. The caller holds metaMu.
+func (rs *Resumer) deadSessionMeta(id string) (dir string, meta Meta, ok bool) {
+	dir, meta, res, err := rs.mg.SessionDir(id)
+	if res.Refused || err != nil {
+		rs.mg.log.Warn("restore session on start", "session", id, "err", err, "refusal", res.Message)
+		return "", Meta{}, false
+	}
+	return dir, meta, meta.Status.State != wire.SessionExited && !meta.Stopped
+}
+
 // autoResumeSession resumes a session whose holder died while it was live,
-// or ends it Exited crashed when auto-resume is off or cannot run. A session
-// that was Working comes back with a "resumed" Unread; gx types nothing.
+// or ends it Exited crashed when it cannot be resumed. A session that was
+// Working comes back with a "resumed" Unread; gx types nothing.
 func (rs *Resumer) autoResumeSession(id string) {
 	rs.mg.Watches.MetaMu.Lock()
 	defer rs.mg.Watches.MetaMu.Unlock()
-	dir, meta, res, err := rs.mg.SessionDir(id)
-	if res.Refused || err != nil {
-		rs.mg.log.Warn("auto-resume session", "session", id, "err", err, "refusal", res.Message)
+	dir, meta, ok := rs.deadSessionMeta(id)
+	if !ok {
 		return
 	}
-	if meta.Status.State == wire.SessionExited || meta.Stopped {
-		return
-	}
-	reason := "auto-resume is off"
-	if rs.mg.settings.Load().AgentsResumeOnStart {
-		reason = rs.resumeRefusal(meta).Message
-	}
+	reason := rs.resumeRefusal(meta).Message
 	if reason == "" {
 		ended := meta
 		meta.RestoredAt = time.Time{}

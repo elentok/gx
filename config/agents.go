@@ -114,7 +114,7 @@ func DefaultAgentsConfig() AgentsConfig {
 		},
 		LeaderKey:       []string{DefaultLeaderKey},
 		FocusSidebarKey: []string{DefaultFocusSidebarKey},
-		ResumeOnStart:   true,
+		ResumeOnStart:   false,
 		Banners:         AgentsBannersConfig{Enabled: true},
 		Sounds:          AgentsSoundsConfig{Enabled: true},
 	}

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed `agents.restore-sessions-on-start` to default to off. A server start no longer launches an agent for a session whose holder died: the session ends Exited (crashed) and you press Restore to bring it back. Set the key to `true` to keep the old behaviour.
+
 ## v0.46.0 - 2026-11-09
 
 - Added a Triage for follow-ups. `gx tickets triage` creates a Triage record per project, saves verdicts and a plan, edits rows, approves, writes and abandons. The web gets a Triage page at `/triage/<project>` with Verify, Questions, Review, Approve, Write and Done views. The Follow-ups card starts or opens the Triage. A follow-up badge in the sidebar footer has a popover per project. The `gx-triage-follow-ups` skill drives it, and Triage sessions show as a Triage group on the Agents page.

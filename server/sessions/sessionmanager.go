@@ -126,7 +126,7 @@ type convHost struct {
 
 func (h convHost) OnMapEpic(address string) bool { return h.maps.OnMapEpic(address) }
 
-// Resumer brings sessions back: resume, restore, auto-resume, handoff, link,
+// Resumer brings sessions back: resume, restore, opt-in auto-resume on start, handoff, link,
 // and step.
 type Resumer struct {
 	mg *Manager

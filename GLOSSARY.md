@@ -377,8 +377,8 @@ one the loop launches for an iteration. `gx server` keeps it alive while no TUI 
 
 **Restore (interactive session)** — relaunch an Exited interactive session on its latest
 conversation, in the same dir, keeping the same session (name, Unread, Actionable). A person does it
-by hand, or gx does it once on server start for sessions that were live before
-(`agents.restore-sessions-on-start`; the old `resume-on-start` key is a hidden alias). Not
+by hand with the Restore button. The key `agents.restore-sessions-on-start` (off by default; the old
+`resume-on-start` key is a hidden alias) makes gx restore the sessions that were live, once, on server start. Not
 **Resume**, which only lifts a pause, and not Claude's `--resume` flag, which a claim uses to reuse
 an agent's last session. _Avoid_: relaunch, resume, restart (sounds like a fresh conversation).
 

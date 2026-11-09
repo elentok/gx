@@ -155,8 +155,8 @@
           "description": "TUI only, not shown on the web page"
         },
         "restore-sessions-on-start": {
-          "default": true,
-          "description": "Reopen the agent sessions that were open when gx last stopped.",
+          "default": false,
+          "description": "Resume every interactive session that was running when the server last stopped. Default: false.",
           "type": "boolean"
         },
         "resume-on-start": {
