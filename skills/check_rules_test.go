@@ -5,6 +5,13 @@ import (
 	"testing"
 )
 
+var inlinedSummaryFormat = []string{
+	"](../gx-local-tracker.md#iteration-summaries)",
+	"`### <session id> — <RFC 3339 time",
+	"`Did`, `Went wrong`, `Decisions`, `Left`",
+	`gx tickets section <addr> "Iteration summaries" -`,
+}
+
 func TestCheckRulesAnchors(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -45,10 +52,10 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"iteration summaries", "gx-local-tracker.md", []string{
 			"## Iteration summaries", "`Did`, `Went wrong`, `Decisions`, `Left`", "labelled `gx`", "never blocks finishing",
 		}},
-		{"implement iteration summaries", "gx-implement/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
-		{"verify-epic iteration summaries", "gx-verify-epic/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
-		{"merge iteration summaries", "gx-merge/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
-		{"code-review iteration summaries", "gx-code-review/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
+		{"implement iteration summaries", "gx-implement/SKILL.md", inlinedSummaryFormat},
+		{"verify-epic iteration summaries", "gx-verify-epic/SKILL.md", inlinedSummaryFormat},
+		{"merge iteration summaries", "gx-merge/SKILL.md", inlinedSummaryFormat},
+		{"code-review iteration summaries", "gx-code-review/SKILL.md", inlinedSummaryFormat},
 		{"research", "gx-research/SKILL.md", []string{"`gx check`"}},
 		{"investigate", "gx-investigate/SKILL.md", []string{
 			"`gx check`", "**Write files with Write, in their own call.**", "never end on an \"Open question\"",

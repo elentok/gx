@@ -217,8 +217,12 @@ If the consultant deferred zero findings, skip this step.
   - **Consultant triage**, verbatim from step 4.
   - **Final disposition** of each finding: the fix ticket it became; for a deferred finding, the
     follow-up it became, was appended to, or was dropped against; or why it was rejected.
-- Append your entry to `## Iteration summaries` as
-  [gx-local-tracker.md](../gx-local-tracker.md#iteration-summaries) describes.
+- Append your entry to `## Iteration summaries`
+  ([format](../gx-local-tracker.md#iteration-summaries), inlined here so you need not look it up):
+  a `### <session id> — <RFC 3339 time from date -u +%Y-%m-%dT%H:%M:%SZ> — agent` heading, then four
+  one-line bullets `Did`, `Went wrong`, `Decisions`, `Left`. Write it with
+  `gx tickets section <addr> "Iteration summaries" -`, which replaces the whole section (it is created
+  if missing), so include earlier entries.
 - `gx tickets set <addr> --iteration-status finished --commitless true` — this skill never commits
   code of its own, so `commitless: true` is always correct here, not just the no-findings case.
   `--status done` will be refused on a `ralph-loop/*` branch (merge status is gx's alone to set);

@@ -287,7 +287,11 @@ or touched code of other passed stories. Only a fix round raises N.
 - **Inline fix or tickets opened**: commit first if you fixed inline. Report `finished` in a later
   tool call, without `--commitless` only if you committed.
 
-Before you report `finished`, append your entry to `## Iteration summaries` as
-[gx-local-tracker.md](../gx-local-tracker.md#iteration-summaries) describes.
+Before you report `finished`, append your entry to `## Iteration summaries`
+([format](../gx-local-tracker.md#iteration-summaries), inlined here so you need not look it up):
+a `### <session id> — <RFC 3339 time from date -u +%Y-%m-%dT%H:%M:%SZ> — agent` heading, then four
+one-line bullets `Did`, `Went wrong`, `Decisions`, `Left`. Write it with
+`gx tickets section <addr> "Iteration summaries" -`, which replaces the whole section (it is created if
+missing), so include earlier entries.
 
 `--status done` is never yours to set. gx decides it after you report `finished`.

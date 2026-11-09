@@ -208,8 +208,12 @@ Continue to Step 5.
   rebase finished and `<target>` is an ancestor of the branch, then does the
   ff.
 
-In ticket mode, before you report `finished`, append your entry to `## Iteration summaries` as
-[gx-local-tracker.md](../gx-local-tracker.md#iteration-summaries) describes.
+In ticket mode, before you report `finished`, append your entry to `## Iteration summaries`
+([format](../gx-local-tracker.md#iteration-summaries), inlined here so you need not look it up):
+a `### <session id> — <RFC 3339 time from date -u +%Y-%m-%dT%H:%M:%SZ> — agent` heading, then four
+one-line bullets `Did`, `Went wrong`, `Decisions`, `Left`. Write it with
+`gx tickets section <addr> "Iteration summaries" -`, which replaces the whole section (it is created if
+missing), so include earlier entries.
 
 Finish with zero background shells: read and stop (TaskStop) any background shell that is
 still open before reporting.
