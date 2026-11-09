@@ -216,17 +216,16 @@ func fileProblems(c Claim, env LintEnv) []claimProblem {
 	return nil
 }
 
-// caseClash returns the name of a sibling of the missing path whose extensionless
-// name matches it case-insensitively (draftImages.ts beside DraftImages.tsx), or "".
+// caseClash returns the name of a sibling of the missing path that matches its
+// full base name case-insensitively but not exactly (foo.tsx beside Foo.tsx), or "".
 func caseClash(path string) string {
 	entries, err := os.ReadDir(filepath.Dir(path))
 	if err != nil {
 		return ""
 	}
-	stem := func(n string) string { return strings.ToLower(strings.TrimSuffix(n, filepath.Ext(n))) }
-	want := stem(filepath.Base(path))
+	want := filepath.Base(path)
 	for _, e := range entries {
-		if !e.IsDir() && stem(e.Name()) == want {
+		if !e.IsDir() && e.Name() != want && strings.EqualFold(e.Name(), want) {
 			return e.Name()
 		}
 	}
