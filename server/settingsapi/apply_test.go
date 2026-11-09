@@ -18,16 +18,16 @@ func TestApplySetAndRemoveKeepOrder(t *testing.T) {
 	reg := registry.Default()
 	doc := []byte(`{"disk-space":{"warn-below":"1G","clean-below":"1G"},"agent-runner":"pty"}`)
 
-	out, err := Apply(reg, ScopeGlobal, doc, []Change{set(`"5m"`, "execution-queue", "spin-window")})
+	out, err := Apply(reg, ScopeGlobal, doc, []Change{set(`"5m"`, "execution-queue", "waiting-slot-grace")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "{\n  \"disk-space\": {\n    \"warn-below\": \"1G\",\n    \"clean-below\": \"1G\"\n  },\n  \"agent-runner\": \"pty\",\n  \"execution-queue\": {\n    \"spin-window\": \"5m\"\n  }\n}\n"
+	want := "{\n  \"disk-space\": {\n    \"warn-below\": \"1G\",\n    \"clean-below\": \"1G\"\n  },\n  \"agent-runner\": \"pty\",\n  \"execution-queue\": {\n    \"waiting-slot-grace\": \"5m\"\n  }\n}\n"
 	if string(out) != want {
 		t.Fatalf("got %q", out)
 	}
 
-	out, err = Apply(reg, ScopeGlobal, out, []Change{remove("execution-queue", "spin-window")})
+	out, err = Apply(reg, ScopeGlobal, out, []Change{remove("execution-queue", "waiting-slot-grace")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +55,8 @@ func TestApplyRefusals(t *testing.T) {
 		changes []Change
 		key     string
 	}{
-		{"duration typo", ScopeGlobal, []Change{set(`"5mm"`, "execution-queue", "spin-window")}, "execution-queue.spin-window"},
-		{"zero duration", ScopeGlobal, []Change{set(`"0s"`, "execution-queue", "spin-window")}, "execution-queue.spin-window"},
+		{"duration typo", ScopeGlobal, []Change{set(`"5mm"`, "execution-queue", "waiting-slot-grace")}, "execution-queue.waiting-slot-grace"},
+		{"zero duration", ScopeGlobal, []Change{set(`"0s"`, "execution-queue", "waiting-slot-grace")}, "execution-queue.waiting-slot-grace"},
 		{"bad size", ScopeGlobal, []Change{set(`"5x"`, "disk-space", "warn-below")}, "disk-space.warn-below"},
 		{"enum non-member", ScopeGlobal, []Change{set(`"nope"`, "agent-runner")}, "agent-runner"},
 		{"number below minimum", ScopeGlobal, []Change{set(`0`, "execution-queue", "max-agents")}, "execution-queue.max-agents"},
@@ -68,9 +68,9 @@ func TestApplyRefusals(t *testing.T) {
 		{"ignored agents sub-key in project", ScopeProject, []Change{set(`true`, "agents", "banners")}, "agents.banners"},
 		{"checks without full", ScopeProject, []Change{set(`{"test":{"changed":"x"}}`, "checks")}, "checks"},
 		{"two keys, one invalid", ScopeGlobal, []Change{
-			set(`"5m"`, "execution-queue", "spin-window"),
-			set(`"5mm"`, "execution-queue", "spin-window"),
-		}, "execution-queue.spin-window"},
+			set(`"5m"`, "execution-queue", "waiting-slot-grace"),
+			set(`"5mm"`, "execution-queue", "waiting-slot-grace"),
+		}, "execution-queue.waiting-slot-grace"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

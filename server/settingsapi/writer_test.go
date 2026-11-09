@@ -47,14 +47,14 @@ func TestWriterKeepsKeysAndOrderAndAppendsNewKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	writeFile(t, path, `{"disk-space":{"warn-below":"1G"},"agent-runner":"pty"}`)
 
-	res, err := newWriter(path).Write(Target{}, []Change{set(`"5m"`, "execution-queue", "spin-window")})
+	res, err := newWriter(path).Write(Target{}, []Change{set(`"5m"`, "execution-queue", "waiting-slot-grace")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(res.Values["execution-queue.spin-window"]) != `"5m"` {
+	if string(res.Values["execution-queue.waiting-slot-grace"]) != `"5m"` {
 		t.Errorf("values = %v", res.Values)
 	}
-	want := "{\n  \"disk-space\": {\n    \"warn-below\": \"1G\"\n  },\n  \"agent-runner\": \"pty\",\n  \"execution-queue\": {\n    \"spin-window\": \"5m\"\n  }\n}\n"
+	want := "{\n  \"disk-space\": {\n    \"warn-below\": \"1G\"\n  },\n  \"agent-runner\": \"pty\",\n  \"execution-queue\": {\n    \"waiting-slot-grace\": \"5m\"\n  }\n}\n"
 	if got := readFile(t, path); got != want {
 		t.Fatalf("got %q", got)
 	}
@@ -67,11 +67,11 @@ func TestWriterHandEditBetweenLoadAndSaveSurvives(t *testing.T) {
 	w := newWriter(path)
 	writeFile(t, path, `{"agent-runner":"pty","disk-space":{"warn-below":"2G"}}`)
 
-	if _, err := w.Write(Target{}, []Change{set(`"5m"`, "execution-queue", "spin-window")}); err != nil {
+	if _, err := w.Write(Target{}, []Change{set(`"5m"`, "execution-queue", "waiting-slot-grace")}); err != nil {
 		t.Fatal(err)
 	}
 	got := readFile(t, path)
-	if !strings.Contains(got, `"warn-below": "2G"`) || !strings.Contains(got, `"spin-window": "5m"`) {
+	if !strings.Contains(got, `"warn-below": "2G"`) || !strings.Contains(got, `"waiting-slot-grace": "5m"`) {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -83,7 +83,7 @@ func TestWriterConcurrentWritesBothSurvive(t *testing.T) {
 	w := newWriter(path)
 	var wg sync.WaitGroup
 	for _, c := range []Change{
-		set(`"5m"`, "execution-queue", "spin-window"),
+		set(`"5m"`, "execution-queue", "waiting-slot-grace"),
 		set(`"1G"`, "disk-space", "warn-below"),
 	} {
 		wg.Go(func() {
@@ -94,7 +94,7 @@ func TestWriterConcurrentWritesBothSurvive(t *testing.T) {
 	}
 	wg.Wait()
 	got := readFile(t, path)
-	if !strings.Contains(got, `"spin-window"`) || !strings.Contains(got, `"warn-below"`) {
+	if !strings.Contains(got, `"waiting-slot-grace"`) || !strings.Contains(got, `"warn-below"`) {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -107,14 +107,14 @@ func TestWriterSymlinkKeepsLinkAndUpdatesTarget(t *testing.T) {
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newWriter(link).Write(Target{}, []Change{set(`"5m"`, "execution-queue", "spin-window")}); err != nil {
+	if _, err := newWriter(link).Write(Target{}, []Change{set(`"5m"`, "execution-queue", "waiting-slot-grace")}); err != nil {
 		t.Fatal(err)
 	}
 	if fi, err := os.Lstat(link); err != nil || fi.Mode()&os.ModeSymlink == 0 {
 		t.Fatalf("link lost: %v %v", fi, err)
 	}
 	got := readFile(t, target)
-	if !strings.Contains(got, `"agent-runner"`) || !strings.Contains(got, `"spin-window": "5m"`) {
+	if !strings.Contains(got, `"agent-runner"`) || !strings.Contains(got, `"waiting-slot-grace": "5m"`) {
 		t.Fatalf("target = %q", got)
 	}
 	noTempFiles(t, filepath.Dir(target))
@@ -124,7 +124,7 @@ func TestWriterMissingFileCreatedForSetLeftForRemove(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "nested", "config.json")
 	w := newWriter(path)
-	if _, err := w.Write(Target{}, []Change{remove("execution-queue", "spin-window")}); err != nil {
+	if _, err := w.Write(Target{}, []Change{remove("execution-queue", "waiting-slot-grace")}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
@@ -133,10 +133,10 @@ func TestWriterMissingFileCreatedForSetLeftForRemove(t *testing.T) {
 	if _, err := os.Stat(filepath.Dir(path)); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("remove created the directory: %v", err)
 	}
-	if _, err := w.Write(Target{}, []Change{set(`"5m"`, "execution-queue", "spin-window")}); err != nil {
+	if _, err := w.Write(Target{}, []Change{set(`"5m"`, "execution-queue", "waiting-slot-grace")}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(readFile(t, path), `"spin-window": "5m"`) {
+	if !strings.Contains(readFile(t, path), `"waiting-slot-grace": "5m"`) {
 		t.Fatal("file not created with the key")
 	}
 }
@@ -148,7 +148,7 @@ func TestWriterRefusalLeavesFileUntouched(t *testing.T) {
 	const orig = `{"agent-runner":"pty"}`
 	writeFile(t, path, orig)
 
-	_, err := newWriter(path).Write(Target{}, []Change{set(`"not a duration"`, "execution-queue", "spin-window")})
+	_, err := newWriter(path).Write(Target{}, []Change{set(`"not a duration"`, "execution-queue", "waiting-slot-grace")})
 	if _, ok := errors.AsType[*Refusal](err); !ok {
 		t.Fatalf("err = %v", err)
 	}
@@ -178,7 +178,7 @@ func TestWriterHookRefusalWritesNothing(t *testing.T) {
 	w := newWriter(path)
 	w.Hooks = hooks
 
-	_, err := w.Write(Target{}, []Change{set(`"5m"`, "execution-queue", "spin-window")})
+	_, err := w.Write(Target{}, []Change{set(`"5m"`, "execution-queue", "waiting-slot-grace")})
 	if _, ok := errors.AsType[*Refusal](err); !ok {
 		t.Fatalf("err = %v", err)
 	}
@@ -193,7 +193,7 @@ func TestWriterAfterHookNoticeInResult(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	w := newWriter(path)
 	w.Hooks = &fakeHooks{notice: "heads up"}
-	res, err := w.Write(Target{}, []Change{set(`"5m"`, "execution-queue", "spin-window")})
+	res, err := w.Write(Target{}, []Change{set(`"5m"`, "execution-queue", "waiting-slot-grace")})
 	if err != nil {
 		t.Fatal(err)
 	}

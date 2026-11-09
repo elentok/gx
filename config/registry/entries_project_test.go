@@ -86,6 +86,8 @@ func TestExclusionsHaveReasons(t *testing.T) {
 		"agents.restore-sessions-on-start", "agents.banners", "agents.sounds", "agents.claude-args", "agents.fix-agent-remote-control",
 		"use-nerdfont-icons", "image-diffs", "stage-diff-context-lines", "input-modal-bottom", "name-aliases",
 		"log", "log.important-refs", "log.hide-refs", "agents.leader-key", "agents.focus-sidebar-key",
+		"execution-queue.retry-storm-launches", "execution-queue.spin-cycles", "execution-queue.spin-window",
+		"budget.notification-thresholds", "evolve.deep-read-cap",
 	} {
 		if _, ok := got[k]; !ok {
 			t.Errorf("exclusion %s missing", k)

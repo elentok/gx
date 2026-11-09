@@ -101,7 +101,7 @@ func TestReadDistinguishesSetFromDefault(t *testing.T) {
 	if !set.Set || string(set.Value) != "3" || set.Default == nil {
 		t.Errorf("set entry = %+v", set)
 	}
-	unset := entryByKey(t, resp, "execution-queue.spin-window")
+	unset := entryByKey(t, resp, "execution-queue.waiting-slot-grace")
 	if unset.Set || unset.Value != nil || unset.Default == nil {
 		t.Errorf("unset entry = %+v", unset)
 	}

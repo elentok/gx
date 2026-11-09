@@ -27,9 +27,6 @@ func coreEntries() []Entry {
 	e = queueInt("max-one-off-agents", "The most agents running one-off tickets at the same time.")
 	e.ProjectOverridable = true
 	add(q, e)
-	add(q, queueInt("retry-storm-launches", "How many launches of one ticket in a short time count as a retry storm and pause it."))
-	add(q, queueInt("spin-cycles", "How many start-and-stop cycles of one ticket within the spin window count as spinning."))
-	add(q, dur(Key("execution-queue", "spin-window"), "The time span in which spin cycles are counted."))
 	add(q, dur(Key("execution-queue", "waiting-slot-grace"), "How long an agent that waits for an answer keeps its slot before the slot is freed."))
 	add(q, Entry{Key: Key("execution-queue", "max-released-agents"), Type: TypeNumber, Min: minOf(0), Integer: true,
 		Description: "The most agents that may wait with their slot released. 0 means none."})
@@ -40,8 +37,6 @@ func coreEntries() []Entry {
 		Description: "Estimated spend in dollars at which gx warns you. 0 turns it off."})
 	add(b, Entry{Key: Key("budget", "hard-limit"), Type: TypeNumber, Min: minOf(0),
 		Description: "Estimated spend in dollars at which gx stops launching agents. 0 turns it off."})
-	add(b, Entry{Key: Key("budget", "notification-thresholds"), Type: TypeNumberList,
-		Description: "Spend amounts in dollars that each send a notification when crossed."})
 	add(b, Entry{Key: Key("budget", "long-ticket-turns"), Type: TypeNumber, Min: minOf(0), Integer: true,
 		Description: "Number of agent turns after which a ticket counts as long and you are alerted. 0 turns it off."})
 	add(b, Entry{Key: Key("subscription", "suppress-extra-usage-warning"), Type: TypeBool,

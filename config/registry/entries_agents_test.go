@@ -30,7 +30,6 @@ func TestAgentsEntries(t *testing.T) {
 		{key: Key("agent-runner"), typ: TypeEnum, section: a, restart: true},
 		{key: Key("runner-wait"), typ: TypeDuration, section: a, restart: true},
 		{key: Key("evolve"), typ: TypeEnum, section: ev},
-		{key: Key("evolve.deep-read-cap"), typ: TypeNumber, section: ev},
 		{key: Key("recovery", "enabled"), typ: TypeBool, section: ev},
 		{key: Key("recovery", "disabled"), typ: TypeStringList, section: ev},
 		{key: Key("recovery", "follow-ups"), typ: TypeString, section: ev},

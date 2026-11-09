@@ -200,19 +200,7 @@
           "type": "integer"
         },
         "notification-thresholds": {
-          "default": [
-            50,
-            100,
-            150,
-            200,
-            250
-          ],
-          "description": "Spend amounts in dollars that each send a notification when crossed.",
-          "items": {
-            "minimum": 0,
-            "type": "number"
-          },
-          "type": "array"
+          "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
         },
         "soft-limit": {
           "default": 300,
@@ -287,10 +275,7 @@
       "type": "string"
     },
     "evolve.deep-read-cap": {
-      "default": 8,
-      "description": "The most deep-read subagents one evolve run may start.",
-      "minimum": 1,
-      "type": "integer"
+      "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
     },
     "execution-queue": {
       "additionalProperties": false,
@@ -320,20 +305,13 @@
           "type": "integer"
         },
         "retry-storm-launches": {
-          "default": 3,
-          "description": "How many launches of one ticket in a short time count as a retry storm and pause it.",
-          "minimum": 1,
-          "type": "integer"
+          "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
         },
         "spin-cycles": {
-          "default": 3,
-          "description": "How many start-and-stop cycles of one ticket within the spin window count as spinning.",
-          "minimum": 1,
-          "type": "integer"
+          "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
         },
         "spin-window": {
-          "description": "The time span in which spin cycles are counted.",
-          "type": "string"
+          "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
         },
         "stalled-nudge-delay": {
           "description": "How long an agent may be silent before it is nudged.",

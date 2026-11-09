@@ -35,30 +35,30 @@ test("200. Settings page, global journey", async ({ page, start }) => {
 
   // A number and a duration reach config.json with the other keys intact.
   await saveText(page, "Max released agents", "5");
-  await saveText(page, "Spin window", "20s");
+  await saveText(page, "Waiting slot grace", "20s");
   const after = await fixture.globalConfig();
   expect(after["execution-queue"]["max-released-agents"]).toBe(5);
-  expect(after["execution-queue"]["spin-window"]).toBe("20s");
+  expect(after["execution-queue"]["waiting-slot-grace"]).toBe("20s");
   expect(after.budget).toEqual(before.budget);
   expect(after.notifications).toEqual(before.notifications);
 
   // A reopened page shows the saved values.
   await page.reload();
-  await expect(text(page, "Spin window")).toHaveValue("20s");
+  await expect(text(page, "Waiting slot grace")).toHaveValue("20s");
   await expect(text(page, "Max released agents")).toHaveValue("5");
 
   // The server refuses a value that is not a duration; the draft stays and nothing is written.
-  await text(page, "Spin window").fill("abc");
+  await text(page, "Waiting slot grace").fill("abc");
   await save(page).click();
   await expect(page.getByRole("alert").filter({ hasText: "Not saved:" })).toBeVisible();
-  await expect(text(page, "Spin window")).toHaveValue("abc");
-  expect((await fixture.globalConfig())["execution-queue"]["spin-window"]).toBe("20s");
+  await expect(text(page, "Waiting slot grace")).toHaveValue("abc");
+  expect((await fixture.globalConfig())["execution-queue"]["waiting-slot-grace"]).toBe("20s");
 
   // Reset removes the key from the file.
   await page.getByRole("button", { name: /^Reset to default/ }).first().click();
   await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
   const reset = await fixture.globalConfig();
-  expect(reset["execution-queue"]["spin-window"]).toBeUndefined();
+  expect(reset["execution-queue"]["waiting-slot-grace"]).toBeUndefined();
   expect(reset["execution-queue"]["max-released-agents"]).toBe(5);
 
   // Secrets: the read response and the page carry the state, never the value.

@@ -70,8 +70,6 @@ func agentsEntries() []Entry {
 	e := SectionEvolveRecovery
 	add(e, Entry{Key: Key("evolve"), Type: TypeEnum, Enum: EvolveChoices,
 		Description: "What gx does when an epic completes: off, maintainer or contributor."})
-	add(e, Entry{Key: Key("evolve.deep-read-cap"), Type: TypeNumber, Min: minOf(1), Integer: true,
-		Description: "The most deep-read subagents one evolve run may start."})
 	add(e, Entry{Key: Key("recovery", "enabled"), Type: TypeBool,
 		Description: "Let gx try to recover tickets that get stuck."})
 	add(e, Entry{Key: Key("recovery", "disabled"), Type: TypeStringList,

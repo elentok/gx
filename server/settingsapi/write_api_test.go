@@ -107,10 +107,10 @@ func TestWriteRefusalNamesKeyAndWritesNothing(t *testing.T) {
 
 func TestWriteSpinWindowDuration(t *testing.T) {
 	f := startAPI(t, nil)
-	if res := f.set(t, "", val("execution-queue.spin-window", `"5mm"`)); !res.Refused {
+	if res := f.set(t, "", val("execution-queue.waiting-slot-grace", `"5mm"`)); !res.Refused {
 		t.Fatalf("5mm saved: %+v", res)
 	}
-	if res := f.set(t, "", val("execution-queue.spin-window", `"5m"`)); res.Refused {
+	if res := f.set(t, "", val("execution-queue.waiting-slot-grace", `"5m"`)); res.Refused {
 		t.Fatalf("5m refused: %+v", res)
 	}
 }
