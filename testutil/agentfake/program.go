@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -276,6 +277,8 @@ type program struct {
 	// an Esc in it stayed alone.
 	dialog bool
 	escC   <-chan time.Time
+	// descendants is the process tree an ActionDescendants started.
+	descendants *exec.Cmd
 }
 
 func (p *program) run(in, ctl io.Reader) (int, error) {
@@ -479,6 +482,10 @@ func (p *program) control(c Control) error {
 			return err
 		}
 		fmt.Fprintf(p.out, "size=%dx%d\r\n", cols, rows)
+	case ActionDescendants:
+		return spawnDescendantsInto(&p.descendants, c.Count, c.Depth)
+	case ActionStopDescendants:
+		stopDescendantsIn(&p.descendants)
 	default:
 		return fmt.Errorf("unknown program control action %q", c.Action)
 	}

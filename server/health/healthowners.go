@@ -71,6 +71,20 @@ func (s *Health) addRunOwners(owners map[syshealth.OwnerKey]syshealth.Owner) {
 }
 
 func (s *Health) addSessionOwners(owners map[syshealth.OwnerKey]syshealth.Owner, ping pingHolder) {
+	s.eachSessionRun(ping, func(_ string, meta SessionMeta, keys []syshealth.OwnerKey) {
+		owner := syshealth.Owner{Kind: syshealth.OwnerSession, Name: meta.Name}
+		if meta.Ticket != "" {
+			owner = syshealth.Owner{Kind: syshealth.OwnerTicket, Name: meta.Ticket}
+		}
+		for _, k := range keys {
+			owners[k] = owner
+		}
+	})
+}
+
+// eachSessionRun calls visit for every live session run whose holder answers
+// ping, with the run's key (session id and run count) and its owner pids.
+func (s *Health) eachSessionRun(ping pingHolder, visit func(key string, meta SessionMeta, keys []syshealth.OwnerKey)) {
 	entries, err := os.ReadDir(s.cfg.SessionsDir)
 	if err != nil {
 		return
@@ -100,13 +114,7 @@ func (s *Health) addSessionOwners(owners map[syshealth.OwnerKey]syshealth.Owner,
 			}
 			c.entries[key] = keys
 		}
-		owner := syshealth.Owner{Kind: syshealth.OwnerSession, Name: meta.Name}
-		if meta.Ticket != "" {
-			owner = syshealth.Owner{Kind: syshealth.OwnerTicket, Name: meta.Ticket}
-		}
-		for _, k := range keys {
-			owners[k] = owner
-		}
+		visit(key, meta, keys)
 	}
 	for key := range c.entries {
 		if !seen[key] {

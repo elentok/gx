@@ -41,10 +41,16 @@ func descendantLevel(count, depth int) string {
 }
 
 func (t *tui) spawnDescendants(count, depth int) error {
+	return spawnDescendantsInto(&t.descendants, count, depth)
+}
+
+// spawnDescendantsInto starts the tree into *slot, which the fake keeps so it
+// can stop the tree later.
+func spawnDescendantsInto(slot **exec.Cmd, count, depth int) error {
 	if count <= 0 {
 		return fmt.Errorf("descendants control needs a positive count, got %d", count)
 	}
-	if t.descendants != nil {
+	if *slot != nil {
 		return fmt.Errorf("descendants already running")
 	}
 	script := "sh -c " + shellQuote(descendantLevel(count, depth)) + " & " +
@@ -55,15 +61,17 @@ func (t *tui) spawnDescendants(count, depth int) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	t.descendants = cmd
+	*slot = cmd
 	return nil
 }
 
-func (t *tui) stopDescendants() {
-	if t.descendants == nil {
+func (t *tui) stopDescendants() { stopDescendantsIn(&t.descendants) }
+
+func stopDescendantsIn(slot **exec.Cmd) {
+	if *slot == nil {
 		return
 	}
-	_ = syscall.Kill(-t.descendants.Process.Pid, syscall.SIGKILL)
-	_ = t.descendants.Wait()
-	t.descendants = nil
+	_ = syscall.Kill(-(*slot).Process.Pid, syscall.SIGKILL)
+	_ = (*slot).Wait()
+	*slot = nil
 }
