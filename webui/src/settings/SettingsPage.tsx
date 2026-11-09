@@ -319,6 +319,7 @@ export function SettingsPage({
             authenticatorMissing={auth.data.setup_code_required}
             onSignOut={() => void signOut()}
             pendingRestart={settings.data.pending_restart}
+            repoChecksFile={settings.data.project?.repo_checks_file}
             onWrite={async (changes) => {
               const res = await postChanges(target, changes);
               if (!res.refused) settings.retry();

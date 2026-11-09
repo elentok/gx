@@ -11,6 +11,8 @@ import { Chip } from "../ui/chip/Chip";
 import { entryLabel, groupBySection, searchEntries } from "./settingsApi";
 import { Group } from "./parts";
 import { SettingsRow, type WriteSetting } from "./SettingsRow";
+import { ChecksEditor } from "./ChecksEditor";
+import { CHECKS_KEY } from "./checks";
 
 /** The seven global sections, in sidebar order. */
 export const GLOBAL_SECTIONS = ["Execution queue", "Budget", "Notifications", "Server", "Agents", "Evolve and recovery", "Ticket store"] as const;
@@ -71,6 +73,8 @@ export interface ShellProps {
   /** Startup-only keys changed since the server started. */
   pendingRestart?: string[];
   onWrite: WriteSetting;
+  /** The project's repo holds .gx/checks.json, which wins over its checks setting. */
+  repoChecksFile?: boolean;
 }
 
 function Sidebar({
@@ -204,7 +208,12 @@ export function SettingsShellView(props: ShellProps) {
           </>
         )}
         {!searching && props.project !== undefined && section === "Checks" && (
-          <EmptyState title="Checks">Checks settings are not available here yet.</EmptyState>
+          <ChecksEditor
+            key={JSON.stringify(sectionEntries[0]?.value ?? null)}
+            entry={sectionEntries.find((e) => e.key === CHECKS_KEY)}
+            repoChecksFile={props.repoChecksFile ?? false}
+            onWrite={onWrite}
+          />
         )}
         {!searching && (props.project === undefined || (section !== "Project" && section !== "Checks")) && <Group>{sectionEntries.map(row)}</Group>}
         {searching && hits.length === 0 && <EmptyState title="No settings match">Nothing in {scopeName} matches “{query.trim()}”.</EmptyState>}
