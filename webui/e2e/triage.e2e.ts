@@ -72,11 +72,11 @@ test.describe("199. Triage journey", () => {
     // Answering in the question component enables the bar and moves the page to Review.
     const questions = page.getByRole("group", nav("Questions"));
     await expect(questions).toBeVisible();
-    // A question is named by its row number and its id: row 01 q1 is 1.1.
-    for (const [id, answer] of [["1.1", "parser"], ["1.2", "no"], ["2.d1", "the sqlite store"]]) {
-      await questions.getByRole("textbox", nav(`Answer to question ${id}`)).fill(answer);
-      if (id !== "2.d1") await questions.getByRole("button", nav("Next →")).click();
-    }
+    // A question is named by its row number and its id: row 01 q1 is 1.1. The fixture gives q1 and q2 options; the design question is text.
+    // Picking an option moves on to the next question by itself.
+    await questions.getByRole("button", { name: "parser", exact: true }).click();
+    await questions.getByRole("button", { name: "No", exact: true }).click();
+    await questions.getByRole("textbox", nav("Answer to question 2.d1")).fill("the sqlite store");
 
     // Review: the bar enables, nothing is changed yet.
     await expect(page.getByRole("button", { name: /^Review 5 rows/ })).toHaveAttribute("aria-pressed", "true");

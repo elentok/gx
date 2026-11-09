@@ -20,6 +20,9 @@ const (
 	// ReasonTriagePhase: the record's step or the row's state does not allow a
 	// row or abandon write, or the merge target is not a ready or map row.
 	ReasonTriagePhase = "triage-phase"
+	// ReasonTriageAnswer: an answer names no question of the row, or is not one
+	// of its question's options.
+	ReasonTriageAnswer = "triage-answer"
 	// ReasonTriageAlreadyApproved: the Triage was approved by another call.
 	ReasonTriageAlreadyApproved = "triage-already-approved"
 	// ReasonTriageNoLive: the project has no live Triage.

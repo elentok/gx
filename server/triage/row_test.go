@@ -49,9 +49,54 @@ func rowOf(v wire.TriageView, addr string) wire.TriageRow {
 	return wire.TriageRow{}
 }
 
+// toApproveAsking is toApprove with a yes/no quick question q1 on the first row.
+func toApproveAsking(t *testing.T, store *triagerec.Store) (*triagerec.Record, string) {
+	t.Helper()
+	rec := mustRec(store.Create())
+	a, b := rec.Rows[0].Address, rec.Rows[1].Address
+	for _, addr := range []string{a, b} {
+		rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addr}))
+	}
+	q := triagerec.Question{ID: "q1", Text: "Keep it?", Kind: triagerec.QuestionQuick, Options: []string{"yes", "no"}, Default: "no"}
+	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
+		{RowID: a, Action: "ready", Questions: []triagerec.Question{q}},
+		{RowID: b, Action: "ready"},
+	}, nil))
+	return rec, a
+}
+
+func TestRow_AnAnswerMustBeAnOptionOfItsQuestion(t *testing.T) {
+	f, store := startViewFixture(t)
+	rec, a := toApproveAsking(t, store)
+	for name, answers := range map[string]map[string]string{
+		"not an option":    {"q1": "agree"},
+		"no such question": {"q9": "yes"},
+		"note on a stray":  {"q1": "agree\nNote: why"},
+	} {
+		res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Answers: answers})
+		if !res.Refused || res.Reason != wire.ReasonTriageAnswer {
+			t.Fatalf("%s: save = %+v, want refused with %s", name, res, wire.ReasonTriageAnswer)
+		}
+	}
+	for _, c := range []struct{ name, answer string }{
+		{"an option", "yes"},
+		{"an option and a note", "no\nNote: not until the rework lands"},
+		{"huh", wire.HuhMessage},
+	} {
+		res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Answers: map[string]string{"q1": c.answer}})
+		if res.Refused {
+			t.Fatalf("%s: save = %+v, want saved", c.name, res)
+		}
+		rec = mustRec(store.LoadLive())
+	}
+	if got := rowOf(show(t, f), a).Answers["q1"]; got != wire.HuhMessage {
+		t.Fatalf("answer = %q", got)
+	}
+}
+
 func TestRow_EditSavesAndTheViewShowsItChanged(t *testing.T) {
 	f, store := startViewFixture(t)
-	rec, a, _ := toApprove(t, store)
+	rec, a := toApproveAsking(t, store)
 	res := saveRow(t, f, wire.TriageRowRequest{
 		Revision: rec.Revision, Address: a, Action: "map", Destination: "new-epic", Answers: map[string]string{"q1": "yes"},
 	})

@@ -3,7 +3,10 @@ package triage
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -43,6 +46,9 @@ func (t *Triage) saveRow(req wire.TriageRowRequest) (wire.TriageEditResult, erro
 	store, rec, refusal, err := t.liveRecord(req.Project)
 	if err != nil || refusal != nil {
 		return orRefusal(refusal), err
+	}
+	if msg := badAnswer(rec, req); msg != "" {
+		return refusedEdit(wire.ReasonTriageAnswer, msg), nil
 	}
 	saved, err := store.SetPerson(rec.ID, req.Revision, req.Address, triagerec.PersonFields{
 		Action: req.Action, Destination: req.Destination, Answers: req.Answers, KeepForLater: req.KeepForLater,
@@ -117,4 +123,38 @@ func editRefusal(err error) (res wire.TriageEditResult, handled bool) {
 		return refusedEdit(wire.ReasonTriagePhase, pe.Msg), true
 	}
 	return res, false
+}
+
+// noteMark joins an answer to its note: "<answer>\nNote: <note>".
+const noteMark = "\nNote: "
+
+// badAnswer says why the web may not save the request's answers, or "". Every
+// answer must name a question of the row; one with options must be an option or
+// Huh?, with or without a note. A page running an older script could otherwise
+// save an answer meant for another question, so the server holds the line.
+func badAnswer(rec *triagerec.Record, req wire.TriageRowRequest) string {
+	if len(req.Answers) == 0 {
+		return ""
+	}
+	var row *triagerec.Row
+	for i := range rec.Rows {
+		if rec.Rows[i].Address == req.Address {
+			row = &rec.Rows[i]
+		}
+	}
+	if row == nil {
+		return "" // SetPerson refuses an unknown row
+	}
+	for id, answer := range req.Answers {
+		qi := slices.IndexFunc(row.AllQuestions(), func(q triagerec.Question) bool { return q.ID == id })
+		if qi < 0 {
+			return fmt.Sprintf("%s has no question %s", req.Address, id)
+		}
+		q := row.AllQuestions()[qi]
+		base, _, _ := strings.Cut(answer, noteMark)
+		if len(q.Options) > 0 && base != wire.HuhMessage && !slices.Contains(q.Options, base) {
+			return fmt.Sprintf("%q is not an option of %s question %s; reload the page", base, req.Address, id)
+		}
+	}
+	return ""
 }

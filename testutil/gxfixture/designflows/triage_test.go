@@ -206,7 +206,11 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 	for _, row := range v.Rows {
 		var args []string
 		for _, q := range row.Questions {
-			args = append(args, "--answer", q.ID+"=ok")
+			answer := "ok" // a design question takes any text; a quick one needs one of its options
+			if len(q.Options) > 0 {
+				answer = q.Options[0]
+			}
+			args = append(args, "--answer", q.ID+"="+answer)
 		}
 		if len(args) == 0 {
 			continue
