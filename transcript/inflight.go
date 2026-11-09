@@ -41,13 +41,11 @@ func NewInFlightTool(name string, in map[string]any) InFlightTool {
 		kind, value = InFlightShell, arg("command")
 	case "exec_command":
 		kind, value = InFlightShell, arg("cmd")
-	case "web_search":
-		kind, value = InFlightSearch, arg("query")
 	case "Agent", "Task":
 		kind, value = InFlightAgent, arg("description", "subagent_type")
 	case "Grep", "Glob":
 		kind, value = InFlightSearch, arg("pattern")
-	case "WebSearch":
+	case "WebSearch", "web_search":
 		kind, value = InFlightSearch, arg("query")
 	case "WebFetch":
 		kind, value = InFlightSearch, arg("url")

@@ -182,16 +182,7 @@ func inputText(rows []string) (string, bool) {
 }
 
 func footerHasInsert(rows []string) bool {
-	input := lastInputRow(rows, claudeInput)
-	if input < 0 {
-		return false
-	}
-	for _, row := range rows[input+1:] {
-		if strings.Contains(plain(row), vimInsertMarker) {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(vimFooter(rows), vimInsertMarker)
 }
 
 // vimFooter is the trimmed footer row below the last input row that shows a vim
