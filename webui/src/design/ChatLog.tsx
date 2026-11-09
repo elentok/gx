@@ -197,7 +197,9 @@ function ChatBody({
   questions,
   onQuestions,
   autoMenu,
+  logTop,
 }: {
+  logTop?: ReactNode;
   session: SessionInfo;
   roundKey: string;
   chat: SessionChatResponse;
@@ -242,6 +244,7 @@ function ChatBody({
       {!questions && (
         <ChatMessages
           chat={chat}
+          head={logTop}
           busy={busy}
           sessionId={session.id}
           working={step && <WorkingRow {...step} background={chat.background} current={chat.current} others={chat.others} />}
@@ -285,6 +288,7 @@ function ChatLog({
   actions: FailureActions;
   questions: boolean;
   onQuestions: (on: boolean) => void;
+  logTop?: ReactNode;
 }) {
   const conn = useConnectionContext();
   const connected = useConnectionState(conn).connected;
@@ -317,7 +321,10 @@ export function DesignChat({
   actions,
   questions,
   onQuestions,
+  logTop,
 }: {
+  /** The first entry of the Chat view's log. */
+  logTop?: ReactNode;
   session?: SessionInfo;
   /** The session's chat, fetched by the page; null while it loads. */
   chat?: SessionChatResponse | null;
@@ -362,6 +369,7 @@ export function DesignChat({
       actions={actions}
       questions={questions}
       onQuestions={onQuestions}
+      logTop={logTop}
     />
   );
 }

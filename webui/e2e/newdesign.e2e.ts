@@ -315,10 +315,22 @@ test("26. New Design form", async ({ page, start }) => {
 
     // The Design chat shows the strip read-only: no Remove, Add or upload states; a click opens the viewer.
     const strip = page.getByLabel("Images", { exact: true });
+    // The Questions view (the first view with a round) shows no strip; the Chat view does.
+    await expect(strip).toHaveCount(0);
+    await page.getByRole("button", { name: "Chat", exact: true }).click();
     await expect(open(strip)).toHaveCount(2);
     await expect(strip.getByRole("button", nav("Remove image"))).toHaveCount(0);
     await expect(strip.getByRole("button", nav("Add image"))).toHaveCount(0);
     await expect(strip.getByLabel("Uploading")).toHaveCount(0);
+    // The strip is the first entry of the log, and (checked after the expect above) has no scrollbar beside it.
+    expect(await strip.evaluate((el) => el.parentElement!.querySelector(":scope > :not([aria-hidden])") === el)).toBe(true);
+    // A scrollbar takes layout space, so the box is bigger than its client area.
+    expect(
+      await strip.evaluate((el) => {
+        const box = el as HTMLElement;
+        return box.offsetWidth === box.clientWidth && box.offsetHeight === box.clientHeight;
+      }),
+    ).toBe(true);
     await open(strip).first().click();
     await page.getByRole("button", { name: /^Close ✕/ }).click();
     await expect(page.getByRole("button", { name: /^Close ✕/ })).toBeHidden();

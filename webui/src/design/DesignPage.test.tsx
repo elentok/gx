@@ -479,6 +479,27 @@ test("a Design with map images shows a read-only strip that opens the viewer wit
   expect(img.getAttribute("src")).toBe("/v1/designs/images/read?epic=gx%3Aa&id=b.png");
 });
 
+test("the map-image strip is the first entry of the chat log, ahead of the messages", async () => {
+  const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }] }));
+  const chat: RouteFetchers = {
+    chat: async () => ({
+      kind: "ok",
+      detail: {
+        conversation_id: "c1",
+        messages: [{ id: "m1", role: "agent", kind: "text", text: "hello from the agent", at: new Date().toISOString() }],
+        round: null,
+        background: [],
+      },
+    }),
+  };
+  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chat, mapImages });
+  const strip = await screen.findByLabelText("Images");
+  const message = await screen.findByText("hello from the agent");
+  expect(strip.parentElement?.contains(message)).toBe(true);
+  expect(strip.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: "Chat" })).getByLabelText("Images")).toBe(strip);
+});
+
 test("a Design with no map images shows no strip", async () => {
   const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [] }));
   render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chatFetcher, mapImages });

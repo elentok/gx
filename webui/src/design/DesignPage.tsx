@@ -99,12 +99,10 @@ function DesignBody({
           Design epic: {name} ↗
         </chakra.a>
       }
-      chatTop={({ questions }) => (
-        <>
-          {!questions && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />}
-          <MapImageStrip address={address} fetcher={deps.fetchMapImages} />
-        </>
-      )}
+      chatTop={({ questions }) =>
+        !questions && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />
+      }
+      logTop={<MapImageStrip address={address} fetcher={deps.fetchMapImages} />}
       ticketRows={model && <Tickets rows={model.tickets} />}
       designMenu={{ card, deletable: detail?.deletable, remove: deps.remove, onDeleted: () => navigate("/epics") }}
     />

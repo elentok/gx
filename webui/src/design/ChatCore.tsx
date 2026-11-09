@@ -381,8 +381,11 @@ export function ChatMessages({
   working,
   sessionId,
   showTools = false,
+  head,
 }: {
   chat: SessionChatResponse;
+  /** The first entry of the log, above the messages. */
+  head?: ReactNode;
   /** Shows each folded run of tool calls; the Design page leaves them out. */
   showTools?: boolean;
   busy: boolean;
@@ -402,6 +405,7 @@ export function ChatMessages({
       key={conversationId}
       signal={`${messages.length}|${chat.background.length}|${busy}`}
     >
+      {head}
       {messages.length === 0 && (
         <CodexNotices
           chat={chat}

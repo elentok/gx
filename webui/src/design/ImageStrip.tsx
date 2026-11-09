@@ -112,7 +112,8 @@ export function ImageStrip({
   trailing?: ReactNode;
 }) {
   return (
-    <Box display="flex" gap="10px" overflowX="auto" pt="2" pb="1" pl="0.5" pr="1" aria-label="Images">
+    // Read-only has nothing hanging outside the row, so it never needs a vertical scrollbar.
+    <Box display="flex" flex="none" gap="10px" overflowX="auto" overflowY={readOnly ? "hidden" : undefined} pt="2" pb="1" pl="0.5" pr="1" aria-label="Images">
       {images.map((image, i) => (
         <Thumb
           key={image.key}

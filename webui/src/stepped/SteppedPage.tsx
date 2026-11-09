@@ -63,6 +63,8 @@ export interface SteppedPageProps {
   subtitleSuffix?: ReactNode;
   metaLink?: ReactNode;
   chatTop?: (ctx: { questions: boolean }) => ReactNode;
+  /** The first entry of the Chat view's log (absent in the Questions view). */
+  logTop?: ReactNode;
   // Design only.
   ticketRows?: ReactNode;
   /** Sub-rows under any step (Triage: Questions and Review under Approve). */
@@ -140,6 +142,7 @@ export function SteppedPage({
   subtitleSuffix,
   metaLink,
   chatTop,
+  logTop,
   ticketRows,
   stepRows,
   noContinue,
@@ -254,6 +257,7 @@ export function SteppedPage({
             done={model?.done}
             nextTitle={model?.nextTitle}
             working={working(session)}
+            logTop={logTop}
             questions={questions}
             onQuestions={(on) => setToggle({ key: viewKey, on })}
             actions={{ address, open: actions.open, resume: actions.resume, fetchScreen: actions.fetchScreen }}
