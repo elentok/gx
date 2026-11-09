@@ -9,7 +9,7 @@ import type { DeleteDesign, OpenFlow, ResumeSession, StopSession } from "../desi
 import type { PostPrompt } from "../design/prompt";
 import type { FetchScreen } from "../design/screen";
 import { DesignActionsMenu, Failure, StartDesignButton } from "../design/SessionControls";
-import type { EpicListRow, SessionInfo } from "../generated/server";
+import type { SessionInfo } from "../generated/server";
 import { PageHeader } from "../page/PageHeader";
 import { useKeyboardOpen } from "../page/useKeyboardOpen";
 import type { MenuEntry } from "../ui/menu/Menu";
@@ -30,11 +30,13 @@ export interface SteppedActions {
 
 /** The Design-only menu items (Delete, Hold, workspace Move), given only by the Design page. */
 export interface DesignMenu {
-  card?: EpicListRow;
+  /** The Move, Remove and Hold sections; the page renders the dialogs they open. */
+  itemGroups?: MenuEntry[][];
   /** The map has no Destination and no tickets yet, so it can still be deleted. */
   deletable?: boolean;
   remove?: DeleteDesign;
   onDeleted: () => void;
+  onOpenEpic: () => void;
 }
 
 export interface SteppedPageProps {
@@ -112,7 +114,8 @@ function SessionStrip({
         designItems={!!designMenu}
         extraItems={menuItems}
         deletable={designMenu?.deletable}
-        card={designMenu?.card}
+        itemGroups={designMenu?.itemGroups}
+        onOpenEpic={designMenu?.onOpenEpic}
         onSelect={onSelect}
         onDeleted={designMenu?.onDeleted ?? (() => {})}
         open={actions.open}
@@ -190,7 +193,7 @@ export function SteppedPage({
           }
           meta={
             <Box display="flex" flexWrap="wrap" alignItems="center" columnGap="3" rowGap="1" fontSize="12px">
-              {session && <AgentLine session={session} wide={wide} />}
+              {session && !designMenu && <AgentLine session={session} wide={wide} />}
               {metaLink}
             </Box>
           }

@@ -1,4 +1,6 @@
-import { Text, chakra } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react";
+import { useCardActions } from "../workspaces/itemActions";
+import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -68,7 +70,10 @@ function DesignBody({
     seenLiveKey.current = liveKey;
     refetch();
   }, [liveKey, refetch]);
+  const { workspaces } = useWorkspaces(conn);
+  const itemActions = useCardActions(card, workspaces);
   return (
+    <>
     <SteppedPage
       address={address}
       title={name}
@@ -94,18 +99,15 @@ function DesignBody({
         };
       }}
       subtitleSuffix={card?.section === SectionOnHold && " · On hold"}
-      metaLink={
-        <chakra.a href={`#/e/${address}`} color="text.dim" textDecoration="underline">
-          Design epic: {name} ↗
-        </chakra.a>
-      }
       chatTop={({ questions }) =>
         !questions && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />
       }
       logTop={<MapImageStrip address={address} fetcher={deps.fetchMapImages} />}
       ticketRows={model && <Tickets rows={model.tickets} />}
-      designMenu={{ card, deletable: detail?.deletable, remove: deps.remove, onDeleted: () => navigate("/epics") }}
+      designMenu={{ itemGroups: itemActions.groups, deletable: detail?.deletable, remove: deps.remove, onDeleted: () => navigate("/epics"), onOpenEpic: () => navigate(`/e/${address}`) }}
     />
+    {itemActions.dialogs}
+    </>
   );
 }
 

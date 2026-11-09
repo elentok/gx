@@ -215,13 +215,12 @@ test("122. Codex design run", async ({ page, start }) => {
   const fixture = await start("codex-design", { autoAdvanceDelay: "1h" });
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
 
-  // The header names the harness and the model, and never the tier; the tier is in the menu.
-  const meta = page.getByTestId("page-header-meta");
-  // The Design epic link follows the agent line inside the same meta block.
-  await expect(meta).toHaveText(/^Codex \S+ · \S+Design epic: \S+ ↗$/);
-  await expect(meta).not.toContainText(/Light|Worker|Strongest/);
+  // The header meta line holds no agent; the menu's Agent block names the harness and the model, with the tier.
+  await expect(page.getByTestId("page-header-meta")).not.toContainText(/Codex|Light|Worker|Strongest/);
   await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).click();
-  await expect(page.getByRole("menu", nav("More actions")).getByText(/^(Light|Worker|Strongest)$/)).toBeVisible();
+  const agentMenu = page.getByRole("menu", nav("More actions"));
+  await expect(agentMenu.getByText(/^Codex \S+ · \S+ effort$/)).toBeVisible();
+  await expect(agentMenu.getByText(/^(Light|Worker|Strongest)$/)).toBeVisible();
   await page.keyboard.press("Escape");
 
   const questions = page.getByRole("group", nav("Questions"));

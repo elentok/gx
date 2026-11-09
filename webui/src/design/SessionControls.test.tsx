@@ -334,12 +334,13 @@ test("arrow keys reach another session's Stop item; Enter stops it and the menu 
   await openMenu();
   const menu = await screen.findByRole("menu");
   const stopItem = await screen.findByRole("menuitem", { name: "Stop old" });
-  // Zag keeps focus on the menu and highlights one item at a time: New session, new, old, Stop old.
+  // Zag keeps focus on the menu and highlights one item at a time: Open design epic, New session, new, old, Stop old.
   const sessionItem = screen.getByRole("menuitem", { name: "old" });
   const arrowTo = async (target: HTMLElement) => {
     fireEvent.keyDown(menu, { key: "ArrowDown" });
     await waitFor(() => expect(target.hasAttribute("data-highlighted")).toBe(true));
   };
+  await arrowTo(screen.getByRole("menuitem", { name: "Open design epic ↗" }));
   await arrowTo(screen.getByRole("menuitem", { name: /New session/ }));
   await arrowTo(screen.getByRole("menuitem", { name: "new ✓" }));
   await arrowTo(sessionItem);

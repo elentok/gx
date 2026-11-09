@@ -2,9 +2,7 @@ import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { copyText } from "../clipboard";
 import { useConnectionContext } from "../connection";
-import type { DesignOpenRequest, EpicListRow, SessionInfo } from "../generated/server";
-import { useCardActions } from "../workspaces/itemActions";
-import { useWorkspaces } from "../workspaces/useActiveWorkspace";
+import type { DesignOpenRequest, SessionInfo } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu";
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
@@ -150,17 +148,20 @@ export function DesignActionsMenu({
   open = postOpenDesign,
   stop = postStopSession,
   remove = postDeleteDesign,
-  card,
+  itemGroups = [],
+  onOpenEpic,
   designItems = true,
   extraItems = [],
 }: {
   address: string;
   /** Items another flow adds beside Copy ID, such as the Triage's Abandon. */
   extraItems?: MenuEntry[];
-  /** Delete, Hold and workspace Move belong to a Design only; another flow's menu leaves them out. */
+  /** Delete, Hold, the epic link and the model row belong to a Design only; another flow's menu leaves them out. */
   designItems?: boolean;
-  /** The Design's card; its workspace and hold state drive the Move, Remove and Hold items. */
-  card?: EpicListRow;
+  /** The Move, Remove and Hold sections. Their dialogs belong to the page, so they outlive this menu. */
+  itemGroups?: MenuEntry[][];
+  /** Goes to the Design's epic page; the first menu item. */
+  onOpenEpic?: () => void;
   shown?: SessionInfo;
   /** Live design sessions, newest first. */
   live: SessionInfo[];
@@ -175,13 +176,12 @@ export function DesignActionsMenu({
   const { run, pending } = useDesignWrite();
   const [confirming, setConfirming] = useState(false);
   const wide = useWide();
-  const { workspaces } = useWorkspaces(useConnectionContext());
-  const itemActions = useCardActions(card, workspaces);
   const canDelete = designItems && deletable && live.length === 0;
 
   const groups: MenuEntry[][] = [];
-  const agent = shown && agentSection(shown, wide);
+  const agent = shown && agentSection(shown, wide, designItems);
   if (agent) groups.push(agent);
+  if (designItems && onOpenEpic) groups.push([{ value: "open-design-epic", label: "Open design epic ↗", onSelect: onOpenEpic }]);
   const sessionItems: MenuEntry[] = [];
   if (shown)
     sessionItems.push({
@@ -207,7 +207,7 @@ export function DesignActionsMenu({
       onSelect: () => setConfirming(true),
     });
   groups.push(copySection);
-  if (designItems) groups.push(...itemActions.groups);
+  if (designItems) groups.push(...itemGroups);
   if (canDelete && confirming)
     groups.push([
       {
@@ -222,20 +222,19 @@ export function DesignActionsMenu({
         ),
       },
     ]);
-  return (
-    <>
-      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} onClosed={() => setConfirming(false)} />
-      {designItems && itemActions.dialogs}
-    </>
-  );
+  return <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} onClosed={() => setConfirming(false)} />;
 }
 
-/** The menu's Agent block for what the header leaves out (Tier, Effort on a phone, the switched note); none when it has no rows. */
-export function agentSection(session: SessionInfo, wide: boolean): MenuEntry[] | undefined {
+/**
+ * The menu's Agent block for what the header leaves out (Tier, the switched note, and Effort on a phone); none when it has no rows.
+ * With `withModel` (the Design page, whose header shows no agent) the first row is the model and its effort instead.
+ */
+export function agentSection(session: SessionInfo, wide: boolean, withModel = false): MenuEntry[] | undefined {
   const agent = agentDetails(session);
   const rows: AgentRow[] = [];
+  if (withModel && agent.model) rows.push({ key: "Model", value: agent.effort ? `${agent.model} · ${agent.effort} effort` : agent.model });
   if (agent.tier) rows.push({ key: "Tier", value: agent.tier });
-  if (!wide && agent.effort) rows.push({ key: "Effort", value: agent.effort });
+  if (!withModel && !wide && agent.effort) rows.push({ key: "Effort", value: agent.effort });
   if (agent.switched) rows.push({ note: "switched by hand" });
   return rows.length > 0 ? [{ kind: "content", value: "agent", content: <AgentBlock rows={rows} /> }] : undefined;
 }
@@ -249,7 +248,13 @@ function AgentBlock({ rows }: { rows: AgentRow[] }) {
         Agent
       </Text>
       {rows.map((row) => (
-        <Box key={"note" in row ? row.note : row.key} display="flex" justifyContent="space-between" gap="3" px="3" py="5px" fontSize="13.5px" color="text.dim">
+        <Box
+          key={"note" in row ? row.note : row.key}
+          display="flex"
+          // The model name is long; it sits under its label rather than wrapping beside it.
+          flexDirection={"key" in row && row.key === "Model" ? "column" : "row"}
+          justifyContent="space-between"
+          gap="3" px="3" py="5px" fontSize="13.5px" color="text.dim">
           {"key" in row && <span>{row.key}</span>}
           <Text as="b" fontFamily="mono" fontSize="13px" fontWeight="500" color="text">
             {"note" in row ? row.note : row.value}

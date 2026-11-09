@@ -114,43 +114,47 @@ function render(
   return Object.assign(router, { setSessions });
 }
 
-const DESIGN_EPIC_LINK = "Design epic: a ↗";
-// The agent part of the meta bar; the Design epic link follows it.
-const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent?.replace(DESIGN_EPIC_LINK, "");
+const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent;
+const agentBlock = async () => within((await screen.findByText("Agent")).parentElement as HTMLElement);
 
-test("the meta bar shows the harness, model and effort of a Codex session, never the tier, and nothing without a session", async () => {
+test("the meta line holds no model and no epic link; the menu's first row is the model and effort, then the tier", async () => {
   render([map("a")], [session("a", { harness: "codex", tier: "worker", model: "gpt-5.3-codex", effort: "medium" })]);
-  expect(await metaText()).toBe("Codex GPT-5.3-Codex · medium");
-  expect(screen.queryByText("Worker")).toBeNull();
-  cleanup();
-  render([map("a")], []);
-  await screen.findByRole("heading", { level: 1 });
   expect(await metaText()).toBe("");
-  expect(screen.getByRole("link", { name: DESIGN_EPIC_LINK }).getAttribute("href")).toBe("#/e/gx:a");
+  expect(screen.queryByRole("link", { name: /Design epic/ })).toBeNull();
+  await openMenu();
+  const block = await agentBlock();
+  expect(block.getByText("Model").nextSibling?.textContent).toBe("Codex GPT-5.3-Codex · medium effort");
+  expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
 });
 
-test("with no model the meta bar reads the harness CLI default and the effort", async () => {
+test("with no model the Model row reads the harness CLI default and the effort", async () => {
   render([map("a")], [session("a", { harness: "claude", tier: "", model: "", effort: "high" })]);
-  expect(await metaText()).toBe("Claude CLI default · high");
+  await openMenu();
+  expect((await agentBlock()).getByText("Model").nextSibling?.textContent).toBe("Claude CLI default · high effort");
 });
 
-test("on a phone the meta bar drops the effort and the menu's Agent block lists Tier and Effort", () =>
+test("on a phone the Agent block has no separate Effort row", () =>
   onPhone(async () => {
     render([map("a")], [session("a", { tier: "worker", model: "sonnet", effort: "medium" })]);
-    expect(await metaText()).toBe("Claude Sonnet");
     await openMenu();
-    const block = within(await screen.findByText("Agent").then((n) => n.parentElement as HTMLElement));
-    expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
-    expect(block.getByText("Effort").nextSibling?.textContent).toBe("medium");
+    const block = await agentBlock();
+    expect(block.getByText("Model").nextSibling?.textContent).toBe("Claude Sonnet · medium effort");
+    expect(block.queryByText("Effort")).toBeNull();
   }));
 
-test("on desktop the Agent block lists Tier only, and a switched model adds the by-hand row", async () => {
+test("a switched model adds the by-hand row", async () => {
   render([map("a")], [session("a", { tier: "worker", model: "opus", effort: "max", model_switched: true })]);
   await openMenu();
-  const block = within((await screen.findByText("Agent")).parentElement as HTMLElement);
-  expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
-  expect(block.queryByText("Effort")).toBeNull();
-  expect(block.getByText("switched by hand")).toBeTruthy();
+  expect((await agentBlock()).getByText("switched by hand")).toBeTruthy();
+});
+
+test("with no session the menu has no Agent block, and Open design epic is its first item and opens the epic page", async () => {
+  const router = render([map("a")], []);
+  await openMenu();
+  expect(screen.queryByText("Agent")).toBeNull();
+  expect((await screen.findAllByRole("menuitem"))[0].textContent).toBe("Open design epic ↗");
+  fireEvent.click(screen.getByRole("menuitem", { name: "Open design epic ↗" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:a"));
 });
 
 test("Copy design ID copies the address and shows it as the subtitle, with no session", async () => {

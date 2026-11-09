@@ -433,7 +433,9 @@ test("50. Design epic page", async ({ page, start }) => {
   // The sidebar's Design row opens the Design page; the header link goes to the design epic.
   await expect(page).toHaveURL(/#\/d\/demo:design-epic$/);
   await expect(page.getByRole("link", { name: /^design-epic\b/ }).first()).toHaveAttribute("href", "#/d/demo:design-epic");
-  await expect(page.getByTestId("page-header-meta").getByRole("link", { name: /^Design epic: .+ ↗$/ })).toHaveAttribute("href", "#/e/demo:design-epic");
+  await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).click();
+  await page.getByRole("menuitem", { name: "Open design epic" }).click();
+  await expect(page).toHaveURL(/#\/e\/demo:design-epic$/);
   // Once the first round lands the session waits for answers and the ring turns "waiting", so the
   // running ring is read first. The epic page is reopened for it; the Design page has no ring.
   await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
