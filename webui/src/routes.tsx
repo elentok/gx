@@ -151,7 +151,6 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     <SettingsPage
       fetchAuth={fetchers.authState}
       fetchList={fetchers.logins}
-      fetchAgents={fetchers.agentSettings}
       fetchSettings={fetchers.settings}
       fetchEpics={fetchers.epicList}
       signOut={fetchers.signOut}

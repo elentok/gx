@@ -19,8 +19,10 @@ export const GLOBAL_SECTIONS = ["Execution queue", "Budget", "Notifications", "S
 
 export const sectionSlug = (section: string) => section.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
+export const projectPath = (project: string) => `/settings/p/${encodeURIComponent(project)}`;
+
 export const sectionPath = (section: string, project?: string) =>
-  `${project === undefined ? "/settings" : `/settings/p/${encodeURIComponent(project)}`}/s/${sectionSlug(section)}`;
+  `${project === undefined ? "/settings" : projectPath(project)}/s/${sectionSlug(section)}`;
 
 export const sectionFromSlug = (slug: string | undefined, sections: readonly string[] = GLOBAL_SECTIONS) => sections.find((s) => sectionSlug(s) === slug);
 
@@ -182,6 +184,37 @@ const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
   </Box>
 );
 
+type SectionBodyProps = Pick<ShellProps, "entries" | "project" | "pendingRestart" | "onWrite" | "repoChecksFile"> & { section: string };
+
+/** One section's rows: Identity and Merging, the Checks editor, or plain rows. Shared by the sidebar shell and the phone page. */
+export function SectionBody({ entries, project, section, pendingRestart, onWrite, repoChecksFile }: SectionBodyProps) {
+  const row = (e: SettingsEntry) => <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} project={project} />;
+  const sectionEntries = entries.filter((e) => e.section === section);
+  if (project !== undefined && section === "Project") {
+    return (
+      <>
+        <Group label="Identity">
+          {sectionEntries.filter((e) => IDENTITY_KEYS.includes(e.key)).map((e) => (
+            <IdentityRow key={e.key} entry={e} />
+          ))}
+        </Group>
+        <Group label="Merging">{sectionEntries.filter((e) => !IDENTITY_KEYS.includes(e.key)).map(row)}</Group>
+      </>
+    );
+  }
+  if (project !== undefined && section === "Checks") {
+    return (
+      <ChecksEditor
+        key={JSON.stringify(sectionEntries[0]?.value ?? null)}
+        entry={sectionEntries.find((e) => e.key === CHECKS_KEY)}
+        repoChecksFile={repoChecksFile ?? false}
+        onWrite={onWrite}
+      />
+    );
+  }
+  return <Group>{sectionEntries.map(row)}</Group>;
+}
+
 export function SettingsShellView(props: ShellProps) {
   const { pendingRestart, onWrite } = props;
   const device = useDevice();
@@ -190,32 +223,13 @@ export function SettingsShellView(props: ShellProps) {
   const section = props.section ?? (props.project === undefined ? GLOBAL_SECTIONS[0] : projectSections(props.entries)[0]);
   const row = (e: SettingsEntry) => <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} project={props.project} />;
   const hits = searchEntries(props.entries, query);
-  const sectionEntries = props.entries.filter((e) => e.section === section);
   const scopeName = props.project === undefined ? "global settings" : `project ${props.project}`;
   return (
     <Box display="grid" gridTemplateColumns={`${device === "desktop" ? 230 : 200}px minmax(0, 1fr)`} gap="14px" alignItems="start">
       <Sidebar {...props} section={section} query={query} onQuery={setQuery} />
       <Box data-mock-part="page" maxW="720px">
         <PageHeader title={searching ? "Search" : section} icon={<PageIcon kind="settings" />} />
-        {!searching && props.project !== undefined && section === "Project" && (
-          <>
-            <Group label="Identity">
-              {sectionEntries.filter((e) => IDENTITY_KEYS.includes(e.key)).map((e) => (
-                <IdentityRow key={e.key} entry={e} />
-              ))}
-            </Group>
-            <Group label="Merging">{sectionEntries.filter((e) => !IDENTITY_KEYS.includes(e.key)).map(row)}</Group>
-          </>
-        )}
-        {!searching && props.project !== undefined && section === "Checks" && (
-          <ChecksEditor
-            key={JSON.stringify(sectionEntries[0]?.value ?? null)}
-            entry={sectionEntries.find((e) => e.key === CHECKS_KEY)}
-            repoChecksFile={props.repoChecksFile ?? false}
-            onWrite={onWrite}
-          />
-        )}
-        {!searching && (props.project === undefined || (section !== "Project" && section !== "Checks")) && <Group>{sectionEntries.map(row)}</Group>}
+        {!searching && <SectionBody {...props} section={section} />}
         {searching && hits.length === 0 && <EmptyState title="No settings match">Nothing in {scopeName} matches “{query.trim()}”.</EmptyState>}
         {searching && hits.length > 0 && (
           <>

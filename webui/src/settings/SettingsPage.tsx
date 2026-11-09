@@ -5,8 +5,18 @@ import { EmptyState } from "../ui/empty-state/EmptyState";
 import type { FetchEpicList } from "../epics/list";
 import { useEpicList } from "../epics/list";
 import { useDevice } from "../useWide";
-import { GLOBAL_SECTIONS, projectSections, sectionFromSlug, sectionPath, SettingsShellView } from "./SettingsShell";
-import { GLOBAL_TARGET, postSettings, useSettings, type FetchSettings, type PostSettings } from "./settingsApi";
+import type { SettingsEntry } from "../generated/server";
+import { GLOBAL_SECTIONS, projectPath, projectSections, SectionBody, sectionFromSlug, sectionPath, SettingsShellView } from "./SettingsShell";
+import {
+  entryLabel,
+  GLOBAL_TARGET,
+  groupBySection,
+  postSettings,
+  searchEntries,
+  useSettings,
+  type FetchSettings,
+  type PostSettings,
+} from "./settingsApi";
 import { fetchAuthState, type AuthState } from "../auth/authState";
 import { CER_LABEL, Fingerprint, PROFILE_LABEL, type CertInfo } from "../auth/cert";
 import { SETTINGS_HREF } from "../hrefs";
@@ -29,12 +39,10 @@ import {
   type LoginWrite,
   type WebLoginEntry,
 } from "./logins";
-import { harnessName, fetchAgentSettings, type FetchAgentSettings } from "./agents";
 import { BackLink, Frame, Group, rowProps } from "./parts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LOGINS_HREF = `${SETTINGS_HREF}/logins`;
-const AGENTS_HREF = `${SETTINGS_HREF}/agents`;
 
 const Chevron = () => (
   <Text aria-hidden color="text.dim">
@@ -56,52 +64,132 @@ function LinkRow({ href, label, detail }: { href: string; label: string; detail?
   );
 }
 
+const sectionHref = (section: string, project?: string) => `#${sectionPath(section, project)}`;
+
+/** A phone search hit: opens the section page holding the row. */
+function HitRows({ entries, query, project }: { entries: SettingsEntry[]; query: string; project?: string }) {
+  return groupBySection(searchEntries(entries, query)).map((g) => (
+    <Group key={g.section} label={`${project ?? "Global"} · ${g.section}`}>
+      {g.entries.map((e) => (
+        <LinkRow key={e.key} href={sectionHref(g.section, project)} label={entryLabel(e)} detail={e.description} />
+      ))}
+    </Group>
+  ));
+}
+
+function ProjectHits({ project, query, fetchSettings }: { project: string; query: string; fetchSettings?: FetchSettings }) {
+  const settings = useSettings(project, undefined, fetchSettings);
+  return settings.data ? <HitRows entries={settings.data.entries} query={query} project={project} /> : null;
+}
+
 export function SettingsHomeView({
   loginCount,
   totpOn,
   authenticatorMissing = false,
-  defaultHarness,
+  entries = [],
+  projects = [],
+  fetchSettings,
   onSignOut,
 }: {
   loginCount?: number;
-  /** The global Default harness; the Agents row shows no detail until it loads. */
-  defaultHarness?: string;
   totpOn: boolean;
   /** TOTP is on but the saved secret was cleared, so the row adds one instead of resetting it. */
   authenticatorMissing?: boolean;
+  /** The global settings, for the section rows' changed chips and the search. */
+  entries?: SettingsEntry[];
+  projects?: string[];
+  /** Reads each project's settings while searching. */
+  fetchSettings?: FetchSettings;
   onSignOut: () => void;
 }) {
+  const [query, setQuery] = useState("");
+  const searching = query.trim() !== "";
+  const changed = new Map(groupBySection(entries).map((g) => [g.section, g.changed]));
   return (
     <Frame>
-      <PageHeader title="Settings" icon={<PageIcon kind="settings" />} />
-      <Group label="Security">
-        <LinkRow
-          href={LOGINS_HREF}
-          label="Web logins"
-          detail={loginCount === undefined ? undefined : `${loginCount} ${loginCount === 1 ? "device" : "devices"}`}
+      <Box data-mock-part="page">
+        <PageHeader title="Settings" icon={<PageIcon kind="settings" />} />
+        <chakra.input
+          data-mock-part="search"
+          type="text"
+          aria-label="Search settings"
+          placeholder="Search all settings"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          mt="2"
+          w="100%"
+          h="40px"
+          px="3.5"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="10px"
+          bg="surface.raised"
+          color="text"
         />
-        <LinkRow href={`${SETTINGS_HREF}/password`} label="Change password" />
-        {totpOn && <LinkRow href={`${SETTINGS_HREF}/authenticator`} label={authenticatorMissing ? "Add authenticator" : "Reset authenticator"} />}
-        <LinkRow href={`${SETTINGS_HREF}/certificate`} label="Certificate" />
-      </Group>
-      <Group>
-        <LinkRow
-          href={AGENTS_HREF}
-          label="Agents"
-          detail={
-            defaultHarness === undefined ? undefined : (
-              <>
-                Default: <b>{harnessName(defaultHarness)}</b>
-              </>
-            )
-          }
-        />
-      </Group>
-      <Group>
-        <chakra.button type="button" onClick={onSignOut} {...rowProps} color="tone.deadlocked.fg">
-          Sign out of this device
-        </chakra.button>
-      </Group>
+        {searching ? (
+          <>
+            <HitRows entries={entries} query={query} />
+            {projects.map((p) => (
+              <ProjectHits key={p} project={p} query={query} fetchSettings={fetchSettings} />
+            ))}
+            {projects.length === 0 && searchEntries(entries, query).length === 0 && (
+              <EmptyState title="No settings match">Nothing matches “{query.trim()}”.</EmptyState>
+            )}
+          </>
+        ) : (
+          <>
+            <Group label="Security">
+              <LinkRow
+                href={LOGINS_HREF}
+                label="Web logins"
+                detail={loginCount === undefined ? undefined : `${loginCount} ${loginCount === 1 ? "device" : "devices"}`}
+              />
+              <LinkRow href={`${SETTINGS_HREF}/password`} label="Change password" />
+              {totpOn && <LinkRow href={`${SETTINGS_HREF}/authenticator`} label={authenticatorMissing ? "Add authenticator" : "Reset authenticator"} />}
+              <LinkRow href={`${SETTINGS_HREF}/certificate`} label="Certificate" />
+            </Group>
+            <Group label="Global settings">
+              {GLOBAL_SECTIONS.map((s) => (
+                <LinkRow key={s} href={sectionHref(s)} label={s} detail={changedText(changed.get(s), "changed")} />
+              ))}
+            </Group>
+            {projects.length > 0 && (
+              <Group label="Projects">
+                {projects.map((p) => (
+                  <LinkRow key={p} href={`#${projectPath(p)}`} label={p} />
+                ))}
+              </Group>
+            )}
+            <Group>
+              <chakra.button type="button" onClick={onSignOut} {...rowProps} color="tone.deadlocked.fg">
+                Sign out of this device
+              </chakra.button>
+            </Group>
+          </>
+        )}
+      </Box>
+    </Frame>
+  );
+}
+
+const changedText = (n: number | undefined, word: string) => (n ? <Chip tone="running">{`${n} ${word}`}</Chip> : undefined);
+
+/** A phone project's list of sections, each with how many of its keys the project overrides. */
+export function ProjectSectionsView({ project, entries }: { project: string; entries: SettingsEntry[] }) {
+  return (
+    <Frame>
+      <Box data-mock-part="page">
+        <BackLink />
+        <PageHeader title={project} icon={<PageIcon kind="settings" />} />
+        <Text mt="2" fontSize="sm" color="text.muted">
+          Each setting uses the global value until you override it here.
+        </Text>
+        <Group label="Sections">
+          {groupBySection(entries).map((g) => (
+            <LinkRow key={g.section} href={sectionHref(g.section, project)} label={g.section} detail={g.section === "Project" ? undefined : changedText(g.changed, "overridden")} />
+          ))}
+        </Group>
+      </Box>
     </Frame>
   );
 }
@@ -266,11 +354,10 @@ export function CertificatePage({ fetchAuth = fetchAuthState }: { fetchAuth?: ()
   );
 }
 
-/** `/settings` and `/settings/s/:section`: the sidebar shell from 640px up, today's list on a phone. */
+/** `/settings` and `/settings/s/:section`: the sidebar shell from 640px up; on a phone the home, a project's section list and one section page. */
 export function SettingsPage({
   fetchAuth = fetchAuthState,
   fetchList = fetchLogins,
-  fetchAgents = fetchAgentSettings,
   fetchSettings,
   fetchEpics,
   postChanges = postSettings,
@@ -279,14 +366,12 @@ export function SettingsPage({
   postChanges?: PostSettings;
   fetchAuth?: () => Promise<AuthState>;
   fetchList?: FetchLogins;
-  fetchAgents?: FetchAgentSettings;
   fetchSettings?: FetchSettings;
   fetchEpics?: FetchEpicList;
   signOut?: () => void | Promise<void>;
 }) {
   const auth = useFetched("settings-auth", fetchAuth);
   const logins = useFetched("settings-logins", fetchList);
-  const agents = useFetched("settings-agents", fetchAgents);
   const { project, section: slug } = useParams();
   const target = project ?? GLOBAL_TARGET;
   const settings = useSettings(target, undefined, fetchSettings);
@@ -297,15 +382,50 @@ export function SettingsPage({
   const section = sectionFromSlug(slug, sections);
   if (wide && project === undefined && !section) return <Navigate to={sectionPath(GLOBAL_SECTIONS[0])} replace />;
   if (wide && project !== undefined && settings.data && !section) return <Navigate to={sectionPath(sections[0], project)} replace />;
-  if (wide && project !== undefined && settings.failed) {
+  if (project !== undefined && settings.failed) {
     return (
       <DetailPage title={{ kind: "Settings" }}>
         <EmptyState title="Project not found">There is no project named “{project}”.</EmptyState>
       </DetailPage>
     );
   }
+  const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort();
+  if (!wide && section) {
+    return (
+      <DetailPage title={{ kind: "Settings", name: section }}>
+        {settings.data ? (
+          <Frame>
+            <Box data-mock-part="page">
+              <BackLink href={project === undefined ? SETTINGS_HREF : `#${projectPath(project)}`} />
+              <PageHeader title={section} icon={<PageIcon kind="settings" />} />
+              <SectionBody
+                entries={settings.data.entries}
+                project={project}
+                section={section}
+                pendingRestart={settings.data.pending_restart}
+                repoChecksFile={settings.data.project?.repo_checks_file}
+                onWrite={async (changes) => {
+                  const res = await postChanges(target, changes);
+                  if (!res.refused) settings.retry();
+                  return res;
+                }}
+              />
+            </Box>
+          </Frame>
+        ) : (
+          <Spinner label="Loading" />
+        )}
+      </DetailPage>
+    );
+  }
+  if (!wide && project !== undefined) {
+    return (
+      <DetailPage title={{ kind: "Settings", name: project }}>
+        {settings.data ? <ProjectSectionsView project={project} entries={settings.data.entries} /> : <Spinner label="Loading" />}
+      </DetailPage>
+    );
+  }
   if (wide) {
-    const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort();
     return (
       <DetailPage title={{ kind: "Settings", name: section }}>
         {auth.data && settings.data ? (
@@ -337,7 +457,9 @@ export function SettingsPage({
       {auth.data ? (
         <SettingsHomeView
           loginCount={logins.data?.length}
-          defaultHarness={agents.data?.default}
+          entries={settings.data?.entries}
+          projects={projects}
+          fetchSettings={fetchSettings}
           totpOn={auth.data.totp_on}
           authenticatorMissing={auth.data.setup_code_required}
           onSignOut={() => void signOut()}

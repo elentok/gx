@@ -33,9 +33,9 @@ export const rowProps = {
 
 export const Frame = ({ children }: { children: ReactNode }) => <Box maxW="560px">{children}</Box>;
 
-export const BackLink = () => (
+export const BackLink = ({ href = SETTINGS_HREF }: { href?: string }) => (
   <chakra.a
-    href={SETTINGS_HREF}
+    href={href}
     display="inline-flex"
     alignItems="center"
     h="8"
