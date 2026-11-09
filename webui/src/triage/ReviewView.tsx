@@ -60,7 +60,10 @@ function useRowEdits(project: string, view: TriageView, refetch: () => void, sav
 }
 
 /** What a row becomes when its action changes: an epic destination survives a ready/map switch, any other starts empty. */
-const switched = (row: TriageRow, action: string): Edit => ({ action, destination: takesEpic(row.action) && takesEpic(action) ? row.destination : undefined });
+const switched = (epicActions: string[], row: TriageRow, action: string): Edit => ({
+  action,
+  destination: takesEpic(epicActions, row.action) && takesEpic(epicActions, action) ? row.destination : undefined,
+});
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -149,13 +152,13 @@ function RowItem({ row, view, onEdit }: { row: TriageRow; view: TriageView; onEd
   const [naming, setNaming] = useState(false);
   const [typed, setTyped] = useState("");
   const action = GROUPS.find((g) => g.action === row.action);
-  const choices = destinationChoices(row.action, row.address, view.destinations, view.rows);
+  const choices = destinationChoices(view.epic_actions, row.action,row.address, view.destinations, view.rows);
   const current = row.destination && (choices.find((c) => c.value === row.destination)?.label ?? row.destination);
   const actionItems: MenuEntry[] = GROUPS.map((g) => ({
     value: g.action,
     label: g.short,
     current: g.action === row.action,
-    onSelect: () => onEdit(switched(row, g.action)),
+    onSelect: () => onEdit(switched(view.epic_actions, row, g.action)),
   }));
   const destItems: MenuEntry[] = choices.map((c) => ({
     value: c.value ?? "new",
@@ -234,7 +237,7 @@ function Group({
   const setAll: MenuEntry[] = GROUPS.filter((g) => g.action !== action).map((g) => ({
     value: g.action,
     label: g.short,
-    onSelect: () => onEdit(rows.map((r) => [r, switched(r, g.action)])),
+    onSelect: () => onEdit(rows.map((r) => [r, switched(view.epic_actions, r, g.action)])),
   }));
   return (
     <Box data-part="action-group" display="flex" flexDirection="column" borderWidth="1px" borderColor="border" borderRadius="md" overflow="hidden">

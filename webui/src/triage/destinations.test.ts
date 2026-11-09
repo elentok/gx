@@ -8,6 +8,7 @@ const destinations: TriageDestination[] = [
   { kind: "map-epic", value: "queue", label: "queue" },
   { kind: "new-map-epic", label: "New map epic" },
 ];
+const epicActions = ["ready", "map"];
 const rows: TriageRow[] = [
   { address: "gx:f/1", title: "one", action: "ready" },
   { address: "gx:f/2", title: "two", action: "map" },
@@ -17,7 +18,7 @@ const rows: TriageRow[] = [
 
 test("ready and map list the suggested epics, the open map epics and a typed new one", () => {
   for (const action of ["ready", "map"])
-    expect(destinationChoices(action, "gx:f/1", destinations, rows)).toEqual([
+    expect(destinationChoices(epicActions, action, "gx:f/1", destinations, rows)).toEqual([
       { value: "sidebar", label: "sidebar", kind: "epic" },
       { value: "queue", label: "queue", kind: "epic" },
       { label: "New map epic…", kind: "new" },
@@ -25,10 +26,10 @@ test("ready and map list the suggested epics, the open map epics and a typed new
 });
 
 test("merge lists the other live ready and map rows", () => {
-  expect(destinationChoices("merge", "gx:f/1", destinations, rows)).toEqual([{ value: "gx:f/2", label: "two", kind: "row" }]);
+  expect(destinationChoices(epicActions, "merge", "gx:f/1", destinations, rows)).toEqual([{ value: "gx:f/2", label: "two", kind: "row" }]);
 });
 
 test("close and keep have no destination", () => {
-  expect(destinationChoices("close", "gx:f/1", destinations, rows)).toEqual([]);
-  expect(destinationChoices("keep", "gx:f/1", destinations, rows)).toEqual([]);
+  expect(destinationChoices(epicActions, "close", "gx:f/1", destinations, rows)).toEqual([]);
+  expect(destinationChoices(epicActions, "keep", "gx:f/1", destinations, rows)).toEqual([]);
 });

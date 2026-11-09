@@ -158,7 +158,8 @@ func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageV
 	v := wire.TriageView{
 		Project: project, State: wire.TriageNone, Flow: string(tickets.FlowTriage),
 		Rows: []wire.TriageRow{}, ActionCounts: map[string]int{}, Destinations: []wire.TriageDestination{},
-		History: []wire.TriageHistoryItem{},
+		EpicActions: triagerec.EpicActions,
+		History:     []wire.TriageHistoryItem{},
 	}
 	if rec == nil {
 		v.Steps = steps("")

@@ -26,6 +26,7 @@ const viewOf = (over: Partial<TriageView> = {}): TriageView => ({
   action_counts: { ready: 1 },
   changed_rows: 0,
   destinations: [],
+  epic_actions: ["ready", "map"],
   can_abandon: false,
   history: [],
   ...over,

@@ -3343,6 +3343,10 @@ export interface TriageView {
   action_counts: { [key: string]: number /* int */};
   changed_rows: number /* int */;
   destinations: TriageDestination[];
+  /**
+   * EpicActions lists the actions whose row takes an epic destination.
+   */
+  epic_actions: string[];
   ready_epic?: string;
   /**
    * Result is set once the Triage is done.

@@ -199,7 +199,9 @@ type TriageView struct {
 	ActionCounts  map[string]int      `json:"action_counts"`
 	ChangedRows   int                 `json:"changed_rows"`
 	Destinations  []TriageDestination `json:"destinations"`
-	ReadyEpic     string              `json:"ready_epic,omitempty"`
+	// EpicActions lists the actions whose row takes an epic destination.
+	EpicActions []string `json:"epic_actions"`
+	ReadyEpic   string   `json:"ready_epic,omitempty"`
 	// Result is set once the Triage is done.
 	Result     *TriageResult       `json:"result,omitempty"`
 	CanAbandon bool                `json:"can_abandon"`

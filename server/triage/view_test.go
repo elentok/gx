@@ -3,6 +3,7 @@ package triage_test
 import (
 	"encoding/json"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -35,7 +36,14 @@ func show(t *testing.T, f servertest.DesignsFixture) wire.TriageView {
 	return v
 }
 
-// mustRec panics on error: a Go call cannot forward a two-value result next
+func TestView_ExposesTheActionsThatTakeAnEpic(t *testing.T) {
+	f, _ := startViewFixture(t)
+	if got, want := show(t, f).EpicActions, []string{"ready", "map"}; !slices.Equal(got, want) {
+		t.Fatalf("epic_actions = %v, want %v", got, want)
+	}
+}
+
+// mustRec panics on error:a Go call cannot forward a two-value result next
 // to a *testing.T, and a panic fails the test with a trace.
 func mustRec(rec *triagerec.Record, err error) *triagerec.Record {
 	if err != nil {

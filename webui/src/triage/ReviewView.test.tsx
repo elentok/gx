@@ -30,6 +30,7 @@ const viewOf = (over: Partial<TriageView> = {}): TriageView => ({
     { kind: "map-epic", value: "queue", label: "queue" },
     { kind: "new-map-epic", label: "New map epic" },
   ],
+  epic_actions: ["ready", "map"],
   ready_epic: "follow-ups-2026-11-08",
   can_abandon: false,
   history: [],

@@ -16,6 +16,10 @@ const (
 	VerdictObsolete = "obsolete"
 )
 
+// EpicActions are the plan actions whose row goes to an epic; a merge may only
+// target a row with one of them.
+var EpicActions = []string{"ready", "map"}
+
 // Plan actions.
 var planActions = []string{"ready", "map", "merge", "close", "keep"}
 
@@ -246,7 +250,7 @@ func (r *Record) checkMergeTarget(from, target string) error {
 	if err != nil || row.gone() {
 		return phaseErr("merge target %q is not a row of this triage", target)
 	}
-	if action, _ := row.Effective(); action != "ready" && action != "map" {
+	if action, _ := row.Effective(); !slices.Contains(EpicActions, action) {
 		return phaseErr("merge target %s is %s, not a ready or map epic", target, action)
 	}
 	return nil

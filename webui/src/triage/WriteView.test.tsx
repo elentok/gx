@@ -9,7 +9,7 @@ afterEach(cleanup);
 const rowOf = (n: number, over: Partial<TriageRow> = {}): TriageRow => ({ address: `gx:follow-ups/${n}`, title: `row ${n}`, action: "ready", ...over });
 
 const viewOf = (rows: TriageRow[]): TriageView =>
-  ({ project: "gx", state: "live", flow: "triage", steps: [], ring_percent: 80, revision: 7, rows, open_questions: 0, action_counts: {}, changed_rows: 0, destinations: [], can_abandon: false, history: [] }) as TriageView;
+  ({ project: "gx", state: "live", flow: "triage", steps: [], ring_percent: 80, revision: 7, rows, open_questions: 0, action_counts: {}, changed_rows: 0, destinations: [], epic_actions: ["ready", "map"], can_abandon: false, history: [] }) as TriageView;
 
 const refusal = "close: ticket is claimed, not draft or open";
 
