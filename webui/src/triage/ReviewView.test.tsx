@@ -137,7 +137,9 @@ test("a row merged into a gone target is outlined", () => {
   const rows = [rowOf(5, "merge", { destination: "gx:follow-ups/1", merge_orphan: true })];
   render(<ReviewView project="gx" view={viewOf({ rows })} refetch={() => {}} save={vi.fn()} />);
   fireEvent.click(screen.getByRole("button", { name: /^Merge into another/ }));
-  expect(screen.getByText("row 5").closest("[data-orphan]")).not.toBeNull();
+  const row = screen.getByText("row 5").closest("[data-orphan]");
+  expect(row).not.toBeNull();
+  expect(getComputedStyle(row as Element).boxShadow).toContain("tone-deadlocked-fg");
 });
 
 test("a stale refusal refetches", async () => {

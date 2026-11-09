@@ -172,7 +172,7 @@ function RowItem({ row, view, onEdit }: { row: TriageRow; view: TriageView; onEd
       py="2"
       borderTopWidth="1px"
       borderColor="border"
-      boxShadow={row.merge_orphan ? "inset 0 0 0 2px var(--chakra-colors-tone-failed-fg)" : row.person_changed ? "inset 0 0 0 2px var(--chakra-colors-tone-running-fg)" : undefined}
+      boxShadow={row.merge_orphan ? "inset 0 0 0 2px var(--chakra-colors-tone-deadlocked-fg)" : row.person_changed ? "inset 0 0 0 2px var(--chakra-colors-tone-running-fg)" : undefined}
       data-changed={row.person_changed || undefined}
       data-orphan={row.merge_orphan || undefined}
     >
