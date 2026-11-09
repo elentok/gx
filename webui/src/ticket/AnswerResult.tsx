@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { TicketDetail } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { Button } from "../ui/button/Button";
-import { OutcomeAdopted, OutcomeQueued, type Sent, wasAdopted } from "./answer";
+import { OutcomeAdopted, OutcomeQueued, isAnsweredRound, type Sent, wasAdopted } from "./answer";
 
 const dim = { fontSize: "xs", color: "fg.muted" } as const;
 
@@ -39,10 +39,9 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
   }, [latest?.text, open]);
 
   // An adopted send records no answer, and the round it answered may no longer be the latest.
-  const adopted = wasAdopted(sent);
-  if (!latest || (!latest.answer && !adopted)) return null;
+  if (!latest || !isAnsweredRound(latest, sent)) return null;
   const note = latest.answer?.note;
-  const shown = sent && (adopted || sent.seq === latest.seq) ? status(sent) : null;
+  const shown = sent && (wasAdopted(sent) || sent.seq === latest.seq) ? status(sent) : null;
   const toggle = cut || !!latest.handoff || open;
   return (
     <Box role="group" aria-label="Answered question" display="flex" flexDirection="column" gap="1.5">

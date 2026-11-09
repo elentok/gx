@@ -246,6 +246,7 @@ test("24. Phone, Design page", async ({ page, start }) => {
   // and images and leaves the tabs with the ⋯; restoring the viewport and leaving focus brings them back.
   const title = page.getByRole("heading", { level: 1 });
   const more = page.getByRole("button", nav("More actions"));
+  const topBar = page.getByRole("button", { name: "Show sidebar", exact: true });
   await page.getByRole("button", nav("Note")).click();
   const box = page.getByRole("textbox", nav("Message"));
   await box.focus();
@@ -258,6 +259,7 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await expect(title).toBeVisible();
   await setViewport(300);
   await expect(title).toBeHidden();
+  await expect(topBar).toBeHidden();
   await expect(page.getByLabel("Images")).toHaveCount(0);
   await expect(view).toBeVisible();
   await expect(more).toBeVisible();
@@ -265,6 +267,7 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await setViewport(0);
   await box.blur();
   await expect(title).toBeVisible();
+  await expect(topBar).toBeVisible();
   await expect(more).toHaveCount(1);
 
   // The ⋯ menu holds the model row and the link to the design epic.

@@ -1,6 +1,4 @@
 import { Text } from "@chakra-ui/react";
-import { useCardActions } from "../workspaces/itemActions";
-import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -23,6 +21,8 @@ import type { FetchScreen } from "./screen";
 import { SectionOnHold, type EpicListRow } from "../generated/server";
 import { slugOf } from "../slug";
 import { useWide } from "../useWide";
+import { useCardActions } from "../workspaces/itemActions";
+import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { designSession, liveSessions } from "./view";
 
 /** The injected fetchers and actions the Design page talks to the server through. */
@@ -74,39 +74,39 @@ function DesignBody({
   const itemActions = useCardActions(card, workspaces);
   return (
     <>
-    <SteppedPage
-      address={address}
-      title={name}
-      icon={<PageIcon kind="design" />}
-      wide={wide}
-      model={model}
-      ring={detail ? (size) => <EpicRing detail={detail} card={card} sessions={sessions} size={size} /> : undefined}
-      live={live}
-      current={designSession(address, sessions)}
-      actions={deps}
-      startLabel="Start design session"
-      startFailure={startFailure}
-      working={(session) => {
-        // The busy row follows what the agent reported; Progress and Continue keep following the map.
-        const running = detail?.steps?.find((s) => s.step === session?.reported_step) ?? model?.current;
-        // Without the map detail there is no step to name, so the row reads a bare "Working".
-        return {
-          step: running?.label,
-          title:
-            running?.step === "resolve-tickets"
-              ? session?.reported_title || detail?.rows.find((r) => r.current)?.title
-              : undefined,
-        };
-      }}
-      subtitleSuffix={card?.section === SectionOnHold && " · On hold"}
-      chatTop={({ questions }) =>
-        !questions && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />
-      }
-      logTop={<MapImageStrip address={address} fetcher={deps.fetchMapImages} />}
-      ticketRows={model && <Tickets rows={model.tickets} />}
-      designMenu={{ itemGroups: itemActions.groups, deletable: detail?.deletable, remove: deps.remove, onDeleted: () => navigate("/epics"), onOpenEpic: () => navigate(`/e/${address}`) }}
-    />
-    {itemActions.dialogs}
+      <SteppedPage
+        address={address}
+        title={name}
+        icon={<PageIcon kind="design" />}
+        wide={wide}
+        model={model}
+        ring={detail ? (size) => <EpicRing detail={detail} card={card} sessions={sessions} size={size} /> : undefined}
+        live={live}
+        current={designSession(address, sessions)}
+        actions={deps}
+        startLabel="Start design session"
+        startFailure={startFailure}
+        working={(session) => {
+          // The busy row follows what the agent reported; Progress and Continue keep following the map.
+          const running = detail?.steps?.find((s) => s.step === session?.reported_step) ?? model?.current;
+          // Without the map detail there is no step to name, so the row reads a bare "Working".
+          return {
+            step: running?.label,
+            title:
+              running?.step === "resolve-tickets"
+                ? session?.reported_title || detail?.rows.find((r) => r.current)?.title
+                : undefined,
+          };
+        }}
+        subtitleSuffix={card?.section === SectionOnHold && " · On hold"}
+        chatTop={({ questions }) =>
+          !questions && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />
+        }
+        logTop={<MapImageStrip address={address} fetcher={deps.fetchMapImages} />}
+        ticketRows={model && <Tickets rows={model.tickets} />}
+        designMenu={{ itemGroups: itemActions.groups, deletable: detail?.deletable, remove: deps.remove, onDeleted: () => navigate("/epics"), onOpenEpic: () => navigate(`/e/${address}`) }}
+      />
+      {itemActions.dialogs}
     </>
   );
 }

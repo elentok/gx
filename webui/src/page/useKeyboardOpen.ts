@@ -27,16 +27,15 @@ export function useKeyboardOpen(): boolean {
     // otherwise moving between two fields would flash closed.
     const sync = (focused: EventTarget | null = document.activeElement) =>
       setOpen(vv.scale <= 1 && window.innerHeight - vv.height >= KEYBOARD_MIN_PX && acceptsText(focused));
-    const onResize = () => sync();
-    const onFocusIn = () => sync();
+    const onChange = () => sync();
     const onFocusOut = (e: FocusEvent) => sync(e.relatedTarget);
     sync();
-    vv.addEventListener("resize", onResize);
-    document.addEventListener("focusin", onFocusIn);
+    vv.addEventListener("resize", onChange);
+    document.addEventListener("focusin", onChange);
     document.addEventListener("focusout", onFocusOut);
     return () => {
-      vv.removeEventListener("resize", onResize);
-      document.removeEventListener("focusin", onFocusIn);
+      vv.removeEventListener("resize", onChange);
+      document.removeEventListener("focusin", onChange);
       document.removeEventListener("focusout", onFocusOut);
     };
   }, []);

@@ -41,6 +41,10 @@ export function sentOf(
 /** Whether the send reached an agent that had already finished, so no answer was recorded. */
 export const wasAdopted = (sent: Sent | null): boolean => sent?.outcome === OutcomeAdopted;
 
+/** The one rule for whether a round shows the answered card: it has an answer, or the send was adopted. */
+export const isAnsweredRound = (latest: { answer?: unknown } | null | undefined, sent: Sent | null): boolean =>
+  !!latest?.answer || wasAdopted(sent);
+
 export type PostAnswer = (body: AnswerBody) => Promise<AnswerResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
