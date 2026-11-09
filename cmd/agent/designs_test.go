@@ -21,6 +21,7 @@ import (
 )
 
 func TestDesignOpenRequest(t *testing.T) {
+	t.Setenv(holder.AgentSessionEnv, "")
 	got, err := designOpenRequest("fresh", "an idea", "proj", false)
 	want := wire.DesignOpenRequest{Epic: "fresh", NewDesign: true, Idea: "an idea", Project: "proj"}
 	if err != nil || got != want {
