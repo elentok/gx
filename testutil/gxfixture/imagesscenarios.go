@@ -142,9 +142,19 @@ func (f sessionSeeder) seedImages(id string, harness string) error {
 	}
 	var path string
 	if harness == "codex" {
+		// The conversation id can change after the first report, so the meta is
+		// read again on each try, and the rollout file may lag the id.
 		var ok bool
-		if path, ok, err = codexsession.RolloutPathIn(filepath.Join(f.root, "home", ".codex"), meta.ConversationID); err != nil || !ok {
-			return fmt.Errorf("session %s: no rollout (found %v): %v", id, ok, err)
+		for deadline := time.Now().Add(sessionWaitTimeout); ; time.Sleep(100 * time.Millisecond) {
+			if m, merr := sessions.ReadMeta(dir); merr == nil {
+				meta = m
+			}
+			if path, ok, err = codexsession.RolloutPathIn(filepath.Join(f.root, "home", ".codex"), meta.ConversationID); err == nil && ok {
+				break
+			}
+			if time.Now().After(deadline) {
+				return fmt.Errorf("session %s: no rollout (found %v): %v", id, ok, err)
+			}
 		}
 	} else {
 		path = transcript.PathIn(filepath.Join(f.root, "home"), meta.Dir, meta.ConversationID)
