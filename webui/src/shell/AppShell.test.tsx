@@ -7,6 +7,7 @@ import { renderThemed } from "../ui/render";
 import { DeviceContext, type Device } from "../useWide";
 import { AppShell } from "./AppShell";
 import { closeNewItem, openNewAgent, openNewDesign } from "./newItemOpen";
+import { EDGE_PX, NO_SIDEBAR_SWIPE_ATTR } from "./useSidebarSwipe";
 
 afterEach(() => {
   closeNewItem();
@@ -243,23 +244,128 @@ describe("swipe", () => {
     expect(isOpen()).toBe(true);
   });
 
-  test.each([
-    ["without a standalone signal", false, false],
-    ["as a home-screen app", true, true],
-  ])("a rightward edge swipe %s", (_, isStandalone, opens) => {
-    if (isStandalone) standalone();
-    setup("phone");
-    swipe(document.body, [5, 300], [100, 300]);
-    expect(isOpen()).toBe(opens);
-  });
+  describe("a rightward swipe opens the sidebar", () => {
+    test.each([
+      ["a tab", () => {}],
+      ["the installed app", standalone],
+    ])("on %s, from past the edge, on phone and tablet", (_, signal) => {
+      signal();
+      for (const device of ["phone", "tablet"] as const) {
+        setup(device);
+        swipe(document.body, [100, 300], [200, 300]);
+        expect(isOpen()).toBe(true);
+        cleanup();
+      }
+    });
 
-  test("navigator.standalone counts as a standalone signal, and only from the edge", () => {
-    vi.stubGlobal("navigator", { ...navigator, standalone: true });
-    setup("phone");
-    swipe(document.body, [100, 300], [200, 300]);
-    expect(isOpen()).toBe(false);
-    swipe(document.body, [5, 300], [100, 300]);
-    expect(isOpen()).toBe(true);
+    test("a start within the edge band opens nothing", () => {
+      setup("phone");
+      swipe(document.body, [5, 300], [100, 300]);
+      expect(isOpen()).toBe(false);
+      swipe(document.body, [EDGE_PX, 300], [200, 300]);
+      expect(isOpen()).toBe(false);
+    });
+
+    test.each([
+      ["under 40px", [100, 300], [135, 300]],
+      ["mostly vertical", [100, 300], [150, 500]],
+      ["leftward", [200, 300], [100, 300]],
+    ] as const)("a %s move opens nothing", (_, from, to) => {
+      setup("phone");
+      swipe(document.body, [...from], [...to]);
+      expect(isOpen()).toBe(false);
+    });
+
+    test("a second finger cancels it", () => {
+      setup("phone");
+      fireEvent.touchStart(document.body, { touches: [{ clientX: 100, clientY: 300 }, { clientX: 200, clientY: 300 }] });
+      fireEvent.touchEnd(document.body, { changedTouches: [{ clientX: 200, clientY: 300 }] });
+      expect(isOpen()).toBe(false);
+    });
+
+    const addScroller = (overflowX: string, scrollWidth: number) => {
+      const el = document.createElement("div");
+      el.style.overflowX = overflowX;
+      Object.defineProperties(el, { scrollWidth: { value: scrollWidth }, clientWidth: { value: 200 } });
+      document.body.appendChild(el);
+      return el;
+    };
+
+    test("a start inside a horizontal scroller opens nothing, at its start or its end", () => {
+      setup("phone");
+      const strip = addScroller("auto", 500);
+      swipe(strip, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(false);
+      strip.scrollLeft = 300;
+      swipe(strip, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(false);
+      const child = document.createElement("span");
+      strip.appendChild(child);
+      swipe(child, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(false);
+    });
+
+    test.each([
+      ["vertical-only scroll (overflow-x computes auto, nothing overflows)", () => addScroller("auto", 200)],
+      ["overflow hidden", () => addScroller("hidden", 500)],
+    ])("%s does not block", (_, make) => {
+      setup("phone");
+      swipe(make(), [100, 300], [200, 300]);
+      expect(isOpen()).toBe(true);
+    });
+
+    test("a marked surface blocks", () => {
+      setup("phone");
+      const row = document.createElement("div");
+      row.setAttribute(NO_SIDEBAR_SWIPE_ATTR, "");
+      const card = document.createElement("div");
+      row.appendChild(card);
+      document.body.appendChild(row);
+      swipe(card, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(false);
+    });
+
+    test.each([
+      ["text", "input"],
+      ["textarea", "textarea"],
+      ["range", "input"],
+      ["select", "select"],
+    ])("a start in a %s field blocks", (kind, tag) => {
+      setup("phone");
+      const el = document.createElement(tag);
+      if (kind === "range") (el as HTMLInputElement).type = "range";
+      document.body.appendChild(el);
+      swipe(el, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(false);
+    });
+
+    test("a checkbox does not block", () => {
+      setup("phone");
+      const el = document.createElement("input");
+      el.type = "checkbox";
+      document.body.appendChild(el);
+      swipe(el, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(true);
+    });
+
+    test("an open dialog blocks", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("worktrees") ? [] : { epics: [], follow_ups: [], projects: [] }), { status: 200 })),
+      );
+      setup("phone");
+      act(openNewAgent);
+      await screen.findByRole("dialog");
+      swipe(document.body, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(false);
+      expect(screen.getByRole("dialog")).toBeTruthy();
+    });
+
+    test("nothing opens while docked", () => {
+      setup("desktop");
+      swipe(document.body, [100, 300], [200, 300]);
+      expect(isOpen()).toBe(true);
+    });
   });
 });
 
