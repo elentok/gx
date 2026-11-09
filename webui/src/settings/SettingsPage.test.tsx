@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { renderThemed } from "../ui/render";
 import { endsInDays } from "./logins";
-import { CertificateView, SettingsHomeView, WebLoginPage, WebLoginsView } from "./SettingsPage";
+import { CertificateView, SettingsHomeView, SettingsPage, WebLoginPage, WebLoginsView } from "./SettingsPage";
 import type { WebLoginEntry } from "./logins";
 
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -19,6 +19,33 @@ const login = (over: Partial<WebLoginEntry> = {}): WebLoginEntry => ({
   ...over,
 });
 const usedDaysAgo = (days: number) => new Date(NOW - days * DAY).toISOString();
+
+describe("SettingsPage project scope", () => {
+  const auth = async () => ({ totp_on: false, setup_code_required: false }) as never;
+  const conn = { getState: () => "open", subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  const renderAt = (path: string, fetchSettings: ComponentProps<typeof SettingsPage>["fetchSettings"]) =>
+    renderThemed(
+      <ConnectionContext.Provider value={conn}>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/settings/p/:project" element={<SettingsPage fetchAuth={auth} fetchSettings={fetchSettings} />} />
+            <Route path="/settings/p/:project/s/:section" element={<SettingsPage fetchAuth={auth} fetchSettings={fetchSettings} />} />
+          </Routes>
+        </MemoryRouter>
+      </ConnectionContext.Provider>,
+    );
+
+  it("shows a not-found state for a project the server does not know", async () => {
+    const { findByText } = renderAt("/settings/p/nope", async () => Promise.reject(new Error("404")));
+    expect(await findByText("Project not found")).toBeTruthy();
+  });
+
+  it("opens the first section of a known project", async () => {
+    const entries = [{ key: "trunk", path: ["trunk"], type: "string", section: "Project", description: "Trunk.", set: false }];
+    const { findByRole } = renderAt("/settings/p/gx", async () => ({ project: { name: "gx", repo_checks_file: false }, entries }));
+    expect(await findByRole("heading", { name: "Project" })).toBeTruthy();
+  });
+});
 
 describe("CertificateView", () => {
   it("shows both downloads and the fingerprint", () => {

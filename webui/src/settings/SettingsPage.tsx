@@ -1,10 +1,11 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import { Navigate, useParams } from "react-router";
+import { Navigate, useNavigate, useParams } from "react-router";
+import { EmptyState } from "../ui/empty-state/EmptyState";
 import type { FetchEpicList } from "../epics/list";
 import { useEpicList } from "../epics/list";
 import { useDevice } from "../useWide";
-import { GLOBAL_SECTIONS, sectionFromSlug, sectionPath, SettingsShellView } from "./SettingsShell";
+import { GLOBAL_SECTIONS, projectSections, sectionFromSlug, sectionPath, SettingsShellView } from "./SettingsShell";
 import { GLOBAL_TARGET, postSettings, useSettings, type FetchSettings, type PostSettings } from "./settingsApi";
 import { fetchAuthState, type AuthState } from "../auth/authState";
 import { CER_LABEL, Fingerprint, PROFILE_LABEL, type CertInfo } from "../auth/cert";
@@ -286,12 +287,23 @@ export function SettingsPage({
   const auth = useFetched("settings-auth", fetchAuth);
   const logins = useFetched("settings-logins", fetchList);
   const agents = useFetched("settings-agents", fetchAgents);
-  const settings = useSettings(GLOBAL_TARGET, undefined, fetchSettings);
+  const { project, section: slug } = useParams();
+  const target = project ?? GLOBAL_TARGET;
+  const settings = useSettings(target, undefined, fetchSettings);
   const { list } = useEpicList(fetchEpics);
   const wide = useDevice() !== "phone";
-  const slug = useParams().section;
-  const section = sectionFromSlug(slug);
-  if (wide && !section) return <Navigate to={sectionPath(GLOBAL_SECTIONS[0])} replace />;
+  const navigate = useNavigate();
+  const sections = project === undefined ? GLOBAL_SECTIONS : settings.data ? projectSections(settings.data.entries) : [];
+  const section = sectionFromSlug(slug, sections);
+  if (wide && project === undefined && !section) return <Navigate to={sectionPath(GLOBAL_SECTIONS[0])} replace />;
+  if (wide && project !== undefined && settings.data && !section) return <Navigate to={sectionPath(sections[0], project)} replace />;
+  if (wide && project !== undefined && settings.failed) {
+    return (
+      <DetailPage title={{ kind: "Settings" }}>
+        <EmptyState title="Project not found">There is no project named “{project}”.</EmptyState>
+      </DetailPage>
+    );
+  }
   if (wide) {
     const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort();
     return (
@@ -300,13 +312,15 @@ export function SettingsPage({
           <SettingsShellView
             entries={settings.data.entries}
             projects={projects}
+            project={project}
+            onScope={(next) => navigate(sectionPath(slug ?? GLOBAL_SECTIONS[0], next === GLOBAL_TARGET ? undefined : next))}
             section={section}
             totpOn={auth.data.totp_on}
             authenticatorMissing={auth.data.setup_code_required}
             onSignOut={() => void signOut()}
             pendingRestart={settings.data.pending_restart}
             onWrite={async (changes) => {
-              const res = await postChanges(GLOBAL_TARGET, changes);
+              const res = await postChanges(target, changes);
               if (!res.refused) settings.retry();
               return res;
             }}

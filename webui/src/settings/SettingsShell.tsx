@@ -7,7 +7,8 @@ import { PageHeader } from "../page/PageHeader";
 import { PageIcon } from "../page/PageIcon";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { useDevice } from "../useWide";
-import { groupBySection, searchEntries } from "./settingsApi";
+import { Chip } from "../ui/chip/Chip";
+import { entryLabel, groupBySection, searchEntries } from "./settingsApi";
 import { Group } from "./parts";
 import { SettingsRow, type WriteSetting } from "./SettingsRow";
 
@@ -16,9 +17,15 @@ export const GLOBAL_SECTIONS = ["Execution queue", "Budget", "Notifications", "S
 
 export const sectionSlug = (section: string) => section.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-export const sectionPath = (section: string) => `/settings/s/${sectionSlug(section)}`;
+export const sectionPath = (section: string, project?: string) =>
+  `${project === undefined ? "/settings" : `/settings/p/${encodeURIComponent(project)}`}/s/${sectionSlug(section)}`;
 
-export const sectionFromSlug = (slug: string | undefined) => GLOBAL_SECTIONS.find((s) => sectionSlug(s) === slug);
+export const sectionFromSlug = (slug: string | undefined, sections: readonly string[] = GLOBAL_SECTIONS) => sections.find((s) => sectionSlug(s) === slug);
+
+/** A project's sidebar sections in the order the server sent them: Project, the overridable ones, Checks. */
+export const projectSections = (entries: SettingsEntry[]) => groupBySection(entries).map((g) => g.section);
+
+const IDENTITY_KEYS = ["name", "repo", "vcs"];
 
 const NavLink = chakra(Link);
 
@@ -52,6 +59,10 @@ const CountChip = ({ n }: { n: number }) => (
 export interface ShellProps {
   entries: SettingsEntry[];
   projects: string[];
+  /** The project on the page; global settings when absent. */
+  project?: string;
+  /** Called with a picker value: "global" or a project name. */
+  onScope?: (target: string) => void;
   /** The section on the page; the first section when absent. */
   section?: string;
   totpOn: boolean;
@@ -65,6 +76,8 @@ export interface ShellProps {
 function Sidebar({
   entries,
   projects,
+  project,
+  onScope,
   section,
   totpOn,
   authenticatorMissing,
@@ -73,6 +86,7 @@ function Sidebar({
   onQuery,
 }: ShellProps & { query: string; onQuery: (q: string) => void }) {
   const changed = new Map(groupBySection(entries).map((g) => [g.section, g.changed]));
+  const sections = project === undefined ? GLOBAL_SECTIONS : projectSections(entries);
   return (
     <chakra.nav data-mock-part="sidebar" display="grid" gap="0.5" alignSelf="start">
       <chakra.select
@@ -86,7 +100,8 @@ function Sidebar({
         borderRadius="8px"
         bg="surface.raised"
         color="text"
-        defaultValue="global"
+        value={project ?? "global"}
+        onChange={(e) => onScope?.(e.target.value)}
       >
         <option value="global">Global settings</option>
         {projects.map((p) => (
@@ -112,11 +127,11 @@ function Sidebar({
         bg="surface.raised"
         color="text"
       />
-      <GroupLabel>Global</GroupLabel>
-      {GLOBAL_SECTIONS.map((s) => (
+      <GroupLabel>{project ?? "Global"}</GroupLabel>
+      {sections.map((s) => (
         <NavLink
           key={s}
-          to={sectionPath(s)}
+          to={sectionPath(s, project)}
           {...navLink}
           aria-current={s === section ? "page" : undefined}
           {...(s === section && { bg: "tone.running.bg", color: "tone.running.fg" })}
@@ -125,14 +140,18 @@ function Sidebar({
           {(changed.get(s) ?? 0) > 0 && <CountChip n={changed.get(s) ?? 0} />}
         </NavLink>
       ))}
-      <GroupLabel>Account</GroupLabel>
-      <AccountLink href={`${SETTINGS_HREF}/logins`}>Web logins</AccountLink>
-      <AccountLink href={`${SETTINGS_HREF}/password`}>Password</AccountLink>
-      {totpOn && <AccountLink href={`${SETTINGS_HREF}/authenticator`}>{authenticatorMissing ? "Add authenticator" : "Authenticator"}</AccountLink>}
-      <AccountLink href={`${SETTINGS_HREF}/certificate`}>Certificate</AccountLink>
-      <chakra.button type="button" onClick={onSignOut} {...navLink} color="tone.deadlocked.fg" textAlign="left">
-        Sign out of this device
-      </chakra.button>
+      {project === undefined && (
+        <>
+          <GroupLabel>Account</GroupLabel>
+          <AccountLink href={`${SETTINGS_HREF}/logins`}>Web logins</AccountLink>
+          <AccountLink href={`${SETTINGS_HREF}/password`}>Password</AccountLink>
+          {totpOn && <AccountLink href={`${SETTINGS_HREF}/authenticator`}>{authenticatorMissing ? "Add authenticator" : "Authenticator"}</AccountLink>}
+          <AccountLink href={`${SETTINGS_HREF}/certificate`}>Certificate</AccountLink>
+          <chakra.button type="button" onClick={onSignOut} {...navLink} color="tone.deadlocked.fg" textAlign="left">
+            Sign out of this device
+          </chakra.button>
+        </>
+      )}
     </chakra.nav>
   );
 }
@@ -146,25 +165,53 @@ const AccountLink = ({ href, children }: { href: string; children: string }) => 
   </chakra.a>
 );
 
+/** A fact about the project: label, value and a read-only chip, with no control. */
+const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
+  <Box px="3.5" py="3" display="flex" gap="3" alignItems="center" _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}>
+    <Text fontWeight="600" color="text.muted">
+      {entry.key === "repo" ? "Repository" : entry.key === "vcs" ? "VCS" : entryLabel(entry)}
+    </Text>
+    <Text fontWeight="700" overflowWrap="anywhere" minW="0">
+      {String(entry.value ?? entry.default ?? "")}
+    </Text>
+    <Chip fontSize="xs">🔒 read-only</Chip>
+  </Box>
+);
+
 export function SettingsShellView(props: ShellProps) {
   const { pendingRestart, onWrite } = props;
   const device = useDevice();
   const [query, setQuery] = useState("");
   const searching = query.trim() !== "";
-  const section = props.section ?? GLOBAL_SECTIONS[0];
+  const section = props.section ?? (props.project === undefined ? GLOBAL_SECTIONS[0] : projectSections(props.entries)[0]);
   const row = (e: SettingsEntry) => <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} />;
   const hits = searchEntries(props.entries, query);
+  const sectionEntries = props.entries.filter((e) => e.section === section);
+  const scopeName = props.project === undefined ? "global settings" : `project ${props.project}`;
   return (
     <Box display="grid" gridTemplateColumns={`${device === "desktop" ? 230 : 200}px minmax(0, 1fr)`} gap="14px" alignItems="start">
       <Sidebar {...props} section={section} query={query} onQuery={setQuery} />
       <Box data-mock-part="page" maxW="720px">
         <PageHeader title={searching ? "Search" : section} icon={<PageIcon kind="settings" />} />
-        {!searching && <Group>{props.entries.filter((e) => e.section === section).map(row)}</Group>}
-        {searching && hits.length === 0 && <EmptyState title="No settings match">Nothing in global settings matches “{query.trim()}”.</EmptyState>}
+        {!searching && props.project !== undefined && section === "Project" && (
+          <>
+            <Group label="Identity">
+              {sectionEntries.filter((e) => IDENTITY_KEYS.includes(e.key)).map((e) => (
+                <IdentityRow key={e.key} entry={e} />
+              ))}
+            </Group>
+            <Group label="Merging">{sectionEntries.filter((e) => !IDENTITY_KEYS.includes(e.key)).map(row)}</Group>
+          </>
+        )}
+        {!searching && props.project !== undefined && section === "Checks" && (
+          <EmptyState title="Checks">Checks settings are not available here yet.</EmptyState>
+        )}
+        {!searching && (props.project === undefined || (section !== "Project" && section !== "Checks")) && <Group>{sectionEntries.map(row)}</Group>}
+        {searching && hits.length === 0 && <EmptyState title="No settings match">Nothing in {scopeName} matches “{query.trim()}”.</EmptyState>}
         {searching && hits.length > 0 && (
           <>
             <Text mt="4" fontSize="xs" letterSpacing="0.08em" textTransform="uppercase" color="text.muted" px="3">
-              {hits.length} {hits.length === 1 ? "match" : "matches"} in global settings
+              {hits.length} {hits.length === 1 ? "match" : "matches"} in {scopeName}
             </Text>
             {groupBySection(hits).map((g) => (
               <Group key={g.section} label={g.section}>

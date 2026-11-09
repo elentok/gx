@@ -136,6 +136,9 @@ func TestReadProjectListsOnlyProjectKeys(t *testing.T) {
 	if resp.Project == nil || resp.Project.Name != "proj" || resp.Project.VCS != "git" {
 		t.Errorf("project = %+v", resp.Project)
 	}
+	if first, last := resp.Entries[0].Section, resp.Entries[len(resp.Entries)-1].Section; first != "Project" || last != "Checks" {
+		t.Errorf("entries run from %q to %q, want Project to Checks", first, last)
+	}
 
 	cap := entryByKey(t, resp, "project.max-agents")
 	if !cap.Set || string(cap.Value) != "2" || cap.GlobalKey != "execution-queue.max-agents" || string(cap.GlobalValue) != "6" {

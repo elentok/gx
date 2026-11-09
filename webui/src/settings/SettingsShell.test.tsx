@@ -1,4 +1,4 @@
-import { fireEvent, within } from "@testing-library/react";
+import { fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { SettingsEntry } from "../generated/server";
@@ -122,5 +122,63 @@ describe("SettingsShellView", () => {
   it("has no Authenticator row while TOTP is off", () => {
     const { queryByRole } = renderShell(undefined, () => {}, false);
     expect(queryByRole("link", { name: /Authenticator/ })).toBeNull();
+  });
+});
+
+describe("SettingsShellView in a project", () => {
+  const p = (key: string, section: string, over: Partial<SettingsEntry> = {}) =>
+    entry({ key, path: [key], section, description: `About ${key}.`, type: "string", ...over });
+  const projectEntries = [
+    p("name", "Project", { read_only: true, value: "gx" }),
+    p("repo", "Project", { read_only: true, value: "/Users/david/dev/gx" }),
+    p("vcs", "Project", { read_only: true, value: "git" }),
+    p("trunk", "Project", { set: true, value: "main" }),
+    p("landing", "Project", { type: "enum", enum: ["on-landed", "on-done"], set: true, value: "on-landed" }),
+    p("auto-ff-merge", "Project", { type: "bool", value: false }),
+    p("project.max-agents", "Execution queue", { type: "number", set: true, value: 2 }),
+    p("checks", "Checks", { type: "checks" }),
+  ];
+
+  const renderProject = (section?: string, onWrite = vi.fn(async () => ({}))) => ({
+    onWrite,
+    ...renderThemed(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <Routes>
+          <Route path="*" element={<SettingsShellView entries={projectEntries} projects={["gx"]} project="gx" section={section} totpOn onSignOut={() => {}} onWrite={onWrite} />} />
+        </Routes>
+      </MemoryRouter>,
+    ),
+  });
+
+  it("lists Project, the overridable sections, then Checks, with chips counting keys in project.json", () => {
+    const { getByRole } = renderProject();
+    const names = Array.from(getByRole("navigation").querySelectorAll("a")).map((a) => a.textContent);
+    expect(names).toEqual(["Project2", "Execution queue1", "Checks"]);
+  });
+
+  it("shows Identity as read-only text with no control", () => {
+    const { container, getByText } = renderProject("Project");
+    const identity = getByText("Identity").nextElementSibling as HTMLElement;
+    expect(identity.textContent).toContain("/Users/david/dev/gx");
+    expect(identity.querySelectorAll("input, button, select")).toHaveLength(0);
+    expect(within(identity).getAllByText(/read-only/)).toHaveLength(3);
+    expect(container.querySelector("[aria-label=Trunk]")).toBeTruthy();
+  });
+
+  it("sends project-scope changes for trunk, landing and auto-ff-merge", async () => {
+    const { getByLabelText, getByRole, onWrite } = renderProject("Project");
+    fireEvent.change(getByLabelText("Trunk"), { target: { value: "develop" } });
+    fireEvent.click(getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onWrite).toHaveBeenCalledWith([{ key: "trunk", value: "develop" }]));
+    fireEvent.click(within(getByLabelText("Landing")).getByText("on-done"));
+    await waitFor(() => expect(onWrite).toHaveBeenCalledWith([{ key: "landing", value: "on-done" }]));
+    fireEvent.click(getByRole("switch", { name: "Auto ff merge" }));
+    await waitFor(() => expect(onWrite).toHaveBeenCalledWith([{ key: "auto-ff-merge", value: true }]));
+  });
+
+  it("opens an empty placeholder for Checks", () => {
+    const { getByRole, queryByLabelText } = renderProject("Checks");
+    expect(getByRole("heading", { name: "Checks" })).toBeTruthy();
+    expect(queryByLabelText("Trunk")).toBeNull();
   });
 });

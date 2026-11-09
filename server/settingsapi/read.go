@@ -43,10 +43,9 @@ func (w *Writer) Read(t Target, pendingRestart []string) (wire.SettingsReadRespo
 		if resp.Project, err = projectInfo(t.Project, targetDoc); err != nil {
 			return resp, err
 		}
-		for _, e := range w.Registry.ForProject() {
-			if e.Section != registry.SectionNotifications {
-				entries = append(entries, e)
-			}
+		// The project view's order is the sidebar's: Project, the overridable sections, Checks.
+		for _, s := range w.Registry.ProjectView() {
+			entries = append(entries, s.Entries...)
 		}
 	}
 

@@ -166,6 +166,8 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     { path: "/tips", element: <TipsPage fetchTips={fetchers.tips} /> },
     { path: "/settings", element: settingsPage },
     { path: "/settings/s/:section", element: settingsPage },
+    { path: "/settings/p/:project", element: settingsPage },
+    { path: "/settings/p/:project/s/:section", element: settingsPage },
     { path: "/settings/logins", element: <WebLoginsPage fetchList={fetchers.logins} /> },
     { path: "/settings/logins/:id", element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
     { path: "/settings/password", element: <ChangePasswordPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
