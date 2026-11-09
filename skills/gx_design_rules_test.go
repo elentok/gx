@@ -347,6 +347,23 @@ func TestGxGrillingKeepsLetteredOptionsOutOfYesNo(t *testing.T) {
 	}
 }
 
+func TestDesignSettlesConfirmationsBeforeSpec(t *testing.T) {
+	design := normalizeSpace(readFile(t, "gx-design/SKILL.md"))
+	for _, want := range []string{
+		"a design question, never an implementer's choice",
+		"Does the spec say the implementer confirms, checks or verifies something?",
+	} {
+		if !strings.Contains(design, normalizeSpace(want)) {
+			t.Errorf("gx-design/SKILL.md lacks %q", want)
+		}
+	}
+	wayfinder := normalizeSpace(readFile(t, "gx-wayfinder/SKILL.md"))
+	want := "rests on an unverified claim about how Claude, Codex or gx behaves, file the confirmation as a map ticket"
+	if !strings.Contains(wayfinder, normalizeSpace(want)) {
+		t.Errorf("gx-wayfinder/SKILL.md lacks %q", want)
+	}
+}
+
 func TestGxWayfinderLetsCallerAllowMoreTickets(t *testing.T) {
 	text := readFile(t, "gx-wayfinder/SKILL.md")
 	if !strings.Contains(text, "unless the calling skill allows more") {
