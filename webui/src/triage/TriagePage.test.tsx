@@ -95,6 +95,15 @@ test("the Verify header shows the title, the step summary, five steps with the f
   expect(document.title).toBe("gx · Triage · gx");
 });
 
+test("the Approve subtitle names the shown view and its count", async () => {
+  const detail = viewOf({ steps: stepsAt(2), step_note: undefined, open_questions: 3 });
+  render([session("exited")], { triage: async () => ({ kind: "ok", detail }) });
+  const subtitle = await screen.findByTestId("page-header-subtitle");
+  expect(subtitle.textContent).toBe("Approve · Questions · 3 left");
+  fireEvent.click(screen.getByRole("button", { name: /^Review 3 rows/ }));
+  await waitFor(() => expect(screen.getByTestId("page-header-subtitle").textContent).toBe("Approve · Review · 3 rows"));
+});
+
 test("the strip names the verdicts saved while a session runs", async () => {
   render([session("working")]);
   await screen.findByText(/Triage session running · verdicts saved 2 of 3/);

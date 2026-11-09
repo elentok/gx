@@ -151,7 +151,11 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
       noContinue={atApprove}
       stepRows={atApprove ? { [APPROVE]: approveSubRows(view, approveView.view) } : undefined}
       working={() => ({ step: model.current?.label })}
-      subtitleSuffix={view.step_note && ` · ${view.step_note}`}
+      subtitleSuffix={
+        atApprove
+          ? ` · ${approveView.view === "questions" ? `Questions · ${view.open_questions} left` : `Review · ${view.rows.length} rows`}`
+          : view.step_note && ` · ${view.step_note}`
+      }
       metaLink={
         <chakra.a href={`#/e/${project}:follow-ups`} color="text.dim" textDecoration="underline">
           Triage of {project}:follow-ups ↗
