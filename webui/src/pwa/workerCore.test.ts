@@ -1,6 +1,13 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createFetchHandler, type FetchEventLike } from "./workerCore";
+import {
+  CACHE_PREFIX,
+  cacheNameFor,
+  createFetchHandler,
+  type FetchEventLike,
+  precache,
+  pruneOldCaches,
+} from "./workerCore";
 
 const ORIGIN = "https://gx.test";
 const SHELL_URL = `${ORIGIN}/`;
@@ -149,5 +156,93 @@ describe("service worker fetch rules", () => {
     const { answer } = send("/");
     await expect(answer).rejects.toThrow("refused");
     expect(store.size).toBe(0);
+  });
+});
+
+function namedCaches() {
+  const all = new Map<string, Map<string, Response>>();
+  const caches = {
+    async open(name: string) {
+      if (!all.has(name)) all.set(name, new Map());
+      const store = all.get(name)!;
+      return {
+        async match(req: string) {
+          return store.get(req)?.clone();
+        },
+        async put(req: string, res: Response) {
+          store.set(req, res);
+        },
+      } as unknown as Cache;
+    },
+    async keys() {
+      return [...all.keys()];
+    },
+    async delete(name: string) {
+      return all.delete(name);
+    },
+  };
+  return { all, caches };
+}
+
+describe("service worker lifecycle", () => {
+  const urls = ["/", "/assets/app-1.js", "/assets/app-1.css", "/manifest.webmanifest", "/pwa-icon-192.png"];
+  const body: Fetch = async (url) => new Response(url.endsWith("/") ? HTML : "x");
+  const deps = (caches: ReturnType<typeof namedCaches>["caches"], fetch: Fetch, buildId = "b1") => ({
+    caches,
+    fetch,
+    origin: ORIGIN,
+    buildId,
+    urls,
+  });
+
+  it("precaches the shell and every listed asset under the build's cache name", async () => {
+    const { all, caches } = namedCaches();
+    await precache(deps(caches, body));
+    expect(cacheNameFor("b1").startsWith(CACHE_PREFIX)).toBe(true);
+    expect([...all.get(cacheNameFor("b1"))!.keys()].sort()).toEqual(urls.map((u) => ORIGIN + u).sort());
+  });
+
+  it("fails the install and leaves no cache when an asset fetch fails", async () => {
+    const { all, caches } = namedCaches();
+    const failing: Fetch = async (url) => (url.endsWith(".css") ? new Response("", { status: 404 }) : body(url));
+    await expect(precache(deps(caches, failing))).rejects.toThrow("app-1.css");
+    expect(all.size).toBe(0);
+    const throwing: Fetch = async (url) => {
+      if (url.endsWith(".js")) throw new TypeError("offline");
+      return body(url);
+    };
+    await expect(precache(deps(caches, throwing))).rejects.toThrow("offline");
+    expect(all.size).toBe(0);
+  });
+
+  it("stores the shell after the assets it references", async () => {
+    const { all, caches } = namedCaches();
+    await precache(deps(caches, body));
+    expect([...all.get(cacheNameFor("b1"))!.keys()].at(-1)).toBe(SHELL_URL);
+  });
+
+  it("keeps the old build's cache when the new build's install fails", async () => {
+    const { all, caches } = namedCaches();
+    await precache(deps(caches, body, "b1"));
+    await expect(precache(deps(caches, async () => new Response("", { status: 500 }), "b2"))).rejects.toThrow();
+    expect([...all.keys()]).toEqual([cacheNameFor("b1")]);
+  });
+
+  it("prunes older builds' prefixed caches, keeps the current one, and never touches others", async () => {
+    const { all, caches } = namedCaches();
+    await precache(deps(caches, body, "b1"));
+    await precache(deps(caches, body, "b2"));
+    await caches.open("someone-elses");
+    await pruneOldCaches({ caches, buildId: "b2" });
+    expect([...all.keys()].sort()).toEqual([cacheNameFor("b2"), "someone-elses"].sort());
+  });
+
+  it("a changed build replaces the copy", async () => {
+    const { all, caches } = namedCaches();
+    await precache(deps(caches, async (u) => new Response(u.endsWith("/") ? "<html>one</html>" : "x"), "b1"));
+    await precache(deps(caches, async (u) => new Response(u.endsWith("/") ? "<html>two</html>" : "x"), "b2"));
+    await pruneOldCaches({ caches, buildId: "b2" });
+    expect(all.has(cacheNameFor("b1"))).toBe(false);
+    expect(await all.get(cacheNameFor("b2"))!.get(SHELL_URL)!.text()).toBe("<html>two</html>");
   });
 });

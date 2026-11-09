@@ -44,16 +44,26 @@ export function serviceWorkerPlugin(): Plugin {
 function workerSource(buildId: string, urls: string[], coreCode: string): string {
   return `// build ${buildId}
 ${coreCode}
-const ASSETS = ${JSON.stringify(urls)};
-void ASSETS;
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+const lifecycle = {
+  caches: self.caches,
+  fetch: (input, init) => fetch(input, init),
+  origin: self.location.origin,
+  buildId: ${JSON.stringify(buildId)},
+  urls: ${JSON.stringify(urls)},
+};
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  event.waitUntil(gxWorkerCore.precache(lifecycle));
+});
+self.addEventListener("activate", (event) =>
+  event.waitUntil(gxWorkerCore.pruneOldCaches(lifecycle).then(() => self.clients.claim())),
+);
 self.addEventListener(
   "fetch",
   gxWorkerCore.createFetchHandler({
     caches: self.caches,
     fetch: (input, init) => fetch(input, init),
-    cacheName: "gx-shell",
+    cacheName: gxWorkerCore.cacheNameFor(lifecycle.buildId),
   }),
 );
 `;

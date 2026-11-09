@@ -16,13 +16,52 @@ export interface WorkerDeps {
   shellTimeoutMs?: number;
 }
 
+// Every cache the worker opens starts with this, so Force refresh can delete
+// exactly the app shell caches and nothing else's.
+export const CACHE_PREFIX = "gx-shell-";
+
+export interface LifecycleDeps {
+  caches: Pick<CacheStorage, "open" | "keys" | "delete">;
+  fetch: (input: string, init?: RequestInit) => Promise<Response>;
+  origin: string;
+  buildId: string;
+  // Site-relative URLs to precache; "/" is the shell.
+  urls: string[];
+}
+
+export function cacheNameFor(buildId: string): string {
+  return CACHE_PREFIX + buildId;
+}
+
+// Fetch everything before opening the cache, so one failed asset leaves no
+// half-set cache behind; the shell goes in last, after the assets it loads.
+export async function precache(deps: LifecycleDeps): Promise<void> {
+  const fetched = await Promise.all(
+    deps.urls.map(async (path) => {
+      const url = deps.origin + path;
+      const response = await deps.fetch(url, { cache: "reload" });
+      if (response.status !== 200) throw new Error(`precache ${url}: status ${response.status}`);
+      return { url, response };
+    }),
+  );
+  const cache = await deps.caches.open(cacheNameFor(deps.buildId));
+  const shellURL = deps.origin + "/";
+  const ordered = [...fetched.filter((f) => f.url !== shellURL), ...fetched.filter((f) => f.url === shellURL)];
+  for (const { url, response } of ordered) await cache.put(url, response);
+}
+
+export async function pruneOldCaches(deps: Pick<LifecycleDeps, "caches" | "buildId">): Promise<void> {
+  const current = cacheNameFor(deps.buildId);
+  const names = await deps.caches.keys();
+  await Promise.all(names.filter((n) => n.startsWith(CACHE_PREFIX) && n !== current).map((n) => deps.caches.delete(n)));
+}
+
 const STALE_WHILE_REVALIDATE = /^\/(manifest\.webmanifest|pwa-icon[^/]*\.png|apple-touch-icon\.png|favicon\.png)$/;
 const ASSET_REF = /(?:src|href)="(\/assets\/[^"]+)"/g;
 
 // A refreshed index.html is stored only when every asset it references is
 // already cached, so an offline open never loads a shell whose scripts are
-// missing. Ticket 05's precache fills the assets first; until then a new
-// index.html is skipped and the old copy stays.
+// missing; otherwise the old copy stays.
 async function refreshShell(cache: Cache, shellURL: string, origin: string, response: Response) {
   const html = await response.text();
   for (const match of html.matchAll(ASSET_REF)) {
