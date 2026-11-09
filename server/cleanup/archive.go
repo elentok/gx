@@ -26,15 +26,9 @@ func (c *Cleanup) ArchiveEpic(project, epic string) (wire.CleanupWriteResult, er
 	if c.d.EpicQueued != nil && c.d.EpicQueued(project, epic) {
 		return refuse(wire.ReasonCleanupQueued, "the epic is queued"), nil
 	}
-	res, err := cleanupscan.ScanIn(c.d.TicketStore, repo)
+	row, err := cleanupscan.ScanEpic(c.d.TicketStore, repo, epic)
 	if err != nil {
 		return wire.CleanupWriteResult{}, err
-	}
-	var row *cleanupscan.EpicScan
-	for i := range res.Epics {
-		if res.Epics[i].Name == epic {
-			row = &res.Epics[i]
-		}
 	}
 	switch {
 	case row == nil:

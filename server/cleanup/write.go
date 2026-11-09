@@ -97,16 +97,7 @@ func (c *Cleanup) act(project, branch string, do func(root, branch string) (wire
 }
 
 func (c *Cleanup) scanRow(root, branch string) (*cleanupscan.WorktreeScan, error) {
-	scan, err := cleanupscan.ScanIn(c.d.TicketStore, root)
-	if err != nil {
-		return nil, err
-	}
-	for i := range scan.Worktrees {
-		if branch != "" && scan.Worktrees[i].Branch == branch {
-			return &scan.Worktrees[i], nil
-		}
-	}
-	return nil, nil
+	return cleanupscan.ScanWorktree(c.d.TicketStore, root, branch)
 }
 
 // removeUnmergedLocked refuses a dirty worktree and one a live session works

@@ -74,38 +74,131 @@ func Scan(dirs config.Dirs, cwd string) (Result, error) {
 	return ScanIn(cfg.TicketStore.Path, cwd)
 }
 
+// ScanEpic classifies one active epic by name, or returns nil when there is no
+// such scannable epic. Write routes use it to re-check one row without the
+// worktree and housekeeping passes ScanIn also runs.
+func ScanEpic(storePath, cwd, name string) (*EpicScan, error) {
+	repo, root, err := openScan(storePath, cwd)
+	if err != nil {
+		return nil, err
+	}
+	epics, err := loadScannableEpics(root)
+	if err != nil {
+		return nil, err
+	}
+	for _, epic := range epics {
+		if epic.Name != name || tickets.IsOneOffsEpicName(epic.Name) {
+			continue
+		}
+		scan, err := scanEpic(repo, epic)
+		if err != nil {
+			return nil, err
+		}
+		return &scan, nil
+	}
+	return nil, nil
+}
+
+// ScanWorktree classifies one local branch (never the trunk), or returns nil
+// when the branch does not exist. It skips every other branch's merge checks.
+func ScanWorktree(storePath, cwd, branch string) (*WorktreeScan, error) {
+	repo, root, err := openScan(storePath, cwd)
+	if err != nil {
+		return nil, err
+	}
+	if branch == "" || branch == repo.Trunk || !git.IsLocalBranch(repo.Root, branch) {
+		return nil, nil
+	}
+	active, err := loadScannableEpics(root)
+	if err != nil {
+		return nil, err
+	}
+	epics, err := withArchived(root, active)
+	if err != nil {
+		return nil, err
+	}
+	worktrees, err := git.ListWorktrees(repo)
+	if err != nil {
+		return nil, err
+	}
+	path := ""
+	for _, wt := range worktrees {
+		if wt.Branch == branch {
+			path = wt.Path
+		}
+	}
+	epicByName := map[string]tickets.Epic{}
+	for _, e := range epics {
+		epicByName[e.Name] = e
+	}
+	scan, err := classifyBranch(repo, branch, path, epicByName)
+	if err != nil {
+		return nil, err
+	}
+	return &scan, nil
+}
+
+// openScan resolves the repo and ticket root a scan runs against.
+func openScan(storePath, cwd string) (git.Repo, string, error) {
+	// A "merged?" check against an unresolved trunk can't be trusted, so
+	// stop before reporting anything the gx-cleanup skill would delete on.
+	openRepo, err := ticketgit.OpenRepoIn(storePath, cwd)
+	if err != nil {
+		return git.Repo{}, "", err
+	}
+	root, err := tickets.RootIn(storePath, cwd)
+	if err != nil {
+		return git.Repo{}, "", err
+	}
+	return *openRepo, root, nil
+}
+
+// loadScannableEpics loads the epics a scan reports on. Containers that gx
+// tickets recreates on demand are never work to archive: archiving one makes
+// the next close split its history.
+func loadScannableEpics(root string) ([]tickets.Epic, error) {
+	epics, err := tickets.Load(root)
+	if err != nil {
+		return nil, err
+	}
+	kept := []tickets.Epic{}
+	for _, epic := range epics {
+		if epic.Name == tickets.FollowUpsEpic || epic.Name == tickets.ArchivedFollowUpsEpic {
+			continue
+		}
+		kept = append(kept, epic)
+	}
+	return kept, nil
+}
+
+// withArchived adds archived epics, which are done, so their iteration
+// branches resolve to done tickets and earn a delete recommendation once
+// merged.
+func withArchived(root string, active []tickets.Epic) ([]tickets.Epic, error) {
+	archived, err := tickets.LoadArchived(root)
+	if err != nil {
+		return nil, err
+	}
+	return append(active, archived...), nil
+}
+
 // ScanIn is Scan over an explicit ticket store.
 func ScanIn(storePath, cwd string) (Result, error) {
 	info, err := git.IdentifyDir(cwd)
 	if err != nil {
 		return Result{}, fmt.Errorf("not inside a git repo: %w", err)
 	}
-	// A "merged?" check against an unresolved trunk can't be trusted, so
-	// stop before reporting anything the gx-cleanup skill would delete on.
-	openRepo, err := ticketgit.OpenRepoIn(storePath, cwd)
+	repo, root, err := openScan(storePath, cwd)
 	if err != nil {
 		return Result{}, err
 	}
-	repo := *openRepo
-
-	root, err := tickets.RootIn(storePath, cwd)
-	if err != nil {
-		return Result{}, err
-	}
-	epics, err := tickets.Load(root)
+	activeEpics, err := loadScannableEpics(root)
 	if err != nil {
 		return Result{}, err
 	}
 
 	result := Result{Epics: []EpicScan{}}
-	activeEpics := []tickets.Epic{}
-	for _, epic := range epics {
-		// Containers that gx tickets recreates on demand are never work to
-		// archive: archiving one makes the next close split its history.
-		if epic.Name == tickets.FollowUpsEpic || epic.Name == tickets.ArchivedFollowUpsEpic {
-			continue
-		}
-		activeEpics = append(activeEpics, epic)
+	for _, epic := range activeEpics {
 		// The standing one-offs epic never finishes and never merges as a unit.
 		if tickets.IsOneOffsEpicName(epic.Name) {
 			continue
@@ -117,13 +210,11 @@ func ScanIn(storePath, cwd string) (Result, error) {
 		result.Epics = append(result.Epics, scan)
 	}
 
-	// Archived epics are done, so their iteration branches resolve to done
-	// tickets and earn a delete recommendation once merged.
-	archived, err := tickets.LoadArchived(root)
+	worktreeEpics, err := withArchived(root, activeEpics)
 	if err != nil {
 		return Result{}, err
 	}
-	result.Worktrees, err = scanWorktrees(repo, append(activeEpics, archived...))
+	result.Worktrees, err = scanWorktrees(repo, worktreeEpics)
 	if err != nil {
 		return Result{}, err
 	}
