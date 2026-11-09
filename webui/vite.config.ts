@@ -2,6 +2,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import cannedSnapshot from "./src/canned-snapshot.json";
+import { serviceWorkerPlugin } from "./src/pwa/serviceWorkerPlugin";
 
 // Serves the canned snapshot at /v1/snapshot so `make web-dev` needs no gx
 // server.
@@ -9,6 +10,7 @@ import cannedSnapshot from "./src/canned-snapshot.json";
 export default defineConfig({
   plugins: [
     react(),
+    serviceWorkerPlugin(),
     {
       name: "canned-snapshot",
       configureServer(server) {

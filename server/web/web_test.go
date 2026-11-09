@@ -177,6 +177,21 @@ func TestServeAsset_CacheHeaders(t *testing.T) {
 	}
 }
 
+func TestServeAsset_ServiceWorker(t *testing.T) {
+	t.Parallel()
+	handler := web.ServeAsset(fstest.MapFS{
+		"index.html": {Data: []byte("<!doctype html>")},
+		"sw.js":      {Data: []byte("self.skipWaiting()")},
+	})
+	// No login cookie: the handler is the whole path, so the worker is open.
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sw.js", nil))
+	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "no-cache" ||
+		!strings.Contains(rec.Header().Get("Content-Type"), "javascript") {
+		t.Errorf("GET /sw.js = %d Cache-Control %q Content-Type %q", rec.Code, rec.Header().Get("Cache-Control"), rec.Header().Get("Content-Type"))
+	}
+}
+
 func TestServeAsset_ManifestContentType(t *testing.T) {
 	t.Parallel()
 	handler := web.ServeAsset(fstest.MapFS{
