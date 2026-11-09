@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { Plugin } from "vite";
+import { type Plugin, transformWithEsbuild } from "vite";
 
 function listFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -20,7 +20,7 @@ export function serviceWorkerPlugin(): Plugin {
     configResolved(config) {
       outDir = join(config.root, config.build.outDir);
     },
-    closeBundle() {
+    async closeBundle() {
       const hash = createHash("sha256");
       const assets = listFiles(outDir)
         .map((f) => ({ name: relative(outDir, f).split("\\").join("/"), file: f }))
@@ -29,20 +29,32 @@ export function serviceWorkerPlugin(): Plugin {
       for (const a of assets) hash.update(a.name).update(readFileSync(a.file));
       const buildId = hash.digest("hex").slice(0, 16);
       const urls = assets.map((a) => (a.name === "index.html" ? "/" : `/${a.name}`));
-      writeFileSync(join(outDir, "sw.js"), workerSource(buildId, urls));
+      const core = await transformWithEsbuild(
+        readFileSync(join(import.meta.dirname, "workerCore.ts"), "utf8"),
+        "workerCore.ts",
+        { format: "iife", globalName: "gxWorkerCore", target: "es2020" },
+      );
+      writeFileSync(join(outDir, "sw.js"), workerSource(buildId, urls, core.code));
     },
   };
 }
 
-// A pass-through stub: no fetch handler, so every request goes to the network.
 // The build id makes each build's worker byte-different, so it installs anew.
-function workerSource(buildId: string, urls: string[]): string {
+// The fetch rules live in workerCore.ts; this entry only wires events to them.
+function workerSource(buildId: string, urls: string[], coreCode: string): string {
   return `// build ${buildId}
-const BUILD_ID = ${JSON.stringify(buildId)};
+${coreCode}
 const ASSETS = ${JSON.stringify(urls)};
-void BUILD_ID;
 void ASSETS;
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener(
+  "fetch",
+  gxWorkerCore.createFetchHandler({
+    caches: self.caches,
+    fetch: (input, init) => fetch(input, init),
+    cacheName: "gx-shell",
+  }),
+);
 `;
 }
