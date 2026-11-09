@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,9 +13,35 @@ import (
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/server/webauth"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
+
+// removeAll retries while a stopped process finishes writing into dir. Go
+// marks its module cache read-only, so the dirs are made writable first.
+func removeAll(dir string) {
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		testutil.MakeWritable(dir)
+		if os.RemoveAll(dir) == nil {
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				return
+			}
+		}
+	}
+}
+
+// binary returns given when set, and otherwise builds pkg into out.
+func binary(given, out, pkg string) (string, error) {
+	if given != "" {
+		return filepath.Abs(given)
+	}
+	// The gxfixture tag adds the fake non-Claude harness to the gx binary.
+	if b, err := exec.Command("go", "build", "-tags", "gxfixture", "-o", out, pkg).CombinedOutput(); err != nil {
+		return "", fmt.Errorf("go build %s: %w\n%s", pkg, err, b)
+	}
+	return out, nil
+}
 
 // installBinaries builds or resolves the gx, fakeclaude and (when wanted) fakecodex
 // binaries and lays out the fixture's PATH dir. It returns the resolved gx binary,
@@ -221,7 +248,7 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 		// The short usage poll lets the server see the window's reset well inside the flow's wait.
 		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s", "GX_USAGE_POLL_INTERVAL="+limitBurnUsagePollInterval, supervise.RateLimitReleaseFileEnv+"="+f.rateLimitReleaseFile())
 	}
-	if err := f.seedTriage(sc); err != nil {
+	if err := seedTriage(f.store, sc); err != nil {
 		return fmt.Errorf("seed triage: %w", err)
 	}
 	if sc.PromptGrace != "" {

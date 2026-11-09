@@ -1,56 +1,40 @@
 package tickets
 
-import (
-	"fmt"
-	"slices"
-	"strings"
+import "github.com/elentok/gx/tickets/schema"
 
-	"github.com/elentok/gx/tickets/schema"
+// The design steps and flows live in schema to keep this package under its size
+// limit; callers keep these names.
+type (
+	DesignStep = schema.DesignStep
+	Flow       = schema.Flow
+	FlowSpec   = schema.FlowSpec
 )
-
-// DesignStep is a value of a map epic's design_step. The values are also the
-// Progress step wire values the server sends.
-type DesignStep string
 
 const (
-	StepChart          DesignStep = "chart"
-	StepResolveTickets DesignStep = "resolve-tickets"
-	StepSpec           DesignStep = "spec"
-	StepReview         DesignStep = "review"
-	StepGrillFindings  DesignStep = "grill-findings"
-	StepCreateTickets  DesignStep = "create-tickets"
-	StepBranch         DesignStep = "branch"
-	StepDone           DesignStep = "done"
+	StepChart          = schema.StepChart
+	StepResolveTickets = schema.StepResolveTickets
+	StepSpec           = schema.StepSpec
+	StepReview         = schema.StepReview
+	StepGrillFindings  = schema.StepGrillFindings
+	StepCreateTickets  = schema.StepCreateTickets
+	StepBranch         = schema.StepBranch
+	StepDone           = schema.StepDone
+	StepVerify         = schema.StepVerify
+	StepPlan           = schema.StepPlan
+	StepApprove        = schema.StepApprove
+	StepWrite          = schema.StepWrite
+	FlowDesign         = schema.FlowDesign
+	FlowTriage         = schema.FlowTriage
 )
 
-// DesignSteps lists every DesignStep, in order.
-var DesignSteps = []DesignStep{
-	StepChart, StepResolveTickets, StepSpec, StepReview,
-	StepGrillFindings, StepCreateTickets, StepBranch, StepDone,
-}
-
-// ParseDesignStep returns the DesignStep named by s, or false when s is not one.
-func ParseDesignStep(s string) (DesignStep, bool) {
-	step := DesignStep(s)
-	return step, slices.Contains(DesignSteps, step)
-}
-
-// DesignStepNames is DesignSteps as strings, for messages and flag help.
-func DesignStepNames() []string {
-	names := make([]string, len(DesignSteps))
-	for i, s := range DesignSteps {
-		names[i] = string(s)
-	}
-	return names
-}
-
-// CheckDesignStep refuses a name that is not one of DesignSteps.
-func CheckDesignStep(step string) error {
-	if _, ok := ParseDesignStep(step); !ok {
-		return fmt.Errorf("design step %q; want one of %s", step, strings.Join(DesignStepNames(), ", "))
-	}
-	return nil
-}
+var (
+	DesignSteps     = schema.DesignSteps
+	ParseDesignStep = schema.ParseDesignStep
+	DesignStepNames = schema.DesignStepNames
+	CheckDesignStep = schema.CheckDesignStep
+	FlowSpecFor     = schema.FlowSpecFor
+	CheckFlowStep   = schema.CheckFlowStep
+)
 
 // HasOpenTicket reports whether any of m's tickets is open or claimed.
 func HasOpenTicket(m Epic) bool {

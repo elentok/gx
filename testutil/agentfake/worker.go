@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -58,7 +59,7 @@ type WorkerConfig struct {
 	// address; it wins over Design for a /gx-design prompt naming that address.
 	DesignByMap map[string][]string `json:"design_by_map,omitempty"`
 	// Triage tunes the /gx-triage-follow-ups fake. Nil plays it with no knobs.
-	Triage *TriageConfig `json:"triage,omitempty"`
+	Triage *triageplay.Config `json:"triage,omitempty"`
 	// Chat makes a plain prompt a chat turn: the person message and a scripted
 	// reply land in the transcript and the turn ends. Off, a plain prompt only
 	// sets the fake busy.

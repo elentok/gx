@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/triage"
 )
@@ -174,7 +174,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 		// Verify takes two sessions; at Write the first and fifth rows fail once before their move and the second once after it.
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 3, 2)}
-			sc.TriageAgent = &agentfake.TriageConfig{
+			sc.TriageAgent = &triageplay.Config{
 				VerifyBatch:    3,
 				FailBeforeMove: []string{project + ":" + tickets.FollowUpsEpic + "/01", project + ":" + tickets.FollowUpsEpic + "/05"},
 				FailAfterMove:  []string{project + ":" + tickets.FollowUpsEpic + "/02"},

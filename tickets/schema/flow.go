@@ -1,9 +1,54 @@
-package tickets
+package schema
 
 import (
 	"fmt"
 	"slices"
+	"strings"
 )
+
+// DesignStep is a value of a map epic's design_step. The values are also the
+// Progress step wire values the server sends.
+type DesignStep string
+
+const (
+	StepChart          DesignStep = "chart"
+	StepResolveTickets DesignStep = "resolve-tickets"
+	StepSpec           DesignStep = "spec"
+	StepReview         DesignStep = "review"
+	StepGrillFindings  DesignStep = "grill-findings"
+	StepCreateTickets  DesignStep = "create-tickets"
+	StepBranch         DesignStep = "branch"
+	StepDone           DesignStep = "done"
+)
+
+// DesignSteps lists every DesignStep, in order.
+var DesignSteps = []DesignStep{
+	StepChart, StepResolveTickets, StepSpec, StepReview,
+	StepGrillFindings, StepCreateTickets, StepBranch, StepDone,
+}
+
+// ParseDesignStep returns the DesignStep named by s, or false when s is not one.
+func ParseDesignStep(s string) (DesignStep, bool) {
+	step := DesignStep(s)
+	return step, slices.Contains(DesignSteps, step)
+}
+
+// DesignStepNames is DesignSteps as strings, for messages and flag help.
+func DesignStepNames() []string {
+	names := make([]string, len(DesignSteps))
+	for i, s := range DesignSteps {
+		names[i] = string(s)
+	}
+	return names
+}
+
+// CheckDesignStep refuses a name that is not one of DesignSteps.
+func CheckDesignStep(step string) error {
+	if _, ok := ParseDesignStep(step); !ok {
+		return fmt.Errorf("design step %q; want one of %s", step, strings.Join(DesignStepNames(), ", "))
+	}
+	return nil
+}
 
 // Flow is a guided sequence of steps a person walks with an agent.
 type Flow string
@@ -37,7 +82,7 @@ type FlowSpec struct {
 
 var flowSpecs = map[Flow]FlowSpec{
 	FlowDesign: {
-		Steps: designStepStrings(),
+		Steps: DesignStepNames(),
 		Labels: map[string]string{
 			string(StepChart): "Chart", string(StepResolveTickets): "Resolve tickets",
 			string(StepSpec): "Spec", string(StepReview): "Review",
@@ -59,10 +104,6 @@ var flowSpecs = map[Flow]FlowSpec{
 		Skill:       "gx-triage-follow-ups",
 		ContinueArg: func(project string) string { return "--project " + project },
 	},
-}
-
-func designStepStrings() []string {
-	return DesignStepNames()
 }
 
 // FlowSpecFor returns the spec of f, or an error for an unknown flow.

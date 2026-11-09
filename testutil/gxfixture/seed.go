@@ -19,7 +19,25 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	triagerec "github.com/elentok/gx/triage"
 )
+
+// seedTriage writes the scenario's Triage records with the triage package, so a
+// seeded record is one the real verbs read.
+func seedTriage(storeDir string, sc scenario) error {
+	for _, s := range sc.Triage {
+		store := triagerec.NewStore(filepath.Join(storeDir, s.Project))
+		rec, err := store.Create()
+		if err != nil {
+			return err
+		}
+		s.Edit(rec)
+		if err := store.Save(rec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // writeConfig writes the fixture's config. overrides are `dotted.key=<json>`
 // entries (a value that is not JSON is a string) set over the defaults.

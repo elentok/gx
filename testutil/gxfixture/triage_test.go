@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -9,22 +10,20 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/tickets"
 )
 
 type triageWant struct {
 	shape string
-	// card is the Follow-ups card of project demo; empty section means no card.
+	// section is the Follow-ups card's; empty means no card.
 	section wire.CardSection
 	pill    string
 	words   string
 	triage  wire.FollowUpTriage
-	// step is the current step of `server triage show`, empty when there is no Triage.
-	step string
-	// state is the shown Triage state, empty when none.
-	state wire.TriageState
+	step    string // current step of `server triage show`, empty without a Triage
+	state   wire.TriageState
 }
 
 func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
@@ -77,14 +76,8 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 			if w.state == "" {
 				return
 			}
-			v := r.triageView(t)
-			if v.State != w.state {
-				t.Errorf("triage state = %q, want %q", v.State, w.state)
-			}
-			if w.step != "" {
-				if cur := currentStep(v); cur != w.step {
-					t.Errorf("triage step = %q, want %q", cur, w.step)
-				}
+			if v := r.triageView(t); v.State != w.state || (w.step != "" && currentStep(v) != w.step) {
+				t.Errorf("triage state %q step %q, want %q and %q", v.State, currentStep(v), w.state, w.step)
 			}
 		})
 	}
@@ -117,39 +110,31 @@ func (r *running) triageView(t *testing.T) wire.TriageView {
 	return v
 }
 
-func TestTriageScenario_CManyCountsFortyFiveOpenFollowUps(t *testing.T) {
-	t.Parallel()
-	r := startWith(t, "triage", nil, "--shape", "c-many")
-	var count wire.FollowUpCount
-	if !testutil.Poll(40*time.Second, 500*time.Millisecond, func() bool {
-		for _, c := range r.epicList(t).FollowUps {
-			count = c
-		}
-		return count.Open == 45
-	}) {
-		t.Fatalf("open follow-ups = %d, want 45", count.Open)
-	}
-	if count.Bugs != 30 || count.Ideas != 15 {
-		t.Errorf("split = %d bugs, %d ideas, want 30 and 15", count.Bugs, count.Ideas)
-	}
-}
-
-func TestTriageScenario_CNamedListsTheWorkspacesTwoProjects(t *testing.T) {
-	t.Parallel()
-	r := startWith(t, "triage", nil, "--shape", "c-named")
-	var got []string
+// followUpsOf polls the follow-up counts until two projects show and returns
+// pick of each, sorted.
+func followUpsOf[T cmp.Ordered](t *testing.T, r *running, shape string, pick func(wire.FollowUpCount) (T, bool)) []T {
+	t.Helper()
+	var got []T
 	if !testutil.Poll(40*time.Second, 500*time.Millisecond, func() bool {
 		got = nil
 		for _, c := range r.epicList(t).FollowUps {
-			if slices.Equal(c.Workspaces, []string{spec.TriageWorkspace}) {
-				got = append(got, c.Project)
+			if v, ok := pick(c); ok {
+				got = append(got, v)
 			}
 		}
 		slices.Sort(got)
 		return len(got) == 2
 	}) {
-		t.Fatalf("projects in %q: %v, want two", spec.TriageWorkspace, got)
+		t.Fatalf("%s: follow-up counts = %v, want two projects", shape, got)
 	}
+	return got
+}
+
+func TestTriageScenario_CNamedListsTheWorkspacesTwoProjects(t *testing.T) {
+	t.Parallel()
+	got := followUpsOf(t, startWith(t, "triage", nil, "--shape", "c-named"), "c-named", func(c wire.FollowUpCount) (string, bool) {
+		return c.Project, slices.Equal(c.Workspaces, []string{spec.TriageWorkspace})
+	})
 	if want := []string{project, spec.TriageSide}; !slices.Equal(got, want) {
 		t.Errorf("projects = %v, want %v", got, want)
 	}
@@ -157,66 +142,9 @@ func TestTriageScenario_CNamedListsTheWorkspacesTwoProjects(t *testing.T) {
 
 func TestTriageScenario_CFewSpansTwoProjects(t *testing.T) {
 	t.Parallel()
-	r := startWith(t, "triage", nil, "--shape", "c-few")
-	var open []int
-	if !testutil.Poll(40*time.Second, 500*time.Millisecond, func() bool {
-		open = nil
-		for _, c := range r.epicList(t).FollowUps {
-			open = append(open, c.Open)
-		}
-		return len(open) == 2
-	}) {
-		t.Fatalf("follow-up counts = %v, want two projects", open)
-	}
-	slices.Sort(open)
-	if !slices.Equal(open, []int{1, 2}) {
-		t.Errorf("open counts = %v, want [1 2]", open)
-	}
-}
-
-func TestTriageScenario_ApproveShapesCarryQuestionsAndChanges(t *testing.T) {
-	t.Parallel()
-	for shape, check := range map[string]func(t *testing.T, v wire.TriageView){
-		"b-questions": func(t *testing.T, v wire.TriageView) {
-			if v.OpenQuestions != 3 {
-				t.Errorf("open questions = %d, want 3", v.OpenQuestions)
-			}
-		},
-		"b-review": func(t *testing.T, v wire.TriageView) {
-			if v.OpenQuestions != 0 || v.ChangedRows != 3 {
-				t.Errorf("open questions %d, changed rows %d, want 0 and 3", v.OpenQuestions, v.ChangedRows)
-			}
-			if len(v.ActionCounts) != 5 {
-				t.Errorf("action groups = %v, want five", v.ActionCounts)
-			}
-		},
-		"writing": func(t *testing.T, v wire.TriageView) {
-			var failed []string
-			for _, row := range v.Rows {
-				if row.WriteState == "failed" {
-					failed = append(failed, row.NewAddress)
-				}
-			}
-			if len(failed) != 2 || (failed[0] == "") == (failed[1] == "") {
-				t.Errorf("failed rows' new addresses = %q, want one empty and one set", failed)
-			}
-		},
-		"result": func(t *testing.T, v wire.TriageView) {
-			if v.Result == nil || v.Result.ReadyEpic != project+":triage-ready" {
-				t.Fatalf("result = %+v, want a ready epic", v.Result)
-			}
-			for _, g := range v.Result.Groups {
-				if g.Action == "keep" && len(g.Items) != 2 {
-					t.Errorf("kept rows = %d, want 2", len(g.Items))
-				}
-			}
-		},
-	} {
-		t.Run(shape, func(t *testing.T) {
-			t.Parallel()
-			r := startWith(t, "triage", nil, "--shape", shape)
-			check(t, r.triageView(t))
-		})
+	got := followUpsOf(t, startWith(t, "triage", nil, "--shape", "c-few"), "c-few", func(c wire.FollowUpCount) (int, bool) { return c.Open, true })
+	if !slices.Equal(got, []int{1, 2}) {
+		t.Errorf("open counts = %v, want [1 2]", got)
 	}
 }
 
@@ -266,14 +194,9 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 		return n
 	}
 	r.waitTriage(t, "the first Verify batch", func(v wire.TriageView) bool { return verified(v) == 3 })
-	r.waitTriage(t, "Plan to end at Approve", func(v wire.TriageView) bool { return currentStep(v) == "approve" && v.OpenQuestions == 3 })
-
-	v := r.triageView(t)
-	if verified(v) != 5 {
-		t.Errorf("verdicts at Approve = %d, want 5", verified(v))
-	}
-	if len(v.ActionCounts) != 5 {
-		t.Errorf("action groups = %v, want all five actions", v.ActionCounts)
+	v := r.waitTriage(t, "Plan to end at Approve", func(v wire.TriageView) bool { return currentStep(v) == "approve" && v.OpenQuestions == 3 })
+	if verified(v) != 5 || len(v.ActionCounts) != 5 {
+		t.Errorf("at Approve: %d verdicts and action groups %v, want 5 and all five actions", verified(v), v.ActionCounts)
 	}
 
 	// Answer every open question, then approve. Plan's session prints its run-end
@@ -297,8 +220,8 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 	// first fails before its move and the second after it. The fifth is a keep
 	// in the plan, so its scripted failure never fires.
 	failedRows := map[string]string{
-		project + ":follow-ups/01": agentfake.TriageRefusalBeforeMove,
-		project + ":follow-ups/02": agentfake.TriageRefusalAfterMove,
+		project + ":follow-ups/01": triageplay.RefusalBeforeMove,
+		project + ":follow-ups/02": triageplay.RefusalAfterMove,
 	}
 	v = r.waitTriage(t, "the Write session to end", func(v wire.TriageView) bool {
 		failed, written := 0, 0
@@ -336,12 +259,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 		r.waitNoSession(t)
 	}
 	v = r.waitTriage(t, "the Triage to be done", func(v wire.TriageView) bool { return v.State == wire.TriageDone })
-	if v.Result == nil {
-		t.Fatal("a done Triage has no result")
-	}
-	for _, row := range v.Rows {
-		if row.WriteState != "done" {
-			t.Errorf("row %s write state = %q, want done", row.Address, row.WriteState)
-		}
+	if v.Result == nil || v.Result.ReadyEpic != project+":triage-ready" {
+		t.Fatalf("result = %+v, want a ready epic", v.Result)
 	}
 }

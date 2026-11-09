@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 )
 
@@ -199,8 +200,8 @@ type Scenario struct {
 	WorkingFixAgents []string
 	// Triage seeds Triage records before the server starts (see TriageScenario).
 	Triage []TriageSeed
-	// TriageAgent tunes the fake Triage agent (see agentfake.TriageConfig).
-	TriageAgent *agentfake.TriageConfig
+	// TriageAgent tunes the fake Triage agent (see triageplay.Config).
+	TriageAgent *triageplay.Config
 	// TriageShaped marks the triage scenario, whose whole content comes from the
 	// --shape value (TriageScenario).
 	TriageShaped bool
