@@ -4,6 +4,7 @@ import { postAfk as defaultPostAfk, toggleAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { SortActivity, SortDefault, SortName, SortNeedsYou, type Workspace } from "../generated/server";
 import { CLEANUP_HREF, SETTINGS_HREF, TIPS_HREF } from "../hrefs";
+import { forceRefresh } from "../pwa/forceRefresh";
 import { useInstall } from "../pwa/install";
 import { RestartDialog } from "../restart/RestartDialog";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
@@ -50,7 +51,7 @@ function BurgerIcon() {
 
 // The app menu: the old top bar's menu, opened from the sidebar footer.
 export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViMode, postSort = defaultPostSort, activeWorkspace }: Props) {
-  const { snapshot } = useConnectionState(useConnectionContext());
+  const { snapshot, connected } = useConnectionState(useConnectionContext());
   const shell = useShell();
   const [restartOpen, setRestartOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -88,7 +89,6 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
     install.mode === "none"
       ? []
       : [
-          { kind: "separator" },
           {
             value: "install",
             label: "Install app",
@@ -136,7 +136,9 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
               shell?.closeSliding();
             },
           },
+          { kind: "separator" },
           ...installEntries,
+          { value: "force-refresh", label: "Force refresh", onSelect: () => void forceRefresh(connected) },
         ]}
       />
       {sheetOpen && (install.mode === "ios" || install.mode === "mac-safari") && <InstallSheet mode={install.mode} onClose={() => setSheetOpen(false)} />}

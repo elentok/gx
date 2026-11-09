@@ -13,7 +13,11 @@ vi.mock("../ui/toaster", async (importOriginal) => ({ ...(await importOriginal<t
 const install = vi.hoisted(() => ({ state: { mode: "none", desktopCaption: false } as { mode: string; desktopCaption: boolean }, promptInstall: vi.fn(async () => {}) }));
 vi.mock("../pwa/install", () => ({ useInstall: () => ({ ...install.state, promptInstall: install.promptInstall }) }));
 
+const forceRefresh = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("../pwa/forceRefresh", () => ({ forceRefresh }));
+
 afterEach(() => {
+  forceRefresh.mockClear();
   install.state = { mode: "none", desktopCaption: false };
   install.promptInstall.mockClear();
   cleanup();
@@ -23,8 +27,8 @@ afterEach(() => {
 
 const research: Workspace = { name: "research", sort: "activity" } as Workspace;
 
-function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}, closeSliding = () => {}) {
-  const state = { snapshot, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}, closeSliding = () => {}, connected = true) {
+  const state = { snapshot, connected, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding, claimHeader: () => () => {} };
   renderThemed(
@@ -41,7 +45,7 @@ test("lists AFK, Vi mode, Sort, Restart server and More settings in order, with 
   setup({ build: "v1.2.3" }, { activeWorkspace: research });
   await screen.findByRole("menuitemcheckbox", { name: "AFK" });
   const items = [...screen.getByRole("menu").querySelectorAll('[role^="menuitem"]')].map((el) => el.textContent?.replace(/\s+/g, " ").trim());
-  expect(items).toEqual(["AFK", "Vi mode", "Sort · research›", "Restart server", "More settings...", "Cleanup", "Tips"]);
+  expect(items).toEqual(["AFK", "Vi mode", "Sort · research›", "Restart server", "More settings...", "Cleanup", "Tips", "Force refresh"]);
   expect(screen.queryByTestId("server-build")).toBeNull();
   expect(screen.queryByText("Claude limits")).toBeNull();
 });
@@ -51,7 +55,7 @@ test("one divider separates AFK, Vi mode and Sort from Restart server and More s
   await screen.findByRole("menuitemcheckbox", { name: "AFK" });
   const menu = screen.getByRole("menu");
   const separators = menu.querySelectorAll('[role="separator"]');
-  expect(separators).toHaveLength(1);
+  expect(separators).toHaveLength(2);
   const sort = screen.getByRole("menuitem", { name: /Sort · research/ });
   const restart = screen.getByRole("menuitem", { name: "Restart server" });
   expect(sort.compareDocumentPosition(separators[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -142,7 +146,24 @@ test("mode none shows no Install row", async () => {
   expect(screen.queryByRole("menuitem", { name: /Install app/ })).toBeNull();
 });
 
-test("prompt mode lists Install app last under its own separator, with the desktop caption, and a click prompts", async () => {
+test("Force refresh always shows, last, and a click hands the connected flag to forceRefresh", async () => {
+  setup();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Force refresh" }));
+  expect(forceRefresh).toHaveBeenCalledWith(true);
+});
+
+test("Force refresh shows with standalone faked, and offline passes connected false", async () => {
+  vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("standalone"), media: q, addEventListener() {}, removeEventListener() {} }));
+  try {
+    setup({}, {}, () => {}, false);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Force refresh" }));
+    expect(forceRefresh).toHaveBeenCalledWith(false);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("prompt mode lists Install app above Force refresh under their own separator, with the desktop caption, and a click prompts", async () => {
   install.state = { mode: "prompt", desktopCaption: true };
   setup();
   const row = await screen.findByRole("menuitem", { name: /Install app/ });
@@ -150,7 +171,7 @@ test("prompt mode lists Install app last under its own separator, with the deskt
   const menu = screen.getByRole("menu");
   expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(2);
   const items = [...menu.querySelectorAll('[role^="menuitem"]')];
-  expect(items[items.length - 1]).toBe(row);
+  expect(items[items.length - 2]).toBe(row);
   fireEvent.click(row);
   expect(install.promptInstall).toHaveBeenCalledTimes(1);
 });
