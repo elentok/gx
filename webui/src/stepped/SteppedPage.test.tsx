@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { MapStep } from "../generated/server";
+import type { MapStep, SessionInfo } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { triageModel } from "./model";
 import { SteppedPage, type SteppedPageProps } from "./SteppedPage";
@@ -56,6 +56,14 @@ test("a Triage model renders its title, five steps, the Start button, and a menu
   const items = (await screen.findAllByRole("menuitem")).map((i) => i.textContent ?? "");
   expect(items).toHaveLength(1);
   expect(items[0]).toContain("Copy triage ID");
+});
+
+test("a live Triage session's header holds no model", async () => {
+  const live = { id: "t-1", project: "gx", dir: "/w", harness: "claude", model: "claude-opus-5", effort: "high", status: { state: "idle" } } as unknown as SessionInfo;
+  render({ live: [live], actions: { fetchChat: async () => ({}) as never } });
+  await screen.findByRole("heading", { name: "gx" });
+  expect(screen.getByTestId("page-header-meta").textContent).not.toContain("Opus");
+  expect(screen.getByTestId("page-header-subtitle").textContent).not.toContain("Opus");
 });
 
 test("the Design slots render only when given", () => {

@@ -182,7 +182,7 @@ export function DesignActionsMenu({
   const canDelete = designItems && deletable && live.length === 0;
 
   const groups: MenuEntry[][] = [];
-  const agent = shown && agentSection(shown, wide, designItems);
+  const agent = shown && agentSection(shown, wide);
   if (agent) groups.push(agent);
   if (designItems && onOpenEpic) groups.push([{ value: "open-design-epic", label: "Open design epic ↗", onSelect: onOpenEpic }]);
   const sessionItems: MenuEntry[] = [];
@@ -229,15 +229,13 @@ export function DesignActionsMenu({
 }
 
 /**
- * The menu's Agent block for what the header leaves out (Tier, the switched note, and Effort on a phone); none when it has no rows.
- * With `withModel` (the Design page, whose header shows no agent) the first row is the model and its effort instead.
+ * The menu's Agent block for what the footer line leaves out (Tier, the switched note, and Effort on a phone); none when it has no rows.
  */
-export function agentSection(session: SessionInfo, wide: boolean, withModel = false): MenuEntry[] | undefined {
+export function agentSection(session: SessionInfo, wide: boolean): MenuEntry[] | undefined {
   const agent = agentDetails(session);
   const rows: AgentRow[] = [];
-  if (withModel && agent.model) rows.push({ key: "Model", value: agent.effort ? `${agent.model} · ${agent.effort} effort` : agent.model });
   if (agent.tier) rows.push({ key: "Tier", value: agent.tier });
-  if (!withModel && !wide && agent.effort) rows.push({ key: "Effort", value: agent.effort });
+  if (!wide && agent.effort) rows.push({ key: "Effort", value: agent.effort });
   if (agent.switched) rows.push({ note: "switched by hand" });
   return rows.length > 0 ? [{ kind: "content", value: "agent", content: <AgentBlock rows={rows} /> }] : undefined;
 }

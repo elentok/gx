@@ -18,7 +18,6 @@ import { PageHeader } from "../page/PageHeader";
 import { AgentChat } from "./AgentChat";
 import { AgentComposer } from "./AgentComposer";
 import { stateLabel, statusMark } from "./rules";
-import { AgentLine } from "../design/AgentLine";
 import { StatusMark } from "./SessionGlyphs";
 import { SessionActions } from "./SessionActions";
 
@@ -74,7 +73,6 @@ function SessionHeader({
                 {stateLabel(s)}
               </Chip>
             )}
-            <AgentLine session={s} wide={wide} />
             {wide && (
               <Text as="span" fontSize="sm" color="text.dim">
                 {s.dir}

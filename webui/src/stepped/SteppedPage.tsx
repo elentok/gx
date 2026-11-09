@@ -1,7 +1,6 @@
 import { Box, chakra } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
-import { AgentLine } from "../design/AgentLine";
 import { DesignChat } from "../design/ChatLog";
 import { hasChat, roundKeyOf, useSessionChat, type FetchChat } from "../design/chat";
 import { useFocusReport, type PostFocus } from "../design/focus";
@@ -199,7 +198,6 @@ export function SteppedPage({
           }
           meta={
             <Box display="flex" flexWrap="wrap" alignItems="center" columnGap="3" rowGap="1" fontSize="12px">
-              {session && !designMenu && <AgentLine session={session} wide={wide} />}
               {metaLink}
             </Box>
           }

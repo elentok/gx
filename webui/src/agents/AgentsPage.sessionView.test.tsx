@@ -5,17 +5,17 @@ import { chat, chatOf, render, session, useAgentsPageHooks } from "./agentsTestK
 
 useAgentsPageHooks();
 
-test("the header names the session, status, dir and ticket, with the joined model name", async () => {
+test("the header names the session, status, dir and ticket, with no model", async () => {
   render([session("s-1", "p", { name: "one", dir: "/work/one", ticket: "gx:m/01" })], "/agents/s-1", true, chatOf(chat()));
   const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
   expect(header.getByText("Idle")).toBeTruthy();
   expect(header.getByText("/work/one")).toBeTruthy();
   expect(header.getByText("gx:m/01")).toBeTruthy();
-  expect(header.getByText("Claude CLI default")).toBeTruthy();
+  expect(header.queryByText("Claude CLI default")).toBeNull();
   cleanup();
   render([session("s-2", "p", { name: "two", harness: "codex" })], "/agents/s-2", true, chatOf(chat()));
   const header2 = within((await screen.findByRole("heading", { name: /two/ })).closest("header")!);
-  expect(header2.getByText("Codex CLI default")).toBeTruthy();
+  expect(header2.queryByText("Codex CLI default")).toBeNull();
 });
 
 test("the header subtitle says Chat before the project", async () => {
@@ -63,10 +63,10 @@ test("a round in the chat shows no question sheet", async () => {
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();
 });
 
-test("the header reads the model and effort as one line, with no tier pill, and the menu's Agent block holds the tier", async () => {
+test("the header has no model, no tier pill, and the menu's Agent block holds the tier", async () => {
   render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5", effort: "high" })], "/agents/s-1", true, chatOf(chat()));
   const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
-  expect(header.getByText("Claude Opus 5").parentElement!.textContent).toBe("Claude Opus 5 · high");
+  expect(header.queryByText(/Claude Opus 5/)).toBeNull();
   expect(header.queryByText("Strongest")).toBeNull();
   expect(header.queryByText("switched by hand")).toBeNull();
   fireEvent.click(header.getByRole("button", { name: "More actions" }));
@@ -77,7 +77,8 @@ test("the header reads the model and effort as one line, with no tier pill, and 
 
 test("the header of a Codex session with a hand-switched model says so in the menu", async () => {
   render([session("s-1", "p", { name: "one", harness: "codex", tier: "worker", model: "gpt-5.5", effort: "xhigh", model_switched: true })], "/agents/s-1", true, chatOf(chat()));
-  expect(await screen.findByText("Codex GPT-5.5")).toBeTruthy();
+  await screen.findByRole("heading", { name: /one/ });
+  expect(screen.queryByText("Codex GPT-5.5")).toBeNull();
   expect(screen.queryByText("switched by hand")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "More actions" }));
   expect(await screen.findByText("switched by hand")).toBeTruthy();

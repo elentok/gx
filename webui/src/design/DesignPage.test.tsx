@@ -117,29 +117,26 @@ function render(
 const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent;
 const agentBlock = async () => within((await screen.findByText("Agent")).parentElement as HTMLElement);
 
-test("the meta line holds no model and no epic link; the menu's first row is the model and effort, then the tier", async () => {
+test("the meta line holds no model and no epic link; the menu's Agent block has the tier and no Model row", async () => {
   render([map("a")], [session("a", { harness: "codex", tier: "worker", model: "gpt-5.3-codex", effort: "medium" })]);
   expect(await metaText()).toBe("");
   expect(screen.queryByRole("link", { name: /Design epic/ })).toBeNull();
   await openMenu();
   const block = await agentBlock();
-  expect(block.getByText("Model").nextSibling?.textContent).toBe("Codex GPT-5.3-Codex · medium effort");
+  expect(block.queryByText("Model")).toBeNull();
+  expect(block.queryByText(/GPT-5.3-Codex/)).toBeNull();
   expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
+  expect(block.queryByText("Effort")).toBeNull();
 });
 
-test("with no model the Model row reads the harness CLI default and the effort", async () => {
-  render([map("a")], [session("a", { harness: "claude", tier: "", model: "", effort: "high" })]);
-  await openMenu();
-  expect((await agentBlock()).getByText("Model").nextSibling?.textContent).toBe("Claude CLI default · high effort");
-});
-
-test("on a phone the Agent block has no separate Effort row", () =>
+test("on a phone the Agent block shows Effort and Tier, and no model", () =>
   onPhone(async () => {
     render([map("a")], [session("a", { tier: "worker", model: "sonnet", effort: "medium" })]);
     await openMenu();
     const block = await agentBlock();
-    expect(block.getByText("Model").nextSibling?.textContent).toBe("Claude Sonnet · medium effort");
-    expect(block.queryByText("Effort")).toBeNull();
+    expect(block.queryByText("Model")).toBeNull();
+    expect(block.getByText("Effort").nextSibling?.textContent).toBe("medium");
+    expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
   }));
 
 test("a switched model adds the by-hand row", async () => {
