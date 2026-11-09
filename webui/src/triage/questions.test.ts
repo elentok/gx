@@ -38,6 +38,7 @@ test("the round skips gone rows, and the unanswered count matches the open count
   const round = roundOf(rows);
   expect(round.map((c) => c.label)).toEqual(["1.1", "1.2", "2.3"]);
   expect(round[0].context).toBe("1 · a");
+  expect(round[0].contextHref).toBe("#/t/gx:follow-ups/1");
   const answers = answersOf(rows);
   expect(round.filter((c) => !answers[c.label]).length).toBe(2);
 });

@@ -17,7 +17,7 @@ export function QuestionSheet({
   onIndex,
   questions = false,
 }: {
-  round: (SessionRoundCard & { context?: string })[];
+  round: (SessionRoundCard & { context?: string; contextHref?: string })[];
   answers: Answers;
   onAnswers: (update: (all: Answers) => Answers) => void;
   /** A new object opens the sheet at that question. */

@@ -150,3 +150,10 @@ test("typing a note keeps every character while saves and reloads cross", async 
   expect((screen.getByRole("textbox", { name: "Note text for question 1.1" }) as HTMLTextAreaElement).value).toBe("remember the budget");
   expect(server.answers["1"]).toBe("yes\nNote: remember the budget");
 });
+
+test("each question links to its ticket, in a new tab", () => {
+  render(<QuestionsView project="gx" view={viewOf()} refetch={vi.fn()} save={vi.fn()} />);
+  const link = screen.getByRole("link", { name: "Open ticket: 1 · a" });
+  expect(link.getAttribute("href")).toBe("#/t/gx:follow-ups/1");
+  expect(link.getAttribute("target")).toBe("_blank");
+});

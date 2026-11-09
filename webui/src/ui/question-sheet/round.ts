@@ -20,6 +20,8 @@ export interface QuestionCard {
   note?: string;
   /** What the question is about, shown muted above its title. */
   context?: string;
+  /** Where the context leads: the ticket the question is about. */
+  contextHref?: string;
 }
 
 /** The title a card shows for its question: "Q8", or "Q8b". */

@@ -1,4 +1,5 @@
 import { HUH_MESSAGE } from "../design/round";
+import { ticketHref } from "../hrefs";
 import type { SessionRoundCard, TriageQuestion, TriageRow } from "../generated/server";
 import { isAnswered, type Answer, type Answers } from "../ui/question-sheet/round";
 
@@ -8,7 +9,7 @@ const NOTE_MARK = "\nNote: ";
 const askedRows = (rows: TriageRow[]) => rows.filter((r) => !r.gone);
 
 /** A card the shared question component shows: the server's round card plus what the question is about. */
-export type TriageCard = SessionRoundCard & { context?: string };
+export type TriageCard = SessionRoundCard & { context?: string; contextHref?: string };
 
 /**
  * Each asked row's number, in row order: the digits that end its address ("gx:follow-ups/01" is "1"), or its
@@ -42,10 +43,11 @@ function cardKind(q: TriageQuestion): string {
 }
 
 /** A record question as a round card. The label is its row-qualified name; the plan's default is the recommended mark. */
-export function cardOf(q: TriageQuestion, label: string, context?: string): TriageCard {
+export function cardOf(q: TriageQuestion, label: string, context?: string, contextHref?: string): TriageCard {
   const kind = cardKind(q);
   const card: TriageCard = { label, title: q.title, body: q.body ?? "", kind };
   if (context) card.context = context;
+  if (contextHref) card.contextHref = contextHref;
   if (kind === "options") card.options = (q.options ?? []).map((o) => ({ id: o, label: o }));
   if (q.recommended) card.recommended = q.recommended;
   return card;
@@ -55,7 +57,7 @@ export function cardOf(q: TriageQuestion, label: string, context?: string): Tria
 export function roundOf(rows: TriageRow[]): TriageCard[] {
   const nums = rowNumbers(rows);
   return askedRows(rows).flatMap((r) =>
-    (r.questions ?? []).map((q) => cardOf(q, labelOf(nums, r, q), `${nums.get(r.address)} · ${r.title}`)),
+    (r.questions ?? []).map((q) => cardOf(q, labelOf(nums, r, q), `${nums.get(r.address)} · ${r.title}`, ticketHref(r.address))),
   );
 }
 
