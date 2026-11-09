@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -121,7 +120,7 @@ func runConfigShow(d Deps, reveal bool) error {
 	if err != nil {
 		return err
 	}
-	tree, err := toTree(cfg, reveal)
+	tree, _, err := toTree(cfg, reveal)
 	if err != nil {
 		return err
 	}
@@ -141,22 +140,16 @@ func runConfigGet(d Deps, key string, reveal bool) error {
 	if err != nil {
 		return err
 	}
-	full, err := toTree(cfg, true)
+	tree, secrets, err := toTree(cfg, reveal)
 	if err != nil {
 		return err
 	}
-	v, ok := lookup(full, key)
+	v, ok := lookup(tree, key)
 	if !ok {
 		return fmt.Errorf("no config key %q (see `gx config show`)", key)
 	}
-	if !reveal {
-		masked, err := toTree(cfg, false)
-		if err != nil {
-			return err
-		}
-		if m, _ := lookup(masked, key); !reflect.DeepEqual(m, v) {
-			return fmt.Errorf("config key %q holds a secret; pass --reveal to print it", key)
-		}
+	if touchesSecret(key, secrets) {
+		return fmt.Errorf("config key %q holds a secret; pass --reveal to print it", key)
 	}
 	s, err := formatValue(v)
 	if err != nil {

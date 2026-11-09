@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -12,43 +13,79 @@ const redacted = "[redacted]"
 // toTree renders cfg as generic JSON. Unless reveal is set, every value of a
 // field tagged secret:"true" that is non-empty is replaced by a placeholder,
 // so an agent reading the output never lands a credential in its transcript.
-func toTree(cfg any, reveal bool) (any, error) {
+// The second result lists the dotted paths that were redacted (slice elements
+// by index); it is empty when reveal is set.
+func toTree(cfg any, reveal bool) (any, []string, error) {
 	b, err := json.Marshal(cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var tree any
 	if err := json.Unmarshal(b, &tree); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	var paths []string
 	if !reveal {
-		redactTree(tree, reflect.TypeOf(cfg))
+		redactTree(tree, reflect.TypeOf(cfg), "", &paths)
 	}
-	return tree, nil
+	return tree, paths, nil
 }
 
-// redactTree walks node alongside the struct type that produced it.
-func redactTree(node any, t reflect.Type) {
+// touchesSecret reports whether key is, sits inside, or contains one of the
+// redacted paths.
+func touchesSecret(key string, paths []string) bool {
+	for _, p := range paths {
+		if key == "" || key == p || strings.HasPrefix(key, p+".") || strings.HasPrefix(p, key+".") {
+			return true
+		}
+	}
+	return false
+}
+
+func joinPath(path, name string) string {
+	if path == "" {
+		return name
+	}
+	return path + "." + name
+}
+
+// redactTree walks node alongside the type that produced it, descending
+// structs, slices, arrays and maps, and records each redacted path in out.
+func redactTree(node any, t reflect.Type, path string, out *[]string) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
-	m, ok := node.(map[string]any)
-	if !ok || t.Kind() != reflect.Struct {
-		return
-	}
-	for f := range t.Fields() {
-		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
-		child, present := m[name]
-		if !present {
-			continue
+	switch t.Kind() {
+	case reflect.Slice, reflect.Array:
+		items, _ := node.([]any)
+		for i, item := range items {
+			redactTree(item, t.Elem(), joinPath(path, strconv.Itoa(i)), out)
 		}
-		if f.Tag.Get("secret") == "true" {
-			if s, isStr := child.(string); !isStr || s != "" {
-				m[name] = redacted
+	case reflect.Map:
+		m, _ := node.(map[string]any)
+		for k, item := range m {
+			redactTree(item, t.Elem(), joinPath(path, k), out)
+		}
+	case reflect.Struct:
+		m, ok := node.(map[string]any)
+		if !ok {
+			return
+		}
+		for f := range t.Fields() {
+			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			child, present := m[name]
+			if !present {
+				continue
 			}
-			continue
+			if f.Tag.Get("secret") == "true" {
+				if s, isStr := child.(string); !isStr || s != "" {
+					m[name] = redacted
+					*out = append(*out, joinPath(path, name))
+				}
+				continue
+			}
+			redactTree(child, f.Type, joinPath(path, name), out)
 		}
-		redactTree(child, f.Type)
 	}
 }
 
