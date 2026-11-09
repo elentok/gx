@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { MemoryRouter } from "react-router";
 import { ConnectionContext, type Connection } from "../connection";
+import { defaultProject } from "../workspaces/defaultProject";
 import type { DesignDraft, DesignDraftSaveRequest } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { DeviceContext, type Device } from "../useWide";
@@ -46,15 +48,20 @@ function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
   return { client, save, remove, setLastProject, uploadImage, removeImage };
 }
 
-async function mount(over: Partial<Parameters<typeof NewDesignForm>[0]> = {}, latest?: Partial<DesignDraft>, lastProject = "", device?: Device) {
+const connState = { snapshot: { sessions: [] } };
+const connection = { refresh: () => {}, getState: () => connState, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+
+async function mount(over: Partial<Parameters<typeof NewDesignForm>[0]> = {}, latest?: Partial<DesignDraft>, lastProject = "", device?: Device, at = "/epics") {
   const onClose = vi.fn();
   const onStarted = vi.fn();
   const fake = fakeDrafts(latest, lastProject);
   await act(async () => {
     renderThemed(
       <DeviceContext.Provider value={device}>
-        <ConnectionContext.Provider value={{ refresh: () => {} } as Connection}>
-          <NewDesignForm projects={["gx", "blog"]} open={ok} drafts={fake.client} onStarted={onStarted} onClose={onClose} {...over} />
+        <ConnectionContext.Provider value={connection}>
+          <MemoryRouter initialEntries={[at]}>
+            <NewDesignForm projects={["gx", "blog"]} open={ok} drafts={fake.client} onStarted={onStarted} onClose={onClose} {...over} />
+          </MemoryRouter>
         </ConnectionContext.Provider>
       </DeviceContext.Provider>,
     );
@@ -107,8 +114,10 @@ test("the form shows a spinner, not its fields, while the drafts load", async ()
   const onClose = vi.fn();
   await act(async () => {
     renderThemed(
-      <ConnectionContext.Provider value={{ refresh: () => {} } as Connection}>
-        <NewDesignForm projects={["gx"]} drafts={{ ...client, list: async () => (await gate, []) }} onStarted={() => {}} onClose={onClose} />
+      <ConnectionContext.Provider value={connection}>
+        <MemoryRouter>
+          <NewDesignForm projects={["gx"]} drafts={{ ...client, list: async () => (await gate, []) }} onStarted={() => {}} onClose={onClose} />
+        </MemoryRouter>
       </ConnectionContext.Provider>,
     );
   });
@@ -118,9 +127,17 @@ test("the form shows a spinner, not its fields, while the drafts load", async ()
   expect(screen.getByRole("textbox", { name: "Epic slug" })).toBeTruthy();
 });
 
-test("starting project of a new draft: the one-project filter, else the last used, else the first", async () => {
-  await mount({ filterProject: "blog" }, undefined, "gx");
+test("starting project of a new draft: the page, the one-project filter, the last used, then the first", async () => {
+  await mount({}, undefined, "gx", undefined, "/e/p:x");
+  expect(project()).toBe("gx");
+  cleanup();
+  await mount({ projects: ["gx", "blog"] }, undefined, "gx", undefined, "/e/blog:x");
   expect(project()).toBe("blog");
+  cleanup();
+  localStorage.setItem("gx.epics.project", JSON.stringify(["blog"]));
+  await mount({}, undefined, "gx");
+  expect(project()).toBe("blog");
+  localStorage.clear();
   cleanup();
   await mount({}, undefined, "blog");
   expect(project()).toBe("blog");
@@ -135,12 +152,41 @@ test("starting project of a new draft: the one-project filter, else the last use
   expect(project()).toBe("gx");
 });
 
-test("a saved draft keeps its project against another filter, even with no text", async () => {
-  await mount({ filterProject: "blog" }, { slug: "x", project: "gx" }, "blog");
+test("a saved draft keeps its project against another page, even with no text", async () => {
+  await mount({}, { slug: "x", project: "gx" }, "blog", undefined, "/e/blog:x");
   expect(project()).toBe("gx");
   cleanup();
-  await mount({ filterProject: "gx" }, { slug: " ", project: "blog" });
+  await mount({}, { slug: " ", project: "blog" }, "", undefined, "/e/gx:x");
   expect(project()).toBe("blog");
+});
+
+test("the form and the shared rule start on the same project for the same inputs", async () => {
+  const projects = ["gx", "blog", "web"];
+  for (const [pathname, lastProject] of [["/e/web:x", "blog"], ["/epics", "blog"], ["/epics", ""], ["/e/nope:x", "gone"]] as const) {
+    await mount({ projects }, undefined, lastProject, undefined, pathname);
+    expect(project()).toBe(defaultProject({ pathname, sessions: [], projects, lastProject }));
+    cleanup();
+  }
+});
+
+test("Epic slug takes focus after the async draft load on a wide device, and a phone keeps it on the panel", async () => {
+  await mount({}, undefined, "", "tablet");
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }));
+  cleanup();
+  await mount({}, undefined, "", "phone");
+  expect(document.activeElement).toBe(screen.getByRole("dialog", { name: "New Design" }));
+});
+
+test("a later render does not pull focus back to Epic slug once it has moved", async () => {
+  await mount();
+  const idea = screen.getByRole("textbox", { name: "Rough idea" });
+  idea.focus();
+  type("Rough idea", "words");
+  expect(document.activeElement).toBe(idea);
+  const dialog = screen.getByRole("dialog", { name: "New Design" });
+  dialog.focus();
+  type("Rough idea", "more words");
+  expect(document.activeElement).toBe(dialog);
 });
 
 test("picking a project sets the last project used; typing does not", async () => {
@@ -156,7 +202,7 @@ test("picking a project sets the last project used; typing does not", async () =
 
 test("a draft whose project is gone moves to the new-draft project with a note, keeping its edited-at", async () => {
   vi.useFakeTimers();
-  const { save } = await mount({ filterProject: "blog" }, { slug: "x", project: "old", edited_at: "2026-01-01T00:00:00Z" });
+  const { save } = await mount({}, { slug: "x", project: "old", edited_at: "2026-01-01T00:00:00Z" }, "blog");
   expect(project()).toBe("blog");
   expect(screen.getByText("old no longer exists; moved to blog")).toBeTruthy();
   await wait(0);
@@ -319,10 +365,12 @@ test("Start design carries the shell's active workspace; no shell sends none", a
   const inShell = vi.fn(ok);
   await act(async () => {
     renderThemed(
-      <ConnectionContext.Provider value={{ refresh: () => {} } as Connection}>
-        <ShellContext.Provider value={shell}>
-          <NewDesignForm projects={["gx"]} open={inShell} drafts={fakeDrafts().client} onStarted={() => {}} onClose={() => {}} />
-        </ShellContext.Provider>
+      <ConnectionContext.Provider value={connection}>
+        <MemoryRouter>
+          <ShellContext.Provider value={shell}>
+            <NewDesignForm projects={["gx"]} open={inShell} drafts={fakeDrafts().client} onStarted={() => {}} onClose={() => {}} />
+          </ShellContext.Provider>
+        </MemoryRouter>
       </ConnectionContext.Provider>,
     );
   });

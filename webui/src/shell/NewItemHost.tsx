@@ -15,7 +15,7 @@ export function NewItemHost() {
   const request = useNewItemRequest();
   return (
     <Portal>
-      {request?.kind === "design" && <DesignDialog filterProject={request.filterProject} />}
+      {request?.kind === "design" && <DesignDialog />}
       {request?.kind === "agent" && <AgentDialog />}
     </Portal>
   );
@@ -33,16 +33,14 @@ function useRouteProject(): string | undefined {
   return undefined;
 }
 
-function DesignDialog({ filterProject }: { filterProject?: string }) {
+function DesignDialog() {
   const navigate = useNavigate();
   const shell = useShell();
   const { list } = useEpicList();
-  const routeProject = useRouteProject();
   const projects = [...new Set([...(list?.projects ?? []), ...(list?.epics ?? []).map((e) => e.project)])].sort();
   return (
     <NewDesignForm
       projects={projects}
-      filterProject={filterProject ?? routeProject}
       onStarted={(address, startFailure) => {
         closeNewItem();
         navigate(designHref(address).slice(1), { state: { startFailure } });

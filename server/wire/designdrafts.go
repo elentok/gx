@@ -50,8 +50,8 @@ type DesignDraftSaveRequest struct {
 	KeepEditedAt bool `json:"keep_edited_at,omitempty"`
 }
 
-// DesignLastProject is the project the New Design form last used, shared by
-// every browser: the answer of the read route and the body of the set route.
+// DesignLastProject is the project the New design and New chat forms last
+// used (both share it), shared by every browser: the answer of the read route and the body of the set route.
 // Project is empty on a fresh server.
 type DesignLastProject struct {
 	Project string `json:"project"`

@@ -2,7 +2,7 @@ import { Box, Menu, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, type ComponentProps, type ReactNode } from "react";
 import { PageHeader } from "../page/PageHeader";
 import { PageIcon } from "../page/PageIcon";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import canned from "../canned-snapshot.json";
 import { authEntries } from "./authEntries";
 import { designFooterEntries } from "./designFooterEntries";
@@ -110,7 +110,8 @@ const cardRow = (over: Partial<EpicListRow> = {}): EpicListRow => ({
   ...over,
 });
 
-const idleConnection = { refresh: () => {} } as Connection;
+const idleState = { connected: true, loadedOnce: true, tick: 0 };
+const idleConnection = { refresh: () => {}, getState: () => idleState, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
 /** A draft client with no drafts, so the New Design form renders blank without a server. */
 const noDrafts: DraftsClient = {
   list: async () => [],
@@ -142,9 +143,11 @@ const SwitcherFrame = ({ drafts, open }: { drafts: DesignDraftItem[]; open?: boo
 
 const ModalFrame = ({ children, h = "600px", w = "800px" }: { children: ReactNode; h?: string; w?: string }) => (
   <ConnectionContext.Provider value={idleConnection}>
-    <Box position="relative" h={h} w={w} transform="translateZ(0)" overflow="hidden" borderWidth="1px" borderColor="border">
-      {children}
-    </Box>
+    <MemoryRouter>
+      <Box position="relative" h={h} w={w} transform="translateZ(0)" overflow="hidden" borderWidth="1px" borderColor="border">
+        {children}
+      </Box>
+    </MemoryRouter>
   </ConnectionContext.Provider>
 );
 

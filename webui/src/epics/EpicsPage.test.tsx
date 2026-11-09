@@ -297,7 +297,7 @@ test("the New Design project ignores a filter of several projects", async () => 
   expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
 });
 
-test("leaving the Epics page clears the filter the openers use", async () => {
+test("the stored one-project filter keeps steering New design after leaving the Epics page", async () => {
   // Unfiltered, the form starts on the first project ("blog"), so "gx" proves the filter reached it.
   localStorage.setItem("gx.epics.project", "gx");
   const list = listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]);
@@ -311,7 +311,7 @@ test("leaving the Epics page clears the filter the openers use", async () => {
   await act(() => router.navigate("/agents"));
   await waitFor(() => expect(screen.queryByRole("searchbox", { name: "Filter epics" })).toBeNull());
   act(() => openNewDesign());
-  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
+  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("gx");
 });
 
 test("Start posts new_design and opens the new Design page", async () => {

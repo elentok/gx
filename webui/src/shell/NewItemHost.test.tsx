@@ -79,9 +79,9 @@ describe("the project a new blank draft starts on", () => {
     await projectIs("alpha");
   });
 
-  test("the Epics page's filtered project wins over the route", async () => {
-    mount("/e/beta:feat");
-    setPageProject("gamma");
+  test("the one-project Epics filter wins over the first project where no page has one", async () => {
+    localStorage.setItem("gx.epics.project", JSON.stringify(["gamma"]));
+    mount("/epics");
     act(() => openNewDesign());
     await projectIs("gamma");
   });
@@ -110,8 +110,8 @@ describe("the project a new blank draft starts on", () => {
     });
 
     test("over the Epics page's filtered project", async () => {
-      mount("/e/beta:feat", restored);
-      setPageProject("gamma");
+      localStorage.setItem("gx.epics.project", JSON.stringify(["gamma"]));
+      mount("/epics", restored);
       act(() => openNewDesign());
       await projectIs("alpha");
     });

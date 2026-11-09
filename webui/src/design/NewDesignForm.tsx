@@ -1,5 +1,5 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import type { DesignDraft } from "../generated/server";
@@ -27,6 +27,10 @@ import { postOpenDesign, type OpenDesign } from "./open";
 import { clearUnsaved, NEW_DRAFT_KEY, readUnsaved, stashUnsaved } from "./unsaved";
 import { useDesignWrite } from "./SessionControls";
 import { useWide } from "../useWide";
+import { useLocation } from "react-router";
+import { useConnectionContext, useConnectionState } from "../connection";
+import { useFocusFirstField } from "../ui/modal/useFocusFirstField";
+import { defaultProject } from "../workspaces/defaultProject";
 import { DraftSwitcher } from "./DraftSwitcher";
 
 /** The draft calls the form makes; the prop defaults to the real ones. */
@@ -68,12 +72,6 @@ type Banner = "conflict" | "gone" | undefined;
 
 const hasText = (d: Partial<Fields>) => !!(d.slug?.trim() || d.idea?.trim());
 
-/** A new draft starts on the page's one-project filter, then the last project used, then the first. */
-function newDraftProject(projects: string[], filterProject?: string, lastProject?: string): string {
-  const known = (p?: string) => (p && projects.includes(p) ? p : undefined);
-  return known(filterProject) || known(lastProject) || projects[0] || "";
-}
-
 const field = {
   fontSize: "16px",
   color: "text",
@@ -96,8 +94,6 @@ const sheetProps = {
 
 interface FormProps {
   projects: string[];
-  /** The Epics page's project filter, when it is on one project. */
-  filterProject?: string;
   open?: OpenDesign;
   /** Runs with the new Design's address once its map exists; `startFailure` is why the session did not start. */
   onStarted: (address: string, startFailure?: string) => void;
@@ -223,7 +219,6 @@ async function saveUnsaved(drafts: DraftsClient): Promise<{ draft: DesignDraft; 
 
 function DraftForm({
   projects,
-  filterProject,
   open = postOpenDesign,
   onStarted,
   onClose,
@@ -244,13 +239,24 @@ function DraftForm({
 }) {
   const sheetMode = !useWide();
   const workspace = useShell()?.workspace;
-  const slugInput = useRef<HTMLInputElement>(null);
+  const slugInput = useRef<HTMLInputElement | null>(null);
+  const focusFirst = useFocusFirstField();
+  // Stable, so a re-render does not run the focus again.
+  const slugRef = useCallback(
+    (el: HTMLInputElement | null) => {
+      slugInput.current = el;
+      focusFirst(el);
+    },
+    [focusFirst],
+  );
+  const { pathname } = useLocation();
+  const sessions = useConnectionState(useConnectionContext()).snapshot?.sessions ?? [];
   // A saved draft keeps its project; one whose project is gone is moved as a new draft would start.
   const kept = initial && projects.includes(initial.project) ? initial.project : undefined;
   const [draft, setDraft] = useState<Fields>(() => ({
     slug: initial?.slug ?? "",
     idea: initial?.idea ?? "",
-    project: kept ?? newDraftProject(projects, filterProject, lastProject),
+    project: kept ?? defaultProject({ pathname, sessions, projects, lastProject }),
   }));
   const [movedFrom] = useState(() => (initial && !kept && initial.project ? initial.project : undefined));
   const [moved, setMoved] = useState(movedFrom !== undefined);
@@ -658,8 +664,7 @@ function DraftForm({
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
-          autoFocus
-          ref={slugInput}
+          ref={slugRef}
           {...field}
           flex="1"
           minW="0"
