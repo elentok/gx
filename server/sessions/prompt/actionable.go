@@ -62,10 +62,15 @@ func (p *Prompt) markSessionActionable(req wire.MarkActionableRequest) (wire.Ses
 const grillingReason = "Grilling: waiting for your answers"
 
 // designActionable is what a Design session's last assistant message asks of
-// the person: the grilling question wins over the run-end line.
+// the person: the grilling question wins over the run-end line. A message that
+// ends on a prose question has no marker gx can show, but the session still
+// waits on the answer, so it raises no Continue for auto-advance to send.
 func designActionable(text string, ref chat.FlowRef, agent string, final bool) (wire.SessionActionable, bool) {
 	if ref.Flow == tickets.FlowDesign && grillround.HasMarker(text) {
 		return wire.SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
+	}
+	if strings.HasSuffix(strings.TrimSpace(text), "?") {
+		return wire.SessionActionable{}, false
 	}
 	return chat.RunEndNext(text, ref, agent, final)
 }

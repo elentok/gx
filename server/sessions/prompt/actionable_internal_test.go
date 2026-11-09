@@ -123,3 +123,16 @@ func TestDecideActionable(t *testing.T) {
 		})
 	}
 }
+
+// A message that ends on a prose question is a session waiting on the person:
+// the run-end line above it must not raise a Continue that auto-advance sends.
+func TestDesignActionable_EndingOnAProseQuestionRaisesNoContinue(t *testing.T) {
+	t.Parallel()
+	text := agentfake.DesignRunEnd + "\n\nDo you agree with B?\n"
+	if a, matched := designActionable(text, designRef, "claude", false); matched {
+		t.Errorf("actionable = %+v, want none while a question waits", a)
+	}
+	if _, matched := designActionable(agentfake.DesignRunEnd+"\n", designRef, "claude", false); !matched {
+		t.Error("a plain run end must still raise its Continue")
+	}
+}
