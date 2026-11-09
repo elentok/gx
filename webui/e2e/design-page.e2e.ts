@@ -71,6 +71,10 @@ test.describe("72. Design actions menu", () => {
     const shown = menu.getByRole("menuitem", { name: /^design-epic/ });
     await expect(shown).toHaveAttribute("aria-current", "true");
     await expect(shown).toContainText("✓");
+    // On the shared stepped-session model a Design is labelled Design, never Triage, and links to no Triage page.
+    await expect(page.getByRole("img", nav("Triage"))).toHaveCount(0);
+    await expect(page.locator("a[href^='#/triage/']")).toHaveCount(0);
+    expect(JSON.parse(await fixture.cli("agents", "list", "--json")).some((s: { design?: boolean; flow?: string }) => s.design && s.flow === "design")).toBe(true);
     await expect(menu.getByRole("menuitem", nav("Stop design-epic"))).toHaveCount(0);
     const other = menu.getByRole("menuitem", { name: /^Claude Code/ });
     await expect(other).toHaveAttribute("aria-current", "false");

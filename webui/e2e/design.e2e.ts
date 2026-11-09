@@ -22,7 +22,7 @@ const ring = (page: Page) => page.locator("[data-kind='design']:not([data-testid
 test.describe("5. Start a design session and answer a round", () => {
   test("first step, ids, answer, Continue and a fresh round", async ({ page, start }) => {
     // A countdown that never ends in the test, so the press is the only Continue.
-    await start("design", { autoAdvanceDelay: "1h" });
+    const fixture = await start("design", { autoAdvanceDelay: "1h" });
     await openDesign(page);
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
     // A Design is a workspace item now, so the Epics footer link no longer stands for it.
@@ -75,6 +75,22 @@ test.describe("5. Start a design session and answer a round", () => {
     }).toPass();
     await showChat(page);
     await expect(page.getByText("A fresh round.")).toBeVisible();
+
+    // The shared stepped-session model: the session reports flow design, and the Agents page never labels it Triage.
+    // Continue and the fresh round above only come from the fake's gx-design turns, so the skill command is unchanged.
+    let id = "";
+    await expect
+      .poll(async () => {
+        const list = JSON.parse(await fixture.cli("agents", "list", "--json")) as { id: string; flow?: string; design?: boolean }[];
+        const design = list.find((s) => s.design);
+        id = design?.id ?? "";
+        return design?.flow;
+      })
+      .toBe("design");
+    await page.evaluate((sid) => (location.hash = `#/agents/${sid}`), id);
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    await expect(page.getByRole("img", nav("Triage"))).toHaveCount(0);
+    await expect(page.locator("a[href^='#/triage/']")).toHaveCount(0);
   });
 });
 
@@ -244,6 +260,9 @@ test.describe("12. The auto-advance switch", () => {
     await expect(questions.getByText("Q9 - Keep going?")).toBeVisible();
     await showChat(page);
     await expect(page.getByText("A fresh round.")).toBeVisible();
+    // Progress still shows the step and the ring stays a Design after auto-advance.
+    await expect(step(page, "resolve-tickets", "current")).toBeVisible();
+    await expect(ring(page)).toBeVisible();
 
     // Auto-queue: the row is enabled and off; on, the Branch step starts "Queuing <epic> in Ns" and the epic is queued at its end.
     const queueName = (on: "on" | "off") => `Auto-queue ${on}`;

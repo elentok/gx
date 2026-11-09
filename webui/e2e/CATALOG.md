@@ -59,12 +59,12 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `design.e2e.ts`
 
-- **First step, ids, answer, Continue and a fresh round:** the first design step and an answered round.
+- **First step, ids, answer, Continue and a fresh round:** the first design step and an answered round; then the session reports flow `design` and its Agents page shows no Triage label or `/triage/` link (the shared stepped-session model changed nothing).
 - **1440px: the Progress region and the ring show each step in turn.**
 - **Cancel stops the send and Continue stays.**
 - **An all-defaulted round:** one "Accept these defaults" card and a grilling Actionable.
 - **Shows the step and ticket, then follows the step report.**
-- **Auto-advance:** shows while working and idle; off, then on starts the countdown and a fresh round follows; then the Auto-queue row is enabled and off, flips on, the Branch step shows "Queuing <epic> in Ns" with Cancel auto-queue, and the epic is queued at the end.
+- **Auto-advance:** shows while working and idle; off, then on starts the countdown and a fresh round follows; then the Auto-queue row is enabled and off, flips on, the Branch step shows "Queuing <epic> in Ns" with Cancel auto-queue, and the epic is queued at the end; after the auto-advanced round the Progress step and the Design ring are unchanged.
 - **Stopped session card:** live asks first, a stopped card moves to Ready to design, the menu and the banner start a new session.
 - **Delete design:** appears when the session stops with the page open, and Delete removes the design.
 - **50. Design epic page.**
@@ -76,7 +76,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `design-page.e2e.ts`
 
-- **Two live sessions:** popover under ⋯ at 1440px, the list shows the shown one, switches and stops.
+- **Two live sessions:** popover under ⋯ at 1440px, the list shows the shown one, switches and stops; the live Design session reports flow `design` with no Triage label or `/triage/` link.
 - **A move starts at the title:** rows stay put, the popover sits above Send.
 - **Chat, prompt, choice, titles, body and meta text** (text size).
 
