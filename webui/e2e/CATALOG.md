@@ -153,6 +153,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **`login.e2e.ts` 102. Login (+103 rate limit, +104 certificate help).** Also two PWA steps with a registered worker: a signed-out reload shows the sign-in screen, and a 401 still signs the page out (one declared reload).
 - **`reload.e2e.ts`:** one allowed reload passes and is counted.
 - **`settings.e2e.ts`:** **106. Sign out another device**; **107. Sign out of this device (+111 CLI revoke)**; **108. Change password**; **109. Reset authenticator**; **110. Web reset from the CLI**; **112. Add the authenticator after a CLI reset.**
+- **`settings-page.e2e.ts`** (scenario `settings`): **200. Settings page, global journey** (a number and a duration reach config.json with the other keys intact, one declared reload shows them, a refused save keeps the draft with "Not saved:", Reset removes the key, secrets are never in the read response or the DOM and a set Slack webhook is not echoed, a startup-only key says "Restart needed to apply", at 390 px the home, a section and a project's section list have no sideways scroll); **201. Settings page, project journey** (Override and "Use global value" add and remove the key in project.json, Remove cap and Set a cap, the hand-written notifications block survives another save, a Checks edit lands in `checks`).
 
 ## Restart and migration (`restart`, `restart-run`, `migration`)
 

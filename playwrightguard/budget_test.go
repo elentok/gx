@@ -21,7 +21,11 @@ import (
 // Triage journey flow (+1): start, the Verify chain with its countdown, the Follow-ups
 // card moving between sections and the sidebar badge need the server round trip, SSE,
 // the fake Triage agent and a real browser; vitest and Go tests cannot see those together.
-const maxFlows = 127
+// Settings page flows (+2): config.json and project.json round trips through the
+// real server (refused save, secrets never echoed, restart-needed, hand-written
+// notifications block kept) and the 390px layout; SettingsPage.test.tsx covers each
+// control alone but cannot see the files or the layout.
+const maxFlows = 129
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
