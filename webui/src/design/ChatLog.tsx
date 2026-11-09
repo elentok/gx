@@ -123,13 +123,16 @@ function ViewToggle({
   total,
   questions,
   onQuestions,
+  menu,
 }: {
   answered: number;
   total: number;
   questions: boolean;
   onQuestions: (on: boolean) => void;
+  /** The ⋯ menu, here while the keyboard layout hides the title row. */
+  menu?: ReactNode;
 }) {
-  return (
+  const tabs = (
     <Box
       role="group"
       aria-label="View"
@@ -146,6 +149,15 @@ function ViewToggle({
       <SegButton on={!questions} onClick={() => onQuestions(false)}>
         Chat
       </SegButton>
+    </Box>
+  );
+  if (!menu) return tabs;
+  return (
+    <Box display="flex" alignItems="center" gap="2" flex="none">
+      <Box flex="1" minW="0" display="flex">
+        {tabs}
+      </Box>
+      {menu}
     </Box>
   );
 }
@@ -198,8 +210,10 @@ function ChatBody({
   onQuestions,
   autoMenu,
   logTop,
+  tabsMenu,
 }: {
   logTop?: ReactNode;
+  tabsMenu?: ReactNode;
   session: SessionInfo;
   roundKey: string;
   chat: SessionChatResponse;
@@ -239,6 +253,7 @@ function ChatBody({
           total={round.length}
           questions={questions}
           onQuestions={onQuestions}
+          menu={tabsMenu}
         />
       )}
       {!questions && (
@@ -289,6 +304,7 @@ function ChatLog({
   questions: boolean;
   onQuestions: (on: boolean) => void;
   logTop?: ReactNode;
+  tabsMenu?: ReactNode;
 }) {
   const conn = useConnectionContext();
   const connected = useConnectionState(conn).connected;
@@ -322,7 +338,10 @@ export function DesignChat({
   questions,
   onQuestions,
   logTop,
+  tabsMenu,
 }: {
+  /** The ⋯ menu in the view tabs row (keyboard layout). */
+  tabsMenu?: ReactNode;
   /** The first entry of the Chat view's log. */
   logTop?: ReactNode;
   session?: SessionInfo;
@@ -370,6 +389,7 @@ export function DesignChat({
       questions={questions}
       onQuestions={onQuestions}
       logTop={logTop}
+      tabsMenu={tabsMenu}
     />
   );
 }

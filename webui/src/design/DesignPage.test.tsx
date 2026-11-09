@@ -521,3 +521,107 @@ test("a refused delete shows the reason and keeps the page", async () => {
   expect(await screen.findByText("a session is running")).toBeTruthy();
   expect(router.state.location.pathname).toBe("/d/gx:a");
 });
+
+// A fake visual viewport: `open()` shrinks it 450px under the layout viewport, `close()` restores it.
+function withKeyboard(body: (kb: { open: () => void; close: () => void }) => Promise<void>) {
+  return onPhone(async () => {
+    const vv = Object.assign(new EventTarget(), { height: 800, scale: 1 });
+    Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+    const set = (h: number) =>
+      act(() => {
+        vv.height = h;
+        vv.dispatchEvent(new Event("resize"));
+      });
+    try {
+      await body({ open: () => set(350), close: () => set(800) });
+    } finally {
+      Object.defineProperty(window, "visualViewport", { value: undefined, configurable: true });
+    }
+  });
+}
+
+const roundChat = (round: unknown[] | null): RouteFetchers => ({
+  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round, background: [] } as never }),
+});
+const askCard = { label: "1", title: "T1", body: "Body 1?", kind: "options", options: [{ id: "a", label: "Alpha" }] };
+const composer = async () => {
+  if (!screen.queryByLabelText("Message")) fireEvent.click(await screen.findByRole("button", { name: "Note" }));
+  return (await screen.findByLabelText("Message")) as HTMLTextAreaElement;
+};
+const focusComposer = async () => {
+  const field = await composer();
+  act(() => field.focus());
+};
+const blurComposer = () => act(() => (document.activeElement as HTMLElement).blur());
+const tabsRow =() => screen.getByRole("group", { name: "View" }).parentElement?.parentElement as HTMLElement;
+const moreIn = (el: HTMLElement) => within(el).queryByRole("button", { name: "More actions" });
+
+async function renderRound(round: unknown[] | null = [askCard]) {
+  const mapImages = async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }] });
+  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...roundChat(round), mapImages });
+  await screen.findByRole("heading", { level: 1 });
+  if (round) await screen.findByRole("group", { name: "View" });
+  else await screen.findByRole("button", { name: "Note" });
+}
+
+test("with the keyboard open the header and images go, the tabs stay and carry the ⋯ menu", () =>
+  withKeyboard(async (kb) => {
+    await renderRound();
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+    await screen.findByLabelText("Images");
+    expect(moreIn(tabsRow())).toBeNull();
+    await focusComposer();
+    kb.open();
+    await waitFor(() => expect(moreIn(tabsRow())).toBeTruthy());
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(screen.queryByLabelText("Images")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1);
+    blurComposer();
+    kb.close();
+    await waitFor(() => expect(moreIn(tabsRow())).toBeNull());
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+    expect(await screen.findByLabelText("Images")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1);
+  }));
+
+test("with no round open the ⋯ goes with the header and returns when the keyboard closes", () =>
+  withKeyboard(async (kb) => {
+    await renderRound(null);
+    await focusComposer();
+    kb.open();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "More actions" })).toBeNull());
+    blurComposer();
+    kb.close();
+    expect(await screen.findByRole("button", { name: "More actions" })).toBeTruthy();
+  }));
+
+test("the tabs-row menu stays open and anchored through focusout and viewport restore, then the layout returns", () =>
+  withKeyboard(async (kb) => {
+    await renderRound();
+    await focusComposer();
+    kb.open();
+    await waitFor(() => expect(moreIn(tabsRow())).toBeTruthy());
+    const more = moreIn(tabsRow()) as HTMLElement;
+    fireEvent.click(more);
+    await screen.findByRole("menuitem", { name: /Copy design ID/ });
+    blurComposer();
+    kb.close();
+    expect(screen.getByRole("menuitem", { name: /Copy design ID/ })).toBeTruthy();
+    expect(moreIn(tabsRow())).toBe(more);
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: /Copy design ID/ }));
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: /Copy design ID/ })).toBeNull());
+    await waitFor(() => expect(moreIn(tabsRow())).toBeNull());
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+  }));
+
+test("the title-row menu with the keyboard closed leaves the layout alone", () =>
+  withKeyboard(async () => {
+    await renderRound();
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    await screen.findByRole("menuitem", { name: /Copy design ID/ });
+    expect(moreIn(tabsRow())).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1);
+  }));

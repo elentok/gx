@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useOnCloseSignal } from "../closeSignal";
 import type { MenuEntry, MenuProps, SubmenuItem } from "./Menu";
+import { useReportOpen } from "./useReportOpen";
 
 const WIDTH = 280;
 const INSET = 8;
@@ -53,8 +54,9 @@ function place(rect: DOMRect, height: number): Place {
 }
 
 /** The phone menu: an anchored popover over a light dim, with submenus swapped into the same panel. */
-export function PhoneMenu({ trigger, items, onClosed, closeSignal }: MenuProps) {
+export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal }: MenuProps) {
   const [anchor, setAnchor] = useState<{ rect: DOMRect; el: HTMLElement } | null>(null);
+  useReportOpen(!!anchor, onOpenChange);
   const [path, setPath] = useState<SubmenuItem[]>([]);
   const [active, setActive] = useState<string>();
   const [placed, setPlaced] = useState<Place>();

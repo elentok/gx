@@ -152,7 +152,10 @@ export function DesignActionsMenu({
   onOpenEpic,
   designItems = true,
   extraItems = [],
+  onOpenChange,
 }: {
+  /** True while the menu is open; the page holds its keyboard layout then. */
+  onOpenChange?: (open: boolean) => void;
   address: string;
   /** Items another flow adds beside Copy ID, such as the Triage's Abandon. */
   extraItems?: MenuEntry[];
@@ -222,7 +225,7 @@ export function DesignActionsMenu({
         ),
       },
     ]);
-  return <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} onClosed={() => setConfirming(false)} />;
+  return <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} onOpenChange={onOpenChange} onClosed={() => setConfirming(false)} />;
 }
 
 /**

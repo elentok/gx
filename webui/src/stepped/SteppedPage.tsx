@@ -85,17 +85,15 @@ export interface SteppedPageProps {
 function SessionStrip({
   address,
   session,
-  live,
   actions,
-  onSelect,
   startFailure,
   startLabel,
   headerButton,
-  designMenu,
-  menuItems,
-}: Pick<SteppedPageProps, "address" | "live" | "actions" | "startFailure" | "startLabel" | "headerButton" | "designMenu" | "menuItems"> & {
+  menu,
+}: Pick<SteppedPageProps, "address" | "actions" | "startFailure" | "startLabel" | "headerButton"> & {
   session?: SessionInfo;
-  onSelect: (id: string) => void;
+  /** The ⋯ menu; absent while it sits in the tabs row instead. */
+  menu?: ReactNode;
 }) {
   // The reason is for the failed start only: a live session means a retry worked.
   const reason = !session || session.status.state === "exited" ? startFailure : undefined;
@@ -107,21 +105,7 @@ function SessionStrip({
       ) : (
         !session && <StartDesignButton address={address} open={actions.open} label={startLabel} />
       )}
-      <DesignActionsMenu
-        address={address}
-        shown={session}
-        live={live}
-        designItems={!!designMenu}
-        extraItems={menuItems}
-        deletable={designMenu?.deletable}
-        itemGroups={designMenu?.itemGroups}
-        onOpenEpic={designMenu?.onOpenEpic}
-        onSelect={onSelect}
-        onDeleted={designMenu?.onDeleted ?? (() => {})}
-        open={actions.open}
-        stop={actions.stop}
-        remove={designMenu?.remove}
-      />
+      {menu}
     </Box>
   );
 }
@@ -162,6 +146,9 @@ export function SteppedPage({
   // The steps then open from the header like on a phone.
   const sideColumn = useDevice() === "desktop";
   const keyboardOpen = useKeyboardOpen();
+  // Opening the tabs-row menu moves focus off the field and closes the keyboard; the layout stays until the menu closes.
+  const [menuHeld, setMenuHeld] = useState(false);
+  const compact = !sideColumn && (keyboardOpen || menuHeld);
   const stepsInline = wide && sideColumn;
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session = live.find((s) => s.id === selected) ?? current;
@@ -170,15 +157,34 @@ export function SteppedPage({
   // Derived, not stored, so it cannot go stale: a round opens in Questions, and the reader's toggle holds for
   // that session and round only. The message list and the impl link both read it.
   const viewKey = `${session?.id}|${roundKeyOf(chat)}`;
-  const questions = chatty && (chat?.round?.length ?? 0) > 0 && (toggle?.key === viewKey ? toggle.on : true);
+  const hasRound = chatty && (chat?.round?.length ?? 0) > 0;
+  const questions = hasRound && (toggle?.key === viewKey ? toggle.on : true);
   useFocusReport(conn, session?.id, connState.streams, actions.focus);
+  const menu = (onOpenChange?: (open: boolean) => void) => (
+    <DesignActionsMenu
+      address={address}
+      shown={session}
+      live={live}
+      designItems={!!designMenu}
+      extraItems={menuItems}
+      deletable={designMenu?.deletable}
+      itemGroups={designMenu?.itemGroups}
+      onOpenEpic={designMenu?.onOpenEpic}
+      onSelect={setSelected}
+      onDeleted={designMenu?.onDeleted ?? (() => {})}
+      open={actions.open}
+      stop={actions.stop}
+      remove={designMenu?.remove}
+      onOpenChange={onOpenChange}
+    />
+  );
   return (
     <>
       {stepsOpen && model && (
         <StepsSheet model={model} rows={ticketRows} stepRows={stepRows} ring={ring?.("compact")} onClose={() => setStepsOpen(false)} />
       )}
       {/* With the keyboard up the header would take most of the visible height; the question needs it. */}
-      <Box mt="4" mb="3" flex="none" display={keyboardOpen && !sideColumn ? "none" : undefined}>
+      <Box mt="4" mb="3" flex="none" display={compact ? "none" : undefined}>
         <PageHeader
           title={title}
           icon={icon}
@@ -217,14 +223,11 @@ export function SteppedPage({
               <SessionStrip
                 address={address}
                 session={session}
-                live={live}
                 actions={actions}
-                onSelect={setSelected}
                 startFailure={startFailure}
                 startLabel={startLabel}
                 headerButton={headerButton}
-                designMenu={designMenu}
-                menuItems={menuItems}
+                menu={!compact && menu()}
               />
             </>
           }
@@ -260,7 +263,8 @@ export function SteppedPage({
             done={model?.done}
             nextTitle={model?.nextTitle}
             working={working(session)}
-            logTop={logTop}
+            logTop={compact ? undefined : logTop}
+            tabsMenu={compact && hasRound ? menu(setMenuHeld) : undefined}
             questions={questions}
             onQuestions={(on) => setToggle({ key: viewKey, on })}
             actions={{ address, open: actions.open, resume: actions.resume, fetchScreen: actions.fetchScreen }}

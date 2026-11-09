@@ -3,6 +3,7 @@ import { Fragment, useState, type ReactElement, type ReactNode } from "react";
 import { useWide } from "../../useWide";
 import { useCloseSignal, useOnCloseSignal } from "../closeSignal";
 import { PhoneMenu } from "./PhoneMenu";
+import { useReportOpen } from "./useReportOpen";
 
 interface ItemBase {
   /** Unique within the menu; also the key. */
@@ -205,12 +206,15 @@ export interface MenuProps {
   trigger: ReactElement;
   items: MenuEntry[];
   onClosed?: () => void;
+  /** True while the menu is open, false once it closes or unmounts. */
+  onOpenChange?: (open: boolean) => void;
   closeSignal?: unknown;
   placement?: "bottom-end" | "bottom-start" | "top-end" | "top-start";
 }
 
-function WideMenu({ trigger, items, onClosed, closeSignal, placement = "bottom-end" }: MenuProps) {
+function WideMenu({ trigger, items, onClosed, onOpenChange, closeSignal, placement = "bottom-end" }: MenuProps) {
   const [open, setOpen] = useState(false);
+  useReportOpen(open, onOpenChange);
   useOnCloseSignal(closeSignal, () => setOpen(false));
   return (
     <ChakraMenu.Root
