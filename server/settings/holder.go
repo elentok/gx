@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"sync"
@@ -63,6 +64,17 @@ type Holder struct {
 	// watch runs the config watcher; guarded by mu, so a reload toggling
 	// server.watch-config only ever cancels a context.
 	watch watch
+	// lastRead is the bytes the latest reload read; webSaved is the bytes of
+	// the latest web save's reload, which the watcher must not reload again.
+	// Both guarded by mu.
+	lastRead, webSaved []byte
+}
+
+// ownWrite reports whether data is what a web save just wrote and reloaded.
+func (h *Holder) ownWrite(data []byte) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.webSaved != nil && bytes.Equal(data, h.webSaved)
 }
 
 // Init gives the holder its wiring; call it once, before the server serves.

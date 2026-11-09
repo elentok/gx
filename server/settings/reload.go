@@ -19,6 +19,10 @@ import (
 const (
 	TriggerCommand = "command"
 	TriggerWatch   = "watch"
+	// TriggerWeb is a reload right after the settings page wrote config.json.
+	// The page shows the result, so it pops no OS banner, and the watcher
+	// skips the file bytes this reload read.
+	TriggerWeb = "web"
 )
 
 // Reload is the one reload path: read → parse → build → diff → apply →
@@ -26,6 +30,10 @@ const (
 func (h *Holder) Reload(trigger string) wire.ReloadResult {
 	h.mu.Lock()
 	res, closeRetired := h.reloadLocked()
+	h.webSaved = nil // any other reload makes an older web save's bytes stale
+	if trigger == TriggerWeb && !res.Refused {
+		h.webSaved = h.lastRead
+	}
 	h.reportReload(trigger, res)
 	h.mu.Unlock()
 	if closeRetired != nil {
@@ -47,6 +55,7 @@ func (h *Holder) reloadLocked() (wire.ReloadResult, func()) {
 	if err != nil {
 		return refuseReload(wire.ReasonInvalidConfig, err.Error()), nil
 	}
+	h.lastRead = data
 	cfg, err := config.Parse(data)
 	if err == nil {
 		err = agentrunner.ValidateSetting(cfg.AgentRunner)
@@ -216,6 +225,9 @@ func (h *Holder) reportReload(trigger string, res wire.ReloadResult) {
 	}
 	level, title, body := reloadBanner(res)
 	h.history.setLast(wire.ReloadRecord{At: time.Now(), Trigger: trigger, Outcome: level, Message: joinBanner(title, body)})
+	if trigger == TriggerWeb {
+		return
+	}
 	h.Banner(level, title, body)
 }
 

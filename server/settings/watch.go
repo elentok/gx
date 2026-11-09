@@ -155,6 +155,10 @@ func (h *Holder) reloadSaved(cw *configWatcher) {
 	case err == nil && cw.last != nil && bytes.Equal(data, cw.last):
 		h.opts.Log.Debug("config unchanged since the last reload attempt", "path", cw.path)
 		return
+	case err == nil && h.ownWrite(data):
+		cw.missing, cw.last = false, data
+		h.opts.Log.Debug("config unchanged since the last web save", "path", cw.path)
+		return
 	default:
 		cw.missing, cw.last = false, data
 	}
