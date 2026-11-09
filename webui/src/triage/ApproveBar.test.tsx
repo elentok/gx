@@ -22,6 +22,7 @@ test("with questions open it is disabled, says how many are left and links to th
   const onAnswer = vi.fn();
   bar({ open_questions: 3 }, { onAnswer });
   screen.getByText("3 questions left.");
+  expect(screen.getByRole("group", { name: "Approve" }).textContent).toBe("3 questions left. Answer them to approve.Approve and write");
   expect(approveButton().disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Answer them" }));
   expect(onAnswer).toHaveBeenCalledTimes(1);

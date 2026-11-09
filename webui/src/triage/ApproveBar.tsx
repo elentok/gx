@@ -61,6 +61,7 @@ export function ApproveBar({
                 <chakra.button type="button" textDecoration="underline" cursor="pointer" onClick={onAnswer}>
                   Answer them
                 </chakra.button>
+                {" to approve."}
               </>
             )}
           </>
