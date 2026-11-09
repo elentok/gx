@@ -38,6 +38,12 @@ type OneOffResult struct {
 	Message string `json:"message,omitempty"`
 }
 
+// Refusal and Refuse let the CLI treat the submit result as a Refusable.
+func (r OneOffResult) Refusal() (bool, string, string) { return r.Refused, r.Reason, r.Message }
+func (OneOffResult) Refuse(reason, message string) OneOffResult {
+	return OneOffResult{Refused: true, Reason: reason, Message: message}
+}
+
 // Refusal reasons of a one-off submit.
 const (
 	ReasonEmptyPrompt   = "empty-prompt"

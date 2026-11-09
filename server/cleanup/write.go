@@ -2,15 +2,12 @@ package cleanup
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/elentok/gx/cleanupscan"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 func (c *Cleanup) removeWrite(w http.ResponseWriter, r *http.Request) {
@@ -38,6 +35,11 @@ func byBranch(do func(project, branch string) (wire.CleanupWriteResult, error)) 
 }
 
 func (c *Cleanup) write(w http.ResponseWriter, r *http.Request, do func(wire.CleanupWriteRequest) (wire.CleanupWriteResult, error)) {
+	decodeAndRun(w, r, do)
+}
+
+// decodeAndRun reads the write request body, runs do and answers with its result.
+func decodeAndRun[T any](w http.ResponseWriter, r *http.Request, do func(wire.CleanupWriteRequest) (T, error)) {
 	var req wire.CleanupWriteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -45,11 +47,7 @@ func (c *Cleanup) write(w http.ResponseWriter, r *http.Request, do func(wire.Cle
 	}
 	res, err := do(req)
 	if err != nil {
-		code := http.StatusInternalServerError
-		if _, ok := errors.AsType[*tickets.AddressError](err); ok {
-			code = http.StatusNotFound
-		}
-		http.Error(w, err.Error(), code)
+		writeErr(w, err)
 		return
 	}
 	wire.WriteJSON(w, res)
@@ -78,13 +76,9 @@ func (c *Cleanup) RemoveUnmergedWorktree(project, branch string) (wire.CleanupWr
 // act runs do under the worktree lock. do re-scans and writes only if the row
 // still passes its check. Nothing here forces: git's refusal stays the reason.
 func (c *Cleanup) act(project, branch string, do func(root, branch string) (wire.CleanupWriteResult, error)) (wire.CleanupWriteResult, error) {
-	dir, err := tickets.ProjectDirByName(c.d.TicketStore, project)
+	_, root, err := c.repoFor(project)
 	if err != nil {
 		return wire.CleanupWriteResult{}, err
-	}
-	root := ticketgit.ProjectRepoRoot(c.d.TicketStore, tickets.ProjectName(dir))
-	if root == "" {
-		return wire.CleanupWriteResult{}, errors.New("project has no repo")
 	}
 	var res wire.CleanupWriteResult
 	err = worktree.WithWorktreeLock(func() error {

@@ -74,26 +74,40 @@ func Routes(c func() *Cleanup) []wire.Route {
 func (c *Cleanup) read(w http.ResponseWriter, r *http.Request) {
 	rep, err := c.Report(r.URL.Query().Get("project"))
 	if err != nil {
-		code := http.StatusInternalServerError
-		if _, ok := errors.AsType[*tickets.AddressError](err); ok {
-			code = http.StatusNotFound
-		}
-		http.Error(w, err.Error(), code)
+		writeErr(w, err)
 		return
 	}
 	wire.WriteJSON(w, rep)
 }
 
+// writeErr answers err: an unknown project or address is a 404, the rest a 500.
+func writeErr(w http.ResponseWriter, err error) {
+	code := http.StatusInternalServerError
+	if _, ok := errors.AsType[*tickets.AddressError](err); ok {
+		code = http.StatusNotFound
+	}
+	http.Error(w, err.Error(), code)
+}
+
+// repoFor returns project's ticket directory and repo root.
+func (c *Cleanup) repoFor(project string) (dir, root string, err error) {
+	dir, err = tickets.ProjectDirByName(c.d.TicketStore, project)
+	if err != nil {
+		return "", "", err
+	}
+	root = ticketgit.ProjectRepoRoot(c.d.TicketStore, tickets.ProjectName(dir))
+	if root == "" {
+		return "", "", fmt.Errorf("project %q has no repo", project)
+	}
+	return dir, root, nil
+}
+
 // Report scans project and starts a background size read for every worktree
 // whose size is not cached yet.
 func (c *Cleanup) Report(project string) (wire.CleanupReport, error) {
-	dir, err := tickets.ProjectDirByName(c.d.TicketStore, project)
+	_, repo, err := c.repoFor(project)
 	if err != nil {
 		return wire.CleanupReport{}, err
-	}
-	repo := ticketgit.ProjectRepoRoot(c.d.TicketStore, tickets.ProjectName(dir))
-	if repo == "" {
-		return wire.CleanupReport{}, fmt.Errorf("project %q has no repo", project)
 	}
 	res, err := cleanupscan.ScanIn(c.d.TicketStore, repo)
 	if err != nil {

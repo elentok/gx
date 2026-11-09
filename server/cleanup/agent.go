@@ -1,32 +1,17 @@
 package cleanup
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 )
 
 func (c *Cleanup) agentWrite(w http.ResponseWriter, r *http.Request) {
-	var req wire.CleanupWriteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	res, err := c.StartAgent(req.Project)
-	if err != nil {
-		code := http.StatusInternalServerError
-		if _, ok := errors.AsType[*tickets.AddressError](err); ok {
-			code = http.StatusNotFound
-		}
-		http.Error(w, err.Error(), code)
-		return
-	}
-	wire.WriteJSON(w, res)
+	decodeAndRun(w, r, func(req wire.CleanupWriteRequest) (wire.OneOffResult, error) {
+		return c.StartAgent(req.Project)
+	})
 }
 
 // StartAgent starts a one-off /gx-cleanup naming only the agent group: the

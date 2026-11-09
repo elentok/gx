@@ -90,3 +90,9 @@ type CleanupWriteResult struct {
 	// WorktreeRemoved is set when the worktree went but the branch stayed.
 	WorktreeRemoved bool `json:"worktree_removed,omitempty"`
 }
+
+// Refusal and Refuse let the CLI treat the write result as a Refusable.
+func (r CleanupWriteResult) Refusal() (bool, string, string) { return r.Refused, r.Reason, r.Message }
+func (CleanupWriteResult) Refuse(reason, message string) CleanupWriteResult {
+	return CleanupWriteResult{Refused: true, Reason: reason, Message: message}
+}

@@ -1,27 +1,21 @@
 package cleanup
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/elentok/gx/cleanupscan"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // ArchiveEpic moves a done epic that has landed on trunk into the project's
 // archive directory. Done and merged are re-checked here, and a queued epic is
 // refused, so a stale view cannot archive live work.
 func (c *Cleanup) ArchiveEpic(project, epic string) (wire.CleanupWriteResult, error) {
-	dir, err := tickets.ProjectDirByName(c.d.TicketStore, project)
+	dir, repo, err := c.repoFor(project)
 	if err != nil {
 		return wire.CleanupWriteResult{}, err
-	}
-	repo := ticketgit.ProjectRepoRoot(c.d.TicketStore, tickets.ProjectName(dir))
-	if repo == "" {
-		return wire.CleanupWriteResult{}, fmt.Errorf("project %q has no repo", project)
 	}
 	if c.d.EpicQueued != nil && c.d.EpicQueued(project, epic) {
 		return refuse(wire.ReasonCleanupQueued, "the epic is queued"), nil
