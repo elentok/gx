@@ -82,7 +82,8 @@ function Thumb({
           bg="surface.raised"
           borderWidth="1px"
           borderColor="border"
-          fontSize="sm"
+          fontSize="13px"
+          color={failed ? "tone.deadlocked.fg" : undefined}
           cursor="pointer"
           aria-label="Remove image"
           onClick={onRemove}
