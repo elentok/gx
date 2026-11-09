@@ -9,7 +9,7 @@ const (
 func Exclusions() []Exclusion {
 	out := []Exclusion{
 		{Key: Key("$schema"), Reason: "not a setting"},
-		{Key: Key("resume-on-start"), Reason: "legacy alias"},
+		{Key: Key("agents", "resume-on-start"), Reason: "legacy alias"},
 		{Key: Key("notifications"), Project: true,
 			Reason: "accepted in project.json, deliberately not editable on the web (secrets); ProjectFile still loads it and the page leaves an existing block untouched"},
 	}

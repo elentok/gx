@@ -1,86 +1,217 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/elentok/gx/main/docs/project-schema.json",
-  "title": "gx project",
-  "description": "A project's project.json in the ticket store. name and repo identify the project; the other keys override config.json for this project only.",
-  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
+  "description": "A project's project.json in the ticket store. name and repo identify the project; the other keys override config.json for this project only.",
   "properties": {
     "$schema": {
       "type": "string"
     },
-    "name": {
-      "type": "string",
-      "description": "Project name, used in ticket addresses (<project>:<epic>/<id>)."
-    },
-    "repo": {
-      "type": "string",
-      "description": "Absolute path of the project's repo (or workspace, for a vcs: none project)."
-    },
-    "vcs": {
-      "type": "string",
-      "enum": ["none"],
-      "description": "\"none\" for a project without a git repo. Absent means git."
-    },
-    "trunk": {
-      "type": "string",
-      "description": "Trunk branch of the project's repo."
-    },
-    "landing": {
-      "type": "string",
-      "enum": ["on-landed", "on-done"],
-      "default": "on-landed",
-      "description": "When a blocker releases its dependents. on-landed: once it has landed on trunk. on-done: once it is done, before it lands; dependents base on the blocker's branch. Default: on-landed."
+    "agents": {
+      "additionalProperties": false,
+      "properties": {
+        "banners": {
+          "description": "accepted in project.json, ignored"
+        },
+        "claude": {
+          "additionalProperties": false,
+          "properties": {
+            "effort": {
+              "description": "The effort level claude uses for the standard tier. Empty keeps the agent's own setting.",
+              "type": "string"
+            },
+            "light": {
+              "additionalProperties": false,
+              "properties": {
+                "effort": {
+                  "description": "The effort level claude uses for the light tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                },
+                "model": {
+                  "description": "The model claude uses for the light tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "model": {
+              "description": "The model claude uses for the standard tier. Empty keeps the agent's own setting.",
+              "type": "string"
+            },
+            "strongest": {
+              "additionalProperties": false,
+              "properties": {
+                "effort": {
+                  "description": "The effort level claude uses for the strongest tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                },
+                "model": {
+                  "description": "The model claude uses for the strongest tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "claude-args": {
+          "description": "accepted in project.json, ignored"
+        },
+        "codex": {
+          "additionalProperties": false,
+          "properties": {
+            "effort": {
+              "description": "The effort level codex uses for the standard tier. Empty keeps the agent's own setting.",
+              "type": "string"
+            },
+            "light": {
+              "additionalProperties": false,
+              "properties": {
+                "effort": {
+                  "description": "The effort level codex uses for the light tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                },
+                "model": {
+                  "description": "The model codex uses for the light tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "model": {
+              "description": "The model codex uses for the standard tier. Empty keeps the agent's own setting.",
+              "type": "string"
+            },
+            "strongest": {
+              "additionalProperties": false,
+              "properties": {
+                "effort": {
+                  "description": "The effort level codex uses for the strongest tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                },
+                "model": {
+                  "description": "The model codex uses for the strongest tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "default-harness": {
+          "description": "The coding agent that new sessions start with.",
+          "enum": [
+            "claude",
+            "codex"
+          ],
+          "type": "string"
+        },
+        "fix-agent-remote-control": {
+          "description": "accepted in project.json, ignored"
+        },
+        "restore-sessions-on-start": {
+          "description": "accepted in project.json, ignored"
+        },
+        "sounds": {
+          "description": "accepted in project.json, ignored"
+        }
+      },
+      "type": "object"
     },
     "auto-ff-merge": {
-      "type": "boolean",
-      "default": false,
-      "description": "Let the server fast-forward a finished epic onto its target. Default: false."
-    },
-    "max-agents": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Maximum live agents for this project. Absent means no per-project cap."
-    },
-    "agents": {
-      "$ref": "config-schema.json#/properties/agents"
-    },
-    "skills": {
-      "$ref": "config-schema.json#/properties/skills"
-    },
-    "notifications": {
-      "$ref": "config-schema.json#/properties/notifications",
-      "description": "Replaces the whole global notifications block for this project."
-    },
-    "evolve": {
-      "type": "boolean",
-      "description": "false opts this project out of evolve. Absent or true follows the global evolve mode."
+      "description": "Fast-forward merge finished work into trunk automatically.",
+      "type": "boolean"
     },
     "checks": {
       "$ref": "checks-schema.json",
-      "description": "The gx check config for this project. A .gx/checks.json in the repo wins over this."
+      "description": "The commands gx check runs for this project."
     },
     "disk-space": {
-      "type": "object",
       "additionalProperties": false,
       "properties": {
         "cleanup-command": {
-          "$ref": "config-schema.json#/properties/disk-space/properties/cleanup-command",
-          "description": "Replaces the global cleanup command for this project. An empty list turns cleanup off for it; an absent key keeps the global command."
+          "description": "The command, with its arguments, that frees disk space.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
-      }
+      },
+      "type": "object"
+    },
+    "evolve": {
+      "description": "Turn evolve off for this project. Leaving it unset follows the global setting.",
+      "type": "boolean"
     },
     "execution-queue": {
-      "type": "object",
       "additionalProperties": false,
       "properties": {
         "max-agents-per-epic": {
-          "$ref": "config-schema.json#/properties/execution-queue/properties/max-agents-per-epic"
+          "description": "The most agents that work on one epic at the same time.",
+          "minimum": 1,
+          "type": "integer"
         },
         "max-one-off-agents": {
-          "$ref": "config-schema.json#/properties/execution-queue/properties/max-one-off-agents"
+          "description": "The most agents running one-off tickets at the same time.",
+          "minimum": 1,
+          "type": "integer"
         }
-      }
+      },
+      "type": "object"
+    },
+    "landing": {
+      "description": "When tickets that wait on a blocker are released: on-landed once it landed on trunk, on-done once it is done.",
+      "enum": [
+        "on-landed",
+        "on-done"
+      ],
+      "type": "string"
+    },
+    "max-agents": {
+      "description": "The most agents this project runs at the same time, within the global cap.",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "name": {
+      "description": "The project's name.",
+      "type": "string"
+    },
+    "notifications": {
+      "$ref": "config-schema.json#/properties/notifications",
+      "description": "accepted in project.json, deliberately not editable on the web (secrets); ProjectFile still loads it and the page leaves an existing block untouched"
+    },
+    "repo": {
+      "description": "The repository directory of the project.",
+      "type": "string"
+    },
+    "skills": {
+      "additionalProperties": false,
+      "properties": {
+        "code-review": {
+          "description": "The skills that review an epic's code.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "implement": {
+          "description": "The skill agents run to implement a ticket.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "trunk": {
+      "description": "The branch that finished work lands on.",
+      "type": "string"
+    },
+    "vcs": {
+      "description": "The version control system of the project. none means the project has no repository.",
+      "type": "string"
     }
-  }
+  },
+  "title": "gx project",
+  "type": "object"
 }

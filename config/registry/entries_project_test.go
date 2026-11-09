@@ -73,7 +73,7 @@ func TestExclusionsHaveReasons(t *testing.T) {
 		got[x.Key.String()] = x
 	}
 	for _, k := range []string{
-		"$schema", "resume-on-start", "notifications",
+		"$schema", "agents.resume-on-start", "notifications",
 		"agents.restore-sessions-on-start", "agents.banners", "agents.sounds", "agents.claude-args", "agents.fix-agent-remote-control",
 		"use-nerdfont-icons", "image-diffs", "stage-diff-context-lines", "input-modal-bottom", "name-aliases",
 		"log", "log.important-refs", "log.hide-refs", "agents.leader-key", "agents.focus-sidebar-key",

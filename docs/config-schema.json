@@ -1,588 +1,553 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/elentok/gx/main/docs/config-schema.json",
-  "title": "gx config",
-  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
     "$schema": {
       "type": "string"
     },
-    "use-nerdfont-icons": {
-      "type": "boolean",
-      "description": "Enable Nerd Font icons in the UI. Default: true.",
-      "default": true
+    "agent-runner": {
+      "default": "auto",
+      "description": "How gx runs agents: auto picks for you, or choose herdr, headless or pty.",
+      "enum": [
+        "auto",
+        "herdr",
+        "headless",
+        "pty"
+      ],
+      "type": "string"
     },
-    "image-diffs": {
-      "type": "boolean",
-      "description": "Render inline image diffs (via the kitty graphics protocol) in the status diff panel on supported terminals. Default: true.",
-      "default": true
-    },
-    "stage-diff-context-lines": {
-      "type": "integer",
-      "description": "Number of context lines shown around each diff hunk in the staging view. Clamped to 0–20. Default: 1.",
-      "minimum": 0,
-      "maximum": 20,
-      "default": 1
-    },
-    "input-modal-bottom": {
-      "description": "Vertical position of the text-input overlay. An integer means fixed lines from the bottom, a percentage string (e.g. \"5%\") means a fraction of screen height from the bottom, and \"center\" places it in the middle of the screen. Default: \"5%\".",
-      "default": "5%",
-      "oneOf": [
-        {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Fixed number of lines from the bottom of the screen."
-        },
-        {
-          "type": "string",
-          "pattern": "^\\d+(\\.\\d+)?%$",
-          "description": "Percentage of screen height from the bottom (e.g. \"5%\")."
-        },
-        {
-          "type": "string",
-          "enum": ["center"],
-          "description": "Center the overlay vertically on the screen."
-        }
-      ]
-    },
-    "name-aliases": {
-      "type": "object",
-      "description": "Exact full-name aliases used for kitty session names.",
-      "additionalProperties": {
-        "type": "string"
-      },
-      "default": {}
-    },
-    "execution-queue": {
-      "type": "object",
-      "description": "Execution queue concurrency limits.",
+    "agents": {
       "additionalProperties": false,
       "properties": {
-        "max-agents-per-epic": {
-          "type": "integer",
-          "description": "Maximum agents that may run concurrently within one epic. Default: 2.",
-          "minimum": 1,
-          "default": 2
-        },
-        "max-agents": {
-          "type": "integer",
-          "description": "Maximum live agents across every project (the server's slot cap). Default: 4.",
-          "minimum": 1,
-          "default": 4
-        },
-        "max-one-off-agents": {
-          "type": "integer",
-          "description": "Maximum agents that may run concurrently across one project's one-off tickets. Default: 3.",
-          "minimum": 1,
-          "default": 3
-        },
-        "retry-storm-launches": {
-          "type": "integer",
-          "description": "Consecutive failed launches of one ticket before it is paused as retry-exhausted. Default: 3.",
-          "minimum": 1,
-          "default": 3
-        },
-        "spin-cycles": {
-          "type": "integer",
-          "description": "Pause/re-claim cycles of one ticket within spin-window before it is quarantined as spinning. Default: 3.",
-          "minimum": 1,
-          "default": 3
-        },
-        "spin-window": {
-          "type": "string",
-          "description": "Go duration string (e.g. \"5m\") bounding the spin-cycles count. Unparsable or non-positive values keep the default. Default: \"5m\".",
-          "default": "5m"
-        },
-        "waiting-slot-grace": {
-          "type": "string",
-          "description": "Go duration string (e.g. \"10m\"). A waiting agent counts toward the slot caps this long, then releases its slot and stays alive. Unparsable or non-positive values keep the default. Default: \"10m\".",
-          "default": "10m"
-        },
-        "max-released-agents": {
-          "type": "integer",
-          "description": "Maximum waiting agents that may hold a released slot at once, across every project. The next waiting agent keeps its slot. 0 disables release. Default: 5.",
-          "minimum": 0,
-          "default": 5
-        },
-        "stalled-nudge-delay": {
-          "type": "string",
-          "description": "Go duration string (e.g. \"2m\"). An idle agent with no open question and no finished report gets one nudge after this long, telling it to run `gx tickets ask` if it waits for a person. Unparsable or non-positive values keep the default. Default: \"2m\".",
-          "default": "2m"
-        }
-      },
-      "default": {
-        "max-agents-per-epic": 2,
-        "max-agents": 4,
-        "max-one-off-agents": 3,
-        "retry-storm-launches": 3,
-        "spin-cycles": 3,
-        "spin-window": "5m",
-        "waiting-slot-grace": "10m",
-        "max-released-agents": 5,
-        "stalled-nudge-delay": "2m"
-      }
-    },
-    "budget": {
-      "type": "object",
-      "description": "Estimated API-equivalent-cost soft/hard limits and notification thresholds, in dollars.",
-      "additionalProperties": false,
-      "properties": {
-        "soft-limit": {
-          "type": "number",
-          "description": "Estimated API-equivalent-cost soft limit in dollars. 0 disables it. Default: 300.",
-          "minimum": 0,
-          "default": 300
-        },
-        "hard-limit": {
-          "type": "number",
-          "description": "Estimated API-equivalent-cost hard limit in dollars. 0 disables it. Bumped up to soft-limit if set at or below a nonzero soft-limit. Default: 350.",
-          "minimum": 0,
-          "default": 350
-        },
-        "notification-thresholds": {
-          "type": "array",
-          "description": "Estimated API-equivalent-cost thresholds in dollars at which a notification fires. Sorted and deduped. Default: [50, 100, 150, 200, 250].",
-          "items": {
-            "type": "number",
-            "minimum": 0
-          },
-          "default": [50, 100, 150, 200, 250]
-        },
-        "long-ticket-turns": {
-          "type": "integer",
-          "description": "Assistant-turn count at which the long-ticket alert fires. 0 turns it off. Negative values are treated as 0. Default: 100.",
-          "minimum": 0,
-          "default": 100
-        }
-      },
-      "default": {
-        "soft-limit": 300,
-        "hard-limit": 350,
-        "notification-thresholds": [50, 100, 150, 200, 250]
-      }
-    },
-    "log": {
-      "type": "object",
-      "description": "Log view display settings.",
-      "additionalProperties": false,
-      "properties": {
-        "important-refs": {
-          "type": "array",
-          "description": "Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge; all others get a dim surface badge. Rules are evaluated in order — the first match wins. The order also controls sort priority: refs matching earlier rules appear first.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["patterns", "color"],
-            "properties": {
-              "patterns": {
-                "type": "array",
-                "description": "Regular expressions matched against the full ref name (e.g. \"^main$\", \"^origin/main$\", \"^v\\\\d\").",
-                "items": { "type": "string" },
-                "minItems": 1
-              },
-              "color": {
-                "type": "string",
-                "description": "Badge color. Named Catppuccin colors: blue, green, yellow, orange, mauve, teal, red, surface. Or a hex value: #rrggbb or #rgb."
-              }
-            }
-          },
-          "default": [
-            { "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"], "color": "yellow" }
-          ]
-        },
-        "hide-refs": {
-          "type": "array",
-          "description": "Regular expressions matched against the full ref name. Matching refs are hidden from the log view entirely. Takes priority over important-refs. Default: empty (nothing hidden).",
-          "items": { "type": "string" },
-          "default": []
-        }
-      }
-    },
-    "notifications": {
-      "type": "object",
-      "description": "External notification integrations.",
-      "additionalProperties": false,
-      "properties": {
-        "telegram": {
-          "type": "object",
-          "description": "Telegram bot credentials for sending notifications. An empty bot-token disables Telegram notifications.",
+        "banners": {
           "additionalProperties": false,
           "properties": {
-            "bot-token": {
-              "type": "string",
-              "description": "Telegram bot token. Default: empty (disabled).",
-              "default": ""
-            },
-            "chat-id": {
-              "type": "string",
-              "description": "Telegram chat id to send notifications to. Default: empty.",
-              "default": ""
+            "enabled": {
+              "default": true,
+              "description": "Show an OS banner when an interactive agent session needs you.",
+              "type": "boolean"
             }
           },
-          "default": {
-            "bot-token": "",
-            "chat-id": ""
-          }
+          "type": "object"
         },
+        "claude": {
+          "additionalProperties": false,
+          "properties": {
+            "effort": {
+              "default": "medium",
+              "description": "The effort level claude uses for the standard tier. Empty keeps the agent's own setting.",
+              "type": "string"
+            },
+            "light": {
+              "additionalProperties": false,
+              "properties": {
+                "effort": {
+                  "default": "",
+                  "description": "The effort level claude uses for the light tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                },
+                "model": {
+                  "default": "haiku",
+                  "description": "The model claude uses for the light tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "model": {
+              "default": "sonnet",
+              "description": "The model claude uses for the standard tier. Empty keeps the agent's own setting.",
+              "type": "string"
+            },
+            "strongest": {
+              "additionalProperties": false,
+              "properties": {
+                "effort": {
+                  "default": "high",
+                  "description": "The effort level claude uses for the strongest tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                },
+                "model": {
+                  "default": "opus",
+                  "description": "The model claude uses for the strongest tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "claude-args": {
+          "description": "Extra command-line arguments passed to every Claude session.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "codex": {
+          "additionalProperties": false,
+          "properties": {
+            "effort": {
+              "default": "medium",
+              "description": "The effort level codex uses for the standard tier. Empty keeps the agent's own setting.",
+              "type": "string"
+            },
+            "light": {
+              "additionalProperties": false,
+              "properties": {
+                "effort": {
+                  "default": "medium",
+                  "description": "The effort level codex uses for the light tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                },
+                "model": {
+                  "default": "gpt-6-luna",
+                  "description": "The model codex uses for the light tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "model": {
+              "default": "gpt-6.1-sol",
+              "description": "The model codex uses for the standard tier. Empty keeps the agent's own setting.",
+              "type": "string"
+            },
+            "strongest": {
+              "additionalProperties": false,
+              "properties": {
+                "effort": {
+                  "default": "high",
+                  "description": "The effort level codex uses for the strongest tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                },
+                "model": {
+                  "default": "gpt-6-astra",
+                  "description": "The model codex uses for the strongest tier. Empty keeps the agent's own setting.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "default-harness": {
+          "default": "claude",
+          "description": "The coding agent that new sessions start with.",
+          "enum": [
+            "claude",
+            "codex"
+          ],
+          "type": "string"
+        },
+        "fix-agent-remote-control": {
+          "default": false,
+          "description": "Start Claude fix-agent sessions with remote control on.",
+          "type": "boolean"
+        },
+        "focus-sidebar-key": {
+          "description": "TUI only, not shown on the web page"
+        },
+        "leader-key": {
+          "description": "TUI only, not shown on the web page"
+        },
+        "restore-sessions-on-start": {
+          "default": true,
+          "description": "Reopen the agent sessions that were open when gx last stopped.",
+          "type": "boolean"
+        },
+        "resume-on-start": {
+          "description": "legacy alias"
+        },
+        "sounds": {
+          "additionalProperties": false,
+          "properties": {
+            "attention": {
+              "description": "The sound file played when a session needs you, relative to the config directory. Empty uses the built-in sound.",
+              "type": "string"
+            },
+            "done": {
+              "description": "The sound file played when a session finishes, relative to the config directory. Empty uses the built-in sound.",
+              "type": "string"
+            },
+            "enabled": {
+              "default": true,
+              "description": "Play a sound when an interactive agent session finishes or needs you.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "budget": {
+      "additionalProperties": false,
+      "properties": {
+        "hard-limit": {
+          "default": 350,
+          "description": "Estimated spend in dollars at which gx stops launching agents. 0 turns it off.",
+          "minimum": 0,
+          "type": "number"
+        },
+        "long-ticket-turns": {
+          "default": 100,
+          "description": "Number of agent turns after which a ticket counts as long and you are alerted. 0 turns it off.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "notification-thresholds": {
+          "default": [
+            50,
+            100,
+            150,
+            200,
+            250
+          ],
+          "description": "Spend amounts in dollars that each send a notification when crossed.",
+          "items": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "soft-limit": {
+          "default": 300,
+          "description": "Estimated spend in dollars at which gx warns you. 0 turns it off.",
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "cpu-watchdog": {
+      "additionalProperties": false,
+      "properties": {
+        "cooldown": {
+          "description": "The least time between two CPU captures.",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Watch the server's CPU use and capture a profile when it stays high.",
+          "type": "boolean"
+        },
+        "sustain": {
+          "description": "How long CPU use must stay high before the watchdog acts.",
+          "type": "string"
+        },
+        "threshold-percent": {
+          "default": 15,
+          "description": "CPU use, in percent of one core, that counts as high.",
+          "minimum": 1,
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "disk-space": {
+      "additionalProperties": false,
+      "properties": {
+        "clean-below": {
+          "default": "10G",
+          "description": "Run the cleanup command when free disk space drops below this size. 0 turns it off.",
+          "type": "string"
+        },
+        "cleanup-command": {
+          "default": [
+            "go",
+            "clean",
+            "-cache"
+          ],
+          "description": "The command, with its arguments, that frees disk space.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "warn-below": {
+          "default": "20G",
+          "description": "Warn when free disk space drops below this size. 0 turns it off.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "evolve": {
+      "default": "off",
+      "description": "What gx does when an epic completes: off, maintainer or contributor.",
+      "enum": [
+        "off",
+        "maintainer",
+        "contributor"
+      ],
+      "type": "string"
+    },
+    "evolve.deep-read-cap": {
+      "default": 8,
+      "description": "The most deep-read subagents one evolve run may start.",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "execution-queue": {
+      "additionalProperties": false,
+      "properties": {
+        "max-agents": {
+          "default": 4,
+          "description": "The most agents that run at the same time across all projects.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max-agents-per-epic": {
+          "default": 2,
+          "description": "The most agents that work on one epic at the same time.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max-one-off-agents": {
+          "default": 3,
+          "description": "The most agents running one-off tickets at the same time.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max-released-agents": {
+          "default": 5,
+          "description": "The most agents that may wait with their slot released. 0 means none.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retry-storm-launches": {
+          "default": 3,
+          "description": "How many launches of one ticket in a short time count as a retry storm and pause it.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "spin-cycles": {
+          "default": 3,
+          "description": "How many start-and-stop cycles of one ticket within the spin window count as spinning.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "spin-window": {
+          "description": "The time span in which spin cycles are counted.",
+          "type": "string"
+        },
+        "stalled-nudge-delay": {
+          "description": "How long an agent may be silent before it is nudged.",
+          "type": "string"
+        },
+        "waiting-slot-grace": {
+          "description": "How long an agent that waits for an answer keeps its slot before the slot is freed.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "image-diffs": {
+      "description": "TUI only, not shown on the web page"
+    },
+    "input-modal-bottom": {
+      "description": "TUI only, not shown on the web page"
+    },
+    "log": {
+      "description": "TUI only, not shown on the web page"
+    },
+    "name-aliases": {
+      "description": "TUI only, not shown on the web page"
+    },
+    "notifications": {
+      "additionalProperties": false,
+      "properties": {
         "slack": {
-          "type": "object",
-          "description": "Slack workflow webhook for sending notifications. An empty webhook-url disables Slack notifications.",
           "additionalProperties": false,
           "properties": {
             "webhook-url": {
-              "type": "string",
-              "description": "Slack workflow webhook URL (accepts a single {\"text\": \"...\"} body). Default: empty (disabled).",
-              "default": ""
+              "default": "",
+              "description": "The Slack webhook address that receives notifications.",
+              "type": "string"
             }
           },
-          "default": {
-            "webhook-url": ""
-          }
+          "type": "object"
+        },
+        "telegram": {
+          "additionalProperties": false,
+          "properties": {
+            "bot-token": {
+              "default": "",
+              "description": "The token of the Telegram bot that sends notifications.",
+              "type": "string"
+            },
+            "chat-id": {
+              "default": "",
+              "description": "The Telegram chat that receives notifications.",
+              "type": "string"
+            }
+          },
+          "type": "object"
         }
       },
-      "default": {
-        "telegram": {
-          "bot-token": "",
-          "chat-id": ""
-        },
-        "slack": {
-          "webhook-url": ""
-        }
-      }
-    },
-    "server": {
-      "type": "object",
-      "description": "Orchestrator server settings.",
-      "properties": {
-        "tcp-listen": {
-          "type": "boolean",
-          "default": false,
-          "description": "Also listen on loopback TCP (127.0.0.1:7421), serving the same routes as the socket. No auth."
-        },
-        "web": {
-          "type": "object",
-          "description": "Web UI listener settings.",
-          "properties": {
-            "allowed-hosts": {
-              "type": "array",
-              "items": { "type": "string" },
-              "default": [],
-              "description": "Host names the web listener accepts in the Host header, besides IP literals and localhost (e.g. a MagicDNS name). Matched without the port, case-insensitively. Any other Host gets a 403. Reloads without a restart."
-            },
-            "totp": {
-              "type": "boolean",
-              "default": true,
-              "description": "Whether web login asks for a TOTP code besides the password. Reloads without a restart; signed-in web logins stay signed in."
-            },
-            "dev-frontend": {
-              "type": "boolean",
-              "default": false,
-              "description": "Dev only: serve the web UI from the Vite dev server at dev-url instead of the embedded build. /v1 stays on gx. Startup-only."
-            },
-            "dev-url": {
-              "type": "string",
-              "default": "http://127.0.0.1:5173",
-              "description": "Loopback http URL of the Vite dev server used when dev-frontend is true."
-            }
-          }
-        },
-        "tab-env": {
-          "type": "array",
-          "description": "KEY=VALUE entries set on every iteration tab's shell, to override what the shell rc would decide (e.g. PATH). Default: empty.",
-          "items": { "type": "string", "pattern": "^[^=]+=" },
-          "default": []
-        },
-        "watch-config": {
-          "type": "boolean",
-          "default": true,
-          "description": "Reload this config file automatically when it is saved. `gx server reload-config` works either way."
-        },
-        "log-retention": {
-          "type": "string",
-          "default": "720h",
-          "description": "Go duration string (e.g. \"168h\") for how long a headless agent's logs outlive its last activity. Unparsable or non-positive values keep the default. Default: \"720h\" (30 days)."
-        }
-      }
-    },
-    "agent-runner": {
-      "type": "string",
-      "enum": ["auto", "herdr", "headless"],
-      "default": "auto",
-      "description": "How the server runs agents. auto uses herdr when it answers within 2s, else headless. herdr requires herdr to be up; headless requires claude on PATH. Checked when the server starts. Default: auto."
-    },
-    "runner-wait": {
-      "type": "string",
-      "default": "5s",
-      "description": "Go duration string (e.g. \"10s\") for N, the wait every agent runner bounds its guards by. Unparsable or non-positive values keep the default. Read when the server starts. Default: \"5s\"."
-    },
-    "evolve": {
-      "type": "string",
-      "enum": ["off", "maintainer", "contributor"],
-      "default": "off",
-      "description": "What the retro hook does when an epic completes. A project opts out with evolve: false in its project file."
-    },
-    "evolve.deep-read-cap": {
-      "type": "integer",
-      "minimum": 1,
-      "default": 8,
-      "description": "Maximum deep-read subagents in one gx-evolve run."
+      "type": "object"
     },
     "recovery": {
-      "type": "object",
-      "description": "Recovery catalog: automatic investigation of paused tickets.",
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Global kill switch for the recovery catalog. Default: true."
-        },
         "disabled": {
-          "type": "array",
-          "description": "Catalog entry IDs to switch off. Default: empty.",
-          "items": { "type": "string" },
-          "default": []
+          "description": "Recovery steps that stay off.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Let gx try to recover tickets that get stuck.",
+          "type": "boolean"
         },
         "follow-ups": {
-          "type": "string",
-          "default": "gx:follow-ups",
-          "description": "Epic (project:epic) that receives the draft research tickets an investigate ticket files. Default: gx:follow-ups."
+          "description": "Where recovery files follow-ups.",
+          "type": "string"
         },
         "notify-hold": {
-          "type": "string",
-          "default": "10m",
-          "description": "Go duration string for how long a pause's chat message waits for recovery before it is sent anyway. Unparsable or non-positive values keep the default. Default: \"10m\"."
+          "description": "How long recovery holds a notification back before sending it.",
+          "type": "string"
         }
-      }
+      },
+      "type": "object"
     },
-    "cpu-watchdog": {
-      "type": "object",
-      "description": "gx watches its own CPU use (the server and each TUI). A sustained spike captures a CPU profile and goroutine dump under the state dir's cpu-spikes/ and, in evolve maintainer mode, files a ticket in the gx project for an agent to find the cause.",
+    "runner-wait": {
+      "description": "How long an agent runner waits on its guards before giving up.",
+      "type": "string"
+    },
+    "server": {
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "type": "boolean",
+        "log-retention": {
+          "description": "How long server logs are kept before they are deleted.",
+          "type": "string"
+        },
+        "recently-finished": {
+          "default": 5,
+          "description": "How many recently finished tickets stay listed. 0 hides them.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tab-env": {
+          "description": "Environment variable names copied into every new terminal tab.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tcp-listen": {
+          "default": false,
+          "description": "Let other machines reach the gx server over TCP, not only this machine.",
+          "type": "boolean"
+        },
+        "watch-config": {
           "default": true,
-          "description": "Turns the watchdog on. Default: true."
+          "description": "Reload the config automatically when config.json changes.",
+          "type": "boolean"
         },
-        "threshold-percent": {
-          "type": "number",
-          "default": 15,
-          "description": "CPU use, in percent of one core and counting subprocesses, that counts as high. Non-positive values keep the default. Default: 15."
-        },
-        "sustain": {
-          "type": "string",
-          "default": "1m",
-          "description": "Go duration string for how long the use must stay high before a spike fires, and low before it can fire again. Default: \"1m\"."
-        },
-        "cooldown": {
-          "type": "string",
-          "default": "6h",
-          "description": "Go duration string for the least time between two spikes: evidence captures per process, and filed tickets. Default: \"6h\"."
+        "web": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed-hosts": {
+              "description": "Host names the web page accepts requests for.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "dev-frontend": {
+              "default": false,
+              "description": "Serve the web page from a development frontend server instead of the built files.",
+              "type": "boolean"
+            },
+            "dev-url": {
+              "default": "http://127.0.0.1:5173",
+              "description": "The address of the development frontend server.",
+              "type": "string"
+            },
+            "listen": {
+              "default": "",
+              "description": "The address the web page is served on.",
+              "type": "string"
+            },
+            "totp": {
+              "default": true,
+              "description": "Ask for a one-time code when signing in to the web page.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
         }
-      }
+      },
+      "type": "object"
     },
-    "disk-space": {
-      "type": "object",
-      "description": "When gx warns about low free disk space, when it cleans, and the command it cleans with. Sizes are strings such as \"20G\", \"500M\" or \"1500000000\" (a bare unit letter is decimal: G is 10^9 bytes; \"GiB\" is 2^30). A config reload applies them with no restart.",
+    "skills": {
       "additionalProperties": false,
       "properties": {
-        "warn-below": {
-          "type": "string",
-          "default": "20G",
-          "description": "Free space below which gx warns. \"0\" turns the warning off. Raised to clean-below when it is non-zero and lower. Default: \"20G\"."
+        "code-review": {
+          "default": [
+            "gx-thermo-nuclear-code-quality-review",
+            "gx-test-review"
+          ],
+          "description": "The skills that review an epic's code.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
-        "clean-below": {
-          "type": "string",
-          "default": "10G",
-          "description": "Free space below which gx runs cleanup-command. \"0\" turns cleaning off. Default: \"10G\"."
-        },
-        "cleanup-command": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": ["go", "clean", "-cache"],
-          "description": "The cleanup command as an argv list, not a shell string. An empty list turns cleanup off. A project's project.json can replace it. Default: [\"go\", \"clean\", \"-cache\"]."
+        "implement": {
+          "default": "gx-implement",
+          "description": "The skill agents run to implement a ticket.",
+          "type": "string"
         }
-      }
+      },
+      "type": "object"
+    },
+    "stage-diff-context-lines": {
+      "description": "TUI only, not shown on the web page"
     },
     "subscription": {
-      "type": "object",
-      "description": "Subscription extra-usage safety check.",
       "additionalProperties": false,
       "properties": {
         "suppress-extra-usage-warning": {
-          "type": "boolean",
           "default": false,
-          "description": "Permanently silence the extra-usage-enabled warning once you have acknowledged it. Default: false."
+          "description": "Hide the warning that appears when a subscription runs into extra paid usage.",
+          "type": "boolean"
         }
-      }
+      },
+      "type": "object"
     },
     "ticket-store": {
-      "type": "object",
-      "description": "Where the global ticket store lives.",
       "additionalProperties": false,
       "properties": {
-        "path": {
-          "type": "string",
-          "description": "Absolute path of the ticket store. Default: <data dir>/tickets (~/.local/share/gx/tickets, honoring XDG_DATA_HOME)."
-        },
         "commit-debounce": {
-          "type": "integer",
-          "minimum": 1,
           "default": 60,
-          "description": "Seconds of quiet after a ticket-store change before the store commit loop commits it."
+          "description": "Seconds the ticket store waits after a change before it commits.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The directory that holds your tickets.",
+          "type": "string"
         },
         "push-remote": {
-          "type": "string",
           "default": "",
-          "description": "Git remote of the store to push to after each commit, best effort. Empty means no push."
-        }
-      }
-    },
-    "skills": {
-      "type": "object",
-      "description": "Which skill(s) gx-implement-equivalent work and code review run under.",
-      "additionalProperties": false,
-      "properties": {
-        "implement": {
-          "type": "string",
-          "description": "Skill invoked for ticket-implementation work. Default: gx-implement.",
-          "default": "gx-implement"
-        },
-        "code-review": {
-          "type": "array",
-          "description": "Skill(s) invoked for code review. Default: [gx-thermo-nuclear-code-quality-review, gx-test-review].",
-          "items": { "type": "string" },
-          "default": ["gx-thermo-nuclear-code-quality-review", "gx-test-review"]
+          "description": "A git remote the ticket store is pushed to after each commit. Empty means no push.",
+          "type": "string"
         }
       },
-      "default": {
-        "implement": "gx-implement",
-        "code-review": ["gx-thermo-nuclear-code-quality-review", "gx-test-review"]
-      }
+      "type": "object"
     },
-    "agents": {
-      "type": "object",
-      "description": "Coding agent settings: the model and effort level each agent runs under, and the interactive (Agents tab) session keys. For model/effort: an absent key uses gx's built-in default; an explicit empty string (\"\") means \"inherit\" — gx passes no flag for that knob, leaving the agent CLI's own configuration in charge. Values are passed through as-is (trimmed of surrounding whitespace) and are never validated against a model/effort allowlist.",
-      "additionalProperties": false,
-      "properties": {
-        "claude": {
-          "type": "object",
-          "description": "Model/effort for the claude agent. Default: model=sonnet, effort=medium.",
-          "additionalProperties": false,
-          "properties": {
-            "model": {
-              "type": "string",
-              "description": "Model passed to the claude CLI. Empty string means inherit the CLI's own setting. Default: sonnet."
-            },
-            "effort": {
-              "type": "string",
-              "description": "Effort level passed to the claude CLI. Empty string means inherit the CLI's own setting. Default: medium."
-            }
-          },
-          "default": {
-            "model": "sonnet",
-            "effort": "medium"
-          }
-        },
-        "codex": {
-          "type": "object",
-          "description": "Model/effort for the codex agent. Default: model=gpt-5.6-sol, effort=medium.",
-          "additionalProperties": false,
-          "properties": {
-            "model": {
-              "type": "string",
-              "description": "Model passed to the codex CLI. Empty string means inherit the CLI's own setting. Default: gpt-5.6-sol."
-            },
-            "effort": {
-              "type": "string",
-              "description": "Effort level passed to the codex CLI. Empty string means inherit the CLI's own setting. Default: medium."
-            }
-          },
-          "default": {
-            "model": "gpt-5.6-sol",
-            "effort": "medium"
-          }
-        },
-        "default-harness": {
-          "type": "string",
-          "enum": ["claude", "codex"],
-          "description": "The harness new sessions use. The server will not start when its program is not on PATH (under agent-runner auto or pty). A project's project.json can override it. Default: claude.",
-          "default": "claude"
-        },
-        "leader-key": {
-          "description": "Key (or list of keys) that starts a leader sequence in the Agents tab. A malformed or blank value falls back to the default. Default: ctrl+a.",
-          "oneOf": [
-            { "type": "string", "minLength": 1 },
-            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
-          ],
-          "default": "ctrl+a"
-        },
-        "focus-sidebar-key": {
-          "description": "Key (or list of keys) that moves focus from the Agents terminal to the sidebar, showing the sidebar if hidden. The leader then this key sends it to the session. A malformed or blank value falls back to the default. Default: ctrl+q.",
-          "oneOf": [
-            { "type": "string", "minLength": 1 },
-            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
-          ],
-          "default": "ctrl+q"
-        },
-        "restore-sessions-on-start": {
-          "type": "boolean",
-          "description": "Restore the interactive sessions that were running when the server last stopped. Default: true.",
-          "default": true
-        },
-        "resume-on-start": {
-          "type": "boolean",
-          "description": "Deprecated alias for restore-sessions-on-start."
-        },
-        "banners": {
-          "type": "object",
-          "description": "OS banners for interactive sessions.",
-          "additionalProperties": false,
-          "properties": {
-            "enabled": {
-              "type": "boolean",
-              "description": "Show a banner when an interactive session finishes or needs attention. Default: true.",
-              "default": true
-            }
-          }
-        },
-        "sounds": {
-          "type": "object",
-          "description": "Sounds for interactive sessions.",
-          "additionalProperties": false,
-          "properties": {
-            "enabled": {
-              "type": "boolean",
-              "description": "Play a sound when an interactive session finishes or needs attention. Default: true.",
-              "default": true
-            },
-            "done": {
-              "type": "string",
-              "description": "Sound file played when a session finishes, relative to the config dir. Empty means the built-in sound."
-            },
-            "attention": {
-              "type": "string",
-              "description": "Sound file played when a session needs attention, relative to the config dir. Empty means the built-in sound."
-            }
-          }
-        },
-        "claude-args": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Extra arguments passed to claude in interactive sessions. Default: none."
-        },
-        "fix-agent-remote-control": {
-          "type": "boolean",
-          "description": "Start Claude fix-agent sessions with --remote-control <ticket address>, so they can be driven from the Claude app. Other harnesses and session kinds ignore it. Default: false.",
-          "default": false
-        }
-      },
-      "default": {
-        "claude": { "model": "sonnet", "effort": "medium" },
-        "codex": { "model": "gpt-5.6-sol", "effort": "medium" }
-      }
+    "use-nerdfont-icons": {
+      "description": "TUI only, not shown on the web page"
     }
-  }
+  },
+  "title": "gx config",
+  "type": "object"
 }
