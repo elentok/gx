@@ -62,6 +62,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/workspaces/hold":                  "server hold",
 	"POST /v1/workspaces/unhold":                "server unhold",
 	"POST /v1/checks/save":                      "server checks-save",
+	"GET /v1/settings":                          "server settings",
 	"GET /v1/settings/agents":                   "server default-harness",
 	"POST /v1/settings/agents":                  "server default-harness-set",
 	"GET /v1/tickets/history":                   "server tickets history",

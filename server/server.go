@@ -43,6 +43,7 @@ import (
 	"github.com/elentok/gx/server/sessions/fixagent"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/settingsapi"
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
@@ -93,21 +94,22 @@ type Server struct {
 	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
 	sessionChat *chat.Chat
 	// prompt holds the auto-advance countdowns and the turn settling.
-	prompt   *sessprompt.Prompt
-	lock     *lifecycle.Lock
-	ln       net.Listener
-	tcp      net.Listener // nil unless Config.TCPAddr is set
-	http     *http.Server
-	tcpHTTP  *http.Server // the socket's routes behind refuseBrowsers
-	web      *web.Web     // the web listener; off unless Config.WebAddr is set and bound
-	logf     *lifecycle.RotatingFile
-	log      *slog.Logger
-	idx      *index.Index
-	harness  *harnesschoice.Harness
-	projects *projects.Registry
-	migrator *projects.Migrator
-	checks   *projects.Checks
-	cleanup  *cleanup.Cleanup
+	prompt         *sessprompt.Prompt
+	lock           *lifecycle.Lock
+	ln             net.Listener
+	tcp            net.Listener // nil unless Config.TCPAddr is set
+	http           *http.Server
+	tcpHTTP        *http.Server // the socket's routes behind refuseBrowsers
+	web            *web.Web     // the web listener; off unless Config.WebAddr is set and bound
+	logf           *lifecycle.RotatingFile
+	log            *slog.Logger
+	idx            *index.Index
+	harness        *harnesschoice.Harness
+	settingsWriter *settingsapi.Writer
+	projects       *projects.Registry
+	migrator       *projects.Migrator
+	checks         *projects.Checks
+	cleanup        *cleanup.Cleanup
 
 	queue      *queue.Queue
 	afk        *queue.AFK
@@ -321,6 +323,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.restarter = s.newRestarter()
 	s.initProjects()
+	s.settingsWriter = s.newSettingsWriter(cfg.ConfigPath)
 	s.startup = lifecycle.NewStartup(startupHost{s}, log)
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{

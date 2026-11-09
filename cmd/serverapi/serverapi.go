@@ -23,7 +23,7 @@ func Commands(d Deps) []*cobra.Command {
 		newServerSnapshotCmd(d), newServerEventsCmd(d), newServerLocksCmd(d), newServerTicketsCmd(d),
 		newServerEpicsCmd(d), newServerStatsCmd(d), newServerTipsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d),
 		newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d),
-		newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDefaultHarnessCmd(d), newServerDefaultHarnessSetCmd(d),
+		newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDefaultHarnessCmd(d), newServerDefaultHarnessSetCmd(d), newServerSettingsCmd(d),
 		newServerCleanupCmd(d), newServerCleanupRemoveCmd(d), newServerCleanupRemoveUnmergedCmd(d), newServerCleanupArchiveCmd(d), newServerCleanupAgentCmd(d), newServerCleanupDeleteCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerRestartCheckCmd(d), newServerRestartNowCmd(d),
 		newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d), newServerWebResetCmd(d),
 		newServerWebResetAuthenticatorCmd(d), newServerWebLoginsCmd(d), newServerWebRevokeCmd(d), newServerWebPasswordCmd(d),

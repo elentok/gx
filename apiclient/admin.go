@@ -102,6 +102,13 @@ func (a *Admin) DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, 
 	return st, err
 }
 
+// Settings is the settings read model of a target: "global" or a project name.
+func (a *Admin) Settings(ctx context.Context, target string) (wire.SettingsReadResponse, error) {
+	var resp wire.SettingsReadResponse
+	err := a.t.get(ctx, "/v1/settings?"+url.Values{"target": {target}}.Encode(), &resp)
+	return resp, err
+}
+
 // SetDefaultHarness writes the Default harness. A refusal is a result (Refused
 // set), not an error.
 func (a *Admin) SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
