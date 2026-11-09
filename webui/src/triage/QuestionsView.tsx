@@ -1,11 +1,12 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { postSaveTriageRow, type SaveTriageRow } from "../design/open";
+import { postSaveTriageRow, postSendBackTriage, type SaveTriageRow, type SendBackTriage } from "../design/open";
 import { QuestionSheet } from "../design/QuestionSheet";
 import type { TriageRow, TriageView } from "../generated/server";
+import { Button } from "../ui/button/Button";
 import type { Answers } from "../ui/question-sheet/round";
 import { showToast } from "../ui/toaster";
-import { refusalText } from "../useWrite";
+import { refusalText, useWrite } from "../useWrite";
 import { answersOf, changedRows, roundOf, rowAnswers } from "./questions";
 
 // The wire's refusal for an out-of-date revision (server/wire ReasonStale); the generated types carry no constant for it.
@@ -32,11 +33,13 @@ export function QuestionsView({
   view,
   refetch,
   save = postSaveTriageRow,
+  sendBack = postSendBackTriage,
 }: {
   project: string;
   view: TriageView;
   refetch: () => void;
   save?: SaveTriageRow;
+  sendBack?: SendBackTriage;
 }) {
   const round = useMemo(() => roundOf(view.rows), [view.rows]);
   const [answers, setAnswers] = useState<Answers>(() => answersOf(view.rows));
@@ -104,10 +107,38 @@ export function QuestionsView({
     else flush();
   };
 
+  const { run, pending } = useWrite({ toastRefusal: false });
+  // Whatever is typed is saved first, so the agent reads the answers on screen, then the record goes back to Plan.
+  const sendBackNow = () =>
+    run(async () => {
+      window.clearTimeout(timer.current);
+      flush();
+      await queue.current;
+      const res = await sendBack({ project, revision: latest.current.revision });
+      if (res.refused) {
+        showToast({ type: "error", title: refusalText(res) });
+        refetch();
+        return res;
+      }
+      showToast({ type: "info", title: "Sent back. The agent is writing new questions." });
+      refetch();
+      return res;
+    });
+
   if (round.length === 0) return <Text color="text.muted">No open questions.</Text>;
   return (
     <Box display="flex" flexDirection="column" gap="2">
       <QuestionSheet key={view.rows.length} round={round} answers={answers} onAnswers={onAnswers} questions />
+      <Box display="flex" alignItems="center" flexWrap="wrap" gap="3">
+        <Button emphasis="ghost" tone="muted" size="sm" disabled={view.open_questions > 0 || pending} onClick={sendBackNow}>
+          Send back to the agent
+        </Button>
+        <Text fontSize="xs" color="text.dim">
+          {view.open_questions > 0
+            ? "Answer every question to send them back."
+            : "The agent reads your answers and notes and asks again. Your answers stay."}
+        </Text>
+      </Box>
       <Text fontSize="xs" color="text.dim">
         Answers go into each ticket body when the Write step runs.
       </Text>

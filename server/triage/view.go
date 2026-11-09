@@ -165,7 +165,7 @@ func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageV
 		return v
 	}
 	isLive := rec.State == triagerec.StateLive
-	v.ID, v.State, v.Revision = rec.ID, wire.TriageState(rec.State), rec.Revision
+	v.ID, v.State, v.Revision, v.Round = rec.ID, wire.TriageState(rec.State), rec.Revision, rec.Round
 	v.Steps = steps(rec.Step)
 	v.CanAbandon = CanAbandon(isLive, rec.Step, stopped)
 

@@ -139,6 +139,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/triage/row":                       "server triage row",
 	"POST /v1/triage/abandon":                   "server triage abandon",
 	"POST /v1/triage/approve":                   "server triage approve",
+	"POST /v1/triage/send-back":                 "server triage send-back",
 	"POST /v1/triage/retry":                     "server triage retry",
 	"POST /v1/triage/keep":                      "server triage keep",
 	"GET /v1/triage":                            "server triage show",

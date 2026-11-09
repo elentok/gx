@@ -67,6 +67,12 @@ type Question struct {
 	Default string       `json:"default,omitempty"`
 }
 
+// Answered is a question the person answered in an earlier round, as asked.
+type Answered struct {
+	Text   string `json:"text"`
+	Answer string `json:"answer"`
+}
+
 // PlanRow is the agent's proposed action for a row.
 type PlanRow struct {
 	RowID       string     `json:"rowId"`
@@ -98,7 +104,10 @@ type Row struct {
 	SuggestedDestination string       `json:"suggestedDestination,omitempty"`
 	Plan                 *PlanRow     `json:"plan,omitempty"`
 	Person               PersonFields `json:"person"`
-	Write                WriteState   `json:"write,omitempty"`
+	// Earlier is what the person answered in the rounds before this one: sent
+	// back to the agent, the answers move here and the row is asked afresh.
+	Earlier []Answered `json:"earlier,omitempty"`
+	Write   WriteState `json:"write,omitempty"`
 	// NewAddress is the ticket's address after a move.
 	NewAddress string `json:"newAddress,omitempty"`
 	// Refusal is the text of the last refusal the write hit.
@@ -114,7 +123,9 @@ type Record struct {
 	State     State     `json:"state"`
 	Step      string    `json:"step"`
 	Revision  int       `json:"revision"`
-	Rows      []Row     `json:"rows"`
+	// Round counts the times the person sent the answers back to the agent.
+	Round int   `json:"round,omitempty"`
+	Rows  []Row `json:"rows"`
 	// LastPassComplete is set when the last verify pass covered every row.
 	LastPassComplete bool   `json:"lastPassComplete,omitempty"`
 	Result           string `json:"result,omitempty"`

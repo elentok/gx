@@ -49,6 +49,14 @@ func (s *Triage) Approve(ctx context.Context, req wire.TriageApproveRequest) (wi
 	return res, err
 }
 
+// SendBack returns project's Triage to Plan with the answers kept and starts the
+// session that asks again. A refusal is a result, not an error.
+func (s *Triage) SendBack(ctx context.Context, req wire.TriageSendBackRequest) (wire.TriageEditResult, error) {
+	var res wire.TriageEditResult
+	err := s.t.post(ctx, "/v1/triage/send-back", req, &res)
+	return res, err
+}
+
 // Retry sets a failed row pending and starts a Write session unless one is live.
 func (s *Triage) Retry(ctx context.Context, req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
 	var res wire.TriageEditResult

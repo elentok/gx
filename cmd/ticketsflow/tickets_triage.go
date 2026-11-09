@@ -144,7 +144,11 @@ func newTriageShowCmd(d Deps) *cobra.Command {
 				fmt.Fprintf(out, "no Triage; next: %s\n", view.Next)
 				return nil
 			}
-			fmt.Fprintf(out, "%s  state=%s step=%s revision=%d next=%s\n", rec.ID, rec.State, rec.Step, rec.Revision, view.Next)
+			fmt.Fprintf(out, "%s  state=%s step=%s revision=%d next=%s", rec.ID, rec.State, rec.Step, rec.Revision, view.Next)
+			if rec.Round > 0 {
+				fmt.Fprintf(out, " round=%d", rec.Round)
+			}
+			fmt.Fprintln(out)
 			for _, r := range rec.Rows {
 				fmt.Fprintf(out, "  %s  verdict=%s write=%s  %s\n", r.Address, r.Verdict, r.Write, r.Title)
 			}

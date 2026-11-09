@@ -78,6 +78,11 @@ func Routes(get func() *Triage) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().approveHandler(w, r) },
 		},
 		{
+			Pattern: "POST /v1/triage/send-back",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().sendBackHandler(w, r) },
+		},
+		{
 			Pattern: "POST /v1/triage/retry",
 			Web:     wire.WebWrite,
 			Handler: func(w http.ResponseWriter, r *http.Request) { rowActionHandler(get().retry)(w, r) },

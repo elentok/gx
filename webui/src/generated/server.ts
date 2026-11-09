@@ -2980,6 +2980,11 @@ export const ReasonTriageNoFollowUps = "triage-no-follow-ups";
  */
 export const ReasonTriagePhase = "triage-phase";
 /**
+ * ReasonTriageAnswer: an answer names no question of the row, or is not one
+ * of its question's options.
+ */
+export const ReasonTriageAnswer = "triage-answer";
+/**
  * ReasonTriageAlreadyApproved: the Triage was approved by another call.
  */
 export const ReasonTriageAlreadyApproved = "triage-already-approved";
@@ -2990,7 +2995,7 @@ export const ReasonTriageNoLive = "triage-no-live";
 /**
  * Refusal reasons of the triage open route, beside the session ones.
  */
-export type ReasonTriage = typeof ReasonTriageApprove | typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageAlreadyApproved | typeof ReasonTriageNoLive;
+export type ReasonTriage = typeof ReasonTriageApprove | typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageAnswer | typeof ReasonTriageAlreadyApproved | typeof ReasonTriageNoLive;
 /**
  * TriageOpenRequest is the body of POST /v1/triage/open. New stops the
  * Triage's live session and starts a fresh one; State is the token of the live
@@ -3079,6 +3084,13 @@ export interface TriageRowRequest {
  * TriageApproveRequest is the body of POST /v1/triage/approve.
  */
 export interface TriageApproveRequest {
+  project: string;
+  revision: number /* int */;
+}
+/**
+ * TriageSendBackRequest is the body of POST /v1/triage/send-back.
+ */
+export interface TriageSendBackRequest {
   project: string;
   revision: number /* int */;
 }
@@ -3175,6 +3187,10 @@ export interface TriageView {
   step_note?: string;
   ring_percent: number /* int */;
   revision?: number /* int */;
+  /**
+   * Round counts the times the answers were sent back to the agent.
+   */
+  round?: number /* int */;
   rows: TriageRow[];
   open_questions: number /* int */;
   action_counts: { [key: string]: number /* int */};

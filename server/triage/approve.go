@@ -23,6 +23,20 @@ func (t *Triage) approveHandler(w http.ResponseWriter, r *http.Request) {
 	wire.WriteJSON(w, res)
 }
 
+func (t *Triage) sendBackHandler(w http.ResponseWriter, r *http.Request) {
+	var req wire.TriageSendBackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := t.sendBack(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, res)
+}
+
 func rowActionHandler(action func(wire.TriageRowActionRequest) (wire.TriageEditResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req wire.TriageRowActionRequest
@@ -80,6 +94,27 @@ func (t *Triage) approve(req wire.TriageApproveRequest) (wire.TriageEditResult, 
 	return wire.TriageEditResult{Revision: saved.Revision}, nil
 }
 
+// sendBack returns the record to Plan with the person's answers kept, and starts
+// the session that asks again. Like approve, it wins the record's compare-and-set
+// first, so a double click makes one round.
+func (t *Triage) sendBack(req wire.TriageSendBackRequest) (wire.TriageEditResult, error) {
+	store, rec, refusal, err := t.liveRecord(req.Project)
+	if err != nil || refusal != nil {
+		return orRefusal(refusal), err
+	}
+	saved, err := store.SendBack(rec.ID, req.Revision)
+	if res, handled := editRefusal(err); handled {
+		return res, nil
+	} else if err != nil {
+		return wire.TriageEditResult{}, err
+	}
+	t.Changed(req.Project)
+	if err := t.launchWrite(req.Project, false); err != nil {
+		return wire.TriageEditResult{}, err
+	}
+	return wire.TriageEditResult{Revision: saved.Revision}, nil
+}
+
 // retry sets a failed row pending and starts a Write session unless one is live.
 func (t *Triage) retry(req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
 	store, rec, refusal, err := t.liveRecord(req.Project)
@@ -122,8 +157,9 @@ func orRefusal(r *wire.TriageEditResult) wire.TriageEditResult {
 	return *r
 }
 
-// launchWrite starts the Write session; with skipIfLive it does nothing when
-// the project's Triage already has a live session.
+// launchWrite starts the project's Triage session, which reads the record's step
+// (Write after approve, Plan after a send back); with skipIfLive it does nothing
+// when the project's Triage already has a live session.
 func (t *Triage) launchWrite(project string, skipIfLive bool) error {
 	defer t.lockProject(project)()
 	if skipIfLive {

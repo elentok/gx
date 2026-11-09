@@ -384,3 +384,51 @@ func TestPlan_EveryVerdictQuestionComesBackInThePlan(t *testing.T) {
 		t.Fatalf("the plan question should replace the verdict's: %+v", got)
 	}
 }
+
+func TestSendBack_KeepsTheAnswersAsEarlierRoundsAndReturnsToPlan(t *testing.T) {
+	s, rec := atPlan(t)
+	q := Question{ID: "q1", Text: "Fix it where?", Kind: QuestionQuick, Options: []string{"parser", "caller"}, Default: "parser"}
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Destination: "x", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil)
+	rec = must(t, rec, err)
+	if _, err := s.SendBack(rec.ID, rec.Revision); err == nil {
+		t.Fatal("want send back refused while a question is open")
+	}
+	rec, err = s.SetPerson(rec.ID, rec.Revision, rowA, PersonFields{Action: "map", Destination: "m", Answers: map[string]string{"q1": "caller\nNote: see 12"}})
+	rec = must(t, rec, err)
+	rec, err = s.SendBack(rec.ID, rec.Revision)
+	rec = must(t, rec, err)
+	a := rec.Rows[0]
+	if rec.Step != "plan" || rec.Round != 1 || a.Plan != nil || len(a.Questions) != 0 || len(a.Person.Answers) != 0 {
+		t.Fatalf("step %s round %d row %+v", rec.Step, rec.Round, a)
+	}
+	if len(a.Earlier) != 1 || a.Earlier[0] != (Answered{Text: "Fix it where?", Answer: "caller\nNote: see 12"}) {
+		t.Fatalf("earlier = %+v", a.Earlier)
+	}
+	if a.Person.Action != "map" || a.Person.Destination != "m" {
+		t.Fatalf("the person's action and destination are kept: %+v", a.Person)
+	}
+	if Next(rec) != BranchPlan {
+		t.Fatalf("next = %s, want plan", Next(rec))
+	}
+	// The agent plans again; the new round starts with no answers and approve is back.
+	q2 := Question{ID: "q1", Text: "Which caller?", Kind: QuestionQuick, Options: []string{"a", "b"}, Default: "a"}
+	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{q2}}, {RowID: rowB, Action: "close"}}, nil)
+	rec = must(t, rec, err)
+	if rec.Step != "approve" || rec.OpenQuestions() != 1 {
+		t.Fatalf("step %s open %d", rec.Step, rec.OpenQuestions())
+	}
+	if _, err := s.SendBack(rec.ID, rec.Revision); err == nil {
+		t.Fatal("want send back refused again while the new question is open")
+	}
+}
+
+func TestSendBack_OnlyAtApprove(t *testing.T) {
+	s, rec := atPlan(t)
+	if _, err := s.SendBack(rec.ID, rec.Revision); err == nil {
+		t.Fatal("want send back refused at plan")
+	}
+	s, rec = atWrite(t)
+	if _, err := s.SendBack(rec.ID, rec.Revision); err == nil {
+		t.Fatal("want send back refused at write")
+	}
+}

@@ -184,6 +184,32 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 	approve.Flags().IntVar(&approveRevision, "revision", 0, "the record revision read")
 	cmd.AddCommand(approve)
 
+	var sendBackJSON bool
+	var sendBackRevision int
+	sendBack := &cobra.Command{
+		Use:   "send-back <project>",
+		Short: "send a project's Triage answers back to the agent for a new round of questions",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Triage.SendBack(ctx, wire.TriageSendBackRequest{Project: args[0], Revision: sendBackRevision})
+			if err != nil {
+				return fmt.Errorf("server send back failed: %w", err)
+			}
+			return editOut(c, res, sendBackJSON)
+		},
+	}
+	sendBack.Flags().BoolVar(&sendBackJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	sendBack.Flags().IntVar(&sendBackRevision, "revision", 0, "the record revision read")
+	cmd.AddCommand(sendBack)
+
 	for _, verb := range []string{"retry", "keep"} {
 		var asJSON bool
 		var revision int

@@ -71,6 +71,21 @@ run with the `✅ verify:` line. When the last verdict is saved, end the same wa
 Plan writes no epics and no tickets; it saves the plan rows (`gx tickets triage plan`, rows as JSON
 on stdin). Compare verdicts only; don't re-read tickets.
 
+**A later round.** When `gx tickets triage show` prints `round=N`, or its `--json` a `round` above 0, the
+person sent their answers back and wants new questions. Read `gx tickets triage show --json`: every row has lost its plan and its verdict questions, and
+its `earlier` list holds what they were asked and answered (a note follows the answer as `Note: …`; the
+"Huh?" message means they could not follow the question). Plan again from those answers, still
+without re-reading tickets:
+
+- Act on the answers: a pick settles that question, so do not ask it again; a note or a "Huh?" means
+  the question was unclear or incomplete, so ask a better one. Reroute the row when an answer
+  changes where it belongs. Keep the person's own action and destination (`person` in the record)
+  unless an answer clearly overrides it.
+- Ask only what is still undecided: a row with nothing left to ask gets no questions. The new
+  questions are ordinary plan questions (the options and default rules below), numbered from `q1`.
+- Save every row that is not gone, as in the first round. The earlier answers still go into each
+  ticket's Decisions at Write.
+
 **Dedupe is part of Plan.** For items describing the same problem, keep the **oldest**. The newer
 ones are `merge into X` rows; the merge itself (the "seen again" entry, the close) waits for Write.
 

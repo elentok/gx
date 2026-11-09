@@ -179,3 +179,51 @@ func TestKeep_LastOpenRowWithLastPassCompleteMakesTheTriageDone(t *testing.T) {
 		t.Fatalf("record still live: %+v", live)
 	}
 }
+
+func sendBack(t *testing.T, f servertest.DesignsFixture, rec *triagerec.Record) wire.TriageEditResult {
+	t.Helper()
+	res, err := f.H.Client.Triage.SendBack(f.Ctx, wire.TriageSendBackRequest{Project: "proj", Revision: rec.Revision})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestSendBack_ReturnsToPlanKeepsTheAnswersAndStartsASession(t *testing.T) {
+	f, store := startViewFixture(t)
+	rec, a := toApproveAsking(t, store)
+	rec = mustRec(store.SetPerson(rec.ID, rec.Revision, a, triagerec.PersonFields{Answers: map[string]string{"q1": "yes\nNote: why"}}))
+	res := sendBack(t, f, rec)
+	if res.Refused {
+		t.Fatalf("send back = %+v", res)
+	}
+	got, _ := store.LoadLive()
+	if got.Step != "plan" || got.Round != 1 || len(got.Rows[0].Earlier) != 1 || got.Rows[0].Earlier[0].Answer != "yes\nNote: why" {
+		t.Fatalf("record = step %s round %d earlier %+v", got.Step, got.Round, got.Rows[0].Earlier)
+	}
+	if live := f.Live(t); len(live) != 1 || live[0].Flow != "triage" {
+		t.Fatalf("live sessions = %+v, want one triage session", live)
+	}
+	if v := show(t, f); v.Round != 1 {
+		t.Fatalf("view round = %d", v.Round)
+	}
+	// A second click finds the record already back at Plan, and starts nothing more.
+	if again := sendBack(t, f, rec); !again.Refused || again.Reason != wire.ReasonTriagePhase {
+		t.Fatalf("second send back = %+v, want refused", again)
+	}
+	if len(f.Live(t)) != 1 {
+		t.Fatal("a refused second send back started another session")
+	}
+}
+
+func TestSendBack_RefusedWhileAQuestionIsOpen(t *testing.T) {
+	f, store := startViewFixture(t)
+	rec, _ := toApproveAsking(t, store)
+	res := sendBack(t, f, rec)
+	if !res.Refused || res.Reason != wire.ReasonTriagePhase {
+		t.Fatalf("send back = %+v, want refused", res)
+	}
+	if len(f.Live(t)) != 0 {
+		t.Fatal("a refused send back started a session")
+	}
+}

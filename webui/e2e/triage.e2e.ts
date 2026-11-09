@@ -78,9 +78,21 @@ test.describe("199. Triage journey", () => {
     await expect(ticketLink).toHaveAttribute("target", "_blank");
     // A question is named by its row number and its id: row 01 q1 is 1.1. The fixture gives q1 and q2 options; the design question is text.
     // Picking an option moves on to the next question by itself.
-    await questions.getByRole("button", { name: "parser", exact: true }).click();
-    await questions.getByRole("button", { name: "No", exact: true }).click();
-    await questions.getByRole("textbox", nav("Answer to question 2.d1")).fill("the sqlite store");
+    const answerAll = async () => {
+      await questions.getByRole("button", { name: "parser", exact: true }).click();
+      await questions.getByRole("button", { name: "No", exact: true }).click();
+      await questions.getByRole("textbox", nav("Answer to question 2.d1")).fill("the sqlite store");
+    };
+    await answerAll();
+
+    // Send the answers back: the record returns to Plan, the fake agent plans again, and Approve comes back with new questions.
+    // The last answer saves after a pause and the page moves to Review; go back to Questions from there.
+    await expect(page.getByRole("button", { name: /^Review 5 rows/ })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: /^Questions/ }).click();
+    await page.getByRole("button", { name: "Send back to the agent" }).click();
+    await expect(page.getByRole("button", { name: "Questions 3" })).toBeVisible({ timeout: 40_000 });
+    await expect(questions).toBeVisible();
+    await answerAll();
 
     // Review: the bar enables, nothing is changed yet.
     await expect(page.getByRole("button", { name: /^Review 5 rows/ })).toHaveAttribute("aria-pressed", "true");

@@ -2,7 +2,7 @@ import { Box, Spinner as ChakraSpinner, Text, chakra } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { flowSession, liveFlowSessions } from "../design/view";
-import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type OpenFlow, type ResumeSession, type SaveTriageRow, type StopSession, type TriageRowAction } from "../design/open";
+import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type SendBackTriage, type OpenFlow, type ResumeSession, type SaveTriageRow, type StopSession, type TriageRowAction } from "../design/open";
 import { useDesignWrite } from "../design/SessionControls";
 import type { FetchChat } from "../design/chat";
 import type { PostFocus } from "../design/focus";
@@ -40,6 +40,7 @@ export interface TriageDeps {
   focus?: PostFocus;
   abandon?: AbandonTriage;
   approve?: ApproveTriage;
+  sendBack?: SendBackTriage;
   saveRow?: SaveTriageRow;
   retry?: TriageRowAction;
   keep?: TriageRowAction;
@@ -163,7 +164,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
       }
       chatTop={() => (
         <>
-          {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} questions={<QuestionsView project={project} view={view} refetch={refetch} save={deps.saveRow} />} review={<ReviewView project={project} view={view} refetch={refetch} save={deps.saveRow} />} />}
+          {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} questions={<QuestionsView project={project} view={view} refetch={refetch} save={deps.saveRow} sendBack={deps.sendBack} />} review={<ReviewView project={project} view={view} refetch={refetch} save={deps.saveRow} />} />}
           {atDone && view.result && <DoneView result={view.result} />}
           {atWrite && <WriteView project={project} view={view} refetch={refetch} retry={deps.retry} keep={deps.keep} />}
           {live.length > 0 && (

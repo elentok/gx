@@ -157,3 +157,42 @@ test("each question links to its ticket, in a new tab", () => {
   expect(link.getAttribute("href")).toBe("#/t/gx:follow-ups/1");
   expect(link.getAttribute("target")).toBe("_blank");
 });
+
+test("Send back is off until every question is answered", () => {
+  render(<QuestionsView project="gx" view={viewOf()} refetch={vi.fn()} save={vi.fn()} sendBack={vi.fn()} />);
+  expect((screen.getByRole("button", { name: "Send back to the agent" }) as HTMLButtonElement).disabled).toBe(true);
+  screen.getByText("Answer every question to send them back.");
+});
+
+test("Send back saves what is on screen first, then sends the revision that save produced", async () => {
+  const calls: string[] = [];
+  const save = vi.fn(async () => {
+    calls.push("save");
+    return { revision: 5 };
+  });
+  const sendBack = vi.fn(async (body: { revision: number }) => {
+    calls.push(`send-back@${body.revision}`);
+    return { revision: 6 };
+  });
+  const refetch = vi.fn();
+  const view = viewOf({ open_questions: 0 });
+  view.rows[0].answers = { "1": "no" };
+  render(<QuestionsView project="gx" view={view} refetch={refetch} save={save} sendBack={sendBack} />);
+  // A change not saved yet: pressing Yes saves at once, and Send back waits for that save.
+  fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send back to the agent" }));
+  await waitFor(() => expect(sendBack).toHaveBeenCalled());
+  expect(calls).toEqual(["save", "send-back@5"]);
+  expect(sendBack).toHaveBeenCalledWith({ project: "gx", revision: 5 });
+});
+
+test("a refused send back says why and reloads", async () => {
+  const sendBack = vi.fn().mockResolvedValue({ refused: true, reason: "triage-phase", message: "send back is refused: 1 questions are still open" });
+  const refetch = vi.fn();
+  const view = viewOf({ open_questions: 0 });
+  view.rows[0].answers = { "1": "yes" };
+  render(<QuestionsView project="gx" view={view} refetch={refetch} save={vi.fn()} sendBack={sendBack} />);
+  fireEvent.click(screen.getByRole("button", { name: "Send back to the agent" }));
+  await waitFor(() => expect(refetch).toHaveBeenCalled());
+  expect(sendBack).toHaveBeenCalledWith({ project: "gx", revision: 4 });
+});

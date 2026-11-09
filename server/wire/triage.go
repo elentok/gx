@@ -110,6 +110,12 @@ type TriageApproveRequest struct {
 	Revision int    `json:"revision"`
 }
 
+// TriageSendBackRequest is the body of POST /v1/triage/send-back.
+type TriageSendBackRequest struct {
+	Project  string `json:"project"`
+	Revision int    `json:"revision"`
+}
+
 // TriageRowActionRequest is the body of POST /v1/triage/retry and
 // /v1/triage/keep: one failed row at step write.
 type TriageRowActionRequest struct {
@@ -185,6 +191,8 @@ type TriageView struct {
 	StepNote    string `json:"step_note,omitempty"`
 	RingPercent int    `json:"ring_percent"`
 	Revision    int    `json:"revision,omitempty"`
+	// Round counts the times the answers were sent back to the agent.
+	Round int `json:"round,omitempty"`
 
 	Rows          []TriageRow         `json:"rows"`
 	OpenQuestions int                 `json:"open_questions"`

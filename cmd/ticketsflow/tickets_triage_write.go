@@ -82,9 +82,13 @@ func locateRow(projectDir string, row *triage.Row) (located, error) {
 	return loc, nil
 }
 
-// decisionLines is the person's answers as body lines, in question order.
+// decisionLines is the person's answers as body lines: those of earlier rounds,
+// then this round's in question order.
 func decisionLines(row *triage.Row) []string {
 	var out []string
+	for _, e := range row.Earlier {
+		out = append(out, fmt.Sprintf("- %s: %s", e.Text, e.Answer))
+	}
 	for _, q := range row.AllQuestions() {
 		if a, ok := row.Person.Answers[q.ID]; ok && strings.TrimSpace(a) != "" {
 			out = append(out, fmt.Sprintf("- %s: %s", q.Text, strings.TrimSpace(a)))
