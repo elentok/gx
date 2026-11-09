@@ -106,7 +106,7 @@ func ScanWorktree(storePath, cwd, branch string) (*WorktreeScan, error) {
 	if err != nil {
 		return nil, err
 	}
-	if branch == "" || branch == repo.Trunk || !git.IsLocalBranch(repo.Root, branch) {
+	if branch == "" || !isScannableBranch(repo, branch, false) || !git.IsLocalBranch(repo.Root, branch) {
 		return nil, nil
 	}
 	active, err := loadScannableEpics(root)
@@ -121,17 +121,7 @@ func ScanWorktree(storePath, cwd, branch string) (*WorktreeScan, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := ""
-	for _, wt := range worktrees {
-		if wt.Branch == branch {
-			path = wt.Path
-		}
-	}
-	epicByName := map[string]tickets.Epic{}
-	for _, e := range epics {
-		epicByName[e.Name] = e
-	}
-	scan, err := classifyBranch(repo, branch, path, epicByName)
+	scan, err := classifyBranch(repo, branch, pathByBranch(worktrees)[branch], epicIndex(epics))
 	if err != nil {
 		return nil, err
 	}

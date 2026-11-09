@@ -69,30 +69,20 @@ func scanWorktrees(repo git.Repo, epics []tickets.Epic) ([]WorktreeScan, error) 
 	if err != nil {
 		return nil, err
 	}
-	pathByBranch := map[string]string{}
 	detached := []git.Worktree{}
 	for _, wt := range worktrees {
-		switch {
-		case wt.Branch != "":
-			pathByBranch[wt.Branch] = wt.Path
-		case wt.IsDetached && !wt.IsBare:
+		if wt.Branch == "" && wt.IsDetached && !wt.IsBare {
 			detached = append(detached, wt)
 		}
 	}
 
-	epicByName := map[string]tickets.Epic{}
-	for _, e := range epics {
-		epicByName[e.Name] = e
-	}
-
 	names := []string{}
 	for _, b := range branches {
-		if b.IsRemote || b.Name == repo.Trunk {
-			continue
+		if isScannableBranch(repo, b.Name, b.IsRemote) {
+			names = append(names, b.Name)
 		}
-		names = append(names, b.Name)
 	}
-	result, err := classifyBranches(repo, names, pathByBranch, epicByName)
+	result, err := classifyBranches(repo, names, pathByBranch(worktrees), epicIndex(epics))
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +94,32 @@ func scanWorktrees(repo git.Repo, epics []tickets.Epic) ([]WorktreeScan, error) 
 		result = append(result, scan)
 	}
 	return result, nil
+}
+
+// isScannableBranch is the filter both scans share: a local branch that is
+// not the trunk.
+func isScannableBranch(repo git.Repo, name string, isRemote bool) bool {
+	return !isRemote && name != repo.Trunk
+}
+
+// pathByBranch maps each checked-out branch to its worktree path.
+func pathByBranch(worktrees []git.Worktree) map[string]string {
+	m := map[string]string{}
+	for _, wt := range worktrees {
+		if wt.Branch != "" {
+			m[wt.Branch] = wt.Path
+		}
+	}
+	return m
+}
+
+// epicIndex maps epic names to their epics.
+func epicIndex(epics []tickets.Epic) map[string]tickets.Epic {
+	m := map[string]tickets.Epic{}
+	for _, e := range epics {
+		m[e.Name] = e
+	}
+	return m
 }
 
 // classifyDetached reports a detached-HEAD worktree. It has no branch to
