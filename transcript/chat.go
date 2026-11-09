@@ -246,10 +246,11 @@ func resolveImages(msg *ChatMessage, meta chatLine, imagesDir string) {
 // carries images, and collapses the run of spaces a chip leaves behind. Call it
 // only for such prompts: a person may have typed the literal text.
 func StripImageChips(text string) string {
-	if !imageChipRE.MatchString(text) {
+	stripped := imageChipRE.ReplaceAllString(text, "")
+	if stripped == text {
 		return text
 	}
-	return spaceRunRE.ReplaceAllString(imageChipRE.ReplaceAllString(text, ""), " ")
+	return spaceRunRE.ReplaceAllString(stripped, " ")
 }
 
 // SavedImage maps a pasted image's source path to a saved image, or to a

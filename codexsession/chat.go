@@ -145,12 +145,9 @@ func ReadChat(r io.Reader, imagesDir string) (Chat, error) {
 			}
 			run.Calls = append(run.Calls, transcript.SummarizeCall(p.Name, args))
 		case p.Type == "message" && (p.Role == "assistant" || p.Role == "user"):
-			var texts []string
+			var raw []string
 			var images []transcript.ChatImage
-			inImage, hasImages := false, false
-			for _, c := range p.Content {
-				hasImages = hasImages || p.Role == "user" && (c.Type == "input_image" || imageOpenRE.MatchString(c.Text))
-			}
+			inImage := false
 			for _, c := range p.Content {
 				if p.Role == "user" {
 					if m := imageOpenRE.FindStringSubmatch(c.Text); m != nil {
@@ -169,8 +166,12 @@ func ReadChat(r io.Reader, imagesDir string) (Chat, error) {
 						continue
 					}
 				}
-				t := c.Text
-				if hasImages {
+				raw = append(raw, c.Text)
+			}
+			// A prompt carries images exactly when the loop collected one.
+			var texts []string
+			for _, t := range raw {
+				if len(images) > 0 {
 					t = transcript.StripImageChips(t)
 				}
 				if t = strings.TrimSpace(t); t != "" && (p.Role == "assistant" || !IsInjected(t)) {

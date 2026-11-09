@@ -446,11 +446,8 @@ func newAgentsRemoveCmd(d Deps) *cobra.Command {
 
 func runAgentsRemoveExited(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut, dryRun bool) error {
 	res, err := cl.Sessions.RemoveExited(ctxOrBackground(ctx), dryRun)
-	if apiclient.IsNotRunning(err) {
-		return fmt.Errorf("%s", notRunningMessage)
-	}
 	if err != nil {
-		return fmt.Errorf("server write failed: %w", err)
+		return mapServerErr(err)
 	}
 	if jsonOut {
 		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
@@ -476,6 +473,14 @@ func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 	})
 }
 
+// mapServerErr turns a failed server write into the error a command returns.
+func mapServerErr(err error) error {
+	if apiclient.IsNotRunning(err) {
+		return fmt.Errorf("%s", notRunningMessage)
+	}
+	return fmt.Errorf("server write failed: %w", err)
+}
+
 // printSessionResult prints a session write's outcome, its session's id when
 // human.
 func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err error) error {
@@ -483,7 +488,7 @@ func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err e
 	case apiclient.IsNotRunning(err):
 		res = wire.SessionResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: notRunningMessage}
 	case err != nil:
-		return fmt.Errorf("server write failed: %w", err)
+		return mapServerErr(err)
 	}
 	if jsonOut {
 		stamped, err := cmdbase.StampProvenance(res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
