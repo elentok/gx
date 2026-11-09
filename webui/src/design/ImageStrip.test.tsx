@@ -26,6 +26,22 @@ test("readOnly hides Remove, retry and the upload states", () => {
   expect(screen.queryByText(/tap to retry/)).toBeNull();
 });
 
+test("open, retry and remove inside a form never submit it", () => {
+  const onSubmit = vi.fn((e: { preventDefault: () => void }) => e.preventDefault());
+  renderThemed(
+    <form onSubmit={onSubmit}>
+      <ImageStrip images={all} onOpen={() => {}} onRetry={() => {}} />
+    </form>,
+  );
+  const buttons = screen.getAllByRole("button");
+  expect(buttons.length).toBeGreaterThanOrEqual(5);
+  for (const b of buttons) {
+    expect(b.getAttribute("type")).toBe("button");
+    fireEvent.click(b);
+  }
+  expect(onSubmit).not.toHaveBeenCalled();
+});
+
 test("clicking a ready thumbnail opens it by index; other tiles are not openable", () => {
   const onOpen = vi.fn();
   renderThemed(<ImageStrip images={[uploading, ready]} onOpen={onOpen} />);

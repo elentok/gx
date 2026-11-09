@@ -46,6 +46,13 @@ test("Prev steps back and stops at the first", () => {
   expect((prev as HTMLButtonElement).disabled).toBe(true);
 });
 
+test("every viewer button is type=button so it never submits a surrounding form", () => {
+  open(2, 0);
+  const buttons = screen.getAllByRole("button");
+  expect(buttons.length).toBeGreaterThanOrEqual(3);
+  for (const b of buttons) expect(b.getAttribute("type")).toBe("button");
+});
+
 test("Close and Escape both close", () => {
   const onClose = vi.fn();
   open(2, 0, onClose);

@@ -211,6 +211,7 @@ export function FailureBanner({
             return (
               <Button
                 key={name}
+                type="button"
                 emphasis={main ? "main" : "secondary"}
                 tone={name === "New session" && restoreHidden ? "running" : undefined}
                 // The mock outlines Deny in the error colour; a secondary button ignores its tone.

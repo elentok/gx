@@ -76,6 +76,22 @@ test("fields are named and inputs are 16px", async () => {
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
 });
 
+test("only Start design submits: a thumbnail and the viewer's Close do not start the design", async () => {
+  const { onStarted } = await mount({}, { slug: "s", idea: "i", images: ["a.png"] });
+  const form = screen.getByRole("dialog", { name: "New Design" });
+  const submits = () => Array.from(document.querySelectorAll("button")).filter((b) => b.type === "submit");
+  expect(submits().map((b) => b.textContent)).toEqual(["Start design"]);
+  const onSubmit = vi.fn((e: Event) => e.preventDefault());
+  form.addEventListener("submit", onSubmit);
+  await act(async () => click("Open image"));
+  expect(onSubmit).not.toHaveBeenCalled();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Close ✕/ })));
+  expect(onSubmit).not.toHaveBeenCalled();
+  expect(onStarted).not.toHaveBeenCalled();
+  await act(async () => click("Start design"));
+  expect(onSubmit).toHaveBeenCalledTimes(1);
+});
+
 test("one project hides the select", async () => {
   await mount({ projects: ["gx"] });
   expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull();

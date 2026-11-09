@@ -24,6 +24,7 @@ function Thumb({
     <Box position="relative" flex="none" w="72px" h="72px" data-state={state}>
       <Box
         as={openable ? "button" : "div"}
+        {...(openable ? { type: "button" } : {})}
         w="full"
         h="full"
         borderRadius="6px"
@@ -45,6 +46,7 @@ function Thumb({
       {failed && (
         <Box
           as={retry ? "button" : "div"}
+          {...(retry ? { type: "button" } : {})}
           position="absolute"
           inset="0"
           p="1"
