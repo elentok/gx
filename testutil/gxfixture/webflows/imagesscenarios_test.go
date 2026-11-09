@@ -16,7 +16,7 @@ func TestDesignImages_ListsTheMapsAttachedImages(t *testing.T) {
 	t.Parallel()
 	r := start(t, "design-images")
 	defer r.Stop(t)
-	listed := imagestore.List(filepath.Join(r.Root(),"data", "gx", "tickets", "demo", "design-epic", "images"))
+	listed := imagestore.List(filepath.Join(r.Root(), "data", "gx", "tickets", "demo", "design-epic", "images"))
 	if len(listed) != spec.DesignImagesCount {
 		t.Errorf("attached images = %d, want %d", len(listed), spec.DesignImagesCount)
 	}
