@@ -106,6 +106,10 @@ func Launch(t *testing.T, register func(func()), scenario string, env []string, 
 	return r
 }
 
+// startTimeout is how long a fixture may take to print its output line; it must
+// stay under the runner's per-test limit so the failure names the stuck step.
+const startTimeout = 40 * time.Second
+
 // LaunchProc is launch without a test, so TestMain can start a shared fixture
 // outside every test's time limit.
 func LaunchProc(register func(func()), scenario string, env []string, flags ...string) (*Running, error) {
@@ -122,7 +126,14 @@ func LaunchProc(register func(func()), scenario string, env []string, flags ...s
 	}
 	r := &Running{cmd: cmd}
 	register(r.Kill)
+	// A fixture that never prints its line would hang the test until the
+	// runner's per-test limit kills it with no diagnosis. SIGQUIT makes it dump
+	// its goroutines to stderr, so the next occurrence names the stuck step.
+	timer := time.AfterFunc(startTimeout, func() { _ = cmd.Process.Signal(syscall.SIGQUIT) })
 	line, err := bufio.NewReader(stdout).ReadBytes('\n')
+	if !timer.Stop() {
+		return r, fmt.Errorf("fixture printed no output line within %s; its goroutine dump is on stderr", startTimeout)
+	}
 	if err != nil {
 		return r, fmt.Errorf("no output line: %v", err)
 	}
