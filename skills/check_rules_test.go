@@ -46,7 +46,9 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"merge iteration summaries", "gx-merge/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
 		{"code-review iteration summaries", "gx-code-review/SKILL.md", []string{"](../gx-local-tracker.md#iteration-summaries)"}},
 		{"research", "gx-research/SKILL.md", []string{"`gx check`"}},
-		{"investigate", "gx-investigate/SKILL.md", []string{"`gx check`"}},
+		{"investigate", "gx-investigate/SKILL.md", []string{
+			"`gx check`", "**Write files with Write, in their own call.**", "never end on an \"Open question\"",
+		}},
 		{"to-tickets", "gx-to-tickets/SKILL.md", []string{"iteration hint", "`gx brief`", "`go_symbol_references`", "verified at {{commit}}", "not verified", "Generated files", "`make web-types`", "Test environment", "@vitest-environment", "Playwright filters", "Mock path", "must fail to compile or fail", "Examples against the helper"}},
 		{"to-tickets bundled and implement-only seams", "gx-to-tickets/SKILL.md", []string{"Every `implement` ticket", "5 or more"}},
 		{"to-tickets lint", "gx-to-tickets/SKILL.md", []string{"lint-claims", "--allow-claim-misses", "name a symbol"}},

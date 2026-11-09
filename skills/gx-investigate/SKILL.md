@@ -208,12 +208,18 @@ session. Everything above (background, state, diagnosis) applies unchanged; only
   ticket. Do nothing else: no agent waits on this, a person picks the verb from the ticket's detail.
   Propose any other command in the report for a human to run.
 - Never wait for a go-ahead, and never ask: an unattended session has no one to answer. Never end
-  with an offer ("say go and I'll…", "want me to file this?"). Do the allowed action, or name the
-  command for a human in the report.
+  with an offer ("say go and I'll…", "want me to file this?"), and never end on an "Open
+  question": decide, or run `gx tickets ask` if a person must answer. Do the allowed action, or
+  name the command for a human in the report.
 - **Write the diagnosis into your own ticket** before the finish report, so it outlives the pane:
   `gx tickets section <your-addr> Findings -` with the final report (see Final report) on stdin.
   Do this in every unattended ending, including `No catalog entry matched`.
-- **Last step, always:** run `gx check` first. Then report on _your own_ ticket (not the failed one):
+- **Write files with Write, in their own call.** Put the findings (and any `recommend` diagnosis)
+  in a scratchpad file with Write first, then feed it to `gx tickets section ... -` or
+  `recommend ... --diagnosis -` as a separate call. Never `cat > file <<'EOF'` inside a compound
+  Bash call: the guard-bash hook rejects the whole command, so every step in it is lost and redone.
+- **Last step, always:** run `gx check` first only if you committed (unpiped; on a commitless
+  ticket it only prints "no applicable checks", so skip it). Then report on _your own_ ticket (not the failed one):
   `gx tickets set <your-addr> --iteration-status finished --commitless true`. Do it after the
   action, including when you only paused the failed ticket or filed a follow-up. Without it the
   server finds no report and pauses your ticket `zero-commit` ("no result reported"), which spawns
