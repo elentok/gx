@@ -20,24 +20,8 @@ import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { EpicCard } from "./EpicCard";
 import { useEpicList, type FetchEpicList } from "./list";
 import { ProjectFilter } from "./ProjectFilter";
+import { activeProjectFilter, readStoredProjects, writeStoredProjects } from "./storedProjects";
 import { sectionsOf, type Section } from "./view";
-
-const PROJECT_KEY = "gx.epics.project";
-
-/** The stored choice: a JSON array, or the plain project name an older version wrote. */
-function readStoredProjects(): string[] {
-  try {
-    const raw = localStorage.getItem(PROJECT_KEY);
-    if (!raw) return [];
-    if (raw.startsWith("[")) {
-      const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string") : [];
-    }
-    return [raw];
-  } catch {
-    return [];
-  }
-}
 
 const TICK_MS = 30_000;
 
@@ -127,9 +111,7 @@ export function EpicsPage({
   const searching = query.trim() !== "";
   // Every project, even one with no epics yet; the epics' own projects cover an older server.
   const projects = [...new Set([...(list?.projects ?? []), ...(list?.epics ?? []).map((e) => e.project)])].sort();
-  // Stored projects that are gone are ignored without rewriting them; none left acts as "All projects".
-  const known = storedProjects.filter((p) => projects.includes(p));
-  const filterProjects = projects.length > 1 && known.length > 0 ? known : undefined;
+  const filterProjects = activeProjectFilter(storedProjects, projects);
   const missing = (checks?.projects ?? []).filter((p) => p.missing && (filterProjects === undefined || filterProjects.includes(p.project)));
   const setupProject = checks?.projects.find((p) => p.project === settingUp);
   // The choice lives in this page's state only; a workspace that is gone acts as "All workspaces".
@@ -138,11 +120,7 @@ export function EpicsPage({
   const shown = sections.filter((s) => s.rows.length > 0);
   const chooseProjects = (chosen: string[]) => {
     setStoredProjects(chosen);
-    try {
-      localStorage.setItem(PROJECT_KEY, JSON.stringify(chosen));
-    } catch {
-      // Storage is a convenience; the choice still holds for this page.
-    }
+    writeStoredProjects(chosen);
   };
   // A filter match opens a collapsed section; without one, the toggle flips the default.
   const isOpen = (s: Section) => searching || s.collapsedByDefault === toggled.has(s.key);
