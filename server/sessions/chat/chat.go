@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/transcript"
 )
 
 // DefaultPollInterval is how often a Poll checks its transcript when Config
@@ -85,8 +86,8 @@ type Chat struct {
 	commandLists *commandlist.Cache
 	// authFailures caches whether each transcript ends in an auth error.
 	authFailures AuthFailures
-	// reportedModels caches the model ID on each transcript's newest reply.
-	reportedModels FileCache[string]
+	// reportedUsage caches each transcript's newest reply model and context usage.
+	reportedUsage FileCache[transcript.Usage]
 	// codexTurns caches the model and effort on each rollout's newest turn.
 	codexTurns FileCache[codexsession.TurnModel]
 }

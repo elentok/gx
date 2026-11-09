@@ -101,6 +101,9 @@ type Snapshot struct {
 	ExtraUsage bool `json:"extra_usage,omitempty"`
 	// Disks lists the disks under the warn threshold; filled in by the handler.
 	Disks []DiskStatus `json:"disks,omitempty"`
+	// ContextCeiling is the smart-zone token ceiling the sessions' context
+	// levels are measured against; filled in by the handler.
+	ContextCeiling int `json:"context_ceiling,omitempty"`
 	// Health is the CPU, memory and disk meters; filled in by the handler.
 	Health  Health       `json:"health"`
 	Tickets []TicketInfo `json:"tickets"`

@@ -37,24 +37,32 @@ func (m Meta) StatusFailure() *wire.SessionFailure {
 // session's transcript, or the saved one before a reply. A Codex session reads
 // its rollout's newest turn instead, see ReportedCodexTurn.
 func (c *Chat) ReportedModel(m Meta) string {
+	model, _ := c.ReportedModelAndContext(m)
+	return model
+}
+
+// ReportedModelAndContext is ReportedModel plus the context tokens of the
+// newest real assistant reply, from the same cached transcript read. tokens is
+// zero when there is no reading (always for Codex and other harnesses).
+func (c *Chat) ReportedModelAndContext(m Meta) (model string, tokens int) {
 	if m.Harness == string(harness.Codex) {
-		return c.ReportedCodexTurn(m).Model
+		return c.ReportedCodexTurn(m).Model, 0
 	}
 	if m.Harness != string(harness.Claude) {
-		return m.Model
+		return m.Model, 0
 	}
 	path, ok := c.ClaudeTranscript(m.ID, m)
 	if !ok {
-		return m.Model
+		return m.Model, 0
 	}
-	model, err := c.reportedModels.Read(path, func(p string) (string, error) {
-		usage, _, err := transcript.LastAssistantUsage(p)
-		return usage.Model, err
+	usage, err := c.reportedUsage.Read(path, func(p string) (transcript.Usage, error) {
+		usage, _, err := transcript.LastAssistantReading(p)
+		return usage, err
 	})
 	if err != nil {
 		c.log.Warn("read reported model", "session", m.ID, "err", err)
 	}
-	return cmp.Or(model, m.Model)
+	return cmp.Or(usage.Model, m.Model), usage.Occupancy()
 }
 
 // ReportedCodexTurn is the model and effort on the newest turn of a Codex

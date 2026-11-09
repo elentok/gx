@@ -244,6 +244,43 @@ func LastAssistantUsage(path string) (Usage, bool, error) {
 	return usage, found, nil
 }
 
+// LastAssistantReading is the newest assistant line's Model with the usage of
+// the newest assistant line that has any occupancy. Claude Code writes
+// synthetic assistant lines with zero usage; those must not read as an empty
+// context. ok=false means no assistant line at all; a transcript whose
+// assistant lines all have zero occupancy returns the newest one's usage, with
+// Occupancy() of zero.
+func LastAssistantReading(path string) (Usage, bool, error) {
+	var newest, reading Usage
+	found, nonzero := false, false
+	err := tailScan(path, func(lines []string) bool {
+		found, nonzero = false, false
+		for _, raw := range slices.Backward(lines) {
+			entry, ok := parseLine(raw)
+			if !ok || entry.Type != "assistant" {
+				continue
+			}
+			u := usageFromLine(entry)
+			if !found {
+				newest, found = u, true
+			}
+			if u.Occupancy() > 0 {
+				reading, nonzero = u, true
+				return true
+			}
+		}
+		return false
+	})
+	if err != nil || !found {
+		return Usage{}, false, err
+	}
+	if nonzero {
+		reading.Model = newest.Model
+		return reading, true, nil
+	}
+	return newest, true, nil
+}
+
 // tailScan hands visit the tail of the transcript at path, split into lines
 // in file order, starting from a small window anchored at EOF and doubling
 // it (still anchored at EOF) until visit reports it has its answer or the

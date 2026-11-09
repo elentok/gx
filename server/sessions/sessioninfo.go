@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions/chat"
@@ -46,7 +47,11 @@ type agentRows interface {
 func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 	cm := m.ChatMeta()
 	info := m.Info()
-	info.Model = mg.chat.ReportedModel(cm)
+	var tokens int
+	info.Model, tokens = mg.chat.ReportedModelAndContext(cm)
+	if tokens > 0 {
+		info.ContextTokens, info.ContextLevel = &tokens, agent.LevelForTokens(tokens)
+	}
 	info.ModelSwitched = chat.ModelSwitched(m.Model, info.Model)
 	if m.Harness == string(harness.Codex) {
 		info.Effort = mg.chat.ReportedCodexTurn(cm).Effort

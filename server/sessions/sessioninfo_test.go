@@ -3,6 +3,7 @@ package sessions_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
@@ -111,6 +113,83 @@ func modelTestManager(t *testing.T, cwd string, lines ...string) (*sessions.Mana
 
 func replyWithModel(model string) string {
 	return `{"type":"assistant","message":{"model":"` + model + `","content":[{"type":"text","text":"hi"}]}}`
+}
+
+func replyWithUsage(model string, tokens int) string {
+	return fmt.Sprintf(`{"type":"assistant","message":{"model":%q,"usage":{"input_tokens":%d}}}`, model, tokens)
+}
+
+const syntheticReply = `{"type":"assistant","message":{"model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0}}}`
+
+var contextMeta = sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
+
+func TestSessionInfoContext_ClaudeReplyGivesCountAndLevel(t *testing.T) {
+	t.Parallel()
+	info := modelTestServer(t, "/work/proj", replyWithUsage("claude-opus-5-5", 80000)).SessionInfo(contextMeta)
+	if info.ContextTokens == nil || *info.ContextTokens != 80000 || info.ContextLevel != agent.LevelYellow {
+		t.Errorf("context = %v/%q, want 80000/yellow", info.ContextTokens, info.ContextLevel)
+	}
+}
+
+func TestSessionInfoContext_NoReadingCarriesNeither(t *testing.T) {
+	t.Parallel()
+	cases := map[string]sessions.Meta{
+		"no assistant message": contextMeta,
+		"codex":                {Harness: "codex", Dir: "/work/proj", ConversationID: "conv"},
+		"missing transcript":   {Harness: "claude", Dir: "/work/proj", ConversationID: "other"},
+	}
+	for name, meta := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			info := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`).SessionInfo(meta)
+			if info.ContextTokens != nil || info.ContextLevel != "" {
+				t.Errorf("context = %v/%q, want none", info.ContextTokens, info.ContextLevel)
+			}
+			b, _ := json.Marshal(info)
+			if strings.Contains(string(b), "context_") {
+				t.Errorf("json %s carries a context field", b)
+			}
+		})
+	}
+}
+
+func TestSessionInfoContext_CompactKeepsTheEarlierCount(t *testing.T) {
+	t.Parallel()
+	boundary := `{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual"}}`
+	info := modelTestServer(t, "/work/proj", replyWithUsage("claude-opus-5-5", 120000), boundary).SessionInfo(contextMeta)
+	if info.ContextTokens == nil || *info.ContextTokens != 120000 || info.ContextLevel != agent.LevelOrange {
+		t.Errorf("context = %v/%q, want 120000/orange", info.ContextTokens, info.ContextLevel)
+	}
+}
+
+func TestSessionInfoContext_SyntheticZeroLineKeepsTheRealCount(t *testing.T) {
+	t.Parallel()
+	info := modelTestServer(t, "/work/proj", replyWithUsage("claude-opus-5-5", 50000), syntheticReply).SessionInfo(contextMeta)
+	if info.ContextTokens == nil || *info.ContextTokens != 50000 || info.ContextLevel != agent.LevelGreen {
+		t.Errorf("context = %v/%q, want 50000/green", info.ContextTokens, info.ContextLevel)
+	}
+}
+
+func TestSessionInfoContext_AppendedReplyChangesTheCachedCount(t *testing.T) {
+	t.Parallel()
+	s, path := modelTestManager(t, "/work/proj", replyWithUsage("claude-opus-5-5", 50000))
+	if got := s.SessionInfo(contextMeta).ContextTokens; got == nil || *got != 50000 {
+		t.Fatalf("tokens = %v, want 50000", got)
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(replyWithUsage("claude-opus-5-5", 140000) + "\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	info := s.SessionInfo(contextMeta)
+	if info.ContextTokens == nil || *info.ContextTokens != 140000 || info.ContextLevel != agent.LevelRed {
+		t.Errorf("context = %v/%q after an appended reply, want 140000/red", info.ContextTokens, info.ContextLevel)
+	}
 }
 
 func TestSessionInfoModel_ReportedBeatsSavedAndNewestReplyWins(t *testing.T) {

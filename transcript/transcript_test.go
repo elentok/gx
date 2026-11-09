@@ -154,6 +154,35 @@ func TestLastAssistantUsage_ReturnsOnlyTheLastAssistantLine(t *testing.T) {
 	}
 }
 
+func TestLastAssistantReading_SkipsZeroOccupancyLineButKeepsItsModel(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"assistant","message":{"model":"claude-opus-5","usage":{"input_tokens":3,"cache_read_input_tokens":90000,"cache_creation_input_tokens":0}}}`,
+		`{"type":"assistant","message":{"model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0}}}`,
+	)
+	usage, ok, err := LastAssistantReading(path)
+	if err != nil || !ok {
+		t.Fatalf("LastAssistantReading() ok=%v err=%v, want ok", ok, err)
+	}
+	if usage.Occupancy() != 90003 {
+		t.Errorf("occupancy = %d, want the real reply's 90003", usage.Occupancy())
+	}
+	if usage.Model != "<synthetic>" {
+		t.Errorf("model = %q, want the newest line's model", usage.Model)
+	}
+}
+
+func TestLastAssistantReading_OnlyZeroLines_ZeroOccupancy(t *testing.T) {
+	path := writeTranscript(t, `{"type":"assistant","message":{"model":"<synthetic>"}}`)
+	usage, ok, err := LastAssistantReading(path)
+	if err != nil || !ok || usage.Occupancy() != 0 {
+		t.Errorf("got occupancy=%d ok=%v err=%v, want 0/true/nil", usage.Occupancy(), ok, err)
+	}
+	_, ok, _ = LastAssistantReading(filepath.Join(t.TempDir(), "missing.jsonl"))
+	if ok {
+		t.Error("missing file ok = true, want false")
+	}
+}
+
 func turnsFixture(t *testing.T) string {
 	return writeTranscript(t,
 		`{"type":"user","timestamp":"2026-01-01T10:00:00Z","message":{}}`,

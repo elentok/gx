@@ -1773,6 +1773,11 @@ export interface Snapshot {
    */
   disks?: DiskStatus[];
   /**
+   * ContextCeiling is the smart-zone token ceiling the sessions' context
+   * levels are measured against; filled in by the handler.
+   */
+  context_ceiling?: number /* int */;
+  /**
    * Health is the CPU, memory and disk meters; filled in by the handler.
    */
   health: Health;
@@ -2651,6 +2656,12 @@ export interface SessionInfo {
    * the person switched it by hand. Never set for a launch with no explicit model.
    */
   model_switched?: boolean;
+  /**
+   * ContextTokens and ContextLevel are the context occupancy of a Claude
+   * session's newest reply; both are absent while there is no reading.
+   */
+  context_tokens?: number /* int */;
+  context_level?: any /* agent.ContextLevel */;
 }
 /**
  * SessionStatus is a Session status.
