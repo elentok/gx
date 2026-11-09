@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { useKeyboardOpen } from "./useKeyboardOpen";
 
 class FakeViewport extends EventTarget {
@@ -56,12 +56,20 @@ test("closed with focus but a gap under 150px", () => {
   expect(result.current).toBe(false);
 });
 
-test("closed while pinch-zoomed", () => {
+test("closed while pinch-zoomed with no keyboard", () => {
   const { result } = mount();
   act(() => a.focus());
   vv.scale = 2;
-  act(() => vv.resize(450));
+  act(() => vv.resize(400)); // half the window tall in zoomed pixels: the whole screen
   expect(result.current).toBe(false);
+});
+
+test("open when iOS zooms into the focused field and the keyboard is up", () => {
+  const { result } = mount();
+  act(() => a.focus());
+  vv.scale = 1.25;
+  act(() => vv.resize(400)); // 400 zoomed pixels is 500 screen pixels: 300 hidden by the keyboard
+  expect(result.current).toBe(true);
 });
 
 test("a focused button or checkbox does not count", () => {
@@ -117,4 +125,20 @@ test("false without a visual viewport", () => {
   const { result } = mount();
   act(() => a.focus());
   expect(result.current).toBe(false);
+});
+
+test("a keyboard size that iOS never reports by event is still picked up while a field is focused", () => {
+  vi.useFakeTimers();
+  try {
+    const { result } = mount();
+    act(() => a.focus());
+    vv.height = 450; // no resize event
+    expect(result.current).toBe(false);
+    act(() => vi.advanceTimersByTime(300));
+    expect(result.current).toBe(true);
+    act(() => a.blur());
+    expect(result.current).toBe(false);
+  } finally {
+    vi.useRealTimers();
+  }
 });

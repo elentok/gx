@@ -9,7 +9,8 @@ import type { FetchScreen } from "../design/screen";
 import { designOf, isTriage, promptable } from "../design/view";
 import type { SessionInfo } from "../generated/server";
 import { designHref, triageHref } from "../hrefs";
-import { useWide } from "../useWide";
+import { useDevice, useWide } from "../useWide";
+import { useKeyboardOpen } from "../page/useKeyboardOpen";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { Modal } from "../ui/modal/Modal";
@@ -49,8 +50,12 @@ function SessionHeader({
   const { tone } = statusMark(s);
   const map = designOf(s);
   const wide = useWide();
+  // With the keyboard up the header would take the height the chat needs; it returns when the keyboard closes.
+  const keyboardOpen = useKeyboardOpen();
+  const device = useDevice();
+  const compact = keyboardOpen && device !== "desktop";
   return (
-    <Box as="header" mb="3">
+    <Box as="header" mb="3" display={compact ? "none" : undefined}>
       <PageHeader
         title={s.name || s.id}
         subtitle={wide ? `Chat · ${s.project}` : `Chat · ${s.project} · ${stateLabel(s)}`}

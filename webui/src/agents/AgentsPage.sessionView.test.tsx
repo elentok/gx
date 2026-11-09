@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import type { SessionChatResponse } from "../generated/server";
 import { chat, chatOf, render, session, useAgentsPageHooks } from "./agentsTestKit";
@@ -110,4 +110,29 @@ test("a failed re-read keeps the last chat", async () => {
   emit("s-1");
   await vi.waitFor(() => expect(calls).toBe(2));
   expect(screen.getByText("hello there")).toBeTruthy();
+});
+
+test("on a phone the chat header goes while the keyboard is open and returns when it closes", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  const vv = Object.assign(new EventTarget(), { height: 800, scale: 1 });
+  Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
+  Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+  const resize = (h: number) =>
+    act(() => {
+      vv.height = h;
+      vv.dispatchEvent(new Event("resize"));
+    });
+  try {
+    render([session("s-1", "p", { name: "one" })], "/agents/s-1", true, chatOf(chat()));
+    const heading = await screen.findByRole("heading", { name: /one/ });
+    act(() => screen.getByRole("textbox").focus());
+    resize(350);
+    await waitFor(() => expect(getComputedStyle(heading.closest("header")!).display).toBe("none"));
+    act(() => (document.activeElement as HTMLElement).blur());
+    resize(800);
+    await waitFor(() => expect(getComputedStyle(heading.closest("header")!).display).not.toBe("none"));
+  } finally {
+    Object.defineProperty(window, "visualViewport", { value: undefined, configurable: true });
+    vi.unstubAllGlobals();
+  }
 });
