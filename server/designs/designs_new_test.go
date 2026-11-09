@@ -32,7 +32,7 @@ func TestDesignsOpenNew_WritesTheMapThenStartsTheSession(t *testing.T) {
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
 	dir, _ := meta["dir"].(string)
-	want := map[string]any{"dir": dir, "name": "fresh-idea", "ticket": "proj:fresh-idea", "design": true, "first_prompt": "/gx-design proj:fresh-idea", "made_worktree": true}
+	want := map[string]any{"dir": dir, "name": "fresh-idea", "ticket": "proj:fresh-idea", "flow": "design", "first_prompt": "/gx-design proj:fresh-idea", "made_worktree": true}
 	for k, v := range want {
 		if meta[k] != v {
 			t.Errorf("meta[%s] = %v, want %v", k, meta[k], v)

@@ -71,8 +71,8 @@ func TestLinkSession_KeepsTheLaunchTierAndSetsNoLaunchKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
-	if meta["tier"] != "worker" || meta["design"] != true {
-		t.Errorf("meta tier=%v design=%v, want worker and true", meta["tier"], meta["design"])
+	if meta["tier"] != "worker" || meta["flow"] != "design" {
+		t.Errorf("meta tier=%v flow=%v, want worker and design", meta["tier"], meta["flow"])
 	}
 	if _, ok := meta["launch_design"]; ok {
 		t.Errorf("link set launch_design = %v", meta["launch_design"])

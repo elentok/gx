@@ -75,7 +75,7 @@ func TestDesignsOpen_CreatesWithTheTuiPrefill(t *testing.T) {
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
 	dir, _ := meta["dir"].(string)
-	want := map[string]any{"dir": dir, "name": "map", "ticket": "proj:map", "harness": string(agentfake.HarnessKind), "first_prompt": "/gx-design proj:map", "design": true, "made_worktree": true}
+	want := map[string]any{"dir": dir, "name": "map", "ticket": "proj:map", "harness": string(agentfake.HarnessKind), "first_prompt": "/gx-design proj:map", "flow": "design", "made_worktree": true}
 	for k, v := range want {
 		if meta[k] != v {
 			t.Errorf("meta[%s] = %v, want %v", k, meta[k], v)
