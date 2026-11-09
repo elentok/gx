@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, test } from "./fixture";
+import { card, expect, menu, menuButton, nav, test } from "./fixture";
 
 const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash);
 
@@ -41,12 +41,64 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   }
   await goto(page, "#/e/demo:running-epic");
 
+  // Cmd/Ctrl+E opens the Command palette on every page, a second press closes it, and the filter box has focus.
+  const palette = page.getByRole("dialog", nav("Commands"));
+  for (const hash of ["#/epics", "#/e/demo:running-epic", "#/agents", "#/stats", "#/settings"]) {
+    await goto(page, hash);
+    await page.keyboard.press("ControlOrMeta+e");
+    await expect(palette).toBeVisible();
+    await expect(palette.getByRole("combobox")).toBeFocused();
+    await page.keyboard.press("ControlOrMeta+e");
+    await expect(palette).toHaveCount(0);
+  }
+
+  // It works from the Design page's chat box too.
+  await goto(page, "#/d/demo:design-live");
+  await page.getByRole("form", nav("Composer")).getByRole("button", nav("Note")).click();
+  await expect(page.getByRole("textbox", nav("Message"))).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+e");
+  await expect(palette).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(palette).toHaveCount(0);
+
+  // The palette is centered horizontally and lists the eight commands in order.
+  await goto(page, "#/epics");
+  await page.keyboard.press("ControlOrMeta+e");
+  await expect(palette).toBeVisible();
+  const box = (await palette.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(2);
+  const rows = palette.getByRole("option");
+  await expect(rows).toHaveText([/^New design/, /^New chat/, /^Next question/, /^Go to Epics/, /^Go to Agents/, /^Go to Stats/, /^Go to Settings/, /^Toggle AFK/]);
+
+  // Next question lands on a Needs you card of the active workspace.
+  await rows.filter({ hasText: "Next question" }).click();
+  await expect(palette).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/(e|d|a|t)\//);
+
+  // Toggle AFK, then the gear menu shows the AFK switch flipped.
+  await goto(page, "#/epics");
+  await page.keyboard.press("ControlOrMeta+e");
+  await expect(rows.filter({ hasText: "Toggle AFK" })).toContainText("AFK is off");
+  await rows.filter({ hasText: "Toggle AFK" }).click();
+  await expect(palette).toHaveCount(0);
+  await menuButton(page).click();
+  await expect(menu(page).getByRole("menuitemcheckbox", nav("AFK"))).toBeChecked();
+  await page.keyboard.press("Escape");
+
   // Clicking the count text itself opens the Epics page.
   await back(9).getByText("9", { exact: true }).click();
   await expect(page).toHaveURL(/#\/epics$/);
 
   // Phone layout on the same settled scenario. 375 px is below the wide layout's 62em breakpoint.
   await page.setViewportSize({ width: 375, height: 812 });
+
+  // The Command palette is a full-screen sheet on the phone.
+  await page.keyboard.press("ControlOrMeta+e");
+  await expect(palette).toBeVisible();
+  await expect.poll(() => palette.boundingBox()).toMatchObject({ x: 0, y: 0, width: 375, height: 812 });
+  await page.keyboard.press("Escape");
+  await expect(palette).toHaveCount(0);
 
   // The grid is one column: two cards of a section sit at the same left edge, one under the other.
   const first = await card(page, "paused-epic").boundingBox();
