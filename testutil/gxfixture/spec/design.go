@@ -190,6 +190,18 @@ func DesignBranchReady() scenario {
 	return sc
 }
 
+// DesignImagesCount is how many images DesignImages attaches to the map.
+const DesignImagesCount = 4
+
+// DesignImages is a Design with DesignImagesCount attached images and its
+// first round open.
+func DesignImages() scenario {
+	sc := DesignScript(tickets.StepResolveTickets, agentfake.DesignTurnRound)
+	sc.EpicImages = map[string]int{project + ":design-epic": DesignImagesCount}
+	sc.OpenDesigns = []string{project + ":design-epic"}
+	return sc
+}
+
 func DesignScript(step tickets.DesignStep, turns ...string) scenario {
 	sc := DesignBase
 	sc.DesignSteps = map[string]string{project + ":design-epic": string(step)}

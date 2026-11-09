@@ -64,6 +64,8 @@ type Scenario struct {
 	DesignHold bool
 	// DesignByMap scripts the design turns of one map, by address, over Design.
 	DesignByMap map[string][]string
+	// EpicImages is how many saved images each map, by address, holds in its images/ folder.
+	EpicImages map[string]int
 	// Queue lists the epics put on the queue once the server is up.
 	Queue []string
 	// QueueAgents is the agent a queued address runs under (`queue add --agent`);

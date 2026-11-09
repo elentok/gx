@@ -33,6 +33,26 @@ func agentsImagesScenario() scenario {
 // pngBase64 is a 1x1 PNG.
 const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
 
+// seedEpicImages saves n PNGs into a map's images folder; none makes no folder.
+func seedEpicImages(dir string, n int) error {
+	if n == 0 {
+		return nil
+	}
+	png, err := base64.StdEncoding.DecodeString(pngBase64)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	for i := 1; i <= n; i++ {
+		if err := os.WriteFile(filepath.Join(dir, transcript.SavedImageName(i, fmt.Sprintf("%08x", i), ".png")), png, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // imageMessage is one user message of the seeded chat: its text, how many saved
 // images it carries, and whether its source path lies outside the session folder.
 type imageMessage struct {

@@ -193,6 +193,9 @@ func (f *fixture) seed(sc scenario) error {
 				return err
 			}
 		}
+		if err := seedEpicImages(filepath.Join(f.store, e.Project, e.Name, "images"), sc.EpicImages[addr]); err != nil {
+			return err
+		}
 		if kind, ok := sc.Recovered[addr]; ok {
 			ev := runlog.Event{Time: time.Now(), Type: string(events.RecoveryApplied), Kind: kind, Reason: "seeded", Outcome: "ok"}
 			if err := runlog.AppendEvent(filepath.Join(f.store, e.Project), e.Name, ev); err != nil {

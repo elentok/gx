@@ -518,6 +518,9 @@ var scenarios = map[string]scenario{
 	// marker is 12 days ago, so a transcript older than that sits before it.
 	// One Design record has no counts, so it is not counted.
 	"grilling-stats": spec.GrillingStats(),
+	// design-images: a live design session with its first round open and
+	// spec.DesignImagesCount images attached to the map.
+	"design-images": spec.DesignImages(),
 	// design-plain (V3): a round, then a plain-text turn after the answer.
 	"design-plain": spec.DesignScript(tickets.StepResolveTickets,
 		agentfake.DesignTurnRound, agentfake.DesignTurnPlain),

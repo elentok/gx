@@ -7,8 +7,27 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
+
+func TestDesignImages_ListsTheMapsAttachedImages(t *testing.T) {
+	t.Parallel()
+	r := start(t, "design-images")
+	defer r.stop(t)
+	listed := imagestore.List(filepath.Join(fixtureRoot(r), "data", "gx", "tickets", "demo", "design-epic", "images"))
+	if len(listed) != spec.DesignImagesCount {
+		t.Errorf("attached images = %d, want %d", len(listed), spec.DesignImagesCount)
+	}
+	var list []wire.SessionInfo
+	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list) == 0 {
+		t.Error("no design session is open")
+	}
+}
 
 func TestAgentsImages_ClaudeAndCodexChatsListSavedImages(t *testing.T) {
 	t.Parallel()
