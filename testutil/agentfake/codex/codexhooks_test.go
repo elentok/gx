@@ -307,6 +307,18 @@ func TestCodexWorker_CodexUsageConfigWritesARateLimitSampleTheProductionReaderSe
 	}, "the 99% sample")
 }
 
+func TestCodexFake_UsageControlSetsTheNextTurnsContextCount(t *testing.T) {
+	home := t.TempDir()
+	p := startCodex(t, home, "usage2")
+	p.send(agentfake.Control{Action: agentfake.ActionUsage, Tokens: 128000})
+	p.startTurn("hello")
+	p.send(agentfake.Control{Action: agentfake.ActionFinish})
+	p.waitFor(func() bool {
+		data, err := os.ReadFile(rolloutFiles(t, home)[0])
+		return err == nil && strings.Contains(string(data), `"last_token_usage":{"input_tokens":128000`)
+	}, "the 128000 token count")
+}
+
 func TestCodexWorker_ErrorBehaviourEndsTheFirstPromptWithAModelErrorAndFinishesOnTheNext(t *testing.T) {
 	cfg, gxLog := agentfake.WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"gx:epic/01": agentfake.BehaviourError}

@@ -357,6 +357,22 @@ func TestTUIClaude_ModelControlChangesTheNextReplysModel(t *testing.T) {
 	}
 }
 
+func TestTUIClaude_UsageControlAppendsAnAssistantLineWithThatContextCount(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	path := f.transcriptPath()
+
+	f.control(Control{Action: ActionUsage, Tokens: 128000})
+	f.control(Control{Action: ActionUsage, Tokens: 90000})
+	// SendTUIControl returns once the fake has acked the control.
+	usage, ok, err := transcript.LastAssistantUsage(path)
+	if err != nil || !ok || usage.Occupancy() != 90000 {
+		t.Fatalf("last usage = %+v, %v, %v; want occupancy 90000", usage, ok, err)
+	}
+	if usage.Model == "" {
+		t.Error("usage line has no model")
+	}
+}
+
 func TestTUIClaude_StaleModelExitsAtStart(t *testing.T) {
 	f := startTUIFake(t, append([]string{"--model", StaleModel}, tuiLaunchArgs...))
 

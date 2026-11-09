@@ -109,6 +109,8 @@ func (t *tui) handleControl(c Control) error {
 	case ActionModel:
 		t.opts.model = c.Model
 		return nil
+	case ActionUsage:
+		return t.appendUsage(c.Tokens)
 	case ActionVimToggle:
 		t.vim = true
 		t.draw()
@@ -207,6 +209,27 @@ func (t *tui) startToolCalls(calls []ToolCall) error {
 		return err
 	}
 	return t.setStatus(StatusBusy, "")
+}
+
+// appendUsage appends an assistant line whose whole context is tokens, as the
+// last turn's usage reports it.
+func (t *tui) appendUsage(tokens int) error {
+	line, err := json.Marshal(map[string]any{
+		"isSidechain": false,
+		"type":        "assistant",
+		"timestamp":   time.Now().UTC().Format(time.RFC3339Nano),
+		"message": map[string]any{
+			"role":        "assistant",
+			"model":       t.opts.model,
+			"stop_reason": "end_turn",
+			"content":     []any{},
+			"usage":       map[string]any{"input_tokens": tokens, "output_tokens": 1},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return t.appendTranscript(string(line))
 }
 
 func (t *tui) appendTranscript(lines string) error {

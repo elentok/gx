@@ -50,6 +50,10 @@ const (
 	// ActionModel makes the TUI fake report Model on every later reply, as a
 	// session does after the user switches model with /model.
 	ActionModel = "model"
+	// ActionUsage makes the fake report a context count of Tokens: the TUI fake
+	// appends an assistant line whose usage holds it, the Codex fake's next
+	// finished turn reports it.
+	ActionUsage = "usage"
 	// ActionCommandOutput makes the TUI fake answer the next "/" command as a
 	// built-in one: it writes the command line, claude's caveat line and a
 	// stdout line holding Message (empty for a command with no output).
@@ -111,6 +115,8 @@ type Control struct {
 	Status int    `json:"status,omitempty"`
 	// Model is the model an ActionModel makes the TUI fake report.
 	Model string `json:"model,omitempty"`
+	// Tokens is the context count an ActionUsage reports.
+	Tokens int `json:"tokens,omitempty"`
 	// Tool and Command describe an ActionToolCall or ActionPermission of the
 	// Codex fake.
 	Tool    string `json:"tool,omitempty"`

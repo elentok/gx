@@ -217,13 +217,16 @@ func runCodex() (int, error) {
 }
 
 type codexFake struct {
-	out   io.Writer
-	id    string
-	home  string
-	cwd   string
-	title string
-	box   *agentfake.InputBox
-	hooks map[string][]codexHook
+	// contextTokens, when set by an ActionUsage, is the last_token_usage input
+	// each finished turn reports instead of the per-turn default.
+	contextTokens int
+	out           io.Writer
+	id            string
+	home          string
+	cwd           string
+	title         string
+	box           *agentfake.InputBox
+	hooks         map[string][]codexHook
 	// dialogs are the startup dialogs still waiting for a key; ctlPath is this
 	// fake's own control channel, for work that runs off the input loop.
 	dialogs []string
@@ -441,7 +444,7 @@ func (c *codexFake) finishTurn() error {
 	if err := c.writeLine("response_item", c.message("assistant", "output_text", reply)); err != nil {
 		return err
 	}
-	input := codexTurnTokens * c.turns
+	input := cmp.Or(c.contextTokens, codexTurnTokens*c.turns)
 	usage := func(tokens int) map[string]any {
 		return map[string]any{"input_tokens": tokens, "total_tokens": tokens}
 	}
@@ -501,6 +504,8 @@ func (c *codexFake) control(ctl agentfake.Control) error {
 		c.screenPermission(ctl)
 	case agentfake.ActionTokenCount:
 		return c.tokenCount(ctl.UsedPercent, ctl.ResetsAt)
+	case agentfake.ActionUsage:
+		c.contextTokens = ctl.Tokens
 	case agentfake.ActionCompact:
 		return c.compact()
 	case agentfake.ActionTaskError:
