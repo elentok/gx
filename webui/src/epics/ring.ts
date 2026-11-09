@@ -22,6 +22,7 @@ const PILL_TONE: Record<string, Tone> = {
   Question: "waiting",
   Permission: "waiting",
   Paused: "paused",
+  Stopped: "paused",
   Deadlocked: "deadlocked",
   "Merge blocked": "deadlocked",
   "Awaiting merge": "done",

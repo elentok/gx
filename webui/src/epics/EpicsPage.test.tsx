@@ -133,6 +133,12 @@ test("an empty section is hidden", async () => {
   expect(regionNames()).toEqual(["epics-needs-you", "epics-finished"]);
 });
 
+test("a Follow-ups card sits in the section its row names", async () => {
+  const fu = (name: string, section: string) => row(name, { card_kind: "follow-ups", project: name, section });
+  await loaded(listOf([fu("a", "designing"), fu("b", "needs-you"), fu("c", "ready-to-design")]));
+  expect(regionNames()).toEqual(["epics-needs-you", "epics-designing", "epics-ready-to-design"]);
+});
+
 test("a toggle opens a collapsed section and closes an open one", async () => {
   await loaded(mixed());
   fireEvent.click(toggle("Finished"));

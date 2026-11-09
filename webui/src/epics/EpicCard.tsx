@@ -23,8 +23,8 @@ import {
 } from "../generated/server";
 import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { ItemMenu, itemOfCard, postUnhold, type ItemWriters } from "../workspaces/itemActions";
-import { designHref, epicHref, ticketHref } from "../hrefs";
-import { postOpenDesign, type OpenDesign } from "../design/open";
+import { designHref, epicHref, ticketHref, triageHref } from "../hrefs";
+import { postOpenDesign, postOpenTriage, type OpenDesign, type OpenFlow } from "../design/open";
 import { Button } from "../ui/button/Button";
 import { useWrite } from "../useWrite";
 import { launchOrVerdictText } from "../verdict";
@@ -35,11 +35,10 @@ import { timeLabel } from "./cardTime";
 import { mergeToast } from "./MergeButton";
 import { postEpicMerge, postEpicStashMerge, postQueueAdd, type PostEpicWrite } from "./queue";
 import { RING_KIND, isCreatingTickets, isLive, needsYouTone, ringProgress, ringTone } from "./ring";
-import { TriageDialog } from "./TriageDialog";
 
 function ringLabel(row: EpicListRow): string {
   if (isCreatingTickets(row)) return "…";
-  if (row.card_kind === CardKindDesign) return `${row.ring_progress ?? 0}%`;
+  if (row.card_kind === CardKindDesign || row.card_kind === CardKindFollowUps) return `${row.ring_progress ?? 0}%`;
   if (row.card_kind === CardKindImplementation) return `${row.done}/${row.total}`;
   return "";
 }
@@ -63,6 +62,7 @@ export interface CardWrites {
   merge?: PostEpicWrite;
   stashMerge?: PostEpicWrite;
   openDesign?: OpenDesign;
+  openTriage?: OpenFlow;
   /** Goes to a hash route. */
   navigate?: (href: string) => void;
   unhold?: ItemWriters["unhold"];
@@ -81,11 +81,11 @@ function ActionButtons({
   writes: CardWrites;
   onChanged: () => void;
 }) {
-  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, openDesign = postOpenDesign, navigate = goTo, unhold = postUnhold } = writes;
-  const [triage, setTriage] = useState(false);
+  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, openDesign = postOpenDesign, openTriage = postOpenTriage, navigate = goTo, unhold = postUnhold } = writes;
   const { run, pending } = useWrite();
 
   const startDesign = (epic: string) => run(() => openDesign({ epic }), { onDone: () => navigate(designHref(epic)) });
+  const startTriage = (project: string) => run(() => openTriage({ epic: project }), { onDone: () => navigate(triageHref(project)) });
 
   function button(a: CardAction, i: number) {
     const target = a.target ?? row.address;
@@ -106,30 +106,26 @@ function ActionButtons({
         />
       );
     }
+    const followUps = row.card_kind === CardKindFollowUps;
     const onClick = {
       [CardActionUnhold]: () => void run(() => unhold(target)),
       [CardActionDesign]: () => startDesign(target),
-      [CardActionContinue]: () => startDesign(target),
-      [CardActionOpen]: () => navigate(designHref(target)),
+      [CardActionContinue]: () => (followUps ? startTriage(target) : startDesign(target)),
+      [CardActionOpen]: () => navigate(a.link ?? designHref(target)),
       [CardActionAnswer]: () => navigate(a.link ?? ticketHref(target)),
       [CardActionOpenTicket]: () => navigate(ticketHref(target)),
       [CardActionOpenEpic]: () => navigate(epicHref(target)),
-      [CardActionTriage]: () => setTriage(true),
+      [CardActionTriage]: () => startTriage(target),
     }[a.kind];
     return (
       <Button key={i} tone="running" emphasis={emphasis} disabled={pending} onClick={onClick}>
-        {pending && (a.kind === CardActionDesign || a.kind === CardActionContinue) && <Spinner size="sm" />}
+        {pending && (a.kind === CardActionDesign || a.kind === CardActionContinue || a.kind === CardActionTriage) && <Spinner size="sm" />}
         {a.label}
       </Button>
     );
   }
 
-  return (
-    <>
-      {row.actions?.map(button)}
-      {triage && <TriageDialog project={row.project} onClose={() => setTriage(false)} />}
-    </>
-  );
+  return <>{row.actions?.map(button)}</>;
 }
 
 /** One /v1/epics card row. */
@@ -159,6 +155,7 @@ export function EpicCard({
       : (launchOrVerdictText(row.launch_step, row.verdict, row.reason) ?? row.reason);
   const hasButtons = (row.actions?.length ?? 0) > 0;
   const tone = needsYou ? needsYouTone(row) : undefined;
+  const pillTone = tone ?? (row.card_kind === CardKindFollowUps && row.state_pill ? needsYouTone(row) : undefined);
   const held = row.section === SectionOnHold;
   return (
     <Box
@@ -224,9 +221,9 @@ export function EpicCard({
           </Box>
         )}
       </Box>
-      {(needsYou || reason) && (
+      {(needsYou || pillTone || reason) && (
         <Box display="flex" flexDirection="column" alignItems="flex-start" gap="2">
-          {needsYou && tone && (
+          {pillTone && (
             <Box
               data-testid="pill"
               display="inline-flex"
@@ -236,8 +233,8 @@ export function EpicCard({
               px="3"
               borderRadius="full"
               fontSize="14px"
-              color={`tone.${tone}.fg`}
-              bg={`tone.${tone}.bg`}
+              color={`tone.${pillTone}.fg`}
+              bg={`tone.${pillTone}.bg`}
             >
               <Box w="7px" h="7px" borderRadius="full" bg="currentColor" />
               {row.state_pill}
