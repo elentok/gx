@@ -4,7 +4,10 @@ import { signOut } from "../apiFetch";
 import { renderThemed } from "../ui/render";
 import { AuthGate } from "./AuthGate";
 import type { AuthState } from "./authState";
+import { useCert } from "./cert";
 import { TEST_CERT } from "./testCert";
+
+const CertProbe = () => <p>cert:{useCert().cert?.cer_path}</p>;
 
 afterEach(() => {
   cleanup();
@@ -38,6 +41,37 @@ test("shows login when signed out", async () => {
 test("shows the app when signed in", async () => {
   renderGate(async () => stateOf("signed-in"));
   expect(await screen.findByText("the app")).toBeTruthy();
+});
+
+test("a failed auth read mounts the app", async () => {
+  renderGate(async () => {
+    throw new Error("offline");
+  });
+  expect(await screen.findByText("the app")).toBeTruthy();
+});
+
+test("after a failed read a 401 re-reads the state and shows login with the hash kept", async () => {
+  window.location.hash = "#/stats";
+  let fail = true;
+  renderGate(async () => {
+    if (fail) throw new Error("offline");
+    return stateOf("signed-out");
+  });
+  await screen.findByText("the app");
+  fail = false;
+  act(() => signOut());
+  expect(await screen.findByRole("button", { name: "Sign in" })).toBeTruthy();
+  expect(window.location.hash).toBe("#/stats");
+});
+
+test("the signed-in app has the cert context", async () => {
+  const state = stateOf("signed-in");
+  renderThemed(
+    <AuthGate fetchState={async () => state}>
+      <CertProbe />
+    </AuthGate>,
+  );
+  expect(await screen.findByText(`cert:${state.cer_path}`)).toBeTruthy();
 });
 
 test("login asks for the setup code only when the state says so", async () => {

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { onSignedOut } from "../apiFetch";
 import { Spinner } from "../ui/spinner/Spinner";
-import { AuthCard } from "./AuthCard";
 import { CertContext } from "./cert";
 import { fetchAuthState, type AuthState } from "./authState";
 import { LoginPage } from "./LoginPage";
@@ -18,20 +17,20 @@ export function AuthGate({
   children: ReactNode;
   fetchState?: () => Promise<AuthState>;
 }) {
-  const [auth, setAuth] = useState<AuthState | null>(null);
-  const [failed, setFailed] = useState(false);
+  // "unknown": the read failed (network or server error). The app mounts anyway so its Offline strip shows; the connection loop does the retrying.
+  const [auth, setAuth] = useState<AuthState | "unknown" | null>(null);
 
   const refresh = useCallback(() => {
-    fetchState().then(setAuth, () => setFailed(true));
+    fetchState().then(setAuth, () => setAuth("unknown"));
   }, [fetchState]);
 
   useEffect(refresh, [refresh]);
   // A 401 is the signed-out signal. Re-read the state: a `gx server web-reset` leaves nothing to sign in to, so the page has to move to setup.
   useEffect(() => onSignedOut(refresh), [refresh]);
 
-  if (failed) return <AuthCard>Could not reach the server.</AuthCard>;
   if (!auth) return <Spinner label="Loading" />;
-  if (auth.state === "signed-in") return <>{children}</>;
+  if (auth === "unknown") return <>{children}</>;
+  if (auth.state === "signed-in") return <CertContext.Provider value={{ cert: auth }}>{children}</CertContext.Provider>;
   return (
     <CertContext.Provider value={{ cert: auth }}>
       {auth.state === "setup" ? <SetupPage auth={auth} onDone={refresh} /> : <LoginPage auth={auth} onDone={refresh} />}
