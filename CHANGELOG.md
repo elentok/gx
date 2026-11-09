@@ -1,9 +1,34 @@
 # Changelog
 
-## Unreleased
+## v0.46.0 - 2026-11-09
 
-- Changed `gx config show` to redact the Telegram bot token and chat id and the Slack webhook, so they stay out of agent transcripts. `--reveal` prints them.
+- Added a Triage for follow-ups. `gx tickets triage` creates a Triage record per project, saves verdicts and a plan, edits rows, approves, writes and abandons. The web gets a Triage page at `/triage/<project>` with Verify, Questions, Review, Approve, Write and Done views. The Follow-ups card starts or opens the Triage. A follow-up badge in the sidebar footer has a popover per project. The `gx-triage-follow-ups` skill drives it, and Triage sessions show as a Triage group on the Agents page.
+- Added workspaces and a new web app shell. A sidebar now holds rows with status rings, nesting, On hold and Other sections, a workspace switcher, a Manage workspaces dialog, a per-workspace Sort, a limits tray and a gear menu. The top bar and the Agents page sidebar are gone. Hold, Move and Remove are available from row menus, page headers and the jump menu, and `gx server workspaces` manages them from the CLI. Cmd/Ctrl+K opens the jump menu, Cmd/Ctrl+B toggles the sidebar, and Alt+1..9 and Alt+Shift+1..9 jump to rows and workspaces. Swipe gestures work on phones.
+- Added a shared page header, menu and model-name labels across the Epic, Design and Agents pages. The harness dot shows on running ticket cards.
+- Added a reworked New Design form. Drafts autosave on the server with a switcher, names and Discard. Images can be pasted or added to the idea. The form remembers the last project, and `gx designs drafts` backs it from the CLI. The gx-design skill reads the listed images.
+- Added Prompt images in chat. You can paste or add images in the Agents and design composers, see thumbnails and a grid in chat messages, and open a full-size view. This works for Claude and Codex, and `gx claude doctor` and `gx codex doctor` check image paste.
+- Added Auto-queue for a Design. A per-session switch starts a countdown when the Design reaches Branch, with Cancel on the Design page and items in the Agents actions menu.
+- Added a Cleanup page, a Tips page and a gear-menu entry for each. Cleanup scans archived epics, merged worktrees and branches, shows sizes, removes them and can start an agent on the unresolved rows.
+- Added a Promote to Design button in the agent page header, backed by the `gx-promote-to-design` skill and `gx agent transcript`.
+- Added a Working row that names the tool in flight, with a count popover. A Screen modal shows the settled screen and marks changed rows.
+- Added a Latest summary block on the ticket page. Every iteration agent now leaves a summary, and verify agents record per-story verdicts.
+- Added `gx agents remove --exited` to sweep every Exited session, `gx evolve inputs` map rows, and a Huh? option on every question in the question UI. An agent question can be answered with a note alone.
 - Added `gx config get <key>` to print one config value by dotted path. A secret key is refused without `--reveal`.
+- Added faster, better-tracked queue launches. Every claimed ticket now launches in its own goroutine, dependency installs are shared per lockfile and capped at 2 server-wide, and a launch can cancel its install. The four launch steps are timed and stamped on finished tickets. The web, TUI, ticket and epic pages show Launching and Waiting for a slot. Stats has a Launch section, `gx server stats` reports launch time, and `gx evolve` flags slow launches.
+- Added a new chat layout for Slack and Telegram notifications. A batch starts with an "N updates" headline, messages are ordered by urgency, and pauses read as plain sentences. A Progress message goes out every interval per epic. The Design Question and Design Ready messages are sent once each, and AFK session alerts show the status word, session name and reason.
+- Changed `gx config show` to redact the Telegram bot token and chat id and the Slack webhook, so they stay out of agent transcripts. `--reveal` prints them.
+- Changed the Agents composer to swap Send for Interrupt while the session is working.
+- Changed a Design to one sidebar row and an epic link on the Design page. Web creates (New design, New chat, Epics, Agents) use the active workspace.
+- Changed limits bars to green below 80%, and the Stats page to show a needs-data forecast when Claude weekly has no sample.
+- Fixed agents that hang or lose their launch prompt. A hung pane is stopped, confirmed gone and relaunched once, and the screen lines are logged. A dead holder relaunches once through the shared path. Codex launch prompts are proven from the rollout and resent. Herdr and PTY Claude agents check for vim before the prompt and relaunch once.
+- Fixed the stall nudge parking an agent that waits on its own background task. A live Claude task now holds the finish wait, checked every 10 minutes under a 60-minute cap. The gate card names the task, with Keep waiting and Stop task buttons. A classifier outage re-sends "continue" at 1, 2 and 4 minutes before pausing.
+- Fixed Retry refusing a dead pane as live, and start-over now clears a dead agent.
+- Fixed the epic branch rebase. It now runs only before the epic's first run, even when its worktree exists, and pauses on a conflict. The conflict-resolution agent gets its dependencies installed first.
+- Fixed the web UI missing launch steps after the event stream dropped. It now restarts the stream and refetches page data when the app returns or the stream reopens.
+- Fixed iOS keyboards panning the header away on fill pages, and the Design header on phones while the keyboard is open.
+- Fixed a CPU and disk cost in the queue. The worktree directory lookup is cached, the ticket index skips re-reading unchanged tickets, done and cancelled tickets are pruned from the queue, and idle state-file writes are skipped.
+- Fixed transcripts of any line length being unreadable in `gx evolve inputs`, and `[Image #N]` chips leaking into prompts.
+- Updated the web UI to use react-icons 5.7.
 
 ## v0.45.1 - 2026-11-04
 
