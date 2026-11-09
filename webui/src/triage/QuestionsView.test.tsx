@@ -71,3 +71,18 @@ test("the page note says where answers go", () => {
   render(<QuestionsView project="gx" view={viewOf()} refetch={() => {}} save={vi.fn()} />);
   screen.getByText("Answers go into each ticket body when the Write step runs.");
 });
+
+test("typing in one row's q1 saves that row only, though every row has a q1", async () => {
+  const save = vi.fn().mockResolvedValue({ revision: 5 });
+  const rows = ["01", "02", "03"].map((n) => ({
+    address: `gx:follow-ups/${n}`,
+    title: `row ${n}`,
+    questions: [{ id: "q1", title: `Q for ${n}?`, kind: "text" }],
+  }));
+  render(<QuestionsView project="gx" view={viewOf({ rows, open_questions: 3 })} refetch={vi.fn()} save={save} />);
+  screen.getByText("0 of 3 answered");
+  fireEvent.change(screen.getByRole("textbox", { name: "Answer to question 1.1" }), { target: { value: "agree" } });
+  await waitFor(() => expect(save).toHaveBeenCalled());
+  expect(save.mock.calls.map((c) => [c[0].address, c[0].answers])).toEqual([["gx:follow-ups/01", { q1: "agree" }]]);
+  screen.getByText("1 of 3 answered");
+});
