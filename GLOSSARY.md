@@ -1033,12 +1033,17 @@ screen.
 
 **Chat** — the outbound Slack/Telegram surface (the wrapper sinks). Deliberately a small, fixed
 subset of run events, for a person away from the terminal. The word **push** is retired for this
-sense: it collided with `git push` and with mobile push notifications, and `notify` was already
-taken by the toast package.
+sense: it collided with `git push`, and `notify` was already taken by the toast package. **Push**
+now names the web push surface below.
 
 **Banner** — an OS-level notification, sent once by the server (never by a TUI), with an optional
 sound. For a person at the machine who isn't looking at the session it concerns. Distinct from a
 **toast**, which lives inside the TUI.
+
+**Push** — a Web Push notification the server sends to a subscribed device, even with the web app
+closed. For events that need the person (an Actionable or failed session, a Design question, a
+Paused ticket), with the Banner's text. Per-device subscription, own switch, not gated by AFK mode;
+only the open-on-screen rule skips it. Distinct from **Chat** and **Banner**.
 
 **AFK mode** — a person-set, machine-wide state in which interactive session events also go to
 **Chat**, for a person away from the machine. It adds a surface; it never silences banners.
