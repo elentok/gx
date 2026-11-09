@@ -4,6 +4,7 @@ import { postAfk as defaultPostAfk, toggleAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { SortActivity, SortDefault, SortName, SortNeedsYou, type Workspace } from "../generated/server";
 import { CLEANUP_HREF, SETTINGS_HREF, TIPS_HREF } from "../hrefs";
+import { useInstall } from "../pwa/install";
 import { RestartDialog } from "../restart/RestartDialog";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { showToast } from "../ui/toaster";
@@ -11,6 +12,7 @@ import { postViMode as defaultPostViMode } from "../vimode";
 import { WriteError } from "../useWrite";
 import { postWorkspace } from "../workspaces/postWorkspace";
 import { FooterButton, interactiveStyle } from "./FooterButton";
+import { InstallSheet } from "./InstallSheet";
 import { useShell } from "./ShellContext";
 
 interface Props {
@@ -51,6 +53,8 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
   const { snapshot } = useConnectionState(useConnectionContext());
   const shell = useShell();
   const [restartOpen, setRestartOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const install = useInstall();
   const afk = snapshot?.afk ?? false;
   const viMode = snapshot?.vi_mode ?? false;
   const toggle = (label: string, value: string, on: boolean, flip: () => void): MenuEntry => ({
@@ -80,6 +84,19 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
         ],
       }
     : { value: "sort", label: "Sort", disabled: true, onSelect: () => {} };
+  const installEntries: MenuEntry[] =
+    install.mode === "none"
+      ? []
+      : [
+          { kind: "separator" },
+          {
+            value: "install",
+            label: "Install app",
+            hint: install.mode === "prompt" && install.desktopCaption ? "Chrome / Edge" : undefined,
+            inlineHint: true,
+            onSelect: () => (install.mode === "prompt" ? void install.promptInstall() : setSheetOpen(true)),
+          },
+        ];
   return (
     <>
       <GxMenu
@@ -119,8 +136,10 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
               shell?.closeSliding();
             },
           },
+          ...installEntries,
         ]}
       />
+      {sheetOpen && (install.mode === "ios" || install.mode === "mac-safari") && <InstallSheet mode={install.mode} onClose={() => setSheetOpen(false)} />}
       {restartOpen && <RestartDialog liveInstance={snapshot?.instance} onClose={() => setRestartOpen(false)} />}
     </>
   );

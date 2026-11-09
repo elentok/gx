@@ -10,7 +10,12 @@ import { ShellContext } from "./ShellContext";
 const showToast = vi.hoisted(() => vi.fn());
 vi.mock("../ui/toaster", async (importOriginal) => ({ ...(await importOriginal<typeof import("../ui/toaster")>()), showToast }));
 
+const install = vi.hoisted(() => ({ state: { mode: "none", desktopCaption: false } as { mode: string; desktopCaption: boolean }, promptInstall: vi.fn(async () => {}) }));
+vi.mock("../pwa/install", () => ({ useInstall: () => ({ ...install.state, promptInstall: install.promptInstall }) }));
+
 afterEach(() => {
+  install.state = { mode: "none", desktopCaption: false };
+  install.promptInstall.mockClear();
   cleanup();
   showToast.mockClear();
   window.location.hash = "";
@@ -129,6 +134,52 @@ test("Restart server opens the restart dialog", async () => {
   setup();
   fireEvent.click(await screen.findByRole("menuitem", { name: "Restart server" }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
+});
+
+test("mode none shows no Install row", async () => {
+  setup();
+  await screen.findByRole("menuitem", { name: "Tips" });
+  expect(screen.queryByRole("menuitem", { name: /Install app/ })).toBeNull();
+});
+
+test("prompt mode lists Install app last under its own separator, with the desktop caption, and a click prompts", async () => {
+  install.state = { mode: "prompt", desktopCaption: true };
+  setup();
+  const row = await screen.findByRole("menuitem", { name: /Install app/ });
+  expect(row.textContent).toContain("Chrome / Edge");
+  const menu = screen.getByRole("menu");
+  expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(2);
+  const items = [...menu.querySelectorAll('[role^="menuitem"]')];
+  expect(items[items.length - 1]).toBe(row);
+  fireEvent.click(row);
+  expect(install.promptInstall).toHaveBeenCalledTimes(1);
+});
+
+test("prompt mode without the desktop caption shows a bare Install app row", async () => {
+  install.state = { mode: "prompt", desktopCaption: false };
+  setup();
+  expect((await screen.findByRole("menuitem", { name: /Install app/ })).textContent?.trim()).toBe("Install app");
+});
+
+test("ios mode opens the Share steps sheet and Done closes it", async () => {
+  install.state = { mode: "ios", desktopCaption: false };
+  setup();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Install app/ }));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog.textContent).toContain("Share");
+  expect(dialog.textContent).toContain("Add to Home Screen");
+  expect(install.promptInstall).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("mac-safari mode shows File then Add to Dock", async () => {
+  install.state = { mode: "mac-safari", desktopCaption: false };
+  setup();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Install app/ }));
+  const text = (await screen.findByRole("dialog")).textContent ?? "";
+  expect(text.indexOf("File")).toBeGreaterThan(-1);
+  expect(text.indexOf("Add to Dock")).toBeGreaterThan(text.indexOf("File"));
 });
 
 test("the Menu trigger is a burger: three horizontal lines and no circle", () => {
