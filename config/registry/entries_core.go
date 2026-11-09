@@ -86,6 +86,11 @@ func coreEntries() []Entry {
 		Description: "CPU use, in percent of one core, that counts as high."})
 	add(s, dur(Key("cpu-watchdog", "sustain"), "How long CPU use must stay high before the watchdog acts."))
 	add(s, dur(Key("cpu-watchdog", "cooldown"), "The least time between two CPU captures."))
+	add(s, Entry{Key: Key("watchdog", "max-tree-processes"), Type: TypeNumber, Min: minOf(1), Integer: true,
+		Description: "The most processes one agent's tree may hold before the watchdog stops the agent."})
+	add(s, dur(Key("watchdog", "interval"), "How often the watchdog counts each agent's processes. Default: 1s."))
+	add(s, Entry{Key: Key("watchdog", "ulimit-headroom"), Type: TypeNumber, Min: minOf(1), Integer: true,
+		Description: "How many processes above your current count an agent may start. The cap is fixed when an agent launches, so restart the agent if legitimate forks start failing."})
 	add(s, Entry{Key: Key("disk-space", "warn-below"), Type: TypeSize,
 		Description: "Warn when free disk space drops below this size. 0 turns it off."})
 	add(s, Entry{Key: Key("disk-space", "clean-below"), Type: TypeSize,

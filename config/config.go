@@ -48,6 +48,7 @@ type Config struct {
 	Server                ServerConfig         `json:"server"`
 	Recovery              RecoveryConfig       `json:"recovery"`
 	CPUWatchdog           CPUWatchdogConfig    `json:"cpu-watchdog"`
+	Watchdog              WatchdogConfig       `json:"watchdog"`
 	DiskSpace             DiskSpaceConfig      `json:"disk-space"`
 	// AgentRunner is auto, herdr, headless or pty. It is validated when the
 	// server starts, not here, so a bad value never breaks the TUI.
@@ -148,6 +149,7 @@ func defaultWith(dataDir func() (string, error)) Config {
 		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{DevURL: DefaultWebDevURL, TOTP: true}},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
+		Watchdog:              DefaultWatchdogConfig(),
 		DiskSpace:             DefaultDiskSpaceConfig(),
 		AgentRunner:           "auto",
 		RunnerWait:            agentrunner.DefaultN,
@@ -446,6 +448,19 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 			if d, err := time.ParseDuration(*w.Cooldown); err == nil && d >= 0 {
 				cfg.CPUWatchdog.Cooldown = d
 			}
+		}
+	}
+	if w := raw.Watchdog; w != nil {
+		if w.MaxTreeProcesses != nil && *w.MaxTreeProcesses > 0 {
+			cfg.Watchdog.MaxTreeProcesses = *w.MaxTreeProcesses
+		}
+		if w.Interval != nil {
+			if d, err := time.ParseDuration(*w.Interval); err == nil && d > 0 {
+				cfg.Watchdog.Interval = d
+			}
+		}
+		if w.UlimitHeadroom != nil && *w.UlimitHeadroom > 0 {
+			cfg.Watchdog.UlimitHeadroom = *w.UlimitHeadroom
 		}
 	}
 	if d := raw.DiskSpace; d != nil {

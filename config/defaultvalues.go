@@ -23,6 +23,7 @@ var hiddenDefaults = map[string]func(Config) any{
 	},
 	"cpu-watchdog.sustain":                func(c Config) any { return durationText(c.CPUWatchdog.Sustain) },
 	"cpu-watchdog.cooldown":               func(c Config) any { return durationText(c.CPUWatchdog.Cooldown) },
+	"watchdog.interval":                   func(c Config) any { return durationText(c.Watchdog.Interval) },
 	"execution-queue.spin-window":         func(c Config) any { return durationText(c.ExecutionQueue.SpinWindow) },
 	"execution-queue.waiting-slot-grace":  func(c Config) any { return durationText(c.ExecutionQueue.WaitingSlotGrace) },
 	"execution-queue.stalled-nudge-delay": func(c Config) any { return durationText(c.ExecutionQueue.StalledNudgeDelay) },

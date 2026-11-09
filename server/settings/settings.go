@@ -86,6 +86,8 @@ type Settings struct {
 
 	// CPUWatchdog is config cpu-watchdog: when a CPU spike files a ticket.
 	CPUWatchdog config.CPUWatchdogConfig
+	// Watchdog is config watchdog: the process-storm limits.
+	Watchdog config.WatchdogConfig
 
 	// DiskSpace is config disk-space: the free-space thresholds and cleanup
 	// command. Zero thresholds mean off, so hand-built Settings stay off.
@@ -159,6 +161,7 @@ func FromConfig(cfg config.Config) Settings {
 		AgentsClaudeArgs:            cfg.Agents.ClaudeArgs,
 		AgentsFixAgentRemoteControl: cfg.Agents.FixAgentRemoteControl,
 		CPUWatchdog:                 cfg.CPUWatchdog,
+		Watchdog:                    cfg.Watchdog,
 		DiskSpace:                   cfg.DiskSpace,
 		RecentlyFinished:            cfg.Server.RecentlyFinished,
 		AgentsClaude:                cfg.Agents.Claude,

@@ -156,7 +156,7 @@
         },
         "restore-sessions-on-start": {
           "default": false,
-          "description": "Resume every interactive session that was running when the server last stopped. Default: false.",
+          "description": "Reopen the agent sessions that were open when gx last stopped.",
           "type": "boolean"
         },
         "resume-on-start": {
@@ -514,6 +514,28 @@
     },
     "use-nerdfont-icons": {
       "description": "TUI only, not shown on the web page"
+    },
+    "watchdog": {
+      "additionalProperties": false,
+      "properties": {
+        "interval": {
+          "description": "How often the watchdog counts each agent's processes. Default: 1s.",
+          "type": "string"
+        },
+        "max-tree-processes": {
+          "default": 200,
+          "description": "The most processes one agent's tree may hold before the watchdog stops the agent.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ulimit-headroom": {
+          "default": 1000,
+          "description": "How many processes above your current count an agent may start. The cap is fixed when an agent launches, so restart the agent if legitimate forks start failing.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
     }
   },
   "title": "gx config",

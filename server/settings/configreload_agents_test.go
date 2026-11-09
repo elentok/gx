@@ -37,7 +37,7 @@ func TestConfigReload_AgentsSessionKeysApply(t *testing.T) {
 	}
 
 	servertest.WriteConfig(t, path, store, map[string]any{"agents": map[string]any{
-		"restore-sessions-on-start": false,
+		"restore-sessions-on-start": true,
 		"banners":                   map[string]any{"enabled": false},
 		"sounds":                    map[string]any{"enabled": false, "done": "done.aiff"},
 		"claude-args":               []string{"--verbose"},
