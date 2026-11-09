@@ -269,7 +269,51 @@ const SAVED_MS = 2000;
 const needsConfirm = (e: SettingsEntry, change: SettingChange) =>
   !!e.risky && !(e.key === "server.web.totp" && "value" in change && change.value === true);
 
-export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: SettingsEntry; pendingRestart: boolean; onWrite: WriteSetting }) {
+const CAP_KEY = "project.max-agents";
+const EVOLVE_KEY = "project.evolve";
+
+/** In a project, a key with a global counterpart is inherited until the project file holds it. */
+function projectTexts(e: SettingsEntry, project: string) {
+  const global = displayValue(e.global_value);
+  if (e.key === CAP_KEY) {
+    return {
+      inherit: (
+        <>
+          No per-project cap (the global cap of <b>{global}</b> still applies)
+        </>
+      ),
+      start: `Set a cap for ${project}`,
+      back: "Remove cap",
+    };
+  }
+  return {
+    inherit:
+      e.key === EVOLVE_KEY ? (
+        <>
+          Follows global mode (<b>{global}</b>)
+        </>
+      ) : (
+        <>
+          Uses the global value <b>{global}</b>
+        </>
+      ),
+    start: `Override for ${project}`,
+    back: `Use global value (${global})`,
+  };
+}
+
+export function SettingsRow({
+  entry,
+  pendingRestart,
+  onWrite,
+  project,
+}: {
+  entry: SettingsEntry;
+  pendingRestart: boolean;
+  onWrite: WriteSetting;
+  /** The project on the page; its overridable keys show inherit and override states. */
+  project?: string;
+}) {
   const write = useWrite({ toastRefusal: false });
   const [draft, setDraft] = useState<string>();
   const [saved, setSaved] = useState(false);
@@ -301,6 +345,11 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
 
   const Control = CONTROLS[entry.type];
   const defaultText = displayValue(entry.default);
+  const overridable = project !== undefined && !!entry.global_key && !entry.read_only;
+  const texts = overridable ? projectTexts(entry, project) : undefined;
+  const inherited = overridable && !entry.set;
+  // Turning a project's evolve switch back on removes the key: unset follows the global mode.
+  const saveValue = (value: unknown) => send(entry.key === EVOLVE_KEY && value === true ? removeChange(entry.key) : setChange(entry.key, value));
   return (
     <Box px="3.5" py="3" display="grid" gap="1.5" _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}>
       <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
@@ -309,6 +358,11 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
         {entry.restart && (
           <Box data-mock-part="restart-badge">
             <Chip tone="waiting">{restartNeeded || pendingRestart ? "Restart needed to apply" : "Needs restart"}</Chip>
+          </Box>
+        )}
+        {overridable && entry.set && (
+          <Box data-mock-part="overridden-chip">
+            <Chip tone="running">Overridden</Chip>
           </Box>
         )}
         <Box flex="1" />
@@ -322,14 +376,29 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
             fontWeight="600"
             color="tone.running.fg"
           >
-            Reset to default ({defaultText})
+            {texts ? texts.back : `Reset to default (${defaultText})`}
           </chakra.button>
         )}
       </Box>
       <Text fontSize="13px" color="text.muted" maxW="62ch">
         {entry.description}
       </Text>
-      {Control ? (
+      {inherited && texts ? (
+        <Box display="flex" gap="3" alignItems="center" flexWrap="wrap">
+          <Text data-mock-part="inherits-global" fontSize="sm" color="text.muted" css={{ "& b": { color: "var(--chakra-colors-text)" } }}>
+            {texts.inherit}
+          </Text>
+          <Button
+            size="sm"
+            emphasis="secondary"
+            tone="muted"
+            disabled={write.pending}
+            onClick={() => send(setChange(entry.key, entry.key === EVOLVE_KEY ? false : entry.global_value))}
+          >
+            {texts.start}
+          </Button>
+        </Box>
+      ) : Control ? (
         <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
           <Control
             entry={entry}
@@ -338,7 +407,7 @@ export function SettingsRow({ entry, pendingRestart, onWrite }: { entry: Setting
             invalid={refused}
             pending={write.pending}
             setDraft={setDraft}
-            save={(value) => send(setChange(entry.key, value))}
+            save={saveValue}
             remove={() => send(removeChange(entry.key))}
           />
         </Box>

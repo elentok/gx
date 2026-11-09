@@ -184,7 +184,7 @@ export function SettingsShellView(props: ShellProps) {
   const [query, setQuery] = useState("");
   const searching = query.trim() !== "";
   const section = props.section ?? (props.project === undefined ? GLOBAL_SECTIONS[0] : projectSections(props.entries)[0]);
-  const row = (e: SettingsEntry) => <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} />;
+  const row = (e: SettingsEntry) => <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} project={props.project} />;
   const hits = searchEntries(props.entries, query);
   const sectionEntries = props.entries.filter((e) => e.section === section);
   const scopeName = props.project === undefined ? "global settings" : `project ${props.project}`;

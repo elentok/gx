@@ -252,4 +252,73 @@ describe("SettingsRow", () => {
       expect(v.getByRole("dialog").textContent).toContain("not moved");
     });
   });
+
+  describe("in a project", () => {
+    const inProject = (e: SettingsEntry) => {
+      const onWrite = vi.fn(async () => ({}) as SettingsWriteResult);
+      const view = renderThemed(<SettingsRow entry={e} pendingRestart={false} onWrite={onWrite} project="gx" />);
+      return { ...view, onWrite };
+    };
+    const inherits = (v: { container: HTMLElement }) => v.container.querySelector("[data-mock-part=inherits-global]")?.textContent;
+    const per = (over: Partial<SettingsEntry>) =>
+      entry({ key: "execution-queue.max-agents-per-epic", global_key: "execution-queue.max-agents-per-epic", global_value: 3, ...over });
+    const cap = (over: Partial<SettingsEntry>) =>
+      entry({ key: "project.max-agents", path: ["project", "max-agents"], global_key: "execution-queue.max-agents", global_value: 6, ...over });
+    const evolve = (over: Partial<SettingsEntry>) =>
+      entry({ key: "project.evolve", path: ["project", "evolve"], type: "bool", global_key: "evolve", global_value: true, ...over });
+
+    it("an unset key shows the global value; Override writes that value", async () => {
+      const v = inProject(per({}));
+      expect(inherits(v)).toBe("Uses the global value 3");
+      expect(v.queryByText("Overridden")).toBeNull();
+      fireEvent.click(v.getByRole("button", { name: "Override for gx" }));
+      await flush();
+      expect(v.onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents-per-epic", value: 3 }]);
+    });
+
+    it("a set key shows the control, the Overridden chip and a link that removes it", async () => {
+      const v = inProject(per({ set: true, value: 2 }));
+      expect(v.getByText("Overridden")).toBeTruthy();
+      expect(v.getByRole("textbox")).toBeTruthy();
+      fireEvent.click(v.getByRole("button", { name: "Use global value (3)" }));
+      await flush();
+      expect(v.onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents-per-epic", remove: true }]);
+    });
+
+    it("the cap row says there is no cap, sets one and removes it", async () => {
+      const absent = inProject(cap({}));
+      expect(inherits(absent)).toBe("No per-project cap (the global cap of 6 still applies)");
+      fireEvent.click(absent.getByRole("button", { name: "Set a cap for gx" }));
+      await flush();
+      expect(absent.onWrite).toHaveBeenCalledWith([{ key: "project.max-agents", value: 6 }]);
+
+      const set = inProject(cap({ set: true, value: 2 }));
+      expect(set.getByText("Overridden")).toBeTruthy();
+      expect(set.queryByText(/Use global value/)).toBeNull();
+      fireEvent.click(set.getByRole("button", { name: "Remove cap" }));
+      await flush();
+      expect(set.onWrite).toHaveBeenCalledWith([{ key: "project.max-agents", remove: true }]);
+    });
+
+    it("the evolve switch follows global when absent, writes false on Override and removes the key otherwise", async () => {
+      const absent = inProject(evolve({}));
+      expect(inherits(absent)).toBe("Follows global mode (on)");
+      fireEvent.click(absent.getByRole("button", { name: "Override for gx" }));
+      await flush();
+      expect(absent.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", value: false }]);
+
+      const off = inProject(evolve({ set: true, value: false }));
+      expect(off.getByRole("switch").getAttribute("aria-checked")).toBe("false");
+      fireEvent.click(off.getByRole("switch"));
+      await flush();
+      expect(off.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", remove: true }]);
+    });
+
+    it("the evolve row's Use global value link removes the key", async () => {
+      const global = inProject(evolve({ set: true, value: false }));
+      fireEvent.click(global.getByRole("button", { name: "Use global value (on)" }));
+      await flush();
+      expect(global.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", remove: true }]);
+    });
+  });
 });
