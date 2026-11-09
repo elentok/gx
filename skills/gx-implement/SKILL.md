@@ -181,6 +181,8 @@ heading. It lists the mock file, the states with their widths, the parts and the
 - Every listed state needs a result line (`pass`, `fail`, `unchecked`) in your report. A state that
   is `unchecked` (skipped, out of time or tools, or its PNG read came back blank) blocks
   `finished`: never report `finished`.
+- A `pass` needs a PNG read that returned an image. After the first empty read, record `unchecked`
+  for that state and stop checking it; computed styles are never a substitute.
 - Skipping the check is never a question to ask a person: "OK to finish without it?" has one
   answer, run it. Only a tool failure you cannot get past (after the MOCK-CHECK.md setup steps)
   justifies "When only a person can answer", and then you ask about that failure.

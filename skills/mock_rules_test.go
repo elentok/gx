@@ -55,6 +55,8 @@ func TestMockRulesAnchors(t *testing.T) {
 			"`<state>-<part>-built.png`",
 			"empty result means the state is unchecked",
 			"`pass`, `fail`",
+			"After the first empty read of a state, stop",
+			"Never write `pass` for a state whose PNGs you did not see",
 		}},
 		{"ui check build", "gx-ui-check/SKILL.md", []string{
 			"go run ./testutil/gxfixture [--hold] <scenario>",
@@ -76,6 +78,7 @@ func TestMockRulesAnchors(t *testing.T) {
 			"$(gx tickets root)/<map>/mocks/",
 			"minus `-impl`",
 			"blocks `finished`",
+			"A `pass` needs a PNG read that returned an image",
 			"Skipping the check is never a question to ask a person",
 			"## Spec deviations",
 			"`gx tickets ask`",

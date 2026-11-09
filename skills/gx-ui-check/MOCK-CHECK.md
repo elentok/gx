@@ -31,6 +31,8 @@ steps. The browser commands come from [gx-playwright-cli](../gx-playwright-cli/S
    Save one crop per part and state, named `<state>-<part>-mock.png` and `<state>-<part>-built.png`.
 7. File-read (Read) both PNGs and compare them side by side by eye. List each difference. A read that returns
    an empty result means the state is unchecked: do not infer the look from computed styles.
+   After the first empty read of a state, stop: record `unchecked` for that state, with no retry,
+   no other crop and no recheck. Never write `pass` for a state whose PNGs you did not see.
 8. Give every listed state one result line: `pass`, `fail` (with the differences) or `unchecked`
    (with the reason).
 
