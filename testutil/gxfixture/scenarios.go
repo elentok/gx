@@ -80,6 +80,19 @@ var scenarios = map[string]scenario{
 			{ID: "02", Slug: "second", Opts: servertest.TicketOpts{BlockedBy: []string{"01"}}},
 		}}},
 	},
+	// drafts: ready plus three New Design drafts (the several-drafts, naming and
+	// switcher-open mock states): one unnamed, one named, one named with images.
+	"drafts": {
+		Epics: []epic{{Project: project, Name: "ready-epic", Tickets: []ticket{
+			{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}},
+			{ID: "02", Slug: "second", Opts: servertest.TicketOpts{BlockedBy: []string{"01"}}},
+		}}},
+		Drafts: []spec.Draft{
+			{Project: project, Idea: "A dark mode for the settings page"},
+			{Project: project, Slug: "export-csv", Idea: "Export the stats table as CSV", Name: "Export CSV"},
+			{Project: project, Slug: "onboarding", Idea: "A first-run walkthrough", Name: "Onboarding", Images: 2},
+		},
+	},
 	// disk-low: an unqueued epic whose project cleans through the disk control files.
 	"disk-low": {
 		Epics: []epic{{Project: project, Name: "disk-epic", Tickets: []ticket{

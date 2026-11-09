@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
@@ -48,6 +49,28 @@ func seedEpicImages(dir string, n int) error {
 	for i := 1; i <= n; i++ {
 		if err := os.WriteFile(filepath.Join(dir, transcript.SavedImageName(i, fmt.Sprintf("%08x", i), ".png")), png, 0o644); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// seedDrafts stores the drafts with the real draft store, so the server reads
+// them as it reads a draft a person saved.
+func seedDrafts(stateDir string, list []spec.Draft) error {
+	png, err := base64.StdEncoding.DecodeString(pngBase64)
+	if err != nil {
+		return err
+	}
+	store := drafts.New(stateDir)
+	for _, d := range list {
+		saved, err := store.Create(d.Project, d.Slug, d.Idea, d.Name)
+		if err != nil {
+			return err
+		}
+		for range d.Images {
+			if res, err := store.AddImage(saved.ID, png); err != nil || res.Refused {
+				return fmt.Errorf("draft %q: image: %v %+v", d.Name, err, res)
+			}
 		}
 	}
 	return nil

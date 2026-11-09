@@ -8,6 +8,8 @@ steps. The browser commands come from [gx-playwright-cli](../gx-playwright-cli/S
 1. Resolve the mock directory first: `mocks=$(gx tickets root)/<map>/mocks`. Do it before any `cd`;
    outside a git repo `gx tickets root` fails with "not inside a git repo".
 2. Start the fixture scenario with [gx-ui-check](SKILL.md) (section 1), adding `--mock-dir "$mocks"`.
+   A New Design mock with several drafts (several-drafts, naming, switcher-open) uses the `drafts`
+   scenario, which seeds three drafts: do not script the UI to create them.
    That includes its `make web-build` when `webui/dist/index.html` is missing. Open its `web_url`
    once. The fixture serves the mock directory over local http and reports the base URL as
    `mock_url`: open `<mock_url><NN>-<slug>.html`. `playwright-cli` blocks `file:` URLs, and the block

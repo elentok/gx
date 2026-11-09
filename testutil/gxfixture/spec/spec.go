@@ -66,6 +66,8 @@ type Scenario struct {
 	DesignByMap map[string][]string
 	// EpicImages is how many saved images each map, by address, holds in its images/ folder.
 	EpicImages map[string]int
+	// Drafts are the New Design drafts seeded into the server's draft store.
+	Drafts []Draft
 	// Queue lists the epics put on the queue once the server is up.
 	Queue []string
 	// QueueAgents is the agent a queued address runs under (`queue add --agent`);
@@ -265,6 +267,12 @@ type SessionSpec struct {
 	// Rejected says the agent rejects the first prompt (see Scenario.UnknownSkill):
 	// the session is settled once it raises the Unknown command Actionable.
 	Rejected bool
+}
+
+// Draft is one seeded New Design draft: its text and how many images it holds.
+type Draft struct {
+	Project, Slug, Idea, Name string
+	Images                    int
 }
 
 // CommandStep is one "/" command a seeded session runs. Output is the stdout
