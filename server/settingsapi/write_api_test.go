@@ -133,7 +133,7 @@ func TestWriteWithWatcherReloadsOnceWithoutBanner(t *testing.T) {
 	}
 }
 
-func TestWriteConcurrentSavesBothLand(t *testing.T) {
+func TestWriteConcurrentSavesAreBothKept(t *testing.T) {
 	f := startAPI(t, nil)
 	var wg sync.WaitGroup
 	for _, c := range []wire.SettingChange{val("execution-queue.max-agents", "4"), val("execution-queue.max-one-off-agents", "5")} {
