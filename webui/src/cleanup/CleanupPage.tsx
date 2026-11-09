@@ -11,7 +11,8 @@ import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
 import { Spinner } from "../ui/spinner/Spinner";
 import { refusalText, useWrite } from "../useWrite";
-import { formatBytes, groupReport, postCleanup as defaultPost, useCleanup, type CleanupAction, type CleanupGroup, type FetchCleanup, type PostCleanup } from "./cleanup";
+import { sizeText } from "../health/formatBytes";
+import { groupReport, postCleanup as defaultPost, useCleanup, type CleanupAction, type CleanupGroup, type FetchCleanup, type PostCleanup } from "./cleanup";
 
 interface Acts {
   pending: boolean;
@@ -78,7 +79,7 @@ function Group({ group, acts }: { group: CleanupGroup; acts: Acts }) {
           <Row key={w.branch} rowKey={w.branch} name={w.branch} acts={acts}>
             {w.size_bytes !== undefined && (
               <Text color="text.muted" data-testid="cleanup-size">
-                {formatBytes(w.size_bytes)}
+                {sizeText(w.size_bytes, "binary")}
               </Text>
             )}
             {group.id === "merged-worktrees" && !w.dirty && button("Remove", () => acts.act(w.branch, "remove-worktree", w.branch))}

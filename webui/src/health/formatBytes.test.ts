@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, memoryBytesText } from "./formatBytes";
+import { formatBytes, memoryBytesText, sizeText } from "./formatBytes";
 
 describe("formatBytes", () => {
   it("shows whole gigabytes without a decimal", () => {
@@ -11,6 +11,19 @@ describe("formatBytes", () => {
     expect(formatBytes(1.5 * 1024 ** 3, "binary")).toBe("1.5");
     expect(formatBytes(1.5e9, "decimal")).toBe("1.5");
     expect(formatBytes(1024 ** 3, "decimal")).toBe("1.1");
+  });
+});
+
+describe("sizeText", () => {
+  it("steps by 1024 for binary and 1000 for decimal", () => {
+    expect(sizeText(2048, "binary")).toBe("2.0 KB");
+    expect(sizeText(2000, "decimal")).toBe("2.0 KB");
+    expect(sizeText(512, "binary")).toBe("512 B");
+  });
+
+  it("rounds to whole units from 100 up", () => {
+    expect(sizeText(150e6, "decimal")).toBe("150 MB");
+    expect(sizeText(1.5e9, "decimal")).toBe("1.5 GB");
   });
 });
 

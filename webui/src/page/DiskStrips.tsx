@@ -1,6 +1,7 @@
 import type { CleanNowResult, DiskStatus } from "../generated/server";
 import { apiFetch } from "../apiFetch";
 import { useConnectionContext, useConnectionState } from "../connection";
+import { sizeText } from "../health/formatBytes";
 import { DiskStrip } from "../ui/disk-strip/DiskStrip";
 import { refusalText, useWrite, WriteError } from "../useWrite";
 
@@ -15,18 +16,6 @@ export async function postCleanDisk(disk: string): Promise<CleanNowResult> {
   return res.json();
 }
 
-const UNITS = ["B", "KB", "MB", "GB", "TB"];
-
-function formatFree(bytes: number): string {
-  let n = bytes;
-  let i = 0;
-  while (n >= 1000 && i < UNITS.length - 1) {
-    n /= 1000;
-    i++;
-  }
-  return `${i === 0 || n >= 100 ? Math.round(n) : n.toFixed(1)} ${UNITS[i]}`;
-}
-
 function ConnectedDiskStrip({ disk }: { disk: DiskStatus }) {
   const conn = useConnectionContext();
   const { run, pending, refusal } = useWrite();
@@ -35,7 +24,7 @@ function ConnectedDiskStrip({ disk }: { disk: DiskStatus }) {
   return (
     <DiskStrip
       name={disk.name}
-      free={formatFree(disk.free_bytes)}
+      free={sizeText(disk.free_bytes, "decimal")}
       held={disk.held}
       cleaning={disk.cleaning}
       pending={pending}
