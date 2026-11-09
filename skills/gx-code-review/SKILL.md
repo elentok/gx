@@ -39,10 +39,15 @@ stop and fix the ticket's frontmatter before doing anything else.
   for the commit list. Fail here — not inside a subagent — if the merge-base can't be resolved or the
   diff is empty.
 - The epic's spec is the first of these that exists: `docs/specs/<epic-slug>.md` from the repo root,
-  then `<epic-dir>/spec.md` (legacy location). When neither does, the epic's ticket bodies are the
+  then `docs/specs/<epic-slug minus a trailing -impl>.md` (an `-impl` epic's design spec has no
+  `-impl` in its name), then `<epic-dir>/spec.md` (legacy location). Look with one `ls` over all
+  three paths, not one failed `ls` per guess. When none exists, the epic's ticket bodies are the
   spec: every other ticket in the epic except this code-review ticket, each read in full with
   `gx tickets show <addr>`. Either way the
   spec resolves — the Spec axis always runs.
+- Derive reviewer scope from ticket statuses now: list the epic's tickets with their statuses and
+  count them (M tickets besides this one). Don't reuse a scope written into an older prompt or
+  ticket body.
 - Collect the **known spec deviations**: read each of this epic's other tickets with
   `gx tickets show <addr>` (only this epic's; skip this code-review ticket) and gather the bullets
   under its `## Spec deviations` section (also check `## Comments` and handoff notes for older
@@ -75,15 +80,22 @@ step 7.
 
 ### Shared review file
 
-Reviewers must not each re-run the diff and the same searches. Write one file in your scratchpad
-directory (with a file write) holding the fixed point, the commit list, the changed-file list, the full
-diff, and the output of any search you already ran (say, a `rg` for a symbol the diff changes). Pass
-its path to every subagent; they read that file instead of running `git diff` themselves. They may
-Read a changed file for more context, but not re-run the diff or a search the file already holds.
+Reviewers must not each re-run the diff and the same searches. Write files in your scratchpad
+directory (with a file write) holding the fixed point, the commit list, the changed-file list, the diff,
+and the output of any search you already ran (say, a `rg` for a symbol the diff changes). Pass
+the paths to every subagent; they read those files instead of running `git diff` themselves. They may
+Read a changed file for more context, but not re-run the diff or a search a file already holds.
+
+Keep each file small enough to read in one Read. When the full diff would pass about 100 KB, write
+an index file (fixed point, commit list, changed-file list, search output) plus one diff file per
+area — a group of changed files that one ticket or one directory owns — and list each diff file with
+its size in the index. A reviewer reads the index first, then the area files for its own scope, each
+once, without paging one file in overlapping line ranges.
 
 Every subagent prompt also says: "You must verify a suspicion before you report it: read the file or
-run the check yourself. Do not flag something as possible or unverified. Drop it if you cannot
-confirm it."
+run the check yourself, with one grep or one read. Do not flag something as possible or unverified.
+Drop it if you cannot confirm it. Don't run `git diff` or `git log -p`; the review files hold the
+diff."
 
 ### Launch
 
@@ -114,7 +126,17 @@ Every subagent gets the shared review file's path from above.
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour
   in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where
   the implementation looks wrong. Quote the spec line — or the ticket address and line — for each
-  finding. Under 400 words."
+  finding. Under 400 words of findings, plus a last line `Covered: <addresses reviewed> of <M>`
+  that is not counted in the cap."
+
+When the epic has more than about 12 tickets, split the Spec axis across several Spec subagents
+by ticket-address range (about 12 tickets each), each with the same brief for its own range. They go
+in the same message as the quality calls.
+
+**Coverage.** After the results return, check each `Covered:` line. When a range is only partly
+covered, re-dispatch a Spec subagent for the tickets left out before triage. Never let a partial
+review read as a full one: step 7 records `Spec reviewed N of M tickets`, with N counted from the
+`Covered:` lines.
 
 Collect every subagent's raw findings verbatim; don't summarize or filter them yourself here.
 
@@ -127,7 +149,11 @@ strongest tier — pass the output of `gx agent model strongest` as the subagent
 
 Brief it with every subagent's raw findings joined into one list, each labeled by the axis and skill
 that produced it (`Quality / <skill-name>`, or `Spec`), plus the epic's ticket list for context (what
-already shipped, what the epic was for) and the known spec deviations list from step 1. Ask it to:
+already shipped, what the epic was for) and the known spec deviations list from step 1. Also give
+it the paths it would otherwise hunt for: the output of `gx tickets root`, the spec path (or ticket
+address list) from step 1, the review file paths from step 3, and, for a finding that touches
+`webui/e2e/*.e2e.ts`, the `gx-playwright-e2es` skill. Tell it to verify a claim with one grep or one read, not to
+re-run searches the reviewers already ran. Ask it to:
 
 - Treat a finding that only restates a known spec deviation as **rejected** (reason: deliberate
   deviation, with the ticket address).
@@ -138,7 +164,9 @@ already shipped, what the epic was for) and the known spec deviations list from 
 - Prioritize by actual impact, not by how many reviewers happened to flag it.
 - Give each finding one verdict and a one-line reason:
   - **approved** — worth a fix ticket in this epic;
-  - **deferred** — real, but not worth fixing in this epic; it becomes a follow-up;
+  - **deferred** — real, but not worth fixing in this epic; it becomes a follow-up. A tiny finding
+    (a comment, whitespace, or about 10 changed lines or fewer) that has no neighbour in its area to
+    merge into is **deferred**, never **approved**: a fix ticket costs a full iteration;
   - **rejected** — dropped.
 - Never reject a finding whose reason is to amend the spec or docs (for example "change the spec
   wording rather than the code"): the edit still has to happen, and a rejection files nothing.
@@ -184,7 +212,8 @@ If the consultant deferred zero findings, skip this step.
 ## 7. Close out
 
 - Write the ticket body (append under the existing sections, don't replace them) with three parts:
-  - **Raw findings**, per axis and reviewer skill, verbatim from step 3.
+  - **Raw findings**, per axis and reviewer skill, verbatim from step 3, with the coverage line
+    `Spec reviewed N of M tickets`.
   - **Consultant triage**, verbatim from step 4.
   - **Final disposition** of each finding: the fix ticket it became; for a deferred finding, the
     follow-up it became, was appended to, or was dropped against; or why it was rejected.

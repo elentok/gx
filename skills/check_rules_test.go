@@ -27,6 +27,9 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"code-review shared diff", "gx-code-review/SKILL.md", []string{
 			"### Shared review file", "scratchpad", "verify a suspicion", "### Size gate", "50 changed lines",
 		}},
+		{"code-review per-area files, spec path and coverage", "gx-code-review/SKILL.md", []string{
+			"one diff file per", "100 KB", "minus a trailing -impl", "`Covered:", "Spec reviewed N of M tickets", "`gx tickets root`", "**deferred**, never **approved**",
+		}},
 		{"tdd", "gx-tdd/SKILL.md", []string{"](../gx-failing-tests.md)", "-count=20"}},
 		{"verify", "gx-verify/SKILL.md", []string{
 			"gx check --staged", "`0`: pass", "`1`: fail", "`2`: could not run", "`3`: no applicable checks",
