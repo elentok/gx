@@ -140,6 +140,39 @@ test("a Fix agent row shows the wrench in its status colour; Queue and plain age
   expect(within(body().getByRole("link", { name: /builder/ })).queryByTestId("fix-wrench")).toBeNull();
 });
 
+test("a nested agent row has the spacer slot and no icon; truncation styles sit on its title", async () => {
+  setup("desktop", "/");
+  await body().findByRole("link", { name: /Blog/ });
+  fireEvent.click(body().getByRole("button", { name: "Expand Blog" }));
+  const builder = within(body().getByRole("link", { name: /builder/ }));
+  expect(getComputedStyle(builder.getByTestId("icon-slot")).width).toBe("26px");
+  expect(builder.queryByLabelText("Chat")).toBeNull();
+  expect(builder.queryByTestId("kind-dot")).toBeNull();
+  const title = builder.getByText("builder");
+  expect(getComputedStyle(title).textOverflow).toBe("ellipsis");
+  expect(getComputedStyle(title).whiteSpace).toBe("nowrap");
+  expect(getComputedStyle(title).fontSize).toBe("13px");
+  // Fix agent: wrench sits in the same slot.
+  const fixer = within(body().getByRole("link", { name: /fixer/ }));
+  expect(fixer.getByTestId("icon-slot").contains(fixer.getByTestId("fix-wrench"))).toBe(true);
+});
+
+test("the open nested agent row is current with the top-level tint and edge; only the last guide stops at the middle", async () => {
+  setup("desktop", "/agents/s1");
+  await body().findByRole("link", { name: /Blog/ });
+  fireEvent.click(body().getByRole("button", { name: "Expand Blog" }));
+  const link = body().getByRole("link", { name: /builder/ });
+  expect(link.getAttribute("aria-current")).toBe("page");
+  const frame = link.parentElement!;
+  const parentFrame = body().getByRole("link", { name: /Blog/ }).parentElement!;
+  expect(getComputedStyle(frame).backgroundColor).toBe(getComputedStyle(parentFrame).backgroundColor);
+  expect(getComputedStyle(frame).borderLeftWidth).toBe("3px");
+  expect(body().getByRole("link", { name: /fixer/ }).getAttribute("aria-current")).toBeNull();
+  const guides = body().getAllByTestId("nested-guide");
+  expect(getComputedStyle(guides[0]).bottom).toBe("0px");
+  expect(getComputedStyle(guides[guides.length - 1]).bottom).toBe("50%");
+});
+
 test("opening another page leaves an expanded row expanded", async () => {
   setup("desktop", "/");
   await body().findByRole("link", { name: /Blog/ });
@@ -164,7 +197,9 @@ test("On hold is collapsed with a count and opens on click; Other lists its rows
   expect(body().getByRole("link", { name: /Old/ })).toBeTruthy();
   expect(body().queryByRole("link", { name: /scratch/ })).toBeNull();
   fireEvent.click(body().getByRole("button", { name: "Other" }));
-  expect(body().getByRole("link", { name: /scratch/ })).toBeTruthy();
+  const scratch = within(body().getByRole("link", { name: /scratch/ }));
+  expect(scratch.getByTestId("icon-slot")).toBeTruthy();
+  expect(scratch.queryByLabelText("Chat")).toBeNull();
 });
 
 test("a chat row reads Chat before its name", async () => {

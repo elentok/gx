@@ -9,6 +9,7 @@ import { ItemMenu, type ItemRef } from "../workspaces/itemActions";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { CHAT_ATTR, NAV_ATTR } from "./SidebarKeys";
+import { useWide } from "../useWide";
 import { useAltHeld } from "./useShortcuts";
 
 /** The epic address of the open page, or "". */
@@ -83,15 +84,39 @@ function Chevron({ open, onToggle, label }: { open: boolean; onToggle: () => voi
   );
 }
 
-function AgentLink({ agent }: { agent: SidebarAgent }) {
+// A row's frame: 4px left padding, 3px edge, then the chevron cell. The nested guide line sits under the icon column.
+const CHEVRON_W = 20;
+const GUIDE_X = `calc(4px + 3px + ${CHEVRON_W}px + var(--chakra-spacing-2) + 13px - 0.75px)`;
+
+function IconSlot({ children }: { children?: ReactNode }) {
   return (
-    <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} {...rowStyle} pl="10" minH="36px">
-      {agent.fix && <WrenchIcon status={agent.status} />}
-      <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" fontSize="13px">
-        {agent.label}
-      </Box>
-      <Status status={agent.status} />
-    </chakra.a>
+    <Box data-testid="icon-slot" w="26px" flex="none" display="flex" alignItems="center" justifyContent="center">
+      {children}
+    </Box>
+  );
+}
+
+/** Reserves the menu button's width (the nested row has no menu yet), so status words line up with the parent's. */
+function MenuSpacer() {
+  return <Box data-testid="menu-spacer" flex="none" w={useWide() ? "36px" : "40px"} />;
+}
+
+/** A nested agent row on the parent row's columns: empty chevron cell, icon slot (wrench for a Fix agent), title, status, menu slot. */
+function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
+  const current = agent.href === `#${useLocation().pathname}`;
+  return (
+    <Box position="relative" display="flex" alignItems="center" pl="1" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
+      <Box data-testid="nested-guide" aria-hidden position="absolute" left={GUIDE_X} top="0" bottom={last ? "50%" : "0"} w="1.5px" bg="border" />
+      <Box w={`${CHEVRON_W}px`} flex="none" />
+      <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2" minH="36px">
+        <IconSlot>{agent.fix && <WrenchIcon status={agent.status} />}</IconSlot>
+        <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" fontSize="13px">
+          {agent.label}
+        </Box>
+        <Status status={agent.status} />
+      </chakra.a>
+      <MenuSpacer />
+    </Box>
   );
 }
 
@@ -148,7 +173,7 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
         <chakra.a href={row.href} {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" pl="2">
-          <Box data-testid="icon-slot" w="26px" flex="none" display="flex" alignItems="center" justifyContent="center">
+          <IconSlot>
             {row.kind === "chat" ? (
               <ChatIcon />
             ) : (
@@ -157,7 +182,7 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
                 <Box data-testid="kind-dot" position="absolute" right="-2px" bottom="-2px" boxSize="8px" borderRadius="full" borderWidth="1.5px" borderColor="sidebar" bg={`kind.${row.kind}.fg`} />
               </Box>
             )}
-          </Box>
+          </IconSlot>
           <Box as="span" flex="1" minW="0" fontSize="14px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
             {row.title}
           </Box>
@@ -169,9 +194,9 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
       </Box>
       {nested && open && (
         <Box as="ul" listStyleType="none" m="0" p="0">
-          {row.agents.map((a) => (
+          {row.agents.map((a, i) => (
             <li key={a.id}>
-              <AgentLink agent={a} />
+              <AgentLink agent={a} last={i === row.agents.length - 1} />
             </li>
           ))}
         </Box>
@@ -228,9 +253,9 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
       )}
       {model.other.length > 0 && (
         <Section id="other" title="Other">
-          {model.other.map((a) => (
+          {model.other.map((a, i) => (
             <li key={a.id}>
-              <AgentLink agent={a} />
+              <AgentLink agent={a} last={i === model.other.length - 1} />
             </li>
           ))}
         </Section>
