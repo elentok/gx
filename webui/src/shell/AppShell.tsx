@@ -12,6 +12,7 @@ import { hasLayer } from "../ui/modal/layers";
 import { Strip } from "../ui/strip/Strip";
 import { useDevice, type Device } from "../useWide";
 import { isMac } from "../platform";
+import { CommandPalette } from "./CommandPalette";
 import { JumpPalette } from "./JumpPalette";
 import { setJumpOpen } from "./jumpOpen";
 import { MascotToggle } from "./MascotToggle";
@@ -359,6 +360,7 @@ export function AppShell({
           {children ?? <Outlet />}
         </Box>
         <JumpPalette fetcher={fetchEpicList} active={active} />
+        <CommandPalette />
         <NewItemHost />
       </Box>
     </ShellContext.Provider>

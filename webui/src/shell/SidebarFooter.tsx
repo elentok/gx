@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList } from "../epics/list";
 import type { Workspace } from "../generated/server";
-import { STATS_HREF } from "../hrefs";
+import { EPICS_HREF, STATS_HREF } from "../hrefs";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
 import { LimitsTray } from "../usage/LimitsTray";
@@ -13,7 +13,6 @@ import { GearMenu } from "./GearMenu";
 import { openNewAgent, openNewDesign } from "./newItemOpen";
 import { useShell } from "./ShellContext";
 
-const EPICS_HREF = "#/epics";
 
 const icon = (children: ReactNode) => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

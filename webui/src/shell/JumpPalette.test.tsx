@@ -160,6 +160,14 @@ test("the empty menu is the active workspace, then Needs you elsewhere", async (
   expect(within(option("waiting-oneoff")).getByText("Needs you")).toBeTruthy();
 });
 
+test("holds no commands", async () => {
+  setup();
+  await open();
+  await waitFor(() => expect(names()).toContain("blog"));
+  type("go to");
+  expect(names().filter((n) => n?.startsWith("Go to"))).toEqual([]);
+});
+
 test("typing finds held, Ready to design, Finished items, agents and other workspaces", async () => {
   setup();
   await open();

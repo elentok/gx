@@ -10,6 +10,8 @@ export const designHref = (address: string) => `#/d/${address}`;
 /** A Triage is its project's, so the address is the project name. */
 export const triageHref = (project: string) => `#/triage/${project}`;
 
+export const EPICS_HREF = "#/epics";
+
 export const STATS_HREF = "#/stats";
 
 export const CLEANUP_HREF = "#/cleanup";
