@@ -6,6 +6,7 @@ import { hasChat, roundKeyOf } from "./chat";
 import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore";
 import type { AutoMenuState } from "./AutoMenu";
 import { Composer } from "./Composer";
+import { FooterLine } from "./FooterLine";
 import {
   FailureBanner,
   GxStopped,
@@ -18,6 +19,12 @@ import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
 import { isAnswered } from "../ui/question-sheet/round";
 import { type RoundDraft, useRoundDraft } from "./roundDraft";
+
+// The footer line where no composer is mounted; the ceiling comes from the snapshot.
+function SessionFooter({ session, modelOnly }: { session: SessionInfo; modelOnly?: boolean }) {
+  const { snapshot } = useConnectionState(useConnectionContext());
+  return <FooterLine session={session} ceiling={snapshot?.context_ceiling} modelOnly={modelOnly} />;
+}
 
 // The sheet and the composer share the round's answers (see useRoundDraft: they survive a reload).
 function ChatTail({
@@ -52,6 +59,7 @@ function ChatTail({
   const [focus, setFocus] = useState<{ index: number }>();
   const failure = visibleFailure(session.failure, done);
   const round = chat.round ?? [];
+  const { snapshot } = useConnectionState(useConnectionContext());
   return (
     // The bottom area: at most half the screen, so only the question body scrolls past that.
     // In the Questions view the cap is gone and the sheet takes the rest of the column.
@@ -89,8 +97,11 @@ function ChatTail({
         session.actionable.reason && (
           <GxStopped reason={session.actionable.reason} />
         )}
-      {!done && !replacesComposer(failure) && (
+      {done || replacesComposer(failure) ? (
+        <SessionFooter session={session} />
+      ) : (
         <Composer
+          ceiling={snapshot?.context_ceiling}
           session={session}
           lastMessage={chat.messages.at(-1)?.id}
           next={chat.next}
@@ -371,6 +382,7 @@ export function DesignChat({
         <Text color="text.muted" fontSize="sm">
           Chat works for Claude and Codex sessions only. Open it in gx, Agents tab.
         </Text>
+        <SessionFooter session={session} modelOnly />
       </>
     );
   }

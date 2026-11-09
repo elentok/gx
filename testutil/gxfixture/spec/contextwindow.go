@@ -21,7 +21,7 @@ func ContextWindowScenario() scenario {
 			{Project: project, Prompt: "hello", Read: true, Tokens: 170_000, Key: "red"},
 			{Project: project},
 			finish(sessionSpec{Project: project, Prompt: "hello", Read: true, Tokens: 40_000}),
-			finish(sessionSpec{Project: project, Prompt: "hello", Read: true, Tokens: 40_000, Link: project + ":" + mapAddr}),
+			{Project: project, Prompt: "hello", Read: true, Tokens: 128_000, Link: project + ":" + mapAddr},
 			{Project: project, Prompt: "hello", Read: true, Tokens: 90_000, Steps: []commandStep{{Prompt: "/compact", Turn: true}}, Key: "compact"},
 			{Project: project, Prompt: "hello", Read: true, NoTranscript: true},
 			{Project: project, Harness: "codex", Prompt: "hello", Read: true, Tokens: 90_000},

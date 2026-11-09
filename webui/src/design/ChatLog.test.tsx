@@ -330,6 +330,21 @@ test("a harness with no chat shows the fixed text and loads no chat", async () =
   expect(fetchChat).not.toHaveBeenCalled();
 });
 
+test("the NoChat notice still shows the model, never a badge", async () => {
+  renderChat([session({ harness: "other", model: "claude-opus-4-7", context_tokens: 70_000, context_level: "green" })], okChat(chatOf([])));
+  expect(await screen.findByText(/^Claude Opus 4.7/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Context" })).toBeNull();
+});
+
+test("a crashed session, with no composer, still shows the footer line", async () => {
+  renderChat(
+    [session({ model: "claude-opus-4-7", context_tokens: 70_000, failure: { kind: "crashed", label: "Crashed" } as SessionInfo["failure"] })],
+    okChat(chatOf([])),
+  );
+  expect(await screen.findByText(/^Claude Opus 4.7/)).toBeTruthy();
+  expect(screen.queryByRole("form", { name: "Composer" })).toBeNull();
+});
+
 test("a Codex session loads its chat and renders every entry kind", async () => {
   const fetchChat = vi.fn<FetchChat>(
     okChat(

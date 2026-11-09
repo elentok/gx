@@ -54,7 +54,10 @@ export function ComposerImages({
   send,
   afterAdd,
   phone = false,
+  footer,
 }: {
+  /** A dim line between the text box and the button row; leave it out when the box carries it. */
+  footer?: ReactNode;
   state: State;
   children: ReactNode;
   send: ReactNode;
@@ -85,6 +88,7 @@ export function ComposerImages({
         <ImageStrip images={state.images} onRetry={state.retry} onRemove={state.remove} />
       )}
       {children}
+      {footer}
       {phone && line && (
         <Box fontSize="sm" color={line.red ? "tone.deadlocked.fg" : "text.dim"}>
           {line.text}

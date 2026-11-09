@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { CompletionConfig } from "../commands/useCompletion";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 
@@ -17,7 +17,10 @@ export function NoteBox({
   onSubmit,
   completion,
   bg,
+  footer,
 }: {
+  /** A line inside the box, under the text. */
+  footer?: ReactNode;
   /** What the note is on, for its labels: "question 2". */
   name: string;
   /** The textarea's form name; see ExpandableTextField. */
@@ -58,6 +61,7 @@ export function NoteBox({
         onSubmit={onSubmit}
         completion={completion}
         bg={bg}
+        footer={footer}
       />
     </Box>
   );

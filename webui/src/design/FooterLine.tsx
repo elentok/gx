@@ -62,7 +62,7 @@ export function FooterLine({ session, ceiling, modelOnly }: { session: SessionIn
   const text = wide && effort ? `${model} · ${effort}` : model;
   const showBadge = session.context_tokens != null && !!ceiling && !modelOnly;
   return (
-    <Box display="flex" alignItems="center" justifyContent="space-between" gap="2" fontSize="xs" color="text.dim">
+    <Box data-testid="footer-line" display="flex" alignItems="center" justifyContent="space-between" gap="2" fontSize="xs" color="text.dim">
       <chakra.span truncate>{text}</chakra.span>
       {showBadge && <ContextBadge tokens={session.context_tokens!} level={session.context_level} ceiling={ceiling!} />}
     </Box>

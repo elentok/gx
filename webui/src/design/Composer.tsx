@@ -24,6 +24,7 @@ import {
 } from "./open";
 import { codexSkillHint } from "./chat";
 import { ComposerImages } from "./ComposerImages";
+import { FooterLine } from "./FooterLine";
 import { InterruptPopover } from "./InterruptPopover";
 import { useComposerImages } from "./useComposerImages";
 import { NoteBox } from "./NoteBox";
@@ -54,7 +55,10 @@ export function Composer({
   onRoundSent,
   onReview,
   autoMenu,
+  ceiling,
 }: {
+  /** The smart-zone ceiling from the snapshot; the badge needs it. */
+  ceiling?: number;
   session: SessionInfo;
   /** The id of the last chat message the page saw. */
   lastMessage?: string;
@@ -227,6 +231,8 @@ export function Composer({
     />
   );
 
+  const footerLine = <FooterLine session={session} ceiling={ceiling} />;
+
   return (
     <Box
       position="sticky"
@@ -243,6 +249,7 @@ export function Composer({
       <ComposerImages
         state={images}
         phone={!wide}
+        footer={!open && footerLine}
         afterAdd={
           <>
             <Button
@@ -294,6 +301,7 @@ export function Composer({
             autoFocus
             onChange={setText}
             onSubmit={onSubmit}
+            footer={footerLine}
             completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
           />
         )}

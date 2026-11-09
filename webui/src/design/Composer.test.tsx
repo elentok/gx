@@ -193,6 +193,15 @@ const openNote = async () => {
   return (await screen.findByLabelText("Message")) as HTMLTextAreaElement;
 };
 
+test("the footer line sits above the buttons with Note closed and inside the box with Note open", async () => {
+  render({});
+  const buttons = (await screen.findByRole("button", { name: "Note" })).parentElement!;
+  const line = () => screen.getByTestId("footer-line");
+  expect(line().nextElementSibling).toBe(buttons);
+  const box = await openNote();
+  expect(box.parentElement!.contains(line())).toBe(true);
+});
+
 test("a plain message posts its text with the last message id", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);
   render({ post });
