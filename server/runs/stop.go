@@ -72,13 +72,19 @@ func (s *Stopper) pause(t TrackedRun, stop Stop) error {
 // session and pauses the ticket process-storm with count and threshold in the
 // detail. The watchdog's one entry point.
 func (s *Stopper) StormStop(t TrackedRun, count, threshold int) error {
-	s.Registry.MarkStop(t.Address, Stop{
+	s.MarkStorm(t.Address, count, threshold)
+	_, err := s.SettleStop(t)
+	return err
+}
+
+// MarkStorm marks the run storm-stopped without settling it, so a caller can
+// kill the tree first and the run's own settle already finds the mark.
+func (s *Stopper) MarkStorm(addr string, count, threshold int) {
+	s.Registry.MarkStop(addr, Stop{
 		Kind:        events.ProcessStorm,
 		Reason:      schema.ProcessStormReason(count, threshold),
 		CloseReason: ticketops.CloseProcessStorm,
 	})
-	_, err := s.SettleStop(t)
-	return err
 }
 
 // BudgetStop is the marker for the budget hard limit.

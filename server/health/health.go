@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/harness"
@@ -65,6 +66,10 @@ type Deps struct {
 	Harness  *harness.Harness
 	Sessions Sessions
 	Log      *slog.Logger
+	// Stopper is the shared stop-and-pause writer; the budget owns it.
+	Stopper func() *runs.Stopper
+	// Notifier shows the banner for a killed tree.
+	Notifier osnotify.Notifier
 }
 
 // Health owns the meters, the process cache, the CPU ticket cooldown and the
@@ -80,7 +85,10 @@ type Health struct {
 	harness  *harness.Harness
 	sessions Sessions
 	log      *slog.Logger
+	stopper  func() *runs.Stopper
+	notifier osnotify.Notifier
 
+	storm      stormWatch
 	healthW    healthWatch
 	procs      procWatch
 	cpuSpikes  cpuSpikes
@@ -90,7 +98,8 @@ type Health struct {
 // New builds the health subsystem with every meter waiting for its first reading.
 func New(d Deps) *Health {
 	h := &Health{cfg: d.Config, settings: d.Settings, projects: d.Projects, events: d.Events, disks: d.Disks,
-		oneOffs: d.OneOffs, registry: d.Registry, harness: d.Harness, sessions: d.Sessions, log: d.Log}
+		oneOffs: d.OneOffs, registry: d.Registry, harness: d.Harness, sessions: d.Sessions, log: d.Log,
+		stopper: d.Stopper, notifier: d.Notifier}
 	h.healthW.health = wire.Health{CPU: waitingMeter, Memory: waitingMeter, Disk: waitingMeter}
 	h.healthW.cpu = meterTrack{high: syshealth.CPUHigh, crit: syshealth.CPUCritical}
 	h.healthW.mem = meterTrack{high: syshealth.MemHigh, crit: syshealth.MemCritical}

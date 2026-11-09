@@ -405,6 +405,7 @@ func New(cfg Config) (*Server, error) {
 		},
 		Settings: &s.settings, Projects: s.projects, Events: events, Disks: s.disks, OneOffs: s.oneOffs,
 		Registry: s.registry, Harness: s.harness, Sessions: sessions.SessionMetas{}, Log: log,
+		Stopper: s.budget.Stopper, Notifier: cfg.Notifier,
 	})
 	s.limits = limits.New(limits.Deps{
 		Config: limits.Config{
@@ -630,6 +631,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(gatesDone); s.scheduler.KeepGatesWatched(freshCtx) }()
 	cpuDone := make(chan struct{})
 	go func() { defer close(cpuDone); s.health.KeepCPUWatched(freshCtx) }()
+	stormDone := make(chan struct{})
+	go func() { defer close(stormDone); s.health.KeepStormWatched(freshCtx) }()
 	disksDone := make(chan struct{})
 	go func() { defer close(disksDone); s.disks.Run(freshCtx) }()
 	migFailDone := make(chan struct{})
@@ -679,6 +682,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		{"wait-tokens", tokensDone},
 		{"wait-gates", gatesDone},
 		{"wait-cpu", cpuDone},
+		{"wait-storm", stormDone},
 		{"wait-disks", disksDone},
 		{"wait-migration-failures", migFailDone},
 		{"wait-health", healthDone},
