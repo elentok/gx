@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { HUH_MESSAGE } from "../design/round";
@@ -85,4 +85,30 @@ test("typing in one row's q1 saves that row only, though every row has a q1", as
   await waitFor(() => expect(save).toHaveBeenCalled());
   expect(save.mock.calls.map((c) => [c[0].address, c[0].answers])).toEqual([["gx:follow-ups/01", { q1: "agree" }]]);
   screen.getByText("1 of 3 answered");
+});
+
+test("after the record changes elsewhere, the next edit builds on the new answers, not the replaced draft", async () => {
+  const save = vi.fn().mockResolvedValue({ revision: 9 });
+  const rows = ["01", "02"].map((n) => ({
+    address: `gx:follow-ups/${n}`,
+    title: `row ${n}`,
+    questions: [{ id: "q1", title: `Q ${n}?`, kind: "text" }],
+  }));
+  const view = (revision: number, answers: Record<string, string>) => viewOf({ revision, rows: rows.map((r) => ({ ...r, answers: r.address.endsWith("01") ? answers : undefined })), open_questions: 2 });
+  let elsewhere: () => void = () => {};
+  function Harness() {
+    const [v, setV] = useState(view(4, {}));
+    elsewhere = () => setV(view(7, {}));
+    return <QuestionsView project="gx" view={v} refetch={vi.fn()} save={save} />;
+  }
+  render(<Harness />);
+  fireEvent.change(screen.getByRole("textbox", { name: "Answer to question 1.1" }), { target: { value: "stale draft" } });
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  save.mockClear();
+  // Someone else clears row 01 (revision 7, not ours); the draft must not come back with the next edit.
+  act(() => elsewhere());
+  fireEvent.click(screen.getByRole("button", { name: "Next →" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Answer to question 2.1" }), { target: { value: "two" } });
+  await waitFor(() => expect(save).toHaveBeenCalled());
+  expect(save.mock.calls.map((c) => [c[0].address, c[0].answers])).toEqual([["gx:follow-ups/02", { q1: "two" }]]);
 });

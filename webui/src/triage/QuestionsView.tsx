@@ -51,6 +51,8 @@ export function QuestionsView({
     ownRevision.current = view.revision;
     const fresh = answersOf(view.rows);
     setAnswers(fresh);
+    // The next edit builds on these, not on the draft the change replaced.
+    latest.current.answers = fresh;
     saved.current = fresh;
     latest.current.revision = view.revision ?? 0;
   }, [view.revision, view.rows]);
