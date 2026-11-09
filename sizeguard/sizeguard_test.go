@@ -45,7 +45,18 @@ const (
 	reasonCohesive   = "cohesive type"
 	reasonTableData  = "table data"
 	splitInstruction = "Split it, do not raise the limit. See .ai/index.md (File size)."
+	// A package total counts every file in the directory, so splitting a file cannot lower it.
+	packageInstruction = "A package total: splitting a file cannot lower it. Trim tests or move code to another package; do not raise the limit. See .ai/index.md (File size)."
 )
+
+// instructionFor returns the fix that can actually lower the measure.
+func instructionFor(measure string) string {
+	switch measure {
+	case measureFiles, measureSourceLines, measureTestLines, measureTestFuncs:
+		return packageInstruction
+	}
+	return splitInstruction
+}
 
 var reasons = []string{reasonGenerated, reasonCohesive, reasonTableData}
 
@@ -79,14 +90,14 @@ const maxBreakdownFiles = 10
 
 // breakdown names the overage and the files contributing most to it, so the reader
 // can see what to cut or move without re-running.
-func breakdown(parts []filePart, over int) string {
+func breakdown(parts []filePart) string {
 	parts = slices.Clone(parts)
 	sort.SliceStable(parts, func(i, j int) bool { return parts[i].n > parts[j].n })
 	if len(parts) > maxBreakdownFiles {
 		parts = parts[:maxBreakdownFiles]
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n  Over by %d. Largest contributors:", over)
+	fmt.Fprintf(&b, "\n  Largest contributors:")
 	for _, p := range parts {
 		fmt.Fprintf(&b, "\n    %6d  %s", p.n, p.path)
 	}
@@ -248,9 +259,9 @@ func check(files map[string]string, allow map[string]exception) []string {
 			limit = e.limit
 		}
 		if m.size > limit {
-			msg := fmt.Sprintf("%s: %s is %d, limit is %d. %s", m.name, m.measure, m.size, limit, splitInstruction)
+			msg := fmt.Sprintf("%s: %s %d, limit %d, over by %d. %s", m.name, m.measure, m.size, limit, m.size-limit, instructionFor(m.measure))
 			if len(m.parts) > 0 {
-				msg += breakdown(m.parts, m.size-limit)
+				msg += breakdown(m.parts)
 			}
 			problems = append(problems, msg)
 		}
@@ -353,15 +364,15 @@ func TestCheck_Breaches(t *testing.T) {
 		files map[string]string
 		want  []string // every substring must appear in one message
 	}{
-		{"too many files", many("big", 51, 1, ".go"), []string{"big", "files", "limit is 50", "is 51"}},
-		{"too many source lines", many("big", 6, 751, ".go"), []string{"big", "source lines", "limit is 4500", "is 4506"}},
-		{"too many test lines", many("big", 6, 834, "_test.go"), []string{"big", "test lines", "limit is 5000", "is 5004"}},
-		{"too many Test funcs", map[string]string{"big/a_test.go": tests("x", 181)}, []string{"big", "Test funcs", "limit is 180", "is 181"}},
-		{"file too long", map[string]string{"p/long.go": src("x", 1001)}, []string{"p/long.go", "lines", "limit is 1000", "is 1001"}},
-		{"test file too long", map[string]string{"p/long_test.go": src("x", 1001)}, []string{"p/long_test.go", "limit is 1000", "is 1001"}},
-		{"type too many methods", map[string]string{"p/t.go": methodsOf("t *T", 51)}, []string{"p.T", "methods", "limit is 50", "is 51"}},
-		{"value receiver", map[string]string{"p/t.go": methodsOf("t T", 51)}, []string{"p.T", "is 51"}},
-		{"generic receiver", map[string]string{"p/t.go": strings.Replace(methodsOf("t *T[K]", 51), "type T struct{}", "type T[K any] struct{}", 1)}, []string{"p.T", "is 51"}},
+		{"too many files", many("big", 51, 1, ".go"), []string{"big: files 51, limit 50, over by 1", "move code to another package"}},
+		{"too many source lines", many("big", 6, 751, ".go"), []string{"big: source lines 4506, limit 4500, over by 6", "move code to another package"}},
+		{"too many test lines", many("big", 6, 834, "_test.go"), []string{"big: test lines 5004, limit 5000, over by 4", "splitting a file cannot lower it"}},
+		{"too many Test funcs", map[string]string{"big/a_test.go": tests("x", 181)}, []string{"big: Test funcs 181, limit 180, over by 1", "Trim tests"}},
+		{"file too long", map[string]string{"p/long.go": src("x", 1001)}, []string{"p/long.go: lines 1001, limit 1000, over by 1", "Split it"}},
+		{"test file too long", map[string]string{"p/long_test.go": src("x", 1001)}, []string{"p/long_test.go: lines 1001, limit 1000", "Split it"}},
+		{"type too many methods", map[string]string{"p/t.go": methodsOf("t *T", 51)}, []string{"p.T: methods 51, limit 50, over by 1", "Split it"}},
+		{"value receiver", map[string]string{"p/t.go": methodsOf("t T", 51)}, []string{"p.T: methods 51"}},
+		{"generic receiver", map[string]string{"p/t.go": strings.Replace(methodsOf("t *T[K]", 51), "type T struct{}", "type T[K any] struct{}", 1)}, []string{"p.T: methods 51"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -369,7 +380,7 @@ func TestCheck_Breaches(t *testing.T) {
 			if len(problems) == 0 {
 				t.Fatal("want a problem, got none")
 			}
-			for _, w := range append(c.want, "Split", "do not raise the limit", ".ai/index.md") {
+			for _, w := range append(c.want, "do not raise the limit", ".ai/index.md") {
 				if !slices.ContainsFunc(problems, func(p string) bool { return strings.Contains(p, w) }) {
 					t.Errorf("no problem contains %q:\n%s", w, strings.Join(problems, "\n"))
 				}
@@ -391,7 +402,7 @@ func TestCheck_PackageBreachListsLargestFiles(t *testing.T) {
 		t.Fatalf("want one problem, got:\n%s", strings.Join(problems, "\n"))
 	}
 	got := problems[0]
-	for _, w := range []string{"Over by 510", "600  big/huge_test.go", "490  big/f0_test.go"} {
+	for _, w := range []string{"over by 510", "600  big/huge_test.go", "490  big/f0_test.go"} {
 		if !strings.Contains(got, w) {
 			t.Errorf("problem lacks %q:\n%s", w, got)
 		}
@@ -451,7 +462,7 @@ func TestCheck_Exceptions(t *testing.T) {
 		{"entry under the default", map[string]string{"p/short.go": src("x", 10)}, map[string]exception{"p/short.go": {1100, reasonCohesive}}, []string{"p/short.go", "drop the entry", "10", "1000"}},
 		{"entry for nothing", over, map[string]exception{"gone/x.go": {1100, reasonCohesive}}, []string{"gone/x.go", "drop the entry"}},
 		{"unknown reason", over, map[string]exception{"p/long.go": {1200, "because"}}, []string{"p/long.go", "reason"}},
-		{"entry below the size still fails", over, map[string]exception{"p/long.go": {1100, reasonCohesive}}, []string{"p/long.go", "limit is 1100", "is 1200", "Split"}},
+		{"entry below the size still fails", over, map[string]exception{"p/long.go": {1100, reasonCohesive}}, []string{"p/long.go", "lines 1200, limit 1100, over by 100", "Split"}},
 		{"package entry", many("big", 51, 1, ".go"), map[string]exception{"big:files": {51, reasonGenerated}}, nil},
 		{"type entry", map[string]string{"p/t.go": methodsOf("t *T", 60)}, map[string]exception{"p.T": {60, reasonCohesive}}, nil},
 	}

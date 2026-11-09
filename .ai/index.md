@@ -318,8 +318,11 @@ Keep a Go source file under about 1000 lines. When one grows past that, move a c
 declarations into a new file in the same package (for example `server/sessionstate.go` out of
 `server/sessions.go`). Moves only: don't change behaviour in the same commit.
 
-`sizeguard` (a test-only package) fails when a limit is passed. Split the unit; never raise a limit.
-Defaults per package (a directory of tracked `.go` files, `_test` packages and `package main`
+`sizeguard` (a test-only package) fails when a limit is passed; never raise a limit. A per-file or
+per-type breach is fixed by splitting. The package measures (files, source lines, test lines, `Test`
+funcs) are totals over the whole directory, so splitting a file cannot lower them (a new file adds
+header lines): trim tests or move code to another package. Take the fix from sizeguard's line
+("pkg: measure N, limit M, over by K"), not from this paragraph. Defaults per package (a directory of tracked `.go` files, `_test` packages and `package main`
 included): 50 files, 4,500 source lines, 5,000 test lines, 180 `Test` funcs. Per file: 1000 lines
 (test files count). Per type: 50 declared methods (test-file methods and promoted methods ignored).
 Its exception list is empty and stays that way unless a split is proven infeasible.
