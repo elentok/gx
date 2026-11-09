@@ -4,7 +4,7 @@ Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfi
 `web_url` once, already signed in: the fixture finishes the web setup and `fixture.ts` adds the
 `cookie_name` cookie to the browser. The `web-setup`, `web-login` and `web-logins` scenarios start
 signed out or with extra web logins. `nextTotpCode()` returns a code for a new TOTP step, and
-`start(scenario, { config: { "server.web.totp": "false" } })` runs without TOTP. It never reloads the page. The suite fails if a page reloads.
+`start(scenario, { config: { "server.web.totp": "false" } })` runs without TOTP. It never reloads the page. The suite fails if a page reloads. Service workers are blocked by default (a worker's answers bypass `page.route`); `epics.e2e.ts` allows them with `--ignore-certificate-errors` for the PWA steps of flow 2, because a worker does not register against the fixture's untrusted root.
 The `limits` scenario seeds the limits state: `start("limits", { shape })` takes `fresh` (default),
 `stale`, `past-reset` or `one-window`. The `spend` scenario seeds the budget ledger
 (`start("spend", { shape })` takes `normal` (default), `short` or `empty`) and holds one fake agent
@@ -53,7 +53,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `epics.e2e.ts`
 
-- **2. Epic looks right:** `mixed-epic` card, epic page ring, stats line and ticket cards before and after queueing; then the `summary-notes` ticket's "Latest summary" block (and no such text on its Epics card) and the `map-evolve` evolve ticket as a top-level one-off card.
+- **2. Epic looks right:** `mixed-epic` card, epic page ring, stats line and ticket cards before and after queueing; then the `summary-notes` ticket's "Latest summary" block (and no such text on its Epics card) and the `map-evolve` evolve ticket as a top-level one-off card. The last step is the PWA journey on a fresh `mixed` fixture (declares `reloads: 1`): the manifest link, fields and icons; the worker activates and an outside ticket still reaches the page through the event stream; Force refresh (toast, registration and a planted shell-cache entry gone, one reload); then `stopServer()` and a cold open in a new page of the same context, showing the shell, the Offline strip and "Can't reach gx. Retrying…" with no epic data.
 - **7. Epic completion:** the epic page when the last ticket finishes.
 - **6. Queue an epic, and outside changes show up:** Queue button disabled while `/v1/queue/add` runs, then the card moves to Implementing; changes made outside the page appear.
 

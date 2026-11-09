@@ -2,6 +2,10 @@ import { readFile } from "node:fs/promises";
 import { HUH_MESSAGE } from "../src/design/round";
 import { blockEvents, card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
 import { expectOption } from "./question";
+import { CACHE_PREFIX } from "../src/pwa/workerCore";
+
+// The PWA steps of flow 2 need a registered worker, which only registers with the fixture's untrusted root ignored.
+test.use({ serviceWorkers: "allow", launchOptions: { args: ["--ignore-certificate-errors"] } });
 
 test("2. Epic looks right", async ({ page, start, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -200,6 +204,63 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     const retrying = page.getByText("holder unreachable, retrying");
     await expect(retrying).toBeVisible({ timeout: 60_000 });
     await expect(retrying).toHaveCount(0, { timeout: 60_000 });
+  });
+
+  // The PWA steps run last, on a fresh `mixed` fixture: Force refresh reloads the page once, and the cold open stops the server.
+  await test.step("PWA: manifest, worker, Force refresh, offline cold open", async () => {
+    const fixture = await start("mixed", { config: { "recovery.enabled": "false" }, reloads: 1 });
+    await expect(card(page, "mixed-epic")).toBeVisible();
+
+    const href = await page.locator('link[rel="manifest"]').getAttribute("href");
+    expect(href).toBeTruthy();
+    const manifestURL = new URL(href!, page.url());
+    const manifestResponse = await page.request.get(manifestURL.href);
+    expect(manifestResponse.status()).toBe(200);
+    const manifest = await manifestResponse.json();
+    expect(manifest).toMatchObject({
+      name: "gx",
+      short_name: "gx",
+      id: "/",
+      start_url: "/",
+      scope: "/",
+      display: "standalone",
+      theme_color: "#0a0d11",
+      background_color: "#0a0d11",
+    });
+    for (const icon of manifest.icons as Array<{ src: string }>) {
+      const response = await page.request.get(new URL(icon.src, manifestURL).href);
+      expect(response.status(), icon.src).toBe(200);
+      expect(response.headers()["content-type"], icon.src).toBe("image/png");
+    }
+
+    const workerState = () => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.state ?? "none");
+    await expect.poll(workerState).toBe("activated");
+
+    // With the worker active, a change made outside the page still reaches it through the event stream.
+    await fixture.cli("tickets", "add", "demo:mixed-epic", "--slug", "pwa-outside", "--body", "# pwa outside\n\n## What to build\n\nx");
+    await page.evaluate((hash) => (location.hash = hash), "#/e/demo:mixed-epic");
+    await expect(page.getByRole("link", { name: /pwa outside/ })).toBeVisible({ timeout: 60_000 });
+
+    // Force refresh: no confirmation; the registration and a planted shell-cache entry go, and the page reloads once.
+    const planted = `${CACHE_PREFIX}planted`;
+    await page.evaluate(async (name) => (await caches.open(name)).put("/planted", new Response("x")), planted);
+    expect(await page.evaluate(() => caches.keys())).toContain(planted);
+    await page.getByRole("button", nav("Menu")).click();
+    await page.getByRole("menuitem", { name: "Force refresh" }).click();
+    await expect(page.getByText("Clearing the cache and reloading…")).toBeVisible();
+    await expect.poll(() => page.evaluate((key) => sessionStorage.getItem(key), "__gxE2eLoads")).toBe("1");
+    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain(planted);
+    // The fresh page registers a new worker as at start-up.
+    await expect.poll(workerState).toBe("activated");
+
+    // Cold open, last: no per-tab copy exists in a new page, and nothing runs after the server stop.
+    await fixture.stopServer();
+    const cold = await context.newPage();
+    await cold.goto(page.url());
+    await expect(cold.getByText("Offline, reconnecting…")).toBeVisible({ timeout: 30_000 });
+    await expect(cold.getByText("Can't reach gx. Retrying…")).toBeVisible();
+    await expect(cold.getByText("mixed-epic")).toHaveCount(0);
+    await expect(cold.getByText("pwa outside")).toHaveCount(0);
   });
 });
 

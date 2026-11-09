@@ -12,6 +12,7 @@ const run = promisify(execFile);
 // where a window property would not. A test ends with a failure when it counted more reloads than
 // `reloads` allowed (none by default).
 const LOADS = "__gxE2eLoads";
+const countedPages = new WeakSet<Page>();
 
 const TOTP_PERIOD_S = 30;
 const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -370,14 +371,18 @@ async function startFixture(
   if (out.cookie) {
     await page.context().addCookies([{ name: out.cookie_name, value: out.cookie, url: out.web_url, secure: true }]);
   }
-  await page.addInitScript((key) => {
-    try {
-      const n = sessionStorage.getItem(key);
-      if (n !== null) sessionStorage.setItem(key, String(Number(n) + 1));
-    } catch {
-      // Storage off: the count stays unset and the test fails at the end.
-    }
-  }, LOADS);
+  // One script per page: a flow that starts several fixtures would otherwise count each reload once per start.
+  if (!countedPages.has(page)) {
+    countedPages.add(page);
+    await page.addInitScript((key) => {
+      try {
+        const n = sessionStorage.getItem(key);
+        if (n !== null) sessionStorage.setItem(key, String(Number(n) + 1));
+      } catch {
+        // Storage off: the count stays unset and the test fails at the end.
+      }
+    }, LOADS);
+  }
   await page.goto(out.web_url);
   await page.evaluate((key) => sessionStorage.setItem(key, "0"), LOADS);
   return { fixture, stop };
