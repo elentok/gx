@@ -959,6 +959,18 @@ test.each(["phone", "tablet"] as const)("on %s the paperclip leads the footer; n
   expect(screen.getAllByRole("button", { name: "Add image" })).toHaveLength(1);
 });
 
+test.each(["phone", "tablet"] as const)("on %s the line under the images shows an upload in progress and a failure, and not before", async (device) => {
+  const { uploadImage } = await mount({}, { slug: "x" }, "", device);
+  expect(screen.queryByText(/uploading|failed|of 10 images/)).toBeNull();
+  uploadImage.mockReturnValueOnce(new Promise(() => undefined));
+  addImages(png("a.png"));
+  await screen.findByText("1 uploading");
+  const big = png("big.png");
+  Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
+  addImages(big);
+  await screen.findByText("1 image failed. Remove it or retry before starting.");
+});
+
 test("on desktop the tile and limits line stay and the footer has no paperclip", async () => {
   await mount({}, { slug: "x" }, "", "desktop");
   const footer = screen.getByRole("button", { name: "Discard" }).parentElement!;
