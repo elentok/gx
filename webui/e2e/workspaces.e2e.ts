@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { blockEvents, card, expect, nav, swipe, test } from "./fixture";
+import { blockEvents, card, expect, nav, sessionRows, swipe, test, touch } from "./fixture";
 
 const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash);
 
@@ -171,6 +171,81 @@ test("Workspaces", async ({ page, start }) => {
   await expect(prompt).not.toBeFocused();
   await goto(page, "#/epics");
 
+  // Tree rows: a nested agent row sits on its parent's columns, has its own "..." menu (none for a Queue agent), and the button follows its own row's hover and focus.
+  const itemOf = (title: string) => row(title).locator("xpath=ancestor::li[1]");
+  const x = async (l: Locator) => {
+    await expect(l).toBeVisible();
+    return (await l.boundingBox())!.x;
+  };
+  const right = async (l: Locator) => {
+    await expect(l).toBeVisible();
+    const box = (await l.boundingBox())!;
+    return box.x + box.width;
+  };
+  const titleOf =(link: Locator) => link.locator(":scope > span").first();
+  const wordsOf = (link: Locator) => link.locator("span").last();
+  const frameButton = (link: Locator) => link.locator("xpath=..").getByRole("button", nav("More actions"));
+  // The button hides through an ancestor's opacity (shown on hover, focus or without hover), so multiply up to the row.
+  const shown = (button: Locator) => button.evaluate((el) => { let o = 1; for (let n: Element | null = el; n && n.tagName !== "LI"; n = n.parentElement) o *= Number(getComputedStyle(n).opacity); return o; });
+  const nestedLinks = (title: string) => itemOf(title).locator("ul").getByRole("link");
+  expect(await x(titleOf(chatRow))).toBe(await x(titleOf(row("ready-epic"))));
+  await sidebar.getByRole("button", nav("Expand paused-epic")).click();
+  await sidebar.getByRole("button", nav("Expand inv-epic")).click();
+  const working = nestedLinks("paused-epic").filter({ hasText: "Working" });
+  const queueAgent = nestedLinks("inv-epic");
+  await expect(working).toHaveCount(1);
+  await expect(queueAgent).toHaveCount(1);
+  await expect(queueAgent.locator("[data-testid=icon-slot] svg")).toHaveCount(0);
+  await expect(working.locator("[data-testid=icon-slot] svg")).toHaveCount(1);
+  const parentMenu = frameButton(row("paused-epic"));
+  expect(await x(titleOf(working))).toBe(await x(titleOf(row("paused-epic"))));
+  // The words differ in length, so their right edges are the shared column.
+  expect(await right(wordsOf(working))).toBe(await right(wordsOf(row("paused-epic"))));
+  expect(await x(frameButton(working))).toBe(await x(parentMenu));
+  await expect(frameButton(queueAgent)).toHaveCount(0);
+  // At 1280px the button shows on its own row only; Tab onto it shows it; without hover every row shows its button.
+  const size = page.viewportSize()!;
+  await page.setViewportSize({ width: 1280, height: size.height });
+  await working.hover();
+  await expect.poll(() => shown(frameButton(working))).toBe(1);
+  await expect.poll(() => shown(parentMenu)).toBe(0);
+  await page.mouse.move(700, 5);
+  await expect.poll(() => shown(frameButton(working))).toBe(0);
+  await working.focus();
+  await page.keyboard.press("Tab");
+  await expect(frameButton(working)).toBeFocused();
+  await expect.poll(() => shown(frameButton(working))).toBe(1);
+  await expect.poll(() => shown(parentMenu)).toBe(0);
+  await page.setViewportSize(size);
+  // A touch context has no hover: the same sidebar shows every row's button, nested included.
+  const phone = await page.context().browser()!.newContext({ ...touch, viewport: { width: 1280, height: size.height }, storageState: await page.context().storageState() });
+  const tablet = await phone.newPage();
+  await tablet.goto(new URL(page.url()).origin + "/#/epics");
+  const tabletSidebar = tablet.getByRole("complementary", nav("Sidebar"));
+  await tabletSidebar.getByRole("button", nav("Expand paused-epic")).click();
+  const tabletWorking = tabletSidebar.getByRole("listitem").filter({ has: tablet.getByRole("button", nav("Collapse paused-epic")) }).locator("ul").getByRole("link", { name: /Working/ });
+  await expect(tabletWorking).toHaveCount(1);
+  for (const button of [frameButton(tabletWorking), tabletSidebar.getByRole("button", nav("More actions")).first()]) await expect.poll(() => shown(button)).toBe(1);
+  await phone.close();
+  // The nested menu: Agent block, Stop while live, Remove; Remove asks first, then the row leaves and so does the session.
+  const agentId = (await working.getAttribute("href"))!.split("/agents/")[1];
+  expect(await sessionRows(fx, agentId)).toHaveLength(1);
+  // Its status words change when it stops, so find the row by its link from here on.
+  const agent = sidebar.locator(`a[href="#/agents/${agentId}"]`);
+  await agent.click();
+  await expect(page).toHaveURL(new RegExp(`#/agents/${agentId}$`));
+  await expect(agent).toHaveAttribute("aria-current", "page");
+  await frameButton(agent).click();
+  await expect(page.getByRole("menu").getByText("Agent", { exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", nav("Stop"))).toBeVisible();
+  await page.getByRole("menuitem", nav("Remove")).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", nav("Remove")).click();
+  await expect(page).toHaveURL(/#\/agents$/);
+  await expect(agent).toHaveCount(0);
+  await expect.poll(() => sessionRows(fx, agentId)).toHaveLength(0);
+  await goto(page, "#/epics");
+
   // Alt+Shift+2 picks the second workspace.
   await page.keyboard.press("Alt+Shift+2");
   await expect(page.getByRole("button", nav("Workspace: gx bugs"))).toBeVisible();
@@ -337,7 +412,7 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("ws-design")).toHaveCount(0);
   await expect(onHold).toBeVisible();
 
-  // Other sits below On hold, is the same in every workspace, and has no Move or Hold.
+  // Other sits below On hold and is the same in every workspace. Its Fix agents have a menu without Move or Hold; the Queue agent has none.
   const other = sidebar.getByRole("button", nav("Other"));
   const otherRows = ["fix-demo_cone-offs_s04", "fix-demo", "one-offs-iter-01"];
   const showOther = async () => {
@@ -345,7 +420,11 @@ test("Workspaces", async ({ page, start }) => {
     for (const name of otherRows) await expect(row(name)).toBeVisible();
   };
   await showOther();
-  for (const name of otherRows) await expect(row(name).locator("xpath=..").getByRole("button", nav("More actions"))).toHaveCount(0);
+  for (const name of otherRows) await expect(row(name).locator("xpath=..").getByRole("button", nav("More actions"))).toHaveCount(name === "one-offs-iter-01" ? 0 : 1);
+  await row("fix-demo").locator("xpath=..").getByRole("button", nav("More actions")).click();
+  await expect(page.getByRole("menuitem", nav("Remove"))).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /^(Move|Hold)/ })).toHaveCount(0);
+  await closeMenus();
   await pick("Default workspace");
   await showOther();
   // Opening an Other row leaves the workspace alone.
