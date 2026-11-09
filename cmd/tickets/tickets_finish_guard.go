@@ -79,14 +79,23 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 
 	addrs := splitAddrs(c, "check-failures")
 
+	// A skip ("no applicable checks") is the result of committing after a
+	// failed run: it must not replace the failure, so it only counts when no
+	// run of this tree failed.
 	var failing *check.Record
+	skipped := false
 	for i := range recs {
 		switch recs[i].Exit {
-		case check.ExitPass, check.ExitNone:
+		case check.ExitPass:
 			return nil
+		case check.ExitNone:
+			skipped = true
 		case check.ExitFail:
 			failing = &recs[i]
 		}
+	}
+	if failing == nil && skipped {
+		return nil
 	}
 	label := ticketref.TicketLabel(path)
 	if failing == nil {

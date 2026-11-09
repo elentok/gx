@@ -238,6 +238,10 @@ Set the shell call's time limit to 600000 ms (see the Tool names table in
 take about 4 minutes. Iterate with `gx brief go-test -run <Test>`, then run `gx check` once at the
 end. Do not run the package separately first.
 
+A ticket is committed only after a green `gx check`, or with `--check-failures` naming follow-ups.
+Committing after a failed run and re-running `gx check` prints a skip (exit 3), which does not clear
+the failure: the finish gate still sees the failed run.
+
 Never run `gx check --full`. Ticket agents run changed-file `gx check`. The epic's verify ticket,
 the proof and the person run `gx check --full` (the verify ticket runs it and the soak in the
 background and polls).

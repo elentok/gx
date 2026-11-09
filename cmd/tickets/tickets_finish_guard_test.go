@@ -129,6 +129,20 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		}
 	})
 
+	t.Run("a skipped run after a failed one does not clear the failure", func(t *testing.T) {
+		f := newFinishFixture(t)
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+		f.record(t, check.ExitFail, "", "TestA")
+		f.record(t, check.ExitNone, "")
+		if err := f.finish(t); err == nil {
+			t.Fatal("want a refusal: the skip must not replace the failed run")
+		}
+		f.assertUnwritten(t)
+		if err := f.finish(t, "--check-failures=02"); err != nil {
+			t.Fatalf("follow-up named: %v", err)
+		}
+	})
+
 	t.Run("kind-filtered line does not count", func(t *testing.T) {
 		f := newFinishFixture(t)
 		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
