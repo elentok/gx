@@ -2,7 +2,8 @@ import { Box, Spinner as ChakraSpinner, Text, chakra } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { flowSession, liveFlowSessions } from "../design/view";
-import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type SendBackTriage, type OpenFlow, type ResumeSession, type SaveTriageRow, type StopSession, type TriageRowAction } from "../design/open";
+import type { OpenFlow, ResumeSession, StopSession } from "../design/open";
+import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTriage, type SendBackTriage, type SaveTriageRow, type TriageRowAction } from "./api";
 import { useDesignWrite } from "../design/SessionControls";
 import type { FetchChat } from "../design/chat";
 import type { PostFocus } from "../design/focus";
@@ -64,8 +65,36 @@ function HeaderButton({ project, session, open = postOpenTriage }: { project: st
   );
 }
 
+type Phase = "approve" | "write" | "done" | "working";
+
+function phaseOf(view: TriageView): Phase {
+  if (view.state === TriageDone) return "done";
+  const current = view.steps.find((s) => s.state === "current")?.step;
+  return current === APPROVE ? "approve" : current === WRITE ? "write" : "working";
+}
+
 // The verdicts the Triage has saved so far, out of its rows.
 const verdictsSaved = (view: TriageView) => `${view.rows.filter((r) => r.verdict).length} of ${view.rows.length}`;
+
+/** Shown above the chat while the Triage's session runs. */
+function RunningBanner({ phase, view }: { phase: Phase; view: TriageView }) {
+  return (
+    <Box
+      display="flex"
+      alignItems="center"
+      gap="2"
+      px="3"
+      py="2"
+      borderWidth="1px"
+      borderColor="tone.running.fg"
+      borderRadius="md"
+      fontSize="sm"
+    >
+      <Box aria-hidden w="8px" h="8px" borderRadius="full" bg="tone.running.fg" />
+      {phase === "write" ? `Write session running · rows written ${rowsWritten(view)} of ${view.rows.length}` : `Triage session running · verdicts saved ${verdictsSaved(view)}`}
+    </Box>
+  );
+}
 
 /** Confirms Abandon. It writes nothing to tickets, so rows already written stay written. */
 function AbandonDialog({
@@ -101,9 +130,12 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
   const [abandoning, setAbandoning] = useState(false);
   const approveView = useApproveView(view.revision, view.open_questions);
   const approval = useApprove({ project, view, refetch, approve: deps.approve, carryReview: approveView.carryReview });
-  const atApprove = view.steps.some((s) => s.step === APPROVE && s.state === "current");
-  const atWrite = view.steps.some((s) => s.step === WRITE && s.state === "current");
-  const atDone = view.state === TriageDone;
+  const phase = phaseOf(view);
+  const atApprove = phase === "approve";
+  const atWrite = phase === "write";
+  const atDone = phase === "done";
+  const { fetchChat, post, open, stop, resume, fetchScreen, focus } = deps;
+  const steppedActions = { fetchChat, post, open, stop, resume, fetchScreen, focus };
   const wide = useWide();
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -136,7 +168,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
       )}
       live={live}
       current={flowSession(FLOW, project, sessions)}
-      actions={deps}
+      actions={steppedActions}
       startLabel="Start"
       beforeRing={atDone && view.result?.ready_epic ? <DoneQueue epic={view.result.ready_epic} fetchEpics={deps.fetchEpics} queue={deps.queue} /> : undefined}
       headerButton={(session) =>
@@ -167,22 +199,7 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
           {atApprove && <ApproveShell view={view} shown={approveView.view} onShow={approveView.setView} approval={approval} questions={<QuestionsView project={project} view={view} refetch={refetch} save={deps.saveRow} sendBack={deps.sendBack} />} review={<ReviewView project={project} view={view} refetch={refetch} save={deps.saveRow} />} />}
           {atDone && view.result && <DoneView result={view.result} />}
           {atWrite && <WriteView project={project} view={view} refetch={refetch} retry={deps.retry} keep={deps.keep} />}
-          {live.length > 0 && (
-          <Box
-            display="flex"
-            alignItems="center"
-            gap="2"
-            px="3"
-            py="2"
-            borderWidth="1px"
-            borderColor="tone.running.fg"
-            borderRadius="md"
-            fontSize="sm"
-          >
-            <Box aria-hidden w="8px" h="8px" borderRadius="full" bg="tone.running.fg" />
-            {atWrite ? `Write session running · rows written ${rowsWritten(view)} of ${view.rows.length}` : `Triage session running · verdicts saved ${verdictsSaved(view)}`}
-          </Box>
-          )}
+          {live.length > 0 && <RunningBanner phase={phase} view={view} />}
         </>
       )}
       />

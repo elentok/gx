@@ -1,6 +1,6 @@
 import { Box, chakra } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import { postApproveTriage, type ApproveTriage } from "../design/open";
+import { postApproveTriage, type ApproveTriage } from "./api";
 import { ReasonTriageAlreadyApproved, type TriageView } from "../generated/server";
 import { Row } from "../stepped/Progress";
 import { showToast } from "../ui/toaster";

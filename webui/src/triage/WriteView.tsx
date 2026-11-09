@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import { postKeepTriageRow, postRetryTriageRow, type TriageRowAction } from "../design/open";
+import { postKeepTriageRow, postRetryTriageRow, type TriageRowAction } from "./api";
 import type { TriageRow, TriageView } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";

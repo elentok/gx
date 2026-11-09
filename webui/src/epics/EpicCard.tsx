@@ -24,7 +24,8 @@ import {
 import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { ItemMenu, itemOfCard, postUnhold, type ItemWriters } from "../workspaces/itemActions";
 import { designHref, epicHref, ticketHref, triageHref } from "../hrefs";
-import { postOpenDesign, postOpenTriage, type OpenDesign, type OpenFlow } from "../design/open";
+import { postOpenDesign, type OpenDesign, type OpenFlow } from "../design/open";
+import { postOpenTriage } from "../triage/api";
 import { Button } from "../ui/button/Button";
 import { useWrite } from "../useWrite";
 import { launchOrVerdictText } from "../verdict";

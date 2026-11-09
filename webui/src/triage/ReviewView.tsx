@@ -1,6 +1,6 @@
 import { Box, Text, chakra } from "@chakra-ui/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { postSaveTriageRow, type SaveTriageRow } from "../design/open";
+import { postSaveTriageRow, type SaveTriageRow } from "./api";
 import type { TriageRow, TriageView } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
