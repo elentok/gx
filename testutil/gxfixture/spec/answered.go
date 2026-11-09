@@ -15,13 +15,15 @@ var AnswerQueued = scenario{
 	DropAskedAgent: true,
 }
 
-// AnswerFinished is a ticket whose agent reports finished with no commit, so it
-// pauses zero-commit with a question, and commits once the hold is released.
-// Releasing it before the answer makes the answer meet a late finish: the
-// "adopted" outcome.
+// AnswerFinished is a ticket that asked and whose agent is gone. A resume
+// relaunches it, and the new agent reports finished with no commit, so the
+// ticket pauses zero-commit, then commits once the hold is released. An
+// answer from the form of the first ask, sent after the release, meets that
+// late finish: the "adopted" outcome.
 var AnswerFinished = scenario{
-	Epics:     []epic{{project, "finished-answer-epic", []ticket{{"01", "stops", servertest.TicketOpts{}}}}},
-	Queue:     []string{project + ":finished-answer-epic"},
-	Behaviour: map[string]string{project + ":finished-answer-epic/01": agentfake.BehaviourEmptyFinish},
-	Hold:      true,
+	Epics:          []epic{{project, "finished-answer-epic", []ticket{{"01", "stops", servertest.TicketOpts{}}}}},
+	Queue:          []string{project + ":finished-answer-epic"},
+	Behaviour:      map[string]string{project + ":finished-answer-epic/01": agentfake.BehaviourAskEmptyFinish},
+	DropAskedAgent: true,
+	Hold:           true,
 }

@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { TicketDetail } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { Button } from "../ui/button/Button";
-import { OutcomeAdopted, OutcomeQueued, type Sent } from "./answer";
+import { OutcomeAdopted, OutcomeQueued, type Sent, wasAdopted } from "./answer";
 
 const dim = { fontSize: "xs", color: "fg.muted" } as const;
 
@@ -20,10 +20,10 @@ function status(sent: Sent): { head: string; tail: string; tone: "running" | "wa
 
 // The answer is the last web message of the exchange (it also covers the fixed "Huh?" message);
 // the round's own answer is the fallback for a detail that carries no chat.
-function answerText(detail: TicketDetail): string {
+function answerText(detail: TicketDetail, sent: Sent | null): string {
   const answer = detail.latest?.answer;
   const fromChat = [...detail.chat].reverse().find((m) => m.from === "web")?.text;
-  return fromChat || answer?.choice || answer?.text || "no option picked";
+  return fromChat || answer?.choice || answer?.text || (wasAdopted(sent) ? sent?.answer : "") || "no option picked";
 }
 
 // The compact card of an answered round, in place of the reading view. The status line is the send
@@ -38,9 +38,11 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
     if (el && !open) setCut(el.scrollHeight > el.clientHeight);
   }, [latest?.text, open]);
 
-  if (!latest?.answer) return null;
-  const note = latest.answer.note;
-  const shown = sent && sent.seq === latest.seq ? status(sent) : null;
+  // An adopted send records no answer, and the round it answered may no longer be the latest.
+  const adopted = wasAdopted(sent);
+  if (!latest || (!latest.answer && !adopted)) return null;
+  const note = latest.answer?.note;
+  const shown = sent && (adopted || sent.seq === latest.seq) ? status(sent) : null;
   const toggle = cut || !!latest.handoff || open;
   return (
     <Box role="group" aria-label="Answered question" display="flex" flexDirection="column" gap="1.5">
@@ -71,7 +73,7 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
       {latest.prompt && latest.prompt !== latest.summary && <Text>{latest.prompt}</Text>}
       <Box display="flex" gap="2" alignItems="baseline" px="2.5" py="2" rounded="md" bg="surface">
         <Text {...dim}>You</Text>
-        <Text fontWeight="700">{answerText(detail)}</Text>
+        <Text fontWeight="700">{answerText(detail, sent)}</Text>
       </Box>
       {note && <Text color="fg.muted">{note}</Text>}
       {shown && (

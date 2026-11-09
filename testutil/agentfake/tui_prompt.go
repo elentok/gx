@@ -226,7 +226,7 @@ func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
 // isAsk reports whether the behaviour's turn is a single gx ask call.
 func isAsk(behaviour string) bool {
 	switch behaviour {
-	case BehaviourAsk, BehaviourAskOptions, BehaviourWriteAsk:
+	case BehaviourAsk, BehaviourAskOptions, BehaviourWriteAsk, BehaviourAskEmptyFinish:
 		return true
 	}
 	return false

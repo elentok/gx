@@ -69,6 +69,16 @@ test("the answer is the last web message when the chat has several exchanges", (
   expect(screen.queryByText("Huh?")).toBeNull();
 });
 
+test("an adopted send shows the card with what was sent, though the round records no answer", () => {
+  const unanswered: TicketDetail = { ...base, chat: [], latest: { ...base.latest!, answer: undefined } };
+  renderThemed(<AnswerResult detail={unanswered} sent={sentOf(seq + 1, base.address, { outcome: "adopted" }, "go on")} />);
+  expect(screen.getByText("go on")).toBeTruthy();
+  expect(status()!.textContent).toBe("Sent ·The agent had already finished");
+  cleanup();
+  renderThemed(<AnswerResult detail={unanswered} sent={sentAs("delivered")} />);
+  expect(screen.queryByRole("group", { name: "Answered question" })).toBeNull();
+});
+
 test("no status line without a send outcome, and none for another round", () => {
   renderThemed(<AnswerResult detail={answered} sent={null} />);
   expect(status()).toBeNull();

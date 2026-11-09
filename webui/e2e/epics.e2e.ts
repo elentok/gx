@@ -1,5 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { HUH_MESSAGE } from "../src/design/round";
-import { card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
+import { blockEvents, card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
 import { expectOption } from "./question";
 
 test("2. Epic looks right", async ({ page, start, context }) => {
@@ -114,6 +115,44 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     const result = page.getByRole("group", { name: "Answered question" });
     await expect(result.getByRole("status", { name: "Answer result" })).toContainText("Queued");
     await expect(result.getByRole("status", { name: "Answer result" })).toContainText("in queue");
+  });
+
+  // 43: the form of an ask is still open when the ticket moves on and its agent finishes late; the answer finds it adopted.
+  await test.step("agent question: answer from a stale form reads The agent had already finished", async () => {
+    // Recovery would fork an investigation off the zero-commit pause.
+    const finished = await start("answer-finished", { config: { "recovery.enabled": "false" } });
+    const addr = "demo:finished-answer-epic/01";
+    await page.evaluate((hash) => (location.hash = hash), `#/t/${addr}`);
+    const form = page.getByRole("form", { name: "Answer" });
+    await form.getByRole("textbox").fill("go on", { timeout: 60_000 });
+    // Cut the page off from the server so the form stays on screen while the ticket moves on.
+    const unblock = await blockEvents(page);
+    await context.setOffline(true);
+    await finished.cli("server", "tickets", "resume", addr);
+    await expect.poll(async () => (await finished.cli("server", "tickets", "history", addr)).split("\tpaused\t").length - 1, { timeout: 90_000 }).toBe(2);
+    await context.setOffline(false);
+    // A refused answer refreshes the page and drops the form, so there is one Send: its request waits
+    // until the late finish is on the ticket, and the server adopts that a moment later.
+    const ticketPath = /^path: (.+)$/m.exec(await finished.cli("tickets", "show", addr))?.[1] ?? "";
+    const finishedAt = async () => /^iteration_finished_at: (.+)$/m.exec(await readFile(ticketPath, "utf8"))?.[1];
+    const emptyFinishAt = await finishedAt();
+    expect(emptyFinishAt).toBeTruthy();
+    let lateFinish!: () => void;
+    const landed = new Promise<void>((resolve) => (lateFinish = resolve));
+    await page.route("**/v1/tickets/answer", async (route) => {
+      await landed;
+      await route.continue();
+    });
+    await form.getByRole("button", { name: "Send answer" }).click();
+    await finished.release();
+    await expect.poll(finishedAt, { timeout: 60_000, intervals: [50] }).not.toBe(emptyFinishAt);
+    lateFinish();
+    const result = page.getByRole("group", { name: "Answered question" });
+    await expect(result.getByRole("status", { name: "Answer result" })).toContainText("Sent");
+    await expect(result.getByRole("status", { name: "Answer result" })).toContainText("The agent had already finished");
+    await expect(result.getByText("go on")).toBeVisible();
+    await unblock();
+    await page.unroute("**/v1/tickets/answer");
   });
 
   // 55: Huh? sends the fixed message, on a ticket that has not been answered yet.

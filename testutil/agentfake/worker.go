@@ -105,10 +105,11 @@ const (
 	// BehaviourFail commits and reports nothing. The TUI fake then exits non-zero,
 	// which the server reads as a failed run.
 	BehaviourFail = "fail"
-	// BehaviourEmptyFinish reports finished with no commit, which the server
+	// BehaviourAskEmptyFinish asks on its first run. A relaunch that sees the
+	// file that ask left reports finished with no commit, which the server
 	// pauses as zero-commit, then commits and reports finished again once the
 	// Hold file is gone: a late finish a flow times by releasing the hold.
-	BehaviourEmptyFinish = "empty-finish"
+	BehaviourAskEmptyFinish = "ask-empty-finish"
 	// BehaviourPermission blocks the TUI fake on a Bash permission prompt, which
 	// only the pty runner can approve. WorkTicket itself does nothing for it.
 	BehaviourPermission = "permission"
@@ -195,8 +196,14 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 		return askQuestion(cfg, address, askOptionsBody)
 	case BehaviourRefuseAsk:
 		return refuseThenAsk(cfg, address)
-	case BehaviourEmptyFinish:
-		if err := reportFinished(cfg, address); err != nil {
+	case BehaviourAskEmptyFinish:
+		if !fileExists(UncommittedFile) {
+			if err := os.WriteFile(UncommittedFile, []byte("asked\n"), 0o644); err != nil {
+				return err
+			}
+			return askQuestion(cfg, address, askBody)
+		}
+		if err := reportFinished(cfg, address, false); err != nil {
 			return err
 		}
 		go func() {
@@ -330,16 +337,18 @@ func finishTicket(cfg WorkerConfig, address string) error {
 			return err
 		}
 	}
-	return reportFinished(cfg, address)
+	return reportFinished(cfg, address, true)
 }
 
-// reportFinished runs `gx check` and reports the iteration finished.
-func reportFinished(cfg WorkerConfig, address string) error {
-	// The finish guard refuses a tree without a passing check run.
-	for _, args := range [][]string{
-		{"check"},
-		{"tickets", "set", address, "--iteration-status", "finished"},
-	} {
+// reportFinished runs `gx check` and reports the iteration finished. The
+// finish guard refuses a branch with commits and no passing check run, so
+// withCheck can be false only for a finish with no commits.
+func reportFinished(cfg WorkerConfig, address string, withCheck bool) error {
+	steps := [][]string{{"tickets", "set", address, "--iteration-status", "finished"}}
+	if withCheck {
+		steps = append([][]string{{"check"}}, steps...)
+	}
+	for _, args := range steps {
 		cmd := exec.Command(cfg.Gx, args...)
 		cmd.Env = append(os.Environ(), cfg.Env...)
 		out, err := cmd.CombinedOutput()

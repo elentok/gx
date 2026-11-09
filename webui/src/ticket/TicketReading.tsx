@@ -2,7 +2,7 @@ import { Box, Text } from "@chakra-ui/react";
 import type { DetailRound, TicketDetail } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { Card } from "../ui/card/Card";
-import type { Sent } from "./answer";
+import { type Sent, wasAdopted } from "./answer";
 import { AnswerResult } from "./AnswerResult";
 import { Collapsible } from "./Collapsible";
 
@@ -24,11 +24,12 @@ function EarlierRound({ round }: { round: DetailRound }) {
 export function TicketReading({ detail, sent = null }: { detail: TicketDetail; sent?: Sent | null }) {
   const { latest } = detail;
   const asker = latest?.by === "gx" ? "GX ASKS" : "THE AGENT ASKS";
+  const answered = !!latest?.answer || wasAdopted(sent);
 
   return (
     <Box mt="4" display="flex" flexDirection="column" gap="4">
-      {latest?.answer && <AnswerResult detail={detail} sent={sent} />}
-      {latest && !latest.answer && (
+      {answered && <AnswerResult detail={detail} sent={sent} />}
+      {latest && !answered && (
         <>
           <Box>
             <Label>{asker}</Label>

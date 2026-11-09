@@ -24,12 +24,22 @@ export interface Sent {
   outcome: string;
   /** 1-based place in the queue, for a queued answer. */
   position?: number;
+  /** What the person sent, for the card of an adopted send: that outcome records no answer of its own. */
+  answer?: string;
 }
 
-export function sentOf(seq: number, address: string, res: { outcome: string; queue?: { address: string }[] }): Sent {
+export function sentOf(
+  seq: number,
+  address: string,
+  res: { outcome: string; queue?: { address: string }[] },
+  answer?: string,
+): Sent {
   const place = (res.queue ?? []).findIndex((q) => q.address === address) + 1;
-  return { seq, outcome: res.outcome, ...(place > 0 ? { position: place } : {}) };
+  return { seq, outcome: res.outcome, ...(place > 0 ? { position: place } : {}), ...(answer ? { answer } : {}) };
 }
+
+/** Whether the send reached an agent that had already finished, so no answer was recorded. */
+export const wasAdopted = (sent: Sent | null): boolean => sent?.outcome === OutcomeAdopted;
 
 export type PostAnswer = (body: AnswerBody) => Promise<AnswerResult>;
 

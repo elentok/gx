@@ -57,7 +57,7 @@ export function AnswerForm({
         if (res.reason === ReasonStale) onStale?.();
       } else {
         setSentSeq(latest.seq);
-        onSent?.(sentOf(latest.seq, detail.address, res));
+        onSent?.(sentOf(latest.seq, detail.address, res, answer.choice || answer.text));
       }
     } catch {
       setError("Could not send the answer. Try again.");
