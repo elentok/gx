@@ -59,6 +59,13 @@ func Routes(w func() *Writer, pending func() []string, reload func() wire.Reload
 
 // write saves the changes, then reloads config.json once for a global write.
 func write(w *Writer, t Target, in []wire.SettingChange, pending func() []string, reload func() wire.ReloadResult) wire.SettingsWriteResult {
+	// A hook may reload inside the write; reuse its result rather than reload twice.
+	var reloaded *wire.ReloadResult
+	t.Reload = func() wire.ReloadResult {
+		rr := reload()
+		reloaded = &rr
+		return rr
+	}
 	changes, err := toChanges(w.Registry, in)
 	var res Result
 	if err == nil {
@@ -81,8 +88,10 @@ func write(w *Writer, t Target, in []wire.SettingChange, pending func() []string
 	if t.Project != "" {
 		return out
 	}
-	rr := reload()
-	if rr.Refused {
+	if reloaded == nil {
+		t.Reload()
+	}
+	if rr := *reloaded; rr.Refused {
 		out.Notices = append(out.Notices, "Saved, but the server could not apply it: "+rr.Message)
 		return out
 	}

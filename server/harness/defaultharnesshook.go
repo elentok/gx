@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/settingsapi"
+	"github.com/elentok/gx/server/wire"
 )
 
 var defaultHarnessPath = registry.Key("agents", "default-harness")
@@ -73,7 +74,11 @@ func (k *settingsHook) After(t settingsapi.Target, changes []settingsapi.Change)
 	defer k.mu.Unlock()
 	out := switchOutcome{before: k.before}
 	if t.Project == "" {
-		if rr := k.h.settings.Reload(settings.TriggerCommand); rr.Refused {
+		reload := t.Reload
+		if reload == nil {
+			reload = func() wire.ReloadResult { return k.h.settings.Reload(settings.TriggerCommand) }
+		}
+		if rr := reload(); rr.Refused {
 			out.reloadRefused, out.reloadReason, out.reloadMsg = true, rr.Reason, rr.Message
 			k.last = out
 			return ""

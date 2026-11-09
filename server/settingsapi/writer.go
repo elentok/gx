@@ -10,12 +10,16 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/config/registry"
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/server/wire"
 )
 
 // Target names the file a write goes to. Project is empty for the global
 // config file.
 type Target struct {
 	Project string
+	// Reload, when set, is the reload a hook runs after a global write instead
+	// of its own, so a caller that reloads itself reloads once.
+	Reload func() wire.ReloadResult
 }
 
 // Hooks lets one key run code around a write. Before may refuse by returning

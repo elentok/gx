@@ -54,6 +54,13 @@ func (f apiFixture) read(t *testing.T, path string) string {
 	return string(b)
 }
 
+// queueConfig reads the blocks these tests check; the file also holds
+// top-level keys that are not objects.
+type queueConfig struct {
+	Queue  map[string]any `json:"execution-queue"`
+	Budget map[string]any `json:"budget"`
+}
+
 func val(key, v string) wire.SettingChange {
 	return wire.SettingChange{Key: key, Value: json.RawMessage(v)}
 }
@@ -66,11 +73,11 @@ func TestWriteSetAndRemoveKeepOtherKeys(t *testing.T) {
 	if res.Refused || string(res.Values["execution-queue.max-agents"]) != "5" {
 		t.Fatalf("result = %+v", res)
 	}
-	var cfg map[string]map[string]any
+	var cfg queueConfig
 	if err := json.Unmarshal([]byte(f.read(t, f.config)), &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg["execution-queue"]["max-agents"] != float64(5) || cfg["execution-queue"]["max-one-off-agents"] != float64(4) || cfg["budget"]["soft-limit"] != float64(10) {
+	if cfg.Queue["max-agents"] != float64(5) || cfg.Queue["max-one-off-agents"] != float64(4) || cfg.Budget["soft-limit"] != float64(10) {
 		t.Fatalf("config = %v", cfg)
 	}
 	res = f.set(t, "", remove("execution-queue.max-agents"))
@@ -144,11 +151,11 @@ func TestWriteConcurrentSavesAreBothKept(t *testing.T) {
 	if !strings.Contains(got, `"max-agents": 4`) && !strings.Contains(got, `"max-agents":4`) || !strings.Contains(got, "5") {
 		t.Fatalf("config = %s", got)
 	}
-	var cfg map[string]map[string]any
+	var cfg queueConfig
 	if err := json.Unmarshal([]byte(got), &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg["execution-queue"]["max-agents"] != float64(4) || cfg["execution-queue"]["max-one-off-agents"] != float64(5) {
+	if cfg.Queue["max-agents"] != float64(4) || cfg.Queue["max-one-off-agents"] != float64(5) {
 		t.Fatalf("config = %v", cfg)
 	}
 }
@@ -194,5 +201,18 @@ func TestWriteProjectRefusesNotificationsAndKeepsHandWrittenBlock(t *testing.T) 
 	}
 	if pf.Notifications["telegram"]["chat-id"] != "42" {
 		t.Fatalf("notifications block lost: %s", f.read(t, file))
+	}
+}
+
+// Seam: a web save of the global Default harness reloads once with the web
+// trigger, so no OS banner pops (the command trigger would).
+func TestWriteDefaultHarnessGlobalPopsNoBanner(t *testing.T) {
+	f := startAPI(t, map[string]any{})
+	res := f.set(t, "", val("agents.default-harness", `"codex"`))
+	if res.Refused {
+		t.Fatalf("result = %+v", res)
+	}
+	if n := len(f.h.Banners.Sent()); n != 0 {
+		t.Errorf("web save sent %d banners, want none", n)
 	}
 }
