@@ -2,6 +2,7 @@ import { Box, Menu as ChakraMenu, Portal, Text } from "@chakra-ui/react";
 import { Fragment, useState, type ReactElement, type ReactNode } from "react";
 import { useWide } from "../../useWide";
 import { useCloseSignal, useOnCloseSignal } from "../closeSignal";
+import { hasLayer } from "../modal/layers";
 import { PhoneMenu } from "./PhoneMenu";
 import { useReportOpen } from "./useReportOpen";
 
@@ -212,6 +213,22 @@ export interface MenuProps {
   placement?: "bottom-end" | "bottom-start" | "top-end" | "top-start";
 }
 
+const SETTLE_MS = 100;
+
+/**
+ * Zag returns focus to the trigger after a close and offers no way to skip it, at a moment it does
+ * not announce. For a short while, a dialog the pick opened takes back any focus that lands outside it.
+ */
+function keepFocusInDialog() {
+  const dialog = () => [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')].at(-1);
+  const takeBack = (e: FocusEvent) => {
+    const d = dialog();
+    if (d && !d.contains(e.target as Node)) d.focus();
+  };
+  document.addEventListener("focusin", takeBack);
+  setTimeout(() => document.removeEventListener("focusin", takeBack), SETTLE_MS);
+}
+
 function WideMenu({ trigger, items, onClosed, onOpenChange, closeSignal, placement = "bottom-end" }: MenuProps) {
   const [open, setOpen] = useState(false);
   useReportOpen(open, onOpenChange);
@@ -225,7 +242,10 @@ function WideMenu({ trigger, items, onClosed, onOpenChange, closeSignal, placeme
       positioning={{ placement }}
       onOpenChange={(e) => {
         setOpen(e.open);
-        if (!e.open) onClosed?.();
+        if (e.open) return;
+        // A pick has run its handler by now, so a dialog it opened is already mounted.
+        if (hasLayer()) keepFocusInDialog();
+        onClosed?.();
       }}
     >
       <ChakraMenu.Trigger asChild>{trigger}</ChakraMenu.Trigger>

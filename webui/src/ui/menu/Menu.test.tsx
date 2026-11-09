@@ -2,6 +2,7 @@ import { fireEvent, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WideContext } from "../../useWide";
+import { Modal } from "../modal/Modal";
 import { renderThemed } from "../render";
 import { GxMenu, menuGroups, type MenuEntry } from "./Menu";
 
@@ -308,4 +309,48 @@ describe("GxMenu", () => {
     await waitFor(() => expect(document.activeElement).toBe(r.getByRole("button", { name: "Menu" })));
     expect(onClosed).toHaveBeenCalledTimes(1);
   });
+});
+
+describe("GxMenu focus after an item", () => {
+  function Host({ opens }: { opens: boolean }) {
+    const [dialog, setDialog] = useState(false);
+    return (
+      <>
+        <GxMenu trigger={trigger} items={[{ value: "a", label: "A", onSelect: () => opens && setDialog(true) }]} />
+        {dialog && (
+          <Modal label="Dialog" onClose={() => setDialog(false)}>
+            <input aria-label="Name" />
+          </Modal>
+        )}
+      </>
+    );
+  }
+  const render = (wide: boolean, opens: boolean) =>
+    renderThemed(
+      <WideContext.Provider value={wide}>
+        <Host opens={opens} />
+      </WideContext.Provider>,
+    );
+
+  for (const [name, wide] of [["wide", true], ["phone", false]] as const) {
+    it(`leaves focus in the dialog an item opened on the ${name} menu`, async () => {
+      const r = render(wide, true);
+      const menu = await open(r);
+      await waitFor(() => expect(document.activeElement).toBe(menu));
+      fireEvent.click(r.getByRole("menuitem", { name: "A" }));
+      const dialog = await r.findByRole("dialog", { name: "Dialog" });
+      await waitFor(() => expect(r.queryByRole("menu")).toBeNull());
+      await new Promise((res) => setTimeout(res, 50));
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
+    it(`still returns focus to the trigger when the item opens nothing on the ${name} menu`, async () => {
+      const r = render(wide, false);
+      const menu = await open(r);
+      await waitFor(() => expect(document.activeElement).toBe(menu));
+      fireEvent.click(r.getByRole("menuitem", { name: "A" }));
+      await waitFor(() => expect(r.queryByRole("menu")).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(r.getByRole("button", { name: "Menu" })));
+    });
+  }
 });
