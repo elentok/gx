@@ -106,6 +106,11 @@ func (t *tui) handleControl(c Control) error {
 		return t.writePid()
 	case ActionAPIError:
 		return t.apiError(c)
+	case ActionDescendants:
+		return t.spawnDescendants(c.Count, c.Depth)
+	case ActionStopDescendants:
+		t.stopDescendants()
+		return nil
 	case ActionModel:
 		t.opts.model = c.Model
 		return nil
@@ -152,6 +157,7 @@ func (t *tui) writePid() error {
 // exit removes the pid file on a clean exit, as claude does; a crash leaves
 // it behind.
 func (t *tui) exit(code int) error {
+	t.stopDescendants()
 	if code != 0 || t.opts.noPidFile {
 		return nil
 	}

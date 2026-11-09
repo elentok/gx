@@ -123,6 +123,9 @@ type Control struct {
 	Command string `json:"command,omitempty"`
 	// ToolCalls are the calls an ActionToolUse leaves in flight, oldest first.
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	// Count and Depth shape the tree an ActionDescendants spawns.
+	Count int `json:"count,omitempty"`
+	Depth int `json:"depth,omitempty"`
 	// UsedPercent is the primary rate-limit use an ActionTokenCount writes.
 	UsedPercent float64 `json:"used_percent,omitempty"`
 }

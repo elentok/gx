@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -69,6 +70,8 @@ type tui struct {
 	// images are the paths behind the [Image #N] chips in the input.
 	images []string
 	paste  pasteState
+	// descendants is the process tree an ActionDescendants started.
+	descendants *exec.Cmd
 }
 
 type PendingWork struct {
