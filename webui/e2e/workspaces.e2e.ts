@@ -35,6 +35,21 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("ready-epic")).toBeVisible();
   await expect(row("ws-design")).toHaveCount(0);
 
+  // The footer's inbox button sums the project's follow-ups (2 bugs, 2 ideas); the popover line opens the Follow-ups card, section open and in view.
+  const inbox = page.getByRole("button", { name: /^Follow-ups/ });
+  const followUpsLine = page.getByRole("menuitem", { name: /^demo/ });
+  await expect(inbox).toHaveAttribute("aria-label", "Follow-ups · 4 open");
+  await expect(inbox).toContainText("4");
+  await inbox.click();
+  await expect(followUpsLine).toContainText("2 bugs · 2 ideas");
+  await expect(followUpsLine).toContainText("4");
+  await followUpsLine.click();
+  await expect(page).toHaveURL(/#\/epics$/);
+  const followUpsCard = page.locator('[data-focus="follow-ups:demo"]');
+  await expect(followUpsCard).toBeVisible();
+  await expect(followUpsCard).toBeInViewport();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+
   // One global ring for keyboard focus: inset on a sidebar row, gap plus blue ring elsewhere, never after a click.
   const blue = "rgb(108, 180, 255)";
   const ring = new RegExp(`${blue.replace(/[()]/g, "\\$&")} 0px 0px 0px 4px`);
@@ -167,6 +182,11 @@ test("Workspaces", async ({ page, start }) => {
   await pick("gx bugs");
   await expect(row("ws-design")).toBeVisible();
   await expect(row("ready-epic")).toHaveCount(0);
+  // The badge covers only this workspace's projects: demo has cards here, so its follow-ups show, matching the card's words.
+  await expect(inbox).toHaveAttribute("aria-label", "Follow-ups · 4 open");
+  await inbox.click();
+  await expect(followUpsLine).toContainText("2 bugs · 2 ideas");
+  await closeMenus();
   await row("ws-design").click();
   // A Design row opens the Design page with its composer, not the epic page.
   await expect(page).toHaveURL(/#\/d\/demo:ws-design$/);
@@ -178,7 +198,7 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("ws-impl-epic")).toBeVisible();
   await expect(row("ws-design")).toHaveCount(0);
   await expect(page).toHaveURL(/#\/d\/demo:ws-design$/);
-
+  await expect(inbox).toHaveAttribute("aria-label", "Follow-ups · 4 open");
 
   // Move from a sidebar row: the row leaves this workspace and shows in the target.
   const rowMenu = (title: string) => row(title).locator("xpath=..").getByRole("button", nav("More actions"));

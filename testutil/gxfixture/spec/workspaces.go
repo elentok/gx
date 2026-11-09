@@ -55,6 +55,13 @@ func WorkspacesScenario() scenario {
 			{project, "ready-epic", open},
 			{project, "design-new", nil},
 			{project, "finished-a", []ticket{{"01", "built", servertest.TicketOpts{Status: "done"}}}},
+			// The sidebar's follow-ups badge: draft and open tickets count: 2 bugs, 2 ideas. The project has no Triage.
+			{project, "follow-ups", []ticket{
+				{"01", "a-bug", servertest.TicketOpts{Category: "bug"}},
+				{"02", "another-bug", servertest.TicketOpts{Category: "bug"}},
+				{"03", "an-idea", servertest.TicketOpts{Category: "idea"}},
+				{"04", "a-draft", servertest.TicketOpts{Category: "idea", Status: "draft"}},
+			}},
 		},
 		EpicMeta: map[string]string{
 			project + ":ws-design":    "status: open\nkind: map\n",

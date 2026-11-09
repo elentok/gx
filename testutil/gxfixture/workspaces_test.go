@@ -38,6 +38,7 @@ func TestWorkspacesScenario_SeedsWorkspacesHoldsAgentsAndACardPerSection(t *test
 		"paused-epic|needs-you|Default workspace",
 		"ready-epic|ready-to-queue|Default workspace",
 		"design-new|ready-to-design|Default workspace",
+		"follow-ups|ready-to-design|", // a project card, in no workspace
 		"finished-a|finished|Default workspace",
 	}
 	var got []string
