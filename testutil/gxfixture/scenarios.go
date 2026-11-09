@@ -261,6 +261,7 @@ var scenarios = map[string]scenario{
 	"map-evolve":            spec.MapEvolve,
 	"classifier-outage":     spec.ClassifierOutage,
 	"answer-queued":         spec.AnswerQueued,
+	"answer-finished":       spec.AnswerFinished,
 	"keep-worktree":         spec.KeepWorktree,
 	"keep-agent":            spec.KeepAgent,
 	"keep-cleanup":          spec.KeepCleanup,

@@ -105,6 +105,10 @@ const (
 	// BehaviourFail commits and reports nothing. The TUI fake then exits non-zero,
 	// which the server reads as a failed run.
 	BehaviourFail = "fail"
+	// BehaviourEmptyFinish reports finished with no commit, which the server
+	// pauses as zero-commit, then commits and reports finished again once the
+	// Hold file is gone: a late finish a flow times by releasing the hold.
+	BehaviourEmptyFinish = "empty-finish"
 	// BehaviourPermission blocks the TUI fake on a Bash permission prompt, which
 	// only the pty runner can approve. WorkTicket itself does nothing for it.
 	BehaviourPermission = "permission"
@@ -191,6 +195,15 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 		return askQuestion(cfg, address, askOptionsBody)
 	case BehaviourRefuseAsk:
 		return refuseThenAsk(cfg, address)
+	case BehaviourEmptyFinish:
+		if err := reportFinished(cfg, address); err != nil {
+			return err
+		}
+		go func() {
+			waitHold(cfg)
+			_ = finishTicket(cfg, address)
+		}()
+		return nil
 	case BehaviourWriteAsk:
 		if !fileExists(UncommittedFile) {
 			if err := os.WriteFile(UncommittedFile, []byte("kept\n"), 0o644); err != nil {
@@ -317,6 +330,11 @@ func finishTicket(cfg WorkerConfig, address string) error {
 			return err
 		}
 	}
+	return reportFinished(cfg, address)
+}
+
+// reportFinished runs `gx check` and reports the iteration finished.
+func reportFinished(cfg WorkerConfig, address string) error {
 	// The finish guard refuses a tree without a passing check run.
 	for _, args := range [][]string{
 		{"check"},
