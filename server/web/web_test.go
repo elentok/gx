@@ -177,6 +177,31 @@ func TestServeAsset_CacheHeaders(t *testing.T) {
 	}
 }
 
+func TestServeAsset_ManifestContentType(t *testing.T) {
+	t.Parallel()
+	handler := web.ServeAsset(fstest.MapFS{
+		"index.html":           {Data: []byte("<!doctype html>")},
+		"manifest.webmanifest": {Data: []byte("{}")},
+		"manifest.json":        {Data: []byte("{}")},
+		"pwa-icon-192.png":     {Data: []byte("png")},
+	})
+	for _, path := range []string{"/manifest.webmanifest", "/manifest.json"} {
+		// No login cookie: the handler is the whole path, so the manifest is open.
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "application/manifest+json" ||
+			rec.Header().Get("Cache-Control") != "no-cache" {
+			t.Errorf("GET %s = %d %q %q, want 200 application/manifest+json no-cache",
+				path, rec.Code, rec.Header().Get("Content-Type"), rec.Header().Get("Cache-Control"))
+		}
+	}
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/pwa-icon-192.png", nil))
+	if got := rec.Header().Get("Content-Type"); got != "image/png" {
+		t.Errorf("icon Content-Type = %q, want image/png", got)
+	}
+}
+
 func TestWeb_SnapshotIsServed(t *testing.T) {
 	t.Parallel()
 	h, base := servertest.StartWeb(t)

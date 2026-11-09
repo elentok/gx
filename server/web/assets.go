@@ -88,6 +88,10 @@ func ServeAsset(assets fs.FS) http.Handler {
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
+		// Go's mime table has no .webmanifest entry, and .json would get application/json.
+		if name == "manifest.webmanifest" || name == "manifest.json" {
+			w.Header().Set("Content-Type", "application/manifest+json")
+		}
 		files.ServeHTTP(w, r)
 	})
 }
