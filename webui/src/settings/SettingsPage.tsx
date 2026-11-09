@@ -396,7 +396,7 @@ export function SettingsPage({
         {settings.data ? (
           <Frame>
             <Box data-mock-part="page">
-              <BackLink href={project === undefined ? SETTINGS_HREF : `#${projectPath(project)}`} />
+              <BackLink href={project === undefined ? SETTINGS_HREF : `#${projectPath(project)}`} label={project ?? "Settings"} />
               <PageHeader title={section} icon={<PageIcon kind="settings" />} />
               <SectionBody
                 entries={settings.data.entries}

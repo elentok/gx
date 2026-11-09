@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { SettingsEntry } from "../generated/server";
 import { renderThemed } from "../ui/render";
+import { DeviceContext } from "../useWide";
 import { GLOBAL_SECTIONS, SettingsShellView } from "./SettingsShell";
 
 const entry = (over: Partial<SettingsEntry>): SettingsEntry => ({
@@ -35,6 +36,22 @@ const renderShell = (section?: string, onSignOut = () => {}, totpOn = true) =>
   );
 
 describe("SettingsShellView", () => {
+  it("keeps the sidebar at tablet width after a section click, in a 200px column", () => {
+    const { getByRole } = renderThemed(
+      <DeviceContext.Provider value="tablet">
+        <MemoryRouter initialEntries={["/settings"]}>
+          <Routes>
+            <Route path="*" element={<SettingsShellView entries={entries} projects={["gx"]} totpOn onSignOut={() => {}} onWrite={async () => ({})} />} />
+          </Routes>
+        </MemoryRouter>
+      </DeviceContext.Provider>,
+    );
+    const nav = getByRole("navigation");
+    expect(getComputedStyle(nav.parentElement as HTMLElement).gridTemplateColumns).toContain("200px");
+    fireEvent.click(getByRole("link", { name: /^Budget$/ }));
+    expect(getByRole("navigation")).toBeTruthy();
+  });
+
   it("lists exactly the seven sections, with no TUI or Global section", () => {
     const { getByRole, queryByRole } = renderShell();
     const nav = getByRole("navigation");

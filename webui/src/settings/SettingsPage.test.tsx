@@ -94,7 +94,7 @@ describe("SettingsPage on a phone", () => {
     list.unmount();
     const section = renderAt("/settings/p/gx/s/budget");
     expect(await section.findByRole("heading", { name: "Budget" })).toBeTruthy();
-    expect(section.getByRole("link", { name: "‹ Settings" }).getAttribute("href")).toBe("#/settings/p/gx");
+    expect(section.getByRole("link", { name: "‹ gx" }).getAttribute("href")).toBe("#/settings/p/gx");
   });
 });
 
