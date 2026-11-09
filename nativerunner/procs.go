@@ -2,6 +2,7 @@ package nativerunner
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -35,18 +36,23 @@ func orPS(p ProcessTable) ProcessTable {
 type psTable struct{}
 
 func (psTable) Lookup(pid int) (Process, bool, error) {
-	start, ok, err := psField(pid, "lstart=")
+	// One exec for both fields: Lookup runs on every poll of every adopted
+	// session, so a second ps doubles the server's baseline child CPU. In the C
+	// locale lstart is a fixed-width date and the command is the rest.
+	out, ok, err := psOutput(pid, "lstart=,command=")
 	if !ok || err != nil {
 		return Process{}, ok, err
 	}
-	cmdline, ok, err := psField(pid, "command=")
-	if !ok || err != nil {
-		return Process{}, ok, err
+	if len(out) <= lstartWidth {
+		return Process{}, false, fmt.Errorf("ps output %q is too short for lstart and command", out)
 	}
-	return Process{Start: start, Cmdline: cmdline}, true, nil
+	return Process{Start: strings.TrimSpace(out[:lstartWidth]), Cmdline: strings.TrimSpace(out[lstartWidth:])}, true, nil
 }
 
-func psField(pid int, field string) (string, bool, error) {
+// lstartWidth is the length of ps's lstart in the C locale, "Mon Nov  9 07:33:28 2026".
+const lstartWidth = 24
+
+func psOutput(pid int, field string) (string, bool, error) {
 	cmd := exec.Command("ps", "-ww", "-p", strconv.Itoa(pid), "-o", field)
 	cmd.Env = append(os.Environ(), "LC_ALL=C")
 	out, err := cmd.Output()
