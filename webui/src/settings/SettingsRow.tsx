@@ -352,9 +352,12 @@ export function SettingsRow({
   const saveValue = (value: unknown) => send(followsGlobal && value === true ? removeChange(entry.key) : setChange(entry.key, value));
   return (
     <Box px="3.5" py="3" display="grid" gap="1.5" _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}>
-      <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
-        <Text fontWeight="600">{entryLabel(entry)}</Text>
-        {entry.set && entry.type !== "secret" && <Box title="Changed from default" w="7px" h="7px" borderRadius="full" bg="tone.running.fg" />}
+      {/* No wrap: a long label wraps itself, so the reset link stays top-right on this row. */}
+      <Box data-mock-part="title-row" display="flex" gap="2" alignItems="center">
+        <Text fontWeight="600" minW="0">
+          {entryLabel(entry)}
+        </Text>
+        {entry.set && entry.type !== "secret" && <Box title="Changed from default" w="7px" h="7px" flexShrink="0" borderRadius="full" bg="tone.running.fg" />}
         {entry.risky && <Chip tone="waiting">Careful</Chip>}
         {entry.restart && (
           <Box data-mock-part="restart-badge">
@@ -376,6 +379,8 @@ export function SettingsRow({
             fontSize="12.5px"
             fontWeight="600"
             color="tone.running.fg"
+            flexShrink="0"
+            whiteSpace="nowrap"
           >
             {texts ? texts.back : `Reset to default (${defaultText})`}
           </chakra.button>

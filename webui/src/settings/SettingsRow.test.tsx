@@ -328,6 +328,15 @@ describe("SettingsRow", () => {
       expect(inProject(evolve({})).getByText("Evolve for this project")).toBeTruthy();
     });
 
+    it("the reset link stays on the title row, which never wraps, so a long label wraps instead", () => {
+      const v = inProject(cap({ set: true, value: 2 }));
+      const row = v.container.querySelector("[data-mock-part=title-row]") as HTMLElement;
+      const link = v.getByRole("button", { name: "Remove cap" });
+      expect(row.contains(link)).toBe(true);
+      expect(getComputedStyle(row).flexWrap).not.toBe("wrap");
+      expect(getComputedStyle(link).flexShrink).toBe("0");
+    });
+
     it("an unset key shows the global value; Override writes that value", async () => {
       const v = inProject(per({}));
       expect(inherits(v)).toBe("Uses the global value 3");
