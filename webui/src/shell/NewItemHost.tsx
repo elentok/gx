@@ -16,7 +16,7 @@ export function NewItemHost() {
   return (
     <Portal>
       {request?.kind === "design" && <DesignDialog filterProject={request.filterProject} />}
-      {request?.kind === "agent" && <AgentDialog prefillProject={request.prefillProject} />}
+      {request?.kind === "agent" && <AgentDialog />}
     </Portal>
   );
 }
@@ -53,13 +53,11 @@ function DesignDialog({ filterProject }: { filterProject?: string }) {
   );
 }
 
-function AgentDialog({ prefillProject }: { prefillProject?: string }) {
+function AgentDialog() {
   const navigate = useNavigate();
   const shell = useShell();
-  const routeProject = useRouteProject();
   return (
     <NewSessionForm
-      prefillProject={prefillProject ?? routeProject}
       fetchTrees={fetchWorktrees}
       create={postCreateSession}
       onClose={closeNewItem}

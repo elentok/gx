@@ -84,7 +84,11 @@ describe("the project a new blank draft starts on", () => {
     setPageProject("gamma");
     act(() => openNewDesign());
     await projectIs("gamma");
-    act(closeNewItem);
+  });
+
+  test("New chat uses the stored one-project Epics filter when the page has no project", async () => {
+    localStorage.setItem("gx.epics.project", JSON.stringify(["gamma"]));
+    mount("/epics");
     act(openNewAgent);
     await projectIs("gamma");
   });

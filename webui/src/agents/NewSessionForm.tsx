@@ -16,6 +16,11 @@ import { Field, field } from "./formField";
 import { fetchWorktrees, postCreateSession, type CreateSession, type FetchWorktrees } from "./newSession";
 import { trimmed, useNewSessionDraft, type NewSessionDraft } from "./useNewSessionDraft";
 import { baseName, WorktreePicker, type Option } from "./WorktreePicker";
+import { getLastProject, setLastProject } from "../design/drafts";
+import type { DraftsClient } from "../design/NewDesignForm";
+import { useDefaultProject } from "../workspaces/defaultProject";
+
+const realDrafts = { getLastProject, setLastProject };
 
 // The picker is Claude-only and a tier reads as the family: "Worker (Claude Sonnet)".
 const tierModel = (id: string) => modelName(id, "claude");
@@ -61,15 +66,15 @@ function PromptField({ value, onChange, target, fetcher }: { value: string; onCh
 
 /** The New session form: Project, one Worktree picker, Name and First prompt. The draft lives in localStorage until create or discard. */
 export function NewSessionForm({
-  prefillProject,
+  drafts = realDrafts,
   fetchTrees = fetchWorktrees,
   create = postCreateSession,
   fetchCommands,
   onCreated,
   onClose,
 }: {
-  /** The selected session's project. */
-  prefillProject?: string;
+  /** The shared last-project value, also written by New design; injected for tests. */
+  drafts?: Pick<DraftsClient, "getLastProject" | "setLastProject">;
   fetchTrees?: FetchWorktrees;
   create?: CreateSession;
   /** Replaces the command-list fetch, for tests. */
@@ -83,7 +88,7 @@ export function NewSessionForm({
   const focusFirst = useFocusFirstField();
   const [loadError, setLoadError] = useState(false);
   const [tier, setTier] = useState("worker");
-  const { draft, update, clear } = useNewSessionDraft(prefillProject);
+  const { draft, update, clear } = useNewSessionDraft();
   const { connected } = useConnectionState(useConnectionContext());
   const { run, pending, refusal, error } = useWrite();
   const workspace = useShell()?.workspace;
@@ -100,7 +105,8 @@ export function NewSessionForm({
   }, [fetchTrees]);
 
   const projects = trees?.map((p) => p.project) ?? [];
-  const project = projects.includes(draft.project) ? draft.project : (projects[0] ?? "");
+  const fallback = useDefaultProject(projects, drafts);
+  const project = projects.includes(draft.project) ? draft.project : fallback;
   const current = trees?.find((p) => p.project === project);
   const rows: Option[] = current
     ? [
@@ -134,6 +140,7 @@ export function NewSessionForm({
       {
         onDone: (res) => {
           clear();
+          drafts.setLastProject(project).catch(() => {});
           onCreated(res.session!.id);
         },
       },

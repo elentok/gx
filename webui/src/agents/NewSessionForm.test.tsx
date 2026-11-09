@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
@@ -25,7 +26,7 @@ const trees: ProjectWorktrees[] = [
 ];
 const accepted: SessionResult = { session: { id: "gx-7" } as never };
 
-function mount(over: { create?: CreateSession; connected?: boolean; prefillProject?: string; fetchCommands?: FetchCommands; workspace?: string; device?: Device } = {}) {
+function mount(over: { create?: CreateSession; connected?: boolean; path?: string; last?: string; setLast?: (project: string) => Promise<void>; fetchCommands?: FetchCommands; workspace?: string; device?: Device } = {}) {
   const posts: NewSessionBody[] = [];
   const create: CreateSession = over.create ?? (async (body) => (posts.push(body), accepted));
   const onCreated = vi.fn();
@@ -35,14 +36,17 @@ function mount(over: { create?: CreateSession; connected?: boolean; prefillProje
     getState: () => state,
     subscribe: () => () => {},
   } as unknown as Connection;
+  const drafts = { getLastProject: async () => over.last ?? "", setLastProject: over.setLast ?? (async () => {}) };
   renderThemed(
-    <DeviceContext.Provider value={over.device ?? "desktop"}>
-      <ConnectionContext.Provider value={conn}>
-        <ShellContext.Provider value={over.workspace === undefined ? undefined : { ...shellStub, workspace: over.workspace }}>
-          <NewSessionForm prefillProject={over.prefillProject} fetchTrees={async () => trees} create={create} fetchCommands={over.fetchCommands} onCreated={onCreated} onClose={onClose} />
-        </ShellContext.Provider>
-      </ConnectionContext.Provider>
-    </DeviceContext.Provider>,
+    <MemoryRouter initialEntries={[over.path ?? "/agents"]}>
+      <DeviceContext.Provider value={over.device ?? "desktop"}>
+        <ConnectionContext.Provider value={conn}>
+          <ShellContext.Provider value={over.workspace === undefined ? undefined : { ...shellStub, workspace: over.workspace }}>
+            <NewSessionForm drafts={drafts} fetchTrees={async () => trees} create={create} fetchCommands={over.fetchCommands} onCreated={onCreated} onClose={onClose} />
+          </ShellContext.Provider>
+        </ConnectionContext.Provider>
+      </DeviceContext.Provider>
+    </MemoryRouter>,
   );
   return { posts, onCreated, onClose };
 }
@@ -55,12 +59,56 @@ const options = () => list().queryAllByRole("option").map((o) => o.textContent);
 const submit = () => fireEvent.click(screen.getByRole("button", { name: "Create session" }));
 
 test("fields and defaults: project prefilled, worktree is the project root", async () => {
-  mount({ prefillProject: "blog" });
+  mount({ path: "/e/blog:x" });
   const wt = await ready();
   expect((screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe("blog");
   expect(wt.value).toBe("Project root");
   for (const name of ["Name", "First prompt"]) expect(screen.getByRole("textbox", { name })).toBeTruthy();
   for (const name of ["Cancel", "Create session"]) expect(screen.getByRole("button", { name })).toBeTruthy();
+});
+
+const projectValue = async () => {
+  await ready();
+  return (screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value;
+};
+
+test("a blank form opens on the page project, then the one-project Epics filter, then last used, then the first", async () => {
+  mount({ path: "/d/blog:x", last: "gx" });
+  expect(await projectValue()).toBe("blog");
+  cleanup();
+  localStorage.setItem("gx.epics.project", JSON.stringify(["blog"]));
+  mount({ last: "gx" });
+  expect(await projectValue()).toBe("blog");
+  cleanup();
+  localStorage.clear();
+  mount({ last: "blog" });
+  await ready();
+  await waitFor(() => expect((screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe("blog"));
+  cleanup();
+  mount();
+  expect(await projectValue()).toBe("gx");
+});
+
+test("a draft with text keeps its project whatever the page", async () => {
+  localStorage.setItem(KEY, JSON.stringify({ project: "gx", name: "keep" }));
+  mount({ path: "/e/blog:x" });
+  expect(await projectValue()).toBe("gx");
+});
+
+test("creating a chat writes the created project as the last project once", async () => {
+  const setLast = vi.fn(async () => {});
+  const { onCreated } = mount({ path: "/e/blog:x", setLast });
+  await ready();
+  submit();
+  await waitFor(() => expect(onCreated).toHaveBeenCalled());
+  expect(setLast.mock.calls).toEqual([["blog"]]);
+});
+
+test("a failed last-project write still completes the create", async () => {
+  const { onCreated } = mount({ setLast: async () => Promise.reject(new Error("down")) });
+  await ready();
+  submit();
+  await waitFor(() => expect(onCreated).toHaveBeenCalledWith("gx-7"));
 });
 
 test("once the projects load, Name has focus on a wide device and Project and First prompt do not", async () => {

@@ -32,12 +32,13 @@ function writeDraft(draft: NewSessionDraft | undefined) {
 export const trimmed = (s: string) => s.trim() || undefined;
 
 /** The form's draft, kept in localStorage until `clear`. */
-export function useNewSessionDraft(prefillProject?: string) {
+export function useNewSessionDraft() {
   const [draft, setDraft] = useState<NewSessionDraft>(() => {
     const saved = readDraft();
     const text = !!(trimmed(saved.name ?? "") || trimmed(saved.prompt ?? "") || saved.dir || saved.create);
     return {
-      project: (text && saved.project) || prefillProject || saved.project || "",
+      // A blank draft has no project of its own: the form resolves it through the default-project rule.
+      project: (text && saved.project) || "",
       dir: saved.dir ?? "",
       create: saved.create ?? "",
       name: saved.name ?? "",

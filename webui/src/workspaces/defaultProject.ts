@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { getLastProject } from "../design/drafts";
+import type { DraftsClient } from "../design/NewDesignForm";
 import { activeProjectFilter, readStoredProjects } from "../epics/storedProjects";
 import type { SessionInfo } from "../generated/server";
 import { currentAddress } from "../shell/SidebarRows";
@@ -30,18 +31,20 @@ export function defaultProject({ pathname, sessions, projects, lastProject }: De
   return candidates.find((c): c is string => !!c && projects.includes(c)) ?? projects[0] ?? "";
 }
 
+const realLast = { getLastProject };
+
 /** `defaultProject` for the current route and snapshot; the last project arrives once the server answers. */
-export function useDefaultProject(projects: string[]): string {
+export function useDefaultProject(projects: string[], drafts: Pick<DraftsClient, "getLastProject"> = realLast): string {
   const { pathname } = useLocation();
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const [lastProject, setLastProject] = useState("");
   useEffect(() => {
     let live = true;
-    getLastProject().then((p) => live && setLastProject(p), () => {});
+    drafts.getLastProject().then((p) => live && setLastProject(p), () => {});
     return () => {
       live = false;
     };
-  }, []);
+  }, [drafts]);
   return defaultProject({ pathname, sessions, projects, lastProject });
 }
