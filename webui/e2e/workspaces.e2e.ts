@@ -547,13 +547,22 @@ test("Workspaces", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/settings$/);
   await goto(page, "#/epics");
 
+  // At 1280px the sidebar is docked: no swipe moves it.
+  await swipe(page, [300, 600], [100, 610]);
+  await expect(sidebar).toBeVisible();
+  await swipe(page, [150, 600], [300, 610]);
+  await expect(sidebar).toBeVisible();
+
   // At 744px the sidebar slides over: picking a row closes it, the jump menu is a popover, no page scrolls sideways.
   await page.setViewportSize({ width: 744, height: 900 });
   await goto(page, "#/epics");
   await expect(sidebar).toBeHidden();
   await page.getByRole("button", nav("Show sidebar")).click();
   await expect(sidebar).toBeVisible();
-  // The swipes are exercised at 390px below.
+  await swipe(page, [300, 600], [100, 610]);
+  await expect(sidebar).toBeHidden();
+  await swipe(page, [150, 600], [300, 610]);
+  await expect(sidebar).toBeVisible();
   await row("paused-epic").click();
   await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
   await expect(sidebar).toBeHidden();
@@ -585,14 +594,14 @@ test("Workspaces", async ({ page, start }) => {
   await page.keyboard.press("Escape");
   await expect(jump).toHaveCount(0);
   await expect(sidebar).toBeVisible();
-  // Swipe left closes it; the edge swipe does not open it outside a home-screen app.
+  // Swipe left closes it; a swipe right from x=150 opens it and one from the system's back-swipe edge (x=5) does not.
   await swipe(page, [200, 700], [200, 300]);
   await expect(sidebar).toBeVisible();
   await swipe(page, [250, 600], [100, 610]);
   await expect(sidebar).toBeHidden();
   await swipe(page, [5, 600], [150, 610]);
   await expect(sidebar).toBeHidden();
-  await page.getByRole("button", nav("Show sidebar")).click();
+  await swipe(page, [150, 600], [300, 610]);
   await expect(sidebar).toBeVisible();
   // The gear menu's dim covers the Hide sidebar toggle: a tap on the toggle and a swipe through the dim still close the menu and the sidebar.
   const gearMenu = page.getByRole("menu");

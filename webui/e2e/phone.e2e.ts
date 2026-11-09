@@ -1,5 +1,5 @@
 import { PNG } from "./agentsKit";
-import { expect, nav, test } from "./fixture";
+import { expect, nav, swipe, test } from "./fixture";
 
 // 375 px is below the wide layout's 62em breakpoint.
 test.use({ viewport: { width: 375, height: 812 } });
@@ -213,6 +213,34 @@ test("24. Phone, Design page", async ({ page, start }) => {
   expect(pop.y + pop.height).toBeGreaterThan(sheetBox.y);
   await page.keyboard.press("Escape");
   await expect(popover).toHaveCount(0);
+
+  // The question cards own horizontal swipes: a swipe right never opens the sidebar, a swipe left moves to the next
+  // question. A wide code block is not in the fixture, so the vitest case in useSidebarSwipe covers a scroller.
+  const sidebar = page.getByRole("complementary", nav("Sidebar"));
+  const prev = page.getByRole("button", nav("← Prev"));
+  const next = page.getByRole("button", nav("Next →"));
+  // Picking SQLite moved to the second card; go back to the first.
+  await expect(prev).toBeEnabled();
+  await prev.click();
+  await expect(prev).toBeDisabled();
+  const cardsBox = (await questions.getByTestId("question-body").boundingBox())!;
+  const cardY = cardsBox.y + 40;
+  await swipe(page, [150, cardY], [300, cardY + 5]);
+  await expect(sidebar).toBeHidden();
+  await expect(prev).toBeDisabled();
+  await swipe(page, [340, cardY], [40, cardY + 5]);
+  await expect(prev).toBeEnabled();
+  await expect(next).toBeDisabled();
+  await expect(sidebar).toBeHidden();
+
+  // With a single question (the next round) a swipe right still leaves the sidebar closed.
+  await questions.getByRole("button", { name: /Yes/ }).click();
+  await page.getByRole("button", nav("Send")).click();
+  await expect(questions.getByText("0 of 1 answered")).toBeVisible();
+  const single = (await questions.getByTestId("question-body").boundingBox())!;
+  await swipe(page, [150, single.y + 40], [300, single.y + 45]);
+  await expect(sidebar).toBeHidden();
+  await expect(questions.getByText("0 of 1 answered")).toBeVisible();
 
   // The step line stays above the sheet in the Questions view.
   const line = (await stepLine.boundingBox())!;
