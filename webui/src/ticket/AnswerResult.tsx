@@ -43,7 +43,7 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
   const shown = sent && sent.seq === latest.seq ? status(sent) : null;
   const toggle = cut || !!latest.handoff || open;
   return (
-    <Box role="group" aria-label="Answered question" display="flex" flexDirection="column" gap="2">
+    <Box role="group" aria-label="Answered question" display="flex" flexDirection="column" gap="1.5">
       <Text fontFamily="condensed" fontSize="xs" fontWeight="600" textTransform="uppercase" color="fg.muted">
         {latest.by === "gx" ? "GX ASKED" : "THE AGENT ASKED"}
       </Text>
@@ -67,7 +67,7 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
           </Button>
         </Box>
       )}
-      <Text fontWeight="600">{latest.summary}</Text>
+      <Text mt="2">{latest.summary}</Text>
       {latest.prompt && latest.prompt !== latest.summary && <Text>{latest.prompt}</Text>}
       <Box display="flex" gap="2" alignItems="baseline" px="2.5" py="2" rounded="md" bg="surface">
         <Text {...dim}>You</Text>
