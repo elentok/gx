@@ -86,6 +86,11 @@ The JSON line has these fields:
 
 ## 2. Open the page and run a flow
 
+Service workers are blocked by default (`serviceWorkers: "block"` in `.playwright/cli.config.json`),
+because requests a worker answers bypass `page.route`. A check that needs the worker opens with a copy
+of that config whose `contextOptions.serviceWorkers` is `"allow"`:
+`playwright-cli -s=<browser_session> open --config=<copy>.json`.
+
 1. Set the `cookie_name` cookie to `cookie`, then open `web_url` once. In a Playwright script use
    `waitUntil: "domcontentloaded"`: the page keeps a live connection, so `load` can time out. A flow
    that types a TOTP code uses the `nextTotpCode()` helper in `webui/e2e/fixture.ts`. It waits for a

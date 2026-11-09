@@ -5,7 +5,8 @@
       "channel": "chromium"
     },
     "contextOptions": {
-      "ignoreHTTPSErrors": true
+      "ignoreHTTPSErrors": true,
+      "serviceWorkers": "block"
     }
   }
 }

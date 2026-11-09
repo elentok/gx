@@ -51,6 +51,10 @@ func TestPlaywrightE2esSkillIsWired(t *testing.T) {
 	checkAnchors(t, "gx-test-review/SKILL.md", "(../gx-playwright-e2es/SKILL.md)")
 }
 
+func TestGxUICheckBlocksWorkersByDefault(t *testing.T) {
+	checkAnchors(t, "gx-ui-check/SKILL.md", "`serviceWorkers: \"block\"`", "bypass `page.route`")
+}
+
 func TestGxImplementTestRules(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md",
 		"(../gx-test-guidelines.md)",

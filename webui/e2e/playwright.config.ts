@@ -13,6 +13,10 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: [["list"]],
   use: {
-    ignoreHTTPSErrors: true, trace: "retain-on-failure" },
+    ignoreHTTPSErrors: true,
+    // Requests a worker answers bypass page.route; only the PWA steps allow workers.
+    serviceWorkers: "block",
+    trace: "retain-on-failure",
+  },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
 });
