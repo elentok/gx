@@ -6,7 +6,11 @@ import type { EpicList, EpicListRow, SessionPlacement, Workspace } from "../gene
 import { ACTIVE_KEY } from "./active";
 import { useActiveWorkspace } from "./useActiveWorkspace";
 
-afterEach(cleanup);
+// A stored "Main" left by an earlier test would satisfy the "Main" waits before the workspace list loads, so a click can land mid-load.
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 const list = { epics: [] as EpicListRow[], follow_ups: [] } as EpicList;
 const epicRow = (name: string, workspace: string) =>
