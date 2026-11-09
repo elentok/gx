@@ -25,7 +25,10 @@ import (
 // real server (refused save, secrets never echoed, restart-needed, hand-written
 // notifications block kept) and the 390px layout; SettingsPage.test.tsx covers each
 // control alone but cannot see the files or the layout.
-const maxFlows = 129
+// Context badge flow (+1): the badge's live update, tooltip, Note placement and dark
+// scheme on the Agents, Design and Triage pages need the server's transcript reads, SSE and
+// a real browser; FooterLine.test.tsx and the server snapshot tests cover each part alone.
+const maxFlows = 130
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

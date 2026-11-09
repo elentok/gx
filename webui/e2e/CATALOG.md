@@ -24,6 +24,11 @@ question, five action groups, three rows changed), `writing` (session running, t
 (Done, two kept rows, a ready epic and a map epic), `stopped` (started from the CLI: no session, stopped at Plan). `journey` has
 follow-ups and no record, for the Triage journey flow. Records are written with the `triage` package; the `verify` and `writing`
 sessions are started with `gx server triage open`. Data: `testutil/gxfixture/spec/triage.go`.
+The `context-window` scenario seeds Claude sessions at 40K, 90K, 128K and 170K tokens (output `transcripts` keys `green`, `yellow`,
+`orange`, `red`, plus `compact`, a session that ran `/compact`), a fresh one, a finished one, one with no transcript file, a Codex one, a
+Queue agent, a Design session at 128K and an open Triage. The server announces transcript growth only while a session works, so a flow
+appends a usage line (to a keyed transcript, or with `controlClaude` `usage`) and then runs a turn (`ask`) or opens a fresh page to see
+the new count. Use `autoAdvanceDelay: "1h"` so the Triage session keeps its conversation.
 The `launch-held` scenario queues one ticket whose worktree has a tracked `package-lock.json`, with a fake `npm`
 on `PATH`: the ticket stays `claimed` at "installing dependencies" while `<gate_dir>/npm-hold` exists
 (`<gate_dir>/npm-started` marks the wait), and removing the hold lets the launch go on. The `epic-at-cap` scenario
@@ -38,7 +43,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (127). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (130). Before you add a flow, add a step to a flow on the same scenario
 (see `skills/gx-playwright-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -178,3 +183,4 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **`agents-commands-output.e2e.ts`:** **155. Command output in the chat, cut at 12 lines**; **155. design page, with 159. /exit.**
 - **`agents-permission.e2e.ts`:** **157. Close dialog, Agents page and design page (+158 design Allow once and Deny)**; **158. Allow once and Deny, readable Claude prompt; refused; ignored Allow key; Codex hook and screen.**
 - **`triage.e2e.ts`:** **199. Triage journey** (`triage` shape `journey`, part 1: the Follow-ups card in Ready to design with Triage, the page opens and the card moves to Designing, a second click opens the same Triage; the Verify strip counts verdicts, the countdown chains a second session, Plan ends with no Continue and no countdown; the card is in Needs you with "Waiting for you" and "Review plan"; the questions link to their tickets, and "Send back to the agent" returns the record to Plan, the fixture agent plans again and Approve comes back with new questions; the sidebar badge shows the count, amber at Approve, and its popover line opens the Triage page; part 3, with one declared reload: Done lists the ready, map and merged groups with links, the card keeps the kept count and no Finished card appears, `gx server queue items` lists nothing before the Queue button, which sits left of the ring and queues the ready epic; after a reload and in a second tab the button is gone; a second Triage abandoned at Plan changes no ticket, the card shows a plain Triage button, and the page lists two past Triages newest first (abandoned, done); the Agents page session links to the Triage page; at 390 px a third Triage at Approve has no Progress panel and no sideways scroll, the view switch and Approve bar work, and the sidebar drawer shows the badge and popover).
+- **`context-window.e2e.ts`:** **202. Context badge (stories 1 to 28)** (scenario `context-window`, 1280 px: the badge on Agents, Design and Triage composers; "70K" after a usage line with no reload, the ring fill grows, a tone per level, the tooltip "N of 130K smart zone"; a fresh session, a finished one, a `/compact` one, one with no transcript and a Codex one; a Queue agent's view has the badge and its sidebar row does not; Note closed puts a borderless footer above the button row, Note open puts it in the box; dark scheme; stopped Design and Triage keep the last count; no model in the Agents or Triage header. NoChat is not covered: the fixture has no NoChat harness.)
