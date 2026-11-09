@@ -263,7 +263,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 			return s, err
 		}
 	}
-	if err := f.runSteps(sc.Steps); err != nil {
+	if err := runSteps(f, sc.Steps); err != nil {
 		return s, err
 	}
 	if err := f.startFixAgents(ctx, sc); err != nil {
@@ -297,7 +297,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 			return s, err
 		}
 	}
-	if err := f.runSteps(sc.StepsAfterSessions); err != nil {
+	if err := runSteps(f, sc.StepsAfterSessions); err != nil {
 		return s, err
 	}
 	if err := f.seedDesigns(ctx, sc); err != nil {
@@ -314,7 +314,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 	return s, nil
 }
 
-func (f *fixture) runSteps(steps [][]string) error {
+func runSteps(f *fixture, steps [][]string) error {
 	for _, args := range steps {
 		if out, err := f.cli(args...); err != nil {
 			return fmt.Errorf("gx %s: %w\n%s", strings.Join(args, " "), err, out)

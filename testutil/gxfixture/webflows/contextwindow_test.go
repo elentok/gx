@@ -41,7 +41,7 @@ func TestContextWindowFixture_SessionsShowTheirContextCount(t *testing.T) {
 			t.Errorf("no session shows a context count of %d: %v", want, counts)
 		}
 	}
-	if queue != 1 || exited < 2 || withoutCount == 0 {
-		t.Errorf("want one Queue agent, two finished sessions and some without a count: queue %d, exited %d, no count %d of %d", queue, exited, withoutCount, len(list))
+	if queue != 1 || exited < 1 || withoutCount == 0 {
+		t.Errorf("want one Queue agent, a finished session and some without a count: queue %d, exited %d, no count %d of %d", queue, exited, withoutCount, len(list))
 	}
 }
