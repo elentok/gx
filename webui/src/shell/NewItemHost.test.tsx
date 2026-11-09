@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { session } from "../agents/agentsTestKit";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
+import type { DesignDraft } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { NewItemHost } from "./NewItemHost";
 import { closeNewItem, openNewAgent, openNewDesign, setPageProject } from "./newItemOpen";
@@ -21,7 +22,14 @@ const epics = [
   { address: "gamma:other", project: "gamma" },
 ];
 
-function mount(path: string) {
+function draftsBody(u: string, draft?: DesignDraft) {
+  if (!draft) return [];
+  if (u.includes("/read")) return { draft };
+  if (u.includes("last-project")) return { project: "" };
+  return [{ ...draft, image_count: 0 }];
+}
+
+function mount(path: string, restored?: DesignDraft) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
@@ -29,7 +37,7 @@ function mount(path: string) {
       const body = u.includes("worktrees")
         ? projects.map((project) => ({ project, root: `/${project}`, worktrees: [], tiers: {} }))
         : u.includes("drafts")
-          ? []
+          ? draftsBody(u, restored)
           : { epics, follow_ups: [], projects };
       return new Response(JSON.stringify(body), { status: 200 });
     }),
@@ -86,5 +94,22 @@ describe("the project a new blank draft starts on", () => {
     mount("/e/beta:feat");
     act(openNewAgent);
     await projectIs("alpha");
+  });
+
+  describe("a restored design draft keeps its own project", () => {
+    const restored: DesignDraft = { id: "d1", project: "alpha", slug: "", idea: "hello", images: [], revision: 1, edited_at: "" };
+
+    test("over the route's project", async () => {
+      mount("/e/beta:feat", restored);
+      act(() => openNewDesign());
+      await projectIs("alpha");
+    });
+
+    test("over the Epics page's filtered project", async () => {
+      mount("/e/beta:feat", restored);
+      setPageProject("gamma");
+      act(() => openNewDesign());
+      await projectIs("alpha");
+    });
   });
 });
