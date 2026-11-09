@@ -84,7 +84,7 @@ a risky key asks for confirmation first; secrets are write-only.
 47. As a gx user, I want the Agents section to hold the default harness, agent models and efforts, `skills`, `agent-runner` and `runner-wait`, so that all agent settings sit together.
 48. As a gx user, I want `subscription` keys under Budget, and `cpu-watchdog` and `disk-space` keys under Server, so that related keys sit together.
 49. As a gx user, I want `recovery` and `evolve` keys under "Evolve and recovery", so that I find them together.
-50. As a gx user on the command line, I want `gx server settings --json` to print every registry key with its current value for global or a project, so that I can read settings without the web page.
+50. As a gx user on the command line, I want `gx server settings --json` to print every registry key with its current value for global, or only the keys that apply to a project for a project, so that I can read settings without the web page.
 51. As a gx user on the command line, I want `gx server settings-set --json` to apply key changes (set or remove) to global or a project through the same writer and validation as the page, so that scripts and the page behave the same.
 52. As a gx user, I want each project listed in the scope picker, so that I can open a project's settings.
 53. As a gx user, I want a project's "Project" section first, with read-only name, repo and vcs under Identity, so that I see what the project is and cannot break its address.
@@ -316,6 +316,10 @@ a risky key asks for confirmation first; secrets are write-only.
   (X)" when absent. "Override for <project>" then "Off" writes `false`. "Use global value" and
   turning it back on both remove the key. `evolve.deep-read-cap` is not overridable per project and a
   write of it to a project is refused.
+- **Project write whitelist.** In project scope the writer refuses any key the registry does not mark
+  project-only or project-overridable, including `notifications` keys and the `agents` sub-keys the
+  merge ignores. The refusal names the key. The project read (page and `gx server settings`) lists
+  only the keys that apply to a project.
 - **`agents`.** Only the keys the config merge applies are flagged overridable: `default-harness` and
   the claude and codex model, effort, light and strongest keys. The other `AgentsConfig` sub-keys
   stay accepted in project.json but are on the exclusion list and not shown.
@@ -361,7 +365,7 @@ Seams, highest first, preferring existing ones:
      compares them with the registry plus the exclusion list. It fails on a struct key with no entry
      and on an entry for a key that no longer exists. The message names the key and points at the
      "Adding a config key" rule in `.ai/index.md`. It also checks each entry's declared type against
-     the key's Go type (bool, number, duration, string, list, map); it does not check descriptions.
+     the key's Go type (bool, number, duration, string, list); it does not check descriptions.
      It asserts that the registry's write-only set equals the `secret:"true"` tagged set minus
      `notifications.telegram.chat-id`.
    - A test that the derived project whitelist equals the registry's project-overridable flags plus
@@ -478,12 +482,12 @@ Per story:
 42. Server API test: config.json as a symlink; the link and target both remain, target updated.
 43. Open each Security row and sign out. Flow: `web-logins` scenario flows. Mock states: `global-section` (account rows), `phone-home`.
 44. The default harness row in Agents changes the default. Flow: the codex flow on `default-harness`. Mock states: no mock row; follow spec.
-45. Set the default harness to one whose program is not on PATH, globally and for a project; both are refused and nothing is written. Set one that is on PATH while agents wait or run; the response and the page show the switch notice with the counts.
+45. Set the default harness to one whose program is not on PATH, globally and for a project; both are refused and nothing is written. Set one that is on PATH while agents wait or run; the response and the page show the switch notice with the counts. The `settings` scenario seeds one waiting and one running agent so the counts show. Mock states: no mock row; follow spec.
 46. Visit `/settings/agents`; the browser lands on the Agents section. Flow: extended codex flow on `default-harness`.
 47. The Agents section lists the keys named in the story, including `runner-wait`. Mock states: no mock row; follow spec.
 48. Each key appears under its section. Mock states: no mock row; follow spec.
 49. Each key appears under "Evolve and recovery". Mock states: no mock row; follow spec.
-50. Run `gx server settings --json` and `gx server settings --project <name> --json`; each lists every registry key with its current value, and no secret value.
+50. Run `gx server settings --json` and `gx server settings --project <name> --json`; the global read lists every registry key and the project read lists only the keys that apply to a project (no global-only key, no `notifications` key); neither shows a secret value.
 51. Run `gx server settings-set --json` to set a global key, remove it, and set a project key; the files change as the page would change them, and a bad value is refused with the key and the file unchanged.
 52. Open each project from the scope picker. Mock states: `project-section`.
 53. Open a project's Project section. Mock states: `project-identity`.
@@ -494,7 +498,7 @@ Per story:
 58. The `max-agents` row shows the absent text with the current global cap (change the global cap to 6 and the text says 6) and "Set a cap for <project>". Mock states: `project-section` (this row differs from the mock; follow the spec).
 59. Set a cap, see "Overridden" and "Remove cap", remove it; the key is gone. Mock states: `project-section`.
 60. The two other caps show "Uses the global value". Mock states: `project-section`.
-61. In the project that has a hand-written `notifications` block, the page shows no Notifications section and no secret rows; save another project key and project.json still holds the same `notifications` block; a write of any `notifications` key to a project is refused or not offered by the API. Mock states: no mock row; follow spec.
+61. In the project that has a hand-written `notifications` block, the page shows no Notifications section and no secret rows; save another project key and project.json still holds the same `notifications` block; a write of any `notifications` key to a project, by the API or by `gx server settings-set --project`, is refused with the key named and nothing written; so is a write of an `agents` sub-key the merge ignores. Mock states: no mock row; follow spec.
 62. Open the project's Evolve row in each of absent, off and on. Mock states: no mock row; follow spec.
 63. Server API test and flow: Off writes `false`; "Use global value" and On both remove it. Mock states: no mock row; follow spec.
 64. Server API test: writing `evolve.deep-read-cap` to a project is refused with an error naming `evolve.deep-read-cap`; the project page shows no such row.
