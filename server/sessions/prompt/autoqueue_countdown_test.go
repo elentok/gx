@@ -79,15 +79,24 @@ func TestAutoQueue_SwitchOnOverAReadyMapCountsDownThenQueues(t *testing.T) {
 	}
 }
 
-func TestAutoQueue_SwitchOnOverANotReadyMapStartsNothing(t *testing.T) {
+func TestAutoQueue_SwitchOnOverANotReadyOrHeldMapStartsNothing(t *testing.T) {
 	t.Parallel()
-	for name, c := range map[string]mapCase{
-		"step":  {step: "spec", implStatus: "open"},
-		"draft": {step: "branch", implStatus: "draft"},
-		"done":  {step: "branch", implStatus: "done"},
+	for name, c := range map[string]struct {
+		mapCase
+		hold bool
+	}{
+		"step":  {mapCase: mapCase{step: "spec", implStatus: "open"}},
+		"draft": {mapCase: mapCase{step: "branch", implStatus: "draft"}},
+		"done":  {mapCase: mapCase{step: "branch", implStatus: "done"}},
+		"held":  {mapCase: mapCase{step: "branch", implStatus: "open"}, hold: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			f, _ := startReadyMap(t, c)
+			f, _ := startReadyMap(t, c.mapCase)
+			if c.hold {
+				if err := f.H.Server.Workspaces().Hold("proj:map"); err != nil {
+					t.Fatal(err)
+				}
+			}
 			setAutoQueue(t, f, true)
 			if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil || !got.AutoQueue {
 				t.Errorf("session = switch %v at %v, want the switch on with no countdown", got.AutoQueue, got.AutoQueueAt)
@@ -97,21 +106,6 @@ func TestAutoQueue_SwitchOnOverANotReadyMapStartsNothing(t *testing.T) {
 				t.Errorf("queued = %v, banners = %+v, want neither", queued(f), f.H.Banners.Sent())
 			}
 		})
-	}
-}
-
-func TestAutoQueue_SwitchOnOverAHeldOrQueuedMapStartsNothing(t *testing.T) {
-	t.Parallel()
-	f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
-	if err := f.H.Server.Workspaces().Hold("proj:map"); err != nil {
-		t.Fatal(err)
-	}
-	setAutoQueue(t, f, true)
-	if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil {
-		t.Errorf("auto_queue_at = %v over a held design, want none", got.AutoQueueAt)
-	}
-	if len(f.H.Banners.Sent()) != 0 {
-		t.Errorf("banners = %+v, want none", f.H.Banners.Sent())
 	}
 }
 
@@ -153,38 +147,45 @@ func TestAutoQueue_ConditionsFailingDuringTheCountdownQueueNothingAndSendABanner
 	}
 }
 
-func TestAutoQueue_SwitchOffCancelsTheCountdownWithABanner(t *testing.T) {
+func TestAutoQueue_SwitchOffOrCancelStopsTheCountdownWithABanner(t *testing.T) {
 	t.Parallel()
-	f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
-	setAutoQueue(t, f, true)
-	if servertest.SessionSnapshot(t, f).AutoQueueAt == nil {
-		t.Fatal("no countdown running")
+	for name, c := range map[string]struct {
+		stop       func(t *testing.T, f *servertest.GrillingFixture)
+		wantSwitch bool
+		banner     string
+	}{
+		"switch off": {
+			stop:   func(t *testing.T, f *servertest.GrillingFixture) { setAutoQueue(t, f, false) },
+			banner: "Auto-queue switched off",
+		},
+		"cancel": {
+			stop: func(t *testing.T, f *servertest.GrillingFixture) {
+				if res, err := f.H.Client.Sessions.CancelAutoQueue(f.Ctx, f.ID); err != nil || res.Refused {
+					t.Fatalf("cancel = %+v, %v", res, err)
+				}
+			},
+			wantSwitch: true,
+			banner:     "Auto-queue cancelled",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
+			setAutoQueue(t, f, true)
+			if servertest.SessionSnapshot(t, f).AutoQueueAt == nil {
+				t.Fatal("no countdown running")
+			}
+			c.stop(t, f)
+			if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil || got.AutoQueue != c.wantSwitch {
+				t.Errorf("session = switch %v at %v, want switch %v with no countdown", got.AutoQueue, got.AutoQueueAt, c.wantSwitch)
+			}
+			waitForBanner(t, f, c.banner)
+			time.Sleep(servertest.CountdownDelay + 500*time.Millisecond)
+			if queued(f) {
+				t.Error("queued after the countdown was stopped")
+			}
+		})
 	}
-	setAutoQueue(t, f, false)
-	if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil || got.AutoQueue {
-		t.Errorf("session = switch %v at %v, want off with no countdown", got.AutoQueue, got.AutoQueueAt)
-	}
-	waitForBanner(t, f, "Auto-queue switched off")
-	time.Sleep(servertest.CountdownDelay + 500*time.Millisecond)
-	if queued(f) {
-		t.Error("queued after the switch went off")
-	}
-}
-
-func TestAutoQueue_CancelStopsTheCountdownWithABannerAndKeepsTheSwitch(t *testing.T) {
-	t.Parallel()
-	f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
-	setAutoQueue(t, f, true)
-	if servertest.SessionSnapshot(t, f).AutoQueueAt == nil {
-		t.Fatal("no countdown running")
-	}
-	if res, err := f.H.Client.Sessions.CancelAutoQueue(f.Ctx, f.ID); err != nil || res.Refused {
-		t.Fatalf("cancel = %+v, %v", res, err)
-	}
-	if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil || !got.AutoQueue {
-		t.Errorf("session = switch %v at %v, want on with no countdown", got.AutoQueue, got.AutoQueueAt)
-	}
-	waitForBanner(t, f, "Auto-queue cancelled")
 }
 
 func TestAutoQueue_CancelWithNoCountdownIsANoOpThatReturnsTheSession(t *testing.T) {

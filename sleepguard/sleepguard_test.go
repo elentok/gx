@@ -112,7 +112,7 @@ var allowed = map[string]int{
 	"server/sessions/retry_prompt_test.go":                    1, // negative wait: no second interrupt or prompt follows the retry
 	"server/sessions/sessionchatwatch_test.go":                2,
 	"server/sessions/prompt/action_test.go":                   7,
-	"server/sessions/prompt/autoadvance_countdown_test.go":    7, // negative waits: a countdown would start and end in the window; includes a held Design
+	"server/sessions/prompt/autoadvance_countdown_test.go":    6, // negative waits: a countdown would start and end in the window; includes a held Design
 	"server/sessions/prompt/autoadvance_guard_test.go":        2,
 	"server/sessions/prompt/autoqueue_countdown_test.go":      2, // negative waits: a countdown would end in the window and queue nothing
 	"server/sessions/prompt/autoqueue_trigger_test.go":        2, // negative waits: a countdown would start and end in the window
