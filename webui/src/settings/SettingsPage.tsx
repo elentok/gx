@@ -1,6 +1,11 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import { useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
+import type { FetchEpicList } from "../epics/list";
+import { useEpicList } from "../epics/list";
+import { useDevice } from "../useWide";
+import { GLOBAL_SECTIONS, sectionFromSlug, sectionPath, SettingsShellView } from "./SettingsShell";
+import { GLOBAL_TARGET, useSettings, type FetchSettings } from "./settingsApi";
 import { fetchAuthState, type AuthState } from "../auth/authState";
 import { CER_LABEL, Fingerprint, PROFILE_LABEL, type CertInfo } from "../auth/cert";
 import { SETTINGS_HREF } from "../hrefs";
@@ -260,20 +265,50 @@ export function CertificatePage({ fetchAuth = fetchAuthState }: { fetchAuth?: ()
   );
 }
 
+/** `/settings` and `/settings/s/:section`: the sidebar shell from 640px up, today's list on a phone. */
 export function SettingsPage({
   fetchAuth = fetchAuthState,
   fetchList = fetchLogins,
   fetchAgents = fetchAgentSettings,
+  fetchSettings,
+  fetchEpics,
   signOut = signOutThisDevice,
 }: {
   fetchAuth?: () => Promise<AuthState>;
   fetchList?: FetchLogins;
   fetchAgents?: FetchAgentSettings;
+  fetchSettings?: FetchSettings;
+  fetchEpics?: FetchEpicList;
   signOut?: () => void | Promise<void>;
 }) {
   const auth = useFetched("settings-auth", fetchAuth);
   const logins = useFetched("settings-logins", fetchList);
   const agents = useFetched("settings-agents", fetchAgents);
+  const settings = useSettings(GLOBAL_TARGET, undefined, fetchSettings);
+  const { list } = useEpicList(fetchEpics);
+  const wide = useDevice() !== "phone";
+  const slug = useParams().section;
+  const section = sectionFromSlug(slug);
+  if (wide && !section) return <Navigate to={sectionPath(GLOBAL_SECTIONS[0])} replace />;
+  if (wide) {
+    const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort();
+    return (
+      <DetailPage title={{ kind: "Settings", name: section }}>
+        {auth.data && settings.data ? (
+          <SettingsShellView
+            entries={settings.data.entries}
+            projects={projects}
+            section={section}
+            totpOn={auth.data.totp_on}
+            authenticatorMissing={auth.data.setup_code_required}
+            onSignOut={() => void signOut()}
+          />
+        ) : (
+          <Spinner label="Loading" />
+        )}
+      </DetailPage>
+    );
+  }
   return (
     <DetailPage title={{ kind: "Settings" }}>
       {auth.data ? (

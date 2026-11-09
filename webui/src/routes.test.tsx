@@ -92,6 +92,27 @@ test("/settings/agents renders the Agents page with the Default harness control"
   expect(screen.getByRole("button", { name: "Codex" })).toBeTruthy();
 });
 
+test("/settings lands on the first section and a section route shows that section's rows", async () => {
+  const settings = async () => ({
+    entries: [
+      { key: "execution-queue.max-agents", path: ["execution-queue", "max-agents"], type: "number", section: "Execution queue", description: "Live agents.", set: false },
+      { key: "budget.soft", path: ["budget", "soft"], type: "number", section: "Budget", description: "Soft limit.", set: false },
+    ],
+  });
+  const extra: RouteFetchers = {
+    settings,
+    authState: async () => ({ totp_on: true, setup_code_required: false }) as never,
+    logins: async () => [],
+    epicList: async () => ({ epics: [{ project: "gx" }] }) as never,
+  };
+  const first = renderAt("/settings", okFor, undefined, undefined, extra);
+  await screen.findByText("Live agents.");
+  expect(first.router.state.location.pathname).toBe("/settings/s/execution-queue");
+  cleanup();
+  renderAt("/settings/s/budget", okFor, undefined, undefined, extra);
+  await screen.findByText("Soft limit.");
+});
+
 test("#/triage/gx renders the Triage page and a ticket address still renders the ticket page", async () => {
   renderAt("/triage/gx", okFor, undefined, undefined, { triage: async () => ({ kind: "not-found" }) });
   await screen.findByText("No Triage for gx");

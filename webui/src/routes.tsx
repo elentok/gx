@@ -6,6 +6,7 @@ import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages";
 import { CertificatePage, SettingsPage, UnknownSettingsPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
 import type { FetchLogins } from "./settings/logins";
 import type { FetchAgentSettings } from "./settings/agents";
+import type { FetchSettings } from "./settings/settingsApi";
 import { AgentsSettingsPage } from "./settings/AgentsSettingsPage";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
@@ -137,6 +138,7 @@ export interface RouteFetchers {
   authState?: () => Promise<AuthState>;
   logins?: FetchLogins;
   agentSettings?: FetchAgentSettings;
+  settings?: FetchSettings;
   signOut?: () => void | Promise<void>;
 }
 
@@ -145,6 +147,16 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
 }
 
 function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
+  const settingsPage = (
+    <SettingsPage
+      fetchAuth={fetchers.authState}
+      fetchList={fetchers.logins}
+      fetchAgents={fetchers.agentSettings}
+      fetchSettings={fetchers.settings}
+      fetchEpics={fetchers.epicList}
+      signOut={fetchers.signOut}
+    />
+  );
   return [
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} saveChecks={fetchers.saveChecks} /> },
     // "/agents/*" also matches "/agents"; the splat is the session label.
@@ -152,7 +164,8 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/cleanup", element: <CleanupPage fetchCleanup={fetchers.cleanup} postCleanup={fetchers.cleanupWrite}fetchEpics={fetchers.epicList} /> },
     { path: "/tips", element: <TipsPage fetchTips={fetchers.tips} /> },
-    { path: "/settings", element: <SettingsPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} fetchAgents={fetchers.agentSettings} signOut={fetchers.signOut} /> },
+    { path: "/settings", element: settingsPage },
+    { path: "/settings/s/:section", element: settingsPage },
     { path: "/settings/logins", element: <WebLoginsPage fetchList={fetchers.logins} /> },
     { path: "/settings/logins/:id", element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
     { path: "/settings/password", element: <ChangePasswordPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
