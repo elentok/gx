@@ -50,6 +50,15 @@ it("focuses a field that mounts after the dialog", () => {
   expect(document.activeElement).toBe(screen.getByLabelText("First"));
 });
 
+it("takes focus from an element outside the dialog, such as a closing menu's item", () => {
+  const outside = document.createElement("button");
+  document.body.append(outside);
+  outside.focus();
+  mount(<Immediate />, "desktop");
+  expect(document.activeElement).toBe(screen.getByLabelText("First"));
+  outside.remove();
+});
+
 it("does not steal focus from a field the person already moved to", () => {
   mount(<Dialog />, "desktop");
   act(() => screen.getByLabelText("Other").focus());

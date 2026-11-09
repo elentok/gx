@@ -671,6 +671,44 @@ test("Workspaces", async ({ page, start }) => {
   await expect(page.getByRole("menuitem", { name: /^archive/ })).toBeVisible();
   await closeMenus();
 
+  // After a real menu closes, focus lands in the dialog: the first field at 1280px, the panel itself at 390px.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(sidebar).toBeVisible();
+  const dialog = page.getByRole("dialog");
+  const newItem = async (name: string) => {
+    await sidebar.getByRole("button", { name: "+ New" }).click();
+    await page.getByRole("menuitem", { name }).click();
+    await expect(dialog).toBeVisible();
+  };
+  const closeDialog = async () => {
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+  };
+  await newItem("New workspace…");
+  await expect(dialog.getByRole("textbox", nav("Workspace name"))).toBeFocused();
+  await closeDialog();
+  await switcher.click();
+  await page.getByRole("menuitem", { name: "New workspace…" }).click();
+  await expect(dialog.getByRole("textbox", nav("Workspace name"))).toBeFocused();
+  await closeDialog();
+  await newItem("New chat");
+  await expect(dialog.getByRole("textbox", nav("Name"))).toBeVisible();
+  await expect(dialog.getByRole("textbox", nav("Name"))).toBeFocused();
+  await closeDialog();
+  for (let n = 0; n < 4; n++) {
+    await newItem("New design");
+    await expect(dialog.getByRole("textbox", nav("Epic slug"))).toBeFocused();
+    await closeDialog();
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(sidebar).toBeVisible();
+  for (const name of ["New chat", "New workspace…"]) {
+    await newItem(name);
+    await expect(dialog).toBeFocused();
+    await closeDialog();
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+
   // The footer's boxes are one size with their icons centered, at 1280px and 390px, and the badges agree.
   const footer = sidebar.locator("footer");
   const epicsBox = footer.getByRole("link", { name: /^Epics/ });

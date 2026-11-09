@@ -12,8 +12,11 @@ export function useFocusFirstField() {
   return useCallback(
     (el: HTMLElement | null) => {
       if (!el || !wide) return;
+      // Lets a closing menu hand focus here when its own focus return lands after this mount.
+      el.dataset.firstField = "";
       const active = document.activeElement;
-      if (active && active !== document.body && active !== el.closest('[role="dialog"]')) return;
+      const dialog = el.closest('[role="dialog"]');
+      if (active && dialog?.contains(active) && active !== dialog) return;
       el.focus();
     },
     [wide],

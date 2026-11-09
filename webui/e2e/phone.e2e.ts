@@ -69,6 +69,8 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
   await page.getByRole("button", nav("New Design")).click();
   const dialog = page.getByRole("dialog", nav("New Design"));
   await expect(dialog).toBeVisible();
+  // The panel has focus, so no text field raises the keyboard.
+  await expect(dialog).toBeFocused();
 
   // A bottom sheet about 88% of the viewport high, with a grab handle.
   const box = await dialog.boundingBox();
