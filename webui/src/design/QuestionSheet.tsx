@@ -1,6 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import type { SessionRoundCard } from "../generated/server";
+import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe";
 import { Button } from "../ui/button/Button";
 import { Question, QuestionDots } from "../ui/question-sheet/Question";
 import { isAnswered, type Answers } from "../ui/question-sheet/round";
@@ -160,6 +161,7 @@ export function QuestionSheet({
         >
           <Box
             ref={row}
+            {...{ [NO_SIDEBAR_SWIPE_ATTR]: "" }}
             onScroll={onScroll}
             display="flex"
             overflowX="auto"

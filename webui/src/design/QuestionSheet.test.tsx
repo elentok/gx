@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, test } from "vitest";
 import type { SessionRoundCard } from "../generated/server";
+import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
 import { Question } from "../ui/question-sheet/Question";
@@ -176,6 +177,18 @@ test.each(["text", "yes-no"])("Huh? on a %s question answers it with the fixed m
     fireEvent.click(screen.getByText("Yes"));
     expect(screen.getByRole("status").textContent).toBe("Q1 - Pick: Yes");
   }
+});
+
+test("the cards row opts out of the sidebar swipe", () => {
+  renderThemed(
+    <QuestionSheet
+      round={[card({ label: "1", kind: "yes-no" }), card({ label: "2", kind: "yes-no" })]}
+      answers={{}}
+      onAnswers={() => {}}
+    />,
+  );
+  const row = screen.getByRole("group", { name: "Question 1 of 2" }).parentElement;
+  expect(row?.hasAttribute(NO_SIDEBAR_SWIPE_ATTR)).toBe(true);
 });
 
 describe("a move scrolls the body to the top", () => {
