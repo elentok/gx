@@ -140,6 +140,67 @@ func TestTriageSeenAgain_RunTwiceAddsOneEntry(t *testing.T) {
 	}
 }
 
+// A crash between a verb and its row save reruns the whole row: the answers and merge note skip,
+// and the second move finds nothing to move instead of writing another ticket.
+func TestTriageRerunAfterCrash_WritesNoSecondMoveNoteOrAnswers(t *testing.T) {
+	repo, project, s := triageAtWrite(t)
+	row, from := s.Rows[0].Address, s.Rows[1].Address
+	writeEpicTicket(t, project, "ready-x", "01-seed.md", "---\nid: \"01\"\nstatus: open\ntype: research\n---\n\n# Seed\n")
+	// Tickets made by `gx tickets add` carry original_address, which locate follows through a move.
+	src := followUpFile(project)
+	if err := os.WriteFile(src, []byte(strings.Replace(ticketText(t, src), "---\n", "---\noriginal_address: \""+row+"\"\n", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pass := func() error {
+		for _, args := range [][]string{
+			{"tickets", "triage", "answers", "--row", row},
+			{"tickets", "triage", "seen-again", "--row", row, "--from", from},
+			{"tickets", "move", tickets.FollowUpsEpic + "/01", "ready-x"},
+		} {
+			if _, err := runIn(t, repo, args...); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := pass(); err != nil {
+		t.Fatalf("first pass: %v", err)
+	}
+	got := triageLocate(t, repo, "--row", row)
+	if got.Position != "moved" {
+		t.Fatalf("after move = %+v", got)
+	}
+	// The rerun starts from locate: a moved row is not moved again.
+	if _, err := runIn(t, repo, "tickets", "triage", "answers", "--row", row); err != nil {
+		t.Fatalf("answers rerun: %v", err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "seen-again", "--row", row, "--from", from); err != nil {
+		t.Fatalf("seen-again rerun: %v", err)
+	}
+	_, moveErr := runIn(t, repo, "tickets", "move", tickets.FollowUpsEpic+"/01", "ready-x")
+	files, err := filepath.Glob(filepath.Join(project, "ready-x", "issues", "*.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 {
+		t.Errorf("ready-x holds %d tickets after the rerun (move err %v), want 2: %v", len(files), moveErr, files)
+	}
+	for _, f := range files {
+		text := ticketText(t, f)
+		if !strings.Contains(text, row) {
+			continue
+		}
+		if n := strings.Count(text, "- which?: beta"); n != 1 {
+			t.Errorf("answer appears %d times in:\n%s", n, text)
+		}
+		if n := strings.Count(text, "seen again"); n != 1 {
+			t.Errorf("seen-again entries = %d in:\n%s", n, text)
+		}
+		return
+	}
+	t.Errorf("no ticket in ready-x carries %s: %v", row, files)
+}
+
 func TestTriageWriteState_FailedKeepsRefusalAndRerunClearsIt(t *testing.T) {
 	repo, _, s := triageAtWrite(t)
 	row := s.Rows[0].Address

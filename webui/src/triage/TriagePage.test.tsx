@@ -261,6 +261,13 @@ test("history lists past Triages in the order sent, read-only, with epic links",
   expect(region.querySelectorAll("button").length).toBe(0);
 });
 
+test("a done Triage with no ready epic shows no Queue epic button", async () => {
+  const detail = viewOf({ state: "done", steps: stepsAt(5), ring_percent: 100, result: { groups: [{ action: "close", items: [{ address: "gx:follow-ups/1", title: "a" }] }] } });
+  render([], { triage: async () => ({ kind: "ok", detail }) });
+  await screen.findByRole("button", { name: "More actions" });
+  expect(screen.queryByRole("button", { name: "Queue epic" })).toBeNull();
+});
+
 test("a done Triage with a ready epic orders the header Queue button, ring, menu", async () => {
   const detail = viewOf({
     state: "done",
