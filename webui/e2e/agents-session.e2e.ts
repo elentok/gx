@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, nav, test } from "./fixture";
-import { ask, go, moreActions, REPLY, sessions, titleHeading } from "./agentsKit";
+import { ask, go, messageBox, moreActions, REPLY, sessions, titleHeading } from "./agentsKit";
 
 /** The chat's scroll box, found from a message in it. */
 const scrollBox = (page: Page, text: string) => page.getByText(text, { exact: true }).first();
@@ -86,7 +86,8 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(page.getByText("after recovery", { exact: true })).toBeVisible();
 
   // Tools in flight: the Working row names the newest call and counts the rest.
-  const tools = await sessions(await start("agents-tools"));
+  const toolsFixture = await start("agents-tools");
+  const tools = await sessions(toolsFixture);
   const row = page.getByRole("status").filter({ hasText: /^Working/ });
   await go(page, `#/agents/${tools[0].id}`);
   await expect(row).toHaveText("Working · running shell: make test");
@@ -105,6 +106,82 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(popover).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(popover).toHaveCount(0);
+  const confirm = page.getByRole("alertdialog", nav("Interrupt the agent?"));
+  const interrupt = page.getByRole("button", { name: "Interrupt", exact: true });
+  const isWorking = async (id: string) => (await sessions(toolsFixture)).find((s) => s.id === id)!.status.state === "working";
+  await expect(confirm).toHaveCount(0);
+
+  // Esc closes the command palette first; no confirm opens.
+  await page.keyboard.press("ControlOrMeta+e");
+  const palette = page.getByRole("dialog", nav("Commands"));
+  await expect(palette).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(palette).toHaveCount(0);
+  await expect(confirm).toHaveCount(0);
+
+  // Esc from the Message box opens the confirm; Esc closes it and nothing is interrupted.
+  await messageBox(page).focus();
+  await page.keyboard.press("Escape");
+  await expect(confirm).toBeVisible();
+  await expect(confirm.getByRole("button", { name: "Interrupt", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(confirm).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible();
+  expect(await isWorking(tools[1].id)).toBe(true);
+
+  // Esc on the page opens the confirm with Interrupt focused; Enter confirms.
+  await messageBox(page).blur();
+  await page.keyboard.press("Escape");
+  await expect(confirm).toBeVisible();
+  await expect(confirm.getByRole("button", { name: "Interrupt", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(confirm).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toHaveCount(0);
+  await expect.poll(() => isWorking(tools[1].id)).toBe(false);
+
+  // The Design session: Esc opens the confirm, Esc closes it and the session stays Working.
+  await go(page, `#/agents/${tools[2].id}`);
+  await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible();
+  // gx drives this session, so Interrupt is off until the composer is turned on.
+  await expect(interrupt).toBeDisabled();
+  await page.getByRole("button", { name: "Turn on composer" }).click();
+  await page.getByRole("button", { name: "Turn on composer" }).last().click();
+  await expect(interrupt).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await expect(confirm).toBeVisible();
+  await expect(confirm.getByRole("button", { name: "Interrupt", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(confirm).toHaveCount(0);
+  expect(await isWorking(tools[2].id)).toBe(true);
+  // The turn ends under the open confirm: the confirm and the button leave.
+  await page.keyboard.press("Escape");
+  await expect(confirm).toBeVisible();
+  await toolsFixture.cli("agents", "interrupt", tools[2].id);
+  await expect(confirm).toHaveCount(0);
+  await expect(interrupt).toHaveCount(0);
+  await expect.poll(() => isWorking(tools[2].id)).toBe(false);
+
+  // Click Interrupt on a Working Chat session and confirm.
+  await go(page, `#/agents/${tools[0].id}`);
+  await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible();
+  await interrupt.click();
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Interrupt", exact: true }).click();
+  await expect(confirm).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toHaveCount(0);
+  await expect.poll(() => isWorking(tools[0].id)).toBe(false);
+
+  // On the idle session the CLI refuses and Esc does nothing.
+  const refused = await toolsFixture.cli("agents", "interrupt", tools[0].id).catch((e: { stdout?: string; stderr?: string }) => `${e.stdout}${e.stderr}`);
+  expect(refused).toContain("not working");
+  await page.keyboard.press("Escape");
+  await expect(confirm).toHaveCount(0);
+  await expect(interrupt).toHaveCount(0);
+
+  // The interrupts above ended the turns; the phone steps need fresh Working sessions.
+  const fresh = await sessions(await start("agents-tools"));
+  await go(page, `#/agents/${fresh[1].id}`);
+  await expect(more).toBeVisible();
   // A tap opens it at the phone width.
   await page.setViewportSize({ width: 390, height: 800 });
   await expect(more).toBeVisible();
