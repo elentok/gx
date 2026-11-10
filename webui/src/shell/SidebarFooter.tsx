@@ -150,7 +150,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
   );
   const anyIndicator = dev.state !== "off" || unhealthy || snapshot?.mode === "paused" || !connected;
   return (
-    <Box as="footer" flex="none" display="flex" flexDirection="column" gap="1" p="2" borderTopWidth="1px" borderColor="border">
+    <Box as="footer" data-part="sidebar-footer" flex="none" display="flex" flexDirection="column" gap="1" p="2" borderTopWidth="1px" borderColor="border">
       {/* At the 280px sidebar the optional indicators cannot share the row without shrinking a box, so they take a line above it. */}
       {desktop && anyIndicator && (
         <Box display="flex" flexWrap="wrap" gap="1" data-part="indicators">

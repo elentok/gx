@@ -210,6 +210,8 @@ export interface MenuProps {
   onOpenChange?: (open: boolean) => void;
   closeSignal?: unknown;
   placement?: "bottom-end" | "bottom-start" | "top-end" | "top-start";
+  /** Keeps the panel inside this element instead of the viewport (a narrow sidebar on a tablet). */
+  boundary?: () => Element;
 }
 
 const SETTLE_MS = 2000;
@@ -238,7 +240,7 @@ function keepFocusInDialog() {
   document.addEventListener("keydown", stop, true);
 }
 
-function WideMenu({ trigger, items, onClosed, onOpenChange, closeSignal, placement = "bottom-end" }: MenuProps) {
+function WideMenu({ trigger, items, onClosed, onOpenChange, closeSignal, placement = "bottom-end", boundary }: MenuProps) {
   const [open, setOpen] = useState(false);
   useReportOpen(open, onOpenChange);
   useOnCloseSignal(closeSignal, () => setOpen(false));
@@ -248,7 +250,7 @@ function WideMenu({ trigger, items, onClosed, onOpenChange, closeSignal, placeme
       lazyMount
       unmountOnExit
       loopFocus
-      positioning={{ placement }}
+      positioning={{ placement, boundary }}
       onOpenChange={(e) => {
         setOpen(e.open);
         if (e.open) return;
