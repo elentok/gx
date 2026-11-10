@@ -2,6 +2,7 @@ import { Box, chakra, Text, type BoxProps } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import {
   CardActionCreatePR,
+  CardActionMarkMerged,
   CardActionOpenPR,
   CardActionTryAgain,
   PRActivityBad,
@@ -12,7 +13,7 @@ import {
   type PRActivityEntry,
 } from "../generated/server";
 import { EpicActionButton } from "../epics/EpicActionButton";
-import { postEpicCreatePR, postEpicTryAgain } from "../epics/queue";
+import { postEpicCreatePR, postEpicMarkMerged, postEpicTryAgain } from "../epics/queue";
 import { ticketHref } from "../hrefs";
 import { Button } from "../ui/button/Button";
 
@@ -46,6 +47,7 @@ export function PrActions({ detail, onChanged }: { detail: EpicDetail; onChanged
   const tryAgain = action(detail, CardActionTryAgain);
   const create = action(detail, CardActionCreatePR);
   const open = action(detail, CardActionOpenPR);
+  const markMerged = action(detail, CardActionMarkMerged);
   const link = open?.link ?? detail.pr?.url;
   return (
     <>
@@ -68,6 +70,17 @@ export function PrActions({ detail, onChanged }: { detail: EpicDetail; onChanged
           label={create.label}
           tone={detail.actions?.includes("merge") ? "muted" : "done"}
           pendingLabel="Creating PR…"
+          onDone={onChanged}
+        />
+      )}
+      {markMerged && (
+        <EpicActionButton
+          address={markMerged.target ?? detail.address}
+          state={detail.state ?? ""}
+          post={postEpicMarkMerged}
+          label={markMerged.label}
+          tone="muted"
+          pendingLabel="Marking as merged…"
           onDone={onChanged}
         />
       )}

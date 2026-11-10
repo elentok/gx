@@ -835,6 +835,28 @@ test("with no PR yet the header shows Create PR and the failure reason", async (
   expect(screen.queryByTestId("pr-chip")).toBeNull();
 });
 
+test("the epic page shows Mark as merged when the server offers it and posts the mark-merged call", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    render("/e/gx:blog-impl", [], "loop", {
+      detail: { state: "awaiting-merge", pr_actions: [{ kind: "mark-merged", label: "Mark as merged" }] },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Mark as merged" }));
+    const call = () => fetchMock.mock.calls.find(([url]) => url === "/v1/epics/mark-merged");
+    await waitFor(() => expect(call()).toBeTruthy());
+    expect(JSON.parse(call()![1].body)).toEqual({ address: "gx:blog-impl", state: "awaiting-merge" });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("without a mark-merged action the epic page has no Mark as merged button", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: { state: "running" } });
+  await screen.findByTestId("stats-line");
+  expect(screen.queryByRole("button", { name: "Mark as merged" })).toBeNull();
+});
+
 test("an epic with no PR activity shows no activity panel", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { state: "running" } });
   await screen.findByTestId("stats-line");
