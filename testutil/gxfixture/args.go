@@ -4,7 +4,7 @@ import "fmt"
 
 // opts is what the command line asked for, before the scenario is looked up.
 type opts struct {
-	gx, fakeClaude, fakeCodex, scenario         string
+	gx, fakeClaude, fakeCodex, fakeGH, scenario string
 	autoAdvance, commandListAge, stallThreshold string
 	mockDir, shape                              string
 	configs                                     []string
@@ -25,6 +25,7 @@ func parseArgs(args []string) (opts, error) {
 		"--gx":                 &o.gx,
 		"--fakeclaude":         &o.fakeClaude,
 		"--fakecodex":          &o.fakeCodex,
+		"--fakegh":             &o.fakeGH,
 	}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]

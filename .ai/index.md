@@ -308,7 +308,11 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   helper two packages need goes in `fixturetest`. The `cache-gate` and
   `cache-gate-custom` scenarios (`cachegate.go`) output `gate_dir`: a fake `go` and `ps` in
   `bin/` (put it first on PATH), `go-hold` to hold a fake build, and `go-clean.log`. The
-  `chat-capture` scenario (`chat.go`, endpoint in `chatcapture/`) outputs `chat_capture`: a JSONL
+  `pr-flow-draft-ci-running`, `pr-flow-fixing` and `pr-flow-ready` scenarios (`spec/prflow.go`,
+  `fakegh.go`) seed epic `ticket-search` with PR 412 under a `pr`-delivery project whose `gh` is the
+  `testutil/ghfake` binary (first on PATH, `--fakegh` overrides the build) and whose `origin` is a
+  bare repo; they output `gh_state` (the fake's state file: edit it to flip a check mid-run, the
+  call log sits beside it) and `origin`. The `chat-capture` scenario (`chat.go`, endpoint in `chatcapture/`) outputs `chat_capture`: a JSONL
   file with one line per Slack or Telegram post the server makes (`transport`, `at`, `text`,
   `parse_mode`); CLI Telegram sends (`gx notify`) still go to the real host, so only Slack reaches it.
 

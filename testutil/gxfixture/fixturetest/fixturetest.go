@@ -28,8 +28,8 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
-// The binaries Run builds: gx, the fixture program, fakeclaude and fakecodex.
-var GxBin, FixtureBin, FakeBin, FakeCodexBin string
+// The binaries Run builds: gx, the fixture program, fakeclaude, fakecodex and the fake gh.
+var GxBin, FixtureBin, FakeBin, FakeCodexBin, FakeGHBin string
 
 // RunMatches reports whether a -run filter lets a test whose name contains
 // part run: true when there is no filter. A package's shared fixture starts
@@ -50,8 +50,9 @@ func Run(m *testing.M, setup func() (teardown func(), err error)) int {
 	}
 	defer os.RemoveAll(dir)
 	GxBin, FixtureBin, FakeBin = filepath.Join(dir, "gx"), filepath.Join(dir, "gxfixture"), filepath.Join(dir, "claude")
-	FakeCodexBin = filepath.Join(dir, "codex")
+	FakeCodexBin, FakeGHBin = filepath.Join(dir, "codex"), filepath.Join(dir, "gh")
 	for out, pkg := range map[string]string{
+		FakeGHBin:    "github.com/elentok/gx/testutil/ghfake/cmd/gh",
 		GxBin:        "github.com/elentok/gx",
 		FixtureBin:   "github.com/elentok/gx/testutil/gxfixture",
 		FakeBin:      "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude",
@@ -114,7 +115,7 @@ const startTimeout = 40 * time.Second
 // LaunchProc is launch without a test, so TestMain can start a shared fixture
 // outside every test's time limit.
 func LaunchProc(register func(func()), scenario string, env []string, flags ...string) (*Running, error) {
-	args := append([]string{"--gx", GxBin, "--fakeclaude", FakeBin}, flags...)
+	args := append([]string{"--gx", GxBin, "--fakeclaude", FakeBin, "--fakegh", FakeGHBin}, flags...)
 	cmd := exec.Command(FixtureBin, append(args, scenario)...)
 	cmd.Env = append(os.Environ(), env...)
 	cmd.Stderr = os.Stderr

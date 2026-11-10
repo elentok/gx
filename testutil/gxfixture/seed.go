@@ -139,6 +139,11 @@ func (f *fixture) seed(sc scenario) error {
 			return err
 		}
 	}
+	if sc.FakeGH != nil {
+		if err := f.addOrigin(repo); err != nil {
+			return err
+		}
+	}
 	if err := seedDrafts(f.stateD, sc.Drafts); err != nil {
 		return err
 	}
@@ -244,6 +249,9 @@ func (f *fixture) seed(sc scenario) error {
 				return fmt.Errorf("set design step of %s: %w\n%s", addr, err, out)
 			}
 		}
+	}
+	if sc.FakeGH != nil && sc.FakeGH.FixCheck != "" {
+		return f.forkFix(sc)
 	}
 	return nil
 }

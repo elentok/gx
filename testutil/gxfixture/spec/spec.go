@@ -139,6 +139,8 @@ type Scenario struct {
 	DiskLow bool
 	// FakeGo writes the gate dir's fake go (see cachegate.go).
 	FakeGo bool
+	// FakeGH puts the scripted fake gh first on PATH over a bare origin (see prflow.go).
+	FakeGH *FakeGH
 	// FakeNpm writes the gate dir's fake npm and holds it (see launchstate.go).
 	FakeNpm bool
 	// FailingNpm makes that fake npm fail at once instead of holding.

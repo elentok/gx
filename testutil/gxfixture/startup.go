@@ -74,6 +74,16 @@ func installBinaries(root string, o opts, sc scenario) (gxBin, binDir string, co
 			return "", "", false, err
 		}
 	}
+	// The bin dir is first on PATH, so this gh is the one the server and its agents run.
+	if sc.FakeGH != nil {
+		ghBin, err := binary(o.fakeGH, filepath.Join(root, "gh"), "github.com/elentok/gx/testutil/ghfake/cmd/gh")
+		if err != nil {
+			return "", "", false, err
+		}
+		if err := os.Symlink(ghBin, filepath.Join(binDir, "gh")); err != nil {
+			return "", "", false, err
+		}
+	}
 	// Agent hooks run a bare `gx`; it must be the build under test, not the host's.
 	if err := os.Symlink(gxBin, filepath.Join(binDir, "gx")); err != nil {
 		return "", "", false, err
@@ -163,6 +173,11 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 			return err
 		}
 	}
+	if sc.FakeGH != nil {
+		if err := f.setupFakeGH(sc.FakeGH); err != nil {
+			return err
+		}
+	}
 	if sc.FakeNpm {
 		if err := f.setupFakeNpm(sc.FailingNpm); err != nil {
 			return err
@@ -204,6 +219,9 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts map[string]string) {
 	if sc.FakeGo || sc.FakeNpm {
 		res.GateDir = f.gateDir()
+	}
+	if sc.FakeGH != nil {
+		res.GHState, res.Origin = f.ghState(), f.origin()
 	}
 	res.ConfigFile = configFile(f.root)
 	res.DevControlFile = f.devControl

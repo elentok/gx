@@ -73,6 +73,10 @@ type Output struct {
 	// OutsideTreePID is the root of the process tree an OutsideTree scenario
 	// started outside gx; empty elsewhere.
 	OutsideTreePID int `json:"outside_tree_pid,omitempty"`
+	// GHState is the fake gh's state file and Origin the bare origin of the pr-flow
+	// scenarios; edit the file to change CI mid-run. Empty elsewhere.
+	GHState string `json:"gh_state,omitempty"`
+	Origin  string `json:"origin,omitempty"`
 	// FeatureWorktree is demo's `feature` worktree, in scenarios that make one.
 	FeatureWorktree string `json:"feature_worktree,omitempty"`
 }
