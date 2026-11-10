@@ -377,3 +377,50 @@ test("a held card is dimmed and Take off hold unholds it", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Take off hold" }));
   await waitFor(() => expect(unhold).toHaveBeenCalledWith("gx:blog"));
 });
+
+describe("PR line", () => {
+  const pr = { number: 412, url: "https://github.com/o/r/pull/412", chip: "#412", checks: "2 of 5 checks running" };
+
+  test("a PR row shows the number chip, the check summary, the status words and the GitHub link", () => {
+    renderThemed(
+      <EpicCard
+        row={row({
+          pr,
+          status_words: "PR draft · CI running",
+          actions: [{ kind: "open-pr", label: "Open on GitHub", target: "gx:blog", link: pr.url }],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("pr-number").textContent).toBe("#412");
+    expect(screen.getByTestId("pr-checks").textContent).toBe("2 of 5 checks running");
+    expect(screen.getByTestId("pr-link").getAttribute("href")).toBe(pr.url);
+    expect(screen.getByTestId("status").textContent).toBe("PR draft · CI running");
+    expect(screen.queryByRole("button", { name: "Open on GitHub" })).toBeNull();
+  });
+
+  test("a fixing row links the fix ticket", () => {
+    renderThemed(
+      <EpicCard
+        row={row({
+          state: "fixing-ci",
+          pr: { ...pr, checks: "go-test failed" },
+          actions: [{ kind: "open-ticket", label: "Open ticket", target: "gx:blog/10" }],
+        })}
+      />,
+    );
+    const link = screen.getByTestId("pr-link");
+    expect(link.textContent).toBe("Fix ticket 10");
+    expect(link.getAttribute("href")).toContain("gx:blog/10");
+  });
+
+  test("a row without a PR has no PR line", () => {
+    renderThemed(<EpicCard row={row()} />);
+    expect(screen.queryByTestId("pr-line")).toBeNull();
+  });
+
+  test("an unreachable GitHub adds a line and keeps the chip", () => {
+    renderThemed(<EpicCard row={row({ pr: { number: 412, chip: "#412", unreachable: true } })} />);
+    expect(screen.getByTestId("pr-unreachable").textContent).toBe("GitHub unreachable");
+    expect(screen.getByTestId("pr-number").textContent).toBe("#412");
+  });
+});

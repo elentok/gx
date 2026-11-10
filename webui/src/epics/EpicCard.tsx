@@ -7,6 +7,7 @@ import {
   CardActionMerge,
   CardActionOpen,
   CardActionOpenEpic,
+  CardActionOpenPR,
   CardActionOpenTicket,
   CardActionQueue,
   CardActionStashMerge,
@@ -35,6 +36,7 @@ import { titleHref } from "./cardLinks";
 import { timeLabel } from "./cardTime";
 import { mergeToast } from "./MergeButton";
 import { postEpicMerge, postEpicStashMerge, postQueueAdd, type PostEpicWrite } from "./queue";
+import { PrLine } from "./PrLine";
 import { RING_KIND, isCreatingTickets, isLive, needsYouTone, ringProgress, ringTone } from "./ring";
 
 function ringLabel(row: EpicListRow): string {
@@ -69,7 +71,10 @@ export interface CardWrites {
   unhold?: ItemWriters["unhold"];
 }
 
-const goTo = (href: string) => {
+/** Open on GitHub is the PR line's link, so the footer leaves it out. */
+const footerActions = (row: EpicListRow): CardAction[] => (row.actions ?? []).filter((a) => a.kind !== CardActionOpenPR);
+
+const goTo =(href: string) => {
   window.location.hash = href;
 };
 
@@ -126,7 +131,7 @@ function ActionButtons({
     );
   }
 
-  return <>{row.actions?.map(button)}</>;
+  return <>{footerActions(row).map(button)}</>;
 }
 
 /** One /v1/epics card row. */
@@ -154,7 +159,7 @@ export function EpicCard({
     seconds !== undefined
       ? `Next run starts in ${seconds}s`
       : (launchOrVerdictText(row.launch_step, row.verdict, row.reason) ?? row.reason);
-  const hasButtons = (row.actions?.length ?? 0) > 0;
+  const hasButtons = footerActions(row).length > 0;
   const tone = needsYou ? needsYouTone(row) : undefined;
   const pillTone = tone ?? (row.card_kind === CardKindFollowUps && row.state_pill ? needsYouTone(row) : undefined);
   const held = row.section === SectionOnHold;
@@ -211,7 +216,7 @@ export function EpicCard({
                 {" · "}
               </>
             )}
-            <Text as="span" data-testid="status" color={`kind.${kind}.fg`}>
+            <Text as="span" data-testid="status" color={row.pr && !tone ? "kind.design.fg" : `kind.${kind}.fg`}>
               {row.status_words}
             </Text>
           </Text>
@@ -222,6 +227,7 @@ export function EpicCard({
           </Box>
         )}
       </Box>
+      <PrLine row={row} />
       {(needsYou || pillTone || reason) && (
         <Box display="flex" flexDirection="column" alignItems="flex-start" gap="2">
           {pillTone && (
