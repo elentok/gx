@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/elentok/gx/testutil/agentfake/claudesettings"
 )
@@ -16,6 +17,11 @@ type AskCall struct {
 	Questions []AskQuestion `json:"questions"`
 	// OutFile, when set, receives the hook's stdout, so a test reads its result.
 	OutFile string `json:"out_file,omitempty"`
+	// TimeoutMs, when set, stands in for claude's hook timeout: the hook is
+	// killed after it. Dialog, when set, is the screen the fake shows on
+	// "input needed" once the hook ends without an answer (timeout or release).
+	TimeoutMs int      `json:"timeout_ms,omitempty"`
+	Dialog    []string `json:"dialog,omitempty"`
 }
 
 // AskQuestion is one question of an AskCall, in claude's own field names.
@@ -69,8 +75,17 @@ func (t *tui) askQuestion(call *AskCall) error {
 	t.askHook = cmd
 	// The hook blocks, so it is waited on off the input loop; the turn ends
 	// through the control channel like any other control.
+	if call.TimeoutMs > 0 {
+		time.AfterFunc(time.Duration(call.TimeoutMs)*time.Millisecond, func() { _ = cmd.Process.Kill() })
+	}
 	go func() {
 		_ = cmd.Wait()
+		if call.Dialog != nil {
+			// A hook that ends with no answer (timeout or release) leaves
+			// Claude's own dialog open.
+			_ = SendControl(t.ctlPath, Control{Action: ActionBlock, WaitingFor: "input needed", Dialog: call.Dialog})
+			return
+		}
 		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 	}()
 	return t.setStatus(StatusBusy, "")

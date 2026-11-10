@@ -77,6 +77,7 @@ func (s infoSource) CheckProjectDir(string, string) (*wire.SessionResult, error)
 	return nil, errors.New("unused")
 }
 func (s infoSource) HeldAsks(string) []wire.AskHookRequest { return nil }
+func (s infoSource) AskReleased(string, string) bool       { return false }
 func (s infoSource) StepFinal(chat.FlowRef) bool           { return false }
 func (s infoSource) NoteFailure(string)                    {}
 func (s infoSource) Stopped() <-chan struct{}              { return nil }

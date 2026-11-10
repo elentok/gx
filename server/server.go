@@ -450,7 +450,7 @@ func New(cfg Config) (*Server, error) {
 		Config: chat.Config{
 			TranscriptMissTTL: cfg.TranscriptMissTTL, ChatPollInterval: cfg.ChatPollInterval,
 			StallThreshold: cfg.StallThreshold, CommandListAge: cfg.CommandListAge,
-			Env: cfg.Env, StateDir: cfg.StateDir,
+			Env: cfg.Env, StateDir: cfg.StateDir, DialogFallbackDelay: cfg.DialogFallbackDelay,
 		},
 		Source: chatSource{s}, Log: log,
 	})

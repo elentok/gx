@@ -242,6 +242,10 @@ type Config struct {
 	// StallThreshold is how long a Working session's transcript may stay
 	// untouched before it counts as stalled; zero means defaultStallThreshold.
 	StallThreshold time.Duration
+	// DialogFallbackDelay is how long a Claude session waits on "input needed"
+	// before its screen dialog lists as a card; zero means
+	// chat.DefaultDialogFallbackDelay.
+	DialogFallbackDelay time.Duration
 	// TranscriptMissTTL is how long a failed transcript lookup is remembered;
 	// zero means defaultTranscriptMissTTL and a negative value remembers none.
 	TranscriptMissTTL time.Duration

@@ -63,6 +63,9 @@ type Source interface {
 	TicketAsk(address string) (q ticketlog.Question, state string, ok bool)
 	// HeldAsks lists the AskUserQuestion calls a Claude hook holds for a session.
 	HeldAsks(session string) []wire.AskHookRequest
+	// AskReleased says whether the session handed a dialog showing question
+	// back to the terminal.
+	AskReleased(session, question string) bool
 }
 
 // Config holds the durations and paths the chat reads from the server config.
@@ -71,8 +74,11 @@ type Config struct {
 	ChatPollInterval  time.Duration
 	StallThreshold    time.Duration
 	CommandListAge    time.Duration
-	Env               []string
-	StateDir          string
+	// DialogFallbackDelay is how long a session waits on "input needed" before
+	// the screen fallback card may list; zero means DefaultDialogFallbackDelay.
+	DialogFallbackDelay time.Duration
+	Env                 []string
+	StateDir            string
 }
 
 // Deps is what New needs.
@@ -107,10 +113,15 @@ type Chat struct {
 	codexQuestions FileCache[codexQuestionRead]
 	// rolloutPath replaces codexsession.RolloutPathIn; tests count lookups with it.
 	rolloutPath func(home, conversationID string) (string, bool, error)
+	// dialogWaits times how long each session has waited on "input needed".
+	dialogWaits dialogWaits
 }
 
 // New builds a Chat.
 func New(d Deps) *Chat {
+	if d.Config.DialogFallbackDelay == 0 {
+		d.Config.DialogFallbackDelay = DefaultDialogFallbackDelay
+	}
 	return &Chat{
 		cfg: d.Config, src: d.Source, log: d.Log,
 		commandLists: commandlist.NewCache(d.Config.CommandListAge, nil),

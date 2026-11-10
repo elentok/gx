@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sync"
 
 	"github.com/elentok/gx/server/wire"
@@ -17,9 +18,10 @@ type askKey struct{ session, toolUseID string }
 type askHolds struct {
 	mu   sync.Mutex
 	held map[askKey]*heldAsk
-	// released are the dialogs handed back to the terminal; a hook that asks
-	// again for one gets a release at once, so no card shows for it.
-	released map[askKey]bool
+	// released are the dialogs handed back to the terminal, with their question
+	// texts; a hook that asks again for one gets a release at once, and the
+	// screen fallback card skips a dialog showing one of those questions.
+	released map[askKey][]string
 }
 
 type heldAsk struct {
@@ -34,7 +36,7 @@ func (mg *Manager) HoldAsk(ctx context.Context, req wire.AskHookRequest) wire.As
 	h := &heldAsk{req: req, result: make(chan wire.AskHookResult, 1)}
 	a := &mg.asks
 	a.mu.Lock()
-	if a.released[key] {
+	if _, ok := a.released[key]; ok {
 		a.mu.Unlock()
 		return wire.AskHookResult{Decision: wire.AskHookRelease}
 	}
@@ -95,6 +97,14 @@ func (mg *Manager) ResolveAsk(session, toolUseID string, res wire.AskHookResult)
 // ReleaseAsk releases a held question to Claude's terminal dialog and
 // remembers its id.
 func (mg *Manager) ReleaseAsk(session, toolUseID string) bool {
+	var questions []string
+	for _, h := range mg.HeldAsks(session) {
+		if h.ToolUseID == toolUseID {
+			for _, q := range h.Questions {
+				questions = append(questions, q.Question)
+			}
+		}
+	}
 	if !mg.ResolveAsk(session, toolUseID, wire.AskHookResult{Decision: wire.AskHookRelease}) {
 		return false
 	}
@@ -102,10 +112,24 @@ func (mg *Manager) ReleaseAsk(session, toolUseID string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.released == nil {
-		a.released = map[askKey]bool{}
+		a.released = map[askKey][]string{}
 	}
-	a.released[askKey{session, toolUseID}] = true
+	a.released[askKey{session, toolUseID}] = questions
 	return true
+}
+
+// AskReleased reports whether the session handed a dialog showing question
+// back to the terminal, so the screen fallback must not list it again.
+func (mg *Manager) AskReleased(session, question string) bool {
+	a := &mg.asks
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for k, qs := range a.released {
+		if k.session == session && slices.Contains(qs, question) {
+			return true
+		}
+	}
+	return false
 }
 
 // AskHoldWrite is POST /v1/sessions/ask-hold: the hook's call, which blocks

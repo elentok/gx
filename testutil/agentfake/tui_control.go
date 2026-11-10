@@ -145,6 +145,27 @@ func WrappedPermissionDialog(command string) []string {
 	}
 }
 
+// AskDialogRows is the screen of Claude's AskUserQuestion dialog for one
+// single-select question: its tab bar, numbered options with the cursor on the
+// first, the free-text row, the chat row and the footer.
+func AskDialogRows(question string, options ...string) []string {
+	rows := []string{"←  ☐ Q  ✔ Submit  →", "", question}
+	for i, o := range options {
+		cursor := "  "
+		if i == 0 {
+			cursor = "❯ "
+		}
+		rows = append(rows, fmt.Sprintf("%s%d. %s", cursor, i+1, o), "     about "+o)
+	}
+	return append(rows,
+		fmt.Sprintf("  %d. Type something.", len(options)+1),
+		"────────────",
+		fmt.Sprintf("  %d. Chat about this", len(options)+2),
+		"",
+		"Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
+	)
+}
+
 // QuestionMenuDialog is the screen rows of a question menu: a numbered choice
 // list that is not an approvable permission card.
 func QuestionMenuDialog() []string {

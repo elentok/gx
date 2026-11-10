@@ -115,6 +115,7 @@ var allowed = map[string]int{
 	"server/sched/runner_test.go":                             1,
 	"server/server_notify_test.go":                            1,
 	"server/server_test.go":                                   1,
+	"server/sessions/askfallback_test.go":                     1, // negative wait: no fallback card lists for a picker, a permission prompt or an unreadable layout
 	"server/sessions/retry_prompt_test.go":                    1, // negative wait: no second interrupt or prompt follows the retry
 	"server/sessions/sessionchatwatch_test.go":                2,
 	"server/sessions/sessioninterrupt_test.go":                1, // negative wait: Codex gets no Ctrl+C after its Esc

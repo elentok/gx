@@ -94,6 +94,7 @@ func startAskFixture(t *testing.T, link *wire.LinkSessionRequest) askFixture {
 			c.LaunchProofCaps.Grace = 6 * time.Second
 			c.LaunchProofCaps.UnknownGrace = 600 * time.Millisecond
 			c.LaunchProofCaps.Poll = 20 * time.Millisecond
+			c.DialogFallbackDelay = 300 * time.Millisecond
 		},
 		servertest.WithEnv("PATH="+bin+string(os.PathListSeparator)+gxBin(t)+string(os.PathListSeparator)+os.Getenv("PATH"),
 			"HOME="+home, "CLAUDE_CONFIG_DIR="+filepath.Join(home, ".claude"), "XDG_STATE_HOME="+xdg),

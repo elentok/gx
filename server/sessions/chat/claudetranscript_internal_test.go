@@ -44,6 +44,7 @@ func (f *fakeSource) CheckProjectDir(string, string) (*wire.SessionResult, error
 	return f.refusal, nil
 }
 func (f *fakeSource) HeldAsks(string) []wire.AskHookRequest { return nil }
+func (f *fakeSource) AskReleased(string, string) bool       { return false }
 func (f *fakeSource) StepFinal(FlowRef) bool                { return f.final }
 func (f *fakeSource) NoteFailure(id string)                 { f.noted <- id }
 func (f *fakeSource) Stopped() <-chan struct{}              { return f.stopped }
