@@ -39,6 +39,19 @@ func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
 	}
 }
 
+func TestPrintEpicList_PrintsThePRNumber(t *testing.T) {
+	var out bytes.Buffer
+	l := wire.EpicList{Epics: []wire.EpicListRow{
+		{Address: "proj:p", Kind: wire.EpicKindLoop, State: wire.EpicListPROpen, Section: wire.SectionImplementing, PR: &wire.PRInfo{Number: 412, Chip: "#412"}},
+	}}
+	if err := printEpicList(&out, l, false); err != nil {
+		t.Fatal(err)
+	}
+	if want := "proj:p\tloop\tpr-open\t0/0\tqueueable=false\timplementing\t\t#412\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
 func TestPrintEpicList_JoinedCardPrintsTheActivePartsAddress(t *testing.T) {
 	var out bytes.Buffer
 	l := wire.EpicList{Epics: []wire.EpicListRow{

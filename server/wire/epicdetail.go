@@ -137,9 +137,39 @@ type EpicDetail struct {
 	// DesignSection is a map epic's own Design card section, which the page's tone
 	// reads even when a joined card shows the -impl epic instead.
 	DesignSection CardSection `json:"design_section,omitempty"`
+	// StatusWords is the card's status line; PR, PRReason, PRActions, PRNotice and
+	// PRActivity are the PR flow's live info, failure reason, buttons, the "CI
+	// failing" notice text and the activity list, newest first.
+	StatusWords string            `json:"status_words,omitempty"`
+	PR          *PRInfo           `json:"pr,omitempty"`
+	PRReason    string            `json:"pr_reason,omitempty"`
+	PRActions   []CardAction      `json:"pr_actions,omitempty"`
+	PRNotice    string            `json:"pr_notice,omitempty"`
+	PRActivity  []PRActivityEntry `json:"pr_activity,omitempty"`
 	// Draft is set on a loop epic that is still being published into.
 	Draft bool `json:"draft,omitempty"`
 	// Deletable is set on an uncharted design, the rule the designs delete route guards.
 	Deletable bool      `json:"deletable,omitempty"`
 	Stats     EpicStats `json:"stats"`
+}
+
+// PRActivityKind sets the dot colour of a PR activity entry.
+type PRActivityKind string
+
+// Spelled as literals for tygo; see the comment on EpicListState.
+const (
+	PRActivityInfo    PRActivityKind = "info"
+	PRActivityGood    PRActivityKind = "good"
+	PRActivityWarning PRActivityKind = "warning"
+	PRActivityBad     PRActivityKind = "bad"
+)
+
+// PRActivityEntry is one line of an epic's PR activity list.
+type PRActivityEntry struct {
+	Time   time.Time      `json:"time"`
+	Kind   PRActivityKind `json:"kind"`
+	Text   string         `json:"text"`
+	Detail string         `json:"detail,omitempty"`
+	// Ticket is the address of the ticket the entry was read from, when it was.
+	Ticket string `json:"ticket,omitempty"`
 }

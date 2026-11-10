@@ -173,7 +173,11 @@ func printEpicList(w io.Writer, l wire.EpicList, allFinished bool) error {
 		if len(e.Addresses) > 0 {
 			address = e.Addresses[0]
 		}
-		if err := printEpicRow(w, address, string(cmp.Or(e.CardKind, wire.CardKind(e.Kind))), string(e.State), e.Done, e.Total, e.Queueable, string(e.Section), e.Workspace); err != nil {
+		extra := []string{string(e.Section), e.Workspace}
+		if e.PR != nil {
+			extra = append(extra, fmt.Sprintf("#%d", e.PR.Number))
+		}
+		if err := printEpicRow(w, address, string(cmp.Or(e.CardKind, wire.CardKind(e.Kind))), string(e.State), e.Done, e.Total, e.Queueable, extra...); err != nil {
 			return err
 		}
 	}

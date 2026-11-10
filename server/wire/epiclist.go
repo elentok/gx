@@ -95,6 +95,10 @@ type EpicListRow struct {
 	// QueueSlot is the 1-based slot of the row's loop epic in the queue, 0 when it
 	// is not queued. A joined card carries its -impl epic's slot.
 	QueueSlot int `json:"queue_slot,omitempty"`
+	// PR is set once the epic has a pull request. PRReason is why the last
+	// attempt to open or push one could not go on, shown with no pause.
+	PR       *PRInfo `json:"pr,omitempty"`
+	PRReason string  `json:"pr_reason,omitempty"`
 
 	// The card fields below are set on loop epic rows. A joined card carries both
 	// of its epics' addresses in Addresses, the active part first.
@@ -221,7 +225,37 @@ const (
 	CardActionTriage CardActionKind = "triage"
 	// Unhold targets the card's active address.
 	CardActionUnhold CardActionKind = "unhold"
+	// The PR actions target the epic. Open on GitHub is a link: its Link is the PR's URL.
+	CardActionCreatePR   CardActionKind = "create-pr"
+	CardActionTryAgain   CardActionKind = "try-again"
+	CardActionMarkMerged CardActionKind = "mark-merged"
+	CardActionOpenPR     CardActionKind = "open-pr"
 )
+
+// PRState is PRInfo.State.
+type PRState string
+
+// Spelled as literals for tygo; see the comment on EpicListState.
+const (
+	PRDraft  PRState = "draft"
+	PRReady  PRState = "ready"
+	PRMerged PRState = "merged"
+)
+
+// PRInfo is an epic's pull request as the Epics page and the epic page show it.
+// It is live and never stored; after a restart only Number, URL and Chip are set
+// until the first poll answers.
+type PRInfo struct {
+	Number int     `json:"number"`
+	URL    string  `json:"url,omitempty"`
+	State  PRState `json:"state,omitempty"`
+	// Checks is the check summary: "2 of 5 checks running", "go-test failed".
+	Checks string `json:"checks,omitempty"`
+	// Chip is the card's chip text: "#412 · draft".
+	Chip string `json:"chip"`
+	// Unreachable is set while GitHub does not answer.
+	Unreachable bool `json:"unreachable,omitempty"`
+}
 
 // CardAction is one button of a card. Target is the address the button opens (a
 // ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).

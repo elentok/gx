@@ -51,6 +51,10 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 	merge := func(target string) []wire.CardAction {
 		return []wire.CardAction{{Kind: wire.CardActionMerge, Label: "Merge", Target: target}}
 	}
+	// An Awaiting merge epic in a merge project also offers Create PR, second.
+	awaiting := func(target string) []wire.CardAction {
+		return append(merge(target), wire.CardAction{Kind: wire.CardActionCreatePR, Label: "Create PR", Target: target})
+	}
 	want := map[string]struct {
 		section wire.CardSection
 		words   string
@@ -59,7 +63,7 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 	}{
 		"proj:ready":    {wire.SectionReadyToQueue, "Not started", 50, queue},
 		"proj:queued":   {wire.SectionImplementing, "Queued #1", 0, nil},
-		"proj:awaiting": {wire.SectionNeedsYou, "Implemented", 100, merge("proj:awaiting")},
+		"proj:awaiting": {wire.SectionNeedsYou, "Implemented", 100, awaiting("proj:awaiting")},
 		"proj:paused":   {wire.SectionNeedsYou, "Implementing...", 0, []wire.CardAction{{Kind: wire.CardActionOpenTicket, Label: "Open ticket", Target: "proj:paused/01"}}},
 		"proj:blocked":  {wire.SectionNeedsYou, "Implemented", 100, merge("proj:blocked")},
 		"proj:merging":  {wire.SectionImplementing, "Merging...", 50, nil},
@@ -67,7 +71,7 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 		"proj:noopen":   {wire.SectionReadyToDesign, "No open tickets", 0, nil},
 		"proj:merged":   {wire.SectionFinished, "Merged", 100, nil},
 		// An empty epic counts as implemented (nothing is left to run).
-		"proj:empty": {wire.SectionNeedsYou, "Implemented", 0, merge("proj:empty")},
+		"proj:empty": {wire.SectionNeedsYou, "Implemented", 0, awaiting("proj:empty")},
 	}
 	for addr, w := range want {
 		r, ok := got[addr]

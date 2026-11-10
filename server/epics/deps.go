@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
@@ -98,7 +99,13 @@ type Deps struct {
 	CapHeld     func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool)
 	AutoFFMerge func(project string) bool
 	// Delivery is the project's delivery ("merge" or "pr"), read live.
-	Delivery          func(project string) string
+	Delivery func(project string) string
+	// PRView is the watcher's live view of the epic's PR; false before the first
+	// poll answers. PRReason is why the last open or push could not go on, and
+	// PRActivity the epic's PR activity list. All three may be nil.
+	PRView            func(root queue.RootRef) (prstate.Live, bool)
+	PRReason          func(root queue.RootRef) string
+	PRActivity        func(root queue.RootRef, e tickets.Epic) []wire.PRActivityEntry
 	CheckWaitingLabel func(address string) string
 	AgentGone         func(address string) (bool, error)
 	LiveTask          func(address string) (BackgroundTask, error)

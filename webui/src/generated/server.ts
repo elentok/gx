@@ -1033,6 +1033,17 @@ export interface EpicDetail {
    */
   design_section?: CardSection;
   /**
+   * StatusWords is the card's status line; PR, PRReason, PRActions, PRNotice and
+   * PRActivity are the PR flow's live info, failure reason, buttons, the "CI
+   * failing" notice text and the activity list, newest first.
+   */
+  status_words?: string;
+  pr?: PRInfo;
+  pr_reason?: string;
+  pr_actions?: CardAction[];
+  pr_notice?: string;
+  pr_activity?: PRActivityEntry[];
+  /**
    * Draft is set on a loop epic that is still being published into.
    */
   draft?: boolean;
@@ -1041,6 +1052,39 @@ export interface EpicDetail {
    */
   deletable?: boolean;
   stats: EpicStats;
+}
+/**
+ * PRActivityKind sets the dot colour of a PR activity entry.
+ */
+export type PRActivityKind = string;
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const PRActivityInfo: PRActivityKind = "info";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const PRActivityGood: PRActivityKind = "good";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const PRActivityWarning: PRActivityKind = "warning";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const PRActivityBad: PRActivityKind = "bad";
+/**
+ * PRActivityEntry is one line of an epic's PR activity list.
+ */
+export interface PRActivityEntry {
+  time: string;
+  kind: PRActivityKind;
+  text: string;
+  detail?: string;
+  /**
+   * Ticket is the address of the ticket the entry was read from, when it was.
+   */
+  ticket?: string;
 }
 
 //////////
@@ -1154,6 +1198,12 @@ export interface EpicListRow {
    * is not queued. A joined card carries its -impl epic's slot.
    */
   queue_slot?: number /* int */;
+  /**
+   * PR is set once the epic has a pull request. PRReason is why the last
+   * attempt to open or push one could not go on, shown with no pause.
+   */
+  pr?: PRInfo;
+  pr_reason?: string;
   /**
    * The card fields below are set on loop epic rows. A joined card carries both
    * of its epics' addresses in Addresses, the active part first.
@@ -1337,6 +1387,51 @@ export const CardActionTriage: CardActionKind = "triage";
  * Unhold targets the card's active address.
  */
 export const CardActionUnhold: CardActionKind = "unhold";
+/**
+ * The PR actions target the epic. Open on GitHub is a link: its Link is the PR's URL.
+ */
+export const CardActionCreatePR: CardActionKind = "create-pr";
+export const CardActionTryAgain: CardActionKind = "try-again";
+export const CardActionMarkMerged: CardActionKind = "mark-merged";
+export const CardActionOpenPR: CardActionKind = "open-pr";
+/**
+ * PRState is PRInfo.State.
+ */
+export type PRState = string;
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const PRDraft: PRState = "draft";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const PRReady: PRState = "ready";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const PRMerged: PRState = "merged";
+/**
+ * PRInfo is an epic's pull request as the Epics page and the epic page show it.
+ * It is live and never stored; after a restart only Number, URL and Chip are set
+ * until the first poll answers.
+ */
+export interface PRInfo {
+  number: number /* int */;
+  url?: string;
+  state?: PRState;
+  /**
+   * Checks is the check summary: "2 of 5 checks running", "go-test failed".
+   */
+  checks?: string;
+  /**
+   * Chip is the card's chip text: "#412 · draft".
+   */
+  chip: string;
+  /**
+   * Unreachable is set while GitHub does not answer.
+   */
+  unreachable?: boolean;
+}
 /**
  * CardAction is one button of a card. Target is the address the button opens (a
  * ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).

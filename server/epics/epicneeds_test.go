@@ -132,8 +132,9 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 		if r.Section != w.section || r.StatePill != w.pill || !strings.Contains(r.Reason, w.reason) || (w.pill != "" && r.Reason == "") {
 			t.Errorf("%s = section %q pill %q reason %q, want %q %q containing %q", addr, r.Section, r.StatePill, r.Reason, w.section, w.pill, w.reason)
 		}
-		if w.pill != "" && !slices.Equal(r.Actions, []wire.CardAction{w.action}) {
-			t.Errorf("%s actions = %v, want [%v]", addr, r.Actions, w.action)
+		// The main action comes first; Create PR may follow it.
+		if w.pill != "" && (len(r.Actions) == 0 || r.Actions[0] != w.action) {
+			t.Errorf("%s actions = %v, want [%v ...]", addr, r.Actions, w.action)
 		}
 	}
 	if r := got["proj:asking"]; r.WaitingSince.Format("2006-01-02") != "2026-03-01" {

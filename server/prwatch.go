@@ -21,6 +21,25 @@ import (
 // PRWatcher is the watcher of open PRs, for tests that force a pass with Tick.
 func (s *Server) PRWatcher() *prflow.Watcher { return s.prWatch }
 
+// prLive is the watcher's view of root's PR, reduced for the epic read models.
+func (s *Server) prLive(root queue.RootRef) (prstate.Live, bool) {
+	if s.prWatch == nil {
+		return prstate.Live{}, false
+	}
+	v, ok := s.prWatch.View(root.Project, root.Epic)
+	if !ok {
+		return prstate.Live{}, false
+	}
+	l := prstate.Live{
+		Draft: v.Draft, Merged: v.State == "MERGED", Unreachable: v.Unreachable,
+		Pending: v.Checks.Pending, Failed: v.Checks.Failed, Green: v.Checks.Green,
+	}
+	if len(v.Failed) > 0 {
+		l.FailedName = v.Failed[0].Name
+	}
+	return l, true
+}
+
 // RescanIndex re-reads the ticket store now, for tests that write a ticket and
 // then force a pass that reads the index.
 func (s *Server) RescanIndex() error { return s.idx.Refresh() }

@@ -2,13 +2,11 @@ package epics
 
 import (
 	"cmp"
-	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
@@ -292,9 +290,6 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 	if !e.IsMap {
 		row.QueueSlot = qidx.slot(root.String())
 		decorateLoopCard(&row, row.QueueSlot)
-		if row.State == wire.EpicListFixingCI {
-			row.StatusWords = fmt.Sprintf("Fixing CI (attempt %d of %d)", prstate.CIFixAttempt(e, time.Time{}), config.DefaultPRConfig().CIFixAttemptsPerCheck)
-		}
 		row.Verdict, row.Reason = s.capLine(root, e, row.Queued)
 		for _, t := range e.Tickets {
 			if e.RenderedStatus(t) != tickets.StatusClaimed {
@@ -309,6 +304,7 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 			row.Section, row.StatePill, row.Reason, row.WaitingSince = wire.SectionNeedsYou, n.Pill, n.Reason, n.Since
 			row.Actions = append([]wire.CardAction{n.Action}, n.More...)
 		}
+		s.decoratePR(&row, root, e)
 		setCardTime(&row, cardTimeSources{startedAt: e.StartedAt, enqueuedAt: qidx.enqueuedAt(root.String())})
 	}
 	return row

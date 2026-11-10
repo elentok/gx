@@ -127,6 +127,7 @@ func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Tim
 		}
 		d.WallClock = int(end.Sub(e.StartedAt).Seconds())
 	}
+	s.decoratePRDetail(&d, root, e)
 	d.Stats = epicStats(e, e.MergedAt, now)
 	d.Stats.Friction = epicFriction(e.Friction)
 	d.Stats.LinesAdded, d.Stats.LinesRemoved = e.LinesAdded, e.LinesRemoved
