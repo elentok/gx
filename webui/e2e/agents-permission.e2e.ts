@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import type { SessionInfo } from "../src/generated/server";
 import { expect, test, type Fixture } from "./fixture";
@@ -20,6 +23,19 @@ const screenDialog = (page: Page) => page.getByRole("dialog", { name: "Screen" }
 const BASH_DIALOG = (command: string) => ["────────────────────", "Bash command", `  ${command}`, "Do you want to proceed?", "❯ 1. Yes", "  2. No", "Esc to cancel"];
 const UNREADABLE = ["▒▒▒▒ nothing gx can read ▒▒▒▒"];
 const QUESTION = ["Select a thing", "❯ 1. One", "  2. Two", "Esc to cancel"];
+
+/** Claude's AskUserQuestion dialog as the screen shows it, as agentfake.AskDialogRows draws it. */
+const askDialog = (question: string, ...options: string[]) => [
+  "←  ☐ Q  ✔ Submit  →",
+  "",
+  question,
+  ...options.flatMap((o, i) => [`${i === 0 ? "❯ " : "  "}${i + 1}. ${o}`, `     about ${o}`]),
+  `  ${options.length + 1}. Type something.`,
+  "────────────",
+  `  ${options.length + 2}. Chat about this`,
+  "",
+  "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
+];
 
 const NOT_APPROVABLE = "This request needs a real answer. Use the key bar in Screen.";
 const NOT_DELIVERED = "The answer did not reach the session. Check Screen.";
@@ -152,6 +168,8 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toBeVisible();
   const plan = await cardOf("permission", "auto-accept edits");
   await go(page, `#/agents/${plan.id}`);
+  // Story 24: the card shows the text of the plan file the dialog names.
+  await expect(page.getByText("second step")).toBeVisible();
   await expect(sheet.getByRole("button", { name: /Yes, and auto-accept edits/ })).toBeVisible();
   await expect(sheet.getByRole("button", { name: /Yes, and manually approve edits/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeDisabled();
@@ -184,6 +202,40 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(sheet).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1280, height: 800 });
+
+  // Dismiss on a hook card: a second ask on an idle session, so the first hook card can still move to the terminal below.
+  const asked = (await claudeIdle(fixture))!;
+  const askedConv = await conversationOf(fixture, asked.id);
+  const outFile = join(mkdtempSync(join(tmpdir(), "ask-out-")), "hook.json");
+  await fixture.controlClaude(askedConv, {
+    action: "askquestion",
+    ask: { tool_use_id: "toolu_dismiss", out_file: outFile, questions: [{ header: "Pick", question: "Which pick?", multiSelect: false, options: [{ label: "A", description: "a" }, { label: "B", description: "b" }] }] },
+  });
+  await go(page, `#/agents/${asked.id}`);
+  await expect(sheet).toContainText("Which pick?");
+  await page.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect.poll(() => readFileSync(outFile, "utf8"), SLOW).toContain("The user doesn't want to proceed with this question");
+  expect(JSON.parse(readFileSync(outFile, "utf8")).hookSpecificOutput.permissionDecision).toBe("deny");
+
+  // A new dialog id after a retype drops the draft: the same session blocks again on another dialog.
+  await fixture.controlClaude(askedConv, { action: "block", waiting_for: "input needed", dialog: askDialog("Which size?", "small", "large") });
+  // The fallback card lists once the dialog has waited out the server's delay, and nothing pushes the page when it has.
+  const revisitUntil = (text: string) =>
+    expect(async () => {
+      await go(page, "#/agents");
+      await go(page, `#/agents/${asked.id}`);
+      await expect(sheet).toContainText(text, { timeout: 3_000 });
+    }).toPass(SLOW);
+  await revisitUntil("Which size?");
+  await sheet.getByRole("button", { name: "Other", exact: true }).first().click();
+  await sheet.getByPlaceholder("Other", { exact: true }).first().fill("draft text");
+  await fixture.controlClaude(askedConv, { action: "block", waiting_for: "input needed", dialog: askDialog("Which shape?", "round", "square") });
+  await revisitUntil("Which shape?");
+  await sheet.getByRole("button", { name: "Other", exact: true }).first().click();
+  await expect(sheet.getByPlaceholder("Other", { exact: true }).first()).toHaveValue("");
+  await page.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await leavesBlocked(fixture, asked.id);
 
   // Last, since each answer clears its card: Dismiss on the fallback card, and the hook card moving to the terminal.
   await go(page, `#/agents/${fallback.id}`);
