@@ -30,6 +30,9 @@ type InstallRequest struct {
 	Mode InstallMode
 	// BackupDir retains dated recovery snapshots. Defaults beside the manifest.
 	BackupDir string
+	// AllowLinkedMarker lets a directory-linked skill's SKILL.md be a symlink.
+	// Only Skill sources set it; the dev path still demands a real file.
+	AllowLinkedMarker bool
 }
 
 // effectiveMode returns r.Mode, defaulting to ModeManagedCopy when unset.

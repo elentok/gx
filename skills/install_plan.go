@@ -61,7 +61,7 @@ func desiredEntries(req InstallRequest) ([]ManagedFile, map[string][]byte, error
 			if err != nil {
 				return nil, nil, err
 			}
-			if !marker.Mode().IsRegular() {
+			if !req.AllowLinkedMarker && !marker.Mode().IsRegular() {
 				return nil, nil, fmt.Errorf("dev skill SKILL.md must be a real file: %s", f.AbsPath)
 			}
 			directories[parts[0]] = filepath.Dir(f.AbsPath)

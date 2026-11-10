@@ -23,6 +23,7 @@ func fakeSkillsDeps(t *testing.T, stdout *bytes.Buffer) skillscmd.Deps {
 	codexRoot := filepath.Join(t.TempDir(), "codex-skills")
 	manifestPath := filepath.Join(t.TempDir(), "manifest.json")
 	statusPath := filepath.Join(t.TempDir(), "skills-install.json")
+	manifestDir := t.TempDir()
 
 	return skillscmd.Deps{
 		Env: cmdbase.Env{
@@ -34,6 +35,9 @@ func fakeSkillsDeps(t *testing.T, stdout *bytes.Buffer) skillscmd.Deps {
 		},
 		ManifestPath: func() (string, error) {
 			return manifestPath, nil
+		},
+		ManifestDir: func() (string, error) {
+			return manifestDir, nil
 		},
 		StatusPath: func() (string, error) {
 			return statusPath, nil

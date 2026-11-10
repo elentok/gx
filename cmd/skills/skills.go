@@ -23,6 +23,8 @@ type Deps struct {
 	cmdbase.Env
 	AgentRoots   func() ([]string, error)
 	ManifestPath func() (string, error)
+	// ManifestDir is the folder holding one manifest per Skill source.
+	ManifestDir func() (string, error)
 	// StatusPath is where `gx server start` records a skill install problem
 	// for the server to show.
 	StatusPath func() (string, error)
@@ -38,7 +40,14 @@ func DefaultDeps(dirs config.Dirs, codexHome string) Deps {
 	return Deps{
 		AgentRoots:   func() ([]string, error) { return defaultAgentRoots(dirs) },
 		ManifestPath: func() (string, error) { return defaultManifestPath(dirs) },
-		StatusPath:   func() (string, error) { return defaultStatusPath(dirs) },
+		ManifestDir: func() (string, error) {
+			base, err := dirs.UserConfigDir()
+			if err != nil {
+				return "", fmt.Errorf("resolve user config dir: %w", err)
+			}
+			return filepath.Dir(skills.ManifestPath(base, skills.BundleID)), nil
+		},
+		StatusPath: func() (string, error) { return defaultStatusPath(dirs) },
 		BackupDir: func() (string, error) {
 			base, err := dirs.DataDir()
 			if err != nil {
@@ -90,12 +99,16 @@ func New(d Deps) *cobra.Command {
 func newSkillsInstallCmd(d Deps) *cobra.Command {
 	var force []string
 	var forceAll bool
-	var dev bool
+	var dev, copyFiles bool
 	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "install gx's canonical skill bundle for Claude and Codex",
-		Args:  cobra.NoArgs,
-		RunE: func(c *cobra.Command, _ []string) error {
+		Use:   "install [<dir>]",
+		Short: "install gx's skill bundle, or the skills of a source folder <dir>, for Claude and Codex",
+		Long: `Without <dir>, install gx's canonical skill bundle as managed copies.
+
+With <dir>, make it a skill source: each direct subfolder holding a SKILL.md
+is linked into both agent roots (or copied with --copy).`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
 			policy := skills.NewForcePolicy(force...)
 			if forceAll {
 				policy = skills.ForceAll()
@@ -103,6 +116,16 @@ func newSkillsInstallCmd(d Deps) *cobra.Command {
 			install := runSkillsInstall
 			if dev {
 				install = runSkillsInstallDev
+			}
+			if len(args) == 1 {
+				if dev {
+					return errors.New("--dev cannot be used with a source folder")
+				}
+				install = func(d Deps, p skills.ForcePolicy, out io.Writer) error {
+					return runSkillsInstallSource(d, args[0], copyFiles, p, out)
+				}
+			} else if copyFiles {
+				return errors.New("--copy needs a source folder <dir>")
 			}
 			if err := install(d, policy, c.OutOrStdout()); err != nil {
 				return err
@@ -116,7 +139,9 @@ func newSkillsInstallCmd(d Deps) *cobra.Command {
 	cmd.Flags().BoolVar(&forceAll, "force-all", false,
 		"force-overwrite every conflicting path")
 	cmd.Flags().BoolVar(&dev, "dev", false,
-		"symlink the current checkout's skill directories; link shared files separately")
+		"symlink the current checkout's skill directories; link shared files separately (not with <dir>)")
+	cmd.Flags().BoolVar(&copyFiles, "copy", false,
+		"with <dir>: install managed copies of each skill instead of links")
 	return cmd
 }
 
@@ -221,11 +246,16 @@ func installSkills(d Deps, force skills.ForcePolicy, out io.Writer, source strin
 // installSkillTargets runs a single skill install and returns its per-target
 // report without printing it.
 func installSkillTargets(d Deps, force skills.ForcePolicy, source string, sources []skills.SourceFile, mode skills.InstallMode) ([]skills.Target, error) {
-	roots, err := d.AgentRoots()
+	manifestPath, err := d.ManifestPath()
 	if err != nil {
 		return nil, err
 	}
-	manifestPath, err := d.ManifestPath()
+	return installTargetsAt(d, manifestPath, force, source, sources, mode, false)
+}
+
+// installTargetsAt is installSkillTargets for an explicit manifest path.
+func installTargetsAt(d Deps, manifestPath string, force skills.ForcePolicy, source string, sources []skills.SourceFile, mode skills.InstallMode, linkedMarker bool) ([]skills.Target, error) {
+	roots, err := d.AgentRoots()
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +273,61 @@ func installSkillTargets(d Deps, force skills.ForcePolicy, source string, source
 		Files:      sources,
 		Force:      force,
 		Mode:       mode,
+
+		AllowLinkedMarker: linkedMarker,
 	})
+}
+
+// runSkillsInstallSource installs the skills of the Skill source dir: one
+// directory link per skill into every root, or managed copies with copyFiles.
+func runSkillsInstallSource(d Deps, dir string, copyFiles bool, force skills.ForcePolicy, out io.Writer) error {
+	if d.ManifestDir == nil {
+		return errors.New("skill sources are not configured")
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return err
+	}
+	real, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return fmt.Errorf("skill source %s: %w", dir, err)
+	}
+	if info, err := os.Stat(real); err != nil || !info.IsDir() {
+		return fmt.Errorf("skill source %s is not a folder", dir)
+	}
+	// Link targets stay inside the path the user gave, not the resolved one.
+	names, err := skills.ScanSource(abs)
+	if err != nil {
+		return err
+	}
+	if len(names) == 0 {
+		fmt.Fprintf(out, "no skills found in %s\n", dir)
+		return nil
+	}
+	files, err := skills.SourceSkillFiles(abs, names, copyFiles)
+	if err != nil {
+		return err
+	}
+	mode := skills.ModeSymlink
+	if copyFiles {
+		mode = skills.ModeManagedCopy
+	}
+	manifestDir, err := d.ManifestDir()
+	if err != nil {
+		return err
+	}
+	manifestPath := filepath.Join(manifestDir, skills.SourceID(real)+".json")
+	targets, installErr := installTargetsAt(d, manifestPath, force, skills.ThirdPartySourcePrefix+real, files, mode, true)
+	printTargetReport(out, targets, installErr == nil)
+	var conflictErr *skills.ConflictError
+	if errors.As(installErr, &conflictErr) {
+		return fmt.Errorf("%w; rerun with --force <path> for each conflicted path, or --force-all to override every conflict", installErr)
+	}
+	if installErr != nil {
+		return installErr
+	}
+	fmt.Fprintf(out, "%d skills from %s: %s\n", len(names), dir, summarizeTargets(targets))
+	return nil
 }
 
 // Refresh reinstalls gx's skill bundle the way it was last installed:
