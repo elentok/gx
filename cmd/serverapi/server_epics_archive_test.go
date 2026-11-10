@@ -138,3 +138,82 @@ func TestServerCleanupWrite_CleanupArchiveAliasTakesYes(t *testing.T) {
 		t.Error("alias did not archive the epic")
 	}
 }
+
+func TestServerEpicsArchived_JSONListsNewestFirst(t *testing.T) {
+	f, _ := archiveFixture(t, "first", "second")
+	// Archived one after the other, so "second" has the newer archived_at.
+	for _, epic := range []string{"proj:first", "proj:second"} {
+		if _, err := runServer(t, f.H, "epics", "archive", epic); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	out, err := runServer(t, f.H, "epics", "archived", "--json")
+	var list wire.ArchivedEpicList
+	if err != nil || json.Unmarshal([]byte(out), &list) != nil {
+		t.Fatalf("out = %q, err = %v", out, err)
+	}
+	if len(list.Epics) != 2 || list.Epics[0].Address != "proj:second" || list.Epics[1].Address != "proj:first" {
+		t.Errorf("epics = %+v, want second then first", list.Epics)
+	}
+}
+
+func TestServerEpicsArchivedDetail_JSONHasArchivedAt(t *testing.T) {
+	f, _ := archiveFixture(t, "foo")
+	if _, err := runServer(t, f.H, "epics", "archive", "proj:foo"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runServer(t, f.H, "epics", "archived-detail", "proj:foo", "--json")
+	var d wire.EpicDetail
+	if err != nil || json.Unmarshal([]byte(out), &d) != nil {
+		t.Fatalf("out = %q, err = %v", out, err)
+	}
+	if d.Address != "proj:foo" || d.ArchivedAt.IsZero() {
+		t.Errorf("detail = %+v, want proj:foo with archived_at", d)
+	}
+}
+
+func TestServerEpicsArchivedDetail_UnknownAddressFails(t *testing.T) {
+	f, _ := archiveFixture(t, "foo")
+	if out, err := runServer(t, f.H, "epics", "archived-detail", "proj:foo"); err == nil {
+		t.Errorf("out = %q, want an error for an epic that is not archived", out)
+	}
+}
+
+func TestServerEpicsUnarchive_ManyTargetsExitsOneOnUnknown(t *testing.T) {
+	f, store := archiveFixture(t, "one", "two")
+	if _, err := runServer(t, f.H, "epics", "archive", "proj:one", "proj:two"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runServer(t, f.H, "epics", "unarchive", "proj:one", "proj:nope", "proj:two")
+	if exit, ok := err.(*cmdbase.ExitError); !ok || exit.Code != 1 {
+		t.Fatalf("err = %v, want exit 1", err)
+	}
+	for _, want := range []string{"done proj:one", "refused proj:nope", "done proj:two", "2 done, 1 refused"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("out = %q, missing %q", out, want)
+		}
+	}
+	if got := archivedNames(t, store); len(got) != 0 {
+		t.Errorf("archived = %v, want none", got)
+	}
+}
+
+func TestServerEpicsUnarchive_JSONIsAnEnvelopeForOneTargetWithNewAddress(t *testing.T) {
+	f, store := archiveFixture(t, "foo")
+	if _, err := runServer(t, f.H, "epics", "archive", "proj:foo"); err != nil {
+		t.Fatal(err)
+	}
+	servertest.WriteCompleteEpic(t, store, "foo")
+
+	out, err := runServer(t, f.H, "epics", "unarchive", "proj:foo", "--json")
+	var res wire.TargetsResult
+	if err != nil || json.Unmarshal([]byte(out), &res) != nil || len(res.Results) != 1 {
+		t.Fatalf("out = %q, err = %v, want a results envelope", out, err)
+	}
+	if r := res.Results[0]; r.Status != wire.TargetDone || r.NewAddress != "proj:foo-2" {
+		t.Errorf("result = %+v, want done with new_address proj:foo-2", r)
+	}
+}

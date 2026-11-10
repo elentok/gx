@@ -7,7 +7,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/server/wire"
 )
+
+// notRunning is the single refusal a write gets when no server answers.
+func notRunning(target string) wire.TargetResult {
+	return wire.RefusedTarget(target, wire.ReasonServerNotRunning, "no server is running; start it with `gx server start`")
+}
 
 // Deps is what the API verbs need: the shared env and whether stdin is a
 // terminal (the web password prompt reads it).
