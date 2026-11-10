@@ -88,14 +88,51 @@ func waitForStatus(t *testing.T, c *holder.HolderClient, want nativerunner.PidSt
 	})
 }
 
-func TestRunHolder_LongSocketPathNamesTheCap(t *testing.T) {
+func TestRunHolder_LongAgentDirServesOnAShortSocket(t *testing.T) {
 	dir := filepath.Join(shortTempDir(t), strings.Repeat("d", 120))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	err := holder.RunHolder(dir, []string{"true"})
-	if err == nil || !strings.Contains(err.Error(), "unix socket path") {
-		t.Fatalf("err = %v, want one naming the unix socket path length cap", err)
+	sock := holder.SocketPath(dir)
+	if len(sock) > 100 {
+		t.Fatalf("SocketPath = %q (%d bytes), want at most 100", sock, len(sock))
+	}
+	finished := make(chan error, 1)
+	go func() {
+		finished <- holder.RunHarnessHolder(dir, gxharness.Claude, holder.HolderOptions{}, []string{"sh", "-c", echoChild, "sh"})
+	}()
+	var c *holder.HolderClient
+	waitFor(t, "long-dir holder answers", func() bool {
+		var err error
+		c, err = holder.DialHolder(dir)
+		return err == nil
+	})
+	if err := c.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-finished; err != nil {
+		t.Fatalf("holder: %v", err)
+	}
+	if _, err := os.Lstat(sock); !os.IsNotExist(err) {
+		t.Errorf("alias socket left behind: %v", err)
+	}
+}
+
+func TestSocketPath(t *testing.T) {
+	short := "/tmp/gxh123/e-01"
+	if got, want := holder.SocketPath(short), short+"/holder.sock"; got != want {
+		t.Errorf("short dir: got %q, want %q", got, want)
+	}
+	long := "/" + strings.Repeat("x", 150)
+	got := holder.SocketPath(long)
+	if got == long+"/holder.sock" || len(got) > 100 {
+		t.Errorf("long dir: got %q (%d bytes)", got, len(got))
+	}
+	if again := holder.SocketPath(long); again != got {
+		t.Errorf("not deterministic: %q vs %q", got, again)
+	}
+	if other := holder.SocketPath(long + "y"); other == got {
+		t.Errorf("distinct dirs share socket %q", got)
 	}
 }
 

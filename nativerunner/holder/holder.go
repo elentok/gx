@@ -149,7 +149,15 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		_ = tty.Close()
 		return err
 	}
-	sock := filepath.Join(dir, HolderSocketFile)
+	sock := SocketPath(dir)
+	if err := prepareSocketDir(sock); err != nil {
+		_ = tty.Close()
+		return err
+	}
+	// A crashed holder's socket at a long path's alias would stop the bind.
+	if sock != filepath.Join(dir, HolderSocketFile) {
+		_ = os.Remove(sock)
+	}
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		_ = tty.Close()

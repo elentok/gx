@@ -177,6 +177,12 @@ func (l layout) lastTouched(dir string) time.Time {
 
 func removeAll(dir string, names []string) error {
 	for _, name := range names {
+		if name == holder.HolderSocketFile {
+			if err := holder.RemoveSocket(dir); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := os.Remove(filepath.Join(dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}

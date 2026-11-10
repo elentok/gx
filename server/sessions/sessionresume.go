@@ -106,12 +106,10 @@ func clearOldHolder(dir string) error {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	for _, f := range []string{holder.ExitCodeFile, holder.HolderSocketFile} {
-		if err := os.Remove(filepath.Join(dir, f)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
+	if err := os.Remove(filepath.Join(dir, holder.ExitCodeFile)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
 	}
-	return nil
+	return holder.RemoveSocket(dir)
 }
 
 // RestoreSessions picks up every live session on server start. A live holder

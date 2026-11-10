@@ -153,25 +153,25 @@ func TestPty_StartCleansDeadHolderDir(t *testing.T) {
 	}
 }
 
-func TestPty_StartHolderThatCannotBindShowsItsStderr(t *testing.T) {
+func TestPty_StartOverLongSocketPathServesOnAShortAlias(t *testing.T) {
 	t.Parallel()
 	p := fakeclaudeRunner(t)
-	// A socket path over the unix limit makes the holder's listen fail.
+	// The agent dir's holder.sock is over the unix limit, so the holder
+	// listens on a short alias instead of failing to bind.
 	label := strings.Repeat("l", 150)
-	_, err := p.Start(agentrunner.StartOptions{Label: label, Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
-	if err == nil {
-		t.Fatal("Start = nil; want the holder's bind failure")
+	s, err := p.Start(agentrunner.StartOptions{Label: label, Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatalf("Start over a long socket path = %v", err)
 	}
-	if strings.Contains(err.Error(), "holder.sock never answered") {
-		t.Errorf("error = %q; want the holder's own stderr", err)
+	t.Cleanup(func() { _ = p.Stop(s); _ = p.Cleanup(label) })
+	if _, err := os.Stat(filepath.Join(p.Root, label, holder.HolderSocketFile)); !os.IsNotExist(err) {
+		t.Errorf("holder.sock in the agent dir = %v; want none", err)
 	}
-	stderr, rerr := os.ReadFile(filepath.Join(p.Root, label, holder.HolderErrFile))
-	if rerr != nil {
-		t.Fatalf("holder.err: %v", rerr)
+	c, err := holder.DialHolder(filepath.Join(p.Root, label))
+	if err != nil {
+		t.Fatalf("dial the alias: %v", err)
 	}
-	if len(stderr) == 0 || !strings.Contains(err.Error(), strings.TrimSpace(string(stderr))) {
-		t.Errorf("error = %q; want it to carry holder.err %q", err, stderr)
-	}
+	_ = c
 }
 
 func TestPty_StartSilentHolderIsTakenAndStopKillsIt(t *testing.T) {

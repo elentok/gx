@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"sync"
@@ -510,7 +509,7 @@ type HolderClient struct {
 
 // DialHolder pings the holder serving dir's holder.sock.
 func DialHolder(dir string) (*HolderClient, error) {
-	c := &HolderClient{sock: filepath.Join(dir, HolderSocketFile)}
+	c := &HolderClient{sock: SocketPath(dir)}
 	resp, err := c.call(holderRequest{Op: opPing})
 	if err != nil {
 		return nil, err
