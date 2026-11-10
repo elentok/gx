@@ -1,13 +1,10 @@
 package pr
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/internal/run"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 )
@@ -240,24 +237,7 @@ func IsCommitMergedToTrunk(dir, trunk, hash string) (bool, error) {
 }
 
 // runGH executes a gh command in dir and returns trimmed stdout.
+// It is the default Runner: the process environment, for the TUI.
 func runGH(dir string, args []string) (string, error) {
-	cmd := exec.Command("gh", args...)
-	cmd.Env = os.Environ()
-	cmd.Dir = dir
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", &run.RunError{
-				Args:   args,
-				Dir:    dir,
-				Stdout: strings.TrimSpace(outBuf.String()),
-				Stderr: strings.TrimSpace(errBuf.String()),
-				Code:   exitErr.ExitCode(),
-			}
-		}
-		return "", fmt.Errorf("gh %s: %w", strings.Join(args, " "), err)
-	}
-	return strings.TrimRight(outBuf.String(), "\r\n"), nil
+	return Runner{Env: os.Environ(), Dir: dir}.Run(args...)
 }

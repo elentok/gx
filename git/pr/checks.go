@@ -14,6 +14,11 @@ type Check struct {
 	HeadSHA    string
 	Status     string
 	Conclusion string
+
+	// Detail for the fix agent; not part of the check's identity.
+	URL   string
+	JobID string
+	RunID string
 }
 
 // Key returns the check's identity.
