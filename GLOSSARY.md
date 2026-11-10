@@ -1162,6 +1162,11 @@ makes it active; opening a held item or an Other row leaves it unchanged. The si
 leaves the main lists. It is not the same as being in no workspace.
 _Avoid_: snoozed, paused (a pause is a queue or ticket state), archived
 
+**Archived epic** — a finished epic or Design the person has put away. It leaves every list except the
+Archive page, its agents are hidden with it, and Unarchive brings it back with its agents and its workspace.
+Not the same as On hold, which is for unfinished work set aside for now.
+_Avoid_: deleted, closed, hidden
+
 **Other section** — the fixed section at the bottom of the web sidebar, below On hold. Its contents are the
 same in every workspace, but its order follows the active workspace's Sort. It lists the agents that belong to no workspace: One-off agents (agents of tickets
 in a project's one-offs epic) and project-level Fix agents (a Fix agent for a failed project ticket
