@@ -16,11 +16,11 @@ var devModeControl = map[string]vitefake.Control{
 	"starting":   {Vite: "hold"},
 }
 
-// setupDevMode lays out the dev-mode scenario: a Dev checkout (none for
+// setupDevMode (a function, not a method, to keep fixture small) lays out the dev-mode scenario: a Dev checkout (none for
 // no-checkout), the fake pnpm first on PATH with its control file, and the
 // config that points the server at them. installing is the one shape with a
 // stale pair (node_modules older than pnpm-lock.yaml), so the server installs.
-func (f *fixture) setupDevMode(shape string) (config []string, err error) {
+func setupDevMode(f *fixture, shape string) (config []string, err error) {
 	dir := filepath.Join(f.root, "devmode")
 	bin := filepath.Join(dir, "bin")
 	if err := os.MkdirAll(bin, 0o755); err != nil {
@@ -29,7 +29,7 @@ func (f *fixture) setupDevMode(shape string) (config []string, err error) {
 	if _, err := binary("", filepath.Join(bin, "pnpm"), "github.com/elentok/gx/testutil/vitefake/cmd/pnpm"); err != nil {
 		return nil, err
 	}
-	f.prependPath(bin)
+	f.env = prependPath(f.env, bin)
 	f.devControl = filepath.Join(dir, "vitefake.json")
 	if err := vitefake.WriteControl(f.devControl, devModeControl[shape]); err != nil {
 		return nil, err

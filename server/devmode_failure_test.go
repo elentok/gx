@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/devvite"
+	"github.com/elentok/gx/server/devvite/vitetest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -45,16 +46,16 @@ func TestDevMode_FailureCausesServeTheBuiltFilesWithAReason(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		fresh  bool
-		script func(*servertest.FakeVite)
+		script func(*vitetest.FakeVite)
 		reason string
 	}{
-		{"start fails", true, func(f *servertest.FakeVite) { f.FailStart(errors.New("boom")) }, "boom"},
-		{"install fails", false, func(f *servertest.FakeVite) { f.FailInstall(errors.New("exit status 1")) }, "exit status 1"},
-		{"pnpm missing at start", true, func(f *servertest.FakeVite) { f.FailStart(devvite.ErrPnpmNotFound) }, "pnpm"},
-		{"pnpm missing at install", false, func(f *servertest.FakeVite) { f.FailInstall(devvite.ErrPnpmNotFound) }, "pnpm"},
+		{"start fails", true, func(f *vitetest.FakeVite) { f.FailStart(errors.New("boom")) }, "boom"},
+		{"install fails", false, func(f *vitetest.FakeVite) { f.FailInstall(errors.New("exit status 1")) }, "exit status 1"},
+		{"pnpm missing at start", true, func(f *vitetest.FakeVite) { f.FailStart(devvite.ErrPnpmNotFound) }, "pnpm"},
+		{"pnpm missing at install", false, func(f *vitetest.FakeVite) { f.FailInstall(devvite.ErrPnpmNotFound) }, "pnpm"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			checkout := servertest.WriteDevCheckout(t, tc.fresh)
+			checkout := vitetest.WriteDevCheckout(t, tc.fresh)
 			r := startDevRig(t, checkout, false)
 			built := r.page(t)
 			tc.script(r.fake)
@@ -72,7 +73,7 @@ func TestDevMode_FailureCausesServeTheBuiltFilesWithAReason(t *testing.T) {
 }
 
 func TestDevMode_InstallThatLeavesNoNodeModulesIsDown(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, false)
+	checkout := vitetest.WriteDevCheckout(t, false)
 	r := startDevRig(t, checkout, false)
 	r.fake.NoNodeModules()
 	r.fake.Release()
@@ -84,7 +85,7 @@ func TestDevMode_InstallThatLeavesNoNodeModulesIsDown(t *testing.T) {
 }
 
 func TestDevMode_CrashServesBuiltFilesAndRestartsOnlyOnRequest(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, false)
 	built := r.page(t)
 	r.fake.Release()
@@ -92,7 +93,7 @@ func TestDevMode_CrashServesBuiltFilesAndRestartsOnlyOnRequest(t *testing.T) {
 		t.Fatalf("restart while off = %+v, want a refusal", res)
 	}
 	r.setKey(t, checkout, true)
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	if res := r.restart(t); !res.Refused {
 		t.Fatalf("restart while running = %+v, want a refusal", res)
 	}
@@ -108,7 +109,7 @@ func TestDevMode_CrashServesBuiltFilesAndRestartsOnlyOnRequest(t *testing.T) {
 	if res := r.restart(t); res.Refused {
 		t.Fatalf("restart while down = %+v", res)
 	}
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	if _, starts := r.fake.Counts(); starts != 2 {
 		t.Fatalf("starts = %d after Restart Vite, want 2", starts)
 	}
@@ -118,17 +119,17 @@ func TestDevMode_CrashServesBuiltFilesAndRestartsOnlyOnRequest(t *testing.T) {
 	r.waitDown(t, "exited")
 	r.setKey(t, checkout, false)
 	r.setKey(t, checkout, true)
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	if _, starts := r.fake.Counts(); starts != 3 {
 		t.Fatalf("starts = %d after flipping the key, want 3", starts)
 	}
 }
 
 func TestDevMode_ViteOutputReachesALogFile(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	data, err := os.ReadFile(filepath.Join(r.h.StateDir, "logs", "vite", "dev-vite.log"))
 	if err != nil || !strings.Contains(string(data), "fake vite output") {
 		t.Fatalf("log = %q, %v, want the fake's output", data, err)

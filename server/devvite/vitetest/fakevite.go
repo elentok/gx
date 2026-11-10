@@ -1,4 +1,4 @@
-package servertest
+package vitetest
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/devvite"
 )
 
@@ -70,11 +69,6 @@ func (f *FakeVite) Log(line string) {
 
 // NewFakeVite returns a fake that is not ready yet.
 func NewFakeVite() *FakeVite { return &FakeVite{ready: make(chan struct{})} }
-
-// WithViteLauncher makes the server's Dev mode use l instead of pnpm.
-func WithViteLauncher(l devvite.Launcher) func(*server.Config) {
-	return func(c *server.Config) { c.ViteLauncher = l }
-}
 
 // Release lets the fake answer its readiness probe.
 func (f *FakeVite) Release() {

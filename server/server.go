@@ -490,7 +490,7 @@ func New(cfg Config) (*Server, error) {
 	s.tcpHTTP = &http.Server{Handler: refuseBrowsers(mux, log)}
 	s.web = s.newWeb()
 	s.web.Bind()
-	if err := s.newDevVite(); err != nil {
+	if err := (devHost{s}).newDevVite(); err != nil {
 		return nil, fmt.Errorf("start dev vite supervisor: %w", err)
 	}
 	// A down herdr never stops the server; it is reported and retried.

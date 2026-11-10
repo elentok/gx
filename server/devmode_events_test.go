@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/devvite/vitetest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -58,7 +59,7 @@ func (d *devEvents) none(typ string) {
 }
 
 func TestDevMode_ReloadAtReadyAndAtOff(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, false)
 	evs := subscribeDevEvents(t, r)
 
@@ -75,7 +76,7 @@ func TestDevMode_ReloadAtReadyAndAtOff(t *testing.T) {
 // The observer publishes the reload before dev-changed, so a dev-changed seen
 // after the reload is the one for starting -> running.
 func TestDevMode_DevChangedAtReady(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, true)
 	servertest.WaitFor(t, 10*time.Second, "the starting state", func() bool {
 		return devSnapshot(t, r.h).State == wire.DevStateStarting
@@ -88,10 +89,10 @@ func TestDevMode_DevChangedAtReady(t *testing.T) {
 }
 
 func TestDevMode_LogLinesPublishNothing(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	evs := subscribeDevEvents(t, r)
 
 	r.fake.Log("hot update")
@@ -108,11 +109,11 @@ func TestDevMode_LogLinesPublishNothing(t *testing.T) {
 }
 
 func TestDevMode_ReloadAtReadyAfterDevDirChange(t *testing.T) {
-	first := servertest.WriteDevCheckout(t, true)
-	second := servertest.WriteDevCheckout(t, true)
+	first := vitetest.WriteDevCheckout(t, true)
+	second := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, first, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	evs := subscribeDevEvents(t, r)
 
 	r.setKey(t, second, true)
@@ -125,7 +126,7 @@ func TestDevMode_ReloadAtReadyAfterDevDirChange(t *testing.T) {
 // An open settings page enables its dev-frontend row from has_checkout, so a
 // dev-dir write must announce itself even while the supervisor stays off.
 func TestDevMode_DevDirWriteTurningOnHasCheckoutPublishesDevChanged(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, filepath.Join(t.TempDir(), "missing"), false)
 	if dev := devSnapshot(t, r.h); dev.HasCheckout {
 		t.Fatalf("dev = %+v, want no checkout", dev)
@@ -140,10 +141,10 @@ func TestDevMode_DevDirWriteTurningOnHasCheckoutPublishesDevChanged(t *testing.T
 }
 
 func TestDevMode_CrashPublishesDevChangedButNoReload(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	evs := subscribeDevEvents(t, r)
 
 	r.fake.Crash()
@@ -155,10 +156,10 @@ func TestDevMode_CrashPublishesDevChangedButNoReload(t *testing.T) {
 }
 
 func TestDevMode_ReloadAtReadyAfterRestartVite(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	r.fake.Crash()
 	servertest.WaitFor(t, 10*time.Second, "the down state", func() bool {
 		return devSnapshot(t, r.h).State == wire.DevStateDown

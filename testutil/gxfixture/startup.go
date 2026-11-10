@@ -145,7 +145,7 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 // and commits the ticket store.
 func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []string) error {
 	if sc.DevMode {
-		devConfig, err := f.setupDevMode(shape)
+		devConfig, err := setupDevMode(f, shape)
 		if err != nil {
 			return err
 		}

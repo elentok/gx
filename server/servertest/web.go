@@ -13,8 +13,14 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/devvite"
 	"github.com/elentok/gx/server/webauth"
 )
+
+// WithViteLauncher makes the server's Dev mode use l instead of pnpm.
+func WithViteLauncher(l devvite.Launcher) func(*server.Config) {
+	return func(c *server.Config) { c.ViteLauncher = l }
+}
 
 // LoginPassword is the password SignIn sets on the account.
 const LoginPassword = "correct horse battery"

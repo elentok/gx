@@ -44,7 +44,7 @@ import (
 var assembleRoutes = func(s *Server) []wire.Route {
 	return slices.Concat(
 		rootRoutes{s}.routes(),
-		s.devRoutes(),
+		devHost{s}.devRoutes(),
 		web.Routes(func() *web.Web { return s.web }),
 		webtls.Routes(func() *x509.Certificate { return s.web.Certs().Root() }),
 		webauth.Routes(func() *webauth.Gate { return s.web.Gate() }),

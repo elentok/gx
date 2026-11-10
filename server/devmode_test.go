@@ -12,13 +12,14 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/devvite/vitetest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
 
 type devRig struct {
 	h      *servertest.Harness
-	fake   *servertest.FakeVite
+	fake   *vitetest.FakeVite
 	cfg    string
 	store  string
 	base   string
@@ -30,7 +31,7 @@ func startDevRig(t *testing.T, checkout string, on bool, opts ...func(*server.Co
 	store := t.TempDir()
 	cfg := filepath.Join(t.TempDir(), "config.json")
 	devConfig(t, cfg, store, map[string]any{"listen": "127.0.0.1:0", "dev-dir": checkout, "dev-frontend": on})
-	fake := servertest.NewFakeVite()
+	fake := vitetest.NewFakeVite()
 	opts = append([]func(*server.Config){servertest.WithConfigFile(cfg), servertest.WithViteLauncher(fake),
 		func(c *server.Config) {
 			c.WebAddr = "127.0.0.1:0"
@@ -71,10 +72,10 @@ func (r *devRig) waitStopped(t *testing.T) {
 }
 
 func TestDevMode_KeyFlipSwapsTheUIWithoutRestart(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, false)
 	built := r.page(t)
-	if built == servertest.ViteStubPage {
+	if built == vitetest.ViteStubPage {
 		t.Fatal("the built index is the stub")
 	}
 
@@ -83,7 +84,7 @@ func TestDevMode_KeyFlipSwapsTheUIWithoutRestart(t *testing.T) {
 		t.Fatalf("page while starting = %q, want the built index", got)
 	}
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	if got := r.h.Server.WebURL(); got != r.base {
 		t.Fatalf("web URL = %q, want %q: the listener must not restart", got, r.base)
 	}
@@ -97,21 +98,21 @@ func TestDevMode_KeyFlipSwapsTheUIWithoutRestart(t *testing.T) {
 }
 
 func TestDevMode_StaleNodeModulesInstallsFirst(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, false)
+	checkout := vitetest.WriteDevCheckout(t, false)
 	r := startDevRig(t, checkout, false)
 	r.fake.Release()
 	r.setKey(t, checkout, true)
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	if installs, starts := r.fake.Counts(); installs != 1 || starts != 1 {
 		t.Fatalf("installs, starts = %d, %d, want 1, 1", installs, starts)
 	}
 }
 
 func TestDevMode_KeyOnAtStartRunsAndStopsWithTheServer(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 
 	if err := r.h.Stop(); err != nil {
 		t.Fatal(err)
@@ -130,20 +131,20 @@ func TestDevMode_KeyOnWithoutACheckoutStartsNothing(t *testing.T) {
 }
 
 func TestDevMode_TwoServersGetDifferentProxyPorts(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	a := startDevRig(t, checkout, true)
 	b := startDevRig(t, checkout, true)
 	a.fake.Release()
 	b.fake.Release()
-	a.waitPage(t, servertest.ViteStubPage)
-	b.waitPage(t, servertest.ViteStubPage)
+	a.waitPage(t, vitetest.ViteStubPage)
+	b.waitPage(t, vitetest.ViteStubPage)
 	if pa, pb := a.fake.Ports(), b.fake.Ports(); len(pa) != 1 || len(pb) != 1 || pa[0] == pb[0] {
 		t.Fatalf("ports = %v and %v, want one distinct port each", pa, pb)
 	}
 }
 
 func TestDevMode_SettingsWriteStartsViteAndSurvivesARestart(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, false)
 	r.fake.Release()
 	res, err := r.h.Client.Admin.SetSettings(context.Background(), wire.SettingsWriteRequest{
@@ -152,7 +153,7 @@ func TestDevMode_SettingsWriteStartsViteAndSurvivesARestart(t *testing.T) {
 	if err != nil || res.Refused {
 		t.Fatalf("write = %+v, %v", res, err)
 	}
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 
 	data, err := os.ReadFile(r.cfg)
 	if err != nil {
@@ -170,7 +171,7 @@ func TestDevMode_SettingsWriteStartsViteAndSurvivesARestart(t *testing.T) {
 	}
 
 	// A restart starts from the saved key: a new server over the same file.
-	fake := servertest.NewFakeVite()
+	fake := vitetest.NewFakeVite()
 	fake.Release()
 	servertest.StartWithStore(t, r.store, servertest.WithViteLauncher(fake), func(c *server.Config) {
 		c.WebAddr = "127.0.0.1:0"
@@ -180,7 +181,7 @@ func TestDevMode_SettingsWriteStartsViteAndSurvivesARestart(t *testing.T) {
 }
 
 func TestDevMode_HandEditAndReloadBothStartVite(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, false, func(c *server.Config) {
 		c.WatchConfig = true
 		c.ConfigWatchDebounce = 20 * time.Millisecond
@@ -192,21 +193,21 @@ func TestDevMode_HandEditAndReloadBothStartVite(t *testing.T) {
 		"watch-config": true,
 		"web":          map[string]any{"listen": "127.0.0.1:0", "dev-dir": checkout, "dev-frontend": true},
 	}})
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 
 	// The reload command (watcher off in the file) stops and starts it the same way.
 	r.setKey(t, checkout, false)
 	r.waitStopped(t)
 	r.setKey(t, checkout, true)
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 }
 
 func TestDevMode_DevDirChangeRestartsFromTheNewCheckoutOrFallsBack(t *testing.T) {
-	first := servertest.WriteDevCheckout(t, true)
-	second := servertest.WriteDevCheckout(t, true)
+	first := vitetest.WriteDevCheckout(t, true)
+	second := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, first, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 
 	r.setKey(t, second, true)
 	servertest.WaitFor(t, 10*time.Second, "Vite to restart from the new checkout", func() bool {
@@ -223,7 +224,7 @@ func TestDevMode_DevDirChangeRestartsFromTheNewCheckoutOrFallsBack(t *testing.T)
 	built := ""
 	servertest.WaitFor(t, 10*time.Second, "the built files", func() bool {
 		built = r.page(t)
-		return built != servertest.ViteStubPage
+		return built != vitetest.ViteStubPage
 	})
 	if dev := devSnapshot(t, r.h); dev.HasCheckout || dev.State != wire.DevStateOff {
 		t.Fatalf("dev = %+v, want off without a checkout", dev)
@@ -233,34 +234,34 @@ func TestDevMode_DevDirChangeRestartsFromTheNewCheckoutOrFallsBack(t *testing.T)
 	if dev := devSnapshot(t, r.h); !dev.HasCheckout {
 		t.Fatalf("dev = %+v, want a checkout", dev)
 	}
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 }
 
 func TestDevMode_DevDirChangeServesBuiltFilesUntilTheNewViteIsReady(t *testing.T) {
-	first := servertest.WriteDevCheckout(t, true)
-	second := servertest.WriteDevCheckout(t, true)
+	first := vitetest.WriteDevCheckout(t, true)
+	second := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, first, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	r.fake.Hold()
 
 	r.setKey(t, second, true)
-	if got := r.page(t); got == servertest.ViteStubPage {
+	if got := r.page(t); got == vitetest.ViteStubPage {
 		t.Fatal("page right after the dev-dir change is the old Vite, want the built files")
 	}
 	servertest.WaitFor(t, 10*time.Second, "the new Vite to start", func() bool {
 		_, starts := r.fake.Counts()
 		return starts == 2
 	})
-	if got := r.page(t); got == servertest.ViteStubPage {
+	if got := r.page(t); got == vitetest.ViteStubPage {
 		t.Fatal("page while the new Vite starts is the stub, want the built files")
 	}
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 }
 
 func TestSnapshotDev_InstallingAndStartingCarryTheirDetails(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, false)
+	checkout := vitetest.WriteDevCheckout(t, false)
 	r := startDevRig(t, checkout, false)
 	release := r.fake.HoldInstall()
 	defer release()
@@ -286,11 +287,11 @@ func TestSnapshotDev_InstallingAndStartingCarryTheirDetails(t *testing.T) {
 }
 
 func TestDevMode_NoWebListenerNeverStartsVite(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	store := t.TempDir()
 	cfg := filepath.Join(t.TempDir(), "config.json")
 	devConfig(t, cfg, store, map[string]any{"dev-dir": checkout, "dev-frontend": true})
-	fake := servertest.NewFakeVite()
+	fake := vitetest.NewFakeVite()
 	fake.Release()
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(cfg), servertest.WithViteLauncher(fake),
 		func(c *server.Config) { c.Settings.WebDevFrontend, c.Settings.WebDevDir = true, checkout })
@@ -310,8 +311,8 @@ func TestDevMode_WebListenerThatFailedToBindNeverStartsVite(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer taken.Close()
-	checkout := servertest.WriteDevCheckout(t, true)
-	fake := servertest.NewFakeVite()
+	checkout := vitetest.WriteDevCheckout(t, true)
+	fake := vitetest.NewFakeVite()
 	fake.Release()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithViteLauncher(fake), func(c *server.Config) {
 		c.WebAddr = taken.Addr().String()
@@ -327,24 +328,24 @@ func TestDevMode_WebListenerThatFailedToBindNeverStartsVite(t *testing.T) {
 }
 
 func TestDevMode_ModulesNeedNoCookieOverHTTPS(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 
-	if code, body := servertest.WebDoCookie(t, http.MethodGet, r.base+"/src/main.tsx", nil); code != http.StatusOK || body != servertest.ViteStubPage {
+	if code, body := servertest.WebDoCookie(t, http.MethodGet, r.base+"/src/main.tsx", nil); code != http.StatusOK || body != vitetest.ViteStubPage {
 		t.Errorf("module without a cookie = %d %q, want the Vite response", code, body)
 	}
 	if code, _ := servertest.WebDoCookie(t, http.MethodGet, r.base+"/v1/snapshot", nil); code != http.StatusUnauthorized {
 		t.Errorf("API without a cookie = %d, want 401", code)
 	}
-	if code, body := servertest.WebDoCookie(t, http.MethodGet, r.base+"/v1/snapshot", r.cookie); code != http.StatusOK || body == servertest.ViteStubPage {
+	if code, body := servertest.WebDoCookie(t, http.MethodGet, r.base+"/v1/snapshot", r.cookie); code != http.StatusOK || body == vitetest.ViteStubPage {
 		t.Errorf("API with a cookie = %d, want the local snapshot", code)
 	}
 }
 
 func TestDevMode_SW_SelfRemovingWorkerOnlyWhileViteRuns(t *testing.T) {
-	checkout := servertest.WriteDevCheckout(t, true)
+	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, false)
 	sw := func() string {
 		_, body := servertest.WebDoCookie(t, http.MethodGet, r.base+"/sw.js", r.cookie)
@@ -357,7 +358,7 @@ func TestDevMode_SW_SelfRemovingWorkerOnlyWhileViteRuns(t *testing.T) {
 
 	r.setKey(t, checkout, true)
 	r.fake.Release()
-	r.waitPage(t, servertest.ViteStubPage)
+	r.waitPage(t, vitetest.ViteStubPage)
 	on := sw()
 	if !strings.Contains(on, "gx-shell-") || !strings.Contains(on, "unregister") {
 		t.Fatalf("worker while Vite runs = %q, want the self-removing worker", on)

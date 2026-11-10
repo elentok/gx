@@ -35,7 +35,7 @@ func startWeb(t *testing.T) (string, *servertest.Harness) {
 func startWebDev(t *testing.T, dev *httptest.Server) (string, *servertest.Harness) {
 	t.Helper()
 	base, h := startWeb(t)
-	h.Server.WebUseViteProxy(portOf(t, dev.URL))
+	server.WebUI(h.Server).UseViteProxy(portOf(t, dev.URL))
 	return base, h
 }
 
@@ -72,12 +72,12 @@ func TestWebDevProxy_SwapsTheUIWithoutRestartingTheListener(t *testing.T) {
 		t.Fatalf("built page = %d %q, want the built index", code, built)
 	}
 
-	h.Server.WebUseViteProxy(portOf(t, dev.URL))
+	server.WebUI(h.Server).UseViteProxy(portOf(t, dev.URL))
 	if code, body := servertest.WebDoCookie(t, http.MethodGet, base+"/src/main.tsx", cookie); code != http.StatusOK || body != "dev:/src/main.tsx" {
 		t.Errorf("proxied asset = %d %q, want the dev frontend's response", code, body)
 	}
 
-	h.Server.WebUseBuiltUI()
+	server.WebUI(h.Server).UseBuiltUI()
 	if code, body := servertest.WebDoCookie(t, http.MethodGet, base+"/", cookie); code != http.StatusOK || body != built {
 		t.Errorf("page after swapping back = %d %q, want the built index", code, body)
 	}
@@ -119,7 +119,7 @@ func TestWebDevProxy_ExplainsWhenDevFrontendIsDown(t *testing.T) {
 	dev.Close()
 
 	base, h := startWeb(t)
-	h.Server.WebUseViteProxy(port)
+	server.WebUI(h.Server).UseViteProxy(port)
 	cookie := servertest.Login(t, h.StateDir, base)
 	code, body := servertest.WebDoCookie(t, http.MethodGet, base+"/", cookie)
 	if code != http.StatusBadGateway || !strings.Contains(body, strconv.Itoa(port)) || strings.Contains(body, "npm run dev") {
