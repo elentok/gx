@@ -12,6 +12,8 @@ interface Props {
   variant?: "marker" | "chip";
   /** The chip's border and text colour (a Chakra token). */
   chipColor?: string;
+  /** Draw the chip's border. It defaults to true; false keeps the chip's size and drops the line. */
+  outline?: boolean;
 }
 
 const markerStyle = {
@@ -25,7 +27,7 @@ const markerStyle = {
 } as const;
 
 // Controlled, because the installed Chakra Tooltip has no open-on-click prop. A tap toggles it.
-export function InfoTip({ label, content, children = "i", variant = "marker", chipColor = "text.muted" }: Props) {
+export function InfoTip({ label, content, children = "i", variant = "marker", chipColor = "text.muted", outline = true }: Props) {
   const [open, setOpen] = useState(false);
   const marker = useRef<HTMLButtonElement>(null);
   // Native listeners, because the menu listens natively and React's synthetic stopPropagation
@@ -75,7 +77,7 @@ export function InfoTip({ label, content, children = "i", variant = "marker", ch
           alignItems="center"
           justifyContent="center"
           flexShrink={0}
-          borderWidth="1px"
+          borderWidth={variant === "chip" && !outline ? "0" : "1px"}
           lineHeight="1"
           cursor="pointer"
           {...(variant === "chip"

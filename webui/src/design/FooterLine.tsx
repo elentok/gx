@@ -46,7 +46,7 @@ export function ContextBadge({ tokens, level, ceiling }: { tokens: number; level
   const tone = LEVEL_TONE[level ?? ""] ?? "muted";
   const fill = Math.min(1, Math.max(0, tokens / ceiling));
   return (
-    <InfoTip label="Context" variant="chip" chipColor={`tone.${tone}.fg`} content={`${kilo(tokens)} of ${kilo(ceiling)} smart zone`}>
+    <InfoTip label="Context" variant="chip" outline={false} chipColor={`tone.${tone}.fg`} content={`${kilo(tokens)} of ${kilo(ceiling)} smart zone`}>
       <chakra.span display="inline-flex" alignItems="center" gap="1" data-tone={tone}>
         <Ring fill={fill} tone={tone} />
         {kilo(tokens)}
