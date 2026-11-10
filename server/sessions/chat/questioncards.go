@@ -5,23 +5,41 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // CardSlot is one place a Question card can come from, in the order the
-// builder shows them: a live blocker first, then a ticket ask, then a printed
-// round.
+// builder shows them: the live blockers first (permission or plan, Claude
+// dialog, Codex question), then a ticket ask, then a printed round.
 type CardSlot int
 
 const (
 	SlotLiveBlocker CardSlot = iota
-	SlotTicketAsk
-	SlotCodexQuestion
-	SlotRound
 	SlotClaudeDialog
+	SlotCodexQuestion
+	SlotTicketAsk
+	SlotRound
 )
+
+// isLiveBlocker: while such a slot has a card, it is the only card listed.
+func (s CardSlot) isLiveBlocker() bool {
+	return s == SlotLiveBlocker || s == SlotClaudeDialog || s == SlotCodexQuestion
+}
+
+// slotApplies gates the slots that depend on the session, not only its class:
+// the dialog and Codex slots are for a plain chat with no ticket, on their harness.
+func slotApplies(slot CardSlot, m Meta) bool {
+	switch slot {
+	case SlotClaudeDialog:
+		return m.Ticket == "" && m.Harness == string(harness.Claude)
+	case SlotCodexQuestion:
+		return m.Ticket == "" && m.Harness == string(harness.Codex)
+	}
+	return true
+}
 
 // SessionClass decides which card slots apply to a session.
 type SessionClass int
@@ -123,18 +141,13 @@ func ClassOf(m Meta) SessionClass {
 type CardSources map[CardSlot][]wire.QuestionCard
 
 // BuildCards picks the cards a session of the class shows: the slots that
-// apply, in slot order, and only the live blocker while one is open. It is
-// never nil.
+// apply, in slot order, and only the first live blocker while one is open. It
+// is never nil.
 func BuildCards(class SessionClass, src CardSources) []wire.QuestionCard {
-	return PickCards(classSlots[class], src)
-}
-
-// PickCards is BuildCards for a given list of applying slots.
-func PickCards(slots []CardSlot, src CardSources) []wire.QuestionCard {
 	out := []wire.QuestionCard{}
-	for _, slot := range slots {
+	for _, slot := range classSlots[class] {
 		cards := src[slot]
-		if slot == SlotLiveBlocker && len(cards) > 0 {
+		if slot.isLiveBlocker() && len(cards) > 0 {
 			return append(out, cards...)
 		}
 		out = append(out, cards...)

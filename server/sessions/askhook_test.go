@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/transcript"
 )
 
 var (
@@ -64,6 +65,7 @@ type askFixture struct {
 	id   string
 	conv string
 	home string
+	dir  string
 }
 
 // startAskFixture starts the fixture's plain Claude session; link, when set,
@@ -130,7 +132,7 @@ func startAskFixture(t *testing.T, link *wire.LinkSessionRequest, cfg ...func(*s
 			t.Fatalf("link = %+v, %v", res, err)
 		}
 	}
-	return askFixture{h: h, ctx: ctx, evs: evs, id: id, conv: conv, home: home}
+	return askFixture{h: h, ctx: ctx, evs: evs, id: id, conv: conv, home: home, dir: dir}
 }
 
 // ask makes the fake open an AskUserQuestion of three questions, the second a
@@ -240,6 +242,29 @@ func TestAskHook_HeldQuestionIsADialogCardAndBlocksTheSessionWhileHeld(t *testin
 			}
 		}
 		return false
+	})
+}
+
+// A held dialog is the only card on a plain chat; the printed round returns
+// once the hold ends.
+func TestAskHook_DialogHidesThePrintedRoundUntilItEnds(t *testing.T) {
+	t.Parallel()
+	f := startAskFixture(t, nil)
+	round := `{"type":"assistant","uuid":"r1","timestamp":"2026-01-01T00:00:00Z","message":{"role":"assistant","content":[{"type":"text","text":"❓ **Q1** - **Store**: Which store?"}]}}`
+	servertest.WriteTranscript(t, filepath.Join(f.home, ".claude", "projects", transcript.Slugify(f.dir), f.conv+".jsonl"), round)
+	f.ask(t)
+	f.waitBlocked(t)
+	cards := f.cards(t)
+	if len(cards) != 1 || cards[0].Source != wire.CardSourceClaudeDialog {
+		t.Fatalf("held: cards = %+v, want only the dialog", cards)
+	}
+	if err := f.esc(); err != nil {
+		t.Fatal(err)
+	}
+	f.waitIdle(t)
+	servertest.WaitFor(t, 10*time.Second, "the printed round", func() bool {
+		c := f.cards(t)
+		return len(c) == 1 && c[0].Source == wire.CardSourceRound
 	})
 }
 

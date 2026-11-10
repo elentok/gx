@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -26,22 +25,27 @@ import (
 func (c *Chat) Cards(dir string, m Meta, snap Snapshot) []wire.QuestionCard {
 	class := ClassOf(m)
 	src := CardSources{SlotRound: RoundCard(snap.Round)}
-	if slices.Contains(classSlots[class], SlotLiveBlocker) {
-		src[SlotLiveBlocker] = c.permissionCards(dir, m, snap)
-	}
-	if addr := askAddress(m); addr != "" && slices.Contains(classSlots[class], SlotTicketAsk) {
-		if q, state, ok := c.src.TicketAsk(addr); ok {
-			src[SlotTicketAsk] = TicketAskCard(addr, q, state)
+	for _, slot := range classSlots[class] {
+		if !slotApplies(slot, m) {
+			continue
 		}
-	}
-	if class == ClassPlain && m.Ticket == "" && m.Harness == string(harness.Codex) {
-		src[SlotCodexQuestion] = c.codexQuestionCards(m)
-	}
-	if class == ClassPlain && m.Ticket == "" && m.Harness == string(harness.Claude) {
-		if held := c.src.HeldAsks(m.ID); len(held) > 0 {
-			src[SlotClaudeDialog] = ClaudeDialogCard(held[0])
-		} else {
-			src[SlotClaudeDialog] = c.claudeFallbackCards(dir, m, snap)
+		switch slot {
+		case SlotLiveBlocker:
+			src[slot] = c.permissionCards(dir, m, snap)
+		case SlotTicketAsk:
+			if addr := askAddress(m); addr != "" {
+				if q, state, ok := c.src.TicketAsk(addr); ok {
+					src[slot] = TicketAskCard(addr, q, state)
+				}
+			}
+		case SlotCodexQuestion:
+			src[slot] = c.codexQuestionCards(m)
+		case SlotClaudeDialog:
+			if held := c.src.HeldAsks(m.ID); len(held) > 0 {
+				src[slot] = ClaudeDialogCard(held[0])
+			} else {
+				src[slot] = c.claudeFallbackCards(dir, m, snap)
+			}
 		}
 	}
 	return BuildCards(class, src)

@@ -15,19 +15,42 @@ func card(source, id string) wire.QuestionCard {
 
 func TestBuildCards_LiveBlockerHidesTheRest(t *testing.T) {
 	t.Parallel()
-	all := []chat.CardSlot{chat.SlotLiveBlocker, chat.SlotTicketAsk, chat.SlotRound}
 	src := chat.CardSources{
 		chat.SlotLiveBlocker: {card("permission", "p")},
 		chat.SlotTicketAsk:   {card("ticket-ask", "a")},
 		chat.SlotRound:       {card("round", "r")},
 	}
-	if got := chat.PickCards(all, src); len(got) != 1 || got[0].Source != "permission" {
+	if got := chat.BuildCards(chat.ClassFlow, src); len(got) != 1 || got[0].Source != "permission" {
 		t.Fatalf("with a blocker = %+v, want only it", got)
 	}
 	delete(src, chat.SlotLiveBlocker)
-	got := chat.PickCards([]chat.CardSlot{chat.SlotTicketAsk, chat.SlotRound}, src)
+	got := chat.BuildCards(chat.ClassFlow, src)
 	if len(got) != 2 || got[0].Source != "ticket-ask" || got[1].Source != "round" {
 		t.Fatalf("no blocker = %+v, want ask then round", got)
+	}
+}
+
+func TestBuildCards_DialogAndCodexQuestionAreLiveBlockers(t *testing.T) {
+	t.Parallel()
+	rest := chat.CardSources{
+		chat.SlotTicketAsk: {card(wire.CardSourceTicketAsk, "a")},
+		chat.SlotRound:     {card(wire.CardSourceRound, "r")},
+	}
+	for slot, source := range map[chat.CardSlot]string{
+		chat.SlotClaudeDialog:  wire.CardSourceClaudeDialog,
+		chat.SlotCodexQuestion: wire.CardSourceCodex,
+	} {
+		src := chat.CardSources{slot: {card(source, "x")}}
+		for k, v := range rest {
+			src[k] = v
+		}
+		if got := chat.BuildCards(chat.ClassPlain, src); len(got) != 1 || got[0].Source != source {
+			t.Errorf("%s with ask and round = %+v, want only it", source, got)
+		}
+		delete(src, slot)
+		if got := chat.BuildCards(chat.ClassPlain, src); len(got) != 2 {
+			t.Errorf("%s gone = %+v, want ask and round", source, got)
+		}
 	}
 }
 
@@ -119,6 +142,17 @@ func TestClaudeDialogCard(t *testing.T) {
 	}
 }
 
+func withoutSlots(src chat.CardSources, slots ...chat.CardSlot) chat.CardSources {
+	out := chat.CardSources{}
+	for k, v := range src {
+		out[k] = v
+	}
+	for _, s := range slots {
+		delete(out, s)
+	}
+	return out
+}
+
 func TestBuildCards_ClassTableAcrossSources(t *testing.T) {
 	t.Parallel()
 	all := chat.CardSources{
@@ -148,7 +182,9 @@ func TestBuildCards_ClassTableAcrossSources(t *testing.T) {
 		want  []string
 	}{
 		{"plain with a blocker", chat.ClassPlain, all, []string{wire.CardSourcePermission}},
-		{"plain without", chat.ClassPlain, noBlocker, []string{wire.CardSourceClaudeDialog, wire.CardSourceCodex, wire.CardSourceTicketAsk, wire.CardSourceRound}},
+		{"plain with a dialog", chat.ClassPlain, noBlocker, []string{wire.CardSourceClaudeDialog}},
+		{"plain with a codex question", chat.ClassPlain, withoutSlots(noBlocker, chat.SlotClaudeDialog), []string{wire.CardSourceCodex}},
+		{"plain without", chat.ClassPlain, withoutSlots(noBlocker, chat.SlotClaudeDialog, chat.SlotCodexQuestion), []string{wire.CardSourceTicketAsk, wire.CardSourceRound}},
 		{"flow with a blocker", chat.ClassFlow, all, []string{wire.CardSourcePermission}},
 		{"flow without", chat.ClassFlow, noBlocker, []string{wire.CardSourceTicketAsk, wire.CardSourceRound}},
 		{"queue", chat.ClassQueueAgent, all, []string{wire.CardSourceTicketAsk}},
