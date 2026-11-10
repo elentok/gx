@@ -3,6 +3,7 @@ packages:
   - path: "github.com/elentok/gx/server/wire"
     output_path: "webui/src/generated/server.ts"
     include_files:
+      - archivedlist.go
       - checkstatus.go
       - cleanup.go
       - designdrafts.go

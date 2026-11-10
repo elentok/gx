@@ -296,8 +296,8 @@ test("an empty epic shows No tickets yet, and an empty summary renders nothing",
 
 test("the Epics, ticket and epic pages all render inside the shared container", async () => {
   const q = renderAt("/epics", okFor);
-  // The sidebar footer carries an Epics link too until 13 removes the top bar.
-  await screen.findAllByRole("link", { name: "Epics" });
+  // The sidebar footer carries an Epics menu button too.
+  await screen.findAllByRole("button", { name: "Epics" });
   expect(q.container.querySelector("[data-page-container]")).toBeTruthy();
   cleanup();
   const t = renderAt("/t/gx:e/01", okFor);

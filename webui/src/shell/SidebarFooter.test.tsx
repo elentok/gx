@@ -78,10 +78,18 @@ test("the + New menu lists the three items and New workspace calls its prop", as
 
 test("the Epics badge shows the server total and is absent at zero", () => {
   setup({ needs_you_total: 3 });
-  expect(screen.getByRole("link", { name: "Epics · 3 need you" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Epics · 3 need you" })).toBeTruthy();
   cleanup();
   setup({ needs_you_total: 0 });
-  expect(screen.getByRole("link", { name: "Epics" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Epics" })).toBeTruthy();
+});
+
+test("the Epics icon opens a menu with Epics and Archive, and Archive navigates to /archive", async () => {
+  const router = setupWithRouter();
+  fireEvent.click(screen.getByRole("button", { name: "Epics" }));
+  expect(await screen.findByRole("menuitem", { name: "Epics" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/archive"));
 });
 
 function stubUsage(ok: boolean) {
@@ -113,6 +121,7 @@ function setupWithRouter(snapshot: Record<string, unknown> = {}) {
   const router = createMemoryRouter([
     { path: "/", element: <SidebarFooter /> },
     { path: "/epics", element: <div>epics page</div> },
+    { path: "/archive", element: <div>archive page</div> },
     { path: "/triage/:project", element: <div>triage page</div> },
   ]);
   renderThemed(
@@ -199,7 +208,7 @@ test("the health button and the gear carry a title tooltip", () => {
 test("the Epics and Follow-ups badges show their count text", async () => {
   stubList([followUps({ triage: "running", left: 2 })]);
   setupWithRouter({ needs_you_total: 2 });
-  const epics = (await screen.findByRole("link", { name: "Epics · 2 need you" })).querySelector("[data-part=badge]")!;
+  const epics = (await screen.findByRole("button", { name: "Epics · 2 need you" })).querySelector("[data-part=badge]")!;
   const follow = (await screen.findByRole("button", { name: "Follow-ups · 3 open" })).querySelector("[data-part=badge]")!;
   expect(epics.textContent).toBe("2");
   expect(follow.textContent).toBe("3");
@@ -208,7 +217,7 @@ test("the Epics and Follow-ups badges show their count text", async () => {
 
 test("every footer box is present with its label", () => {
   setup({ mode: "paused", needs_you_total: 1, health: { cpu: meter("normal"), memory: meter("critical"), disk: meter("normal") } }, false);
-  expect(screen.getByRole("link", { name: /^Epics/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Epics/ })).toBeTruthy();
   expect(screen.getByRole("button", { name: /^Follow-ups/ })).toBeTruthy();
   expect(screen.getByRole("link", { name: "Stats and health" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Menu" })).toBeTruthy();

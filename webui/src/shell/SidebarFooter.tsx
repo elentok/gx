@@ -6,7 +6,7 @@ import { useEpicList } from "../epics/list";
 import type { Workspace } from "../generated/server";
 import { DevPopover } from "../dev/DevPopover";
 import { useDev } from "../dev";
-import { EPICS_HREF, STATS_HREF } from "../hrefs";
+import { STATS_HREF } from "../hrefs";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
 import { LimitsTray } from "../usage/LimitsTray";
@@ -41,6 +41,35 @@ function FooterLink({ href, label, badge, children }: { href: string; label: str
     >
       {children}
     </FooterButton>
+  );
+}
+
+/** The Epics icon: a menu of the Epics page and the Archive, with the needs-you count as its badge. */
+function EpicsMenu({ needsYou }: { needsYou: number }) {
+  const navigate = useNavigate();
+  const shell = useShell();
+  const go = (path: string) => () => {
+    navigate(path);
+    shell?.closeSliding();
+  };
+  return (
+    <GxMenu
+      placement="top-end"
+      trigger={
+        <FooterButton
+          title="Epics"
+          aria-label={needsYou ? `Epics · ${needsYou} ${needsYou === 1 ? "needs" : "need"} you` : "Epics"}
+          badge={needsYou ? { tone: "waiting", text: needsYou } : undefined}
+          {...interactiveStyle}
+        >
+          <EpicsIcon />
+        </FooterButton>
+      }
+      items={[
+        { value: "epics", label: "Epics", onSelect: go("/epics") },
+        { value: "archive", label: "Archive", onSelect: go("/archive") },
+      ]}
+    />
   );
 }
 
@@ -174,9 +203,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
         ]}
       />
       <Box flex="1" />
-      <FooterLink href={EPICS_HREF} label="Epics" badge={needsYou}>
-        <EpicsIcon />
-      </FooterLink>
+      <EpicsMenu needsYou={needsYou} />
       <FollowUpsButton workspace={activeWorkspace?.name} />
       <FooterLink href={STATS_HREF} label="Stats and health">
         <StatsIcon />

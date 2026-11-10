@@ -22,6 +22,8 @@ import { EpicPage } from "./epic/EpicPage";
 import type { FixAgent } from "./epic/fixAgent";
 import type { SaveChecks } from "./checks/setup";
 import type { FetchChecksStatus } from "./checks/status";
+import type { FetchArchived } from "./archive/archive";
+import { ArchivePage } from "./archive/ArchivePage";
 import { EpicsPage } from "./epics/EpicsPage";
 import type { FetchEpicList } from "./epics/list";
 import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup";
@@ -125,6 +127,7 @@ export interface RouteFetchers {
   ticket?: FetchDetail;
   epic?: FetchEpicDetail;
   epicList?: FetchEpicList;
+  archived?: FetchArchived;
   checksStatus?: FetchChecksStatus;
   saveChecks?: SaveChecks;
   stats?: FetchStats;
@@ -157,6 +160,8 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
   );
   return [
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} saveChecks={fetchers.saveChecks} /> },
+    { path: "/archive", element: <ArchivePage fetchList={fetchers.archived} /> },
+    { path: "/archive/*", element: <ArchivePage fetchList={fetchers.archived} /> },
     // "/agents/*" also matches "/agents"; the splat is the session label.
     { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
