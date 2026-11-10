@@ -1,5 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { createHmac } from "node:crypto";
+import { constants } from "node:fs";
 import { mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -254,8 +255,15 @@ async function startFixture(
     codexSessionsDir: out.codex_sessions_dir ?? "",
     devControlFile: out.dev_control_file ?? "",
     async cli(...args) {
-      const { stdout } = await run(out.gx, args, { env, cwd: tmpdir() });
-      return stdout;
+      // A CLI call that blocks would otherwise eat the whole test timeout with no hint of which call hung.
+      try {
+        const { stdout } = await run(out.gx, args, { env, cwd: tmpdir(), timeout: 30_000, killSignal: "SIGQUIT" });
+        return stdout;
+      } catch (e) {
+        const err = e as { killed?: boolean; stderr?: string };
+        if (err.killed) throw new Error(`gx ${args.join(" ")} hung for 30s; stderr:\n${err.stderr ?? ""}`);
+        throw e;
+      }
     },
     async cliEnv(extra, ...args) {
       const { stdout } = await run(out.gx, args, { env: { ...env, ...extra }, cwd: tmpdir() });
@@ -324,7 +332,10 @@ async function startFixture(
       const dir = join(env.HOME!, ".claude", "agentfake");
       const ack = join(dir, `${conversation}.ack`);
       const handled = (await stat(ack).catch(() => ({ size: 0 }))).size;
-      const fifo = await open(join(dir, `${conversation}.ctl`), "w");
+      // A blocking open of a FIFO nobody reads never returns; O_NONBLOCK fails with ENXIO instead, so the test can say which session is dead.
+      const fifo = await open(join(dir, `${conversation}.ctl`), constants.O_WRONLY | constants.O_NONBLOCK).catch((e) => {
+        throw new Error(`no agentfake is reading ${conversation}.ctl: ${(e as Error).message}`);
+      });
       await fifo.write(`${JSON.stringify({ type: "agentfake_control", ...control })}\n`);
       await fifo.close();
       // A key sent before the fake handled the control would beat it.
