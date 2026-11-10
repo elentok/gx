@@ -169,7 +169,7 @@ func (m Meta) CanAutoAdvance() bool {
 // ChatMeta is the part of the meta the chat reads.
 func (m Meta) ChatMeta() chat.Meta {
 	return chat.Meta{
-		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket,
+		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket, FixOf: m.FixOf,
 		Flow: m.FlowRef(), ConversationID: m.ConversationID, Model: m.Model, Effort: m.Effort,
 		Status: m.Status, Exit: m.Exit, RestoreCrashed: m.RestoreCrashed,
 	}

@@ -45,6 +45,7 @@ const chatOf = (messages: SessionChatMessage[], over: Partial<SessionChatRespons
   conversation_id: "c1",
   messages,
   round: null,
+  questions: [],
   background: [],
   ...over,
 });

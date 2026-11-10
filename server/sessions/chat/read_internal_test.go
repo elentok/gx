@@ -405,6 +405,22 @@ func TestRead_RoundParsesCardsAndStripsFences(t *testing.T) {
 	}
 }
 
+func TestRead_QuestionsListsTheRoundAsOneCard(t *testing.T) {
+	t.Parallel()
+	got := chatOf(t, assistantText("a1", goodRound))
+	if len(got.Questions) != 1 || got.Questions[0].Source != wire.CardSourceRound || len(got.Questions[0].Questions) != 2 {
+		t.Fatalf("questions = %+v, want one round card of 2 questions", got.Questions)
+	}
+	again := chatOf(t, assistantText("a1", goodRound))
+	other := chatOf(t, assistantText("a1", strings.Replace(goodRound, "Keep going?", "Stop?", 1)))
+	if again.Questions[0].ID != got.Questions[0].ID || other.Questions[0].ID == got.Questions[0].ID {
+		t.Errorf("ids = %q %q %q, want stable then different", got.Questions[0].ID, again.Questions[0].ID, other.Questions[0].ID)
+	}
+	if none := chatOf(t, assistantText("a2", "hello")); none.Questions == nil || len(none.Questions) != 0 {
+		t.Errorf("no round: questions = %#v, want empty non-nil", none.Questions)
+	}
+}
+
 func TestRead_RoundCardCarriesLinks(t *testing.T) {
 	t.Parallel()
 	text := "❓ **Q1** - **Pick a variant?**: See the mock.\n\n```gx-question\ntype: yes-no\nlinks:\n  - label: Mock\n    url: https://claude.ai/artifact/abc\n```"

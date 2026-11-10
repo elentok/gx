@@ -2462,6 +2462,11 @@ export interface SessionChatResponse {
   unsupported?: boolean;
   truncated?: boolean;
   round: SessionRoundCard[] | null;
+  /**
+   * Questions lists the Question cards the session shows, live blocker first;
+   * never null.
+   */
+  questions: QuestionCard[];
   next?: SessionNext;
   background: SessionBackgroundTask[];
   /**
@@ -2710,6 +2715,49 @@ export interface SessionRoundCard {
   recommended?: string;
   links?: QuestionLink[];
   note?: string;
+}
+/**
+ * Question card sources.
+ */
+export const CardSourceClaudeDialog = "claude-dialog";
+export const CardSourceCodex = "codex-question";
+export const CardSourcePermission = "permission";
+export const CardSourceRound = "round";
+export const CardSourceTicketAsk = "ticket-ask";
+/**
+ * QuestionCardOption is one choice of a card question.
+ */
+export interface QuestionCardOption {
+  id: string;
+  label: string;
+  description?: string;
+  consequence?: string;
+}
+/**
+ * QuestionCardQuestion is one question of a card. Kind is yes-no, options,
+ * multi-select or text; Note says why a question fell back to text.
+ */
+export interface QuestionCardQuestion {
+  kind: string;
+  label?: string;
+  title: string;
+  body: string;
+  yes?: string;
+  no?: string;
+  options?: QuestionCardOption[];
+  recommended?: string;
+  links?: QuestionLink[];
+  note?: string;
+}
+/**
+ * QuestionCard is one source item the person answers: a hook dialog, a Codex
+ * call, a permission or plan prompt, a ticket ask or one printed round. ID is
+ * stable across reads and new for a new item.
+ */
+export interface QuestionCard {
+  source: string;
+  id: string;
+  questions: QuestionCardQuestion[];
 }
 /**
  * SessionNext is the Actionable a gx-design run-end line raises.

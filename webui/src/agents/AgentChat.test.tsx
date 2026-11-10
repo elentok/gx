@@ -32,6 +32,7 @@ const chat = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => (
   conversation_id: "c1",
   messages: [{ id: "m1", role: "agent", kind: "text", text: "hello there", at: new Date().toISOString() }],
   round: null,
+  questions: [],
   background: [],
   ...over,
 });

@@ -26,6 +26,7 @@ const RestoreCrashWindow = time.Minute
 // Meta is what the chat reads of a session's saved meta.
 type Meta struct {
 	ID, Harness, Project, Dir, Ticket, ConversationID string
+	FixOf                                             string
 	Flow                                              FlowRef
 	Model, Effort                                     string
 	Status                                            wire.SessionStatus

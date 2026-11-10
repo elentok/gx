@@ -252,7 +252,7 @@ test("the countdown keeps running after Close dialog", async () => {
     ],
     "/d/gx:a",
     detailOf(),
-    { chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, background: [] } }) },
+    { chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, questions: [], background: [] } }) },
   );
   fireEvent.click(await screen.findByRole("button", { name: "Close dialog" }));
   await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith("/v1/sessions/keys", expect.objectContaining({ method: "POST" })));
@@ -466,7 +466,7 @@ test("confirming Delete calls the route and goes to the Epics page", async () =>
 });
 
 const chatFetcher: RouteFetchers = {
-  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, background: [] } }),
+  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, questions: [], background: [] } }),
 };
 
 test("a Design with map images shows a read-only strip that opens the viewer with the map-image URL", async () => {
@@ -489,6 +489,7 @@ test("the map-image strip is the first entry of the chat log, ahead of the messa
         conversation_id: "c1",
         messages: [{ id: "m1", role: "agent", kind: "text", text: "hello from the agent", at: new Date().toISOString() }],
         round: null,
+        questions: [],
         background: [],
       },
     }),

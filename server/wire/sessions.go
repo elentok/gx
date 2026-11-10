@@ -103,13 +103,16 @@ type SessionTranscriptResponse struct {
 // answered; Next is the run-end line of that turn; Background lists the shells,
 // Monitors and subagents still running.
 type SessionChatResponse struct {
-	ConversationID string                  `json:"conversation_id"`
-	Messages       []SessionChatMessage    `json:"messages"`
-	Unsupported    bool                    `json:"unsupported,omitempty"`
-	Truncated      bool                    `json:"truncated,omitempty"`
-	Round          []SessionRoundCard      `json:"round" tstype:"SessionRoundCard[] | null"`
-	Next           *SessionNext            `json:"next"`
-	Background     []SessionBackgroundTask `json:"background"`
+	ConversationID string               `json:"conversation_id"`
+	Messages       []SessionChatMessage `json:"messages"`
+	Unsupported    bool                 `json:"unsupported,omitempty"`
+	Truncated      bool                 `json:"truncated,omitempty"`
+	Round          []SessionRoundCard   `json:"round" tstype:"SessionRoundCard[] | null"`
+	// Questions lists the Question cards the session shows, live blocker first;
+	// never null.
+	Questions  []QuestionCard          `json:"questions"`
+	Next       *SessionNext            `json:"next"`
+	Background []SessionBackgroundTask `json:"background"`
 	// Current is the newest tool call in flight and Others the older ones,
 	// newest first; both are absent when nothing is in flight.
 	Current *SessionInFlightTool  `json:"current,omitempty"`
@@ -313,6 +316,47 @@ type SessionRoundCard struct {
 	Recommended string               `json:"recommended,omitempty"`
 	Links       []QuestionLink       `json:"links,omitempty"`
 	Note        string               `json:"note,omitempty"`
+}
+
+// Question card sources.
+const (
+	CardSourceClaudeDialog = "claude-dialog"
+	CardSourceCodex        = "codex-question"
+	CardSourcePermission   = "permission"
+	CardSourceRound        = "round"
+	CardSourceTicketAsk    = "ticket-ask"
+)
+
+// QuestionCardOption is one choice of a card question.
+type QuestionCardOption struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
+	Consequence string `json:"consequence,omitempty"`
+}
+
+// QuestionCardQuestion is one question of a card. Kind is yes-no, options,
+// multi-select or text; Note says why a question fell back to text.
+type QuestionCardQuestion struct {
+	Kind        string               `json:"kind"`
+	Label       string               `json:"label,omitempty"`
+	Title       string               `json:"title"`
+	Body        string               `json:"body"`
+	Yes         string               `json:"yes,omitempty"`
+	No          string               `json:"no,omitempty"`
+	Options     []QuestionCardOption `json:"options,omitempty"`
+	Recommended string               `json:"recommended,omitempty"`
+	Links       []QuestionLink       `json:"links,omitempty"`
+	Note        string               `json:"note,omitempty"`
+}
+
+// QuestionCard is one source item the person answers: a hook dialog, a Codex
+// call, a permission or plan prompt, a ticket ask or one printed round. ID is
+// stable across reads and new for a new item.
+type QuestionCard struct {
+	Source    string                 `json:"source"`
+	ID        string                 `json:"id"`
+	Questions []QuestionCardQuestion `json:"questions"`
 }
 
 // SessionNext is the Actionable a gx-design run-end line raises.

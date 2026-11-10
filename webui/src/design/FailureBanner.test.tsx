@@ -35,6 +35,7 @@ const chat: SessionChatResponse = {
   conversation_id: "c1",
   messages: [{ id: "m9", role: "agent", kind: "text", text: "hi", at: new Date().toISOString() }],
   round: null,
+  questions: [],
   background: [],
 };
 

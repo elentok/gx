@@ -72,6 +72,7 @@ const chatOf = (
   ],
   // The server sends null, not [], when the last turn holds no round.
   round: null,
+  questions: [],
   background: [],
   ...over,
 });
