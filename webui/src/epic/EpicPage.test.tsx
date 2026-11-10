@@ -772,3 +772,71 @@ test("a seeded page cache paints the header before the fetch resolves", async ()
   expect(await screen.findByText("2/7")).toBeTruthy();
   sessionStorage.clear();
 });
+
+const ciFailing: Partial<EpicDetail> = {
+  state: "paused",
+  pr: { number: 412, url: "https://github.com/o/r/pull/412", state: "draft", chip: "#412 · draft" },
+  pr_notice: "CI failing: go-test failed 3 times (limit 3 per check). Fix it by hand and push, or press Try again to give the agent 3 more attempts.",
+  pr_actions: [
+    { kind: "open-pr", label: "Open on GitHub", link: "https://github.com/o/r/pull/412" },
+    { kind: "try-again", label: "Try again" },
+  ],
+  pr_activity: [
+    { time: "2026-01-02T14:52:00Z", kind: "warning", text: "Paused: go-test failed 3 times", detail: "Limit reached." },
+    { time: "2026-01-02T14:41:00Z", kind: "good", text: "Fix pushed", ticket: "gx:blog-impl/11" },
+  ],
+};
+
+test("a PR epic shows the chip, Open on GitHub and the activity newest first with the fix link", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: ciFailing });
+  expect((await screen.findByTestId("pr-chip")).textContent).toBe("PR #412 · draft");
+  expect(screen.getByRole("button", { name: "Open on GitHub" })).toBeTruthy();
+  const panel = screen.getByTestId("pr-activity");
+  expect(panel.textContent).toContain("2 entries");
+  const items = within(panel).getAllByRole("listitem");
+  expect(items[0].textContent).toContain("Paused: go-test failed 3 times");
+  expect(items[0].textContent).toContain("Limit reached.");
+  expect(items[1].textContent).toContain("Fix pushed");
+  expect(within(items[1]).getByRole("link", { name: "ticket 11" }).getAttribute("href")).toBe("#/t/gx:blog-impl/11");
+});
+
+test("a ci-failing epic shows the notice, and both Try again buttons post the epic address", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    render("/e/gx:blog-impl", [], "loop", { detail: ciFailing });
+    const notice = await screen.findByTestId("pr-notice");
+    expect(notice.textContent).toContain("CI failing: go-test failed 3 times");
+    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(2);
+    fireEvent.click(within(notice).getByRole("button", { name: "Try again" }));
+    const call = () => fetchMock.mock.calls.find(([url]) => url === "/v1/epics/try-again");
+    await waitFor(() => expect(call()).toBeTruthy());
+    expect(JSON.parse(call()![1].body)).toEqual({ address: "gx:blog-impl", state: "paused" });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("a PR text failure shows its notice the same way", async () => {
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: { state: "paused", pr_notice: "PR text failed: the agent could not write it.", pr_actions: [{ kind: "try-again", label: "Try again" }] },
+  });
+  const notice = await screen.findByTestId("pr-notice");
+  expect(notice.textContent).toContain("PR text failed");
+  expect(within(notice).getByRole("button", { name: "Try again" })).toBeTruthy();
+});
+
+test("with no PR yet the header shows Create PR and the failure reason", async () => {
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: { state: "awaiting-pr", pr_actions: [{ kind: "create-pr", label: "Create PR" }], pr_reason: "gh is not signed in" },
+  });
+  expect(await screen.findByRole("button", { name: "Create PR" })).toBeTruthy();
+  expect(screen.getByTestId("pr-reason").textContent).toBe("gh is not signed in");
+  expect(screen.queryByTestId("pr-chip")).toBeNull();
+});
+
+test("an epic with no PR activity shows no activity panel", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: { state: "running" } });
+  await screen.findByTestId("stats-line");
+  expect(screen.queryByTestId("pr-activity")).toBeNull();
+});

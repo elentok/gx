@@ -30,6 +30,7 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
 import type { FixAgent } from "./fixAgent";
 import { MoreStats } from "./MoreStats";
+import { PrActions, PrActivity, PrNotice } from "./PrFlow";
 import { TicketCard } from "./TicketCard";
 import {
   cardMeta,
@@ -178,8 +179,15 @@ function EpicBar({
           {detail.state === "awaiting-merge" && (
             <MergeButton address={address} state={detail.state} onMerged={onChanged} />
           )}
+          <PrActions detail={detail} onChanged={onChanged} />
         </Box>
       </Box>
+      {detail.pr_reason && !detail.pr_notice && (
+        <Text data-testid="pr-reason" mt="2" fontSize="14px" color="text.dim" textAlign="right">
+          {detail.pr_reason}
+        </Text>
+      )}
+      <PrNotice detail={detail} wide={wide} onChanged={onChanged} />
       {mergeBlocked(detail) && <MergeBlockNotice address={address} detail={detail} wide={wide} onChanged={onChanged} />}
     </>
   );
@@ -397,6 +405,7 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
               }
             />
           </Box>
+          <PrActivity entries={detail.pr_activity} />
           {detail.total === 0 ? (
             <Text mt="4" color="text.muted">
               No tickets yet

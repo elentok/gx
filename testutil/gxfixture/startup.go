@@ -76,7 +76,7 @@ func installBinaries(root string, o opts, sc scenario) (gxBin, binDir string, co
 	}
 	// The bin dir is first on PATH, so this gh is the one the server and its agents run.
 	if sc.FakeGH != nil {
-		ghBin, err := binary(o.fakeGH, filepath.Join(root, "gh"), "github.com/elentok/gx/testutil/ghfake/cmd/gh")
+		ghBin, err := binary(o.fakeGH, filepath.Join(root, "ghbin"), "github.com/elentok/gx/testutil/ghfake/cmd/gh")
 		if err != nil {
 			return "", "", false, err
 		}

@@ -33,3 +33,7 @@ export const postQueueAdd: PostEpicWrite = (body) => postEpicWrite("/v1/queue/ad
 export const postEpicMerge: PostEpicWrite = (body) => postEpicWrite("/v1/epics/merge", body);
 
 export const postEpicStashMerge: PostEpicWrite = (body) => postEpicWrite("/v1/epics/stash-merge", body);
+
+export const postEpicCreatePR: PostEpicWrite = (body) => postEpicWrite("/v1/epics/create-pr", body);
+
+export const postEpicTryAgain: PostEpicWrite = (body) => postEpicWrite("/v1/epics/try-again", body);

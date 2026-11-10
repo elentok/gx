@@ -922,6 +922,32 @@ export const galleryEntries: GalleryEntry[] = [
         ),
       },
       {
+        label: "CI failing",
+        node: (
+          <EpicPageFrame
+            detail={withRows(
+              {
+                state: "paused",
+                pr: { number: 412, url: "https://github.com/demo/blog/pull/412", state: "draft", chip: "#412 · draft" },
+                pr_notice:
+                  "CI failing: go-test failed 3 times (limit 3 per check). Fix it by hand and push, or press Try again to give the agent 3 more attempts.",
+                pr_actions: [
+                  { kind: "open-pr", label: "Open on GitHub", link: "https://github.com/demo/blog/pull/412" },
+                  { kind: "try-again", label: "Try again" },
+                ],
+                pr_activity: [
+                  { time: "2026-01-02T14:52:00Z", kind: "warning", text: "Paused: go-test failed 3 times", detail: "Limit reached for this check." },
+                  { time: "2026-01-02T14:50:00Z", kind: "bad", text: "CI failed: go-test", detail: "TestSearchIndex: nil pointer in index.go:88" },
+                  { time: "2026-01-02T14:41:00Z", kind: "info", text: "Fix pushed", ticket: "demo:blog/11", detail: "Third attempt: guarded the nil case." },
+                  { time: "2026-01-02T14:02:00Z", kind: "good", text: "PR #412 opened as draft" },
+                ],
+              },
+              doneRows,
+            )}
+          />
+        ),
+      },
+      {
         label: "dirty-trunk",
         node: (
           <EpicPageFrame
