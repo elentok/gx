@@ -157,7 +157,8 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
           {indicators}
         </Box>
       )}
-      <Box display="flex" alignItems="center" gap="1">
+      {/* Off desktop the boxes keep their size and the pill sits in this row; when the row is too narrow for them all, the indicators and the menu wrap together, so the pill stays left of the menu. */}
+      <Box display="flex" alignItems="center" gap="1" flexWrap={desktop ? "nowrap" : "wrap"}>
       <GxMenu
         placement="top-start"
         trigger={
@@ -182,8 +183,10 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       </FooterLink>
       {health && <Tray health={health} connected={connected} />}
       <LimitsTray conn={conn} />
-      {!desktop && indicators}
-      <GearMenu activeWorkspace={activeWorkspace} />
+      <Box display="flex" alignItems="center" gap="1" flex="none" ml="auto">
+        {!desktop && indicators}
+        <GearMenu activeWorkspace={activeWorkspace} />
+      </Box>
       </Box>
     </Box>
   );

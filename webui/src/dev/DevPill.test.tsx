@@ -9,7 +9,7 @@ afterEach(cleanup);
 const cases: [DevState, string, string, boolean][] = [
   ["installing", "Dev · installing", "muted", true],
   ["starting", "Dev · starting", "muted", true],
-  ["running", "Dev", "running", false],
+  ["running", "Dev", "done", false],
   ["down", "Dev · down", "deadlocked", false],
 ];
 

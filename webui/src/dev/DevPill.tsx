@@ -1,16 +1,18 @@
 import { Box, Spinner } from "@chakra-ui/react";
 import type { DevState } from "../generated/server";
 import type { Tone } from "../ui/tone";
+import { useCoarsePointer } from "../useWide";
 
 const LOOK: Partial<Record<DevState, { text: string; tone: Tone; title: string; busy?: boolean }>> = {
   installing: { text: "Dev · installing", tone: "muted", title: "Dev mode: Installing dependencies", busy: true },
   starting: { text: "Dev · starting", tone: "muted", title: "Dev mode: Starting Vite", busy: true },
-  running: { text: "Dev", tone: "running", title: "Dev mode: Vite is running" },
+  running: { text: "Dev", tone: "done", title: "Dev mode: Vite is running" },
   down: { text: "Dev · down", tone: "deadlocked", title: "Dev mode: Vite is down" },
 };
 
 /** The sidebar-footer pill for Dev mode; renders nothing while Dev mode is off. */
 export function DevPill({ state }: { state: DevState }) {
+  const coarse = useCoarsePointer();
   const look = LOOK[state];
   if (!look) return null;
   return (
@@ -22,7 +24,7 @@ export function DevPill({ state }: { state: DevState }) {
       display="inline-flex"
       alignItems="center"
       gap="6px"
-      h="22px"
+      h={coarse ? "28px" : "22px"}
       px="8px"
       flex="none"
       whiteSpace="nowrap"
