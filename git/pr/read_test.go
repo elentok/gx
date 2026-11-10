@@ -182,7 +182,7 @@ func TestFindByHead(t *testing.T) {
 func TestWatchQuery(t *testing.T) {
 	t.Parallel()
 	const body = `{"data":{"repository":{
-		"p5":{"state":"OPEN","isDraft":true,"headRefOid":"abc","mergeCommit":null,"mergeable":"CONFLICTING"},
+		"p5":{"state":"OPEN","isDraft":true,"headRefOid":"abc","mergeCommit":null,"mergeable":"CONFLICTING","commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}},
 		"p6":{"state":"MERGED","isDraft":false,"headRefOid":"def","mergeCommit":{"oid":"mc"},"mergeable":"UNKNOWN"}}}}`
 	r, log := fakeGH(t, t.TempDir(), body, "", 0)
 	got, err := r.WatchQuery("o/r", []int{5, 6})
@@ -192,7 +192,7 @@ func TestWatchQuery(t *testing.T) {
 	if !strings.Contains(readLog(t, log), "p5:pullRequest(number:5)") {
 		t.Fatalf("aliases missing in %q", readLog(t, log))
 	}
-	if g := got[5]; g.State != "OPEN" || !g.IsDraft || g.HeadSHA != "abc" || g.Mergeable != "CONFLICTING" {
+	if g := got[5]; g.State != "OPEN" || !g.IsDraft || g.HeadSHA != "abc" || g.Mergeable != "CONFLICTING" || g.Rollup != "FAILURE" {
 		t.Fatalf("open: %+v", g)
 	}
 	if g := got[6]; g.State != "MERGED" || g.MergeCommit != "mc" || g.Mergeable != "" {

@@ -190,7 +190,7 @@ func (s *State) graphQL(args []string) string {
 			query = v
 		}
 	}
-	if strings.Contains(query, "statusCheckRollup") {
+	if strings.Contains(query, "contexts(") {
 		return s.checksResponse(flagValue(args, "-F")[len("p="):])
 	}
 	repo := map[string]any{}
@@ -198,11 +198,37 @@ func (s *State) graphQL(args []string) string {
 		var node any
 		if p := s.byNumber(m[1]); p != nil {
 			node = map[string]any{"state": p.State, "isDraft": p.Draft, "headRefOid": p.HeadSHA,
-				"mergeCommit": nullable(p.MergeCommit), "mergeable": p.Mergeable}
+				"mergeCommit": nullable(p.MergeCommit), "mergeable": p.Mergeable,
+				"commits": map[string]any{"nodes": []any{map[string]any{"commit": map[string]any{
+					"statusCheckRollup": s.rollup(p.HeadSHA)}}}}}
 		}
 		repo["p"+m[1]] = node
 	}
 	return mustJSON(map[string]any{"data": map[string]any{"repository": repo}})
+}
+
+// rollup is GitHub's rollup state for a head: null without checks, FAILURE if
+// any failed, PENDING if any is not done, else SUCCESS.
+func (s *State) rollup(headSHA string) any {
+	checks := s.Checks[headSHA]
+	if len(checks) == 0 {
+		return nil
+	}
+	state := "SUCCESS"
+	for _, c := range checks {
+		failed, pending := c.Conclusion == "FAILURE" || c.Conclusion == "TIMED_OUT" || c.Conclusion == "STARTUP_FAILURE", c.Status != "COMPLETED"
+		if c.StatusState != "" {
+			failed = c.StatusState == "FAILURE" || c.StatusState == "ERROR"
+			pending = c.StatusState == "PENDING" || c.StatusState == "EXPECTED"
+		}
+		if failed {
+			return map[string]any{"state": "FAILURE"}
+		}
+		if pending {
+			state = "PENDING"
+		}
+	}
+	return map[string]any{"state": state}
 }
 
 func (s *State) checksResponse(number string) string {

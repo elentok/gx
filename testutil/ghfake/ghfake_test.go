@@ -76,12 +76,13 @@ func TestWatchQuery_AnswersFromState(t *testing.T) {
 	f := ghfake.New(t)
 	f.Update(func(s *ghfake.State) {
 		s.PRs = []ghfake.PR{{Number: 7, State: "OPEN", Draft: true, HeadSHA: "abc", Mergeable: "CONFLICTING"}}
+		s.Checks = map[string][]ghfake.Check{"abc": {{Name: "ci", Status: "COMPLETED", Conclusion: "FAILURE"}, {Name: "lint", Status: "IN_PROGRESS"}}}
 	})
 	out, _, code := gh(t, f, "", "api", "graphql", "-f", "query=query{repository{p7:pullRequest(number:7){state} p8:pullRequest(number:8){state}}}")
 	if code != 0 {
 		t.Fatalf("exit = %d", code)
 	}
-	for _, want := range []string{`"p7":{"headRefOid":"abc","isDraft":true,"mergeCommit":null,"mergeable":"CONFLICTING","state":"OPEN"}`, `"p8":null`} {
+	for _, want := range []string{`"headRefOid":"abc","isDraft":true,"mergeCommit":null,"mergeable":"CONFLICTING","state":"OPEN"`, `"statusCheckRollup":{"state":"FAILURE"}`, `"p8":null`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("watch answer %s lacks %s", out, want)
 		}

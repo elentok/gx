@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/runs"
@@ -141,6 +142,7 @@ type Server struct {
 	chat      *notify.ServerChat // never nil; sends nothing when no destination is configured
 	registry  *runs.Registry
 	progress  *sched.ProgressTimer
+	prWatch   *prflow.Watcher // polls open PRs; see prwatch.go
 	reclaimer *sched.Reclaimer
 	launcher  *sched.Launcher
 	guards    *runs.Guards
@@ -499,6 +501,7 @@ func New(cfg Config) (*Server, error) {
 	s.progress = sched.NewProgressTimer(sched.ProgressTimerDeps{
 		Registry: s.registry, Projects: s.projects, Writer: s.writer, Chat: s.chat, Interval: cfg.Chat.ProgressInterval,
 	})
+	s.prWatch = prflow.NewWatcher(prWatchHost{s})
 	s.scheduler = sched.NewScheduler(sched.SchedulerDeps{
 		Log: s.log, Projects: s.projects, Recovery: s.recovery, Registry: s.registry,
 		Index: s.idx, Writer: s.writer, Settings: &s.settings, Migrator: s.migrator, Queue: s.queue,
@@ -650,6 +653,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(sweepDone); s.sessions.Conv.SweepDesignCounts() }()
 	progressDone := make(chan struct{})
 	go func() { defer close(progressDone); s.progress.Run(freshCtx) }()
+	prWatchDone := make(chan struct{})
+	go func() { defer close(prWatchDone); s.prWatch.Run(freshCtx) }()
 	s.health.FileStartIncident(time.Now())
 	var err error
 	select {
@@ -697,6 +702,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		{"wait-usage", usageDone},
 		{"wait-sweep", sweepDone},
 		{"wait-progress", progressDone},
+		{"wait-pr-watch", prWatchDone},
 	} {
 		recordShutdown(w.name)
 		<-w.done

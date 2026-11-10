@@ -58,12 +58,9 @@ func classifyCheck(status, conclusion string) checkOutcome {
 	return outcomePending
 }
 
-// ClassifyChecks classifies the checks on headSHA. Checks on other commits are
-// ignored. When the same key appears more than once, the last one wins, so
-// callers pass reruns in order. Failed lists the keys of the failed checks.
-func ClassifyChecks(headSHA string, checks []Check) (result ChecksResult, failed []CheckKey) {
-	latest := map[CheckKey]Check{}
-	var order []CheckKey
+// latestChecks is the newest check per key on headSHA, in first-seen order.
+func latestChecks(headSHA string, checks []Check) (order []CheckKey, latest map[CheckKey]Check) {
+	latest = map[CheckKey]Check{}
 	for _, c := range checks {
 		if c.HeadSHA != headSHA {
 			continue
@@ -73,6 +70,34 @@ func ClassifyChecks(headSHA string, checks []Check) (result ChecksResult, failed
 		}
 		latest[c.Key()] = c
 	}
+	return order, latest
+}
+
+// CheckCounts is how many checks on a head are in each state.
+type CheckCounts struct{ Pending, Failed, Green int }
+
+// CountChecks counts the checks on headSHA by state, one per key like ClassifyChecks.
+func CountChecks(headSHA string, checks []Check) CheckCounts {
+	order, latest := latestChecks(headSHA, checks)
+	var n CheckCounts
+	for _, k := range order {
+		switch classifyCheck(latest[k].Status, latest[k].Conclusion) {
+		case outcomeFailed:
+			n.Failed++
+		case outcomePending:
+			n.Pending++
+		default:
+			n.Green++
+		}
+	}
+	return n
+}
+
+// ClassifyChecks classifies the checks on headSHA. Checks on other commits are
+// ignored. When the same key appears more than once, the last one wins, so
+// callers pass reruns in order. Failed lists the keys of the failed checks.
+func ClassifyChecks(headSHA string, checks []Check) (result ChecksResult, failed []CheckKey) {
+	order, latest := latestChecks(headSHA, checks)
 	if len(order) == 0 {
 		return ChecksNone, nil
 	}

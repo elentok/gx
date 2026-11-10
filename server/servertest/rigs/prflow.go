@@ -1,6 +1,7 @@
 package rigs
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/ghfake"
+	"github.com/elentok/gx/tickets"
 )
 
 // PRFlowGrace is the no-checks grace window StartPRFlow writes to config.json.
@@ -33,6 +35,33 @@ type PRFlow struct {
 	Env []string
 	// ConfigPath is the config.json the server was started with.
 	ConfigPath string
+}
+
+// EpicDir is the directory of the rig's epic.
+func (f *PRFlow) EpicDir() string { return filepath.Join(f.Store, "proj", "epic-a") }
+
+// StampPR gives the rig's epic a PR identity, as opening the PR would, and has
+// the server re-read the store.
+func (f *PRFlow) StampPR(t *testing.T, number int, url string) {
+	t.Helper()
+	if err := tickets.StampEpicFields(f.EpicDir(), map[string]any{"pr_number": number, "pr_url": url}); err != nil {
+		t.Fatal(err)
+	}
+	f.Rescan(t)
+}
+
+// Rescan has the server re-read the ticket store now.
+func (f *PRFlow) Rescan(t *testing.T) {
+	t.Helper()
+	if err := f.H.Server.RescanIndex(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Tick forces one pass of the PR watcher.
+func (f *PRFlow) Tick(t *testing.T) {
+	t.Helper()
+	f.H.Server.PRWatcher().Tick(context.Background())
 }
 
 // StartPRFlow starts the server paused-by-default like any harness; tests drive

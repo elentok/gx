@@ -105,6 +105,9 @@ type WatchState struct {
 	// Mergeable is set only while State is OPEN; GitHub's value on a closed
 	// PR means nothing.
 	Mergeable string
+	// Rollup is the head commit's status-check rollup state (SUCCESS, FAILURE,
+	// ERROR, PENDING, EXPECTED), empty when the head has no checks.
+	Rollup string
 }
 
 // WatchQuery fetches the cheap fields of many PRs in one GraphQL call.
@@ -116,7 +119,7 @@ func (r Runner) WatchQuery(repo string, numbers []int) (map[int]WatchState, erro
 	var b strings.Builder
 	b.WriteString("query($o:String!,$n:String!){repository(owner:$o,name:$n){")
 	for _, num := range numbers {
-		fmt.Fprintf(&b, "p%d:pullRequest(number:%d){state isDraft headRefOid mergeCommit{oid} mergeable} ", num, num)
+		fmt.Fprintf(&b, "p%d:pullRequest(number:%d){state isDraft headRefOid mergeCommit{oid} mergeable commits(last:1){nodes{commit{statusCheckRollup{state}}}}} ", num, num)
 	}
 	b.WriteString("}}")
 	var env struct {
@@ -130,6 +133,15 @@ func (r Runner) WatchQuery(repo string, numbers []int) (map[int]WatchState, erro
 					OID string `json:"oid"`
 				} `json:"mergeCommit"`
 				Mergeable string `json:"mergeable"`
+				Commits   struct {
+					Nodes []struct {
+						Commit struct {
+							StatusCheckRollup *struct {
+								State string `json:"state"`
+							} `json:"statusCheckRollup"`
+						} `json:"commit"`
+					} `json:"nodes"`
+				} `json:"commits"`
 			} `json:"repository"`
 		} `json:"data"`
 	}
@@ -151,6 +163,9 @@ func (r Runner) WatchQuery(repo string, numbers []int) (map[int]WatchState, erro
 		}
 		if n.State == "OPEN" {
 			s.Mergeable = n.Mergeable
+		}
+		if len(n.Commits.Nodes) > 0 && n.Commits.Nodes[0].Commit.StatusCheckRollup != nil {
+			s.Rollup = n.Commits.Nodes[0].Commit.StatusCheckRollup.State
 		}
 		out[num] = s
 	}

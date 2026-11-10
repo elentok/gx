@@ -9,6 +9,17 @@ func done(wf, name, sha, conclusion string) Check {
 	return Check{WorkflowID: wf, Name: name, HeadSHA: sha, Status: "COMPLETED", Conclusion: conclusion}
 }
 
+func TestCountChecks(t *testing.T) {
+	checks := []Check{
+		done("1", "a", "head", "SUCCESS"), done("1", "b", "head", "FAILURE"),
+		{Name: "c", HeadSHA: "head", Status: "IN_PROGRESS"}, done("1", "d", "old", "FAILURE"),
+		done("1", "b", "head", "SUCCESS"), // a rerun replaces the earlier b
+	}
+	if got, want := CountChecks("head", checks), (CheckCounts{Pending: 1, Green: 2}); got != want {
+		t.Fatalf("counts = %+v, want %+v", got, want)
+	}
+}
+
 func TestClassifyChecks(t *testing.T) {
 	cases := []struct {
 		name   string
