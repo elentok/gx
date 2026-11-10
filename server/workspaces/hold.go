@@ -158,6 +158,10 @@ func (s *Store) UnholdEpics(targets []string) (wire.HoldResult, error) {
 			res.Results = append(res.Results, *refused)
 			continue
 		}
+		if !s.IsHeld(t.key) {
+			res.Results = append(res.Results, wire.RefusedTarget(addr, wire.ReasonNotOnHold, "not on hold"))
+			continue
+		}
 		if err := s.Unhold(t.key); err != nil {
 			return wire.HoldResult{}, err
 		}

@@ -79,6 +79,7 @@ const (
 	ReasonHoldQueued      = "hold-queued"
 	ReasonHoldNotHoldable = "hold-not-holdable"
 	ReasonHoldUnknown     = "hold-unknown"
+	ReasonNotOnHold       = "not-on-hold"
 	HoldQueuedText        = "Remove it from the queue first"
 )
 

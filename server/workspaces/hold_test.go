@@ -85,6 +85,23 @@ func TestHold_UnholdAsksNothingAndStartsNothing(t *testing.T) {
 	}
 }
 
+func TestHold_UnholdRefusesTargetNotOnHold(t *testing.T) {
+	f := holdFixture(t)
+	if res := hold(t, f, false, false, "proj:map"); res.Results[0].Refused() {
+		t.Fatalf("hold = %+v", res)
+	}
+	res, err := f.H.Client.Admin.UnholdEpics(f.Ctx, []string{"proj:map", "proj:plain"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := res.Results[0]; r.Refused() || r.Status != wire.TargetDone {
+		t.Errorf("held target = %+v, want done", r)
+	}
+	if r := res.Results[1]; !r.Refused() || r.Reason != wire.ReasonNotOnHold || r.Message != "not on hold" {
+		t.Errorf("not-held target = %+v, want refused not-on-hold", r)
+	}
+}
+
 func TestHold_QueuedLoopEpicAndQueuedImplAreRefused(t *testing.T) {
 	f := holdFixture(t)
 	if res, err := f.H.Client.Queue.Add(f.Ctx, "proj:plain", ""); err != nil || res.Refused {

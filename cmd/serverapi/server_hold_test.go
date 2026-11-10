@@ -91,9 +91,25 @@ func TestServerHold_ManyTargetsPrintLinesSummaryAndExitOne(t *testing.T) {
 	if !strings.HasPrefix(out, "done proj:plain\nrefused proj:nope: ") || !strings.HasSuffix(out, "1 done, 1 refused\n") {
 		t.Errorf("out = %q, want a line per target and the summary", out)
 	}
+	if _, err := runServer(t, f.H, "hold", "proj:plain", "proj:map"); err != nil {
+		t.Fatal(err)
+	}
 	out, err = runServer(t, f.H, "unhold", "proj:plain", "proj:map")
 	if err != nil || out != "done proj:plain\ndone proj:map\n2 done, 0 refused\n" {
 		t.Errorf("unhold = %q, %v", out, err)
+	}
+	// plain is no longer held, so a second unhold of it is refused beside a held map.
+	if _, err := runServer(t, f.H, "hold", "proj:map"); err != nil {
+		t.Fatal(err)
+	}
+	out, err = runServer(t, f.H, "unhold", "proj:map", "proj:plain", "--json")
+	var res wire.HoldResult
+	if json.Unmarshal([]byte(out), &res) != nil || len(res.Results) != 2 ||
+		res.Results[0].Status != wire.TargetDone || res.Results[1].Reason != wire.ReasonNotOnHold {
+		t.Errorf("unhold mix = %q, want done then not-on-hold", out)
+	}
+	if !errors.As(err, &exit) || exit.Code != 1 {
+		t.Errorf("unhold mix err = %v, want exit 1", err)
 	}
 }
 
