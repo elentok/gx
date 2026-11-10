@@ -79,6 +79,9 @@ type HolderOptions struct {
 	Cols, Rows int
 	// Trust answers the harness's trust dialog while the child starts.
 	Trust bool
+	// AnswerDaemon answers Codex's incompatible-feature-settings dialog, which
+	// gx's own launch flags cause; set for Codex holders by RunHarnessHolder.
+	AnswerDaemon bool
 	// ProcCap is the process limit the child's tree runs under; zero is none.
 	ProcCap int
 	// Env (KEY=VALUE) is appended to the child's env.
@@ -109,6 +112,7 @@ func RunHarnessHolder(dir string, kind agentrunner.Kind, opts HolderOptions, arg
 	if err != nil {
 		return err
 	}
+	opts.AnswerDaemon = kind == harness.Codex
 	return runHolder(dir, h, opts, argv)
 }
 
@@ -220,8 +224,8 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	// socket goes.
 	defer srv.finish()
 	go srv.serve(ln)
-	if opts.Trust {
-		go answerTrust(h, scr, ptmx, watcher, exited)
+	if opts.Trust || opts.AnswerDaemon {
+		go answerTrust(h, scr, ptmx, watcher, exited, opts.Trust)
 	}
 	output := make(outputSignal, 1)
 	go srv.frames.run(output, srv.finished)
@@ -298,8 +302,11 @@ func terminalEnv(env []string) []string {
 
 // answerTrust types the trust dialog's key until the child is past starting
 // up. As in Pty.Start, keys repeat while the dialog stays up, since claude
-// drops a key typed before it reads input.
-func answerTrust(h harness.Harness, scr *screen.Screen, keys io.Writer, watcher harness.Watcher, exited <-chan struct{}) {
+// drops a key typed before it reads input. Without trust only the daemon
+// dialog is answered: gx's own launch flags cause it, so it is never the
+// person's to decide, and its digit goes in once, since a repeat would land in
+// the prompt after the dialog closed.
+func answerTrust(h harness.Harness, scr *screen.Screen, keys io.Writer, watcher harness.Watcher, exited <-chan struct{}, trust bool) {
 	var next time.Time
 	for {
 		st := watcher.Status()
@@ -307,11 +314,15 @@ func answerTrust(h harness.Harness, scr *screen.Screen, keys io.Writer, watcher 
 			return
 		}
 		if !time.Now().Before(next) {
-			if startup := h.StartupScreen(scr.ScrollbackTail(StartupScrollback), scr.Rows()); startup.Dialog != harness.NoDialog {
+			startup := h.StartupScreen(scr.ScrollbackTail(StartupScrollback), scr.Rows())
+			if startup.Dialog == harness.DaemonDialog || trust && startup.Dialog != harness.NoDialog {
 				if _, err := io.WriteString(keys, startup.Key); err != nil {
 					return
 				}
 				next = time.Now().Add(TrustKeyRepeat)
+				if startup.Dialog == harness.DaemonDialog {
+					next = time.Now().Add(time.Hour)
+				}
 			}
 		}
 		select {

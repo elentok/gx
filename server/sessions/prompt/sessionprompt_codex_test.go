@@ -10,7 +10,15 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 )
+
+// The fake's daemon dialog passes only on digit 1, so reaching Idle (which the
+// helper waits for) proves startup sent it.
+func TestSessionPrompt_CodexDaemonDialogIsAnsweredAtStartup(t *testing.T) {
+	t.Parallel()
+	startCodexPromptSession(t, codex.CodexDaemonEnv+"=1")
+}
 
 // startCodexPromptSession runs a session on the fake Codex, Idle, with extraEnv
 // added to the env it runs in. The conversation id is per test: the fake's

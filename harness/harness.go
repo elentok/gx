@@ -167,6 +167,7 @@ const (
 	HooksReviewDialog
 	UpdateDialog
 	ModelNudgeDialog
+	DaemonDialog
 )
 
 // Startup is a classified pre-session screen; Key answers Dialog.

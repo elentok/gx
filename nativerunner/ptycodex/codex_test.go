@@ -80,6 +80,7 @@ func TestPtyCodex_AnswersEveryStartupDialog(t *testing.T) {
 		codex.CodexHooksReviewEnv+"=1",
 		codex.CodexUpdateEnv+"=1",
 		codex.CodexModelNudgeEnv+"=1",
+		codex.CodexDaemonEnv+"=1",
 	)
 	// Start returns only once the launch loop saw Ready, which the fake reports
 	// after the last dialog.

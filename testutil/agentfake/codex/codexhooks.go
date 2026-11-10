@@ -25,6 +25,10 @@ const (
 	CodexHooksReviewEnv = "GX_AGENTFAKE_CODEX_HOOKS_REVIEW"
 	CodexUpdateEnv      = "GX_AGENTFAKE_CODEX_UPDATE"
 	CodexModelNudgeEnv  = "GX_AGENTFAKE_CODEX_MODEL_NUDGE"
+	CodexDaemonEnv      = "GX_AGENTFAKE_CODEX_DAEMON"
+
+	// CodexDaemonDialog is real Codex's wording; only the digit 1 passes it.
+	CodexDaemonDialog = "Background server has incompatible feature settings"
 
 	CodexTrustDialog       = "Trust this directory? Press Enter to continue"
 	CodexHooksReviewDialog = "Hooks review: Press Enter to continue"
@@ -44,6 +48,7 @@ func codexDialogs() []string {
 		{CodexHooksReviewEnv, CodexHooksReviewDialog},
 		{CodexUpdateEnv, CodexUpdateDialog},
 		{CodexModelNudgeEnv, CodexModelNudgeDialog},
+		{CodexDaemonEnv, CodexDaemonDialog},
 	} {
 		if os.Getenv(d.env) == "1" {
 			out = append(out, d.text)

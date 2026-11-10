@@ -215,16 +215,16 @@ func TestCodexStartupScreen_AnswersEveryDialog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for text, want := range map[string]harness.Dialog{
-		"Trust this directory? Press Enter to continue": harness.TrustDialog,
-		"Hooks review: Press Enter to continue":         harness.HooksReviewDialog,
-		"Update available: Press Enter to continue":     harness.UpdateDialog,
-		"Model nudge: Press Enter to continue":          harness.ModelNudgeDialog,
-		"› ask codex":                                   harness.NoDialog,
+	for text, want := range map[string]harness.Startup{
+		"Trust this directory? Press Enter to continue":       {Dialog: harness.TrustDialog, Key: "\r"},
+		"Hooks review: Press Enter to continue":               {Dialog: harness.HooksReviewDialog, Key: "\r"},
+		"Update available: Press Enter to continue":           {Dialog: harness.UpdateDialog, Key: "\r"},
+		"Model nudge: Press Enter to continue":                {Dialog: harness.ModelNudgeDialog, Key: "\r"},
+		"Background server has incompatible feature settings": {Dialog: harness.DaemonDialog, Key: "1"},
+		"› ask codex": {},
 	} {
-		got := h.StartupScreen(nil, []string{text})
-		if got.Dialog != want || want != harness.NoDialog && got.Key == "" {
-			t.Errorf("StartupScreen(%q) = %+v, want dialog %v with a key", text, got, want)
+		if got := h.StartupScreen(nil, []string{text}); got != want {
+			t.Errorf("StartupScreen(%q) = %+v, want %+v", text, got, want)
 		}
 	}
 }

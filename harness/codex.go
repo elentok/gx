@@ -179,25 +179,43 @@ func codexHomeFrom(env []string) string {
 // codexDialogs holds the text that names each startup dialog, lowercase. Only
 // the trust wording is from real Codex; the rest is what the fake shows, since
 // no recorded stream has a dialog. Update and model nudge are also switched
-// off by flag. Every dialog is answered with Enter.
+// off by flag. Every dialog is answered with Enter except the daemon dialog,
+// whose default row is Cancel (exits the process): digit 1 runs without the daemon.
 var codexDialogs = []struct {
 	dialog Dialog
 	text   []string
+	key    string
+	// visibleOnly matches the visible rows alone: a stray Enter after the
+	// dialog is harmless, but a stray digit is typed into the prompt, so the
+	// answer must stop once the dialog has left the screen.
+	visibleOnly bool
 }{
-	{TrustDialog, []string{"do you trust the contents", "trust this directory"}},
-	{HooksReviewDialog, []string{"hooks review"}},
-	{UpdateDialog, []string{"update available"}},
-	{ModelNudgeDialog, []string{"model nudge"}},
+	{TrustDialog, []string{"do you trust the contents", "trust this directory"}, "\r", false},
+	{HooksReviewDialog, []string{"hooks review"}, "\r", false},
+	{UpdateDialog, []string{"update available"}, "\r", false},
+	{ModelNudgeDialog, []string{"model nudge"}, "\r", false},
+	{DaemonDialog, []string{"incompatible feature settings"}, "1", true},
 }
 
 func (codexHarness) StartupScreen(scrolled, rows []string) Startup {
 	screenText := strings.ToLower(strings.Join(slices.Concat(scrolled, rows), "\n"))
+	visibleText := strings.ToLower(strings.Join(rows, "\n"))
+	// An answered dialog's text can stay in the scrollback, so the dialog
+	// showing now is the one whose text sits lowest.
+	out, lowest := Startup{}, -1
 	for _, d := range codexDialogs {
-		if slices.ContainsFunc(d.text, func(t string) bool { return strings.Contains(screenText, t) }) {
-			return Startup{Dialog: d.dialog, Key: "\r"}
+		text, base := screenText, 0
+		if d.visibleOnly {
+			// The rows are the tail of screenText, so offsets stay comparable.
+			text, base = visibleText, len(screenText)-len(visibleText)
+		}
+		for _, t := range d.text {
+			if at := strings.LastIndex(text, t) + base; at-base >= 0 && at > lowest {
+				out, lowest = Startup{Dialog: d.dialog, Key: d.key}, at
+			}
 		}
 	}
-	return Startup{}
+	return out
 }
 
 // DisplayName drops the braille spinner Codex prefixes its title with while

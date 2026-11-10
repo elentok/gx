@@ -347,10 +347,9 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 	c.setTitle(c.title)
 	// Codex turns bracketed paste on, so a paste keeps its newlines.
 	fmt.Fprint(c.out, "\x1b[?2004h")
-	if err := c.sessionStart(); err != nil {
+	if err := c.showNext(); err != nil {
 		return 0, err
 	}
-	c.showNext()
 	for ev := range events {
 		switch {
 		case ev.Err != nil:
@@ -372,8 +371,18 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 				return 0, err
 			}
 		case len(c.dialogs) > 0:
+			// Real Codex's daemon dialog rests on Cancel, which exits: only 1 passes.
+			if c.dialogs[0] == CodexDaemonDialog {
+				if ev.Key != '1' {
+					continue
+				}
+				// Real Codex redraws over the dialog once it is answered.
+				fmt.Fprint(c.out, "\x1b[2J\x1b[H")
+			}
 			c.dialogs = c.dialogs[1:]
-			c.showNext()
+			if err := c.showNext(); err != nil {
+				return 0, err
+			}
 		case c.onKey != nil:
 			next := c.onKey
 			c.onKey = nil
@@ -390,14 +399,19 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 }
 
 // showNext shows the first startup dialog still waiting, or, with none left,
-// the idle prompt: Ready comes only after every dialog is answered.
-func (c *codexFake) showNext() {
+// the idle prompt: SessionStart and Ready come only after every dialog is
+// answered, as in Codex.
+func (c *codexFake) showNext() error {
 	if len(c.dialogs) > 0 {
 		fmt.Fprint(c.out, c.dialogs[0]+"\r\n")
-		return
+		return nil
+	}
+	if err := c.sessionStart(); err != nil {
+		return err
 	}
 	c.report("idle")
 	c.box.Draw()
+	return nil
 }
 
 func (c *codexFake) exit() {

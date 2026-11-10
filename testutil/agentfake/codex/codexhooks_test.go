@@ -261,11 +261,12 @@ func (p *codexProc) waitFor(cond func() bool, what string) {
 }
 
 func TestCodexDialogs_BlockReadyUntilAKeyArrives(t *testing.T) {
-	for _, d := range []struct{ env, text string }{
-		{CodexTrustEnv, CodexTrustDialog},
-		{CodexHooksReviewEnv, CodexHooksReviewDialog},
-		{CodexUpdateEnv, CodexUpdateDialog},
-		{CodexModelNudgeEnv, CodexModelNudgeDialog},
+	for _, d := range []struct{ env, text, key string }{
+		{CodexTrustEnv, CodexTrustDialog, "\r"},
+		{CodexHooksReviewEnv, CodexHooksReviewDialog, "\r"},
+		{CodexUpdateEnv, CodexUpdateDialog, "\r"},
+		{CodexModelNudgeEnv, CodexModelNudgeDialog, "\r"},
+		{CodexDaemonEnv, CodexDaemonDialog, "1"},
 	} {
 		t.Run(d.env, func(t *testing.T) {
 			conv := agentfake.NewConversationID(t)
@@ -276,7 +277,7 @@ func TestCodexDialogs_BlockReadyUntilAKeyArrives(t *testing.T) {
 			if p.Watcher.Status().State == harness.Idle {
 				t.Fatal("Ready before the dialog was answered")
 			}
-			p.SendKeys("\r")
+			p.SendKeys(d.key)
 			p.WaitStatus(harness.Status{State: harness.Idle})
 		})
 	}
