@@ -1086,6 +1086,17 @@ _Avoid_: status area, indicators bar
 type its width gives.
 _Avoid_: breakpoint, form factor
 
+**Dev mode** — the server-wide switch that makes the web UI load from a Vite dev server the gx
+server runs itself, from the **Dev checkout**, instead of from the built files. Flipping it takes
+effect at once and reloads every open page. When Vite is down, pages get the built files and an
+error. For people working on gx itself.
+_Avoid_: dev frontend (the old config name), dev server (that is Vite, not the mode)
+
+**Dev checkout** — the gx source checkout whose `webui/` the **Dev mode** Vite serves: the
+checkout the binary was built from, unless the config names another one. A release build has none,
+and then Dev mode is not offered.
+_Avoid_: dev directory, source dir
+
 ## Web workspaces
 
 **Workspace** — a named theme the person creates to group what they work on now: Designs, epics and
