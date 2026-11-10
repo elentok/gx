@@ -149,8 +149,10 @@ type PidWatcher struct {
 		nextSearch time.Time
 	}
 
-	mu   sync.Mutex
-	live pidState
+	mu sync.Mutex
+	// askDir is the holder's state dir, where hooks leave ask-holds markers.
+	askDir string
+	live   pidState
 	// held, while set, is what state reports in place of the live status.
 	held *pidState
 	// lastLimit is when the newest rate limit applied was written: an older
@@ -177,6 +179,8 @@ type pidState struct {
 	rateLimit *transcript.APIError
 	// bgStale is a `shell` that the transcript showed no task for.
 	bgStale bool
+	// askHeld is a gx hook holding Claude's question dialog for the web.
+	askHeld bool
 }
 
 // pidStartSlack is how far before the spawn claude's startedAt may fall and
@@ -219,6 +223,7 @@ func (w *PidWatcher) watch(stop <-chan struct{}) {
 // poll keeps the last status when the file is gone or half-written: claude
 // deletes it on a clean exit and rewrites it in place.
 func (w *PidWatcher) poll() {
+	w.pollAsk()
 	f, ok := w.read(w.path)
 	if !ok && !w.found {
 		var path string
@@ -253,6 +258,31 @@ func (w *PidWatcher) poll() {
 	}
 	w.pollTranscript(f.SessionID)
 	w.pollBackground(f.SessionID)
+}
+
+// SetAskDir names the state dir whose ask-holds markers mean a question is held.
+func (w *PidWatcher) SetAskDir(dir string) {
+	w.mu.Lock()
+	w.askDir = dir
+	w.mu.Unlock()
+}
+
+// pollAsk reads the hook marker, announcing an edge.
+func (w *PidWatcher) pollAsk() {
+	w.mu.Lock()
+	dir := w.askDir
+	w.mu.Unlock()
+	if dir == "" {
+		return
+	}
+	held := askHeld(dir)
+	w.mu.Lock()
+	edge := held != w.live.askHeld
+	w.live.askHeld = held
+	w.mu.Unlock()
+	if edge {
+		w.changed()
+	}
 }
 
 // pollBackground cross-checks a pid-file `shell` against the transcript: a
@@ -506,6 +536,9 @@ func (w *PidWatcher) state() pidState {
 // limited turn as any other, and only the next Working clears the hold.
 func (w *PidWatcher) Status() Status {
 	st := w.state()
+	if st.askHeld {
+		return Status{State: Blocked, Blocked: BlockedQuestion}
+	}
 	s, ok := programStatus(st.program)
 	// OSC done ends the turn but can't say a background shell outlives it;
 	// only the pid file's shell state does.

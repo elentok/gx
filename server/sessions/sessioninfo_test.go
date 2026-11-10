@@ -76,12 +76,13 @@ func (s infoSource) ReadMeta(string) (chat.Meta, error) { return chat.Meta{}, er
 func (s infoSource) CheckProjectDir(string, string) (*wire.SessionResult, error) {
 	return nil, errors.New("unused")
 }
-func (s infoSource) StepFinal(chat.FlowRef) bool { return false }
-func (s infoSource) NoteFailure(string)          {}
-func (s infoSource) Stopped() <-chan struct{}    { return nil }
-func (s infoSource) HasChatReader(string) bool   { return false }
-func (s infoSource) CodexHome() (string, error)  { return s.codexHome, nil }
-func (s infoSource) Publish(string, string)      {}
+func (s infoSource) HeldAsks(string) []wire.AskHookRequest { return nil }
+func (s infoSource) StepFinal(chat.FlowRef) bool           { return false }
+func (s infoSource) NoteFailure(string)                    {}
+func (s infoSource) Stopped() <-chan struct{}              { return nil }
+func (s infoSource) HasChatReader(string) bool             { return false }
+func (s infoSource) CodexHome() (string, error)            { return s.codexHome, nil }
+func (s infoSource) Publish(string, string)                {}
 func (s infoSource) TicketAsk(string) (ticketlog.Question, string, bool) {
 	return ticketlog.Question{}, "", false
 }

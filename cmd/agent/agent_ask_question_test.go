@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +15,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -50,6 +54,45 @@ func TestAskQuestionHook_FailuresPrintNothingAndExitZero(t *testing.T) {
 		out, err := runAskHook(t, tc.client, tc.stdin)
 		if err != nil || out != "" {
 			t.Errorf("%s: stdout %q, err %v, want empty and nil", tc.name, out, err)
+		}
+	}
+}
+
+func TestAskQuestionHook_MarkerExistsOnlyWhileHeld(t *testing.T) {
+	h := servertest.Start(t)
+	live := func() (*apiclient.Client, error) { return h.Client, nil }
+	for _, how := range []string{"resolved", "cancelled"} {
+		holdDir := t.TempDir()
+		t.Setenv(harness.AskHoldDirEnv, holdDir)
+		markers := func() int {
+			e, _ := os.ReadDir(filepath.Join(holdDir, "ask-holds"))
+			return len(e)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		errc := make(chan error, 1)
+		go func() {
+			errc <- runAskQuestion(ctx, live, "s1", []byte(askPayload), io.Discard, true)
+		}()
+		deadline := time.Now().Add(8 * time.Second)
+		for len(h.Server.Sessions().HeldAsks("s1")) == 0 && time.Now().Before(deadline) {
+			<-time.After(5 * time.Millisecond)
+		}
+		if n := markers(); n != 1 {
+			t.Errorf("%s: markers while held = %d, want 1", how, n)
+		}
+		if how == "resolved" {
+			h.Server.Sessions().ResolveAsk("s1", "toolu_1", wire.AskHookResult{Decision: wire.AskHookRelease})
+		} else {
+			cancel()
+		}
+		select {
+		case <-errc:
+		case <-time.After(8 * time.Second):
+			t.Fatalf("%s: hook did not return", how)
+		}
+		cancel()
+		if n := markers(); n != 0 {
+			t.Errorf("%s: markers after return = %d, want 0", how, n)
 		}
 	}
 }

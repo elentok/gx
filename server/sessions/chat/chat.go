@@ -61,6 +61,8 @@ type Source interface {
 	// token; ok is false for an unknown address or a ticket with no answerable
 	// question.
 	TicketAsk(address string) (q ticketlog.Question, state string, ok bool)
+	// HeldAsks lists the AskUserQuestion calls a Claude hook holds for a session.
+	HeldAsks(session string) []wire.AskHookRequest
 }
 
 // Config holds the durations and paths the chat reads from the server config.

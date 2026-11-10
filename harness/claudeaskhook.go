@@ -1,6 +1,59 @@
 package harness
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"strconv"
+	"syscall"
+)
+
+// AskHoldDirEnv carries the holder's state dir into the child's env, so the
+// hook can leave a marker where the watcher looks.
+const AskHoldDirEnv = "GX_HOLDER_DIR"
+
+const askHoldsDir = "ask-holds"
+
+// AskHoldMarker creates the marker of a hook holding in dir, named by its pid,
+// and returns the func that removes it. A dir of "" makes no marker.
+func AskHoldMarker(dir string, pid int) (remove func(), err error) {
+	if dir == "" {
+		return func() {}, nil
+	}
+	holds := filepath.Join(dir, askHoldsDir)
+	if err := os.MkdirAll(holds, 0o700); err != nil {
+		return func() {}, err
+	}
+	path := filepath.Join(holds, strconv.Itoa(pid))
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		return func() {}, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
+// askHeld says whether a live hook holds a question in dir. A marker whose pid
+// is gone (a hook that was killed) is stale: it is deleted and ignored.
+func askHeld(dir string) bool {
+	holds := filepath.Join(dir, askHoldsDir)
+	entries, err := os.ReadDir(holds)
+	if err != nil {
+		return false
+	}
+	held := false
+	for _, e := range entries {
+		pid, err := strconv.Atoi(e.Name())
+		if err != nil {
+			continue
+		}
+		if errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) {
+			_ = os.Remove(filepath.Join(holds, e.Name()))
+			continue
+		}
+		held = true
+	}
+	return held
+}
 
 // ClaudeAskHookCommand is the PreToolUse hook that holds Claude's
 // AskUserQuestion dialog for the web. The gx session id travels in the env

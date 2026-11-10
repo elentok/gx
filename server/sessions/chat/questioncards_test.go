@@ -88,6 +88,37 @@ func TestTicketAskCard_QueueAgentListsOnlyTheAsk(t *testing.T) {
 	}
 }
 
+func TestClaudeDialogCard(t *testing.T) {
+	t.Parallel()
+	req := wire.AskHookRequest{Session: "s1", ToolUseID: "toolu_9", Questions: []wire.AskHookQuestion{
+		{Header: "Scope", Question: "Which scope?", Options: []wire.AskHookOption{{Label: "A", Description: "first"}, {Label: "B", Description: "second"}}},
+		{Header: "Extras", Question: "Which extras?", MultiSelect: true, Options: []wire.AskHookOption{{Label: "X", Description: "x desc"}}},
+		{Header: "Ship", Question: "Ship it?", Options: []wire.AskHookOption{{Label: "Yes"}}},
+	}}
+	got := chat.ClaudeDialogCard(req)
+	if len(got) != 1 || got[0].Source != wire.CardSourceClaudeDialog || got[0].ID != "toolu_9" || len(got[0].Questions) != 3 {
+		t.Fatalf("card = %+v", got)
+	}
+	other := wire.QuestionCardOption{ID: "other", Label: "Other", Text: true}
+	want := []wire.QuestionCardQuestion{
+		{Kind: "options", Label: "Scope", Title: "Which scope?", Options: []wire.QuestionCardOption{{ID: "1", Label: "A", Description: "first"}, {ID: "2", Label: "B", Description: "second"}, other}},
+		{Kind: "multi-select", Label: "Extras", Title: "Which extras?", Options: []wire.QuestionCardOption{{ID: "1", Label: "X", Description: "x desc"}, other}},
+		{Kind: "options", Label: "Ship", Title: "Ship it?", Options: []wire.QuestionCardOption{{ID: "1", Label: "Yes"}, other}},
+	}
+	if !reflect.DeepEqual(got[0].Questions, want) {
+		t.Errorf("questions = %+v, want %+v", got[0].Questions, want)
+	}
+
+	src := chat.CardSources{chat.SlotClaudeDialog: got}
+	for class, wantN := range map[chat.SessionClass]int{
+		chat.ClassPlain: 1, chat.ClassFlow: 0, chat.ClassQueueAgent: 0, chat.ClassFixAgent: 0,
+	} {
+		if n := len(chat.BuildCards(class, src)); n != wantN {
+			t.Errorf("class %v: %d cards, want %d", class, n, wantN)
+		}
+	}
+}
+
 func TestClassOf(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {

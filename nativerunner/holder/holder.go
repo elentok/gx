@@ -177,6 +177,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 	cmd.Env = append(terminalEnv(os.Environ()), opts.Env...)
+	cmd.Env = append(cmd.Env, harness.AskHoldDirEnv+"="+dir)
 	if opts.GXSession != "" {
 		cmd.Env = append(cmd.Env, AgentSessionEnv+"="+opts.GXSession)
 	}
@@ -196,6 +197,9 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		_ = cmd.Wait()
 		_ = tty.Close()
 		return err
+	}
+	if w, ok := watcher.(interface{ SetAskDir(string) }); ok {
+		w.SetAskDir(dir)
 	}
 	pid, _ := watcher.(harness.PidStatusWatcher)
 	srv := &holderServer{

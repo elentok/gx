@@ -50,6 +50,9 @@ func (c chatSource) TicketAsk(address string) (ticketlog.Question, string, bool)
 	return ticketlog.QuestionOfEvent(*open), queue.AnswerState(*open, t.PausedClass()), true
 }
 
+func (c chatSource) HeldAsks(session string) []wire.AskHookRequest {
+	return c.s.sessions.HeldAsks(session)
+}
 func (c chatSource) StepFinal(ref chat.FlowRef) bool { return c.s.prompt.StepFinal(ref) }
 func (c chatSource) NoteFailure(id string)           { c.s.sessions.NoteFailure(id) }
 func (c chatSource) Stopped() <-chan struct{}        { return c.s.sessions.Watches.Stop }

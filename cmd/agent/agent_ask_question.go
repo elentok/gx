@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
 )
@@ -58,6 +59,10 @@ func runAskQuestion(ctx context.Context, dial func() (*apiclient.Client, error),
 	if err != nil {
 		return err
 	}
+	// The marker tells the holder's watcher the session is Blocked while held.
+	// A marker that fails to write only costs the Blocked state.
+	remove, _ := harness.AskHoldMarker(os.Getenv(harness.AskHoldDirEnv), os.Getpid())
+	defer remove()
 	res, err := cl.Sessions.AskHold(ctx, req)
 	if err != nil {
 		return err

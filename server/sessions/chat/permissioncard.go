@@ -37,6 +37,11 @@ func (c *Chat) Cards(dir string, m Meta, snap Snapshot) []wire.QuestionCard {
 	if class == ClassPlain && m.Ticket == "" && m.Harness == string(harness.Codex) {
 		src[SlotCodexQuestion] = c.codexQuestionCards(m)
 	}
+	if class == ClassPlain && m.Ticket == "" && m.Harness == string(harness.Claude) {
+		if held := c.src.HeldAsks(m.ID); len(held) > 0 {
+			src[SlotClaudeDialog] = ClaudeDialogCard(held[0])
+		}
+	}
 	return BuildCards(class, src)
 }
 

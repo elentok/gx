@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -191,6 +192,66 @@ func TestPidWatcher_ReportsSessionStatus(t *testing.T) {
 	if got := w.ConversationID(); got != "conv-1" {
 		t.Errorf("ConversationID = %q, want conv-1", got)
 	}
+}
+
+func TestPidWatcher_AskHoldMarkerBlocksOnAQuestion(t *testing.T) {
+	deadPid := func() int {
+		c := exec.Command("true")
+		if err := c.Run(); err != nil {
+			t.Fatal(err)
+		}
+		return c.Process.Pid
+	}
+	setup := func(t *testing.T, stream string) (*PidWatcher, string) {
+		sessions, holder := t.TempDir(), t.TempDir()
+		spawned := time.Now()
+		w := newPidWatcher(sessions, 4242, spawned)
+		writePidFile(t, sessions, spawned, `,"status":"busy"`)
+		w.SetAskDir(holder)
+		w.poll()
+		feedOSC7501(w, stream)
+		return w, holder
+	}
+	blocked := Status{State: Blocked, Blocked: BlockedQuestion}
+	for name, stream := range map[string]string{"busy": "", "osc working": "\x1b]7501;state=working:app=claude\a"} {
+		t.Run(name, func(t *testing.T) {
+			w, holder := setup(t, stream)
+			if got := w.Status(); got != (Status{State: Working}) {
+				t.Fatalf("before the marker: Status = %+v, want Working", got)
+			}
+			changes := 0
+			w.OnChange(func() { changes++ })
+			remove, err := AskHoldMarker(holder, os.Getpid())
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.poll()
+			if got := w.Status(); got != blocked {
+				t.Errorf("held: Status = %+v, want Blocked/question", got)
+			}
+			remove()
+			w.poll()
+			if got := w.Status(); got != (Status{State: Working}) {
+				t.Errorf("released: Status = %+v, want Working", got)
+			}
+			if changes != 2 {
+				t.Errorf("changes = %d, want one per edge", changes)
+			}
+		})
+	}
+	t.Run("a dead pid's marker is ignored and deleted", func(t *testing.T) {
+		w, holder := setup(t, "")
+		if _, err := AskHoldMarker(holder, deadPid()); err != nil {
+			t.Fatal(err)
+		}
+		w.poll()
+		if got := w.Status(); got != (Status{State: Working}) {
+			t.Errorf("Status = %+v, want Working", got)
+		}
+		if askHeld(holder) {
+			t.Error("stale marker still counts")
+		}
+	})
 }
 
 // feedOSC7501 hands w every report in a recorded byte stream.
