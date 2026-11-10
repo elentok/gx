@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // approvableHeaders are the dialog titles gx may approve from the web UI.
@@ -60,19 +61,8 @@ func ParseDialog(rows []string) Dialog {
 		return Dialog{}
 	}
 
-	var options []string
-	for _, row := range rows[q+1 : esc] {
-		t := strings.TrimSpace(row)
-		if t == "" {
-			continue
-		}
-		m := optionRow.FindStringSubmatch(t)
-		if m == nil || m[1] != strconv.Itoa(len(options)+1) {
-			return Dialog{}
-		}
-		options = append(options, strings.TrimSpace(m[2]))
-	}
-	if len(options) == 0 {
+	options, _, clean, wrapped := readOptions(rows[q+1 : esc])
+	if !clean || wrapped || len(options) == 0 {
 		return Dialog{}
 	}
 
@@ -88,6 +78,43 @@ func ParseDialog(rows []string) Dialog {
 		d.ID = dialogID(header, body)
 	}
 	return d
+}
+
+// readOptions reads the numbered options at the top of rows. A row indented to
+// the label column of the option above, with no number, is that option's
+// wrapped label and joins it. The first row that is neither stops the list and
+// clean is false; blank rows are skipped.
+func readOptions(rows []string) (options []string, cursor int, clean, wrapped bool) {
+	cursor = -1
+	textCol := 0
+	for _, row := range rows {
+		t := strings.TrimSpace(row)
+		if t == "" {
+			continue
+		}
+		indent := utf8.RuneCountInString(row) - utf8.RuneCountInString(strings.TrimLeft(row, " \t"))
+		if m := optionRow.FindStringSubmatchIndex(t); m != nil && t[m[2]:m[3]] == strconv.Itoa(len(options)+1) {
+			if strings.HasPrefix(t, "❯") {
+				cursor = len(options)
+			}
+			textCol = indent + utf8.RuneCountInString(t[:m[4]])
+			options = append(options, strings.TrimSpace(t[m[4]:]))
+			continue
+		}
+		if len(options) > 0 && indent >= textCol && !isRule(t) && !isDashRule(t) && !isHintRow(t) {
+			options[len(options)-1] = Normalize(options[len(options)-1], t)
+			wrapped = true
+			continue
+		}
+		return options, cursor, false, wrapped
+	}
+	return options, cursor, true, wrapped
+}
+
+// isHintRow reports whether t is a key hint claude prints under an option,
+// which is not part of the label.
+func isHintRow(t string) bool {
+	return strings.HasPrefix(t, "shift+tab ") || strings.HasPrefix(t, "ctrl+")
 }
 
 // headerAndBody reads the title and body between the last rule above the
@@ -166,22 +193,7 @@ func ReadDialog(rows []string) DialogView {
 		return DialogView{}
 	}
 
-	var options []string
-	cursor := -1
-	for _, row := range rows[q+1:] {
-		t := strings.TrimSpace(row)
-		if t == "" {
-			continue
-		}
-		m := optionRow.FindStringSubmatch(t)
-		if m == nil || m[1] != strconv.Itoa(len(options)+1) {
-			break
-		}
-		if strings.HasPrefix(t, "❯") {
-			cursor = len(options)
-		}
-		options = append(options, strings.TrimSpace(m[2]))
-	}
+	options, cursor, _, _ := readOptions(rows[q+1:])
 	if len(options) == 0 {
 		return DialogView{}
 	}

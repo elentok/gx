@@ -160,3 +160,43 @@ func TestParseDialog_OptionOneMustBeExactlyYes(t *testing.T) {
 		t.Fatal("option 1 other than \"Yes\" must not be approvable")
 	}
 }
+
+func TestReadDialog_WrappedOptionRows(t *testing.T) {
+	rows := dialogRows(t, "permission-wrapped-w80.screen.txt")
+	v := ReadDialog(rows)
+	want := []string{
+		"Yes",
+		"Yes, and always allow access to /private/tmp/claude-501/scratchpad/wf/perm from this project",
+		"Yes, and switch to auto mode · auto mode handles these prompts for you",
+		"No",
+	}
+	if strings.Join(v.Options, "|") != strings.Join(want, "|") {
+		t.Fatalf("options = %q, want %q", v.Options, want)
+	}
+	if v.Cursor != 0 || v.ID == "" {
+		t.Fatalf("cursor=%d id=%q", v.Cursor, v.ID)
+	}
+	if d := ParseDialog(rows); d.Approvable || d.Header != "" {
+		t.Fatalf("ParseDialog on wrapped layout = %+v, want zero Dialog", d)
+	}
+}
+
+func TestReadDialog_PlanHintRowIsNotLabel(t *testing.T) {
+	v := ReadDialog(dialogRows(t, "plan-approval.screen.txt"))
+	if got := v.Options[2]; got != "Tell Claude what to change" {
+		t.Fatalf("option 3 = %q", got)
+	}
+}
+
+func TestReadDialog_StrayRowEndsList(t *testing.T) {
+	rows := []string{
+		" Do you want to proceed?",
+		" ❯ 1. Yes",
+		"   2. No",
+		" stray row",
+		"   3. Never",
+	}
+	if v := ReadDialog(rows); len(v.Options) != 2 {
+		t.Fatalf("options = %q, want 2", v.Options)
+	}
+}
