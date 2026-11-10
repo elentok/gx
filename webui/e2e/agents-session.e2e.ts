@@ -196,6 +196,17 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(interrupt).not.toHaveAttribute("title", /Esc/);
   await page.keyboard.press("Escape");
   await expect(confirm).toHaveCount(0);
+
+  // An interrupted turn is one dim separator in Claude and Codex, Chat and Design sessions.
+  const interrupted = await sessions(await start("agents-interrupted"));
+  expect(interrupted).toHaveLength(4);
+  await page.setViewportSize({ width: 1280, height: 560 });
+  for (const s of interrupted) {
+    await go(page, `#/agents/${s.id}`);
+    await expect(page.getByText("hello", { exact: true })).toBeVisible();
+    await expect(page.getByRole("separator").filter({ hasText: /^Turn interrupted$/ })).toHaveCount(1);
+    await expect(page.getByText("[Request interrupted by user]")).toHaveCount(0);
+  }
 });
 
 // Moved to vitest: 77 and 81 (AgentsPage.composer.test.tsx), 82 (AgentsPage.sessionView.test.tsx),
