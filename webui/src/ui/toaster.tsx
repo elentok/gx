@@ -41,7 +41,7 @@ export function AppToaster() {
             <Toast.Root width={{ md: actions ? "320px" : "sm" }} {...(actions && { bg: "surface.raised", color: "text", borderWidth: "1px", borderColor: "border" })}>
               {!actions && <Toast.Indicator />}
               <div>
-                {toast.title && <Toast.Title {...(actions && { fontWeight: "600", fontSize: "14px" })}>{toast.title}</Toast.Title>}
+                {toast.title && <Toast.Title {...(actions && { fontWeight: "700", fontSize: "14px" })}>{toast.title}</Toast.Title>}
                 {toast.description && <Toast.Description>{toast.description}</Toast.Description>}
                 {actions && (
                   <Box display="flex" gap="1.5" flexWrap="wrap" mt="2">
