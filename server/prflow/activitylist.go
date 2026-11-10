@@ -20,11 +20,11 @@ var entryWords = map[Kind]struct {
 	KindReranCheck:      {"Check re-run", wire.PRActivityInfo},
 	KindCIFailed:        {"CI failed", wire.PRActivityBad},
 	KindFlaky:           {"Marked flaky", wire.PRActivityWarning},
-	KindPausedCIFailing: {"CI failing: gx gave up", wire.PRActivityBad},
+	KindPausedCIFailing: {"Paused: CI failing", wire.PRActivityBad},
 	KindTryAgainReset:   {"Try again", wire.PRActivityInfo},
 	KindPRMerged:        {"PR merged", wire.PRActivityGood},
 	KindTrunkUpdated:    {"Local trunk updated", wire.PRActivityGood},
-	KindPRClosed:        {"PR closed", wire.PRActivityWarning},
+	KindPRClosed:        {"PR closed without merging", wire.PRActivityWarning},
 	KindGitHubDown:      {"GitHub unreachable", wire.PRActivityWarning},
 	KindGitHubUp:        {"GitHub reachable again", wire.PRActivityInfo},
 	KindMarkedMerged:    {"Marked as merged", wire.PRActivityGood},
@@ -40,6 +40,9 @@ func List(project string, e tickets.Epic) []wire.PRActivityEntry {
 		w, ok := entryWords[en.Kind]
 		if !ok {
 			w.text, w.kind = string(en.Kind), wire.PRActivityInfo
+		}
+		if en.Title != "" {
+			w.text = en.Title
 		}
 		detail := en.Detail
 		if detail == "" && len(en.Checks) > 0 {

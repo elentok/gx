@@ -9,6 +9,27 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+func TestList_GiveUpAndClosedCopy(t *testing.T) {
+	dir := t.TempDir()
+	base := time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC)
+	for i, en := range []prflow.Entry{
+		{Kind: prflow.KindPausedCIFailing, Title: "Paused: go-test failed 3 times", Detail: "Limit reached for this check. Try again resets the count."},
+		{Kind: prflow.KindPRClosed},
+	} {
+		en.Time = base.Add(time.Duration(i) * time.Hour)
+		if err := prflow.Append(dir, en); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := prflow.List("proj", tickets.Epic{Name: "epic", Path: dir})
+	if len(got) != 2 || got[0].Text != "PR closed without merging" {
+		t.Fatalf("entries = %+v", got)
+	}
+	if got[1].Text != "Paused: go-test failed 3 times" || got[1].Detail != "Limit reached for this check. Try again resets the count." {
+		t.Errorf("pause entry = %+v", got[1])
+	}
+}
+
 func TestList_FixEntriesLinkTheirTicketAndSortNewestFirst(t *testing.T) {
 	dir := t.TempDir()
 	base := time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC)

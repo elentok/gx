@@ -85,9 +85,9 @@ func TestGiveUp_CapsStoreCIFailingAndNotifyOnce(t *testing.T) {
 		seed   []string
 		reason string
 	}{
-		"per check": {seed: []string{"11/build", "11/build", "11/build"}, reason: "build failed 3 times"},
+		"per check": {seed: []string{"11/build", "11/build", "11/build"}, reason: "CI failing: build failed 3 times (limit 3 per check). Fix it by hand and push, or press Try again to give the agent 3 more attempts."},
 		"per PR": {seed: []string{"1/a", "2/b", "3/c", "4/d", "5/e", "6/f", "7/g", "8/h", "9/i", "10/j"},
-			reason: "CI failed 10 times"},
+			reason: "CI failing: CI failed 10 times (limit 10 per pull request)."},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

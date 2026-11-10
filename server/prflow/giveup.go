@@ -23,16 +23,20 @@ func (w *Watcher) ciGate(t Target, v View) (stop bool, err error) {
 	if err != nil || reason == "" {
 		return false, err
 	}
-	return true, w.giveUp(t, reason)
+	return true, w.giveUp(t, giveUpNote{Reason: reason, Detail: reason})
 }
+
+// giveUpNote is the words of one give-up: Reason is the epic's pause notice,
+// Title and Detail the activity entry (an empty Title keeps the kind's words).
+type giveUpNote struct{ Reason, Title, Detail string }
 
 // giveUp stores "CI failing" and sends its one notice, then logs it. Later polls
 // see the stored block and do not come back here.
-func (w *Watcher) giveUp(t Target, reason string) error {
-	if err := w.host.PauseCIFailing(t, reason); err != nil {
+func (w *Watcher) giveUp(t Target, n giveUpNote) error {
+	if err := w.host.PauseCIFailing(t, n.Reason); err != nil {
 		return err
 	}
-	return Append(t.Dir, Entry{Kind: KindPausedCIFailing, Detail: reason})
+	return Append(t.Dir, Entry{Kind: KindPausedCIFailing, Title: n.Title, Detail: n.Detail})
 }
 
 // ResetBlock clears the epic's stored pause and logs a Try again reset, so the
@@ -45,13 +49,20 @@ func ResetBlock(epicDir, detail string) error {
 }
 
 // capReason says which cap gave out: the check's own, else the PR's.
-func capReason(epicDir string, c pr.Check, perCheck int) string {
+func capReason(epicDir string, c pr.Check, perCheck, perPR int) giveUpNote {
 	key := CheckKeyString(c.Key())
+	what, limit, unit, n := "", perCheck, "check", perCheck
 	if byCheck, err := CIFailedByCheck(epicDir); err == nil && byCheck[key] >= perCheck {
-		return fmt.Sprintf("%s failed %d times. The last fix did not change the result.", c.Name, perCheck)
+		what = c.Name + " failed"
+	} else {
+		total, _ := CIFailedAttempts(epicDir)
+		what, limit, unit, n = "CI failed", perPR, "pull request", total
 	}
-	total, _ := CIFailedAttempts(epicDir)
-	return fmt.Sprintf("CI failed %d times on this pull request. The last fix did not change the result.", total)
+	return giveUpNote{
+		Reason: fmt.Sprintf("CI failing: %s %d times (limit %d per %s). Fix it by hand and push, or press Try again to give the agent %d more attempts.", what, n, limit, unit, limit),
+		Title:  fmt.Sprintf("Paused: %s %d times", what, n),
+		Detail: fmt.Sprintf("Limit reached for this %s. Try again resets the count.", unit),
+	}
 }
 
 // unfixableReason is why gx gives up at once: the newest ci-fix ticket finished

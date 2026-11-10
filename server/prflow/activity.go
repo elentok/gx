@@ -44,6 +44,8 @@ type Entry struct {
 	Time   time.Time `json:"time"`
 	Kind   Kind      `json:"kind"`
 	Detail string    `json:"detail,omitempty"`
+	// Title replaces the kind's words on the page when set.
+	Title string `json:"title,omitempty"`
 	// Checks names the check keys involved (one for a rerun or a flaky mark,
 	// the failed ones for a CI failure).
 	Checks   []string `json:"checks,omitempty"`

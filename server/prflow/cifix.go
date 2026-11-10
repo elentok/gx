@@ -211,7 +211,7 @@ func (w *Watcher) startCIFix(r pr.Runner, repo string, t Target, v View) error {
 			return nil
 		}
 		if res == CIFixCapReached {
-			return w.giveUp(t, capReason(t.Dir, c, perCheck))
+			return w.giveUp(t, capReason(t.Dir, c, perCheck, perPR))
 		}
 	}
 	return nil
