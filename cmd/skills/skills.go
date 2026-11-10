@@ -151,15 +151,23 @@ is linked into both agent roots (or copied with --copy).`,
 func newSkillsUninstallCmd(d Deps) *cobra.Command {
 	var force []string
 	cmd := &cobra.Command{
-		Use:   "uninstall",
-		Short: "remove gx's canonical skill bundle for Claude and Codex",
-		Args:  cobra.NoArgs,
-		RunE: func(c *cobra.Command, _ []string) error {
+		Use:   "uninstall [<dir>]",
+		Short: "remove gx's skill bundle, or the skills of a source folder <dir>, for Claude and Codex",
+		Long: `Without <dir>, remove gx's canonical skill bundle only; sources stay installed.
+
+With <dir>, remove that source's links or copies and forget the source. The
+folder itself is never touched and need not exist. A locally modified entry is
+kept and reported conflicted until --force names it.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				return runSkillsUninstallSource(d, args[0], force, c.OutOrStdout())
+			}
 			return runSkillsUninstall(d, force, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringSliceVar(&force, "force", nil,
-		"bundle-relative path(s) to force-remove despite local modification")
+		"root-relative path(s) to force-remove despite local modification")
 	return cmd
 }
 
@@ -742,6 +750,43 @@ func runSkillsUninstall(d Deps, force []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	return uninstallManifest(d, manifestPath, "gx's skill bundle", force, out)
+}
+
+// runSkillsUninstallSource removes one Skill source's entries and record. The
+// record is keyed by the folder's real path; a folder that is gone cannot be
+// resolved, so its parent is resolved instead, then the path as typed.
+func runSkillsUninstallSource(d Deps, dir string, force []string, out io.Writer) error {
+	if d.ManifestDir == nil {
+		return errors.New("skill sources are not configured")
+	}
+	manifestDir, err := d.ManifestDir()
+	if err != nil {
+		return err
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return err
+	}
+	candidates := []string{abs}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		candidates = []string{real, abs}
+	} else if parent, err := filepath.EvalSymlinks(filepath.Dir(abs)); err == nil {
+		candidates = []string{filepath.Join(parent, filepath.Base(abs)), abs}
+	}
+	manifestPath := filepath.Join(manifestDir, skills.SourceID(candidates[0])+".json")
+	for _, c := range candidates {
+		p := filepath.Join(manifestDir, skills.SourceID(c)+".json")
+		if _, err := os.Stat(p); err == nil {
+			manifestPath = p
+			break
+		}
+	}
+	return uninstallManifest(d, manifestPath, "skill source "+dir, force, out)
+}
+
+func uninstallManifest(d Deps, manifestPath, what string, force []string, out io.Writer) error {
+	var err error
 	forcePolicy := skills.NewForcePolicy(force...)
 
 	backupDir := ""
@@ -753,7 +798,7 @@ func runSkillsUninstall(d Deps, force []string, out io.Writer) error {
 	}
 	targets, err := skills.Uninstall(manifestPath, forcePolicy, skills.UninstallOptions{BackupDir: backupDir})
 	if errors.Is(err, skills.ErrNotExist) {
-		fmt.Fprintln(out, "gx's skill bundle is not installed")
+		fmt.Fprintf(out, "%s is not installed\n", what)
 		return nil
 	}
 	if err != nil {
