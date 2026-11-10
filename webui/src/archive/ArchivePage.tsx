@@ -14,6 +14,7 @@ import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { GxMenu } from "../ui/menu/Menu";
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
+import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { Spinner } from "../ui/spinner/Spinner";
 import { showToast } from "../ui/toaster";
 import { useFetched } from "../useFetched";
@@ -47,10 +48,13 @@ function ArchiveRow({
       aria-label={row.title}
       onClick={act}
       onKeyDown={onKeyDown}
+      position="relative"
       display="flex"
       alignItems="center"
-      gap="3"
-      p="4"
+      gap="4"
+      py="18px"
+      px="20px"
+      pl={select ? "46px" : "20px"}
       cursor="pointer"
       bg="surface.raised"
       borderWidth="1px"
@@ -58,12 +62,13 @@ function ArchiveRow({
       borderRadius="12px"
     >
       {select && (
-        <Box display="flex" onClick={(e) => e.stopPropagation()}>
+        <Box position="absolute" top="12px" left="12px" zIndex="2" display="flex" onClick={(e) => e.stopPropagation()}>
           <SelectBox checked={select.checked} label={`Select ${row.title}`} onToggle={select.onToggle} size="20px" />
         </Box>
       )}
+      <ProgressRing progress={1} tone="done" kind={row.kind === "map" ? "design" : "implementation"} size="sm" label="" />
       <Box minW="0" flex="1">
-        <Text fontFamily="condensed" fontSize="20px" fontWeight="600" lineHeight="1.2">
+        <Text fontFamily="condensed" fontSize="24px" fontWeight="600" lineHeight="1.15">
           {row.title}
         </Text>
         <Text color="text.muted" fontSize="14px">
@@ -115,17 +120,35 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
         <PageHeader
           title="Archive"
           actions={
-            epics.length > 0 && (
-              <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.state.on ? select.leave : select.enter}>
-                {select.state.on ? "Cancel" : "Select"}
-              </Button>
-            )
+            <>
+              <Link
+                href={EPICS_HREF}
+                display="inline-flex"
+                alignItems="center"
+                h="40px"
+                px="4"
+                flexShrink="0"
+                whiteSpace="nowrap"
+                fontWeight="600"
+                color="text"
+                bg="surface.raised"
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="8px"
+                textDecoration="none"
+                _hover={{ borderColor: "text.dim", textDecoration: "none" }}
+              >
+                ← Epics
+              </Link>
+              {epics.length > 0 && (
+                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.state.on ? select.leave : select.enter}>
+                  {select.state.on ? "Cancel" : "Select"}
+                </Button>
+              )}
+            </>
           }
         />
       </Box>
-      <Link href={EPICS_HREF} display="inline-block" mt="3" color="text.muted" textDecoration="none" _hover={{ color: "text", textDecoration: "none" }}>
-        ← Epics
-      </Link>
       {select.state.on && (
         <SelectBar sel={select} sticky>
           <SidebarBulkActions sel={select} shown={ONLY_UNARCHIVE} onResults={left} />
@@ -140,17 +163,22 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
       ) : epics.length === 0 ? (
         <EmptyState title="Nothing is archived" />
       ) : (
-        <Box as="ul" mt="6" p="0" display="flex" flexDirection="column" gap="3">
-          {epics.map((r) => (
-            <ArchiveRow
-              key={r.address}
-              row={r}
-              select={select.state.on ? { checked: select.state.keys.includes(r.address), onToggle: () => select.toggle(r.address) } : undefined}
-              onOpen={() => navigate(`/archive/${r.address}`)}
-              onUnarchive={() => void unarchiveOne(r)}
-            />
-          ))}
-        </Box>
+        <>
+          <Text mt="6" mb="3" color="text.muted" fontSize="13px" letterSpacing="0.08em" textTransform="uppercase">
+            Newest first
+          </Text>
+          <Box as="ul" m="0" p="0" display="grid" gap="16px" gridTemplateColumns="repeat(auto-fill, minmax(min(100%, 360px), 1fr))">
+            {epics.map((r) => (
+              <ArchiveRow
+                key={r.address}
+                row={r}
+                select={select.state.on ? { checked: select.state.keys.includes(r.address), onToggle: () => select.toggle(r.address) } : undefined}
+                onOpen={() => navigate(`/archive/${r.address}`)}
+                onUnarchive={() => void unarchiveOne(r)}
+              />
+            ))}
+          </Box>
+        </>
       )}
     </DetailPage>
   );
