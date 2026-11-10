@@ -21,9 +21,17 @@ func (s *Server) newDevVite() error {
 		Observer: func(snap devvite.Snapshot) {
 			if snap.State == devvite.StateRunning {
 				s.web.UseViteProxy(snap.Port)
+				if !s.viteServed.Swap(true) {
+					s.events.Publish(wire.EventReload, "")
+				}
 			} else {
+				// No reload here: a page on a Vite that went down is reloaded
+				// by nothing, and the pages of a stopping Vite were already told
+				// by applyDevMode.
 				s.web.UseBuiltUI()
+				s.viteServed.Store(false)
 			}
+			s.events.Publish(wire.EventDevChanged, "")
 		},
 	})
 	if err != nil {
@@ -44,6 +52,9 @@ func (s *Server) applyDevMode(next Settings) {
 		// The supervisor reports off only after Vite has stopped; until then
 		// the proxy would answer 502.
 		s.web.UseBuiltUI()
+		if s.viteServed.Swap(false) {
+			s.events.Publish(wire.EventReload, "")
+		}
 	}
 	s.vite.Set(on, root)
 }

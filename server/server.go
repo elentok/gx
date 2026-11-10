@@ -103,6 +103,7 @@ type Server struct {
 	tcpHTTP        *http.Server // the socket's routes behind refuseBrowsers
 	web            *web.Web     // the web listener; off unless Config.WebAddr is set and bound
 	vite           *devvite.Supervisor
+	viteServed     atomic.Bool // the web UI is served from Vite, so a swap away needs a reload; see devmode.go
 	logf           *lifecycle.RotatingFile
 	log            *slog.Logger
 	idx            *index.Index

@@ -56,6 +56,16 @@ func (f *FakeVite) Crash() {
 	}
 }
 
+// Log makes every running fake print a line, as Vite does while it runs.
+func (f *FakeVite) Log(line string) {
+	f.mu.Lock()
+	procs := append([]*fakeViteProc(nil), f.procs...)
+	f.mu.Unlock()
+	for _, p := range procs {
+		_, _ = io.WriteString(p.out, line+"\n")
+	}
+}
+
 // NewFakeVite returns a fake that is not ready yet.
 func NewFakeVite() *FakeVite { return &FakeVite{ready: make(chan struct{})} }
 
@@ -131,7 +141,7 @@ func (f *FakeVite) Start(_ context.Context, webuiDir string, port int, out io.Wr
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, ViteStubPage)
 	})}
-	p := &fakeViteProc{f: f, srv: srv, done: make(chan struct{})}
+	p := &fakeViteProc{f: f, srv: srv, out: out, done: make(chan struct{})}
 	go func() { _ = srv.Serve(ln); close(p.done) }()
 	f.mu.Lock()
 	f.starts++
@@ -157,6 +167,7 @@ func (f *FakeVite) Probe(ctx context.Context, _ int) error {
 type fakeViteProc struct {
 	f    *FakeVite
 	srv  *http.Server
+	out  io.Writer
 	done chan struct{}
 	once sync.Once
 }
