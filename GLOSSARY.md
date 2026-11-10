@@ -868,6 +868,36 @@ GitHub reports the PR merged. _Avoid_: land, landing (retired), merge mode.
 **Auto-PR** — in a project whose **Delivery** is `pr`, opening the PR as soon as the epic is
 complete, without the person pressing Create PR. The `pr` counterpart of auto-ff-merge.
 
+**Awaiting PR** — an epic pill: a **Complete epic** in a `pr` **Delivery** project that has no PR yet.
+It waits for Create PR (or **Auto-PR**) the way an Awaiting merge epic waits for Merge. It is in
+Needs you. If the PR closes without merging, the epic returns here.
+
+**ci-fix ticket** — a system-generated ticket (`type: ci-fix`) the server forks into a complete epic
+that has an open PR, one per failed CI run. It runs like a **Merge ticket**, in the epic's worktree
+on the epic branch: it fixes the failure, pushes and exits. Its Resolution lists Check, Cause,
+Change, Commit and Outcome (`fixed` or `unfixable`); gx counts attempts from these. A person never
+authors one. At most one is open per epic.
+_Avoid_: fix agent ticket, babysit ticket.
+
+**Fixing CI** — an epic state: every ticket is done or cancelled except an open or claimed **ci-fix
+ticket**. Not in Needs you. Derived like **Merging**.
+
+**pr-text ticket** — a system-generated ticket (`type: pr-text`) that writes the PR title and body
+(`Title:` and `Body:` in its Resolution) on the light tier, before the PR opens. gx never edits the
+text afterwards.
+
+**PR activity list** — the timeline on an epic page of what gx did on its PR (opened as draft, CI
+failed, fix pushed, marked ready, rebased, merged ...) and the CI results it reacted to. Ticketless
+entries live in `pr-activity.jsonl` beside the epic's `ticket.md`; entries from tickets are read
+from their Resolutions. It holds no GitHub reviews or comments.
+
+**"CI failing" pause** — an epic-level pause (derived from the store, like **Merge blocked**) shown
+as Paused in Needs you: a check hit its attempt cap (3 per check, 10 per PR), or a **ci-fix ticket**
+reported `Outcome: unfixable`. Ends with Try again on the web, or by itself when CI turns green.
+
+**"PR text failed" pause** — an epic-level pause: the **pr-text ticket** gave up after its retries,
+so no PR opens. Ends with Try again on the web.
+
 ## Launching External Programs
 
 gx runs external programs (`$EDITOR`, the comment editor, `lazygit`, `git commit`) in one of two
