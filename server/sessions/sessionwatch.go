@@ -166,6 +166,10 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 						mg.raiseUnread(m)
 						mg.TriggerBanner(m.ID, unreadSound(st.State), "")
 					}
+					// The released dialog is gone once the session leaves Blocked.
+					if prev.State == wire.SessionBlocked && st.State != wire.SessionBlocked {
+						mg.ForgetReleasedAsks(m.ID)
+					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
 					if st.Promptable() {
@@ -343,6 +347,7 @@ func (mg *Manager) recordSessionExit(m *Meta, exit string) bool {
 // Actionable as saved and firing nothing.
 func (mg *Manager) markExited(m *Meta, exit string) {
 	mg.Conv.SaveTotals(m.ConvSession(), m.ConversationID)
+	mg.ForgetReleasedAsks(m.ID)
 	m.Status, m.StatusChangedAt, m.Exit = wire.SessionStatus{State: wire.SessionExited}, time.Now(), exit
 	m.RestoreCrashed = exit == wire.SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < chat.RestoreCrashWindow
 }

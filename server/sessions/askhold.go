@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/elentok/gx/server/wire"
@@ -74,7 +75,21 @@ func (mg *Manager) HeldAsks(session string) []wire.AskHookRequest {
 			out = append(out, h.req)
 		}
 	}
+	slices.SortFunc(out, func(x, y wire.AskHookRequest) int { return strings.Compare(x.ToolUseID, y.ToolUseID) })
 	return out
+}
+
+// ForgetReleasedAsks drops a session's released dialogs: the session ended or
+// a new blocker started, so a later dialog with the same question is a new one.
+func (mg *Manager) ForgetReleasedAsks(session string) {
+	a := &mg.asks
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for k := range a.released {
+		if k.session == session {
+			delete(a.released, k)
+		}
+	}
 }
 
 // ResolveAsk gives a held question its result and reports whether one was held.
@@ -97,24 +112,27 @@ func (mg *Manager) ResolveAsk(session, toolUseID string, res wire.AskHookResult)
 // ReleaseAsk releases a held question to Claude's terminal dialog and
 // remembers its id.
 func (mg *Manager) ReleaseAsk(session, toolUseID string) bool {
-	var questions []string
-	for _, h := range mg.HeldAsks(session) {
-		if h.ToolUseID == toolUseID {
-			for _, q := range h.Questions {
-				questions = append(questions, q.Question)
-			}
-		}
-	}
-	if !mg.ResolveAsk(session, toolUseID, wire.AskHookResult{Decision: wire.AskHookRelease}) {
-		return false
-	}
 	a := &mg.asks
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	key := askKey{session, toolUseID}
+	h, ok := a.held[key]
+	if !ok {
+		return false
+	}
+	select {
+	case h.result <- wire.AskHookResult{Decision: wire.AskHookRelease}:
+	default:
+		return false
+	}
+	var questions []string
+	for _, q := range h.req.Questions {
+		questions = append(questions, q.Question)
+	}
 	if a.released == nil {
 		a.released = map[askKey][]string{}
 	}
-	a.released[askKey{session, toolUseID}] = questions
+	a.released[key] = questions
 	return true
 }
 
