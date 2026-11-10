@@ -61,6 +61,35 @@ func TestSkillsInstallSource_FirstInstallRemovesDanglingLinkIntoSource(t *testin
 	}
 }
 
+func TestSkillsInstallSource_FirstInstallRemovesDanglingLinkForDeletedSkill(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := fakeSkillsDeps(t, &stdout)
+	claude, _ := agentRootsOf(t, d)
+	src := writeSource(t)
+	if err := os.MkdirAll(claude, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	inside := filepath.Join(claude, "deleted-long-ago")
+	outside := filepath.Join(claude, "elsewhere")
+	if err := os.Symlink(filepath.Join(src, "deleted-long-ago"), inside); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(t.TempDir(), "gone"), outside); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := run(t, d, "install", src); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	if _, err := os.Lstat(inside); !os.IsNotExist(err) {
+		t.Errorf("dangling link into source survived: %v", err)
+	}
+	if _, err := os.Lstat(outside); err != nil {
+		t.Errorf("dangling link outside source was touched: %v", err)
+	}
+}
+
 func TestSkillsInstallSource_FirstInstallConflictsAbortWholeSource(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer

@@ -653,8 +653,15 @@ func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyF
 	if copyFiles {
 		mode = skills.ModeManagedCopy
 	}
+	_, statErr := os.Stat(manifestPath)
+	firstInstall := os.IsNotExist(statErr)
 	targets, installErr := installTargetsAt(d, manifestPath, force, skills.ThirdPartySourcePrefix+real, files, mode, true, switchMode)
 	printTargetReport(out, targets, installErr == nil)
+	if firstInstall && installErr == nil {
+		if err := removeDanglingLinks(d, abs); err != nil {
+			return err
+		}
+	}
 	var conflictErr *skills.ConflictError
 	if errors.As(installErr, &conflictErr) {
 		return fmt.Errorf("%w; rerun with --force <path> for each conflicted path, or --force-all to override every conflict", installErr)
@@ -666,6 +673,21 @@ func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyF
 	warnCodexHomeDuplicates(d, out, files)
 	if len(problems) > 0 {
 		return &clashError{problems}
+	}
+	return nil
+}
+
+// removeDanglingLinks clears leftover links into a source for skills deleted
+// from it, in every agent root.
+func removeDanglingLinks(d Deps, source string) error {
+	roots, err := d.AgentRoots()
+	if err != nil {
+		return err
+	}
+	for _, root := range roots {
+		if _, err := skills.RemoveDanglingLinksInto(root, source); err != nil {
+			return err
+		}
 	}
 	return nil
 }

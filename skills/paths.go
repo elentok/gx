@@ -75,6 +75,30 @@ func danglingLinkInto(path, sourceDir string) bool {
 	return err == nil && within(link, physical)
 }
 
+// RemoveDanglingLinksInto deletes every top-level dangling link in root that
+// points into sourceDir, whatever its name, and returns the removed names.
+func RemoveDanglingLinksInto(root, sourceDir string) ([]string, error) {
+	entries, err := os.ReadDir(root)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var removed []string
+	for _, e := range entries {
+		path := filepath.Join(root, e.Name())
+		if !danglingLinkInto(path, sourceDir) {
+			continue
+		}
+		if err := os.Remove(path); err != nil {
+			return removed, err
+		}
+		removed = append(removed, e.Name())
+	}
+	return removed, nil
+}
+
 func canonicalRoots(roots []string) ([]string, error) {
 	seen := map[string]bool{}
 	var result []string
