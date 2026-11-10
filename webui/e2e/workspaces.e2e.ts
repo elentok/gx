@@ -790,14 +790,15 @@ test("Workspaces", async ({ page, start }) => {
     await expect(locator).toBeVisible();
     return (await locator.boundingBox())!;
   };
-  const checkBoxes = async () => {
+  // `wrapped`: with every indicator shown off desktop the row wraps and the menu drops to a second line, so only the sizes must agree.
+  const checkBoxes = async (wrapped = false) => {
     const sizes = [];
     for (const box of boxes) {
       const b = await measure(box);
       const i = await measure(box.locator("svg"));
       expect(i.x + i.width / 2).toBeCloseTo(b.x + b.width / 2, 0);
       expect(i.y + i.height / 2).toBeCloseTo(b.y + b.height / 2, 0);
-      sizes.push([b.width, b.height, b.y]);
+      sizes.push(wrapped ? [b.width, b.height] : [b.width, b.height, b.y]);
     }
     for (const s of sizes) expect(s).toEqual(sizes[0]);
     return sizes[0][0];
@@ -845,7 +846,7 @@ test("Workspaces", async ({ page, start }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(sidebar).toBeVisible();
   await expect(epicsBox).toHaveCSS("width", "34px");
-  expect(await checkBoxes()).toBe(34);
+  expect(await checkBoxes(true)).toBe(34);
   // The touch footer keeps its boxes at 34px with every indicator shown; only the 280px sidebar is held to fit.
   for (let n = 0; n < 3; n++) expect((await measure(indicators.nth(n))).width).toBe(34);
 });
