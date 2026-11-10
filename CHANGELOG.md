@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.48.0 - 2026-11-10
+
+- Added a PR flow for epics. A project can set `delivery` to `pr` and turn on Auto-PR. gx then opens a draft PR through `gh`, writes the PR title and body with a `pr-text` ticket (bundled `gx-pr-text` skill), and watches the PR from the server. It marks the PR ready when CI is green, with a grace window for PRs that have no checks. A failed CI run is rerun once. If it still fails, gx starts one short `ci-fix` ticket per failed run (bundled `gx-ci-fix` skill), up to a cap. If a rerun passes, gx files a follow-up in the project's `follow-ups` epic. Config keys `skills.pr-text` and `skills.ci-fix` choose the skills. A conflicting PR branch is rebased with a PR-mode Merge ticket, and foreign commits block it. When the PR is merged or closed, gx updates the local Trunk, stamps `merged_at` and releases dependent epics. Dirty-trunk and trunk-update blocks have Merge again and Stash, merge and restore buttons. A Delivery change mid-flow is applied: `pr` never auto-merges, and a switch to `merge` cancels `pr-text`.
+- Added PR states to the web UI. The epic card shows the PR number chip, check summary and link, a Create PR button and a Mark as merged button. The epic page shows the PR chip, Open on GitHub, Try again, the CI failing notice and the PR activity list. Needs you cards cover Ready for review, CI failing with Try again, Merge blocked, and PR text failed. Epic pills include Awaiting PR, Writing PR text, Fixing CI, CI failing and PR text failed.
+- Added a Create PR route and CLI verb, and `mark-merged` to record a merge done outside gx. `gx-cleanup` calls `mark-merged`.
+- Added Dev mode to the web UI. Dev mode is a live switch that runs Vite from a Dev checkout (`server.web.dev-dir` replaces `server.web.dev-url`, and `dev-frontend` is live). The sidebar footer shows a Dev pill with a popover, the gear menu has a Dev mode row, and a one-time toast appears when Vite goes down. When Vite is down, gx serves the built files and offers a Restart Vite route. Open pages learn about Dev state changes and reload after a gx restart. While Vite runs, `/sw.js` answers with a self-removing worker. The `dev-frontend` setting shows as a disabled switch when there is no Dev checkout.
+- Changed a PR epic so it is never stamped merged by the nothing-to-merge or hand-merge path. A hand Mark as merged sends no merged notice, and a closed PR clears the merge block.
+- Fixed a `holder.sock` path that could pass the unix socket length cap, by using a short alias.
+- Fixed the claudedoctor holder check so it can no longer cause a fork storm.
+- Changed gx to read git refs, the current branch and plain-worktree `.git` files directly instead of forking `git rev-parse`.
+- Updated dependencies: `golang.org/x/net`, `klauspost/compress` and `goldmark`, for Snyk findings.
+
 ## v0.47.0 - 2026-11-10
 
 - Added a Settings page to the web UI. It has a sidebar of sections, a scope picker for the global config and each project, search over the current scope, and controls for each setting type with reset and saved states. Risky settings ask for confirmation before they are written, settings that need a restart are marked, and list and secret rows are supported. `gx server settings` reads the settings and `gx server settings-set` writes them from the CLI.
