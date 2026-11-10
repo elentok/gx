@@ -130,9 +130,74 @@ func BlockedScenario() scenario {
 	)
 	sc.Sessions = append(sc.Sessions, blockedCommandSessions()...)
 	sc.Sessions = append(sc.Sessions, stateCommandSessions()...)
+	sc.Sessions = append(sc.Sessions, QuestionSessions()...)
 	addQueueAgent(&sc)
+	addAskQueueAgent(&sc)
 	addDesignAgents(&sc)
 	return sc
+}
+
+// QuestionSessionCount is how many sessions QuestionSessions seeds.
+const QuestionSessionCount = 6
+
+// QuestionSessions are plain chats that each wait on one kind of question, in
+// this order: a hook-held three-question dialog (the second multi-select), the
+// same dialog with the hook missed (the keystroke-fallback card), a Codex
+// request_user_input call with three questions and its overlay, a wrapped
+// permission dialog, a plan dialog with a plan file, and a chat that printed a
+// Grilling round. A flow opens or closes one with fixture.controlClaude.
+func QuestionSessions() []sessionSpec {
+	blocked := func(s sessionSpec) sessionSpec {
+		s.Failure = wire.FailureKindBlocked
+		return s
+	}
+	opts := func(labels ...string) []agentfake.AskOption {
+		out := make([]agentfake.AskOption, len(labels))
+		for i, l := range labels {
+			out[i] = agentfake.AskOption{Label: l, Description: l + " it is"}
+		}
+		return out
+	}
+	hook := &agentfake.AskCall{
+		ToolUseID: "toolu_fixture_ask",
+		Questions: []agentfake.AskQuestion{
+			{Header: "Store", Question: "Which store?", Options: opts("SQLite", "Files")},
+			{Header: "Checks", Question: "Which checks run?", MultiSelect: true, Options: opts("Lint", "Unit", "E2E")},
+			{Header: "Start", Question: "Migrate at startup?", Options: opts("Yes", "No")},
+		},
+	}
+	codexOpts := []agentfake.QuestionOption{{Label: "Yes", Description: "Do it"}, {Label: "No", Description: "Skip it"}}
+	return []sessionSpec{
+		{Project: project, Prompt: "hello", Read: true,
+			Control: &agentfake.Control{Action: agentfake.ActionAskQuestion, Ask: hook}},
+		blocked(sessionSpec{Project: project, Prompt: "hello", Read: true,
+			Control: &agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "input needed",
+				Dialog: agentfake.AskDialogRows("Which color?", "red", "blue")}}),
+		blocked(sessionSpec{Project: project, Harness: "codex",
+			Control: &agentfake.Control{Action: agentfake.ActionQuestion, Question: &agentfake.QuestionCall{
+				CallID: "call_fixture_q",
+				Questions: []agentfake.QuestionSpec{
+					{ID: "store", Header: "Store", Question: "Which store?", Options: codexOpts},
+					{ID: "migrate", Header: "Migrate", Question: "Migrate at startup?", Options: codexOpts},
+					{ID: "checks", Header: "Checks", Question: "Run the checks?", Options: codexOpts},
+				}}}}),
+		blocked(sessionSpec{Project: project, Prompt: "hello", Read: true,
+			Control: &agentfake.Control{Action: agentfake.ActionBlock,
+				Dialog: agentfake.WrappedPermissionDialog("rg --files --glob '*.go' --glob '*.md' --hidden --no-ignore")}}),
+		blocked(sessionSpec{Project: project, Prompt: "hello", Read: true, Plan: "# Plan\n\n- [ ] first step\n- [ ] second step\n"}),
+		{Project: project, Prompt: agentfake.DesignPromptPrefix + project + ":design-epic", Read: true},
+	}
+}
+
+// addAskQueueAgent adds a Queue agent whose ticket asks with `gx tickets ask`.
+func addAskQueueAgent(sc *scenario) {
+	const askEpic = "ask-epic"
+	sc.Epics = append(sc.Epics, epic{project, askEpic, []ticket{{"01", "asks", servertest.TicketOpts{}}}})
+	sc.Queue = append(sc.Queue, project+":"+askEpic)
+	if sc.Behaviour == nil {
+		sc.Behaviour = map[string]string{}
+	}
+	sc.Behaviour[project+":"+askEpic+"/01"] = agentfake.BehaviourAsk
 }
 
 // stateCommandSessions are the plain sessions in the remaining states: Blocked

@@ -288,6 +288,10 @@ type SessionSpec struct {
 	// Failure.Kind the session must then show.
 	Control *agentfake.Control
 	Failure string
+	// Plan is the text of a plan file the seeder writes under the fixture's
+	// ~/.claude/plans; the session then blocks on Claude's plan dialog for it
+	// (and Control is ignored).
+	Plan string
 	// ThenPrompt is one more chat turn sent after the control, so a reply
 	// carries what the control changed.
 	ThenPrompt string

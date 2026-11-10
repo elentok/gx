@@ -155,6 +155,17 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 		time.Sleep(300 * time.Millisecond)
 	}
 	control := s.Control
+	if s.Plan != "" {
+		planPath := filepath.Join(f.root, "home", ".claude", "plans", "fixture-plan.md")
+		if err := os.MkdirAll(filepath.Dir(planPath), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(planPath, []byte(s.Plan), 0o644); err != nil {
+			return err
+		}
+		control = &agentfake.Control{Action: agentfake.ActionBlock,
+			Dialog: agentfake.PlanDialog(planPath, "Yes, and auto-accept edits", "Yes, and manually approve edits", "Tell Claude what to change")}
+	}
 	if s.Crash {
 		control = &agentfake.Control{Action: agentfake.ActionExit, Code: 1}
 	}

@@ -30,8 +30,9 @@ const leanSessionCount = 9
 
 // commandSessionCount is the sessions of agents-blocked but the Queue agent,
 // whose place in the list depends on when the worker starts: the eight of
-// agents, three, eight Blocked, three in other states, and two design sessions.
-const commandSessionCount = 24
+// agents, three, eight Blocked, three in other states, the question sessions,
+// and two design sessions.
+const commandSessionCount = 24 + spec.QuestionSessionCount
 
 // seededSessions is the list without the Queue agent, in creation order.
 func (r *running) seededSessions(t *testing.T) []wire.SessionInfo {
@@ -153,11 +154,11 @@ func TestBlockedScenario_RemainingStatesExist(t *testing.T) {
 	var queue []wire.SessionInfo
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
 		queue = slices.DeleteFunc(r.sessionsOf(t), func(s wire.SessionInfo) bool { return !s.Queue })
-		return len(queue) == 1
+		return len(queue) == 2
 	}) {
-		t.Fatalf("queue agents = %+v, want one", queue)
+		t.Fatalf("queue agents = %+v, want two", queue)
 	}
-	claudeDesign, codexDesign := list[22], list[23]
+	claudeDesign, codexDesign := list[22+spec.QuestionSessionCount], list[23+spec.QuestionSessionCount]
 	if !claudeDesign.Design || claudeDesign.Harness == "codex" || !claudeDesign.AutoAdvance {
 		t.Errorf("Claude design = harness %q design %v auto-advance %v", claudeDesign.Harness, claudeDesign.Design, claudeDesign.AutoAdvance)
 	}
