@@ -181,7 +181,14 @@ func (rs *Resumer) endDeadSession(id string) {
 		return
 	}
 	rs.mg.log.Info("session not restored on start", "session", id)
-	rs.mg.endFailedStart(dir, &meta)
+	// Not endFailedStart: the server dying is not news about the session, so
+	// its saved Unread stays and no banner fires.
+	rs.mg.markExited(&meta, wire.SessionExitCrashed)
+	if err := WriteMeta(dir, meta); err != nil {
+		rs.mg.log.Warn("save session meta", "session", id, "err", err)
+		return
+	}
+	rs.mg.events.Publish(wire.EventSessionChanged, id)
 }
 
 // deadSessionMeta reads a dead session's dir and meta, not ok when it is

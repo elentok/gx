@@ -120,9 +120,10 @@ func TestRestart_DeadHolderWithoutAutoResumeIsCrashed(t *testing.T) {
 	for name, tc := range map[string]struct {
 		harness string
 		opts    []func(*server.Config)
+		unread  bool
 	}{
 		"restore-on-start off":  {harness: string(agentfake.HarnessKind)},
-		"harness cannot resume": {harness: string(agentfake.NoResumeHarnessKind), opts: []func(*server.Config){resumeOnStart}},
+		"harness cannot resume": {harness: string(agentfake.NoResumeHarnessKind), opts: []func(*server.Config){resumeOnStart}, unread: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			h, ctx, _, id, _ := startFakeSessionWith(t, wire.CreateSessionRequest{Harness: tc.harness}, tc.opts...)
@@ -130,8 +131,8 @@ func TestRestart_DeadHolderWithoutAutoResumeIsCrashed(t *testing.T) {
 
 			h.Restart(t)
 			got := waitForSnapshot(ctx, t, h, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
-			if got.Exit != wire.SessionExitCrashed || !got.Unread.Unread || got.Unread.Resumed {
-				t.Errorf("session = %+v, want exited crashed and unread", got)
+			if got.Exit != wire.SessionExitCrashed || got.Unread.Unread != tc.unread || got.Unread.Resumed {
+				t.Errorf("session = %+v, want exited crashed, unread %v", got, tc.unread)
 			}
 			if run := readMeta(t, h, id)["run"]; run != nil {
 				t.Errorf("run = %v, want no resume", run)

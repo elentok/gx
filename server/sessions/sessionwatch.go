@@ -330,12 +330,18 @@ func (mg *Manager) recordSessionExit(m *Meta, exit string) bool {
 			mg.TriggerBanner(m.ID, sound.Done, "")
 		}
 	}
-	mg.Conv.SaveTotals(m.ConvSession(), m.ConversationID)
-	m.Status, m.StatusChangedAt, m.Exit = wire.SessionStatus{State: wire.SessionExited}, time.Now(), exit
-	m.RestoreCrashed = exit == wire.SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < chat.RestoreCrashWindow
+	mg.markExited(m, exit)
 	m.FirstPrompt = ""
 	m.Actionable = wire.SessionActionable{}
 	return true
+}
+
+// markExited moves m to Exited with exit, leaving Unread, FirstPrompt and
+// Actionable as saved and firing nothing.
+func (mg *Manager) markExited(m *Meta, exit string) {
+	mg.Conv.SaveTotals(m.ConvSession(), m.ConversationID)
+	m.Status, m.StatusChangedAt, m.Exit = wire.SessionStatus{State: wire.SessionExited}, time.Now(), exit
+	m.RestoreCrashed = exit == wire.SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < chat.RestoreCrashWindow
 }
 
 // raisesUnread reports whether a move from one live state to another needs
