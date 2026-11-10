@@ -4,6 +4,7 @@ import {
   CardActionAnswer,
   CardActionContinue,
   CardActionDesign,
+  CardActionMarkMerged,
   CardActionMerge,
   CardActionOpen,
   CardActionOpenEpic,
@@ -12,6 +13,7 @@ import {
   CardActionQueue,
   CardActionStashMerge,
   CardActionTriage,
+  CardActionTryAgain,
   CardActionUnhold,
   CardKindDesign,
   CardKindFollowUps,
@@ -35,9 +37,9 @@ import { EpicActionButton } from "./EpicActionButton";
 import { titleHref } from "./cardLinks";
 import { timeLabel } from "./cardTime";
 import { mergeToast } from "./MergeButton";
-import { postEpicMerge, postEpicStashMerge, postQueueAdd, type PostEpicWrite } from "./queue";
+import { postEpicMerge, postEpicStashMerge, postEpicTryAgain, postQueueAdd, type PostEpicWrite } from "./queue";
 import { PrLine } from "./PrLine";
-import { RING_KIND, isCreatingTickets, isLive, needsYouTone, ringProgress, ringTone } from "./ring";
+import { READY_FOR_REVIEW_REASON, RING_KIND, isCreatingTickets, isLive, isReadyForReview, needsYouTone, ringProgress, ringTone } from "./ring";
 
 function ringLabel(row: EpicListRow): string {
   if (isCreatingTickets(row)) return "…";
@@ -64,6 +66,7 @@ export interface CardWrites {
   queue?: PostEpicWrite;
   merge?: PostEpicWrite;
   stashMerge?: PostEpicWrite;
+  tryAgain?: PostEpicWrite;
   openDesign?: OpenDesign;
   openTriage?: OpenFlow;
   /** Goes to a hash route. */
@@ -71,8 +74,16 @@ export interface CardWrites {
   unhold?: ItemWriters["unhold"];
 }
 
-/** Open on GitHub is the PR line's link, so the footer leaves it out. */
-const footerActions = (row: EpicListRow): CardAction[] => (row.actions ?? []).filter((a) => a.kind !== CardActionOpenPR);
+/**
+ * Open on GitHub is the PR line's link, so the footer leaves it out. A failing PR is the exception: the mock's
+ * footer is just Open PR beside Try again, and Mark as merged has no card button.
+ */
+const footerActions = (row: EpicListRow): CardAction[] => {
+  const all = row.actions ?? [];
+  const tryAgain = all.find((a) => a.kind === CardActionTryAgain);
+  if (tryAgain) return [...all.filter((a) => a.kind === CardActionOpenPR), tryAgain];
+  return all.filter((a) => a.kind !== CardActionOpenPR && a.kind !== CardActionMarkMerged);
+};
 
 const goTo =(href: string) => {
   window.location.hash = href;
@@ -87,7 +98,7 @@ function ActionButtons({
   writes: CardWrites;
   onChanged: () => void;
 }) {
-  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, openDesign = postOpenDesign, openTriage = postOpenTriage, navigate = goTo, unhold = postUnhold } = writes;
+  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, tryAgain = postEpicTryAgain, openDesign = postOpenDesign, openTriage = postOpenTriage, navigate = goTo, unhold = postUnhold } = writes;
   const { run, pending } = useWrite();
 
   const startDesign = (epic: string) => run(() => openDesign({ epic }), { onDone: () => navigate(designHref(epic)) });
@@ -96,18 +107,27 @@ function ActionButtons({
   function button(a: CardAction, i: number) {
     const target = a.target ?? row.address;
     const emphasis = i === 0 ? "main" : "secondary";
-    if (a.kind === CardActionQueue || a.kind === CardActionMerge || a.kind === CardActionStashMerge) {
+    if (a.kind === CardActionOpenPR) {
+      return (
+        <Button key={i} tone="running" emphasis="secondary" onClick={() => window.open(a.link, "_blank", "noopener,noreferrer")}>
+          Open PR
+        </Button>
+      );
+    }
+    if (a.kind === CardActionQueue || a.kind === CardActionMerge || a.kind === CardActionStashMerge || a.kind === CardActionTryAgain) {
       const isQueue = a.kind === CardActionQueue;
       const isStash = a.kind === CardActionStashMerge;
+      const isTryAgain = a.kind === CardActionTryAgain;
       return (
         <EpicActionButton
           key={i}
           address={target}
           state={row.state}
-          post={isQueue ? queue : isStash ? stashMerge : merge}
+          post={isQueue ? queue : isStash ? stashMerge : isTryAgain ? tryAgain : merge}
           label={a.label}
-          pendingLabel={isQueue ? "Queueing…" : "Merging…"}
-          success={isQueue || isStash ? undefined : (res) => mergeToast(target, res)}
+          emphasis={isStash ? "secondary" : undefined}
+          pendingLabel={isQueue ? "Queueing…" : isTryAgain ? "Trying again…" : "Merging…"}
+          success={isQueue || isStash || isTryAgain ? undefined : (res) => mergeToast(target, res)}
           onDone={onChanged}
         />
       );
@@ -158,7 +178,7 @@ export function EpicCard({
   const reason =
     seconds !== undefined
       ? `Next run starts in ${seconds}s`
-      : (launchOrVerdictText(row.launch_step, row.verdict, row.reason) ?? row.reason);
+      : (launchOrVerdictText(row.launch_step, row.verdict, row.reason) ?? row.reason ?? (isReadyForReview(row) ? READY_FOR_REVIEW_REASON : undefined));
   const hasButtons = footerActions(row).length > 0;
   const tone = needsYou ? needsYouTone(row) : undefined;
   const pillTone = tone ?? (row.card_kind === CardKindFollowUps && row.state_pill ? needsYouTone(row) : undefined);
@@ -216,7 +236,7 @@ export function EpicCard({
                 {" · "}
               </>
             )}
-            <Text as="span" data-testid="status" color={row.pr && !tone ? "kind.design.fg" : `kind.${kind}.fg`}>
+            <Text as="span" data-testid="status" color={isReadyForReview(row) ? "tone.done.fg" : row.pr && !tone ? "kind.design.fg" : `kind.${kind}.fg`}>
               {row.status_words}
             </Text>
           </Text>

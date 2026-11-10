@@ -178,6 +178,77 @@ test("a refused Merge shows its reason in a toast", async () => {
   expect(await screen.findByText("Conflicts with main")).toBeTruthy();
 });
 
+const ciFailing = (over: Partial<EpicListRow> = {}) =>
+  needsYou({
+    state: "ci-failing",
+    status_words: "CI failing",
+    state_pill: "Paused",
+    reason: "go-test failed 3 times. The last fix did not change the result.",
+    pr: { number: 12, url: "https://github.com/o/r/pull/12", checks: "1 of 5 checks failed" },
+    actions: [
+      { kind: "try-again", label: "Try again", target: "gx:blog" },
+      { kind: "open-epic", label: "Open epic", target: "gx:blog" },
+      { kind: "mark-merged", label: "Mark as merged", target: "gx:blog" },
+      { kind: "open-pr", label: "Open on GitHub", target: "gx:blog", link: "https://github.com/o/r/pull/12" },
+    ],
+    ...over,
+  } as Partial<EpicListRow>);
+
+test("a CI failing card shows the Paused pill, the reason, Try again and Open PR", () => {
+  renderThemed(<EpicCard row={ciFailing()} />);
+  expect(text(screen.getByTestId("status"))).toBe("CI failing");
+  expect(text(screen.getByTestId("pill"))).toContain("Paused");
+  expect(text(screen.getByTestId("reason"))).toContain("go-test failed 3 times");
+  expect(screen.getAllByRole("button").map(text)).toEqual(["Open PR", "Try again"]);
+  const open = vi.spyOn(window, "open").mockReturnValue(null);
+  fireEvent.click(screen.getByRole("button", { name: "Open PR" }));
+  expect(open).toHaveBeenCalledWith("https://github.com/o/r/pull/12", "_blank", "noopener,noreferrer");
+  open.mockRestore();
+});
+
+test("Try again posts the epic address and state; a refusal shows its reason", async () => {
+  const tryAgain = vi.fn().mockResolvedValue({ refused: true, reason: "x", message: "The pause already changed" });
+  renderThemed(<EpicCard row={ciFailing()} writes={{ tryAgain }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  expect(await screen.findByText("The pause already changed")).toBeTruthy();
+  expect(tryAgain).toHaveBeenCalledWith({ address: "gx:blog", state: "ci-failing" });
+});
+
+test("a merge-blocked PR card shows both merge buttons", () => {
+  renderThemed(
+    <EpicCard
+      row={needsYou({
+        state: "merge-blocked",
+        status_words: "PR merged",
+        state_pill: "Merge blocked",
+        reason: "Trunk has local changes",
+        actions: [
+          { kind: "stash-merge", label: "Stash, merge and restore", target: "gx:blog" },
+          { kind: "merge", label: "Merge", target: "gx:blog" },
+        ],
+      })}
+    />,
+  );
+  expect(screen.getAllByRole("button").map(text)).toEqual(["Stash, merge and restore", "Merge"]);
+  expect(text(screen.getByTestId("status"))).toBe("PR merged");
+});
+
+test("Ready for review has no buttons and shows the waiting reason", () => {
+  renderThemed(
+    <EpicCard
+      row={row({
+        state: "pr-open",
+        status_words: "Ready for review",
+        pr: { number: 12, url: "https://github.com/o/r/pull/12", checks: "5 of 5 checks passed" },
+        actions: [{ kind: "open-pr", label: "Open on GitHub", target: "gx:blog", link: "https://github.com/o/r/pull/12" }],
+      } as Partial<EpicListRow>)}
+    />,
+  );
+  expect(screen.queryByRole("button")).toBeNull();
+  expect(text(screen.getByTestId("reason"))).toContain("Waiting for you to merge");
+  expect(text(screen.getByTestId("pr-checks"))).toBe("5 of 5 checks passed");
+});
+
 test("the Merge button is disabled while the merge is pending", async () => {
   let release!: (v: unknown) => void;
   const merge = vi.fn().mockReturnValue(new Promise((r) => (release = r)));

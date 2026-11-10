@@ -28,11 +28,16 @@ const PILL_TONE: Record<string, Tone> = {
   "Awaiting merge": "done",
 };
 
+/** A PR with every check green waits for a person on GitHub; the server sends it in the implementing section. */
+export const isReadyForReview = (row: EpicListRow) => !!row.pr && row.status_words === "Ready for review";
+
+export const READY_FOR_REVIEW_REASON = "Waiting for you to merge the PR on GitHub.";
+
 export const needsYouTone = (row: EpicListRow): Tone => PILL_TONE[row.state_pill ?? ""] ?? "waiting";
 
 export function ringTone(row: EpicListRow): Tone {
   if (row.section === SectionNeedsYou) return needsYouTone(row);
-  if (row.state === EpicListFinished) return "done";
+  if (row.state === EpicListFinished || isReadyForReview(row)) return "done";
   return isLive(row) ? "running" : "muted";
 }
 
