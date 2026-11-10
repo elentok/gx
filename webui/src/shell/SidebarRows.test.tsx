@@ -113,6 +113,14 @@ test("clicking an epic row navigates and leaves it collapsed; the chevron toggle
   expect(body().queryByRole("link", { name: /builder/ })).toBeNull();
 });
 
+test("outside select mode rows have no checkboxes and a row's ... menu still opens", async () => {
+  setup("desktop", "/");
+  const shop = await body().findByRole("link", { name: /Shop/ });
+  expect(body().queryAllByRole("checkbox")).toEqual([]);
+  fireEvent.click(within(shop.closest("li")!).getByRole("button", { name: "More actions" }));
+  expect((await screen.findAllByRole("menuitem")).length).toBeGreaterThan(0);
+});
+
 test("chat and epic icons sit in the same fixed, centering slot", async () => {
   setup("desktop", "/");
   const epic = within(await body().findByRole("link", { name: /Blog/ }));

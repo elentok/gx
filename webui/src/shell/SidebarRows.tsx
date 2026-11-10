@@ -12,6 +12,9 @@ import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { CHAT_ATTR, NAV_ATTR } from "./SidebarKeys";
 import { useMoreActionsSize } from "../ui/menu/MoreActionsButton";
+import { showToast } from "../ui/toaster";
+import { GROUP_ON_HOLD, GROUP_OTHER } from "../select/selectModel";
+import { SelectBox, useSidebarSelect } from "./SidebarSelect";
 import { useAltHeld } from "./useShortcuts";
 
 /** The epic address of the open page, or "". */
@@ -93,13 +96,25 @@ const CHEVRON_W = 20;
 const GUIDE_X = `calc(4px + ${CHEVRON_W}px + 13px - 3px - 0.75px)`;
 
 /** The frame both a top-level row and a nested agent row share: hover group, current background and edge. */
-function RowFrame({ current, children }: { current: boolean; children: ReactNode }) {
+function RowFrame({ current, selected, children }: { current: boolean; selected?: boolean; children: ReactNode }) {
   return (
-    <Box className="group" position="relative" display="flex" alignItems="center" pl="1" pr="6px" bg={current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
+    <Box className="group" data-selected={selected ? "" : undefined} position="relative" display="flex" alignItems="center" pl="1" pr="6px" bg={selected ? "sidebar.selected" : current ? "sidebar.current" : undefined} borderLeftWidth="3px" borderLeftColor={current ? "tone.running.fg" : "transparent"} borderRadius="6px">
       {children}
     </Box>
   );
 }
+
+/** The row's checkbox in select mode, in its own cell so the columns stay aligned. */
+function RowCheck({ id, label }: { id: string; label: string }) {
+  const sel = useSidebarSelect();
+  return (
+    <Box flex="none" display="flex" alignItems="center" pr="1">
+      <SelectBox checked={sel.state.keys.includes(id)} label={`Select ${label}`} onToggle={() => sel.toggle(id)} />
+    </Box>
+  );
+}
+
+const QUEUE_REASON = "Managed by the queue: it can't be selected.";
 
 function IconSlot({ children }: { children?: ReactNode }) {
   return (
@@ -120,11 +135,19 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
   const navigate = useNavigate();
   // A Queue agent is gx-driven: no menu, just the spacer that keeps the status column aligned.
   const managed = canManage(agent.session);
+  const sel = useSidebarSelect();
+  const selecting = sel.state.on;
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!selecting || managed || e.key !== " ") return;
+    e.preventDefault();
+    showToast({ type: "info", title: QUEUE_REASON, id: "select-queue-agent" });
+  };
   return (
-    <RowFrame current={current}>
+    <RowFrame current={current} selected={selecting && sel.state.keys.includes(agent.id)}>
       <Box data-testid="nested-guide" aria-hidden position="absolute" left={GUIDE_X} top="0" bottom={last ? "50%" : "0"} w="1.5px" bg="border" />
       <Box w={`${CHEVRON_W}px`} flex="none" />
-      <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" px="0" minH="36px">
+      {selecting && managed && <RowCheck id={agent.id} label={agent.label} />}
+      <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} onKeyDown={onKeyDown} {...rowStyle} flex="1" minW="0" px="0" minH="36px">
         <IconSlot>{agent.fix && <WrenchIcon status={agent.status} />}</IconSlot>
         <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" fontSize="13px">
           {agent.label}
@@ -191,12 +214,15 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
   const onRemoved = () => {
     if (current) navigate("/agents");
   };
+  const sel = useSidebarSelect();
+  const selecting = sel.state.on;
   return (
     <li>
-      <RowFrame current={current}>
+      <RowFrame current={current} selected={selecting && sel.state.keys.includes(row.key)}>
         <Box w={`${CHEVRON_W}px`} flex="none">
           {nested && <Chevron open={open} onToggle={() => setOpen(!open)} label={`${open ? "Collapse" : "Expand"} ${row.title}`} />}
         </Box>
+        {selecting && <RowCheck id={row.key} label={row.title} />}
         <chakra.a href={row.href} {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" px="0">
           <IconSlot>
             {row.kind === "chat" ? (
@@ -232,16 +258,25 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
   );
 }
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+function Section({ id, group, title, children }: { id: string; group: string; title: string; children: ReactNode }) {
+  const sel = useSidebarSelect();
+  const open = !!sel.sectionOpen[group];
+  const gs = sel.groupState(group);
   return (
     <li>
-      <chakra.button type="button" {...{ [NAV_ATTR]: `section:${id}` }} aria-expanded={open} onClick={() => setOpen(!open)} display="flex" alignItems="center" gap="1" w="100%" px="3" minH="36px" color="text.dim" fontSize="12px" cursor="pointer">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: open ? "rotate(90deg)" : "none" }}>
-          <path d="M4.5 2.5 8 6l-3.5 3.5" />
-        </svg>
-        {title}
-      </chakra.button>
+      <Box display="flex" alignItems="center" pr="3">
+        {sel.state.on && (
+          <Box pl="3" flex="none" display="flex">
+            <SelectBox checked={gs === "all"} mixed={gs === "some"} label={`Select all in ${title}`} onToggle={() => sel.toggleGroup(group)} />
+          </Box>
+        )}
+        <chakra.button type="button" {...{ [NAV_ATTR]: `section:${id}` }} aria-expanded={open} onClick={() => sel.setSectionOpen(group, !open)} display="flex" alignItems="center" gap="1" flex="1" px="3" minH="36px" color="text.dim" fontSize="12px" cursor="pointer">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: open ? "rotate(90deg)" : "none" }}>
+            <path d="M4.5 2.5 8 6l-3.5 3.5" />
+          </svg>
+          {title}
+        </chakra.button>
+      </Box>
       {open && (
         <Box as="ul" listStyleType="none" m="0" p="0">
           {children}
@@ -272,14 +307,14 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
         <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
       ))}
       {model.held.length > 0 && (
-        <Section id="hold" title={`On hold (${model.held.length})`}>
+        <Section id="hold" group={GROUP_ON_HOLD} title={`On hold (${model.held.length})`}>
           {model.held.map((r) => (
             <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
           ))}
         </Section>
       )}
       {model.other.length > 0 && (
-        <Section id="other" title="Other">
+        <Section id="other" group={GROUP_OTHER} title="Other">
           {model.other.map((a, i) => (
             <li key={a.id}>
               <AgentLink agent={a} last={i === model.other.length - 1} />

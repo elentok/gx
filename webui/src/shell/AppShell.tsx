@@ -23,6 +23,7 @@ import { ShellContext, type Shell } from "./ShellContext";
 import { SidebarFooter } from "./SidebarFooter";
 import { LIST_ATTR, useSidebarKeys } from "./SidebarKeys";
 import { SidebarRows } from "./SidebarRows";
+import { FooterSlot, SelectButton, SidebarSelectProvider } from "./SidebarSelect";
 import {
   useActiveWorkspace,
   useWorkspaces,
@@ -240,6 +241,7 @@ export function AppShell({
           }}
         >
           <CloseSignalContext.Provider value={closeSignal}>
+            <SidebarSelectProvider fetcher={fetchEpicList} active={active}>
             <Box
               display="flex"
               alignItems="center"
@@ -272,6 +274,7 @@ export function AppShell({
                 </Box>
               )}
               <Box flex="1" />
+              <SelectButton />
               <chakra.button
                 type="button"
                 aria-label="Search"
@@ -329,10 +332,12 @@ export function AppShell({
             >
               <SidebarRows fetcher={fetchEpicList} active={active} />
             </Box>
-            <SidebarFooter
-              onNewWorkspace={() => setNewWorkspace(true)}
-              activeWorkspace={resolved ? workspaces.find((w) => w.name === active) : undefined}
-            />
+            <FooterSlot>
+              <SidebarFooter
+                onNewWorkspace={() => setNewWorkspace(true)}
+                activeWorkspace={resolved ? workspaces.find((w) => w.name === active) : undefined}
+              />
+            </FooterSlot>
             <Portal>
               {manageWorkspaces && (
                 <ManageWorkspaces
@@ -351,6 +356,7 @@ export function AppShell({
                 />
               )}
             </Portal>
+            </SidebarSelectProvider>
           </CloseSignalContext.Provider>
         </Box>
         <Box flex="1" minW="0">
