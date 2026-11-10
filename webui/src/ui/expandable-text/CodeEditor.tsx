@@ -10,6 +10,12 @@ import { fieldLook } from "./look";
 
 export type ViMode = "INSERT" | "NORMAL" | "VISUAL";
 
+/**
+ * The editor's host carries its vi mode here while vi is on. InterruptControl reads it by this name from the
+ * DOM, which keeps it free of CodeMirror and lets it judge an Esc before vim handles it.
+ */
+const VI_MODE_ATTR = "data-vi-mode";
+
 /** What the host can ask of the editor. */
 export type CodeEditorHandle = {
   /** Sends vi Escape and keeps focus in the editor. */
@@ -116,8 +122,14 @@ export default function CodeEditor({
     mapOnce();
     const cm = getCM(v);
     if (!cm) return;
-    const onMode = (e: { mode: string }) => callbacks.current.onModeChange?.(modeOf(e.mode));
+    const dom = v.dom.parentElement;
+    const onMode = (e: { mode: string }) => {
+      const mode = modeOf(e.mode);
+      dom?.setAttribute(VI_MODE_ATTR, mode);
+      callbacks.current.onModeChange?.(mode);
+    };
     cm.on("vim-mode-change", onMode);
+    dom?.setAttribute(VI_MODE_ATTR, "INSERT");
     closers.set(cm, () => callbacks.current.onZZ?.());
     // Entering insert mode with i collapses the selection; put it back.
     const { anchor, head } = v.state.selection.main;
@@ -126,6 +138,7 @@ export default function CodeEditor({
     callbacks.current.onModeChange?.("INSERT");
     stopVi.current = () => {
       cm.off("vim-mode-change", onMode);
+      dom?.removeAttribute(VI_MODE_ATTR);
       closers.delete(cm);
     };
   };

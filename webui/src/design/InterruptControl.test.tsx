@@ -67,6 +67,38 @@ test("Esc does nothing under a dialog, a layer, a menu, a listbox or the Questio
   }
 });
 
+// The large Vi editor: a layer holding a host that carries the vi mode.
+function viEditor(mode: string) {
+  return (
+    <Modal key="vi" label="Editor" onClose={() => {}}>
+      <div data-vi-mode={mode}>
+        <input aria-label="text" />
+      </div>
+    </Modal>
+  );
+}
+const escIn = () => fireEvent.keyDown(screen.getByLabelText("text"), { key: "Escape" });
+
+test("in the large Vi editor a consumed Esc (INSERT, VISUAL) opens nothing; a NORMAL Esc opens the confirm", async () => {
+  for (const mode of ["INSERT", "VISUAL"]) {
+    mount({ extra: viEditor(mode) });
+    escIn();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(confirm()).toBeNull();
+    cleanup();
+  }
+  mount({ extra: viEditor("NORMAL") });
+  escIn();
+  await screen.findByRole("alertdialog", { name: "Interrupt the agent?" });
+});
+
+test("a NORMAL-mode Esc in the Vi editor still yields to another layer or menu on top", async () => {
+  mount({ extra: [viEditor("NORMAL"), <div key="l" role="listbox" aria-label="Commands" />] });
+  escIn();
+  await new Promise((r) => setTimeout(r, 20));
+  expect(confirm()).toBeNull();
+});
+
 test("Esc does nothing while disconnected", async () => {
   mount({ connected: false });
   esc();

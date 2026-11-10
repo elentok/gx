@@ -33,7 +33,14 @@ export function InterruptControl({
     if (!wide || disabled) return;
     // Capture phase: judge what is on top as it was before this same Escape closes it.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || open || hasLayer() || document.querySelector(ON_TOP)) return;
+      if (e.key !== "Escape" || open) return;
+      // The large Vi editor (CodeEditor sets data-vi-mode) is a layer, but it lets an Esc through in NORMAL
+      // mode; in INSERT and VISUAL, vim uses the Esc. Its own dialog is not "something on top".
+      const vi = e.target instanceof Element ? e.target.closest("[data-vi-mode]") : null;
+      if (vi && vi.getAttribute("data-vi-mode") !== "NORMAL") return;
+      const own = vi?.closest('[role="dialog"]');
+      if (!vi && hasLayer()) return;
+      for (const el of document.querySelectorAll(ON_TOP)) if (el !== own) return;
       setViaKey(true);
       setOpen(true);
     };

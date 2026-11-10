@@ -43,6 +43,29 @@ function mount(viMode: boolean, selection = { start: 0, end: 0 }, doc = DOC) {
   };
 }
 
+describe("vi mode attribute", () => {
+  const modeAttr = (view: EditorView) => view.dom.parentElement!.getAttribute("data-vi-mode");
+
+  test("follows INSERT, NORMAL and VISUAL, so an outside Esc handler can tell what vim will consume", () => {
+    const { view, keys } = mount(true);
+    expect(modeAttr(view)).toBe("INSERT");
+    keys("<Esc>");
+    expect(modeAttr(view)).toBe("NORMAL");
+    keys("v");
+    expect(modeAttr(view)).toBe("VISUAL");
+  });
+
+  test("is removed when vi is turned off", () => {
+    const { view, setVi } = mount(true);
+    setVi(false);
+    expect(modeAttr(view)).toBeNull();
+  });
+
+  test("is absent with vi off from the start", () => {
+    expect(modeAttr(mount(false).view)).toBeNull();
+  });
+});
+
 describe("vi on", () => {
   test("opens in INSERT, then Esc, v, Esc i report the modes", () => {
     const { keys, onModeChange } = mount(true);
