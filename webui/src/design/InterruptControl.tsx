@@ -1,13 +1,9 @@
 import { Spinner } from "@chakra-ui/react";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { Button } from "../ui/button/Button";
-import { hasLayer } from "../ui/modal/layers";
 import { useWide } from "../useWide";
+import { escOpensInterrupt } from "./escOpensInterrupt";
 import { InterruptPopover } from "./InterruptPopover";
-
-// Anything open that takes Esc first. The completion menu's own handler has not run when we judge, so it is
-// found by its DOM; the Questions view leaves on this same Escape.
-const ON_TOP = '[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"],[data-questions-view]';
 
 // The Interrupt button, its confirm and the confirm's open state. Rendered only while the composer is Working.
 export function InterruptControl({
@@ -24,25 +20,18 @@ export function InterruptControl({
   /** Layout props for the button (the Design composer's slot). */
   buttonProps?: Partial<Omit<ComponentProps<typeof Button>, "ref">>;
 }) {
-  const [open, setOpen] = useState(false);
-  const [viaKey, setViaKey] = useState(false);
+  const [open, setOpen] = useState<false | "click" | "key">(false);
   const ref = useRef<HTMLButtonElement>(null);
   const wide = useWide();
   const disabled = !connected || pending;
   useEffect(() => {
     if (!wide || disabled) return;
-    // Capture phase: judge what is on top as it was before this same Escape closes it.
+    // Capture phase, so we judge what is on top before this same Escape closes it. For the same reason a
+    // `defaultPrevented` check would always read false here: a field that uses Esc to cancel an edit is
+    // found through escOpensInterrupt's layer and DOM checks instead.
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || open) return;
-      // The large Vi editor (CodeEditor sets data-vi-mode) is a layer, but it lets an Esc through in NORMAL
-      // mode; in INSERT and VISUAL, vim uses the Esc. Its own dialog is not "something on top".
-      const vi = e.target instanceof Element ? e.target.closest("[data-vi-mode]") : null;
-      if (vi && vi.getAttribute("data-vi-mode") !== "NORMAL") return;
-      const own = vi?.closest('[role="dialog"]');
-      if (!vi && hasLayer()) return;
-      for (const el of document.querySelectorAll(ON_TOP)) if (el !== own) return;
-      setViaKey(true);
-      setOpen(true);
+      if (escOpensInterrupt(e.target)) setOpen("key");
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -55,18 +44,15 @@ export function InterruptControl({
         {...buttonProps}
         disabled={disabled}
         title={wide ? "Interrupt (Esc)" : undefined}
-        aria-expanded={open}
-        onClick={() => {
-          setViaKey(false);
-          setOpen(!open);
-        }}
+        aria-expanded={open !== false}
+        onClick={() => setOpen(open ? false : "click")}
       >
         {pending && <Spinner size="sm" />}
         Interrupt
       </Button>
       <InterruptPopover
-        open={open}
-        initialFocus={viaKey ? "confirm" : "cancel"}
+        open={open !== false}
+        initialFocus={open === "key" ? "confirm" : "cancel"}
         disabled={disabled}
         anchorRef={ref}
         onConfirm={() => {
