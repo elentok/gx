@@ -129,7 +129,7 @@ test("Bulk actions", async ({ page, start }) => {
 
   // Entry 28: newest first, with project, kind, date and workspace; the order and fields match the CLI.
   const rows = page.locator("li[aria-label]");
-  const cliRows = async (): Promise<{ title: string; address: string; workspace: string; kind: string }[]> =>
+  const cliRows = async (): Promise<{ title: string; address: string; workspace: string; kind: string; archived_at?: string }[]> =>
     JSON.parse(await fx.cli("server", "epics", "archived", "--json")).epics;
   const listed = await cliRows();
   expect(listed.length).toBeGreaterThan(3);
@@ -139,6 +139,13 @@ test("Bulk actions", async ({ page, start }) => {
     const row = rows.filter({ hasText: r.title }).first();
     await expect(row).toContainText(`demo · ${r.kind === "map" ? "Design" : "Epic"} ·`);
     await expect(row).toContainText(r.workspace);
+    if (r.archived_at) {
+      const date = await page.evaluate(
+        (iso) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }),
+        r.archived_at,
+      );
+      await expect(row).toContainText(date);
+    }
   }
   const rowOf = (title: string) => rows.filter({ has: page.getByText(title, { exact: true }) });
 
@@ -157,6 +164,10 @@ test("Bulk actions", async ({ page, start }) => {
   await expect(page.getByTestId("archived-stamp")).toContainText("Archived");
   await expect(page.getByRole("button", nav("Unarchive"))).toBeVisible();
   await expect(page.locator('a[href^="#/t/"]')).toHaveCount(0);
+  for (const name of ["Queue", "Hold", "Merge", "Fix", "Open design"]) {
+    await expect(page.getByRole("button", nav(name))).toHaveCount(0);
+    await expect(page.getByRole("link", nav(name))).toHaveCount(0);
+  }
   await expect(page.getByText("built", { exact: true })).toBeVisible();
 
   // Entry 32 and 38: Unarchive from the detail puts the epic back in its named workspace, active on the Epics page.

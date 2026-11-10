@@ -287,7 +287,9 @@ no PR block, no sessions. An archived Design's `impl_address` is its archived `-
 read-only at `/archive/<address>`. Read-only means: the header shows the Archived stamp and one
 action, Unarchive, and every other action is absent (Queue, Hold, Merge, Fix, Open design); ticket
 rows are plain text, because the ticket page reads only the active index; an archived Design's
-`-impl` link goes to its archive detail. The Archive page refetches the list on the event that
+`-impl` link goes to its archive detail. **Deviation:** the archived Design bar also keeps an
+"Open implementation epic" button (ticket 24), kept deliberately; the spec asks only for the `-impl`
+link. The Archive page refetches the list on the event that
 refetches the Epics page, once per burst, on mount and when the connection returns. No new event
 type. Rows update from an action's response, so the person does not wait for the refetch.
 
