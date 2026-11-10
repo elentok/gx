@@ -122,6 +122,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 		{"prompt", "/gx-one-off proj:epic-a/01"},
 		{"implement", "/gx-implement proj:epic-a/01"},
 		{"evolve", "/gx-evolve proj:epic-a/01"},
+		{"pr-text", "/gx-pr-text proj:epic-a/01"},
 		{"diagnose", "/gx-investigate proj:epic-a/01"},
 		{"investigate", "/gx-investigate proj:epic-a/01"},
 	} {

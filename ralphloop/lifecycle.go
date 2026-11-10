@@ -36,8 +36,11 @@ func ticketAddress(t tickets.Ticket) string {
 // return of FinishIteration, never an outcome.
 type FinishOutcome struct {
 	Merged bool
-	Status schema.Status // the pause status; empty when Merged
-	Kind   events.Kind
+	// Cancelled is a commitless attempt closed as cancelled by a finish check:
+	// neither merged nor paused. Reason is why.
+	Cancelled bool
+	Status    schema.Status // the pause status; empty when Merged
+	Kind      events.Kind
 	// Reason is the pause's own reason, as its run-log event recorded it.
 	Reason string
 }

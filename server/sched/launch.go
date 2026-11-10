@@ -101,6 +101,8 @@ func launchNote(t tickets.Ticket, cwd string) string {
 	switch {
 	case t.Type == string(schema.TypeTrunkConflict):
 		note = trunkConflictNote
+	case t.Type == string(schema.TypePRText):
+		// The ticket body names the epic, worktree and skill; gx-pr-text reads it.
 	case t.IsVerify():
 		if head, err := git.RevParse(cwd, "HEAD"); err == nil {
 			note = srvrecovery.VerifyResumeNote(t, head)

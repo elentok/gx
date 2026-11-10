@@ -238,6 +238,10 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 		s.events.Publish(wire.EventIterationFailed, addr.String())
 		return false
 	}
+	if out.Cancelled {
+		s.log.Info("late finish cancelled", "ticket", addr, "reason", out.Reason)
+		return false
+	}
 	if !out.Merged {
 		s.log.Warn("late finish re-paused", "ticket", addr, "kind", out.Kind, "reason", out.Reason)
 		s.events.Publish(wire.EventIterationPaused, addr.String())

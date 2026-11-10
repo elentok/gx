@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // DefaultSmartZone is the context-token ceiling used when none is configured.
@@ -68,6 +69,9 @@ const codeReviewSkill = "gx-code-review"
 // VerifySkill is the skill launched for type: verify tickets.
 const VerifySkill = "gx-verify-epic"
 
+// PRTextSkill is the skill launched for type: pr-text tickets.
+const PRTextSkill = "gx-pr-text"
+
 // LaunchSkill is the skill an iteration on t starts under: workerSkill,
 // unless t's type routes it to its own skill.
 func LaunchSkill(t tickets.Ticket, workerSkill string) string {
@@ -76,6 +80,8 @@ func LaunchSkill(t tickets.Ticket, workerSkill string) string {
 		return codeReviewSkill
 	case t.IsVerify():
 		return VerifySkill
+	case t.Type == string(schema.TypePRText):
+		return PRTextSkill
 	}
 	return workerSkill
 }

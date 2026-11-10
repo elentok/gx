@@ -35,6 +35,8 @@ func LaunchSkill(t tickets.Ticket) string {
 		return investigateSkill
 	case t.Type == string(schema.TypeMerge):
 		return mergeSkill
+	case t.Type == string(schema.TypePRText):
+		return agent.PRTextSkill
 	}
 	return implementSkill
 }

@@ -7,7 +7,17 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/tickets"
 )
+
+func TestLaunchSkill_PRTextTicketsRunGxPRText(t *testing.T) {
+	if got := LaunchSkill(tickets.Ticket{Type: "pr-text"}, DefaultWorkerSkill); got != "gx-pr-text" {
+		t.Fatalf("LaunchSkill(pr-text) = %q, want gx-pr-text", got)
+	}
+	if got := LaunchSkill(tickets.Ticket{Type: "implement"}, DefaultWorkerSkill); got != DefaultWorkerSkill {
+		t.Fatalf("LaunchSkill(implement) = %q, want the worker skill", got)
+	}
+}
 
 func TestSkillPrompt_MatchesTheHarnessSkillCommand(t *testing.T) {
 	t.Parallel()

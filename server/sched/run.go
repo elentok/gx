@@ -537,6 +537,14 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 		l.Events.Publish(wire.EventIterationFailed, ticketAddr)
 		return
 	}
+	if out.Cancelled {
+		// The finish check closed the attempt and the next step is already written.
+		if cerr := agentrunner.Cleanup(deps.Runner, run.Session.Label); cerr != nil {
+			l.Log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
+		}
+		l.Log.Info("attempt cancelled", "ticket", ticketAddr, "reason", out.Reason)
+		return
+	}
 	if !out.Merged {
 		// The finish path already wrote the pause; tell a person its own reason.
 		if one.KeepAskedAgent && out.Kind == events.SelfReported {

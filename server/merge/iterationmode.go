@@ -2,6 +2,7 @@ package merge
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
@@ -11,8 +12,10 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -38,7 +41,8 @@ type IterationMode struct {
 	err error
 	// finishCheck, when set, runs before a commitless ticket closes and may pause
 	// it instead; a trunk-conflict ticket scans its files for conflict markers.
-	finishCheck func(o ralphloop.OneIteration) (out ralphloop.FinishOutcome, paused bool, err error)
+	// A pr-text ticket cancels it instead.
+	finishCheck func(d deps.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (out ralphloop.FinishOutcome, handled bool, err error)
 	// AfterDone, when set, runs once the ticket's finished report is adopted.
 	AfterDone func()
 	// Ref is the detached worktree's start for a commitless ticket in a real
@@ -59,14 +63,48 @@ func (s *Landing) IterationModeFor(addr tickets.Address, t tickets.Ticket) Itera
 		if e, ok := s.writer.FreshEpic(addr.Project, addr.Epic); ok {
 			files = e.TrunkConflictFiles
 		}
-		m.finishCheck = func(o ralphloop.OneIteration) (ralphloop.FinishOutcome, bool, error) {
+		m.finishCheck = func(_ deps.Deps, o ralphloop.OneIteration, _ ralphloop.IterationWorktree, _ string) (ralphloop.FinishOutcome, bool, error) {
 			return pauseOnMarkers(o, dir, files)
 		}
 		return m
 	}
+	if typ == schema.TypePRText {
+		return s.prTextMode(addr)
+	}
 	m := IterationMode{Commitless: addr.Project == projects.ScratchProject || addr.Epic == queue.OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
 	if m.Commitless && (addr.Project == projects.ScratchProject || s.projectHasNoVCS(addr.Project)) {
 		m.ScratchDir = projects.ScratchSubdir(s.cfg.TicketStore, addr.Epic)
+	}
+	return m
+}
+
+// prTextMode runs a pr-text ticket commitless in the epic's feature worktree,
+// which it only reads. A Resolution that fails the check cancels the attempt and
+// has prflow fork the next, or store pr-text-failed after the last.
+func (s *Landing) prTextMode(addr tickets.Address) IterationMode {
+	m := IterationMode{Commitless: true, ScratchDir: filepath.Join(s.projects.WorktreeDir(addr.Project), addr.Epic)}
+	m.finishCheck = func(d deps.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (ralphloop.FinishOutcome, bool, error) {
+		t, err := schema.ParseTicket(o.Ticket.Path)
+		if err != nil || t.IterationStatus != schema.IterationStatusFinished {
+			return ralphloop.FinishOutcome{}, false, err
+		}
+		reason, err := prflow.CheckText(o.Ticket.Path)
+		if err != nil || reason == "" {
+			return ralphloop.FinishOutcome{}, false, err
+		}
+		out, err := ralphloop.CancelCommitless(d, o, w, pane, reason)
+		if err != nil {
+			return out, false, err
+		}
+		epic, ok := s.writer.FreshEpic(addr.Project, addr.Epic)
+		if !ok {
+			return out, true, fmt.Errorf("epic %s not found", addr.Epic)
+		}
+		if _, err := prflow.AfterInvalidText(epic.Path, o.Ticket.Path, reason); err != nil {
+			return out, true, fmt.Errorf("after invalid PR text: %w", err)
+		}
+		s.events.Publish(wire.EventQueueChanged, queue.RootOf(addr).String())
+		return out, true, nil
 	}
 	return m
 }
@@ -145,7 +183,7 @@ func (m IterationMode) Finish(d deps.Deps, o ralphloop.OneIteration, w ralphloop
 		return ralphloop.FinishMerge(d, o, w, pane, target)
 	case m.Commitless:
 		if m.finishCheck != nil {
-			if out, paused, err := m.finishCheck(o); err != nil || paused {
+			if out, handled, err := m.finishCheck(d, o, w, pane); err != nil || handled {
 				return out, err
 			}
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -146,6 +147,18 @@ func commitlessSession(w IterationWorktree, pane string) agentrunner.Session {
 		return agentrunner.Session{}
 	}
 	return agentrunner.Session{Label: w.Label, ID: pane}
+}
+
+// CancelCommitless closes a commitless ticket whose report failed a finish check
+// as cancelled with reason, and stops its agent. It never pauses the ticket.
+func CancelCommitless(d deps.Deps, o OneIteration, w IterationWorktree, pane, reason string) (FinishOutcome, error) {
+	if err := ticketops.CancelWithResolution(o.Ticket.Path, reason); err != nil {
+		return FinishOutcome{}, fmt.Errorf("cancelling ticket %s: %w", o.Ticket.Identifier, err)
+	}
+	if err := cleanupCommitless(d, o, w, commitlessSession(w, pane)); err != nil {
+		return FinishOutcome{}, err
+	}
+	return FinishOutcome{Cancelled: true, Reason: reason}, nil
 }
 
 func cleanupCommitless(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {

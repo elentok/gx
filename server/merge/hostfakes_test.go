@@ -1,9 +1,11 @@
 package merge
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -24,6 +26,22 @@ func TestLandingMergeModeResolvesTargetThroughHost(t *testing.T) {
 	got, err := m.target()
 	if err != nil || got != "develop" || !m.Feature {
 		t.Fatalf("target = %q, %v, feature = %v; want develop, nil, true", got, err, m.Feature)
+	}
+}
+
+func TestLandingPRTextModeIsCommitlessInTheFeatureWorktree(t *testing.T) {
+	store := t.TempDir()
+	reg := projects.NewRegistry(func() projects.Env { return projects.Env{TicketStore: store} }, nil, nil, nil, nil, nil)
+	l := &Landing{projects: reg}
+	m := l.IterationModeFor(tickets.Address{Project: "p", Epic: "e", ID: "02"}, tickets.Ticket{Type: "pr-text"})
+	if !m.Commitless || m.Feature {
+		t.Fatalf("commitless = %v, feature = %v; want commitless, not a feature-branch run", m.Commitless, m.Feature)
+	}
+	if want := filepath.Join(reg.WorktreeDir("p"), "e"); m.ScratchDir != want {
+		t.Fatalf("ScratchDir = %q, want the epic's feature worktree %q", m.ScratchDir, want)
+	}
+	if m.finishCheck == nil {
+		t.Fatal("no finish check")
 	}
 }
 

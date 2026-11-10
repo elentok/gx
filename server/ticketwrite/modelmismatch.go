@@ -47,12 +47,21 @@ func (w *Writer) PauseModelMismatch(scratchDir, ticketPath string, addr tickets.
 	w.recordModelMismatch(scratchDir, ticketPath, addr, run, m, w.d.Host.StopRun(run))
 }
 
+// launchTier is the tier a launch is pinned to: a one-shot override, else the
+// light tier for a pr-text ticket, else none (the worker tier applies).
+func launchTier(ticketType string, override agent.Tier) agent.Tier {
+	if override == "" && ticketType == string(schema.TypePRText) {
+		return agent.TierLight
+	}
+	return override
+}
+
 // LaunchModel resolves the model and effort a launch runs on, honouring a
 // one-shot tier override. ok is false when an implement launch resolved to no
 // model: it is refused and paused, and no agent may start.
 func (w *Writer) LaunchModel(scratchDir string, t tickets.Ticket, addr tickets.Address, agentKind agent.AgentKind) (model, effort string, ok bool) {
 	var tierRun runs.Run
-	if tier := w.d.Host.TakeTierOverride(t.Path); tier != "" {
+	if tier := launchTier(t.Type, w.d.Host.TakeTierOverride(t.Path)); tier != "" {
 		tierRun.Model, tierRun.Effort = agent.ResolveTier(w.d.Projects.AgentsConfig(addr.Project), agentKind, tier)
 	}
 	model, effort = w.d.Projects.RunAgentConfig(addr.Project, agentKind, tierRun)
