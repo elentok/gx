@@ -94,10 +94,78 @@ func defaultStatusPath(dirs config.Dirs) (string, error) {
 func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "skills",
-		Short: "install or remove gx's built-in agent skill bundle",
+		Short: "install, remove or list gx's skill bundle and your own skill source folders",
 	}
-	cmd.AddCommand(newSkillsInstallCmd(d), newSkillsUninstallCmd(d))
+	cmd.AddCommand(newSkillsInstallCmd(d), newSkillsUninstallCmd(d), newSkillsListCmd(d))
 	return cmd
+}
+
+func newSkillsListCmd(d Deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "list the skill bundle and every installed skill source",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, args []string) error {
+			return runSkillsList(d, c.OutOrStdout())
+		},
+	}
+}
+
+// runSkillsList prints the bundle (or the dev checkout) first, then one line
+// per remembered source.
+func runSkillsList(d Deps, out io.Writer) error {
+	manifestPath, err := d.ManifestPath()
+	if err != nil {
+		return err
+	}
+	m, err := skills.Load(manifestPath)
+	switch {
+	case errors.Is(err, skills.ErrNotExist):
+		fmt.Fprintln(out, "gx skill bundle: not installed")
+	case err != nil:
+		return err
+	default:
+		what := "gx skill bundle"
+		if root, ok := skills.DevRoot(m); ok {
+			what = "gx dev checkout " + root
+		}
+		fmt.Fprintf(out, "%s: %s, roots %s\n", what, m.Mode, strings.Join(m.AgentRoots, ", "))
+	}
+
+	var sources []skills.Manifest
+	if d.ManifestDir != nil {
+		manifestDir, err := d.ManifestDir()
+		if err != nil {
+			return err
+		}
+		paths, _ := filepath.Glob(filepath.Join(manifestDir, "*.json"))
+		for _, path := range paths {
+			if sm, err := skills.Load(path); err == nil {
+				if _, ok := skills.ThirdPartyRoot(sm); ok {
+					sources = append(sources, sm)
+				}
+			}
+		}
+	}
+	if len(sources) == 0 {
+		fmt.Fprintln(out, "no skill sources installed")
+		return nil
+	}
+	for _, sm := range sources {
+		root, _ := skills.ThirdPartyRoot(sm)
+		fmt.Fprintf(out, "source %s: %s, roots %s, %d skills\n", root, sm.Mode, strings.Join(sm.AgentRoots, ", "), skillCount(sm))
+	}
+	return nil
+}
+
+// skillCount counts the distinct skill folders a source manifest owns.
+func skillCount(m skills.Manifest) int {
+	names := map[string]bool{}
+	for _, f := range m.Files {
+		name, _, _ := strings.Cut(filepath.ToSlash(f.Path), "/")
+		names[name] = true
+	}
+	return len(names)
 }
 
 func newSkillsInstallCmd(d Deps) *cobra.Command {
@@ -567,6 +635,7 @@ func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyF
 		return installErr
 	}
 	fmt.Fprintf(out, "%d skills from %s: %s\n", len(names), dir, summarizeTargets(targets))
+	warnCodexHomeDuplicates(d, out, files)
 	if len(problems) > 0 {
 		return &clashError{problems}
 	}
