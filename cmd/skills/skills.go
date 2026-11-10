@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -175,7 +176,7 @@ func runSkillsInstallAll(d Deps, force skills.ForcePolicy, out io.Writer) error 
 	if problem == "" {
 		return nil
 	}
-	return errors.New(strings.Join(problems, "\n"))
+	return errors.New(strings.Join(dedupe(problems), "\n"))
 }
 
 // runSkillsInstall extracts gx's embedded canonical skill bundle to a
@@ -346,15 +347,154 @@ func runSkillsInstallSource(d Deps, dir string, copyFiles bool, force skills.For
 		return err
 	}
 	manifestPath := filepath.Join(manifestDir, skills.SourceID(real)+".json")
-	return syncSourceDir(d, manifestPath, abs, real, names, copyFiles, true, force, out)
+	syncErr := syncSourceDir(d, manifestPath, abs, real, names, copyFiles, true, force, out)
+	var clash *clashError
+	if syncErr != nil && !errors.As(syncErr, &clash) {
+		return syncErr
+	}
+	// A source remembered earlier still holds the clashing names; resync it so
+	// it drops them too, whatever order the sources were installed in.
+	problems := dedupe(clashProblems(syncErr))
+	for _, other := range clashingSources(d, real, names) {
+		if p := syncSource(d, other.manifestPath, other.manifest, other.real, force, out); p != "" {
+			problems = dedupe(append(problems, p))
+		}
+	}
+	if len(problems) > 0 {
+		return errors.New(strings.Join(problems, "\n"))
+	}
+	return nil
+}
+
+// clashError carries the name clashes of a source install that otherwise
+// succeeded: the clashing names were skipped, everything else installed.
+type clashError struct{ problems []string }
+
+func (e *clashError) Error() string { return strings.Join(e.problems, "; ") }
+
+func clashProblems(err error) []string {
+	var clash *clashError
+	if errors.As(err, &clash) {
+		return clash.problems
+	}
+	return nil
+}
+
+// dedupe drops repeated problems, keeping first-seen order. Both sides of a
+// clash report the same line.
+func dedupe(problems []string) []string {
+	seen := map[string]bool{}
+	var kept []string
+	for _, p := range problems {
+		if p != "" && !seen[p] {
+			seen[p] = true
+			kept = append(kept, p)
+		}
+	}
+	return kept
+}
+
+// rememberedSource is another remembered Skill source and the skill names it
+// currently has.
+type rememberedSource struct {
+	manifestPath string
+	manifest     skills.Manifest
+	real, abs    string
+	names        []string
+}
+
+// otherSources lists every remembered Skill source except the one at real that
+// still exists and can be scanned.
+func otherSources(d Deps, real string) []rememberedSource {
+	if d.ManifestDir == nil {
+		return nil
+	}
+	manifestDir, err := d.ManifestDir()
+	if err != nil {
+		return nil
+	}
+	paths, _ := filepath.Glob(filepath.Join(manifestDir, "*.json"))
+	var others []rememberedSource
+	for _, path := range paths {
+		m, err := skills.Load(path)
+		if err != nil {
+			continue
+		}
+		other, ok := skills.ThirdPartyRoot(m)
+		if !ok || other == real {
+			continue
+		}
+		if info, err := os.Stat(other); err != nil || !info.IsDir() {
+			continue
+		}
+		abs := recordedAbs(m, other)
+		names, err := skills.ScanSource(abs)
+		if err != nil {
+			continue
+		}
+		others = append(others, rememberedSource{path, m, other, abs, names})
+	}
+	return others
+}
+
+// recordedAbs recovers the folder path the person gave for a source, which may
+// differ from its resolved path, from the links gx recorded.
+func recordedAbs(m skills.Manifest, real string) string {
+	for _, f := range m.Files {
+		if f.Kind == skills.KindDirectoryLink && f.LinkTarget != "" {
+			return filepath.Dir(f.LinkTarget)
+		}
+	}
+	return real
+}
+
+// sourceClashes returns the name clashes between the source at real, with the
+// given names, and every other remembered source: name -> sorted real paths.
+func sourceClashes(d Deps, real string, names []string) (map[string][]string, []rememberedSource) {
+	others := otherSources(d, real)
+	all := map[string][]string{real: names}
+	for _, o := range others {
+		all[o.real] = o.names
+	}
+	return skills.SourceClashes(all), others
+}
+
+// clashingSources lists the other remembered sources that share a skill name
+// with the source at real.
+func clashingSources(d Deps, real string, names []string) []rememberedSource {
+	clashes, others := sourceClashes(d, real, names)
+	var out []rememberedSource
+	for _, o := range others {
+		for _, name := range o.names {
+			if slices.Contains(clashes[name], real) {
+				out = append(out, o)
+				break
+			}
+		}
+	}
+	return out
 }
 
 // syncSourceDir installs the named skills of the source abs (real is its
-// resolved path) into every root. A source that lost all its skills passes no
-// names, which removes its links. Only an explicit install passes switchMode:
-// a re-sync keeps the recorded mode.
+// resolved path) into every root, minus the names another source also has: a
+// clash is skipped in both sources and returned as a clashError after the rest
+// installed. A source that lost all its skills passes no names, which removes
+// its links. Only an explicit install passes switchMode: a re-sync keeps the
+// recorded mode.
 func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyFiles, switchMode bool, force skills.ForcePolicy, out io.Writer) error {
 	dir := abs
+	clashes, _ := sourceClashes(d, real, names)
+	var problems []string
+	kept := names[:0:0]
+	for _, name := range names {
+		holders := clashes[name]
+		if len(holders) == 0 {
+			kept = append(kept, name)
+			continue
+		}
+		problems = append(problems, fmt.Sprintf("skill name %q is shared by %s, skipped in every one", name, strings.Join(holders, " and ")))
+	}
+	names = kept
 	files, err := skills.SourceSkillFiles(abs, names, copyFiles)
 	if err != nil {
 		return err
@@ -373,6 +513,9 @@ func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyF
 		return installErr
 	}
 	fmt.Fprintf(out, "%d skills from %s: %s\n", len(names), dir, summarizeTargets(targets))
+	if len(problems) > 0 {
+		return &clashError{problems}
+	}
 	return nil
 }
 
@@ -397,13 +540,7 @@ func Refresh(d Deps, out io.Writer) {
 }
 
 func joinProblems(problems []string) string {
-	var kept []string
-	for _, p := range problems {
-		if p != "" {
-			kept = append(kept, p)
-		}
-	}
-	return strings.Join(kept, "; ")
+	return strings.Join(dedupe(problems), "; ")
 }
 
 // syncSources re-syncs every remembered Skill source in its recorded mode and
@@ -442,19 +579,17 @@ func syncSource(d Deps, manifestPath string, m skills.Manifest, real string, for
 	}
 	// Links point inside the folder path the person gave, which may differ from
 	// its resolved path; recover it from the recorded links.
-	abs := real
-	for _, f := range m.Files {
-		if f.Kind == skills.KindDirectoryLink && f.LinkTarget != "" {
-			abs = filepath.Dir(f.LinkTarget)
-			break
-		}
-	}
+	abs := recordedAbs(m, real)
 	names, err := skills.ScanSource(abs)
 	if err != nil {
 		return fmt.Sprintf("skill source %s: %v", real, err)
 	}
 	copyFiles := m.Mode == skills.ModeManagedCopy
 	if err := syncSourceDir(d, manifestPath, abs, real, names, copyFiles, false, force, out); err != nil {
+		var clash *clashError
+		if errors.As(err, &clash) {
+			return strings.Join(clash.problems, "; ")
+		}
 		return fmt.Sprintf("skill source %s: %v", real, err)
 	}
 	return ""
