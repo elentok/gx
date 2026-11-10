@@ -439,15 +439,15 @@
               },
               "type": "array"
             },
+            "dev-dir": {
+              "default": "",
+              "description": "The Dev checkout path, overriding the one stamped into the binary. A leading ~ is expanded; otherwise it must be absolute.",
+              "type": "string"
+            },
             "dev-frontend": {
               "default": false,
-              "description": "Serve the web page from a development frontend server instead of the built files.",
+              "description": "Turn on Dev mode: gx runs its own Vite from the Dev checkout and serves the web UI from it.",
               "type": "boolean"
-            },
-            "dev-url": {
-              "default": "http://127.0.0.1:5173",
-              "description": "The address of the development frontend server.",
-              "type": "string"
             },
             "listen": {
               "default": "",

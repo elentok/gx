@@ -58,11 +58,6 @@ func DefaultValue(path registry.KeyPath) (any, bool) {
 // file would hold it; nil when cfg holds none. Comparing two configs through
 // it needs no per-key code.
 func ValueAt(cfg Config, path registry.KeyPath) any {
-	// The effective dev URL, so a dev-url that is ignored while dev-frontend
-	// is off never counts as a change.
-	if path.String() == "server.web.dev-url" {
-		return cfg.Server.Web.DevFrontendURL()
-	}
 	node, _ := valueAt(cfg, path)
 	return node
 }

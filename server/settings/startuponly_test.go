@@ -4,7 +4,6 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/elentok/gx/config/registry"
@@ -16,12 +15,11 @@ import (
 func startupOnlyCases(t *testing.T) map[string]map[string]any {
 	other := t.TempDir()
 	return map[string]map[string]any{
-		"ticket-store.path":       {"ticket-store": map[string]any{"path": other}},
-		"server.tcp-listen":       {"server": map[string]any{"tcp-listen": true}},
-		"server.web.listen":       {"server": map[string]any{"web": map[string]any{"listen": "127.0.0.1:0"}}},
-		"server.web.dev-frontend": {"server": map[string]any{"web": map[string]any{"dev-frontend": true}}},
-		"agent-runner":            {"agent-runner": "headless"},
-		"runner-wait":             {"runner-wait": "7s"},
+		"ticket-store.path": {"ticket-store": map[string]any{"path": other}},
+		"server.tcp-listen": {"server": map[string]any{"tcp-listen": true}},
+		"server.web.listen": {"server": map[string]any{"web": map[string]any{"listen": "127.0.0.1:0"}}},
+		"agent-runner":      {"agent-runner": "headless"},
+		"runner-wait":       {"runner-wait": "7s"},
 	}
 }
 
@@ -30,8 +28,6 @@ func startupOnlyCases(t *testing.T) map[string]map[string]any {
 func TestStartupOnly_ReportsExactlyTheRegistryFlags(t *testing.T) {
 	t.Parallel()
 	cases := startupOnlyCases(t)
-	// dev-url is ignored while dev-frontend is off, so it only reports with it.
-	cases["server.web.dev-url"] = map[string]any{"server": map[string]any{"web": map[string]any{"dev-frontend": true, "dev-url": "http://127.0.0.1:5199"}}}
 
 	var flagged []string
 	for _, e := range registry.Default().All() {
@@ -54,9 +50,7 @@ func TestStartupOnly_ReportsExactlyTheRegistryFlags(t *testing.T) {
 		if res.Refused || !slices.Contains(res.Warnings, want) {
 			t.Errorf("changing %s: %+v, want warning %q", key, res, want)
 		}
-		// Turning dev-frontend on also changes the dev URL in effect, so the
-		// two dev keys report together.
-		if !strings.HasPrefix(key, "server.web.dev-") && len(res.Warnings) != 1 {
+		if len(res.Warnings) != 1 {
 			t.Errorf("changing %s: warnings %v, want only %q", key, res.Warnings, want)
 		}
 	}

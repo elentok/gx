@@ -55,7 +55,7 @@ func TestSettingsScenario(t *testing.T) {
 		t.Error("slack webhook-url is set, want it unset")
 	}
 	if _, ok := section("server", "web")["dev-frontend"]; ok {
-		t.Error("risky server.web.dev-frontend is set, want its default")
+		t.Error("server.web.dev-frontend (Dev mode) is set, want its default")
 	}
 
 	store := filepath.Join(r.Root(), "data", "gx", "tickets")

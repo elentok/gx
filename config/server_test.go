@@ -116,12 +116,17 @@ func TestLoadServerWebTOTP(t *testing.T) {
 	}
 }
 
-func TestLoadServerWebDevFrontend(t *testing.T) {
-	for body, want := range map[string]string{
-		`{}`: "",
-		`{"server":{"web":{"dev-frontend":true}}}`:                                    DefaultWebDevURL,
-		`{"server":{"web":{"dev-frontend":true,"dev-url":"http://localhost:5174"}}}`:  "http://localhost:5174",
-		`{"server":{"web":{"dev-frontend":false,"dev-url":"http://localhost:5174"}}}`: "",
+func TestLoadServerWebDev(t *testing.T) {
+	type dev struct {
+		on  bool
+		dir string
+	}
+	for body, want := range map[string]dev{
+		`{}`: {},
+		`{"server":{"web":{"dev-frontend":true}}}`:                           {on: true},
+		`{"server":{"web":{"dev-frontend":true,"dev-dir":"~/src/gx"}}}`:      {on: true, dir: "~/src/gx"},
+		`{"server":{"web":{"dev-dir":"/opt/gx"}}}`:                           {dir: "/opt/gx"},
+		`{"server":{"web":{"dev-frontend":true,"dev-url":"http://x:5174"}}}`: {on: true},
 	} {
 		tmp := t.TempDir()
 		prev := userConfigDirFn
@@ -129,8 +134,9 @@ func TestLoadServerWebDevFrontend(t *testing.T) {
 		t.Cleanup(func() { userConfigDirFn = prev })
 		writeBudgetConfig(t, tmp, body)
 		cfg, err := Load()
-		if err != nil || cfg.Server.Web.DevFrontendURL() != want {
-			t.Errorf("%s: DevFrontendURL = %q (err %v), want %q", body, cfg.Server.Web.DevFrontendURL(), err, want)
+		got := dev{cfg.Server.Web.DevFrontend, cfg.Server.Web.DevDir}
+		if err != nil || got != want {
+			t.Errorf("%s: dev = %+v (err %v), want %+v", body, got, err, want)
 		}
 	}
 }

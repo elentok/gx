@@ -234,10 +234,8 @@ describe("SettingsRow", () => {
       entry({ risky: true, risky_off_only: over.key === "server.web.totp", confirm_text: "This is risky.", ...over });
     const cases: [string, Partial<SettingsEntry>, (v: ReturnType<typeof setup>) => void, unknown][] = [
       ["server.web.listen", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
-      ["server.web.dev-url", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
       ["ticket-store.path", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
       ["server.tcp-listen", { type: "bool", default: false }, (v) => fireEvent.click(v.getByRole("switch")), true],
-      ["server.web.dev-frontend", { type: "bool", default: false }, (v) => fireEvent.click(v.getByRole("switch")), true],
       ["server.web.totp", { type: "bool", default: true, set: true, value: true }, (v) => fireEvent.click(v.getByRole("switch")), false],
       ["server.web.allowed-hosts", { type: "string-list", default: [] }, (v) => {
         fireEvent.change(v.getByRole("textbox"), { target: { value: "h" } });

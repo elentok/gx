@@ -13,7 +13,7 @@ web-build:
 	cd webui && pnpm install --frozen-lockfile && pnpm build
 	touch webui/dist/.gitkeep # vite empties dist; the Go embed needs this file to compile
 
-# Serves the canned snapshot. Against a real server, set server.web.dev-url instead.
+# Serves the canned snapshot. Against a real server, turn on server.web.dev-frontend instead.
 web-dev:
 	cd webui && pnpm install --frozen-lockfile && pnpm dev
 

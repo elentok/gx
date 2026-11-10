@@ -103,11 +103,12 @@ type ServerConfig struct {
 type WebConfig struct {
 	// Listen is the host:port to serve the web UI on; empty means off.
 	Listen string `json:"listen"`
-	// DevFrontend serves the UI from the Vite dev server at DevURL instead of
-	// the embedded build. Dev only.
+	// DevFrontend turns on Dev mode: gx runs its own Vite from the Dev
+	// checkout and serves the UI from it.
 	DevFrontend bool `json:"dev-frontend"`
-	// DevURL is the loopback http URL of the Vite dev server.
-	DevURL string `json:"dev-url"`
+	// DevDir is the Dev checkout path overriding the one stamped into the
+	// binary. Empty means the stamped one.
+	DevDir string `json:"dev-dir"`
 	// AllowedHosts are host names, besides IP literals and localhost, the
 	// listener accepts in the Host header.
 	AllowedHosts []string `json:"allowed-hosts"`
@@ -115,19 +116,8 @@ type WebConfig struct {
 	TOTP bool `json:"totp"`
 }
 
-// DevFrontendURL is the dev server URL to proxy to, or "" when dev-frontend is off.
-func (w WebConfig) DevFrontendURL() string {
-	if !w.DevFrontend {
-		return ""
-	}
-	return w.DevURL
-}
-
 // DefaultRecentlyFinished is the RecentlyFinished when none is configured.
 const DefaultRecentlyFinished = 5
-
-// DefaultWebDevURL is the Vite dev server that server.web.dev-frontend uses when dev-url is unset.
-const DefaultWebDevURL = "http://127.0.0.1:5173"
 
 // Default returns the default configuration.
 func Default() Config { return defaultWith(DataDir) }
@@ -146,7 +136,7 @@ func defaultWith(dataDir func() (string, error)) Config {
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           ticketStoreConfigWith(dataDir),
-		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{DevURL: DefaultWebDevURL, TOTP: true}},
+		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{TOTP: true}},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
 		Watchdog:              DefaultWatchdogConfig(),
@@ -387,8 +377,8 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.DevFrontend != nil {
 		cfg.Server.Web.DevFrontend = *raw.Server.Web.DevFrontend
 	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.DevURL != nil {
-		cfg.Server.Web.DevURL = *raw.Server.Web.DevURL
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.DevDir != nil {
+		cfg.Server.Web.DevDir = *raw.Server.Web.DevDir
 	}
 	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.AllowedHosts != nil {
 		cfg.Server.Web.AllowedHosts = raw.Server.Web.AllowedHosts

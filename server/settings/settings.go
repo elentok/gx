@@ -113,6 +113,11 @@ type Settings struct {
 	// Settings keeps TOTP on.
 	WebTOTPOff bool
 
+	// WebDevFrontend is config server.web.dev-frontend (Dev mode on).
+	WebDevFrontend bool
+	// WebDevDir is config server.web.dev-dir, the Dev checkout override.
+	WebDevDir string
+
 	// WebInterfaceIPs lists the local interface IPs the web URL may fall back
 	// to; nil reads the machine's interfaces. Tests inject it.
 	WebInterfaceIPs func() []net.IP
@@ -169,6 +174,8 @@ func FromConfig(cfg config.Config) Settings {
 		AgentsDefaultHarness:        cfg.Agents.DefaultHarness,
 		WebAllowedHosts:             cfg.Server.Web.AllowedHosts,
 		WebTOTPOff:                  !cfg.Server.Web.TOTP,
+		WebDevFrontend:              cfg.Server.Web.DevFrontend,
+		WebDevDir:                   cfg.Server.Web.DevDir,
 	}
 }
 

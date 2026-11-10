@@ -80,7 +80,7 @@ type rawConfig struct {
 		Web              *struct {
 			Listen      *string `json:"listen"`
 			DevFrontend *bool   `json:"dev-frontend"`
-			DevURL      *string `json:"dev-url"`
+			DevDir      *string `json:"dev-dir"`
 
 			AllowedHosts []string `json:"allowed-hosts"`
 			TOTP         *bool    `json:"totp"`

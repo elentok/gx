@@ -287,6 +287,7 @@ func New(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: cfg.LogLevel}))
+	warnIgnoredDevURL(log, cfg.ConfigPath)
 	idx := index.New(cfg.TicketStore, events, log)
 	registry, savedRuns, err := runs.Open(cfg.StateDir, log)
 	if err != nil {

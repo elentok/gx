@@ -68,12 +68,10 @@ func coreEntries() []Entry {
 	add(s, risky(Entry{Key: Key("server", "web", "listen"), Type: TypeString, Restart: true,
 		Description: "The address the web page is served on."},
 		"Changing the address can expose the web page to other machines or lock you out of it."))
-	add(s, risky(Entry{Key: Key("server", "web", "dev-frontend"), Type: TypeBool, Restart: true,
-		Description: "Serve the web page from a development frontend server instead of the built files."},
-		"The web page will load from the development server. If it is not running, the page stays blank."))
-	add(s, risky(Entry{Key: Key("server", "web", "dev-url"), Type: TypeString, Restart: true,
-		Description: "The address of the development frontend server."},
-		"If this address is wrong, the web page stays blank while the development frontend is on."))
+	add(s, Entry{Key: Key("server", "web", "dev-frontend"), Type: TypeBool,
+		Description: "Turn on Dev mode: gx runs its own Vite from the Dev checkout and serves the web UI from it."})
+	add(s, Entry{Key: Key("server", "web", "dev-dir"), Type: TypeString,
+		Description: "The Dev checkout path, overriding the one stamped into the binary. A leading ~ is expanded; otherwise it must be absolute."})
 	add(s, risky(Entry{Key: Key("server", "web", "allowed-hosts"), Type: TypeStringList,
 		Description: "Host names the web page accepts requests for."},
 		"A wrong list can lock you out of the web page, and a broad one lets other sites reach it."))
