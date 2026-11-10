@@ -743,53 +743,6 @@ export interface DetailRun {
 }
 
 //////////
-// source: devstatus.go
-
-/**
- * DevState is where Dev mode is in its life.
- */
-export const DevStateOff = "off";
-export const DevStateInstalling = "installing";
-export const DevStateStarting = "starting";
-export const DevStateRunning = "running";
-export const DevStateDown = "down";
-export type DevState = typeof DevStateOff | typeof DevStateInstalling | typeof DevStateStarting | typeof DevStateRunning | typeof DevStateDown;
-/**
- * ReasonDevNotDown is the refusal reason of a Vite restart while Vite is not down.
- */
-export const ReasonDevNotDown = "dev-not-down";
-/**
- * DevRestartResult is the answer to a Vite restart; a refusal changes nothing.
- */
-export interface DevRestartResult {
-  refused?: boolean;
-  reason?: string;
-  message?: string;
-}
-/**
- * DevStatus is the Dev block of the snapshot.
- */
-export interface DevStatus {
-  state: DevState;
-  /**
-   * HasCheckout is whether gx found a Dev checkout.
-   */
-  has_checkout: boolean;
-  /**
-   * Reason says why Dev mode cannot run or is down; empty when nothing is wrong.
-   */
-  reason?: string;
-  /**
-   * LogTail is the last Vite log lines.
-   */
-  log_tail?: string[];
-  /**
-   * Checkout is the Dev checkout root; empty without one.
-   */
-  checkout?: string;
-}
-
-//////////
 // source: diskwatch.go
 
 /**
@@ -2693,6 +2646,36 @@ export interface SessionHuh {
   title: string;
 }
 /**
+ * Refusal reasons of POST /v1/sessions/answer, beside ReasonStale.
+ */
+export const ReasonAnswerSourceNotSupported = "source-not-supported";
+/**
+ * SessionAnswerRequest is the body of POST /v1/sessions/answer: the answer to
+ * one Question card, named by its source and id. Answers line up with the
+ * card's questions by position; a missing or empty one is unanswered. Note is
+ * the note on the whole round. LastMessage guards the web mux like the prompt
+ * route's.
+ */
+export interface SessionAnswerRequest {
+  id: string;
+  source: string;
+  card_id: string;
+  answers?: SessionAnswer[];
+  note?: string;
+  images?: string[];
+  last_message?: string;
+}
+/**
+ * SessionAnswer is the answer to one question of a card: the picked option id
+ * (or "yes"/"no"), typed text, a per-question note, or the Huh? mark.
+ */
+export interface SessionAnswer {
+  choice?: string;
+  text?: string;
+  note?: string;
+  huh?: boolean;
+}
+/**
  * SessionRoundOption is one choice of an options card.
  */
 export interface SessionRoundOption {
@@ -2716,14 +2699,15 @@ export interface SessionRoundCard {
   links?: QuestionLink[];
   note?: string;
 }
-/**
- * Question card sources.
- */
 export const CardSourceClaudeDialog = "claude-dialog";
 export const CardSourceCodex = "codex-question";
 export const CardSourcePermission = "permission";
 export const CardSourceRound = "round";
 export const CardSourceTicketAsk = "ticket-ask";
+/**
+ * Question card sources.
+ */
+export type CardSource = typeof CardSourceClaudeDialog | typeof CardSourceCodex | typeof CardSourcePermission | typeof CardSourceRound | typeof CardSourceTicketAsk;
 /**
  * QuestionCardOption is one choice of a card question.
  */

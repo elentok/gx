@@ -118,6 +118,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/sessions/permission":               "agents permission",
 	"POST /v1/sessions/create":                  "agents create",
 	"POST /v1/sessions/keys":                    "agents keys",
+	"POST /v1/sessions/answer":                  "agents answer",
 	"POST /v1/sessions/stop":                    "agents stop",
 	"POST /v1/sessions/remove":                  "agents remove",
 	"POST /v1/sessions/remove-exited":           "agents remove",

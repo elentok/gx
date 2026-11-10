@@ -23,6 +23,12 @@ func Routes(get func() *Prompt) []wire.Route {
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().promptHandler(promptSourceWeb)(w, r) },
 		},
 		{
+			Pattern:    "POST /v1/sessions/answer",
+			Web:        wire.WebWrite,
+			Handler:    func(w http.ResponseWriter, r *http.Request) { get().answerHandler(promptSourceCLI)(w, r) },
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().answerHandler(promptSourceWeb)(w, r) },
+		},
+		{
 			Pattern:    "POST /v1/sessions/keys",
 			Web:        wire.WebWrite,
 			Handler:    func(w http.ResponseWriter, r *http.Request) { get().keysHandler(promptSourceCLI)(w, r) },

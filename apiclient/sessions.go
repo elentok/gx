@@ -290,6 +290,14 @@ func (s *Sessions) RemoveImage(ctx context.Context, req wire.SessionImageRequest
 	return res, err
 }
 
+// Answer answers a Question card. A refusal is a result (Refused set), not an
+// error.
+func (s *Sessions) Answer(ctx context.Context, req wire.SessionAnswerRequest) (wire.SessionResult, error) {
+	var res wire.SessionResult
+	err := s.t.post(ctx, "/v1/sessions/answer", req, &res)
+	return res, err
+}
+
 // Keys sends a named key or literal text to a live session. A refusal is a
 // result (Refused set), not an error.
 func (s *Sessions) Keys(ctx context.Context, req wire.SessionKeysRequest) (wire.SessionResult, error) {

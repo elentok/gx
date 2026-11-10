@@ -296,6 +296,33 @@ type SessionHuh struct {
 	Title    string `json:"title"`
 }
 
+// Refusal reasons of POST /v1/sessions/answer, beside ReasonStale.
+const ReasonAnswerSourceNotSupported = "source-not-supported"
+
+// SessionAnswerRequest is the body of POST /v1/sessions/answer: the answer to
+// one Question card, named by its source and id. Answers line up with the
+// card's questions by position; a missing or empty one is unanswered. Note is
+// the note on the whole round. LastMessage guards the web mux like the prompt
+// route's.
+type SessionAnswerRequest struct {
+	ID          string          `json:"id"`
+	Source      string          `json:"source"`
+	CardID      string          `json:"card_id"`
+	Answers     []SessionAnswer `json:"answers,omitempty"`
+	Note        string          `json:"note,omitempty"`
+	Images      []string        `json:"images,omitempty"`
+	LastMessage string          `json:"last_message,omitempty"`
+}
+
+// SessionAnswer is the answer to one question of a card: the picked option id
+// (or "yes"/"no"), typed text, a per-question note, or the Huh? mark.
+type SessionAnswer struct {
+	Choice string `json:"choice,omitempty"`
+	Text   string `json:"text,omitempty"`
+	Note   string `json:"note,omitempty"`
+	Huh    bool   `json:"huh,omitempty"`
+}
+
 // SessionRoundOption is one choice of an options card.
 type SessionRoundOption struct {
 	ID          string `json:"id"`
