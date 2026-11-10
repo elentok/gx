@@ -333,6 +333,10 @@ type ticketMDYAML struct {
 	PRURL       string     `yaml:"pr_url"`
 	QueuedAt    *time.Time `yaml:"queued_at"`
 
+	ArchivedAt        *time.Time `yaml:"archived_at"`
+	ArchivedWorkspace string     `yaml:"archived_workspace"`
+	BranchName        string     `yaml:"branch_name"`
+
 	DesignStartedAt *time.Time `yaml:"design_started_at"`
 
 	LinesAdded   *int                    `yaml:"lines_added"`
@@ -410,6 +414,10 @@ func loadEpicTicketMD(epic *Epic) {
 		epic.MergedAt = *wire.MergedAt
 	}
 	epic.PRNumber, epic.PRURL = wire.PRNumber, wire.PRURL
+	if wire.ArchivedAt != nil {
+		epic.ArchivedAt = *wire.ArchivedAt
+	}
+	epic.ArchivedWorkspace, epic.BranchName = wire.ArchivedWorkspace, wire.BranchName
 	if wire.QueuedAt != nil {
 		epic.QueuedAt = *wire.QueuedAt
 	}

@@ -93,6 +93,12 @@ type Epic struct {
 	// PRNumber and PRURL name the epic's pull request; zero until stamped.
 	PRNumber int
 	PRURL    string
+	// ArchivedAt, ArchivedWorkspace and BranchName are server-stamped. Zero
+	// means never archived, no stored workspace, or never renamed. On a Design
+	// pair they live on the Design and apply to both halves.
+	ArchivedAt        time.Time
+	ArchivedWorkspace string
+	BranchName        string
 	// QueuedAt is when the epic was first added to the queue; zero on an epic
 	// queued before the field existed.
 	QueuedAt time.Time
@@ -149,6 +155,21 @@ type Epic struct {
 // every lookup reads ts as it stands. A caller that edits ts in place (a
 // status flip in a plan simulation) uses it, because a cache holds Ticket
 // values and would keep serving the old ones.
+// Branch is the epic's effective git branch: branch_name when set, else its
+// name. A rename keeps the branch.
+func (e Epic) Branch() string {
+	if e.BranchName != "" {
+		return e.BranchName
+	}
+	return e.Name
+}
+
+// ImplBranch is the branch of a Design's implementation half.
+func ImplBranch(design Epic) string { return design.Branch() + "-impl" }
+
+// DesignBranch is the branch of a Design's design half.
+func DesignBranch(design Epic) string { return design.Branch() + "-design" }
+
 func (e Epic) WithTickets(ts []Ticket) Epic {
 	e.Tickets = ts
 	e.forks = nil

@@ -86,6 +86,10 @@ func init() {
 	Default.Register(Step{Name: "pr-pause-kinds", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// epic-archive-fields: archived_at, archived_workspace and branch_name are optional; absent is the default.
+	Default.Register(Step{Name: "epic-archive-fields", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

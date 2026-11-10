@@ -120,6 +120,7 @@ settable via ` + "`tickets set`" + `, and unset until gx stamps them.
   queued_at (RFC3339 timestamp) — when the epic was first added to the queue (stamped once
     by the server; epics queued earlier fall back to started_at, then merged_at)
   pr_number (int), pr_url — the epic's pull request (stamped by the server; zero when absent)
+  archived_at, archived_workspace, branch_name — archive and rename state (stamped by the server; empty when absent)
   lines_added, lines_removed — lines the epic's branch added and removed
   total_tokens — input + output + cache writes + cache reads over every session of every
     ticket; a stamped 0 is different from unset, and actual_cost is stamped whenever it is

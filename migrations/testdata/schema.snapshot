@@ -56,6 +56,9 @@ struct tickets.Epic
   MergedAt time.Time 
   PRNumber int 
   PRURL string 
+  ArchivedAt time.Time 
+  ArchivedWorkspace string 
+  BranchName string 
   QueuedAt time.Time 
   DesignStartedAt time.Time 
   LinesAdded *int 
@@ -89,5 +92,5 @@ enum pause_kind: agent_name_taken agent_pane_busy agent_prompt_stalled all-pause
 enum pause_reason: agent_name_taken agent_pane_busy agent_prompt_stalled ambiguous-base ambiguous-merge background-task-gate blocked-cycle blocked-pane budget-killed ci-failing classifier-outage conflict-markers dirty-trunk duplicate-live handle-mismatch iteration-error manual merge-conflict merge-error merge-unreported model-mismatch needs-rebase parent-defect pr-dirty-trunk pr-foreign-conflict pr-text-failed pr-trunk-update process-storm retry-exhausted self-reported spinning stranded-commits trunk-missing zero-commit
 enum status: cancelled claimed done draft needs-answer needs-repair open paused
 enum type: ci-fix code-review conflict-resolution diagnose evolve grilling implement investigate merge pr-text prompt prototype research trunk-conflict verify
-epic server-stamped: created_at completed_at merged_at queued_at design_started_at land_block_kind land_block_reason land_block_files trunk_fast_forwarded_at trunk_conflict_backup trunk_conflict_files evolved_at evolve_skipped evolve_ticket lines_added lines_removed total_tokens actual_cost had_codex friction pr_number pr_url
+epic server-stamped: created_at completed_at merged_at queued_at design_started_at land_block_kind land_block_reason land_block_files trunk_fast_forwarded_at trunk_conflict_backup trunk_conflict_files evolved_at evolve_skipped evolve_ticket lines_added lines_removed total_tokens actual_cost had_codex friction pr_number pr_url archived_at archived_workspace branch_name
 sections: ## Paused | ## Needs Answer | ## Needs Repair

@@ -389,6 +389,51 @@ func TestLoad_PRFields(t *testing.T) {
 	}
 }
 
+func TestLoad_ArchiveAndBranchFields(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "with", "ticket.md"), "---\nstatus: open\narchived_at: 2026-01-02T03:04:05Z\narchived_workspace: w1\nbranch_name: foo\n---\n# E\n")
+	writeFile(t, filepath.Join(dir, "without", "ticket.md"), "---\nstatus: open\n---\n# E\n")
+
+	epics, err := Load(dir)
+	if err != nil || len(epics) != 2 {
+		t.Fatalf("Load = %v, %v", epics, err)
+	}
+	for _, e := range epics {
+		want := Epic{}
+		if e.Name == "with" {
+			want.ArchivedAt = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+			want.ArchivedWorkspace, want.BranchName = "w1", "foo"
+		}
+		if !e.ArchivedAt.Equal(want.ArchivedAt) || e.ArchivedWorkspace != want.ArchivedWorkspace || e.BranchName != want.BranchName {
+			t.Errorf("%s: got %v %q %q", e.Name, e.ArchivedAt, e.ArchivedWorkspace, e.BranchName)
+		}
+	}
+}
+
+func TestBranchHelpers(t *testing.T) {
+	tests := []struct {
+		name               string
+		design             Epic
+		branch, impl, dsgn string
+	}{
+		{"unrenamed", Epic{Name: "foo"}, "foo", "foo-impl", "foo-design"},
+		{"renamed", Epic{Name: "foo-2", BranchName: "foo"}, "foo", "foo-impl", "foo-design"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.design.Branch(); got != tt.branch {
+				t.Errorf("Branch = %q, want %q", got, tt.branch)
+			}
+			if got := ImplBranch(tt.design); got != tt.impl {
+				t.Errorf("ImplBranch = %q, want %q", got, tt.impl)
+			}
+			if got := DesignBranch(tt.design); got != tt.dsgn {
+				t.Errorf("DesignBranch = %q, want %q", got, tt.dsgn)
+			}
+		})
+	}
+}
+
 func TestLoad_MergedAtRoundTrips(t *testing.T) {
 	dir := t.TempDir()
 	epicPath := filepath.Join(dir, "e")
