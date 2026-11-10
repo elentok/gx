@@ -22,14 +22,38 @@ const ViteStubPage = "vite-stub"
 // and Start serves ViteStubPage on the claimed port. It holds readiness until
 // Release, so a test can observe the starting state.
 type FakeVite struct {
-	mu       sync.Mutex
-	installs int
-	starts   int
-	running  int
-	ports    []int
-	dirs     []string
-	ready    chan struct{}
-	once     sync.Once
+	mu        sync.Mutex
+	installs  int
+	starts    int
+	running   int
+	ports     []int
+	dirs      []string
+	procs     []*fakeViteProc
+	noModules bool
+	installE  error
+	startE    error
+	ready     chan struct{}
+	once      sync.Once
+}
+
+// FailInstall makes every Install return err (nil clears it).
+func (f *FakeVite) FailInstall(err error) { f.mu.Lock(); f.installE = err; f.mu.Unlock() }
+
+// FailStart makes every Start return err (nil clears it).
+func (f *FakeVite) FailStart(err error) { f.mu.Lock(); f.startE = err; f.mu.Unlock() }
+
+// NoNodeModules makes Install succeed without creating node_modules.
+func (f *FakeVite) NoNodeModules() { f.mu.Lock(); f.noModules = true; f.mu.Unlock() }
+
+// Crash ends every running fake the way a Vite crash would: Wait returns
+// without anyone calling Stop.
+func (f *FakeVite) Crash() {
+	f.mu.Lock()
+	procs := append([]*fakeViteProc(nil), f.procs...)
+	f.mu.Unlock()
+	for _, p := range procs {
+		p.Stop()
+	}
 }
 
 // NewFakeVite returns a fake that is not ready yet.
@@ -80,14 +104,26 @@ func (f *FakeVite) FreePort() (int, error) {
 	return ln.Addr().(*net.TCPAddr).Port, nil
 }
 
-func (f *FakeVite) Install(_ context.Context, webuiDir string, _ io.Writer) error {
+func (f *FakeVite) Install(_ context.Context, webuiDir string, out io.Writer) error {
 	f.mu.Lock()
 	f.installs++
+	err, skip := f.installE, f.noModules
 	f.mu.Unlock()
+	_, _ = io.WriteString(out, "fake install output\n")
+	if err != nil || skip {
+		return err
+	}
 	return os.MkdirAll(filepath.Join(webuiDir, "node_modules"), 0o755)
 }
 
-func (f *FakeVite) Start(_ context.Context, webuiDir string, port int, _ io.Writer) (devvite.Process, error) {
+func (f *FakeVite) Start(_ context.Context, webuiDir string, port int, out io.Writer) (devvite.Process, error) {
+	f.mu.Lock()
+	failure := f.startE
+	f.mu.Unlock()
+	if failure != nil {
+		return nil, failure
+	}
+	_, _ = io.WriteString(out, "fake vite output\n")
 	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
 	if err != nil {
 		return nil, err
@@ -102,6 +138,7 @@ func (f *FakeVite) Start(_ context.Context, webuiDir string, port int, _ io.Writ
 	f.running++
 	f.ports = append(f.ports, port)
 	f.dirs = append(f.dirs, webuiDir)
+	f.procs = append(f.procs, p)
 	f.mu.Unlock()
 	return p, nil
 }

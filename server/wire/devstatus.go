@@ -11,6 +11,16 @@ const (
 	DevStateDown       DevState = "down"
 )
 
+// ReasonDevNotDown is the refusal reason of a Vite restart while Vite is not down.
+const ReasonDevNotDown = "dev-not-down"
+
+// DevRestartResult is the answer to a Vite restart; a refusal changes nothing.
+type DevRestartResult struct {
+	Refused bool   `json:"refused,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
 // DevStatus is the Dev block of the snapshot.
 type DevStatus struct {
 	State DevState `json:"state"`

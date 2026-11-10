@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/devcheckout"
+	"github.com/elentok/gx/server/devvite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/version"
 )
@@ -26,5 +27,10 @@ func (s *Server) devStatus() wire.DevStatus {
 		}
 	}
 	dev.Reason = strings.Join(reasons, "; ")
+	if s.vite != nil {
+		if snap := s.vite.Snapshot(); snap.State != devvite.StateOff {
+			dev.State, dev.Reason, dev.LogTail = wire.DevState(snap.State), snap.Reason, snap.Logs
+		}
+	}
 	return dev
 }

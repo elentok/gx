@@ -1,11 +1,13 @@
 package server
 
 import (
+	"net/http"
 	"path/filepath"
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/devcheckout"
 	"github.com/elentok/gx/server/devvite"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/version"
 )
 
@@ -44,6 +46,20 @@ func (s *Server) applyDevMode(next Settings) {
 		s.web.UseBuiltUI()
 	}
 	s.vite.Set(on, root)
+}
+
+// devRoutes is the Vite restart, which only the web UI offers (ADR 0028).
+func (s *Server) devRoutes() []wire.Route {
+	return []wire.Route{{Pattern: "POST /v1/dev/restart", Web: wire.WebWrite, WebHandler: s.devRestart}}
+}
+
+func (s *Server) devRestart(w http.ResponseWriter, _ *http.Request) {
+	if err := s.vite.Restart(); err != nil {
+		wire.WriteJSON(w, wire.DevRestartResult{Refused: true, Reason: wire.ReasonDevNotDown,
+			Message: "Vite can only be restarted while it is down"})
+		return
+	}
+	wire.WriteJSON(w, wire.DevRestartResult{})
 }
 
 func (h reloadHost) ApplyDevMode(_, next Settings) { h.s.applyDevMode(next) }
