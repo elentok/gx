@@ -41,7 +41,7 @@ export const sheetCardsOf = (card: QuestionCard | undefined): SessionRoundCard[]
     kind: q.kind,
     yes: q.yes,
     no: q.no,
-    options: q.options?.map((o) => ({ id: o.id, label: o.label, consequence: o.consequence })),
+    options: q.options?.map((o) => ({ id: o.id, label: o.label, consequence: o.consequence, text: o.text })),
     recommended: q.recommended,
     links: q.links,
     note: q.note,

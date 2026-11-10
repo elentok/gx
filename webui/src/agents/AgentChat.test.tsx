@@ -4,7 +4,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { PostAnswer } from "../design/prompt";
-import type { SessionChatResponse, SessionFailure, SessionInfo, SessionResult } from "../generated/server";
+import type { QuestionCard, SessionChatResponse, SessionFailure, SessionInfo, SessionResult } from "../generated/server";
 import { roundCards } from "../design/roundFixture";
 import { renderThemed } from "../ui/render";
 import { AgentChat } from "./AgentChat";
@@ -121,6 +121,105 @@ test("a new card id drops the draft", async () => {
   view.rerender(chat({ questions: roundCards(round("Another way?")) }));
   await screen.findByText("Another way?");
   expect(submitButton().disabled).toBe(true);
+});
+
+const sourceCard = (source: string, over: Partial<QuestionCard> = {}, text = false): QuestionCard => ({
+  source,
+  id: `${source}-1`,
+  questions: [
+    {
+      kind: "options",
+      title: "Pick one?",
+      body: "The plan text",
+      options: [
+        { id: "1", label: "Alpha" },
+        ...(text ? [{ id: "other", label: "Other", text: true }] : []),
+      ],
+    },
+  ],
+  ...over,
+});
+
+const buttonNames = () => Array.from(document.querySelectorAll("button")).map((b) => b.textContent ?? "");
+const has = (name: string) => buttonNames().includes(name);
+
+test.each([
+  ["a hook dialog", sourceCard("claude-dialog"), { release: true, dismiss: true, note: true }],
+  ["a keystroke-fallback dialog", sourceCard("claude-dialog", { fallback: true }), { release: false, dismiss: true, note: false }],
+  ["a permission card", sourceCard("permission"), { release: false, dismiss: true, note: false }],
+  ["a Codex question", sourceCard("codex-question"), { release: false, dismiss: false, note: true }],
+])("%s shows exactly its actions", async (_name, card, want) => {
+  render(session(), chat({ questions: [card] }));
+  await screen.findByText(/Pick one\?/);
+  expect(has("Answer in the terminal")).toBe(want.release);
+  expect(has("Dismiss")).toBe(want.dismiss);
+  expect(!!screen.queryByRole("button", { name: /^Note on question/ })).toBe(want.note);
+});
+
+test("Dismiss posts an answer with no pick", async () => {
+  const post = vi.fn(async () => ({ refused: false }) as SessionResult);
+  const refetch = vi.fn();
+  render(session(), chat({ questions: [sourceCard("permission")] }), post, refetch);
+  await screen.findByText(/Pick one\?/);
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({ source: "permission", card_id: "permission-1", answers: [] }));
+  expect(refetch).toHaveBeenCalled();
+});
+
+test("Answer in the terminal posts a release", async () => {
+  const post = vi.fn(async () => ({ refused: false }) as SessionResult);
+  render(session(), chat({ questions: [sourceCard("claude-dialog")] }), post);
+  await screen.findByText(/Pick one\?/);
+  fireEvent.click(screen.getByRole("button", { name: "Answer in the terminal" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({ source: "claude-dialog", release: true }));
+});
+
+test("a plan card shows its plan text and a text row that needs text", async () => {
+  render(session(), chat({ questions: [sourceCard("permission", {}, true)] }));
+  expect(await screen.findByText("The plan text")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Other/ }));
+  expect(submitButton().disabled).toBe(true);
+  fireEvent.change(screen.getByRole("textbox", { name: /Other/ }), { target: { value: "change it" } });
+  expect(submitButton().disabled).toBe(false);
+});
+
+test("a Codex answer that stopped part way disables Submit and points to Screen", async () => {
+  const post = vi.fn(async () => ({ refused: true, reason: "codex-stopped", message: "x" }) as SessionResult);
+  render(session({ harness: "codex" }), chat({ questions: [sourceCard("codex-question")] }), post);
+  await screen.findByText(/Pick one\?/);
+  fireEvent.click(screen.getByRole("button", { name: /Alpha/ }));
+  fireEvent.click(submitButton());
+  expect((await screen.findByRole("alert")).textContent).toMatch(/Screen/);
+  expect(submitButton().disabled).toBe(true);
+});
+
+test("a Codex card shown before the overlay exists says to retry and keeps Submit", async () => {
+  const post = vi.fn(async () => ({ refused: true, reason: "codex-not-ready", message: "x" }) as SessionResult);
+  render(session({ harness: "codex" }), chat({ questions: [sourceCard("codex-question")] }), post);
+  await screen.findByText(/Pick one\?/);
+  fireEvent.click(screen.getByRole("button", { name: /Alpha/ }));
+  fireEvent.click(submitButton());
+  expect((await screen.findByRole("alert")).textContent).toMatch(/not ready.*Retry/);
+  expect(submitButton().disabled).toBe(false);
+});
+
+test("a keystroke-fallback refusal shows the server's text", async () => {
+  const post = vi.fn(async () => ({ refused: true, reason: "bad-request", message: "the dialog on screen changed" }) as SessionResult);
+  render(session(), chat({ questions: [sourceCard("claude-dialog", { fallback: true })] }), post);
+  await screen.findByText(/Pick one\?/);
+  fireEvent.click(screen.getByRole("button", { name: /Alpha/ }));
+  fireEvent.click(submitButton());
+  expect((await screen.findByRole("alert")).textContent).toBe("the dialog on screen changed");
+});
+
+test("a card the next read no longer lists disappears", async () => {
+  const view = render(session(), chat({ questions: [sourceCard("claude-dialog")] }));
+  await screen.findByText(/Pick one\?/);
+  view.rerender(chat({ questions: [] }));
+  expect(screen.queryByText(/Pick one\?/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
 });
 
 test("the banner still shows with a card visible", async () => {

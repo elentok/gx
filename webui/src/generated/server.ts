@@ -2695,14 +2695,15 @@ export interface SessionHuh {
  * Refusal reasons of POST /v1/sessions/answer, beside ReasonStale.
  */
 export const ReasonAnswerSourceNotSupported = "source-not-supported";
+export const ReasonCodexNotReady = "codex-not-ready";
+export const ReasonCodexMismatch = "codex-mismatch";
+export const ReasonCodexStopped = "codex-stopped";
 /**
  * Refusal reasons of an answer to a codex-question card. NotReady and Mismatch
  * sent no key, so the card keeps its retry; Stopped sent some, so the card
  * disables Submit for that call and points to Screen.
  */
-export const ReasonCodexNotReady = "codex-not-ready";
-export const ReasonCodexMismatch = "codex-mismatch";
-export const ReasonCodexStopped = "codex-stopped";
+export type ReasonCodex = typeof ReasonCodexNotReady | typeof ReasonCodexMismatch | typeof ReasonCodexStopped;
 /**
  * SessionAnswerRequest is the body of POST /v1/sessions/answer: the answer to
  * one Question card, named by its source and id. Answers line up with the
@@ -2718,13 +2719,19 @@ export interface SessionAnswerRequest {
   note?: string;
   images?: string[];
   last_message?: string;
+  /**
+   * Release hands a claude-dialog card back to Claude's terminal dialog.
+   */
+  release?: boolean;
 }
 /**
  * SessionAnswer is the answer to one question of a card: the picked option id
- * (or "yes"/"no"), typed text, a per-question note, or the Huh? mark.
+ * (or "yes"/"no"), typed text, a per-question note, or the Huh? mark. Choices
+ * are the picked option ids of a multi-select question.
  */
 export interface SessionAnswer {
   choice?: string;
+  choices?: string[];
   text?: string;
   note?: string;
   huh?: boolean;
@@ -2736,6 +2743,10 @@ export interface SessionRoundOption {
   id: string;
   label: string;
   consequence?: string;
+  /**
+   * Text marks a row the person types into; only a card's options set it.
+   */
+  text?: boolean;
 }
 /**
  * SessionRoundCard is one question of a Grilling round. Kind is yes-no,
@@ -2800,6 +2811,11 @@ export interface QuestionCard {
   source: string;
   id: string;
   questions: QuestionCardQuestion[];
+  /**
+   * Fallback marks a claude-dialog card read off the screen: it has no hook to
+   * release and takes no note.
+   */
+  fallback?: boolean;
 }
 /**
  * SessionNext is the Actionable a gx-design run-end line raises.

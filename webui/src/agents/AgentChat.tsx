@@ -6,7 +6,17 @@ import { FailureBanner, visibleFailure } from "../design/FailureBanner";
 import { postAnswer, type PostAnswer } from "../design/prompt";
 import { QuestionSheet } from "../design/QuestionSheet";
 import { useRoundDraft } from "../design/roundDraft";
-import type { QuestionCard, SessionChatResponse, SessionInfo } from "../generated/server";
+import {
+  CardSourceClaudeDialog,
+  CardSourceCodex,
+  CardSourcePermission,
+  ReasonCodexNotReady,
+  ReasonCodexStopped,
+  type QuestionCard,
+  type SessionAnswer,
+  type SessionChatResponse,
+  type SessionInfo,
+} from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
 import { allAnswered } from "../ui/question-sheet/round";
@@ -28,11 +38,17 @@ function CardSheet({
   const { draft, setAnswers, setIndex, clear } = useRoundDraft(session.id, card.id);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  // Codex typed some keys and stopped: another Submit would type the rest on top of them.
+  const [stopped, setStopped] = useState(false);
   const cards = sheetCardsOf(card);
   const ready = allAnswered(cards, draft.answers);
+  const claude = card.source === CardSourceClaudeDialog;
+  const hook = claude && !card.fallback;
+  const dismissable = claude || card.source === CardSourcePermission;
+  const notes = hook || card.source === CardSourceCodex;
 
-  const submit = async () => {
-    if (!ready || pending) return;
+  const send = async (answers: SessionAnswer[], release?: boolean) => {
+    if (pending) return;
     setPending(true);
     setError("");
     try {
@@ -40,11 +56,16 @@ function CardSheet({
         id: session.id,
         source: card.source,
         card_id: card.id,
-        answers: cards.map((c) => draft.answers[c.label] ?? {}),
+        answers,
+        release,
         last_message: lastMessage,
       });
       if (res.refused) {
-        setError(res.message ?? "The answer was refused.");
+        if (res.reason === ReasonCodexNotReady) setError("Codex is not ready for the answer yet. Retry in a moment.");
+        else if (res.reason === ReasonCodexStopped) {
+          setStopped(true);
+          setError("Codex took part of the answer and stopped. Open Screen to finish it.");
+        } else setError(res.message ?? "The answer was refused.");
         if (res.reason === ReasonStale) refetch();
       } else {
         clear();
@@ -59,11 +80,23 @@ function CardSheet({
 
   return (
     <Box display="flex" flexDirection="column" gap="2" maxH="50dvh" minH="0" flex="none">
-      <QuestionSheet round={cards} answers={draft.answers} onAnswers={setAnswers} initialIndex={draft.index} onIndex={setIndex} />
+      <QuestionSheet round={cards} answers={draft.answers} onAnswers={setAnswers} initialIndex={draft.index} onIndex={setIndex} notes={notes} />
       {error && <Text role="alert">{error}</Text>}
-      <Button emphasis="main" alignSelf="flex-end" disabled={!ready || pending} onClick={submit}>
-        Submit
-      </Button>
+      <Box display="flex" gap="2" justifyContent="flex-end" flexWrap="wrap">
+        {hook && (
+          <Button emphasis="ghost" tone="muted" disabled={pending} onClick={() => send([], true)}>
+            Answer in the terminal
+          </Button>
+        )}
+        {dismissable && (
+          <Button emphasis="ghost" tone="muted" disabled={pending} onClick={() => send([])}>
+            Dismiss
+          </Button>
+        )}
+        <Button emphasis="main" disabled={!ready || pending || stopped} onClick={() => ready && send(cards.map((c) => draft.answers[c.label] ?? {}))}>
+          Submit
+        </Button>
+      </Box>
     </Box>
   );
 }

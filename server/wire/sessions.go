@@ -340,6 +340,8 @@ type SessionRoundOption struct {
 	ID          string `json:"id"`
 	Label       string `json:"label"`
 	Consequence string `json:"consequence,omitempty"`
+	// Text marks a row the person types into; only a card's options set it.
+	Text bool `json:"text,omitempty"`
 }
 
 // SessionRoundCard is one question of a Grilling round. Kind is yes-no,
@@ -398,6 +400,9 @@ type QuestionCard struct {
 	Source    string                 `json:"source"`
 	ID        string                 `json:"id"`
 	Questions []QuestionCardQuestion `json:"questions"`
+	// Fallback marks a claude-dialog card read off the screen: it has no hook to
+	// release and takes no note.
+	Fallback bool `json:"fallback,omitempty"`
 }
 
 // SessionNext is the Actionable a gx-design run-end line raises.

@@ -16,6 +16,7 @@ export function QuestionSheet({
   initialIndex = 0,
   onIndex,
   questions = false,
+  notes = true,
 }: {
   round: (SessionRoundCard & { context?: string; contextHref?: string })[];
   answers: Answers;
@@ -27,6 +28,8 @@ export function QuestionSheet({
   onIndex?: (index: number) => void;
   /** The Questions view: the sheet fills its column, renders big and cannot fold. The page owns it. */
   questions?: boolean;
+  /** False for cards that take no note: a screen-read dialog, a permission or plan card. */
+  notes?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -184,6 +187,7 @@ export function QuestionSheet({
               >
                 <Question
                   big={questions}
+                  notes={notes}
                   card={c}
                   answer={answers[c.label] ?? {}}
                   onChange={(a) =>

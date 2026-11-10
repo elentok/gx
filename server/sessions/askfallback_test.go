@@ -52,7 +52,7 @@ func TestAskFallback_InputNeededListsACardWithNoNote(t *testing.T) {
 	f := startAskFixture(t, nil)
 	f.block(t, "input needed", agentfake.AskDialogRows("Which color?", "red", "blue"))
 	card := f.waitCard(t)
-	if card.Source != wire.CardSourceClaudeDialog || len(card.Questions) != 1 {
+	if card.Source != wire.CardSourceClaudeDialog || !card.Fallback || len(card.Questions) != 1 {
 		t.Fatalf("card = %+v", card)
 	}
 	q := card.Questions[0]

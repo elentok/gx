@@ -105,5 +105,6 @@ func ClaudeFallbackCard(d claudeui.AskDialog, turn int) []wire.QuestionCard {
 		Source:    wire.CardSourceClaudeDialog,
 		ID:        fmt.Sprintf("%s-%d-%s", d.ID, turn, hex.EncodeToString(sum[:6])),
 		Questions: []wire.QuestionCardQuestion{q},
+		Fallback:  true,
 	}}
 }
