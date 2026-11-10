@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -135,28 +134,20 @@ func runSkillsList(d Deps, out io.Writer) error {
 		fmt.Fprintf(out, "%s: %s, roots %s\n", what, m.Mode, strings.Join(m.AgentRoots, ", "))
 	}
 
-	var sources []skills.Manifest
-	if d.ManifestDir != nil {
-		manifestDir, err := d.ManifestDir()
-		if err != nil {
-			return err
-		}
-		paths, _ := filepath.Glob(filepath.Join(manifestDir, "*.json"))
-		for _, path := range paths {
-			if sm, err := skills.Load(path); err == nil {
-				if _, ok := skills.ThirdPartyRoot(sm); ok {
-					sources = append(sources, sm)
-				}
-			}
-		}
+	sources, err := loadSources(d)
+	if err != nil {
+		return err
 	}
-	if len(sources) == 0 {
+	listed := 0
+	for _, s := range sources {
+		if s.err != nil {
+			continue
+		}
+		listed++
+		fmt.Fprintf(out, "source %s: %s, roots %s, %d skills\n", s.real, s.manifest.Mode, strings.Join(s.manifest.AgentRoots, ", "), skillCount(s.manifest))
+	}
+	if listed == 0 {
 		fmt.Fprintln(out, "no skill sources installed")
-		return nil
-	}
-	for _, sm := range sources {
-		root, _ := skills.ThirdPartyRoot(sm)
-		fmt.Fprintf(out, "source %s: %s, roots %s, %d skills\n", root, sm.Mode, strings.Join(sm.AgentRoots, ", "), skillCount(sm))
 	}
 	return nil
 }
@@ -188,24 +179,20 @@ is linked into both agent roots (or copied with --copy).`,
 			if forceAll {
 				policy = skills.ForceAll()
 			}
-			install := runSkillsInstall
-			if dev {
-				install = runSkillsInstallDev
+			if len(args) == 1 && dev {
+				return errors.New("--dev cannot be used with a source folder")
 			}
-			if len(args) == 1 {
-				if dev {
-					return errors.New("--dev cannot be used with a source folder")
-				}
-				install = func(d Deps, p skills.ForcePolicy, out io.Writer) error {
-					return runSkillsInstallSource(d, args[0], copyFiles, p, out)
-				}
-			} else if copyFiles {
+			if len(args) == 0 && copyFiles {
 				return errors.New("--copy needs a source folder <dir>")
 			}
-			if len(args) == 0 && !dev {
+			switch {
+			case len(args) == 1:
+				return runSkillsInstallSource(d, args[0], copyFiles, policy, c.OutOrStdout())
+			case dev:
+				return runSkillsInstallDev(d, policy, c.OutOrStdout())
+			default:
 				return runSkillsInstallAll(d, policy, c.OutOrStdout())
 			}
-			return install(d, policy, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringSliceVar(&force, "force", nil,
@@ -388,12 +375,16 @@ func installSkills(d Deps, force skills.ForcePolicy, out io.Writer, source strin
 	if installErr == nil {
 		warnCodexHomeDuplicates(d, out, sources)
 	}
+	return withForceHint(installErr)
+}
 
+// withForceHint turns a conflict into an actionable error message.
+func withForceHint(err error) error {
 	var conflictErr *skills.ConflictError
-	if errors.As(installErr, &conflictErr) {
-		return fmt.Errorf("%w; rerun with --force <path> for each conflicted path, or --force-all to override every conflict", installErr)
+	if errors.As(err, &conflictErr) {
+		return fmt.Errorf("%w; rerun with --force <path> for each conflicted path, or --force-all to override every conflict", err)
 	}
-	return installErr
+	return err
 }
 
 // installSkillTargets runs a single skill install and returns its per-target
@@ -403,11 +394,22 @@ func installSkillTargets(d Deps, force skills.ForcePolicy, source string, source
 	if err != nil {
 		return nil, err
 	}
-	return installTargetsAt(d, manifestPath, force, source, sources, mode, false, false)
+	return installTargetsAt(d, installOptions{manifestPath: manifestPath, source: source, files: sources, mode: mode, force: force})
+}
+
+// installOptions describes one install into the agent roots.
+type installOptions struct {
+	manifestPath string
+	source       string
+	files        []skills.SourceFile
+	mode         skills.InstallMode
+	force        skills.ForcePolicy
+	linkedMarker bool
+	switchMode   bool
 }
 
 // installTargetsAt is installSkillTargets for an explicit manifest path.
-func installTargetsAt(d Deps, manifestPath string, force skills.ForcePolicy, source string, sources []skills.SourceFile, mode skills.InstallMode, linkedMarker, switchMode bool) ([]skills.Target, error) {
+func installTargetsAt(d Deps, o installOptions) ([]skills.Target, error) {
 	roots, err := d.AgentRoots()
 	if err != nil {
 		return nil, err
@@ -419,107 +421,18 @@ func installTargetsAt(d Deps, manifestPath string, force skills.ForcePolicy, sou
 			return nil, err
 		}
 	}
-	return skills.Install(manifestPath, skills.InstallRequest{
-		ProtectedSources: protectedSourceDirs(d, source),
+	return skills.Install(o.manifestPath, skills.InstallRequest{
+		ProtectedSources: protectedSourceDirs(d, o.source),
 		BackupDir:        backupDir,
-		Source:           source,
+		Source:           o.source,
 		AgentRoots:       roots,
-		Files:            sources,
-		Force:            force,
-		Mode:             mode,
-		SwitchMode:       switchMode,
+		Files:            o.files,
+		Force:            o.force,
+		Mode:             o.mode,
+		SwitchMode:       o.switchMode,
 
-		AllowLinkedMarker: linkedMarker,
+		AllowLinkedMarker: o.linkedMarker,
 	})
-}
-
-// protectedSourceDirs lists every remembered Skill source folder plus the one
-// being installed, which no agent root may resolve into.
-func protectedSourceDirs(d Deps, source string) []string {
-	var dirs []string
-	if real, ok := skills.ThirdPartyRoot(skills.Manifest{Source: source}); ok {
-		dirs = append(dirs, real)
-	}
-	if d.ManifestDir == nil {
-		return dirs
-	}
-	manifestDir, err := d.ManifestDir()
-	if err != nil {
-		return dirs
-	}
-	paths, _ := filepath.Glob(filepath.Join(manifestDir, "*.json"))
-	for _, path := range paths {
-		if m, err := skills.Load(path); err == nil {
-			if real, ok := skills.ThirdPartyRoot(m); ok {
-				dirs = append(dirs, real)
-			}
-		}
-	}
-	return dirs
-}
-
-// runSkillsInstallSource installs the skills of the Skill source dir: one
-// directory link per skill into every root, or managed copies with copyFiles.
-func runSkillsInstallSource(d Deps, dir string, copyFiles bool, force skills.ForcePolicy, out io.Writer) error {
-	if d.ManifestDir == nil {
-		return errors.New("skill sources are not configured")
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return err
-	}
-	real, err := filepath.EvalSymlinks(abs)
-	if err != nil {
-		return fmt.Errorf("skill source %s: %w", dir, err)
-	}
-	if info, err := os.Stat(real); err != nil || !info.IsDir() {
-		return fmt.Errorf("skill source %s is not a folder", dir)
-	}
-	// Link targets stay inside the path the user gave, not the resolved one.
-	names, err := skills.ScanSource(abs)
-	if err != nil {
-		return err
-	}
-	if len(names) == 0 {
-		fmt.Fprintf(out, "no skills found in %s\n", dir)
-		return nil
-	}
-	manifestDir, err := d.ManifestDir()
-	if err != nil {
-		return err
-	}
-	manifestPath := filepath.Join(manifestDir, skills.SourceID(real)+".json")
-	syncErr := syncSourceDir(d, manifestPath, abs, real, names, copyFiles, true, force, out)
-	var clash *clashError
-	if syncErr != nil && !errors.As(syncErr, &clash) {
-		return syncErr
-	}
-	// A source remembered earlier still holds the clashing names; resync it so
-	// it drops them too, whatever order the sources were installed in.
-	problems := dedupe(clashProblems(syncErr))
-	for _, other := range clashingSources(d, real, names) {
-		if p := syncSource(d, other.manifestPath, other.manifest, other.real, force, out); p != "" {
-			problems = dedupe(append(problems, p))
-		}
-	}
-	if len(problems) > 0 {
-		return errors.New(strings.Join(problems, "\n"))
-	}
-	return nil
-}
-
-// clashError carries the name clashes of a source install that otherwise
-// succeeded: the clashing names were skipped, everything else installed.
-type clashError struct{ problems []string }
-
-func (e *clashError) Error() string { return strings.Join(e.problems, "; ") }
-
-func clashProblems(err error) []string {
-	var clash *clashError
-	if errors.As(err, &clash) {
-		return clash.problems
-	}
-	return nil
 }
 
 // dedupe drops repeated problems, keeping first-seen order. Both sides of a
@@ -534,162 +447,6 @@ func dedupe(problems []string) []string {
 		}
 	}
 	return kept
-}
-
-// rememberedSource is another remembered Skill source and the skill names it
-// currently has.
-type rememberedSource struct {
-	manifestPath string
-	manifest     skills.Manifest
-	real, abs    string
-	names        []string
-}
-
-// otherSources lists every remembered Skill source except the one at real that
-// still exists and can be scanned.
-func otherSources(d Deps, real string) []rememberedSource {
-	if d.ManifestDir == nil {
-		return nil
-	}
-	manifestDir, err := d.ManifestDir()
-	if err != nil {
-		return nil
-	}
-	paths, _ := filepath.Glob(filepath.Join(manifestDir, "*.json"))
-	var others []rememberedSource
-	for _, path := range paths {
-		m, err := skills.Load(path)
-		if err != nil {
-			continue
-		}
-		other, ok := skills.ThirdPartyRoot(m)
-		if !ok || other == real {
-			continue
-		}
-		if info, err := os.Stat(other); err != nil || !info.IsDir() {
-			continue
-		}
-		abs := recordedAbs(m, other)
-		names, err := skills.ScanSource(abs)
-		if err != nil {
-			continue
-		}
-		others = append(others, rememberedSource{path, m, other, abs, names})
-	}
-	return others
-}
-
-// recordedAbs recovers the folder path the person gave for a source, which may
-// differ from its resolved path, from the links gx recorded.
-func recordedAbs(m skills.Manifest, real string) string {
-	for _, f := range m.Files {
-		if f.Kind == skills.KindDirectoryLink && f.LinkTarget != "" {
-			return filepath.Dir(f.LinkTarget)
-		}
-	}
-	return real
-}
-
-// sourceClashes returns the name clashes between the source at real, with the
-// given names, and every other remembered source: name -> sorted real paths.
-func sourceClashes(d Deps, real string, names []string) (map[string][]string, []rememberedSource) {
-	others := otherSources(d, real)
-	all := map[string][]string{real: names}
-	for _, o := range others {
-		all[o.real] = o.names
-	}
-	return skills.SourceClashes(all), others
-}
-
-// clashingSources lists the other remembered sources that share a skill name
-// with the source at real.
-func clashingSources(d Deps, real string, names []string) []rememberedSource {
-	clashes, others := sourceClashes(d, real, names)
-	var out []rememberedSource
-	for _, o := range others {
-		for _, name := range o.names {
-			if slices.Contains(clashes[name], real) {
-				out = append(out, o)
-				break
-			}
-		}
-	}
-	return out
-}
-
-// syncSourceDir installs the named skills of the source abs (real is its
-// resolved path) into every root, minus the names another source also has: a
-// clash is skipped in both sources and returned as a clashError after the rest
-// installed. A source that lost all its skills passes no names, which removes
-// its links. Only an explicit install passes switchMode: a re-sync keeps the
-// recorded mode.
-func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyFiles, switchMode bool, force skills.ForcePolicy, out io.Writer) error {
-	dir := abs
-	clashes, _ := sourceClashes(d, real, names)
-	owned, owner, err := bundleOwner(d)
-	if err != nil {
-		return err
-	}
-	var problems []string
-	kept := names[:0:0]
-	for _, name := range names {
-		if owned[name] {
-			problems = append(problems, fmt.Sprintf("skill name %q is owned by %s and by source %s; the source's copy was skipped, delete the old copy from %s", name, owner, real, real))
-			continue
-		}
-		holders := clashes[name]
-		if len(holders) == 0 {
-			kept = append(kept, name)
-			continue
-		}
-		problems = append(problems, fmt.Sprintf("skill name %q is shared by %s, skipped in every one", name, strings.Join(holders, " and ")))
-	}
-	names = kept
-	files, err := skills.SourceSkillFiles(abs, names, copyFiles)
-	if err != nil {
-		return err
-	}
-	mode := skills.ModeSymlink
-	if copyFiles {
-		mode = skills.ModeManagedCopy
-	}
-	_, statErr := os.Stat(manifestPath)
-	firstInstall := os.IsNotExist(statErr)
-	targets, installErr := installTargetsAt(d, manifestPath, force, skills.ThirdPartySourcePrefix+real, files, mode, true, switchMode)
-	printTargetReport(out, targets, installErr == nil)
-	if firstInstall && installErr == nil {
-		if err := removeDanglingLinks(d, abs); err != nil {
-			return err
-		}
-	}
-	var conflictErr *skills.ConflictError
-	if errors.As(installErr, &conflictErr) {
-		return fmt.Errorf("%w; rerun with --force <path> for each conflicted path, or --force-all to override every conflict", installErr)
-	}
-	if installErr != nil {
-		return installErr
-	}
-	fmt.Fprintf(out, "%d skills from %s: %s\n", len(names), dir, summarizeTargets(targets))
-	warnCodexHomeDuplicates(d, out, files)
-	if len(problems) > 0 {
-		return &clashError{problems}
-	}
-	return nil
-}
-
-// removeDanglingLinks clears leftover links into a source for skills deleted
-// from it, in every agent root.
-func removeDanglingLinks(d Deps, source string) error {
-	roots, err := d.AgentRoots()
-	if err != nil {
-		return err
-	}
-	for _, root := range roots {
-		if _, err := skills.RemoveDanglingLinksInto(root, source); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // Refresh reinstalls gx's skill bundle the way it was last installed:
@@ -714,58 +471,6 @@ func Refresh(d Deps, out io.Writer) {
 
 func joinProblems(problems []string) string {
 	return strings.Join(dedupe(problems), "; ")
-}
-
-// syncSources re-syncs every remembered Skill source in its recorded mode and
-// returns one problem per source that failed or is gone. Each source stands
-// alone: a problem never stops the next one.
-func syncSources(d Deps, force skills.ForcePolicy, out io.Writer) []string {
-	if d.ManifestDir == nil {
-		return nil
-	}
-	manifestDir, err := d.ManifestDir()
-	if err != nil {
-		return []string{err.Error()}
-	}
-	paths, _ := filepath.Glob(filepath.Join(manifestDir, "*.json"))
-	var problems []string
-	for _, path := range paths {
-		m, err := skills.Load(path)
-		if err != nil {
-			problems = append(problems, err.Error())
-			continue
-		}
-		real, ok := skills.ThirdPartyRoot(m)
-		if !ok {
-			continue
-		}
-		if p := syncSource(d, path, m, real, force, out); p != "" {
-			problems = append(problems, p)
-		}
-	}
-	return problems
-}
-
-func syncSource(d Deps, manifestPath string, m skills.Manifest, real string, force skills.ForcePolicy, out io.Writer) string {
-	if info, err := os.Stat(real); err != nil || !info.IsDir() {
-		return fmt.Sprintf("skill source %s is gone, skills left as they are; run `gx skills uninstall %s`", real, real)
-	}
-	// Links point inside the folder path the person gave, which may differ from
-	// its resolved path; recover it from the recorded links.
-	abs := recordedAbs(m, real)
-	names, err := skills.ScanSource(abs)
-	if err != nil {
-		return fmt.Sprintf("skill source %s: %v", real, err)
-	}
-	copyFiles := m.Mode == skills.ModeManagedCopy
-	if err := syncSourceDir(d, manifestPath, abs, real, names, copyFiles, false, force, out); err != nil {
-		var clash *clashError
-		if errors.As(err, &clash) {
-			return strings.Join(clash.problems, "; ")
-		}
-		return fmt.Sprintf("skill source %s: %v", real, err)
-	}
-	return ""
 }
 
 func refreshProblem(d Deps, out io.Writer) string {
@@ -872,50 +577,16 @@ func runSkillsUninstall(d Deps, force []string, out io.Writer) error {
 	return uninstallManifest(d, manifestPath, "gx's skill bundle", force, out)
 }
 
-// runSkillsUninstallSource removes one Skill source's entries and record. The
-// record is keyed by the folder's real path; a folder that is gone cannot be
-// resolved, so its parent is resolved instead, then the path as typed.
-func runSkillsUninstallSource(d Deps, dir string, force []string, out io.Writer) error {
-	if d.ManifestDir == nil {
-		return errors.New("skill sources are not configured")
-	}
-	manifestDir, err := d.ManifestDir()
-	if err != nil {
-		return err
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return err
-	}
-	candidates := []string{abs}
-	if real, err := filepath.EvalSymlinks(abs); err == nil {
-		candidates = []string{real, abs}
-	} else if parent, err := filepath.EvalSymlinks(filepath.Dir(abs)); err == nil {
-		candidates = []string{filepath.Join(parent, filepath.Base(abs)), abs}
-	}
-	manifestPath := filepath.Join(manifestDir, skills.SourceID(candidates[0])+".json")
-	for _, c := range candidates {
-		p := filepath.Join(manifestDir, skills.SourceID(c)+".json")
-		if _, err := os.Stat(p); err == nil {
-			manifestPath = p
-			break
-		}
-	}
-	return uninstallManifest(d, manifestPath, "skill source "+dir, force, out)
-}
-
 func uninstallManifest(d Deps, manifestPath, what string, force []string, out io.Writer) error {
-	var err error
-	forcePolicy := skills.NewForcePolicy(force...)
-
 	backupDir := ""
 	if d.BackupDir != nil {
+		var err error
 		backupDir, err = d.BackupDir()
 		if err != nil {
 			return err
 		}
 	}
-	targets, err := skills.Uninstall(manifestPath, forcePolicy, skills.UninstallOptions{BackupDir: backupDir})
+	targets, err := skills.Uninstall(manifestPath, skills.NewForcePolicy(force...), skills.UninstallOptions{BackupDir: backupDir})
 	if errors.Is(err, skills.ErrNotExist) {
 		fmt.Fprintf(out, "%s is not installed\n", what)
 		return nil
