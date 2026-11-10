@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { DevState, DevStatus } from "../generated/server";
 import { renderThemed } from "../ui/render";
+import { DeviceContext } from "../useWide";
 import { DevPopover } from "./DevPopover";
 
 const showToast = vi.hoisted(() => vi.fn());
@@ -69,6 +70,23 @@ test("a refused write shows the error toast", async () => {
   await waitFor(() => expect(showToast).toHaveBeenCalledWith({ type: "error", title: "no write" }));
   fireEvent.click(screen.getByText("Restart Vite"));
   await waitFor(() => expect(showToast).toHaveBeenCalledWith({ type: "error", title: "Vite is not down." }));
+});
+
+test("on a phone both buttons render and long log lines wrap instead of widening the popover", async () => {
+  const long = "x".repeat(400);
+  renderThemed(
+    <DeviceContext.Provider value="phone">
+      <DevPopover dev={dev("down", { log_tail: [long], checkout: `/${long}` })} />
+    </DeviceContext.Provider>,
+  );
+  fireEvent.click(screen.getByRole("button"));
+  await screen.findByText("Turn off Dev mode");
+  expect(screen.getByText("Restart Vite")).toBeTruthy();
+  const log = getComputedStyle(screen.getByTestId("dev-popover-log"));
+  expect(log.whiteSpace).toBe("pre-wrap");
+  expect(log.wordBreak).toBe("break-all");
+  expect(log.overflow).toBe("hidden");
+  expect(getComputedStyle(screen.getByTestId("dev-popover-path")).wordBreak).toBe("break-all");
 });
 
 test("renders nothing when off", () => {
