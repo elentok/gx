@@ -39,8 +39,6 @@ export interface SelectApi {
   groupState: (group: string) => GroupState;
   selectAll: () => void;
   selectNone: () => void;
-  /** Drops these keys from the selection. */
-  deselect: (keys: string[]) => void;
   /** A row's display name, for tooltips and toasts; the key when unknown. */
   nameOf: (key: string) => string;
   /** Call after an action ran: leaves select mode when nothing is selected any more. */
@@ -53,8 +51,19 @@ export interface SidebarSelect extends SelectApi {
   setSectionOpen: (group: string, open: boolean) => void;
 }
 
-/** The select model over `rows`, with Escape to leave. An unloaded list is not an empty one, so nothing is pruned until `loaded`. */
-export function useSelectApi(rows: SelectRow[], names: Map<string, string>, loaded: boolean): SelectApi {
+const unfocused = (t: EventTarget | null) => t === document.body || t === document.documentElement;
+const inSidebar = (t: EventTarget | null) => t instanceof Element && !!t.closest("aside");
+
+/** Escape belongs to the sidebar when focus is in it or nowhere. */
+const sidebarOwnsKey = (t: EventTarget | null) => unfocused(t) || inSidebar(t);
+/** Escape belongs to a page when focus is in the page, outside the sidebar. */
+export const pageOwnsKey = (t: EventTarget | null) => !unfocused(t) && !inSidebar(t);
+
+/**
+ * The select model over `rows`, with Escape to leave when `ownsKey` accepts the focused element (each area
+ * owns its own Escape). An unloaded list is not an empty one, so nothing is pruned until `loaded`.
+ */
+export function useSelectApi(rows: SelectRow[], names: Map<string, string>, loaded: boolean, ownsKey: (t: EventTarget | null) => boolean = pageOwnsKey): SelectApi {
   const [state, setState] = useState<SelectState>(initialSelect);
   // A row that leaves the list leaves the selection.
   useEffect(() => {
@@ -63,9 +72,11 @@ export function useSelectApi(rows: SelectRow[], names: Map<string, string>, load
 
   const stateRef = useRef(state);
   stateRef.current = state;
+  const ownsKeyRef = useRef(ownsKey);
+  ownsKeyRef.current = ownsKey;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return;
+      if (e.defaultPrevented || !ownsKeyRef.current(e.target)) return;
       if (selectIntent(e, stateRef.current.on, hasLayer() || isTextTarget(e.target)) === "leave") setState(leave);
     };
     document.addEventListener("keydown", onKey);
@@ -83,7 +94,6 @@ export function useSelectApi(rows: SelectRow[], names: Map<string, string>, load
       groupState: (group) => groupState(state, rows, group),
       selectAll: () => setState((s) => selectAll(s, rows)),
       selectNone: () => setState(selectNone),
-      deselect: (keys) => setState((s) => ({ ...s, keys: s.keys.filter((k) => !keys.includes(k)) })),
       nameOf: (key) => names.get(key) ?? key,
       afterRun: () => setState((s) => prune(s, rows, true)),
     }),
@@ -113,8 +123,7 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
     const onKey = (e: KeyboardEvent) => {
       const stop = e.target instanceof Element ? e.target.closest<HTMLElement>(`[${NAV_ATTR}]`) : null;
       // With nothing focused the key lands on the body: `s` then enters the sidebar's select mode.
-      const unfocused = e.target === document.body || e.target === document.documentElement;
-      if (e.defaultPrevented || !(unfocused || stop?.closest("aside"))) return;
+      if (e.defaultPrevented || !sidebarOwnsKey(e.target)) return;
       const { state, rows, enter, toggle } = ref.current;
       const intent = selectIntent(e, state.on, hasLayer() || isTextTarget(e.target));
       if (intent === "enter-select") {
@@ -182,7 +191,7 @@ export function SidebarSelectProvider({ fetcher, active, children }: { fetcher?:
     return out;
   }, [model]);
 
-  const api = useSelectApi(rows, names, !!model);
+  const api = useSelectApi(rows, names, !!model, sidebarOwnsKey);
   const select = useMemo<SidebarSelect>(() => ({ ...api, sectionOpen, setSectionOpen }), [api, sectionOpen, setSectionOpen]);
   useSidebarSelectKeys(select);
 

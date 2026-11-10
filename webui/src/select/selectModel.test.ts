@@ -65,6 +65,13 @@ describe("section checkbox", () => {
     expect(groupState(on("a", "b"), rows, GROUP_ON_HOLD)).toBe("all");
   });
 
+  it("counts rows of a collapsed section, hidden ones included, but not unselectable rows", () => {
+    const hidden = [r("a", { group: GROUP_ON_HOLD, visible: false }), r("b", { group: GROUP_ON_HOLD, visible: false }), r("q", { group: GROUP_ON_HOLD, selectable: false })];
+    expect(groupState(on("a"), hidden, GROUP_ON_HOLD)).toBe("some");
+    expect(groupState(on("a", "b"), hidden, GROUP_ON_HOLD)).toBe("all");
+    expect(toggleGroup(on(), hidden, GROUP_ON_HOLD).keys).toEqual(["a", "b"]);
+  });
+
   it("selects every row of the section, then clears them", () => {
     expect(toggleGroup(on("c", "a"), rows, GROUP_ON_HOLD).keys).toEqual(["c", "a", "b"]);
     expect(toggleGroup(on("c", "a", "b"), rows, GROUP_ON_HOLD).keys).toEqual(["c"]);

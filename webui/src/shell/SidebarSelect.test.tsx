@@ -187,6 +187,43 @@ test("section checkboxes select a whole section and show a mixed state", async (
   expect(count()).toBe("0 selected");
 });
 
+test("a collapsed section's checkbox selects its hidden rows and shows all", async () => {
+  setup();
+  await enterSelect();
+  const section = box("Select all in On hold (2)");
+  fireEvent.click(section);
+  expect(count()).toBe("2 selected");
+  expect(section.checked).toBe(true);
+});
+
+test("Escape with focus outside the sidebar leaves the sidebar mode alone", async () => {
+  setup();
+  await enterSelect();
+  const outside = document.body.appendChild(document.createElement("button"));
+  outside.focus();
+  fireEvent.keyDown(outside, { key: "Escape" });
+  expect(count()).toBe("0 selected");
+  outside.remove();
+});
+
+test("Escape with focus on a sidebar control ends the mode", async () => {
+  setup();
+  await enterSelect();
+  const control = screen.getByRole("button", { name: "Select all" });
+  control.focus();
+  fireEvent.keyDown(control, { key: "Escape" });
+  expect(screen.queryByTestId("select-count")).toBeNull();
+});
+
+test("`s` with focus on a sidebar button that is not a row enters select mode", async () => {
+  setup();
+  await body().findByRole("link", { name: /Blog/ });
+  const btn = document.querySelector<HTMLElement>("aside button:not([data-nav])")!;
+  btn.focus();
+  fireEvent.keyDown(btn, { key: "s" });
+  expect(screen.getByTestId("select-count")).toBeTruthy();
+});
+
 test("Escape ends the mode", async () => {
   setup();
   await enterSelect();

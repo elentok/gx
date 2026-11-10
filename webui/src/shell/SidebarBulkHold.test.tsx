@@ -129,7 +129,8 @@ test("Hold dry-runs, and with no live sessions sends one real call without yes a
   expect(calls[0].body).toEqual({ targets: ["p:blog", "p:shop"], dry_run: true });
   expect(calls[1].body).toEqual({ targets: ["p:blog", "p:shop"] });
   expect(screen.queryByRole("dialog")).toBeNull();
-  await waitFor(() => expect(screen.queryByTestId("select-count")).toBeNull());
+  // Held rows stay in On hold, so they stay selected.
+  expect(screen.getByTestId("select-count").textContent).toBe("2 selected");
 });
 
 test("Hold asks when a dry run lists sessions, and sends the real call with yes only after the confirm", async () => {
@@ -162,7 +163,7 @@ test("Take off hold runs on held rows only, with no question", async () => {
   await waitFor(() => expect(calls).toHaveLength(1));
   expect(calls[0]).toEqual({ route: "unhold", body: { targets: ["p:old"] } });
   expect(screen.queryByRole("dialog")).toBeNull();
-  await waitFor(() => expect(screen.getByTestId("select-count").textContent).toBe("1 selected"));
+  expect(screen.getByTestId("select-count").textContent).toBe("2 selected");
   expect(toast.mock.calls.some(([t]) => /Not run/.test(t.title) && /Blog: not on hold/.test(t.description))).toBe(true);
 });
 
@@ -174,6 +175,6 @@ test("refused rows stay selected and a toast gives each reason", async () => {
   fireEvent.click(bar().getByRole("button", { name: "Hold 2" }));
   await waitFor(() => expect(toast).toHaveBeenCalled());
   expect(toast.mock.calls[0][0]).toMatchObject({ type: "error", title: "Shop: It is queued." });
-  await waitFor(() => expect(screen.getByTestId("select-count").textContent).toBe("1 selected"));
+  expect(screen.getByTestId("select-count").textContent).toBe("2 selected");
   expect(box("Select Shop").checked).toBe(true);
 });

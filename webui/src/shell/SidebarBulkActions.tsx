@@ -56,7 +56,6 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: 
         if (r.status === TargetDone && r.new_address) showToast({ type: "info", title: `${v.action === "unarchive" ? "Unarchived" : "Archived"} as ${r.new_address.split(":").pop()}` });
       }
       onResults?.(results);
-      sel.deselect(results.filter((r) => r.status === TargetDone).map((r) => r.target));
       if (v.fit.skipped.length > 0) showToast({ type: "info", title: "Not run on some rows", description: skipLines(v.fit, sel.nameOf).join("; ") });
       sel.afterRun();
     } catch (err) {

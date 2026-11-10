@@ -130,9 +130,12 @@ export function prune(s: SelectState, rows: SelectRow[], afterRun = false): Sele
 
 export type GroupState = "none" | "some" | "all";
 
-/** The section checkbox: all picked, none, or mixed (some). Rows of the group that are not pickable do not count. */
+/** A section's selectable rows, hidden ones in a collapsed section included. */
+const groupRows = (rows: SelectRow[], group: string) => rows.filter((r) => r.selectable && r.group === group);
+
+/** The section checkbox: all picked, none, or mixed (some). Unselectable rows do not count; collapsed rows do. */
 export function groupState(s: SelectState, rows: SelectRow[], group: string): GroupState {
-  const mine = pickable(rows).filter((r) => r.group === group);
+  const mine = groupRows(rows, group);
   const n = mine.filter((r) => s.keys.includes(r.key)).length;
   if (n === 0) return "none";
   return n === mine.length ? "all" : "some";
@@ -141,7 +144,7 @@ export function groupState(s: SelectState, rows: SelectRow[], group: string): Gr
 /** Clicking a section checkbox selects all its rows, or clears them when all are already picked. */
 export function toggleGroup(s: SelectState, rows: SelectRow[], group: string): SelectState {
   if (!s.on) return s;
-  const mine = pickable(rows).filter((r) => r.group === group).map((r) => r.key);
+  const mine = groupRows(rows, group).map((r) => r.key);
   if (groupState(s, rows, group) === "all") return { ...s, keys: s.keys.filter((k) => !mine.includes(k)) };
   return { ...s, keys: [...s.keys, ...mine.filter((k) => !s.keys.includes(k))] };
 }
