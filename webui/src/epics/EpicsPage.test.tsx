@@ -532,3 +532,77 @@ test("route state focus opens Ready to design and scrolls to the Follow-ups card
   expect(document.querySelector('[data-focus="follow-ups:gx"]')).not.toBeNull();
   expect(screen.getByRole("button", { name: /Ready to design/ }).getAttribute("aria-expanded")).toBe("true");
 });
+
+const actionsBar = () => screen.getByTestId("page-header-actions");
+const startSelect = async (list: EpicList) => {
+  await loaded(list);
+  fireEvent.click(within(actionsBar()).getByRole("button", { name: "Select" }));
+};
+const barButtons = () => within(document.querySelector('[data-part="select-bar"]') as HTMLElement).getAllByRole("button").map((b) => b.textContent ?? "");
+
+test("Select shows a corner checkbox on each loop card and the sticky bar", async () => {
+  await loaded(mixed());
+  expect(screen.queryByTestId("select-count")).toBeNull();
+  expect(screen.queryByRole("checkbox")).toBeNull();
+  fireEvent.click(within(actionsBar()).getByRole("button", { name: "Select" }));
+  expect(screen.getByTestId("select-count").textContent).toBe("0 selected");
+  expect(screen.getByRole("checkbox", { name: "Select need" })).toBeTruthy();
+  expect(within(actionsBar()).queryByRole("button", { name: "Select" })).toBeNull();
+  expect(getComputedStyle(document.querySelector('[data-part="select-bar"]') as HTMLElement).position).toBe("sticky");
+});
+
+test("the bar offers only Move, Hold, Take off hold and Archive, never Stop or Remove", async () => {
+  await startSelect(mixed());
+  fireEvent.click(toggle("Finished"));
+  fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+  const labels = barButtons();
+  expect(labels.some((l) => l.startsWith("Move"))).toBe(true);
+  expect(labels.some((l) => l.startsWith("Hold"))).toBe(true);
+  expect(labels.some((l) => l.startsWith("Archive"))).toBe(true);
+  expect(labels.some((l) => /^(Stop|Remove)/.test(l))).toBe(false);
+});
+
+test("Select all skips cards in a collapsed section", async () => {
+  await startSelect(mixed());
+  fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+  expect(screen.getByTestId("select-count").textContent).toBe("4 selected");
+  fireEvent.click(screen.getByRole("button", { name: "Select none" }));
+  fireEvent.click(toggle("Finished"));
+  fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+  expect(screen.getByTestId("select-count").textContent).toBe("6 selected");
+});
+
+test("the header Archive link has no count and targets the Archive page", async () => {
+  await loaded(mixed());
+  const link = within(actionsBar()).getByRole("link", { name: "Archive" });
+  expect(link.getAttribute("href")).toBe("#/archive");
+  expect(link.textContent).toBe("Archive");
+});
+
+test("leaving the page ends its select mode", async () => {
+  const list = mixed();
+  stubFetch(list);
+  const { router } = renderEpics(async () => list);
+  await filterBox();
+  fireEvent.click(await within(await screen.findByTestId("page-header-actions")).findByRole("button", { name: "Select" }));
+  expect(screen.getByTestId("select-count")).toBeTruthy();
+  await act(() => router.navigate("/stats"));
+  await act(() => router.navigate("/epics"));
+  await filterBox();
+  expect(screen.queryByTestId("select-count")).toBeNull();
+});
+
+test("a card that leaves the list leaves the selection", async () => {
+  let list = listOf([row("a", { section: "implementing" }), row("b", { section: "implementing" })]);
+  const { conn: c, emit } = eventConn();
+  stubFetch(list);
+  renderEpics(async () => list, c);
+  await filterBox();
+  fireEvent.click(await within(await screen.findByTestId("page-header-actions")).findByRole("button", { name: "Select" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Select a" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Select b" }));
+  expect(screen.getByTestId("select-count").textContent).toBe("2 selected");
+  list = listOf([row("b", { section: "implementing" })]);
+  act(() => emit());
+  await waitFor(() => expect(screen.getByTestId("select-count").textContent).toBe("1 selected"));
+});

@@ -12,9 +12,9 @@ import { Modal } from "../ui/modal/Modal";
 import { showToast } from "../ui/toaster";
 import { WriteError } from "../useWrite";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
-import { useSidebarSelect } from "./SidebarSelect";
+import type { SelectApi } from "./SidebarSelect";
 
-const SHOWN: SelectAction[] = ["move", "hold", "unhold", "stop", "remove", "archive"];
+const SIDEBAR_ACTIONS: SelectAction[] = ["move", "hold", "unhold", "stop", "remove", "archive"];
 
 /** What an archive dry run found: the rows that would run and the ones it refused. */
 interface ArchiveConfirm {
@@ -23,9 +23,8 @@ interface ArchiveConfirm {
   refused: TargetResult[];
 }
 
-/** Move, Hold and Take off hold in the select bar: each runs on the selected rows it fits. */
-export function SidebarBulkActions() {
-  const sel = useSidebarSelect();
+/** The actions of a select bar: each runs on the selected rows it fits. `shown` limits which actions the bar offers. */
+export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS }: { sel: SelectApi; shown?: SelectAction[] }) {
   const { workspaces } = useWorkspaces(useConnectionContext());
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
@@ -35,7 +34,7 @@ export function SidebarBulkActions() {
 
   const [archiveConfirm, setArchiveConfirm] = useState<ArchiveConfirm>();
 
-  const views = visibleActions(sel.state, sel.rows).filter((v) => SHOWN.includes(v.action));
+  const views = visibleActions(sel.state, sel.rows).filter((v) => shown.includes(v.action));
   if (views.length === 0 && !confirm && !stopConfirm && !removeConfirm && !archiveConfirm) return null;
 
   const tip = (v: ActionView) =>

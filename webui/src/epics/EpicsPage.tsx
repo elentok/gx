@@ -1,4 +1,4 @@
-import { Box, chakra, Input, Text } from "@chakra-ui/react";
+import { Box, chakra, Input, Link, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { MissingBanner } from "../checks/MissingBanner";
@@ -7,6 +7,9 @@ import { postSaveChecks, type SaveChecks } from "../checks/setup";
 import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status";
 import { useConnectionContext } from "../connection";
 import { CardKindFollowUps, type Workspace } from "../generated/server";
+import { rowOfCard, type SelectAction } from "../select/selectModel";
+import { SidebarBulkActions } from "../shell/SidebarBulkActions";
+import { SelectBar, useSelectApi, type SelectApi } from "../shell/SidebarSelect";
 import { openNewDesign } from "../shell/newItemOpen";
 import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { DetailPage } from "../page/DetailPage";
@@ -37,11 +40,15 @@ function usePageClock(active: boolean): number {
   return now;
 }
 
+/** No Stop or Remove: cards have no sessions to act on. */
+const PAGE_ACTIONS: SelectAction[] = ["move", "hold", "unhold", "archive"];
+
 function SectionBlock({
   section,
   now,
   open,
   workspaces,
+  select,
   onToggle,
   onChanged,
 }: {
@@ -49,6 +56,7 @@ function SectionBlock({
   now: number;
   open: boolean;
   workspaces: Workspace[];
+  select: SelectApi;
   onToggle: () => void;
   onChanged: () => void;
 }) {
@@ -79,7 +87,14 @@ function SectionBlock({
       {open && (
         <Box display="grid" gap="20px" gridTemplateColumns="repeat(auto-fill, minmax(min(100%, 360px), 1fr))">
           {section.rows.map((r) => (
-            <EpicCard key={r.address} row={r} now={now} workspaces={workspaces} onChanged={onChanged} />
+            <EpicCard
+              key={r.address}
+              row={r}
+              now={now}
+              workspaces={workspaces}
+              onChanged={onChanged}
+              select={select.state.on && rowOfCard(r).selectable ? { checked: select.state.keys.includes(r.address), onToggle: () => select.toggle(r.address) } : undefined}
+            />
           ))}
         </Box>
       )}
@@ -130,6 +145,10 @@ export function EpicsPage({
       if (!next.delete(key)) next.add(key);
       return next;
     });
+  // This page's own select mode: it ends with the page, unlike the sidebar's. Cards in a collapsed section are not visible to Select all.
+  const selectRows = shown.flatMap((s) => s.rows.map((r) => rowOfCard(r, isOpen(s))));
+  const names = new Map(shown.flatMap((s) => s.rows.map((r) => [r.address, r.name] as const)));
+  const select = useSelectApi(selectRows, names, !!list);
   // Route state `focus` names a card (the sidebar's follow-ups popover): open its section once, then scroll to it.
   const focus = (useLocation().state as { focus?: string } | null)?.focus;
   const focused = useRef<string | undefined>(undefined);
@@ -155,6 +174,7 @@ export function EpicsPage({
       New Design
     </Button>
   );
+  const hasEpics = !!list && list.epics.length > 0;
 
   return (
     <DetailPage title={{ kind: "Epics" }}>
@@ -163,9 +183,26 @@ export function EpicsPage({
           title="Epics"
           icon={<PageIcon kind="epics" />}
           subtitle={list ? `${list.epics.length} ${list.epics.length === 1 ? "epic" : "epics"}` : undefined}
-          actions={list && list.epics.length > 0 ? newDesign : undefined}
+          actions={
+            <>
+              <Link href="#/archive" flexShrink="0" whiteSpace="nowrap" fontSize="14px">
+                Archive
+              </Link>
+              {hasEpics && !select.state.on && (
+                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.enter}>
+                  Select
+                </Button>
+              )}
+              {hasEpics && newDesign}
+            </>
+          }
         />
       </Box>
+      {select.state.on && (
+        <SelectBar sel={select} sticky>
+          <SidebarBulkActions sel={select} shown={PAGE_ACTIONS} />
+        </SelectBar>
+      )}
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <Input
           type="search"
@@ -220,7 +257,7 @@ export function EpicsPage({
         <EmptyState title="No match" />
       ) : (
         shown.map((s) => (
-          <SectionBlock key={s.key} section={s} now={now} open={isOpen(s)} workspaces={workspaces} onToggle={() => toggle(s.key)} onChanged={retry} />
+          <SectionBlock key={s.key} section={s} now={now} open={isOpen(s)} workspaces={workspaces} select={select} onToggle={() => toggle(s.key)} onChanged={retry} />
         ))
       )}
       {setupProject && <SetupDialog project={setupProject} save={saveChecks} onSaved={rereadChecks} onClose={() => setSettingUp(undefined)} />}

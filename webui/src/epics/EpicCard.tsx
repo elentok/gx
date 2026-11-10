@@ -25,6 +25,7 @@ import {
   type EpicListRow,
   type Workspace,
 } from "../generated/server";
+import { SelectBox } from "../shell/SidebarSelect";
 import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { ItemMenu, itemOfCard, postUnhold, type ItemWriters } from "../workspaces/itemActions";
 import { designHref, epicHref, ticketHref, triageHref } from "../hrefs";
@@ -187,8 +188,11 @@ export function EpicCard({
   writes = {},
   workspaces = [],
   onChanged = () => {},
+  select,
 }: {
   row: EpicListRow;
+  /** Set while the page is in select mode: the card's corner checkbox. */
+  select?: { checked: boolean; onToggle: () => void };
   /** The page clock, in epoch milliseconds. */
   now?: number;
   writes?: CardWrites;
@@ -222,6 +226,7 @@ export function EpicCard({
       data-section={row.section}
       data-focus={row.card_kind === CardKindFollowUps ? followUpsFocus(row.project) : undefined}
       opacity={held ? 0.6 : undefined}
+      position="relative"
       bg="surface.raised"
       borderWidth="1px"
       borderColor="border"
@@ -236,6 +241,11 @@ export function EpicCard({
           : undefined
       }
     >
+      {select && (
+        <Box position="absolute" top="4px" left="4px" display="flex">
+          <SelectBox checked={select.checked} label={`Select ${row.name}`} onToggle={select.onToggle} />
+        </Box>
+      )}
       <Box display="flex" alignItems="center" gap="4">
         <ProgressRing
           progress={ringProgress(row)}

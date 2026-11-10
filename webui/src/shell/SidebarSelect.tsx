@@ -26,12 +26,10 @@ import { isTextTarget } from "./keys";
 import { useSidebarModel } from "./SidebarRows";
 import { SidebarBulkActions } from "./SidebarBulkActions";
 
-export interface SidebarSelect {
+/** One select-mode instance: the sidebar has one, the Epics page has its own. */
+export interface SelectApi {
   state: SelectState;
   rows: SelectRow[];
-  /** Whether a section ("on-hold" or "other") is expanded; a collapsed section's rows are not visible to Select all. */
-  sectionOpen: Record<string, boolean>;
-  setSectionOpen: (group: string, open: boolean) => void;
   enter: () => void;
   leave: () => void;
   toggle: (key: string) => void;
@@ -45,6 +43,50 @@ export interface SidebarSelect {
   nameOf: (key: string) => string;
   /** Call after an action ran: leaves select mode when nothing is selected any more. */
   afterRun: () => void;
+}
+
+export interface SidebarSelect extends SelectApi {
+  /** Whether a section ("on-hold" or "other") is expanded; a collapsed section's rows are not visible to Select all. */
+  sectionOpen: Record<string, boolean>;
+  setSectionOpen: (group: string, open: boolean) => void;
+}
+
+/** The select model over `rows`, with Escape to leave. An unloaded list is not an empty one, so nothing is pruned until `loaded`. */
+export function useSelectApi(rows: SelectRow[], names: Map<string, string>, loaded: boolean): SelectApi {
+  const [state, setState] = useState<SelectState>(initialSelect);
+  // A row that leaves the list leaves the selection.
+  useEffect(() => {
+    if (loaded) setState((s) => prune(s, rows));
+  }, [loaded, rows]);
+
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (selectIntent(e, stateRef.current.on, hasLayer() || isTextTarget(e.target)) === "leave") setState(leave);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  return useMemo<SelectApi>(
+    () => ({
+      state,
+      rows,
+      enter: () => setState(enter),
+      leave: () => setState(leave),
+      toggle: (key) => setState((s) => toggle(s, key)),
+      toggleGroup: (group) => setState((s) => toggleGroup(s, rows, group)),
+      groupState: (group) => groupState(state, rows, group),
+      selectAll: () => setState((s) => selectAll(s, rows)),
+      selectNone: () => setState(selectNone),
+      deselect: (keys) => setState((s) => ({ ...s, keys: s.keys.filter((k) => !keys.includes(k)) })),
+      nameOf: (key) => names.get(key) ?? key,
+      afterRun: () => setState((s) => prune(s, rows, true)),
+    }),
+    [state, rows, names],
+  );
 }
 
 const SidebarSelectContext = createContext<SidebarSelect | null>(null);
@@ -71,7 +113,6 @@ const rowOf = (r: SidebarRow, visible: boolean): SelectRow => ({
 /** Holds one select model for the whole sidebar, above the rows and the footer, so the selection survives navigation. */
 export function SidebarSelectProvider({ fetcher, active, children }: { fetcher?: FetchEpicList; active: string; children: ReactNode }) {
   const model = useSidebarModel(fetcher, active);
-  const [state, setState] = useState<SelectState>(initialSelect);
   const [sectionOpen, setOpen] = useState<Record<string, boolean>>({});
   const setSectionOpen = useCallback((group: string, open: boolean) => setOpen((o) => ({ ...o, [group]: open })), []);
 
@@ -103,42 +144,8 @@ export function SidebarSelectProvider({ fetcher, active, children }: { fetcher?:
     return out;
   }, [model]);
 
-  // A row that leaves the list leaves the selection. An unloaded list is not an empty one.
-  const loaded = !!model;
-  useEffect(() => {
-    if (loaded) setState((s) => prune(s, rows));
-  }, [loaded, rows]);
-
-  const stateRef = useRef(state);
-  stateRef.current = state;
-  const select = useMemo<SidebarSelect>(
-    () => ({
-      state,
-      rows,
-      sectionOpen,
-      setSectionOpen,
-      enter: () => setState(enter),
-      leave: () => setState(leave),
-      toggle: (key) => setState((s) => toggle(s, key)),
-      toggleGroup: (group) => setState((s) => toggleGroup(s, rows, group)),
-      groupState: (group) => groupState(state, rows, group),
-      selectAll: () => setState((s) => selectAll(s, rows)),
-      selectNone: () => setState(selectNone),
-      deselect: (keys) => setState((s) => ({ ...s, keys: s.keys.filter((k) => !keys.includes(k)) })),
-      nameOf: (key) => names.get(key) ?? key,
-      afterRun: () => setState((s) => prune(s, rows, true)),
-    }),
-    [state, rows, sectionOpen, setSectionOpen, names],
-  );
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return;
-      if (selectIntent(e, stateRef.current.on, hasLayer() || isTextTarget(e.target)) === "leave") setState(leave);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  const api = useSelectApi(rows, names, !!model);
+  const select = useMemo<SidebarSelect>(() => ({ ...api, sectionOpen, setSectionOpen }), [api, sectionOpen, setSectionOpen]);
 
   return <SidebarSelectContext.Provider value={select}>{children}</SidebarSelectContext.Provider>;
 }
@@ -181,23 +188,36 @@ export function SelectButton() {
 
 /** The footer, or the select bar in its place while the mode is on. */
 export function FooterSlot({ children }: { children: ReactNode }) {
-  return useSidebarSelect().state.on ? (
-    <SelectBar>
-      <SidebarBulkActions />
+  const sel = useSidebarSelect();
+  return sel.state.on ? (
+    <SelectBar sel={sel}>
+      <SidebarBulkActions sel={sel} />
     </SelectBar>
   ) : (
     children
   );
 }
 
-/** The bar that replaces the footer in select mode. Action buttons go in `children`. */
-export function SelectBar({ children }: { children?: ReactNode }) {
-  const sel = useSidebarSelect();
+/** The bar that replaces the footer in select mode. Action buttons go in `children`. `sticky` pins it under a page header instead. */
+export function SelectBar({ sel, sticky, children }: { sel: SelectApi; sticky?: boolean; children?: ReactNode }) {
   const n = sel.state.keys.length;
   const pickable = sel.rows.filter((r) => r.visible && r.selectable);
   const all = pickable.length > 0 && pickable.every((r) => sel.state.keys.includes(r.key));
   return (
-    <Box as="footer" data-part="select-bar" flex="none" display="flex" flexDirection="column" gap="2" px="2" py="10px" borderTopWidth="1px" borderColor="tone.running.fg" bg="surface.raised">
+    <Box
+      as="footer"
+      data-part="select-bar"
+      flex="none"
+      display="flex"
+      flexDirection="column"
+      gap="2"
+      px="2"
+      py="10px"
+      borderTopWidth="1px"
+      borderColor="tone.running.fg"
+      bg="surface.raised"
+      {...(sticky ? { position: "sticky", top: "0", zIndex: "sticky", mt: "4", borderWidth: "1px", borderRadius: "md" } : {})}
+    >
       <Box display="flex" alignItems="center" gap="1.5">
         <Box as="span" flex="1" fontSize="14px" fontWeight="600" whiteSpace="nowrap" data-testid="select-count">
           {n} selected
