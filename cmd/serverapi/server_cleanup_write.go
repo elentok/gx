@@ -39,6 +39,7 @@ func newCleanupCmd(d Deps, use, short, extra string, run func(ctx context.Contex
 		c.Flags().StringVar(&req.Branch, "branch", "", "the branch")
 	case "epic":
 		c.Flags().StringVar(&req.Epic, "epic", "", "the epic")
+		c.Flags().BoolVar(&req.Yes, "yes", false, "confirm stopping the epic's live sessions")
 	}
 	if extra != "" {
 		_ = c.MarkFlagRequired(extra)
@@ -55,7 +56,7 @@ func newServerCleanupRemoveUnmergedCmd(d Deps) *cobra.Command {
 }
 
 func newServerCleanupArchiveCmd(d Deps) *cobra.Command {
-	return newServerCleanupWriteCmd(d, "cleanup-archive", "Archive a done epic that has landed on trunk", "epic", (*apiclient.Reads).ArchiveCleanupEpic)
+	return newServerCleanupWriteCmd(d, "cleanup-archive", "Archive a done epic (one-epic alias of `gx server epics archive`)", "epic", (*apiclient.Reads).ArchiveCleanupEpic)
 }
 
 func newServerCleanupDeleteCmd(d Deps) *cobra.Command {

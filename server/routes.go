@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/elentok/gx/server/archive"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/cleanup"
 	"github.com/elentok/gx/server/designs"
@@ -57,6 +58,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		harnesschoice.Routes(func() *harnesschoice.Harness { return s.harness }),
 		settingsapi.Routes(func() *settingsapi.Writer { return s.settingsWriter }, func() []string { return s.settings.Status().PendingRestart }, func() wire.ReloadResult { return s.settings.Reload(settings.TriggerWeb) }),
 		cleanup.Routes(func() *cleanup.Cleanup { return s.cleanup }),
+		archive.Routes(func() *archive.Archive { return s.archive }),
 		disk.Routes(func() *disk.Disk { return s.disks }),
 		health.Routes(func() *health.Health { return s.health }),
 		limits.Routes(func() *limits.Limits { return s.limits }),

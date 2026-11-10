@@ -45,18 +45,18 @@ func TestCleanupArchive_DoneMergedEpicLeavesTheActiveList(t *testing.T) {
 	}
 }
 
-func TestCleanupArchive_RefusesADoneEpicThatHasNotLanded(t *testing.T) {
+func TestCleanupArchive_ArchivesADoneEpicThatHasNotLanded(t *testing.T) {
 	repo, store := testutil.TempRepo(t), t.TempDir()
 	servertest.WriteCompleteEpic(t, store, "unlanded")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
 
 	res, err := h.Client.Reads.ArchiveCleanupEpic(context.Background(), archiveReq("unlanded"))
-	if err != nil || !res.Refused || res.Reason != wire.ReasonCleanupNotMerged {
+	if err != nil || res.Refused {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
-	if archived, _ := tickets.ArchivedEpicNames(filepath.Join(store, "proj")); archived["unlanded"] {
-		t.Errorf("unmerged epic archived")
+	if archived, _ := tickets.ArchivedEpicNames(filepath.Join(store, "proj")); !archived["unlanded"] {
+		t.Errorf("unmerged epic not archived")
 	}
 }
 

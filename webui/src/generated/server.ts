@@ -126,6 +126,10 @@ export interface CleanupWriteRequest {
   project: string;
   branch?: string;
   epic?: string;
+  /**
+   * Yes confirms an archive that stops the epic's live Sessions.
+   */
+  yes?: boolean;
 }
 export const ReasonCleanupUnknown = "cleanup-unknown";
 export const ReasonCleanupNotMerged = "cleanup-not-merged";
@@ -3315,7 +3319,26 @@ export interface TargetResult {
    * Sessions are the live Session ids the write stopped, or on a dry run would stop.
    */
   sessions?: string[];
+  /**
+   * OnTrunk is an archive dry run's answer: whether gx sees the epic on trunk.
+   */
+  on_trunk?: boolean;
 }
+/**
+ * ArchiveRequest archives loop epics. Yes confirms, for the whole request,
+ * that archiving stops live Sessions. DryRun runs every rule and writes nothing.
+ */
+export interface ArchiveRequest {
+  targets: string[];
+  yes?: boolean;
+  dry_run?: boolean;
+}
+export const ReasonArchiveNotFinished = "not-finished";
+export const ReasonArchiveRenameFailed = "rename-failed";
+/**
+ * Refusal reasons of archive. The cleanup reasons cover queued, not done and unknown.
+ */
+export type ReasonArchive = typeof ReasonArchiveNotFinished | typeof ReasonArchiveRenameFailed;
 /**
  * TargetsResult is the envelope of a many-target write, in argument order.
  */

@@ -20,7 +20,23 @@ type TargetResult struct {
 	NewAddress string `json:"new_address,omitempty"`
 	// Sessions are the live Session ids the write stopped, or on a dry run would stop.
 	Sessions []string `json:"sessions,omitempty"`
+	// OnTrunk is an archive dry run's answer: whether gx sees the epic on trunk.
+	OnTrunk *bool `json:"on_trunk,omitempty"`
 }
+
+// ArchiveRequest archives loop epics. Yes confirms, for the whole request,
+// that archiving stops live Sessions. DryRun runs every rule and writes nothing.
+type ArchiveRequest struct {
+	Targets []string `json:"targets"`
+	Yes     bool     `json:"yes,omitempty"`
+	DryRun  bool     `json:"dry_run,omitempty"`
+}
+
+// Refusal reasons of archive. The cleanup reasons cover queued, not done and unknown.
+const (
+	ReasonArchiveNotFinished  = "not-finished"
+	ReasonArchiveRenameFailed = "rename-failed"
+)
 
 // Refused reports whether the target was refused.
 func (r TargetResult) Refused() bool { return r.Status == TargetRefused }

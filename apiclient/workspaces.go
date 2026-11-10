@@ -60,6 +60,13 @@ func (a *Admin) HoldEpics(ctx context.Context, targets []string, yes, dryRun boo
 	return res, err
 }
 
+// ArchiveEpics archives each loop epic on its own; a refusal is a result.
+func (a *Admin) ArchiveEpics(ctx context.Context, targets []string, yes, dryRun bool) (wire.TargetsResult, error) {
+	var res wire.TargetsResult
+	err := a.t.post(ctx, "/v1/epics/archive", wire.ArchiveRequest{Targets: targets, Yes: yes, DryRun: dryRun}, &res)
+	return res, err
+}
+
 // UnholdEpics clears the holds.
 func (a *Admin) UnholdEpics(ctx context.Context, targets []string) (wire.HoldResult, error) {
 	var res wire.HoldResult

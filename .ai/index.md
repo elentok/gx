@@ -226,6 +226,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `tickets/detail`, `epics` and `epics/detail`. The root implements its `Deps`;
   `server/workspaces/` holds the workspace store: ordered workspaces, membership, hold marks,
   persisted, publishing `workspaces-changed` (a leaf; imports `broker`, `wire` and `tickets`);
+  `server/archive/` archives finished loop epics (stop Sessions, clear hold, rename into `.archive`,
+  stamp, re-key Sessions), with `Routes()` for `epics/archive`; the root implements its `Deps` and
+  `cleanup/archive-epic` calls it;
   `server/designs/` holds the Design sessions (open, worktree, delete, and the cleanup the Manager
   and the rescan call back), with `Routes()` for `designs/open`, `designs/delete` and
   `designs/worktree`;

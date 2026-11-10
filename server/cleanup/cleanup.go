@@ -33,8 +33,8 @@ type Deps struct {
 	Size func(ctx context.Context, path string) (uint64, error)
 	// Sessions lists every session, for refusing a worktree one still works in.
 	Sessions func() ([]wire.SessionInfo, error)
-	// EpicQueued reports whether the epic's root is in the ralph-loop queue.
-	EpicQueued func(project, epic string) bool
+	// ArchiveEpic is the one-epic archive alias; server/archive owns the code.
+	ArchiveEpic func(project, epic string, yes bool) (wire.CleanupWriteResult, error)
 	// SubmitOneOff starts a one-off agent ticket.
 	SubmitOneOff func(wire.OneOffRequest) (wire.OneOffResult, error)
 }

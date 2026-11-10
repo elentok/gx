@@ -62,6 +62,8 @@ type CleanupWriteRequest struct {
 	Project string `json:"project"`
 	Branch  string `json:"branch,omitempty"`
 	Epic    string `json:"epic,omitempty"`
+	// Yes confirms an archive that stops the epic's live Sessions.
+	Yes bool `json:"yes,omitempty"`
 }
 
 // Reasons a cleanup write refuses.

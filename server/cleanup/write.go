@@ -24,7 +24,7 @@ func (c *Cleanup) removeUnmergedWrite(w http.ResponseWriter, r *http.Request) {
 
 func (c *Cleanup) archiveWrite(w http.ResponseWriter, r *http.Request) {
 	c.write(w, r, func(req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
-		return c.ArchiveEpic(req.Project, req.Epic)
+		return c.d.ArchiveEpic(req.Project, req.Epic, req.Yes)
 	})
 }
 

@@ -28,6 +28,7 @@ import (
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
+	"github.com/elentok/gx/server/archive"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/cleanup"
@@ -115,6 +116,7 @@ type Server struct {
 	migrator       *projects.Migrator
 	checks         *projects.Checks
 	cleanup        *cleanup.Cleanup
+	archive        *archive.Archive
 
 	queue      *queue.Queue
 	afk        *queue.AFK
@@ -394,8 +396,8 @@ func New(cfg Config) (*Server, error) {
 	s.cleanup = cleanup.New(cleanup.Deps{TicketStore: cfg.TicketStore, Env: cfg.Env, Events: events,
 		Sessions:     func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
 		SubmitOneOff: s.oneOffs.Submit,
-		EpicQueued: func(project, epic string) bool {
-			return s.queue.RootQueued(queue.RootRef{Project: project, Epic: epic})
+		ArchiveEpic: func(project, epic string, yes bool) (wire.CleanupWriteResult, error) {
+			return s.archive.Cleanup(project, epic, yes)
 		}})
 	s.disks = disk.New(disk.Deps{
 		Config: disk.Config{
@@ -469,6 +471,7 @@ func New(cfg Config) (*Server, error) {
 		OnTriageIdle: s.triage.StopFinished,
 	})
 	s.sessions = newManager(s)
+	s.archive = newArchive(s)
 	s.sessions.Maps.OnDesignStart = s.clearHold
 	s.sessions.OnSessionGone = s.dropSessionMember
 	s.designs.GiveSessions(s.sessions)
