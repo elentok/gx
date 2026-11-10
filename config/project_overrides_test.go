@@ -135,10 +135,34 @@ func TestReadProjectFile_UnknownEnumsLoadWithDefaults(t *testing.T) {
 	}
 }
 
+func TestProjectFile_DeliveryAndAutoPR(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body       string
+		wantPR     bool
+		wantAutoPR bool
+		wantPolicy string
+	}{
+		"absent":           {`{}`, false, false, LandingOnLanded},
+		"bogus":            {`{"delivery": "bogus"}`, false, false, LandingOnLanded},
+		"merge on-done":    {`{"delivery": "merge", "landing": "on-done"}`, false, false, LandingOnDone},
+		"pr":               {`{"delivery": "pr", "auto-pr": true}`, true, true, LandingOnLanded},
+		"pr beats landing": {`{"delivery": "pr", "landing": "on-done"}`, true, false, LandingOnLanded},
+	} {
+		pf, err := ReadProjectFile(writeProjectJSON(t, tc.body))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if pf.DeliveryIsPR() != tc.wantPR || pf.AutoPREnabled() != tc.wantAutoPR || pf.LandingPolicy() != tc.wantPolicy {
+			t.Errorf("%s: pr=%v autoPR=%v policy=%q", name, pf.DeliveryIsPR(), pf.AutoPREnabled(), pf.LandingPolicy())
+		}
+	}
+}
+
 func TestValidateProjectFile_RejectsBadEnums(t *testing.T) {
 	cases := map[string]string{
-		"landing": `{"landing": "pr"}`,
-		"vcs":     `{"vcs": "hg"}`,
+		"landing":  `{"landing": "pr"}`,
+		"delivery": `{"delivery": "bogus"}`,
+		"vcs":      `{"vcs": "hg"}`,
 	}
 	for key, body := range cases {
 		pf, err := ParseProjectFile([]byte(body))

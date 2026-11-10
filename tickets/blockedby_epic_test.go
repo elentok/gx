@@ -53,6 +53,21 @@ func TestResolveCrossEpic_WholeEpicReleasesOnPolicyStamp(t *testing.T) {
 	}
 }
 
+func TestResolveCrossEpic_PREpicReleasesOnlyOnMergedAt(t *testing.T) {
+	for _, release := range []EpicRelease{{}, {OnDone: true}, {OnDone: true, AutoFFMerge: true}} {
+		open := wholeEpic(doneTicket(), true, false)
+		open[0].PRNumber = 7
+		if got := dependentStatus(release, open); got != StatusBlocked {
+			t.Errorf("%+v: open PR: got %v, want blocked", release, got)
+		}
+		merged := wholeEpic(doneTicket(), true, true)
+		merged[0].PRNumber = 7
+		if got := dependentStatus(release, merged); got != StatusOpen {
+			t.Errorf("%+v: merged PR: got %v, want open", release, got)
+		}
+	}
+}
+
 func TestResolveCrossEpic_WholeEpicBlocksWhileATicketIsOpen(t *testing.T) {
 	reopened := append(doneTicket(), Ticket{Number: 2, Identifier: "02", Status: "open"})
 	for _, release := range []EpicRelease{{}, {OnDone: true}, {OnDone: true, AutoFFMerge: true}} {

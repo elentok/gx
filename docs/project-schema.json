@@ -130,9 +130,21 @@
       "description": "Fast-forward merge finished work into trunk automatically.",
       "type": "boolean"
     },
+    "auto-pr": {
+      "description": "Open the pull request automatically when an epic finishes in a pr project.",
+      "type": "boolean"
+    },
     "checks": {
       "$ref": "checks-schema.json",
       "description": "The commands gx check runs for this project."
+    },
+    "delivery": {
+      "description": "How finished epics reach trunk: merge fast-forwards them, pr opens a pull request. With pr, dependents are released once the pull request merged.",
+      "enum": [
+        "merge",
+        "pr"
+      ],
+      "type": "string"
     },
     "disk-space": {
       "additionalProperties": false,

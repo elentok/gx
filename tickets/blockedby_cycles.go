@@ -47,7 +47,7 @@ func EpicReleaseOf(pf config.ProjectFile) EpicRelease {
 // with auto-ff-merge, completed_at alone is not enough: a root pause stamps it
 // without the branch ever merging.
 func (r EpicRelease) stamped(e Epic) bool {
-	if !r.OnDone {
+	if !r.OnDone || e.PRNumber != 0 {
 		return !e.MergedAt.IsZero()
 	}
 	return !e.CompletedAt.IsZero() && (!r.AutoFFMerge || !e.MergedAt.IsZero())

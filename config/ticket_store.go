@@ -53,6 +53,8 @@ type ProjectFile struct {
 	Trunk         *string              `json:"trunk,omitempty"`
 	Landing       *string              `json:"landing,omitempty"`
 	AutoFFMerge   *bool                `json:"auto-ff-merge,omitempty"`
+	Delivery      *string              `json:"delivery,omitempty"`
+	AutoPR        *bool                `json:"auto-pr,omitempty"`
 	MaxAgents     *int                 `json:"max-agents,omitempty"`
 	Agents        *AgentsConfig        `json:"agents,omitempty"`
 	Skills        *SkillsConfig        `json:"skills,omitempty"`
@@ -85,10 +87,28 @@ const LandingOnDone = "on-done"
 // LandingPolicy is the project's landing policy; absent, empty or unknown
 // means the default.
 func (pf ProjectFile) LandingPolicy() string {
+	if pf.DeliveryIsPR() {
+		return LandingOnLanded
+	}
 	if pf.Landing != nil && *pf.Landing == LandingOnDone {
 		return LandingOnDone
 	}
 	return LandingOnLanded
+}
+
+// DeliveryPR is the delivery value where finished epics go out as pull
+// requests; absent, empty or unknown delivery is merge.
+const DeliveryPR = "pr"
+
+// DeliveryIsPR reports whether the project delivers epics as pull requests.
+func (pf ProjectFile) DeliveryIsPR() bool {
+	return pf.Delivery != nil && *pf.Delivery == DeliveryPR
+}
+
+// AutoPREnabled reports whether the project opted in to opening the pull
+// request automatically.
+func (pf ProjectFile) AutoPREnabled() bool {
+	return pf.AutoPR != nil && *pf.AutoPR
 }
 
 // AutoFFMergeEnabled reports whether the project opted in to the server
@@ -136,6 +156,9 @@ func ValidateProjectFile(pf ProjectFile) error {
 	}
 	if pf.Landing != nil && *pf.Landing != "" && *pf.Landing != LandingOnLanded && *pf.Landing != LandingOnDone {
 		return fmt.Errorf("landing: %q is not allowed (want %q or %q)", *pf.Landing, LandingOnLanded, LandingOnDone)
+	}
+	if pf.Delivery != nil && *pf.Delivery != "" && *pf.Delivery != "merge" && *pf.Delivery != DeliveryPR {
+		return fmt.Errorf("delivery: %q is not allowed (want %q or %q)", *pf.Delivery, "merge", DeliveryPR)
 	}
 	if pf.Agents != nil {
 		if err := validateDefaultHarness(pf.Agents.DefaultHarness); err != nil {

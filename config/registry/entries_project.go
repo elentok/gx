@@ -18,6 +18,10 @@ func projectEntries() []Entry {
 			Description: "When tickets that wait on a blocker are released: on-landed once it landed on trunk, on-done once it is done."},
 		{Key: Key("auto-ff-merge"), Type: TypeBool, Section: p, ProjectOnly: true,
 			Description: "Fast-forward merge finished work into trunk automatically."},
+		{Key: Key("delivery"), Type: TypeEnum, Enum: DeliveryChoices, Section: p, ProjectOnly: true,
+			Description: "How finished epics reach trunk: merge fast-forwards them, pr opens a pull request. With pr, dependents are released once the pull request merged."},
+		{Key: Key("auto-pr"), Type: TypeBool, Section: p, ProjectOnly: true,
+			Description: "Open the pull request automatically when an epic finishes in a pr project."},
 		{Key: Key("project", "max-agents"), ProjectKey: Key("max-agents"), GlobalKey: Key("execution-queue", "max-agents"),
 			Label: "Max live agents for this project", Override: OverrideCap,
 			Type: TypeNumber, Min: minOf(1), Integer: true, Section: SectionExecutionQueue, ProjectOnly: true,
@@ -33,3 +37,6 @@ func projectEntries() []Entry {
 
 // LandingChoices repeats the landing values config validates against.
 var LandingChoices = []string{"on-landed", "on-done"}
+
+// DeliveryChoices repeats the delivery values config understands.
+var DeliveryChoices = []string{"merge", "pr"}
