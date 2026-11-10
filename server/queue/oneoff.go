@@ -2,7 +2,6 @@ package queue
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,79 +25,13 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
-	"gopkg.in/yaml.v3"
 )
 
 // oneOffNameWords is how many of the prompt's first words seed a default name.
 const oneOffNameWords = 4
 
-var nonSlugRe = regexp.MustCompile(`[^a-z0-9]+`)
-
-// oneOffFileFrontmatter is the subset of a payload file's frontmatter a submit
-// understands.
-type oneOffFileFrontmatter struct {
-	Project               string   `yaml:"project"`
-	Name                  string   `yaml:"name"`
-	Agent                 string   `yaml:"agent"`
-	BlockedBy             []string `yaml:"blocked_by"`
-	ExpectedContextWindow int      `yaml:"expected_context_window"`
-	Front                 bool     `yaml:"front"`
-	Unique                string   `yaml:"unique"`
-}
-
-// removedFileKeys are payload keys one-offs no longer accept.
-var removedFileKeys = []string{"commits", "base"}
-
-// removedKeyError is a payload frontmatter key one-offs no longer accept.
-type removedKeyError struct{ key string }
-
-func (e removedKeyError) Error() string {
-	return "the " + e.key + " key is no longer supported: a one-off never commits"
-}
-
-// applyFile merges the payload file into req; anything already set on req wins.
-func applyOneOffFile(req *wire.OneOffRequest) error {
-	raw, err := os.ReadFile(req.File)
-	if err != nil {
-		return err
-	}
-	yamlPart, body, hasFM := schema.SplitFrontmatter(string(raw))
-	var fm oneOffFileFrontmatter
-	if hasFM {
-		if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
-			return err
-		}
-		var keys map[string]any
-		if err := yaml.Unmarshal([]byte(yamlPart), &keys); err != nil {
-			return err
-		}
-		for _, k := range removedFileKeys {
-			if _, ok := keys[k]; ok {
-				return removedKeyError{k}
-			}
-		}
-	} else {
-		body = string(raw)
-	}
-	setIfEmpty := func(dst *string, v string) {
-		if *dst == "" {
-			*dst = v
-		}
-	}
-	setIfEmpty(&req.Prompt, body)
-	setIfEmpty(&req.Project, fm.Project)
-	setIfEmpty(&req.Name, fm.Name)
-	setIfEmpty(&req.Agent, fm.Agent)
-	setIfEmpty(&req.Unique, fm.Unique)
-	req.Front = req.Front || fm.Front
-	if len(req.BlockedBy) == 0 {
-		req.BlockedBy = fm.BlockedBy
-	}
-	if req.ExpectedContextWindow == 0 {
-		req.ExpectedContextWindow = fm.ExpectedContextWindow
-	}
-	return nil
-}
+// slugRe is what a one-off name may be: the filename of its ticket.
+var slugRe = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 func oneOffRefusal(reason, msg string) wire.OneOffResult {
 	return wire.OneOffResult{Refused: true, Reason: reason, Message: msg}
@@ -160,24 +93,6 @@ func (o *OneOffs) Submit(req wire.OneOffRequest) (wire.OneOffResult, error) {
 // oneOffValidate checks the submit and fills plan. A refusal (or error) means
 // plan is unusable; nothing has been written.
 func (o *OneOffs) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.OneOffResult, error) {
-	if req.File != "" {
-		if err := applyOneOffFile(&req); err != nil {
-			var removed removedKeyError
-			if errors.As(err, &removed) {
-				return oneOffRefusal(wire.ReasonOptionRemoved, err.Error()), nil
-			}
-			return oneOffRefusal(wire.ReasonBadFile, err.Error()), nil
-		}
-		if req.Unique == "" && !req.NoUnique {
-			resolved, err := filepath.EvalSymlinks(req.File)
-			if err != nil {
-				return oneOffRefusal(wire.ReasonBadFile, err.Error()), nil
-			}
-			if req.Unique, err = filepath.Abs(resolved); err != nil {
-				return oneOffRefusal(wire.ReasonBadFile, err.Error()), nil
-			}
-		}
-	}
 	if req.NoUnique {
 		req.Unique = ""
 	}
@@ -204,6 +119,9 @@ func (o *OneOffs) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire
 	slug := req.Name
 	if slug == "" {
 		slug = defaultOneOffName(prompt)
+	}
+	if !slugRe.MatchString(slug) {
+		return oneOffRefusal(wire.ReasonInvalidAddress, "name "+slug+" must be lowercase letters, digits and dashes"), nil
 	}
 	if _, err := tickets.ParseAddress(tickets.Address{Project: project, Epic: slug, ID: "01"}.String(), tickets.AddressContext{}); err != nil {
 		return oneOffRefusal(wire.ReasonInvalidAddress, "name "+slug+" is not usable in a ticket address"), nil
@@ -459,15 +377,11 @@ func within(root, p string) bool {
 // defaultOneOffName is the prompt's first words. The ticket number keeps two
 // submits of the same prompt apart.
 func defaultOneOffName(prompt string) string {
-	words := strings.Fields(strings.ToLower(prompt))
+	words := strings.Fields(prompt)
 	if len(words) > oneOffNameWords {
 		words = words[:oneOffNameWords]
 	}
-	slug := strings.Trim(nonSlugRe.ReplaceAllString(strings.Join(words, "-"), "-"), "-")
-	if slug == "" {
-		slug = "one-off"
-	}
-	return slug
+	return tickets.Slug(strings.Join(words, " "))
 }
 
 // The epics holding one-off tickets: every ticket in OneOffsEpic is a one-off,
@@ -519,7 +433,11 @@ func (o *OneOffs) writeOneOffTicket(projectDir, slug string, tk schema.Ticket, p
 	if err != nil {
 		return "", "", err
 	}
-	path = filepath.Join(epicDir, "issues", fmt.Sprintf("%s-%s.md", id, slug))
+	issuesDir := filepath.Join(epicDir, "issues")
+	path = filepath.Join(issuesDir, fmt.Sprintf("%s-%s.md", id, slug))
+	if !within(issuesDir, path) {
+		return "", "", fmt.Errorf("one-off name %q escapes the issues directory", slug)
+	}
 	if err := os.WriteFile(path, out, 0o644); err != nil {
 		return "", "", err
 	}

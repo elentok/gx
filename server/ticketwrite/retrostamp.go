@@ -22,7 +22,7 @@ func RetroSubmit(project, epic string, now time.Time) wire.OneOffRequest {
 	return wire.OneOffRequest{
 		Prompt:  "Retro of epic " + project + ":" + epic,
 		Project: project,
-		Name:    "evolve-" + epic + "-" + now.Format("20060102-1504"),
+		Name:    tickets.Slug("evolve-" + epic + "-" + now.Format("20060102-1504")),
 		Type:    string(schema.TypeEvolve),
 		Unique:  RetroKeyPrefix + project + "/" + epic,
 		Notify:  true,

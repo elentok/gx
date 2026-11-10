@@ -19,12 +19,8 @@ type OneOffRequest struct {
 	Front bool `json:"front,omitempty"`
 	// Notify sends the ticket's Result to chat on success; pauses always notify.
 	Notify bool `json:"notify,omitempty"`
-	// File is a server-side path to a markdown payload (frontmatter + body).
-	// Its frontmatter fills every field left unset here; the body is the prompt
-	// when Prompt is empty.
-	File string `json:"file,omitempty"`
-	// Unique is the dedupe key; a --file submit defaults it to the file's
-	// resolved path unless NoUnique is set. A plain prompt has none.
+	// Unique is the dedupe key. The CLI defaults a --file submit's to the file's
+	// resolved path before sending; NoUnique clears it. A plain prompt has none.
 	Unique   string `json:"unique,omitempty"`
 	NoUnique bool   `json:"no_unique,omitempty"`
 }

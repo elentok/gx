@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -47,7 +48,7 @@ func (s *Health) FileStartIncident(now time.Time) {
 		Prompt:  startIncidentPrompt(string(note), path),
 		Project: projects.OutboxProject,
 		Type:    string(schema.TypeDiagnose),
-		Name:    "server-start-" + now.Format("20060102-1504"),
+		Name:    tickets.Slug("server-start-" + now.Format("20060102-1504")),
 		Unique:  "server-start-incident",
 		Front:   true,
 		Notify:  true,

@@ -28,6 +28,13 @@ func TestParseAddress(t *testing.T) {
 		{in: "epic/", ctx: ctx, code: CodeMalformedAddress},
 		{in: "a:b:c/06", ctx: ctx, code: CodeMalformedAddress},
 		{in: "epic/x6", ctx: ctx, code: CodeMalformedAddress},
+		{in: "../06", ctx: ctx, code: CodeMalformedAddress},
+		{in: "./06", ctx: ctx, code: CodeMalformedAddress},
+		{in: "..:epic/06", ctx: ctx, code: CodeMalformedAddress},
+		{in: "p:../06", ctx: ctx, code: CodeMalformedAddress},
+		{in: "06", ctx: AddressContext{Project: "gx", Epic: ".."}, code: CodeMalformedAddress},
+		{in: "p:a..b/06", ctx: ctx, want: "p:a..b/06"},
+		{in: "p:.hidden/06", ctx: ctx, want: "p:.hidden/06"},
 	}
 	for _, tt := range tests {
 		got, err := ParseAddress(tt.in, tt.ctx)

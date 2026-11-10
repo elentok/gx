@@ -1000,7 +1000,7 @@ Deletes:
 - **Types** (08 §2, 11 §5): one-offs default to `type: prompt` (new, always commitless).
   `--commits` creates `type: implement`. `vcs: none` is always commitless.
 - **File payload** (08 §3): `--file` reads frontmatter + body; flags override frontmatter. No
-  template noun, no store directory. Over HTTP the file is a server-side path (localhost only).
+  template noun, no store directory. The CLI reads the file and sends its content; the server never sees the path.
 - **Waiting** (08 §4): default prints the address (`--json` → `{address, status}`), exit 0.
   `--wait` blocks on the stream (reconnecting across a server restart) until terminal or parked,
   prints the `## Result`, and exits with a code from the table below. `--timeout <dur>` (no

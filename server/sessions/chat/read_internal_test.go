@@ -22,7 +22,7 @@ import (
 
 const (
 	testCwd  = "/work/proj"
-	testConv = "conv"
+	testConv = "019f7c18-ff7f-7382-a353-e80c020defdb"
 )
 
 // readFixture serves the chat routes over a fakeSource, with one session whose
@@ -355,6 +355,16 @@ func TestArchive_RouteMatchesThePlainRollout(t *testing.T) {
 func TestArchive_RouteWithoutAnArchiveIs404(t *testing.T) {
 	t.Parallel()
 	f := newCodexFixture(t)
+	if code, _ := f.get(t, "/v1/sessions/chat/archive"); code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", code)
+	}
+}
+
+func TestArchive_ConversationIdThatIsNotAUUIDFindsNoArchive(t *testing.T) {
+	t.Parallel()
+	f := newCodexFixture(t)
+	writeZstd(t, f.path, archivedRollout...)
+	f.src.meta.ConversationID = "019f" // a substring of the archive's name
 	if code, _ := f.get(t, "/v1/sessions/chat/archive"); code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", code)
 	}

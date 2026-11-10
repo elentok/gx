@@ -3,6 +3,7 @@ package chat
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -25,10 +26,20 @@ func (c *Chat) Transcript(id string, meta Meta) (string, agentrunner.Kind, bool)
 // ForgetMiss drops a remembered transcript miss of conversationID.
 func (c *Chat) ForgetMiss(conversationID string) { c.transcripts.ForgetMiss(conversationID) }
 
+// conversationUUIDRe is the shape of a Codex conversation id, whatever its UUID
+// version (Codex writes v7). Only the shape is checked.
+var conversationUUIDRe = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
 // codexArchive finds the zstd rollout of a Codex session whose plain rollout is
 // gone. It only looks for the file; nothing is decoded.
 func (c *Chat) codexArchive(id string, meta Meta) (string, bool) {
 	if meta.Harness != string(harness.Codex) || meta.ConversationID == "" {
+		return "", false
+	}
+	// The id picks the archive by substring, so a short or malformed one could
+	// match another conversation's file.
+	if !conversationUUIDRe.MatchString(meta.ConversationID) {
+		c.log.Warn("codex conversation id is not a uuid; not looking for its archive", "session", id, "conversation", meta.ConversationID)
 		return "", false
 	}
 	home, err := c.src.CodexHome()

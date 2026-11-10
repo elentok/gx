@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 )
 
 func (c *Cleanup) agentWrite(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +40,7 @@ func (c *Cleanup) StartAgent(project string) (wire.OneOffResult, error) {
 	return c.d.SubmitOneOff(wire.OneOffRequest{
 		Prompt:  agentPrompt(project, branches, epics),
 		Project: project,
-		Name:    "cleanup-agent",
+		Name:    tickets.Slug("cleanup-agent"),
 		Type:    "prompt",
 		Unique:  "cleanup-agent:" + project,
 		Notify:  true,

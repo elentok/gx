@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -72,7 +73,7 @@ func (s *Health) cpuSpike(sp cpuwatch.Spike, now time.Time) wire.CPUSpikeResult 
 		Prompt:  cpuSpikePrompt(sp, set.CPUWatchdog),
 		Project: projects.OutboxProject,
 		Type:    string(schema.TypeDiagnose),
-		Name:    "cpu-spike-" + sp.Source + "-" + now.Format("20060102-1504"),
+		Name:    tickets.Slug("cpu-spike-" + sp.Source + "-" + now.Format("20060102-1504")),
 		Unique:  "cpu-spike:" + sp.Source,
 		Front:   true,
 		Notify:  true,

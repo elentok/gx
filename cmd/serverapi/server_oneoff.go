@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/apiclient"
@@ -26,6 +25,7 @@ const exitDuplicateLive = 7
 
 func newServerOneOffCmd(d Deps) *cobra.Command {
 	var req wire.OneOffRequest
+	var file string
 	var jsonOut, wait bool
 	var timeout time.Duration
 	cmd := &cobra.Command{
@@ -33,28 +33,28 @@ func newServerOneOffCmd(d Deps) *cobra.Command {
 		Short: "create a top-level ticket from a prompt and queue it",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) == 0 && req.File == "" {
+			if len(args) == 0 && file == "" {
 				return errors.New("a one-off needs a prompt argument or --file")
+			}
+			if len(args) == 1 {
+				req.Prompt = args[0]
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			if file != "" {
+				// A payload that cannot be used refuses before the server is dialled.
+				if refusal := applyOneOffPayload(&req, file); refusal != nil {
+					return renderOneOff(ctx, d.Dirs(), nil, c.OutOrStdout(), c.ErrOrStderr(), jsonOut, wait, timeout, *refusal)
+				}
 			}
 			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
-			if len(args) == 1 {
-				req.Prompt = args[0]
-			}
 			if req.Cwd, err = os.Getwd(); err != nil {
 				return err
-			}
-			if req.File != "" {
-				// The server reads the file, so it needs a path valid from its side.
-				if req.File, err = filepath.Abs(req.File); err != nil {
-					return err
-				}
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
 			}
 			return runServerOneOff(ctx, d.Dirs(), cl, c.OutOrStdout(), c.ErrOrStderr(), jsonOut, wait, timeout, req)
 		},
@@ -67,7 +67,7 @@ func newServerOneOffCmd(d Deps) *cobra.Command {
 	cmd.Flags().IntVar(&req.ExpectedContextWindow, "expected-context-window", 0, "expected context window in tokens")
 	cmd.Flags().BoolVar(&req.Front, "front", false, "queue it at the head instead of the tail")
 	cmd.Flags().BoolVar(&req.Notify, "notify", false, "send the ticket's Result to chat when it succeeds (a pause always notifies)")
-	cmd.Flags().StringVar(&req.File, "file", "", "markdown payload (frontmatter + body); flags override its frontmatter. Read by the server, so localhost only")
+	cmd.Flags().StringVar(&file, "file", "", "markdown payload (frontmatter + body); flags override its frontmatter")
 	cmd.Flags().StringVar(&req.Unique, "unique", "", "dedupe key: refuse while a live ticket of the project has it (--file defaults to its resolved path)")
 	cmd.Flags().BoolVar(&req.NoUnique, "no-unique", false, "do not dedupe, even with --file")
 	cmd.MarkFlagsMutuallyExclusive("unique", "no-unique")
@@ -87,6 +87,12 @@ func runServerOneOff(ctx context.Context, dirs config.Dirs, cl *apiclient.Client
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
+	return renderOneOff(ctx, dirs, cl, w, errW, jsonOut, wait, timeout, res)
+}
+
+// renderOneOff prints a submit's result and, when asked, waits on its ticket.
+// cl may be nil when res is a refusal made before any server call.
+func renderOneOff(ctx context.Context, dirs config.Dirs, cl *apiclient.Client, w, errW io.Writer, jsonOut, wait bool, timeout time.Duration, res wire.OneOffResult) error {
 	d := DecideOneOff(res, wait)
 	if d.Notice != "" {
 		fmt.Fprintln(errW, d.Notice)

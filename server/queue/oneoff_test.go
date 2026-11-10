@@ -154,54 +154,42 @@ func TestOneOff_OptionsMergeInFrontmatter(t *testing.T) {
 	}
 }
 
-func TestOneOff_FileTypeKeyIsIgnored(t *testing.T) {
+func TestOneOff_NameBecomesTheTicketSlug(t *testing.T) {
 	t.Parallel()
 	h, repo := rigs.StartOneOffHarness(t)
-	file := filepath.Join(t.TempDir(), "payload.md")
-	if err := os.WriteFile(file, []byte("---\ntype: implement\n---\njust a prompt\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	res, err := h.Client.Queue.OneOff(context.Background(), wire.OneOffRequest{File: file, Cwd: repo})
-	if err != nil || res.Refused {
-		t.Fatalf("one-off: %+v, %v", res, err)
-	}
-	if raw := readOneOffTicket(t, h, res.Address); !strings.Contains(raw, "type: prompt") {
-		t.Errorf("type key changed the ticket type:\n%s", raw)
-	}
-}
-
-func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
-	t.Parallel()
-	h, repo := rigs.StartOneOffHarness(t)
-	ctx := context.Background()
-	file := filepath.Join(t.TempDir(), "payload.md")
-	payload := "---\nexpected_context_window: 40000\nname: from-file\n---\nbuild it from the file\n"
-	if err := os.WriteFile(file, []byte(payload), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{File: file, Cwd: repo, ExpectedContextWindow: 90000})
+	res, err := h.Client.Queue.OneOff(context.Background(), wire.OneOffRequest{
+		Prompt: "build it from the request", Name: "from-request", Cwd: repo, ExpectedContextWindow: 90000,
+	})
 	if err != nil || res.Refused {
 		t.Fatalf("one-off: %+v, %v", res, err)
 	}
 	if res.Address != "proj:one-offs/01" {
 		t.Errorf("address = %q; want proj:one-offs/01", res.Address)
 	}
-	if files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "one-offs", "issues", "01-from-file.md")); len(files) != 1 {
-		t.Errorf("ticket files = %v; want the frontmatter name as slug", files)
+	if files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "one-offs", "issues", "01-from-request.md")); len(files) != 1 {
+		t.Errorf("ticket files = %v; want the name as slug", files)
 	}
 	raw := readOneOffTicket(t, h, res.Address)
-	for _, want := range []string{"type: prompt", "expected_context_window: 90000", "build it from the file"} {
+	for _, want := range []string{"type: prompt", "expected_context_window: 90000", "build it from the request"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("ticket lacks %q:\n%s", want, raw)
 		}
 	}
-	if strings.Contains(raw, "40000") {
-		t.Errorf("flag should override the frontmatter window:\n%s", raw)
-	}
+}
 
-	res, err = h.Client.Queue.OneOff(ctx, wire.OneOffRequest{File: filepath.Join(t.TempDir(), "missing.md"), Cwd: repo})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonBadFile {
-		t.Errorf("missing file: %+v, %v; want %s refusal", res, err, wire.ReasonBadFile)
+// A name becomes a filename, so only lowercase letters, digits and dashes pass.
+func TestOneOff_NameThatIsNotASlugIsRefusedAndNothingIsWritten(t *testing.T) {
+	t.Parallel()
+	h, repo := rigs.StartOneOffHarness(t)
+	ctx := context.Background()
+	for _, name := range []string{"Upper", "with_underscore", "dotted.name", "..", "../escape", "a/b", "with space", `back\slash`} {
+		res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "x", Name: name, Cwd: repo})
+		if err != nil || !res.Refused || res.Reason != wire.ReasonInvalidAddress {
+			t.Errorf("name %q: %+v, %v; want refusal %s", name, res, err, wire.ReasonInvalidAddress)
+		}
+	}
+	if files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "one-offs", "issues", "*")); len(files) != 0 {
+		t.Errorf("a refused submit left %v behind", files)
 	}
 }
 
@@ -210,10 +198,6 @@ func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
 func TestOneOff_AgentIsPinnedOnlyByAnExplicitChoice(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	payload := filepath.Join(t.TempDir(), "payload.md")
-	if err := os.WriteFile(payload, []byte("---\nagent: codex\n---\nfrom the file\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	cases := []struct {
 		name      string
 		req       wire.OneOffRequest
@@ -221,7 +205,7 @@ func TestOneOff_AgentIsPinnedOnlyByAnExplicitChoice(t *testing.T) {
 	}{
 		{"plain", wire.OneOffRequest{Prompt: "plain job", Name: "plain-job"}, ""},
 		{"flag", wire.OneOffRequest{Prompt: "flag job", Name: "flag-job", Agent: "claude"}, "claude"},
-		{"payload", wire.OneOffRequest{File: payload, Name: "payload-job"}, "codex"},
+		{"payload", wire.OneOffRequest{Prompt: "from the file", Name: "payload-job", Agent: "codex"}, "codex"},
 	}
 	for _, c := range cases {
 		// A harness per case: the epic's root is queued once, by its first one-off.
@@ -282,11 +266,7 @@ func TestOneOff_InvalidAgentLeavesNoTicketAndRetryIsNotDuplicateLive(t *testing.
 	t.Parallel()
 	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
-	file := filepath.Join(t.TempDir(), "job.md")
-	if err := os.WriteFile(file, []byte("do the thing\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	req := wire.OneOffRequest{File: file, Cwd: repo, Name: "bad-agent-job", Agent: "gpt"}
+	req := wire.OneOffRequest{Prompt: "do the thing", Unique: "job-key", Cwd: repo, Name: "bad-agent-job", Agent: "gpt"}
 	res, err := h.Client.Queue.OneOff(ctx, req)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonInvalidAgent {
 		t.Fatalf("got %+v, %v; want refusal %s", res, err, wire.ReasonInvalidAgent)
@@ -362,30 +342,19 @@ func TestOneOff_RefusesBadTypes(t *testing.T) {
 	}
 }
 
-func TestOneOff_DuplicateLiveRefusedByFileKey(t *testing.T) {
+func TestOneOff_DuplicateLiveRefusedByUniqueKey(t *testing.T) {
 	t.Parallel()
 	h, repo := rigs.StartOneOffHarness(t)
 	ctx := context.Background()
-	dir := t.TempDir()
-	file := filepath.Join(dir, "payload.md")
-	if err := os.WriteFile(file, []byte("do the thing\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	link := filepath.Join(dir, "link.md")
-	if err := os.Symlink(file, link); err != nil {
-		t.Fatal(err)
-	}
-	first, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{File: file, Cwd: repo})
+	first, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "do the thing", Unique: "payload-key", Cwd: repo})
 	if err != nil || first.Refused {
 		t.Fatalf("first: %+v, %v", first, err)
 	}
-	for name, f := range map[string]string{"same file": file, "symlink": link} {
-		res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{File: f, Cwd: repo})
-		if err != nil || !res.Refused || res.Reason != wire.ReasonDuplicateLive || res.Address != first.Address {
-			t.Errorf("%s: %+v, %v; want duplicate-live naming %s", name, res, err, first.Address)
-		}
+	res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "do the thing", Unique: "payload-key", Cwd: repo})
+	if err != nil || !res.Refused || res.Reason != wire.ReasonDuplicateLive || res.Address != first.Address {
+		t.Errorf("same key: %+v, %v; want duplicate-live naming %s", res, err, first.Address)
 	}
-	if res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{File: file, Cwd: repo, NoUnique: true}); err != nil || res.Refused {
+	if res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "do the thing", Unique: "payload-key", Cwd: repo, NoUnique: true}); err != nil || res.Refused {
 		t.Errorf("--no-unique: %+v, %v; want accepted", res, err)
 	}
 	if res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "plain", Cwd: repo}); err != nil || res.Refused {

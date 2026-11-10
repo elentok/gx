@@ -112,6 +112,12 @@ func ParseAddress(s string, ctx AddressContext) (Address, error) {
 	if epic == "" {
 		epic = ctx.Epic
 	}
+	// Both name directories, so neither may climb out of its parent.
+	for _, part := range []string{project, epic} {
+		if part == "." || part == ".." {
+			return Address{}, &AddressError{CodeMalformedAddress, fmt.Sprintf("%q is not a ticket address: %q is not a project or epic name", s, part)}
+		}
+	}
 	if epic == "" {
 		return Address{}, &AddressError{CodeEpicRequired, fmt.Sprintf("%q names no epic and the current directory is not inside one", s)}
 	}
