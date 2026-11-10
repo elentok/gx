@@ -93,6 +93,10 @@ func (t *tui) handleControl(c Control) error {
 		return t.startToolCalls(c.ToolCalls)
 	case ActionAskQuestion:
 		return t.askQuestion(c.Ask)
+	case ActionAskScreen:
+		return t.startAskScreen(c.AskScreen)
+	case ActionAskEscTimeout:
+		return t.askEscTimeout()
 	case ActionFast:
 		t.fast = true
 		return nil

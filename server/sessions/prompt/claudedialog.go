@@ -17,8 +17,9 @@ const dismissReason = "The user doesn't want to proceed with this question. Do n
 // answerClaudeDialog resolves the held AskUserQuestion call of a claude-dialog
 // card (already checked as the current one): Release hands it to the terminal
 // dialog, an answer with nothing picked denies it, and anything else must
-// answer every question. A call that is no longer held is stale.
-func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest) wire.SessionResult {
+// answer every question. A card with no held call is a fallback card, answered
+// by keys.
+func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest, dir string) wire.SessionResult {
 	stale := sessions.Refusal(wire.ReasonStale, "the question moved on; review it first")
 	var held *wire.AskHookRequest
 	for _, h := range p.sessions.HeldAsks(req.ID) {
@@ -27,7 +28,7 @@ func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest) wire.SessionR
 		}
 	}
 	if held == nil {
-		return stale
+		return p.answerClaudeKeys(req, dir)
 	}
 	var res wire.AskHookResult
 	switch {

@@ -58,7 +58,7 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 		return sessions.Refusal(wire.ReasonStale, "the question moved on; review it first"), nil
 	}
 	if req.Source == wire.CardSourceClaudeDialog {
-		return p.answerClaudeDialog(req), nil
+		return p.answerClaudeDialog(req, dir), nil
 	}
 	if req.Source == wire.CardSourceCodex {
 		return p.answerCodexQuestion(req, *card, source)

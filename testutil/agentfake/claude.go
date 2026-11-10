@@ -69,6 +69,12 @@ const (
 	// for AskUserQuestion with Ask as its call, busy while the hook holds.
 	// Esc sends the hook SIGTERM.
 	ActionAskQuestion = "askquestion"
+	// ActionAskScreen makes the TUI fake open the AskUserQuestion dialog in
+	// AskScreen with no hook: a screen that takes arrows, digits, Enter, Esc
+	// and typed text and records them. ActionAskEscTimeout is the fake's own
+	// end of an Esc that no "[" followed.
+	ActionAskScreen     = "askscreen"
+	ActionAskEscTimeout = "askesctimeout"
 	// The Codex fake's scripted events. ActionToolCall runs Tool (default
 	// "Bash") with Command through its PreToolUse hooks; ActionPermission asks
 	// approval for Command through its PermissionRequest hooks; ActionTokenCount
@@ -121,6 +127,8 @@ type Control struct {
 	// text is Message.
 	Error  string `json:"error,omitempty"`
 	Status int    `json:"status,omitempty"`
+	// AskScreen is the dialog an ActionAskScreen opens.
+	AskScreen *AskScreen `json:"ask_screen,omitempty"`
 	// Model is the model an ActionModel makes the TUI fake report.
 	Model string `json:"model,omitempty"`
 	// Tokens is the context count an ActionUsage reports.

@@ -74,6 +74,9 @@ type tui struct {
 	descendants *exec.Cmd
 	// askHook is the AskUserQuestion hook an ActionAskQuestion started; Esc ends it.
 	askHook *exec.Cmd
+	// askUI is the AskUserQuestion dialog an ActionAskScreen opened; it takes
+	// every key until it ends.
+	askUI *askUI
 }
 
 type PendingWork struct {
@@ -147,6 +150,10 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 				return 0, err
 			}
 			if _, err := t.ack.Write([]byte{'.'}); err != nil {
+				return 0, err
+			}
+		case t.askUI != nil:
+			if err := t.askScreenKey(ev.Key); err != nil {
 				return 0, err
 			}
 		case t.opts.trust:
