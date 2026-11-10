@@ -10,6 +10,12 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+func TestLaunchSkill_CIFixTicketsRunGxCIFix(t *testing.T) {
+	if got := LaunchSkill(tickets.Ticket{Type: "ci-fix"}, DefaultWorkerSkill); got != "gx-ci-fix" {
+		t.Fatalf("LaunchSkill(ci-fix) = %q, want gx-ci-fix", got)
+	}
+}
+
 func TestLaunchSkill_PRTextTicketsRunGxPRText(t *testing.T) {
 	if got := LaunchSkill(tickets.Ticket{Type: "pr-text"}, DefaultWorkerSkill); got != "gx-pr-text" {
 		t.Fatalf("LaunchSkill(pr-text) = %q, want gx-pr-text", got)

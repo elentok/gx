@@ -237,6 +237,18 @@ func (p *Registry) AgentsConfig(project string) config.AgentsConfig {
 	return cfg.Agents
 }
 
+// CIFixSkills is config skills.ci-fix for project: the project's list replaces
+// the global one when it sets one.
+func (p *Registry) CIFixSkills(project string) []string {
+	cfg := config.Config{Skills: config.SkillsConfig{CIFix: p.settings.Load().CIFixSkills}}
+	if dir, err := p.Dir(project); err == nil {
+		if pf, err := config.ReadProjectFile(dir); err == nil {
+			cfg = cfg.WithProject(pf)
+		}
+	}
+	return cfg.Skills.CIFix
+}
+
 // LaunchHarness is the harness a new interactive session in project starts on
 // when its request names none. Unlike the Default harness it keeps an
 // unregistered name, so createSession refuses it instead of silently running

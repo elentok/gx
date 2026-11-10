@@ -76,6 +76,12 @@ type Settings struct {
 	// NoChecksGrace is config pr.no-checks-grace.
 	NoChecksGrace time.Duration
 
+	// CIFixSkills is config skills.ci-fix; the per-check and per-PR caps are
+	// pr.ci-fix-attempts-per-check and -per-pr. Zero caps mean the defaults.
+	CIFixSkills           []string
+	CIFixAttemptsPerCheck int
+	CIFixAttemptsPerPR    int
+
 	// WatchConfig reloads the config file whenever it is saved.
 	WatchConfig bool
 
@@ -173,6 +179,9 @@ func FromConfig(cfg config.Config) Settings {
 		DiskSpace:                   cfg.DiskSpace,
 		RecentlyFinished:            cfg.Server.RecentlyFinished,
 		NoChecksGrace:               cfg.PR.NoChecksGrace,
+		CIFixSkills:                 cfg.Skills.CIFix,
+		CIFixAttemptsPerCheck:       cfg.PR.CIFixAttemptsPerCheck,
+		CIFixAttemptsPerPR:          cfg.PR.CIFixAttemptsPerPR,
 		AgentsClaude:                cfg.Agents.Claude,
 		AgentsCodex:                 cfg.Agents.Codex,
 		AgentsDefaultHarness:        cfg.Agents.DefaultHarness,

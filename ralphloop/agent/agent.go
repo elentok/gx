@@ -72,6 +72,9 @@ const VerifySkill = "gx-verify-epic"
 // PRTextSkill is the skill launched for type: pr-text tickets.
 const PRTextSkill = "gx-pr-text"
 
+// CIFixSkill is the skill launched for type: ci-fix tickets.
+const CIFixSkill = "gx-ci-fix"
+
 // LaunchSkill is the skill an iteration on t starts under: workerSkill,
 // unless t's type routes it to its own skill.
 func LaunchSkill(t tickets.Ticket, workerSkill string) string {
@@ -82,6 +85,8 @@ func LaunchSkill(t tickets.Ticket, workerSkill string) string {
 		return VerifySkill
 	case t.Type == string(schema.TypePRText):
 		return PRTextSkill
+	case t.Type == string(schema.TypeCIFix):
+		return CIFixSkill
 	}
 	return workerSkill
 }

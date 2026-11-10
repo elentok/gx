@@ -93,6 +93,19 @@ func CountChecks(headSHA string, checks []Check) CheckCounts {
 	return n
 }
 
+// FailedChecks is the newest check of each failed key on headSHA, in the order
+// ClassifyChecks lists the keys, with the detail a fix agent reads.
+func FailedChecks(headSHA string, checks []Check) []Check {
+	order, latest := latestChecks(headSHA, checks)
+	var out []Check
+	for _, k := range order {
+		if classifyCheck(latest[k].Status, latest[k].Conclusion) == outcomeFailed {
+			out = append(out, latest[k])
+		}
+	}
+	return out
+}
+
 // ClassifyChecks classifies the checks on headSHA. Checks on other commits are
 // ignored. When the same key appears more than once, the last one wins, so
 // callers pass reruns in order. Failed lists the keys of the failed checks.

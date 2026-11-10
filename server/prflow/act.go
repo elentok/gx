@@ -15,7 +15,10 @@ type seenHead struct {
 // act is the per-poll dispatch: later PR tickets add their action here, each in
 // its own function. An error follows the watcher's outage rules.
 func (w *Watcher) act(r pr.Runner, repo string, t Target, v View) error {
-	return w.markReady(r, repo, t, v)
+	if err := w.markReady(r, repo, t, v); err != nil {
+		return err
+	}
+	return w.startCIFix(t, v)
 }
 
 // markReady takes a green draft out of draft, once per head SHA. A PR with no

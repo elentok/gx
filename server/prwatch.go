@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"path/filepath"
 	"time"
 
@@ -105,6 +106,19 @@ func (h prWatchHost) CancelStalePRText() {
 }
 
 func (h prWatchHost) OpenPR(root queue.RootRef) (prflow.Outcome, error) { return h.s.OpenPR(root) }
+
+func (h prWatchHost) CIFixSkills(project string) []string { return h.s.projects.CIFixSkills(project) }
+
+// CIFixCaps are the configured attempts per check and per PR; zero means the default.
+func (h prWatchHost) CIFixCaps() (perCheck, perPR int) {
+	set := h.s.settings.Load()
+	def := config.DefaultPRConfig()
+	return cmp.Or(set.CIFixAttemptsPerCheck, def.CIFixAttemptsPerCheck), cmp.Or(set.CIFixAttemptsPerPR, def.CIFixAttemptsPerPR)
+}
+
+func (h prWatchHost) QueueRoot(root queue.RootRef, ticketID string) error {
+	return h.s.merger.EnsureQueued(root, ticketID)
+}
 
 func (h prWatchHost) Env() []string { return h.s.cfg.Env }
 

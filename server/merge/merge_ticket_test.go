@@ -3,6 +3,7 @@ package merge_test
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -32,6 +33,13 @@ func newMergeFixture(t *testing.T, report func(n int) string, cfgOpts ...func(*s
 // turn n before reporting; an empty report writes none.
 func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n int) string, cfgOpts ...func(*server.Config)) (f *schedFixture, turns func() []mergeTurn) {
 	t.Helper()
+	return newFeatureTicketFixture(t, "merge", turn, cfgOpts...)
+}
+
+// newFeatureTicketFixture is newMergeFixtureWith for any ticket type that runs
+// in the feature worktree.
+func newFeatureTicketFixture(t *testing.T, typ string, turn func(f *schedFixture, cwd string, n int) string, cfgOpts ...func(*server.Config)) (f *schedFixture, turns func() []mergeTurn) {
+	t.Helper()
 	var mu sync.Mutex
 	var seen []mergeTurn
 	var agentTurn func(f *schedFixture, p *servertest.Turn, _ string)
@@ -52,7 +60,7 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 			reportIteration(t, f.TicketFile(t, "01"), report)
 		}
 	}
-	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: "merge"}}, agentTurn, cfgOpts...)
+	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: typ}}, agentTurn, cfgOpts...)
 	// One commit of its own, so the epic completes unmerged and keeps its worktree.
 	commitOnBranch(t, f.Repo, schedEpic)
 	// Merging the epic is not this ticket's concern.
@@ -102,6 +110,41 @@ func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
 		t.Errorf("ticket not done:\n%s", body)
 	}
 	f.assertFeatureKept(t, "finish")
+}
+
+// A ci-fix ticket runs like a merge ticket, but under gx-ci-fix, and an
+// unfixable outcome finishes with no commit without a zero-commit pause.
+func TestCIFixTicket_UnfixableFinishRunsInTheFeatureWorktreeWithoutACommit(t *testing.T) {
+	t.Parallel()
+	f, turns := newFeatureTicketFixture(t, "ci-fix", func(f *schedFixture, _ string, _ int) string {
+		path := f.TicketFile(t, "01")
+		body := servertest.ReadFile(t, path)
+		if err := os.WriteFile(path, []byte(body+"\n## Resolution\n\nCheck: build\nOutcome: unfixable\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return "finished"
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.QueueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
+
+	got := turns()
+	if len(got) != 1 {
+		t.Fatalf("turns = %d, want 1", len(got))
+	}
+	if want := "/gx-ci-fix proj:" + schedEpic + "/01"; got[0].prompt.Text != want {
+		t.Errorf("prompt = %q, want %q", got[0].prompt.Text, want)
+	}
+	if want := f.featureWorktree(t); got[0].prompt.Cwd != want {
+		t.Errorf("cwd = %s, want the feature worktree %s", got[0].prompt.Cwd, want)
+	}
+	if got[0].branch != schedEpic || got[0].iterationBranch != "" {
+		t.Errorf("branch = %q, iteration branch = %q; want the epic branch only", got[0].branch, got[0].iterationBranch)
+	}
+	if body := servertest.ReadFile(t, f.TicketFile(t, "01")); !strings.Contains(body, "status: done") {
+		t.Errorf("ticket not done:\n%s", body)
+	}
 }
 
 func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T) {

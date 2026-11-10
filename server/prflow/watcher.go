@@ -47,6 +47,12 @@ type Host interface {
 	// CancelStalePRText cancels the open or running pr-text ticket of every epic
 	// without a PR in a project whose delivery is no longer `pr`, read live.
 	CancelStalePRText()
+	// CIFixSkills is the skills a ci-fix ticket of project runs.
+	CIFixSkills(project string) []string
+	// CIFixCaps is the ci-fix attempts allowed per check and per PR.
+	CIFixCaps() (perCheck, perPR int)
+	// QueueRoot queues the epic's ticket so it is claimed.
+	QueueRoot(root queue.RootRef, ticketID string) error
 }
 
 // View is the live state of one epic's PR. It exists only in memory.
@@ -57,11 +63,13 @@ type View struct {
 	Draft   bool
 	HeadSHA string
 	// Rollup is GitHub's cheap rollup state for the head.
-	Rollup    string
-	Checks    pr.CheckCounts
-	CI        pr.ChecksResult
-	Failed    []pr.CheckKey
-	Mergeable string
+	Rollup string
+	Checks pr.CheckCounts
+	CI     pr.ChecksResult
+	Failed []pr.CheckKey
+	// FailedChecks is the failed checks of the head with their run and job ids.
+	FailedChecks []pr.Check
+	Mergeable    string
 	// LastError is the newest poll failure, empty after a good poll.
 	LastError   string
 	Unreachable bool
@@ -299,7 +307,7 @@ func (w *Watcher) nextView(r pr.Runner, repo string, t Target, st pr.WatchState)
 	failing := st.Rollup == "FAILURE" || st.Rollup == "ERROR"
 	detail := v.Number == 0 || v.HeadSHA != st.HeadSHA || v.Rollup != st.Rollup || failing
 	next := View{Number: t.Number, URL: t.URL, State: st.State, Draft: st.IsDraft, HeadSHA: st.HeadSHA,
-		Rollup: st.Rollup, Mergeable: st.Mergeable, Checks: v.Checks, CI: v.CI, Failed: v.Failed}
+		Rollup: st.Rollup, Mergeable: st.Mergeable, Checks: v.Checks, CI: v.CI, Failed: v.Failed, FailedChecks: v.FailedChecks}
 	if detail {
 		head, checks, err := r.PRChecks(repo, t.Number)
 		if err != nil {
@@ -308,6 +316,7 @@ func (w *Watcher) nextView(r pr.Runner, repo string, t Target, st pr.WatchState)
 		var failed []pr.CheckKey
 		next.CI, failed = pr.ClassifyChecks(head, checks)
 		next.Failed = failed
+		next.FailedChecks = pr.FailedChecks(head, checks)
 		next.Checks = pr.CountChecks(head, checks)
 	}
 	return next, nil

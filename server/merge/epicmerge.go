@@ -332,6 +332,12 @@ func (s *Merger) ensureFeatureWorktree(project, epic, repo string) error {
 	return git.AddWorktreeOnBranch(info.Repo, epic, path)
 }
 
+// EnsureQueued queues ticketID of root unless the root is queued, so a ticket
+// the server just forked into an idle epic gets claimed.
+func (s *Merger) EnsureQueued(root queue.RootRef, ticketID string) error {
+	return s.ensureRootQueued(root, tickets.Ticket{Identifier: ticketID})
+}
+
 // ensureRootQueued queues the root's first ticket unless the root is queued.
 func (s *Merger) ensureRootQueued(root queue.RootRef, first tickets.Ticket) error {
 	addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: first.Identifier}.String()

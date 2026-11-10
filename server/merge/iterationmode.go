@@ -52,7 +52,7 @@ type IterationMode struct {
 
 func (s *Landing) IterationModeFor(addr tickets.Address, t tickets.Ticket) IterationMode {
 	typ := schema.TicketType(t.Type)
-	if typ == schema.TypeMerge {
+	if typ == schema.TypeMerge || prflow.RunsInFeature(typ) {
 		return IterationMode{Feature: true, target: func() (string, error) { return s.host.MergeTarget(addr) }}
 	}
 	if typ == schema.TypeTrunkConflict {
