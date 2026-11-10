@@ -63,7 +63,7 @@ test.each(["tablet", "phone"] as const)("on %s the Dev pill sits in the row befo
   const pill = document.querySelector('[data-part="dev-pill"]')!;
   const menu = screen.getByRole("button", { name: "Menu" });
   expect(pill.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(pill.parentElement).toBe(menu.parentElement);
+  expect(pill.closest("button")!.parentElement).toBe(menu.parentElement);
 });
 
 test("the + New menu lists the three items and New workspace calls its prop", async () => {
