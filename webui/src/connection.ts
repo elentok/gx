@@ -31,7 +31,12 @@ export interface ConnectionDeps {
   openStream?: (url: string, signal: AbortSignal) => Promise<AsyncIterable<string>>;
   /** Seeds the first render with the last snapshot and saves each new one. */
   cache?: SnapshotCache;
+  /** Reloads the page on the server's reload event. Defaults to window.location.reload. */
+  reload?: () => void;
 }
+
+/** The server event that asks every open page to reload (a Dev UI swap). */
+export const RELOAD_EVENT = "reload";
 
 // The server's heartbeat is an SSE comment line, which EventSource never surfaces, so
 // the stream is read as raw text: any chunk, comment or event, proves the link is alive.
@@ -64,6 +69,11 @@ function eventAddress(block: string): string | undefined {
   }
 }
 
+function eventId(block: string): number | undefined {
+  const id = /^id: ?(\d+)$/m.exec(block)?.[1];
+  return id === undefined ? undefined : Number(id);
+}
+
 function eventName(block: string): string {
   return /^event: ?(.*)$/m.exec(block)?.[1] ?? "";
 }
@@ -76,6 +86,9 @@ export function createConnection(deps: ConnectionDeps = {}) {
   const getSnapshot = deps.fetchSnapshot ?? fetchSnapshot;
   const openStream = deps.openStream ?? openEventStream;
   const clientId = deps.clientId ?? `web-${randomId()}`;
+  const reload = deps.reload ?? (() => window.location.reload());
+  // A reconnect can replay a reload event this page already acted on; ids only grow, so one id is never acted on twice.
+  let lastReloadId = -1;
 
   const cached = deps.cache?.load() ?? null;
   let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, liveSnapshot: false, tick: 0, streams: 0 };
@@ -187,7 +200,16 @@ export function createConnection(deps: ConnectionDeps = {}) {
         // there is one, only lets a ticket page tell whether the event is about it.
         const events = blocks.filter((b) => /^event:/m.test(b));
         if (events.length > 0) void refresh(g);
-        for (const b of events) eventListeners.forEach((l) => l(eventAddress(b), eventName(b)));
+        for (const b of events) {
+          if (eventName(b) === RELOAD_EVENT) {
+            const id = eventId(b);
+            if (id === undefined || id > lastReloadId) {
+              if (id !== undefined) lastReloadId = id;
+              reload();
+            }
+          }
+          eventListeners.forEach((l) => l(eventAddress(b), eventName(b)));
+        }
       }
       if (g === gen) fail();
     } catch {

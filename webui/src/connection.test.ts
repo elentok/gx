@@ -37,8 +37,10 @@ function setup(opts: { snapshotFails?: () => boolean } = {}) {
   const log: string[] = [];
   const streams: FakeStream[] = [];
   let seq = 0;
+  const reload = vi.fn();
   const conn = createConnection({
     clientId: "tab-1",
+    reload,
     fetchSnapshot: async () => {
       log.push("snapshot");
       if (opts.snapshotFails?.()) throw new Error("down");
@@ -71,7 +73,7 @@ function setup(opts: { snapshotFails?: () => boolean } = {}) {
       })();
     },
   });
-  return { conn, log, streams };
+  return { conn, log, streams, reload };
 }
 
 function setVisibility(v: "visible" | "hidden") {
@@ -102,6 +104,40 @@ test("an event frame refetches the snapshot without reconnecting", async () => {
   await vi.advanceTimersByTimeAsync(0);
   expect(log).toEqual(["snapshot", "events /v1/events?since=1&client=tab-1", "snapshot"]);
   expect(conn.getState().snapshot?.seq).toBe(2);
+  conn.stop();
+});
+
+test("a dev-changed event refetches the snapshot", async () => {
+  const { conn, log, streams } = setup();
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  streams[0].push('id: 2\nevent: dev-changed\ndata: {"type":"dev-changed"}\n\n');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(log).toEqual(["snapshot", "events /v1/events?since=1&client=tab-1", "snapshot"]);
+  conn.stop();
+});
+
+test("a reload event calls the injected reload once", async () => {
+  const { conn, streams, reload } = setup();
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  streams[0].push('id: 2\nevent: reload\ndata: {"type":"reload"}\n\n');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(reload).toHaveBeenCalledTimes(1);
+  conn.stop();
+});
+
+test("a reload event replayed after a reconnect does not reload again", async () => {
+  const { conn, streams, reload } = setup();
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  streams[0].push('id: 5\nevent: reload\ndata: {}\n\n');
+  await vi.advanceTimersByTimeAsync(0);
+  streams[0].end();
+  await vi.advanceTimersByTimeAsync(1000);
+  streams[1].push('id: 5\nevent: reload\ndata: {}\n\n');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(reload).toHaveBeenCalledTimes(1);
   conn.stop();
 });
 
