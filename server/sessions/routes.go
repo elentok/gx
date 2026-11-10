@@ -62,6 +62,6 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 		{Pattern: "POST /v1/sessions/link", Handler: res((*Resumer).SessionLinkWrite)},
 		{Pattern: "POST /v1/sessions/step", Handler: res((*Resumer).SessionStepWrite)},
 		{Pattern: "POST /v1/sessions/resume", Web: wire.WebWrite, Handler: write(resume), WebHandler: designWeb(resume)},
-		{Pattern: "POST /v1/sessions/interrupt", Web: wire.WebWrite, Handler: write(interrupt), WebHandler: designWeb(interrupt)},
+		{Pattern: "POST /v1/sessions/interrupt", Web: wire.WebWrite, Handler: write(interrupt), WebHandler: agentWeb(interrupt)},
 	}
 }

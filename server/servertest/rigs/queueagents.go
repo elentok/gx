@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -61,19 +62,19 @@ func StartQueueRows(t *testing.T, runner string) (*servertest.Harness, NamedFake
 // StartQueueChat queues the ticket on the default PTY runner and holds its
 // turn open after the agent wrote text to its transcript. The returned
 // release ends the turn.
-func StartQueueChat(t *testing.T, text string) (*servertest.Harness, wire.SessionInfo, func()) {
+func StartQueueChat(t *testing.T, text string, opts ...func(*server.Config)) (*servertest.Harness, wire.SessionInfo, func()) {
 	t.Helper()
-	return StartQueueChatTokens(t, text, 0)
+	return StartQueueChatTokens(t, text, 0, opts...)
 }
 
 // StartQueueChatTokens is StartQueueChat with the agent's reply reporting
 // inputTokens of context.
-func StartQueueChatTokens(t *testing.T, text string, inputTokens int) (*servertest.Harness, wire.SessionInfo, func()) {
+func StartQueueChatTokens(t *testing.T, text string, inputTokens int, opts ...func(*server.Config)) (*servertest.Harness, wire.SessionInfo, func()) {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, opts...)
 	var release func()
 	held := make(chan struct{})
 	h.OnTurn(func(turn *servertest.Turn) {
