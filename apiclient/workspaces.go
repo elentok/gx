@@ -33,9 +33,12 @@ func (a *Admin) ReorderWorkspaces(ctx context.Context, names []string) (wire.Wor
 	return a.workspaceWrite(ctx, "/v1/workspaces/reorder", wire.WorkspaceRequest{Order: names})
 }
 
-// MoveToWorkspace puts a Design, epic or chat in a workspace. A refusal is a result.
-func (a *Admin) MoveToWorkspace(ctx context.Context, key, workspace string) (wire.WorkspaceResult, error) {
-	return a.workspaceWrite(ctx, "/v1/workspaces/move", wire.WorkspaceRequest{Key: key, Name: workspace})
+// MoveToWorkspace puts Designs, epics or chats in a workspace, each on its own.
+// A refusal is a result.
+func (a *Admin) MoveToWorkspace(ctx context.Context, workspace string, keys ...string) (wire.TargetsResult, error) {
+	var res wire.TargetsResult
+	err := a.t.post(ctx, "/v1/workspaces/move", wire.WorkspaceRequest{Targets: keys, Name: workspace}, &res)
+	return res, err
 }
 
 // RemoveFromWorkspace sends a member back to the Default workspace.
@@ -48,18 +51,19 @@ func (a *Admin) SetWorkspaceSort(ctx context.Context, name, sort string) (wire.W
 	return a.workspaceWrite(ctx, "/v1/workspaces/sort", wire.WorkspaceRequest{Name: name, Sort: sort})
 }
 
-// HoldEpic holds a Design or epic; yes confirms exiting the Design's live
-// sessions. A refusal is a result (Refused set).
-func (a *Admin) HoldEpic(ctx context.Context, epic string, yes bool) (wire.HoldResult, error) {
+// HoldEpics holds Designs or epics, each on its own; yes confirms exiting a
+// Design's live sessions for the whole request, dryRun writes nothing. A
+// refusal is a result.
+func (a *Admin) HoldEpics(ctx context.Context, targets []string, yes, dryRun bool) (wire.HoldResult, error) {
 	var res wire.HoldResult
-	err := a.t.post(ctx, "/v1/workspaces/hold", wire.HoldRequest{Epic: epic, Yes: yes}, &res)
+	err := a.t.post(ctx, "/v1/workspaces/hold", wire.HoldRequest{Targets: targets, Yes: yes, DryRun: dryRun}, &res)
 	return res, err
 }
 
-// UnholdEpic clears a hold.
-func (a *Admin) UnholdEpic(ctx context.Context, epic string) (wire.HoldResult, error) {
+// UnholdEpics clears the holds.
+func (a *Admin) UnholdEpics(ctx context.Context, targets []string) (wire.HoldResult, error) {
 	var res wire.HoldResult
-	err := a.t.post(ctx, "/v1/workspaces/unhold", wire.HoldRequest{Epic: epic}, &res)
+	err := a.t.post(ctx, "/v1/workspaces/unhold", wire.HoldRequest{Targets: targets}, &res)
 	return res, err
 }
 

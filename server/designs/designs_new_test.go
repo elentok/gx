@@ -150,7 +150,7 @@ func TestDesignsOpenNew_PromotedFromAChatStartsInItsWorkspace(t *testing.T) {
 	if err != nil || chat.Session == nil {
 		t.Fatalf("create chat = %+v, %v", chat, err)
 	}
-	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, chat.Session.ID, "Bugs"); err != nil || res.Refused {
+	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, "Bugs", chat.Session.ID); err != nil || res.Results[0].Refused() {
 		t.Fatalf("move chat = %+v, %v", res, err)
 	}
 	open := func(slug, from string) {
@@ -187,7 +187,7 @@ func TestDesignsOpenNew_WorkspaceNameDecidesWhereItLands(t *testing.T) {
 	if err != nil || chat.Session == nil {
 		t.Fatalf("create chat = %+v, %v", chat, err)
 	}
-	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, chat.Session.ID, "Bugs"); err != nil || res.Refused {
+	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, "Bugs", chat.Session.ID); err != nil || res.Results[0].Refused() {
 		t.Fatalf("move chat = %+v, %v", res, err)
 	}
 	var members func() map[string]int

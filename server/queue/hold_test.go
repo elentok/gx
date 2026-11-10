@@ -24,7 +24,7 @@ func TestQueueAdd_ClearsTheHoldOfAHeldEpic(t *testing.T) {
 	f := servertest.StartDesignsIn(t, store)
 
 	for _, addr := range []string{"proj:plain", "proj:other", "proj:map"} {
-		if res, err := f.H.Client.Admin.HoldEpic(f.Ctx, addr, true); err != nil || res.Refused {
+		if res, err := f.H.Client.Admin.HoldEpics(f.Ctx, []string{addr}, true, false); err != nil || res.Results[0].Refused() {
 			t.Fatalf("hold %s = %+v, %v", addr, res, err)
 		}
 	}

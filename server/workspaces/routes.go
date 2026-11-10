@@ -61,8 +61,23 @@ func Routes(get func() *Store, listed func() []wire.Workspace) []wire.Route {
 		}}
 	}
 	return []wire.Route{
-		hold("POST /v1/workspaces/hold", func(s *Store, r wire.HoldRequest) (wire.HoldResult, error) { return s.HoldEpic(r.Epic, r.Yes) }),
-		hold("POST /v1/workspaces/unhold", func(s *Store, r wire.HoldRequest) (wire.HoldResult, error) { return s.UnholdEpic(r.Epic) }),
+		hold("POST /v1/workspaces/hold", func(s *Store, r wire.HoldRequest) (wire.HoldResult, error) {
+			return s.HoldEpics(r.Targets, r.Yes, r.DryRun)
+		}),
+		hold("POST /v1/workspaces/unhold", func(s *Store, r wire.HoldRequest) (wire.HoldResult, error) { return s.UnholdEpics(r.Targets) }),
+		{Pattern: "POST /v1/workspaces/move", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) {
+			var req wire.WorkspaceRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			res, err := get().MoveTargets(req.Targets, req.Name)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			wire.WriteJSON(w, res)
+		}},
 		{Pattern: "GET /v1/workspaces", Web: wire.WebRead, Handler: func(w http.ResponseWriter, _ *http.Request) {
 			wire.WriteJSON(w, wire.WorkspaceList{Workspaces: listed()})
 		}},
@@ -70,7 +85,6 @@ func Routes(get func() *Store, listed func() []wire.Workspace) []wire.Route {
 		write("POST /v1/workspaces/rename", func(s *Store, r wire.WorkspaceRequest) error { return s.Rename(r.Name, r.To) }),
 		write("POST /v1/workspaces/delete", func(s *Store, r wire.WorkspaceRequest) error { return s.Delete(r.Name) }),
 		write("POST /v1/workspaces/reorder", func(s *Store, r wire.WorkspaceRequest) error { return s.Reorder(r.Order) }),
-		write("POST /v1/workspaces/move", func(s *Store, r wire.WorkspaceRequest) error { return s.Join(r.Key, r.Name) }),
 		write("POST /v1/workspaces/sort", func(s *Store, r wire.WorkspaceRequest) error { return s.SetSort(r.Name, r.Sort) }),
 		write("POST /v1/workspaces/remove", func(s *Store, r wire.WorkspaceRequest) error { return s.Remove(r.Key) }),
 	}

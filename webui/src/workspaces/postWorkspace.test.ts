@@ -7,10 +7,10 @@ afterEach(() => vi.unstubAllGlobals());
 it("posts the JSON body to the workspace route and returns the parsed result", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
   vi.stubGlobal("fetch", fetchMock);
-  await expect(postWorkspace("move", { name: "w", key: "k" })).resolves.toEqual({ ok: true });
+  await expect(postWorkspace("move", { name: "w", targets: ["k"] })).resolves.toEqual({ ok: true });
   expect(fetchMock).toHaveBeenCalledWith(
     "/v1/workspaces/move",
-    expect.objectContaining({ method: "POST", body: JSON.stringify({ name: "w", key: "k" }) }),
+    expect.objectContaining({ method: "POST", body: JSON.stringify({ name: "w", targets: ["k"] }) }),
   );
 });
 

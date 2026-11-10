@@ -5,11 +5,13 @@ import {
   HoldQueuedText,
   SectionOnHold,
   type EpicListRow,
-  ReasonHoldLiveSessions,
-  type HoldResult,
+  ReasonNeedsYes,
+  TargetRefused,
+  type HoldRequest,
   type SessionInfo,
+  type TargetsResult,
   type Workspace,
-  type WorkspaceResult,
+  type WorkspaceRequest,
 } from "../generated/server";
 import type { StopSession } from "../design/open";
 import { useSessionManage } from "../agents/useSessionManage";
@@ -18,7 +20,7 @@ import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu";
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
-import { useWrite } from "../useWrite";
+import { useWrite, WriteError, type Refusable } from "../useWrite";
 import { postWorkspace } from "./postWorkspace";
 
 /** What the menu needs of a Design or epic card, a chat or a jump row. One-off, Follow-ups and Other get no menu. */
@@ -54,19 +56,31 @@ export function useCardActions(card: EpicListRow | undefined, workspaces: Worksp
   return useItemActions(itemOfCard(card), workspaces);
 }
 
+/** The one result of a one-target write, flat as `useWrite` wants it. */
+export interface ItemWriteResult extends Refusable {
+  sessions?: string[];
+}
+
 export interface ItemWriters {
-  move: (key: string, to: string) => Promise<WorkspaceResult>;
-  hold: (epic: string, yes?: boolean) => Promise<HoldResult>;
-  unhold: (epic: string) => Promise<HoldResult>;
+  move: (key: string, to: string) => Promise<ItemWriteResult>;
+  hold: (epic: string, yes?: boolean) => Promise<ItemWriteResult>;
+  unhold: (epic: string) => Promise<ItemWriteResult>;
   /** A chat's Stop and Remove; the agent page's defaults when absent. */
   stop?: StopSession;
   remove?: RemoveSession;
 }
 
-export const postMove = (key: string, to: string) => postWorkspace<WorkspaceResult>("move", { name: to, key });
-export const postHold = (epic: string, yes?: boolean) =>
-  postWorkspace<HoldResult>("hold", { epic, ...(yes ? { yes } : {}) });
-export const postUnhold = (epic: string) => postWorkspace<HoldResult>("unhold", { epic });
+/** Posts one target and unwraps its result: a refusal is `refused`, as `useWrite` reads it. */
+async function postOne(route: string, body: WorkspaceRequest | HoldRequest): Promise<ItemWriteResult> {
+  const { results } = await postWorkspace<TargetsResult>(route, body);
+  const r = results[0];
+  if (!r) throw new WriteError("The server answered with no result.");
+  return { refused: r.status === TargetRefused, reason: r.reason, message: r.message, sessions: r.sessions };
+}
+
+export const postMove = (key: string, to: string) => postOne("move", { name: to, targets: [key] });
+export const postHold = (epic: string, yes?: boolean) => postOne("hold", { targets: [epic], ...(yes ? { yes } : {}) });
+export const postUnhold = (epic: string) => postOne("unhold", { targets: [epic] });
 
 export const defaultWriters: ItemWriters = { move: postMove, hold: postHold, unhold: postUnhold };
 
@@ -145,7 +159,7 @@ export function useItemActions(
       run(async () => {
         const res = await writers.hold(item.key);
         // A refusal that names live sessions is a question, not an error: ask, then re-post with yes.
-        if (res.refused && res.reason === ReasonHoldLiveSessions) {
+        if (res.refused && res.reason === ReasonNeedsYes) {
           setDialog({ kind: "hold", sessions: res.sessions ?? [] });
           return { ...res, refused: false };
         }

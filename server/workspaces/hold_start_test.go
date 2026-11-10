@@ -20,8 +20,8 @@ func heldKeys(t *testing.T, held func() (wire.Snapshot, error)) []string {
 func TestHold_OpeningAHeldDesignTakesTheHoldOff(t *testing.T) {
 	f := holdFixture(t)
 	f.Open(t, "proj:map", false)
-	if res, err := f.H.Client.Admin.HoldEpic(f.Ctx, "proj:map", true); err != nil || res.Refused {
-		t.Fatalf("hold = %+v, %v", res, err)
+	if res := hold(t, f, true, false, "proj:map"); res.Results[0].Refused() {
+		t.Fatalf("hold = %+v", res)
 	}
 	snap := func() (wire.Snapshot, error) { return f.H.Client.Snapshot(f.Ctx) }
 	if got := heldKeys(t, snap); !slices.Equal(got, []string{"proj:map"}) {
@@ -39,8 +39,8 @@ func TestHold_OpeningAHeldDesignTakesTheHoldOff(t *testing.T) {
 func TestHold_ResumingAHeldDesignSessionTakesTheHoldOff(t *testing.T) {
 	f := holdFixture(t)
 	id := f.Open(t, "proj:map", false).Session.ID
-	if res, err := f.H.Client.Admin.HoldEpic(f.Ctx, "proj:map", true); err != nil || res.Refused {
-		t.Fatalf("hold = %+v, %v", res, err)
+	if res := hold(t, f, true, false, "proj:map"); res.Results[0].Refused() {
+		t.Fatalf("hold = %+v", res)
 	}
 	if res, err := f.H.Client.Sessions.Resume(f.Ctx, id); err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)

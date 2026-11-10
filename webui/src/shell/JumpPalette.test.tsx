@@ -72,7 +72,15 @@ function Where() {
 }
 
 function setup({ path = "/agents", narrow = false } = {}) {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) =>
+      new Response(
+        JSON.stringify(String(url).includes("/v1/workspaces/") ? { results: [{ target: "x", status: "done" }], held: [] } : { epics: rows, follow_ups: [] }),
+        { status: 200 },
+      ),
+    ),
+  );
   if (narrow) vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   const state = { snapshot: { sessions, placements, workspaces: [{ name: "Default", default: true, members: 3 }, { name: "Work", members: 2 }] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
@@ -260,7 +268,7 @@ test("Move from a row posts and does not open the row", async () => {
   fireEvent.click(await screen.findByRole("menuitem", { name: /^Work/ }));
   await waitFor(() => expect(posts()).toHaveLength(1));
   expect(String(posts()[0][0])).toContain("/v1/workspaces/move");
-  expect(JSON.parse(String(posts()[0][1]?.body))).toEqual({ name: "Work", key: "p:blog" });
+  expect(JSON.parse(String(posts()[0][1]?.body))).toEqual({ name: "Work", targets: ["p:blog"] });
   expect(screen.getByTestId("where").textContent).toBe("/agents");
 });
 

@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { HoldQueuedText, ReasonHoldLiveSessions, type Workspace } from "../generated/server";
+import { HoldQueuedText, ReasonNeedsYes, type Workspace } from "../generated/server";
 import { session } from "../agents/agentsTestKit";
 import { renderThemed } from "../ui/render";
 import { WideContext } from "../useWide";
-import { ItemMenu, type ItemRef, type ItemWriters } from "./itemActions";
+import { ItemMenu, postHold, type ItemRef, type ItemWriters } from "./itemActions";
 
 afterEach(cleanup);
 
@@ -15,8 +15,8 @@ const workspaces: Workspace[] = [
 
 const writers = (over: Partial<ItemWriters> = {}): ItemWriters => ({
   move: vi.fn(async () => ({})),
-  hold: vi.fn(async () => ({ held: [] })),
-  unhold: vi.fn(async () => ({ held: [] })),
+  hold: vi.fn(async () => ({})),
+  unhold: vi.fn(async () => ({})),
   ...over,
 });
 
@@ -65,14 +65,28 @@ test("a queued epic's Hold is disabled with the reason", async () => {
 test("holding a Design with live sessions names them, then re-posts with yes", async () => {
   const hold = vi
     .fn<ItemWriters["hold"]>()
-    .mockResolvedValueOnce({ held: [], refused: true, reason: ReasonHoldLiveSessions, sessions: ["scratch", "draft"] })
-    .mockResolvedValueOnce({ held: ["p:shop"] });
+    .mockResolvedValueOnce({ refused: true, reason: ReasonNeedsYes, sessions: ["scratch", "draft"] })
+    .mockResolvedValueOnce({});
   await open(design, writers({ hold }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Hold" }));
   expect((await screen.findByText(/scratch, draft/)).textContent).toContain("ends its live sessions");
   expect(hold).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole("button", { name: "Hold and end sessions" }));
   await waitFor(() => expect(hold).toHaveBeenLastCalledWith("p:shop", true));
+});
+
+test("the default writers send one target and unwrap its result", async () => {
+  const fetchMock = vi.fn(async () =>
+    new Response(JSON.stringify({ held: [], results: [{ target: "p:shop", status: "refused", reason: "needs-yes", sessions: ["s1"] }] }), { status: 200 }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    await expect(postHold("p:shop", true)).resolves.toMatchObject({ refused: true, reason: ReasonNeedsYes, sessions: ["s1"] });
+    const init = (fetchMock.mock.calls[0] as unknown[])[1] as RequestInit;
+    expect(JSON.parse(String(init.body))).toEqual({ targets: ["p:shop"], yes: true });
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 test("Take off hold posts with no confirmation", async () => {

@@ -3263,6 +3263,51 @@ export interface StatsLimitBurns {
 }
 
 //////////
+// source: targets.go
+
+export const TargetDone = "done";
+export const TargetRefused = "refused";
+/**
+ * TargetFits is a dry run's answer for a target that would be done.
+ */
+export const TargetFits = "fits";
+/**
+ * Status values of a TargetResult.
+ */
+export type Target = typeof TargetDone | typeof TargetRefused | typeof TargetFits;
+/**
+ * TargetResult is what one target of a many-target write came to. A refusal is
+ * a result, not an error (ADR 0028), and blocks no other target.
+ */
+export interface TargetResult {
+  target: string;
+  status: string;
+  /**
+   * Reason is a stable code, set only when refused.
+   */
+  reason?: string;
+  message?: string;
+  /**
+   * NewAddress is set only after a rename.
+   */
+  new_address?: string;
+  /**
+   * Sessions are the live Session ids the write stopped, or on a dry run would stop.
+   */
+  sessions?: string[];
+}
+/**
+ * TargetsResult is the envelope of a many-target write, in argument order.
+ */
+export interface TargetsResult {
+  results: TargetResult[];
+}
+/**
+ * ReasonNeedsYes refuses a target whose write stops live Sessions and came without yes.
+ */
+export const ReasonNeedsYes = "needs-yes";
+
+//////////
 // source: tips.go
 
 /**
@@ -3740,13 +3785,15 @@ export interface WorkspaceList {
 /**
  * WorkspaceRequest is a workspace write: Name is the workspace acted on, To the
  * new name of a rename. Key is the Design, epic or chat a move or remove acts
- * on (Name is the target workspace of a move); Order is the full new order of a reorder.
+ * on (a remove; Name is the target workspace of a move); Targets are the keys a move acts on;
+ * Order is the full new order of a reorder.
  * Sort is the Sort* value a sort write sets on Name.
  */
 export interface WorkspaceRequest {
   name: string;
   to?: string;
   key?: string;
+  targets?: string[];
   order?: string[];
   sort?: string;
 }
@@ -3777,33 +3824,28 @@ export interface WorkspaceResult {
   message?: string;
 }
 /**
- * HoldRequest holds or unholds a Design or epic. Yes confirms that holding
- * exits the Design's live sessions.
+ * HoldRequest holds or unholds Designs or epics. Yes confirms, for the whole
+ * request, that holding exits a Design's live sessions. DryRun runs every rule
+ * and writes nothing.
  */
 export interface HoldRequest {
-  epic: string;
+  targets: string[];
   yes?: boolean;
+  dry_run?: boolean;
 }
 /**
- * HoldResult is a hold or unhold: the held keys after it and the sessions it
- * ended, or a refusal. A refusal for ReasonHoldLiveSessions lists the sessions
- * that need Yes in Sessions.
+ * HoldResult is a hold or unhold: one result per target and the held keys
+ * after the request. A target that needs Yes is refused ReasonNeedsYes and
+ * lists the sessions in its Sessions.
  */
 export interface HoldResult {
+  results: TargetResult[];
   held: string[];
-  sessions?: string[];
-  refused?: boolean;
-  reason?: string;
-  message?: string;
 }
 /**
  * Refusal reasons of hold. The queued text is asserted by the web.
  */
 export const ReasonHoldQueued = "hold-queued";
-/**
- * Refusal reasons of hold. The queued text is asserted by the web.
- */
-export const ReasonHoldLiveSessions = "hold-live-sessions";
 /**
  * Refusal reasons of hold. The queued text is asserted by the web.
  */

@@ -211,7 +211,7 @@ test("a chat row reads Chat before its name", async () => {
 
 test("a row's ... menu opens and Move posts the other workspace", async () => {
   const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
-    new Response(JSON.stringify(String(url).includes("/v1/workspaces/") ? { workspaces: [] } : { epics: rows, follow_ups: [] }), { status: 200 }),
+    new Response(JSON.stringify(String(url).includes("/v1/workspaces/") ? { results: [{ target: "p:shop", status: "done" }] } :{ epics: rows, follow_ups: [] }), { status: 200 }),
   );
   setup("desktop");
   vi.stubGlobal("fetch", fetchMock);
@@ -221,7 +221,7 @@ test("a row's ... menu opens and Move posts the other workspace", async () => {
   fireEvent.click(await screen.findByRole("menuitem", { name: /^Work/ }));
   await waitFor(() => {
     const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/v1/workspaces/move"));
-    expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ name: "Work", key: "p:shop" });
+    expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ name: "Work", targets: ["p:shop"] });
   });
 });
 
@@ -337,7 +337,7 @@ test("Alt with the Hold dialog open leaves it open", async () => {
   const fetchMock = vi.fn(async (url: string) =>
     new Response(
       JSON.stringify(
-        String(url).includes("/v1/workspaces/hold") ? { held: [], refused: true, reason: "hold-live-sessions", sessions: ["designer"] } : { epics: rows, follow_ups: [] },
+        String(url).includes("/v1/workspaces/hold") ? { held: [], results: [{ target: "p:shop", status: "refused", reason: "needs-yes", sessions: ["designer"] }] } : { epics: rows, follow_ups: [] },
       ),
       { status: 200 },
     ),

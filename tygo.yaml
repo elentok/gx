@@ -27,6 +27,7 @@ packages:
       - settingspage.go
       - settingswrite.go
       - stats.go
+      - targets.go
       - tips.go
       - triage.go
       - usagesummary.go

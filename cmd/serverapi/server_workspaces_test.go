@@ -187,9 +187,17 @@ func TestServerWorkspaces_ReorderMoveRemove(t *testing.T) {
 	}
 
 	out, err := runWorkspaces(t, h, "move", "proj:follow-ups", "Bugs", "--json")
-	var res wire.WorkspaceResult
-	if err != nil || json.Unmarshal([]byte(out), &res) != nil || !res.Refused || res.Reason != wire.ReasonWorkspaceNotJoinable {
-		t.Errorf("--json refusal = %q (%v)", out, err)
+	var res wire.TargetsResult
+	if err == nil || json.Unmarshal([]byte(out), &res) != nil || len(res.Results) != 1 || !res.Results[0].Refused() || res.Results[0].Reason != wire.ReasonWorkspaceNotJoinable {
+		t.Errorf("--json refusal = %q (%v), want the envelope and a non-zero exit", out, err)
+	}
+
+	out, err = runWorkspaces(t, h, "move", "proj:plain", "proj:nope", "Bugs")
+	if err == nil || !strings.HasPrefix(out, "done proj:plain\nrefused proj:nope: ") || !strings.HasSuffix(out, "1 done, 1 refused\n") {
+		t.Errorf("two-target move = %q (%v), want a line per target and the summary", out, err)
+	}
+	if _, err := runWorkspaces(t, h, "move", "proj:plain"); err == nil {
+		t.Error("move without a workspace exited zero")
 	}
 
 	if _, err := runWorkspaces(t, h, "remove", "proj:plain"); err != nil {

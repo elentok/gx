@@ -1,6 +1,7 @@
 package epics_test
 
 import (
+	"context"
 	"net/http"
 	"slices"
 	"testing"
@@ -51,6 +52,14 @@ func (r wsRig) mustWrite(res wire.WorkspaceResult, err error) {
 	}
 }
 
+func (r wsRig) mustMove(ctx context.Context, key, workspace string) {
+	r.t.Helper()
+	res, err := r.h.Client.Admin.MoveToWorkspace(ctx, workspace, key)
+	if err != nil || res.Results[0].Refused() {
+		r.t.Fatalf("move: %v %+v", err, res)
+	}
+}
+
 func TestWorkspaces_CardsNameTheirWorkspace(t *testing.T) {
 	t.Parallel()
 	r := startWorkspaceRig(t)
@@ -65,7 +74,7 @@ func TestWorkspaces_CardsNameTheirWorkspace(t *testing.T) {
 	}
 
 	before := got["design"]
-	r.mustWrite(r.h.Client.Admin.MoveToWorkspace(ctx, "proj:design", "Work"))
+	r.mustMove(ctx, "proj:design", "Work")
 	after := r.list()["design"]
 	if after.Workspace != "Work" {
 		t.Errorf("joined card workspace = %q, want Work", after.Workspace)
@@ -92,7 +101,7 @@ func TestWorkspaces_HeldCardsSitOnlyInOnHoldAndLeaveTheCounts(t *testing.T) {
 		t.Fatalf("before hold: total=%d workspaces=%+v", snap.NeedsYouTotal, snap.Workspaces)
 	}
 
-	if res, err := r.h.Client.Admin.HoldEpic(ctx, "proj:stuck", true); err != nil || res.Refused {
+	if res, err := r.h.Client.Admin.HoldEpics(ctx, []string{"proj:stuck"}, true, false); err != nil || res.Results[0].Refused() {
 		t.Fatalf("hold: %v %+v", err, res)
 	}
 	row := r.list()["stuck"]
@@ -114,7 +123,7 @@ func TestWorkspaces_HeldCardsSitOnlyInOnHoldAndLeaveTheCounts(t *testing.T) {
 func TestWorkspaces_HeldDesignPullsItsImplIntoOnHold(t *testing.T) {
 	t.Parallel()
 	r := startWorkspaceRig(t)
-	if res, err := r.h.Client.Admin.HoldEpic(t.Context(), "proj:design", true); err != nil || res.Refused {
+	if res, err := r.h.Client.Admin.HoldEpics(t.Context(), []string{"proj:design"}, true, false); err != nil || res.Results[0].Refused() {
 		t.Fatalf("hold: %v %+v", err, res)
 	}
 	got := r.list()
@@ -162,8 +171,8 @@ func TestWorkspaces_RestartKeepsTheListAndTheHeldCard(t *testing.T) {
 	r := startWorkspaceRig(t)
 	ctx := t.Context()
 	r.mustWrite(r.h.Client.Admin.CreateWorkspace(ctx, "Work"))
-	r.mustWrite(r.h.Client.Admin.MoveToWorkspace(ctx, "proj:design", "Work"))
-	if res, err := r.h.Client.Admin.HoldEpic(ctx, "proj:stuck", true); err != nil || res.Refused {
+	r.mustMove(ctx, "proj:design", "Work")
+	if res, err := r.h.Client.Admin.HoldEpics(ctx, []string{"proj:stuck"}, true, false); err != nil || res.Results[0].Refused() {
 		t.Fatalf("hold: %v %+v", err, res)
 	}
 	before, err := r.h.Client.Reads.Workspaces(ctx)

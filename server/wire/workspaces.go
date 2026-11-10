@@ -21,14 +21,16 @@ type WorkspaceList struct {
 
 // WorkspaceRequest is a workspace write: Name is the workspace acted on, To the
 // new name of a rename. Key is the Design, epic or chat a move or remove acts
-// on (Name is the target workspace of a move); Order is the full new order of a reorder.
+// on (a remove; Name is the target workspace of a move); Targets are the keys a move acts on;
+// Order is the full new order of a reorder.
 // Sort is the Sort* value a sort write sets on Name.
 type WorkspaceRequest struct {
-	Name  string   `json:"name"`
-	To    string   `json:"to,omitempty"`
-	Key   string   `json:"key,omitempty"`
-	Order []string `json:"order,omitempty"`
-	Sort  string   `json:"sort,omitempty"`
+	Name    string   `json:"name"`
+	To      string   `json:"to,omitempty"`
+	Key     string   `json:"key,omitempty"`
+	Targets []string `json:"targets,omitempty"`
+	Order   []string `json:"order,omitempty"`
+	Sort    string   `json:"sort,omitempty"`
 }
 
 // Where a session sits in the sidebar.
@@ -55,31 +57,29 @@ type WorkspaceResult struct {
 	Message    string      `json:"message,omitempty"`
 }
 
-// HoldRequest holds or unholds a Design or epic. Yes confirms that holding
-// exits the Design's live sessions.
+// HoldRequest holds or unholds Designs or epics. Yes confirms, for the whole
+// request, that holding exits a Design's live sessions. DryRun runs every rule
+// and writes nothing.
 type HoldRequest struct {
-	Epic string `json:"epic"`
-	Yes  bool   `json:"yes,omitempty"`
+	Targets []string `json:"targets"`
+	Yes     bool     `json:"yes,omitempty"`
+	DryRun  bool     `json:"dry_run,omitempty"`
 }
 
-// HoldResult is a hold or unhold: the held keys after it and the sessions it
-// ended, or a refusal. A refusal for ReasonHoldLiveSessions lists the sessions
-// that need Yes in Sessions.
+// HoldResult is a hold or unhold: one result per target and the held keys
+// after the request. A target that needs Yes is refused ReasonNeedsYes and
+// lists the sessions in its Sessions.
 type HoldResult struct {
-	Held     []string `json:"held"`
-	Sessions []string `json:"sessions,omitempty"`
-	Refused  bool     `json:"refused,omitempty"`
-	Reason   string   `json:"reason,omitempty"`
-	Message  string   `json:"message,omitempty"`
+	Results []TargetResult `json:"results"`
+	Held    []string       `json:"held"`
 }
 
 // Refusal reasons of hold. The queued text is asserted by the web.
 const (
-	ReasonHoldQueued       = "hold-queued"
-	ReasonHoldLiveSessions = "hold-live-sessions"
-	ReasonHoldNotHoldable  = "hold-not-holdable"
-	ReasonHoldUnknown      = "hold-unknown"
-	HoldQueuedText         = "Remove it from the queue first"
+	ReasonHoldQueued      = "hold-queued"
+	ReasonHoldNotHoldable = "hold-not-holdable"
+	ReasonHoldUnknown     = "hold-unknown"
+	HoldQueuedText        = "Remove it from the queue first"
 )
 
 // Refusal reasons of the workspace writes.

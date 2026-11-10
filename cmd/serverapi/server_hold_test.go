@@ -3,6 +3,7 @@ package serverapi
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,7 +58,7 @@ func TestServerHold_NeedsYesWhileDesignSessionsAreLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	var res wire.HoldResult
-	if err := json.Unmarshal([]byte(out), &res); err != nil || res.Refused || len(res.Held) != 0 {
+	if err := json.Unmarshal([]byte(out), &res); err != nil || res.Results[0].Refused() || len(res.Held) != 0 {
 		t.Errorf("unhold --json = %q (%+v, %v), want nothing held", out, res, err)
 	}
 }
@@ -77,5 +78,43 @@ func TestServerHold_JSONAndQueuedRefusal(t *testing.T) {
 	}
 	if _, err := runServer(t, f.H, "hold", "proj:plain"); err == nil || !strings.Contains(err.Error(), "Remove it from the queue first") {
 		t.Errorf("hold of a queued epic err = %v, want the queue text", err)
+	}
+}
+
+func TestServerHold_ManyTargetsPrintLinesSummaryAndExitOne(t *testing.T) {
+	f := holdFixture(t)
+	out, err := runServer(t, f.H, "hold", "proj:plain", "proj:nope")
+	var exit *cmdbase.ExitError
+	if !errors.As(err, &exit) || exit.Code != 1 {
+		t.Fatalf("err = %v, want exit 1", err)
+	}
+	if !strings.HasPrefix(out, "done proj:plain\nrefused proj:nope: ") || !strings.HasSuffix(out, "1 done, 1 refused\n") {
+		t.Errorf("out = %q, want a line per target and the summary", out)
+	}
+	out, err = runServer(t, f.H, "unhold", "proj:plain", "proj:map")
+	if err != nil || out != "done proj:plain\ndone proj:map\n2 done, 0 refused\n" {
+		t.Errorf("unhold = %q, %v", out, err)
+	}
+}
+
+func TestServerHold_JSONIsTheEnvelopeEvenForOneTarget(t *testing.T) {
+	f := holdFixture(t)
+	out, err := runServer(t, f.H, "hold", "proj:nope", "--json")
+	var res wire.HoldResult
+	if json.Unmarshal([]byte(out), &res) != nil || len(res.Results) != 1 || res.Results[0].Reason != wire.ReasonHoldUnknown {
+		t.Errorf("--json = %q, want one refused result", out)
+	}
+	if err == nil {
+		t.Error("a refused target exited zero")
+	}
+}
+
+func TestServerHold_DryRunChangesNothing(t *testing.T) {
+	f := holdFixture(t)
+	id := f.Open(t, "proj:map", false).Session.ID
+	out, err := runServer(t, f.H, "hold", "proj:map", "--dry-run", "--json")
+	var res wire.HoldResult
+	if err != nil || json.Unmarshal([]byte(out), &res) != nil || res.Results[0].Status != wire.TargetFits || len(res.Results[0].Sessions) != 1 || res.Results[0].Sessions[0] != id || len(res.Held) != 0 {
+		t.Errorf("--dry-run = %q, %v, want fits listing %s and nothing held", out, err, id)
 	}
 }

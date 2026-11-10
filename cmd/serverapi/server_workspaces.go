@@ -76,15 +76,49 @@ func newServerWorkspacesCmd(d Deps) *cobra.Command {
 		func(ctx context.Context, cl *apiclient.Client, a []string) (wire.WorkspaceResult, error) {
 			return cl.Admin.ReorderWorkspaces(ctx, a)
 		})
-	write("move <key> <workspace>", "put a Design, epic (project:epic) or chat session in a workspace", cobra.ExactArgs(2),
-		func(ctx context.Context, cl *apiclient.Client, a []string) (wire.WorkspaceResult, error) {
-			return cl.Admin.MoveToWorkspace(ctx, a[0], a[1])
-		})
+	cmd.AddCommand(newWorkspaceMoveCmd(d))
 	write("remove <key>", "send a Design, epic or chat back to the Default workspace", cobra.ExactArgs(1),
 		func(ctx context.Context, cl *apiclient.Client, a []string) (wire.WorkspaceResult, error) {
 			return cl.Admin.RemoveFromWorkspace(ctx, a[0])
 		})
 	return cmd
+}
+
+// newWorkspaceMoveCmd puts many Designs, epics or chats in one workspace, each on its own.
+func newWorkspaceMoveCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	v := &cobra.Command{
+		Use:   "move <key>... <workspace>",
+		Short: "put Designs, epics (project:epic) or chat sessions in a workspace (the workspace is last)",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			keys, workspace := args[:len(args)-1], args[len(args)-1]
+			res, err := cl.Admin.MoveToWorkspace(ctx, workspace, keys...)
+			switch {
+			case apiclient.IsNotRunning(err):
+				res = wire.TargetsResult{}
+				for _, k := range keys {
+					res.Results = append(res.Results, notRunning(k))
+				}
+			case err != nil:
+				return fmt.Errorf("server write failed: %w", err)
+			}
+			return printTargets(c.OutOrStdout(), jsonOut, res, res.Results, func(w io.Writer, r wire.TargetResult) error {
+				_, err := fmt.Fprintf(w, "done %s\n", r.Target)
+				return err
+			})
+		},
+	}
+	v.Flags().BoolVar(&jsonOut, "json", false, "emit the structured results as JSON")
+	return v
 }
 
 // newWorkspaceSortCmd reads a workspace's Sort, or sets it when a value is given.

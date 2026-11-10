@@ -88,7 +88,7 @@ func TestWorkspaces_FollowUpsCarryTheirProjectsWorkspaces(t *testing.T) {
 	r := startWorkspaceRig(t)
 	ctx := t.Context()
 	r.mustWrite(r.h.Client.Admin.CreateWorkspace(ctx, "Work"))
-	r.mustWrite(r.h.Client.Admin.MoveToWorkspace(ctx, "proj:design", "Work"))
+	r.mustMove(ctx, "proj:design", "Work")
 
 	hs, err := r.h.Client.Handshake(ctx)
 	if err != nil {

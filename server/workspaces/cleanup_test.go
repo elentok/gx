@@ -23,7 +23,7 @@ func bugsMembers(ctx context.Context, f servertest.DesignsFixture) int {
 
 func moveToBugs(t *testing.T, f servertest.DesignsFixture, key string) {
 	t.Helper()
-	if res, err := f.H.Client.Admin.MoveToWorkspace(f.Ctx, key, "Bugs"); err != nil || res.Refused {
+	if res, err := f.H.Client.Admin.MoveToWorkspace(f.Ctx, "Bugs", key); err != nil || res.Results[0].Refused() {
 		t.Fatalf("move %s = %+v, %v", key, res, err)
 	}
 }

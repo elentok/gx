@@ -33,6 +33,24 @@ func startMembership(t *testing.T) (servertest.DesignsFixture, context.Context) 
 	return f, f.Ctx
 }
 
+func TestWorkspacesRoutes_MoveTakesManyTargetsAndRefusesOneAlone(t *testing.T) {
+	f, ctx := startMembership(t)
+	res, err := f.H.Client.Admin.MoveToWorkspace(ctx, "Bugs", "proj:plain", "proj:nope", "proj:map")
+	if err != nil || len(res.Results) != 3 {
+		t.Fatalf("move = %+v, %v, want three results", res, err)
+	}
+	want := []wire.TargetResult{
+		{Target: "proj:plain", Status: wire.TargetDone},
+		{Target: "proj:nope", Status: wire.TargetRefused, Reason: wire.ReasonWorkspaceUnknownKey},
+		{Target: "proj:map", Status: wire.TargetDone},
+	}
+	for i, r := range res.Results {
+		if r.Target != want[i].Target || r.Status != want[i].Status || r.Reason != want[i].Reason {
+			t.Errorf("result %d = %+v, want %+v", i, r, want[i])
+		}
+	}
+}
+
 func TestWorkspacesRoutes_ReorderChangesOrderAndRejectsPartialOrUnknown(t *testing.T) {
 	h := servertest.Start(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -81,8 +99,8 @@ func TestWorkspacesRoutes_MoveAndRemoveMembers(t *testing.T) {
 		return -1
 	}
 	for _, key := range []string{"proj:map", "proj:plain", chat.Session.ID, "proj:map-impl"} {
-		res, err := f.H.Client.Admin.MoveToWorkspace(ctx, key, "Bugs")
-		if err != nil || res.Refused {
+		res, err := f.H.Client.Admin.MoveToWorkspace(ctx, "Bugs", key)
+		if err != nil || res.Results[0].Refused() {
 			t.Fatalf("move %s = %+v, %v", key, res, err)
 		}
 	}
@@ -129,11 +147,12 @@ func TestWorkspacesRoutes_MoveRefusals(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := f.H.Client.Admin.MoveToWorkspace(ctx, tt.key, "Bugs")
-			if err != nil {
-				t.Fatal(err)
+			out, err := f.H.Client.Admin.MoveToWorkspace(ctx, "Bugs", tt.key)
+			if err != nil || len(out.Results) != 1 {
+				t.Fatalf("move = %+v, %v", out, err)
 			}
-			if !res.Refused || res.Reason != tt.reason || res.Message == "" {
+			res := out.Results[0]
+			if !res.Refused() || res.Reason != tt.reason || res.Message == "" || res.Target != tt.key {
 				t.Errorf("result = %+v, want refused with %q and a message", res, tt.reason)
 			}
 		})
@@ -159,7 +178,7 @@ func TestWorkspacesRoutes_SnapshotPlacesChatsDesignsAndFixAgents(t *testing.T) {
 		t.Fatalf("open design = %+v", designRes)
 	}
 	design := designRes.Session.ID
-	if res, err := f.H.Client.Admin.MoveToWorkspace(ctx, chat, "Bugs"); err != nil || res.Refused {
+	if res, err := f.H.Client.Admin.MoveToWorkspace(ctx, "Bugs", chat); err != nil || res.Results[0].Refused() {
 		t.Fatalf("move chat = %+v, %v", res, err)
 	}
 	snap, err := f.H.Client.Snapshot(ctx)
