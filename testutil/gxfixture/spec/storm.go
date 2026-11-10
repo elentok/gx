@@ -34,6 +34,8 @@ var ProcessStorm = scenario{
 	Queue:     []string{project + ":storm-epic"},
 	Behaviour: map[string]string{StormTicket: agentfake.BehaviourStorm},
 	Config:    stormConfig,
+	// The trees are real, so the watchdog must read the real process table.
+	RealProcesses: true,
 }
 
 // StormIdleTicket is the ticket of the session-storm scenario, which no
@@ -51,7 +53,8 @@ var SessionStorm = scenario{
 		Prompt:  "hello",
 		Control: &agentfake.Control{Action: agentfake.ActionDescendants, Count: agentfake.StormDescendants, Depth: 1},
 	}},
-	Config: stormConfig,
+	Config:        stormConfig,
+	RealProcesses: true,
 }
 
 // OutsideStormCount is the size of the tree the outside-storm scenario starts.
@@ -59,4 +62,4 @@ const OutsideStormCount = agentfake.StormDescendants
 
 // OutsideStorm is a tree above the threshold that gx did not launch: the
 // watchdog covers agents only, so it stays alive.
-var OutsideStorm = scenario{OutsideTree: OutsideStormCount, Config: stormConfig}
+var OutsideStorm = scenario{OutsideTree: OutsideStormCount, RealProcesses: true, Config: stormConfig}

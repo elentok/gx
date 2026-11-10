@@ -147,7 +147,7 @@ func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
 	if err := f.setupDisk(); err != nil {
 		return err
 	}
-	if err := f.setupHealth(); err != nil {
+	if err := f.setupHealth(sc.RealProcesses); err != nil {
 		return err
 	}
 	// Any scenario that cleans needs the fake ps: the real one sees the `go test` running this fixture.

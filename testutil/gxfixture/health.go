@@ -32,7 +32,7 @@ func (f *fixture) healthDir() string { return filepath.Join(f.root, "health") }
 // setupHealth gives every scenario fake CPU, memory and processes: the server
 // reads them from <health dir>/system and <health dir>/processes, which start
 // at calmHealth and calmProcesses.
-func (f *fixture) setupHealth() error {
+func (f *fixture) setupHealth(realProcesses bool) error {
 	if err := os.MkdirAll(f.healthDir(), 0o755); err != nil {
 		return err
 	}
@@ -44,7 +44,10 @@ func (f *fixture) setupHealth() error {
 	if err := os.WriteFile(processes, []byte(calmProcesses), 0o644); err != nil {
 		return err
 	}
-	f.env = append(f.env, "GX_HEALTH_FILE="+system, "GX_HEALTH_PROCESSES="+processes, "GX_HEALTH_INTERVAL="+healthInterval)
+	f.env = append(f.env, "GX_HEALTH_FILE="+system, "GX_HEALTH_INTERVAL="+healthInterval)
+	if !realProcesses {
+		f.env = append(f.env, "GX_HEALTH_PROCESSES="+processes)
+	}
 	return nil
 }
 

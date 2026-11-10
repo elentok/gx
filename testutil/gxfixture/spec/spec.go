@@ -168,6 +168,9 @@ type Scenario struct {
 	// DeadSessions is how many prompt-less sessions are created together, after Sessions,
 	// then all crashed, so a large dead set seeds fast.
 	DeadSessions int
+	// RealProcesses makes the server read the real process table instead of the
+	// fixture's fake one, for scenarios whose processes are real trees.
+	RealProcesses bool
 	// OutsideTree starts a process tree of this many sleepers once the server is
 	// up, outside any agent of gx; it lives as long as the fixture.
 	OutsideTree int
