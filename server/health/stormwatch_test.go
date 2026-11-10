@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/procwatch"
 	"github.com/elentok/gx/server"
 	healthpkg "github.com/elentok/gx/server/health"
@@ -97,6 +98,18 @@ func isZombie(pid int) bool {
 	return err != nil || strings.HasPrefix(strings.TrimSpace(string(out)), "Z")
 }
 
+// killBanners is the banners about a tree gx killed. The real process table
+// also holds the test machine's own trees, which raise foreign notices.
+func killBanners(h *servertest.Harness) []osnotify.Notification {
+	var out []osnotify.Notification
+	for _, n := range h.Banners.Sent() {
+		if strings.HasPrefix(n.Title, "Process storm stopped") {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 func watchdogConfig(threshold int) map[string]any {
 	return map[string]any{"watchdog": map[string]any{"max-tree-processes": threshold, "interval": "50ms"}}
 }
@@ -110,7 +123,7 @@ func startStormRun(t *testing.T, root, threshold int) (*servertest.Harness, stri
 	cfgPath := filepath.Join(t.TempDir(), "config.json")
 	servertest.WriteConfig(t, cfgPath, store, watchdogConfig(threshold))
 	r := &pidRunner{Runner: runnerfake.NewRunner(), pids: []agentrunner.OwnerPID{{PID: root}}}
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(r), servertest.WithConfigFile(cfgPath), func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(r), servertest.WithConfigFile(cfgPath), servertest.WithRealProcesses(), func(c *server.Config) {
 		c.Settings.Watchdog.MaxTreeProcesses = threshold
 		c.Settings.Watchdog.Interval = 50 * time.Millisecond
 	})
@@ -135,10 +148,10 @@ func TestStorm_TreeOverThresholdIsKilledWholeAndTicketPaused(t *testing.T) {
 		tk, err := schema.ParseTicket(ticketPath)
 		return err == nil && tk.Status == schema.StatusPaused && tk.PauseReason == schema.PauseProcessStorm
 	})
-	testutil.WaitFor(t, 10*time.Second, "the banner", func() bool { return len(h.Banners.Sent()) > 0 })
+	testutil.WaitFor(t, 10*time.Second, "the banner", func() bool { return len(killBanners(h)) > 0 })
 	// Further polls must not announce the same kill again.
 	time.Sleep(300 * time.Millisecond) // negative wait: a second banner would arrive within a few polls
-	sent := h.Banners.Sent()
+	sent := killBanners(h)
 	if len(sent) != 1 {
 		t.Fatalf("banners = %+v, want exactly one", sent)
 	}
@@ -160,7 +173,7 @@ func TestStorm_TreeUnderThresholdIsLeftAlone(t *testing.T) {
 	if !anyAlive(treePIDs(t, root)) {
 		t.Error("tree under the threshold was killed")
 	}
-	if n := len(h.Banners.Sent()); n != 0 {
+	if n := len(killBanners(h)); n != 0 {
 		t.Errorf("banners = %d, want none", n)
 	}
 	if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status == schema.StatusPaused {
@@ -190,7 +203,7 @@ func TestStorm_ReloadingTheThresholdChangesTheBehaviour(t *testing.T) {
 // and returns the holder and agent pids.
 func startStormSession(t *testing.T, threshold int) (*servertest.Harness, context.Context, <-chan wire.Event, string, []int) {
 	t.Helper()
-	h, ctx, evs, id, conv := servertest.StartFakeSession(t, func(c *server.Config) {
+	h, ctx, evs, id, conv := servertest.StartFakeSession(t, servertest.WithRealProcesses(), func(c *server.Config) {
 		c.Settings.Watchdog.MaxTreeProcesses = threshold
 		c.Settings.Watchdog.Interval = 50 * time.Millisecond
 	})
@@ -207,9 +220,9 @@ func TestStorm_SessionTreeOverThresholdIsKilledWholeWithOneBanner(t *testing.T) 
 
 	servertest.WaitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	testutil.WaitFor(t, 10*time.Second, "the session tree to be gone", func() bool { return !anyAlive(pids) })
-	testutil.WaitFor(t, 10*time.Second, "the banner", func() bool { return len(h.Banners.Sent()) > 0 })
+	testutil.WaitFor(t, 10*time.Second, "the banner", func() bool { return len(killBanners(h)) > 0 })
 	time.Sleep(300 * time.Millisecond) // negative wait: a second banner would arrive within a few polls
-	sent := h.Banners.Sent()
+	sent := killBanners(h)
 	if len(sent) != 1 {
 		t.Fatalf("banners = %+v, want exactly one", sent)
 	}
@@ -226,7 +239,7 @@ func TestStorm_SessionTreeUnderThresholdIsLeftAlone(t *testing.T) {
 	if !anyAlive(pids) {
 		t.Error("session tree under the threshold was killed")
 	}
-	if n := len(h.Banners.Sent()); n != 0 {
+	if n := len(killBanners(h)); n != 0 {
 		t.Errorf("banners = %d, want none", n)
 	}
 	snap, err := h.Client.Snapshot(ctx)

@@ -63,33 +63,13 @@ func (s *Health) KeepStormWatched(ctx context.Context) {
 			wd := s.settings.Load().Watchdog
 			return procwatch.Config{Threshold: wd.MaxTreeProcesses, Interval: wd.Interval}
 		},
-		Roots:  s.stormRoots,
-		Report: s.stormFound,
+		Roots:   s.stormRoots,
+		Report:  s.stormFound,
+		Foreign: s.foreignStormFound,
+		UID:     os.Getuid(),
+		Reader:  s.cfg.ProcessSource,
 	}
-	foreign := &procwatch.Watcher{
-		Settings: w.Settings,
-		Roots:    s.launchedRoots,
-		Foreign:  s.foreignStormFound,
-		UID:      os.Getuid(),
-		Reader:   s.cfg.ProcessSource,
-	}
-	go foreign.Run(ctx)
 	w.Run(ctx)
-}
-
-// launchedRoots is the roots of the last stormRoots poll: every tree gx
-// launched, which a foreign tree's count leaves out.
-func (s *Health) launchedRoots() []int {
-	s.storm.mu.Lock()
-	defer s.storm.mu.Unlock()
-	var roots []int
-	for pid := range s.storm.byRoot {
-		roots = append(roots, pid)
-	}
-	for pid := range s.storm.bySess {
-		roots = append(roots, pid)
-	}
-	return roots
 }
 
 // foreignStormFound only notifies: gx did not start the tree and kills nothing

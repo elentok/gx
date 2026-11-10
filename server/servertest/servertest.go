@@ -27,6 +27,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -79,6 +80,12 @@ type Harness struct {
 	Stop func() error
 
 	cfg server.Config
+}
+
+// WithRealProcesses reads the test machine's process table in place of the
+// fake, for tests whose subject is a real process tree.
+func WithRealProcesses() func(*server.Config) {
+	return func(c *server.Config) { c.ProcessSource = syshealth.DefaultProcess() }
 }
 
 // WithConfigFile points the server's config reload at path.
