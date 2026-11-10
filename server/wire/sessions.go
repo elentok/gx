@@ -320,15 +320,19 @@ type SessionAnswerRequest struct {
 	Note        string          `json:"note,omitempty"`
 	Images      []string        `json:"images,omitempty"`
 	LastMessage string          `json:"last_message,omitempty"`
+	// Release hands a claude-dialog card back to Claude's terminal dialog.
+	Release bool `json:"release,omitempty"`
 }
 
 // SessionAnswer is the answer to one question of a card: the picked option id
-// (or "yes"/"no"), typed text, a per-question note, or the Huh? mark.
+// (or "yes"/"no"), typed text, a per-question note, or the Huh? mark. Choices
+// are the picked option ids of a multi-select question.
 type SessionAnswer struct {
-	Choice string `json:"choice,omitempty"`
-	Text   string `json:"text,omitempty"`
-	Note   string `json:"note,omitempty"`
-	Huh    bool   `json:"huh,omitempty"`
+	Choice  string   `json:"choice,omitempty"`
+	Choices []string `json:"choices,omitempty"`
+	Text    string   `json:"text,omitempty"`
+	Note    string   `json:"note,omitempty"`
+	Huh     bool     `json:"huh,omitempty"`
 }
 
 // SessionRoundOption is one choice of an options card.

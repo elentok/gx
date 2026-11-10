@@ -14,6 +14,8 @@ import (
 type AskCall struct {
 	ToolUseID string        `json:"tool_use_id"`
 	Questions []AskQuestion `json:"questions"`
+	// OutFile, when set, receives the hook's stdout, so a test reads its result.
+	OutFile string `json:"out_file,omitempty"`
 }
 
 // AskQuestion is one question of an AskCall, in claude's own field names.
@@ -54,6 +56,13 @@ func (t *tui) askQuestion(call *AskCall) error {
 	cmd.Dir = t.pid.Cwd
 	cmd.Env = os.Environ()
 	cmd.Stdin = bytes.NewReader(payload)
+	if call.OutFile != "" {
+		out, err := os.Create(call.OutFile)
+		if err != nil {
+			return err
+		}
+		cmd.Stdout = out
+	}
 	if err := cmd.Start(); err != nil {
 		return err
 	}

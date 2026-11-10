@@ -130,8 +130,9 @@ func startAskFixture(t *testing.T, link *wire.LinkSessionRequest) askFixture {
 
 // ask makes the fake open an AskUserQuestion of three questions, the second a
 // multi-select, through the hook.
-func (f askFixture) ask(t *testing.T) {
+func (f askFixture) ask(t *testing.T) (hookOut string) {
 	t.Helper()
+	hookOut = filepath.Join(t.TempDir(), "hook.out")
 	opts := func(labels ...string) []agentfake.AskOption {
 		var out []agentfake.AskOption
 		for _, l := range labels {
@@ -139,7 +140,7 @@ func (f askFixture) ask(t *testing.T) {
 		}
 		return out
 	}
-	call := &agentfake.AskCall{ToolUseID: "toolu_ask", Questions: []agentfake.AskQuestion{
+	call := &agentfake.AskCall{ToolUseID: "toolu_ask", OutFile: hookOut, Questions: []agentfake.AskQuestion{
 		{Header: "Color", Question: "Which color?", Options: opts("red", "blue")},
 		{Header: "Sizes", Question: "Which sizes?", MultiSelect: true, Options: opts("S", "M", "L")},
 		{Header: "Ship", Question: "Ship it?", Options: opts("yes", "no")},
@@ -150,6 +151,7 @@ func (f askFixture) ask(t *testing.T) {
 	// The server's shutdown waits on a request the hook still holds, so a test
 	// that fails mid-hold must release it first. Runs before the harness stops.
 	t.Cleanup(func() { f.esc() })
+	return hookOut
 }
 
 // esc presses Esc on the fake, which sends the held hook SIGTERM.

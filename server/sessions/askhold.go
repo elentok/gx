@@ -17,6 +17,9 @@ type askKey struct{ session, toolUseID string }
 type askHolds struct {
 	mu   sync.Mutex
 	held map[askKey]*heldAsk
+	// released are the dialogs handed back to the terminal; a hook that asks
+	// again for one gets a release at once, so no card shows for it.
+	released map[askKey]bool
 }
 
 type heldAsk struct {
@@ -31,6 +34,10 @@ func (mg *Manager) HoldAsk(ctx context.Context, req wire.AskHookRequest) wire.As
 	h := &heldAsk{req: req, result: make(chan wire.AskHookResult, 1)}
 	a := &mg.asks
 	a.mu.Lock()
+	if a.released[key] {
+		a.mu.Unlock()
+		return wire.AskHookResult{Decision: wire.AskHookRelease}
+	}
 	if a.held == nil {
 		a.held = map[askKey]*heldAsk{}
 	}
@@ -82,6 +89,22 @@ func (mg *Manager) ResolveAsk(session, toolUseID string, res wire.AskHookResult)
 	default:
 		return false
 	}
+	return true
+}
+
+// ReleaseAsk releases a held question to Claude's terminal dialog and
+// remembers its id.
+func (mg *Manager) ReleaseAsk(session, toolUseID string) bool {
+	if !mg.ResolveAsk(session, toolUseID, wire.AskHookResult{Decision: wire.AskHookRelease}) {
+		return false
+	}
+	a := &mg.asks
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.released == nil {
+		a.released = map[askKey]bool{}
+	}
+	a.released[askKey{session, toolUseID}] = true
 	return true
 }
 
