@@ -287,7 +287,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 - `e2e/` — end-to-end tests (slow, CI only)
 - `testutil/` — fakes and helpers: `testutil/agentfake` (fake Claude, shared core),
   `testutil/agentfake/codex` (fake Codex, imports `agentfake`), `testutil/herdrfake`,
-  `testutil/runnerfake`, `testutil/herdrctl`, `testutil/teatestv2`, `testutil/claudeenv`
+  `testutil/runnerfake`, `testutil/herdrctl`, `testutil/teatestv2`, `testutil/claudeenv`,
+  `testutil/vitefake` (scripted fake `pnpm` for Dev mode fixtures; control file via
+  `VITEFAKE_CONTROL`, binary in `cmd/pnpm`)
 - `testutil/gxfixture` — e2e fixture program: `gxfixture <ready|mixed|finishing|edge>` starts an
   isolated real `gx server` (pty runner, `fakeclaude` as `claude`) and prints JSON with `web_url`,
   socket, state dir, hold file and `log_file` (the server's stdout+stderr, which holds the cleanup
