@@ -314,6 +314,14 @@ func (s *Sessions) MarkActionable(ctx context.Context, req wire.MarkActionableRe
 	return res, err
 }
 
+// AskHold registers a Claude AskUserQuestion call and blocks until the server
+// decides what the hook does with it.
+func (s *Sessions) AskHold(ctx context.Context, req wire.AskHookRequest) (wire.AskHookResult, error) {
+	var res wire.AskHookResult
+	err := s.t.post(ctx, "/v1/sessions/ask-hold", req, &res)
+	return res, err
+}
+
 // Link sets an agent's Session ticket. A refusal is a result (Refused set),
 // not an error.
 func (s *Sessions) Link(ctx context.Context, req wire.LinkSessionRequest) (wire.SessionResult, error) {

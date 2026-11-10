@@ -380,7 +380,16 @@ func launchArgs(meta *Meta, claudeArgs, codexRoots []string) []string {
 	if meta.RemoteControl != "" {
 		args = append(args, "--remote-control", meta.RemoteControl)
 	}
+	if isPlainClaude(meta) {
+		// The other launches ban the tool or never ask a person.
+		args = append(args, harness.ClaudeAskHookArgs()...)
+	}
 	return args
+}
+
+// isPlainClaude is a Claude chat with no flow, ticket or fix-of.
+func isPlainClaude(meta *Meta) bool {
+	return meta.Harness == string(harness.Claude) && meta.Flow == "" && meta.Ticket == "" && meta.FixOf == ""
 }
 
 // isPlainCodex is a Codex chat with no flow, ticket or fix-of.

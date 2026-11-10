@@ -49,6 +49,8 @@ type Manager struct {
 	settings *settings.Holder
 	harness  *harnesschoice.Harness
 	idx      *index.Index
+	// asks are the AskUserQuestion calls held by Claude's hook.
+	asks askHolds
 	// chat reads the sessions' transcripts for the watch loop.
 	chat  *chat.Chat
 	focus *FocusReports

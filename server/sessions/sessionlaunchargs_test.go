@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"encoding/json"
 	"slices"
 	"testing"
 
@@ -46,11 +47,66 @@ func TestLaunchArgs(t *testing.T) {
 		{"codex queue ticket keeps the guard", Meta{Harness: "codex", Ticket: "gx:e/01"}, nil, harness.CodexArgs(harness.CodexArgsInput{WritableRoots: roots})},
 		{"codex fix keeps the guard", Meta{Harness: "codex", FixOf: "gx:e/01"}, nil, harness.CodexArgs(harness.CodexArgsInput{WritableRoots: roots})},
 	} {
-		if got := launchArgs(&tc.meta, tc.claudeArgs, roots); !slices.Equal(got, tc.want) {
-			t.Errorf("%s: args = %v, want %v", tc.name, got, tc.want)
+		want := tc.want
+		if tc.meta.Harness == "claude" && tc.meta.Flow == "" {
+			want = append(slices.Clone(want), harness.ClaudeAskHookArgs()...)
+		}
+		if got := launchArgs(&tc.meta, tc.claudeArgs, roots); !slices.Equal(got, want) {
+			t.Errorf("%s: args = %v, want %v", tc.name, got, want)
 		}
 	}
 	if !slices.Equal(claudeArgs, []string{"--verbose"}) {
 		t.Errorf("configured claude args mutated: %v", claudeArgs)
+	}
+}
+
+// askHookInSettings reports whether the merged --settings of a claude launch
+// carries a PreToolUse hook for AskUserQuestion with the 600 s timeout.
+func askHookInSettings(t *testing.T, args []string) bool {
+	t.Helper()
+	merged := harness.MergeClaudeSettings(args)
+	for i, a := range merged {
+		if a != "--settings" || i+1 >= len(merged) {
+			continue
+		}
+		var s struct {
+			Hooks struct {
+				PreToolUse []struct {
+					Matcher string `json:"matcher"`
+					Hooks   []struct {
+						Command string `json:"command"`
+						Timeout int    `json:"timeout"`
+					} `json:"hooks"`
+				} `json:"PreToolUse"`
+			} `json:"hooks"`
+		}
+		if err := json.Unmarshal([]byte(merged[i+1]), &s); err != nil {
+			t.Fatal(err)
+		}
+		for _, g := range s.Hooks.PreToolUse {
+			if g.Matcher == "AskUserQuestion" && len(g.Hooks) == 1 && g.Hooks[0].Command == "gx agent ask-question" && g.Hooks[0].Timeout == 600 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func TestLaunchArgs_ClaudeAskHookOnPlainLaunchOnly(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		meta Meta
+		want bool
+	}{
+		{"plain", Meta{Harness: "claude"}, true},
+		{"design", Meta{Harness: "claude", Flow: tickets.FlowDesign}, false},
+		{"triage", Meta{Harness: "claude", Flow: tickets.FlowTriage, FlowKey: "proj"}, false},
+		{"queue ticket", Meta{Harness: "claude", Ticket: "gx:e/01"}, false},
+		{"fix", Meta{Harness: "claude", FixOf: "gx:e/01"}, false},
+	} {
+		if got := askHookInSettings(t, launchArgs(&tc.meta, []string{"--verbose"}, nil)); got != tc.want {
+			t.Errorf("%s: ask hook installed = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }

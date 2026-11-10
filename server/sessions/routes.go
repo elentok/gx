@@ -65,6 +65,7 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 		{Pattern: "POST /v1/sessions/mark-read", Handler: write(func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().MarkSessionRead })},
 		{Pattern: "POST /v1/sessions/focus", Web: wire.WebWrite, Handler: m((*Manager).SessionFocusWrite), WebHandler: m((*Manager).SessionFocusWriteWeb)},
 		{Pattern: "POST /v1/sessions/show", Handler: write(func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().FocusSession })},
+		{Pattern: "POST /v1/sessions/ask-hold", Handler: m((*Manager).AskHoldWrite)},
 		{Pattern: "POST /v1/sessions/link", Handler: res((*Resumer).SessionLinkWrite)},
 		{Pattern: "POST /v1/sessions/step", Handler: res((*Resumer).SessionStepWrite)},
 		{Pattern: "POST /v1/sessions/resume", Web: wire.WebWrite, Handler: write(resume), WebHandler: designWeb(resume)},
