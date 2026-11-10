@@ -28,6 +28,12 @@ export async function bulkArchive(targets: string[], opts: { dryRun?: boolean; y
   return res.results ?? [];
 }
 
+/** Targets are archive addresses; a clash with a live epic comes back renamed in `new_address`. */
+export async function bulkUnarchive(targets: string[]): Promise<TargetResult[]> {
+  const res = await postJson<SessionResult & TargetsResult>("/v1/epics/unarchive")({ targets });
+  return res.results ?? [];
+}
+
 export const bulkStop =(sessions: SessionInfo[]) => postSessions("/v1/sessions/stop", sessions, false);
 
 /** Remove confirms with yes: the server stops a live session first. */

@@ -4,6 +4,7 @@ import {
   ProgressDone,
   SectionFinished,
   SectionOnHold,
+  type ArchivedEpicRow,
   type EpicListRow,
   type SessionInfo,
 } from "../generated/server";
@@ -53,6 +54,10 @@ export function rowOfCard(card: EpicListRow, visible = true): SelectRow {
     held: card.section === SectionOnHold,
     archivable: isArchivable(card),
   };
+}
+
+export function rowOfArchived(row: ArchivedEpicRow): SelectRow {
+  return { key: row.address, kind: "archived", visible: true, selectable: true };
 }
 
 export function rowOfAgent(s: SessionInfo, visible = true, group?: string): SelectRow {

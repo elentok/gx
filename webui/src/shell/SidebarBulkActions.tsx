@@ -4,7 +4,7 @@ import { useConnectionContext } from "../connection";
 import { TargetDone, TargetRefused, type TargetResult } from "../generated/server";
 import { isExited } from "../agents/sessionWrites";
 import type { SessionInfo } from "../generated/server";
-import { bulkArchive, bulkHold, bulkMove, bulkRemove, bulkStop, bulkUnhold } from "../select/bulkWrites";
+import { bulkArchive, bulkHold, bulkMove, bulkRemove, bulkStop, bulkUnarchive, bulkUnhold } from "../select/bulkWrites";
 import { skipLines, visibleActions, type ActionView, type SelectAction } from "../select/selectModel";
 import { Button } from "../ui/button/Button";
 import { GxMenu } from "../ui/menu/Menu";
@@ -24,7 +24,7 @@ interface ArchiveConfirm {
 }
 
 /** The actions of a select bar: each runs on the selected rows it fits. `shown` limits which actions the bar offers. */
-export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS }: { sel: SelectApi; shown?: SelectAction[] }) {
+export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: { sel: SelectApi; shown?: SelectAction[]; onResults?: (results: TargetResult[]) => void }) {
   const { workspaces } = useWorkspaces(useConnectionContext());
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
@@ -53,8 +53,9 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS }: { sel: Sele
         if (r.status !== TargetDone) showToast({ type: "error", title: `${sel.nameOf(r.target)}: ${r.message || r.reason || "refused"}` });
       }
       for (const r of results) {
-        if (r.status === TargetDone && r.new_address) showToast({ type: "info", title: `Archived as ${r.new_address.split(":").pop()}` });
+        if (r.status === TargetDone && r.new_address) showToast({ type: "info", title: `${v.action === "unarchive" ? "Unarchived" : "Archived"} as ${r.new_address.split(":").pop()}` });
       }
+      onResults?.(results);
       sel.deselect(results.filter((r) => r.status === TargetDone).map((r) => r.target));
       if (v.fit.skipped.length > 0) showToast({ type: "info", title: "Not run on some rows", description: skipLines(v.fit, sel.nameOf).join("; ") });
       sel.afterRun();
@@ -106,6 +107,7 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS }: { sel: Sele
   const holdView = byAction("hold");
   const unhold = byAction("unhold");
   const archiveView = byAction("archive");
+  const unarchiveView = byAction("unarchive");
 
   return (
     <Box display="flex" flexWrap="wrap" gap="1.5">
@@ -148,6 +150,11 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS }: { sel: Sele
       {archiveView && (
         <Button size="sm" emphasis="secondary" tone="paused" title={tip(archiveView)} disabled={pending} onClick={() => void archive(archiveView)}>
           {archiveView.label}
+        </Button>
+      )}
+      {unarchiveView && (
+        <Button size="sm" emphasis="secondary" tone="running" title={tip(unarchiveView)} disabled={pending} onClick={() => void run(unarchiveView, () => bulkUnarchive(unarchiveView.fit.fits))}>
+          {unarchiveView.label}
         </Button>
       )}
       {archiveConfirm && (
