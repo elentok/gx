@@ -34,6 +34,10 @@ type Deps struct {
 	// Workspace names the workspace a key is in; Unhold clears its hold mark.
 	Workspace func(key string) string
 	Unhold    func(key string) error
+	// SetMember puts a key in a workspace (an unknown one is an error); Remove
+	// returns it to Default.
+	SetMember func(key, workspace string) error
+	Remove    func(key string) error
 	// RekeySession rewrites a Session's ticket and fix_of through rekey.
 	// CleanupDesign removes a Design's worktree and branch when it allows it.
 	CleanupDesign func(project, epic string)
@@ -274,22 +278,24 @@ func (a *Archive) write(dir string, halves []half, name string) error {
 		if err := tickets.OverwriteEpicFields(filepath.Join(archive, m.name), fields); err != nil {
 			return err
 		}
-		a.rekey(m.key, m.name)
+		a.rekey(tickets.EpicAddress, m.key, tickets.ArchiveKey(m.key, m.name))
 	}
 	a.d.Events.Publish(wire.EventWorkspacesChanged, "")
 	return nil
 }
 
-// rekey points every Session of the epic, live or exited, at the archive key.
-func (a *Archive) rekey(key, name string) {
+// rekey points every Session of the epic keyed `from`, live or exited, at the
+// key `to`. epicOf cuts a ticket address down to its epic key; an archive key
+// needs tickets.ArchiveEpicKey, as its first slash is not the ticket's.
+func (a *Archive) rekey(epicOf func(string) string, from, to string) {
 	rekeyOne := func(addr string) string {
-		if tickets.EpicAddress(addr) == key {
-			return tickets.ArchiveKey(addr, name)
+		if epicOf(addr) == from {
+			return to + strings.TrimPrefix(addr, from)
 		}
 		return addr
 	}
 	for _, si := range a.d.Sessions() {
-		if tickets.EpicAddress(si.Ticket) != key && tickets.EpicAddress(si.FixOf) != key {
+		if epicOf(si.Ticket) != from && epicOf(si.FixOf) != from {
 			continue
 		}
 		err := a.d.RekeySession(si.ID, func(ticket, fixOf string) (string, string) {

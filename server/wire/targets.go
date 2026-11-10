@@ -32,6 +32,12 @@ type ArchiveRequest struct {
 	DryRun  bool     `json:"dry_run,omitempty"`
 }
 
+// UnarchiveRequest brings epics back out of .archive. Each target is an archive
+// address (`project:name`, suffix included).
+type UnarchiveRequest struct {
+	Targets []string `json:"targets"`
+}
+
 // Refusal reasons of archive. The cleanup reasons cover queued, not done and unknown.
 const (
 	ReasonArchiveNotFinished  = "not-finished"

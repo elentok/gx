@@ -48,6 +48,7 @@ func newServerEpicsCmd(d Deps) *cobra.Command {
 	merge.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(merge)
 	cmd.AddCommand(newServerEpicsArchiveCmd(d))
+	cmd.AddCommand(newServerEpicsUnarchiveCmd(d))
 
 	createPR := &cobra.Command{
 		Use:   "create-pr <project:epic>",

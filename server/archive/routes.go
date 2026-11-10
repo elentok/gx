@@ -24,5 +24,18 @@ func Routes(a func() *Archive) []wire.Route {
 			}
 			wire.WriteJSON(w, res)
 		}},
+		{Pattern: "POST /v1/epics/unarchive", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) {
+			var req wire.UnarchiveRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			res, err := a().Unarchive(req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			wire.WriteJSON(w, res)
+		}},
 	}
 }

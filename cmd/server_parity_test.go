@@ -61,6 +61,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/workspaces/sort":                  "server workspaces sort",
 	"POST /v1/workspaces/hold":                  "server hold",
 	"POST /v1/epics/archive":                    "server epics archive",
+	"POST /v1/epics/unarchive":                  "server epics unarchive",
 	"POST /v1/workspaces/unhold":                "server unhold",
 	"POST /v1/checks/save":                      "server checks-save",
 	"GET /v1/settings":                          "server settings",

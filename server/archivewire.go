@@ -13,6 +13,8 @@ func newArchive(s *Server) *archive.Archive {
 		Events:        s.events,
 		Workspace:     s.workspaces.Workspace,
 		Unhold:        s.workspaces.Unhold,
+		SetMember:     s.workspaces.SetMember,
+		Remove:        s.workspaces.Remove,
 		CleanupDesign: s.designs.CleanupDesign,
 		RekeySession:  s.rekeySession,
 	})

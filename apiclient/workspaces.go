@@ -67,6 +67,13 @@ func (a *Admin) ArchiveEpics(ctx context.Context, targets []string, yes, dryRun 
 	return res, err
 }
 
+// UnarchiveEpics brings each archived epic back; only an unknown target is refused.
+func (a *Admin) UnarchiveEpics(ctx context.Context, targets []string) (wire.TargetsResult, error) {
+	var res wire.TargetsResult
+	err := a.t.post(ctx, "/v1/epics/unarchive", wire.UnarchiveRequest{Targets: targets}, &res)
+	return res, err
+}
+
 // UnholdEpics clears the holds.
 func (a *Admin) UnholdEpics(ctx context.Context, targets []string) (wire.HoldResult, error) {
 	var res wire.HoldResult

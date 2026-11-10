@@ -3333,6 +3333,13 @@ export interface ArchiveRequest {
   yes?: boolean;
   dry_run?: boolean;
 }
+/**
+ * UnarchiveRequest brings epics back out of .archive. Each target is an archive
+ * address (`project:name`, suffix included).
+ */
+export interface UnarchiveRequest {
+  targets: string[];
+}
 export const ReasonArchiveNotFinished = "not-finished";
 export const ReasonArchiveRenameFailed = "rename-failed";
 /**
