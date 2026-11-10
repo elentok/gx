@@ -347,12 +347,15 @@ export function TicketCard({
   indent,
   fixAgent,
   verdict,
+  plain,
 }: {
   row: EpicDetailRow;
   meta: string;
   indent: number;
   fixAgent?: FixAgent;
   verdict?: string;
+  /** Plain text for the archive: no link and no note actions, since the ticket page reads only the active index. */
+  plain?: boolean;
 }) {
   const look = cardLook(row);
   const wide = useWide();
@@ -362,7 +365,11 @@ export function TicketCard({
       data-tone={toneOf(row)}
       ml={`${indent * (wide ? 28 : 20)}px`}
     >
-      {look.kind === "note" ? (
+      {plain ? (
+        <CardFrame row={row} wide={wide}>
+          <Line row={row} meta={meta} wide={wide} />
+        </CardFrame>
+      ) : look.kind === "note" ? (
         <NoteCard row={row} meta={meta} wide={wide} note={look} fixAgent={fixAgent} />
       ) : (
         <Link

@@ -46,14 +46,17 @@ function EpicRoute({
   fetchList,
   openDesign,
   fixAgent,
+  readOnly,
 }: {
   fetchDetail?: FetchEpicDetail;
   fetchList?: FetchEpicList;
   openDesign?: OpenDesign;
   fixAgent?: FixAgent;
+  readOnly?: boolean;
 }) {
   return (
     <EpicPage
+      readOnly={readOnly}
       address={useParams()["*"] ?? ""}
       fetchDetail={fetchDetail}
       fetchList={fetchList}
@@ -128,6 +131,7 @@ export interface RouteFetchers {
   epic?: FetchEpicDetail;
   epicList?: FetchEpicList;
   archived?: FetchArchived;
+  archivedEpic?: FetchEpicDetail;
   checksStatus?: FetchChecksStatus;
   saveChecks?: SaveChecks;
   stats?: FetchStats;
@@ -161,7 +165,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
   return [
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} saveChecks={fetchers.saveChecks} /> },
     { path: "/archive", element: <ArchivePage fetchList={fetchers.archived} /> },
-    { path: "/archive/*", element: <ArchivePage fetchList={fetchers.archived} /> },
+    { path: "/archive/*", element: <EpicRoute readOnly fetchDetail={fetchers.archivedEpic} fetchList={fetchers.epicList} /> },
     // "/agents/*" also matches "/agents"; the splat is the session label.
     { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },

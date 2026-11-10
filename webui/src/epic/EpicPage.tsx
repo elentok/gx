@@ -11,12 +11,15 @@ import { slugOf } from "../slug";
 import { useWide } from "../useWide";
 import { verdictText } from "../verdict";
 import { hasDesignSession, liveSessions } from "../design/view";
-import { ActionMerge, ActionStashMerge, type EpicDetailRow, type EpicListRow } from "../generated/server";
+import { ActionMerge, ActionStashMerge, TargetDone, type EpicDetailRow, type EpicListRow } from "../generated/server";
 import { useCardActions } from "../workspaces/itemActions";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { EpicRing } from "./EpicRing";
 import { MergeButton, StashMergeButton } from "../epics/MergeButton";
-import { designHref, epicHref } from "../hrefs";
+import { archiveHref, designHref, epicHref } from "../hrefs";
+import { bulkUnarchive } from "../select/bulkWrites";
+import { showToast } from "../ui/toaster";
+import { WriteError } from "../useWrite";
 import { QueueButton } from "../epics/QueueButton";
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
 import { Markdown } from "../markdown/Markdown";
@@ -48,7 +51,7 @@ import {
 const DONE_SHOWN = 3;
 
 // The done cards under their badge: the newest few, then the rest on request (not remembered).
-function DoneGroup({ rows, ctx, heads }: { rows: EpicDetailRow[]; ctx: RowContext; heads: boolean }) {
+function DoneGroup({ rows, ctx, heads, plain }: { rows: EpicDetailRow[]; ctx: RowContext; heads: boolean; plain?: boolean }) {
   const [all, setAll] = useState(false);
   if (rows.length === 0) return null;
   const done = doneRows(rows);
@@ -59,7 +62,7 @@ function DoneGroup({ rows, ctx, heads }: { rows: EpicDetailRow[]; ctx: RowContex
         {doneHeading(done)}
       </Badge>
       {shown.map((r) => (
-        <TicketCard key={r.address} row={r} meta={doneMeta(r, ctx)} indent={0} />
+        <TicketCard key={r.address} row={r} meta={doneMeta(r, ctx)} indent={0} plain={plain} />
       ))}
       {done.length > DONE_SHOWN && (
         <Button tone="muted" emphasis="ghost" size="sm" alignSelf="flex-start" onClick={() => setAll(!all)}>
@@ -70,17 +73,17 @@ function DoneGroup({ rows, ctx, heads }: { rows: EpicDetailRow[]; ctx: RowContex
   );
 }
 
-function EpicBody({ detail, now, designLive, fixAgent }: { detail: EpicDetail; now: number; designLive: boolean; fixAgent?: FixAgent }) {
+function EpicBody({ detail, now, designLive, fixAgent, plain }: { detail: EpicDetail; now: number; designLive: boolean; fixAgent?: FixAgent; plain?: boolean }) {
   const ctx = rowContext(detail, now, designLive);
   const pending = useConnectionState(useConnectionContext()).snapshot?.pending;
   return (
     <>
       <Box mt="28px" display="flex" flexDirection="column" gap="8px">
         {nestLive(detail.rows).map(({ row: r, indent }) => (
-          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} fixAgent={fixAgent} verdict={r.holder_unreachable ? "holder unreachable, retrying" : verdictText(pending, r.address, r.launch_step)} />
+          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} plain={plain} fixAgent={fixAgent} verdict={r.holder_unreachable ? "holder unreachable, retrying" : verdictText(pending, r.address, r.launch_step)} />
         ))}
       </Box>
-      <DoneGroup rows={detail.rows.filter(isFolded)} ctx={ctx} heads={detail.rows.every(isFolded)} />
+      <DoneGroup rows={detail.rows.filter(isFolded)} ctx={ctx} heads={detail.rows.every(isFolded)} plain={plain} />
     </>
   );
 }
@@ -190,6 +193,37 @@ function EpicBar({
       <PrNotice detail={detail} wide={wide} onChanged={onChanged} />
       {mergeBlocked(detail) && <MergeBlockNotice address={address} detail={detail} wide={wide} onChanged={onChanged} />}
     </>
+  );
+}
+
+const archivedOn = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+
+// The archived page's bar: the stamp, the link to the Design's -impl archive page, and Unarchive. No other action.
+function ArchivedBar({ address, detail }: { address: string; detail: EpicDetail }) {
+  const navigate = useNavigate();
+  const unarchive = async () => {
+    try {
+      const [r] = await bulkUnarchive([address]);
+      if (r?.status === TargetDone) navigate(epicHref(r.new_address ?? address).slice(1));
+      else showToast({ type: "error", title: `${slugOf(address)}: ${r?.message || r?.reason || "refused"}` });
+    } catch (err) {
+      showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." });
+    }
+  };
+  return (
+    <Box display="flex" flexWrap="wrap" alignItems="center" justifyContent="flex-end" gap="3">
+      {detail.archived_at && (
+        <Badge data-testid="archived-stamp">{`Archived ${archivedOn(detail.archived_at)}`}</Badge>
+      )}
+      {detail.kind === "map" && detail.impl_address && (
+        <Button tone="muted" emphasis="secondary" onClick={() => navigate(archiveHref(detail.impl_address ?? "").slice(1))}>
+          Open implementation epic
+        </Button>
+      )}
+      <Button tone="running" onClick={() => void unarchive()}>
+        Unarchive
+      </Button>
+    </Box>
   );
 }
 
@@ -342,6 +376,8 @@ type EpicPageProps = {
   openDesign?: OpenDesign;
   fetchList?: FetchEpicList;
   fixAgent?: FixAgent;
+  /** The archived epic: read from the archive, one Unarchive action, ticket rows as plain text. */
+  readOnly?: boolean;
 };
 
 // The body reads `useWide`, so it renders inside DetailPage's page mode.
@@ -354,14 +390,14 @@ export function EpicPage(props: EpicPageProps) {
   );
 }
 
-function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: EpicPageProps & { list: EpicList | null }) {
+function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list, readOnly }: EpicPageProps & { list: EpicList | null }) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps the running clocks counting.
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const wide = useWide();
   const now = Date.now();
   const designLive = liveSessions(address, sessions).length > 0;
-  const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail);
+  const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail, readOnly);
   // The payload has no name field: the epic name is the address after the project.
   const name = slugOf(address);
   // A joined card lists both of its epics; the other one is the Design or its -impl epic.
@@ -390,18 +426,22 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
               actions={
                 <>
                   <EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "header" : "headerSm"} />
-                  <EpicMenu address={address} card={card} />
+                  {!readOnly && <EpicMenu address={address} card={card} />}
                 </>
               }
               meta={
-                <EpicBar
-                  address={address}
-                  detail={detail}
-                  wide={wide}
-                  partner={partner}
-                  openDesign={openDesign}
-                  onChanged={refetch}
-                />
+                readOnly ? (
+                  <ArchivedBar address={address} detail={detail} />
+                ) : (
+                  <EpicBar
+                    address={address}
+                    detail={detail}
+                    wide={wide}
+                    partner={partner}
+                    openDesign={openDesign}
+                    onChanged={refetch}
+                  />
+                )
               }
             />
           </Box>
@@ -411,7 +451,7 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
               No tickets yet
             </Text>
           ) : (
-            <EpicBody detail={detail} now={now} designLive={designLive} fixAgent={fixAgent} />
+            <EpicBody detail={detail} now={now} designLive={designLive} fixAgent={fixAgent} plain={readOnly} />
           )}
           <MoreStats detail={detail} />
         </>

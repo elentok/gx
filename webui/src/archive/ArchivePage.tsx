@@ -91,7 +91,8 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
   const { data, failed } = useFetched("archived", fetchList, conn);
   // Rows an action's response removed; a fresh list replaces them.
   const [gone, setGone] = useState<Set<string>>(new Set());
-  useEffect(() => setGone(new Set()), [data]);
+  // A page-cache read returns a new object each render, so keep the same Set when nothing is gone.
+  useEffect(() => setGone((g) => (g.size === 0 ? g : new Set())), [data]);
   const epics = useMemo(() => (data?.epics ?? []).filter((r) => !gone.has(r.address)), [data, gone]);
   const rows = useMemo(() => epics.map(rowOfArchived), [epics]);
   const names = useMemo(() => new Map(epics.map((r) => [r.address, r.title] as const)), [epics]);

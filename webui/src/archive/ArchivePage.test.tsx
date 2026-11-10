@@ -30,7 +30,7 @@ function eventConn() {
 
 function renderArchive(archived: FetchArchived, withConn: Connection = conn) {
   sessionStorage.clear();
-  const router = createMemoryRouter(appRoutes({ archived, epicList: async () => ({ epics: [], follow_ups: [] }) }), { initialEntries: ["/archive"] });
+  const router = createMemoryRouter(appRoutes({ archived, archivedEpic: () => new Promise(() => {}), epicList: async () => ({ epics: [], follow_ups: [] }) }), { initialEntries: ["/archive"] });
   renderThemed(
     <ConnectionContext.Provider value={withConn}>
       <RouterProvider router={router} />
