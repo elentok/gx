@@ -178,6 +178,69 @@ func TestScanWorktrees_DetachedWorktreeListedAndDirtyReported(t *testing.T) {
 	}
 }
 
+func TestScanEpic_RenamedEpicReadsItsBranchName(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	branchWithCommits(t, dir, "foo", "foo.txt")
+	testutil.MustGitExported(t, dir, "merge", "--ff-only", "foo")
+	repo := git.Repo{Root: dir, Trunk: "main"}
+
+	epic := testEpic("foo-2", "01", "done")
+	epic.BranchName = "foo"
+	scan, err := scanEpic(repo, epic)
+	if err != nil {
+		t.Fatalf("scanEpic: %v", err)
+	}
+	if !scan.MergedToTrunk {
+		t.Errorf("MergedToTrunk = false, want true (branch foo is on trunk)")
+	}
+}
+
+func TestEpicIndex_ActiveEpicOwnsItsNameOverArchivedBranchName(t *testing.T) {
+	t.Parallel()
+	active := testEpic("foo", "04", "open")
+	archived := testEpic("foo-2", "04", "done")
+	archived.BranchName = "foo"
+	archived.ArchivedAt = time.Now()
+	renamed := testEpic("bar-2", "01", "open")
+	renamed.BranchName = "bar"
+
+	idx := epicIndex([]tickets.Epic{active, renamed, archived})
+
+	if got := idx["foo"].Name; got != "foo" {
+		t.Errorf("idx[foo] = %q, want the active foo", got)
+	}
+	if got := idx["bar"].Name; got != "bar-2" {
+		t.Errorf("idx[bar] = %q, want the renamed bar-2 (found by its branch_name)", got)
+	}
+	if got := idx["foo-2"].Name; got != "foo-2" {
+		t.Errorf("idx[foo-2] = %q, want foo-2", got)
+	}
+}
+
+func TestScanWorktrees_ArchivedEpicOfSameBranchGivesNoRecommendation(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	scanCommitOnBranch(t, dir, "ralph-loop/foo-item-04", old)
+	scanGit(t, dir, old, "merge", "--ff-only", "ralph-loop/foo-item-04")
+
+	active := testEpic("foo", "04", "open")
+	archived := testEpic("foo-2", "04", "done")
+	archived.BranchName = "foo"
+	archived.ArchivedAt = time.Now()
+
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scan := scanByBranch(t, repo, []tickets.Epic{active, archived})["ralph-loop/foo-item-04"]
+
+	if scan.TicketDone {
+		t.Errorf("TicketDone = true, want false (the active foo's ticket 04 is open)")
+	}
+	if scan.Recommendation == "delete" {
+		t.Errorf("Recommendation = delete, want none: the archived foo-2 must not judge foo's branches")
+	}
+}
+
 func TestScanWorktrees_ActiveWorkNeverRecommended(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

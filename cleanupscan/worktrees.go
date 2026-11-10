@@ -113,11 +113,23 @@ func pathByBranch(worktrees []git.Worktree) map[string]string {
 	return m
 }
 
-// epicIndex maps epic names to their epics.
+// epicIndex maps branch names to their epics. Every epic is found by its own
+// name and also by branch_name, but an active epic owns its name: no other
+// epic's branch_name takes that key from it, so an active epic's branches are
+// never judged by an archived one.
 func epicIndex(epics []tickets.Epic) map[string]tickets.Epic {
 	m := map[string]tickets.Epic{}
 	for _, e := range epics {
 		m[e.Name] = e
+	}
+	for _, e := range epics {
+		if e.BranchName == "" {
+			continue
+		}
+		if owner, ok := m[e.BranchName]; ok && owner.Name != e.Name && owner.ArchivedAt.IsZero() {
+			continue
+		}
+		m[e.BranchName] = e
 	}
 	return m
 }

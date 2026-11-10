@@ -24,16 +24,22 @@ import (
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
-// designBranch is the branch and worktree name of a map's Design.
-func designBranch(epic string) string { return epic + "-design" }
+// loadDesignEpic loads the Design's epic, with Name set so Branch falls back
+// to the folder name when branch_name is empty.
+func loadDesignEpic(projectDir, epic string) tickets.Epic {
+	e := tickets.LoadEpicTicketMD(filepath.Join(projectDir, epic))
+	e.Name = epic
+	return e
+}
 
 // designClash is the refusal message when the project has an epic named like
 // the Design's branch, or "".
 func designClash(projectDir, project, epic string) string {
-	if _, err := os.Stat(filepath.Join(projectDir, designBranch(epic))); err != nil {
+	branch := tickets.DesignBranch(loadDesignEpic(projectDir, epic))
+	if _, err := os.Stat(filepath.Join(projectDir, branch)); err != nil {
 		return ""
 	}
-	return fmt.Sprintf("%s has an epic %s, which would share the branch of the %s Design", project, designBranch(epic), epic)
+	return fmt.Sprintf("%s has an epic %s, which would share the branch of the %s Design", project, branch, epic)
 }
 
 // designCtx is what every design git helper needs about one map: its project
@@ -43,6 +49,7 @@ type designCtx struct {
 	repo       *git.Repo
 	epic       string
 	branch     string
+	implBranch string
 	path       string
 }
 
@@ -55,8 +62,9 @@ func (s *Designs) designCtxOf(project, epic string) (designCtx, error) {
 	if err != nil {
 		return designCtx{}, err
 	}
-	branch := designBranch(epic)
-	return designCtx{projectDir, repo, epic, branch, filepath.Join(repo.LinkedWorktreeDir(), branch)}, nil
+	e := loadDesignEpic(projectDir, epic)
+	branch := tickets.DesignBranch(e)
+	return designCtx{projectDir, repo, epic, branch, tickets.ImplBranch(e), filepath.Join(repo.LinkedWorktreeDir(), branch)}, nil
 }
 
 // pastBranchStep reports whether design_step is branch or done.
@@ -70,7 +78,7 @@ func pastBranchStep(step tickets.DesignStep) bool {
 // A deleted impl branch with design_step branch still counts.
 func (c designCtx) afterBranch() bool {
 	step := tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(c.projectDir, c.epic)).DesignStep)
-	return pastBranchStep(step) || ticketgit.BranchExists(c.repo.Root, c.epic+tickets.ImplEpicSuffix)
+	return pastBranchStep(step) || ticketgit.BranchExists(c.repo.Root, c.implBranch)
 }
 
 // designDir is where a map's Design session runs: the trunk checkout once past
@@ -144,12 +152,12 @@ func (s *Designs) tryCleanupDesign(project, epic string) error {
 			return fmt.Errorf("the worktree has uncommitted edits")
 		}
 	}
-	missing, err := history.UnappliedPatches(c.repo.Root, epic+tickets.ImplEpicSuffix, c.branch)
+	missing, err := history.UnappliedPatches(c.repo.Root, c.implBranch, c.branch)
 	if err != nil {
 		return err
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("%d design commit(s) are not in %s", len(missing), epic+tickets.ImplEpicSuffix)
+		return fmt.Errorf("%d design commit(s) are not in %s", len(missing), c.implBranch)
 	}
 	return c.removeWorktreeAndBranch(false)
 }

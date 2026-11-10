@@ -247,13 +247,13 @@ func scanEpic(repo git.Repo, epic tickets.Epic) (EpicScan, error) {
 	}
 	branchExists := false
 	for _, b := range branches {
-		if b.Name == epic.Name {
+		if b.Name == epic.Branch() {
 			branchExists = true
 			break
 		}
 	}
 	if branchExists {
-		merged, err := pr.IsCommitMergedToTrunk(repo.Root, repo.Trunk, epic.Name)
+		merged, err := pr.IsCommitMergedToTrunk(repo.Root, repo.Trunk, epic.Branch())
 		if err != nil {
 			return EpicScan{}, err
 		}

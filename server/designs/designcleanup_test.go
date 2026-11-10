@@ -90,6 +90,30 @@ func TestDesignCleanup_SessionExitAfterBranchRemovesWorktreeAndBranch(t *testing
 	waitFor(t, func() bool { return f.designGone(t, dir) })
 }
 
+// A Design renamed after its branches were made keeps them: its worktree and
+// branch are foo-design, and its design commits are checked against foo-impl.
+func TestDesignCleanup_RenamedDesignUsesBranchNameBranches(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "map-impl", "01", "first", "")
+	fm := "---\nkind: map\ndesign_step: create-tickets\nbranch_name: foo\n---\n"
+	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte(fm), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := startDesignsIn(t, store)
+	dir, id := f.openDesignWorktree(t, true)
+	if filepath.Base(dir) != "foo-design" {
+		t.Fatalf("design worktree = %s, want foo-design", dir)
+	}
+	gitOut(t, f.repo, "branch", "foo-impl", "foo-design")
+	f.stop(t, id)
+	waitFor(t, func() bool {
+		_, err := os.Stat(dir)
+		return os.IsNotExist(err) && gitOut(t, f.repo, "branch", "--list", "foo-design") == ""
+	})
+}
+
 func TestDesignCleanup_RebasedImplBranchCountsAsMerged(t *testing.T) {
 	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
