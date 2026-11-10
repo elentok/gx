@@ -49,6 +49,9 @@ type Host interface {
 	// CancelStalePRText cancels the open or running pr-text ticket of every epic
 	// without a PR in a project whose delivery is no longer `pr`, read live.
 	CancelStalePRText()
+	// PauseCIFailing stores "CI failing" with reason on the epic and sends the
+	// one notice for it.
+	PauseCIFailing(t Target, reason string) error
 	// CIFixSkills is the skills a ci-fix ticket of project runs.
 	CIFixSkills(project string) []string
 	// CIFixCaps is the ci-fix attempts allowed per check and per PR.

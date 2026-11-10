@@ -71,6 +71,11 @@ func (s *Tickets) EpicCreatePR(ctx context.Context, address string) (wire.QueueR
 	return s.t.queueWriteTo(ctx, "/v1/epics/create-pr", wire.QueueRequest{Address: address})
 }
 
+// EpicTryAgain ends a "CI failing" or "PR text failed" pause and reruns the failed step.
+func (s *Tickets) EpicTryAgain(ctx context.Context, address string) (wire.QueueResult, error) {
+	return s.t.queueWriteTo(ctx, "/v1/epics/try-again", wire.QueueRequest{Address: address})
+}
+
 // EpicStashMerge is "Stash, merge and restore" for an epic paused on a dirty
 // trunk: the target is fast-forwarded and the uncommitted files come back with
 // conflict markers, behind a trunk-conflict ticket (TrunkConflict).

@@ -171,6 +171,18 @@ func (c *ServerChat) Pause(project string, override *ServerChatConfig, epic, tic
 	}
 }
 
+// EpicPause notifies that epic waits on a person for a pause of its own, not a
+// ticket's: label names it and reason says why.
+func (c *ServerChat) EpicPause(project string, override *ServerChatConfig, epic, label, reason string) {
+	if c == nil {
+		return
+	}
+	msg := epicPauseMessage(project, epic, label, reason)
+	for _, s := range c.projectSinks(override) {
+		s.sendMessage(msg, epicSource(project+"/"+epic), "")
+	}
+}
+
 // FinishSink is the EventSink the server's finish path reports through for
 // one ticket. It forwards only what the server cannot see from the outcome: a
 // conflict resolution starting, and the resolution child pausing. The ticket's

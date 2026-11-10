@@ -74,7 +74,10 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		triage.Routes(func() *triage.Triage { return s.triage }),
 		sessprompt.Routes(func() *sessprompt.Prompt { return s.prompt }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
-		prflow.Routes(func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.CreatePR }),
+		prflow.Routes(
+			func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.CreatePR },
+			func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.TryAgain },
+		),
 		sched.Routes(func() *sched.Scheduler { return s.scheduler }, func() *sched.Explainer { return s.explain }),
 	)
 }

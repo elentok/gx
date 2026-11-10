@@ -126,6 +126,18 @@ func ticketSubject(epic, identifier, ticketPath string) string {
 	return subject
 }
 
+// epicPauseMessage is the "an epic waits on a person" message: label names the
+// pause and reason says why.
+func epicPauseMessage(project, epic, label, reason string) chatMessage {
+	return chatMessage{
+		icon: "🛑", status: "Repair", subject: epic,
+		lines:   []string{label, reason},
+		project: project,
+		kind:    notifyKindTicketNeedsHuman,
+		urgency: urgencyRepair,
+	}
+}
+
 // conflictStartedMessage is the "an agent took over a merge conflict" message.
 func conflictStartedMessage(project, epic, ticketPath, identifier string) chatMessage {
 	return chatMessage{

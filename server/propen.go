@@ -22,6 +22,11 @@ func (s *Server) CreatePR(req wire.QueueRequest) (wire.QueueResult, error) {
 	return prflow.Create(prOpenHost{s}, req)
 }
 
+// TryAgain is the Try again route's handler.
+func (s *Server) TryAgain(req wire.QueueRequest) (wire.QueueResult, error) {
+	return prflow.TryAgain(prOpenHost{s}, req)
+}
+
 // PROpenBlock is why root's last open attempt could not go on, "" when it is not blocked.
 func (s *Server) PROpenBlock(root queue.RootRef) string { return s.prReasons.Reason(root) }
 

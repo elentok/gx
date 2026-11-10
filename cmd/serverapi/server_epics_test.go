@@ -176,6 +176,18 @@ func TestServerEpicsCreatePR_RejectsNonEpicAddressesAndHasJSON(t *testing.T) {
 	}
 }
 
+func TestServerEpicsTryAgain_RejectsNonEpicAddressesAndHasJSON(t *testing.T) {
+	for _, args := range [][]string{{}, {"proj:epic/01"}, {"epic"}, {"proj:a", "proj:b"}} {
+		if err := execute(t, append([]string{"server", "epics", "try-again"}, args...), Deps{}); err == nil {
+			t.Errorf("args %q: want an error", args)
+		}
+	}
+	c, _, err := serverParent(Deps{}).Find([]string{"epics", "try-again"})
+	if err != nil || c.Flags().Lookup("json") == nil {
+		t.Errorf("try-again = %v, err %v; want a verb with --json", c, err)
+	}
+}
+
 func TestServerEpicsCreatePR_PrintsOutcomeAndRefusal(t *testing.T) {
 	var out bytes.Buffer
 	err := cmdbase.RunServerQueueWrite(context.Background(), nil, &out, false,

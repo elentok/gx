@@ -2,10 +2,12 @@ package server
 
 import (
 	"cmp"
+	"fmt"
 	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
@@ -108,6 +110,16 @@ func (h prWatchHost) CancelStalePRText() {
 }
 
 func (h prWatchHost) OpenPR(root queue.RootRef) (prflow.Outcome, error) { return h.s.OpenPR(root) }
+
+// PauseCIFailing stores "CI failing" on the epic and sends its one notice.
+func (h prWatchHost) PauseCIFailing(t prflow.Target, reason string) error {
+	e, ok := prOpenHost(h).Epic(t.Project, t.Epic)
+	if !ok {
+		return fmt.Errorf("epic %s:%s not found", t.Project, t.Epic)
+	}
+	h.s.merger.PauseEpic(queue.RootRef{Project: t.Project, Epic: t.Epic}, e, events.CIFailing, reason)
+	return nil
+}
 
 func (h prWatchHost) CIFixSkills(project string) []string { return h.s.projects.CIFixSkills(project) }
 

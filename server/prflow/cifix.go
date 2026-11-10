@@ -166,6 +166,9 @@ func (w *Watcher) startCIFix(r pr.Runner, repo string, t Target, v View) error {
 	if v.State != "OPEN" {
 		return nil
 	}
+	if stop, err := w.ciGate(t, v); stop || err != nil {
+		return err
+	}
 	entries, err := sinceReset(t.Dir)
 	if err != nil {
 		return err
@@ -200,9 +203,11 @@ func (w *Watcher) startCIFix(r pr.Runner, repo string, t Target, v View) error {
 		if res == CIFixStarted {
 			return w.host.QueueRoot(queue.RootRef{Project: t.Project, Epic: t.Epic}, id)
 		}
-		// Busy or capped for this check; another check may still have room.
 		if res == CIFixBusy {
 			return nil
+		}
+		if res == CIFixCapReached {
+			return w.giveUp(t, capReason(t.Dir, c, perCheck))
 		}
 	}
 	return nil

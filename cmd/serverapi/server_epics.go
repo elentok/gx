@@ -64,6 +64,22 @@ func newServerEpicsCmd(d Deps) *cobra.Command {
 	createPR.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(createPR)
 
+	tryAgain := &cobra.Command{
+		Use:   "try-again <project:epic>",
+		Short: "end a \"CI failing\" or \"PR text failed\" pause: reset the attempt counts and run the failed step again",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
+				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
+			}
+			return cmdbase.ServerQueueWrite(d.Dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+				return cl.Tickets.EpicTryAgain(ctx, args[0])
+			})
+		},
+	}
+	tryAgain.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(tryAgain)
+
 	stashMerge := &cobra.Command{
 		Use:   "stash-merge <project:epic>",
 		Short: "merge an epic paused on a dirty trunk: set the clashing files aside, merge, restore them with conflict markers",

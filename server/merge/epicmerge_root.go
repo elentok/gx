@@ -438,6 +438,17 @@ func (s *Merger) storeMergeBlock(root queue.RootRef, epicPath string, p mergePau
 	}
 }
 
+// PauseEpic stores a pause of kind on e and sends the epic's one notice, through
+// the chat path notifyEpicOutcome uses. The PR flow uses it to give up on an
+// epic's CI, which is no merge, so the epic-complete text would be wrong.
+func (s *Merger) PauseEpic(root queue.RootRef, e tickets.Epic, kind events.Kind, reason string) {
+	s.storeMergeBlock(root, e.Path, mergePause{reason: reason, kind: kind})
+	s.events.PublishEvent(wire.Event{Type: wire.EventRootPaused, Address: root.String(), Kind: string(kind), Level: wire.EventLevelWarning, Message: reason})
+	if s.chat.Enabled() && !tickets.IsOneOffEpic(e) {
+		s.chat.EpicPause(root.Project, s.projects.ChatOverride(root.Project), root.Epic, schema.PauseReason(kind).Label(), reason)
+	}
+}
+
 // NothingToMerge reports whether the root's feature branch is missing or has no
 // commits ahead of its target. An error reading either means there may be
 // something to merge: never call an epic merged on a guess.

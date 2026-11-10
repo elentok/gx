@@ -43,6 +43,7 @@ var allowed = map[string]int{
 	"procwatch/procwatch_test.go":                             3, // a poll loop with a deadline; negative waits: a killed forker forks no more, a storm is not reported under the threshold
 	"server/devmode_failure_test.go":                          1, // negative wait: a crashed Vite is not restarted on its own
 	"server/designs/designready_test.go":                      1, // negative wait: no Ready message follows a rescan
+	"server/prflow/giveup_test.go":                            1, // negative wait: giving up on CI sends no second notice
 	"server/ticketwrite/blocked_pause_test.go":                3, // negative waits: no pause before the dwell ends, after a re-check, or on a usage limit
 	"server/budget/extrausage_internal_test.go":               2, // poll loop with a deadline; negative wait: no second notice is sent
 	"server/servertest/longticket_test.go":                    1, // a delayed transcript write
