@@ -116,7 +116,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
           {...itemStyle}
         >
           <Label item={entry} />
-          <ChakraMenu.ItemIndicator />
+          {!entry.inlineHint && <ChakraMenu.ItemIndicator />}
         </ChakraMenu.CheckboxItem>
       );
     case "radio-group":

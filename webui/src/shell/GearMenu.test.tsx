@@ -82,6 +82,33 @@ test("the AFK and Vi mode items post the opposite of the snapshot", async () => 
   await waitFor(() => expect(postViMode).toHaveBeenCalledWith(true));
 });
 
+const menuItems = () => [...screen.getByRole("menu").querySelectorAll('[role^="menuitem"]')].map((el) => el.textContent?.replace(/\s+/g, " ").trim());
+
+test("with a Dev checkout the Dev mode row sits under Vi mode, follows the Dev state and posts the opposite", async () => {
+  const postDevFrontend = vi.fn();
+  setup({ dev: { state: "running", has_checkout: true } }, { postDevFrontend });
+  const row = await screen.findByRole("menuitemcheckbox", { name: "Dev mode" });
+  expect(menuItems()?.slice(0, 3)).toEqual(["AFK", "Vi mode", "Dev mode"]);
+  expect(row.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(row);
+  await waitFor(() => expect(postDevFrontend).toHaveBeenCalledWith(false));
+});
+
+test("an off Dev state shows the row unchecked and flipping it posts true", async () => {
+  const postDevFrontend = vi.fn();
+  setup({ dev: { state: "off", has_checkout: true } }, { postDevFrontend });
+  const row = await screen.findByRole("menuitemcheckbox", { name: "Dev mode" });
+  expect(row.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(row);
+  await waitFor(() => expect(postDevFrontend).toHaveBeenCalledWith(true));
+});
+
+test("without a Dev checkout there is no Dev mode row", async () => {
+  setup({ dev: { state: "off", has_checkout: false } });
+  await screen.findByRole("menuitemcheckbox", { name: "AFK" });
+  expect(screen.queryByRole("menuitemcheckbox", { name: "Dev mode" })).toBeNull();
+});
+
 test("Sort is disabled until the active workspace resolves", async () => {
   setup();
   const sort = await screen.findByRole("menuitem", { name: "Sort" });

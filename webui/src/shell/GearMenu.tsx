@@ -11,6 +11,7 @@ import { useWorkerRegistration } from "../pwa/registerWorker";
 import { RestartDialog } from "../restart/RestartDialog";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { showToast } from "../ui/toaster";
+import { postDevFrontend as defaultPostDevFrontend, useDev } from "../dev";
 import { postViMode as defaultPostViMode } from "../vimode";
 import { WriteError } from "../useWrite";
 import { postWorkspace } from "../workspaces/postWorkspace";
@@ -21,6 +22,7 @@ import { useShell } from "./ShellContext";
 interface Props {
   postAfk?: (on: boolean) => Promise<void>;
   postViMode?: (on: boolean) => Promise<void>;
+  postDevFrontend?: (on: boolean) => void;
   postSort?: (workspace: string, sort: string) => Promise<unknown>;
   /** The active workspace once it resolves; Sort stays disabled until then. */
   activeWorkspace?: Workspace;
@@ -52,7 +54,8 @@ function BurgerIcon() {
 }
 
 // The app menu: the old top bar's menu, opened from the sidebar footer.
-export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViMode, postSort = defaultPostSort, activeWorkspace }: Props) {
+export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViMode, postDevFrontend = defaultPostDevFrontend, postSort = defaultPostSort, activeWorkspace }: Props) {
+  const dev = useDev();
   const { snapshot, connected } = useConnectionState(useConnectionContext());
   const shell = useShell();
   const [restartOpen, setRestartOpen] = useState(false);
@@ -62,6 +65,7 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
   const { cert } = useCert();
   const afk = snapshot?.afk ?? false;
   const viMode = snapshot?.vi_mode ?? false;
+  const devOn = dev.state !== "off";
   const toggle = (label: string, value: string, on: boolean, flip: () => void): MenuEntry => ({
     kind: "checkbox",
     value,
@@ -125,6 +129,7 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
         items={[
           toggle("AFK", "afk", afk, () => toggleAfk(afk, postAfk)),
           toggle("Vi mode", "vimode", viMode, () => guarded(postViMode(!viMode))),
+          ...(dev.has_checkout ? [toggle("Dev mode", "devmode", devOn, () => postDevFrontend(!devOn))] : []),
           sort,
           { kind: "separator" },
           { value: "restart", label: "Restart server", onSelect: () => setRestartOpen(true) },
