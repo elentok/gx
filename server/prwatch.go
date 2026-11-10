@@ -121,6 +121,18 @@ func (h prWatchHost) PauseCIFailing(t prflow.Target, reason string) error {
 	return nil
 }
 
+// PauseForeignConflict stores the foreign-commits block on the epic and sends its one notice.
+func (h prWatchHost) PauseForeignConflict(t prflow.Target, reason string) error {
+	e, ok := prOpenHost(h).Epic(t.Project, t.Epic)
+	if !ok {
+		return fmt.Errorf("epic %s:%s not found", t.Project, t.Epic)
+	}
+	h.s.merger.PauseEpic(queue.RootRef{Project: t.Project, Epic: t.Epic}, e, events.PRForeignConflict, reason)
+	return nil
+}
+
+func (h prWatchHost) ForkPRMerge(root queue.RootRef) error { return h.s.merger.ForkPRMerge(root) }
+
 func (h prWatchHost) CIFixSkills(project string) []string { return h.s.projects.CIFixSkills(project) }
 
 // CIFixCaps are the configured attempts per check and per PR; zero means the default.

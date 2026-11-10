@@ -52,6 +52,12 @@ type Host interface {
 	// PauseCIFailing stores "CI failing" with reason on the epic and sends the
 	// one notice for it.
 	PauseCIFailing(t Target, reason string) error
+	// PauseForeignConflict stores "pull request conflicts with others' commits"
+	// with reason on the epic and sends the one notice for it.
+	PauseForeignConflict(t Target, reason string) error
+	// ForkPRMerge forks a PR-mode Merge ticket for the epic's conflicting PR, or
+	// stores "needs rebase" at the cap; it forks none while one is pending.
+	ForkPRMerge(root queue.RootRef) error
 	// CIFixSkills is the skills a ci-fix ticket of project runs.
 	CIFixSkills(project string) []string
 	// CIFixCaps is the ci-fix attempts allowed per check and per PR.

@@ -136,10 +136,14 @@ func (s *Merger) epicMergeLocked(root queue.RootRef, one ralphloop.OneIteration,
 	if err := s.ensureRootQueued(root, one.Ticket); err != nil {
 		return mergeDecision{}, err
 	}
-	if ff, err := git.IsAncestor(repo, target, "refs/heads/"+root.Epic); err != nil {
-		return mergeDecision{}, err
-	} else if ff {
-		return s.mergeEpic(root, one, repo, epics, e, target, true), nil
+	// Merge again on a blocked PR epic rebases its branch; it never merges locally.
+	prBlocked := e.PRNumber != 0 && (e.MergeBlockKind == string(schema.PauseNeedsRebase) || e.MergeBlockKind == string(schema.PausePRForeignConflict))
+	if !prBlocked {
+		if ff, err := git.IsAncestor(repo, target, "refs/heads/"+root.Epic); err != nil {
+			return mergeDecision{}, err
+		} else if ff {
+			return s.mergeEpic(root, one, repo, epics, e, target, true), nil
+		}
 	}
 	id := s.forkMergeTicket(root, e, target, true)
 	if id == "" {

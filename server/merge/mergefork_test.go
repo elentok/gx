@@ -158,6 +158,28 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 	waitUntil(t, "the dependent to launch", func() bool { return f.others.Load() > 0 })
 }
 
+func TestMergeFork_AnEpicWithAPRIsNeverMergedLocally(t *testing.T) {
+	t.Parallel()
+	f := newForkFixture(t, nil)
+	if err := tickets.StampEpicFields(filepath.Join(f.Store, "proj", schedEpic), map[string]any{"pr_number": 5, "pr_url": "https://github.com/o/r/pull/5"}); err != nil {
+		t.Fatal(err)
+	}
+	f.H.Server.Rescan()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.QueueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
+
+	if files := f.mergeTicketFiles(t); len(files) != 0 {
+		t.Errorf("merge tickets = %v, want none: the watcher forks them, not the finish", files)
+	}
+	f.assertStamps(t, false)
+	// The ticket's own turn moves main on; a local merge would put the epic's commits on it.
+	if out := f.Git(t, "branch", "--contains", schedEpic, "main"); strings.TrimSpace(out) != "" {
+		t.Errorf("main holds the epic's tip after the finish: %s", out)
+	}
+}
+
 func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
 	t.Parallel()
 	f := newForkFixture(t, nil)

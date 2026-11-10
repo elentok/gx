@@ -18,6 +18,9 @@ func (w *Watcher) act(r pr.Runner, repo string, t Target, v View) error {
 	if err := w.markReady(r, repo, t, v); err != nil {
 		return err
 	}
+	if stop, err := w.startConflictFix(t, v); stop || err != nil {
+		return err
+	}
 	return w.startCIFix(r, repo, t, v)
 }
 

@@ -206,7 +206,8 @@ func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 		s.stampMergedEpic(root, e, 0, 0, nil)
 		s.StampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
-	case force || s.AutoFFMerge(project) || hasManualMergeTicket(e):
+	// An epic with a PR is merged on GitHub by a person, never here.
+	case e.PRNumber == 0 && (force || s.AutoFFMerge(project) || hasManualMergeTicket(e)):
 		trunkBefore, revErr := git.RevParse(repo, "refs/heads/"+target)
 		pause := s.mergeRoot(project, epics, one, repo)
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
