@@ -153,7 +153,7 @@ export function SelectButton() {
   const sel = useSidebarSelect();
   if (sel.state.on) return null;
   return (
-    <chakra.button type="button" onClick={sel.enter} h="34px" px="2" borderRadius="8px" color="text.dim" fontSize="13px" cursor="pointer" _hover={{ bg: "surface.raised" }}>
+    <chakra.button type="button" onClick={sel.enter} h="34px" px="2" borderRadius="6px" color="tone.running.fg" fontSize="13px" cursor="pointer" _hover={{ bg: "surface.raised" }}>
       Select
     </chakra.button>
   );
@@ -171,15 +171,15 @@ export function SelectBar({ children }: { children?: ReactNode }) {
   const pickable = sel.rows.filter((r) => r.visible && r.selectable);
   const all = pickable.length > 0 && pickable.every((r) => sel.state.keys.includes(r.key));
   return (
-    <Box as="footer" data-part="select-bar" flex="none" display="flex" flexDirection="column" gap="2" p="2" borderTopWidth="1px" borderColor="border">
-      <Box display="flex" alignItems="center" gap="2">
-        <Box as="span" flex="1" fontSize="13px" data-testid="select-count">
+    <Box as="footer" data-part="select-bar" flex="none" display="flex" flexDirection="column" gap="2" px="2" py="10px" borderTopWidth="1px" borderColor="tone.running.fg" bg="surface.raised">
+      <Box display="flex" alignItems="center" gap="1.5">
+        <Box as="span" flex="1" fontSize="14px" fontWeight="600" whiteSpace="nowrap" data-testid="select-count">
           {n} selected
         </Box>
-        <Button size="sm" emphasis="ghost" tone="muted" onClick={all ? sel.selectNone : sel.selectAll}>
+        <Button size="sm" emphasis="ghost" tone="running" onClick={all ? sel.selectNone : sel.selectAll}>
           {all ? "Select none" : "Select all"}
         </Button>
-        <Button size="sm" emphasis="secondary" onClick={sel.leave}>
+        <Button size="sm" emphasis="ghost" tone="running" onClick={sel.leave}>
           Done
         </Button>
       </Box>
