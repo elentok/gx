@@ -278,6 +278,9 @@ func buildInstallPlan(manifestPath string, req InstallRequest) (*installationPla
 					if f.LinkTarget != "" && current == managedIdentity(f) {
 						owner = OwnershipUnchanged
 					}
+					if f.Kind == KindDirectoryLink && danglingLinkInto(path, filepath.Dir(f.LinkTarget)) {
+						owner = OwnershipAbsent
+					}
 					if f.Kind == KindDirectoryLink && current == "\x00non-link" {
 						owner, err = legacyDirectoryOwnership(path, old)
 						if err != nil {

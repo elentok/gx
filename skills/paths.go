@@ -51,6 +51,30 @@ func within(path, dir string) bool {
 	return err == nil && (rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".."))
 }
 
+// danglingLinkInto reports a symlink at path whose target is gone and was
+// inside sourceDir: a leftover of an earlier hand-made link to this source.
+func danglingLinkInto(path, sourceDir string) bool {
+	if info, err := os.Lstat(path); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		return false
+	}
+	if _, err := os.Stat(path); err == nil {
+		return false
+	}
+	link, err := os.Readlink(path)
+	if err != nil {
+		return false
+	}
+	if !filepath.IsAbs(link) {
+		link = filepath.Join(filepath.Dir(path), link)
+	}
+	link = filepath.Clean(link)
+	if within(link, filepath.Clean(sourceDir)) {
+		return true
+	}
+	physical, err := physicalPath(sourceDir)
+	return err == nil && within(link, physical)
+}
+
 func canonicalRoots(roots []string) ([]string, error) {
 	seen := map[string]bool{}
 	var result []string
