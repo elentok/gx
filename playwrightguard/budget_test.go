@@ -35,7 +35,10 @@ import (
 // Dev mode flow (+1): the pill journey needs the scripted fake Vite over a real server round trip (SSE reload,
 // the dev worker's unregistration in a real browser); the DevPill, DevPopover and settings row vitest tests
 // cover each state alone.
-const maxFlows = 138
+// Bulk actions flow (+1): select, Move, Hold, Stop and the Archive confirm need a server round trip and real
+// layout (the menu above the bar, the footer's width) that vitest cannot see; the select model, bar and page
+// tests cover each rule alone.
+const maxFlows = 139
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
