@@ -5,6 +5,7 @@ import { TEST_CERT } from "../auth/testCert";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { Workspace } from "../generated/server";
 import { renderThemed } from "../ui/render";
+import { type Device, DeviceContext } from "../useWide";
 import { WriteError } from "../useWrite";
 import { GearMenu } from "./GearMenu";
 import { ShellContext } from "./ShellContext";
@@ -33,18 +34,20 @@ afterEach(() => {
 
 const research: Workspace = { name: "research", sort: "activity" } as Workspace;
 
-function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}, closeSliding = () => {}, connected = true, certValue: CertContextValue = {}) {
+function setup(snapshot: Record<string, unknown> = {}, props: Parameters<typeof GearMenu>[0] = {}, closeSliding = () => {}, connected = true, certValue: CertContextValue = {}, device: Device = "desktop") {
   const state = { snapshot, connected, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding, claimHeader: () => () => {} };
   renderThemed(
-    <ConnectionContext.Provider value={conn}>
-      <ShellContext.Provider value={shell}>
-        <CertContext.Provider value={certValue}>
-          <GearMenu {...props} />
-        </CertContext.Provider>
-      </ShellContext.Provider>
-    </ConnectionContext.Provider>,
+    <DeviceContext.Provider value={device}>
+      <ConnectionContext.Provider value={conn}>
+        <ShellContext.Provider value={shell}>
+          <CertContext.Provider value={certValue}>
+            <GearMenu {...props} />
+          </CertContext.Provider>
+        </ShellContext.Provider>
+      </ConnectionContext.Provider>
+    </DeviceContext.Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
 }
@@ -92,6 +95,16 @@ test("with a Dev checkout the Dev mode row sits under Vi mode, follows the Dev s
   expect(row.getAttribute("aria-checked")).toBe("true");
   fireEvent.click(row);
   await waitFor(() => expect(postDevFrontend).toHaveBeenCalledWith(false));
+});
+
+test("on a phone the Dev mode row keeps its place and the same drawn switch as Vi mode", async () => {
+  setup({ vi_mode: true, dev: { state: "running", has_checkout: true } }, {}, () => {}, true, {}, "phone");
+  const row = await screen.findByRole("menuitemcheckbox", { name: "Dev mode" });
+  expect(menuItems()?.slice(0, 3)).toEqual(["AFK", "Vi mode✓", "Dev mode✓"]);
+  const drawn = (el: Element) => [...el.querySelectorAll("[aria-hidden]")].map((n) => n.outerHTML);
+  const vi = screen.getByRole("menuitemcheckbox", { name: "Vi mode" });
+  expect(drawn(row).length).toBeGreaterThan(0);
+  expect(drawn(row)).toEqual(drawn(vi));
 });
 
 test("an off Dev state shows the row unchecked and flipping it posts true", async () => {
