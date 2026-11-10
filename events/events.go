@@ -197,6 +197,20 @@ const (
 	// ProcessStorm is a run the watchdog killed because its process tree grew
 	// past the threshold. A retry would run the same code and storm again.
 	ProcessStorm Kind = "process-storm"
+	// CIFailing is an epic whose pull request's CI is red and whose automatic
+	// fix attempts are used up.
+	CIFailing Kind = "ci-failing"
+	// PRTextFailed is an epic whose pull request title and description could
+	// not be generated.
+	PRTextFailed Kind = "pr-text-failed"
+	// PRForeignConflict is an epic whose pull request conflicts with commits
+	// someone else pushed to the target.
+	PRForeignConflict Kind = "pr-foreign-conflict"
+	// PRDirtyTrunk is a pull request flow step git refused because trunk's
+	// checkout has local changes.
+	PRDirtyTrunk Kind = "pr-dirty-trunk"
+	// PRTrunkUpdate is a failed update of trunk from the merged pull request.
+	PRTrunkUpdate Kind = "pr-trunk-update"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -217,6 +231,7 @@ var kinds = map[Kind]bool{
 	TrunkMissing: true, DirtyTrunk: true, MergeError: true, MergeUnreported: true,
 	NeedsRebase: true, ConflictMarkers: true, ModelMismatch: true,
 	ClassifierOutage: true, ProcessStorm: true,
+	CIFailing: true, PRTextFailed: true, PRForeignConflict: true, PRDirtyTrunk: true, PRTrunkUpdate: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

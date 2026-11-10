@@ -15,6 +15,9 @@ func TestPauseReasonLabelGroups(t *testing.T) {
 			PauseMergeConflict, PauseAmbiguousMerge, PauseDirtyTrunk, PauseTrunkMissing,
 			PauseStrandedCommits, PauseMergeError, PauseNeedsRebase, PauseConflictMarkers,
 		},
+		"pull request": {
+			PauseCIFailing, PausePRTextFailed, PausePRForeignConflict, PausePRDirtyTrunk, PausePRTrunkUpdate,
+		},
 		"ticket graph":     {PauseBlockedCycle, PauseParentDefect},
 		"limits and other": {PauseBudgetKilled, PauseIterationError, PauseManual, PauseModelMismatch, PauseProcessStorm},
 	}

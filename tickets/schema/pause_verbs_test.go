@@ -53,6 +53,11 @@ func TestPauseRows_TableMatchesSpec(t *testing.T) {
 		{PauseDirtyTrunk, PauseClassAnswer, ReceiverGx, []PauseVerb{VerbStashMerge, VerbMergeAgain}},
 		{PauseBackgroundTaskGate, PauseClassAnswer, ReceiverGx, []PauseVerb{VerbKeepWaiting, VerbStopTask, VerbRetry, VerbStartOver}},
 		{PauseNeedsRebase, PauseClassRepair, "", []PauseVerb{VerbMergeAgain}},
+		{PauseCIFailing, PauseClassRepair, "", []PauseVerb{VerbTryAgain}},
+		{PausePRTextFailed, PauseClassRepair, "", []PauseVerb{VerbTryAgain}},
+		{PausePRForeignConflict, PauseClassRepair, "", []PauseVerb{VerbMergeAgain}},
+		{PausePRDirtyTrunk, PauseClassAnswer, ReceiverGx, []PauseVerb{VerbStashMerge, VerbMergeAgain}},
+		{PausePRTrunkUpdate, PauseClassRepair, "", []PauseVerb{VerbMergeAgain}},
 		{PauseConflictMarkers, PauseClassRepair, "", []PauseVerb{VerbRetry, VerbStartOver}},
 	}
 	for _, c := range cases {

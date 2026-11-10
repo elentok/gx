@@ -2,6 +2,7 @@ package events
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -48,6 +49,15 @@ func TestKind_CauseHerdrIsAnAttributeOfTheKind(t *testing.T) {
 	for _, k := range Kinds() {
 		if !k.Valid() {
 			t.Errorf("Kinds() returned invalid %q", k)
+		}
+	}
+}
+
+func TestKinds_ListsThePullRequestKinds(t *testing.T) {
+	listed := Kinds()
+	for _, k := range []Kind{CIFailing, PRTextFailed, PRForeignConflict, PRDirtyTrunk, PRTrunkUpdate} {
+		if !slices.Contains(listed, k) {
+			t.Errorf("Kinds() does not list %q", k)
 		}
 	}
 }

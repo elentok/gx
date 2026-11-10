@@ -44,6 +44,11 @@ const (
 	PauseModelMismatch      PauseReason = "model-mismatch"
 	PauseClassifierOutage   PauseReason = "classifier-outage"
 	PauseProcessStorm       PauseReason = "process-storm"
+	PauseCIFailing          PauseReason = "ci-failing"
+	PausePRTextFailed       PauseReason = "pr-text-failed"
+	PausePRForeignConflict  PauseReason = "pr-foreign-conflict"
+	PausePRDirtyTrunk       PauseReason = "pr-dirty-trunk"
+	PausePRTrunkUpdate      PauseReason = "pr-trunk-update"
 )
 
 // ProcessStormReason is the pause detail for a run the watchdog killed: what
@@ -74,7 +79,12 @@ var pauseClasses = map[PauseReason]PauseClass{
 	PauseManual:             PauseClassAnswer,
 	PauseDirtyTrunk:         PauseClassAnswer,
 	PauseModelMismatch:      PauseClassAnswer,
+	PausePRDirtyTrunk:       PauseClassAnswer,
 
+	PauseCIFailing:          PauseClassRepair,
+	PausePRTextFailed:       PauseClassRepair,
+	PausePRForeignConflict:  PauseClassRepair,
+	PausePRTrunkUpdate:      PauseClassRepair,
 	PauseMergeUnreported:    PauseClassRepair,
 	PauseSpinning:           PauseClassRepair,
 	PauseRetryExhausted:     PauseClassRepair,
@@ -135,6 +145,12 @@ var pauseLabels = map[PauseReason]string{
 	PauseIterationError: "Run failed",
 	PauseManual:         "Paused by you",
 	PauseModelMismatch:  "Wrong model",
+	// Pull request.
+	PauseCIFailing:         "CI is failing",
+	PausePRTextFailed:      "Pull request text failed",
+	PausePRForeignConflict: "Pull request conflicts with others' commits",
+	PausePRDirtyTrunk:      "Trunk has local changes",
+	PausePRTrunkUpdate:     "Trunk update failed",
 }
 
 // Label is r's plain-words label, or "" for an empty or unknown reason.

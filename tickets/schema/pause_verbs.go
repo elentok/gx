@@ -20,6 +20,10 @@ const (
 	VerbReopenRetry PauseVerb = "reopen-retry"
 	VerbStashMerge  PauseVerb = "stash-merge"
 
+	// VerbTryAgain reruns the failed pull request step. VerbRetry means a
+	// fresh agent and stays separate.
+	VerbTryAgain PauseVerb = "try-again"
+
 	// VerbResumeOnWorker ends a model-mismatch pause by running the ticket
 	// again on the model its tier resolved to.
 	VerbResumeOnWorker PauseVerb = "resume-on-worker"
@@ -58,6 +62,8 @@ var pauseVerbs = map[PauseVerb]VerbInfo{
 	VerbAllowDeny:   {Word: "approve", Label: "Allow / Deny", Tooltip: "Answer the agent's permission request. The agent goes on from where it stopped."},
 	VerbReopenRetry: {Word: "reopen-and-retry", Label: "Reopen and retry", Tooltip: "Reopen the ticket and start a fresh agent on the stranded commits."},
 	VerbStashMerge:  {Word: "stash-merge", Label: "Stash, merge and restore", Tooltip: "Set your changes aside, merge, then put them back. Conflicts are left for you to fix."},
+
+	VerbTryAgain: {Word: "try-again", Label: "Try again", Tooltip: "Run the failed pull request step again."},
 
 	VerbResumeOnWorker: {Word: "resume-on-worker", Label: "Resume on worker", Tooltip: "Lift the pause and run the ticket again on the model its tier names."},
 
@@ -179,6 +185,12 @@ var pauseRows = map[PauseReason]PauseRow{
 	PauseTrunkMissing: mergeAgain,
 	PauseMergeError:   mergeAgain,
 	PauseNeedsRebase:  mergeAgain,
+
+	PauseCIFailing:         verbs(VerbTryAgain),
+	PausePRTextFailed:      verbs(VerbTryAgain),
+	PausePRForeignConflict: mergeAgain,
+	PausePRDirtyTrunk:      verbs(VerbStashMerge, VerbMergeAgain).from(ReceiverGx),
+	PausePRTrunkUpdate:     mergeAgain,
 }
 
 // graphEventsNotPauses are the kinds with no row: they come from the ticket

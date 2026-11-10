@@ -82,6 +82,10 @@ func init() {
 	Default.Register(Step{Name: "pr-epic-fields", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// pr-pause-kinds: new pause kind enum values; no older ticket or epic carries them.
+	Default.Register(Step{Name: "pr-pause-kinds", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the
