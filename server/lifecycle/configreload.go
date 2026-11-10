@@ -15,6 +15,8 @@ type ReloadHost interface {
 	ApplyWatchConfig(old, next settings.Settings) func()
 	// PruneLogsIfRetentionChanged prunes the session logs when the retention changed.
 	PruneLogsIfRetentionChanged(old, next settings.Settings)
+	// ApplyDevMode tells the Vite supervisor the desired state; it returns at once.
+	ApplyDevMode(old, next settings.Settings)
 	KickGuards()
 }
 
@@ -31,6 +33,7 @@ func ReloadAppliers(h ReloadHost) settings.Appliers {
 		After: []settings.Applier{
 			func(old, next settings.Settings) func() { h.ReissueCerts(old, next); return nil },
 			h.ApplyWatchConfig,
+			func(old, next settings.Settings) func() { h.ApplyDevMode(old, next); return nil },
 			func(old, next settings.Settings) func() { h.PruneLogsIfRetentionChanged(old, next); return nil },
 			func(settings.Settings, settings.Settings) func() { h.KickGuards(); return nil },
 		},

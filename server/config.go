@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/server/devvite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
@@ -31,6 +32,10 @@ type Config struct {
 	// SpawnRestart starts the restart from the given binary, detached. Nil means
 	// `<binary> server restart --continue` in its own session; tests fake it.
 	SpawnRestart func(bin string) error
+
+	// ViteLauncher spawns the Dev mode Vite and probes it. Nil means pnpm;
+	// tests fake it.
+	ViteLauncher devvite.Launcher
 
 	StateDir    string
 	Build       string

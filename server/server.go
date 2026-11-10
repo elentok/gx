@@ -30,6 +30,7 @@ import (
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/cleanup"
 	"github.com/elentok/gx/server/designs"
+	"github.com/elentok/gx/server/devvite"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -101,6 +102,7 @@ type Server struct {
 	http           *http.Server
 	tcpHTTP        *http.Server // the socket's routes behind refuseBrowsers
 	web            *web.Web     // the web listener; off unless Config.WebAddr is set and bound
+	vite           *devvite.Supervisor
 	logf           *lifecycle.RotatingFile
 	log            *slog.Logger
 	idx            *index.Index
@@ -487,6 +489,9 @@ func New(cfg Config) (*Server, error) {
 	s.tcpHTTP = &http.Server{Handler: refuseBrowsers(mux, log)}
 	s.web = s.newWeb()
 	s.web.Bind()
+	if err := s.newDevVite(); err != nil {
+		return nil, fmt.Errorf("start dev vite supervisor: %w", err)
+	}
 	// A down herdr never stops the server; it is reported and retried.
 	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
 	// The scheduler and the launcher call each other, so the launcher is set after both exist.
@@ -658,6 +663,9 @@ func (s *Server) Serve(ctx context.Context) error {
 			err = nil
 		}
 		_ = shutdown()
+	}
+	if err := s.vite.Close(); err != nil {
+		s.log.Warn("closing the Vite supervisor failed", "err", err)
 	}
 	// Stop claiming, let a merge in flight finish, then flush the store commit
 	// loop, and only then release the lock. Agents in their panes are not touched.
