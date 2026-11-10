@@ -3,6 +3,7 @@ package agent
 import (
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/config"
@@ -114,6 +115,21 @@ func TestAgentArgs_ModelAndEffort(t *testing.T) {
 				t.Errorf("AgentArgs() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// Every Queue agent launch (conflict and doctor agents included) keeps the
+// Codex question guard and never turns the question tool on.
+func TestAgentArgs_CodexKeepsTheQuestionGuard(t *testing.T) {
+	t.Parallel()
+	args := AgentArgs(AgentCodex, notARepo, "scratch", "epic", "", "")
+	if slices.Contains(args, harness.CodexQuestionToolFlag) || slices.Contains(args, "--no-daemon") {
+		t.Errorf("args = %v, want no question tool flag", args)
+	}
+	if !slices.ContainsFunc(args, func(a string) bool {
+		return strings.HasPrefix(a, "hooks.PreToolUse=") && strings.Contains(a, harness.CodexQuestionTool)
+	}) {
+		t.Errorf("args = %v, want the question guard hook", args)
 	}
 }
 

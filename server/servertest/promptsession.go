@@ -39,6 +39,13 @@ func StartCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEn
 // the server's config.
 func StartCodexPromptSessionWith(t *testing.T, cfg func(*server.Config), extraEnv ...string) PromptFixture {
 	t.Helper()
+	return StartCodexPromptSessionAs(t, cfg, wire.CreateSessionRequest{}, extraEnv...)
+}
+
+// StartCodexPromptSessionAs is StartCodexPromptSessionWith with the session
+// made from create (a Fix agent has FixOf set). Project, Dir and Harness default.
+func StartCodexPromptSessionAs(t *testing.T, cfg func(*server.Config), create wire.CreateSessionRequest, extraEnv ...string) PromptFixture {
+	t.Helper()
 	conv := "thread-server-prompt-" + strings.ReplaceAll(t.Name(), "/", "-")
 	bin := FakeCodexDir(t)
 	home := t.TempDir()
@@ -51,7 +58,8 @@ func StartCodexPromptSessionWith(t *testing.T, cfg func(*server.Config), extraEn
 			codex.CodexIDEnv + "=" + conv,
 			agentfake.ProgramDirEnv + "=" + agentfake.NewProgramDir(t),
 		}, extraEnv...)...))
-	res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "codex"})
+	create.Project, create.Dir, create.Harness = "proj", t.TempDir(), "codex"
+	res, err := f.H.Client.Sessions.Create(f.Ctx, create)
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

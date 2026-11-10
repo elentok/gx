@@ -55,7 +55,7 @@ func openCodexQuestion(t *testing.T, f servertest.PromptFixture, call agentfake.
 	servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool {
 		return s.Status.State == wire.SessionBlocked && s.Status.Kind == "question"
 	})
-	servertest.WaitForScreen(t, servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID)), "Question 1/")
+	servertest.WaitForScreen(t, servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID)), "Question "+strconv.Itoa(call.StartAt+1)+"/")
 }
 
 func waitForCodexCard(t *testing.T, f servertest.PromptFixture) wire.QuestionCard {
@@ -265,9 +265,19 @@ func TestSessionAnswer_CodexQuestionMismatchStopsWithTheRightOutcome(t *testing.
 	t.Parallel()
 	for name, tc := range map[string]struct {
 		shown    []agentfake.QuestionSpec
+		start    int // overlay opens on this 0-based question
+		cursor   int // overlay opens with its cursor on this row
 		reason   string
 		wantKeys []string
 	}{
+		"header on the screen names another question": {
+			start:  1,
+			reason: wire.ReasonCodexMismatch,
+		},
+		"cursor not on the first row": {
+			cursor: 2,
+			reason: wire.ReasonCodexMismatch,
+		},
 		"question text on the first": {
 			shown:  shownWith(0, func(q *agentfake.QuestionSpec) { q.Question = "Another?" }),
 			reason: wire.ReasonCodexMismatch,
@@ -298,7 +308,7 @@ func TestSessionAnswer_CodexQuestionMismatchStopsWithTheRightOutcome(t *testing.
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			f := startCodexQuestionSession(t)
-			openCodexQuestion(t, f, agentfake.QuestionCall{Shown: tc.shown})
+			openCodexQuestion(t, f, agentfake.QuestionCall{Shown: tc.shown, StartAt: tc.start, StartCursor: tc.cursor})
 			card := waitForCodexCard(t, f)
 			res := answerCodex(t, f, card.ID, wire.SessionAnswer{Choice: "1"}, wire.SessionAnswer{Choice: "1"}, wire.SessionAnswer{Choice: "1"})
 			if !res.Refused || res.Reason != tc.reason {
@@ -306,6 +316,37 @@ func TestSessionAnswer_CodexQuestionMismatchStopsWithTheRightOutcome(t *testing.
 			}
 			wantKeys(t, f, tc.wantKeys...)
 		})
+	}
+}
+
+// A question the screen wraps onto two lines is the same question.
+func TestSessionAnswer_CodexQuestionWrappedQuestionIsNotAMismatch(t *testing.T) {
+	t.Parallel()
+	f := startCodexQuestionSession(t)
+	openCodexQuestion(t, f, agentfake.QuestionCall{Shown: shownWith(0, func(q *agentfake.QuestionSpec) { q.Question = "Question\r\n  a?" })})
+	card := waitForCodexCard(t, f)
+	if res := answerCodex(t, f, card.ID, wire.SessionAnswer{Choice: "1"}, wire.SessionAnswer{Choice: "1"}, wire.SessionAnswer{Choice: "1"}); res.Refused {
+		t.Fatalf("answer = %+v", res)
+	}
+	wantKeys(t, f, "1", "1", "1")
+}
+
+// A Fix agent is not a plain chat: an open question call is no codex card.
+func TestCodexQuestion_FixSessionListsNoCodexCard(t *testing.T) {
+	t.Parallel()
+	f := servertest.StartCodexPromptSessionAs(t, func(c *server.Config) {
+		c.PromptGrace = servertest.FirstPromptGrace
+		c.CodexQuestionWait = time.Second
+	}, wire.CreateSessionRequest{Ticket: "proj:plain/01", FixOf: "proj:plain/01"})
+	openCodexQuestion(t, f, agentfake.QuestionCall{})
+	chat, err := f.H.Client.Sessions.Chat(f.Ctx, f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range chat.Questions {
+		if c.Source == wire.CardSourceCodex {
+			t.Errorf("questions = %+v, want no codex card", chat.Questions)
+		}
 	}
 }
 

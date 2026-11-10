@@ -3,6 +3,7 @@ package sessions
 import (
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/harness"
@@ -57,6 +58,42 @@ func TestLaunchArgs(t *testing.T) {
 	}
 	if !slices.Equal(claudeArgs, []string{"--verbose"}) {
 		t.Errorf("configured claude args mutated: %v", claudeArgs)
+	}
+}
+
+// A plain Codex chat, new or resumed (both run launchArgs), turns the question
+// tool on and drops its guard. Every other Codex launch (conflict and doctor
+// agents among them run as a Queue ticket or a Fix session) keeps the guard
+// and never gets the flag.
+func TestLaunchArgs_CodexQuestionToolOnPlainChatOnly(t *testing.T) {
+	t.Parallel()
+	guard := func(args []string) bool {
+		return slices.ContainsFunc(args, func(a string) bool {
+			return strings.HasPrefix(a, "hooks.PreToolUse=") && strings.Contains(a, harness.CodexQuestionTool)
+		})
+	}
+	for _, tc := range []struct {
+		name  string
+		meta  Meta
+		plain bool
+	}{
+		{"plain chat", Meta{Harness: "codex"}, true},
+		{"plain chat with a model", Meta{Harness: "codex", Model: "gpt-6-astra", Effort: "high"}, true},
+		{"queue ticket", Meta{Harness: "codex", Ticket: "gx:e/01"}, false},
+		{"fix agent", Meta{Harness: "codex", FixOf: "gx:e/01"}, false},
+		{"design", Meta{Harness: "codex", Flow: tickets.FlowDesign}, false},
+		{"triage", Meta{Harness: "codex", Flow: tickets.FlowTriage, FlowKey: "proj"}, false},
+	} {
+		args := launchArgs(&tc.meta, nil, []string{"/repo/.git"})
+		if got := slices.Contains(args, harness.CodexQuestionToolFlag); got != tc.plain {
+			t.Errorf("%s: question tool flag = %v, want %v", tc.name, got, tc.plain)
+		}
+		if got := slices.Contains(args, "--no-daemon"); got != tc.plain {
+			t.Errorf("%s: --no-daemon = %v, want %v", tc.name, got, tc.plain)
+		}
+		if got := guard(args); got == tc.plain {
+			t.Errorf("%s: question guard hook = %v, want %v", tc.name, got, !tc.plain)
+		}
 	}
 }
 

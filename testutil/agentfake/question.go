@@ -22,6 +22,11 @@ type QuestionCall struct {
 	// Shown, when set, is what the overlay draws in place of Questions, for a
 	// screen that does not match the call.
 	Shown []QuestionSpec `json:"shown,omitempty"`
+	// StartAt is the 0-based question the overlay opens on, and StartCursor the
+	// 1-based row its cursor opens on (default 1), for a screen that is not at
+	// the start.
+	StartAt     int `json:"start_at,omitempty"`
+	StartCursor int `json:"start_cursor,omitempty"`
 	// Quiet writes the call and nothing else: no Blocked report, no overlay,
 	// until an ActionQuestionShow.
 	Quiet bool `json:"quiet,omitempty"`

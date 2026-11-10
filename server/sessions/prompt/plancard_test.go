@@ -92,6 +92,29 @@ func TestPlanCard_DismissSendsEsc(t *testing.T) {
 	waitForSubmitted(t, f.conv, escLogged)
 }
 
+// The card id is the plan file name plus a hash of the dialog and the plan
+// text, so an id from before the file or the block changed reaches nothing.
+func TestPlanCard_OldIdIsStaleAndSendsNoKeys(t *testing.T) {
+	t.Parallel()
+	f := startPromptSessionWithGrace(t, 10*time.Second)
+	f.blockOn(t, agentfake.PlanDialog(planFile(t, "plan-now", "# Now"), planOptions...))
+	card := f.permissionCard(t)
+	cut := strings.LastIndex(card.ID, "-")
+	if cut < 0 {
+		t.Fatalf("card id %q has no hash part", card.ID)
+	}
+	for label, id := range map[string]string{
+		"file name changed":  "plan-before" + card.ID[cut:],
+		"block hash changed": card.ID[:cut+1] + "000000000000",
+	} {
+		res := f.answer(t, wire.SessionAnswerRequest{Source: wire.CardSourcePermission, CardID: id, Answers: []wire.SessionAnswer{{Choice: "1"}}})
+		if !res.Refused || res.Reason != wire.ReasonStale {
+			t.Errorf("%s: answer = %+v, want %s", label, res, wire.ReasonStale)
+		}
+	}
+	f.nothingSent(t)
+}
+
 func TestPlanCard_UnreadablePlanFileListsOptionsOnly(t *testing.T) {
 	t.Parallel()
 	f := startPromptSessionWithGrace(t, 10*time.Second)

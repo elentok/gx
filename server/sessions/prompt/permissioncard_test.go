@@ -80,16 +80,37 @@ func TestPermissionCard_StaleIdAndUnknownChoiceSendNothing(t *testing.T) {
 
 func TestPermissionCard_UnreadableScreenListsNoCardAndKeepsTheBanner(t *testing.T) {
 	t.Parallel()
-	f := startPromptSessionWithGrace(t, 10*time.Second)
-	f.blockOn(t, []string{"something no one can read"})
-	chat, err := f.h.Client.Sessions.Chat(f.ctx, f.id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(chat.Questions) != 0 {
-		t.Errorf("questions = %+v, want none", chat.Questions)
-	}
-	if chat.Failure == nil || chat.Failure.Kind != wire.FailureKindBlocked {
-		t.Errorf("failure = %+v, want the blocked banner", chat.Failure)
+	for name, rows := range map[string][]string{
+		"unreadable text": {"something no one can read"},
+		"login screen": {
+			"Select login method:",
+			"❯ 1. Claude account with subscription",
+			"  2. Anthropic Console account",
+			"Esc to cancel",
+		},
+		"MCP elicitation": {
+			"────────────────────",
+			"Server fixture-mcp requests information",
+			"  Enter the deployment target",
+			"❯ 1. Accept",
+			"  2. Decline",
+			"Esc to cancel",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := startPromptSessionWithGrace(t, 10*time.Second)
+			f.blockOn(t, rows)
+			chat, err := f.h.Client.Sessions.Chat(f.ctx, f.id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(chat.Questions) != 0 {
+				t.Errorf("questions = %+v, want none", chat.Questions)
+			}
+			if chat.Failure == nil || chat.Failure.Kind != wire.FailureKindBlocked {
+				t.Errorf("failure = %+v, want the blocked banner", chat.Failure)
+			}
+		})
 	}
 }

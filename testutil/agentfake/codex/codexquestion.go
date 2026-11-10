@@ -69,7 +69,8 @@ func (c *codexFake) openQuestion(call *agentfake.QuestionCall) error {
 	if len(shown) == 0 {
 		shown = call.Questions
 	}
-	c.ask = &codexAsk{call: *call, shown: shown, cursor: 1}
+	cursor := max(call.StartCursor, 1)
+	c.ask = &codexAsk{call: *call, shown: shown, cursor: cursor, n: call.StartAt}
 	if !call.Quiet {
 		c.showQuestion()
 	}

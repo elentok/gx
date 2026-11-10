@@ -214,9 +214,9 @@ func TestAskHook_HeldQuestionIsADialogCardAndBlocksTheSessionWhileHeld(t *testin
 		t.Fatalf("cards = %+v, want one claude-dialog card of three questions", cards)
 	}
 	for i, want := range []struct {
-		title, kind string
-		options     []string
-	}{{"Which color?", "options", []string{"red", "blue", "Other"}}, {"Which sizes?", "multi-select", []string{"S", "M", "L", "Other"}}, {"Ship it?", "options", []string{"yes", "no", "Other"}}} {
+		title, label, kind string
+		options            []string
+	}{{"Which color?", "Color", "options", []string{"red", "blue", "Other"}}, {"Which sizes?", "Sizes", "multi-select", []string{"S", "M", "L", "Other"}}, {"Ship it?", "Ship", "options", []string{"yes", "no", "Other"}}} {
 		q := cards[0].Questions[i]
 		var labels []string
 		for _, o := range q.Options {
@@ -225,6 +225,9 @@ func TestAskHook_HeldQuestionIsADialogCardAndBlocksTheSessionWhileHeld(t *testin
 			if !o.Text && o.Description != "about "+o.Label {
 				t.Errorf("question %d option %q description = %q", i, o.Label, o.Description)
 			}
+		}
+		if q.Label != want.label {
+			t.Errorf("question %d label = %q, want %q", i, q.Label, want.label)
 		}
 		if q.Title != want.title || q.Kind != want.kind || !slices.Equal(labels, want.options) {
 			t.Errorf("question %d = %q %s %v, want %+v", i, q.Title, q.Kind, labels, want)
