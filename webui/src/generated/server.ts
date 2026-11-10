@@ -2696,6 +2696,14 @@ export interface SessionHuh {
  */
 export const ReasonAnswerSourceNotSupported = "source-not-supported";
 /**
+ * Refusal reasons of an answer to a codex-question card. NotReady and Mismatch
+ * sent no key, so the card keeps its retry; Stopped sent some, so the card
+ * disables Submit for that call and points to Screen.
+ */
+export const ReasonCodexNotReady = "codex-not-ready";
+export const ReasonCodexMismatch = "codex-mismatch";
+export const ReasonCodexStopped = "codex-stopped";
+/**
  * SessionAnswerRequest is the body of POST /v1/sessions/answer: the answer to
  * one Question card, named by its source and id. Answers line up with the
  * card's questions by position; a missing or empty one is unanswered. Note is

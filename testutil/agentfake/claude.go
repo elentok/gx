@@ -78,6 +78,10 @@ const (
 	ActionTokenCount       = "tokencount"
 	ActionCompact          = "compact"
 	ActionTaskError        = "taskerror"
+	// ActionQuestion makes the Codex fake open the request_user_input call in
+	// Question; ActionQuestionShow draws the overlay of a Quiet one.
+	ActionQuestion     = "question"
+	ActionQuestionShow = "questionshow"
 )
 
 // Control stands in for what real claude does on its own. It travels on the
@@ -121,6 +125,8 @@ type Control struct {
 	// Codex fake.
 	Tool    string `json:"tool,omitempty"`
 	Command string `json:"command,omitempty"`
+	// Question is the call an ActionQuestion opens.
+	Question *QuestionCall `json:"question,omitempty"`
 	// ToolCalls are the calls an ActionToolUse leaves in flight, oldest first.
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 	// Count and Depth shape the tree an ActionDescendants spawns.

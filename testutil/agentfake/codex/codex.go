@@ -250,6 +250,8 @@ type codexFake struct {
 	// background is a background terminal still running; input is the key layer.
 	background bool
 	input      codexInput
+	// ask is the open request_user_input call, nil with none.
+	ask *codexAsk
 	// turnImages are the pasted images of the prompt being submitted; startTurn
 	// writes them into the user message.
 	turnImages []string
@@ -521,6 +523,10 @@ func (c *codexFake) control(ctl agentfake.Control) error {
 		return c.permission(ctl.Command, nil)
 	case agentfake.ActionPermissionScreen:
 		c.screenPermission(ctl)
+	case agentfake.ActionQuestion:
+		return c.openQuestion(ctl.Question)
+	case agentfake.ActionQuestionShow:
+		c.showQuestion()
 	case agentfake.ActionTokenCount:
 		return c.tokenCount(ctl.UsedPercent, ctl.ResetsAt)
 	case agentfake.ActionUsage:

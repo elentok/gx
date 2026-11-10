@@ -193,6 +193,9 @@ type Config struct {
 	// KeysSettleStep and KeysSettleCap are the read interval and the limit of
 	// a keys request's settle; zero means the prompt.DefaultKeysSettle ones.
 	KeysSettleStep, KeysSettleCap time.Duration
+	// CodexQuestionWait bounds the wait for each question's header on Codex's
+	// overlay; zero means prompt.DefaultCodexQuestionWait.
+	CodexQuestionWait time.Duration
 	// FirstPromptStartTimeout bounds the Starting time, counted from launch,
 	// before a pending first prompt is handed to a person; zero means
 	// DefaultFirstPromptStartTimeout.

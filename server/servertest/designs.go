@@ -94,6 +94,8 @@ func StartDesigns(t *testing.T, opts ...func(*server.Config)) DesignsFixture {
 type PromptFixture struct {
 	DesignsFixture
 	ID, Conv, Transcript string
+	// CodexHome is the fake Codex's CODEX_HOME, set by the Codex sessions.
+	CodexHome string
 }
 
 // StartPromptSession starts a PromptFixture. grace is how long the server

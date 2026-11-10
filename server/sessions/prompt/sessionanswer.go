@@ -47,7 +47,7 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if req.Source != wire.CardSourceRound && req.Source != wire.CardSourcePermission {
+	if req.Source != wire.CardSourceRound && req.Source != wire.CardSourcePermission && req.Source != wire.CardSourceCodex {
 		return sessions.Refusal(wire.ReasonAnswerSourceNotSupported, fmt.Sprintf("answers to %q cards are not supported yet", req.Source)), nil
 	}
 	card, err := p.currentCard(req.ID, dir, meta, req.Source)
@@ -56,6 +56,9 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 	}
 	if card == nil || card.ID != req.CardID {
 		return sessions.Refusal(wire.ReasonStale, "the question moved on; review it first"), nil
+	}
+	if req.Source == wire.CardSourceCodex {
+		return p.answerCodexQuestion(req, *card, source)
 	}
 	if req.Source == wire.CardSourcePermission {
 		if meta.Harness == string(harness.Codex) {

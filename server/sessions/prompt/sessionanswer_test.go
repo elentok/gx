@@ -127,7 +127,7 @@ func TestSessionAnswer_StaleAndUnsupportedSendNothing(t *testing.T) {
 	if res := f.answer(t, wire.SessionAnswerRequest{Source: wire.CardSourceRound, CardID: "old", Answers: answers}); !res.Refused || res.Reason != wire.ReasonStale {
 		t.Errorf("stale id: %+v, want %s", res, wire.ReasonStale)
 	}
-	if res := f.answer(t, wire.SessionAnswerRequest{Source: wire.CardSourceCodex, CardID: id, Answers: answers}); !res.Refused || res.Reason != wire.ReasonAnswerSourceNotSupported {
+	if res := f.answer(t, wire.SessionAnswerRequest{Source: wire.CardSourceClaudeDialog, CardID: id, Answers: answers}); !res.Refused || res.Reason != wire.ReasonAnswerSourceNotSupported {
 		t.Errorf("other source: %+v, want %s", res, wire.ReasonAnswerSourceNotSupported)
 	}
 	f.fixture().NothingSent(t)

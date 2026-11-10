@@ -32,10 +32,17 @@ func StartCodexPromptSession(t *testing.T, extraEnv ...string) PromptFixture {
 // wait for an answer to take effect, for a test whose fake does real work first.
 func StartCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEnv ...string) PromptFixture {
 	t.Helper()
+	return StartCodexPromptSessionWith(t, func(c *server.Config) { c.PromptGrace = grace }, extraEnv...)
+}
+
+// StartCodexPromptSessionWith is StartCodexPromptSession with cfg applied to
+// the server's config.
+func StartCodexPromptSessionWith(t *testing.T, cfg func(*server.Config), extraEnv ...string) PromptFixture {
+	t.Helper()
 	conv := "thread-server-prompt-" + strings.ReplaceAll(t.Name(), "/", "-")
 	bin := FakeCodexDir(t)
 	home := t.TempDir()
-	f := StartDesigns(t, func(c *server.Config) { c.PromptGrace = grace },
+	f := StartDesigns(t, cfg,
 		WithChatHarness("codex"),
 		WithEnv(append([]string{
 			"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
@@ -51,7 +58,7 @@ func StartCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEn
 	id := res.Session.ID
 	WaitForHolder(t, filepath.Join(f.H.SessionsDir, id))
 	WaitForSession(f.Ctx, t, f.H, f.Evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	return PromptFixture{DesignsFixture: f, ID: id, Conv: conv}
+	return PromptFixture{DesignsFixture: f, ID: id, Conv: conv, CodexHome: filepath.Join(home, ".codex")}
 }
 
 // StartCodexPermissionSession is a Codex session with its own conversation id,

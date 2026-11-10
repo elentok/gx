@@ -66,6 +66,9 @@ type Config struct {
 	// KeysSettleStep and KeysSettleCap are the read interval and the limit of
 	// a keys request's settle; zero means the Default one.
 	KeysSettleStep, KeysSettleCap time.Duration
+	// CodexQuestionWait bounds the wait for each question's header on the
+	// overlay; zero means DefaultCodexQuestionWait.
+	CodexQuestionWait time.Duration
 }
 
 // RunOpts hooks an action run into a person's own input. OnTyped runs once a
