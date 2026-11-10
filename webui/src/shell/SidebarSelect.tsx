@@ -24,6 +24,7 @@ import { selectIntent } from "../select/selectKeys";
 import type { SidebarRow } from "../workspaces/sidebarModel";
 import { isTextTarget } from "./keys";
 import { useSidebarModel } from "./SidebarRows";
+import { SidebarBulkActions } from "./SidebarBulkActions";
 
 export interface SidebarSelect {
   state: SelectState;
@@ -38,6 +39,10 @@ export interface SidebarSelect {
   groupState: (group: string) => GroupState;
   selectAll: () => void;
   selectNone: () => void;
+  /** Drops these keys from the selection. */
+  deselect: (keys: string[]) => void;
+  /** A row's display name, for tooltips and toasts; the key when unknown. */
+  nameOf: (key: string) => string;
   /** Call after an action ran: leaves select mode when nothing is selected any more. */
   afterRun: () => void;
 }
@@ -85,6 +90,18 @@ export function SidebarSelectProvider({ fetcher, active, children }: { fetcher?:
     return out;
   }, [model, sectionOpen]);
 
+  const names = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!model) return out;
+    const add = (name: string, key: string) => out.set(key, name);
+    for (const r of [...model.rows, ...model.held]) {
+      add(r.title, r.key);
+      for (const a of r.agents) add(a.label, a.session.id);
+    }
+    for (const a of model.other) add(a.label, a.session.id);
+    return out;
+  }, [model]);
+
   // A row that leaves the list leaves the selection. An unloaded list is not an empty one.
   const loaded = !!model;
   useEffect(() => {
@@ -106,9 +123,11 @@ export function SidebarSelectProvider({ fetcher, active, children }: { fetcher?:
       groupState: (group) => groupState(state, rows, group),
       selectAll: () => setState((s) => selectAll(s, rows)),
       selectNone: () => setState(selectNone),
+      deselect: (keys) => setState((s) => ({ ...s, keys: s.keys.filter((k) => !keys.includes(k)) })),
+      nameOf: (key) => names.get(key) ?? key,
       afterRun: () => setState((s) => prune(s, rows, true)),
     }),
-    [state, rows, sectionOpen, setSectionOpen],
+    [state, rows, sectionOpen, setSectionOpen, names],
   );
 
   useEffect(() => {
@@ -161,7 +180,13 @@ export function SelectButton() {
 
 /** The footer, or the select bar in its place while the mode is on. */
 export function FooterSlot({ children }: { children: ReactNode }) {
-  return useSidebarSelect().state.on ? <SelectBar /> : children;
+  return useSidebarSelect().state.on ? (
+    <SelectBar>
+      <SidebarBulkActions />
+    </SelectBar>
+  ) : (
+    children
+  );
 }
 
 /** The bar that replaces the footer in select mode. Action buttons go in `children`. */
