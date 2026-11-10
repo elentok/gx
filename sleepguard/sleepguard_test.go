@@ -89,7 +89,7 @@ var allowed = map[string]int{
 	"server/disk/diskhealth_test.go":                          1, // negative wait: failed readings never leave the waiting state
 	"server/disk/diskhold_test.go":                            3,
 	"server/disk/diskwatch_test.go":                           3,
-	"server/merge/handmerged_test.go":                         1,
+	"server/merge/handmerged_test.go":                         2, // negative waits: an out-of-scope epic is not probed; a PR epic is not stamped
 	"server/sched/fill_order_test.go":                         1, // negative wait: a wrong later launch would show within a beat
 	"server/sched/headless_block_reclaim_test.go":             2,
 	"server/health/healthprocs_test.go":                       4,
@@ -148,6 +148,7 @@ var allowed = map[string]int{
 	"testutil/gxfixture/limitsflows/limitburn_test.go":        4, // three poll loops with a deadline; a settle wait so the poll sees the first line
 	"testutil/gxfixture/limitsflows/migrate_test.go":          2, // poll loop with a deadline; negative wait: the hold must keep the server migrating
 	"testutil/gxfixture/designflows/ready_test.go":            1,
+	"testutil/gxfixture/webflows/prflow_test.go":              1, // negative wait: an open PR epic is not stamped merged after the stamp delay
 	"testutil/gxfixture/limitsflows/restart_test.go":          1, // poll loop with a deadline waiting on the running-agent count
 	"testutil/gxfixture/designflows/united_test.go":           1,
 	"testutil/herdrfake/state_test.go":                        2,

@@ -81,6 +81,36 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 	}
 }
 
+func TestHandMerged_AnEpicWithAPRIsNotStampedByItsBranchBeingMerged(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	writeCompleteEpic(t, store, "prepic")
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"prepic"}})
+	if err := tickets.StampEpicFields(filepath.Join(store, "proj", "prepic"), map[string]any{"pr_number": 5, "pr_url": "https://github.com/o/r/pull/5"}); err != nil {
+		t.Fatal(err)
+	}
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
+	var mu sync.Mutex
+	probed := false
+	h.Server.Reconciler().SetMergedProbe(func(_, ancestor, _ string) (bool, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		probed = probed || ancestor == "refs/heads/prepic"
+		return true, nil
+	})
+	// The probe says merged for any epic; the dependent makes prepic eligible, so only the PR guard holds it back.
+	time.Sleep(500 * time.Millisecond) // negative wait: a stamp would land within a few polls
+	mu.Lock()
+	defer mu.Unlock()
+	if probed {
+		t.Error("a PR epic was probed for a hand merge")
+	}
+	if md := servertest.ReadFile(t, filepath.Join(store, "proj", "prepic", "ticket.md")); strings.Contains(md, "merged_at:") {
+		t.Errorf("PR epic stamped merged_at:\n%s", md)
+	}
+}
+
 func TestHandMerged_StampsLinesFromTheEpicsTrailerCommits(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)

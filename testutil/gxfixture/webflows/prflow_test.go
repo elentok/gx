@@ -67,8 +67,19 @@ func TestPRFlowScenarios_CardsShowTheScriptedPR(t *testing.T) {
 			if row.PR.Number != spec.PRFlowNumber || row.PR.URL != spec.PRFlowURL || !strings.Contains(row.PR.Chip, tc.chipHas) {
 				t.Errorf("pr = %+v, want #%d at %s with chip containing %q", row.PR, spec.PRFlowNumber, spec.PRFlowURL, tc.chipHas)
 			}
+			r.assertNotStamped(t)
 			r.Stop(t)
 		})
+	}
+}
+
+// assertNotStamped reads the row after the stamp delay: a PR epic that is
+// still open must stay unmerged, which only a late read can catch.
+func (r *running) assertNotStamped(t *testing.T) {
+	t.Helper()
+	time.Sleep(4 * time.Second)
+	if row := r.prFlowRow(t); !row.MergedAt.IsZero() {
+		t.Errorf("open PR epic stamped merged_at: %+v", row)
 	}
 }
 

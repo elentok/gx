@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 func TestMergeRoot_FastForwardMergesOntoTheTarget(t *testing.T) {
@@ -198,6 +199,23 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 			}
 		})
 	}
+}
+
+func TestMergeRoot_NothingToMergeLeavesAnEpicWithAPRUnmerged(t *testing.T) {
+	t.Parallel()
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ *servertest.Turn, id string) {
+		f.finishCommitless(t, id)
+	})
+	if err := tickets.StampEpicFields(filepath.Join(f.Store, "proj", schedEpic), map[string]any{"pr_number": 5, "pr_url": "https://github.com/o/r/pull/5"}); err != nil {
+		t.Fatal(err)
+	}
+	f.H.Server.Rescan()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.QueueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
+
+	f.assertStamps(t, false)
 }
 
 func TestMergeRoot_StampsOnlyCompletedAtWhenTheMergePauses(t *testing.T) {

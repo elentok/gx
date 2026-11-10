@@ -202,7 +202,7 @@ func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 		if first {
 			s.StampEpic(root, e.Path, "completed_at")
 		}
-	case s.NothingToMerge(project, epics, one, repo):
+	case e.PRNumber == 0 && s.NothingToMerge(project, epics, one, repo):
 		s.stampMergedEpic(root, e, 0, 0, nil)
 		s.StampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true

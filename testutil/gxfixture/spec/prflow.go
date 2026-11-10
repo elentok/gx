@@ -54,6 +54,10 @@ func prFlowScenario(done int, draft bool, checks []ghfake.Check, fixCheck string
 	}
 	addr := project + ":" + PRFlowEpic
 	sc := scenario{
+		// A commit on the epic branch, so it is never an ancestor of trunk and reads as unmerged.
+		GitSetup: func(git Git, repo string) error {
+			return CommitOnBranch(git, repo, PRFlowEpic, "feature.txt", "feature")
+		},
 		Epics: []epic{{project, PRFlowEpic, tickets}},
 		EpicMeta: map[string]string{addr: "status: open\ncompleted_at: 2026-01-01T10:00:00Z\n" +
 			fmt.Sprintf("pr_number: %d\npr_url: %s\n", PRFlowNumber, PRFlowURL)},
