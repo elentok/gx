@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { HUH_MESSAGE } from "../src/design/round";
+import { HUH_MESSAGE } from "../src/triage/questions";
 import { card, epicsButton, expect, holdRoute, nav, openEpics, section, sessionRows, test, type Fixture } from "./fixture";
 import { expectOption } from "./question";
 

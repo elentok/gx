@@ -1,8 +1,7 @@
 // @vitest-environment node
 import { expect, test } from "vitest";
-import { HUH_MESSAGE } from "../design/round";
 import type { TriageRow } from "../generated/server";
-import { answersOf, cardOf, changedRows, encodeAnswer, roundOf, rowAnswers } from "./questions";
+import { HUH_MESSAGE, answersOf, cardOf, changedRows, encodeAnswer, roundOf, rowAnswers } from "./questions";
 
 const rows: TriageRow[] = [
   {

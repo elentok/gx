@@ -5,7 +5,7 @@ import { DesignChat } from "../design/ChatLog";
 import { hasChat, roundKeyOf, roundOf, useSessionChat, type FetchChat } from "../design/chat";
 import { useFocusReport, type PostFocus } from "../design/focus";
 import type { DeleteDesign, OpenFlow, ResumeSession, StopSession } from "../design/open";
-import type { PostPrompt } from "../design/prompt";
+import type { PostAnswer, PostPrompt } from "../design/prompt";
 import type { FetchScreen } from "../design/screen";
 import { DesignActionsMenu, Failure, StartDesignButton } from "../design/SessionControls";
 import type { SessionInfo } from "../generated/server";
@@ -20,6 +20,7 @@ import { Progress, StepLine, StepsSheet, summaryLine, type StepRows } from "./Pr
 export interface SteppedActions {
   fetchChat?: FetchChat;
   post?: PostPrompt;
+  answer?: PostAnswer;
   open?: OpenFlow;
   stop?: StopSession;
   resume?: ResumeSession;
@@ -258,6 +259,7 @@ export function SteppedPage({
             chat={noContinue && chat ? { ...chat, next: undefined } : chat}
             refetch={refetchChat}
             post={actions.post}
+            answer={actions.answer}
             done={model?.done}
             nextTitle={model?.nextTitle}
             working={working(session)}

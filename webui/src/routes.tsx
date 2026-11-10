@@ -14,7 +14,7 @@ import type { AbandonTriage, ApproveTriage } from "./triage/api";
 import { TriagePage } from "./triage/TriagePage";
 import type { FetchTriage } from "./triage/useTriage";
 import type { PostFocus } from "./design/focus";
-import type { PostPrompt } from "./design/prompt";
+import type { PostAnswer, PostPrompt } from "./design/prompt";
 import type { FetchScreen } from "./design/screen";
 import type { FetchMapImages } from "./design/mapImages";
 import type { FetchEpicDetail } from "./epic/detail";
@@ -80,6 +80,7 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
         fetchDetail: fetchers.epic,
         fetchChat: fetchers.chat,
         post: fetchers.prompt,
+        answer: fetchers.answer,
         open: fetchers.openDesign,
         remove: fetchers.deleteDesign,
         stop: fetchers.stop,
@@ -102,6 +103,7 @@ function TriageRoute({ fetchers }: { fetchers: RouteFetchers }) {
         fetchTriage: fetchers.triage,
         fetchChat: fetchers.chat,
         post: fetchers.prompt,
+        answer: fetchers.answer,
         open: fetchers.openTriage,
         stop: fetchers.stop,
         resume: fetchers.resume,
@@ -140,6 +142,7 @@ export interface RouteFetchers {
   tips?: FetchTips;
   chat?: FetchChat;
   prompt?: PostPrompt;
+  answer?: PostAnswer;
   focus?: PostFocus;
   fixAgent?: FixAgent;
   authState?: () => Promise<AuthState>;

@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
-import { HUH_MESSAGE } from "../design/round";
 import type { TriageView } from "../generated/server";
 import { renderThemed as render } from "../ui/render";
 import { QuestionsView } from "./QuestionsView";
+import { HUH_MESSAGE } from "./questions";
 
 afterEach(cleanup);
 

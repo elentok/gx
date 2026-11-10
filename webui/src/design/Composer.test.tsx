@@ -28,8 +28,7 @@ import { renderThemed } from "../ui/render";
 import { WriteError } from "../useWrite";
 import type { FetchChat } from "./chat";
 import { Composer } from "./Composer";
-import type { PostPrompt } from "./prompt";
-import { HUH_MESSAGE } from "./round";
+import type { PostAnswer, PostPrompt } from "./prompt";
 import { roundCards } from "./roundFixture";
 
 afterEach(() => {
@@ -113,6 +112,7 @@ function render(opts: {
   chat?: SessionChatResponse;
   connected?: boolean;
   post?: PostPrompt;
+  answer?: PostAnswer;
   fetchChat?: FetchChat;
   rows?: EpicDetailRow[];
   steps?: MapStep[];
@@ -170,6 +170,7 @@ function render(opts: {
         opts.fetchChat ??
         (async () => ({ kind: "ok", detail: opts.chat ?? chatOf() })),
       prompt: opts.post,
+      answer: opts.answer,
     }),
     { initialEntries: ["/d/gx:a"] },
   );
@@ -314,8 +315,8 @@ test("the box is 5 rows, scrolls into view and has the expand button; no round: 
 
 test("with a round the modal is Note on this round and its text goes in the Note part", async () => {
   Element.prototype.scrollIntoView = vi.fn();
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ round: round() }) });
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  render({ answer, chat: chatOf({ round: round() }) });
   const box = await openNote();
   expect(box.rows).toBe(5);
   // The round's text answer has its own expand button above the note's.
@@ -328,8 +329,8 @@ test("with a round the modal is Note on this round and its text goes in the Note
   expect(box.value).toBe("round note");
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].text).toMatch(/\n\nNote:\nround note$/);
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+  expect(answer.mock.calls[0][0].note).toBe("round note");
 });
 
 test("on a phone a note on a question alone enables Send", async () => {
@@ -874,9 +875,10 @@ const round = (): SessionRoundCard[] => [
 
 const sheet = () => screen.findByRole("group", { name: "Questions" });
 
-test("Send answers the whole round in one prompt", async () => {
+test("Send answers the whole round through one answer request, with no prompt text", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ round: round() }) });
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  render({ post, answer, chat: chatOf({ round: round() }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
   fireEvent.click(s.getByRole("button", { name: "No" }));
@@ -891,31 +893,37 @@ test("Send answers the whole round in one prompt", async () => {
   );
   fireEvent.change(await openNote(), { target: { value: "overall" } });
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post).toHaveBeenCalledWith({
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+  expect(post).not.toHaveBeenCalled();
+  expect(answer).toHaveBeenCalledWith({
     id: "s-a",
-    text: "Q1 - T1: Alpha\n  Note: because\nQ2 - T2: No - Nope\nQ3 - T3: free text\n\nNote:\noverall",
+    source: "round",
+    card_id: "1:T1|2:T2|3:T3",
+    answers: [
+      { choice: "a", note: "because", huh: false },
+      { choice: "no", huh: false },
+      { text: "free text", huh: false },
+    ],
+    note: "overall",
     last_message: "m9",
   });
 });
 
-test("Huh? puts the fixed message in the prompt, names the question for the record, and sends nothing on the click", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ round: round() }) });
+test("Huh? goes out as a mark on its question, and sends nothing on the click", async () => {
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  render({ answer, chat: chatOf({ round: round() }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Huh?" }));
-  expect(post).not.toHaveBeenCalled();
+  expect(answer).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  const body = post.mock.calls[0][0];
-  expect(body.text).toContain(`Q1 - T1: ${HUH_MESSAGE}`);
-  expect(body.huh).toEqual([{ question: round()[0].body, title: "T1" }]);
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+  expect(answer.mock.calls[0][0].answers?.[0]).toMatchObject({ huh: true });
 });
 
 // Q1 answered, Q2 and Q3 not; Send is clicked and the popover is open.
-const sendWithGaps = async (post: PostPrompt) => {
-  render({ post, chat: chatOf({ round: round() }) });
+const sendWithGaps = async (answer: PostAnswer) => {
+  render({ answer, chat: chatOf({ round: round() }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Beta" }));
   fireEvent.click(s.getByRole("button", { name: "Question 3" }));
@@ -931,8 +939,8 @@ const sendWithGaps = async (post: PostPrompt) => {
 };
 
 test("Send with gaps opens a popover listing the unanswered questions; Send anyway has focus and sends", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  const { popover } = await sendWithGaps(post);
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  const { popover } = await sendWithGaps(answer);
   const p = within(popover);
   expect(popover.getAttribute("aria-label")).toBe("Unanswered questions");
   expect(p.getByText("2 questions are unanswered")).toBeTruthy();
@@ -947,18 +955,16 @@ test("Send with gaps opens a popover listing the unanswered questions; Send anyw
       p.getByRole("button", { name: "Send anyway" }),
     ),
   );
-  expect(post).not.toHaveBeenCalled();
+  expect(answer).not.toHaveBeenCalled();
 
   fireEvent.click(p.getByRole("button", { name: "Send anyway" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].text).toBe(
-    "Q1 - T1: Beta\nQ2 - T2: (unanswered)\nQ3 - T3: (unanswered)",
-  );
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+  expect(answer.mock.calls[0][0].answers).toEqual([{ choice: "b", huh: false }, {}, {}]);
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 });
 
 test("one gap says 'question is unanswered'", async () => {
-  const { s } = await sendWithGaps(vi.fn<PostPrompt>(async () => ok));
+  const { s } = await sendWithGaps(vi.fn<PostAnswer>(async () => ok));
   fireEvent.click(s.getByRole("button", { name: "Question 2" }));
   fireEvent.click(s.getByRole("button", { name: "Yes" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
@@ -971,8 +977,8 @@ test("one gap says 'question is unanswered'", async () => {
 });
 
 test("Escape closes the popover and focuses Send", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  const { popover } = await sendWithGaps(post);
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  const { popover } = await sendWithGaps(answer);
   fireEvent.keyDown(popover, { key: "Escape" });
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   await waitFor(() =>
@@ -980,12 +986,12 @@ test("Escape closes the popover and focuses Send", async () => {
       screen.getByRole("button", { name: "Send answers" }),
     ),
   );
-  expect(post).not.toHaveBeenCalled();
+  expect(answer).not.toHaveBeenCalled();
 });
 
 test("an outside click closes the popover and focuses Send", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  await sendWithGaps(post);
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  await sendWithGaps(answer);
   // The popover listens for outside presses a tick after it opens, so press until it hears one.
   await waitFor(() => {
     fireEvent.pointerDown(document.body);
@@ -997,20 +1003,20 @@ test("an outside click closes the popover and focuses Send", async () => {
       screen.getByRole("button", { name: "Send answers" }),
     ),
   );
-  expect(post).not.toHaveBeenCalled();
+  expect(answer).not.toHaveBeenCalled();
 });
 
 test("a second Send click closes the popover and sends nothing", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  await sendWithGaps(post);
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  await sendWithGaps(answer);
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-  expect(post).not.toHaveBeenCalled();
+  expect(answer).not.toHaveBeenCalled();
 });
 
 test("a popover row opens the sheet at that question and focuses its first control, from the Chat view", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  const { s, popover: gaps } = await sendWithGaps(post);
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  const { s, popover: gaps } = await sendWithGaps(answer);
   // The sheet is gone in the Chat view; close the popover first and open it again after.
   fireEvent.keyDown(gaps, { key: "Escape" });
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
@@ -1044,20 +1050,20 @@ test("a popover row opens the sheet at that question and focuses its first contr
       within(screen.getByRole("group", { name: "Questions" })).getByRole("button", { name: "Yes" }),
     ),
   );
-  expect(post).not.toHaveBeenCalled();
+  expect(answer).not.toHaveBeenCalled();
 });
 
 test("Send with every question answered posts at once", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ round: [askCard(1)] }) });
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  render({ answer, chat: chatOf({ round: [askCard(1)] }) });
   fireEvent.click(within(await sheet()).getByRole("button", { name: "Alpha" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
   expect(screen.queryByRole("alertdialog")).toBeNull();
 });
 
 test("a stale refusal keeps every answer and note of the round", async () => {
-  const post = vi.fn<PostPrompt>(async () => ({
+  const answer = vi.fn<PostAnswer>(async () => ({
     refused: true,
     reason: "stale",
     message: "the conversation moved",
@@ -1066,7 +1072,7 @@ test("a stale refusal keeps every answer and note of the round", async () => {
     kind: "ok",
     detail: chatOf({ round: round() }),
   }));
-  render({ post, fetchChat });
+  render({ answer, fetchChat });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
   const box = await openNote();
@@ -1103,17 +1109,17 @@ test("question bodies and option labels render their markdown", async () => {
 });
 
 test("a finished turn with a background task still takes answers", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
+  const answer = vi.fn<PostAnswer>(async () => ok);
   render({
     state: "working",
     background: true,
-    post,
+    answer,
     chat: chatOf({ round: [askCard(1)] }),
   });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
 });
 
 test("a question card shows its number and title above the body", async () => {
@@ -1151,25 +1157,25 @@ test("design page: the key runs Send", async () => {
 });
 
 test("design page: the key runs Send answers, and with gaps opens the popover", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ round: round() }) });
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  render({ answer, chat: chatOf({ round: round() }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Beta" }));
   const box = await openNote();
   cmdEnter(box);
   const popover = await screen.findByRole("alertdialog");
   expect(within(popover).getByText("2 questions are unanswered")).toBeTruthy();
-  expect(post).not.toHaveBeenCalled();
+  expect(answer).not.toHaveBeenCalled();
 });
 
 test("design page: the key sends a complete round", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ round: [askCard(1)] }) });
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  render({ answer, chat: chatOf({ round: [askCard(1)] }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
   cmdEnter(await openNote());
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].text).toBe("Q1 - T1: Alpha");
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+  expect(answer.mock.calls[0][0].answers).toEqual([{ choice: "a", huh: false }]);
 });
 
 test("the key in the large editor sends on a wide screen and does nothing on a narrow one", async () => {
@@ -1333,15 +1339,15 @@ test("images: the note opens from the draft on load and the key sends images alo
 
 test("images: Send answers carries the ready images", async () => {
   draftImages("i1");
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ round: round() }) });
+  const answer = vi.fn<PostAnswer>(async () => ok);
+  render({ answer, chat: chatOf({ round: round() }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
   fireEvent.click(s.getByRole("button", { name: "No" }));
   fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), { target: { value: "x" } });
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].images).toEqual(["i1"]);
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+  expect(answer.mock.calls[0][0].images).toEqual(["i1"]);
 });
 
 test("images: a failed upload keeps Send off", async () => {

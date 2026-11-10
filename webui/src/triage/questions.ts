@@ -1,7 +1,9 @@
-import { HUH_MESSAGE } from "../design/round";
 import { ticketHref } from "../hrefs";
 import type { SessionRoundCard, TriageQuestion, TriageRow } from "../generated/server";
 import { isAnswered, type Answer, type Answers } from "../ui/question-sheet/round";
+
+/** The text a Huh? answer is stored as in a triage row's answers. */
+export const HUH_MESSAGE = "I could not follow this question. Could you explain it another way?";
 
 const NOTE_MARK = "\nNote: ";
 

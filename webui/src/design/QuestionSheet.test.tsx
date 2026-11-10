@@ -8,7 +8,6 @@ import { renderThemed } from "../ui/render";
 import { Question } from "../ui/question-sheet/Question";
 import type { Answers } from "../ui/question-sheet/round";
 import { QuestionSheet } from "./QuestionSheet";
-import { HUH_MESSAGE, roundPrompt } from "./round";
 
 afterEach(cleanup);
 
@@ -159,23 +158,25 @@ test("the question note's large editor is titled with the question and its text 
   expect(seen.at(-1)?.["2"]?.note).toBe("hello");
 });
 
-test.each(["text", "yes-no"])("Huh? on a %s question answers it with the fixed message, and a pick replaces it", (kind) => {
+test.each(["text", "yes-no"])("Huh? on a %s question marks it huh, and a pick replaces the mark", (kind) => {
   function Harness() {
     const [answers, setAnswers] = useState<Answers>({});
     return (
       <>
         <QuestionSheet round={[card({ kind })]} answers={answers} onAnswers={(u) => setAnswers(u)} />
-        <output>{roundPrompt([card({ kind })], answers, "")}</output>
+        <output>{JSON.stringify(answers["1"])}</output>
       </>
     );
   }
   renderThemed(<Harness />);
   fireEvent.click(screen.getByText("Huh?"));
   expect(screen.getByText("1 of 1 answered")).toBeTruthy();
-  expect(screen.getByRole("status").textContent).toBe(`Q1 - Pick: ${HUH_MESSAGE}`);
+  expect(JSON.parse(screen.getByRole("status").textContent ?? "")).toMatchObject({ huh: true });
   if (kind === "yes-no") {
     fireEvent.click(screen.getByText("Yes"));
-    expect(screen.getByRole("status").textContent).toBe("Q1 - Pick: Yes");
+    const a = JSON.parse(screen.getByRole("status").textContent ?? "");
+    expect(a.choice).toBe("yes");
+    expect(a.huh).toBeFalsy();
   }
 });
 

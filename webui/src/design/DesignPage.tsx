@@ -13,7 +13,7 @@ import type { PostFocus } from "./focus";
 import { MapImageStrip } from "./MapImageStrip";
 import type { FetchMapImages } from "./mapImages";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
-import type { PostPrompt } from "./prompt";
+import type { PostAnswer, PostPrompt } from "./prompt";
 import { ImplLink, Tickets, showsImplLink } from "./Progress";
 import { designModel } from "../stepped/model";
 import { SteppedPage } from "../stepped/SteppedPage";
@@ -30,6 +30,7 @@ export interface DesignDeps {
   fetchDetail?: FetchEpicDetail;
   fetchChat?: FetchChat;
   post?: PostPrompt;
+  answer?: PostAnswer;
   open?: OpenDesign;
   remove?: DeleteDesign;
   stop?: StopSession;

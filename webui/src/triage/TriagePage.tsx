@@ -7,7 +7,7 @@ import { postAbandonTriage, postOpenTriage, type AbandonTriage, type ApproveTria
 import { useDesignWrite } from "../design/SessionControls";
 import type { FetchChat } from "../design/chat";
 import type { PostFocus } from "../design/focus";
-import type { PostPrompt } from "../design/prompt";
+import type { PostAnswer, PostPrompt } from "../design/prompt";
 import type { FetchScreen } from "../design/screen";
 import { TriageAbandoned, TriageDone, TriageNone, type SessionInfo, type TriageView } from "../generated/server";
 import { Modal } from "../ui/modal/Modal";
@@ -34,6 +34,7 @@ export interface TriageDeps {
   fetchTriage?: FetchTriage;
   fetchChat?: FetchChat;
   post?: PostPrompt;
+  answer?: PostAnswer;
   open?: OpenFlow;
   stop?: StopSession;
   resume?: ResumeSession;
@@ -134,8 +135,8 @@ function TriageBody({ project, view, deps, refetch }: { project: string; view: T
   const atApprove = phase === "approve";
   const atWrite = phase === "write";
   const atDone = phase === "done";
-  const { fetchChat, post, open, stop, resume, fetchScreen, focus } = deps;
-  const steppedActions = { fetchChat, post, open, stop, resume, fetchScreen, focus };
+  const { fetchChat, post, answer, open, stop, resume, fetchScreen, focus } = deps;
+  const steppedActions = { fetchChat, post, answer, open, stop, resume, fetchScreen, focus };
   const wide = useWide();
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];

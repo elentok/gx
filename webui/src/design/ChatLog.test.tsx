@@ -6,7 +6,7 @@ import type { SessionChatMessage, SessionChatResponse, SessionInfo, SessionRound
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
-import type { PostPrompt } from "./prompt";
+import type { PostAnswer } from "./prompt";
 import { roundCards } from "./roundFixture";
 
 afterEach(() => {
@@ -56,7 +56,7 @@ const chatOf = (
 
 const okChat = (c: SessionChatResponse): FetchChat => async () => ({ kind: "ok", detail: c });
 
-function renderChat(sessions: SessionInfo[], fetchChat: FetchChat, prompt?: PostPrompt, mapDetail: Record<string, unknown> = {}) {
+function renderChat(sessions: SessionInfo[], fetchChat: FetchChat, answer?: PostAnswer, mapDetail: Record<string, unknown> = {}) {
   const state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const listeners = new Set<(a?: string) => void>();
   const conn = {
@@ -105,7 +105,7 @@ function renderChat(sessions: SessionInfo[], fetchChat: FetchChat, prompt?: Post
         },
       }),
       chat: fetchChat,
-      prompt,
+      answer,
     }),
     { initialEntries: ["/d/gx:a"] },
   );
@@ -562,28 +562,28 @@ test("a new round starts with a clean sheet", async () => {
 });
 
 test("sending the round drops its draft", async () => {
-  const post = vi.fn<PostPrompt>(async () => ({}));
-  renderChat([session()], roundChat(), post);
+  const answer = vi.fn<PostAnswer>(async () => ({}));
+  renderChat([session()], roundChat(), answer);
   const sheet = await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
   cleanup();
-  renderChat([session()], roundChat(), post);
+  renderChat([session()], roundChat(), answer);
   const again = await screen.findByRole("group", { name: "Questions" });
   expect(within(again).queryByRole("button", { name: "Question 1, answered" })).toBeNull();
 });
 
 test("during a round the box shows the composer draft; Send answers uses it as the note and clears it", async () => {
   localStorage.setItem("gx.draft.composer.s-a", "shared note");
-  const post = vi.fn<PostPrompt>(async () => ({}));
-  renderChat([session()], roundChat(), post);
+  const answer = vi.fn<PostAnswer>(async () => ({}));
+  renderChat([session()], roundChat(), answer);
   expect(((await screen.findByRole("textbox", { name: "Message" })) as HTMLTextAreaElement).value).toBe("shared note");
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].text).toMatch(/\n\nNote:\nshared note$/);
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+  expect(answer.mock.calls[0][0].note).toBe("shared note");
   await waitFor(() => expect(localStorage.getItem("gx.draft.composer.s-a")).toBeNull());
 });
 
@@ -729,11 +729,11 @@ test("Escape with the failure banner's screen modal open closes only the modal",
 });
 
 test("a successful send shows the chat; a refused send keeps Questions and shows the error", async () => {
-  const post = vi
-    .fn<PostPrompt>()
+  const answer = vi
+    .fn<PostAnswer>()
     .mockResolvedValueOnce({ refused: true, reason: "text-too-long", message: "text is over the limit" })
     .mockResolvedValue({});
-  renderChat([session()], focusChat(), post);
+  renderChat([session()], focusChat(), answer);
   await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
@@ -814,9 +814,9 @@ test("answers, the open question and the note survive two view switches; the tex
 const defaultsText ="Intro\n\n**Decided unless you object**\n\n- Naming: use camelCase\n- Order: alphabetical";
 
 test("defaulted questions render as plain text beside one card, and Send asks nothing about them", async () => {
-  const post = vi.fn<PostPrompt>(async () => ({}));
+  const answer = vi.fn<PostAnswer>(async () => ({}));
   const fetchChat = okChat(chatOf([msg({ text: defaultsText })], { round: [card({ label: "1", body: "First?" })] }));
-  renderChat([session()], fetchChat, post);
+  renderChat([session()], fetchChat, answer);
   const sheet = await screen.findByRole("group", { name: "Questions" });
   expect(within(sheet).getAllByRole("button", { name: /^Question \d/ })).toHaveLength(1);
   fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
@@ -825,11 +825,9 @@ test("defaulted questions render as plain text beside one card, and Send asks no
   expect(screen.getByText("Naming: use camelCase")).toBeTruthy();
   expect(screen.getByText("Order: alphabetical")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  const sent = JSON.stringify(post.mock.calls[0]);
-  expect(sent).toContain("Q1");
-  expect(sent).not.toContain("camelCase");
-  expect(sent).not.toContain("unanswered");
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+  expect(answer.mock.calls[0][0].answers).toHaveLength(1);
+  expect(JSON.stringify(answer.mock.calls[0])).not.toContain("camelCase");
 });
 
 test("an all-defaulted round shows one Accept these defaults card", async () => {

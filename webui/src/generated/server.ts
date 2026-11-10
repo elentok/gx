@@ -743,6 +743,53 @@ export interface DetailRun {
 }
 
 //////////
+// source: devstatus.go
+
+/**
+ * DevState is where Dev mode is in its life.
+ */
+export const DevStateOff = "off";
+export const DevStateInstalling = "installing";
+export const DevStateStarting = "starting";
+export const DevStateRunning = "running";
+export const DevStateDown = "down";
+export type DevState = typeof DevStateOff | typeof DevStateInstalling | typeof DevStateStarting | typeof DevStateRunning | typeof DevStateDown;
+/**
+ * ReasonDevNotDown is the refusal reason of a Vite restart while Vite is not down.
+ */
+export const ReasonDevNotDown = "dev-not-down";
+/**
+ * DevRestartResult is the answer to a Vite restart; a refusal changes nothing.
+ */
+export interface DevRestartResult {
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+/**
+ * DevStatus is the Dev block of the snapshot.
+ */
+export interface DevStatus {
+  state: DevState;
+  /**
+   * HasCheckout is whether gx found a Dev checkout.
+   */
+  has_checkout: boolean;
+  /**
+   * Reason says why Dev mode cannot run or is down; empty when nothing is wrong.
+   */
+  reason?: string;
+  /**
+   * LogTail is the last Vite log lines.
+   */
+  log_tail?: string[];
+  /**
+   * Checkout is the Dev checkout root; empty without one.
+   */
+  checkout?: string;
+}
+
+//////////
 // source: diskwatch.go
 
 /**

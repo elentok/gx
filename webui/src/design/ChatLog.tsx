@@ -15,7 +15,7 @@ import {
   visibleFailure,
   type FailureActions,
 } from "./FailureBanner";
-import type { PostPrompt } from "./prompt";
+import type { PostAnswer, PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
 import { isAnswered } from "../ui/question-sheet/round";
 import { type RoundDraft, useRoundDraft } from "./roundDraft";
@@ -32,6 +32,7 @@ function ChatTail({
   chat,
   connected,
   post,
+  answer,
   onStale,
   done,
   nextTitle,
@@ -45,6 +46,7 @@ function ChatTail({
   chat: SessionChatResponse;
   connected: boolean;
   post?: PostPrompt;
+  answer?: PostAnswer;
   onStale: () => void;
   done?: boolean;
   nextTitle?: string;
@@ -109,6 +111,8 @@ function ChatTail({
           nextTitle={nextTitle}
           connected={connected}
           post={post}
+          answer={answer}
+          roundId={roundKeyOf(chat)}
           onStale={onStale}
           round={round}
           answers={answers}
@@ -213,6 +217,7 @@ function ChatBody({
   chat,
   connected,
   post,
+  answer,
   onStale,
   done,
   nextTitle,
@@ -231,6 +236,7 @@ function ChatBody({
   chat: SessionChatResponse;
   connected: boolean;
   post?: PostPrompt;
+  answer?: PostAnswer;
   onStale: () => void;
   done?: boolean;
   nextTitle?: string;
@@ -285,6 +291,7 @@ function ChatBody({
         chat={chat}
         connected={connected}
         post={post}
+        answer={answer}
         onStale={onStale}
         done={done}
         nextTitle={nextTitle}
@@ -309,6 +316,7 @@ function ChatLog({
   chat: SessionChatResponse;
   refetch: () => void;
   post?: PostPrompt;
+  answer?: PostAnswer;
   done?: boolean;
   nextTitle?: string;
   working?: WorkingStep;
@@ -343,6 +351,7 @@ export function DesignChat({
   chat,
   refetch,
   post,
+  answer,
   done,
   nextTitle,
   working,
@@ -361,6 +370,7 @@ export function DesignChat({
   chat?: SessionChatResponse | null;
   refetch: () => void;
   post?: PostPrompt;
+  answer?: PostAnswer;
   /** The Design's Progress is Done: no composer, no `ended` banner. */
   done?: boolean;
   /** The subtitle under Continue: the next ticket's title, or the step label. */
@@ -395,6 +405,7 @@ export function DesignChat({
       chat={chat}
       refetch={refetch}
       post={post}
+      answer={answer}
       done={done}
       nextTitle={nextTitle}
       working={working}

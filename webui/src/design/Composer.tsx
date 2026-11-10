@@ -2,8 +2,9 @@ import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { PiNotePencil } from "react-icons/pi";
 import { useComposerDraft } from "../drafts";
-import type {
-  SessionInfo,
+import {
+  CardSourceRound,
+  type SessionInfo,
   SessionNext,
   SessionRoundCard,
 } from "../generated/server";
@@ -28,9 +29,10 @@ import { FooterLine } from "./FooterLine";
 import { InterruptControl } from "./InterruptControl";
 import { useComposerImages } from "./useComposerImages";
 import { NoteBox } from "./NoteBox";
-import type { PostPrompt } from "./prompt";
+import { postAnswer, type PostAnswer, type PostPrompt } from "./prompt";
 import type { Answers } from "../ui/question-sheet/round";
-import { huhOf, roundPrompt, unansweredOf } from "./round";
+import { ReasonStale } from "../ticket/answer";
+import { unansweredOf } from "./round";
 import { SendPopover } from "./SendPopover";
 import { usePromptSend } from "./usePromptSend";
 import { useWide } from "../useWide";
@@ -44,7 +46,9 @@ export function Composer({
   nextTitle,
   connected,
   post,
-  interrupt = postInterruptSession,
+  answer = postAnswer,
+  roundId = "",
+  interrupt =postInterruptSession,
   setAutoAdvance = postAutoAdvance,
   setAutoQueue = postAutoQueue,
   cancelAutoAdvance = postCancelAutoAdvance,
@@ -67,6 +71,10 @@ export function Composer({
   nextTitle?: string;
   connected: boolean;
   post?: PostPrompt;
+  /** Posts the open round's answers; the server words the prompt. */
+  answer?: PostAnswer;
+  /** The server's card id of the open round. */
+  roundId?: string;
   interrupt?: InterruptSession;
   setAutoAdvance?: SetAutoAdvance;
   setAutoQueue?: SetAutoQueue;
@@ -114,12 +122,29 @@ export function Composer({
   const inRound = round.length > 0;
   const sendRound = () => {
     setGapsOpen(false);
-    const huh = huhOf(round, answers);
-    return send({ text: roundPrompt(round, answers, text), ...(huh.length ? { huh } : {}), ...images.payload }, () => {
-      setText("");
-      images.clear();
-      onRoundSent?.();
-    });
+    if (!enabled) return;
+    return write(
+      async () => {
+        const res = await answer({
+          id: session.id,
+          source: CardSourceRound,
+          card_id: roundId,
+          answers: round.map((c) => answers[c.label] ?? {}),
+          note: text.trim() || undefined,
+          last_message: lastMessage,
+          ...images.payload,
+        });
+        if (res.refused && res.reason === ReasonStale) onStale?.();
+        return res;
+      },
+      {
+        onDone: () => {
+          setText("");
+          images.clear();
+          onRoundSent?.();
+        },
+      },
+    );
   };
   const unanswered = unansweredOf(round, answers);
   // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
