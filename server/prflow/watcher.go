@@ -277,7 +277,7 @@ func (w *Watcher) autoOpen(ctx context.Context) {
 func (w *Watcher) liveTargets() []Target {
 	var out []Target
 	for _, t := range w.host.Watched() {
-		if entries, err := Read(t.Dir); err == nil && slices.ContainsFunc(entries, func(e Entry) bool { return e.Kind == KindPRMerged }) {
+		if mergeRecorded(t.Dir) {
 			continue
 		}
 		out = append(out, t)

@@ -76,6 +76,11 @@ func (s *Tickets) EpicTryAgain(ctx context.Context, address string) (wire.QueueR
 	return s.t.queueWriteTo(ctx, "/v1/epics/try-again", wire.QueueRequest{Address: address})
 }
 
+// EpicMarkMerged records a merge done outside gx on an epic.
+func (s *Tickets) EpicMarkMerged(ctx context.Context, address string) (wire.QueueResult, error) {
+	return s.t.queueWriteTo(ctx, "/v1/epics/mark-merged", wire.QueueRequest{Address: address})
+}
+
 // EpicStashMerge is "Stash, merge and restore" for an epic paused on a dirty
 // trunk: the target is fast-forwarded and the uncommitted files come back with
 // conflict markers, behind a trunk-conflict ticket (TrunkConflict).

@@ -14,5 +14,9 @@ func TestPRFlowSkillRules(t *testing.T) {
 		"`Check`", "`Cause`", "`Change`", "`Commit`", "`Outcome`",
 		"`fixed`", "`unfixable`", "`foreign-conflict`",
 	)
+	checkAnchors(t, "gx-cleanup/SKILL.md",
+		"`gx server epics mark-merged <project:epic>`",
+		"never writes `merged_at` itself",
+	)
 	checkAnchors(t, "gx-pr-text/SKILL.md", "`Title:`", "`Body:`", "`skills.pr-text`")
 }

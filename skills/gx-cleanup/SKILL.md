@@ -140,7 +140,9 @@ ff-only-merge path (case-2.1 merge candidates and the "merge, skip review" pick 
 
 - **Archive** (`all_done && merged_to_main` epics): `root=$(gx tickets root); mv "$root/<epic>" "$root/.archive/<epic>"`
   (create `$root/.archive` first if missing) — a plain filesystem move inside the store, no git
-  staging or commit in the repo.
+  staging or commit in the repo. Before the move, run `gx server epics mark-merged <project:epic>`
+  so the merge is recorded; the skill never writes `merged_at` itself, and a refusal does not stop
+  the archive.
 - **Safe deletes** (branches/worktrees with `recommendation == "delete"`, or investigated as "safe
   to delete" in Step 3): run `git worktree remove <path>` if the entry has a `path`, then
   `git branch <delete_mode> <branch>` — `delete_mode` is the scan's field: `-d`, or `-D` when the

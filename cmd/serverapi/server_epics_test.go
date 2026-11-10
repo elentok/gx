@@ -188,6 +188,34 @@ func TestServerEpicsTryAgain_RejectsNonEpicAddressesAndHasJSON(t *testing.T) {
 	}
 }
 
+func TestServerEpicsMarkMerged_RejectsNonEpicAddressesAndHasJSON(t *testing.T) {
+	for _, args := range [][]string{{}, {"proj:epic/01"}, {"epic"}, {"proj:a", "proj:b"}} {
+		if err := execute(t, append([]string{"server", "epics", "mark-merged"}, args...), Deps{}); err == nil {
+			t.Errorf("args %q: want an error", args)
+		}
+	}
+	c, _, err := serverParent(Deps{}).Find([]string{"epics", "mark-merged"})
+	if err != nil || c.Flags().Lookup("json") == nil {
+		t.Errorf("mark-merged = %v, err %v; want a verb with --json", c, err)
+	}
+}
+
+func TestServerEpicsMarkMerged_JSONRefusalPrintsTheReasonAndFails(t *testing.T) {
+	refusal := wire.QueueResult{Refused: true, Reason: wire.ReasonTicketLive, Message: "has a running ticket"}
+	var out bytes.Buffer
+	err := cmdbase.RunServerQueueWrite(context.Background(), nil, &out, true,
+		func(context.Context, *apiclient.Client) (wire.QueueResult, error) { return refusal, nil })
+	if err != nil || !strings.Contains(out.String(), `"refused": true`) || !strings.Contains(out.String(), `"reason": "ticket-live"`) {
+		t.Errorf("out = %q, err = %v; want the refusal JSON", out.String(), err)
+	}
+	if err := jsonRefusalExit(true, refusal); err == nil {
+		t.Error("a --json refusal must exit non-zero")
+	}
+	if err := jsonRefusalExit(true, wire.QueueResult{}); err != nil {
+		t.Errorf("a success must exit zero, got %v", err)
+	}
+}
+
 func TestServerEpicsCreatePR_PrintsOutcomeAndRefusal(t *testing.T) {
 	var out bytes.Buffer
 	err := cmdbase.RunServerQueueWrite(context.Background(), nil, &out, false,

@@ -80,6 +80,29 @@ func newServerEpicsCmd(d Deps) *cobra.Command {
 	tryAgain.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(tryAgain)
 
+	markMerged := &cobra.Command{
+		Use:   "mark-merged <project:epic>",
+		Short: "record a merge done outside gx: stamp merged_at on a complete epic (refuses unfinished work)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
+				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
+			}
+			var res wire.QueueResult
+			err := cmdbase.ServerQueueWrite(d.Dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+				var err error
+				res, err = cl.Tickets.EpicMarkMerged(ctx, args[0])
+				return res, err
+			})
+			if err == nil {
+				err = jsonRefusalExit(jsonOut, res)
+			}
+			return err
+		},
+	}
+	markMerged.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(markMerged)
+
 	stashMerge := &cobra.Command{
 		Use:   "stash-merge <project:epic>",
 		Short: "merge an epic paused on a dirty trunk: set the clashing files aside, merge, restore them with conflict markers",
@@ -115,6 +138,16 @@ func newServerEpicsCmd(d Deps) *cobra.Command {
 }
 
 // printEpicRow writes the one-line epic summary shared by the list and detail verbs.
+// jsonRefusalExit is the error that makes a --json refusal exit non-zero. The
+// shared queue-write helper prints the refusal and returns nil in JSON mode;
+// gx-cleanup needs the exit code too.
+func jsonRefusalExit(jsonOut bool, res wire.QueueResult) error {
+	if jsonOut && res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	return nil
+}
+
 func printEpicRow(w io.Writer, address, kind, state string, done, total int, queueable bool, extra ...string) error {
 	line := fmt.Sprintf("%s\t%s\t%s\t%d/%d\tqueueable=%t", address, kind, state, done, total, queueable)
 	for _, col := range extra {

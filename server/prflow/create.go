@@ -19,10 +19,10 @@ type CreateHost interface {
 	EpicState(root queue.RootRef, e tickets.Epic) wire.EpicState
 }
 
-// Routes lists the Create PR and Try again writes, each with its web variant.
-// The getters are called per request, so a route can be listed before the
-// server has its handler.
-func Routes(create, tryAgain func() func(wire.QueueRequest) (wire.QueueResult, error)) []wire.Route {
+// Routes lists the Create PR, Try again and Mark as merged writes, each with
+// its web variant. The getters are called per request, so a route can be listed
+// before the server has its handler.
+func Routes(create, tryAgain, markMerged func() func(wire.QueueRequest) (wire.QueueResult, error)) []wire.Route {
 	write := func(pattern string, do func() func(wire.QueueRequest) (wire.QueueResult, error)) wire.Route {
 		return wire.Route{
 			Pattern:    pattern,
@@ -31,7 +31,11 @@ func Routes(create, tryAgain func() func(wire.QueueRequest) (wire.QueueResult, e
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { queue.HandlerWeb(do())(w, r) },
 		}
 	}
-	return []wire.Route{write("POST /v1/epics/create-pr", create), write("POST /v1/epics/try-again", tryAgain)}
+	return []wire.Route{
+		write("POST /v1/epics/create-pr", create),
+		write("POST /v1/epics/try-again", tryAgain),
+		write("POST /v1/epics/mark-merged", markMerged),
+	}
 }
 
 // Create is the manual PR trigger for an epic address: it runs Open once. A gh

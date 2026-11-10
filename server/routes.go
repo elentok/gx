@@ -77,6 +77,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		prflow.Routes(
 			func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.CreatePR },
 			func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.TryAgain },
+			func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.merger.EpicMarkMerged },
 		),
 		sched.Routes(func() *sched.Scheduler { return s.scheduler }, func() *sched.Explainer { return s.explain }),
 	)

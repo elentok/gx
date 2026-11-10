@@ -23,6 +23,11 @@ func (w *Watcher) closeOrMerge(t Target, v View) (handled bool, err error) {
 // PR calls. The state comes from the PR, never from ancestry: a squash merge
 // leaves the head SHA off Trunk.
 func (w *Watcher) Merged(t Target) error {
+	// A person marked it merged: that path writes its own entries and retries
+	// the Trunk update, so a poll already in flight must not add a second set.
+	if logged(t.Dir, KindMarkedMerged) {
+		return nil
+	}
 	if !logged(t.Dir, KindPRMerged) {
 		// Before the entry, so a crash retries the cancel along with the update.
 		w.host.CancelFlowTickets(t)
@@ -50,7 +55,7 @@ func (w *Watcher) updateTrunk(t Target) error {
 func (w *Watcher) retryMerged() {
 	for _, t := range w.host.Watched() {
 		// Watched reads the index, which may not show a stamp this tick just made.
-		if logged(t.Dir, KindPRMerged) && tickets.LoadEpicTicketMD(t.Dir).MergedAt.IsZero() {
+		if mergeRecorded(t.Dir) && tickets.LoadEpicTicketMD(t.Dir).MergedAt.IsZero() {
 			_ = w.updateTrunk(t)
 		}
 	}
@@ -67,6 +72,12 @@ func (w *Watcher) closed(t Target) error {
 		return err
 	}
 	return Append(t.Dir, Entry{Kind: KindPRClosed, Detail: t.URL})
+}
+
+// mergeRecorded is whether the log says the PR merged, by GitHub or by hand:
+// either way the PR is no longer polled and the Trunk update is retried.
+func mergeRecorded(dir string) bool {
+	return logged(dir, KindPRMerged) || logged(dir, KindMarkedMerged)
 }
 
 func logged(dir string, k Kind) bool {
