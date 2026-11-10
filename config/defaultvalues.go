@@ -14,6 +14,7 @@ import (
 var hiddenDefaults = map[string]func(Config) any{
 	"runner-wait":          func(c Config) any { return durationText(c.RunnerWait) },
 	"recovery.notify-hold": func(c Config) any { return durationText(c.Recovery.NotifyHold) },
+	"pr.no-checks-grace":   func(c Config) any { return durationText(c.PR.NoChecksGrace) },
 	// Zero means the runner's own default, which is what the page shows.
 	"server.log-retention": func(c Config) any {
 		if c.Server.LogRetention == 0 {

@@ -101,6 +101,10 @@ func (c Config) WithProject(pf ProjectFile) Config {
 		if s.CodeReview != nil {
 			c.Skills.CodeReview = s.CodeReview
 		}
+		if s.CIFix != nil {
+			c.Skills.CIFix = s.CIFix
+		}
+		c.Skills.PRText = firstNonEmpty(s.PRText, c.Skills.PRText)
 	}
 	if n := pf.Notifications; n != nil {
 		// Replaces the whole block: a destination is transport + target, so

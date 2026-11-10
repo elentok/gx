@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -259,6 +260,31 @@ func TestValidateProjectFile_DefaultHarness(t *testing.T) {
 	}
 	if err := ValidateProjectFile(pf); err == nil || !strings.Contains(err.Error(), "agents.default-harness") {
 		t.Errorf("bad value err = %v, want one naming the key", err)
+	}
+}
+
+func TestWithProject_PRSkillsOverrideAndCapsStayGlobal(t *testing.T) {
+	global := Config{Skills: DefaultSkillsConfig(), PR: DefaultPRConfig()}
+	global.Skills.CIFix = []string{"g"}
+	global.Skills.PRText = "global-text"
+	pf, err := ReadProjectFile(writeProjectJSON(t, `{
+		"skills": {"ci-fix": ["p1", "p2"], "pr-text": "proj-text"}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := global.WithProject(pf)
+	if !slices.Equal(got.Skills.CIFix, []string{"p1", "p2"}) || got.Skills.PRText != "proj-text" {
+		t.Errorf("skills = %+v", got.Skills)
+	}
+	if got.PR != global.PR {
+		t.Errorf("PR = %+v, want the global %+v", got.PR, global.PR)
+	}
+	if _, err := ReadProjectFile(writeProjectJSON(t, `{"pr": {"ci-fix-attempts-per-check": 9}}`)); err == nil {
+		t.Error("project.json accepted a pr block, want it rejected")
+	}
+	if got := global.WithProject(ProjectFile{}); !slices.Equal(got.Skills.CIFix, []string{"g"}) || got.Skills.PRText != "global-text" {
+		t.Errorf("empty project changed skills: %+v", got.Skills)
 	}
 }
 

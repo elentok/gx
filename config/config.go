@@ -42,6 +42,7 @@ type Config struct {
 	Budget                BudgetConfig         `json:"budget"`
 	Notifications         NotificationsConfig  `json:"notifications"`
 	Skills                SkillsConfig         `json:"skills"`
+	PR                    PRConfig             `json:"pr"`
 	Agents                AgentsConfig         `json:"agents"`
 	Subscription          SubscriptionConfig   `json:"subscription"`
 	TicketStore           TicketStoreConfig    `json:"ticket-store"`
@@ -133,6 +134,7 @@ func defaultWith(dataDir func() (string, error)) Config {
 		Budget:                DefaultBudgetConfig(),
 		Notifications:         DefaultNotificationsConfig(),
 		Skills:                DefaultSkillsConfig(),
+		PR:                    DefaultPRConfig(),
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           ticketStoreConfigWith(dataDir),
@@ -297,6 +299,25 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		}
 		if raw.Skills.CodeReview != nil {
 			cfg.Skills.CodeReview = raw.Skills.CodeReview
+		}
+		if raw.Skills.CIFix != nil {
+			cfg.Skills.CIFix = raw.Skills.CIFix
+		}
+		if raw.Skills.PRText != nil {
+			cfg.Skills.PRText = *raw.Skills.PRText
+		}
+	}
+	if p := raw.PR; p != nil {
+		if p.CIFixAttemptsPerCheck != nil && *p.CIFixAttemptsPerCheck >= 1 {
+			cfg.PR.CIFixAttemptsPerCheck = *p.CIFixAttemptsPerCheck
+		}
+		if p.CIFixAttemptsPerPR != nil && *p.CIFixAttemptsPerPR >= 1 {
+			cfg.PR.CIFixAttemptsPerPR = *p.CIFixAttemptsPerPR
+		}
+		if p.NoChecksGrace != nil {
+			if d, err := time.ParseDuration(*p.NoChecksGrace); err == nil && d >= 0 {
+				cfg.PR.NoChecksGrace = d
+			}
 		}
 	}
 	if raw.Agents != nil {

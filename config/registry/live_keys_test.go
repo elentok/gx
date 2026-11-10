@@ -30,6 +30,8 @@ agents.restore-sessions-on-start agents.banners.enabled agents.sounds.enabled
 agents.sounds.done agents.sounds.attention agents.claude-args agents.fix-agent-remote-control
 evolve recovery.enabled recovery.disabled recovery.follow-ups recovery.notify-hold
 ticket-store.commit-debounce ticket-store.push-remote
+skills.ci-fix skills.pr-text
+pr.ci-fix-attempts-per-check pr.ci-fix-attempts-per-pr pr.no-checks-grace
 `)
 
 func TestPageKeysAreLiveOrRestart(t *testing.T) {

@@ -369,6 +369,28 @@
       },
       "type": "object"
     },
+    "pr": {
+      "additionalProperties": false,
+      "properties": {
+        "ci-fix-attempts-per-check": {
+          "default": 3,
+          "description": "The most ci-fix tickets gx files for one failing check. Default: 3.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ci-fix-attempts-per-pr": {
+          "default": 10,
+          "description": "The most ci-fix tickets gx files for one pull request. Default: 10.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "no-checks-grace": {
+          "description": "How long a pull request with no checks waits before it counts as green. Default: 2m.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "recovery": {
       "additionalProperties": false,
       "properties": {
@@ -468,11 +490,24 @@
     "skills": {
       "additionalProperties": false,
       "properties": {
+        "ci-fix": {
+          "default": [],
+          "description": "The skills a ci-fix ticket runs, in order. Empty uses the bundled gx-ci-fix.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "code-review": {
           "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
         },
         "implement": {
           "description": "valid in config.json but read by nothing outside config/, so a web save would change nothing"
+        },
+        "pr-text": {
+          "default": "",
+          "description": "The skill that writes the pull request title and body. Empty uses the bundled gx-pr-text.",
+          "type": "string"
         }
       },
       "type": "object"

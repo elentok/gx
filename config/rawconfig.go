@@ -41,7 +41,14 @@ type rawConfig struct {
 	Skills *struct {
 		Implement  *string  `json:"implement"`
 		CodeReview []string `json:"code-review"`
+		CIFix      []string `json:"ci-fix"`
+		PRText     *string  `json:"pr-text"`
 	} `json:"skills"`
+	PR *struct {
+		CIFixAttemptsPerCheck *int    `json:"ci-fix-attempts-per-check"`
+		CIFixAttemptsPerPR    *int    `json:"ci-fix-attempts-per-pr"`
+		NoChecksGrace         *string `json:"no-checks-grace"`
+	} `json:"pr"`
 	Agents *struct {
 		Claude          *rawAgentConfig `json:"claude"`
 		Codex           *rawAgentConfig `json:"codex"`

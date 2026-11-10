@@ -323,7 +323,7 @@ a risky key asks for confirmation first; secrets are write-only.
 - **`agents`.** Only the keys the config merge applies are flagged overridable: `default-harness` and
   the claude and codex model, effort, light and strongest keys. The other `AgentsConfig` sub-keys
   stay accepted in project.json but are on the exclusion list and not shown.
-- **`skills`.** Only `implement` and `code-review` are overridable (what `WithProject` applies).
+- **`skills`.** `ci-fix` and `pr-text` are overridable (what `WithProject` applies). `implement` and `code-review` are inert and excluded.
 - **`disk-space.cleanup-command`.** Overridable list.
 - **Project-only keys.** `trunk`, `landing`, `auto-ff-merge` and `checks` are plain project values.
   `name`, `repo` and `vcs` are read-only.
@@ -587,7 +587,7 @@ audit in "Applying a change").
 
 Facts the code already settles, written here so they are not rediscovered:
 
-- The overridable `skills` keys are `implement` and `code-review` (`WithProject`).
+- The overridable `skills` keys are `ci-fix` and `pr-text` (`WithProject`).
 - The store loop already commits project.json (it polls `git status` and runs `add -A`, debounced).
 - The TUI-only list is in "Exclusion list" above.
 - `check.LoadConfig` prefers `.gx/checks.json` in the repo over project.json `checks`.
