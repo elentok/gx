@@ -331,6 +331,17 @@ test("with a round the modal is Note on this round and its text goes in the Note
   expect(post.mock.calls[0][0].text).toMatch(/\n\nNote:\nround note$/);
 });
 
+test("on a phone a note on a question alone enables Send", async () => {
+  Element.prototype.scrollIntoView = vi.fn();
+  render({ wide: false, chat: chatOf({ round: round() }) });
+  const send = (await screen.findByRole("button", { name: "Send" })) as HTMLButtonElement;
+  expect(send.disabled).toBe(true);
+  const s = within(await sheet());
+  fireEvent.click(s.getAllByRole("button", { name: /^Note on question/ })[0]);
+  fireEvent.change(await s.findByPlaceholderText("Note on this question"), { target: { value: "just a note" } });
+  await waitFor(() => expect(send.disabled).toBe(false));
+});
+
 const autoButton = () => screen.findByRole("button", { name: /^Auto:/ });
 
 // The Auto button opens the popover that holds the switches.
