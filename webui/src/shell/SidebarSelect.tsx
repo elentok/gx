@@ -22,7 +22,9 @@ import {
 } from "../select/selectModel";
 import { selectIntent } from "../select/selectKeys";
 import type { SidebarRow } from "../workspaces/sidebarModel";
+import { showToast } from "../ui/toaster";
 import { isTextTarget } from "./keys";
+import { NAV_ATTR } from "./SidebarKeys";
 import { useSidebarModel } from "./SidebarRows";
 import { SidebarBulkActions } from "./SidebarBulkActions";
 
@@ -98,6 +100,40 @@ export function useSidebarSelect(): SidebarSelect {
   return sel;
 }
 
+const QUEUE_REASON = "Managed by the queue: it can't be selected.";
+
+/**
+ * `s`, Space and Enter while a sidebar row has focus. Runs in the capture phase so that in select
+ * mode Enter toggles instead of reaching the row's open handler. Escape is handled by useSelectApi.
+ */
+function useSidebarSelectKeys(sel: SidebarSelect) {
+  const ref = useRef(sel);
+  ref.current = sel;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const stop = e.target instanceof Element ? e.target.closest<HTMLElement>(`[${NAV_ATTR}]`) : null;
+      if (e.defaultPrevented || !stop || !stop.closest("aside")) return;
+      const { state, rows, enter, toggle } = ref.current;
+      const intent = selectIntent(e, state.on, hasLayer() || isTextTarget(e.target));
+      if (intent === "enter-select") {
+        e.preventDefault();
+        enter();
+        return;
+      }
+      if (intent !== "toggle") return;
+      const nav = stop.getAttribute(NAV_ATTR) ?? "";
+      const key = nav.startsWith("row:") ? nav.slice(4) : nav.startsWith("agent:") ? nav.slice(6) : "";
+      if (!key) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (rows.find((r) => r.key === key)?.selectable === false) showToast({ type: "info", title: QUEUE_REASON, id: "select-queue-agent" });
+      else toggle(key);
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, []);
+}
+
 const rowOf = (r: SidebarRow, visible: boolean): SelectRow => ({
   key: r.key,
   kind: r.kind === "chat" || r.kind === "design" ? r.kind : "epic",
@@ -146,6 +182,7 @@ export function SidebarSelectProvider({ fetcher, active, children }: { fetcher?:
 
   const api = useSelectApi(rows, names, !!model);
   const select = useMemo<SidebarSelect>(() => ({ ...api, sectionOpen, setSectionOpen }), [api, sectionOpen, setSectionOpen]);
+  useSidebarSelectKeys(select);
 
   return <SidebarSelectContext.Provider value={select}>{children}</SidebarSelectContext.Provider>;
 }

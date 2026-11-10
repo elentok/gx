@@ -8,11 +8,17 @@ import { CardKindImplementation, SectionImplementing, SectionOnHold, SessionBloc
 import { renderThemed } from "../ui/render";
 import { DeviceContext } from "../useWide";
 import { AppShell } from "./AppShell";
+import { closeNewItem, openNewAgent } from "./newItemOpen";
 import type { Shell } from "./ShellContext";
 import { useSidebarKeys } from "./SidebarKeys";
 
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("../ui/toaster", async (orig) => ({ ...(await orig<typeof import("../ui/toaster")>()), showToast: toast }));
+
 afterEach(() => {
   cleanup();
+  toast.mockClear();
+  closeNewItem();
   vi.unstubAllGlobals();
   localStorage.clear();
   window.location.hash = "";
@@ -43,14 +49,23 @@ const placements: SessionPlacement[] = [
   { session: "s2", kind: "other" },
 ];
 
-async function setup(withChat = false) {
+async function setup(withChat = false, withQueue = false) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })));
   const state = {
     snapshot: {
       needs_you_total: 0,
       workspaces: [{ name: "Default", default: true, members: 0 }],
-      sessions: [session("s1", "p", { name: "builder" }), session("s2", "p", { name: "scratch" }), ...(withChat ? [session("s3", "p", { name: "talk" })] : [])],
-      placements: withChat ? [...placements, { session: "s3", kind: "chat", workspace: "Default" }] : placements,
+      sessions: [
+        session("s1", "p", { name: "builder" }),
+        session("s2", "p", { name: "scratch" }),
+        ...(withChat ? [session("s3", "p", { name: "talk" })] : []),
+        ...(withQueue ? [session("s6", "p", { name: "queuer", queue: true, tier: "worker" })] : []),
+      ],
+      placements: [
+        ...placements,
+        ...(withChat ? [{ session: "s3", kind: "chat", workspace: "Default" }] : []),
+        ...(withQueue ? [{ session: "s6", kind: "epic", epic: "p:blog" }] : []),
+      ],
     },
     connected: true,
     loadedOnce: true,
@@ -316,4 +331,72 @@ test("vim keys do nothing outside the sidebar or in a text field", async () => {
   input.focus();
   fireEvent.keyDown(input, { key: "j" });
   expect(document.activeElement).toBe(input);
+});
+
+const box = (name: string) => body().getByRole("checkbox", { name }) as HTMLInputElement;
+
+test("`s` enters select mode from a row and Escape leaves it", async () => {
+  await setup();
+  focus(body().getByRole("link", { name: /Blog/ }));
+  press("s");
+  expect(box("Select Blog").checked).toBe(false);
+  press("Escape");
+  expect(body().queryByRole("checkbox", { name: "Select Blog" })).toBeNull();
+});
+
+test("Space does nothing outside select mode and toggles the focused row in it", async () => {
+  await setup();
+  focus(body().getByRole("link", { name: /Blog/ }));
+  press(" ");
+  expect(body().queryByRole("checkbox", { name: "Select Blog" })).toBeNull();
+  press("s");
+  press(" ");
+  expect(box("Select Blog").checked).toBe(true);
+  press(" ");
+  expect(box("Select Blog").checked).toBe(false);
+});
+
+test("Enter opens the row outside select mode and toggles it in select mode", async () => {
+  await setup();
+  focus(body().getByRole("link", { name: /Blog/ }));
+  press("s");
+  press("Enter");
+  expect(box("Select Blog").checked).toBe(true);
+  expect(window.location.hash).toBe("");
+  press("Escape");
+  press("Enter");
+  await waitFor(() => expect(window.location.hash).toBe("#/e/p:blog"));
+});
+
+test("Space on a Queue agent shows the reason toast and selects nothing", async () => {
+  await setup(false, true);
+  focus(body().getByRole("link", { name: /Blog/ }));
+  press("l");
+  focus(body().getByRole("link", { name: /queuer/ }));
+  press("s");
+  press(" ");
+  expect(toast).toHaveBeenCalledTimes(1);
+  expect(toast.mock.calls[0][0].title).toMatch(/queue/i);
+  expect(screen.getByTestId("select-count").textContent).toBe("0 selected");
+});
+
+test("typing `shsl` in the New chat name field starts no mode", async () => {
+  await setup();
+  // The form's worktree list comes from the same fetch the sidebar used for its epics.
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("[]", { status: 200 })));
+  act(openNewAgent);
+  const input = await screen.findByRole("textbox", { name: "Name" });
+  input.focus();
+  for (const key of "shsl") fireEvent.keyDown(input, { key });
+  expect(document.activeElement).toBe(input);
+  expect(body().queryByRole("checkbox")).toBeNull();
+});
+
+test("select keys are ignored while a menu is open", async () => {
+  await setup();
+  fireEvent.click(within(body().getByRole("link", { name: /Blog/ }).closest("li")!).getByRole("button", { name: "More actions" }));
+  const item = (await screen.findAllByRole("menuitem"))[0];
+  item.focus();
+  fireEvent.keyDown(item, { key: "s" });
+  expect(body().queryByRole("checkbox")).toBeNull();
 });

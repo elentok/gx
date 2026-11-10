@@ -12,7 +12,6 @@ import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { CHAT_ATTR, NAV_ATTR } from "./SidebarKeys";
 import { useMoreActionsSize } from "../ui/menu/MoreActionsButton";
-import { showToast } from "../ui/toaster";
 import { GROUP_ON_HOLD, GROUP_OTHER } from "../select/selectModel";
 import { SelectBox, useSidebarSelect } from "./SidebarSelect";
 import { useAltHeld } from "./useShortcuts";
@@ -114,8 +113,6 @@ function RowCheck({ id, label }: { id: string; label: string }) {
   );
 }
 
-const QUEUE_REASON = "Managed by the queue: it can't be selected.";
-
 function IconSlot({ children }: { children?: ReactNode }) {
   return (
     <Box data-testid="icon-slot" w="26px" flex="none" display="flex" alignItems="center" justifyContent="center">
@@ -137,17 +134,12 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
   const managed = canManage(agent.session);
   const sel = useSidebarSelect();
   const selecting = sel.state.on;
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!selecting || managed || e.key !== " ") return;
-    e.preventDefault();
-    showToast({ type: "info", title: QUEUE_REASON, id: "select-queue-agent" });
-  };
   return (
     <RowFrame current={current} selected={selecting && sel.state.keys.includes(agent.id)}>
       <Box data-testid="nested-guide" aria-hidden position="absolute" left={GUIDE_X} top="0" bottom={last ? "50%" : "0"} w="1.5px" bg="border" />
       <Box w={`${CHEVRON_W}px`} flex="none" />
       {selecting && managed && <RowCheck id={agent.id} label={agent.label} />}
-      <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} onKeyDown={onKeyDown} {...rowStyle} flex="1" minW="0" px="0" minH="36px">
+      <chakra.a href={agent.href} {...{ [NAV_ATTR]: `agent:${agent.id}` }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" px="0" minH="36px">
         <IconSlot>{agent.fix && <WrenchIcon status={agent.status} />}</IconSlot>
         <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" fontSize="13px">
           {agent.label}
