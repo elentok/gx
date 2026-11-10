@@ -36,6 +36,8 @@ type InstallRequest struct {
 	// AllowLinkedMarker lets a directory-linked skill's SKILL.md be a symlink.
 	// Only Skill sources set it; the dev path still demands a real file.
 	AllowLinkedMarker bool
+	// ProtectedSources are Skill source folders no agent root may resolve into.
+	ProtectedSources []string
 }
 
 // effectiveMode returns r.Mode, defaulting to ModeManagedCopy when unset.

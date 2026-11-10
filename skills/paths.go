@@ -188,6 +188,30 @@ func displayTargets(p *installationPlan, roots []string) {
 	}
 }
 
+// overlapError refuses a destination that resolves into, or over, a skill
+// source, and prints the steps that convert the root.
+func overlapError(path, source string) error {
+	return fmt.Errorf("destination %s resolves into the skill source %s; gx never writes into a source. "+
+		"Steps: remove the root link, make the root a real folder, delete the old gx-* bundle copies in the source, rerun",
+		path, source)
+}
+
+// checkRootsOutsideSources refuses an agent root that resolves into any source.
+func checkRootsOutsideSources(roots, sources []string) error {
+	for _, source := range sources {
+		physical, err := physicalPath(source)
+		if err != nil {
+			return err
+		}
+		for _, root := range roots {
+			if within(root, physical) {
+				return overlapError(root, physical)
+			}
+		}
+	}
+	return nil
+}
+
 // Source targets remain protected when the requested bundle comes from a
 // temporary extraction, or when uninstall sees a root alias into a checkout.
 func protectRecordedSources(path string, m Manifest) error {
@@ -200,7 +224,7 @@ func protectRecordedSources(path string, m Manifest) error {
 			return err
 		}
 		if within(source, path) || (entryKind(f) == KindDirectoryLink && within(path, source)) {
-			return fmt.Errorf("destination %s overlaps source %s", path, source)
+			return overlapError(path, source)
 		}
 	}
 	if checkout, ok := DevRoot(m); ok {
@@ -209,7 +233,7 @@ func protectRecordedSources(path string, m Manifest) error {
 			return err
 		}
 		if within(source, path) || within(path, source) {
-			return fmt.Errorf("destination %s overlaps source checkout %s", path, source)
+			return overlapError(path, source)
 		}
 	}
 	return nil

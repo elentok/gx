@@ -277,16 +277,42 @@ func installTargetsAt(d Deps, manifestPath string, force skills.ForcePolicy, sou
 		}
 	}
 	return skills.Install(manifestPath, skills.InstallRequest{
-		BackupDir:  backupDir,
-		Source:     source,
-		AgentRoots: roots,
-		Files:      sources,
-		Force:      force,
-		Mode:       mode,
-		SwitchMode: switchMode,
+		ProtectedSources: protectedSourceDirs(d, source),
+		BackupDir:        backupDir,
+		Source:           source,
+		AgentRoots:       roots,
+		Files:            sources,
+		Force:            force,
+		Mode:             mode,
+		SwitchMode:       switchMode,
 
 		AllowLinkedMarker: linkedMarker,
 	})
+}
+
+// protectedSourceDirs lists every remembered Skill source folder plus the one
+// being installed, which no agent root may resolve into.
+func protectedSourceDirs(d Deps, source string) []string {
+	var dirs []string
+	if real, ok := skills.ThirdPartyRoot(skills.Manifest{Source: source}); ok {
+		dirs = append(dirs, real)
+	}
+	if d.ManifestDir == nil {
+		return dirs
+	}
+	manifestDir, err := d.ManifestDir()
+	if err != nil {
+		return dirs
+	}
+	paths, _ := filepath.Glob(filepath.Join(manifestDir, "*.json"))
+	for _, path := range paths {
+		if m, err := skills.Load(path); err == nil {
+			if real, ok := skills.ThirdPartyRoot(m); ok {
+				dirs = append(dirs, real)
+			}
+		}
+	}
+	return dirs
 }
 
 // runSkillsInstallSource installs the skills of the Skill source dir: one

@@ -143,6 +143,9 @@ func buildInstallPlan(manifestPath string, req InstallRequest) (*installationPla
 	if err != nil {
 		return nil, err
 	}
+	if err := checkRootsOutsideSources(roots, req.ProtectedSources); err != nil {
+		return nil, err
+	}
 	old, err := ownedPaths(prev)
 	if err != nil {
 		return nil, err
@@ -192,7 +195,7 @@ func buildInstallPlan(manifestPath string, req InstallRequest) (*installationPla
 		}
 		for _, src := range protectedSources {
 			if within(src, path) {
-				return fmt.Errorf("destination %s contains source %s", path, src)
+				return overlapError(path, src)
 			}
 		}
 		return nil
