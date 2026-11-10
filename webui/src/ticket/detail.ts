@@ -50,8 +50,13 @@ export function useDetail<T>(
     notFound: false,
   }));
   const latest = useRef(0);
+  const current = useRef(address);
+  current.current = address;
 
   const refetch = useCallback(() => {
+    // A callback kept from an earlier address (a POST that returns after the person moved on) must not bump
+    // the counter: that would drop the fetch of the page now shown and leave it blank.
+    if (address !== current.current) return;
     const n = ++latest.current;
     fetcher(address).then(
       (r) => {

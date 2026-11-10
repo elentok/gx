@@ -16,6 +16,8 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
     // Requests a worker answers bypass page.route; only the PWA steps allow workers.
     serviceWorkers: "block",
+    // Without a limit a click on a vanished element retries until the test timeout and fails with no call log.
+    actionTimeout: 20_000,
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
