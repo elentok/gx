@@ -46,6 +46,26 @@ export const REPLY = "Sure, here is a short answer.";
 export const chatOf = async (fixture: Fixture, id: string) =>
   JSON.parse(await fixture.cli("agents", "chat", id, "--json")) as { messages: unknown[]; conversation_id: string };
 
+/**
+ * The session that shows a question card of this source whose JSON contains `text`, polled until one does.
+ * The page reads the chats side by side: a CLI call per session takes seconds each.
+ */
+export async function cardSession(page: Page, fixture: Fixture, source: string, text: string) {
+  let found: SessionInfo | undefined;
+  await expect
+    .poll(async () => {
+      const all = await sessions(fixture);
+      const chats = await page.evaluate(
+        (ids) => Promise.all(ids.map((id) => fetch(`/v1/sessions/chat?session=${encodeURIComponent(id)}`).then((r) => r.json()))),
+        all.map((s) => s.id),
+      );
+      found = all.find((_, i) => ((chats[i].questions ?? []) as unknown[]).some((c) => JSON.stringify(c).includes(`"source":"${source}"`) && JSON.stringify(c).includes(text)));
+      return !!found;
+    }, { message: `a session with a ${source} card with ${text}` })
+    .toBe(true);
+  return found!;
+}
+
 /** Prompts a session and waits for the reply. A prompt is refused until the last turn ends, so it retries. */
 export async function ask(fixture: Fixture, id: string, text: string) {
   const before = (await chatOf(fixture, id)).messages.length;

@@ -10,6 +10,7 @@ import {
   CardSourceClaudeDialog,
   CardSourceCodex,
   CardSourcePermission,
+  CardSourceRound,
   ReasonCodexNotReady,
   ReasonCodexStopped,
   type QuestionCard,
@@ -80,7 +81,7 @@ function CardSheet({
 
   return (
     <Box display="flex" flexDirection="column" gap="2" maxH="50dvh" minH="0" flex="none">
-      <QuestionSheet round={cards} answers={draft.answers} onAnswers={setAnswers} initialIndex={draft.index} onIndex={setIndex} notes={notes} />
+      <QuestionSheet round={cards} answers={draft.answers} onAnswers={setAnswers} initialIndex={draft.index} onIndex={setIndex} notes={notes} huh={card.source === CardSourceRound} />
       {error && <Text role="alert">{error}</Text>}
       <Box display="flex" gap="2" justifyContent="flex-end" flexWrap="wrap">
         {hook && (
@@ -117,7 +118,8 @@ export function AgentChat({
   const failure = visibleFailure(session.failure);
   const card = chat.questions[0];
   return (
-    <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
+    // Sized by its content first, so the "No messages yet" row beside it cannot squeeze a card and banner under the composer.
+    <Box display="flex" flexDirection="column" gap="3" flex="1 1 auto" minH="0">
       <ChatMessages chat={chat} busy={busy} sessionId={session.id} showTools working={<WorkingRow current={chat.current} others={chat.others} />} />
       {card && <CardSheet key={card.id} session={session} card={card} lastMessage={chat.messages.at(-1)?.id} post={post} refetch={refetch} />}
       {failure && (

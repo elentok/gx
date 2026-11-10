@@ -86,6 +86,16 @@ test("a card shows the sheet, and Submit waits for every answer", async () => {
   expect(submitButton().disabled).toBe(false);
 });
 
+test("Huh? shows on a printed round only", async () => {
+  const cards = roundCards(round());
+  render(session(), chat({ questions: cards }));
+  expect(await screen.findByRole("button", { name: "Huh?" })).toBeTruthy();
+  cleanup();
+  render(session(), chat({ questions: cards.map((c) => ({ ...c, source: "ticket-ask" })) }));
+  expect(await screen.findByText("Which way?")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Huh?" })).toBeNull();
+});
+
 test("Submit posts the structured answer", async () => {
   const post = vi.fn(async () => ({ refused: false }) as SessionResult);
   const cards = roundCards(round());

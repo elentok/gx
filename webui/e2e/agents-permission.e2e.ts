@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { SessionInfo } from "../src/generated/server";
 import { expect, test, type Fixture } from "./fixture";
-import { chatOf, claudeIdle, go, sessions } from "./agentsKit";
+import { cardSession, chatOf, claudeIdle, go, sessions } from "./agentsKit";
 
 const conversationOf = async (fixture: Fixture, id: string) => (await chatOf(fixture, id)).conversation_id;
 const stateOf = async (fixture: Fixture, id: string) => (await sessions(fixture)).find((s) => s.id === id)!.status.state;
@@ -115,6 +115,86 @@ test("157. Close dialog, Agents page and design page; 158. design Allow once and
 test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow key; Codex hook and screen", async ({ page, start }) => {
   const fixture = await start("agents-blocked", { autoAdvanceDelay: "1h" });
   await page.setViewportSize({ width: 1280, height: 800 });
+
+  // The Agents-page question sheet: hook dialog card, then the keystroke-fallback card.
+  const sheet = page.getByRole("group", { name: "Questions" });
+  const cardOf = (source: string, text: string) => cardSession(page, fixture, source, text);
+  const hookCard = await cardOf("claude-dialog", "Which store?");
+  await go(page, `#/agents/${hookCard.id}`);
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toContainText("0 of 3 answered");
+  // Submit, Dismiss and the terminal button sit beside the group, not in it.
+  await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Answer in the terminal" })).toBeVisible();
+  await sheet.getByRole("button", { name: "Other", exact: true }).first().click();
+  await sheet.getByPlaceholder("Other", { exact: true }).first().fill("Postgres");
+  await expect(sheet).toContainText("1 of 3 answered");
+  // Picking an answer moves to the next question.
+  await sheet.getByRole("button", { name: "Note on question Checks" }).click();
+  await expect(sheet.getByPlaceholder("Note on this question")).toBeVisible();
+
+  const fallback = await cardOf("claude-dialog", "Which color?");
+  await go(page, `#/agents/${fallback.id}`);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /^Note on question/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Answer in the terminal" })).toHaveCount(0);
+  await expect(failure(page)).toBeVisible();
+
+  // Permission and plan cards: exact labels, nothing preselected, no Huh?.
+  const wrapped = await cardOf("permission", "ask again for this command");
+  await go(page, `#/agents/${wrapped.id}`);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("button", { pressed: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toBeVisible();
+  const plan = await cardOf("permission", "auto-accept edits");
+  await go(page, `#/agents/${plan.id}`);
+  await expect(sheet.getByRole("button", { name: /Yes, and auto-accept edits/ })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /Yes, and manually approve edits/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeDisabled();
+  await sheet.getByRole("button", { name: /Tell Claude what to change/ }).click();
+  await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeDisabled();
+  await sheet.getByPlaceholder("Tell Claude what to change").fill("fewer steps");
+  await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeEnabled();
+
+  // Codex question card: Note, no Huh?; the Queue agent's ticket ask: Submit only; the printed round: Huh? and nothing else.
+  const codexCard = await cardOf("codex-question", "Which store?");
+  await go(page, `#/agents/${codexCard.id}`);
+  await expect(sheet).toContainText("0 of 3 answered");
+  await expect(sheet.getByRole("button", { name: "Note on question Store" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0);
+  const ticketAsk = await cardOf("ticket-ask", "");
+  await go(page, `#/agents/${ticketAsk.id}`);
+  await expect(sheet).toBeVisible();
+  await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Answer in the terminal" })).toHaveCount(0);
+  const round = await cardOf("round", "Which store?");
+  await go(page, `#/agents/${round.id}`);
+  await expect(sheet).toContainText("Which store?");
+  await expect(sheet.getByRole("button", { name: "Huh?" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toHaveCount(0);
+
+  // On a phone the sheet fits the width.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(sheet).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // Last, since each answer clears its card: Dismiss on the fallback card, and the hook card moving to the terminal.
+  await go(page, `#/agents/${fallback.id}`);
+  await expect(sheet).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await leavesBlocked(fixture, fallback.id);
+  await expect(sheet).toHaveCount(0);
+  await go(page, `#/agents/${hookCard.id}`);
+  await expect(sheet).toBeVisible();
+  await page.getByRole("button", { name: "Answer in the terminal" }).click();
+  await expect(sheet).toHaveCount(0);
 
   const allow = await blockIdle(fixture, BASH_DIALOG("rg allow-me"));
   let before = await fixture.input(allow.conv);

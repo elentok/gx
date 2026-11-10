@@ -17,6 +17,7 @@ export function QuestionSheet({
   onIndex,
   questions = false,
   notes = true,
+  huh = true,
 }: {
   round: (SessionRoundCard & { context?: string; contextHref?: string })[];
   answers: Answers;
@@ -30,6 +31,8 @@ export function QuestionSheet({
   questions?: boolean;
   /** False for cards that take no note: a screen-read dialog, a permission or plan card. */
   notes?: boolean;
+  /** False for every card but a printed round: only a round's questions can be sent back as Huh?. */
+  huh?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -188,6 +191,7 @@ export function QuestionSheet({
                 <Question
                   big={questions}
                   notes={notes}
+                  huh={huh}
                   card={c}
                   answer={answers[c.label] ?? {}}
                   onChange={(a) =>
