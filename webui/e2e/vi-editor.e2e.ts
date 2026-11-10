@@ -72,7 +72,7 @@ const openWith = async (page: Page, text: string, caret: number) => {
 test.describe("124. Vi editor: open, close and submit", () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
-  test("Cmd-Enter in the agent composer's editor closes it and sends", async ({ page, start }) => {
+  test("Cmd-Enter in the agent composer's editor closes it and sends; in a Working session the first Esc leaves insert mode and the second opens the interrupt confirm",async ({ page, start }) => {
     const fixture = await start("agents");
     const idle = (await sessions(fixture))[0];
     await setViMode(fixture, page, true);
@@ -86,22 +86,17 @@ test.describe("124. Vi editor: open, close and submit", () => {
     await sent;
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect.poll(() => fixture.cli("agents", "chat", idle.id)).toContain("sent from the editor");
-  });
-
-  test("Esc in a Working session's editor: the first leaves insert mode, the second opens the interrupt confirm", async ({ page, start }) => {
-    const fixture = await start("agents");
+    // A Working session: the first Esc leaves insert mode, the second opens the interrupt confirm.
     const working = (await sessions(fixture))[1];
-    await setViMode(fixture, page, true);
     await go(page, `#/agents/${working.id}`);
     await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible();
     await composer(page).getByRole("button", nav("Open the note in a large editor")).click();
-    const dialog = page.getByRole("dialog", { name: /^Message to / });
-    const editor = dialog.getByRole("textbox", { name: /text$/ });
-    await expect(editor).toBeFocused();
+    const workingDialog = page.getByRole("dialog", { name: /^Message to / });
+    await expect(workingDialog.getByRole("textbox", { name: /text$/ })).toBeFocused();
     const confirm = page.getByRole("alertdialog", nav("Interrupt the agent?"));
     await page.keyboard.press("Escape");
     await expect(confirm).toHaveCount(0);
-    await expect(dialog).toBeVisible();
+    await expect(workingDialog).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(confirm).toBeVisible();
     await expect(confirm.getByRole("button", { name: "Interrupt", exact: true })).toBeFocused();
