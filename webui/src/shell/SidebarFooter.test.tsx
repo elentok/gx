@@ -38,6 +38,15 @@ test("warning, paused and disconnected icons show with their tooltips when they 
   expect(offline()).not.toBeNull();
 });
 
+test("the Dev pill is the only indicator and still gets the indicator line", () => {
+  setup({ mode: "running", dev: { state: "running", has_checkout: true } });
+  const line = document.querySelector('[data-part="indicators"]');
+  expect(line?.querySelector('[data-part="dev-pill"]')?.textContent).toBe("Dev");
+  cleanup();
+  setup({ mode: "running", dev: { state: "off", has_checkout: true } });
+  expect(document.querySelector('[data-part="indicators"]')).toBeNull();
+});
+
 test("the + New menu lists the three items and New workspace calls its prop", async () => {
   const onNewWorkspace = vi.fn();
   setup({}, true, onNewWorkspace);

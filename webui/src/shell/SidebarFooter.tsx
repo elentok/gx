@@ -4,6 +4,8 @@ import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList } from "../epics/list";
 import type { Workspace } from "../generated/server";
+import { DevPill } from "../dev/DevPill";
+import { useDev } from "../dev";
 import { EPICS_HREF, STATS_HREF } from "../hrefs";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
@@ -125,8 +127,10 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
   const unhealthy = !!health && [health.cpu, health.memory, health.disk].some((m) => m.state === "high" || m.state === "critical");
   const needsYou = snapshot?.needs_you_total ?? 0;
   const desktop = useDevice() === "desktop";
+  const dev = useDev().state;
   const indicators = (
     <>
+      <DevPill state={dev} />
       {unhealthy && (
         <Indicator label="System health is high or critical" tone="waiting">
           <WarningIcon />
@@ -144,7 +148,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       )}
     </>
   );
-  const anyIndicator = unhealthy || snapshot?.mode === "paused" || !connected;
+  const anyIndicator = dev !== "off" || unhealthy || snapshot?.mode === "paused" || !connected;
   return (
     <Box as="footer" flex="none" display="flex" flexDirection="column" gap="1" p="2" borderTopWidth="1px" borderColor="border">
       {/* At the 280px sidebar the optional indicators cannot share the row without shrinking a box, so they take a line above it. */}
