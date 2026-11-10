@@ -1,6 +1,8 @@
 package server
 
 import (
+	"time"
+
 	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
@@ -28,12 +30,17 @@ func (s *Server) epicsDeps() epics.Deps {
 
 		Workspaces: s.workspaces,
 
-		CapHeld:           func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool) { return s.explain.CapHeld(root, e) },
-		AutoFFMerge:       func(project string) bool { return s.merger.AutoFFMerge(project) },
-		Delivery:          func(project string) string { return s.merger.Delivery(project) },
-		PRView:            s.prLive,
-		PRReason:          s.prReasons.Reason,
-		PRActivity:        func(root queue.RootRef, e tickets.Epic) []wire.PRActivityEntry { return prflow.List(root.Project, e) },
+		CapHeld:     func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool) { return s.explain.CapHeld(root, e) },
+		AutoFFMerge: func(project string) bool { return s.merger.AutoFFMerge(project) },
+		Delivery:    func(project string) string { return s.merger.Delivery(project) },
+		PRView:      s.prLive,
+		PRReason:    s.prReasons.Reason,
+		PRActivity:  func(root queue.RootRef, e tickets.Epic) []wire.PRActivityEntry { return prflow.List(root.Project, e) },
+		PRCIFix: func(e tickets.Epic) (time.Time, int) {
+			since, _ := prflow.ResetTime(e.Path)
+			perCheck, _ := prWatchHost{s}.CIFixCaps()
+			return since, perCheck
+		},
 		CheckWaitingLabel: func(address string) string { return s.explain.CheckWaitingLabel(address) },
 		AgentGone:         func(address string) (bool, error) { return s.ops.AgentGone(address) },
 		LiveTask: func(address string) (epics.BackgroundTask, error) {

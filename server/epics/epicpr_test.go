@@ -2,11 +2,13 @@ package epics
 
 import (
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func kinds(as []wire.CardAction) []wire.CardActionKind {
@@ -81,6 +83,30 @@ func TestDecoratePR_WordsActionsAndInfo(t *testing.T) {
 				t.Error("the failure reason is missing")
 			}
 		})
+	}
+}
+
+func TestDecoratePR_CIFixAttemptCountsFromTryAgainAndShowsConfiguredCap(t *testing.T) {
+	t.Parallel()
+	reset := time.Unix(100, 0)
+	old := tickets.Ticket{Identifier: "01", Type: string(schema.TypeCIFix), CreatedAt: reset.Add(-time.Hour)}
+	fresh := tickets.Ticket{Identifier: "02", Type: string(schema.TypeCIFix), CreatedAt: reset.Add(time.Hour)}
+	e := tickets.Epic{PRNumber: 412, Tickets: []tickets.Ticket{old, fresh}}
+	root := queue.RootRef{Project: "proj", Epic: "epic"}
+	s := &Epics{Deps: Deps{
+		Delivery: func(string) string { return "pr" },
+		PRView:   func(queue.RootRef) (prstate.Live, bool) { return prstate.Live{Draft: true, Failed: 1, Green: 1}, true },
+		PRCIFix:  func(tickets.Epic) (time.Time, int) { return reset, 5 },
+	}}
+	row := wire.EpicListRow{State: wire.EpicListFixingCI}
+	s.decoratePR(&row, root, e)
+	if want := "Fixing CI (attempt 1 of 5)"; row.StatusWords != want {
+		t.Errorf("row words = %q, want %q", row.StatusWords, want)
+	}
+	d := wire.EpicDetail{State: wire.EpicState(wire.EpicListFixingCI)}
+	s.decoratePRDetail(&d, root, e)
+	if want := "Fixing CI (attempt 1 of 5)"; d.StatusWords != want {
+		t.Errorf("detail words = %q, want %q", d.StatusWords, want)
 	}
 }
 

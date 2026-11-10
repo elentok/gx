@@ -48,6 +48,16 @@ func prActions(root queue.RootRef, e tickets.Epic, state wire.EpicListState, del
 	return out
 }
 
+// ciFixWords are e's status words for state, counting ci-fix attempts from the
+// newest Try again against the configured cap.
+func (s *Epics) ciFixWords(state wire.EpicListState, info *wire.PRInfo, live *prstate.Live, e tickets.Epic) string {
+	since, perCheck := time.Time{}, config.DefaultPRConfig().CIFixAttemptsPerCheck
+	if s.PRCIFix != nil {
+		since, perCheck = s.PRCIFix(e)
+	}
+	return prstate.Words(state, info, live, prstate.CIFixAttempt(e, since), perCheck)
+}
+
 // decoratePR adds the PR fields to a loop epic row, after its needs-you part is set.
 func (s *Epics) decoratePR(row *wire.EpicListRow, root queue.RootRef, e tickets.Epic) {
 	var live *prstate.Live
@@ -55,7 +65,7 @@ func (s *Epics) decoratePR(row *wire.EpicListRow, root queue.RootRef, e tickets.
 	if s.PRReason != nil {
 		row.PRReason = s.PRReason(root)
 	}
-	if w := prstate.Words(row.State, row.PR, live, prstate.CIFixAttempt(e, time.Time{}), config.DefaultPRConfig().CIFixAttemptsPerCheck); w != "" {
+	if w := s.ciFixWords(row.State, row.PR, live, e); w != "" {
 		row.StatusWords = w
 	}
 	more := prActions(root, e, row.State, s.Delivery(root.Project), row.PR)
@@ -81,7 +91,7 @@ func (s *Epics) decoratePRDetail(d *wire.EpicDetail, root queue.RootRef, e ticke
 	if s.PRReason != nil {
 		d.PRReason = s.PRReason(root)
 	}
-	d.StatusWords = prstate.Words(state, d.PR, live, prstate.CIFixAttempt(e, time.Time{}), config.DefaultPRConfig().CIFixAttemptsPerCheck)
+	d.StatusWords = s.ciFixWords(state, d.PR, live, e)
 	d.PRActions = prActions(root, e, state, s.Delivery(root.Project), d.PR)
 	if prstate.Blocked(e) {
 		d.PRNotice = e.MergeBlockReason

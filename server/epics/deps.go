@@ -103,9 +103,12 @@ type Deps struct {
 	// PRView is the watcher's live view of the epic's PR; false before the first
 	// poll answers. PRReason is why the last open or push could not go on, and
 	// PRActivity the epic's PR activity list. All three may be nil.
-	PRView            func(root queue.RootRef) (prstate.Live, bool)
-	PRReason          func(root queue.RootRef) string
-	PRActivity        func(root queue.RootRef, e tickets.Epic) []wire.PRActivityEntry
+	PRView     func(root queue.RootRef) (prstate.Live, bool)
+	PRReason   func(root queue.RootRef) string
+	PRActivity func(root queue.RootRef, e tickets.Epic) []wire.PRActivityEntry
+	// PRCIFix is the newest Try again time (ci-fix attempts count from it) and
+	// the configured attempts per check. Nil means no reset and the default cap.
+	PRCIFix           func(e tickets.Epic) (since time.Time, perCheck int)
 	CheckWaitingLabel func(address string) string
 	AgentGone         func(address string) (bool, error)
 	LiveTask          func(address string) (BackgroundTask, error)
