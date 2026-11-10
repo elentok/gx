@@ -311,7 +311,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `pr-flow-draft-ci-running`, `pr-flow-fixing` and `pr-flow-ready` scenarios (`spec/prflow.go`,
   `fakegh.go`) seed epic `ticket-search` with PR 412 under a `pr`-delivery project whose `gh` is the
   `testutil/ghfake` binary (first on PATH, `--fakegh` overrides the build) and whose `origin` is a
-  bare repo; they output `gh_state` (the fake's state file: edit it to flip a check mid-run, the
+  bare repo (`pr-flow-ci-failing`, `pr-flow-merge-blocked`, `pr-flow-awaiting` and `pr-flow-merge-project` are in `spec/prflowblocked.go`); they output `gh_state` (the fake's state file: edit it to flip a check mid-run, the
   call log sits beside it) and `origin`. The `chat-capture` scenario (`chat.go`, endpoint in `chatcapture/`) outputs `chat_capture`: a JSONL
   file with one line per Slack or Telegram post the server makes (`transport`, `at`, `text`,
   `parse_mode`); CLI Telegram sends (`gx notify`) still go to the real host, so only Slack reaches it.

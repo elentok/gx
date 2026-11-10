@@ -140,7 +140,7 @@ func (f *fixture) seed(sc scenario) error {
 		}
 	}
 	if sc.FakeGH != nil {
-		if err := f.addOrigin(repo); err != nil {
+		if err := f.addOrigin(repo, sc.FakeGH); err != nil {
 			return err
 		}
 	}
@@ -250,8 +250,8 @@ func (f *fixture) seed(sc scenario) error {
 			}
 		}
 	}
-	if sc.FakeGH != nil && sc.FakeGH.FixCheck != "" {
-		return f.forkFix(sc)
+	if sc.FakeGH != nil {
+		return f.seedPRFlow(sc)
 	}
 	return nil
 }

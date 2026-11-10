@@ -3,12 +3,16 @@ package webflows
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -65,6 +69,94 @@ func TestPRFlowScenarios_CardsShowTheScriptedPR(t *testing.T) {
 			}
 			r.Stop(t)
 		})
+	}
+}
+
+func kinds(as []wire.CardAction) (out []wire.CardActionKind) {
+	for _, a := range as {
+		out = append(out, a.Kind)
+	}
+	return out
+}
+
+func TestPRFlowScenarios_BlockedAndAwaitingCards(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		scenario, words, pill string
+		actions               []wire.CardActionKind
+		after                 func(t *testing.T, r *running, row wire.EpicListRow)
+	}{
+		{"pr-flow-ci-failing", "CI failing", "CI failing", []wire.CardActionKind{wire.CardActionTryAgain}, checkActivityList},
+		{"pr-flow-merge-blocked", "PR merged", "Merge blocked", []wire.CardActionKind{wire.CardActionStashMerge, wire.CardActionMerge}, checkMergeAfterCleaning},
+		{"pr-flow-awaiting", "Implemented", "Awaiting PR", []wire.CardActionKind{wire.CardActionCreatePR}, nil},
+		{"pr-flow-merge-project", "Implemented", "Awaiting merge", []wire.CardActionKind{wire.CardActionMerge, wire.CardActionCreatePR}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.scenario, func(t *testing.T) {
+			t.Parallel()
+			r := start(t, tc.scenario)
+			var row wire.EpicListRow
+			if !testutil.Poll(30*time.Second, 100*time.Millisecond, func() bool {
+				row = r.prFlowRow(t)
+				return row.StatusWords == tc.words && row.StatePill == tc.pill
+			}) {
+				t.Fatalf("row = %+v, want status words %q and pill %q", row, tc.words, tc.pill)
+			}
+			// The card may carry more buttons (open epic, open PR); these come in this order.
+			got := kinds(row.Actions)
+			if pos := slices.Index(got, tc.actions[0]); pos < 0 || !slices.Equal(got[pos:min(pos+len(tc.actions), len(got))], tc.actions) {
+				t.Errorf("actions = %v, want %v in a row", got, tc.actions)
+			}
+			if tc.after != nil {
+				tc.after(t, r, row)
+			}
+			r.Stop(t)
+		})
+	}
+}
+
+// checkActivityList: seven entries, newest first, the fix entries linking tickets 11 and 10.
+func checkActivityList(t *testing.T, r *running, row wire.EpicListRow) {
+	t.Helper()
+	var d wire.EpicDetail
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "epics", "detail", row.Address, "--json")), &d); err != nil {
+		t.Fatal(err)
+	}
+	if len(d.PRActivity) != 7 {
+		t.Fatalf("activity = %+v, want 7 entries", d.PRActivity)
+	}
+	if d.PRActivity[0].Text != "CI failing: gx gave up" || d.PRActivity[6].Text != "Draft PR opened" {
+		t.Errorf("activity = %+v, want newest first from the pause to the draft PR", d.PRActivity)
+	}
+	var fixes []string
+	for _, e := range d.PRActivity {
+		if e.Text == "Fix pushed" {
+			fixes = append(fixes, e.Ticket)
+		}
+	}
+	if len(fixes) != 2 || !strings.HasSuffix(fixes[0], "/11") || !strings.HasSuffix(fixes[1], "/10") {
+		t.Errorf("fix entries link %v, want tickets 11 then 10", fixes)
+	}
+}
+
+// checkMergeAfterCleaning: cleaning Trunk and pressing Merge stamps merged_at.
+func checkMergeAfterCleaning(t *testing.T, r *running, row wire.EpicListRow) {
+	t.Helper()
+	if !row.MergedAt.IsZero() {
+		t.Fatalf("merged_at = %v before the merge", row.MergedAt)
+	}
+	if err := os.Remove(filepath.Join(r.Repo(), "same.txt")); err != nil {
+		t.Fatal(err)
+	}
+	// The watcher also retries the Trunk update on its own tick, so the press
+	// may find the epic already merged; either way merged_at ends up stamped.
+	cmd := exec.Command(fixturetest.GxBin, "server", "epics", "merge", row.Address)
+	cmd.Env = r.Env
+	if out, err := cmd.CombinedOutput(); err != nil && !strings.Contains(string(out), "already-merged") {
+		t.Fatalf("merge: %v\n%s", err, out)
+	}
+	if !testutil.Poll(30*time.Second, 100*time.Millisecond, func() bool { return !r.prFlowRow(t).MergedAt.IsZero() }) {
+		t.Fatalf("merged_at still empty: %+v", r.prFlowRow(t))
 	}
 }
 

@@ -3,6 +3,7 @@ package spec
 import (
 	"fmt"
 
+	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/ghfake"
 )
@@ -23,6 +24,13 @@ type FakeGH struct {
 	// FixCheck, when set, forks the epic's ci-fix ticket for this failed check
 	// once the epic is seeded, which logs its "CI failed" entry too.
 	FixCheck string
+	// Activity is written to the epic's pr-activity.jsonl through the server's writer.
+	Activity []prflow.Entry
+	// Resolutions is the Resolution section of the seeded ticket with that id.
+	Resolutions map[string]string
+	// MergedFile makes the PR's merge commit (on origin) add this file, while local
+	// Trunk has an uncommitted file of the same name: it cannot fast-forward.
+	MergedFile string
 }
 
 // prCheck is a check of PR 412's head; status is "COMPLETED" or "IN_PROGRESS".
