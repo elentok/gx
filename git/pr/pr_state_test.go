@@ -24,6 +24,23 @@ func TestCIState(t *testing.T) {
 			{Status: "IN_PROGRESS"},
 			{Status: "COMPLETED", Conclusion: "FAILURE"},
 		}}, CIFailed},
+		{"empty rollup", PR{StatusCheckRollup: []PRStatusCheck{}}, CINone},
+	}
+	for _, k := range []struct {
+		conclusion string
+		state      CIState
+	}{
+		{"SUCCESS", CIPassed}, {"NEUTRAL", CIPassed}, {"SKIPPED", CIPassed},
+		{"FAILURE", CIFailed}, {"TIMED_OUT", CIFailed}, {"STARTUP_FAILURE", CIFailed},
+		{"CANCELLED", CIRunning}, {"STALE", CIRunning}, {"ACTION_REQUIRED", CIRunning},
+	} {
+		cases = append(cases, struct {
+			name  string
+			pr    PR
+			state CIState
+		}{"conclusion " + k.conclusion, PR{StatusCheckRollup: []PRStatusCheck{
+			{Status: "COMPLETED", Conclusion: k.conclusion},
+		}}, k.state})
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

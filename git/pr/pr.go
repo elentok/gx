@@ -82,29 +82,24 @@ const (
 	MarkerRed
 )
 
-var failedCheckConclusions = map[string]bool{
-	"FAILURE":         true,
-	"TIMED_OUT":       true,
-	"ACTION_REQUIRED": true,
-	"CANCELLED":       true,
-}
-
 // CIState rolls up StatusCheckRollup into a single state: any failing
-// conclusion wins, else any still-running check wins, else passed (or none
-// if there are no checks at all).
+// conclusion wins, else any pending check wins, else passed (or none
+// if there are no checks at all). See classifyCheck for the sets.
 func (pr PR) CIState() CIState {
 	if len(pr.StatusCheckRollup) == 0 {
 		return CINone
 	}
+	pending := false
 	for _, c := range pr.StatusCheckRollup {
-		if failedCheckConclusions[c.Conclusion] {
+		switch classifyCheck(c.Status, c.Conclusion) {
+		case outcomeFailed:
 			return CIFailed
+		case outcomePending:
+			pending = true
 		}
 	}
-	for _, c := range pr.StatusCheckRollup {
-		if c.Status != "COMPLETED" {
-			return CIRunning
-		}
+	if pending {
+		return CIRunning
 	}
 	return CIPassed
 }
