@@ -226,7 +226,7 @@ func buildInstallPlan(manifestPath string, req InstallRequest) (*installationPla
 						return nil, err
 					}
 				}
-				allowed := req.Force.Allows(top)
+				allowed := req.Force.Allows(top) || (req.SwitchMode && owner == OwnershipUnchanged)
 				status := StatusConflicted
 				if allowed {
 					status = StatusUpdated
@@ -287,7 +287,7 @@ func buildInstallPlan(manifestPath string, req InstallRequest) (*installationPla
 				}
 			}
 			status := installStatus(owner, managedIdentity(f), current, req.Force, f.Path)
-			if (modeChange || retarget) && !req.Force.Allows(f.Path) && !underReplacement {
+			if ((modeChange && !req.SwitchMode) || retarget) && !req.Force.Allows(f.Path) && !underReplacement {
 				status = StatusConflicted
 			}
 			p.targets = append(p.targets, Target{Root: root, Path: f.Path, Ownership: owner, Status: status})

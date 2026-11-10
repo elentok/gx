@@ -28,6 +28,9 @@ type InstallRequest struct {
 	// Mode selects how files are placed on disk. The zero value is
 	// ModeManagedCopy.
 	Mode InstallMode
+	// SwitchMode makes a change of Mode consent: entries gx owns unchanged
+	// switch without force. One modified entry still blocks the whole install.
+	SwitchMode bool
 	// BackupDir retains dated recovery snapshots. Defaults beside the manifest.
 	BackupDir string
 	// AllowLinkedMarker lets a directory-linked skill's SKILL.md be a symlink.

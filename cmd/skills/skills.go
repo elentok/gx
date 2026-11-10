@@ -260,11 +260,11 @@ func installSkillTargets(d Deps, force skills.ForcePolicy, source string, source
 	if err != nil {
 		return nil, err
 	}
-	return installTargetsAt(d, manifestPath, force, source, sources, mode, false)
+	return installTargetsAt(d, manifestPath, force, source, sources, mode, false, false)
 }
 
 // installTargetsAt is installSkillTargets for an explicit manifest path.
-func installTargetsAt(d Deps, manifestPath string, force skills.ForcePolicy, source string, sources []skills.SourceFile, mode skills.InstallMode, linkedMarker bool) ([]skills.Target, error) {
+func installTargetsAt(d Deps, manifestPath string, force skills.ForcePolicy, source string, sources []skills.SourceFile, mode skills.InstallMode, linkedMarker, switchMode bool) ([]skills.Target, error) {
 	roots, err := d.AgentRoots()
 	if err != nil {
 		return nil, err
@@ -283,6 +283,7 @@ func installTargetsAt(d Deps, manifestPath string, force skills.ForcePolicy, sou
 		Files:      sources,
 		Force:      force,
 		Mode:       mode,
+		SwitchMode: switchMode,
 
 		AllowLinkedMarker: linkedMarker,
 	})
@@ -319,13 +320,14 @@ func runSkillsInstallSource(d Deps, dir string, copyFiles bool, force skills.For
 		return err
 	}
 	manifestPath := filepath.Join(manifestDir, skills.SourceID(real)+".json")
-	return syncSourceDir(d, manifestPath, abs, real, names, copyFiles, force, out)
+	return syncSourceDir(d, manifestPath, abs, real, names, copyFiles, true, force, out)
 }
 
 // syncSourceDir installs the named skills of the source abs (real is its
 // resolved path) into every root. A source that lost all its skills passes no
-// names, which removes its links.
-func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyFiles bool, force skills.ForcePolicy, out io.Writer) error {
+// names, which removes its links. Only an explicit install passes switchMode:
+// a re-sync keeps the recorded mode.
+func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyFiles, switchMode bool, force skills.ForcePolicy, out io.Writer) error {
 	dir := abs
 	files, err := skills.SourceSkillFiles(abs, names, copyFiles)
 	if err != nil {
@@ -335,7 +337,7 @@ func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyF
 	if copyFiles {
 		mode = skills.ModeManagedCopy
 	}
-	targets, installErr := installTargetsAt(d, manifestPath, force, skills.ThirdPartySourcePrefix+real, files, mode, true)
+	targets, installErr := installTargetsAt(d, manifestPath, force, skills.ThirdPartySourcePrefix+real, files, mode, true, switchMode)
 	printTargetReport(out, targets, installErr == nil)
 	var conflictErr *skills.ConflictError
 	if errors.As(installErr, &conflictErr) {
@@ -426,7 +428,7 @@ func syncSource(d Deps, manifestPath string, m skills.Manifest, real string, for
 		return fmt.Sprintf("skill source %s: %v", real, err)
 	}
 	copyFiles := m.Mode == skills.ModeManagedCopy
-	if err := syncSourceDir(d, manifestPath, abs, real, names, copyFiles, force, out); err != nil {
+	if err := syncSourceDir(d, manifestPath, abs, real, names, copyFiles, false, force, out); err != nil {
 		return fmt.Sprintf("skill source %s: %v", real, err)
 	}
 	return ""
