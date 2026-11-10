@@ -47,3 +47,18 @@ func TestParseArgs(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckShape_DevMode(t *testing.T) {
+	sc := scenarios["dev-mode"]
+	if got, err := checkShape(sc, ""); err != nil || got != "running" {
+		t.Errorf("default = %q, %v, want running", got, err)
+	}
+	for _, shape := range []string{"off", "installing", "starting", "running", "down", "no-checkout"} {
+		if got, err := checkShape(sc, shape); err != nil || got != shape {
+			t.Errorf("%s = %q, %v", shape, got, err)
+		}
+	}
+	if _, err := checkShape(sc, "bogus"); err == nil {
+		t.Error("bogus shape accepted")
+	}
+}

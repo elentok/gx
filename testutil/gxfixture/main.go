@@ -13,6 +13,7 @@
 // --shape <normal|short|empty> picks the seeded budget ledger of the spend scenario (default normal).
 // --shape <menu|few-days|stale|past-reset|stats> picks the seeded limit history of the limit-burn scenario (default menu).
 // --shape <c-zero|c-few|c-many|c-live|c-named|verify|b-questions|b-review|writing|result|stopped|journey> picks the Triage state of the triage scenario (default c-few).
+// --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
@@ -101,7 +102,7 @@ func run(args []string) (err error) {
 		return err
 	}
 	defer stopCapture()
-	if err := f.prepareStore(sc, port, o.configs); err != nil {
+	if err := f.prepareStore(sc, shape, port, o.configs); err != nil {
 		return err
 	}
 	if o.hideCodex {
@@ -203,6 +204,8 @@ type fixture struct {
 	restarted bool
 	// chatCapture is the capture file of a chat-capture scenario; empty elsewhere.
 	chatCapture string
+	// devControl is the dev-mode scenario's fake pnpm control file; empty elsewhere.
+	devControl string
 }
 
 // waitReady polls until the server answers with its web URL and Setup code.

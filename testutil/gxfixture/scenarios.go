@@ -614,6 +614,8 @@ var scenarios = map[string]scenario{
 	// triage: follow-ups and a Triage in the state --shape names (default c-few).
 	// run swaps in spec.TriageScenario(shape).
 	"triage": {TriageShaped: true},
+	// dev-mode: a Dev checkout and a fake pnpm in the state --shape names (default running).
+	"dev-mode": {DevMode: true},
 	// dirty-trunk: a complete epic whose merge is paused because trunk's checkout
 	// holds an uncommitted same.txt that the epic's branch also adds, so
 	// restoring the stash after the merge conflicts.

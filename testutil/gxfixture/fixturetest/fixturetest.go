@@ -263,6 +263,23 @@ func (r *Running) Web(t *testing.T) *Web {
 	return &Web{client: c, origin: u.Scheme + "://" + u.Host}
 }
 
+// Get reads a JSON route into into and fails on any status but 200.
+func (w *Web) Get(t *testing.T, path string, into any) {
+	t.Helper()
+	resp, err := w.client.Get(w.origin + path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s: %d: %s", path, resp.StatusCode, raw)
+	}
+	if err := json.Unmarshal(raw, into); err != nil {
+		t.Fatalf("GET %s: %v", path, err)
+	}
+}
+
 // Post sends a write as the web page does and fails on a refusal.
 func (w *Web) Post(t *testing.T, path string, body any) {
 	t.Helper()

@@ -61,6 +61,9 @@ type Output struct {
 	// CodexSessionsDir holds the held Codex worker's rollout in the limit-burn
 	// scenario; empty elsewhere.
 	CodexSessionsDir string `json:"codex_sessions_dir,omitempty"`
+	// DevControlFile is the dev-mode scenario's fake pnpm control file (package
+	// vitefake): rewrite it to move the fake, e.g. {"vite":"crash"}. Empty elsewhere.
+	DevControlFile string `json:"dev_control_file,omitempty"`
 	// MockURL is the base URL serving --mock-dir; empty without the flag.
 	MockURL string `json:"mock_url,omitempty"`
 	// BrowserSession names this worktree's playwright-cli session (`-s=<name>`): the

@@ -221,6 +221,9 @@ type Scenario struct {
 	// TriageShaped marks the triage scenario, whose whole content comes from the
 	// --shape value (TriageScenario).
 	TriageShaped bool
+	// DevMode seeds a Dev checkout and the fake pnpm in the state the --shape
+	// value names (default running); see DevModeShapes and devmode.go.
+	DevMode bool
 }
 
 // WebMode is how far the fixture takes the web setup and sign-in.

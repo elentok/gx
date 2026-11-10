@@ -78,6 +78,12 @@ func (f *fixture) putBinFirst(scripts map[string]string) error {
 			return err
 		}
 	}
+	f.prependPath(bin)
+	return nil
+}
+
+// prependPath puts bin first on the server's PATH.
+func (f *fixture) prependPath(bin string) {
 	path := ""
 	for _, kv := range f.env {
 		if v, ok := strings.CutPrefix(kv, "PATH="); ok {
@@ -86,5 +92,4 @@ func (f *fixture) putBinFirst(scripts map[string]string) error {
 	}
 	// The last PATH entry wins.
 	f.env = append(f.env, "PATH="+bin+string(os.PathListSeparator)+path)
-	return nil
 }

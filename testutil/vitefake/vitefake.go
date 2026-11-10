@@ -46,6 +46,20 @@ func readControl(path string) Control {
 	return c
 }
 
+// WriteControl replaces the control file's content in one rename, so the
+// polling fake never reads it half written.
+func WriteControl(path string, c Control) error {
+	data, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 // Run behaves as pnpm with args and returns the exit code.
 func Run(ctx context.Context, args []string, controlPath string, out io.Writer) int {
 	switch {

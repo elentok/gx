@@ -143,7 +143,14 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 
 // prepareStore sets up the scenario's side dirs, writes the config and seeds
 // and commits the ticket store.
-func (f *fixture) prepareStore(sc scenario, port int, configs []string) error {
+func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []string) error {
+	if sc.DevMode {
+		devConfig, err := f.setupDevMode(shape)
+		if err != nil {
+			return err
+		}
+		sc.Config = append(slices.Clone(sc.Config), devConfig...)
+	}
 	if err := f.setupDisk(); err != nil {
 		return err
 	}
@@ -199,6 +206,7 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 		res.GateDir = f.gateDir()
 	}
 	res.ConfigFile = configFile(f.root)
+	res.DevControlFile = f.devControl
 	res.ChatCapture = f.chatCapture
 	res.Transcripts = transcripts
 	if sc.LimitBurn {

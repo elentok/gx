@@ -24,6 +24,13 @@ question, five action groups, three rows changed), `writing` (session running, t
 (Done, two kept rows, a ready epic and a map epic), `stopped` (started from the CLI: no session, stopped at Plan). `journey` has
 follow-ups and no record, for the Triage journey flow. Records are written with the `triage` package; the `verify` and `writing`
 sessions are started with `gx server triage open`. Data: `testutil/gxfixture/spec/triage.go`.
+The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
+(`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
+The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install
+held), `starting` (on, Vite never ready), `running` (on, ready), `down` (starts `running`; the flow rewrites the control file, then the
+state moves to `down`, so the toast fires after the page loaded) and `no-checkout` (key on, no `dev-dir`, no stamp: no checkout). The
+output field `dev_control_file` is the fake's JSON control file (`{"install":"hold"|"fail"|"ok","vite":"hold"|"crash"|"ready"}`): write
+`{"vite":"crash"}` to take Vite down, or `{}` to release a hold. Data: `testutil/gxfixture/devmode.go`.
 The `context-window` scenario seeds Claude sessions at 40K, 90K, 128K and 170K tokens (output `transcripts` keys `green`, `yellow`,
 `orange`, `red`, plus `compact`, a session that ran `/compact`), a fresh one, a finished one, one with no transcript file, a Codex one, a
 Queue agent, a Design session at 128K and an open Triage. The server announces transcript growth only while a session works, so a flow
