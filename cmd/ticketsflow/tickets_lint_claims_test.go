@@ -111,14 +111,14 @@ func TestLintClaims_BareFileNamesAndCaseClashes(t *testing.T) {
 	f.file("web/CommandPalette.tsx", "export {}\n")
 	f.ticket("01", "implement", "", "## Where to look\n\n"+
 		"Edit `CommandMenu.tsx` and `CommandPalette.tsx`.\n\n## What to build\n\n"+
-		"Add `web/draftImages.ts` and `web/fresh.ts`.\n")
+		"Add `web/draftImages.tsx` and `web/fresh.ts`.\n")
 	out, code := f.lint()
 	if code != 1 {
 		t.Errorf("exit = %d, want 1", code)
 	}
 	wantLines(t, out,
 		"miss: 01: CommandMenu.tsx: no such file anywhere in the repo",
-		"miss: 01: web/draftImages.ts: differs only by case from existing DraftImages.tsx")
+		"miss: 01: web/draftImages.tsx: differs only by case from existing DraftImages.tsx")
 	wantLines(t, out, "planned: 01: web/fresh.ts")
 	wantNoLines(t, out, "CommandPalette.tsx:", "miss: 01: web/fresh.ts")
 }

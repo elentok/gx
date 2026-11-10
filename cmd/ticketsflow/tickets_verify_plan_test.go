@@ -50,7 +50,7 @@ func TestVerifyPlan_TablePrintsEstimates(t *testing.T) {
 		t.Fatalf("--table: %v", err)
 	}
 	wantLines(t, out, "web flow", "6K", "CLI check", "3K", "Go test run", "4K", "skill quote", "2K",
-		"mock state", "8K", "part base", "15K", "collect estimate", "30K", "split limit", "60K")
+		"mock state", "14K", "part base", "15K", "collect estimate", "30K", "split limit", "60K")
 }
 
 func TestVerifyPlan_PrintsEntries(t *testing.T) {
@@ -94,7 +94,7 @@ func TestVerifyPlan_OnePartWritesLoneEntry(t *testing.T) {
 		t.Errorf("manifest:\n%s", got)
 	}
 	body := readManifestFile(t, filepath.Join(dir, "verify-body-verify.md"))
-	for _, want := range []string{"Round: 1\n", "docs/specs/demo.md", "Fixture scenario: demo", "## Out of Scope", "(estimate 8K)"} {
+	for _, want := range []string{"Round: 1\n", "docs/specs/demo.md", "Fixture scenario: demo", "## Out of Scope", "(estimate 14K)"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body missing %q:\n%s", want, body)
 		}

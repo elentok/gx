@@ -196,6 +196,12 @@ func claimProblems(c Claim, env LintEnv) []claimProblem {
 func fileProblems(c Claim, env LintEnv) []claimProblem {
 	path := filepath.Join(env.Root, filepath.FromSlash(c.File))
 	data, err := os.ReadFile(path)
+	// On a case-insensitive filesystem (macOS) the read succeeds against the clashing name.
+	if err == nil && !hasExactName(path) {
+		if clash := caseClash(path); clash != "" {
+			return []claimProblem{{c.Text + ": differs only by case from existing " + clash, nil}}
+		}
+	}
 	if err != nil {
 		if info, serr := os.Stat(path); serr == nil && info.IsDir() && c.Kind == ClaimPath {
 			return nil
@@ -214,6 +220,21 @@ func fileProblems(c Claim, env LintEnv) []claimProblem {
 		}
 	}
 	return nil
+}
+
+// hasExactName reports whether the path's directory lists its base name with exactly that case.
+func hasExactName(path string) bool {
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		return true
+	}
+	want := filepath.Base(path)
+	for _, e := range entries {
+		if e.Name() == want {
+			return true
+		}
+	}
+	return false
 }
 
 // caseClash returns the name of a sibling of the missing path that matches its

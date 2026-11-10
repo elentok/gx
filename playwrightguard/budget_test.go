@@ -28,7 +28,11 @@ import (
 // Context badge flow (+1): the badge's live update, tooltip, Note placement and dark
 // scheme on the Agents, Design and Triage pages need the server's transcript reads, SSE and
 // a real browser; FooterLine.test.tsx and the server snapshot tests cover each part alone.
-const maxFlows = 130
+// Pause recovery tests (+7): the single "every pause reason recovers" flow was split into one
+// parallel test per recovery (hung relaunch, live task, dirty worktree, Codex task, classifier
+// outage, unreachable holder, process storm) so they run side by side with a short launch grace.
+// Each needs a real pane, holder or process tree, which vitest and Go tests cannot stand in for.
+const maxFlows = 137
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

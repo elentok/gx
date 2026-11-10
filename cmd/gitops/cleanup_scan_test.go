@@ -139,6 +139,8 @@ func TestExecute_CleanupScan_ArchivedEpicIterationBranchIsDeletable(t *testing.T
 	old := time.Now().Add(-72 * time.Hour).Format(time.RFC3339)
 	t.Setenv("GIT_AUTHOR_DATE", old)
 	t.Setenv("GIT_COMMITTER_DATE", old)
+	// The tip must be old: TempRepo's shared template commit is only as old as the template.
+	testutil.MustGitExported(t, dir, "commit", "--allow-empty", "-m", "old work")
 	testutil.MustGitExported(t, dir, "branch", "ralph-loop/old-epic-item-01")
 
 	result := scanJSON(t, dir)
