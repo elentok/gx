@@ -26,7 +26,13 @@ func TestMain(m *testing.M) {
 	}
 	builtGx.build()
 	builtFakecodex.build()
-	os.Exit(m.Run())
+	code := m.Run()
+	for _, b := range []*builtBinary{builtGx, builtFakecodex} {
+		if b.path != "" {
+			_ = os.RemoveAll(filepath.Dir(b.path))
+		}
+	}
+	os.Exit(code)
 }
 
 // builtBinary builds one Go package once per test run, into a directory of its

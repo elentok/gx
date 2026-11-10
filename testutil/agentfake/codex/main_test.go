@@ -2,6 +2,7 @@ package codex
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/testutil/agentfake"
@@ -17,5 +18,9 @@ func TestMain(m *testing.M) {
 		agentfake.Program()
 	}
 	agentfake.RegisterHarness()
-	os.Exit(m.Run())
+	code := m.Run()
+	if gxPath != "" {
+		_ = os.RemoveAll(filepath.Dir(gxPath))
+	}
+	os.Exit(code)
 }

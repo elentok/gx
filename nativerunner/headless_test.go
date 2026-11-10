@@ -55,7 +55,9 @@ func TestMain(m *testing.M) {
 		agentfake.Claude()
 	}
 	warmBuilds()
-	os.Exit(m.Run())
+	code := m.Run()
+	removeBuilds()
+	os.Exit(code)
 }
 
 type launchRecord struct {

@@ -27,6 +27,16 @@ var (
 	soakGXErr  error
 )
 
+// TestMain removes the gx that soakGX built: each build is a tens-of-MB copy
+// in $TMPDIR.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if soakGXDir != "" {
+		_ = os.RemoveAll(soakGXDir)
+	}
+	os.Exit(code)
+}
+
 // soakGX builds gx once per test run; the script runs the gx on PATH.
 func soakGX(t *testing.T) string {
 	t.Helper()

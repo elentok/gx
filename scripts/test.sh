@@ -49,6 +49,11 @@ trap 'rm -rf "$work"' EXIT
 go build -o "$work/gx" .
 gx=$work/gx
 
+# Keep the tests' state out of the real state dir. Every test that takes a
+# project lock (projectlock.lockPath) leaves an empty gx-project-*.lock file
+# there, one per temp project dir; a day of runs left 300k of them.
+export XDG_STATE_HOME=$work/state
+
 # Package paths (not dirs) of everything the "go" step runs.
 skip=$(printf '%s\n' "$module/e2e" "${race_pkgs[@]/#.\//$module/}")
 other_pkgs=()

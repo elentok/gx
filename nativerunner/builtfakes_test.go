@@ -38,6 +38,16 @@ func (b *builtBinary) get(t *testing.T) string {
 	return b.path
 }
 
+// removeBuilds deletes every built binary's directory. TestMain calls it after
+// the run: each build is a copy of a Go binary, tens of MB, in $TMPDIR.
+func removeBuilds() {
+	for _, b := range []*builtBinary{builtGx, builtFakeclaude, builtFakecodex} {
+		if b.path != "" {
+			_ = os.RemoveAll(filepath.Dir(b.path))
+		}
+	}
+}
+
 // warmBuilds builds every binary in parallel before the first test runs, so no
 // test's own time (or the slow-test limit) pays for a cold compile. A build
 // error is kept and reported by the first get.
