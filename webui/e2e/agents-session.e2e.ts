@@ -110,6 +110,9 @@ test("75. Read a session", async ({ page, start }) => {
   const interrupt = page.getByRole("button", { name: "Interrupt", exact: true });
   const isWorking = async (id: string) => (await sessions(toolsFixture)).find((s) => s.id === id)!.status.state === "working";
   await expect(confirm).toHaveCount(0);
+  // The tooltip names the key on a wide screen.
+  await interrupt.hover();
+  await expect(interrupt).toHaveAttribute("title", /Esc/);
 
   // Esc closes the command palette first; no confirm opens.
   await page.keyboard.press("ControlOrMeta+e");
@@ -188,6 +191,11 @@ test("75. Read a session", async ({ page, start }) => {
   await more.dispatchEvent("click");
   await expect(popover).toBeVisible();
   await expect(popover.getByRole("listitem")).toHaveCount(2);
+  // A phone has no key: the tooltip does not name Esc and Esc opens nothing.
+  await expect(interrupt).toBeVisible();
+  await expect(interrupt).not.toHaveAttribute("title", /Esc/);
+  await page.keyboard.press("Escape");
+  await expect(confirm).toHaveCount(0);
 });
 
 // Moved to vitest: 77 and 81 (AgentsPage.composer.test.tsx), 82 (AgentsPage.sessionView.test.tsx),
