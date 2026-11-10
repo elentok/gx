@@ -64,6 +64,7 @@ const rowOf = (r: SidebarRow, visible: boolean): SelectRow => ({
   group: r.held ? GROUP_ON_HOLD : undefined,
   queued: r.queued,
   held: r.held,
+  archivable: r.archivable,
   session: r.session,
 });
 

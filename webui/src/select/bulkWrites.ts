@@ -22,7 +22,13 @@ async function postSessions(path: string, sessions: SessionInfo[], yes: boolean)
   return res.results ?? [];
 }
 
-export const bulkStop = (sessions: SessionInfo[]) => postSessions("/v1/sessions/stop", sessions, false);
+/** `dryRun` asks what an archive would stop and whether each epic is on trunk, without archiving; `yes` confirms the stop of live sessions. */
+export async function bulkArchive(targets: string[], opts: { dryRun?: boolean; yes?: boolean } = {}): Promise<TargetResult[]> {
+  const res = await postJson<SessionResult & TargetsResult>("/v1/epics/archive")({ targets, ...(opts.dryRun ? { dry_run: true } : {}), ...(opts.yes ? { yes: true } : {}) });
+  return res.results ?? [];
+}
+
+export const bulkStop =(sessions: SessionInfo[]) => postSessions("/v1/sessions/stop", sessions, false);
 
 /** Remove confirms with yes: the server stops a live session first. */
 export const bulkRemove = (sessions: SessionInfo[]) => postSessions("/v1/sessions/remove", sessions, true);

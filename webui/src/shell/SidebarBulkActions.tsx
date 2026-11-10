@@ -1,10 +1,10 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useRef, useState } from "react";
 import { useConnectionContext } from "../connection";
-import { TargetDone, type TargetResult } from "../generated/server";
+import { TargetDone, TargetRefused, type TargetResult } from "../generated/server";
 import { isExited } from "../agents/sessionWrites";
 import type { SessionInfo } from "../generated/server";
-import { bulkHold, bulkMove, bulkRemove, bulkStop, bulkUnhold } from "../select/bulkWrites";
+import { bulkArchive, bulkHold, bulkMove, bulkRemove, bulkStop, bulkUnhold } from "../select/bulkWrites";
 import { skipLines, visibleActions, type ActionView, type SelectAction } from "../select/selectModel";
 import { Button } from "../ui/button/Button";
 import { GxMenu } from "../ui/menu/Menu";
@@ -14,7 +14,14 @@ import { WriteError } from "../useWrite";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { useSidebarSelect } from "./SidebarSelect";
 
-const SHOWN: SelectAction[] = ["move", "hold", "unhold", "stop", "remove"];
+const SHOWN: SelectAction[] = ["move", "hold", "unhold", "stop", "remove", "archive"];
+
+/** What an archive dry run found: the rows that would run and the ones it refused. */
+interface ArchiveConfirm {
+  view: ActionView;
+  fits: TargetResult[];
+  refused: TargetResult[];
+}
 
 /** Move, Hold and Take off hold in the select bar: each runs on the selected rows it fits. */
 export function SidebarBulkActions() {
@@ -26,8 +33,10 @@ export function SidebarBulkActions() {
   const [stopConfirm, setStopConfirm] = useState<{ view: ActionView; sessions: SessionInfo[] }>();
   const [removeConfirm, setRemoveConfirm] = useState<{ view: ActionView; sessions: SessionInfo[] }>();
 
+  const [archiveConfirm, setArchiveConfirm] = useState<ArchiveConfirm>();
+
   const views = visibleActions(sel.state, sel.rows).filter((v) => SHOWN.includes(v.action));
-  if (views.length === 0 && !confirm && !stopConfirm && !removeConfirm) return null;
+  if (views.length === 0 && !confirm && !stopConfirm && !removeConfirm && !archiveConfirm) return null;
 
   const tip = (v: ActionView) =>
     [`Runs on ${v.fit.fits.map(sel.nameOf).join(", ")}`, ...skipLines(v.fit, sel.nameOf)].join("\n");
@@ -43,6 +52,9 @@ export function SidebarBulkActions() {
       if (!results) return;
       for (const r of results) {
         if (r.status !== TargetDone) showToast({ type: "error", title: `${sel.nameOf(r.target)}: ${r.message || r.reason || "refused"}` });
+      }
+      for (const r of results) {
+        if (r.status === TargetDone && r.new_address) showToast({ type: "info", title: `Archived as ${r.new_address.split(":").pop()}` });
       }
       sel.deselect(results.filter((r) => r.status === TargetDone).map((r) => r.target));
       if (v.fit.skipped.length > 0) showToast({ type: "info", title: "Not run on some rows", description: skipLines(v.fit, sel.nameOf).join("; ") });
@@ -66,7 +78,21 @@ export function SidebarBulkActions() {
       return undefined;
     });
 
-  const nameOfSession = (s: SessionInfo) => sel.nameOf(s.id);
+  // Archive always asks, from a dry run: the rows, the live sessions it stops, and epics gx cannot see on trunk.
+  const archive = (v: ActionView) =>
+    run(v, async () => {
+      const dry = await bulkArchive(v.fit.fits, { dryRun: true });
+      setArchiveConfirm({ view: v, fits: dry.filter((r) => r.status !== TargetRefused), refused: dry.filter((r) => r.status === TargetRefused) });
+      return undefined;
+    });
+
+  const confirmArchive = ({ view, fits, refused }: ArchiveConfirm) => {
+    setArchiveConfirm(undefined);
+    // Rows the dry run refused do not run; they join the results so they stay selected with their reasons.
+    void run(view, async () => [...refused, ...(await bulkArchive(fits.map((r) => r.target), { yes: true }))]);
+  };
+
+  const nameOfSession =(s: SessionInfo) => sel.nameOf(s.id);
   const sessionsOf =(keys: string[]) => keys.flatMap((k) => sel.rows.find((r) => r.key === k)?.session ?? []);
 
   // Stop asks once, listing the rows; Exited rows were already skipped "not live" by the fit.
@@ -80,6 +106,7 @@ export function SidebarBulkActions() {
   const move = byAction("move");
   const holdView = byAction("hold");
   const unhold = byAction("unhold");
+  const archiveView = byAction("archive");
 
   return (
     <Box display="flex" flexWrap="wrap" gap="1.5">
@@ -118,6 +145,46 @@ export function SidebarBulkActions() {
         <Button size="sm" emphasis="secondary" tone="paused" title={tip(removeView)} disabled={pending} onClick={() => remove(removeView)}>
           {removeView.label}
         </Button>
+      )}
+      {archiveView && (
+        <Button size="sm" emphasis="secondary" tone="paused" title={tip(archiveView)} disabled={pending} onClick={() => void archive(archiveView)}>
+          {archiveView.label}
+        </Button>
+      )}
+      {archiveConfirm && (
+        <Modal label="Archive selected" onClose={() => setArchiveConfirm(undefined)} maxW="md">
+          <Text fontWeight="bold">
+            Archive {archiveConfirm.fits.length} {archiveConfirm.fits.length === 1 ? "epic" : "epics"}? Live agents stop and the epics leave the sidebar. Unarchive brings them back.
+          </Text>
+          <Box as="ul" pl="5" listStyleType="disc">
+            {archiveConfirm.fits.map((r) => (
+              <li key={r.target}>{sel.nameOf(r.target)}</li>
+            ))}
+          </Box>
+          {archiveConfirm.fits.flatMap((r) => r.sessions ?? []).length > 0 && (
+            <Text>Live sessions will stop: {archiveConfirm.fits.flatMap((r) => r.sessions ?? []).join(", ")}.</Text>
+          )}
+          {archiveConfirm.fits
+            .filter((r) => r.on_trunk === false)
+            .map((r) => (
+              <Text key={r.target} color="tone.waiting.fg">
+                ⚠ {sel.nameOf(r.target)} is not merged to trunk. Archiving keeps its branch, but the work is not on trunk.
+              </Text>
+            ))}
+          {archiveConfirm.refused.map((r) => (
+            <Text key={r.target}>
+              {sel.nameOf(r.target)} will not run: {r.message || r.reason || "refused"}.
+            </Text>
+          ))}
+          <Box display="flex" gap="2" justifyContent="flex-end">
+            <Button emphasis="secondary" onClick={() => setArchiveConfirm(undefined)} autoFocus>
+              Cancel
+            </Button>
+            <Button tone="running" disabled={archiveConfirm.fits.length === 0} onClick={() => confirmArchive(archiveConfirm)}>
+              Archive
+            </Button>
+          </Box>
+        </Modal>
       )}
       {stopConfirm && (
         <Modal label="Stop selected" onClose={() => setStopConfirm(undefined)} maxW="sm">

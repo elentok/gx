@@ -34,6 +34,12 @@ export interface SelectRow {
 export const GROUP_ON_HOLD = "on-hold";
 export const GROUP_OTHER = "other";
 
+export function isArchivable(card: EpicListRow): boolean {
+  const design = card.card_kind === CardKindDesign;
+  const loop = design || card.card_kind === CardKindImplementation;
+  return card.section === SectionFinished && (design ? card.progress_step === ProgressDone : loop);
+}
+
 export function rowOfCard(card: EpicListRow, visible = true): SelectRow {
   const design = card.card_kind === CardKindDesign;
   const loop = design || card.card_kind === CardKindImplementation;
@@ -45,7 +51,7 @@ export function rowOfCard(card: EpicListRow, visible = true): SelectRow {
     group: card.section === SectionOnHold ? GROUP_ON_HOLD : undefined,
     queued: card.queued,
     held: card.section === SectionOnHold,
-    archivable: card.section === SectionFinished && (design ? card.progress_step === ProgressDone : loop),
+    archivable: isArchivable(card),
   };
 }
 

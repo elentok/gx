@@ -18,6 +18,7 @@ import {
 import { isActionable, stateLabel } from "../agents/rules";
 import { RING_KIND, isLive, ringProgress } from "../epics/ring";
 import { agentHref, designHref } from "../hrefs";
+import { isArchivable } from "../select/selectModel";
 import { titleHref } from "../epics/cardLinks";
 import type { Kind, Tone } from "../ui/tone";
 
@@ -57,6 +58,8 @@ export interface SidebarRow {
   held?: boolean;
   /** The card's epic (or a Design's -impl) holds a queue item; Hold is then disabled. */
   queued?: boolean;
+  /** A Finished loop epic or a Design at its last step: Archive fits it. */
+  archivable?: boolean;
   /** A chat's session, for its menu's Stop and Remove. */
   session?: SessionInfo;
   agents: SidebarAgent[];
@@ -111,6 +114,7 @@ function cardRow(r: EpicListRow, agents: SidebarAgent[], held: boolean): Sidebar
     ring: ringProgress(r),
     ...(held ? { held: true } : {}),
     ...(r.queued ? { queued: true } : {}),
+    ...(isArchivable(r) ? { archivable: true } : {}),
     // A Design is one row: its session shows on the Design page, not nested under it.
     agents: kind === "design" ? [] : agents,
   };
