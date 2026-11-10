@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, menu, menuButton, nav, section, test } from "./fixture";
+import { card, expect, menu, menuButton, nav, openEpics, section, test } from "./fixture";
 
 const NEEDS_YOU = [
   "paused-epic",
@@ -82,7 +82,7 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/epics$/);
   await card(page, "paused-epic").getByRole("link", { name: "paused-epic", exact: true }).click();
   await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
-  await page.getByRole("link", { name: /^Epics/ }).click();
+  await openEpics(page);
   await expect(page).toHaveURL(/#\/epics$/);
 
   // Only merge-blocked and awaiting-merge cards offer Merge; an awaiting epic also offers Create PR.
@@ -117,10 +117,10 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await expect(queuedTime).toHaveText("<1m");
 
   // A held card that would need you is in neither the Epics badge nor Needs you.
-  const epicsLink = (n: number) => page.getByRole("link", nav(`Epics · ${n} need you`));
-  await expect(epicsLink(NEEDS_YOU.length)).toBeVisible();
+  const epicsWithCount = (n: number) => page.getByRole("button", nav(`Epics · ${n} need you`));
+  await expect(epicsWithCount(NEEDS_YOU.length)).toBeVisible();
   await fixture.cli("server", "hold", "demo:paused-epic");
-  await expect(epicsLink(NEEDS_YOU.length - 1)).toBeVisible();
+  await expect(epicsWithCount(NEEDS_YOU.length - 1)).toBeVisible();
   await expect(needs.locator("[data-section]")).toHaveCount(NEEDS_YOU.length - 1);
   await expect(needs.getByRole("link", { name: "paused-epic", exact: true })).toHaveCount(0);
 

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { HUH_MESSAGE } from "../src/design/round";
-import { card, expect, holdRoute, nav, section, sessionRows, test, type Fixture } from "./fixture";
+import { card, epicsButton, expect, holdRoute, nav, openEpics, section, sessionRows, test, type Fixture } from "./fixture";
 import { expectOption } from "./question";
 
 // The card's title opens the epic page, whose Start button starts the session and moves on.
@@ -25,8 +25,8 @@ test.describe("5. Start a design session and answer a round", () => {
     const fixture = await start("design", { autoAdvanceDelay: "1h" });
     await openDesign(page);
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
-    // A Design is a workspace item now, so the Epics footer link no longer stands for it.
-    await expect(page.getByRole("link", nav("Epics"))).not.toHaveAttribute("aria-current", "page");
+    // A Design is a workspace item now, so the Epics footer button no longer stands for it.
+    await expect(epicsButton(page)).not.toHaveAttribute("aria-current", "page");
     // The charted design has no session, so its ⋯ menu holds only Copy design ID and Hold.
     await expect(page.getByTestId("page-header-actions").getByRole("button", nav("More actions"))).toHaveCount(1);
     await page.getByRole("button", nav("Start design session")).click();
@@ -364,7 +364,7 @@ test.describe("43. New session on a Design", () => {
 
     // The stopped session's card moves to Ready to design as Not started with a Design button.
     await stopSession(fixture, slug);
-    await page.getByRole("link", nav("Epics")).click();
+    await openEpics(page);
     const ready = await section(page, "Ready to design");
     const stopped = ready.locator("[data-kind]").filter({ has: page.getByRole("link", nav(slug)) });
     await expect(stopped).toContainText("Not started");

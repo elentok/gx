@@ -781,7 +781,7 @@ test("Workspaces", async ({ page, start }) => {
 
   // The footer's boxes are one size with their icons centered, at 1280px and 390px, and the badges agree.
   const footer = sidebar.locator("footer");
-  const epicsBox = footer.getByRole("link", { name: /^Epics/ });
+  const epicsBox = footer.getByRole("button", { name: /^Epics/ });
   const followUpsBox = footer.getByRole("button", { name: /^Follow-ups/ });
   const statsBox = footer.getByRole("link", { name: /^Stats/ });
   const gearBox = footer.getByRole("button", nav("Menu"));

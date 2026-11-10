@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { HUH_MESSAGE } from "../src/design/round";
-import { blockEvents, card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
+import { blockEvents, card, expect, holdRoute, nav, openEpics, section, test, toasts } from "./fixture";
 import { expectOption } from "./question";
 import { CACHE_PREFIX } from "../src/pwa/workerCore";
 
@@ -87,7 +87,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
   });
 
-  await page.getByRole("link", { name: /^Epics/ }).click();
+  await openEpics(page);
   await expect(mixed.getByText("4/7")).toBeVisible();
   await expect(mixed.getByTestId("pill")).toBeVisible();
   await expect(mixed.getByTestId("reason")).toBeVisible();
@@ -181,7 +181,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     await expect(summary.getByRole("term")).toHaveText(["Did:", "Went wrong:", "Decisions:", "Left:", "Did:", "Went wrong:", "Decisions:", "Left:"]);
     await expect(summary.getByRole("definition").first()).toHaveText("Verified the fake story.");
     await expect(summary.getByRole("definition").nth(4)).toHaveText("launched the agent and settled the run");
-    await page.getByRole("link", { name: /^Epics/ }).click();
+    await openEpics(page);
     const finished = await section(page, "Finished");
     await expect(finished.getByRole("link", { name: "summary-epic" })).toBeVisible();
     await expect(card(page, "summary-epic").getByText("Latest summary")).toHaveCount(0);
@@ -273,7 +273,7 @@ test("7. Epic completion", async ({ page, start }) => {
   // While held, the running ticket's card meta starts with "running · ".
   await card(page, "finishing-epic").getByRole("link", { name: "finishing-epic" }).click();
   await expect(page.locator('a[href$="/t/demo:finishing-epic/02"] [data-meta]')).toHaveText(/^running · /);
-  await page.getByRole("link", { name: /^Epics/ }).click();
+  await openEpics(page);
 
   await fixture.release();
 

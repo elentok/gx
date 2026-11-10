@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
 import { chatOf, PNG, png, steerUploads } from "./agentsKit";
-import { card, expect, flag, nav, section, sessionRows, test } from "./fixture";
+import { card, expect, flag, nav, openEpics, section, sessionRows, test } from "./fixture";
 
 const openDialog = async (page: Page) => {
   await page.getByRole("button", nav("New Design")).click();
@@ -73,7 +73,7 @@ test("26. New Design form", async ({ page, start }) => {
   expect(shown).not.toContain("Destination");
 
   // A reopened modal is empty. The card of the Designing epic opens its epic page.
-  await page.getByRole("link", { name: /^Epics/ }).click();
+  await openEpics(page);
   const reopened = fields(await openDialog(page));
   await expect(reopened.slug).toHaveValue("");
   await expect(reopened.idea).toHaveValue("");
@@ -82,7 +82,7 @@ test("26. New Design form", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/e\/demo:fresh-design$/);
 
   // Autosave: typed text shows "Saved", survives a reload, and a closed form reopens on the same draft.
-  await page.getByRole("link", { name: /^Epics/ }).click();
+  await openEpics(page);
   const first = await openDialog(page);
   await fields(first).slug.fill("alpha");
   await fields(first).idea.fill("First idea");

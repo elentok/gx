@@ -1,5 +1,5 @@
 import { chromium, type Browser, type Page } from "@playwright/test";
-import { expect, menuButton, nav, test, type Fixture } from "./fixture";
+import { epicsButton, expect, menuButton, nav, test, type Fixture } from "./fixture";
 
 /** The ids `gx server web-logins` prints, one per line, the id first. */
 const loginIds = async (fixture: Fixture) =>
@@ -197,7 +197,7 @@ test("110. Web reset from the CLI", async ({ page, start }) => {
   fixture.useTotpSecret(await page.locator('[data-mock-part="totp-key"] code').innerText());
   await page.getByLabel("Enter the code it shows").fill(await fixture.nextTotpCode());
   await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page.getByRole("link", { name: "Epics", exact: true }).or(page.getByRole("heading", { name: "Epics" })).first()).toBeVisible();
+  await expect(epicsButton(page).or(page.getByRole("heading", { name: "Epics" })).first()).toBeVisible();
 });
 
 test("112. Add the authenticator after a CLI reset", async ({ page: first, start }) => {
@@ -242,7 +242,7 @@ test("112. Add the authenticator after a CLI reset", async ({ page: first, start
   fixture.useTotpSecret(key);
   await page.getByLabel("Enter the code it shows").fill(await fixture.nextTotpCode());
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("link", { name: "Epics", exact: true }).or(page.getByRole("heading", { name: "Epics" })).first()).toBeVisible();
+  await expect(epicsButton(page).or(page.getByRole("heading", { name: "Epics" })).first()).toBeVisible();
 
   const browser = await chromium.launch();
   try {

@@ -5,7 +5,7 @@ const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location
 
 test("22. Back link count, then the phone layout", async ({ page, start }) => {
   const fx = await start("united");
-  const back = (n: number) => page.getByRole("link", nav(`Epics · ${n} need you`));
+  const back = (n: number) => page.getByRole("button", nav(`Epics · ${n} need you`));
 
   // The footer badge counts every card that needs you, whichever page is open.
   // The permission card joins only once its held worker asks, so the full count of nine is the signal that the scenario has settled.
@@ -18,11 +18,11 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await goto(page, "#/e/demo:running-epic");
   await expect(back(9)).toBeVisible();
 
-  // The count is not the link's colour and sits on the waiting-tone pill (the mock's tab count).
+  // The count is not the button's colour and sits on the waiting-tone pill (the mock's tab count).
   const style = await back(9).getByText("9", { exact: true }).evaluate((el) => {
     const cs = getComputedStyle(el);
-    const link = getComputedStyle(el.closest("a")!);
-    return { recolored: cs.color !== link.color, bg: cs.backgroundColor };
+    const button = getComputedStyle(el.closest("button")!);
+    return { recolored: cs.color !== button.color, bg: cs.backgroundColor };
   });
   expect(style).toEqual({ recolored: true, bg: "rgb(242, 184, 69)" });
 
@@ -86,8 +86,9 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await expect(menu(page).getByRole("menuitemcheckbox", nav("AFK"))).toBeChecked();
   await page.keyboard.press("Escape");
 
-  // Clicking the count text itself opens the Epics page.
+  // Clicking the count text itself opens the Epics menu, whose Epics item opens the page.
   await back(9).getByText("9", { exact: true }).click();
+  await page.getByRole("menuitem", { name: /^Epics/ }).click();
   await expect(page).toHaveURL(/#\/epics$/);
 
   // Phone layout on the same settled scenario. 375 px is below the wide layout's 62em breakpoint.

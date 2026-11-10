@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test, type Fixture } from "./fixture";
+import { epicsButton, expect, test, type Fixture } from "./fixture";
 
 const GOOD_PASSWORD = "correct horse battery staple";
 
@@ -11,7 +11,7 @@ async function setupCode(fixture: Fixture): Promise<string> {
 }
 
 const stepText = (page: Page, text: string) => page.getByText(text, { exact: false });
-const signedIn = (page: Page) => expect(page.getByRole("heading", { name: "Epics" }).or(page.getByRole("link", { name: "Epics", exact: true })).first()).toBeVisible();
+const signedIn = (page: Page) => expect(page.getByRole("heading", { name: "Epics" }).or(epicsButton(page)).first()).toBeVisible();
 
 /** The setup starts with no secret, so the fixture takes the key step 3 shows. */
 async function adoptKey(page: Page, fixture: Fixture) {

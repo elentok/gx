@@ -451,6 +451,15 @@ export async function swipe(page: Page, from: [number, number], to: [number, num
 /** Matches a role's accessible name exactly. */
 export const nav = (name: string) => ({ name, exact: true });
 
+/** The footer's Epics menu button; its name gains " · n need you" while cards need you. */
+export const epicsButton = (page: Page) => page.getByRole("button", { name: /^Epics/ });
+
+/** Opens the Epics page from the footer's Epics menu. */
+export async function openEpics(page: Page) {
+  await epicsButton(page).click();
+  await page.getByRole("menuitem", { name: /^Epics/ }).click();
+}
+
 /** The button that opens the app menu, and the menu it opens. */
 export const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
 export const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
