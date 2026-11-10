@@ -640,6 +640,47 @@ test("the cards are one tab stop, and arrows and hjkl move by position", async (
   expect(cards().filter((c) => c.tabIndex === 0)).toEqual([first]);
 });
 
+// jsdom does not move focus on Tab and user-event is not a dependency, so step through the tab order by hand.
+const tabOrder = () => Array.from(document.querySelectorAll<HTMLElement>("a[href], button, input, [tabindex]")).filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled);
+const tab = (back = false) => {
+  const order = tabOrder();
+  const at = order.indexOf(document.activeElement as HTMLElement);
+  order[(at + (back ? -1 : 1) + order.length) % order.length].focus();
+};
+
+test("each area is one tab stop: Tab from the sidebar lands on the page cards once, Shift+Tab returns", async () => {
+  const list = listOf(["a", "b", "c"].map((n) => row(n, { section: "implementing", workspace: "Default" })));
+  stubFetch(list);
+  renderEpics(async () => list, wsConn());
+  await filterBox();
+  const sidebar = screen.getByTestId("sidebar-body");
+  await within(sidebar).findAllByRole("link");
+  await waitFor(() => expect(cards()).toHaveLength(3));
+  const inSidebar = (el: Element | null) => !!el && sidebar.contains(el);
+  // Only the roving items count: the per-row "More actions" buttons are separate stops (see the ticket's Spec deviations).
+  const rowStops = tabOrder().filter((el) => inSidebar(el) && el.hasAttribute("data-nav"));
+  const cardStops = tabOrder().filter((el) => el.hasAttribute("data-page-item"));
+  expect(rowStops).toHaveLength(1);
+  expect(cardStops).toHaveLength(1);
+
+  // A full Tab cycle from the sidebar row passes the page cards exactly once, and Shift+Tab from the card gets back to the row.
+  const [sidebarRow] = rowStops;
+  const [card] = cardStops;
+  sidebarRow.focus();
+  const forward: HTMLElement[] = [];
+  do {
+    tab();
+    forward.push(document.activeElement as HTMLElement);
+  } while (document.activeElement !== sidebarRow && forward.length < tabOrder().length);
+  expect(forward.filter((el) => el.hasAttribute("data-page-item"))).toEqual([card]);
+
+  card.focus();
+  let steps = 0;
+  while (document.activeElement !== sidebarRow && steps++ < tabOrder().length) tab(true);
+  expect(document.activeElement).toBe(sidebarRow);
+  expect(steps).toBeLessThan(tabOrder().length);
+});
+
 test("s with a card focused enters the page's select mode; Space and Enter toggle there", async () => {
   await cardsLoaded();
   const a = cardOf("a");
