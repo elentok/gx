@@ -10,20 +10,23 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
-func (f *fixture) ghDir() string { return filepath.Join(f.root, "gh") }
+// fakeGH is the fixture's fake gh and its bare origin.
+type fakeGH struct{ *fixture }
+
+func (f fakeGH) ghDir() string { return filepath.Join(f.root, "gh") }
 
 // ghState is the fake gh's state file, which a flow edits to change CI.
-func (f *fixture) ghState() string { return filepath.Join(f.ghDir(), "state.json") }
+func (f fakeGH) ghState() string { return filepath.Join(f.ghDir(), "state.json") }
 
 // origin is the bare repo the project repo's `origin` names; the path ends in
 // the owner/repo the fake gh answers for.
-func (f *fixture) origin() string {
+func (f fakeGH) origin() string {
 	return filepath.Join(f.root, "origin", filepath.FromSlash(ghfake.Repo)+".git")
 }
 
 // setupFakeGH writes the fake gh's starting state and points the server at its
 // directory. The gh binary itself is the one installBinaries put in the bin dir.
-func (f *fixture) setupFakeGH(sc *spec.FakeGH) error {
+func (f fakeGH) setupFakeGH(sc *spec.FakeGH) error {
 	if err := os.MkdirAll(f.ghDir(), 0o755); err != nil {
 		return err
 	}
@@ -38,7 +41,7 @@ func (f *fixture) setupFakeGH(sc *spec.FakeGH) error {
 }
 
 // addOrigin makes the bare origin the project repo's remote, with trunk pushed.
-func (f *fixture) addOrigin(repo string, sc *spec.FakeGH) error {
+func (f fakeGH) addOrigin(repo string, sc *spec.FakeGH) error {
 	for _, args := range [][]string{{"remote", "add", "origin", f.origin()}, {"push", "-q", "origin", "main"}} {
 		if err := f.git(repo, args...); err != nil {
 			return err
@@ -52,7 +55,7 @@ func (f *fixture) addOrigin(repo string, sc *spec.FakeGH) error {
 
 // mergeOnOrigin puts a commit adding file on origin's main, which local Trunk
 // does not have, and leaves an uncommitted file of that name in Trunk.
-func (f *fixture) mergeOnOrigin(repo, file string) error {
+func (f fakeGH) mergeOnOrigin(repo, file string) error {
 	if err := os.WriteFile(filepath.Join(repo, file), []byte("merged"), 0o644); err != nil {
 		return err
 	}
@@ -66,7 +69,7 @@ func (f *fixture) mergeOnOrigin(repo, file string) error {
 
 // seedPRFlow writes what the scenario's epic holds beyond tickets and frontmatter:
 // ticket Resolutions, the activity log, and the forked ci-fix ticket.
-func (f *fixture) seedPRFlow(sc scenario) error {
+func (f fakeGH) seedPRFlow(sc scenario) error {
 	e := sc.Epics[0]
 	epicDir := filepath.Join(f.store, e.Project, e.Name)
 	for _, tk := range e.Tickets {
@@ -96,7 +99,7 @@ func (f *fixture) seedPRFlow(sc scenario) error {
 
 // forkFix forks the epic's ci-fix ticket for the scenario's failed check, as the
 // watcher would, which also logs the "CI failed" entry.
-func (f *fixture) forkFix(sc scenario) error {
+func (f fakeGH) forkFix(sc scenario) error {
 	e := sc.Epics[0]
 	_, _, err := prflow.ForkCIFix(filepath.Join(f.store, e.Project, e.Name), prflow.CIFixJob{
 		Project: e.Project, Epic: e.Name, Number: spec.PRFlowNumber, URL: spec.PRFlowURL,

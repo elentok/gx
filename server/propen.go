@@ -13,26 +13,26 @@ import (
 )
 
 // OpenPR runs one attempt of the PR flow's open step for root.
-func (s *Server) OpenPR(root queue.RootRef) (prflow.Outcome, error) {
-	return prflow.Open(prOpenHost{s}, root)
+func (p PRFlow) OpenPR(root queue.RootRef) (prflow.Outcome, error) {
+	return prflow.Open(prOpenHost{p.s}, root)
 }
 
 // CreatePR is the Create PR route's handler.
-func (s *Server) CreatePR(req wire.QueueRequest) (wire.QueueResult, error) {
-	return prflow.Create(prOpenHost{s}, req)
+func (p PRFlow) CreatePR(req wire.QueueRequest) (wire.QueueResult, error) {
+	return prflow.Create(prOpenHost{p.s}, req)
 }
 
 // TryAgain is the Try again route's handler.
-func (s *Server) TryAgain(req wire.QueueRequest) (wire.QueueResult, error) {
-	return prflow.TryAgain(prOpenHost{s}, req)
+func (p PRFlow) TryAgain(req wire.QueueRequest) (wire.QueueResult, error) {
+	return prflow.TryAgain(prOpenHost{p.s}, req)
 }
 
 // PROpenBlock is why root's last open attempt could not go on, "" when it is not blocked.
-func (s *Server) PROpenBlock(root queue.RootRef) string { return s.prReasons.Reason(root) }
+func (p PRFlow) PROpenBlock(root queue.RootRef) string { return p.s.prReasons.Reason(root) }
 
 // SetPRMergedHook sets what runs when an open attempt finds the epic branch's
 // PR already merged.
-func (s *Server) SetPRMergedHook(f func(queue.RootRef, pr.HeadPR)) { s.prMergedHook = f }
+func (p PRFlow) SetPRMergedHook(f func(queue.RootRef, pr.HeadPR)) { p.s.prMergedHook = f }
 
 // prOpenHost is the root as the open step sees it.
 type prOpenHost struct{ s *Server }

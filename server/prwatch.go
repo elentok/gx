@@ -18,11 +18,15 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// PRWatcher is the watcher of open PRs, for tests that force a pass with Tick.
-func (s *Server) PRWatcher() *prflow.Watcher { return s.prWatch }
+// PRFlow is the Server's PR flow surface: the watcher, the open step and their test hooks.
+type PRFlow struct{ s *Server }
 
-// prLive is the watcher's view of root's PR, reduced for the epic read models.
-func (s *Server) prLive(root queue.RootRef) (prstate.Live, bool) {
+// Watcher is the watcher of open PRs, for tests that force a pass with Tick.
+func (p PRFlow) Watcher() *prflow.Watcher { return p.s.prWatch }
+
+// live is the watcher's view of root's PR, reduced for the epic read models.
+func (p PRFlow) live(root queue.RootRef) (prstate.Live, bool) {
+	s := p.s
 	if s.prWatch == nil {
 		return prstate.Live{}, false
 	}
@@ -42,7 +46,7 @@ func (s *Server) prLive(root queue.RootRef) (prstate.Live, bool) {
 
 // RescanIndex re-reads the ticket store now, for tests that write a ticket and
 // then force a pass that reads the index.
-func (s *Server) RescanIndex() error { return s.idx.Refresh() }
+func (p PRFlow) RescanIndex() error { return p.s.idx.Refresh() }
 
 // prWatchHost is the root as the PR watcher sees it.
 type prWatchHost struct{ s *Server }
@@ -128,7 +132,7 @@ func (h prWatchHost) CancelStalePRText() {
 	}
 }
 
-func (h prWatchHost) OpenPR(root queue.RootRef) (prflow.Outcome, error) { return h.s.OpenPR(root) }
+func (h prWatchHost) OpenPR(root queue.RootRef) (prflow.Outcome, error) { return h.s.PR.OpenPR(root) }
 
 // PauseCIFailing stores "CI failing" on the epic and sends its one notice.
 func (h prWatchHost) PauseCIFailing(t prflow.Target, reason string) error {

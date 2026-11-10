@@ -26,7 +26,7 @@ func PRFlowCIFailing() scenario {
 		return ticket{id, "ci-fix-" + id, servertest.TicketOpts{Type: "ci-fix", Status: "done", DoneAt: stamp(d)}}
 	}
 	sc.Epics[0].Tickets = append(sc.Epics[0].Tickets, fix("10", 290*time.Minute), fix("11", 230*time.Minute))
-	reason := "go-test failed 3 times. The last fix did not change the result."
+	reason := "CI failing: go-test failed 3 times (limit 3 per check). Fix it by hand and push, or press Try again to give the agent 3 more attempts."
 	sc.EpicMeta[prFlowAddr] += "land_block_kind: ci-failing\nland_block_reason: " + strconv.Quote(reason) + "\n"
 	sc.FakeGH.Resolutions = map[string]string{
 		"10": "Outcome: fixed\nCause: nil case in the index lookup\nCommit: abc1234\n\nSecond attempt: guarded the nil case. Pushed abc1234.",
@@ -37,7 +37,7 @@ func PRFlowCIFailing() scenario {
 		{Time: ago(300 * time.Minute), Kind: prflow.KindCIFailed, Checks: []string{"go-test"}, TicketID: "10"},
 		{Time: ago(240 * time.Minute), Kind: prflow.KindCIFailed, Checks: []string{"go-test"}, TicketID: "11"},
 		{Time: ago(180 * time.Minute), Kind: prflow.KindCIFailed, Detail: "TestSearchIndex: nil pointer in index.go:88", Checks: []string{"go-test"}},
-		{Time: ago(179 * time.Minute), Kind: prflow.KindPausedCIFailing, Detail: "CI failing"},
+		{Time: ago(179 * time.Minute), Kind: prflow.KindPausedCIFailing, Title: "Paused: go-test failed 3 times", Detail: "Limit reached for this check. Try again resets the count."},
 	}
 	return sc
 }

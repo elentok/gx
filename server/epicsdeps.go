@@ -33,7 +33,7 @@ func (s *Server) epicsDeps() epics.Deps {
 		CapHeld:     func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool) { return s.explain.CapHeld(root, e) },
 		AutoFFMerge: func(project string) bool { return s.merger.AutoFFMerge(project) },
 		Delivery:    func(project string) string { return s.merger.Delivery(project) },
-		PRView:      s.prLive,
+		PRView:      s.PR.live,
 		PRReason:    s.prReasons.Reason,
 		PRActivity:  func(root queue.RootRef, e tickets.Epic) []wire.PRActivityEntry { return prflow.List(root.Project, e) },
 		PRCIFix: func(e tickets.Epic) (time.Time, int) {

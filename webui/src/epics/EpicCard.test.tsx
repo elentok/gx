@@ -183,7 +183,7 @@ const ciFailing = (over: Partial<EpicListRow> = {}) =>
     state: "ci-failing",
     status_words: "CI failing",
     state_pill: "Paused",
-    reason: "go-test failed 3 times. The last fix did not change the result.",
+    reason: "CI failing: go-test failed 3 times (limit 3 per check). Fix it by hand and push, or press Try again to give the agent 3 more attempts.",
     pr: { number: 12, url: "https://github.com/o/r/pull/12", checks: "1 of 5 checks failed" },
     actions: [
       { kind: "try-again", label: "Try again", target: "gx:blog" },

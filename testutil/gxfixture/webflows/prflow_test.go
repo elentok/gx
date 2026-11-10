@@ -136,7 +136,7 @@ func checkActivityList(t *testing.T, r *running, row wire.EpicListRow) {
 	if len(d.PRActivity) != 7 {
 		t.Fatalf("activity = %+v, want 7 entries", d.PRActivity)
 	}
-	if d.PRActivity[0].Text != "CI failing: gx gave up" || d.PRActivity[6].Text != "Draft PR opened" {
+	if d.PRActivity[0].Text != "Paused: go-test failed 3 times" || d.PRActivity[6].Text != "Draft PR opened" {
 		t.Errorf("activity = %+v, want newest first from the pause to the draft PR", d.PRActivity)
 	}
 	var fixes []string

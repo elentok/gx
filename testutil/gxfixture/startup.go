@@ -174,7 +174,7 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 		}
 	}
 	if sc.FakeGH != nil {
-		if err := f.setupFakeGH(sc.FakeGH); err != nil {
+		if err := (fakeGH{f}).setupFakeGH(sc.FakeGH); err != nil {
 			return err
 		}
 	}
@@ -221,7 +221,7 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 		res.GateDir = f.gateDir()
 	}
 	if sc.FakeGH != nil {
-		res.GHState, res.Origin = f.ghState(), f.origin()
+		res.GHState, res.Origin = fakeGH{f}.ghState(), fakeGH{f}.origin()
 	}
 	res.ConfigFile = configFile(f.root)
 	res.DevControlFile = f.devControl

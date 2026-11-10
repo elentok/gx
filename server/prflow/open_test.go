@@ -43,7 +43,7 @@ func openRig(t *testing.T, resolution string) *rigs.PRFlow {
 
 func open(t *testing.T, f *rigs.PRFlow) prflow.Outcome {
 	t.Helper()
-	out, err := f.H.Server.OpenPR(epicRoot)
+	out, err := f.H.Server.PR.OpenPR(epicRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,14 +81,14 @@ func TestOpen_GhCheckFailuresChangeNothingAndAreRetried(t *testing.T) {
 				t.Fatalf("outcome = %s", out)
 			}
 			untouched(t, f)
-			if f.H.Server.PROpenBlock(epicRoot) == "" {
+			if f.H.Server.PR.PROpenBlock(epicRoot) == "" {
 				t.Error("no reason stored")
 			}
 			f.GH.Update(func(s *ghfake.State) { s.LoggedOut, s.NoRepoAccess = false, false })
 			if out := open(t, f); out != prflow.OutcomeOpened {
 				t.Fatalf("retry outcome = %s", out)
 			}
-			if r := f.H.Server.PROpenBlock(epicRoot); r != "" {
+			if r := f.H.Server.PR.PROpenBlock(epicRoot); r != "" {
 				t.Errorf("reason %q not cleared by the success", r)
 			}
 		})
@@ -101,7 +101,7 @@ func TestOpen_NoOriginIsAPreflightFailure(t *testing.T) {
 	if out := open(t, f); out != prflow.OutcomeBlocked {
 		t.Fatalf("outcome = %s", out)
 	}
-	if r := f.H.Server.PROpenBlock(epicRoot); !strings.Contains(r, "origin") {
+	if r := f.H.Server.PR.PROpenBlock(epicRoot); !strings.Contains(r, "origin") {
 		t.Errorf("reason = %q, want it to name origin", r)
 	}
 	untouched(t, f)
@@ -153,7 +153,7 @@ func TestOpen_MergedPRHandsOver(t *testing.T) {
 	openPR(f)
 	f.GH.Update(func(s *ghfake.State) { s.PRs[0].State = "MERGED" })
 	var got []pr.HeadPR
-	f.H.Server.SetPRMergedHook(func(r queue.RootRef, p pr.HeadPR) {
+	f.H.Server.PR.SetPRMergedHook(func(r queue.RootRef, p pr.HeadPR) {
 		if r != epicRoot {
 			t.Errorf("root = %v", r)
 		}
@@ -251,7 +251,7 @@ func TestOpen_FailedPushShowsAReasonKeepsTheTextAndRetries(t *testing.T) {
 	if out := open(t, f); out != prflow.OutcomeBlocked {
 		t.Fatalf("outcome = %s", out)
 	}
-	if r := f.H.Server.PROpenBlock(epicRoot); !strings.Contains(r, "push failed") {
+	if r := f.H.Server.PR.PROpenBlock(epicRoot); !strings.Contains(r, "push failed") {
 		t.Errorf("reason = %q", r)
 	}
 	if e := tickets.LoadEpicAt(f.EpicDir()); e.PRNumber != 0 || e.MergeBlockKind != "" || creates(f) != 0 {

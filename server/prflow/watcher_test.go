@@ -58,7 +58,7 @@ func TestWatcher_PollsAnEpicWithAPRNumber(t *testing.T) {
 	f.StampPR(t, 5, prURL)
 	f.Tick(t)
 
-	w := f.H.Server.PRWatcher()
+	w := f.H.Server.PR.Watcher()
 	v, ok := w.View("proj", "epic-a")
 	if !ok {
 		t.Fatal("no view for the epic")
@@ -114,7 +114,7 @@ func TestWatcher_RestartKeepsWatchingWithoutAnIdentityLookup(t *testing.T) {
 	f.Rescan(t)
 	f.Tick(t)
 
-	if _, ok := f.H.Server.PRWatcher().View("proj", "epic-a"); !ok {
+	if _, ok := f.H.Server.PR.Watcher().View("proj", "epic-a"); !ok {
 		t.Fatal("restarted server does not watch the epic")
 	}
 	for _, prefix := range []string{"pr list", "pr view"} {
@@ -129,7 +129,7 @@ func TestWatcher_OutageIsLoggedOnceKeepsTheViewAndRecovers(t *testing.T) {
 	openPR(f)
 	f.StampPR(t, 5, prURL)
 	f.Tick(t)
-	w := f.H.Server.PRWatcher()
+	w := f.H.Server.PR.Watcher()
 
 	f.GH.Update(func(s *ghfake.State) {
 		s.Failures = []ghfake.Failure{{Match: "api graphql", Code: 1, Stderr: "dial tcp: connection refused"}}
@@ -177,7 +177,7 @@ func TestWatcher_RateLimitHonoursRetryAfter(t *testing.T) {
 		s.Failures = []ghfake.Failure{{Match: "api graphql", Code: 1, Stderr: "HTTP 429: rate limited\nretry-after: 600"}}
 	})
 	f.Tick(t)
-	if d := f.H.Server.PRWatcher().Delay(); d != 10*time.Minute {
+	if d := f.H.Server.PR.Watcher().Delay(); d != 10*time.Minute {
 		t.Fatalf("delay = %v, want the 10m retry-after", d)
 	}
 }
@@ -234,7 +234,7 @@ func TestWatcher_ActErrorIsPerEpicAndNotAnOutage(t *testing.T) {
 	if calls := f.GH.CallsMatching("pr ready 6"); len(calls) != 1 {
 		t.Fatalf("epic B was not marked ready after epic A's action failed: %v", f.GH.Calls())
 	}
-	w := f.H.Server.PRWatcher()
+	w := f.H.Server.PR.Watcher()
 	for _, epic := range []string{"epic-a", "epic-b"} {
 		if v, _ := w.View("proj", epic); v.Unreachable {
 			t.Fatalf("%s view = %+v, want reachable after an action error", epic, v)
@@ -253,7 +253,7 @@ func TestWatcher_DelayPollsFastInsideTheNoChecksGraceWindow(t *testing.T) {
 	openPR(f)
 	setChecks(f, "sha1")
 	now := time.Now()
-	w := f.H.Server.PRWatcher()
+	w := f.H.Server.PR.Watcher()
 	w.SetClock(func() time.Time { return now })
 	f.StampPR(t, 5, prURL)
 	f.Tick(t)

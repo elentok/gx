@@ -44,7 +44,7 @@ func (s *Merger) syncTrunk(root queue.RootRef, notify bool) bool {
 		return false
 	}
 	unlock := s.guards.Trunks.Lock(repo, target)
-	p := s.fastForwardTrunk(repo, target)
+	p := fastForwardTrunk(repo, target)
 	if p.kind != "" {
 		unlock()
 		s.pauseTrunkUpdate(root, e, p)
@@ -91,7 +91,7 @@ func (s *Merger) pauseTrunkUpdate(root queue.RootRef, e tickets.Epic, p mergePau
 
 // fastForwardTrunk fetches origin and fast-forwards target's checkout to
 // origin/target. A zero kind in the result means Trunk is up to date.
-func (s *Merger) fastForwardTrunk(repo, target string) mergePause {
+func fastForwardTrunk(repo, target string) mergePause {
 	fail := func(format string, args ...any) mergePause {
 		return mergePause{kind: events.PRTrunkUpdate, reason: fmt.Sprintf(format, args...)}
 	}

@@ -89,7 +89,7 @@ func TestDeliverySwitch_EpicWithAPRKeepsItAfterSwitchToMerge(t *testing.T) {
 	setProject(t, f, deliveryMerge)
 	f.GH.Update(func(s *ghfake.State) { s.PRs[0].HeadSHA = "sha2" })
 	f.Tick(t)
-	v, ok := f.H.Server.PRWatcher().View("proj", "epic-a")
+	v, ok := f.H.Server.PR.Watcher().View("proj", "epic-a")
 	if !ok || v.HeadSHA != "sha2" {
 		t.Fatalf("view = %+v, %v; want the PR still polled", v, ok)
 	}

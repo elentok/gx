@@ -6,7 +6,7 @@ const srcDir = join(__dirname, "..");
 // theme.ts is the one place raw colors and font names belong.
 const allowed = new Set(["ui/theme.ts"]);
 
-const rawHex = /#[0-9a-fA-F]{3,8}\b/;
+const rawHex = /#(?!\d+[ ·])[0-9a-fA-F]{3,8}\b/;
 const fontTokens = new Set(["condensed", "text", "mono", "inherit"]);
 const fontFamilyValue = /font-?family\s*[:=]?\s*\{?\s*["'`]([^"'`]*)/gi;
 // Chakra's built-in bg.* tokens are light-mode colors; this dark-only theme defines its own surfaces.
@@ -43,6 +43,10 @@ describe("raw style guard", () => {
   it("fails on a planted raw hex color", () => {
     expect(violations('<Box bg="#ff00aa" />')).toEqual(["raw hex color"]);
     expect(violations("const c = '#fff';")).toEqual(["raw hex color"]);
+  });
+
+  it("ignores an issue number followed by a space", () => {
+    expect(violations('chip: "#412 · draft", text: "PR #412 opened"')).toEqual([]);
   });
 
   it("fails on a planted Chakra bg token", () => {

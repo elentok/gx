@@ -144,6 +144,8 @@ type Server struct {
 	registry *runs.Registry
 	progress *sched.ProgressTimer
 	prWatch  *prflow.Watcher // polls open PRs; see prwatch.go
+	// PR is the PR flow surface; see prwatch.go.
+	PR PRFlow
 	// prReasons and prMergedHook belong to the PR open step; see propen.go.
 	prReasons    prflow.Reasons
 	prMergedHook func(queue.RootRef, pr.HeadPR)
@@ -476,6 +478,7 @@ func New(cfg Config) (*Server, error) {
 	s.resumer = newResumer(s)
 	s.fixAgent = fixagent.New(fixAgentHost{sessionHost{s}})
 	s.prompt.GiveResumer(s.resumer)
+	s.PR = PRFlow{s}
 	s.epics = epics.New(s.epicsDeps())
 	s.ops = newTicketOps(s)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {

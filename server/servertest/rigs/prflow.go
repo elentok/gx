@@ -54,7 +54,7 @@ func (f *PRFlow) StampPR(t *testing.T, number int, url string) {
 // Rescan has the server re-read the ticket store now.
 func (f *PRFlow) Rescan(t *testing.T) {
 	t.Helper()
-	if err := f.H.Server.RescanIndex(); err != nil {
+	if err := f.H.Server.PR.RescanIndex(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -62,7 +62,7 @@ func (f *PRFlow) Rescan(t *testing.T) {
 // Tick forces one pass of the PR watcher.
 func (f *PRFlow) Tick(t *testing.T) {
 	t.Helper()
-	f.H.Server.PRWatcher().Tick(context.Background())
+	f.H.Server.PR.Watcher().Tick(context.Background())
 }
 
 // StartPRFlow starts the server paused-by-default like any harness; tests drive
