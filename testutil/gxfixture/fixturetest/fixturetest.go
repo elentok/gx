@@ -43,7 +43,7 @@ func RunMatches(part string) bool {
 // starts the package's shared fixtures, outside every test's time limit) and
 // then the tests. setup may be nil; its teardown runs after the tests.
 func Run(m *testing.M, setup func() (teardown func(), err error)) int {
-	dir, err := os.MkdirTemp("", "gxfb")
+	dir, err := makeTempDir()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
