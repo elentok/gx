@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // CardSlot is one place a Question card can come from, in the order the
@@ -32,8 +33,38 @@ const (
 var classSlots = map[SessionClass][]CardSlot{
 	ClassPlain:      {SlotLiveBlocker, SlotRound},
 	ClassFlow:       {SlotLiveBlocker, SlotRound},
-	ClassQueueAgent: {},
-	ClassFixAgent:   {SlotLiveBlocker, SlotRound},
+	ClassQueueAgent: {SlotTicketAsk},
+	ClassFixAgent:   {SlotLiveBlocker, SlotTicketAsk, SlotRound},
+}
+
+// askAddress is the ticket whose ask a session's chat lists: the run of a Queue
+// agent, or what a Fix agent fixes (which may be a project name, then no ask).
+func askAddress(m Meta) string {
+	if m.RunTicket != "" {
+		return m.RunTicket
+	}
+	return m.FixOf
+}
+
+// TicketAskCard is an open ticket ask as a Question card. Its id is the ticket
+// address and the ask's state token, so a new or re-paused ask is a new card.
+func TicketAskCard(address string, q ticketlog.Question, state string) []wire.QuestionCard {
+	cq := wire.QuestionCardQuestion{
+		Kind: q.Kind, Title: q.Summary, Body: q.Detail, Yes: q.Yes, No: q.No,
+		Recommended: q.Recommended,
+	}
+	for _, l := range q.Links {
+		cq.Links = append(cq.Links, wire.QuestionLink{Label: l.Label, URL: l.URL})
+	}
+	for _, o := range q.Options {
+		cq.Options = append(cq.Options, wire.QuestionCardOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
+	}
+	return []wire.QuestionCard{{Source: wire.CardSourceTicketAsk, ID: address + "#" + state, Questions: []wire.QuestionCardQuestion{cq}}}
+}
+
+// SplitTicketAskID is the ticket address and state token of a ticket-ask card id.
+func SplitTicketAskID(id string) (address, state string, ok bool) {
+	return strings.Cut(id, "#")
 }
 
 // ClassOf is the class of a session.

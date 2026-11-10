@@ -1,9 +1,13 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // chatSource is the chat's view of the server's sessions.
@@ -26,6 +30,24 @@ func (c chatSource) ReadMeta(dir string) (chat.Meta, error) {
 
 func (c chatSource) CheckProjectDir(project, dir string) (*wire.SessionResult, error) {
 	return c.s.sessions.CheckProjectDir(project, dir)
+}
+
+// TicketAsk applies the same answerable checks as ticketops.Ops.Answer, so a
+// card is listed exactly while an answer would be accepted.
+func (c chatSource) TicketAsk(address string) (ticketlog.Question, string, bool) {
+	ref, found, err := c.s.writer.FindTicket(address)
+	if err != nil || !found {
+		return ticketlog.Question{}, "", false
+	}
+	t, err := schema.ParseTicket(ref.Ticket.Path)
+	if err != nil || t.PausedClass() == "" || t.PausedClass() == schema.PauseClassRepair || t.PauseReason != schema.PauseSelfReported {
+		return ticketlog.Question{}, "", false
+	}
+	open := tickets.OpenQuestion(queue.ReadLogLenient(ref.Ticket))
+	if open == nil {
+		return ticketlog.Question{}, "", false
+	}
+	return ticketlog.QuestionOfEvent(*open), queue.AnswerState(*open, t.PausedClass()), true
 }
 
 func (c chatSource) StepFinal(ref chat.FlowRef) bool { return c.s.prompt.StepFinal(ref) }

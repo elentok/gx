@@ -40,6 +40,9 @@ func (p *Prompt) answerHandler(source string) http.HandlerFunc {
 // for its source, and sends the answer: a printed round as the person's prompt,
 // a permission dialog as the digit of the chosen option.
 func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wire.SessionResult, error) {
+	if req.Source == wire.CardSourceTicketAsk {
+		return p.answerTicketAsk(req, source)
+	}
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
@@ -65,6 +68,40 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 		LastMessage: req.LastMessage, Images: req.Images, Huh: huhOf(card.Questions, req.Answers),
 	}
 	return p.promptSession(prompt, source)
+}
+
+// answerTicketAsk answers a ticket-ask card through the ticket answer code. A
+// Queue agent id is not a sessions-dir session, so it resolves as a read does.
+// The card id carries the ask's state token, which the answer code rechecks
+// under the ticket lock: a stale id reaches nothing.
+func (p *Prompt) answerTicketAsk(req wire.SessionAnswerRequest, source string) (wire.SessionResult, error) {
+	dir, meta, res, err := p.sessions.ReadableSession(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	var card *wire.QuestionCard
+	for _, c := range p.sessionChat.Cards(dir, meta.ChatMeta(), chat.Snapshot{}) {
+		if c.Source == req.Source {
+			card = &c
+		}
+	}
+	if card == nil || card.ID != req.CardID {
+		return sessions.Refusal(wire.ReasonStale, "the question moved on; review it first"), nil
+	}
+	address, state, _ := chat.SplitTicketAskID(card.ID)
+	a := answerAt(req.Answers, 0)
+	q := wire.QueueRequest{
+		Address: address, State: state, Source: source,
+		Choice: a.Choice, Text: a.Text, Huh: a.Huh, Note: cmp.Or(a.Note, req.Note),
+	}
+	qr, err := p.AnswerTicket(q)
+	if err != nil {
+		return wire.SessionResult{}, err
+	}
+	if qr.Refused {
+		return sessions.Refusal(qr.Reason, qr.Message), nil
+	}
+	return wire.SessionResult{}, nil
 }
 
 // currentCard is the session's current card of source, or nil with none.

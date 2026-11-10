@@ -28,6 +28,11 @@ func (c *Chat) Cards(dir string, m Meta, snap Snapshot) []wire.QuestionCard {
 	if slices.Contains(classSlots[class], SlotLiveBlocker) {
 		src[SlotLiveBlocker] = c.permissionCards(dir, m, snap)
 	}
+	if addr := askAddress(m); addr != "" && slices.Contains(classSlots[class], SlotTicketAsk) {
+		if q, state, ok := c.src.TicketAsk(addr); ok {
+			src[SlotTicketAsk] = TicketAskCard(addr, q, state)
+		}
+	}
 	return BuildCards(class, src)
 }
 

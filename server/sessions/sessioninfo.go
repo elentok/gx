@@ -94,6 +94,7 @@ func (mg *Manager) ReadableSession(id string) (string, Meta, wire.SessionResult,
 			Dir:            cmp.Or(d.Meta.Cwd, row.Dir),
 			ConversationID: d.Meta.SessionID,
 			Status:         row.Status,
+			RunTicket:      row.Ticket,
 		}, wire.SessionResult{}, nil
 	}
 	return dir, meta, res, nil

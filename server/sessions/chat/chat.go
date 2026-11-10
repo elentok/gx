@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -27,11 +28,14 @@ const RestoreCrashWindow = time.Minute
 type Meta struct {
 	ID, Harness, Project, Dir, Ticket, ConversationID string
 	FixOf                                             string
-	Flow                                              FlowRef
-	Model, Effort                                     string
-	Status                                            wire.SessionStatus
-	Exit                                              string
-	RestoreCrashed                                    bool
+	// RunTicket is the ticket a Queue agent works on. It is not Ticket: that
+	// would make the chat read the agent as a design step.
+	RunTicket      string
+	Flow           FlowRef
+	Model, Effort  string
+	Status         wire.SessionStatus
+	Exit           string
+	RestoreCrashed bool
 }
 
 // Source is what the chat needs from the sessions that own the metas.
@@ -53,6 +57,10 @@ type Source interface {
 	HasChatReader(harness string) bool
 	CodexHome() (string, error)
 	Publish(event, id string)
+	// TicketAsk is the open `gx tickets ask` question of a ticket and its state
+	// token; ok is false for an unknown address or a ticket with no answerable
+	// question.
+	TicketAsk(address string) (q ticketlog.Question, state string, ok bool)
 }
 
 // Config holds the durations and paths the chat reads from the server config.

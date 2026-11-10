@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/wire"
 )
 
 // DefaultFirstPromptStartTimeout is how long a session may stay Starting,
@@ -121,6 +122,9 @@ type Prompt struct {
 	sessions *sessions.Manager
 	// resumer is built from the Manager, so it is handed over by GiveResumer.
 	resumer *sessions.Resumer
+	// AnswerTicket is the ticket answer code a ticket-ask card is answered
+	// through. The ticket ops come after Prompt, so the root sets it.
+	AnswerTicket func(wire.QueueRequest) (wire.QueueResult, error)
 
 	autoAdvances autoAdvances
 	autoQueues   autoAdvances

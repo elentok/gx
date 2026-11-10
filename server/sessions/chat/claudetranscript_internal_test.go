@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -48,6 +49,9 @@ func (f *fakeSource) Stopped() <-chan struct{}    { return f.stopped }
 func (f *fakeSource) HasChatReader(h string) bool { return f.readers[h] }
 func (f *fakeSource) CodexHome() (string, error)  { return f.codexHome, nil }
 func (f *fakeSource) Publish(event, id string)    { f.published <- [2]string{event, id} }
+func (f *fakeSource) TicketAsk(string) (ticketlog.Question, string, bool) {
+	return ticketlog.Question{}, "", false
+}
 
 func claudeChat(src Source, config string) *Chat {
 	return New(Deps{

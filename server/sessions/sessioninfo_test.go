@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -81,6 +82,9 @@ func (s infoSource) Stopped() <-chan struct{}    { return nil }
 func (s infoSource) HasChatReader(string) bool   { return false }
 func (s infoSource) CodexHome() (string, error)  { return s.codexHome, nil }
 func (s infoSource) Publish(string, string)      {}
+func (s infoSource) TicketAsk(string) (ticketlog.Question, string, bool) {
+	return ticketlog.Question{}, "", false
+}
 
 // infoManager is a Manager with the session chat and prompt that New builds.
 func infoManager(env []string, codexHome string) *sessions.Manager {

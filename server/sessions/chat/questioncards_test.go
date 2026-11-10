@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func card(source, id string) wire.QuestionCard {
@@ -56,6 +57,34 @@ func TestRoundCard_IDFollowsTheRound(t *testing.T) {
 	}
 	if chat.RoundCard(nil) != nil {
 		t.Error("no round should give no card")
+	}
+}
+
+func TestTicketAskCard_QueueAgentListsOnlyTheAsk(t *testing.T) {
+	t.Parallel()
+	q := ticketlog.Question{
+		Summary: "Ship it?", Kind: ticketlog.QuestionOptions, Detail: "more", Recommended: "a",
+		Options: []ticketlog.QuestionOption{{ID: "a", Label: "A", Consequence: "fast"}},
+		Links:   []ticketlog.QuestionLink{{Label: "Mock", URL: "https://x"}},
+	}
+	ask := chat.TicketAskCard("gx:e/01", q, "3:answer")
+	got := chat.BuildCards(chat.ClassQueueAgent, chat.CardSources{
+		chat.SlotLiveBlocker: {card("permission", "p")}, chat.SlotTicketAsk: ask, chat.SlotRound: {card("round", "r")},
+	})
+	if len(got) != 1 || got[0].Source != wire.CardSourceTicketAsk || got[0].ID != "gx:e/01#3:answer" {
+		t.Fatalf("queue agent cards = %+v, want only the ask", got)
+	}
+	cq := got[0].Questions[0]
+	if cq.Title != "Ship it?" || cq.Body != "more" || cq.Recommended != "a" || cq.Options[0].Consequence != "fast" || cq.Links[0].URL != "https://x" {
+		t.Errorf("question = %+v", cq)
+	}
+	addr, state, ok := chat.SplitTicketAskID(got[0].ID)
+	if !ok || addr != "gx:e/01" || state != "3:answer" {
+		t.Errorf("split = %q %q %v", addr, state, ok)
+	}
+	fix := chat.BuildCards(chat.ClassFixAgent, chat.CardSources{chat.SlotTicketAsk: ask, chat.SlotRound: {card("round", "r")}})
+	if len(fix) != 2 || fix[0].Source != wire.CardSourceTicketAsk {
+		t.Errorf("fix agent cards = %+v, want ask then round", fix)
 	}
 }
 

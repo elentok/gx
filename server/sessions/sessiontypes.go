@@ -51,6 +51,8 @@ type Meta struct {
 	FlowKey string       `json:"flow_key,omitempty"`
 	// FixOf is the ticket address (or project name) a Fix agent fixes.
 	FixOf string `json:"fix_of,omitempty"`
+	// RunTicket is the ticket a Queue agent works on; only ReadableSession sets it.
+	RunTicket string `json:"-"`
 	// LaunchDesign is set only by a design launch path. Design alone (set by
 	// `gx agent link` too) says nothing about how the session was launched.
 	LaunchDesign bool `json:"launch_design,omitempty"`
@@ -169,7 +171,7 @@ func (m Meta) CanAutoAdvance() bool {
 // ChatMeta is the part of the meta the chat reads.
 func (m Meta) ChatMeta() chat.Meta {
 	return chat.Meta{
-		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket, FixOf: m.FixOf,
+		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket, FixOf: m.FixOf, RunTicket: m.RunTicket,
 		Flow: m.FlowRef(), ConversationID: m.ConversationID, Model: m.Model, Effort: m.Effort,
 		Status: m.Status, Exit: m.Exit, RestoreCrashed: m.RestoreCrashed,
 	}

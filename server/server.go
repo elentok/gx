@@ -484,6 +484,7 @@ func New(cfg Config) (*Server, error) {
 	s.PR = PRFlow{s}
 	s.epics = epics.New(s.epicsDeps())
 	s.ops = newTicketOps(s)
+	s.prompt.AnswerTicket = s.ops.Answer
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished
 	}
