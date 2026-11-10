@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/term"
 	"github.com/elentok/gx/backgroundtask"
+	"github.com/elentok/gx/testutil/agentfake/claudesettings"
 )
 
 const EscKey = 0x1b
@@ -119,7 +120,7 @@ func (t *tui) handleControl(c Control) error {
 	case ActionVimToggle:
 		t.vim = true
 		t.draw()
-		return writeVimSetting(claudeSettingsPath())
+		return writeVimSetting(claudesettings.Path())
 	default:
 		return fmt.Errorf("unknown control action %q", c.Action)
 	}

@@ -18,6 +18,7 @@ import (
 
 	"github.com/charmbracelet/x/term"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/testutil/agentfake/claudesettings"
 )
 
 // ProgramEnv, set to "1", makes a test binary that calls Program from its
@@ -201,14 +202,14 @@ func runProgram() (int, error) {
 	if os.Getenv(ProgramInputEnv) == "1" {
 		p.box = NewInputBox(os.Stdout, os.Getenv(ProgramDraftEnv))
 		// A person's vim mode starts in NORMAL unless the launch asked for normal editing.
-		p.box.vim = launchEditorMode(os.Args[1:]) == "vim"
+		p.box.vim = claudesettings.LaunchEditorMode(os.Args[1:]) == "vim"
 		p.box.normal = p.box.vim
 		if os.Getenv(ProgramInsertNoMarkerEnv) == "1" {
 			p.box.vim, p.box.normal, p.box.noMarker = true, false, true
 		}
 		p.box.leaveI = os.Getenv(ProgramClearLeavesIEnv) == "1"
 		p.box.logClear = p.box.leaveI || os.Getenv(ProgramLogClearEnv) == "1"
-		p.box.configPath = claudeSettingsPath()
+		p.box.configPath = claudesettings.Path()
 		if s := os.Getenv(ProgramReadyDelayEnv); s != "" {
 			if p.inputBoxDelay, err = time.ParseDuration(s); err != nil {
 				return 0, err

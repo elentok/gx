@@ -6,37 +6,13 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
+
+	"github.com/elentok/gx/testutil/agentfake/claudesettings"
 )
 
 // statusLineTimeout bounds the command so a hung one cannot stall the fake.
 const statusLineTimeout = 10 * time.Second
-
-// statusLineCommand returns the settings' statusLine command, or "" when the
-// settings are absent or malformed.
-func statusLineCommand(settings string) string {
-	raw := strings.TrimSpace(settings)
-	if raw == "" {
-		return ""
-	}
-	if !strings.HasPrefix(raw, "{") {
-		data, err := os.ReadFile(raw)
-		if err != nil {
-			return ""
-		}
-		raw = string(data)
-	}
-	var s struct {
-		StatusLine struct {
-			Command string `json:"command"`
-		} `json:"statusLine"`
-	}
-	if err := json.Unmarshal([]byte(raw), &s); err != nil {
-		return ""
-	}
-	return s.StatusLine.Command
-}
 
 // StatusLinePayload is the JSON claude sends the statusLine command. Without
 // usage there is no rate_limits key.
@@ -53,7 +29,7 @@ func StatusLinePayload(model string, usage *UsageConfig) ([]byte, error) {
 // runStatusLine runs the settings' statusLine command after a turn. Like
 // claude, it ignores the command's output and failure.
 func (t *tui) runStatusLine() {
-	command := statusLineCommand(t.opts.settings)
+	command := claudesettings.StatusLineCommand(t.opts.settings)
 	if command == "" {
 		return
 	}

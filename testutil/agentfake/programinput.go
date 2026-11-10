@@ -237,7 +237,7 @@ func (b *InputBox) control(c Control) bool {
 }
 
 // writeEditorMode records editorMode vim in the settings file, keeping its
-// other keys, where launchEditorMode (and gx's claudeVimMode) read it.
+// other keys, where claudesettings.LaunchEditorMode (and gx's claudeVimMode) read it.
 func (b *InputBox) writeEditorMode() error { return writeVimSetting(b.configPath) }
 
 // writeVimSetting records editorMode vim in the settings file at path.

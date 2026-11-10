@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/term"
+	"github.com/elentok/gx/testutil/agentfake/claudesettings"
 )
 
 // outageTurns parses TUIClassifierOutageEnv: a count of failing turns, 0 when unset or bad.
@@ -116,7 +117,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	// Claude merges repeated --settings; the fake only needs the statusLine one.
 	var settings string
 	fs.Func("settings", "", func(v string) error {
-		if settings == "" || statusLineCommand(v) != "" {
+		if settings == "" || claudesettings.StatusLineCommand(v) != "" {
 			settings = v
 		}
 		return nil

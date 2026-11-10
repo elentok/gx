@@ -1,4 +1,5 @@
-package agentfake
+// Package claudesettings reads the parts of claude's settings the fake honours.
+package claudesettings
 
 import (
 	"encoding/json"
@@ -7,31 +8,51 @@ import (
 	"strings"
 )
 
-// editorModeOf reads editorMode from a settings file or inline JSON; "" when
-// absent or unreadable.
-func editorModeOf(settings string) string {
+// decode reads settings, a file path or inline JSON, into v. It reports false
+// when the settings are absent or unreadable.
+func decode(settings string, v any) bool {
 	raw := strings.TrimSpace(settings)
 	if raw == "" {
-		return ""
+		return false
 	}
 	if !strings.HasPrefix(raw, "{") {
 		data, err := os.ReadFile(raw)
 		if err != nil {
-			return ""
+			return false
 		}
 		raw = string(data)
 	}
+	return json.Unmarshal([]byte(raw), v) == nil
+}
+
+// editorModeOf reads editorMode from a settings file or inline JSON; "" when
+// absent or unreadable.
+func editorModeOf(settings string) string {
 	var s struct {
 		EditorMode string `json:"editorMode"`
 	}
-	if json.Unmarshal([]byte(raw), &s) != nil {
+	if !decode(settings, &s) {
 		return ""
 	}
 	return s.EditorMode
 }
 
-// claudeSettingsPath is CLAUDE_CONFIG_DIR's settings.json, or ~/.claude's.
-func claudeSettingsPath() string {
+// StatusLineCommand returns the settings' statusLine command, or "" when the
+// settings are absent or malformed.
+func StatusLineCommand(settings string) string {
+	var s struct {
+		StatusLine struct {
+			Command string `json:"command"`
+		} `json:"statusLine"`
+	}
+	if !decode(settings, &s) {
+		return ""
+	}
+	return s.StatusLine.Command
+}
+
+// Path is CLAUDE_CONFIG_DIR's settings.json, or ~/.claude's.
+func Path() string {
 	cfgDir := os.Getenv("CLAUDE_CONFIG_DIR")
 	if cfgDir == "" {
 		home, _ := os.UserHomeDir()
@@ -40,12 +61,12 @@ func claudeSettingsPath() string {
 	return filepath.Join(cfgDir, "settings.json")
 }
 
-// launchEditorMode is the editor mode the fake starts in. Like claude, a
+// LaunchEditorMode is the editor mode the fake starts in. Like claude, a
 // --settings flag beats the person's config; the last flag that sets one wins.
 // The config is the global .claude.json, then settings.json. Like gx's
 // claudeConfigDirs, CLAUDE_CONFIG_DIR holds both files when it is set; else
 // they are HOME's.
-func launchEditorMode(args []string) string {
+func LaunchEditorMode(args []string) string {
 	mode := ""
 	home, _ := os.UserHomeDir()
 	cfgDir, globalDir := os.Getenv("CLAUDE_CONFIG_DIR"), home
