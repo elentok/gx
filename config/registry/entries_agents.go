@@ -45,7 +45,7 @@ func agentsEntries() []Entry {
 		}
 	}
 	add(a, Entry{Key: Key("agents", "restore-sessions-on-start"), Type: TypeBool,
-		Description: "Reopen the agent sessions that were open when gx last stopped."})
+		Description: "Resume every interactive session that was running when the server last stopped. Default: false."})
 	add(a, Entry{Key: Key("agents", "banners", "enabled"), Type: TypeBool,
 		Description: "Show an OS banner when an interactive agent session needs you."})
 	add(a, Entry{Key: Key("agents", "sounds", "enabled"), Type: TypeBool,

@@ -33,7 +33,7 @@ func uninstallAgent(t *testing.T, loaded bool) (*launchdAgent, *[][]string) {
 	a, calls := newTestAgent(t)
 	a.output = func(args ...string) (string, error) {
 		if loaded {
-			return "state = running", nil
+			return "pid = 4242\n\tstate = running", nil
 		}
 		return "Could not find service", errors.New("exit status 113")
 	}
@@ -100,6 +100,34 @@ func TestLaunchdUninstall_LoadedJobWithoutPlistIsStillBootedOut(t *testing.T) {
 		t.Errorf("launchctl calls = %v, want one bootout", *calls)
 	}
 	if strings.Contains(out.String(), "not installed") {
+		t.Errorf("output = %q", out.String())
+	}
+}
+
+func TestLaunchdUninstall_LoadedJobWithoutPidClaimsNoStop(t *testing.T) {
+	a, _ := uninstallAgent(t, true)
+	a.output = func(args ...string) (string, error) { return "state = waiting\n\tlast exit code = 0", nil }
+	installPlist(t, a)
+	var out strings.Builder
+
+	if err := a.Uninstall(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(out.String(), "stopped the running server") || !strings.Contains(out.String(), "no server was running") {
+		t.Errorf("output = %q", out.String())
+	}
+}
+
+func TestLaunchdUninstall_PlistAlreadyGoneClaimsNoRemoval(t *testing.T) {
+	a, _ := uninstallAgent(t, true)
+	var out strings.Builder
+
+	if err := a.Uninstall(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(out.String(), "removed") || !strings.Contains(out.String(), "stopped the running server") {
 		t.Errorf("output = %q", out.String())
 	}
 }

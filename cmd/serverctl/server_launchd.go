@@ -241,10 +241,11 @@ func (a *launchdAgent) Install() error {
 // plist. It never runs `launchctl disable`, so a later Install needs no
 // `enable`. A loaded job whose plist is gone is still booted out.
 func (a *launchdAgent) Uninstall(w io.Writer) error {
-	loaded := true
+	loaded, running := true, false
 	if a.output != nil {
-		_, err := a.output("print", a.target())
+		out, err := a.output("print", a.target())
 		loaded = err == nil
+		running = loaded && launchctlPrintHasPid(out)
 	}
 	if loaded {
 		if err := a.run("bootout", a.target()); err != nil {
@@ -261,12 +262,29 @@ func (a *launchdAgent) Uninstall(w io.Writer) error {
 		_, err := fmt.Fprintln(w, "not installed")
 		return err
 	}
-	stopped := "no server was running"
-	if loaded {
-		stopped = "stopped the running server"
+	var report strings.Builder
+	if removed {
+		fmt.Fprintf(&report, "removed %s\n", a.plistPath())
 	}
-	_, err := fmt.Fprintf(w, "removed %s\n%s\nagent holders keep running\n", a.plistPath(), stopped)
+	if running {
+		report.WriteString("stopped the running server\n")
+	} else {
+		report.WriteString("no server was running\n")
+	}
+	report.WriteString("agent holders keep running\n")
+	_, err := io.WriteString(w, report.String())
 	return err
+}
+
+// launchctlPrintHasPid reports whether `launchctl print` output shows a live
+// process: a loaded job between runs has no pid line.
+func launchctlPrintHasPid(out string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "pid = ") {
+			return true
+		}
+	}
+	return false
 }
 
 // bootstrapAttempts and bootstrapRetryDelay bound how long Install waits for a

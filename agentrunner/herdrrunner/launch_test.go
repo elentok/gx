@@ -3,6 +3,7 @@ package herdrrunner_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -23,7 +24,7 @@ func TestStart_CapsThePaneBeforeTheAgentStarts(t *testing.T) {
 	state := herdrfake.NewState(t)
 	_, fakeEnv := herdrfake.StartAgentHostEnv(t, state)
 	r := newTestRunner(fakeEnv)
-	r.ProcCap = func() int { return 1234 }
+	r.ProcCap = func(*slog.Logger) int { return 1234 }
 	if _, err := r.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
 		t.Fatal(err)
 	}

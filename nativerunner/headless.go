@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,6 +56,9 @@ type Headless struct {
 	ProcHeadroom func() int
 	// ProcCount counts processes for the cap; nil means DefaultProcCount.
 	ProcCount func() (int, error)
+
+	// log receives the reason a launch goes uncapped (see SetLog); nil logs nothing.
+	log *slog.Logger
 
 	mu       sync.Mutex
 	sessions map[string]*headlessSession
@@ -221,13 +225,17 @@ func openAgentFiles(dir string) (agentFiles, error) {
 	return f, nil
 }
 
+// SetLog names the logger for uncapped launches. The server owns the logger and
+// builds its runners before it exists, so it is set after, before first use.
+func (h *Headless) SetLog(l *slog.Logger) { h.log = l }
+
 // spawn starts claude detached in its own session.
 func (h *Headless) spawn(opts agentrunner.StartOptions, sessionID string, f agentFiles) (*exec.Cmd, error) {
 	claude := h.Claude
 	if claude == "" {
 		claude = "claude"
 	}
-	name, args := CappedCommand(LiveProcCap(h.ProcHeadroom, h.ProcCount, nil), claude, launchArgs(sessionID, opts.Args))
+	name, args := CappedCommand(LiveProcCap(h.ProcHeadroom, h.ProcCount, h.log), claude, launchArgs(sessionID, opts.Args))
 	cmd := exec.Command(name, args...)
 	cmd.Dir = opts.Cwd
 	cmd.Env = LaunchEnv(os.Environ(), opts.Env)

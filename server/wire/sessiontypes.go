@@ -41,7 +41,7 @@ type SessionInfo struct {
 	RunStartedAt time.Time `json:"run_started_at"`
 	// Exit is how an Exited session ended.
 	Exit string `json:"exit,omitempty"`
-	// Stopped marks a session the person stopped; it is never auto-resumed.
+	// Stopped marks a session the person stopped; the start step never restores it, even with agents.restore-sessions-on-start on.
 	Stopped    bool              `json:"stopped,omitempty"`
 	Unread     SessionUnread     `json:"unread"`
 	Actionable SessionActionable `json:"actionable"`

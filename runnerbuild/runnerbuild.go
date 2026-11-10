@@ -3,6 +3,7 @@
 package runnerbuild
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 
@@ -60,7 +61,7 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 			h := herdrrunner.NewIn(herdr.CLI{Env: env}, home, sessionlookup.RootsFrom(env).CodexHome)
 			h.N = n
 			if pty != nil {
-				h.ProcCap = func() int { return nativerunner.LiveProcCap(pty.ProcHeadroom, nil, nil) }
+				h.ProcCap = func(log *slog.Logger) int { return nativerunner.LiveProcCap(pty.ProcHeadroom, nil, log) }
 			}
 			r = h
 		case agentrunner.ChoiceHeadless:

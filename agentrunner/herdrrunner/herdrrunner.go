@@ -63,8 +63,8 @@ type Runner struct {
 
 	// ProcCap is the process cap for an agent launched now; zero or nil means
 	// uncapped. The pane's shell gets it before the agent starts, so the agent
-	// and its children inherit it.
-	ProcCap func() int
+	// and its children inherit it. It gets the runner's logger (see SetLog).
+	ProcCap func(log *slog.Logger) int
 
 	// Home is the home of the Claude transcripts a launch prompt is proved
 	// against. Empty skips the transcript proof.
@@ -146,7 +146,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 		return agentrunner.Session{}, err
 	}
 	if r.ProcCap != nil {
-		if limit := r.ProcCap(); limit > 0 {
+		if limit := r.ProcCap(r.log); limit > 0 {
 			if err := r.CLI.PaneRun(tab.RootPaneID, nativerunner.UlimitCommand(limit)); err != nil {
 				_ = r.CLI.TabClose(tab.TabID)
 				return agentrunner.Session{}, fmt.Errorf("cap the pane's processes: %w", err)

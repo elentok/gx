@@ -15,10 +15,11 @@ import (
 	"github.com/elentok/gx/nativerunner/holder"
 )
 
-// resumeSpacing staggers a server start's auto-resumes.
+// resumeSpacing staggers the resumes of a server start with
+// agents.restore-sessions-on-start on.
 const resumeSpacing = 100 * time.Millisecond
 
-// resumeCrashWindow is how soon an auto-resumed child may exit and still
+// resumeCrashWindow is how soon a start-restored child may exit and still
 // count as crashed, whatever its exit code.
 const resumeCrashWindow = 10 * time.Second
 
@@ -203,7 +204,9 @@ func (rs *Resumer) deadSessionMeta(id string) (dir string, meta Meta, ok bool) {
 }
 
 // autoResumeSession resumes a session whose holder died while it was live,
-// or ends it Exited crashed when it cannot be resumed. A session that was
+// or ends it Exited crashed when it cannot be resumed. It runs only when
+// agents.restore-sessions-on-start is on; otherwise dead sessions are not
+// restored by the start step. A session that was
 // Working comes back with a "resumed" Unread; gx types nothing.
 func (rs *Resumer) autoResumeSession(id string) {
 	rs.mg.Watches.MetaMu.Lock()
