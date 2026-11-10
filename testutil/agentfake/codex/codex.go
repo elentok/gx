@@ -495,7 +495,12 @@ func (c *codexFake) control(ctl agentfake.Control) error {
 	case agentfake.ActionBackground:
 		c.backgroundControl(ctl.Running)
 	case actionInterrupt:
-		return c.interrupt()
+		// The timer's Esc is now a key of its own; a later byte must not log it again.
+		if len(c.input.seq) != 1 {
+			return nil
+		}
+		c.input.seq, c.input.escTimer = nil, nil
+		return c.interrupt(agentfake.ProgramEscEntry)
 	case agentfake.ActionToolCall:
 		return c.toolCall(ctl.Tool, ctl.Command)
 	case agentfake.ActionPermission:

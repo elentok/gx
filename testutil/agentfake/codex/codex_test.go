@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -397,6 +398,72 @@ func TestCodex_RolloutShapeMatchesTheRecordedFixture(t *testing.T) {
 			t.Errorf("rollout writes %v, which the recorded fixture lacks", pair)
 		}
 	}
+}
+
+// waitSubmitted polls the fake's log of submitted inputs until it equals want.
+func (p *codexProc) waitSubmitted(want ...string) {
+	p.t.Helper()
+	var got []string
+	testutil.WaitFor(p.t, 10*time.Second, "submitted log "+strings.Join(quoteAll(want), " "), func() bool {
+		data, _ := os.ReadFile(agentfake.ProgramSubmittedPath(p.id))
+		got = nil
+		for line := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
+			if line != "" {
+				got = append(got, line)
+			}
+		}
+		return slices.Equal(got, quoteAll(want))
+	})
+}
+
+func quoteAll(entries []string) []string {
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = strconv.Quote(e)
+	}
+	return out
+}
+
+func (p *codexProc) write(s string) {
+	p.t.Helper()
+	if _, err := io.WriteString(p.stdin, s); err != nil {
+		p.t.Fatal(err)
+	}
+}
+
+func TestCodex_EscAndCtrlCLogAsSeparateEntries(t *testing.T) {
+	p := startCodex(t, t.TempDir(), "keys-1", codexLaunchArgs...)
+	p.waitOut("state=idle")
+
+	p.write("\x1b")
+	p.waitSubmitted(agentfake.ProgramEscEntry)
+
+	p.write("\x03")
+	p.waitSubmitted(agentfake.ProgramEscEntry, agentfake.ProgramInterruptEntry)
+
+	// An Esc followed by a plain key logs the Esc, then types the key.
+	p.write("\x1bx")
+	p.waitSubmitted(agentfake.ProgramEscEntry, agentfake.ProgramInterruptEntry, agentfake.ProgramEscEntry)
+}
+
+func TestCodex_ArrowKeyLogsNothing(t *testing.T) {
+	p := startCodex(t, t.TempDir(), "keys-2", codexLaunchArgs...)
+	p.waitOut("state=idle")
+	p.write("\x1b[A")
+	p.write("\x03")
+	p.waitSubmitted(agentfake.ProgramInterruptEntry)
+}
+
+func TestCodex_EscEndsARunningTurn(t *testing.T) {
+	p := startCodex(t, t.TempDir(), "keys-3", codexLaunchArgs...)
+	p.waitOut("state=idle")
+	p.write("work\r")
+	p.waitOut("state=working")
+	p.write("\x1b")
+	testutil.WaitFor(t, 10*time.Second, "idle again after Esc", func() bool {
+		return strings.Count(p.out.String(), "state=idle") >= 2
+	})
+	p.waitSubmitted("work", agentfake.ProgramEscEntry)
 }
 
 func TestCodex_VersionIsFixed(t *testing.T) {

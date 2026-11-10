@@ -62,7 +62,7 @@ func (c *codexFake) key(b byte) error {
 	}
 	switch b {
 	case agentfake.CtrlC:
-		return c.interrupt()
+		return c.interrupt(agentfake.ProgramInterruptEntry)
 	case tabKey:
 		if c.working && c.box.Text() != "" {
 			in.queue = append(in.queue, c.box.Text())
@@ -90,7 +90,7 @@ func (c *codexFake) sequenceKey(b byte) error {
 	}
 	if len(in.seq) == 1 && b != '[' {
 		in.seq = nil
-		if err := c.interrupt(); err != nil {
+		if err := c.interrupt(agentfake.ProgramEscEntry); err != nil {
 			return err
 		}
 		return c.key(b)
@@ -155,8 +155,8 @@ func (c *codexFake) submitLogged(text string) error {
 
 // interrupt is Ctrl+C or Esc: it ends a running turn, leaving a background
 // terminal and its Ready title in place.
-func (c *codexFake) interrupt() error {
-	if err := agentfake.LogSubmitted(c.id, agentfake.ProgramInterruptEntry); err != nil {
+func (c *codexFake) interrupt(entry string) error {
+	if err := agentfake.LogSubmitted(c.id, entry); err != nil {
 		return err
 	}
 	if !c.working {
