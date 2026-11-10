@@ -28,7 +28,7 @@ func (s *Landing) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, t
 	if err != nil || !clean {
 		return false, err
 	}
-	ref, now, landed, err := s.landWithRestore(repo.Root, dir, epic, target, snapshot, restored, clashing,
+	ref, now, landed, err := s.landWithRestore(repo.Root, dir, epic, epic, target, snapshot, restored, clashing,
 		"restore after failed land", "landed")
 	if err != nil {
 		return landed, err
@@ -41,13 +41,14 @@ func (s *Landing) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, t
 	return true, nil
 }
 
-// landWithRestore fast-forwards target's checkout dir to epic over files, whose
+// landWithRestore fast-forwards target's checkout dir to the ref to (the epic
+// branch, or origin's Trunk for a merged pull request) over files, whose
 // uncommitted content snapshot holds, and puts merged back in their place. The
 // backup ref comes first: whatever happens to the files, they stay in git. When
 // the fast-forward fails the files go back as they were and landed is false;
 // landed is true when only the final restore failed. failLog and doneWord are
 // the Warn message and the error wording of the two callers.
-func (s *Landing) landWithRestore(repoRoot, dir, epic, target, snapshot, merged string, files []string, failLog, doneWord string) (ref string, now time.Time, landed bool, err error) {
+func (s *Landing) landWithRestore(repoRoot, dir, epic, to, target, snapshot, merged string, files []string, failLog, doneWord string) (ref string, now time.Time, landed bool, err error) {
 	ref, now, err = s.backupSnapshot(repoRoot, epic, snapshot)
 	if err != nil {
 		return "", now, false, err
@@ -55,7 +56,7 @@ func (s *Landing) landWithRestore(repoRoot, dir, epic, target, snapshot, merged 
 	if err := git.SetAside(dir, files); err != nil {
 		return ref, now, false, fmt.Errorf("set aside %s: %w (backup %s)", listFiles(files), err, ref)
 	}
-	ok, err := history.MergeFastForward(dir, epic)
+	ok, err := history.MergeFastForward(dir, to)
 	if err != nil || !ok {
 		if rerr := git.RestoreFromTree(dir, snapshot, files); rerr != nil {
 			s.log.Warn(failLog, "epic", epic, "backup", ref, "err", rerr)

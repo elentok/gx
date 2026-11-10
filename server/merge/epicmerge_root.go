@@ -433,8 +433,11 @@ func (s *Merger) storeMergeBlock(root queue.RootRef, epicPath string, p mergePau
 	fields := map[string]any{mergeBlockReasonKey: p.reason, mergeBlockKindKey: string(p.kind)}
 	if len(p.files) > 0 {
 		fields[mergeBlockFilesKey] = p.files
+	} else if err := tickets.ClearEpicFields(epicPath, mergeBlockFilesKey); err != nil {
+		s.log.Warn("clear merge block files", "root", root, "err", err)
 	}
-	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
+	// A retry can change the block's kind and reason: the new one replaces the old.
+	if err := tickets.OverwriteEpicFields(epicPath, fields); err != nil {
 		s.log.Warn("store merge block", "root", root, "err", err)
 	}
 }

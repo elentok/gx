@@ -62,8 +62,8 @@ func (s *Epics) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.Epic
 			Pill: PillMergeBlocked, Reason: e.MergeBlockReason, Since: fallback,
 			Action: wire.CardAction{Kind: wire.CardActionMerge, Label: "Merge", Target: root.String()},
 		}
-		if e.MergeBlockKind == string(schema.PauseDirtyTrunk) {
-			n.Reason = schema.PauseDirtyTrunk.Label()
+		if k := schema.PauseReason(e.MergeBlockKind); k == schema.PauseDirtyTrunk || k == schema.PausePRDirtyTrunk {
+			n.Reason = k.Label()
 			n.Action = wire.CardAction{Kind: wire.CardActionStashMerge, Label: schema.VerbStashMerge.Label(), Target: root.String()}
 			n.More = []wire.CardAction{{Kind: wire.CardActionMerge, Label: schema.VerbMergeAgain.Label(), Target: root.String()}}
 		}

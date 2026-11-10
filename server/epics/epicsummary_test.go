@@ -180,6 +180,10 @@ func TestSummarizeEpic_MergeBlockActionsFollowTheVerbTable(t *testing.T) {
 		"merge-error":   {"merge"},
 		"trunk-missing": {"merge"},
 		"needs-rebase":  {"merge"},
+
+		"pr-foreign-conflict": {"merge"},
+		"pr-dirty-trunk":      {"stash-merge", "merge"},
+		"pr-trunk-update":     {"merge"},
 	}
 	for kind, actions := range want {
 		e := tickets.Epic{Name: "epic", CompletedAt: time.Unix(50, 0), MergeBlockKind: kind, MergeBlockReason: "why", Tickets: []tickets.Ticket{summaryTicket("01", "done")}}

@@ -49,6 +49,31 @@ func TestEpicList_DirtyTrunkCardHasBothActions(t *testing.T) {
 	}
 }
 
+func TestEpicList_PRTrunkCardsShowTheirButtons(t *testing.T) {
+	t.Parallel()
+	done := map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")}
+	block := func(kind string) string {
+		return "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: " + kind + "\nland_block_reason: \"PR #412 merged on GitHub, but local main cannot fast-forward\"\n---\n"
+	}
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "dirty", block("pr-dirty-trunk"), done)
+		rigs.WriteEpicFiles(t, store, "update", block("pr-trunk-update"), done)
+	})
+
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
+	rows := map[string]wire.EpicListRow{}
+	for _, r := range rigs.GetEpicList(t, code, body).Epics {
+		rows[r.Address] = r
+	}
+	dirty, update := rows["proj:dirty"], rows["proj:update"]
+	if dirty.Reason != "Trunk has local changes" || len(dirty.Actions) != 2 || dirty.Actions[0].Kind != wire.CardActionStashMerge {
+		t.Errorf("pr-dirty-trunk row = reason %q actions %v", dirty.Reason, dirty.Actions)
+	}
+	if !strings.HasPrefix(update.Reason, "PR #412 merged") || len(update.Actions) != 1 || update.Actions[0].Kind != wire.CardActionMerge {
+		t.Errorf("pr-trunk-update row = reason %q actions %v", update.Reason, update.Actions)
+	}
+}
+
 func TestEpicList_NeedsYouReasons(t *testing.T) {
 	t.Parallel()
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"

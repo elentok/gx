@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/schedule"
+	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -29,6 +30,14 @@ func (s *Merger) EpicMerge(req wire.QueueRequest) (wire.QueueResult, error) {
 	if err != nil {
 		return mergeVerbError(err)
 	}
+	// A blocked Trunk update of a merged pull request retries the update; there is no branch to merge.
+	if k := m.epic.MergeBlockKind; k == string(schema.PausePRTrunkUpdate) || k == string(schema.PausePRDirtyTrunk) {
+		if r := epicMergeRefusal(m.root, m.epic, m.repo); r != nil {
+			return *r, nil
+		}
+		s.retryTrunkUpdate(m)
+		return wire.QueueResult{}, nil
+	}
 	first, _, target, err := s.EpicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
 		return wire.QueueResult{}, err
@@ -41,6 +50,14 @@ func (s *Merger) EpicMerge(req wire.QueueRequest) (wire.QueueResult, error) {
 		return wire.QueueResult{}, err
 	}
 	return s.actOnMerge(m.root, one, m.dir, m.epic, d), nil
+}
+
+// retryTrunkUpdate is the Trunk update of a merged pull request, run by hand: a
+// failure keeps or changes the stored block, a success logs "trunk updated".
+func (s *Merger) retryTrunkUpdate(m mergeEpicRef) {
+	if s.SyncTrunkAfterMerge(m.root) {
+		_ = prflow.Append(m.epic.Path, prflow.Entry{Kind: prflow.KindTrunkUpdated})
+	}
 }
 
 // mergeEpicRef is the epic a manual merge verb acts on, loaded and checked.

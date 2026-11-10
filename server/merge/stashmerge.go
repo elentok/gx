@@ -26,12 +26,16 @@ func (s *Landing) EpicStashMerge(req wire.QueueRequest) (wire.QueueResult, error
 	if err != nil {
 		return mergeVerbError(err)
 	}
-	if m.epic.MergeBlockKind != string(events.DirtyTrunk) {
+	prKind := m.epic.MergeBlockKind == string(events.PRDirtyTrunk)
+	if m.epic.MergeBlockKind != string(events.DirtyTrunk) && !prKind {
 		return queue.Refusal(wire.ReasonNotDirtyTrunk, m.root.String()+" is not paused on a dirty trunk"), nil
 	}
 	first, _, target, err := s.merger.EpicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
 		return wire.QueueResult{}, err
+	}
+	if prKind {
+		return s.prStashMerge(m, target)
 	}
 	one := ralphloop.OneIteration{Epic: m.root.Epic, Ticket: first}
 	unlock := s.guards.Trunks.Lock(m.repo, target)
@@ -45,6 +49,65 @@ func (s *Landing) EpicStashMerge(req wire.QueueRequest) (wire.QueueResult, error
 		return s.merger.actOnMerge(m.root, one, m.dir, m.epic, *d), nil
 	}
 	return res, nil
+}
+
+// prStashMerge is Stash, merge and restore for a merged pull request: it sets
+// the clashing files aside, fast-forwards Trunk to origin and puts them back, with
+// conflict markers where they clash, then stamps the epic like any Trunk update.
+func (s *Landing) prStashMerge(m mergeEpicRef, target string) (wire.QueueResult, error) {
+	unlock := s.guards.Trunks.Lock(m.repo, target)
+	res, err := s.prStashMergeLocked(m, target)
+	unlock()
+	if err != nil || res != nil {
+		return derefResult(res), err
+	}
+	s.merger.retryTrunkUpdate(m)
+	return wire.QueueResult{}, nil
+}
+
+func derefResult(r *wire.QueueResult) wire.QueueResult {
+	if r == nil {
+		return wire.QueueResult{}
+	}
+	return *r
+}
+
+// prStashMergeLocked is prStashMerge's work under the trunk lock; a refusal is
+// returned when there is nothing to stash.
+func (s *Landing) prStashMergeLocked(m mergeEpicRef, target string) (*wire.QueueResult, error) {
+	if r := epicMergeRefusal(m.root, m.epic, m.repo); r != nil {
+		return r, nil
+	}
+	if err := git.Fetch(m.repo, "origin"); err != nil {
+		return nil, err
+	}
+	repo, dir, err := checkoutDirFor(m.repo, target)
+	if err != nil {
+		return nil, err
+	}
+	remote := "refs/remotes/origin/" + target
+	if ff, err := git.IsAncestor(m.repo, "refs/heads/"+target, remote); err != nil {
+		return nil, err
+	} else if !ff {
+		r := queue.Refusal(wire.ReasonNotDirtyTrunk, target+" has commits that are not on origin/"+target+", so it cannot fast-forward")
+		return &r, nil
+	}
+	clashing := clashingBetween(repo.Root, dir, "refs/heads/"+target, remote)
+	if len(clashing) == 0 {
+		r := queue.Refusal(wire.ReasonNotDirtyTrunk, "no uncommitted file on "+target+" clashes any more; merge again")
+		return &r, nil
+	}
+	snapshot, err := git.SnapshotPaths(dir, clashing)
+	if err != nil {
+		return nil, err
+	}
+	tree, _, err := git.MergeSnapshotMarked(dir, snapshot, remote)
+	if err != nil {
+		return nil, err
+	}
+	_, _, _, err = s.landWithRestore(repo.Root, dir, m.root.Epic, remote, target, snapshot, tree, clashing,
+		"restore after failed stash-merge", "fast-forwarded")
+	return nil, err
 }
 
 // stashMergeLocked is epicStashMerge's work under the target's trunk lock. A
@@ -81,7 +144,7 @@ func (s *Landing) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, t
 		d, err := s.merger.epicMergeLocked(root, one, m.repo, m.epics, e, target)
 		return wire.QueueResult{}, &d, err
 	}
-	ref, now, _, err := s.landWithRestore(repo.Root, dir, epic, target, snapshot, tree, clashing,
+	ref, now, _, err := s.landWithRestore(repo.Root, dir, epic, epic, target, snapshot, tree, clashing,
 		"restore after failed stash-merge", "fast-forwarded")
 	if err != nil {
 		return wire.QueueResult{}, nil, err
