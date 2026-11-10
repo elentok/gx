@@ -41,6 +41,11 @@ const cases: [DevState, string][] = [
   ["down", "Vite is down"],
 ];
 
+test.each(cases)("%s names the pill button with the status", (state, status) => {
+  renderThemed(<DevPopover dev={dev(state)} />);
+  expect(screen.getByRole("button", { name: `Dev mode: ${status}` })).toBeTruthy();
+});
+
 test.each(cases)("%s shows status, reason, log lines and path", async (state, status) => {
   await open(dev(state));
   expect(screen.getByTestId("dev-popover-status").textContent).toBe(status);

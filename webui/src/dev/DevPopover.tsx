@@ -88,7 +88,7 @@ export function DevPopover({ dev, postDevFrontend = defaultPostDevFrontend, post
     <GxMenu
       placement="top-end"
       trigger={
-        <button type="button" aria-label={`Dev mode: ${status}`} style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>
+        <button type="button" aria-label={`Dev mode: ${look.status}`} style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>
           <DevPill state={dev.state} />
         </button>
       }

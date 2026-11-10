@@ -12,7 +12,9 @@ const loads = (page: Page) => page.evaluate((key) => Number(sessionStorage.getIt
 
 /** Marks the document so a later reload shows as a missing mark. */
 const mark = (page: Page) => page.evaluate(() => ((window as any).__devMark = true));
-const reloaded = (page: Page) => expect.poll(() => page.evaluate(() => (window as any).__devMark === undefined)).toBe(true);
+// A read landing mid-navigation throws "context destroyed", which is itself the reload.
+const reloaded = (page: Page) =>
+  expect.poll(() => page.evaluate(() => (window as any).__devMark === undefined).catch(() => true)).toBe(true);
 
 // A ready Vite serves the fake's own page, never the gx UI: the page then shows "vitefake" and has no pill.
 const onVite = (page: Page) => expect(page.locator("#root")).toHaveText("vitefake");
