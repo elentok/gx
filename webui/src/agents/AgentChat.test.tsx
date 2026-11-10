@@ -348,7 +348,9 @@ test("a Codex answer that stopped part way disables Submit and points to Screen"
   );
   render(
     session({ harness: "codex" }),
-    chat({ questions: [sourceCard("codex-question")] }),
+    chat({
+      questions: [sourceCard("codex-question", { id: "call_stopped_once" })],
+    }),
     post,
   );
   await screen.findByText(/Pick one\?/);
@@ -356,6 +358,47 @@ test("a Codex answer that stopped part way disables Submit and points to Screen"
   fireEvent.click(submitButton());
   expect((await screen.findByRole("alert")).textContent).toMatch(/Screen/);
   expect(submitButton().disabled).toBe(true);
+});
+
+test("a stopped Codex card keeps Submit disabled across a remount, and a new call re-enables it", async () => {
+  const post = vi.fn(
+    async () =>
+      ({
+        refused: true,
+        reason: "codex-stopped",
+        message: "x",
+      }) as SessionResult,
+  );
+  const stopped = sourceCard("codex-question", { id: "call_stop" });
+  render(
+    session({ harness: "codex" }),
+    chat({ questions: [stopped] }),
+    post,
+  );
+  await screen.findByText(/Pick one\?/);
+  fireEvent.click(screen.getByRole("button", { name: /Alpha/ }));
+  fireEvent.click(submitButton());
+  await screen.findByRole("alert");
+  cleanup();
+  render(
+    session({ harness: "codex" }),
+    chat({ questions: [stopped] }),
+    post,
+  );
+  await screen.findByText(/Pick one\?/);
+  // The draft keeps Alpha chosen, so only the stopped state can disable Submit.
+  expect(submitButton().disabled).toBe(true);
+  cleanup();
+  render(
+    session({ harness: "codex" }),
+    chat({
+      questions: [sourceCard("codex-question", { id: "call_new" })],
+    }),
+    post,
+  );
+  await screen.findByText(/Pick one\?/);
+  fireEvent.click(screen.getByRole("button", { name: /Alpha/ }));
+  expect(submitButton().disabled).toBe(false);
 });
 
 test("a Codex card shown before the overlay exists says to retry and keeps Submit", async () => {

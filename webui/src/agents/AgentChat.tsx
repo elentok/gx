@@ -22,6 +22,9 @@ import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
 import { allAnswered, type QuestionMode } from "../ui/question-sheet/round";
 
+// Codex calls whose keys were partly typed. Module-level so leaving the page and coming back keeps Submit off.
+const stoppedCalls = new Set<string>();
+
 /** The first open card, docked above the banner. The caller keys it by card id, so a new card starts a fresh draft. */
 function CardSheet({
   session,
@@ -43,7 +46,7 @@ function CardSheet({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   // Codex typed some keys and stopped: another Submit would type the rest on top of them.
-  const [stopped, setStopped] = useState(false);
+  const [stopped, setStopped] = useState(() => stoppedCalls.has(card.id));
   const cards = sheetCardsOf(card);
   const ready = allAnswered(cards, draft.answers);
   const claude = card.source === CardSourceClaudeDialog;
@@ -73,6 +76,7 @@ function CardSheet({
         if (res.reason === ReasonCodexNotReady)
           setError("Codex is not ready for the answer yet. Retry in a moment.");
         else if (res.reason === ReasonCodexStopped) {
+          stoppedCalls.add(card.id);
           setStopped(true);
           setError(
             "Codex took part of the answer and stopped. Open Screen to finish it.",

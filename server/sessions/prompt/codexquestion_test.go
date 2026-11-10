@@ -195,6 +195,26 @@ func TestSessionAnswer_CodexQuestionNoteAndFreeTextUseTheirKeys(t *testing.T) {
 	}
 }
 
+func TestSessionAnswer_CodexQuestionFreeTextRowIDWithTextUsesNoneOfTheAbove(t *testing.T) {
+	t.Parallel()
+	f := startCodexQuestionSession(t)
+	openCodexQuestion(t, f, agentfake.QuestionCall{})
+	card := waitForCodexCard(t, f)
+	res := answerCodex(t, f, card.ID,
+		wire.SessionAnswer{Choice: "1"},
+		wire.SessionAnswer{Choice: "other", Text: "my own"},
+		wire.SessionAnswer{Choice: "3"})
+	if res.Refused {
+		t.Fatalf("answer = %+v", res)
+	}
+	wantKeys(t, f, "1",
+		"Down", "Down", "Down", "Enter", "text:my own", "Enter",
+		"3")
+	if got := codexOutput(t, f); !slices.Equal(got["b"], []string{"None of the above", "user_note: my own"}) {
+		t.Errorf("output = %q", got)
+	}
+}
+
 func TestSessionAnswer_CodexQuestionNotReadySendsNothingThenWorks(t *testing.T) {
 	t.Parallel()
 	f := startCodexQuestionSession(t)

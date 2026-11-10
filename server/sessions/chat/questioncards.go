@@ -90,9 +90,13 @@ func SplitTicketAskID(id string) (address, state string, ok bool) {
 	return strings.Cut(id, "#")
 }
 
+// CodexFreeTextID is the id of the card's last row, the free-text row that
+// stands for Codex's "None of the above".
+const CodexFreeTextID = "other"
+
 // CodexQuestionCard is an open request_user_input call as a Question card. Its
 // id is the call id; an option's id is its 1-based position, the digit that
-// picks it in Codex's overlay.
+// picks it in Codex's overlay. A free-text row follows the numbered ones.
 func CodexQuestionCard(q codexsession.OpenQuestion) []wire.QuestionCard {
 	qs := make([]wire.QuestionCardQuestion, len(q.Questions))
 	for i, it := range q.Questions {
@@ -100,6 +104,7 @@ func CodexQuestionCard(q codexsession.OpenQuestion) []wire.QuestionCard {
 		for j, o := range it.Options {
 			cq.Options = append(cq.Options, wire.QuestionCardOption{ID: strconv.Itoa(j + 1), Label: o.Label, Description: o.Description})
 		}
+		cq.Options = append(cq.Options, wire.QuestionCardOption{ID: CodexFreeTextID, Label: "None of the above", Text: true})
 		qs[i] = cq
 	}
 	return []wire.QuestionCard{{Source: wire.CardSourceCodex, ID: q.CallID, Questions: qs}}

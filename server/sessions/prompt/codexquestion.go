@@ -3,6 +3,7 @@ package prompt
 import (
 	"cmp"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner/codexui"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -117,24 +119,31 @@ func checkOverlay(c *holder.HolderClient, wait time.Duration, i, total int, q wi
 		}
 		time.Sleep(codexQuestionPoll)
 	}
+	numbered := numberedOptions(q)
 	switch {
 	case o.Total != total:
 		return fmt.Sprintf("the screen has %d questions, the card has %d", o.Total, total)
 	case claudeui.Normalize(o.Question) != claudeui.Normalize(q.Title):
 		return "the question text on the screen differs from the card"
-	case o.Rows != len(q.Options)+1:
-		return fmt.Sprintf("the screen has %d rows, the card has %d options", o.Rows-1, len(q.Options))
+	case o.Rows != len(numbered)+1:
+		return fmt.Sprintf("the screen has %d rows, the card has %d options", o.Rows-1, len(numbered))
 	case o.Cursor != 1 || o.NotesOpen:
 		return "the screen's cursor is not on the first row"
 	case o.LastQuestion != (i == total-1):
 		return "the screen's footer does not match the question's position"
 	}
-	for j, opt := range q.Options {
+	for j, opt := range numbered {
 		if claudeui.Normalize(o.Labels[j]) != claudeui.Normalize(opt.Label) {
 			return fmt.Sprintf("row %d on the screen differs from the card", j+1)
 		}
 	}
 	return ""
+}
+
+// numberedOptions is the options Codex's overlay numbers: the card's rows
+// without its free-text row, which is the overlay's own None of the above.
+func numberedOptions(q wire.QuestionCardQuestion) []wire.QuestionCardOption {
+	return slices.DeleteFunc(slices.Clone(q.Options), func(o wire.QuestionCardOption) bool { return o.Text })
 }
 
 // codexQuestionKeys is the keys of every question, in order. An option k is
@@ -157,11 +166,13 @@ func codexQuestionKeys(card wire.QuestionCard, answers []wire.SessionAnswer) ([]
 	for i, q := range card.Questions {
 		a := answerAt(answers, i)
 		note, text := strings.TrimSpace(a.Note), strings.TrimSpace(a.Text)
+		numbered := numberedOptions(q)
 		var ks []wire.SessionKeysRequest
+		freeText := a.Choice == chat.CodexFreeTextID && len(numbered) < len(q.Options)
 		switch {
-		case a.Choice != "":
+		case a.Choice != "" && !freeText:
 			k, err := strconv.Atoi(a.Choice)
-			if err != nil || k < 1 || k > len(q.Options) || k > 9 {
+			if err != nil || k < 1 || k > len(numbered) || k > 9 {
 				return bad(fmt.Sprintf("choice %q is not an option of question %d", a.Choice, i+1))
 			}
 			if note == "" {
@@ -170,7 +181,7 @@ func codexQuestionKeys(card wire.QuestionCard, answers []wire.SessionAnswer) ([]
 			}
 			ks = append(downs(k-1), key("tab"), typed(note), key("enter"))
 		case text != "":
-			ks = append(downs(len(q.Options)), key("enter"), typed(text), key("enter"))
+			ks = append(downs(len(numbered)), key("enter"), typed(text), key("enter"))
 		default:
 			return bad(fmt.Sprintf("question %d needs an answer", i+1))
 		}
