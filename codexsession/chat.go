@@ -74,6 +74,7 @@ type chatRolloutLine struct {
 	Type      string `json:"type"`
 	Payload   struct {
 		Type       string `json:"type"`
+		Reason     string `json:"reason"`
 		Role       string `json:"role"`
 		Name       string `json:"name"`
 		CallID     string `json:"call_id"`
@@ -88,7 +89,7 @@ type chatRolloutLine struct {
 }
 
 // Prefixes of the lines Codex injects as user messages.
-var injectedPrefixes = []string{"# AGENTS.md instructions", "<environment_context>"}
+var injectedPrefixes = []string{"# AGENTS.md instructions", "<environment_context>", "<turn_aborted>"}
 
 const gxCommandPrefix = "$gx-"
 
@@ -128,6 +129,11 @@ func ReadChat(r io.Reader, imagesDir string) (Chat, error) {
 			chat.Version = p.CLIVersion
 		case line.Type == "event_msg" && p.Type == "task_complete":
 			chat.Turns++
+		case line.Type == "event_msg" && p.Type == "turn_aborted":
+			if p.Reason == "interrupted" {
+				flush()
+				chat.Messages = append(chat.Messages, transcript.ChatMessage{ID: id, Kind: transcript.ChatKindInterrupted, At: at})
+			}
 		case line.Type == "compacted":
 			flush()
 			chat.Messages = append(chat.Messages, transcript.ChatMessage{ID: id, Kind: transcript.ChatKindCompacted, At: at})

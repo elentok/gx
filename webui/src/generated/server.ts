@@ -2361,7 +2361,7 @@ export interface AutoQueueRequest {
 export interface SessionChatMessage {
   id: string;
   role: string; // transcript.ChatRoleAgent or ChatRolePerson
-  kind: string; // text, prompt, command or output
+  kind: string; // text, prompt, command, output, tools, compacted or interrupted
   text: string;
   at: string;
   /**

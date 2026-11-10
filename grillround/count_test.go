@@ -32,6 +32,8 @@ func chat(parts ...string) []transcript.ChatMessage {
 			m.Role, m.Kind, m.Text = transcript.ChatRolePerson, transcript.ChatKindPrompt, p[2:]
 		case p == "tools":
 			m.Role, m.Kind, m.ToolCount = transcript.ChatRoleAgent, transcript.ChatKindTools, 3
+		case p == "interrupted":
+			m.Kind = transcript.ChatKindInterrupted
 		default:
 			m.Role, m.Kind, m.Text = transcript.ChatRoleAgent, transcript.ChatKindText, p
 		}
@@ -71,6 +73,11 @@ func TestCount(t *testing.T) {
 			"summary shares a message with the run-end line",
 			chat(alpha, "> a", "We picked a.\n\n"+runEnd),
 			[]conversations.GrillingItem{item(0, 1, 3), item(2, 0, 3)},
+		},
+		{
+			"an interrupted marker is not a person turn",
+			chat(alpha, "> a", "interrupted", "We picked a.\n\n"+runEnd),
+			[]conversations.GrillingItem{item(0, 1, 3), item(3, 0, 3)},
 		},
 		{
 			"summary shares a message with the next round",

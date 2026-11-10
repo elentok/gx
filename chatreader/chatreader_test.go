@@ -1,6 +1,7 @@
 package chatreader_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,6 +60,35 @@ func TestCodex_CompactionIsAnEntry(t *testing.T) {
 	want := "o11:person:prompt:Reply with exactly the word: pong|o14:agent:text:pong|o20::compacted:"
 	if got := summary(res.Messages); got != want {
 		t.Errorf("messages = %s, want %s", got, want)
+	}
+}
+
+func TestCodex_Interrupt(t *testing.T) {
+	t.Parallel()
+	event := func(n int, reason string) string {
+		return fmt.Sprintf(`{"ordinal":%d,"type":"event_msg","payload":{"type":"turn_aborted","reason":%q}}`, n, reason)
+	}
+	fragment := func(n int, role string) string {
+		return fmt.Sprintf(`{"ordinal":%d,"type":"response_item","payload":{"type":"message","role":%q,"content":[{"type":"input_text","text":"<turn_aborted>\nThe user interrupted the previous turn on purpose.\n</turn_aborted>"}]}}`, n, role)
+	}
+	cases := []struct {
+		name  string
+		lines []string
+		want  string
+	}{
+		{"interrupted event", []string{event(7, "interrupted")}, "o7::interrupted:"},
+		{"other reason", []string{event(7, "replaced")}, ""},
+		{"developer fragment", []string{fragment(6, "developer")}, ""},
+		{"user fragment", []string{fragment(6, "user")}, ""},
+		{"fragment plus event", []string{fragment(6, "developer"), event(7, "interrupted"), fragment(8, "user")}, "o7::interrupted:"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := summary(readCodex(t, c.lines...).Messages); got != c.want {
+				t.Errorf("messages = %q, want %q", got, c.want)
+			}
+		})
 	}
 }
 

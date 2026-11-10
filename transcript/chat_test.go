@@ -92,6 +92,38 @@ func TestReadChat_CommandOutput(t *testing.T) {
 	}
 }
 
+func TestReadChat_InterruptMarker(t *testing.T) {
+	line := func(typ, id, text string) string {
+		b, _ := json.Marshal(map[string]any{"type": typ, "uuid": id, "timestamp": "2026-01-01T10:00:00Z", "message": map[string]any{"content": []map[string]any{{"type": "text", "text": text}}}})
+		return string(b)
+	}
+	lines := []string{
+		line("user", "p1", "do it"),
+		line("assistant", "a1", "working"),
+		line("user", "i1", "[Request interrupted by user]"),
+		line("user", "i2", "[Request interrupted by user for tool use]"),
+		line("user", "p2", "[Request interrupted by user] but please go on"),
+	}
+	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n")+"\n"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, m := range msgs {
+		got = append(got, m.ID+":"+m.Role+":"+m.Kind)
+	}
+	want := []string{"p1:person:prompt", "a1:agent:text", "i1::interrupted", "i2::interrupted", "p2:person:prompt"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("messages = %v, want %v", got, want)
+	}
+	if texts := TrailingAgentTexts(msgs[:3]); len(texts) != 0 {
+		t.Errorf("TrailingAgentTexts after the marker = %v, want none", texts)
+	}
+	if texts := TrailingAgentTexts(msgs[:2]); !reflect.DeepEqual(texts, []string{"working"}) {
+		t.Errorf("TrailingAgentTexts before the marker = %v", texts)
+	}
+}
+
 func TestForEachLine_NoLineCapAndUnterminatedLast(t *testing.T) {
 	big := strings.Repeat("x", 11<<20)
 	var got []string

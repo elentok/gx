@@ -32,6 +32,8 @@ const (
 	// compaction.
 	ChatKindTools     = "tools"
 	ChatKindCompacted = "compacted"
+	// ChatKindInterrupted marks a turn the person stopped. It has no role.
+	ChatKindInterrupted = "interrupted"
 )
 
 // ChatMessage is one visible entry of a conversation. ID is the transcript
@@ -64,7 +66,7 @@ func TrailingAgentTexts(msgs []ChatMessage) []string {
 	var out []string
 	for i := len(msgs) - 1; i >= 0; i-- {
 		switch m := msgs[i]; {
-		case m.Role == ChatRolePerson || m.Kind == ChatKindCompacted:
+		case m.Role == ChatRolePerson || m.Kind == ChatKindCompacted || m.Kind == ChatKindInterrupted:
 			return out
 		case m.Kind == ChatKindText:
 			out = append(out, m.Text)
@@ -325,6 +327,11 @@ func SummarizeCall(name string, in map[string]any) string {
 	return name
 }
 
+var interruptTexts = map[string]bool{
+	"[Request interrupted by user]":              true,
+	"[Request interrupted by user for tool use]": true,
+}
+
 func (l chatLine) message() (ChatMessage, bool) {
 	if l.IsSidechain || l.IsMeta || l.IsCompactSummary || (l.Type != "assistant" && l.Type != "user") {
 		return ChatMessage{}, false
@@ -355,6 +362,9 @@ func (l chatLine) message() (ChatMessage, bool) {
 	if l.Type == "assistant" {
 		msg.Role, msg.Kind = ChatRoleAgent, ChatKindText
 		return msg, true
+	}
+	if len(images) == 0 && interruptTexts[text] {
+		return ChatMessage{ID: l.UUID, Kind: ChatKindInterrupted, At: l.at()}, true
 	}
 	msg.Role = ChatRolePerson
 	if out := commandOutputRE.FindStringSubmatch(text); out != nil {

@@ -64,7 +64,7 @@ type AutoQueueRequest struct {
 type SessionChatMessage struct {
 	ID   string    `json:"id"`
 	Role string    `json:"role"` // transcript.ChatRoleAgent or ChatRolePerson
-	Kind string    `json:"kind"` // text, prompt, command or output
+	Kind string    `json:"kind"` // text, prompt, command, output, tools, compacted or interrupted
 	Text string    `json:"text"`
 	At   time.Time `json:"at"`
 	// ToolCount and LastTool describe a tools entry, which folds a run of tool
