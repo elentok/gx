@@ -1,6 +1,8 @@
 package server
 
 import (
+	"time"
+
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/merge"
@@ -38,3 +40,8 @@ func (s *Server) EpicState(root queue.RootRef, e tickets.Epic) wire.EpicState {
 }
 
 func (s *Server) EpicMergeBlocked(e tickets.Epic) bool { return epics.EpicMergeBlocked(e) }
+
+// WaitSettled waits for every settle goroutine; see runs.Guards.WaitSettled.
+func (s *Server) WaitSettled(timeout time.Duration) bool {
+	return s.guards.WaitSettled(timeout)
+}

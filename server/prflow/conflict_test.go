@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/ghfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -128,13 +130,33 @@ func TestConflict_MergeAgainOnABlockedPREpicForksAPRModeTicketPastTheCap(t *test
 	f := rigs.StartPRFlow(t, rigs.PRFlowOpts{})
 	threeFinishedMerges(t, f)
 	assertBlock(t, f, schema.PauseNeedsRebase)
-	for _, tk := range tickets.LoadEpicAt(f.EpicDir()).Tickets {
-		if tk.Status != string(schema.StatusDone) {
-			finishWith(t, f, tk, "")
+	// The fixture's ralph loop keeps claiming and writing tickets while this
+	// runs, so one pass can be undone: finish again until the epic has read
+	// done on several passes in a row.
+	clean := 0
+	testutil.WaitFor(t, 10*time.Second, "epic to settle as done", func() bool {
+		open := 0
+		for _, tk := range tickets.LoadEpicAt(f.EpicDir()).Tickets {
+			if tk.Status != string(schema.StatusDone) {
+				open++
+				finishWith(t, f, tk, "")
+			}
 		}
+		if open > 0 {
+			clean = 0
+			return false
+		}
+		clean++
+		return clean >= 4
+	})
+	// The server may create the epic branch itself first.
+	branch := func() error {
+		return exec.Command("git", "-C", f.Origin.Local, "rev-parse", "--verify", "-q", "refs/heads/epic-a").Run()
 	}
-	if out, err := exec.Command("git", "-C", f.Origin.Local, "branch", "epic-a", "main").CombinedOutput(); err != nil {
-		t.Fatalf("git branch: %v\n%s", err, out)
+	if branch() != nil {
+		if out, err := exec.Command("git", "-C", f.Origin.Local, "branch", "epic-a", "main").CombinedOutput(); err != nil && branch() != nil {
+			t.Fatalf("git branch: %v\n%s", err, out)
+		}
 	}
 	res, err := f.H.Client.Tickets.EpicMerge(context.Background(), "proj:epic-a")
 	if err != nil || res.Refused || res.MergeTicket == "" {

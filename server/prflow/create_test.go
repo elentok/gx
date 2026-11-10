@@ -169,10 +169,13 @@ func TestAutoPR_DoesNotOpen(t *testing.T) {
 }
 
 func TestAutoPR_OneOffNeverOpens(t *testing.T) {
-	f := autoRig(t, autoOn)
+	f := openRig(t, goodText)
 	servertest.WriteTicketWith(t, f.Store, "proj", tickets.OneOffsEpic, "01", "x", servertest.TicketOpts{Status: "done"})
-	// Only the one-offs epic is left to consider.
+	// Only the one-offs epic is left to consider. Written before Auto-PR is on,
+	// so the watcher's own tick never sees epic-a complete.
 	servertest.WriteTicketWith(t, f.Store, "proj", "epic-a", "02", "more", servertest.TicketOpts{})
+	f.Rescan(t)
+	setProject(t, f, autoOn)
 	f.Rescan(t)
 	f.Tick(t)
 	if creates(f) != 0 {
