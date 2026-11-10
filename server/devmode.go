@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/devcheckout"
@@ -45,11 +46,9 @@ func (s *Server) newDevVite() error {
 // applyDevMode tells the supervisor what is wanted. It returns at once, so it
 // is safe under the reload lock.
 func (s *Server) applyDevMode(next Settings) {
-	home := harness.LookupEnv(s.cfg.Env, "HOME")
-	root := devcheckout.Resolve(next.WebDevDir, version.DevDir, home)
-	on := next.WebDevFrontend && root != "" && s.web.Listener() != nil
-	if !on {
-		// The supervisor reports off only after Vite has stopped; until then
+	root, on, _ := s.devPlan(next)
+	if !on || s.vite.Snapshot().Root != root {
+		// The supervisor reports a stop only after Vite has stopped; until then
 		// the proxy would answer 502.
 		s.web.UseBuiltUI()
 		if s.viteServed.Swap(false) {
@@ -57,6 +56,26 @@ func (s *Server) applyDevMode(next Settings) {
 		}
 	}
 	s.vite.Set(on, root)
+}
+
+// devPlan is the one rule for whether Dev mode is on: the Dev checkout it runs
+// from, and when it cannot run, why not. The reason is empty when on is only
+// false because dev-frontend is off.
+func (s *Server) devPlan(st Settings) (root string, on bool, reason string) {
+	home := harness.LookupEnv(s.cfg.Env, "HOME")
+	root = devcheckout.Resolve(st.WebDevDir, version.DevDir, home)
+	var reasons []string
+	if root == "" {
+		reasons = append(reasons, "gx has no Dev checkout")
+	}
+	if s.web.Listener() == nil {
+		why := strings.TrimSpace(s.web.Err())
+		if why == "" {
+			why = "the web listener is off"
+		}
+		reasons = append(reasons, why)
+	}
+	return root, st.WebDevFrontend && len(reasons) == 0, strings.Join(reasons, "; ")
 }
 
 // devRoutes is the Vite restart, which only the web UI offers (ADR 0028).

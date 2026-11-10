@@ -34,6 +34,8 @@ type FakeVite struct {
 	startE    error
 	ready     chan struct{}
 	once      sync.Once
+
+	installGate chan struct{}
 }
 
 // FailInstall makes every Install return err (nil clears it).
@@ -75,7 +77,19 @@ func WithViteLauncher(l devvite.Launcher) func(*server.Config) {
 }
 
 // Release lets the fake answer its readiness probe.
-func (f *FakeVite) Release() { f.once.Do(func() { close(f.ready) }) }
+func (f *FakeVite) Release() {
+	f.mu.Lock()
+	ready, once := f.ready, &f.once
+	f.mu.Unlock()
+	once.Do(func() { close(ready) })
+}
+
+// Hold makes the fakes started from now on not ready again, after a Release.
+func (f *FakeVite) Hold() {
+	f.mu.Lock()
+	f.ready, f.once = make(chan struct{}), sync.Once{}
+	f.mu.Unlock()
+}
 
 // Counts returns how many installs and starts happened.
 func (f *FakeVite) Counts() (installs, starts int) {
@@ -114,12 +128,30 @@ func (f *FakeVite) FreePort() (int, error) {
 	return ln.Addr().(*net.TCPAddr).Port, nil
 }
 
-func (f *FakeVite) Install(_ context.Context, webuiDir string, out io.Writer) error {
+// HoldInstall makes Install wait until the returned release func is called, so
+// a test can observe the installing state.
+func (f *FakeVite) HoldInstall() (release func()) {
+	gate := make(chan struct{})
+	f.mu.Lock()
+	f.installGate = gate
+	f.mu.Unlock()
+	var once sync.Once
+	return func() { once.Do(func() { close(gate) }) }
+}
+
+func (f *FakeVite) Install(ctx context.Context, webuiDir string, out io.Writer) error {
 	f.mu.Lock()
 	f.installs++
-	err, skip := f.installE, f.noModules
+	err, skip, gate := f.installE, f.noModules, f.installGate
 	f.mu.Unlock()
 	_, _ = io.WriteString(out, "fake install output\n")
+	if gate != nil {
+		select {
+		case <-gate:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	if err != nil || skip {
 		return err
 	}
@@ -154,8 +186,11 @@ func (f *FakeVite) Start(_ context.Context, webuiDir string, port int, out io.Wr
 }
 
 func (f *FakeVite) Probe(ctx context.Context, _ int) error {
+	f.mu.Lock()
+	ready := f.ready
+	f.mu.Unlock()
 	select {
-	case <-f.ready:
+	case <-ready:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()

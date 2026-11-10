@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -235,6 +236,55 @@ func TestDevMode_DevDirChangeRestartsFromTheNewCheckoutOrFallsBack(t *testing.T)
 	r.waitPage(t, servertest.ViteStubPage)
 }
 
+func TestDevMode_DevDirChangeServesBuiltFilesUntilTheNewViteIsReady(t *testing.T) {
+	first := servertest.WriteDevCheckout(t, true)
+	second := servertest.WriteDevCheckout(t, true)
+	r := startDevRig(t, first, true)
+	r.fake.Release()
+	r.waitPage(t, servertest.ViteStubPage)
+	r.fake.Hold()
+
+	r.setKey(t, second, true)
+	if got := r.page(t); got == servertest.ViteStubPage {
+		t.Fatal("page right after the dev-dir change is the old Vite, want the built files")
+	}
+	servertest.WaitFor(t, 10*time.Second, "the new Vite to start", func() bool {
+		_, starts := r.fake.Counts()
+		return starts == 2
+	})
+	if got := r.page(t); got == servertest.ViteStubPage {
+		t.Fatal("page while the new Vite starts is the stub, want the built files")
+	}
+	r.fake.Release()
+	r.waitPage(t, servertest.ViteStubPage)
+}
+
+func TestSnapshotDev_InstallingAndStartingCarryTheirDetails(t *testing.T) {
+	checkout := servertest.WriteDevCheckout(t, false)
+	r := startDevRig(t, checkout, false)
+	release := r.fake.HoldInstall()
+	defer release()
+
+	r.setKey(t, checkout, true)
+	var dev wire.DevStatus
+	servertest.WaitFor(t, 10*time.Second, "the installing state", func() bool {
+		dev = devSnapshot(t, r.h)
+		return dev.State == wire.DevStateInstalling
+	})
+	if dev.Checkout != checkout || !dev.HasCheckout || len(dev.LogTail) == 0 || dev.Reason == "" {
+		t.Fatalf("installing dev = %+v, want checkout, reason and log lines", dev)
+	}
+
+	release()
+	servertest.WaitFor(t, 10*time.Second, "the starting state", func() bool {
+		dev = devSnapshot(t, r.h)
+		return dev.State == wire.DevStateStarting
+	})
+	if dev.Checkout != checkout || !dev.HasCheckout || len(dev.LogTail) == 0 || dev.Reason == "" {
+		t.Fatalf("starting dev = %+v, want checkout, reason and log lines", dev)
+	}
+}
+
 func TestDevMode_NoWebListenerNeverStartsVite(t *testing.T) {
 	checkout := servertest.WriteDevCheckout(t, true)
 	store := t.TempDir()
@@ -251,6 +301,28 @@ func TestDevMode_NoWebListenerNeverStartsVite(t *testing.T) {
 	dev := devSnapshot(t, h)
 	if dev.State != wire.DevStateOff || !dev.HasCheckout || !strings.Contains(dev.Reason, "listener") {
 		t.Fatalf("dev = %+v, want off with a listener reason", dev)
+	}
+}
+
+func TestDevMode_WebListenerThatFailedToBindNeverStartsVite(t *testing.T) {
+	taken, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer taken.Close()
+	checkout := servertest.WriteDevCheckout(t, true)
+	fake := servertest.NewFakeVite()
+	fake.Release()
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithViteLauncher(fake), func(c *server.Config) {
+		c.WebAddr = taken.Addr().String()
+		c.Settings.WebDevFrontend, c.Settings.WebDevDir = true, checkout
+	})
+	if _, starts := fake.Counts(); starts != 0 {
+		t.Fatalf("starts = %d, want 0 when the web listener failed to bind", starts)
+	}
+	dev := devSnapshot(t, h)
+	if dev.State != wire.DevStateOff || dev.Reason == "" || strings.Contains(dev.Reason, "listener is off") {
+		t.Fatalf("dev = %+v, want off with the bind failure as the reason", dev)
 	}
 }
 

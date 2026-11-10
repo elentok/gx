@@ -71,6 +71,21 @@ func TestDevMode_ReloadAtReadyAndAtOff(t *testing.T) {
 	evs.expect(wire.EventReload)
 }
 
+// The observer publishes the reload before dev-changed, so a dev-changed seen
+// after the reload is the one for starting -> running.
+func TestDevMode_DevChangedAtReady(t *testing.T) {
+	checkout := servertest.WriteDevCheckout(t, true)
+	r := startDevRig(t, checkout, true)
+	servertest.WaitFor(t, 10*time.Second, "the starting state", func() bool {
+		return devSnapshot(t, r.h).State == wire.DevStateStarting
+	})
+	evs := subscribeDevEvents(t, r)
+
+	r.fake.Release()
+	evs.expect(wire.EventReload)
+	evs.expect(wire.EventDevChanged)
+}
+
 func TestDevMode_LogLinesPublishNothing(t *testing.T) {
 	checkout := servertest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, true)

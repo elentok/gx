@@ -359,9 +359,10 @@ from an authenticator app.
      with several web logins, so that I can test setup, login and Settings.
 102. As a developer, I want the web-only routes listed in one place and checked by a test, so that a
      new web-only route is a choice, not an accident (ADR 0028 amendment).
-103. As a developer, I want the Vite dev frontend (`server.web.dev-url`) to keep working behind the
-     HTTPS listener, so that hot reload still works. (Dev mode in `docs/specs/dev-mode.md` replaces
-     `server.web.dev-url`: gx runs its own Vite and the same proxy rules apply. Dev mode serves the
+103. As a developer, I want the Vite dev frontend (Dev mode: `server.web.dev-dir`, `dev-frontend`) to
+     keep working behind the HTTPS listener, so that hot reload still works. (Dev mode is described
+     in `docs/specs/dev-mode.md`: gx runs its own Vite and the same proxy rules apply. It replaced the
+     old `server.web.dev-url` setting. Dev mode serves the
      `webui/` UI sources to anyone who can reach the listener, without login, like the built assets;
      `webui/vite.config.ts` sets `server.fs.strict: true` and `server.fs.allow` to the `webui/`
      folder, and `dev-frontend` has no risky confirm. The Dev mode restart route is a
@@ -508,7 +509,7 @@ CLI always uses the unix socket). Every route, the account routes included, is t
 on the socket and the TCP listener; there is no per-route split.
 
 `make web-dev-proxy` and `GX_WEBUI_PROXY` go away: the browser behind that Vite proxy sends `Origin`
-and `Sec-Fetch-Site`, so the check would refuse it. `server.web.dev-url` (story 103) is the only way
+and `Sec-Fetch-Site`, so the check would refuse it. Dev mode (story 103) is the only way
 to run the dev UI against a real server. The Makefile, `webui/vite.config.ts` and any docs that name
 the proxy mode change with it.
 
@@ -928,7 +929,7 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
 101. Flows S, L and G run on the three new scenarios.
 102. Go test (seam 3): the web-only route test fails when a web-only route is added to the mux
      without the list. Shell check: ADR 0028 has the amendment.
-103. Go test (seam 1): with `server.web.dev-url` set to a stub on loopback, a module request is
+103. Go test (seam 1): with Dev mode proxying to a stub Vite on loopback, a module request is
      proxied over HTTPS without a cookie and an API request still needs one.
 104. Go test (seam 3, `servertest.StartWithTCP`): a plain request to `/v1/snapshot` answers 200;
      the same request with `Origin: http://evil.example`, with `Sec-Fetch-Site: cross-site`, or
