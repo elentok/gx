@@ -213,8 +213,11 @@ button. The epic page shows a **PR activity list** of what gx did.
   through the ticket-write code into the project's `follow-ups` epic (fixed sections: check, run
   URL, head SHA), skipping it when an open follow-up already names the check key; if it fails, the normal ci-fix ticket starts. The agent never
   reruns, so no agent waits on CI.
-- Its Resolution has the lines Check, Cause, Change, Commit and Outcome (`fixed` or `unfixable`).
-  `unfixable` finishes with no commit and the reason, and pauses the epic at once.
+- Its Resolution has the lines Check, Cause, Change, Commit and Outcome (`fixed`, `unfixable` or
+  `foreign-conflict`). `unfixable` finishes with no commit and the reason, and pauses the epic at
+  once. `foreign-conflict` (also written by the PR-mode Merge ticket) means the rebase onto the
+  remote branch conflicted with foreign commits: it finishes with no commit, and the server sets
+  `pr-foreign-conflict` from that Outcome line.
 - Attempt caps: 3 per failing check and 10 per PR, both global `config.json` keys (names are the
   implementer's choice) with these defaults. When the server creates a ci-fix ticket it writes a "CI failed" entry to
   `pr-activity.jsonl` with the check keys and the ticket id. Counts per check and per PR come from
@@ -240,7 +243,8 @@ button. The epic page shows a **PR activity list** of what gx did.
   `VerbTryAgain` (the existing `VerbRetry` means "start a fresh agent"). The `pause_reason` and
   `pause_kind` enum change needs a migration step (see Storage and schema). The web verb for both is
   Try again (a new server route with a CLI-mirrored verb, names the implementer's choice); it appends
-  a reset entry to `pr-activity.jsonl` and clears the block. "CI failing" is entered when a check
+  a reset entry to `pr-activity.jsonl` and clears the block. When a green run clears "CI failing" by
+  itself, the server writes the same "Try again reset" entry, so the attempt counts start fresh. "CI failing" is entered when a check
   hits its cap, the PR's total hits its cap, or a fix reports `unfixable`; gx notifies once when it
   gives up. Why gx cannot recover on its own (ADR 0042): gx has used its attempt budget, or the agent
   judged that no code change fixes it, so only a person can add budget or fix it by hand. Try again
@@ -392,7 +396,7 @@ scenarios below are implementation tickets (`pr-flow-awaiting`, `pr-flow-draft-c
 25. `Outcome: unfixable` pauses at once with attempts left. Mock states: `card-ci-failing`, `page-a-ci-failing`.
 26. "CI failing" in Needs you with reason, PR link and Try again. Mock states: `card-ci-failing`, `page-a-ci-failing`.
 27. Try again: the counts reset and a new fix ticket starts; `pr-activity.jsonl` has the reset entry.
-28. A green run after a hand push clears the pause without Try again.
+28. A green run after a hand push clears the pause without Try again and writes a "Try again reset" entry.
 29. One notification on give-up and none per attempt (notification log).
 30. Fixing CI is outside Needs you. Mock states: `card-fixing`.
 31. A PR with no checks is marked ready after the grace window (the fixture sets the key to a few seconds), not before.
@@ -414,8 +418,8 @@ scenarios below are implementation tickets (`pr-flow-awaiting`, `pr-flow-draft-c
 47. `gx server epics mark-merged <project:epic>` stamps `merged_at`; the card button does the same. In a `pr` project with dirty local trunk it leaves `merged_at` empty, shows Merge blocked (`pr-dirty-trunk`) with the table's buttons, and a button press stamps it.
 48. mark-merged on an incomplete or running epic prints the refusal (`--json`: `refused` true, exit non-zero).
 49. gx-cleanup calls the verb (grep of the skill and its fixture run).
-50. PR chip and "Open on GitHub" show after the PR exists. Mock states: `card-draft-ci-running`, `card-ready-for-review`, `page-a-ci-failing`.
-51. The card PR line shows number chip, check summary and link. Mock states: `card-draft-ci-running`, `card-fixing`, `card-ready-for-review`.
+50. PR chip and "Open on GitHub" show after the PR exists. Mock states: `card-draft-ci-running`, `page-a-ci-failing`.
+51. The card PR line shows number chip, check summary and link. Mock states: `card-draft-ci-running`, `card-ready-for-review`.
 52. The activity list is newest first with the fix entry linking to its ticket. Mock states: `page-a-ci-failing`.
 53. A scripted `gh` failure adds "GitHub unreachable", keeps state, retries and never pauses.
 54. Restart the server with an open PR: the PR chip and watching continue with no `gh` lookup for identity.
@@ -429,18 +433,17 @@ scenarios below are implementation tickets (`pr-flow-awaiting`, `pr-flow-draft-c
 62. The pause-to-verb table test passes with the "CI failing" and "PR text failed" rows, and Try again clears each.
 63. While the `pr-text` ticket runs the epic shows "Writing PR text" in Running, not in Needs you and not Awaiting PR.
 64. Each Merge blocked way in a `pr` project shows its kind's buttons from the table above, and `EpicMergeBlocked` does not match `ci-failing` or `pr-text-failed`.
-65. After "PR merged" and a crash before the fast-forward, a restart retries the fetch and fast-forward without a second entry; a paused ci-fix ticket is cancelled by the merge.
 
-Mock states:
+**Mock states**
 
-- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, state `card-draft-ci-running`, width 440, fixture scenario `pr-flow-draft-ci-running`; parts: card, ring, title, status, pr-line.
-- Same path, state `card-fixing`, width 440, scenario `pr-flow-fixing`; parts: card.
-- Same path, state `card-ready-for-review`, width 440, scenario `pr-flow-ready`; parts: card.
-- Same path, state `card-ci-failing`, width 440, scenario `pr-flow-ci-failing`; parts: card, pill, reason, try-again.
-- Same path, state `card-merge-blocked`, width 440, scenario `pr-flow-merge-blocked`; parts: card.
-- Same path, state `card-awaiting-pr`, width 440, scenario `pr-flow-awaiting`; parts: card, create-pr.
-- Same path, state `card-merge-project-create-pr`, width 440, scenario `pr-flow-merge-project`; parts: card, create-pr.
-- Same path, state `page-a-ci-failing`, width 1000, scenario `pr-flow-ci-failing`; parts: header, actions, pause-notice, activity.
+- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, `card-draft-ci-running`, width 440, fixture scenario `pr-flow-draft-ci-running`, parts: card, ring, title, status, pr-line.
+- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, `card-fixing`, width 440, fixture scenario `pr-flow-fixing`, parts: card.
+- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, `card-ready-for-review`, width 440, fixture scenario `pr-flow-ready`, parts: card.
+- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, `card-ci-failing`, width 440, fixture scenario `pr-flow-ci-failing`, parts: card, pill, reason, try-again.
+- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, `card-merge-blocked`, width 440, fixture scenario `pr-flow-merge-blocked`, parts: card.
+- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, `card-awaiting-pr`, width 440, fixture scenario `pr-flow-awaiting`, parts: card, create-pr.
+- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, `card-merge-project-create-pr`, width 440, fixture scenario `pr-flow-merge-project`, parts: card, create-pr.
+- `/Users/david/.local/share/gx/tickets/gx/pr-flow/mocks/02-epic-card-and-page-for-a-pr-epic.html`, `page-a-ci-failing`, width 1000, fixture scenario `pr-flow-ci-failing`, parts: header, actions, pause-notice, activity.
 
 The fixture scenarios above do not exist yet and are implementation tickets.
 
