@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // PRWatcher is the watcher of open PRs, for tests that force a pass with Tick.
@@ -70,6 +71,37 @@ func (h prWatchHost) AutoPR() []prflow.Target {
 		}
 	}
 	return out
+}
+
+// CancelStalePRText cancels, with its agent, the pr-text ticket of an epic with
+// no PR whose project switched from `pr` to `merge`, so no PR opens. An epic
+// with a PR is left alone: its PR stays tracked.
+func (h prWatchHost) CancelStalePRText() {
+	dirs, err := tickets.ProjectDirs(h.s.cfg.TicketStore)
+	if err != nil {
+		return
+	}
+	for _, dir := range dirs {
+		if pf, err := config.ReadProjectFile(dir); err != nil || pf.DeliveryIsPR() {
+			continue
+		}
+		epics, ok := h.s.idx.EpicsOf(dir)
+		if !ok {
+			continue
+		}
+		for _, e := range epics {
+			if e.PRNumber != 0 || !e.MergedAt.IsZero() {
+				continue
+			}
+			for _, t := range e.Tickets {
+				if t.Type != string(schema.TypePRText) || (t.Status != string(schema.StatusOpen) && t.Status != string(schema.StatusClaimed)) {
+					continue
+				}
+				addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: e.Name, ID: t.Identifier}
+				_, _ = h.s.ops.Cancel(wire.QueueRequest{Address: addr.String(), Stop: true, Source: "pr-flow"})
+			}
+		}
+	}
 }
 
 func (h prWatchHost) OpenPR(root queue.RootRef) (prflow.Outcome, error) { return h.s.OpenPR(root) }

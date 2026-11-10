@@ -44,6 +44,9 @@ type Host interface {
 	AutoPR() []Target
 	// OpenPR runs one Open attempt for root.
 	OpenPR(root queue.RootRef) (Outcome, error)
+	// CancelStalePRText cancels the open or running pr-text ticket of every epic
+	// without a PR in a project whose delivery is no longer `pr`, read live.
+	CancelStalePRText()
 }
 
 // View is the live state of one epic's PR. It exists only in memory.
@@ -209,6 +212,7 @@ func (w *Watcher) Tick(ctx context.Context) {
 			w.recovered(project, ts)
 		}
 	}
+	w.host.CancelStalePRText()
 	w.autoOpen(ctx)
 	w.mu.Lock()
 	defer w.mu.Unlock()

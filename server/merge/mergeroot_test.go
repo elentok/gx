@@ -48,6 +48,24 @@ func TestMergeRoot_AutoFFMergeOffLeavesTheBranchAndDequeuesTheRoot(t *testing.T)
 	}
 }
 
+func TestMergeRoot_PRDeliveryNeverAutoMergesEvenWithAutoFFMerge(t *testing.T) {
+	t.Parallel()
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
+		commitWork(t, p, id)
+	})
+	if err := servertest.WriteProjectRepo(f.Store, "proj", f.Repo, `,"auto-ff-merge":true,"delivery":"pr"`); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.QueueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
+
+	if out := f.Git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
+		t.Errorf("a pr project merged the feature branch: %q", out)
+	}
+}
+
 // The all-done gate, not the merge core, keeps an epic with an open review ticket from fast-forwarding.
 func TestMergeRoot_OpenCodeReviewTicketHoldsTheMergeUntilItIsDone(t *testing.T) {
 	t.Parallel()

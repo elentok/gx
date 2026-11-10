@@ -55,14 +55,15 @@ func NewMerger(d Deps, rec *Reconciler, landing *Landing) *Merger {
 }
 
 // AutoFFMerge reports whether the project opted in to automatic ff-only merges,
-// read live. An unreadable project file means off: never merge on a guess.
+// read live. An unreadable project file means off: never merge on a guess. A
+// `pr` project never auto-merges, whatever auto-ff-merge says.
 func (s *Merger) AutoFFMerge(project string) bool {
 	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return false
 	}
 	pf, _ := config.ReadProjectFile(dir)
-	return pf.AutoFFMergeEnabled()
+	return !pf.DeliveryIsPR() && pf.AutoFFMergeEnabled()
 }
 
 // Delivery is the project's delivery, read live from project.json: "pr" or, for
