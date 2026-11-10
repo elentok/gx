@@ -127,11 +127,10 @@ is linked into both agent roots (or copied with --copy).`,
 			} else if copyFiles {
 				return errors.New("--copy needs a source folder <dir>")
 			}
-			if err := install(d, policy, c.OutOrStdout()); err != nil {
-				return err
+			if len(args) == 0 && !dev {
+				return runSkillsInstallAll(d, policy, c.OutOrStdout())
 			}
-			clearSkillsProblem(d)
-			return nil
+			return install(d, policy, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringSliceVar(&force, "force", nil,
@@ -160,12 +159,23 @@ func newSkillsUninstallCmd(d Deps) *cobra.Command {
 	return cmd
 }
 
-// clearSkillsProblem drops the problem the last `gx server start` recorded,
-// so the web UI stops showing it once a manual install succeeds.
-func clearSkillsProblem(d Deps) {
-	if path, err := d.StatusPath(); err == nil {
-		_ = skills.WriteProblem(path, "")
+// runSkillsInstallAll is a bare install: the bundle, then every remembered
+// source. It records the joined problem the way Refresh does (cleared when the
+// run is clean) and fails when any part had a problem.
+func runSkillsInstallAll(d Deps, force skills.ForcePolicy, out io.Writer) error {
+	var problems []string
+	if err := runSkillsInstall(d, force, out); err != nil {
+		problems = append(problems, err.Error())
 	}
+	problems = append(problems, syncSources(d, force, out)...)
+	problem := joinProblems(problems)
+	if path, err := d.StatusPath(); err == nil {
+		_ = skills.WriteProblem(path, problem)
+	}
+	if problem == "" {
+		return nil
+	}
+	return errors.New(strings.Join(problems, "\n"))
 }
 
 // runSkillsInstall extracts gx's embedded canonical skill bundle to a
@@ -304,6 +314,19 @@ func runSkillsInstallSource(d Deps, dir string, copyFiles bool, force skills.For
 		fmt.Fprintf(out, "no skills found in %s\n", dir)
 		return nil
 	}
+	manifestDir, err := d.ManifestDir()
+	if err != nil {
+		return err
+	}
+	manifestPath := filepath.Join(manifestDir, skills.SourceID(real)+".json")
+	return syncSourceDir(d, manifestPath, abs, real, names, copyFiles, force, out)
+}
+
+// syncSourceDir installs the named skills of the source abs (real is its
+// resolved path) into every root. A source that lost all its skills passes no
+// names, which removes its links.
+func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyFiles bool, force skills.ForcePolicy, out io.Writer) error {
+	dir := abs
 	files, err := skills.SourceSkillFiles(abs, names, copyFiles)
 	if err != nil {
 		return err
@@ -312,11 +335,6 @@ func runSkillsInstallSource(d Deps, dir string, copyFiles bool, force skills.For
 	if copyFiles {
 		mode = skills.ModeManagedCopy
 	}
-	manifestDir, err := d.ManifestDir()
-	if err != nil {
-		return err
-	}
-	manifestPath := filepath.Join(manifestDir, skills.SourceID(real)+".json")
 	targets, installErr := installTargetsAt(d, manifestPath, force, skills.ThirdPartySourcePrefix+real, files, mode, true)
 	printTargetReport(out, targets, installErr == nil)
 	var conflictErr *skills.ConflictError
@@ -336,7 +354,8 @@ func runSkillsInstallSource(d Deps, dir string, copyFiles bool, force skills.For
 // printed and recorded for the server to show, and a clean install clears
 // the record.
 func Refresh(d Deps, out io.Writer) {
-	problem := refreshProblem(d, out)
+	problems := append([]string{refreshProblem(d, out)}, syncSources(d, skills.NewForcePolicy(), out)...)
+	problem := joinProblems(problems)
 	if problem != "" {
 		fmt.Fprintf(out, "warning: skills: %s\n", problem)
 	}
@@ -347,6 +366,70 @@ func Refresh(d Deps, out io.Writer) {
 	if err != nil {
 		fmt.Fprintf(out, "warning: record skill install result: %v\n", err)
 	}
+}
+
+func joinProblems(problems []string) string {
+	var kept []string
+	for _, p := range problems {
+		if p != "" {
+			kept = append(kept, p)
+		}
+	}
+	return strings.Join(kept, "; ")
+}
+
+// syncSources re-syncs every remembered Skill source in its recorded mode and
+// returns one problem per source that failed or is gone. Each source stands
+// alone: a problem never stops the next one.
+func syncSources(d Deps, force skills.ForcePolicy, out io.Writer) []string {
+	if d.ManifestDir == nil {
+		return nil
+	}
+	manifestDir, err := d.ManifestDir()
+	if err != nil {
+		return []string{err.Error()}
+	}
+	paths, _ := filepath.Glob(filepath.Join(manifestDir, "*.json"))
+	var problems []string
+	for _, path := range paths {
+		m, err := skills.Load(path)
+		if err != nil {
+			problems = append(problems, err.Error())
+			continue
+		}
+		real, ok := skills.ThirdPartyRoot(m)
+		if !ok {
+			continue
+		}
+		if p := syncSource(d, path, m, real, force, out); p != "" {
+			problems = append(problems, p)
+		}
+	}
+	return problems
+}
+
+func syncSource(d Deps, manifestPath string, m skills.Manifest, real string, force skills.ForcePolicy, out io.Writer) string {
+	if info, err := os.Stat(real); err != nil || !info.IsDir() {
+		return fmt.Sprintf("skill source %s is gone, skills left as they are; run `gx skills uninstall %s`", real, real)
+	}
+	// Links point inside the folder path the person gave, which may differ from
+	// its resolved path; recover it from the recorded links.
+	abs := real
+	for _, f := range m.Files {
+		if f.Kind == skills.KindDirectoryLink && f.LinkTarget != "" {
+			abs = filepath.Dir(f.LinkTarget)
+			break
+		}
+	}
+	names, err := skills.ScanSource(abs)
+	if err != nil {
+		return fmt.Sprintf("skill source %s: %v", real, err)
+	}
+	copyFiles := m.Mode == skills.ModeManagedCopy
+	if err := syncSourceDir(d, manifestPath, abs, real, names, copyFiles, force, out); err != nil {
+		return fmt.Sprintf("skill source %s: %v", real, err)
+	}
+	return ""
 }
 
 func refreshProblem(d Deps, out io.Writer) string {
