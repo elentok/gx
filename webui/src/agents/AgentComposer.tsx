@@ -1,9 +1,9 @@
 import { Box, Spinner } from "@chakra-ui/react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { codexSkillHint, hasChat } from "../design/chat";
 import { FooterLine } from "../design/FooterLine";
 import { ComposerImages } from "../design/ComposerImages";
-import { InterruptPopover } from "../design/InterruptPopover";
+import { InterruptControl } from "../design/InterruptControl";
 import { postInterruptSession, stateToken, type InterruptSession } from "../design/open";
 import { promptable } from "../design/view";
 import { useComposerImages } from "../design/useComposerImages";
@@ -57,12 +57,6 @@ export function AgentComposer({
   });
   // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
   const working = session.status.state === "working" && !promptable(session);
-  const [interruptOpen, setInterruptOpen] = useState(false);
-  const interruptRef = useRef<HTMLButtonElement>(null);
-  const onInterrupt = () => {
-    setInterruptOpen(false);
-    return connected ? write(() => interrupt({ id: session.id, state: stateToken(session) })) : Promise.resolve();
-  };
   const canSend = images.canSend(text);
   const sendText = () =>
     send({ text, ...images.payload }, () => {
@@ -106,25 +100,11 @@ export function AgentComposer({
         state={images}
         send={
           working ? (
-            <>
-              <Button
-                ref={interruptRef}
-                emphasis="secondary"
-                disabled={!connected || pending}
-                aria-expanded={interruptOpen}
-                onClick={() => setInterruptOpen(!interruptOpen)}
-              >
-                {pending && <Spinner size="sm" />}
-                Interrupt
-              </Button>
-              <InterruptPopover
-                open={interruptOpen}
-                disabled={!connected || pending}
-                anchorRef={interruptRef}
-                onConfirm={onInterrupt}
-                onClose={() => setInterruptOpen(false)}
-              />
-            </>
+            <InterruptControl
+              connected={connected}
+              pending={pending}
+              onInterrupt={() => write(() => interrupt({ id: session.id, state: stateToken(session) }))}
+            />
           ) : (
             <Button disabled={!enabled || !canSend} onClick={sendText}>
               {pending && <Spinner size="sm" />}

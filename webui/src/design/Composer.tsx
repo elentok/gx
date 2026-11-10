@@ -1,5 +1,5 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { PiNotePencil } from "react-icons/pi";
 import { useComposerDraft } from "../drafts";
 import type {
@@ -25,7 +25,7 @@ import {
 import { codexSkillHint } from "./chat";
 import { ComposerImages } from "./ComposerImages";
 import { FooterLine } from "./FooterLine";
-import { InterruptPopover } from "./InterruptPopover";
+import { InterruptControl } from "./InterruptControl";
 import { useComposerImages } from "./useComposerImages";
 import { NoteBox } from "./NoteBox";
 import type { PostPrompt } from "./prompt";
@@ -87,8 +87,6 @@ export function Composer({
   const wide = useWide();
   const [gapsOpen, setGapsOpen] = useState(false);
   const sendRef = useRef<HTMLButtonElement>(null);
-  const [interruptOpen, setInterruptOpen] = useState(false);
-  const interruptRef = useRef<HTMLButtonElement>(null);
   const [text, setText] = useComposerDraft(session.id);
   // Shared text is never hidden behind a closed Note: it opens on load and on every change (another tab).
   const images = useComposerImages(session.id);
@@ -112,10 +110,6 @@ export function Composer({
   });
 
   const run: RunCall = (call) => (connected ? write(call) : Promise.resolve());
-  const onInterrupt = () => {
-    setInterruptOpen(false);
-    return run(() => interrupt({ id: session.id, state: stateToken(session) }));
-  };
 
   const inRound = round.length > 0;
   const sendRound = () => {
@@ -152,32 +146,18 @@ export function Composer({
 
   const canContinue = !!next?.action.action?.length;
   // On the phone the main button takes the row's remaining width; a round with no answers dims Send.
-  const slot = wide ? { whiteSpace: "nowrap", flex: "none" } : { flex: "1", minW: "0", h: "44px", justifyContent: "center", borderRadius: "10px" };
+  const slot: Partial<ComponentProps<typeof Button>> = wide ? { whiteSpace: "nowrap", flex: "none" } : { flex: "1", minW: "0", h: "44px", justifyContent: "center", borderRadius: "10px" };
   // Notes (on a question or in the composer) and images are worth sending without any answer.
   const hasQuestionNote = round.some((c) => !!answers[c.label]?.note?.trim());
   const noAnswers = !wide && unanswered.length === round.length && !hasQuestionNote && !hasContent;
   // Interrupt while the agent works; Continue after a run-end line unless a note or round is waiting to go.
   const mainButton = working ? (
-    <>
-      <Button
-        ref={interruptRef}
-        emphasis="secondary"
-        {...slot}
-        disabled={!connected || pending}
-        aria-expanded={interruptOpen}
-        onClick={() => setInterruptOpen(!interruptOpen)}
-      >
-        {pending && <Spinner size="sm" />}
-        Interrupt
-      </Button>
-      <InterruptPopover
-        open={interruptOpen}
-        disabled={!connected || pending}
-        anchorRef={interruptRef}
-        onConfirm={onInterrupt}
-        onClose={() => setInterruptOpen(false)}
-      />
-    </>
+    <InterruptControl
+      connected={connected}
+      pending={pending}
+      buttonProps={slot}
+      onInterrupt={() => write(() => interrupt({ id: session.id, state: stateToken(session) }))}
+    />
   ) : canContinue && !inRound && !hasContent ? (
     <Button
       aria-label={nextTitle ? `Continue ${nextTitle}` : "Continue"}
