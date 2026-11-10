@@ -15,6 +15,9 @@ type seenHead struct {
 // act is the per-poll dispatch: later PR tickets add their action here, each in
 // its own function. An error follows the watcher's outage rules.
 func (w *Watcher) act(r pr.Runner, repo string, t Target, v View) error {
+	if handled, err := w.closeOrMerge(t, v); handled || err != nil {
+		return err
+	}
 	if err := w.markReady(r, repo, t, v); err != nil {
 		return err
 	}

@@ -65,6 +65,13 @@ type Host interface {
 	// FileFlakyFollowUp files f in the project's own follow-ups epic, or notes a
 	// repeat on the open draft with the same key.
 	FileFlakyFollowUp(project string, from tickets.Address, f ticketwrite.FollowUp) error
+	// CancelFlowTickets cancels, with their agents, every unfinished ci-fix and
+	// Merge ticket of the epic.
+	CancelFlowTickets(t Target)
+	// SyncTrunkAfterMerge fetches origin and fast-forwards local Trunk, then
+	// stamps merged_at and releases the root. False means the update failed and
+	// a block is stored; the watcher retries it every tick.
+	SyncTrunkAfterMerge(t Target) (synced bool)
 	// QueueRoot queues the epic's ticket so it is claimed.
 	QueueRoot(root queue.RootRef, ticketID string) error
 }
@@ -236,6 +243,7 @@ func (w *Watcher) Tick(ctx context.Context) {
 			w.recovered(project, ts)
 		}
 	}
+	w.retryMerged()
 	w.host.CancelStalePRText()
 	w.autoOpen(ctx)
 	w.mu.Lock()

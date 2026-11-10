@@ -443,7 +443,12 @@ func (s *Merger) storeMergeBlock(root queue.RootRef, epicPath string, p mergePau
 // the chat path notifyEpicOutcome uses. The PR flow uses it to give up on an
 // epic's CI, which is no merge, so the epic-complete text would be wrong.
 func (s *Merger) PauseEpic(root queue.RootRef, e tickets.Epic, kind events.Kind, reason string) {
-	s.storeMergeBlock(root, e.Path, mergePause{reason: reason, kind: kind})
+	s.pauseEpic(root, e, mergePause{reason: reason, kind: kind})
+}
+
+func (s *Merger) pauseEpic(root queue.RootRef, e tickets.Epic, p mergePause) {
+	kind, reason := p.kind, p.reason
+	s.storeMergeBlock(root, e.Path, p)
 	s.events.PublishEvent(wire.Event{Type: wire.EventRootPaused, Address: root.String(), Kind: string(kind), Level: wire.EventLevelWarning, Message: reason})
 	if s.chat.Enabled() && !tickets.IsOneOffEpic(e) {
 		s.chat.EpicPause(root.Project, s.projects.ChatOverride(root.Project), root.Epic, schema.PauseReason(kind).Label(), reason)
@@ -536,11 +541,17 @@ func mergeFailed(project, epic string, err error) mergePause {
 // merge would also change: files that differ between the target's tip and the
 // branch's. An unrelated local change doesn't block a merge, so it isn't listed.
 func clashingFiles(repoRoot, dir, target, branch string) []string {
+	return clashingBetween(repoRoot, dir, "refs/heads/"+target, "refs/heads/"+branch)
+}
+
+// clashingBetween is clashingFiles for any two refs: the uncommitted files in
+// dir that differ between from and to.
+func clashingBetween(repoRoot, dir, from, to string) []string {
 	dirty, err := git.UncommittedPaths(dir)
 	if err != nil || len(dirty) == 0 {
 		return nil
 	}
-	merged, err := git.DiffNames(repoRoot, "refs/heads/"+target, "refs/heads/"+branch)
+	merged, err := git.DiffNames(repoRoot, from, to)
 	if err != nil {
 		return nil
 	}

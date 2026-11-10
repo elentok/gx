@@ -82,5 +82,16 @@ func (h prOpenHost) Kick() { h.s.prWatch.Kick() }
 func (h prOpenHost) PRMerged(root queue.RootRef, p pr.HeadPR) {
 	if h.s.prMergedHook != nil {
 		h.s.prMergedHook(root, p)
+		return
+	}
+	// Give the epic the PR's identity first: the Trunk update retries from the
+	// watcher's list, which holds epics that have one.
+	dir := h.EpicDir(root.Project, root.Epic)
+	if err := tickets.StampEpicFields(dir, map[string]any{"pr_number": p.Number, "pr_url": p.URL}); err != nil {
+		h.s.log.Warn("stamp adopted merged PR", "root", root, "err", err)
+		return
+	}
+	if err := h.s.prWatch.Merged(prflow.Target{Project: root.Project, Epic: root.Epic, Dir: dir, Number: p.Number, URL: p.URL}); err != nil {
+		h.s.log.Warn("adopted merged PR", "root", root, "err", err)
 	}
 }

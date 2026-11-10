@@ -151,6 +151,26 @@ func (h prWatchHost) FileFlakyFollowUp(project string, from tickets.Address, f t
 	return err
 }
 
+// CancelFlowTickets cancels every unfinished ci-fix and Merge ticket of the
+// epic, stopping their agents: a PR that merges while a fix runs wins.
+func (h prWatchHost) CancelFlowTickets(t prflow.Target) {
+	e, ok := prOpenHost(h).Epic(t.Project, t.Epic)
+	if !ok {
+		return
+	}
+	for _, tk := range e.Tickets {
+		if (tk.Type != string(schema.TypeCIFix) && tk.Type != string(schema.TypeMerge)) || e.RenderedStatus(tk).Terminal() {
+			continue
+		}
+		addr := tickets.Address{Project: t.Project, Epic: t.Epic, ID: tk.Identifier}
+		_, _ = h.s.ops.Cancel(wire.QueueRequest{Address: addr.String(), Stop: true, Source: "pr-flow"})
+	}
+}
+
+func (h prWatchHost) SyncTrunkAfterMerge(t prflow.Target) bool {
+	return h.s.merger.SyncTrunkAfterMerge(queue.RootRef{Project: t.Project, Epic: t.Epic})
+}
+
 func (h prWatchHost) QueueRoot(root queue.RootRef, ticketID string) error {
 	return h.s.merger.EnsureQueued(root, ticketID)
 }
