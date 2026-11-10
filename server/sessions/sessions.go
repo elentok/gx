@@ -301,7 +301,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
-		Args:      launchArgs(meta, mg.settings.Load().AgentsClaudeArgs, mg.codexRoots(meta)),
+		Args:      launchArgs(meta, mg.settings.Load().AgentsClaudeArgs, codexRoots(mg, meta)),
 		Env:       env,
 		Cwd:       meta.Dir,
 	}
@@ -328,7 +328,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 			"--cols", strconv.Itoa(cols), "--rows", strconv.Itoa(rows),
 			"--dir", dir,
 		},
-		mg.procCapArgs(),
+		procCapArgs(mg),
 		trustFlag(meta.MadeWorktree),
 		[]string{"--", launch.Name},
 		launch.Args)
@@ -345,7 +345,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 
 // procCapArgs is the holder's cap flag for a launch now, from the live
 // headroom setting.
-func (mg *Manager) procCapArgs() []string {
+func procCapArgs(mg *Manager) []string {
 	count := mg.cfg.ProcCount
 	if count == nil {
 		count = nativerunner.DefaultProcCount
@@ -384,7 +384,7 @@ func launchArgs(meta *Meta, claudeArgs, codexRoots []string) []string {
 // codexRoots are the writable roots of a Codex session: its dir's git dirs and
 // the project's ticket-store dir, which holds every epic dir. Other harnesses
 // get none.
-func (mg *Manager) codexRoots(meta *Meta) []string {
+func codexRoots(mg *Manager, meta *Meta) []string {
 	if meta.Harness != string(harness.Codex) {
 		return nil
 	}
