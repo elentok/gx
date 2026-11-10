@@ -106,6 +106,7 @@ func (mg *Manager) ResolveAsk(session, toolUseID string, res wire.AskHookResult)
 	default:
 		return false
 	}
+	delete(a.held, askKey{session, toolUseID})
 	return true
 }
 
@@ -125,6 +126,7 @@ func (mg *Manager) ReleaseAsk(session, toolUseID string) bool {
 	default:
 		return false
 	}
+	delete(a.held, key)
 	var questions []string
 	for _, q := range h.req.Questions {
 		questions = append(questions, q.Question)

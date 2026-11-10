@@ -84,3 +84,26 @@ func TestAskHold_ReAskAfterReleaseNeverRegistersAHold(t *testing.T) {
 		cancel()
 	}
 }
+
+// The page refetches the moment its answer is accepted, so the held card must be gone by then,
+// not whenever the hook goroutine wakes up.
+func TestAskHold_ResolveAndReleaseDropTheHeldAskAtOnce(t *testing.T) {
+	for name, finish := range map[string]func(mg *Manager) bool{
+		"resolve": func(mg *Manager) bool {
+			return mg.ResolveAsk("s1", "t1", wire.AskHookResult{Decision: wire.AskHookDeny})
+		},
+		"release": func(mg *Manager) bool { return mg.ReleaseAsk("s1", "t1") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			mg := &Manager{}
+			holdAsync(mg, "s1", "t1", "Which one?")
+			waitHeld(t, mg, "s1", 1)
+			if !finish(mg) {
+				t.Fatal("finish = false")
+			}
+			if n := len(mg.HeldAsks("s1")); n != 0 {
+				t.Fatalf("held asks right after finish = %d, want 0", n)
+			}
+		})
+	}
+}
