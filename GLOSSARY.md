@@ -875,16 +875,19 @@ Needs you. If the PR closes without merging, the epic returns here.
 **ci-fix ticket** — a system-generated ticket (`type: ci-fix`) the server forks into a complete epic
 that has an open PR, one per failed CI run. It runs like a **Merge ticket**, in the epic's worktree
 on the epic branch: it fixes the failure, pushes and exits. Its Resolution lists Check, Cause,
-Change, Commit and Outcome (`fixed` or `unfixable`); gx counts attempts from these. A person never
+Change, Commit and Outcome (`fixed` or `unfixable`). gx counts attempts from its "CI failed" activity entries, not from Resolutions. A person never
 authors one. At most one is open per epic.
 _Avoid_: fix agent ticket, babysit ticket.
 
 **Fixing CI** — an epic state: every ticket is done or cancelled except an open or claimed **ci-fix
 ticket**. Not in Needs you. Derived like **Merging**.
 
+**Writing PR text** — an epic state: the epic has an open or claimed **pr-text ticket**. Shown in
+Running, not in Needs you. Derived like **Merging**.
+
 **pr-text ticket** — a system-generated ticket (`type: pr-text`) that writes the PR title and body
 (`Title:` and `Body:` in its Resolution) on the light tier, before the PR opens. gx never edits the
-text afterwards.
+text afterwards. It is commitless and only reads the epic's worktree.
 
 **PR activity list** — the timeline on an epic page of what gx did on its PR (opened as draft, CI
 failed, fix pushed, marked ready, rebased, merged ...) and the CI results it reacted to. Ticketless
@@ -1233,7 +1236,8 @@ config. _Avoid_: suite, task, test target.
 **Check lock** — the machine-wide lock a `gx check --full` run takes when it runs the test kind. A second full run waits for it, and a ticket whose agent waits shows a waiting label.
 
 **Flake** — a test that fails and then passes on a rerun with no code change. A flake counts as a
-failure: a pass on retry is not a pass. A known flake is an open follow-up, not an entry on a list.
+failure: a pass on retry is not a pass. This holds for gx's own test runs. A PR check that passes on
+the server's one rerun counts as green for the PR, and the follow-up is the record. A known flake is an open follow-up, not an entry on a list.
 _Avoid_: intermittent failure, known failure.
 
 **Pre-existing failure** — a test or flow that fails on the branch and fails the same way on its

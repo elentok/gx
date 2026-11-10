@@ -137,8 +137,11 @@ button. The epic page shows a **PR activity list** of what gx did.
 ### PR text
 
 - A `pr-text` ticket (new system-generated ticket type) runs on the light tier, commitless, in the
-  epic's feature worktree, which it only reads. A `finishCheck` validates `Title:` and `Body:`; an
-  invalid Resolution is a failed attempt. While it runs the epic shows "Writing PR text" in Running
+  epic's feature worktree, which it only reads. A `finishCheck` validates `Title:` and `Body:`; a
+  failed `finishCheck` closes the attempt as cancelled with the reason (it never pauses the ticket),
+  the server forks the next `pr-text` ticket, and after the third it sets `pr-text-failed`.
+  `TypePRText` joins `IsCommitless` and `commitlessByDesignTypes`, and `IterationModeFor` gives it
+  Commitless with `ScratchDir` set to the feature worktree. While it runs the epic shows "Writing PR text" in Running
   (derived like Merging, not in Needs you). Awaiting PR and the open gate ignore `pr-text` tickets. It receives the epic
   address and the worktree path, reads the spec, ticket titles and diff itself, and writes `Title:`
   (one non-empty line) and a `Body:` section (non-empty) in its Resolution. gx checks nothing else.
@@ -202,9 +205,13 @@ button. The epic page shows a **PR activity list** of what gx did.
   the failure before the push; fetches, rebases and pushes the epic branch without overwriting
   (`--force-with-lease` stays); never skips hooks, never force-pushes over foreign commits and never
   edits CI config to turn a check off.
-- Before it creates a ci-fix ticket the server reruns a failed job once (`gh run rerun --job`). If the
-  rerun passes, the server adds "flaky: <check>" to the activity list and files the follow-up itself
-  (through the gx-follow-up path); if it fails, the normal ci-fix ticket starts. The agent never
+- Before it creates a ci-fix ticket the server reruns a failed job once (`gh run rerun --job`), only
+  after its workflow run has completed, and never for a check with no workflow run. It writes a "reran
+  <check>" entry (check key and head SHA) to `pr-activity.jsonl` and reruns at most once per (check
+  key, head SHA), so a restart does not rerun again. If the rerun passes, the check counts as green
+  for the PR, the server adds "flaky: <check>" to the activity list and writes the follow-up itself
+  through the ticket-write code into the project's `follow-ups` epic (fixed sections: check, run
+  URL, head SHA), skipping it when an open follow-up already names the check key; if it fails, the normal ci-fix ticket starts. The agent never
   reruns, so no agent waits on CI.
 - Its Resolution has the lines Check, Cause, Change, Commit and Outcome (`fixed` or `unfixable`).
   `unfixable` finishes with no commit and the reason, and pauses the epic at once.
@@ -241,13 +248,21 @@ button. The epic page shows a **PR activity list** of what gx did.
   text ticket's tries run out and ends on Try again.
 - **Writing PR text**: derived like Merging; the epic has an open or claimed `pr-text` ticket. Shown
   in Running, not in Needs you.
-- **Merge blocked in a `pr` project** (ADR 0042: each way in names the web button that ends it):
+- **Merge blocked in a `pr` project** (ADR 0042: each way in names its kind, the web button that ends
+  it, and why gx cannot recover):
 
-  | Way in | Reason shown | Button |
-  | --- | --- | --- |
-  | PR conflicts with trunk and 3 Merge tickets are used | needs rebase | Merge again: forks a PR-mode Merge ticket |
-  | Rebase conflict with foreign commits | the conflicting files | Merge again, after the person resolves it |
-  | Local trunk update failed after the PR merged | the git error | Stash, merge and restore, and Merge again, both retargeted to fetch and fast-forward local trunk |
+  | Way in | `land_block_kind` | Button | Why gx cannot recover |
+  | --- | --- | --- | --- |
+  | PR conflicts with trunk and 3 Merge tickets are used | `needs-rebase` | Merge again: forks a PR-mode Merge ticket | The attempt cap is used up |
+  | Rebase conflict with foreign commits | new `pr-foreign-conflict` | Merge again, after the person resolves it | A person must judge the foreign commits |
+  | Local trunk dirty after the PR merged | new `pr-dirty-trunk` | Stash, merge and restore, and Merge again, both retargeted to fetch and fast-forward local trunk | Local trunk is outside gx |
+  | Other local trunk update failure after the PR merged (failed fetch, diverged trunk) | new `pr-trunk-update` | Merge again, retargeted to fetch and fast-forward | Local trunk or the network is outside gx |
+
+  The PR merge and mark-merged both write the last two kinds, and the verbs dispatch on the kind. All
+  three new kinds go in the `pause_kind` migration step and the pause-to-verb table. Merge blocked
+  after a merged PR is stored, not derived from the "PR merged" entry. `EpicMergeBlocked` excludes
+  `ci-failing` and `pr-text-failed`; `summarizeEpic` gives those two their own reasons ("CI failing",
+  "PR text failed"). A Go test covers it.
 - **Awaiting PR** is a new pill: a Complete epic in a `pr` project with no PR (including after a
   closed PR). In Needs you. Awaiting PR, Merge blocked, "CI failing" and "PR text failed" are the
   only PR-related items in Needs you; draft with CI running, fixing and ready for review are in Running
@@ -256,17 +271,21 @@ button. The epic page shows a **PR activity list** of what gx did.
   failing", "Writing PR text", "PR merged" (with Merge blocked), "Implemented" (no PR yet). A
   Merge-blocked epic whose PR merged shows the buttons from the table above.
 - In a `pr` project an epic releases its dependents only once the PR has merged and local trunk holds
-  the merge, whatever `auto-ff-merge` or `landing` say.
+  the merge, whatever `auto-ff-merge` or `landing` say. The seam: `ProjectFile.LandingPolicy()` returns
+  `on-landed` when `delivery` is `pr` (it feeds `EpicReleaseOf` and `MergingOnMerged`, so base
+  derivation is covered), and `EpicRelease.stamped` also requires `merged_at` for any epic with
+  `pr_number` set (story 56). A Go test covers release and base derivation.
 
 ### After the PR merges
 
-- gx records "PR merged" in `pr-activity.jsonl`, cancels any running `ci-fix` or Merge ticket and its
-  agent and ignores its unpushed work, then runs `git fetch origin` and fast-forwards local trunk to
+- gx records "PR merged" in `pr-activity.jsonl`, cancels every open, claimed or paused `ci-fix` and Merge ticket (and
+  their agents), clears `ci-failing`, and ignores its unpushed work, then runs `git fetch origin` and fast-forwards local trunk to
   `origin/<trunk>`. Only after local trunk holds the merge does it stamp `merged_at` (the stamp
   hand-merge detection uses) and add "trunk updated". A failure leaves `merged_at` empty and the epic
-  Merge blocked with the reason, derived from the "PR merged" entry and the land-block fields, and
-  dependents wait (`EpicMergeBlocked` needs `merged_at` empty, and dependents are released on
-  `merged_at`).
+  Merge blocked with a `pr-dirty-trunk` or `pr-trunk-update` kind, and dependents wait. Once the "PR merged" entry exists, gx stops polling the PR; each tick retries
+  the fetch and fast-forward until `merged_at` is stamped or a block is set, writes no second entry,
+  and shows "PR merged" meanwhile. (`EpicMergeBlocked` needs `merged_at` empty, and dependents are
+  released on `merged_at`.)
 - A PR closed without merging, or a deleted remote branch (which closes it), clears `pr_number` and
   `pr_url` and returns the epic to Awaiting PR with "PR closed without merging" in the list. Create PR opens a new PR; Auto-PR does
   not reopen one for that epic by itself: it skips an epic whose list has a close entry newer than
@@ -282,7 +301,7 @@ button. The epic page shows a **PR activity list** of what gx did.
 
 - `pr_number` and `pr_url` are optional epic frontmatter fields written when the PR opens or is
   adopted. A restart reads them from disk with no `gh` call.
-- The ticketless PR activity entries (PR opened, adopted PR, marked ready for review, CI failed
+- The ticketless PR activity entries (PR opened, adopted PR, marked ready for review, reran <check>, CI failed
   (with check keys and ci-fix ticket id), flaky: <check>, Paused "CI failing", Try again reset, PR
   merged, trunk updated, PR closed without merging, GitHub unreachable, GitHub reachable again,
   marked merged by hand) are an append-only
@@ -292,7 +311,7 @@ button. The epic page shows a **PR activity list** of what gx did.
 - Migration steps (`migrations/steps.go`, then update `migrations/testdata/schema.snapshot`, per
   `.ai/index.md`): one named step for the `ci-fix` and `pr-text` ticket type values, one for the
   `pr_number` and `pr_url` epic fields, and one for the `pause_reason`/`pause_kind` values
-  (`ci-failing`, `pr-text-failed`). They rewrite no data. The first implementation ticket carries
+  (`ci-failing`, `pr-text-failed`, `pr-foreign-conflict`, `pr-dirty-trunk`, `pr-trunk-update`). They rewrite no data. The first implementation ticket carries
   them. Step names are the implementer's choice, and a released name is never reused.
 
 ### Web and CLI
@@ -366,7 +385,7 @@ scenarios below are implementation tickets (`pr-flow-awaiting`, `pr-flow-draft-c
 18. A failed run creates one `ci-fix` ticket with its run and job ids. Mock states: `card-fixing`.
 19. The second fix ticket's prompt lists the earlier Resolution.
 20. The ci-fix prompt carries the run and job ids; a rules test on the bundled `gx-ci-fix` skill text (like `skills/mock_rules_test.go`) checks it forbids skipping hooks, force-pushing over foreign commits and editing CI config, and names the local check run.
-21. Flake path: the server reruns the failed job once; when the rerun passes it adds "flaky: <check>", files the follow-up in the `follow-ups` epic and creates no ci-fix ticket; when it fails the ci-fix ticket starts.
+21. Flake path: the server reruns the failed job once; when the rerun passes it adds "flaky: <check>", files the follow-up in the `follow-ups` epic and creates no ci-fix ticket; when it fails the ci-fix ticket starts. After a server restart the same (check key, head SHA) is not rerun again, and a repeat flake adds no second follow-up.
 22. The bundled skill text tells the agent to use a read-only strongest-tier reviewer before the push (rules test).
 23. `skills.ci-fix` listed skills appear in the fix ticket prompt; a project override replaces the list.
 24. A fourth failure of one check, and an eleventh failure on a PR, create no further ticket and show "CI failing".
@@ -392,7 +411,7 @@ scenarios below are implementation tickets (`pr-flow-awaiting`, `pr-flow-draft-c
 44. An existing open PR on the branch is adopted ("adopted PR"); a merged one marks the epic merged.
 45. Kill and restart the server between PR creation and number write: restart adopts and no second PR is created.
 46. The PR merges during a running fix ticket: the ticket is cancelled and the trunk update runs.
-47. `gx server epics mark-merged <project:epic>` stamps `merged_at`; the card button does the same.
+47. `gx server epics mark-merged <project:epic>` stamps `merged_at`; the card button does the same. In a `pr` project with dirty local trunk it leaves `merged_at` empty, shows Merge blocked (`pr-dirty-trunk`) with the table's buttons, and a button press stamps it.
 48. mark-merged on an incomplete or running epic prints the refusal (`--json`: `refused` true, exit non-zero).
 49. gx-cleanup calls the verb (grep of the skill and its fixture run).
 50. PR chip and "Open on GitHub" show after the PR exists. Mock states: `card-draft-ci-running`, `card-ready-for-review`, `page-a-ci-failing`.
@@ -409,7 +428,8 @@ scenarios below are implementation tickets (`pr-flow-awaiting`, `pr-flow-draft-c
 61. A one-off shows no Create PR and opens no PR.
 62. The pause-to-verb table test passes with the "CI failing" and "PR text failed" rows, and Try again clears each.
 63. While the `pr-text` ticket runs the epic shows "Writing PR text" in Running, not in Needs you and not Awaiting PR.
-64. Each Merge blocked way in a `pr` project shows the button in the table above.
+64. Each Merge blocked way in a `pr` project shows its kind's buttons from the table above, and `EpicMergeBlocked` does not match `ci-failing` or `pr-text-failed`.
+65. After "PR merged" and a crash before the fast-forward, a restart retries the fetch and fast-forward without a second entry; a paused ci-fix ticket is cancelled by the merge.
 
 Mock states:
 
