@@ -123,6 +123,22 @@ func TestMerged_CancelsUnfinishedCIFixAndClearsCIFailing(t *testing.T) {
 	}
 }
 
+func TestClosed_ClearsTheMergeBlockToAwaitingPR(t *testing.T) {
+	f := openRig(t, "")
+	openPR(f)
+	f.StampPR(t, 5, prURL)
+	if err := tickets.StampEpicFields(f.EpicDir(), map[string]any{"land_block_kind": "ci-failing", "land_block_reason": "red"}); err != nil {
+		t.Fatal(err)
+	}
+	f.GH.Update(func(s *ghfake.State) { s.PRs[0].State = "CLOSED" })
+	f.Rescan(t)
+	f.Tick(t)
+	e := tickets.LoadEpicAt(f.EpicDir())
+	if e.PRNumber != 0 || e.MergeBlockKind != "" || e.MergeBlockReason != "" {
+		t.Fatalf("pr %d, block %q reason %q", e.PRNumber, e.MergeBlockKind, e.MergeBlockReason)
+	}
+}
+
 func TestClosed_ClearsThePRAndLogsIt(t *testing.T) {
 	f := openRig(t, "")
 	openPR(f)

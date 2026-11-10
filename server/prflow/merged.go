@@ -61,14 +61,15 @@ func (w *Watcher) retryMerged() {
 	}
 }
 
-// closed clears the epic's PR identity, so it is Awaiting PR again, and logs
+// closed clears the epic's PR identity and any merge block (which would hide
+// Awaiting PR in prstate.Of), so it is Awaiting PR again, and logs
 // it. Auto-PR skips it because "PR closed" is newer than "PR opened".
 func (w *Watcher) closed(t Target) error {
 	// The index lags the disk, so a second pass can still see the closed PR.
 	if tickets.LoadEpicAt(t.Dir).PRNumber == 0 {
 		return nil
 	}
-	if err := tickets.ClearEpicFields(t.Dir, "pr_number", "pr_url"); err != nil {
+	if err := tickets.ClearEpicFields(t.Dir, "pr_number", "pr_url", blockKindKey, blockReasonKey); err != nil {
 		return err
 	}
 	return Append(t.Dir, Entry{Kind: KindPRClosed, Detail: t.URL})
