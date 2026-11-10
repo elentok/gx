@@ -37,7 +37,7 @@ func (s *Server) newDevVite() error {
 func (s *Server) applyDevMode(next Settings) {
 	home := harness.LookupEnv(s.cfg.Env, "HOME")
 	root := devcheckout.Resolve(next.WebDevDir, version.DevDir, home)
-	on := next.WebDevFrontend && root != ""
+	on := next.WebDevFrontend && root != "" && s.web.Listener() != nil
 	if !on {
 		// The supervisor reports off only after Vite has stopped; until then
 		// the proxy would answer 502.

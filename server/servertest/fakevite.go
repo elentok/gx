@@ -27,6 +27,7 @@ type FakeVite struct {
 	starts   int
 	running  int
 	ports    []int
+	dirs     []string
 	ready    chan struct{}
 	once     sync.Once
 }
@@ -63,6 +64,13 @@ func (f *FakeVite) Ports() []int {
 	return append([]int(nil), f.ports...)
 }
 
+// Dirs lists the webui directory every Start was given.
+func (f *FakeVite) Dirs() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.dirs...)
+}
+
 func (f *FakeVite) FreePort() (int, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -79,7 +87,7 @@ func (f *FakeVite) Install(_ context.Context, webuiDir string, _ io.Writer) erro
 	return os.MkdirAll(filepath.Join(webuiDir, "node_modules"), 0o755)
 }
 
-func (f *FakeVite) Start(_ context.Context, _ string, port int, _ io.Writer) (devvite.Process, error) {
+func (f *FakeVite) Start(_ context.Context, webuiDir string, port int, _ io.Writer) (devvite.Process, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
 	if err != nil {
 		return nil, err
@@ -93,6 +101,7 @@ func (f *FakeVite) Start(_ context.Context, _ string, port int, _ io.Writer) (de
 	f.starts++
 	f.running++
 	f.ports = append(f.ports, port)
+	f.dirs = append(f.dirs, webuiDir)
 	f.mu.Unlock()
 	return p, nil
 }
