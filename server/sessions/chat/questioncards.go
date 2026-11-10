@@ -33,10 +33,11 @@ const (
 	ClassFixAgent
 )
 
-// classSlots is the class table: later tickets add a slot to a class here.
+// classSlots is the class table, in display order: live blocker, ticket ask,
+// printed round. A dialog slot is a live blocker too and sits before the ask.
 var classSlots = map[SessionClass][]CardSlot{
-	ClassPlain:      {SlotLiveBlocker, SlotClaudeDialog, SlotCodexQuestion, SlotRound},
-	ClassFlow:       {SlotLiveBlocker, SlotRound},
+	ClassPlain:      {SlotLiveBlocker, SlotClaudeDialog, SlotCodexQuestion, SlotTicketAsk, SlotRound},
+	ClassFlow:       {SlotLiveBlocker, SlotTicketAsk, SlotRound},
 	ClassQueueAgent: {SlotTicketAsk},
 	ClassFixAgent:   {SlotLiveBlocker, SlotTicketAsk, SlotRound},
 }

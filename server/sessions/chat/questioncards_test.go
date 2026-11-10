@@ -119,6 +119,49 @@ func TestClaudeDialogCard(t *testing.T) {
 	}
 }
 
+func TestBuildCards_ClassTableAcrossSources(t *testing.T) {
+	t.Parallel()
+	all := chat.CardSources{
+		chat.SlotLiveBlocker:   {card(wire.CardSourcePermission, "p")},
+		chat.SlotClaudeDialog:  {card(wire.CardSourceClaudeDialog, "d")},
+		chat.SlotCodexQuestion: {card(wire.CardSourceCodex, "c")},
+		chat.SlotTicketAsk:     {card(wire.CardSourceTicketAsk, "a")},
+		chat.SlotRound:         {card(wire.CardSourceRound, "r")},
+	}
+	noBlocker := chat.CardSources{}
+	for k, v := range all {
+		if k != chat.SlotLiveBlocker {
+			noBlocker[k] = v
+		}
+	}
+	sources := func(cards []wire.QuestionCard) []string {
+		var out []string
+		for _, c := range cards {
+			out = append(out, c.Source)
+		}
+		return out
+	}
+	cases := []struct {
+		name  string
+		class chat.SessionClass
+		src   chat.CardSources
+		want  []string
+	}{
+		{"plain with a blocker", chat.ClassPlain, all, []string{wire.CardSourcePermission}},
+		{"plain without", chat.ClassPlain, noBlocker, []string{wire.CardSourceClaudeDialog, wire.CardSourceCodex, wire.CardSourceTicketAsk, wire.CardSourceRound}},
+		{"flow with a blocker", chat.ClassFlow, all, []string{wire.CardSourcePermission}},
+		{"flow without", chat.ClassFlow, noBlocker, []string{wire.CardSourceTicketAsk, wire.CardSourceRound}},
+		{"queue", chat.ClassQueueAgent, all, []string{wire.CardSourceTicketAsk}},
+		{"fix with a blocker", chat.ClassFixAgent, all, []string{wire.CardSourcePermission}},
+		{"fix without", chat.ClassFixAgent, noBlocker, []string{wire.CardSourceTicketAsk, wire.CardSourceRound}},
+	}
+	for _, c := range cases {
+		if got := sources(chat.BuildCards(c.class, c.src)); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: sources = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestClassOf(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
