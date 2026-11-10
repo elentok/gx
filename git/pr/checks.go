@@ -73,6 +73,22 @@ func latestChecks(headSHA string, checks []Check) (order []CheckKey, latest map[
 	return order, latest
 }
 
+// HeadChecks is the newest check per key on headSHA, in first-seen order.
+func HeadChecks(headSHA string, checks []Check) []Check {
+	order, latest := latestChecks(headSHA, checks)
+	out := make([]Check, 0, len(order))
+	for _, k := range order {
+		out = append(out, latest[k])
+	}
+	return out
+}
+
+// Green reports whether the check completed without failing.
+func (c Check) Green() bool { return classifyCheck(c.Status, c.Conclusion) == outcomeGreen }
+
+// Completed reports whether the check has finished, whatever its conclusion.
+func (c Check) Completed() bool { return c.Status == "COMPLETED" }
+
 // CheckCounts is how many checks on a head are in each state.
 type CheckCounts struct{ Pending, Failed, Green int }
 

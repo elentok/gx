@@ -18,7 +18,7 @@ func (w *Watcher) act(r pr.Runner, repo string, t Target, v View) error {
 	if err := w.markReady(r, repo, t, v); err != nil {
 		return err
 	}
-	return w.startCIFix(t, v)
+	return w.startCIFix(r, repo, t, v)
 }
 
 // markReady takes a green draft out of draft, once per head SHA. A PR with no

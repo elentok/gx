@@ -235,6 +235,30 @@ func TestWriteFollowUp_GuardBodyAndDedupeKey(t *testing.T) {
 	}
 }
 
+func TestWriteFollowUpIn_FilesIntoTheGivenEpicNotTheConfiguredOne(t *testing.T) {
+	t.Parallel()
+	_, store, _, _ := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
+	other := filepath.Join(store, "other", "follow-ups")
+	from := tickets.Address{Project: "other", Epic: "epic-a", ID: "03"}
+	spec := ticketwrite.FollowUp{Slug: "flaky", Title: "Flaky", Source: "S.", Problem: "P.", SuggestedFix: "F.", Key: "w/build"}
+	for range 2 {
+		if _, err := WriteFollowUpIn(other, from, spec); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := tickets.LoadEpicAt(other).Tickets
+	if len(got) != 1 {
+		t.Fatalf("given epic has %d tickets, want 1 (the repeat is noted)", len(got))
+	}
+	raw, _ := os.ReadFile(got[0].Path)
+	if !strings.Contains(string(raw), "Seen again in other:epic-a/03") {
+		t.Errorf("repeat not noted:\n%s", raw)
+	}
+	if n := len(followUpTickets(t, store)); n != 0 {
+		t.Errorf("configured epic got %d tickets, want none", n)
+	}
+}
+
 func TestProposalClass_AmbiguousOrMissingFilesNothing(t *testing.T) {
 	t.Parallel()
 	for name, result := range map[string]string{

@@ -2,6 +2,7 @@ package prflow_test
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -39,9 +40,20 @@ func failingPR(t *testing.T, f *rigs.PRFlow, sha string, checks ...ghfake.Check)
 	f.StampPR(t, 5, prURL)
 }
 
+// reran logs the rerun each key's failed job already had, so the next poll forks.
+func reran(t *testing.T, f *rigs.PRFlow, sha string, keys ...string) {
+	t.Helper()
+	for _, k := range keys {
+		if err := prflow.Append(f.EpicDir(), prflow.Entry{Kind: prflow.KindReranCheck, Checks: []string{k}, HeadSHA: sha}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestCIFix_FailedCheckForksOneTicketWithTheRunAndSkills(t *testing.T) {
 	f := rigs.StartPRFlow(t, rigs.PRFlowOpts{Server: []func(*server.Config){func(c *server.Config) { c.CIFixSkills = []string{"my-ci-rules"} }}})
 	failingPR(t, f, "sha1", done("build", "FAILURE", 11), done("lint", "TIMED_OUT", 12))
+	reran(t, f, "sha1", "11/build", "12/lint")
 	f.Tick(t)
 	f.Tick(t)
 	got := ciFixTickets(f)
@@ -55,6 +67,7 @@ func TestCIFix_FailedCheckForksOneTicketWithTheRunAndSkills(t *testing.T) {
 		}
 	}
 	es, _ := prflow.Read(f.EpicDir())
+	es = slices.DeleteFunc(es, func(e prflow.Entry) bool { return e.Kind == prflow.KindReranCheck })
 	if len(es) != 1 || es[0].Kind != prflow.KindCIFailed || es[0].TicketID != got[0].Identifier || len(es[0].Checks) != 1 {
 		t.Fatalf("activity = %+v, want one CI failed entry naming the ticket", es)
 	}
@@ -63,6 +76,7 @@ func TestCIFix_FailedCheckForksOneTicketWithTheRunAndSkills(t *testing.T) {
 func TestCIFix_SecondFailedRunGetsATicketWithTheFirstResolution(t *testing.T) {
 	f := rigs.StartPRFlow(t, rigs.PRFlowOpts{})
 	failingPR(t, f, "sha1", done("build", "FAILURE", 11))
+	reran(t, f, "sha1", "11/build")
 	f.Tick(t)
 	first := ciFixTickets(f)[0]
 	raw := servertest.ReadFile(t, first.Path)
@@ -79,6 +93,7 @@ func TestCIFix_SecondFailedRunGetsATicketWithTheFirstResolution(t *testing.T) {
 	rerun := done("build", "FAILURE", 21)
 	rerun.WorkflowID = 11
 	setChecks(f, "sha2", rerun)
+	reran(t, f, "sha2", "11/build")
 	f.Tick(t)
 	got := ciFixTickets(f)
 	if len(got) != 2 {
@@ -151,6 +166,7 @@ func TestCIFix_ProjectOverrideReplacesTheSkillList(t *testing.T) {
 		t.Fatal(err)
 	}
 	failingPR(t, f, "sha1", done("build", "FAILURE", 11))
+	reran(t, f, "sha1", "11/build")
 	f.Tick(t)
 	got := ciFixTickets(f)
 	if len(got) != 1 {

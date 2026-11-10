@@ -9,6 +9,8 @@ import (
 	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/recovery"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -114,6 +116,15 @@ func (h prWatchHost) CIFixCaps() (perCheck, perPR int) {
 	set := h.s.settings.Load()
 	def := config.DefaultPRConfig()
 	return cmp.Or(set.CIFixAttemptsPerCheck, def.CIFixAttemptsPerCheck), cmp.Or(set.CIFixAttemptsPerPR, def.CIFixAttemptsPerPR)
+}
+
+func (h prWatchHost) FileFlakyFollowUp(project string, from tickets.Address, f ticketwrite.FollowUp) error {
+	dir, err := h.s.projects.Dir(project)
+	if err != nil {
+		return err
+	}
+	_, err = recovery.WriteFollowUpIn(filepath.Join(dir, "follow-ups"), from, f)
+	return err
 }
 
 func (h prWatchHost) QueueRoot(root queue.RootRef, ticketID string) error {

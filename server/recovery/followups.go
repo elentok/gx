@@ -141,6 +141,11 @@ func (rec *Recovery) WriteFollowUp(from tickets.Address, f ticketwrite.FollowUp)
 	if err != nil {
 		return "", err
 	}
+	return WriteFollowUpIn(epicPath, from, f)
+}
+
+// WriteFollowUpIn is WriteFollowUp into the epic at epicPath.
+func WriteFollowUpIn(epicPath string, from tickets.Address, f ticketwrite.FollowUp) (string, error) {
 	if err := EnsureDraftEpic(epicPath); err != nil {
 		return "", err
 	}

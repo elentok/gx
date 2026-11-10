@@ -9,6 +9,8 @@ import (
 
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketwrite"
+	"github.com/elentok/gx/tickets"
 )
 
 // Poll intervals and the backoff cap (spec "Watching the PR").
@@ -51,6 +53,9 @@ type Host interface {
 	CIFixSkills(project string) []string
 	// CIFixCaps is the ci-fix attempts allowed per check and per PR.
 	CIFixCaps() (perCheck, perPR int)
+	// FileFlakyFollowUp files f in the project's own follow-ups epic, or notes a
+	// repeat on the open draft with the same key.
+	FileFlakyFollowUp(project string, from tickets.Address, f ticketwrite.FollowUp) error
 	// QueueRoot queues the epic's ticket so it is claimed.
 	QueueRoot(root queue.RootRef, ticketID string) error
 }
@@ -69,7 +74,9 @@ type View struct {
 	Failed []pr.CheckKey
 	// FailedChecks is the failed checks of the head with their run and job ids.
 	FailedChecks []pr.Check
-	Mergeable    string
+	// HeadChecks is the newest check per key on the head, whatever its state.
+	HeadChecks []pr.Check
+	Mergeable  string
 	// LastError is the newest poll failure, empty after a good poll.
 	LastError   string
 	Unreachable bool
@@ -307,7 +314,8 @@ func (w *Watcher) nextView(r pr.Runner, repo string, t Target, st pr.WatchState)
 	failing := st.Rollup == "FAILURE" || st.Rollup == "ERROR"
 	detail := v.Number == 0 || v.HeadSHA != st.HeadSHA || v.Rollup != st.Rollup || failing
 	next := View{Number: t.Number, URL: t.URL, State: st.State, Draft: st.IsDraft, HeadSHA: st.HeadSHA,
-		Rollup: st.Rollup, Mergeable: st.Mergeable, Checks: v.Checks, CI: v.CI, Failed: v.Failed, FailedChecks: v.FailedChecks}
+		Rollup: st.Rollup, Mergeable: st.Mergeable, Checks: v.Checks, CI: v.CI, Failed: v.Failed, FailedChecks: v.FailedChecks,
+		HeadChecks: v.HeadChecks}
 	if detail {
 		head, checks, err := r.PRChecks(repo, t.Number)
 		if err != nil {
@@ -318,6 +326,7 @@ func (w *Watcher) nextView(r pr.Runner, repo string, t Target, st pr.WatchState)
 		next.Failed = failed
 		next.FailedChecks = pr.FailedChecks(head, checks)
 		next.Checks = pr.CountChecks(head, checks)
+		next.HeadChecks = pr.HeadChecks(head, checks)
 	}
 	return next, nil
 }

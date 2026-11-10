@@ -162,21 +162,33 @@ func OutcomeOf(ticketPath string) (string, error) {
 // head that has none yet, and queues the epic so it is claimed. Pending CI,
 // cancelled, stale and action-required checks, and a head the failure is not
 // on, start nothing: the view's failed set is already per head.
-func (w *Watcher) startCIFix(t Target, v View) error {
-	if v.State != "OPEN" || v.CI != pr.ChecksFailed {
+func (w *Watcher) startCIFix(r pr.Runner, repo string, t Target, v View) error {
+	if v.State != "OPEN" {
 		return nil
 	}
 	entries, err := sinceReset(t.Dir)
 	if err != nil {
 		return err
 	}
+	if err := w.settleReruns(t, v, entries); err != nil {
+		return err
+	}
+	if v.CI != pr.ChecksFailed {
+		return nil
+	}
 	perCheck, perPR := w.host.CIFixCaps()
 	for _, c := range v.FailedChecks {
 		key := CheckKeyString(c.Key())
-		if slices.ContainsFunc(entries, func(e Entry) bool {
-			return e.Kind == KindCIFailed && e.HeadSHA == v.HeadSHA && slices.Contains(e.Checks, key)
-		}) {
+		if hasEntry(entries, KindCIFailed, v.HeadSHA, key) {
 			continue
+		}
+		if c.RunID != "" && !hasEntry(entries, KindReranCheck, v.HeadSHA, key) {
+			// A failed job is rerun once before a ticket starts, and only
+			// when its whole workflow run has finished.
+			if !runCompleted(v.HeadChecks, c.RunID) {
+				continue
+			}
+			return w.rerun(r, repo, t, v, c, key)
 		}
 		id, res, err := ForkCIFix(t.Dir, CIFixJob{
 			Project: t.Project, Epic: t.Epic, Number: t.Number, URL: t.URL, HeadSHA: v.HeadSHA, Check: c,
