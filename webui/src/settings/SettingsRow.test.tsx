@@ -1,6 +1,7 @@
 import { act, fireEvent, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsEntry, SettingsWriteResult } from "../generated/server";
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { renderThemed } from "../ui/render";
 import { SettingsRow } from "./SettingsRow";
 
@@ -226,6 +227,38 @@ describe("SettingsRow", () => {
     it("a chat id string row shows in full", () => {
       const { getByRole } = setup(entry({ key: "notifications.telegram.chat-id", type: "string", set: true, value: "-1001234567890" }));
       expect((getByRole("textbox") as HTMLInputElement).value).toBe("-1001234567890");
+    });
+  });
+
+  describe("server.web.dev-frontend", () => {
+    const REASON = "Off: gx has no Dev checkout. Set the Dev checkout path below.";
+    const devRow = entry({ key: "server.web.dev-frontend", type: "bool", default: false });
+    const withDev = (has_checkout: boolean) => {
+      const state = { snapshot: { dev: { state: "off", has_checkout } } } as unknown as ConnectionState;
+      const conn = { getState: () => state, subscribe: () => () => {} } as unknown as Connection;
+      const onWrite = vi.fn(async () => ({}) as SettingsWriteResult);
+      const view = renderThemed(
+        <ConnectionContext.Provider value={conn}>
+          <SettingsRow entry={devRow} pendingRestart={false} onWrite={onWrite} />
+        </ConnectionContext.Provider>,
+      );
+      return { ...view, onWrite };
+    };
+
+    it("is a disabled switch with the reason line while there is no Dev checkout", () => {
+      const v = withDev(false);
+      expect((v.getByRole("switch") as HTMLButtonElement).disabled).toBe(true);
+      expect(v.getByText(REASON)).toBeTruthy();
+    });
+
+    it("is an enabled switch without the reason line with a Dev checkout, and a toggle writes with no dialog", async () => {
+      const v = withDev(true);
+      expect((v.getByRole("switch") as HTMLButtonElement).disabled).toBe(false);
+      expect(v.queryByText(REASON)).toBeNull();
+      fireEvent.click(v.getByRole("switch"));
+      await flush();
+      expect(v.queryByRole("dialog")).toBeNull();
+      expect(v.onWrite).toHaveBeenCalledWith([{ key: "server.web.dev-frontend", value: true }]);
     });
   });
 

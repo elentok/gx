@@ -1,4 +1,4 @@
-import { fireEvent, waitFor } from "@testing-library/react";
+import { act, fireEvent, waitFor } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -95,6 +95,35 @@ describe("SettingsPage on a phone", () => {
     const section = renderAt("/settings/p/gx/s/budget");
     expect(await section.findByRole("heading", { name: "Budget" })).toBeTruthy();
     expect(section.getByRole("link", { name: "‹ gx" }).getAttribute("href")).toBe("#/settings/p/gx");
+  });
+});
+
+describe("SettingsPage Dev checkout", () => {
+  const auth = async () => ({ totp_on: false, setup_code_required: false }) as never;
+  const snap = (has_checkout: boolean) => ({ snapshot: { dev: { state: "off", has_checkout } } }) as unknown as ConnectionState;
+
+  it("enables the open dev-frontend row when a refetched snapshot has a Dev checkout, without a reload", async () => {
+    let state = snap(false);
+    const listeners = new Set<() => void>();
+    const conn = {
+      getState: () => state,
+      subscribe: (l: () => void) => (listeners.add(l), () => listeners.delete(l)),
+      onEvent: () => () => {},
+    } as unknown as Connection;
+    const entries = [{ key: "server.web.dev-frontend", path: ["server", "web", "dev-frontend"], type: "bool", section: "Server", description: "Dev.", set: false, default: false }];
+    const { findByRole } = renderThemed(
+      <ConnectionContext.Provider value={conn}>
+        <MemoryRouter initialEntries={["/settings/s/server"]}>
+          <Routes>
+            <Route path="/settings/s/:section" element={<SettingsPage fetchAuth={auth} fetchSettings={async () => ({ entries }) as never} />} />
+          </Routes>
+        </MemoryRouter>
+      </ConnectionContext.Provider>,
+    );
+    expect(((await findByRole("switch")) as HTMLButtonElement).disabled).toBe(true);
+    state = snap(true);
+    act(() => listeners.forEach((l) => l()));
+    await waitFor(() => expect(((document.querySelector("[role=switch]") as HTMLButtonElement)).disabled).toBe(false));
   });
 });
 

@@ -1,6 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../generated/server";
+import { DEV_FRONTEND_KEY, useDev } from "../dev";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { Modal } from "../ui/modal/Modal";
@@ -28,6 +29,8 @@ interface ControlProps {
   dirty: boolean;
   invalid: boolean;
   pending: boolean;
+  /** The control is switched off for a reason shown beside it. */
+  locked: boolean;
   setDraft: (d: string | undefined) => void;
   save: (value: unknown) => void;
   remove: () => void;
@@ -82,7 +85,7 @@ function TextControl({ entry, draft, dirty, invalid, pending, setDraft, save }: 
   );
 }
 
-function BoolControl({ entry, draft, pending, save }: ControlProps) {
+function BoolControl({ entry, draft, pending, locked, save }: ControlProps) {
   const on = draft === "true";
   return (
     <chakra.button
@@ -90,7 +93,7 @@ function BoolControl({ entry, draft, pending, save }: ControlProps) {
       role="switch"
       aria-checked={on}
       aria-label={entryLabel(entry)}
-      disabled={pending}
+      disabled={pending || locked}
       onClick={() => save(!on)}
       w="40px"
       h="22px"
@@ -310,6 +313,8 @@ export function SettingsRow({
   project?: string;
 }) {
   const write = useWrite({ toastRefusal: false });
+  // Presence comes from the snapshot's Dev block, which repaints on dev-changed; the entries are read once.
+  const noDevCheckout = entry.key === DEV_FRONTEND_KEY && !useDev().has_checkout;
   const [draft, setDraft] = useState<string>();
   const [saved, setSaved] = useState(false);
   const [restartNeeded, setRestartNeeded] = useState(false);
@@ -412,6 +417,7 @@ export function SettingsRow({
             dirty={dirty}
             invalid={refused}
             pending={write.pending}
+            locked={noDevCheckout}
             setDraft={setDraft}
             save={saveValue}
             remove={() => send(removeChange(entry.key))}
@@ -420,6 +426,11 @@ export function SettingsRow({
       ) : (
         <Text fontSize="sm" color="text.muted" data-testid="setting-value">
           {valueText(entry)}
+        </Text>
+      )}
+      {noDevCheckout && (
+        <Text fontSize="sm" color="text.muted">
+          Off: gx has no Dev checkout. Set the Dev checkout path below.
         </Text>
       )}
       {errorText && (
