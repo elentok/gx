@@ -1222,6 +1222,13 @@ step with it. gx may change its copy; a sync pulls the upstream's later changes 
 Contrast with a bundled skill gx wrote itself (e.g. `gx-verify`), which has no upstream.
 _Avoid_: external skill (for a vendored one).
 
+**Skill source** — a folder of skills outside gx that the person installs with `gx skills install
+<dir>`. gx remembers it and re-syncs it on every bare install and server start. Each direct
+subfolder with a `SKILL.md` is one skill. _Avoid_: skill repo, skill pack.
+
+**Third-party skill** — a skill installed from a **Skill source**, not shipped with gx. Not a
+**Vendored skill**, which gx copies into its bundle. _Avoid_: external skill, user skill.
+
 **Sync strategy** — how a sync brings a vendored skill's upstream changes into gx's copy. **Merge**:
 a 3-way merge of the upstream change into gx's copy, then a review of the result. **Port**: no
 merge; each upstream change is read and carried over by hand only if it matters to gx's copy. Port
