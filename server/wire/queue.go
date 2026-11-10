@@ -104,6 +104,8 @@ const (
 	ReasonOneOffsEpic      = "one-offs-epic"
 	ReasonNotDirtyTrunk    = "not-dirty-trunk"
 	ReasonNeedsRebase      = "needs-rebase"
+	ReasonHasPR            = "has-pr"
+	ReasonPROpenFailed     = "pr-open-failed"
 )
 
 // EventQueueChanged is emitted once per queue write; Address is the ticket it

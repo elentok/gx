@@ -164,6 +164,37 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 	}
 }
 
+func TestServerEpicsCreatePR_RejectsNonEpicAddressesAndHasJSON(t *testing.T) {
+	for _, args := range [][]string{{}, {"proj:epic/01"}, {"epic"}, {"proj:a", "proj:b"}} {
+		if err := execute(t, append([]string{"server", "epics", "create-pr"}, args...), Deps{}); err == nil {
+			t.Errorf("args %q: want an error", args)
+		}
+	}
+	c, _, err := serverParent(Deps{}).Find([]string{"epics", "create-pr"})
+	if err != nil || c.Flags().Lookup("json") == nil {
+		t.Errorf("create-pr = %v, err %v; want a verb with --json", c, err)
+	}
+}
+
+func TestServerEpicsCreatePR_PrintsOutcomeAndRefusal(t *testing.T) {
+	var out bytes.Buffer
+	err := cmdbase.RunServerQueueWrite(context.Background(), nil, &out, false,
+		func(context.Context, *apiclient.Client) (wire.QueueResult, error) {
+			return wire.QueueResult{Refused: true, Reason: wire.ReasonHasPR, Message: "already has PR #9"}, nil
+		})
+	if err == nil || err.Error() != "refused (has-pr): already has PR #9" {
+		t.Errorf("err = %v", err)
+	}
+	out.Reset()
+	err = cmdbase.RunServerQueueWrite(context.Background(), nil, &out, true,
+		func(context.Context, *apiclient.Client) (wire.QueueResult, error) {
+			return wire.QueueResult{Refused: true, Reason: wire.ReasonHasPR}, nil
+		})
+	if err != nil || !strings.Contains(out.String(), `"refused": true`) {
+		t.Errorf("json out = %q, err %v; want the refusal printed, as the other epic verbs do", out.String(), err)
+	}
+}
+
 func TestServerEpicsMerge_RefusesWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "a.sock"))
 	err := cmdbase.RunServerQueueWrite(context.Background(), cl, &bytes.Buffer{}, false,

@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 )
 
 // Outcome is what one Open attempt did.
@@ -156,20 +155,7 @@ func openGate(dir string, root queue.RootRef) bool {
 		return false
 	}
 	e := tickets.LoadEpicAt(dir)
-	if e.IsMap || e.PRNumber != 0 || !e.MergedAt.IsZero() {
-		return false
-	}
-	var real int
-	for _, t := range e.Tickets {
-		if t.Type == string(schema.TypePRText) {
-			continue
-		}
-		if t.Status != string(schema.StatusDone) && t.Status != string(schema.StatusCancelled) {
-			return false
-		}
-		real++
-	}
-	return real > 0
+	return !e.IsMap && e.PRNumber == 0 && e.MergedAt.IsZero() && complete(e)
 }
 
 func createDraft(r pr.Runner, repo, head, base, title, body string) (int, string, error) {

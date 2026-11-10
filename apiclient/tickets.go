@@ -66,6 +66,11 @@ func (s *Tickets) EpicMerge(ctx context.Context, address string) (wire.QueueResu
 	return s.t.queueWriteTo(ctx, "/v1/epics/merge", wire.QueueRequest{Address: address})
 }
 
+// EpicCreatePR opens the pull request of a complete epic now.
+func (s *Tickets) EpicCreatePR(ctx context.Context, address string) (wire.QueueResult, error) {
+	return s.t.queueWriteTo(ctx, "/v1/epics/create-pr", wire.QueueRequest{Address: address})
+}
+
 // EpicStashMerge is "Stash, merge and restore" for an epic paused on a dirty
 // trunk: the target is fast-forwarded and the uncommitted files come back with
 // conflict markers, behind a trunk-conflict ticket (TrunkConflict).

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git/pr"
+	"github.com/elentok/gx/server/queue"
 )
 
 // Poll intervals and the backoff cap (spec "Watching the PR").
@@ -38,6 +39,11 @@ type Host interface {
 	RepoDir(project string) (string, bool)
 	// NoChecksGrace is how long a PR with no checks waits before it counts as green.
 	NoChecksGrace() time.Duration
+	// AutoPR is every epic (Project, Epic and Dir set) in the Awaiting PR state
+	// of a `pr` project with auto-pr on, read live from project.json.
+	AutoPR() []Target
+	// OpenPR runs one Open attempt for root.
+	OpenPR(root queue.RootRef) (Outcome, error)
 }
 
 // View is the live state of one epic's PR. It exists only in memory.
@@ -203,6 +209,7 @@ func (w *Watcher) Tick(ctx context.Context) {
 			w.recovered(project, ts)
 		}
 	}
+	w.autoOpen(ctx)
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if failed {
@@ -210,6 +217,23 @@ func (w *Watcher) Tick(ctx context.Context) {
 		w.retryAfter = retryAfter
 	} else {
 		w.fails, w.retryAfter = 0, 0
+	}
+}
+
+// autoOpen opens a PR for each Auto-PR epic, except one whose newest "PR closed"
+// entry is newer than its newest "PR opened": a closed PR is never reopened
+// automatically. A failed attempt keeps its stored reason and retries next tick.
+func (w *Watcher) autoOpen(ctx context.Context) {
+	for _, t := range w.host.AutoPR() {
+		if ctx.Err() != nil {
+			return
+		}
+		closed, _ := LastClosed(t.Dir)
+		opened, _ := LastOpened(t.Dir)
+		if closed.After(opened) {
+			continue
+		}
+		_, _ = w.host.OpenPR(queue.RootRef{Project: t.Project, Epic: t.Epic})
 	}
 }
 

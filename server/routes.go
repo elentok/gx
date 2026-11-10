@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/merge"
+	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
@@ -73,6 +74,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		triage.Routes(func() *triage.Triage { return s.triage }),
 		sessprompt.Routes(func() *sessprompt.Prompt { return s.prompt }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
+		prflow.Routes(func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.CreatePR }),
 		sched.Routes(func() *sched.Scheduler { return s.scheduler }, func() *sched.Explainer { return s.explain }),
 	)
 }

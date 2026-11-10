@@ -5,7 +5,10 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/prflow"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -40,6 +43,36 @@ func (h prWatchHost) Watched() []prflow.Target {
 	}
 	return out
 }
+
+// AutoPR is each Awaiting PR epic of a project whose delivery is `pr` and whose
+// auto-pr is on. project.json is read on every call, so a flip applies on the
+// next tick. A merge project never qualifies.
+func (h prWatchHost) AutoPR() []prflow.Target {
+	dirs, err := tickets.ProjectDirs(h.s.cfg.TicketStore)
+	if err != nil {
+		return nil
+	}
+	var out []prflow.Target
+	for _, dir := range dirs {
+		pf, err := config.ReadProjectFile(dir)
+		if err != nil || !pf.DeliveryIsPR() || !pf.AutoPREnabled() {
+			continue
+		}
+		epics, ok := h.s.idx.EpicsOf(dir)
+		if !ok {
+			continue
+		}
+		for _, e := range epics {
+			if tickets.IsOneOffsEpicName(e.Name) || prstate.Of(e, config.DeliveryPR) != wire.EpicStateAwaitingPR {
+				continue
+			}
+			out = append(out, prflow.Target{Project: tickets.ProjectName(dir), Epic: e.Name, Dir: e.Path})
+		}
+	}
+	return out
+}
+
+func (h prWatchHost) OpenPR(root queue.RootRef) (prflow.Outcome, error) { return h.s.OpenPR(root) }
 
 func (h prWatchHost) Env() []string { return h.s.cfg.Env }
 
