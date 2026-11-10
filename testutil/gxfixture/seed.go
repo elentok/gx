@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -250,8 +251,32 @@ func (f *fixture) seed(sc scenario) error {
 			}
 		}
 	}
+	if err := f.seedArchived(sc.Archived); err != nil {
+		return err
+	}
 	if sc.FakeGH != nil {
 		return fakeGH{f}.seedPRFlow(sc)
+	}
+	return nil
+}
+
+// seedArchived writes each archived epic under its project's .archive folder.
+func (f *fixture) seedArchived(archived []archivedEpic) error {
+	for _, a := range archived {
+		dir := filepath.Join(f.store, a.Project, ".archive", a.Name)
+		if err := os.MkdirAll(filepath.Join(dir, "issues"), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte("---\n"+a.Meta+"---\n"), 0o644); err != nil {
+			return err
+		}
+		for _, tk := range a.Tickets {
+			// Not WriteTicketFile: it would write a project.json into .archive.
+			body := "---\nid: \"" + tk.ID + "\"\nstatus: " + cmp.Or(tk.Opts.Status, "open") + "\ntype: implement\n---\n# " + tk.Slug + "\n"
+			if err := os.WriteFile(filepath.Join(dir, "issues", tk.ID+"-"+tk.Slug+".md"), []byte(body), 0o644); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

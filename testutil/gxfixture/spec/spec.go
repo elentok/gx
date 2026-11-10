@@ -38,6 +38,14 @@ type Epic struct {
 	Tickets       []Ticket
 }
 
+// ArchivedEpic is one epic seeded under <store>/<project>/.archive/<name>. Meta
+// is its ticket.md frontmatter (the lines between the "---" fences), so it can
+// carry archived_at and archived_workspace or leave them out.
+type ArchivedEpic struct {
+	Project, Name, Meta string
+	Tickets             []Ticket
+}
+
 // Git runs git in dir for a GitSetup hook.
 type Git func(dir string, args ...string) error
 
@@ -46,6 +54,8 @@ type Scenario struct {
 	// Projects have no epics.
 	Projects []string
 	Epics    []Epic
+	// Archived are epics seeded in the projects' .archive folders.
+	Archived []ArchivedEpic
 	// Behaviour is the fake worker's per-ticket behaviour, by address.
 	Behaviour map[string]string
 	// RateLimitFromUsage makes the ratelimit worker's reset come from a usage window that

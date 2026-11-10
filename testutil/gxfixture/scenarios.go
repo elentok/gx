@@ -37,6 +37,7 @@ type (
 	ticket         = spec.Ticket
 	epic           = spec.Epic
 	scenario       = spec.Scenario
+	archivedEpic   = spec.ArchivedEpic
 	recommendation = spec.Recommendation
 	sessionSpec    = spec.SessionSpec
 	commandStep    = spec.CommandStep
@@ -618,6 +619,9 @@ var scenarios = map[string]scenario{
 	// workspaces: three workspaces with members, held items, agents and one card
 	// per section. See spec.WorkspacesScenario.
 	"workspaces": spec.WorkspacesScenario(),
+	// bulk-actions: finished, queued, held and Design epics, live agents and
+	// archived epics for the bulk actions. See spec.BulkActionsScenario.
+	"bulk-actions": spec.BulkActionsScenario(),
 	// triage: follow-ups and a Triage in the state --shape names (default c-few).
 	// run swaps in spec.TriageScenario(shape).
 	"triage": {TriageShaped: true},
