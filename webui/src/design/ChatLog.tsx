@@ -64,6 +64,7 @@ function ChatTail({
     // The bottom area: at most half the screen, so only the question body scrolls past that.
     // In the Questions view the cap is gone and the sheet takes the rest of the column.
     <Box
+      data-questions-view={questions ? "" : undefined}
       flex={questions ? "1" : "none"}
       maxH={questions ? undefined : "50dvh"}
       display="flex"

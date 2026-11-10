@@ -9,6 +9,7 @@ export function InterruptPopover({
   anchorRef,
   onConfirm,
   onClose,
+  initialFocus = "cancel",
 }: {
   open: boolean;
   disabled: boolean;
@@ -16,13 +17,16 @@ export function InterruptPopover({
   anchorRef: RefObject<HTMLElement | null>;
   onConfirm: () => void;
   onClose: () => void;
+  /** Which button takes focus on open: Cancel for a click, Interrupt for the Esc key. */
+  initialFocus?: "cancel" | "confirm";
 }) {
   const cancel = useRef<HTMLButtonElement>(null);
+  const confirm = useRef<HTMLButtonElement>(null);
   return (
     <Popover.Root
       open={open}
       onOpenChange={(e) => !e.open && onClose()}
-      initialFocusEl={() => cancel.current}
+      initialFocusEl={() => (initialFocus === "confirm" ? confirm.current : cancel.current)}
       finalFocusEl={() => anchorRef.current}
       // Interrupt is not "outside": its own click toggles, so a second click can't reopen what the first closed.
       persistentElements={[() => anchorRef.current]}
@@ -75,6 +79,7 @@ export function InterruptPopover({
                 Cancel
               </Button>
               <Button
+                ref={confirm}
                 size="sm"
                 tone="deadlocked"
                 disabled={disabled}

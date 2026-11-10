@@ -118,6 +118,13 @@ test("a Working session swaps Send for Interrupt, posting the state token after 
   expect(body.state).toMatch(/^s-a:working:\d+$/);
 });
 
+test("Esc opens the confirm in this composer, from the message box", async () => {
+  render({ s: session("working") });
+  box().focus();
+  fireEvent.keyDown(box(), { key: "Escape" });
+  expect(await screen.findByRole("alertdialog", { name: "Interrupt the agent?" })).toBeTruthy();
+});
+
 test("a refused send shows its reason inline only, no toast, and keeps the draft", async () => {
   const toast = vi.spyOn(toaster, "create");
   const post = vi.fn(async () => ({ refused: true, message: "text may not start with !" })) as unknown as PostPrompt;

@@ -656,6 +656,13 @@ test("without a countdown there is no countdown text or Cancel", async () => {
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
 });
 
+test("Esc opens the confirm in this composer", async () => {
+  render({ state: "working", chat: chatOf() });
+  await openNote();
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(await screen.findByRole("alertdialog", { name: "Interrupt the agent?" })).toBeTruthy();
+});
+
 test("Cancel in the Interrupt confirm closes it without posting", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
