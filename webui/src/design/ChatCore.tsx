@@ -94,22 +94,17 @@ function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sess
   );
 }
 
+function Separator({ children }: { children: string }) {
+  return (
+    <Text role="separator" textAlign="center" fontSize="xs" color="text.dim" borderBlockStart="1px solid" borderColor="border" pt="1">
+      {children}
+    </Text>
+  );
+}
+
 function Entry({ m, showTools, sessionId }: { m: SessionChatMessage; showTools: boolean; sessionId: string }) {
-  if (m.kind === "compacted") {
-    return (
-      <Text
-        role="separator"
-        textAlign="center"
-        fontSize="xs"
-        color="text.dim"
-        borderBlockStart="1px solid"
-        borderColor="border"
-        pt="1"
-      >
-        Context compacted
-      </Text>
-    );
-  }
+  if (m.kind === "compacted") return <Separator>Context compacted</Separator>;
+  if (m.kind === "interrupted") return <Separator>Turn interrupted</Separator>;
   if (m.kind === "tools") return showTools ? <ToolCalls m={m} /> : null;
   if (m.kind === "prompt") {
     const images = m.images ?? [];

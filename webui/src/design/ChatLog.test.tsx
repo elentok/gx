@@ -136,6 +136,19 @@ test("each entry kind renders", async () => {
   expect(screen.getByText("Earlier messages hidden")).toBeTruthy();
 });
 
+test("an interrupted message renders as a Turn interrupted separator", async () => {
+  renderChat([session()], okChat(chatOf([msg({ kind: "interrupted" })])));
+  const sep = await screen.findByRole("separator");
+  expect(sep.textContent).toBe("Turn interrupted");
+  expect(screen.queryByText("Context compacted")).toBeNull();
+});
+
+test("an interrupted message in a Codex chat reads the same", async () => {
+  renderChat([session({ harness: "codex" })], okChat(chatOf([msg({ kind: "interrupted" })])));
+  const sep = await screen.findByRole("separator");
+  expect(sep.textContent).toBe("Turn interrupted");
+});
+
 const outputLines = (n: number) => Array.from({ length: n }, (_, i) => `line ${i + 1}`).join("\n");
 
 test("long command output is cut at 12 lines until Show all", async () => {
