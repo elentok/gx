@@ -200,3 +200,18 @@ func TestReadDialog_StrayRowEndsList(t *testing.T) {
 		t.Fatalf("options = %q, want 2", v.Options)
 	}
 }
+
+func TestPlanFilePath_OneRowOrWrappedOntoTheNext(t *testing.T) {
+	t.Parallel()
+	const want = "~/.claude/plans/plan-a-b.md"
+	for name, rows := range map[string][]string{
+		"one row": {"x", "   ctrl+g to edit in Nvim · " + want},
+		"wrapped": {"x", "   ctrl+g to edit in Vim ·", "   " + want},
+		"absent":  {"x"},
+	} {
+		got := PlanFilePath(rows)
+		if (name == "absent") != (got == "") || (name != "absent" && got != want) {
+			t.Errorf("%s: path = %q", name, got)
+		}
+	}
+}

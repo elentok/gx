@@ -107,6 +107,28 @@ func BashPermissionDialog(command string) []string {
 	}
 }
 
+// PlanDialog is Claude's plan approval for the plan in planPath. options are
+// the numbered rows; the real dialog lists three, the last "Tell Claude what to
+// change".
+func PlanDialog(planPath string, options ...string) []string {
+	rows := []string{
+		"────────────────────",
+		" Ready to code?",
+		" Here is Claude's plan:",
+		" - [ ] a step shown on screen",
+		"────────────────────",
+		" Claude has written up a plan and is ready to execute. Would you like to proceed?",
+	}
+	for i, o := range options {
+		cursor := "  "
+		if i == 0 {
+			cursor = "❯ "
+		}
+		rows = append(rows, fmt.Sprintf(" %s%d. %s", cursor, i+1, o))
+	}
+	return append(rows, "", " ctrl+g to edit in Vim · "+planPath)
+}
+
 // WrappedPermissionDialog is a Bash permission prompt whose second option wraps
 // onto a second row and grants a standing permission.
 func WrappedPermissionDialog(command string) []string {

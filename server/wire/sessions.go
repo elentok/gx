@@ -359,6 +359,8 @@ type QuestionCardOption struct {
 	Label       string `json:"label"`
 	Description string `json:"description,omitempty"`
 	Consequence string `json:"consequence,omitempty"`
+	// Text marks a row the person types into: the card needs text before Submit.
+	Text bool `json:"text,omitempty"`
 }
 
 // QuestionCardQuestion is one question of a card. Kind is yes-no, options,

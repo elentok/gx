@@ -2715,6 +2715,10 @@ export interface QuestionCardOption {
   label: string;
   description?: string;
   consequence?: string;
+  /**
+   * Text marks a row the person types into: the card needs text before Submit.
+   */
+  text?: boolean;
 }
 /**
  * QuestionCardQuestion is one question of a card. Kind is yes-no, options,

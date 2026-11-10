@@ -171,7 +171,10 @@ type DialogView struct {
 	ID string
 }
 
-const planQuestionPrefix = "Claude has written up a plan"
+// PlanQuestionPrefix starts the question line of a plan approval dialog.
+const PlanQuestionPrefix = "Claude has written up a plan"
+
+const planQuestionPrefix = PlanQuestionPrefix
 
 func isQuestionRow(t string) bool {
 	return (strings.HasPrefix(t, "Do you want") && strings.HasSuffix(t, "?")) ||
@@ -213,6 +216,25 @@ func ReadDialog(rows []string) DialogView {
 		PlainYes: options[0] == "Yes",
 		ID:       dialogID(header, body),
 	}
+}
+
+// PlanFilePath is the plan file the footer of a plan dialog names ("ctrl+g to
+// edit in Vim · ~/.claude/plans/x.md"), or "" with none. A narrow screen wraps
+// the path onto the row below.
+func PlanFilePath(rows []string) string {
+	for i := len(rows) - 1; i >= 0; i-- {
+		t := strings.TrimSpace(rows[i])
+		if !strings.HasPrefix(t, "ctrl+g to edit in") {
+			continue
+		}
+		_, path, _ := strings.Cut(t, "·")
+		path = strings.TrimSpace(path)
+		if path == "" && i+1 < len(rows) {
+			path = strings.TrimSpace(rows[i+1])
+		}
+		return path
+	}
+	return ""
 }
 
 // isDashRule reports whether row is a ╌ separator around a diff or command.

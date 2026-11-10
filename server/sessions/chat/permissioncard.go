@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -42,7 +44,7 @@ func (c *Chat) permissionCards(dir string, m Meta, snap Snapshot) []wire.Questio
 		c.log.Warn("read screen for permission card", "session", m.ID, "err", err)
 		return nil
 	}
-	return PermissionCard(rows, personTurns(snap.Msgs))
+	return PermissionCard(rows, personTurns(snap.Msgs), harness.LookupEnv(c.cfg.Env, "HOME"))
 }
 
 func personTurns(msgs []wire.SessionChatMessage) int {
@@ -55,26 +57,72 @@ func personTurns(msgs []wire.SessionChatMessage) int {
 	return n
 }
 
-// PermissionCard is the permission dialog on rows as one single-select card
-// with every option and no preselection, or no cards. Nothing is marked
-// recommended: a standing grant such as "always allow" gets no hint. The id
-// holds the dialog id, the turn and a hash of the whole block, so the same
-// dialog on a later turn is a new card.
-func PermissionCard(rows []string, turn int) []wire.QuestionCard {
+// TextRowLabel is the label of a plan dialog's row that takes typed feedback.
+const TextRowLabel = "Tell Claude what to change"
+
+// PermissionCard is the permission or plan dialog on rows as one single-select
+// card with every option and no preselection, or no cards. Nothing is marked
+// recommended: a standing grant such as "always allow" gets no hint. A
+// permission id holds the dialog id, the turn and a hash of the whole block, so
+// the same dialog on a later turn is a new card. A plan card carries the plan
+// file's text and its id is the file name plus a hash of the block, so a new
+// plan is a new card; its option labelled TextRowLabel is a text row. home
+// resolves the "~" of the plan file path.
+func PermissionCard(rows []string, turn int, home string) []wire.QuestionCard {
 	v := claudeui.ReadDialog(rows)
-	if v.Kind != claudeui.DialogPermission {
+	if v.Kind == claudeui.DialogUnreadable {
 		return nil
 	}
-	sum := sha256.Sum256([]byte(strings.Join(append([]string{v.Header, v.Body, v.Question}, v.Options...), "\n")))
 	q := wire.QuestionCardQuestion{
 		Kind: "options", Title: v.Question, Body: joinDialogText(v.Header, v.Body),
 	}
 	for i, o := range v.Options {
-		q.Options = append(q.Options, wire.QuestionCardOption{ID: strconv.Itoa(i + 1), Label: o})
+		q.Options = append(q.Options, wire.QuestionCardOption{ID: strconv.Itoa(i + 1), Label: o, Text: v.Kind == claudeui.DialogPlan && o == TextRowLabel})
 	}
+	hashed := append([]string{v.Header, v.Body, v.Question}, v.Options...)
+	id := fmt.Sprintf("%s-%d-", v.ID, turn)
+	if v.Kind == claudeui.DialogPlan {
+		path := claudeui.PlanFilePath(rows)
+		q.Body = readPlanFile(path, home)
+		hashed = append(hashed, q.Body, planBlock(rows))
+		id = planFileName(path) + "-"
+	}
+	sum := sha256.Sum256([]byte(strings.Join(hashed, "\n")))
 	return []wire.QuestionCard{{
 		Source:    wire.CardSourcePermission,
-		ID:        fmt.Sprintf("%s-%d-%s", v.ID, turn, hex.EncodeToString(sum[:6])),
+		ID:        id + hex.EncodeToString(sum[:6]),
 		Questions: []wire.QuestionCardQuestion{q},
 	}}
+}
+
+// planBlock is the screen text from the "Ready to code?" title down, which
+// holds the part of the plan the dialog shows.
+func planBlock(rows []string) string {
+	for i, r := range rows {
+		if strings.TrimSpace(r) == "Ready to code?" {
+			rows = rows[i:]
+			break
+		}
+	}
+	return strings.Join(rows, "\n")
+}
+
+func planFileName(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), ".md")
+}
+
+// readPlanFile is the text of the plan file a dialog names, or "" when the
+// path is not a Claude plan file or cannot be read.
+func readPlanFile(path, home string) string {
+	if rest, ok := strings.CutPrefix(path, "~/"); ok {
+		path = filepath.Join(home, rest)
+	}
+	if !filepath.IsAbs(path) || !strings.HasSuffix(path, ".md") || !strings.Contains(path, "/.claude/plans/") {
+		return ""
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
 }

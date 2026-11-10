@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
@@ -82,14 +83,44 @@ func (p *Prompt) currentCard(id, dir string, meta sessions.Meta, source string) 
 // answerPermissionCard sends the chosen option's digit. An answer that picks no
 // option is a dismiss and denies, as the banner's Deny does.
 func (p *Prompt) answerPermissionCard(req wire.SessionAnswerRequest, card wire.QuestionCard, source string) (wire.SessionResult, error) {
-	choice := answerAt(req.Answers, 0).Choice
-	if choice == "" {
+	a := answerAt(req.Answers, 0)
+	isPlan := strings.HasPrefix(card.Questions[0].Title, claudeui.PlanQuestionPrefix)
+	if a.Choice == "" {
+		if isPlan {
+			// Esc rejects the plan and leaves the session idle in plan mode.
+			return p.keysSession(wire.SessionKeysRequest{ID: req.ID, Key: "esc", OnlyBlocked: true}, source)
+		}
 		return p.keysSession(wire.SessionKeysRequest{ID: req.ID, Permission: string(agentrunner.DecisionDeny)}, source)
 	}
-	if !slices.ContainsFunc(card.Questions[0].Options, func(o wire.QuestionCardOption) bool { return o.ID == choice }) {
-		return sessions.Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("choice %q is not an option of the dialog", choice)), nil
+	i := slices.IndexFunc(card.Questions[0].Options, func(o wire.QuestionCardOption) bool { return o.ID == a.Choice })
+	if i < 0 {
+		return sessions.Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("choice %q is not an option of the dialog", a.Choice)), nil
 	}
-	return p.keysSession(wire.SessionKeysRequest{ID: req.ID, Key: choice, OnlyBlocked: true}, source)
+	if !card.Questions[0].Options[i].Text {
+		return p.keysSession(wire.SessionKeysRequest{ID: req.ID, Key: a.Choice, OnlyBlocked: true}, source)
+	}
+	text := strings.TrimSpace(a.Text)
+	if text == "" {
+		return sessions.Refusal(wire.ReasonSessionBadRequest, "the option needs text before it can be sent"), nil
+	}
+	return p.answerTextRow(req.ID, a.Choice, text, source)
+}
+
+// answerTextRow picks the text row by its digit, types the text into the
+// inline box and submits with Enter. Only the last key waits for the dialog to
+// close: the first two leave it open.
+func (p *Prompt) answerTextRow(id, digit, text, source string) (wire.SessionResult, error) {
+	for _, req := range []wire.SessionKeysRequest{
+		{ID: id, Key: digit, OnlyBlocked: true},
+		{ID: id, Text: text, OnlyBlocked: true},
+	} {
+		seq, n, refusal := validateSessionKeys(req)
+		sent, err := p.sendSessionKeys(req, source, seq, n, refusal)
+		if sent.res.Refused || err != nil {
+			return sent.res, err
+		}
+	}
+	return p.keysSession(wire.SessionKeysRequest{ID: id, Key: "enter", OnlyBlocked: true}, source)
 }
 
 func answerAt(answers []wire.SessionAnswer, i int) wire.SessionAnswer {
