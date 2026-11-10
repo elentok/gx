@@ -2,11 +2,14 @@ package epics
 
 import (
 	"cmp"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
@@ -37,6 +40,8 @@ func epicListState(e tickets.Epic, queued, queueable bool, loopState wire.EpicSt
 		return wire.EpicListDraft
 	case loopState == wire.EpicStatePaused && EpicMergeBlocked(e):
 		return wire.EpicListMergeBlocked
+	case loopState == wire.EpicStatePaused && prstate.Blocked(e):
+		return wire.EpicListState(e.MergeBlockKind)
 	case loopState != wire.EpicStateWaiting && loopState != wire.EpicStateFinished:
 		return wire.EpicListState(loopState)
 	case queued:
@@ -280,13 +285,16 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 	if e.IsMap {
 		row.Kind = wire.EpicKindMap
 	}
-	row.State = epicListState(e, queued, queueable, EpicStateFor(root, e, s.Runs.StartedAtOf))
+	row.State = epicListState(e, queued, queueable, EpicStateFor(root, e, s.Delivery(project), s.Runs.StartedAtOf))
 	if row.State == wire.EpicListMergeBlocked {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}
 	if !e.IsMap {
 		row.QueueSlot = qidx.slot(root.String())
 		decorateLoopCard(&row, row.QueueSlot)
+		if row.State == wire.EpicListFixingCI {
+			row.StatusWords = fmt.Sprintf("Fixing CI (attempt %d of %d)", prstate.CIFixAttempt(e, time.Time{}), config.DefaultPRConfig().CIFixAttemptsPerCheck)
+		}
 		row.Verdict, row.Reason = s.capLine(root, e, row.Queued)
 		for _, t := range e.Tickets {
 			if e.RenderedStatus(t) != tickets.StatusClaimed {

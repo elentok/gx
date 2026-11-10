@@ -34,7 +34,7 @@ func (s *Server) TicketOps() *ticketops.Ops { return s.ops }
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recovery.RecoverAsync(f) }
 
 func (s *Server) EpicState(root queue.RootRef, e tickets.Epic) wire.EpicState {
-	return epics.EpicStateFor(root, e, s.registry.StartedAtOf)
+	return epics.EpicStateFor(root, e, s.merger.Delivery(root.Project), s.registry.StartedAtOf)
 }
 
 func (s *Server) EpicMergeBlocked(e tickets.Epic) bool { return epics.EpicMergeBlocked(e) }

@@ -20,9 +20,10 @@ var cardSectionOrder = []wire.CardSection{
 // loopCardSection is the section of a loop epic row.
 func loopCardSection(state wire.EpicListState) wire.CardSection {
 	switch state {
-	case wire.EpicListPaused, wire.EpicListMergeBlocked:
+	case wire.EpicListPaused, wire.EpicListMergeBlocked, wire.EpicListAwaitingPR, wire.EpicListCIFailing, wire.EpicListPRTextFailed:
 		return wire.SectionNeedsYou
-	case wire.EpicListRunning, wire.EpicListQueued, wire.EpicListMerging, wire.EpicListAwaitingMerge:
+	case wire.EpicListRunning, wire.EpicListQueued, wire.EpicListMerging, wire.EpicListAwaitingMerge,
+		wire.EpicListWritingPRText, wire.EpicListFixingCI, wire.EpicListPROpen:
 		return wire.SectionImplementing
 	case wire.EpicListReady:
 		return wire.SectionReadyToQueue
@@ -40,7 +41,10 @@ func loopStatusWords(state wire.EpicListState, position int) string {
 		return "Implementing..."
 	case wire.EpicListMerging:
 		return "Merging..."
-	case wire.EpicListAwaitingMerge, wire.EpicListMergeBlocked:
+	case wire.EpicListWritingPRText:
+		return "Writing PR text"
+	case wire.EpicListAwaitingMerge, wire.EpicListMergeBlocked, wire.EpicListAwaitingPR, wire.EpicListPROpen,
+		wire.EpicListCIFailing, wire.EpicListPRTextFailed:
 		return "Implemented"
 	case wire.EpicListQueued:
 		return fmt.Sprintf("Queued #%d", position)

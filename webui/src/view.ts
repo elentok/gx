@@ -9,6 +9,10 @@ const STATE_LABELS: Record<EpicState, string> = {
   waiting: "Waiting for a slot",
   "awaiting-merge": "Awaiting merge",
   finished: "Merged",
+  "awaiting-pr": "Awaiting PR",
+  "writing-pr-text": "Writing PR text",
+  "fixing-ci": "Fixing CI",
+  "pr-open": "Implemented",
 };
 
 // Only Waiting changes with the queue mode: a paused queue is why

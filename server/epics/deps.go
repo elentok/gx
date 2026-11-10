@@ -95,8 +95,10 @@ type Deps struct {
 
 	// CapHeld gives the cap verdict of the epic's next ready ticket, when a cap
 	// holds it back.
-	CapHeld           func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool)
-	AutoFFMerge       func(project string) bool
+	CapHeld     func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool)
+	AutoFFMerge func(project string) bool
+	// Delivery is the project's delivery ("merge" or "pr"), read live.
+	Delivery          func(project string) string
 	CheckWaitingLabel func(address string) string
 	AgentGone         func(address string) (bool, error)
 	LiveTask          func(address string) (BackgroundTask, error)

@@ -22,6 +22,9 @@ const (
 	PillDeadlocked    = "Deadlocked"
 	PillMergeBlocked  = "Merge blocked"
 	PillAwaitingMerge = "Awaiting merge"
+	PillAwaitingPR    = "Awaiting PR"
+	PillCIFailing     = "CI failing"
+	PillPRTextFailed  = "PR text failed"
 )
 
 // needsYou is why a loop epic waits on the person: the pill word, the reason line,
@@ -65,6 +68,20 @@ func (s *Epics) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.Epic
 			n.More = []wire.CardAction{{Kind: wire.CardActionMerge, Label: schema.VerbMergeAgain.Label(), Target: root.String()}}
 		}
 		return n, true
+	case state == wire.EpicListAwaitingPR:
+		return needsYou{
+			Pill: PillAwaitingPR, Reason: "Ready for a pull request", Since: fallback,
+			Action: wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: root.String()},
+		}, true
+	case state == wire.EpicListCIFailing || state == wire.EpicListPRTextFailed:
+		pill := PillCIFailing
+		if state == wire.EpicListPRTextFailed {
+			pill = PillPRTextFailed
+		}
+		return needsYou{
+			Pill: pill, Reason: e.MergeBlockReason, Since: fallback,
+			Action: wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: root.String()},
+		}, true
 	case state == wire.EpicListPaused && StateOf(e) == StateCycle:
 		return needsYou{
 			Pill: PillDeadlocked, Reason: CycleReason(root, e), Since: fallback,

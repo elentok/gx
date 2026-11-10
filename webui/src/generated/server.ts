@@ -1060,6 +1060,16 @@ export const EpicListRunning: EpicListState = "running";
 export const EpicListAwaitingMerge: EpicListState = "awaiting-merge";
 export const EpicListMerging: EpicListState = "merging";
 export const EpicListPaused: EpicListState = "paused";
+export const EpicListAwaitingPR: EpicListState = "awaiting-pr";
+export const EpicListWritingPRText: EpicListState = "writing-pr-text";
+export const EpicListFixingCI: EpicListState = "fixing-ci";
+export const EpicListPROpen: EpicListState = "pr-open";
+/**
+ * EpicListCIFailing and EpicListPRTextFailed are the Paused epics whose stored
+ * land_block_kind is that PR-flow pause.
+ */
+export const EpicListCIFailing: EpicListState = "ci-failing";
+export const EpicListPRTextFailed: EpicListState = "pr-text-failed";
 export const EpicListReady: EpicListState = "ready";
 export const EpicListDesigning: EpicListState = "designing";
 export const EpicListWaitingToDesign: EpicListState = "waiting-to-design";
@@ -1374,17 +1384,29 @@ export const EpicStateRunning = "running";
 export const EpicStateMerging = "merging";
 export const EpicStateWaiting = "waiting";
 /**
+ * The PR flow's states, derived from the ticket store. Awaiting PR is a
+ * complete epic in a pr-delivery project with no pull request yet; Writing PR
+ * text and Fixing CI are Merging's siblings; PR open has a pull request and no
+ * merge.
+ */
+export const EpicStateAwaitingPR = "awaiting-pr";
+export const EpicStateWritingPRText = "writing-pr-text";
+export const EpicStateFixingCI = "fixing-ci";
+export const EpicStatePROpen = "pr-open";
+/**
  * EpicStatePaused is an epic with nothing runnable: a paused ticket, a
  * dependency deadlock, or a blocked merge. EpicSummary.Reason says which.
  */
 export const EpicStatePaused = "paused";
-export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateMerging | typeof EpicStateWaiting | typeof EpicStatePaused;
+export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateMerging | typeof EpicStateWaiting | typeof EpicStateAwaitingPR | typeof EpicStateWritingPRText | typeof EpicStateFixingCI | typeof EpicStatePROpen | typeof EpicStatePaused;
 export const EpicReasonDeadlock = "Dependency deadlock";
 export const EpicReasonMergeBlocked = "Merge blocked";
+export const EpicReasonCIFailing = "CI failing";
+export const EpicReasonPRTextFailed = "PR text failed";
 /**
  * The reasons a Paused epic gives for itself, when no ticket is paused.
  */
-export type EpicReason = typeof EpicReasonDeadlock | typeof EpicReasonMergeBlocked;
+export type EpicReason = typeof EpicReasonDeadlock | typeof EpicReasonMergeBlocked | typeof EpicReasonCIFailing | typeof EpicReasonPRTextFailed;
 /**
  * SummaryTicket is one ticket in an EpicSummary: an active one carries
  * ClaimedAt, a Paused one carries Recovery and its unclipped Pause reason.

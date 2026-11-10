@@ -140,7 +140,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 					tc.epic.Tickets[i].Body = pausedBody
 				}
 			}
-			got := summarizeEpic(root, tc.epic, claimed, recovering, noLog)
+			got := summarizeEpic(root, tc.epic, "merge", claimed, recovering, noLog)
 			if got.State != tc.wantState {
 				t.Fatalf("state = %q, want %q", got.State, tc.wantState)
 			}
@@ -183,7 +183,7 @@ func TestSummarizeEpic_MergeBlockActionsFollowTheVerbTable(t *testing.T) {
 	}
 	for kind, actions := range want {
 		e := tickets.Epic{Name: "epic", CompletedAt: time.Unix(50, 0), MergeBlockKind: kind, MergeBlockReason: "why", Tickets: []tickets.Ticket{summaryTicket("01", "done")}}
-		got := summarizeEpic(root, e, func(string) (time.Time, bool) { return time.Time{}, false }, func(string) string { return "" }, func(tickets.Ticket) []tickets.LogEvent { return nil })
+		got := summarizeEpic(root, e, "merge", func(string) (time.Time, bool) { return time.Time{}, false }, func(string) string { return "" }, func(tickets.Ticket) []tickets.LogEvent { return nil })
 		if !equalStrings(got.Actions, actions) {
 			t.Errorf("%s actions = %v, want %v", kind, got.Actions, actions)
 		}
@@ -198,7 +198,7 @@ func TestSummarizeEpic_PausedDetails(t *testing.T) {
 	broken := summaryTicket("04", "nonsense")
 	broken.ReadErr = "cannot read it"
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{repair, broken}}
-	got := summarizeEpic(root, epic,
+	got := summarizeEpic(root, epic, "merge",
 		func(string) (time.Time, bool) { return time.Time{}, false },
 		func(addr string) string {
 			if addr == "proj:epic/03" {
@@ -236,7 +236,7 @@ func TestSummarizeEpic_PausedEntriesCarrySummaryAnswerableAnswered(t *testing.T)
 		"03": {question(1, "old"), {Type: tickets.EventPauseAnswer, Seq: 2, Question: 1}},
 	}
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{asked, repair, answered}}
-	got := summarizeEpic(root, epic,
+	got := summarizeEpic(root, epic, "merge",
 		func(string) (time.Time, bool) { return time.Time{}, false },
 		func(string) string { return "" },
 		func(tk tickets.Ticket) []tickets.LogEvent { return logs[tk.Identifier] })
@@ -261,7 +261,7 @@ func TestSummarizeEpic_OneOffsRootNeverAwaitsMergeAndCountsNothing(t *testing.T)
 	root := queue.RootRef{Project: "proj", Epic: queue.OneOffsEpic}
 
 	allDone := tickets.Epic{Name: queue.OneOffsEpic, Tickets: []tickets.Ticket{summaryTicket("01", "done")}}
-	got := summarizeEpic(root, allDone, none, noRecovery, noLog)
+	got := summarizeEpic(root, allDone, "merge", none, noRecovery, noLog)
 	if got.State == wire.EpicStateAwaitingMerge || got.Done != 0 || got.Total != 0 {
 		t.Errorf("all-done one-offs = state %q done %d total %d", got.State, got.Done, got.Total)
 	}
@@ -269,7 +269,7 @@ func TestSummarizeEpic_OneOffsRootNeverAwaitsMergeAndCountsNothing(t *testing.T)
 	broken := tickets.Epic{Name: queue.OneOffsEpic, Tickets: []tickets.Ticket{
 		summaryTicket("01", "done"), repairPausedTicket("02"), answerPausedTicket("03"),
 	}}
-	got = summarizeEpic(root, broken, none, noRecovery, noLog)
+	got = summarizeEpic(root, broken, "merge", none, noRecovery, noLog)
 	if got.State != wire.EpicStatePaused || len(got.Paused) != 2 {
 		t.Errorf("one-offs with paused tickets = state %q paused %+v", got.State, got.Paused)
 	}
@@ -311,7 +311,7 @@ func TestSummarizeEpic_MergingState(t *testing.T) {
 			if tc.wantActive != nil {
 				claimed = claimedAll
 			}
-			got := summarizeEpic(root, tickets.Epic{Name: tc.epic, Tickets: tc.tickets}, claimed, noRecovery, noLog)
+			got := summarizeEpic(root, tickets.Epic{Name: tc.epic, Tickets: tc.tickets}, "merge", claimed, noRecovery, noLog)
 			if got.State != tc.wantState {
 				t.Fatalf("state = %q, want %q", got.State, tc.wantState)
 			}
@@ -343,7 +343,7 @@ func TestSummarizeEpic_DeadlockedAgreesWithStateOf(t *testing.T) {
 		epic := tickets.Epic{Name: "epic", Tickets: ts}
 		state := StateOf(epic)
 		stuck := state == StatePaused || state == StateCycle
-		got := summarizeEpic(root, epic, none, noRecovery, noLog)
+		got := summarizeEpic(root, epic, "merge", none, noRecovery, noLog)
 		if (got.State == wire.EpicStatePaused) != stuck {
 			t.Errorf("%v: state %q, StateOf %v", statuses, got.State, state)
 		}

@@ -103,7 +103,7 @@ func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Tim
 	queued := s.Queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
-		State: EpicStateFor(root, e, s.Runs.StartedAtOf),
+		State: EpicStateFor(root, e, s.Delivery(root.Project), s.Runs.StartedAtOf),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
 		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
 		Draft: e.Status == string(schema.StatusDraft),

@@ -64,6 +64,10 @@ const STATE_TONES: Record<NonNullable<EpicDetail["state"]>, Tone> = {
   paused: "paused",
   waiting: "waiting",
   "awaiting-merge": "waiting",
+  "awaiting-pr": "waiting",
+  "writing-pr-text": "running",
+  "fixing-ci": "running",
+  "pr-open": "waiting",
 };
 
 // A draft -impl epic is still being published into; a Waiting epic that holds no queue item is not waiting for a slot.

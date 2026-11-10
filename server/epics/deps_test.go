@@ -104,6 +104,7 @@ func fakeEpics() Deps {
 		Pauses:      fakePauses{},
 		Sessions:    fakeSessions{},
 		AutoFFMerge: func(string) bool { return true },
+		Delivery:    func(string) string { return "merge" },
 	}
 }
 

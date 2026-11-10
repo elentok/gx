@@ -17,6 +17,15 @@ const (
 	EpicListMerging       EpicListState = "merging"
 	EpicListPaused        EpicListState = "paused"
 
+	EpicListAwaitingPR    EpicListState = "awaiting-pr"
+	EpicListWritingPRText EpicListState = "writing-pr-text"
+	EpicListFixingCI      EpicListState = "fixing-ci"
+	EpicListPROpen        EpicListState = "pr-open"
+	// EpicListCIFailing and EpicListPRTextFailed are the Paused epics whose stored
+	// land_block_kind is that PR-flow pause.
+	EpicListCIFailing    EpicListState = "ci-failing"
+	EpicListPRTextFailed EpicListState = "pr-text-failed"
+
 	EpicListReady           EpicListState = "ready"
 	EpicListDesigning       EpicListState = "designing"
 	EpicListWaitingToDesign EpicListState = "waiting-to-design"
@@ -247,6 +256,14 @@ const (
 	// that are open or claimed.
 	EpicStateMerging EpicState = "merging"
 	EpicStateWaiting EpicState = "waiting"
+	// The PR flow's states, derived from the ticket store. Awaiting PR is a
+	// complete epic in a pr-delivery project with no pull request yet; Writing PR
+	// text and Fixing CI are Merging's siblings; PR open has a pull request and no
+	// merge.
+	EpicStateAwaitingPR    EpicState = "awaiting-pr"
+	EpicStateWritingPRText EpicState = "writing-pr-text"
+	EpicStateFixingCI      EpicState = "fixing-ci"
+	EpicStatePROpen        EpicState = "pr-open"
 	// EpicStatePaused is an epic with nothing runnable: a paused ticket, a
 	// dependency deadlock, or a blocked merge. EpicSummary.Reason says which.
 	EpicStatePaused EpicState = "paused"
@@ -256,6 +273,8 @@ const (
 const (
 	EpicReasonDeadlock     = "Dependency deadlock"
 	EpicReasonMergeBlocked = "Merge blocked"
+	EpicReasonCIFailing    = "CI failing"
+	EpicReasonPRTextFailed = "PR text failed"
 )
 
 // SummaryTicket is one ticket in an EpicSummary: an active one carries

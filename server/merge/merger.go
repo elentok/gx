@@ -65,6 +65,19 @@ func (s *Merger) AutoFFMerge(project string) bool {
 	return pf.AutoFFMergeEnabled()
 }
 
+// Delivery is the project's delivery, read live from project.json: "pr" or, for
+// anything else including an unreadable file, "merge".
+func (s *Merger) Delivery(project string) string {
+	dir, err := s.projects.Dir(project)
+	if err != nil {
+		return "merge"
+	}
+	if pf, _ := config.ReadProjectFile(dir); pf.DeliveryIsPR() {
+		return config.DeliveryPR
+	}
+	return "merge"
+}
+
 // EpicRefs is rootRefs for epic's Root ticket, the one ticket every caller
 // that means "the epic's refs" agrees on, so they all lock the same key. A
 // non-root ticket's base: never moves where the epic starts or merges.

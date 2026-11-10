@@ -29,6 +29,7 @@ func (s *Server) epicsDeps() epics.Deps {
 
 		CapHeld:           func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool) { return s.explain.CapHeld(root, e) },
 		AutoFFMerge:       func(project string) bool { return s.merger.AutoFFMerge(project) },
+		Delivery:          func(project string) string { return s.merger.Delivery(project) },
 		CheckWaitingLabel: func(address string) string { return s.explain.CheckWaitingLabel(address) },
 		AgentGone:         func(address string) (bool, error) { return s.ops.AgentGone(address) },
 		LiveTask: func(address string) (epics.BackgroundTask, error) {

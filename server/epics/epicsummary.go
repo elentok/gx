@@ -4,6 +4,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
@@ -36,7 +37,7 @@ func (s *Epics) EpicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 		if i < 0 || projEpics[i].IsMap || !projEpics[i].MergedAt.IsZero() {
 			continue
 		}
-		sum := summarizeEpic(root, projEpics[i], s.Runs.StartedAtOf, recoveryOf, queue.ReadLogLenient)
+		sum := summarizeEpic(root, projEpics[i], s.Delivery(root.Project), s.Runs.StartedAtOf, recoveryOf, queue.ReadLogLenient)
 		for j := range sum.Active {
 			sum.Active[j].NeedsApproval = s.needsApproval(sum.Active[j].Address)
 			sum.Active[j].LaunchStep = s.launchStep(sum.Active[j].Address)
@@ -89,7 +90,7 @@ func answeredLatest(evs []tickets.LogEvent) bool {
 
 // summarizeEpic applies the state rules, first match wins. A claimed ticket
 // counts as runnable, but only one with a server claim time counts as running.
-func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) wire.EpicSummary {
+func summarizeEpic(root queue.RootRef, e tickets.Epic, delivery string, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) wire.EpicSummary {
 	sum := wire.EpicSummary{
 		Address: root.String(), Name: e.Name, Project: root.Project, Done: e.DoneCount(), Total: e.TotalCount(),
 		Active: []wire.SummaryTicket{}, Paused: []wire.SummaryTicket{},
@@ -127,13 +128,17 @@ func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (t
 	if oneOffs {
 		sum.Done, sum.Total = 0, 0
 	}
-	sum.State = EpicStateFor(root, e, claimedAt)
+	sum.State = EpicStateFor(root, e, delivery, claimedAt)
 	if sum.State == wire.EpicStatePaused {
 		sum.Reason, sum.More = pausedEpicReason(e)
 		switch {
 		case root.Mergeable() && EpicMergeBlocked(e):
 			sum.Reason, sum.Detail = wire.EpicReasonMergeBlocked, e.MergeBlockReason
 			sum.MergeBlocked, sum.MergeBlockKind = true, e.MergeBlockKind
+			sum.Actions = mergeBlockActions(e.MergeBlockKind)
+		case root.Mergeable() && prstate.Blocked(e):
+			sum.Reason, sum.Detail = prBlockedReason(e.MergeBlockKind), e.MergeBlockReason
+			sum.MergeBlockKind = e.MergeBlockKind
 			sum.Actions = mergeBlockActions(e.MergeBlockKind)
 		case StateOf(e) == StateCycle:
 			sum.Reason, sum.Detail = wire.EpicReasonDeadlock, CycleReason(root, e)
@@ -147,7 +152,19 @@ func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (t
 
 // showsActive reports whether an epic in state lists its claimed tickets.
 func showsActive(state wire.EpicState) bool {
-	return state == wire.EpicStateRunning || state == wire.EpicStateMerging
+	switch state {
+	case wire.EpicStateRunning, wire.EpicStateMerging, wire.EpicStateWritingPRText, wire.EpicStateFixingCI:
+		return true
+	}
+	return false
+}
+
+// prBlockedReason is the Paused reason of a stored PR-flow block kind.
+func prBlockedReason(kind string) string {
+	if kind == string(schema.PauseCIFailing) {
+		return wire.EpicReasonCIFailing
+	}
+	return wire.EpicReasonPRTextFailed
 }
 
 // pausedEpicReason is the reason of the first paused ticket in e's ticket
@@ -169,7 +186,7 @@ func pausedEpicReason(e tickets.Epic) (reason string, more int) {
 
 // EpicMergeBlocked reports whether e is done and unmerged, with its last merge blocked.
 func EpicMergeBlocked(e tickets.Epic) bool {
-	return StateOf(e) == StateDone && e.MergedAt.IsZero() && e.MergeBlockReason != ""
+	return StateOf(e) == StateDone && e.MergedAt.IsZero() && e.MergeBlockReason != "" && !prstate.IsBlockKind(e.MergeBlockKind)
 }
 
 // onlyMergeTicketsRemain reports whether every ticket is done or cancelled
@@ -194,14 +211,19 @@ func onlyMergeTicketsRemain(e tickets.Epic) bool {
 
 // EpicStateFor is the one place that decides an epic's state. Running needs a
 // claimed, non-paused ticket that has a server claim time.
-func EpicStateFor(root queue.RootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) wire.EpicState {
+func EpicStateFor(root queue.RootRef, e tickets.Epic, delivery string, claimedAt func(string) (time.Time, bool)) wire.EpicState {
+	if root.Mergeable() && !EpicMergeBlocked(e) {
+		if st := prstate.Of(e, delivery); st != "" {
+			return st
+		}
+	}
 	switch StateOf(e) {
 	case StateDone:
 		if !root.Mergeable() {
 			return wire.EpicStateWaiting
 		}
 		if e.MergedAt.IsZero() {
-			if EpicMergeBlocked(e) {
+			if EpicMergeBlocked(e) || prstate.Blocked(e) {
 				return wire.EpicStatePaused
 			}
 			return wire.EpicStateAwaitingMerge
