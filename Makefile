@@ -17,7 +17,7 @@ web-build:
 	cd webui && pnpm install --frozen-lockfile && pnpm build
 	touch webui/dist/.gitkeep # vite empties dist; the Go embed needs this file to compile
 
-# Serves the canned snapshot. Against a real server, turn on server.web.dev-frontend instead.
+# Serves the canned snapshot. Dev mode in gx runs its own Vite; this target is only the canned snapshot.
 web-dev:
 	cd webui && pnpm install --frozen-lockfile && pnpm dev
 

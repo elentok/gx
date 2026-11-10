@@ -1,4 +1,6 @@
 /// <reference types="vitest/config" />
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import cannedSnapshot from "./src/canned-snapshot.json";
@@ -6,6 +8,8 @@ import { serviceWorkerPlugin } from "./src/pwa/serviceWorkerPlugin";
 
 // Serves the canned snapshot at /v1/snapshot so `make web-dev` needs no gx
 // server.
+
+const webuiDir = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [
@@ -29,8 +33,12 @@ export default defineConfig({
     },
   ],
   server: {
-    // gx server proxies to http://127.0.0.1:5173; Vite's default "localhost" can bind only ::1.
+    // gx runs its own Vite for Dev mode and reads this file, so it passes no
+    // launcher arguments and finds the port itself. Vite's default "localhost"
+    // can bind only ::1.
     host: "127.0.0.1",
+    // gx's Vite is reachable through the web listener; keep /@fs/ inside webui/.
+    fs: { strict: true, allow: [webuiDir] },
   },
   build: {
     rollupOptions: {
