@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
-import type { SessionChatResponse } from "../generated/server";
+import type { SessionChatResponse, SessionRoundCard } from "../generated/server";
+import { roundCards } from "../design/roundFixture";
 import { chat, chatOf, render, session, useAgentsPageHooks } from "./agentsTestKit";
 
 useAgentsPageHooks();
@@ -56,8 +57,8 @@ test("a busy session shows a plain Working row, and an empty chat says so", asyn
 });
 
 test("a round in the chat shows no question sheet", async () => {
-  const round = [{ label: "Pick", title: "Which?", options: [{ label: "A" }] }] as unknown as SessionChatResponse["round"];
-  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat({ round })));
+  const round = [{ label: "Pick", title: "Which?", options: [{ label: "A" }] }] as unknown as SessionRoundCard[];
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat({ questions: roundCards(round) })));
   expect(await screen.findByText("hello there")).toBeTruthy();
   expect(screen.queryByText("Which?")).toBeNull();
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();

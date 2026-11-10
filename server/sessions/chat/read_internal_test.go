@@ -384,13 +384,23 @@ const goodRound = "Intro\n\n" +
 	"❓ **Q1** - **Which store?**: SQLite or files?\n\n➡️ SQLite\n\n```gx-question\ntype: options\nrecommended: a\noptions:\n  - id: a\n    label: SQLite\n  - id: b\n    label: Files\n```\n\n---\n\n" +
 	"❓ **Q2** - **Keep going?**: Ok?\n\n➡️ Yes\n\n```gx-question\ntype: yes-no\nrecommended: yes\n```"
 
+// roundQs is the printed round's questions, nil when the response lists no round card.
+func roundQs(c wire.SessionChatResponse) []wire.QuestionCardQuestion {
+	for _, card := range c.Questions {
+		if card.Source == wire.CardSourceRound {
+			return card.Questions
+		}
+	}
+	return nil
+}
+
 func TestRead_RoundParsesCardsAndStripsFences(t *testing.T) {
 	t.Parallel()
 	got := chatOf(t, assistantText("a1", goodRound))
-	if len(got.Round) != 2 {
-		t.Fatalf("round = %+v, want 2 cards", got.Round)
+	if len(roundQs(got)) != 2 {
+		t.Fatalf("round = %+v, want 2 cards", roundQs(got))
 	}
-	c1, c2 := got.Round[0], got.Round[1]
+	c1, c2 := roundQs(got)[0], roundQs(got)[1]
 	if c1.Label != "1" || c1.Title != "Which store?" || c1.Kind != "options" || c1.Recommended != "a" || len(c1.Options) != 2 || c1.Note != "" {
 		t.Errorf("card 1 = %+v", c1)
 	}
@@ -425,8 +435,8 @@ func TestRead_RoundCardCarriesLinks(t *testing.T) {
 	t.Parallel()
 	text := "❓ **Q1** - **Pick a variant?**: See the mock.\n\n```gx-question\ntype: yes-no\nlinks:\n  - label: Mock\n    url: https://claude.ai/artifact/abc\n```"
 	got := chatOf(t, assistantText("a1", text))
-	if len(got.Round) != 1 || len(got.Round[0].Links) != 1 || got.Round[0].Links[0].URL != "https://claude.ai/artifact/abc" || got.Round[0].Links[0].Label != "Mock" {
-		t.Fatalf("round = %+v, want the card's link", got.Round)
+	if len(roundQs(got)) != 1 || len(roundQs(got)[0].Links) != 1 || roundQs(got)[0].Links[0].URL != "https://claude.ai/artifact/abc" || roundQs(got)[0].Links[0].Label != "Mock" {
+		t.Fatalf("round = %+v, want the card's link", roundQs(got))
 	}
 }
 
@@ -438,10 +448,10 @@ func TestRead_RoundDefaultsAreNotCards(t *testing.T) {
 			t.Parallel()
 			round := "❓ **Q1** - **Which store?**: SQLite or files?\n\n➡️ SQLite\n\n```gx-question\ntype: yes-no\nrecommended: yes\n```" + sep + defaults
 			got := chatOf(t, assistantText("a1", round))
-			if len(got.Round) != 1 {
-				t.Fatalf("round = %+v, want 1 card", got.Round)
+			if len(roundQs(got)) != 1 {
+				t.Fatalf("round = %+v, want 1 card", roundQs(got))
 			}
-			if body := got.Round[0].Body; strings.Contains(body, "camelCase") || strings.Contains(body, "Decided") {
+			if body := roundQs(got)[0].Body; strings.Contains(body, "camelCase") || strings.Contains(body, "Decided") {
 				t.Errorf("card body = %q, want no defaults text", body)
 			}
 		})
@@ -456,7 +466,7 @@ func TestRead_RoundReadsDriftedHeadersLeniently(t *testing.T) {
 			"❓ **Q2** Third thing? More"+yesNo+"\n\n"+
 			"❓ **Q3** - **Bold title** body"+yesNo))
 	var titles []string
-	for _, c := range got.Round {
+	for _, c := range roundQs(got) {
 		titles = append(titles, fmt.Sprintf("%s=%s", c.Label, c.Title))
 	}
 	if want := "1=Plain title,2=Third thing?,3=Bold title"; strings.Join(titles, ",") != want {
@@ -472,15 +482,15 @@ func TestRead_RoundBadOrMissingBlockGivesFreeTextCard(t *testing.T) {
 			"❓ **Q2** - **Missing**: y\n\n---\n\n"+
 			"❓ **Q3** - **Twice**: z"+good+good+"\n\n---\n\n"+
 			"❓ **Q4** - **Fine**: w"+good))
-	if len(got.Round) != 4 {
-		t.Fatalf("round = %+v, want 4 cards", got.Round)
+	if len(roundQs(got)) != 4 {
+		t.Fatalf("round = %+v, want 4 cards", roundQs(got))
 	}
-	for _, c := range got.Round[:3] {
+	for _, c := range roundQs(got)[:3] {
 		if c.Kind != "text" || c.Note == "" || len(c.Options) != 0 || c.Recommended != "" {
 			t.Errorf("card %s = %+v, want a free-text card with a note", c.Label, c)
 		}
 	}
-	if c := got.Round[3]; c.Kind != "yes-no" || c.Recommended != "yes" || c.Note != "" {
+	if c := roundQs(got)[3]; c.Kind != "yes-no" || c.Recommended != "yes" || c.Note != "" {
 		t.Errorf("card 4 = %+v, want it answerable", c)
 	}
 }
@@ -489,8 +499,8 @@ func TestRead_CommandOutputIsNotAnAgentReply(t *testing.T) {
 	t.Parallel()
 	out := personPrompt("o1", "<local-command-stdout>Total cost: $1.20</local-command-stdout>")
 	got := chatOf(t, assistantText("a1", goodRound), out)
-	if len(got.Round) != 2 {
-		t.Errorf("round = %+v, want the open round kept past the output entry", got.Round)
+	if len(roundQs(got)) != 2 {
+		t.Errorf("round = %+v, want the open round kept past the output entry", roundQs(got))
 	}
 	last := got.Messages[len(got.Messages)-1]
 	if last.ID != "o1" || last.Kind != "output" || last.Text != "Total cost: $1.20" {
@@ -504,13 +514,13 @@ func TestRead_CommandOutputIsNotAnAgentReply(t *testing.T) {
 func TestRead_RoundIsNullOnceThePersonAnswers(t *testing.T) {
 	t.Parallel()
 	got := chatOf(t, assistantText("a1", goodRound), personPrompt("u1", "yes to both"))
-	if got.Round != nil {
-		t.Errorf("round = %+v, want null after a person prompt", got.Round)
+	if roundQs(got) != nil {
+		t.Errorf("round = %+v, want null after a person prompt", roundQs(got))
 	}
 	got = chatOf(t, assistantText("a1", goodRound),
 		`{"type":"assistant","uuid":"a2","timestamp":"2026-01-01T10:00:02Z","message":{"content":[{"type":"tool_use","id":"t","name":"Bash"}]}}`)
-	if len(got.Round) != 2 {
-		t.Errorf("round = %+v, want it kept when a tool call follows", got.Round)
+	if len(roundQs(got)) != 2 {
+		t.Errorf("round = %+v, want it kept when a tool call follows", roundQs(got))
 	}
 }
 
@@ -530,8 +540,8 @@ func TestRead_NextReadsTheRunEndLine(t *testing.T) {
 func TestRead_RoundWinsOverTheRunEndLine(t *testing.T) {
 	t.Parallel()
 	got := chatOf(t, assistantText("a1", "✅ Design: halfway. Next: design detector"), assistantText("a2", goodRound))
-	if len(got.Round) != 2 || got.Next != nil {
-		t.Errorf("round = %d cards, next = %+v, want the round and no Continue", len(got.Round), got.Next)
+	if len(roundQs(got)) != 2 || got.Next != nil {
+		t.Errorf("round = %d cards, next = %+v, want the round and no Continue", len(roundQs(got)), got.Next)
 	}
 }
 

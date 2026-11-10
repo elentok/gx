@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Connection } from "../connection";
-import type { SessionChatResponse } from "../generated/server";
+import { CardSourceRound, type SessionChatResponse, type SessionRoundCard } from "../generated/server";
 import { fetchJson, useDetail, type DetailResult } from "../ticket/detail";
 
 export type FetchChat = (sessionId: string) => Promise<DetailResult<SessionChatResponse>>;
@@ -29,6 +29,23 @@ export const useSessionChat = (sessionId: string | undefined, conn: Connection, 
   return useDetail(sessionId ?? "", conn, fetchOrNone);
 };
 
-/** Names the pending round: a new round (or none) is a different key. */
-export const roundKeyOf = (chat: SessionChatResponse | null | undefined) =>
-  (chat?.round ?? []).map((c) => `${c.label}:${c.title}`).join("|");
+const roundCardOf = (chat: SessionChatResponse | null | undefined) =>
+  chat?.questions.find((c) => c.source === CardSourceRound);
+
+/** The printed round's questions, as the sheet's cards; empty when no round is open. */
+export const roundOf = (chat: SessionChatResponse | null | undefined): SessionRoundCard[] =>
+  (roundCardOf(chat)?.questions ?? []).map((q) => ({
+    label: q.label ?? "",
+    title: q.title,
+    body: q.body,
+    kind: q.kind,
+    yes: q.yes,
+    no: q.no,
+    options: q.options?.map((o) => ({ id: o.id, label: o.label, consequence: o.consequence })),
+    recommended: q.recommended,
+    links: q.links,
+    note: q.note,
+  }));
+
+/** Names the pending round by the server's card id: a new round (or none) is a different key. */
+export const roundKeyOf = (chat: SessionChatResponse | null | undefined) => roundCardOf(chat)?.id ?? "";

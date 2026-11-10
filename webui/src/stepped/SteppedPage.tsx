@@ -2,7 +2,7 @@ import { Box, chakra } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { DesignChat } from "../design/ChatLog";
-import { hasChat, roundKeyOf, useSessionChat, type FetchChat } from "../design/chat";
+import { hasChat, roundKeyOf, roundOf, useSessionChat, type FetchChat } from "../design/chat";
 import { useFocusReport, type PostFocus } from "../design/focus";
 import type { DeleteDesign, OpenFlow, ResumeSession, StopSession } from "../design/open";
 import type { PostPrompt } from "../design/prompt";
@@ -156,7 +156,7 @@ export function SteppedPage({
   // Derived, not stored, so it cannot go stale: a round opens in Questions, and the reader's toggle holds for
   // that session and round only. The message list and the impl link both read it.
   const viewKey = `${session?.id}|${roundKeyOf(chat)}`;
-  const hasRound = chatty && (chat?.round?.length ?? 0) > 0;
+  const hasRound = chatty && roundOf(chat).length > 0;
   const questions = hasRound && (toggle?.key === viewKey ? toggle.on : true);
   useFocusReport(conn, session?.id, connState.streams, actions.focus);
   const menu = (onOpenChange?: (open: boolean) => void) => (

@@ -103,7 +103,7 @@ func (r *running) waitChat(t *testing.T, id string, ok func(wire.SessionChatResp
 			return chat
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("chat never reached the wanted state; round = %+v next = %+v", chat.Round, chat.Next)
+			t.Fatalf("chat never reached the wanted state; questions = %+v next = %+v", chat.Questions, chat.Next)
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
@@ -145,8 +145,10 @@ func (r *running) waitIdle(t *testing.T, id string) {
 
 func roundLabels(chat wire.SessionChatResponse) []string {
 	var labels []string
-	for _, c := range chat.Round {
-		labels = append(labels, c.Label)
+	for _, card := range chat.Questions {
+		for _, q := range card.Questions {
+			labels = append(labels, q.Label)
+		}
 	}
 	return labels
 }
@@ -172,7 +174,7 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 	}
 	id := res.Session.ID
 
-	chat := r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return len(c.Round) > 0 })
+	chat := r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return len(c.Questions) > 0 })
 	if got := roundLabels(chat); !slices.Equal(got, []string{"8", "8b"}) {
 		t.Fatalf("round labels = %v, want 8 and 8b", got)
 	}
@@ -210,7 +212,7 @@ func TestDesignTwoLiveScenario_TwoSessionsNewestPlaysRoundOne(t *testing.T) {
 	if live[1].RunStartedAt.After(newest.RunStartedAt) {
 		newest = live[1]
 	}
-	chat := r.waitChat(t, newest.ID, func(c wire.SessionChatResponse) bool { return len(c.Round) > 0 })
+	chat := r.waitChat(t, newest.ID, func(c wire.SessionChatResponse) bool { return len(c.Questions) > 0 })
 	if got := roundLabels(chat); !slices.Equal(got, []string{"8", "8b"}) {
 		t.Errorf("round labels = %v, want 8 and 8b", got)
 	}
@@ -453,7 +455,7 @@ func TestDesignQuestionWaitScenario_ReleasingTheHoldMakesTheSessionWaitOnAGrilli
 	if err := os.Remove(r.HoldFile); err != nil {
 		t.Fatal(err)
 	}
-	r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return len(c.Round) > 0 })
+	r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return len(c.Questions) > 0 })
 	r.waitIdle(t, id)
 	// The Grilling flag trails the idle status by a poll.
 	testutil.WaitFor(t, 15*time.Second, "an idle session waiting on a Grilling round", grilling)

@@ -64,7 +64,7 @@ const detailOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
 const chat: SessionChatResponse = {
   conversation_id: "c",
   messages: [],
-  round: null,
+  questions: [],
   background: [],
   truncated: false,
 } as unknown as SessionChatResponse;

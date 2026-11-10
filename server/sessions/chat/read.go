@@ -66,7 +66,7 @@ func (c *Chat) archiveRead(w http.ResponseWriter, r *http.Request) {
 	snap := SnapshotOf(read, harness.Codex, meta.Flow, c.src.StepFinal(meta.Flow))
 	wire.WriteJSON(w, wire.SessionChatResponse{
 		ConversationID: meta.ConversationID, Messages: snap.Msgs, Truncated: snap.Truncated,
-		Round: snap.Round, Questions: SessionCards(meta, snap.Round), Next: snap.Next, Background: []wire.SessionBackgroundTask{},
+		Questions: SessionCards(meta, snap.Round), Next: snap.Next, Background: []wire.SessionBackgroundTask{},
 		Failure:    c.Failure(meta),
 		Unreadable: snap.Unreadable, CodexVersion: snap.CodexVersion,
 	})
@@ -99,7 +99,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 			return
 		default:
 			out.Messages, out.Truncated = snap.Msgs, snap.Truncated
-			out.Round, out.Next, out.Background = snap.Round, snap.Next, snap.Background(time.Now())
+			out.Next, out.Background = snap.Next, snap.Background(time.Now())
 			out.Questions = c.Cards(dir, meta, snap)
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
 			for i, t := range snap.InFlight {

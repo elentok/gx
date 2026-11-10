@@ -2,7 +2,8 @@ import { cleanup, createEvent, fireEvent, screen, waitFor, within } from "@testi
 import { describe, expect, test, vi } from "vitest";
 import { FOCUS_PROMPT_STATE } from "./promptFocus";
 import { clearCommandListCache } from "../commands/useCommandList";
-import type { SessionChatResponse, SessionInfo } from "../generated/server";
+import type { SessionChatResponse, SessionInfo, SessionRoundCard } from "../generated/server";
+import { roundCards } from "../design/roundFixture";
 import { accepted, chat, chatOf, composerBox, prompts, refused, render, sendButton, session, stubPrompt, type, useAgentsPageHooks } from "./agentsTestKit";
 
 useAgentsPageHooks();
@@ -184,8 +185,8 @@ test.each(["auth", "stalled"])("a non-Claude session with a %s failure, which ne
 });
 
 test("a design session shows its plain chat with no sheet, and links to its map's design page", async () => {
-  const round = [{ id: "q1", header: "Pick", question: "Which one?", options: [] }] as unknown as SessionChatResponse["round"];
-  render([session("s-1", "p", { design: true, ticket: "gx:map/01" })], "/agents/s-1", true, chatOf(chat({ round })));
+  const round = [{ id: "q1", header: "Pick", question: "Which one?", options: [] }] as unknown as SessionRoundCard[];
+  render([session("s-1", "p", { design: true, ticket: "gx:map/01" })], "/agents/s-1", true, chatOf(chat({ questions: roundCards(round) })));
   expect(await screen.findByText("hello there")).toBeTruthy();
   expect(screen.queryByText("Which one?")).toBeNull();
   expect(screen.getByRole("link", { name: "Open design page →" }).getAttribute("href")).toBe("#/d/gx:map");

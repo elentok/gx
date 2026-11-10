@@ -7,6 +7,7 @@ import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import { FailureBanner } from "./FailureBanner";
 import type { PostKeys } from "./keys";
+import { roundCards } from "./roundFixture";
 import type { FetchPermission } from "./permission";
 import type { OpenDesign, ResumeSession } from "./open";
 import type { PostPrompt } from "./prompt";
@@ -34,7 +35,6 @@ const session = (state: string, failure?: SessionFailure, harness = "claude"): S
 const chat: SessionChatResponse = {
   conversation_id: "c1",
   messages: [{ id: "m9", role: "agent", kind: "text", text: "hi", at: new Date().toISOString() }],
-  round: null,
   questions: [],
   background: [],
 };
@@ -148,7 +148,7 @@ test("Restore sends the state token and keeps a half-answered round's draft", as
   const resume = vi.fn<ResumeSession>(async () => ok);
   const round: SessionChatResponse = {
     ...chat,
-    round: [{ label: "1", title: "Name", body: "What name?", kind: "text" }],
+    questions: roundCards([{ label: "1", title: "Name", body: "What name?", kind: "text" }]),
   };
   render(crashed(), { resume, chat: round });
   const answer = (await screen.findByLabelText("Answer to question 1")) as HTMLTextAreaElement;

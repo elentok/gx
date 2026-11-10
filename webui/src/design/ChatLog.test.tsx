@@ -7,6 +7,7 @@ import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
 import type { PostPrompt } from "./prompt";
+import { roundCards } from "./roundFixture";
 
 afterEach(() => {
   cleanup();
@@ -41,11 +42,14 @@ const msg = (over: Partial<SessionChatMessage>): SessionChatMessage => ({
   ...over,
 });
 
-const chatOf = (messages: SessionChatMessage[], over: Partial<SessionChatResponse> = {}): SessionChatResponse => ({
+// `round` is the printed round's cards; they reach the component as the server's `round` card in `questions`.
+const chatOf = (
+  messages: SessionChatMessage[],
+  { round, ...over }: Partial<SessionChatResponse> & { round?: SessionRoundCard[] } = {},
+): SessionChatResponse => ({
   conversation_id: "c1",
   messages,
-  round: null,
-  questions: [],
+  questions: roundCards(round),
   background: [],
   ...over,
 });

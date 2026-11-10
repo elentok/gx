@@ -2,7 +2,7 @@ import { Box, chakra, Text } from "@chakra-ui/react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { SessionChatResponse, SessionInfo } from "../generated/server";
-import { hasChat, roundKeyOf } from "./chat";
+import { hasChat, roundKeyOf, roundOf } from "./chat";
 import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore";
 import type { AutoMenuState } from "./AutoMenu";
 import { Composer } from "./Composer";
@@ -58,7 +58,7 @@ function ChatTail({
   const { answers } = draft;
   const [focus, setFocus] = useState<{ index: number }>();
   const failure = visibleFailure(session.failure, done);
-  const round = chat.round ?? [];
+  const round = roundOf(chat);
   const { snapshot } = useConnectionState(useConnectionContext());
   return (
     // The bottom area: at most half the screen, so only the question body scrolls past that.
@@ -241,7 +241,7 @@ function ChatBody({
   autoMenu: AutoMenuState;
 }) {
   const roundDraft = useRoundDraft(session.id, roundKey);
-  const round = chat.round ?? [];
+  const round = roundOf(chat);
   const hasRound = round.length > 0;
   useEffect(() => {
     if (!questions) return;

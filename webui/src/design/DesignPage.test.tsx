@@ -2,8 +2,9 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicDetail, EpicDetailRow, EpicList, EpicListRow, MapStep, SessionInfo } from "../generated/server";
+import type { EpicDetail, EpicDetailRow, EpicList, EpicListRow, MapStep, SessionInfo, SessionRoundCard } from "../generated/server";
 import { appRoutes, type RouteFetchers } from "../routes";
+import { roundCards } from "./roundFixture";
 import { renderThemed } from "../ui/render";
 
 afterEach(cleanup);
@@ -252,7 +253,7 @@ test("the countdown keeps running after Close dialog", async () => {
     ],
     "/d/gx:a",
     detailOf(),
-    { chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, questions: [], background: [] } }) },
+    { chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], questions: [], background: [] } }) },
   );
   fireEvent.click(await screen.findByRole("button", { name: "Close dialog" }));
   await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith("/v1/sessions/keys", expect.objectContaining({ method: "POST" })));
@@ -466,7 +467,7 @@ test("confirming Delete calls the route and goes to the Epics page", async () =>
 });
 
 const chatFetcher: RouteFetchers = {
-  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, questions: [], background: [] } }),
+  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], questions: [], background: [] } }),
 };
 
 test("a Design with map images shows a read-only strip that opens the viewer with the map-image URL", async () => {
@@ -488,7 +489,6 @@ test("the map-image strip is the first entry of the chat log, ahead of the messa
       detail: {
         conversation_id: "c1",
         messages: [{ id: "m1", role: "agent", kind: "text", text: "hello from the agent", at: new Date().toISOString() }],
-        round: null,
         questions: [],
         background: [],
       },
@@ -540,7 +540,7 @@ function withKeyboard(body: (kb: { open: () => void; close: () => void }) => Pro
 }
 
 const roundChat = (round: unknown[] | null): RouteFetchers => ({
-  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round, background: [] } as never }),
+  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], questions: roundCards(round as SessionRoundCard[] | null), background: [] } as never }),
 });
 const askCard = { label: "1", title: "T1", body: "Body 1?", kind: "options", options: [{ id: "a", label: "Alpha" }] };
 const composer = async () => {

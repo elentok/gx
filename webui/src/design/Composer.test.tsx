@@ -30,6 +30,7 @@ import type { FetchChat } from "./chat";
 import { Composer } from "./Composer";
 import type { PostPrompt } from "./prompt";
 import { HUH_MESSAGE } from "./round";
+import { roundCards } from "./roundFixture";
 
 afterEach(() => {
   cleanup();
@@ -57,8 +58,9 @@ const session = (
   ...auto,
 });
 
+// `round` is the printed round's cards; they reach the component as the server's `round` card in `questions`.
 const chatOf = (
-  over: Partial<SessionChatResponse> = {},
+  { round, ...over }: Partial<SessionChatResponse> & { round?: SessionRoundCard[] } = {},
 ): SessionChatResponse => ({
   conversation_id: "c1",
   messages: [
@@ -70,9 +72,7 @@ const chatOf = (
       at: new Date().toISOString(),
     },
   ],
-  // The server sends null, not [], when the last turn holds no round.
-  round: null,
-  questions: [],
+  questions: roundCards(round),
   background: [],
   ...over,
 });

@@ -85,7 +85,6 @@ export function render(sessions: SessionInfo[] | undefined, path: string | { pat
 export const chat = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => ({
   conversation_id: "c1",
   messages: [{ id: "m1", role: "agent", kind: "text", text: "hello there", at: "2026-01-01T00:00:00Z" }],
-  round: null,
   questions: [],
   background: [],
   ...over,

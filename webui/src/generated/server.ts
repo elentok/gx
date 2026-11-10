@@ -2404,17 +2404,16 @@ export interface SessionTranscriptResponse {
  * SessionChatResponse is the visible messages of a session's newest
  * conversation. ConversationID changes after a /clear. Unsupported marks a
  * session of a harness that has no chat; its Messages stay empty. Truncated
- * says earlier messages were cut to fit maxChatMessages. Round holds the cards
- * of a Grilling round the agent ended its last turn with and the person has not
- * answered; Next is the run-end line of that turn; Background lists the shells,
- * Monitors and subagents still running.
+ * says earlier messages were cut to fit maxChatMessages. Questions holds the
+ * cards the person has not answered, among them a Grilling round the agent
+ * ended its last turn with; Next is the run-end line of that turn; Background
+ * lists the shells, Monitors and subagents still running.
  */
 export interface SessionChatResponse {
   conversation_id: string;
   messages: SessionChatMessage[];
   unsupported?: boolean;
   truncated?: boolean;
-  round: SessionRoundCard[] | null;
   /**
    * Questions lists the Question cards the session shows, live blocker first;
    * never null.

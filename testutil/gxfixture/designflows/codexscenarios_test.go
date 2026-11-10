@@ -106,6 +106,6 @@ func TestCodexDesignScenario_SessionOnCodexLinkedToTheMapWithTheScriptedRound(t 
 	}) {
 		t.Errorf("no rollout under %s holds the scripted round", rollouts)
 	}
-	r.waitChat(t, designs[0].ID, func(c wire.SessionChatResponse) bool { return len(c.Messages) > 0 && c.Round != nil })
+	r.waitChat(t, designs[0].ID, func(c wire.SessionChatResponse) bool { return len(c.Messages) > 0 && len(c.Questions) > 0 })
 	r.Stop(t)
 }

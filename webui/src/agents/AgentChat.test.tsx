@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { SessionChatResponse, SessionFailure, SessionInfo } from "../generated/server";
+import { roundCards } from "../design/roundFixture";
 import { renderThemed } from "../ui/render";
 import { AgentChat } from "./AgentChat";
 
@@ -31,7 +32,6 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
 const chat = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => ({
   conversation_id: "c1",
   messages: [{ id: "m1", role: "agent", kind: "text", text: "hello there", at: new Date().toISOString() }],
-  round: null,
   questions: [],
   background: [],
   ...over,
@@ -64,7 +64,7 @@ test("a busy session names the tool in flight", async () => {
 
 test("a round shows no sheet and no toggle", async () => {
   const round = [{ label: "1", title: "t", body: "Which way?", kind: "options" as const, options: [{ id: "a", label: "Alpha" }] }];
-  render(session(), chat({ round }));
+  render(session(), chat({ questions: roundCards(round) }));
   await screen.findByText("hello there");
   expect(screen.queryByText("Which way?")).toBeNull();
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();
