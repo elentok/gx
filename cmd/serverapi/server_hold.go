@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -67,7 +68,7 @@ func runHold(c *cobra.Command, d Deps, jsonOut bool, targets []string, do func(c
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
-	return printTargets(c.OutOrStdout(), jsonOut, res, res.Results, func(w io.Writer, r wire.TargetResult) error {
+	return cmdbase.PrintTargets(c.OutOrStdout(), jsonOut, res, res.Results, func(w io.Writer, r wire.TargetResult) error {
 		if len(r.Sessions) > 0 {
 			verb := "ended"
 			if r.Status == wire.TargetFits {

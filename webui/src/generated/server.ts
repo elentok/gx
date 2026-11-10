@@ -2707,8 +2707,8 @@ export interface RemoveExitedResult {
   dry_run?: boolean;
 }
 /**
- * SessionRequest names the session a stop or remove acts on. State is the
- * token the web sends with a stop or Restore; see SessionStateToken. Only the
+ * SessionRequest names the session a write acts on. State is the token the web
+ * sends with a Restore, interrupt or Design open; see SessionStateToken. Only the
  * web mux checks it (see checkDesignWrite): the plain mux ignores State, and on
  * the web mux an empty State never matches a token, so it is refused as stale.
  */
@@ -2716,6 +2716,26 @@ export interface SessionRequest {
   id: string;
   state?: string;
 }
+/**
+ * SessionTarget is one session of a stop or remove. State is the web-only row
+ * token (see SessionRowToken); the plain route sends none and ignores it.
+ */
+export interface SessionTarget {
+  id: string;
+  state?: string;
+}
+/**
+ * SessionTargetsRequest stops or removes many sessions. Yes confirms, for the
+ * whole request, a remove that stops a live session.
+ */
+export interface SessionTargetsRequest {
+  targets: SessionTarget[];
+  yes?: boolean;
+}
+/**
+ * StaleRowMessage is the message of a web target whose row changed since it was selected.
+ */
+export const StaleRowMessage = "changed, reselect";
 
 //////////
 // source: sessiontypes.go

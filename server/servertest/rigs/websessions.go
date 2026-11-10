@@ -2,6 +2,7 @@ package rigs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/elentok/gx/server/servertest"
 	"net/http"
@@ -47,8 +48,21 @@ func StartWebDesign(t *testing.T) (h *servertest.Harness, base string, cookie *h
 	return h, base, cookie, ctx, evs, create("proj:map"), create("proj:plain")
 }
 
-// SessionToken is the state token of session id in the current snapshot.
+// SessionToken is the old state token of session id in the current snapshot,
+// which resume, interrupt and Design open still take. A stop or remove takes
+// RowToken instead.
 func SessionToken(ctx context.Context, t *testing.T, h *servertest.Harness, id string) string {
+	t.Helper()
+	return snapshotToken(ctx, t, h, id, sessions.SessionStateToken)
+}
+
+// RowToken is the web's row token for session id in the current snapshot.
+func RowToken(ctx context.Context, t *testing.T, h *servertest.Harness, id string) string {
+	t.Helper()
+	return snapshotToken(ctx, t, h, id, sessions.SessionRowToken)
+}
+
+func snapshotToken(ctx context.Context, t *testing.T, h *servertest.Harness, id string, token func(wire.SessionInfo) string) string {
 	t.Helper()
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
@@ -56,11 +70,24 @@ func SessionToken(ctx context.Context, t *testing.T, h *servertest.Harness, id s
 	}
 	for _, s := range snap.Sessions {
 		if s.ID == id {
-			return sessions.SessionStateToken(s)
+			return token(s)
 		}
 	}
 	t.Fatalf("no session %s", id)
 	return ""
+}
+
+// WebTargetWrite posts a web stop or remove of one session with a row token and
+// returns that session's result.
+func WebTargetWrite(t *testing.T, base string, cookie *http.Cookie, verb, id, state string, yes bool) (int, wire.TargetResult) {
+	t.Helper()
+	body := fmt.Sprintf(`{"targets":[{"id":%q,"state":%q}],"yes":%t}`, id, state, yes)
+	code, text := servertest.WebPostJSON(t, base+"/v1/sessions/"+verb, body, cookie, "", servertest.JSONPost(base))
+	var res wire.TargetsResult
+	if err := json.Unmarshal([]byte(text), &res); err != nil || len(res.Results) != 1 {
+		t.Fatalf("%s answered %d %q, want one result (%v)", verb, code, text, err)
+	}
+	return code, res.Results[0]
 }
 
 // WebSessionWrite posts a session write verb with a state token.

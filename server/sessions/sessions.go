@@ -571,7 +571,8 @@ func waitForFile(path string, timeout time.Duration) {
 	}
 }
 
-// RemoveSession deletes an Exited session's state dir, never its Dir.
+// RemoveSession deletes an Exited session's state dir, never its Dir. A live
+// session is refused needs-yes; RemoveTarget stops it first when yes came.
 func (mg *Manager) RemoveSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	mg.Watches.MetaMu.Lock()
 	defer mg.Watches.MetaMu.Unlock()
@@ -580,7 +581,7 @@ func (mg *Manager) RemoveSession(req wire.SessionRequest) (wire.SessionResult, e
 		return res, err
 	}
 	if meta.Status.State != wire.SessionExited {
-		return Refusal(wire.ReasonSessionLive, fmt.Sprintf("session %s is live; stop it first", req.ID)), nil
+		return Refusal(wire.ReasonNeedsYes, fmt.Sprintf("session %s is live; removing it stops it, so confirm", req.ID)), nil
 	}
 	if err := os.RemoveAll(dir); err != nil {
 		return wire.SessionResult{}, err

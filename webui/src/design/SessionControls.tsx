@@ -13,6 +13,7 @@ import {
   postDeleteDesign,
   postOpenDesign,
   postStopSession,
+  rowToken,
   stateToken,
   type DeleteDesign,
   type OpenFlow,
@@ -195,7 +196,7 @@ export function DesignActionsMenu({
       onSelect: () => startNew(run, address, shown, open),
     });
   if (shown && live.length > 1)
-    sessionItems.push(...liveSessionEntries(live, shown, pending, onSelect, (s) => run(() => stop({ id: s.id, state: stateToken(s) }))));
+    sessionItems.push(...liveSessionEntries(live, shown, pending, onSelect, (s) => run(() => stop({ id: s.id, state: rowToken(s) }))));
   if (sessionItems.length > 0) groups.push(sessionItems);
   const copySection: MenuEntry[] = [
     { value: "copy-design-id", label: designItems ? "Copy design ID" : "Copy triage ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) },

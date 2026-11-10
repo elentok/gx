@@ -1,8 +1,9 @@
 import type { SessionInfo, SessionRequest, SessionResult } from "../generated/server";
-import { postJson, postStopSession, stateToken, type StopSession } from "../design/open";
+import { postStopSession, postTarget, rowToken, type StopSession } from "../design/open";
 
 export type RemoveSession = (body: SessionRequest) => Promise<SessionResult>;
-export const postRemoveSession: RemoveSession = postJson("/v1/sessions/remove");
+/** Remove confirms with yes, so the server stops a live session itself. */
+export const postRemoveSession: RemoveSession = postTarget("/v1/sessions/remove", true);
 
 export const isExited = (s: SessionInfo) => s.status.state === "exited";
 
@@ -17,13 +18,7 @@ export interface SessionWrites {
   remove?: RemoveSession;
 }
 
-/** Removes a session; a live one is stopped first. Returns the first refusal, else the removal. */
-export async function removeSession(s: SessionInfo, { stop = postStopSession, remove = postRemoveSession }: SessionWrites = {}): Promise<SessionResult> {
-  let current = s;
-  if (!isExited(s)) {
-    const stopped = await stop({ id: s.id, state: stateToken(s) });
-    if (stopped.refused || !stopped.session) return stopped;
-    current = stopped.session;
-  }
-  return remove({ id: current.id, state: stateToken(current) });
+/** Removes a session in one call; the server stops a live one first. */
+export function removeSession(s: SessionInfo, { remove = postRemoveSession }: Pick<SessionWrites, "remove"> = {}): Promise<SessionResult> {
+  return remove({ id: s.id, state: rowToken(s) });
 }

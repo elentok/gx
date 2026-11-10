@@ -3,7 +3,10 @@ package sessions
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/nativerunner/holder"
@@ -62,25 +65,32 @@ func (mg *Manager) CheckSteppedWrite(req wire.SessionRequest) (wire.SessionResul
 	return wire.SessionResult{}, nil
 }
 
-// SessionWriteAgentWeb is sessionWrite for a web stop or remove: any session
-// except a Queue agent, which ralph-loop drives, and only with the state token
-// of the session the page saw.
-func (mg *Manager) SessionWriteAgentWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-	return sessionWriteAs(mg.checkAgentWrite, do)
+// SessionRowToken is the web's proof of the row a stop or remove was selected
+// on: the id, when the current run began, and whether it is live or Exited. A
+// Working/Idle flip leaves it alone. The time is the run_started_at string the
+// page already holds.
+func SessionRowToken(s wire.SessionInfo) string {
+	state := "live"
+	if s.Status.State == wire.SessionExited {
+		state = "exited"
+	}
+	return fmt.Sprintf("%s:%s:%s", s.ID, s.RunStartedAt.Format(time.RFC3339Nano), state)
 }
 
-// checkAgentWrite returns the refusal for a web write on a Queue session or on
-// a session whose state moved since the page saw it.
-func (mg *Manager) checkAgentWrite(req wire.SessionRequest) (wire.SessionResult, error) {
-	_, meta, res, err := mg.SessionDir(req.ID)
+// checkAgentWrite returns the refusal for a web stop or remove of a Queue
+// session, which ralph-loop drives, or of a row that changed since it was
+// selected. It compares only SessionRowToken.
+func (mg *Manager) checkAgentWrite(t wire.SessionTarget) (wire.SessionResult, error) {
+	// A Queue agent has no state dir here, so its id prefix is the only tell.
+	if strings.HasPrefix(t.ID, queue.AgentIDPrefix) {
+		return Refusal(wire.ReasonSessionQueue, fmt.Sprintf("session %s is a Queue agent; ralph-loop drives it", t.ID)), nil
+	}
+	_, meta, res, err := mg.SessionDir(t.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if meta.Info().Queue {
-		return Refusal(wire.ReasonSessionQueue, fmt.Sprintf("session %s is a Queue agent; ralph-loop drives it", req.ID)), nil
-	}
-	if req.State != SessionStateToken(meta.Info()) {
-		return Refusal(wire.ReasonStale, "the session changed; review its current state"), nil
+	if info := meta.Info(); t.State != SessionRowToken(info) {
+		return Refusal(wire.ReasonStale, wire.StaleRowMessage), nil
 	}
 	return wire.SessionResult{}, nil
 }

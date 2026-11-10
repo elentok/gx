@@ -1,6 +1,6 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import { postStopSession, stateToken, type StopSession } from "../design/open";
+import { postStopSession, rowToken, type StopSession } from "../design/open";
 import type { SessionInfo } from "../generated/server";
 import { useWrite } from "../useWrite";
 import { Button } from "../ui/button/Button";
@@ -22,7 +22,7 @@ export function useSessionManage(
   const name = session.name || session.id;
   const items: MenuEntry[] = [];
   if (live)
-    items.push({ value: "stop", label: "Stop", danger: true, disabled: pending, onSelect: () => run(() => stop({ id: session.id, state: stateToken(session) })) });
+    items.push({ value: "stop", label: "Stop", danger: true, disabled: pending, onSelect: () => run(() => stop({ id: session.id, state: rowToken(session) })) });
   items.push({ value: "remove", label: "Remove", danger: true, disabled: pending, onSelect: () => setConfirming(true) });
   const dialog = confirming ? (
     <Modal label={`Remove ${name}`} onClose={() => setConfirming(false)} maxW="sm">
@@ -36,7 +36,7 @@ export function useSessionManage(
           disabled={pending}
           onClick={() => {
             setConfirming(false);
-            run(() => removeSession(session, { stop, remove }), {
+            run(() => removeSession(session, { remove }), {
               onDone: () => {
                 forgetLast(session.id);
                 onRemoved();

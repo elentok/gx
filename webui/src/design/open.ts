@@ -6,6 +6,7 @@ import type {
   SessionInfo,
   SessionRequest,
   SessionResult,
+  TargetsResult,
 } from "../generated/server";
 import { apiFetch } from "../apiFetch";
 import { WriteError } from "../useWrite";
@@ -47,7 +48,16 @@ export async function readWrite<R extends SessionResult>(res: Response): Promise
 
 export const postOpenDesign: OpenDesign = postJson("/v1/designs/open");
 export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete");
-export const postStopSession: StopSession = postJson("/v1/sessions/stop");
+/** A stop or remove of one session on the many-target route, answered as the refusable shape the pages use. `body.state` is a rowToken. */
+export const postTarget =
+  (path: string, yes = false) =>
+  async ({ id, state }: SessionRequest): Promise<SessionResult> => {
+    const res = await postJson<SessionResult & TargetsResult>(path)({ targets: [{ id, state }], yes });
+    const r = res.results[0];
+    return r?.status === "refused" ? { refused: true, reason: r.reason, message: r.message } : {};
+  };
+
+export const postStopSession: StopSession = postTarget("/v1/sessions/stop");
 export const postResumeSession: ResumeSession = postJson("/v1/sessions/resume");
 export const postInterruptSession: InterruptSession = postJson(
   "/v1/sessions/interrupt",
@@ -76,4 +86,9 @@ export function stateToken(s: SessionInfo): string {
   const nanos = (/\.(\d+)/.exec(at)?.[1] ?? "").padEnd(9, "0").slice(0, 9);
   const seconds = Math.floor(Date.parse(at.replace(/\.\d+/, "")) / 1000);
   return `${s.id}:${s.status.state}:${BigInt(seconds) * 1_000_000_000n + BigInt(nanos)}`;
+}
+
+/** The server's SessionRowToken, sent with a stop or remove: id, run_started_at as the page holds it, and live or exited. A Working/Idle flip leaves it alone. */
+export function rowToken(s: SessionInfo): string {
+  return `${s.id}:${s.run_started_at}:${s.status.state === "exited" ? "exited" : "live"}`;
 }

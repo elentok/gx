@@ -141,9 +141,37 @@ func (s *Sessions) RetryMigration(ctx context.Context, req wire.RetryMigrationRe
 // Stop ends a live session's holder. A refusal is a result (Refused set), not
 // an error.
 func (s *Sessions) Stop(ctx context.Context, id string) (wire.SessionResult, error) {
-	var res wire.SessionResult
-	err := s.t.post(ctx, "/v1/sessions/stop", wire.SessionRequest{ID: id}, &res)
+	res, err := s.StopMany(ctx, []string{id})
+	return firstSessionResult(res), err
+}
+
+// StopMany stops each session; a refusal is that target's result.
+func (s *Sessions) StopMany(ctx context.Context, ids []string) (wire.TargetsResult, error) {
+	return s.targets(ctx, "/v1/sessions/stop", ids, false)
+}
+
+// RemoveMany removes each session. Yes confirms stopping the live ones.
+func (s *Sessions) RemoveMany(ctx context.Context, ids []string, yes bool) (wire.TargetsResult, error) {
+	return s.targets(ctx, "/v1/sessions/remove", ids, yes)
+}
+
+func (s *Sessions) targets(ctx context.Context, path string, ids []string, yes bool) (wire.TargetsResult, error) {
+	req := wire.SessionTargetsRequest{Yes: yes}
+	for _, id := range ids {
+		req.Targets = append(req.Targets, wire.SessionTarget{ID: id})
+	}
+	var res wire.TargetsResult
+	err := s.t.post(ctx, path, req, &res)
 	return res, err
+}
+
+// firstSessionResult is the single-session view of a many-target answer.
+func firstSessionResult(res wire.TargetsResult) wire.SessionResult {
+	if len(res.Results) == 0 {
+		return wire.SessionResult{}
+	}
+	r := res.Results[0]
+	return wire.SessionResult{Refused: r.Refused(), Reason: r.Reason, Message: r.Message}
 }
 
 // Interrupt ends a Working session's current turn and keeps the session. A
@@ -186,12 +214,11 @@ func (s *Sessions) CancelAutoQueue(ctx context.Context, id string) (wire.Session
 	return res, err
 }
 
-// Remove deletes an Exited session's state dir. A refusal is a result (Refused
-// set), not an error.
+// Remove deletes an Exited session's state dir; a live session is refused
+// needs-yes. A refusal is a result (Refused set), not an error.
 func (s *Sessions) Remove(ctx context.Context, id string) (wire.SessionResult, error) {
-	var res wire.SessionResult
-	err := s.t.post(ctx, "/v1/sessions/remove", wire.SessionRequest{ID: id}, &res)
-	return res, err
+	res, err := s.RemoveMany(ctx, []string{id}, false)
+	return firstSessionResult(res), err
 }
 
 // RemoveExited deletes every Exited session in one server-side sweep, or with

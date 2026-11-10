@@ -21,14 +21,17 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 	write := func(do func() func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) { SessionWrite(do())(w, r) }
 	}
-	agentWeb := func(do func() func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) { mg().SessionWriteAgentWeb(do())(w, r) }
+	// targets serves stop and remove, which take many sessions.
+	targets := func(do func(*Manager) func(string, bool) (wire.SessionResult, error), web bool) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) { mg().SessionTargetsWrite(do(mg()), web)(w, r) }
 	}
+	stopTarget := func(m *Manager) func(string, bool) (wire.SessionResult, error) {
+		return func(id string, _ bool) (wire.SessionResult, error) { return m.StopSession(wire.SessionRequest{ID: id}) }
+	}
+	removeTarget := func(m *Manager) func(string, bool) (wire.SessionResult, error) { return m.RemoveTarget }
 	designWeb := func(do func() func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) { mg().SessionWriteDesignWeb(do())(w, r) }
 	}
-	stop := func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().StopSession }
-	remove := func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().RemoveSession }
 	interrupt := func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().InterruptSession }
 	resume := func() func(wire.SessionRequest) (wire.SessionResult, error) { return rs().ResumeSession }
 	return []wire.Route{
@@ -41,8 +44,8 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 			wire.WriteJSON(w, list)
 		}},
 		{Pattern: "POST /v1/sessions/create", Web: wire.WebWrite, Handler: m((*Manager).SessionCreateWrite), WebHandler: m((*Manager).SessionCreateWeb)},
-		{Pattern: "POST /v1/sessions/stop", Web: wire.WebWrite, Handler: write(stop), WebHandler: agentWeb(stop)},
-		{Pattern: "POST /v1/sessions/remove", Web: wire.WebWrite, Handler: write(remove), WebHandler: agentWeb(remove)},
+		{Pattern: "POST /v1/sessions/stop", Web: wire.WebWrite, Handler: targets(stopTarget, false), WebHandler: targets(stopTarget, true)},
+		{Pattern: "POST /v1/sessions/remove", Web: wire.WebWrite, Handler: targets(removeTarget, false), WebHandler: targets(removeTarget, true)},
 		{Pattern: "POST /v1/sessions/remove-exited", Handler: func(w http.ResponseWriter, r *http.Request) {
 			var req wire.RemoveExitedRequest
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

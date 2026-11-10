@@ -278,8 +278,7 @@ test("an exited nested agent has no Stop; a Queue agent has no menu button", asy
 test("removing the open nested agent from its row confirms, then goes to the agents list", async () => {
   const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
     const u = String(url);
-    if (u.includes("/v1/sessions/stop")) return new Response(JSON.stringify({ session: session("s1", "p", { status: { state: "exited" } }) }), { status: 200 });
-    if (u.includes("/v1/sessions/remove")) return new Response(JSON.stringify({}), { status: 200 });
+    if (u.includes("/v1/sessions/remove")) return new Response(JSON.stringify({ results: [{ target: "s1", status: "done" }] }), { status: 200 });
     return new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 });
   });
   setup("desktop", "/agents/s1");
@@ -308,8 +307,7 @@ test("a nested row owns its menu button apart from its parent; a nested row neve
 test("removing the open chat from its row confirms, then leaves its page", async () => {
   const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
     const u = String(url);
-    if (u.includes("/v1/sessions/stop")) return new Response(JSON.stringify({ session: session("s3", "p", { status: { state: "exited" } }) }), { status: 200 });
-    if (u.includes("/v1/sessions/remove")) return new Response(JSON.stringify({}), { status: 200 });
+    if (u.includes("/v1/sessions/remove")) return new Response(JSON.stringify({ results: [{ target: "s3", status: "done" }] }), { status: 200 });
     return new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 });
   });
   setup("desktop", "/agents/s3");

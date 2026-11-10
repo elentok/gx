@@ -268,8 +268,8 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Refused || res.Session == nil {
-		t.Fatalf("stop = %+v, want the session", res)
+	if res.Refused {
+		t.Fatalf("stop = %+v, want it to succeed", res)
 	}
 	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if got.Exit != wire.SessionExitClean || !got.Stopped || got.Unread.Unread {
@@ -335,8 +335,8 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 	dir := filepath.Join(h.SessionsDir, id)
 
 	res, err := h.Client.Sessions.Remove(ctx, id)
-	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionLive {
-		t.Fatalf("remove live = %+v, %v; want refused %s", res, err, wire.ReasonSessionLive)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNeedsYes {
+		t.Fatalf("remove live = %+v, %v; want refused %s", res, err, wire.ReasonNeedsYes)
 	}
 	if _, err := os.Stat(dir); err != nil {
 		t.Fatalf("refused remove touched the state dir: %v", err)

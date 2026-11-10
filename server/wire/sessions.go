@@ -352,11 +352,28 @@ type RemoveExitedResult struct {
 	DryRun  bool     `json:"dry_run,omitempty"`
 }
 
-// SessionRequest names the session a stop or remove acts on. State is the
-// token the web sends with a stop or Restore; see SessionStateToken. Only the
+// SessionRequest names the session a write acts on. State is the token the web
+// sends with a Restore, interrupt or Design open; see SessionStateToken. Only the
 // web mux checks it (see checkDesignWrite): the plain mux ignores State, and on
 // the web mux an empty State never matches a token, so it is refused as stale.
 type SessionRequest struct {
 	ID    string `json:"id"`
 	State string `json:"state,omitempty"`
 }
+
+// SessionTarget is one session of a stop or remove. State is the web-only row
+// token (see SessionRowToken); the plain route sends none and ignores it.
+type SessionTarget struct {
+	ID    string `json:"id"`
+	State string `json:"state,omitempty"`
+}
+
+// SessionTargetsRequest stops or removes many sessions. Yes confirms, for the
+// whole request, a remove that stops a live session.
+type SessionTargetsRequest struct {
+	Targets []SessionTarget `json:"targets"`
+	Yes     bool            `json:"yes,omitempty"`
+}
+
+// StaleRowMessage is the message of a web target whose row changed since it was selected.
+const StaleRowMessage = "changed, reselect"

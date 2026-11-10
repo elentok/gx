@@ -25,7 +25,7 @@ func NewAgents(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error { return d.OpenTab(nav.TabAgents) }}
 	cmd.AddCommand(newAgentsCreateCmd(d.Dial()), newAgentsListCmd(d), newAgentsChatCmd(d), newAgentsScreenCmd(d), newAgentsCommandsCmd(d), newAgentsPermissionCmd(d), newAgentsKeysCmd(d),
-		newAgentsSessionCmd(d, "stop", "end a live session's agent (it stays, Exited)", (*apiclient.Sessions).Stop),
+		newAgentsStopCmd(d),
 		newAgentsSessionCmd(d, "interrupt", "end a Working session's current turn (the session stays)", (*apiclient.Sessions).Interrupt),
 		newAgentsRemoveCmd(d),
 		newAgentsSessionCmd(d, "mark-read", "clear a session's Unread", (*apiclient.Sessions).MarkRead),
@@ -411,14 +411,52 @@ func newAgentsSessionCmd(d Deps, verb, short string, write sessionWriteFunc) *co
 	return cmd
 }
 
-// newAgentsRemoveCmd is `gx agents remove <id>` or `--exited`, which sweeps
+// newAgentsStopCmd is `gx agents stop <id>...`.
+func newAgentsStopCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "stop <id>...",
+		Short: "end each live session's agent (it stays, Exited)",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			return runAgentsTargets(c.Context(), c.OutOrStdout(), jsonOut, args, func(ctx context.Context) (wire.TargetsResult, error) {
+				return cl.Sessions.StopMany(ctx, args)
+			})
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured results as JSON")
+	return cmd
+}
+
+// runAgentsTargets prints the per-session results of a stop or remove.
+func runAgentsTargets(ctx context.Context, w io.Writer, jsonOut bool, ids []string, call func(context.Context) (wire.TargetsResult, error)) error {
+	res, err := call(ctxOrBackground(ctx))
+	switch {
+	case apiclient.IsNotRunning(err):
+		res = wire.TargetsResult{}
+		for _, id := range ids {
+			res.Results = append(res.Results, wire.RefusedTarget(id, wire.ReasonServerNotRunning, notRunningMessage))
+		}
+	case err != nil:
+		return mapServerErr(err)
+	}
+	return cmdbase.PrintTargets(w, jsonOut, res, res.Results, func(w io.Writer, r wire.TargetResult) error {
+		_, err := fmt.Fprintln(w, r.Target)
+		return err
+	})
+}
+
+// newAgentsRemoveCmd is `gx agents remove <id>...` or `--exited`, which sweeps
 // every Exited session in one server call.
 func newAgentsRemoveCmd(d Deps) *cobra.Command {
-	var jsonOut, exited, dryRun bool
+	var jsonOut, exited, dryRun, yes bool
 	cmd := &cobra.Command{
-		Use:   "remove <id> | --exited [--dry-run]",
-		Short: "delete an Exited session, or every Exited session with --exited",
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "remove <id>... [--yes] | --exited [--dry-run]",
+		Short: "delete sessions (--yes stops live ones first), or every Exited session with --exited",
 		RunE: func(c *cobra.Command, args []string) error {
 			switch {
 			case exited && len(args) > 0:
@@ -435,9 +473,12 @@ func newAgentsRemoveCmd(d Deps) *cobra.Command {
 			if exited {
 				return runAgentsRemoveExited(c.Context(), cl, c.OutOrStdout(), jsonOut, dryRun)
 			}
-			return runAgentsSessionWrite(c.Context(), cl, c.OutOrStdout(), jsonOut, (*apiclient.Sessions).Remove, args[0])
+			return runAgentsTargets(c.Context(), c.OutOrStdout(), jsonOut, args, func(ctx context.Context) (wire.TargetsResult, error) {
+				return cl.Sessions.RemoveMany(ctx, args, yes)
+			})
 		},
 	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "confirm stopping live sessions before removing them")
 	cmd.Flags().BoolVar(&exited, "exited", false, "remove every Exited session, printing the ids removed")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "with --exited, list the ids without removing them")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")

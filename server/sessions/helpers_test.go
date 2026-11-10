@@ -74,7 +74,9 @@ var (
 	clearByInput           = servertest.ClearByInput
 	startWebDesign         = rigs.StartWebDesign
 	sessionToken           = rigs.SessionToken
+	rowToken               = rigs.RowToken
 	webSessionWrite        = rigs.WebSessionWrite
+	webTargetWrite         = rigs.WebTargetWrite
 )
 
 type designsFixture struct {

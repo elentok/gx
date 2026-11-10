@@ -17,7 +17,7 @@ import type {
 import { appRoutes, type RouteFetchers } from "../routes";
 import { renderThemed } from "../ui/render";
 import { WriteError } from "../useWrite";
-import { stateToken } from "./open";
+import { rowToken, stateToken } from "./open";
 
 afterEach(() => {
   cleanup();
@@ -250,6 +250,13 @@ test("New session on an exited session asks nothing and sends no state token", a
   expect(confirm).not.toHaveBeenCalled();
 });
 
+test("the row token is the id, the run start as held, and live or exited", () => {
+  const s = session("s1", { run_started_at: "2026-10-23T09:00:00.5Z" });
+  expect(rowToken(s)).toBe("s1:2026-10-23T09:00:00.5Z:live");
+  expect(rowToken({ ...s, status: { state: "working" } })).toBe(rowToken(s));
+  expect(rowToken({ ...s, status: { state: "exited" } })).toBe("s1:2026-10-23T09:00:00.5Z:exited");
+});
+
 test("the state token has the server's shape", () => {
   expect(stateToken(session("s1"))).toBe("s1:idle:1792749600123456789");
 });
@@ -323,7 +330,7 @@ test("the Live sessions list switches the page and stops another session with a 
   await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   await openMenu();
   fireEvent.click(await screen.findByRole("menuitem", { name: "Stop new" }));
-  await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "new", state: stateToken(newer) }));
+  await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "new", state: rowToken(newer) }));
 });
 
 test("arrow keys reach another session's Stop item; Enter stops it and the menu stays open", async () => {
@@ -346,7 +353,7 @@ test("arrow keys reach another session's Stop item; Enter stops it and the menu 
   await arrowTo(sessionItem);
   await arrowTo(stopItem);
   fireEvent.keyDown(menu, { key: "Enter" });
-  await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "old", state: stateToken(other) }));
+  await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "old", state: rowToken(other) }));
   expect(menu.isConnected).toBe(true);
   expect(screen.getByRole("menu")).toBe(menu);
 });
@@ -366,7 +373,7 @@ test("on a phone the ⋯ menu is an anchored popover with the desktop items", as
     const menu = await screen.findByRole("menu");
     expect(screen.getByText("Live sessions · 2")).toBeTruthy();
     fireEvent.click(screen.getByRole("menuitem", { name: "Stop s2" }));
-    await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "s2", state: stateToken(other) }));
+    await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "s2", state: rowToken(other) }));
     fireEvent.click(await newSession());
     await waitFor(() => expect(openDesign).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());

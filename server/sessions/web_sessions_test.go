@@ -1,11 +1,15 @@
 package sessions_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server/servertest"
@@ -20,19 +24,19 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 
 	for _, tc := range []struct{ name, id, state, want string }{
 		{"no token", design, "", wire.ReasonStale},
-		{"old token", design, design + ":starting:1", wire.ReasonStale},
+		{"old token", design, fresh, wire.ReasonStale},
 	} {
-		code, body := webSessionWrite(t, base, cookie, "stop", tc.id, tc.state)
-		if code != http.StatusOK || servertest.ReasonOf(t, body) != tc.want {
-			t.Errorf("stop with %s = %d %s, want %s", tc.name, code, body, tc.want)
+		code, res := webTargetWrite(t, base, cookie, "stop", tc.id, tc.state, false)
+		if code != http.StatusOK || res.Reason != tc.want {
+			t.Errorf("stop with %s = %d %+v, want %s", tc.name, code, res, tc.want)
 		}
 	}
 	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonSessionNotDesign {
 		t.Errorf("restore of a plain session = %d %s, want not-design-session", code, body)
 	}
 
-	if code, body := webSessionWrite(t, base, cookie, "stop", design, fresh); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
-		t.Fatalf("stop with a fresh token = %d %s, want it to succeed", code, body)
+	if code, res := webTargetWrite(t, base, cookie, "stop", design, rowToken(ctx, t, h, design), false); code != http.StatusOK || res.Refused() {
+		t.Fatalf("stop with a fresh token = %d %+v, want it to succeed", code, res)
 	}
 	waitForSession(ctx, t, h, evs, design, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
@@ -49,29 +53,88 @@ func TestWebSessions_StopThenRemoveAPlainSession(t *testing.T) {
 	h, base, cookie, ctx, evs, _, plain := startWebDesign(t)
 	waitForHolder(t, filepath.Join(h.SessionsDir, plain))
 
-	live := sessionToken(ctx, t, h, plain)
-	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonSessionLive {
-		t.Fatalf("remove of a live session = %d %s, want session-live", code, body)
+	live := rowToken(ctx, t, h, plain)
+	if code, res := webTargetWrite(t, base, cookie, "remove", plain, live, false); code != http.StatusOK || res.Reason != wire.ReasonNeedsYes {
+		t.Fatalf("remove of a live session = %d %+v, want needs-yes", code, res)
 	}
-	if code, body := webSessionWrite(t, base, cookie, "stop", plain, live); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
-		t.Fatalf("stop of a plain session = %d %s, want it to succeed", code, body)
+	if code, res := webTargetWrite(t, base, cookie, "stop", plain, live, false); code != http.StatusOK || res.Refused() {
+		t.Fatalf("stop of a plain session = %d %+v, want it to succeed", code, res)
 	}
 	waitForSession(ctx, t, h, evs, plain, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
-	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonStale {
-		t.Errorf("remove with the pre-stop token = %d %s, want stale", code, body)
+	if code, res := webTargetWrite(t, base, cookie, "remove", plain, live, false); code != http.StatusOK || res.Reason != wire.ReasonStale || res.Message != wire.StaleRowMessage {
+		t.Errorf("remove with the pre-stop token = %d %+v, want stale %q", code, res, wire.StaleRowMessage)
 	}
-	if code, body := webSessionWrite(t, base, cookie, "remove", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
-		t.Fatalf("remove with a fresh token = %d %s, want it to succeed", code, body)
+	exited := rowToken(ctx, t, h, plain)
+	if code, res := webTargetWrite(t, base, cookie, "stop", plain, exited, false); code != http.StatusOK || res.Reason != wire.ReasonSessionNotLive {
+		t.Errorf("stop of an Exited session = %d %+v, want session-not-live", code, res)
 	}
+	if code, res := webTargetWrite(t, base, cookie, "remove", plain, exited, false); code != http.StatusOK || res.Refused() {
+		t.Fatalf("remove with a fresh token = %d %+v, want it to succeed", code, res)
+	}
+	assertNotListed(ctx, t, h, plain)
+}
+
+func assertNotListed(ctx context.Context, t *testing.T, h *servertest.Harness, id string) {
+	t.Helper()
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range snap.Sessions {
-		if s.ID == plain {
-			t.Errorf("session %s is still listed after remove", plain)
+		if s.ID == id {
+			t.Errorf("session %s is still listed after remove", id)
 		}
+	}
+}
+
+func TestWebSessions_RemoveWithYesStopsAndRemovesALiveSession(t *testing.T) {
+	t.Parallel()
+	h, base, cookie, ctx, _, _, plain := startWebDesign(t)
+	waitForHolder(t, filepath.Join(h.SessionsDir, plain))
+
+	if code, res := webTargetWrite(t, base, cookie, "remove", plain, rowToken(ctx, t, h, plain), true); code != http.StatusOK || res.Refused() {
+		t.Fatalf("remove with yes = %d %+v, want it to succeed", code, res)
+	}
+	assertNotListed(ctx, t, h, plain)
+}
+
+func TestWebSessions_QueueSessionIsRefusedOnTheWebRouteOnly(t *testing.T) {
+	t.Parallel()
+	h, base, cookie, ctx, _, _, _ := startWebDesign(t)
+	id := queue.AgentIDPrefix + "proj-map-impl-01"
+	for _, verb := range []string{"stop", "remove"} {
+		if code, res := webTargetWrite(t, base, cookie, verb, id, "", false); code != http.StatusOK || res.Reason != wire.ReasonSessionQueue {
+			t.Errorf("web %s of a Queue session = %d %+v, want queue-session", verb, code, res)
+		}
+	}
+	res, err := h.Client.Sessions.StopMany(ctx, []string{id})
+	if err != nil || len(res.Results) != 1 || res.Results[0].Reason == wire.ReasonSessionQueue {
+		t.Errorf("plain stop of a Queue session = %+v, %v, want no queue-session refusal", res, err)
+	}
+}
+
+func TestSessionRowToken(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 1, 2, 3, 4, 5, 6, time.UTC)
+	row := func(state string, run time.Time) wire.SessionInfo {
+		return wire.SessionInfo{ID: "s1", RunStartedAt: run, Status: wire.SessionStatus{State: state}}
+	}
+	working := sessions.SessionRowToken(row(wire.SessionWorking, at))
+	if idle := sessions.SessionRowToken(row(wire.SessionIdle, at)); idle != working {
+		t.Errorf("Idle token %q differs from Working token %q", idle, working)
+	}
+	for name, other := range map[string]wire.SessionInfo{
+		"exited":      row(wire.SessionExited, at),
+		"restored":    row(wire.SessionWorking, at.Add(time.Second)),
+		"another row": {ID: "s2", RunStartedAt: at, Status: wire.SessionStatus{State: wire.SessionWorking}},
+	} {
+		if sessions.SessionRowToken(other) == working {
+			t.Errorf("%s keeps the token %q", name, working)
+		}
+	}
+	if old := sessions.SessionStateToken(row(wire.SessionWorking, at)); old == working {
+		t.Errorf("the old token format %q equals the row token", old)
 	}
 }
 

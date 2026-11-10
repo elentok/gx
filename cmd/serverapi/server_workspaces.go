@@ -111,7 +111,7 @@ func newWorkspaceMoveCmd(d Deps) *cobra.Command {
 			case err != nil:
 				return fmt.Errorf("server write failed: %w", err)
 			}
-			return printTargets(c.OutOrStdout(), jsonOut, res, res.Results, func(w io.Writer, r wire.TargetResult) error {
+			return cmdbase.PrintTargets(c.OutOrStdout(), jsonOut, res, res.Results, func(w io.Writer, r wire.TargetResult) error {
 				_, err := fmt.Fprintf(w, "done %s\n", r.Target)
 				return err
 			})

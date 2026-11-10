@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
@@ -475,34 +476,59 @@ func TestAgentsRemoveExited_PrintsIdsAndDryRunKeepsThem(t *testing.T) {
 	}
 }
 
-func TestAgentsStopAndRemove_JSON(t *testing.T) {
+func TestAgentsStopAndRemove_ManyIDs(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
-	created, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
-	if err != nil || created.Session == nil {
-		t.Fatalf("create = %+v, %v", created, err)
+	create := func() string {
+		created, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+		if err != nil || created.Session == nil {
+			t.Fatalf("create = %+v, %v", created, err)
+		}
+		return created.Session.ID
 	}
-	id := created.Session.ID
+	a, b := create(), create()
+	ids := []string{a, b}
 
-	run := func(write sessionWriteFunc) wire.SessionResult {
-		t.Helper()
+	remove := func(yes, jsonOut bool) (string, error) {
 		var out bytes.Buffer
-		if err := runAgentsSessionWrite(ctx, h.Client, &out, true, write, id); err != nil {
-			t.Fatal(err)
+		err := runAgentsTargets(ctx, &out, jsonOut, ids, func(ctx context.Context) (wire.TargetsResult, error) {
+			return h.Client.Sessions.RemoveMany(ctx, ids, yes)
+		})
+		return out.String(), err
+	}
+	var exit *cmdbase.ExitError
+	out, err := remove(false, true)
+	if !errors.As(err, &exit) || exit.Code != 1 {
+		t.Fatalf("remove live without yes = %v, want exit 1", err)
+	}
+	var env wire.TargetsResult
+	if err := json.Unmarshal([]byte(out), &env); err != nil || len(env.Results) != 2 {
+		t.Fatalf("envelope %q: %v", out, err)
+	}
+	for _, r := range env.Results {
+		if r.Reason != wire.ReasonNeedsYes {
+			t.Errorf("%s = %+v, want %s", r.Target, r, wire.ReasonNeedsYes)
 		}
-		var res wire.SessionResult
-		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
-			t.Fatalf("output %q: %v", out.String(), err)
-		}
-		return res
 	}
-	if res := run((*apiclient.Sessions).Remove); !res.Refused || res.Reason != wire.ReasonSessionLive {
-		t.Errorf("remove live = %+v, want refused %s", res, wire.ReasonSessionLive)
+
+	// The plain route sends no token and does not refuse a Queue-shaped id.
+	stopIDs := []string{a, "queue-x"}
+	var stopped bytes.Buffer
+	err = runAgentsTargets(ctx, &stopped, false, stopIDs, func(ctx context.Context) (wire.TargetsResult, error) {
+		return h.Client.Sessions.StopMany(ctx, stopIDs)
+	})
+	if !errors.As(err, &exit) || !strings.Contains(stopped.String(), "done "+a) || !strings.Contains(stopped.String(), "1 done, 1 refused") {
+		t.Errorf("stop of a live and an unknown id = %q, %v; want a line each and the summary", stopped.String(), err)
 	}
-	if res := run((*apiclient.Sessions).Stop); res.Refused || res.Session == nil || !res.Session.Stopped {
-		t.Errorf("stop = %+v, want the stopped session", res)
+	if strings.Contains(stopped.String(), wire.ReasonSessionQueue) {
+		t.Errorf("the plain route refused a Queue-shaped id: %q", stopped.String())
 	}
-	if res := run((*apiclient.Sessions).Remove); res.Refused {
-		t.Errorf("remove = %+v, want removed", res)
+
+	out, err = remove(true, false)
+	if err != nil || !strings.Contains(out, "2 done, 0 refused") {
+		t.Fatalf("remove with yes = %q, %v; want both removed", out, err)
+	}
+	if list, err := h.Client.Sessions.List(ctx); err != nil || len(list) != 0 {
+		t.Errorf("sessions after remove = %+v, %v; want none", list, err)
 	}
 }
