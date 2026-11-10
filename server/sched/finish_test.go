@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
@@ -130,6 +131,18 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 			store, repo := t.TempDir(), testutil.TempRepo(t)
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: tc.typ})
 			servertest.SetProjectRepo(t, store, "proj", repo)
+			if tc.typ == "pr-text" {
+				// A pr-text ticket only exists in a PR-delivery project (the server
+				// cancels it otherwise) and runs in the epic's feature worktree.
+				if err := servertest.WriteProjectRepo(store, "proj", repo, `,"auto-ff-merge":true,"delivery":"pr"`); err != nil {
+					t.Fatal(err)
+				}
+				wtDir, err := deps.DefaultDeps().WorktreeDir(repo)
+				if err != nil {
+					t.Fatal(err)
+				}
+				servertest.GitOut(t, repo, "worktree", "add", "-b", "epic-a", filepath.Join(wtDir, "epic-a"))
+			}
 			h := servertest.StartWithStore(t, store)
 			_, prompt, _ := servertest.RegisterTurn(h)
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
