@@ -72,6 +72,8 @@ type tui struct {
 	paste  pasteState
 	// descendants is the process tree an ActionDescendants started.
 	descendants *exec.Cmd
+	// askHook is the AskUserQuestion hook an ActionAskQuestion started; Esc ends it.
+	askHook *exec.Cmd
 }
 
 type PendingWork struct {

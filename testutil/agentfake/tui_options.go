@@ -114,10 +114,11 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	sessionID := fs.String("session-id", "", "")
 	resume := fs.String("resume", "", "")
 	fs.String("permission-mode", "", "")
-	// Claude merges repeated --settings; the fake only needs the statusLine one.
+	// Claude merges repeated --settings; the fake only needs the one with the
+	// statusLine or the AskUserQuestion hook (gx merges them into one flag).
 	var settings string
 	fs.Func("settings", "", func(v string) error {
-		if settings == "" || claudesettings.StatusLineCommand(v) != "" {
+		if settings == "" || claudesettings.StatusLineCommand(v) != "" || claudesettings.HookCommand(v, "PreToolUse", "AskUserQuestion") != "" {
 			settings = v
 		}
 		return nil

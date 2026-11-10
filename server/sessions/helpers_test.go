@@ -19,7 +19,9 @@ import (
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
-	os.Exit(m.Run())
+	code := m.Run()
+	removeGxBin()
+	os.Exit(code)
 }
 
 // Aliases for the helpers that live in servertest, so the callers here keep

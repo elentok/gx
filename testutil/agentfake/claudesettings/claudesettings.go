@@ -51,6 +51,28 @@ func StatusLineCommand(settings string) string {
 	return s.StatusLine.Command
 }
 
+// HookCommand returns the first command of settings' hooks for event whose
+// matcher is matcher, or "" when there is none.
+func HookCommand(settings, event, matcher string) string {
+	var s struct {
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if !decode(settings, &s) {
+		return ""
+	}
+	for _, g := range s.Hooks[event] {
+		if g.Matcher == matcher && len(g.Hooks) > 0 {
+			return g.Hooks[0].Command
+		}
+	}
+	return ""
+}
+
 // Path is CLAUDE_CONFIG_DIR's settings.json, or ~/.claude's.
 func Path() string {
 	cfgDir := os.Getenv("CLAUDE_CONFIG_DIR")

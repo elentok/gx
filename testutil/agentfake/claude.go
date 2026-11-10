@@ -65,6 +65,10 @@ const (
 	// entry of ToolCalls, with no tool_result, and go busy: the calls are in
 	// flight until ActionFinish.
 	ActionToolUse = "tooluse"
+	// ActionAskQuestion makes the TUI fake run the settings' PreToolUse hook
+	// for AskUserQuestion with Ask as its call, busy while the hook holds.
+	// Esc sends the hook SIGTERM.
+	ActionAskQuestion = "askquestion"
 	// The Codex fake's scripted events. ActionToolCall runs Tool (default
 	// "Bash") with Command through its PreToolUse hooks; ActionPermission asks
 	// approval for Command through its PermissionRequest hooks; ActionTokenCount
@@ -127,6 +131,8 @@ type Control struct {
 	Command string `json:"command,omitempty"`
 	// Question is the call an ActionQuestion opens.
 	Question *QuestionCall `json:"question,omitempty"`
+	// Ask is the AskUserQuestion call an ActionAskQuestion runs the hook for.
+	Ask *AskCall `json:"ask,omitempty"`
 	// ToolCalls are the calls an ActionToolUse leaves in flight, oldest first.
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 	// Count and Depth shape the tree an ActionDescendants spawns.

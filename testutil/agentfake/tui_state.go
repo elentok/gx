@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
@@ -28,6 +29,11 @@ const (
 // dialog open.
 func (t *tui) interrupt() error {
 	t.typed.Reset()
+	if t.askHook != nil {
+		// Esc on a held dialog ends the hook, as claude does.
+		_ = t.askHook.Process.Signal(syscall.SIGTERM)
+		return nil
+	}
 	if t.pid.Status != StatusWaiting || t.stalled {
 		return nil
 	}
@@ -61,6 +67,7 @@ func (t *tui) cancel() error {
 func (t *tui) handleControl(c Control) error {
 	switch c.Action {
 	case ActionFinish:
+		t.askHook = nil
 		if err := t.setStatus(StatusIdle, ""); err != nil {
 			return err
 		}
@@ -84,6 +91,8 @@ func (t *tui) handleControl(c Control) error {
 		return t.writeBackgroundMarker(c.Running)
 	case ActionToolUse:
 		return t.startToolCalls(c.ToolCalls)
+	case ActionAskQuestion:
+		return t.askQuestion(c.Ask)
 	case ActionFast:
 		t.fast = true
 		return nil
