@@ -549,6 +549,9 @@ test("Select shows a corner checkbox on each loop card and the sticky bar", asyn
   expect(screen.getByRole("checkbox", { name: "Select need" })).toBeTruthy();
   expect(within(actionsBar()).queryByRole("button", { name: "Select" })).toBeNull();
   expect(getComputedStyle(document.querySelector('[data-part="select-bar"]') as HTMLElement).position).toBe("sticky");
+  fireEvent.click(within(actionsBar()).getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByTestId("select-count")).toBeNull();
+  expect(within(actionsBar()).getByRole("button", { name: "Select" })).toBeTruthy();
 });
 
 test("the bar offers only Move, Hold, Take off hold and Archive, never Stop or Remove", async () => {

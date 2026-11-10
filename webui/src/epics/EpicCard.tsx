@@ -236,17 +236,19 @@ export function EpicCard({
       flexDirection="column"
       gap="3"
       style={
-        tone
-          ? { borderColor: `color-mix(in srgb, var(--chakra-colors-tone-${tone}-fg) 40%, var(--chakra-colors-border))` }
-          : undefined
+        select?.checked
+          ? { borderColor: "var(--chakra-colors-tone-running-fg)", background: "var(--chakra-colors-tone-running-bg)" }
+          : tone
+            ? { borderColor: `color-mix(in srgb, var(--chakra-colors-tone-${tone}-fg) 40%, var(--chakra-colors-border))` }
+            : undefined
       }
     >
       {select && (
-        <Box position="absolute" top="4px" left="4px" display="flex">
-          <SelectBox checked={select.checked} label={`Select ${row.name}`} onToggle={select.onToggle} />
+        <Box position="absolute" top="12px" left="12px" zIndex="2" display="flex">
+          <SelectBox checked={select.checked} label={`Select ${row.name}`} onToggle={select.onToggle} size="20px" />
         </Box>
       )}
-      <Box display="flex" alignItems="center" gap="4">
+      <Box display="flex" alignItems="center" gap="4" pl={select ? "26px" : undefined}>
         <ProgressRing
           progress={ringProgress(row)}
           tone={ringTone(row)}

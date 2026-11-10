@@ -151,7 +151,7 @@ export function SidebarSelectProvider({ fetcher, active, children }: { fetcher?:
 }
 
 /** A row or section checkbox. The mixed state is a real indeterminate checkbox. */
-export function SelectBox({ checked, mixed, label, onToggle }: { checked: boolean; mixed?: boolean; label: string; onToggle: () => void }) {
+export function SelectBox({ checked, mixed, label, onToggle, size = "16px" }: { checked: boolean; mixed?: boolean; label: string; onToggle: () => void; size?: string }) {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (ref.current) ref.current.indeterminate = !!mixed;
@@ -167,7 +167,7 @@ export function SelectBox({ checked, mixed, label, onToggle }: { checked: boolea
       onChange={onToggle}
       onClick={(e) => e.stopPropagation()}
       flex="none"
-      boxSize="16px"
+      boxSize={size}
       m="0"
       cursor="pointer"
       accentColor="var(--chakra-colors-tone-running-fg)"
@@ -209,17 +209,19 @@ export function SelectBar({ sel, sticky, children }: { sel: SelectApi; sticky?: 
       data-part="select-bar"
       flex="none"
       display="flex"
-      flexDirection="column"
-      gap="2"
-      px="2"
+      flexDirection={sticky ? "row" : "column"}
+      flexWrap={sticky ? "wrap" : undefined}
+      alignItems={sticky ? "center" : undefined}
+      gap={sticky ? "3" : "2"}
+      px={sticky ? "14px" : "2"}
       py="10px"
       borderTopWidth="1px"
       borderColor="tone.running.fg"
       bg="surface.raised"
-      {...(sticky ? { position: "sticky", top: "0", zIndex: "sticky", mt: "4", borderWidth: "1px", borderRadius: "md" } : {})}
+      {...(sticky ? { position: "sticky", top: "0", zIndex: "sticky", mt: "3", borderWidth: "1px", borderRadius: "10px" } : {})}
     >
-      <Box display="flex" alignItems="center" gap="1.5">
-        <Box as="span" flex="1" fontSize="14px" fontWeight="600" whiteSpace="nowrap" data-testid="select-count">
+      <Box display="flex" alignItems="center" gap="1.5" flex={sticky ? "none" : undefined}>
+        <Box as="span" flex={sticky ? "none" : "1"} mr={sticky ? "2" : undefined} fontSize="14px" fontWeight="600" whiteSpace="nowrap" data-testid="select-count">
           {n} selected
         </Box>
         <Button size="sm" emphasis="ghost" tone="running" onClick={all ? sel.selectNone : sel.selectAll}>
@@ -229,7 +231,7 @@ export function SelectBar({ sel, sticky, children }: { sel: SelectApi; sticky?: 
           Done
         </Button>
       </Box>
-      {children}
+      {sticky ? <Box ml="auto">{children}</Box> : children}
     </Box>
   );
 }

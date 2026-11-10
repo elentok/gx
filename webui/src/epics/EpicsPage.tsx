@@ -185,12 +185,28 @@ export function EpicsPage({
           subtitle={list ? `${list.epics.length} ${list.epics.length === 1 ? "epic" : "epics"}` : undefined}
           actions={
             <>
-              <Link href="#/archive" flexShrink="0" whiteSpace="nowrap" fontSize="14px">
+              <Link
+                href="#/archive"
+                display="inline-flex"
+                alignItems="center"
+                h="40px"
+                px="4"
+                flexShrink="0"
+                whiteSpace="nowrap"
+                fontWeight="600"
+                color="text"
+                bg="surface.raised"
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="8px"
+                textDecoration="none"
+                _hover={{ borderColor: "text.dim", textDecoration: "none" }}
+              >
                 Archive
               </Link>
-              {hasEpics && !select.state.on && (
-                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.enter}>
-                  Select
+              {hasEpics && (
+                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.state.on ? select.leave : select.enter}>
+                  {select.state.on ? "Cancel" : "Select"}
                 </Button>
               )}
               {hasEpics && newDesign}
@@ -198,11 +214,6 @@ export function EpicsPage({
           }
         />
       </Box>
-      {select.state.on && (
-        <SelectBar sel={select} sticky>
-          <SidebarBulkActions sel={select} shown={PAGE_ACTIONS} />
-        </SelectBar>
-      )}
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <Input
           type="search"
@@ -241,6 +252,11 @@ export function EpicsPage({
           </chakra.select>
         )}
       </Box>
+      {select.state.on && (
+        <SelectBar sel={select} sticky>
+          <SidebarBulkActions sel={select} shown={PAGE_ACTIONS} />
+        </SelectBar>
+      )}
       {!bannerHidden && <MissingBanner missing={missing} onSetUp={setSettingUp} onDismiss={() => setBannerHidden(true)} />}
       {failed ? (
         <Box mt="6" display="flex" alignItems="center" gap="3">
