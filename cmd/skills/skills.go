@@ -33,6 +33,9 @@ type Deps struct {
 	BackupDir func() (string, error)
 	// CodexHome is $CODEX_HOME; nil skips the duplicate-skill warning.
 	CodexHome func() string
+	// BundleSkills names the skills gx's bundle owns; nil reads the embedded
+	// bundle. Tests inject it because the embed cannot change.
+	BundleSkills func() ([]string, error)
 }
 
 // DefaultDeps wires the production skill locations for the given env and
@@ -221,7 +224,42 @@ func runSkillsInstallDev(d Deps, force skills.ForcePolicy, out io.Writer) error 
 		return err
 	}
 
-	return installSkills(d, force, out, skills.DevSourcePrefix+devRoot, sources, skills.ModeSymlink)
+	if err := installSkills(d, force, out, skills.DevSourcePrefix+devRoot, sources, skills.ModeSymlink); err != nil {
+		return err
+	}
+	// Sources holding a name the checkout owns drop it now, not at the next
+	// bare install.
+	if problems := dedupe(syncSources(d, force, out)); len(problems) > 0 {
+		return errors.New(strings.Join(problems, "\n"))
+	}
+	return nil
+}
+
+// bundleOwner returns the skill names gx's bundle owns and who installed them:
+// the dev checkout in a dev install, else the built-in bundle. The dev
+// checkout carries the same names as the embed.
+func bundleOwner(d Deps) (map[string]bool, string, error) {
+	namesOf := skills.BundleSkillNames
+	if d.BundleSkills != nil {
+		namesOf = d.BundleSkills
+	}
+	names, err := namesOf()
+	if err != nil {
+		return nil, "", err
+	}
+	owned := map[string]bool{}
+	for _, name := range names {
+		owned[name] = true
+	}
+	owner := "gx's skill bundle"
+	if manifestPath, err := d.ManifestPath(); err == nil {
+		if m, err := skills.Load(manifestPath); err == nil {
+			if root, ok := skills.DevRoot(m); ok {
+				owner = "the dev checkout " + root
+			}
+		}
+	}
+	return owned, owner, nil
 }
 
 // resolveDevRoot returns the root of the git repository (or, for a linked
@@ -484,9 +522,17 @@ func clashingSources(d Deps, real string, names []string) []rememberedSource {
 func syncSourceDir(d Deps, manifestPath, abs, real string, names []string, copyFiles, switchMode bool, force skills.ForcePolicy, out io.Writer) error {
 	dir := abs
 	clashes, _ := sourceClashes(d, real, names)
+	owned, owner, err := bundleOwner(d)
+	if err != nil {
+		return err
+	}
 	var problems []string
 	kept := names[:0:0]
 	for _, name := range names {
+		if owned[name] {
+			problems = append(problems, fmt.Sprintf("skill name %q is owned by %s and by source %s; the source's copy was skipped, delete the old copy from %s", name, owner, real, real))
+			continue
+		}
 		holders := clashes[name]
 		if len(holders) == 0 {
 			kept = append(kept, name)

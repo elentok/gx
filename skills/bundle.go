@@ -6,6 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
+	"strings"
 )
 
 // Bundle is gx's canonical, installable skill bundle (see gx.md),
@@ -41,6 +44,24 @@ func BundleFiles() ([]string, error) {
 		return nil, fmt.Errorf("walk embedded bundle: %w", err)
 	}
 	return files, nil
+}
+
+// BundleSkillNames returns the name of every skill directory in Bundle, sorted.
+// Top-level files such as gx.md are shared files, not skills.
+func BundleSkillNames() ([]string, error) {
+	rels, err := BundleFiles()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, rel := range rels {
+		name, _, ok := strings.Cut(rel, "/")
+		if ok && !slices.Contains(names, name) {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 // ExtractBundle writes every file in Bundle into dir (created as needed),
