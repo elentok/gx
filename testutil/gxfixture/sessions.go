@@ -217,6 +217,9 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	if s.Images {
 		return f.seedImages(id, s.Harness)
 	}
+	if s.Interrupted {
+		return f.seedInterrupted(id, s.Harness)
+	}
 	return nil
 }
 

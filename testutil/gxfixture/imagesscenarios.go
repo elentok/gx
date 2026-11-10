@@ -96,17 +96,6 @@ var seededImageMessages = []imageMessage{
 // transcript lines that reference them.
 func (f sessionSeeder) seedImages(id string, harness string) error {
 	dir := filepath.Join(f.root, "data", "gx", "sessions", id)
-	// The conversation id lands in the meta when the harness reports it.
-	var meta sessions.Meta
-	var err error
-	for deadline := time.Now().Add(sessionWaitTimeout); ; time.Sleep(100 * time.Millisecond) {
-		if meta, err = sessions.ReadMeta(dir); err == nil && meta.ConversationID != "" {
-			break
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("session %s: no conversation id (%v)", id, err)
-		}
-	}
 	png, err := base64.StdEncoding.DecodeString(pngBase64)
 	if err != nil {
 		return err
@@ -140,24 +129,58 @@ func (f sessionSeeder) seedImages(id string, harness string) error {
 			lines = append(lines, claudeImageLines(n, m, paths)...)
 		}
 	}
-	var path string
+	if err := f.appendChatLines(id, harness, lines); err != nil {
+		return err
+	}
+	return f.waitFor(id, "the image messages", func(_ wire.SessionInfo, c wire.SessionChatResponse) bool {
+		return slices.ContainsFunc(c.Messages, func(msg wire.SessionChatMessage) bool { return len(msg.Images) == 10 })
+	})
+}
+
+// seedInterrupted appends the lines of one interrupted turn, as each harness
+// writes them, and waits until the chat shows the separator.
+func (f sessionSeeder) seedInterrupted(id string, harness string) error {
+	lines := []string{`{"type":"user","uuid":"u-interrupted","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}`}
 	if harness == "codex" {
-		// The conversation id can change after the first report, so the meta is
-		// read again on each try, and the rollout file may lag the id.
-		var ok bool
-		for deadline := time.Now().Add(sessionWaitTimeout); ; time.Sleep(100 * time.Millisecond) {
-			if m, merr := sessions.ReadMeta(dir); merr == nil {
-				meta = m
+		lines = []string{
+			`{"timestamp":"2026-01-01T10:00:00Z","type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}}`,
+			`{"timestamp":"2026-01-01T10:00:00Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"<turn_aborted>\nThe user interrupted the previous turn on purpose.\n</turn_aborted>"}]}}`,
+		}
+	}
+	if err := f.appendChatLines(id, harness, lines); err != nil {
+		return err
+	}
+	return f.waitFor(id, "the interrupted message", func(_ wire.SessionInfo, c wire.SessionChatResponse) bool {
+		return slices.ContainsFunc(c.Messages, func(msg wire.SessionChatMessage) bool { return msg.Kind == transcript.ChatKindInterrupted })
+	})
+}
+
+// appendChatLines appends transcript lines to the session's Claude transcript or
+// Codex rollout, once the harness has reported its conversation id.
+func (f sessionSeeder) appendChatLines(id, harness string, lines []string) error {
+	dir := filepath.Join(f.root, "data", "gx", "sessions", id)
+	var meta sessions.Meta
+	var path string
+	var err error
+	// The conversation id can change after the first report, so the meta is read
+	// again on each try, and the Codex rollout file may lag the id.
+	for deadline := time.Now().Add(sessionWaitTimeout); ; time.Sleep(100 * time.Millisecond) {
+		if m, merr := sessions.ReadMeta(dir); merr == nil {
+			meta = m
+		}
+		if meta.ConversationID != "" {
+			if harness != "codex" {
+				path = transcript.PathIn(filepath.Join(f.root, "home"), meta.Dir, meta.ConversationID)
+				break
 			}
+			var ok bool
 			if path, ok, err = codexsession.RolloutPathIn(filepath.Join(f.root, "home", ".codex"), meta.ConversationID); err == nil && ok {
 				break
 			}
-			if time.Now().After(deadline) {
-				return fmt.Errorf("session %s: no rollout (found %v): %v", id, ok, err)
-			}
 		}
-	} else {
-		path = transcript.PathIn(filepath.Join(f.root, "home"), meta.Dir, meta.ConversationID)
+		if time.Now().After(deadline) {
+			return fmt.Errorf("session %s: no chat file (conversation %q): %v", id, meta.ConversationID, err)
+		}
 	}
 	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -167,12 +190,7 @@ func (f sessionSeeder) seedImages(id string, harness string) error {
 		_ = file.Close()
 		return err
 	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return f.waitFor(id, "the image messages", func(_ wire.SessionInfo, c wire.SessionChatResponse) bool {
-		return slices.ContainsFunc(c.Messages, func(msg wire.SessionChatMessage) bool { return len(msg.Images) == 10 })
-	})
+	return file.Close()
 }
 
 // chips is "[Image #1] [Image #2] ..." followed by the text.

@@ -281,6 +281,8 @@ type SessionSpec struct {
 	Steps []CommandStep
 	// Images appends the saved-image messages of agentsImagesScenario to the chat.
 	Images bool
+	// Interrupted appends one interrupted turn to the chat (see InterruptedScenario).
+	Interrupted bool
 	// Rejected says the agent rejects the first prompt (see Scenario.UnknownSkill):
 	// the session is settled once it raises the Unknown command Actionable.
 	Rejected bool
