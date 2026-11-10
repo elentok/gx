@@ -87,7 +87,7 @@ export function DevPopover({ dev, postDevFrontend = defaultPostDevFrontend, post
   return (
     <GxMenu
       placement="top-end"
-      boundary={() => document.querySelector('[data-part="sidebar-footer"]') ?? document.body}
+      boundary={() => document.querySelector('[data-part="sidebar-footer"]')?.parentElement ?? document.body}
       trigger={
         <button type="button" aria-label={`Dev mode: ${look.status}`} style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>
           <DevPill state={dev.state} />
