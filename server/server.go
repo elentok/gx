@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
@@ -139,14 +140,17 @@ type Server struct {
 	merger    *merge.Merger
 	scheduler *sched.Scheduler
 
-	chat      *notify.ServerChat // never nil; sends nothing when no destination is configured
-	registry  *runs.Registry
-	progress  *sched.ProgressTimer
-	prWatch   *prflow.Watcher // polls open PRs; see prwatch.go
-	reclaimer *sched.Reclaimer
-	launcher  *sched.Launcher
-	guards    *runs.Guards
-	explain   *sched.Explainer
+	chat     *notify.ServerChat // never nil; sends nothing when no destination is configured
+	registry *runs.Registry
+	progress *sched.ProgressTimer
+	prWatch  *prflow.Watcher // polls open PRs; see prwatch.go
+	// prReasons and prMergedHook belong to the PR open step; see propen.go.
+	prReasons    prflow.Reasons
+	prMergedHook func(queue.RootRef, pr.HeadPR)
+	reclaimer    *sched.Reclaimer
+	launcher     *sched.Launcher
+	guards       *runs.Guards
+	explain      *sched.Explainer
 	// sessions creates, stops and watches the sessions; resumer brings them back.
 	sessions *sessions.Manager
 	resumer  *sessions.Resumer
