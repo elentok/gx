@@ -69,6 +69,8 @@ type OpenHost interface {
 	EpicDir(project, epic string) string
 	// Worktree is where the epic's feature worktree lives, for the pr-text agent to read.
 	Worktree(project, epic string) string
+	// PRTextSkill is config skills.pr-text for project, "" for the bundled skill.
+	PRTextSkill(project string) string
 	Reasons() *Reasons
 	// Kick asks the watcher for an early poll.
 	Kick()
@@ -118,7 +120,7 @@ func Open(h OpenHost, root queue.RootRef) (Outcome, error) {
 	}
 	title, body, ok := LatestText(dir)
 	if !ok {
-		_, _, err := StartPRText(dir, TextJob{Epic: root.Project + ":" + root.Epic, Worktree: h.Worktree(root.Project, root.Epic)})
+		_, _, err := StartPRText(dir, TextJob{Epic: root.Project + ":" + root.Epic, Worktree: h.Worktree(root.Project, root.Epic), Skill: h.PRTextSkill(root.Project)})
 		if err != nil {
 			return OutcomeSkipped, err
 		}

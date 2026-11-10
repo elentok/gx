@@ -55,6 +55,8 @@ func (h prOpenHost) Worktree(project, epic string) string {
 	return filepath.Join(h.s.projects.WorktreeDir(project), epic)
 }
 
+func (h prOpenHost) PRTextSkill(project string) string { return h.s.projects.PRTextSkill(project) }
+
 func (h prOpenHost) Reasons() *prflow.Reasons { return &h.s.prReasons }
 
 func (h prOpenHost) Epic(project, epic string) (tickets.Epic, bool) {

@@ -237,17 +237,25 @@ func (p *Registry) AgentsConfig(project string) config.AgentsConfig {
 	return cfg.Agents
 }
 
-// CIFixSkills is config skills.ci-fix for project: the project's list replaces
-// the global one when it sets one.
-func (p *Registry) CIFixSkills(project string) []string {
-	cfg := config.Config{Skills: config.SkillsConfig{CIFix: p.settings.Load().CIFixSkills}}
+// skillsConfig is config skills.* for project, with the project's overrides on
+// top.
+func (p *Registry) skillsConfig(project string) config.SkillsConfig {
+	set := p.settings.Load()
+	cfg := config.Config{Skills: config.SkillsConfig{CIFix: set.CIFixSkills, PRText: set.PRTextSkill}}
 	if dir, err := p.Dir(project); err == nil {
 		if pf, err := config.ReadProjectFile(dir); err == nil {
 			cfg = cfg.WithProject(pf)
 		}
 	}
-	return cfg.Skills.CIFix
+	return cfg.Skills
 }
+
+// CIFixSkills is config skills.ci-fix for project: the project's list replaces
+// the global one when it sets one.
+func (p *Registry) CIFixSkills(project string) []string { return p.skillsConfig(project).CIFix }
+
+// PRTextSkill is config skills.pr-text for project, "" for the bundled default.
+func (p *Registry) PRTextSkill(project string) string { return p.skillsConfig(project).PRText }
 
 // LaunchHarness is the harness a new interactive session in project starts on
 // when its request names none. Unlike the Default harness it keeps an

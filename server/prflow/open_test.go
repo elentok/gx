@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git/pr"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
@@ -222,6 +223,22 @@ func TestOpen_NoUsableTextStartsOnePRTextTicketAndOpensNothing(t *testing.T) {
 				t.Errorf("open pr-text tickets = %d, want 1", running)
 			}
 		})
+	}
+}
+
+func TestOpen_PRTextTicketCarriesTheConfiguredSkill(t *testing.T) {
+	f := rigs.StartPRFlow(t, rigs.PRFlowOpts{Server: []func(*server.Config){func(c *server.Config) { c.PRTextSkill = "my-text-skill" }}})
+	servertest.WriteTicketWith(t, f.Store, "proj", "epic-a", "01", "root", servertest.TicketOpts{Status: "done"})
+	servertest.CommitOnBranch(t, f.Origin.Local, "epic-a")
+	if out := open(t, f); out != prflow.OutcomeWriting {
+		t.Fatalf("outcome = %s", out)
+	}
+	all := prTextTickets(f)
+	if len(all) != 1 {
+		t.Fatalf("pr-text tickets = %d, want 1", len(all))
+	}
+	if md := servertest.ReadFile(t, ticketFile(t, f, all[0].Identifier)); !strings.Contains(md, "Skill: my-text-skill") {
+		t.Errorf("ticket lacks the configured skill:\n%s", md)
 	}
 }
 

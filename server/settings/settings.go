@@ -78,7 +78,9 @@ type Settings struct {
 
 	// CIFixSkills is config skills.ci-fix; the per-check and per-PR caps are
 	// pr.ci-fix-attempts-per-check and -per-pr. Zero caps mean the defaults.
-	CIFixSkills           []string
+	CIFixSkills []string
+	// PRTextSkill is config skills.pr-text; empty means the bundled gx-pr-text.
+	PRTextSkill           string
 	CIFixAttemptsPerCheck int
 	CIFixAttemptsPerPR    int
 
@@ -180,6 +182,7 @@ func FromConfig(cfg config.Config) Settings {
 		RecentlyFinished:            cfg.Server.RecentlyFinished,
 		NoChecksGrace:               cfg.PR.NoChecksGrace,
 		CIFixSkills:                 cfg.Skills.CIFix,
+		PRTextSkill:                 cfg.Skills.PRText,
 		CIFixAttemptsPerCheck:       cfg.PR.CIFixAttemptsPerCheck,
 		CIFixAttemptsPerPR:          cfg.PR.CIFixAttemptsPerPR,
 		AgentsClaude:                cfg.Agents.Claude,
