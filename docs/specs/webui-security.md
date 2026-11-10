@@ -360,7 +360,12 @@ from an authenticator app.
 102. As a developer, I want the web-only routes listed in one place and checked by a test, so that a
      new web-only route is a choice, not an accident (ADR 0028 amendment).
 103. As a developer, I want the Vite dev frontend (`server.web.dev-url`) to keep working behind the
-     HTTPS listener, so that hot reload still works.
+     HTTPS listener, so that hot reload still works. (Dev mode in `docs/specs/dev-mode.md` replaces
+     `server.web.dev-url`: gx runs its own Vite and the same proxy rules apply. Dev mode serves the
+     `webui/` UI sources to anyone who can reach the listener, without login, like the built assets;
+     `webui/vite.config.ts` sets `server.fs.strict: true` and `server.fs.allow` to the `webui/`
+     folder, and `dev-frontend` has no risky confirm. The Dev mode restart route is a
+     web-only `WebWrite` route and belongs in the story 102 web-only route list.)
 
 ## Implementation Decisions
 

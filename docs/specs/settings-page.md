@@ -65,7 +65,7 @@ a risky key asks for confirmation first; secrets are write-only.
 28. As a gx user, I want "Restart needed to apply" next to a key after I save a startup-only key, so that I know the saved value is not live yet.
 29. As a gx user, I want a live key to apply after the save without a restart, and every key to be either live or flagged startup-only, so that the page never says "Saved" for a value the running server ignores.
 30. As a gx user, I want a web save to trigger exactly one config reload and no desktop OS banner, and two saves at the same moment not to lose each other's change, so that saving from my phone does not pop notices on my desktop.
-31. As a gx user, I want a confirm dialog naming the risk before I change `server.web.listen`, `server.web.allowed-hosts`, `server.web.totp` (turning it off), `server.tcp-listen`, `server.web.dev-frontend`, `server.web.dev-url` or `ticket-store.path`, so that I do not lock myself out by accident.
+31. As a gx user, I want a confirm dialog naming the risk before I change `server.web.listen`, `server.web.allowed-hosts`, `server.web.totp` (turning it off), `server.tcp-listen` or `ticket-store.path`, so that I do not lock myself out by accident. (`server.web.dev-frontend` and `server.web.dev-url` left this list; see `docs/specs/dev-mode.md`.)
 32. As a gx user, I want the `ticket-store.path` confirm to say that the old data is not moved, so that I know what the change does.
 33. As a gx user, I want the Telegram bot token and Slack webhook URL never sent to the browser, so that a web login cannot read my secrets back.
 34. As a gx user, I want a secret to show "Set" or "Not set" with Replace and Clear, so that I can rotate or remove it without seeing it.
@@ -282,8 +282,8 @@ a risky key asks for confirmation first; secrets are write-only.
 ### Risky keys and restart marks
 
 - **Risky-key confirm.** The registry flags `server.web.listen`, `server.web.allowed-hosts`,
-  `server.web.totp` (confirm only when turning it off), `server.tcp-listen`,
-  `server.web.dev-frontend`, `server.web.dev-url` and `ticket-store.path`. Changing one opens a
+  `server.web.totp` (confirm only when turning it off), `server.tcp-listen`
+  and `ticket-store.path`. (`server.web.dev-frontend` and `server.web.dev-url` left this list: see `docs/specs/dev-mode.md`.) Changing one opens a
   confirm dialog naming the risk, with Cancel and "Change it". Normal validation still runs before
   the write. The confirm is a page step; the server API does not require a confirmation token.
 - **Command keys.** `disk-space.cleanup-command`, `agents.claude-args`, `server.tab-env` and project
