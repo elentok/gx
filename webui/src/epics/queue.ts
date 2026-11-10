@@ -36,4 +36,6 @@ export const postEpicStashMerge: PostEpicWrite = (body) => postEpicWrite("/v1/ep
 
 export const postEpicCreatePR: PostEpicWrite = (body) => postEpicWrite("/v1/epics/create-pr", body);
 
+export const postEpicMarkMerged: PostEpicWrite = (body) => postEpicWrite("/v1/epics/mark-merged", body);
+
 export const postEpicTryAgain: PostEpicWrite = (body) => postEpicWrite("/v1/epics/try-again", body);

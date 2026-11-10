@@ -495,3 +495,70 @@ describe("PR line", () => {
     expect(screen.getByTestId("pr-number").textContent).toBe("#412");
   });
 });
+
+describe("Create PR and Mark as merged", () => {
+  const create = { kind: "create-pr", label: "Create PR", target: "gx:blog" } as const;
+  const markMerged = { kind: "mark-merged", label: "Mark as merged", target: "gx:blog" } as const;
+  const awaitingPR = (over: Partial<EpicListRow> = {}) =>
+    needsYou({ state: "awaiting-pr", status_words: "Implemented", state_pill: "Awaiting PR", reason: undefined, actions: [{ kind: "open-epic", label: "Open epic", target: "gx:blog" }, create], ...over });
+
+  test("an awaiting-PR card has Create PR as its one main button", () => {
+    renderThemed(<EpicCard row={awaitingPR()} />);
+    expect(text(screen.getByTestId("pill"))).toContain("Awaiting PR");
+    expect(screen.getAllByRole("button").map(text)).toEqual(["Create PR"]);
+  });
+
+  test("a merge-project card shows Create PR as the secondary button left of Merge", () => {
+    const r = needsYou({
+      state: "awaiting-merge",
+      state_pill: "Awaiting merge",
+      actions: [{ kind: "open-epic", label: "Open epic", target: "gx:blog" }, { kind: "merge", label: "Merge", target: "gx:blog" }, create],
+    });
+    renderThemed(<EpicCard row={r} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.map(text)).toEqual(["Create PR", "Merge"]);
+    expect(buttons[0].className).not.toBe(buttons[1].className);
+  });
+
+  test("Create PR posts the address and shown state, with a spinner-free pending label", async () => {
+    let finish!: (v: never) => void;
+    const createPR = vi.fn(() => new Promise<never>((res) => (finish = res)));
+    const { container } = renderThemed(<EpicCard row={awaitingPR()} writes={{ createPR }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Create PR" }));
+    expect(createPR).toHaveBeenCalledWith({ address: "gx:blog", state: "awaiting-pr" });
+    expect(await screen.findByRole("button", { name: "Creating PR…" })).toBeTruthy();
+    expect(container.querySelector(".chakra-spinner")).toBeNull();
+    await act(async () => finish({} as never));
+  });
+
+  test("a failed gh check shows its reason", async () => {
+    const createPR = vi.fn().mockResolvedValue({ refused: true, reason: "gh", message: "gh is not signed in" });
+    renderThemed(<EpicCard row={awaitingPR()} writes={{ createPR }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Create PR" }));
+    expect(await screen.findByText("gh is not signed in")).toBeTruthy();
+  });
+
+  test("Mark as merged is on the menu when offered, asks first, then posts", async () => {
+    const markMergedWrite = vi.fn().mockResolvedValue({});
+    const onChanged = vi.fn();
+    renderThemed(
+      <EpicCard row={awaitingPR({ workspace: "Default", actions: [create, markMerged] })} writes={{ markMerged: markMergedWrite }} onChanged={onChanged} />,
+    );
+    expect(screen.getAllByRole("button").map(text)).not.toContain("Mark as merged");
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(await screen.findByText("Mark as merged"));
+    expect(markMergedWrite).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Mark as merged" }));
+    await waitFor(() => expect(markMergedWrite).toHaveBeenCalledWith({ address: "gx:blog", state: "awaiting-pr" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  });
+
+  test("a card without the actions shows neither", async () => {
+    renderThemed(<EpicCard row={row({ workspace: "Default" })} />);
+    expect(screen.queryByRole("button", { name: "Create PR" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    await screen.findByText("Hold");
+    expect(screen.queryByText("Mark as merged")).toBeNull();
+  });
+});

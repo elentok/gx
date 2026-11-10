@@ -181,17 +181,21 @@ export function ItemMenu({
   workspaces,
   writers,
   onRemoved,
+  extra,
 }: {
   item: ItemRef;
   workspaces: Workspace[];
   writers?: ItemWriters;
   onRemoved?: () => void;
+  /** A card's own entries, as one more group after the item's. */
+  extra?: MenuEntry[];
 }) {
   const { groups, dialogs } = useItemActions(item, workspaces, writers, onRemoved);
-  if (groups.length === 0) return null;
+  const all = extra?.length ? [...groups, extra] : groups;
+  if (all.length === 0) return null;
   return (
     <>
-      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
+      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(all)} />
       {dialogs}
     </>
   );

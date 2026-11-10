@@ -13,6 +13,8 @@ interface Props {
   tone?: Tone;
   emphasis?: ButtonEmphasis;
   pendingLabel: string;
+  /** Off for a write that runs a text ticket: the label alone says it is working. */
+  spinner?: boolean;
   tooltip?: string;
   /** A toast for a success the page does not show by itself. */
   success?: (res: EpicWriteResult) => ToastSpec | undefined;
@@ -20,11 +22,11 @@ interface Props {
 }
 
 /** A POST button for an epic write: it sends the state the view shows; the outcome shows in a toast. */
-export function EpicActionButton({ address, state, post, label, tone = "running", emphasis, pendingLabel, tooltip, success, onDone }: Props) {
+export function EpicActionButton({ address, state, post, label, tone = "running", emphasis, pendingLabel, spinner = true, tooltip, success, onDone }: Props) {
   const { run, pending } = useWrite();
   return (
     <Button tone={tone} emphasis={emphasis} title={tooltip} disabled={pending} onClick={() => run(() => post({ address, state }), { onDone, success })}>
-      {pending && <Spinner size="sm" />}
+      {pending && spinner && <Spinner size="sm" />}
       {pending ? pendingLabel : label}
     </Button>
   );

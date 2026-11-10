@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   CardActionAnswer,
   CardActionContinue,
+  CardActionCreatePR,
   CardActionDesign,
   CardActionMarkMerged,
   CardActionMerge,
@@ -30,6 +31,8 @@ import { designHref, epicHref, ticketHref, triageHref } from "../hrefs";
 import { postOpenDesign, type OpenDesign, type OpenFlow } from "../design/open";
 import { postOpenTriage } from "../triage/api";
 import { Button } from "../ui/button/Button";
+import { Modal } from "../ui/modal/Modal";
+import type { MenuEntry } from "../ui/menu/Menu";
 import { useWrite } from "../useWrite";
 import { launchOrVerdictText } from "../verdict";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
@@ -37,7 +40,7 @@ import { EpicActionButton } from "./EpicActionButton";
 import { titleHref } from "./cardLinks";
 import { timeLabel } from "./cardTime";
 import { mergeToast } from "./MergeButton";
-import { postEpicMerge, postEpicStashMerge, postEpicTryAgain, postQueueAdd, type PostEpicWrite } from "./queue";
+import { postEpicCreatePR, postEpicMarkMerged, postEpicMerge, postEpicStashMerge, postEpicTryAgain, postQueueAdd, type PostEpicWrite } from "./queue";
 import { PrLine } from "./PrLine";
 import { READY_FOR_REVIEW_REASON, RING_KIND, isCreatingTickets, isLive, isReadyForReview, needsYouTone, ringProgress, ringTone } from "./ring";
 
@@ -67,6 +70,8 @@ export interface CardWrites {
   merge?: PostEpicWrite;
   stashMerge?: PostEpicWrite;
   tryAgain?: PostEpicWrite;
+  createPR?: PostEpicWrite;
+  markMerged?: PostEpicWrite;
   openDesign?: OpenDesign;
   openTriage?: OpenFlow;
   /** Goes to a hash route. */
@@ -80,6 +85,12 @@ export interface CardWrites {
  */
 const footerActions = (row: EpicListRow): CardAction[] => {
   const all = row.actions ?? [];
+  const create = all.find((a) => a.kind === CardActionCreatePR);
+  // Create PR stands alone in a pr project and sits left of Merge, the main button, in a merge project.
+  if (create) {
+    const merges = all.filter((a) => a.kind === CardActionMerge || a.kind === CardActionStashMerge);
+    return [create, ...merges];
+  }
   const tryAgain = all.find((a) => a.kind === CardActionTryAgain);
   if (tryAgain) return [...all.filter((a) => a.kind === CardActionOpenPR), tryAgain];
   return all.filter((a) => a.kind !== CardActionOpenPR && a.kind !== CardActionMarkMerged);
@@ -98,7 +109,7 @@ function ActionButtons({
   writes: CardWrites;
   onChanged: () => void;
 }) {
-  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, tryAgain = postEpicTryAgain, openDesign = postOpenDesign, openTriage = postOpenTriage, navigate = goTo, unhold = postUnhold } = writes;
+  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, tryAgain = postEpicTryAgain, createPR = postEpicCreatePR, openDesign = postOpenDesign, openTriage = postOpenTriage, navigate = goTo, unhold = postUnhold } = writes;
   const { run, pending } = useWrite();
 
   const startDesign = (epic: string) => run(() => openDesign({ epic }), { onDone: () => navigate(designHref(epic)) });
@@ -112,6 +123,21 @@ function ActionButtons({
         <Button key={i} tone="running" emphasis="secondary" onClick={() => window.open(a.link, "_blank", "noopener,noreferrer")}>
           Open PR
         </Button>
+      );
+    }
+    if (a.kind === CardActionCreatePR) {
+      return (
+        <EpicActionButton
+          key={i}
+          address={target}
+          state={row.state}
+          post={createPR}
+          label={a.label}
+          emphasis={footerActions(row).length > 1 ? "secondary" : undefined}
+          pendingLabel="Creating PR…"
+          spinner={false}
+          onDone={onChanged}
+        />
       );
     }
     if (a.kind === CardActionQueue || a.kind === CardActionMerge || a.kind === CardActionStashMerge || a.kind === CardActionTryAgain) {
@@ -183,6 +209,13 @@ export function EpicCard({
   const tone = needsYou ? needsYouTone(row) : undefined;
   const pillTone = tone ?? (row.card_kind === CardKindFollowUps && row.state_pill ? needsYouTone(row) : undefined);
   const held = row.section === SectionOnHold;
+  const { run } = useWrite();
+  const [confirmMerged, setConfirmMerged] = useState(false);
+  const markMerged = row.actions?.find((a) => a.kind === CardActionMarkMerged);
+  const markMergedAddress = markMerged?.target ?? row.address;
+  const extra: MenuEntry[] | undefined = markMerged
+    ? [{ value: "mark-merged", label: markMerged.label, onSelect: () => setConfirmMerged(true) }]
+    : undefined;
   return (
     <Box
       data-kind={kind}
@@ -243,8 +276,27 @@ export function EpicCard({
         </Box>
         {row.workspace && (
           <Box ml="auto" flex="none">
-            <ItemMenu item={itemOfCard(row)!} workspaces={workspaces} />
+            <ItemMenu item={itemOfCard(row)!} workspaces={workspaces} extra={extra} />
           </Box>
+        )}
+        {confirmMerged && (
+          <Modal label={`Mark ${row.name} as merged`} onClose={() => setConfirmMerged(false)} maxW="sm">
+            <Text>Mark {row.name} as merged? Do this only when its PR was merged outside gx.</Text>
+            <Box display="flex" gap="2" justifyContent="flex-end">
+              <Button emphasis="secondary" onClick={() => setConfirmMerged(false)} autoFocus>
+                Cancel
+              </Button>
+              <Button
+                tone="done"
+                onClick={() => {
+                  setConfirmMerged(false);
+                  void run(() => (writes.markMerged ?? postEpicMarkMerged)({ address: markMergedAddress, state: row.state }), { onDone: onChanged });
+                }}
+              >
+                Mark as merged
+              </Button>
+            </Box>
+          </Modal>
         )}
       </Box>
       <PrLine row={row} />
