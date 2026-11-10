@@ -1,8 +1,36 @@
 # Changelog
 
-## Unreleased
+## v0.47.0 - 2026-11-10
 
+- Added a Settings page to the web UI. It has a sidebar of sections, a scope picker for the global config and each project, search over the current scope, and controls for each setting type with reset and saved states. Risky settings ask for confirmation before they are written, settings that need a restart are marked, and list and secret rows are supported. `gx server settings` reads the settings and `gx server settings-set` writes them from the CLI.
+- Added a footer line and context badge to the Agents composer, the Design and Triage composers, and the Queue. Codex sessions and Queue agents show a context count. The model now shows in the footer instead of the page headers.
+- Added an installable web app. The app has a web manifest and icons, the gear menu has Install app and Force refresh rows, and the shell is cached so the app opens offline with an offline empty state.
+- Added a Command palette on Cmd/Ctrl+E. It fuzzy-filters the sidebar rows and has New design, New chat, Toggle AFK, Next question and Go to commands.
+- Added a process watchdog. The server watches the process tree of every ticket run and of interactive sessions, freezes and kills a process storm that gx launched, and only sends a notification for a storm gx did not launch. Headless agents, PTY agents and herdr panes launch under a process cap.
+- Added `gx server uninstall`.
+- Added links on question cards. A question can list links, and they show on its card.
+- Added `gx brief failures`, which lists every failing test in a brief log with its first lines.
+- Added a `...` menu on nested agent rows in the sidebar.
 - Changed `agents.restore-sessions-on-start` to default to off. A server start no longer launches an agent for a session whose holder died: the session ends Exited (crashed) and you press Restore to bring it back. Set the key to `true` to keep the old behaviour.
+- Changed server start to leave a dead session's Unread marks and banners alone.
+- Changed Triage questions to be answered one by one, with options, a recommended default and choice cards. Each question links to its ticket, and answers can be sent back for a new round of questions.
+- Changed the sidebar so a swipe right from anywhere but the left edge opens it. A swipe on a Design question card no longer opens the sidebar.
+- Changed New chat and New design to start on the project of the page you are on and to share one default-project rule. The last project is remembered.
+- Changed the Design page to move the model and epic link into the ⋯ menu, show map images as the first chat entry, and use a compact answered-question card.
+- Changed the New Design sheet to have a Close text button and a paperclip in its footer, with the same attach rule on phone, tablet and desktop.
+- Changed `gx tickets add` to refuse a bare epic slug outside a registered project and to refuse a retried child with the same title and parent.
+- Changed the first-launch rebase abort to name the conflicting files, and `gx brief conflicts` to print the hunks.
+- Fixed a Design round with only notes that could not be sent on a phone.
+- Fixed a Design message ending on a prose question raising a run-end Continue.
+- Fixed a skipped `gx check` clearing an earlier failed run at the finish gate.
+- Fixed `gx check format` to report "no prettier" for JS packages that have no prettier.
+- Fixed `gx brief playwright --help` running the whole suite instead of printing usage.
+- Fixed a chat failing to load when a Claude transcript has a line longer than 10MB.
+- Fixed cleanup sizes showing a size measured before a change.
+- Fixed the phone header staying visible with the keyboard open on chats, and keyboard detection being unreliable.
+- Fixed a menu taking focus back from a dialog that its item opened, and New dialogs focusing their first field.
+- Fixed credit-card AutoFill appearing in free-text boxes.
+- Fixed Triage: a typed note is kept while its save and reload cross, a web answer that is not an option of its question is refused, and rows with the same question no longer share answers.
 
 ## v0.46.0 - 2026-11-09
 
