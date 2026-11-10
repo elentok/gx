@@ -85,18 +85,18 @@ func TrunkBaseRef(repoRoot, trunk string) string {
 	if trunk == "" {
 		return ""
 	}
-	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + trunk}) != "" {
+	if revVerify(repoRoot, "refs/remotes/origin/"+trunk) != "" {
 		return "origin/" + trunk
 	}
-	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/" + trunk}) != "" {
+	if revVerify(repoRoot, "refs/heads/"+trunk) != "" {
 		return trunk
 	}
 	return ""
 }
 
 func syncBetween(repoRoot, localRef, remoteRef string) (SyncStatus, error) {
-	localHash := run.AllowFail(repoRoot, []string{"rev-parse", "--verify", localRef})
-	remoteHash := run.AllowFail(repoRoot, []string{"rev-parse", "--verify", remoteRef})
+	localHash := revVerify(repoRoot, localRef)
+	remoteHash := revVerify(repoRoot, remoteRef)
 
 	if localHash == "" || remoteHash == "" {
 		return SyncStatus{Name: StatusUnknown}, nil

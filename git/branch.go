@@ -53,6 +53,9 @@ func parseBranchLine(line string) Branch {
 
 // CurrentBranch returns the short name of the current branch in dir.
 func CurrentBranch(dir string) (string, error) {
+	if name, ok := currentBranchFast(dir); ok {
+		return name, nil
+	}
 	out, _, err := run.Exec(dir, []string{"rev-parse", "--abbrev-ref", "HEAD"})
 	return out, err
 }
@@ -76,7 +79,7 @@ func UpstreamBranch(repoRoot, branch string) string {
 	}
 	// Fall back to the conventional remote tracking ref, using the full path to
 	// avoid ambiguity with any local branch that happens to be named origin/<branch>.
-	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + branch}) != "" {
+	if revVerify(repoRoot, "refs/remotes/origin/"+branch) != "" {
 		return "origin/" + branch
 	}
 	return ""

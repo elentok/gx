@@ -15,6 +15,12 @@ var ErrRefNotFound = errors.New("ref not found")
 // RevParse resolves ref to its full commit hash in dir. A ref that does not
 // exist returns ErrRefNotFound; any other failure is returned as is.
 func RevParse(dir, ref string) (string, error) {
+	if h, found, ok := resolveRev(dir, ref); ok {
+		if !found {
+			return "", fmt.Errorf("%w: %s", ErrRefNotFound, ref)
+		}
+		return h, nil
+	}
 	// --verify --quiet exits 1 with no output for a missing ref; real git
 	// failures (bad repo, corrupt object) exit 128.
 	out, _, err := run.Exec(dir, []string{"rev-parse", "--verify", "--quiet", ref})

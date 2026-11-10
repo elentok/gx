@@ -176,10 +176,10 @@ func RemoteDefaultBranch(repoRoot string) string {
 	}
 
 	// Fall back to checking local branches
-	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/main"}) != "" {
+	if revVerify(repoRoot, "refs/heads/main") != "" {
 		return "main"
 	}
-	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/master"}) != "" {
+	if revVerify(repoRoot, "refs/heads/master") != "" {
 		return "master"
 	}
 

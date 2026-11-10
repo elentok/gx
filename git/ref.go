@@ -11,6 +11,9 @@ func ValidBranchName(name string) bool {
 // RefExists reports whether the full ref (e.g. refs/heads/main) exists.
 // Unlike IsLocalBranch it never matches a pattern.
 func RefExists(repoRoot, ref string) bool {
+	if _, found, ok := resolveRev(repoRoot, ref); ok {
+		return found
+	}
 	_, _, err := run.Exec(repoRoot, []string{"rev-parse", "--verify", "--quiet", ref})
 	return err == nil
 }
