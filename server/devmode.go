@@ -92,4 +92,14 @@ func (s *Server) devRestart(w http.ResponseWriter, _ *http.Request) {
 	wire.WriteJSON(w, wire.DevRestartResult{})
 }
 
-func (h reloadHost) ApplyDevMode(_, next Settings) { h.s.applyDevMode(next) }
+// ApplyDevMode also announces a changed Dev checkout or reason: the supervisor
+// only reports state changes, and a settings page enables its dev-frontend row
+// from has_checkout.
+func (h reloadHost) ApplyDevMode(prev, next Settings) {
+	prevRoot, _, prevReason := h.s.devPlan(prev)
+	nextRoot, _, nextReason := h.s.devPlan(next)
+	h.s.applyDevMode(next)
+	if prevRoot != nextRoot || prevReason != nextReason {
+		h.s.events.Publish(wire.EventDevChanged, "")
+	}
+}

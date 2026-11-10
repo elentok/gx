@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -118,6 +119,23 @@ func TestDevMode_ReloadAtReadyAfterDevDirChange(t *testing.T) {
 	evs.expect(wire.EventReload)
 	if dev := devSnapshot(t, r.h); dev.State != wire.DevStateRunning {
 		t.Fatalf("dev = %+v, want running", dev)
+	}
+}
+
+// An open settings page enables its dev-frontend row from has_checkout, so a
+// dev-dir write must announce itself even while the supervisor stays off.
+func TestDevMode_DevDirWriteTurningOnHasCheckoutPublishesDevChanged(t *testing.T) {
+	checkout := servertest.WriteDevCheckout(t, true)
+	r := startDevRig(t, filepath.Join(t.TempDir(), "missing"), false)
+	if dev := devSnapshot(t, r.h); dev.HasCheckout {
+		t.Fatalf("dev = %+v, want no checkout", dev)
+	}
+	evs := subscribeDevEvents(t, r)
+
+	r.setKey(t, checkout, false)
+	evs.expect(wire.EventDevChanged)
+	if dev := devSnapshot(t, r.h); !dev.HasCheckout {
+		t.Fatalf("dev = %+v, want a checkout", dev)
 	}
 }
 
