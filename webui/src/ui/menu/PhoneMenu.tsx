@@ -287,7 +287,7 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
                         ›
                       </Text>
                     )}
-                    {r.checked && (
+                    {r.checked && !r.inlineHint && (
                       <Text as="span" aria-hidden position="absolute" right="4">
                         ✓
                       </Text>

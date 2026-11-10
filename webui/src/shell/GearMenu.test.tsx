@@ -100,7 +100,7 @@ test("with a Dev checkout the Dev mode row sits under Vi mode, follows the Dev s
 test("on a phone the Dev mode row keeps its place and the same drawn switch as Vi mode", async () => {
   setup({ vi_mode: true, dev: { state: "running", has_checkout: true } }, {}, () => {}, true, {}, "phone");
   const row = await screen.findByRole("menuitemcheckbox", { name: "Dev mode" });
-  expect(menuItems()?.slice(0, 3)).toEqual(["AFK", "Vi mode✓", "Dev mode✓"]);
+  expect(menuItems()?.slice(0, 3)).toEqual(["AFK", "Vi mode", "Dev mode"]);
   const drawn = (el: Element) => [...el.querySelectorAll("[aria-hidden]")].map((n) => n.outerHTML);
   const vi = screen.getByRole("menuitemcheckbox", { name: "Vi mode" });
   expect(drawn(row).length).toBeGreaterThan(0);
