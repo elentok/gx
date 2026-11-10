@@ -5,8 +5,12 @@ GO_VERSION := 1.25.0
 # Runs `gx brief`. CI has no installed gx, and an installed one can be older than the checkout.
 GX ?= go run .
 
+# The second -X stamps this checkout's directory so gx can find its Dev checkout.
+MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+LDFLAGS = -X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty) -X github.com/elentok/gx/version.DevDir=$(MAKEFILE_DIR)
+
 build: web-build
-	go build -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" -o gx .
+	go build -ldflags "$(LDFLAGS)" -o gx .
 
 # webui/dist is not committed; the Go embed falls back to a placeholder without it.
 web-build:
@@ -35,7 +39,7 @@ web-types:
 	go run github.com/gzuidhof/tygo@v0.2.21 generate
 
 install: web-build
-	go install -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" .
+	go install -ldflags "$(LDFLAGS)" .
 
 # Every non-e2e test step side by side; see scripts/test.sh. The real-herdr e2e
 # tests skip here even inside herdr: they need GX_E2E=1 (see e2e).

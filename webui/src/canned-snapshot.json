@@ -1,5 +1,6 @@
 {
   "seq": 42,
+  "dev": { "state": "off", "has_checkout": false },
   "budget": {
     "day": "2026-10-19",
     "total": 12.5,

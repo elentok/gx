@@ -12,6 +12,7 @@ import type { Snapshot } from "./snapshot";
 
 const emptySnapshot = (seq: number): Snapshot => ({
   seq,
+  dev: { state: "off", has_checkout: false },
   budget: { day: "", total: 0, soft_limit: 0, hard_limit: 0, budget_paused: false, hard_latched: false },
   health: {
     cpu: { level: 0, state: "unknown", reason: "waiting", read_at: "" },

@@ -8,6 +8,7 @@ packages:
       - designdrafts.go
       - designs.go
       - detail.go
+      - devstatus.go
       - diskwatch.go
       - epicdetail.go
       - epiclist.go

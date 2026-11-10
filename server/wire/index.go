@@ -119,6 +119,8 @@ type Snapshot struct {
 	// ViMode is set while the web UI's vi mode is on; filled in by the handler.
 	// Missing means off.
 	ViMode bool `json:"vi_mode,omitempty"`
+	// Dev is the Dev mode block; filled in by the handler.
+	Dev DevStatus `json:"dev"`
 	// Workspaces are the ordered workspaces; filled in by the handler.
 	Workspaces []Workspace `json:"workspaces,omitempty"`
 	// NeedsYouTotal counts every Needs-you card, One-off cards included; filled in

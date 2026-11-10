@@ -7,6 +7,10 @@ import "runtime/debug"
 // version is set at build time via -ldflags "-X github.com/elentok/gx/version.version=vX.Y.Z"
 var version = ""
 
+// DevDir is the checkout directory `make build` and `make install` stamp via
+// -X; empty for plain `go build` and `go run`.
+var DevDir = ""
+
 // Get returns the ldflags-injected version, else the module version from the
 // build info, else "dev".
 func Get() string {
