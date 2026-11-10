@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
@@ -33,7 +34,36 @@ func (c *Chat) Cards(dir string, m Meta, snap Snapshot) []wire.QuestionCard {
 			src[SlotTicketAsk] = TicketAskCard(addr, q, state)
 		}
 	}
+	if class == ClassPlain && m.Ticket == "" && m.Harness == string(harness.Codex) {
+		src[SlotCodexQuestion] = c.codexQuestionCards(m)
+	}
 	return BuildCards(class, src)
+}
+
+type codexQuestionRead struct {
+	q  codexsession.OpenQuestion
+	ok bool
+}
+
+// codexQuestionCards is the card of the open request_user_input call in the
+// session's rollout, listed as soon as the call is on disk.
+func (c *Chat) codexQuestionCards(m Meta) []wire.QuestionCard {
+	path, ok := c.codexRollout(m.ID, m)
+	if !ok {
+		return nil
+	}
+	r, err := c.codexQuestions.Read(path, func(p string) (codexQuestionRead, error) {
+		q, ok, err := codexsession.ReadOpenQuestion(p)
+		return codexQuestionRead{q, ok}, err
+	})
+	if err != nil {
+		c.log.Warn("read codex question", "session", m.ID, "err", err)
+		return nil
+	}
+	if !r.ok {
+		return nil
+	}
+	return CodexQuestionCard(r.q)
 }
 
 // permissionCards is the card of the permission dialog a Blocked Claude session

@@ -1,8 +1,10 @@
 package chat
 
 import (
+	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -16,6 +18,7 @@ type CardSlot int
 const (
 	SlotLiveBlocker CardSlot = iota
 	SlotTicketAsk
+	SlotCodexQuestion
 	SlotRound
 )
 
@@ -31,7 +34,7 @@ const (
 
 // classSlots is the class table: later tickets add a slot to a class here.
 var classSlots = map[SessionClass][]CardSlot{
-	ClassPlain:      {SlotLiveBlocker, SlotRound},
+	ClassPlain:      {SlotLiveBlocker, SlotCodexQuestion, SlotRound},
 	ClassFlow:       {SlotLiveBlocker, SlotRound},
 	ClassQueueAgent: {SlotTicketAsk},
 	ClassFixAgent:   {SlotLiveBlocker, SlotTicketAsk, SlotRound},
@@ -65,6 +68,21 @@ func TicketAskCard(address string, q ticketlog.Question, state string) []wire.Qu
 // SplitTicketAskID is the ticket address and state token of a ticket-ask card id.
 func SplitTicketAskID(id string) (address, state string, ok bool) {
 	return strings.Cut(id, "#")
+}
+
+// CodexQuestionCard is an open request_user_input call as a Question card. Its
+// id is the call id; an option's id is its 1-based position, the digit that
+// picks it in Codex's overlay.
+func CodexQuestionCard(q codexsession.OpenQuestion) []wire.QuestionCard {
+	qs := make([]wire.QuestionCardQuestion, len(q.Questions))
+	for i, it := range q.Questions {
+		cq := wire.QuestionCardQuestion{Kind: "options", Label: it.Header, Title: it.Question}
+		for j, o := range it.Options {
+			cq.Options = append(cq.Options, wire.QuestionCardOption{ID: strconv.Itoa(j + 1), Label: o.Label, Description: o.Description})
+		}
+		qs[i] = cq
+	}
+	return []wire.QuestionCard{{Source: wire.CardSourceCodex, ID: q.CallID, Questions: qs}}
 }
 
 // ClassOf is the class of a session.
