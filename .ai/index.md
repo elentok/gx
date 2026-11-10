@@ -166,7 +166,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
   `server/web/` holds the web listener: bind, the login-gated mux, static and dev proxy, the
   CLI-facing web calls and the stream bookkeeping (the root implements `Host`);
-  `server/webauth/` holds web login: the login store (password, TOTP, devices, setup code, rate
+  `server/devvite/` holds the Dev mode Vite supervisor: install when `node_modules` is stale, start Vite on a free loopback port, report `running` only after a real HTTP probe, never restart on its own (`New`, `Set`, `Restart`, `Snapshot`, `Close`; the `Launcher` interface is the spawn and probe seam; imports the standard library only); `server/webauth/` holds web login: the login store (password, TOTP, devices, setup code, rate
   limits), the cookie gate (`Gate`) and the login routes (imports `webtls` and `wire`; the root
   implements `Host`; `cmd` and `testutil/gxfixture` import it too);
   `server/disk/` holds disk watching: free-space status, the watch loop, the hold, the clean-now
