@@ -94,6 +94,16 @@ func TestSessionKeys_QueueAgentIsReadOnly(t *testing.T) {
 	}
 }
 
+func TestSessionKeys_DigitKeyPicksADialogOption(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	f.fixture().BlockOn(t, agentfake.BashPermissionDialog("ls"))
+	if res := f.keys(t, wire.SessionKeysRequest{Key: "2"}); res.Refused {
+		t.Fatalf("key 2 = %+v", res)
+	}
+	waitForSubmitted(t, f.conv, strconv.Quote("2")+"\n")
+}
+
 func TestSessionKeys_NamedKeysReachTheFake(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
@@ -32,14 +34,14 @@ func (p *Prompt) answerHandler(source string) http.HandlerFunc {
 }
 
 // answerSession re-reads the chat, refuses a card that is not the current one
-// for its source, and sends the answer as the person's prompt. Only a printed
-// round is routed so far.
+// for its source, and sends the answer: a printed round as the person's prompt,
+// a permission dialog as the digit of the chosen option.
 func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wire.SessionResult, error) {
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if req.Source != wire.CardSourceRound {
+	if req.Source != wire.CardSourceRound && req.Source != wire.CardSourcePermission {
 		return sessions.Refusal(wire.ReasonAnswerSourceNotSupported, fmt.Sprintf("answers to %q cards are not supported yet", req.Source)), nil
 	}
 	card, err := p.currentCard(req.ID, dir, meta, req.Source)
@@ -48,6 +50,9 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 	}
 	if card == nil || card.ID != req.CardID {
 		return sessions.Refusal(wire.ReasonStale, "the question moved on; review it first"), nil
+	}
+	if req.Source == wire.CardSourcePermission {
+		return p.answerPermissionCard(req, *card, source)
 	}
 	prompt := wire.SessionPromptRequest{
 		ID: req.ID, Text: roundPrompt(card.Questions, req.Answers, req.Note),
@@ -58,23 +63,33 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 
 // currentCard is the session's current card of source, or nil with none.
 func (p *Prompt) currentCard(id, dir string, meta sessions.Meta, source string) (*wire.QuestionCard, error) {
-	path, kind, ok := p.sessionChat.Transcript(id, meta.ChatMeta())
-	if !ok {
-		return nil, nil
+	var snap chat.Snapshot
+	if path, kind, ok := p.sessionChat.Transcript(id, meta.ChatMeta()); ok {
+		var err error
+		snap, err = p.sessionChat.ReadSnapshot(path, kind, meta.FlowRef(), dir)
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
 	}
-	snap, err := p.sessionChat.ReadSnapshot(path, kind, meta.FlowRef(), dir)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	for _, c := range chat.SessionCards(meta.ChatMeta(), snap.Round) {
+	for _, c := range p.sessionChat.Cards(dir, meta.ChatMeta(), snap) {
 		if c.Source == source {
 			return &c, nil
 		}
 	}
 	return nil, nil
+}
+
+// answerPermissionCard sends the chosen option's digit. An answer that picks no
+// option is a dismiss and denies, as the banner's Deny does.
+func (p *Prompt) answerPermissionCard(req wire.SessionAnswerRequest, card wire.QuestionCard, source string) (wire.SessionResult, error) {
+	choice := answerAt(req.Answers, 0).Choice
+	if choice == "" {
+		return p.keysSession(wire.SessionKeysRequest{ID: req.ID, Permission: string(agentrunner.DecisionDeny)}, source)
+	}
+	if !slices.ContainsFunc(card.Questions[0].Options, func(o wire.QuestionCardOption) bool { return o.ID == choice }) {
+		return sessions.Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("choice %q is not an option of the dialog", choice)), nil
+	}
+	return p.keysSession(wire.SessionKeysRequest{ID: req.ID, Key: choice, OnlyBlocked: true}, source)
 }
 
 func answerAt(answers []wire.SessionAnswer, i int) wire.SessionAnswer {

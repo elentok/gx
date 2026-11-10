@@ -107,6 +107,22 @@ func BashPermissionDialog(command string) []string {
 	}
 }
 
+// WrappedPermissionDialog is a Bash permission prompt whose second option wraps
+// onto a second row and grants a standing permission.
+func WrappedPermissionDialog(command string) []string {
+	return []string{
+		"────────────────────",
+		"Bash command",
+		"  " + command,
+		"Do you want to proceed?",
+		"❯ 1. Yes",
+		"  2. Yes, and don't ask again for this command in",
+		"     /some/long/project/path",
+		"  3. No",
+		"Esc to cancel",
+	}
+}
+
 // QuestionMenuDialog is the screen rows of a question menu: a numbered choice
 // list that is not an approvable permission card.
 func QuestionMenuDialog() []string {

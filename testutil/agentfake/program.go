@@ -404,6 +404,10 @@ func (p *program) key(b byte) error {
 	if p.dialog && b == '\r' {
 		return p.closeDialog(ProgramEnterEntry)
 	}
+	if p.dialog && b >= '0' && b <= '9' {
+		// A digit picks the numbered option.
+		return p.closeDialog(string(b))
+	}
 	if p.box != nil {
 		if !p.ready {
 			return nil

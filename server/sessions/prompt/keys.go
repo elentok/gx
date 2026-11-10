@@ -38,6 +38,13 @@ var sessionKeyBytes = map[string]string{
 	"ctrl+c":    "\x03",
 }
 
+func init() {
+	// Digits pick a numbered dialog option.
+	for d := '0'; d <= '9'; d++ {
+		sessionKeyBytes[string(d)] = string(d)
+	}
+}
+
 func (p *Prompt) keysHandler(source string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req wire.SessionKeysRequest

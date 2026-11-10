@@ -30,10 +30,10 @@ const (
 
 // classSlots is the class table: later tickets add a slot to a class here.
 var classSlots = map[SessionClass][]CardSlot{
-	ClassPlain:      {SlotRound},
-	ClassFlow:       {SlotRound},
+	ClassPlain:      {SlotLiveBlocker, SlotRound},
+	ClassFlow:       {SlotLiveBlocker, SlotRound},
 	ClassQueueAgent: {},
-	ClassFixAgent:   {SlotRound},
+	ClassFixAgent:   {SlotLiveBlocker, SlotRound},
 }
 
 // ClassOf is the class of a session.

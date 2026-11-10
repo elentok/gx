@@ -78,7 +78,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	out := wire.SessionChatResponse{ConversationID: meta.ConversationID, Messages: []wire.SessionChatMessage{}, Background: []wire.SessionBackgroundTask{}, Questions: SessionCards(meta, nil), Failure: c.Failure(meta)}
+	out := wire.SessionChatResponse{ConversationID: meta.ConversationID, Messages: []wire.SessionChatMessage{}, Background: []wire.SessionBackgroundTask{}, Questions: c.Cards(dir, meta, Snapshot{}), Failure: c.Failure(meta)}
 	if !c.src.HasChatReader(meta.Harness) {
 		out.Unsupported = true
 		wire.WriteJSON(w, out)
@@ -100,7 +100,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 		default:
 			out.Messages, out.Truncated = snap.Msgs, snap.Truncated
 			out.Round, out.Next, out.Background = snap.Round, snap.Next, snap.Background(time.Now())
-			out.Questions = SessionCards(meta, snap.Round)
+			out.Questions = c.Cards(dir, meta, snap)
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
 			for i, t := range snap.InFlight {
 				tool := wire.SessionInFlightTool{Kind: t.Kind, Label: t.Label}
