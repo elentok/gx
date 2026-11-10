@@ -85,10 +85,9 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await page.getByRole("link", { name: /^Epics/ }).click();
   await expect(page).toHaveURL(/#\/epics$/);
 
-  // Only merge-blocked and awaiting-merge cards offer Merge.
-  for (const name of ["blocked-merge-epic", "awaiting-epic"]) {
-    await expect(actions(page, name)).toHaveText(["Merge"]);
-  }
+  // Only merge-blocked and awaiting-merge cards offer Merge; an awaiting epic also offers Create PR.
+  await expect(actions(page, "blocked-merge-epic")).toHaveText(["Merge"]);
+  await expect(actions(page, "awaiting-epic")).toHaveText(["Create PR", "Merge"]);
   // A dirty trunk offers both ways out and names the cause, but lists no files on the card.
   const dirty = card(page, "dirty-trunk-epic");
   await expect(actions(page, "dirty-trunk-epic")).toHaveText(["Stash, merge and restore", "Merge again"]);
@@ -149,6 +148,19 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   // 30: Open epic on a deadlock card navigates to its page.
   await card(page, "deadlock-epic").getByRole("button", nav("Open epic")).click();
   await expect(page).toHaveURL(/#\/e\/demo:deadlock-epic$/);
+
+  // PR flow: a CI-failing epic needs you with its reason; Try again starts a fix ticket against the fake gh.
+  // Last step: a second start() moves the page to the new fixture's origin.
+  const pr = await start("pr-flow-ci-failing");
+  const prCard = card(page, "ticket-search");
+  await expect(prCard.getByTestId("pill")).toHaveText("CI failing");
+  await expect(prCard.getByTestId("reason")).toContainText("go-test failed 3 times");
+  const tryAgain = prCard.getByRole("button", { name: "Try again" });
+  await expect(tryAgain).toBeEnabled();
+  await tryAgain.click();
+  await expect(prCard.getByText("Fixing CI")).toBeVisible();
+  await expect(prCard.getByTestId("pill")).toHaveCount(0);
+  expect(await pr.cli("server", "epics")).toContain("412");
 });
 
 test("18. Joined card", async ({ page, start }) => {

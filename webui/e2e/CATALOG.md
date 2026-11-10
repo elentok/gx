@@ -104,7 +104,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `united.e2e.ts`
 
-- **16. Needs you (+63, 28, 29, 30).**
+- **16. Needs you (+63, 28, 29, 30).** Last step, on a second `start("pr-flow-ci-failing")`: the epic's card is in Needs you with "CI failing", its reason and an enabled Try again; after the click the card leaves Needs you and reads "Fixing CI" (the fake gh still reports the check failing), and `gx server epics` shows PR 412.
 - **18. Joined card.**
 
 ### `dirty-trunk.e2e.ts`

@@ -28,6 +28,10 @@ func TryAgain(h CreateHost, req wire.QueueRequest) (wire.QueueResult, error) {
 		return queue.Refusal(wire.ReasonNotPaused, root.String()+" is not paused on CI or on its pull request text"), nil
 	}
 	if shown := wire.EpicState(req.State); shown != "" {
+		// An Epics card shows the list state; the Epic page's vocabulary calls both pauses "paused".
+		if s := wire.EpicListState(shown); s == wire.EpicListCIFailing || s == wire.EpicListPRTextFailed {
+			shown = wire.EpicStatePaused
+		}
 		if now := h.EpicState(root, e); shown != now {
 			return queue.Refusal(wire.ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown)), nil
 		}
