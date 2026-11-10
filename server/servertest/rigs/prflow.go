@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server"
@@ -83,6 +84,8 @@ func StartPRFlow(t *testing.T, opts PRFlowOpts) *PRFlow {
 	var env []string
 	setup := func(c *server.Config) {
 		c.ConfigPath = configPath
+		// Test servers take their settings from Config, not from config.json.
+		c.NoChecksGrace, _ = time.ParseDuration(PRFlowGrace)
 		// The base PATH comes from the server env: reading the process's is banned.
 		c.Env = origin.GH.Env(c.Env, harness.LookupEnv(c.Env, "PATH"))
 	}

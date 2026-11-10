@@ -73,6 +73,9 @@ type Settings struct {
 	// SuppressExtraUsageWarning is config subscription.suppress-extra-usage-warning.
 	SuppressExtraUsageWarning bool
 
+	// NoChecksGrace is config pr.no-checks-grace.
+	NoChecksGrace time.Duration
+
 	// WatchConfig reloads the config file whenever it is saved.
 	WatchConfig bool
 
@@ -169,6 +172,7 @@ func FromConfig(cfg config.Config) Settings {
 		Watchdog:                    cfg.Watchdog,
 		DiskSpace:                   cfg.DiskSpace,
 		RecentlyFinished:            cfg.Server.RecentlyFinished,
+		NoChecksGrace:               cfg.PR.NoChecksGrace,
 		AgentsClaude:                cfg.Agents.Claude,
 		AgentsCodex:                 cfg.Agents.Codex,
 		AgentsDefaultHarness:        cfg.Agents.DefaultHarness,

@@ -36,6 +36,8 @@ type Host interface {
 	Env() []string
 	// RepoDir is the project's repo checkout.
 	RepoDir(project string) (string, bool)
+	// NoChecksGrace is how long a PR with no checks waits before it counts as green.
+	NoChecksGrace() time.Duration
 }
 
 // View is the live state of one epic's PR. It exists only in memory.
@@ -71,6 +73,28 @@ type Watcher struct {
 	// retry-after of the last one.
 	fails      int
 	retryAfter time.Duration
+	// seen and readied are per epic: the head last seen, and the head already
+	// marked ready.
+	seen    map[epicKey]seenHead
+	readied map[epicKey]string
+	clock   func() time.Time
+}
+
+// SetClock replaces the watcher's clock, for tests.
+func (w *Watcher) SetClock(now func() time.Time) {
+	w.mu.Lock()
+	w.clock = now
+	w.mu.Unlock()
+}
+
+func (w *Watcher) now() time.Time {
+	w.mu.Lock()
+	c := w.clock
+	w.mu.Unlock()
+	if c == nil {
+		return time.Now()
+	}
+	return c()
 }
 
 type epicKey struct{ project, epic string }
@@ -83,6 +107,9 @@ func NewWatcher(host Host) *Watcher {
 		views: map[epicKey]View{},
 		repos: map[string]string{},
 		down:  map[string]bool{},
+
+		seen:    map[epicKey]seenHead{},
+		readied: map[epicKey]string{},
 	}
 }
 
@@ -228,7 +255,9 @@ func (w *Watcher) pollProject(project string, ts []Target) error {
 		w.mu.Lock()
 		w.views[epicKey{t.Project, t.Epic}] = v
 		w.mu.Unlock()
-		w.act(t, v)
+		if err := w.act(r, repo, t, v); err != nil {
+			return err
+		}
 	}
 	return nil
 }

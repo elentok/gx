@@ -2,6 +2,7 @@ package server
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/prflow"
@@ -41,6 +42,8 @@ func (h prWatchHost) Watched() []prflow.Target {
 }
 
 func (h prWatchHost) Env() []string { return h.s.cfg.Env }
+
+func (h prWatchHost) NoChecksGrace() time.Duration { return h.s.settings.Load().NoChecksGrace }
 
 func (h prWatchHost) RepoDir(project string) (string, bool) {
 	pf, err := config.ReadProjectFile(filepath.Join(h.s.cfg.TicketStore, project))
