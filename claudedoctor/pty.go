@@ -89,6 +89,14 @@ func checkHolderSurvivesKickstart(in Input) (string, bool) {
 	if err != nil {
 		return err.Error(), false
 	}
+	return holderSurvivesLaunchd(in.Env, exe, true)
+}
+
+// holderSurvivesLaunchd runs the kickstart check against the holder binary exe.
+// detach starts it under setsid, as the real launcher does. Without it the
+// holder stays in the launchd job's process group and kickstart -k must kill
+// it, which is the negative control that proves the check can fail.
+func holderSurvivesLaunchd(env []string, exe string, detach bool) (string, bool) {
 	// Short dir: holder.sock lives in it and socket paths are length-capped.
 	dir, err := os.MkdirTemp("", "gxd")
 	if err != nil {
@@ -96,9 +104,19 @@ func checkHolderSurvivesKickstart(in Input) (string, bool) {
 	}
 	defer os.RemoveAll(dir)
 
-	start := fmt.Sprintf(`%s %q agent-holder --session-id doctor --dir %q -- sleep 600 </dev/null >/dev/null 2>&1`,
-		setsid, exe, dir)
-	return holderSurvives(dir, func() (int, error) { return kickstartJob(in.Env, dir, start) })
+	start := holderStartCommand(exe, dir, detach)
+	return holderSurvives(dir, func() (int, error) { return kickstartJob(env, dir, start) })
+}
+
+// holderStartCommand is the shell command that starts `agent-holder` serving
+// dir, under setsid when detach is set.
+func holderStartCommand(exe, dir string, detach bool) string {
+	prefix := ""
+	if detach {
+		prefix = setsid + " "
+	}
+	return fmt.Sprintf(`%s%q agent-holder --session-id doctor --dir %q -- sleep 600 </dev/null >/dev/null 2>&1`,
+		prefix, exe, dir)
 }
 
 // holderSurvives runs kickstart, which starts a holder serving dir and

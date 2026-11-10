@@ -2,7 +2,10 @@ package claudedoctor_test
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -30,7 +33,39 @@ func TestMain(m *testing.M) {
 	if os.Getenv(agentfake.TUIEnv) == "1" {
 		agentfake.TUIClaude()
 	}
+	// Backstop: this binary launched as `agent-holder` by something that did not
+	// set holderEnv would fall through to m.Run and re-run the whole suite, whose
+	// holder check launches it again, without end. Refuse instead.
+	if len(os.Args) > 1 && os.Args[1] == "agent-holder" {
+		fmt.Fprintln(os.Stderr, "claudedoctor.test: refusing to run as an agent-holder; it would re-run the suite and fork without end")
+		os.Exit(backstopExit)
+	}
+	// The backstop test launches this binary as a holder on purpose. If the
+	// backstop above ever stops firing, exit here instead of running the suite.
+	if os.Getenv(backstopProbeEnv) == "1" {
+		os.Exit(backstopBroken)
+	}
 	os.Exit(m.Run())
+}
+
+const (
+	// backstopExit is the status TestMain exits with when it refuses to be a holder.
+	backstopExit = 2
+	// backstopBroken is the status a probe launch exits with when the backstop
+	// did not refuse it.
+	backstopBroken = 3
+	// backstopProbeEnv marks a launch made by TestMain_RefusesToBeAnAgentHolder.
+	backstopProbeEnv = "GX_TEST_BACKSTOP_PROBE"
+)
+
+func TestMain_RefusesToBeAnAgentHolder(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "agent-holder", "--session-id", "doctor", "--dir", t.TempDir(), "--", "sleep", "1")
+	cmd.Env = append(os.Environ(), backstopProbeEnv+"=1", holderEnv+"=")
+	err := cmd.Run()
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) || ee.ExitCode() != backstopExit {
+		t.Fatalf("launching the test binary as agent-holder = %v, want exit %d", err, backstopExit)
+	}
 }
 
 func fakeImagePty(t *testing.T) *nativerunner.Pty {

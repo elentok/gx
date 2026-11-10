@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -292,6 +293,70 @@ func TestHolderCheck_SkipsUnderGoTest(t *testing.T) {
 	}
 	if got := notGx("/usr/local/bin/gx"); got != "" {
 		t.Errorf("gx binary skipped: %q", got)
+	}
+}
+
+// The skip is only as good as its wiring: dropping SkipIf from the table entry
+// would pass TestHolderCheck_SkipsUnderGoTest and bring the fork storm back.
+func TestHolderCheck_TableEntryCarriesTheGuard(t *testing.T) {
+	for _, c := range ptyChecks {
+		if c.Name != "holder-survives-kickstart" {
+			continue
+		}
+		if c.SkipIf == nil {
+			t.Fatal("holder-survives-kickstart has no SkipIf; under go test it would launch the test binary as agent-holder")
+		}
+		if c.SkipIf() == "" {
+			t.Error("holder-survives-kickstart SkipIf does not skip under go test")
+		}
+		return
+	}
+	t.Fatal("holder-survives-kickstart is not in ptyChecks")
+}
+
+func TestHolderStartCommand_SetsidOnlyWhenDetached(t *testing.T) {
+	t.Parallel()
+	detached := holderStartCommand("/bin/gx", "/tmp/gxd1", true)
+	if !strings.HasPrefix(detached, setsid+" ") {
+		t.Errorf("detached start does not run under setsid: %s", detached)
+	}
+	plain := holderStartCommand("/bin/gx", "/tmp/gxd1", false)
+	if strings.Contains(plain, "setsid") {
+		t.Errorf("non-detached start uses setsid: %s", plain)
+	}
+	for _, cmd := range []string{detached, plain} {
+		if !strings.Contains(cmd, `"/bin/gx" agent-holder --session-id doctor --dir "/tmp/gxd1" -- sleep 600`) {
+			t.Errorf("start command lost its holder invocation: %s", cmd)
+		}
+	}
+}
+
+// TestHolderSurvivesLaunchd_RealGx proves the setsid path on the real binary:
+// the holder outlives `launchctl kickstart -k` only when detached. It builds gx
+// and drives launchd, so it runs only when asked: GX_DOCTOR_LAUNCHD=1.
+func TestHolderSurvivesLaunchd_RealGx(t *testing.T) {
+	if os.Getenv("GX_DOCTOR_LAUNCHD") != "1" {
+		t.Skip("set GX_DOCTOR_LAUNCHD=1 to run against launchd")
+	}
+	if _, err := exec.LookPath("launchctl"); err != nil {
+		t.Skip("launchctl not found")
+	}
+	gx := filepath.Join(t.TempDir(), "gx")
+	build := exec.Command("go", "build", "-o", gx, "github.com/elentok/gx")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build gx: %v\n%s", err, out)
+	}
+	if detail, ok := holderSurvivesLaunchd(os.Environ(), gx, true); !ok {
+		t.Errorf("detached holder did not survive kickstart: %s", detail)
+	}
+	// The negative control must fail because the holder died with the job's
+	// process group, not because launchctl itself errored: any failure would
+	// otherwise pass it.
+	detail, ok := holderSurvivesLaunchd(os.Environ(), gx, false)
+	if ok {
+		t.Errorf("holder without setsid survived kickstart, so the check cannot fail: %s", detail)
+	} else if !strings.Contains(detail, "after kickstart -k") {
+		t.Errorf("holder without setsid failed for another reason than dying on kickstart: %s", detail)
 	}
 }
 
