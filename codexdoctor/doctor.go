@@ -62,6 +62,9 @@ type Recording struct {
 	Launch Launch
 	// Probe is the commit attempted from a Codex shell call.
 	Probe Probe
+	// Features is the output of `codex -c <question flag> features list`.
+	// Unknown features.* keys only warn, so the listing is the one signal.
+	Features string
 	// Note is what a record-only session saw, or why it could not run.
 	Note string
 }
@@ -126,6 +129,7 @@ const (
 	LiveRolloutsSession = "live-rollouts"
 	ImagePasteSession   = "image-paste"
 	ImageSlashSession   = "image-slash"
+	FeaturesSession     = "features"
 )
 
 // Table is the doctor's check list, in run order.
@@ -133,6 +137,7 @@ var Table = []Check{
 	{Name: "codex-version", Mode: Live, Run: checkCodexVersion},
 	{Name: "rollout-format", Mode: Fixture, Session: RolloutsSession, Run: checkRolloutFormat},
 	{Name: "launch-flags", Mode: Live, Session: LaunchSession, DependsOn: []string{"codex-version"}, Run: checkLaunchFlags},
+	{Name: "question-flag", Mode: Live, Session: FeaturesSession, DependsOn: []string{"codex-version"}, Run: checkQuestionFlag},
 	{Name: "osc7501-title", Mode: Live, Session: TurnSession, DependsOn: []string{"codex-version"}, Run: checkOSC7501Title},
 	{Name: "hooks-fire", Mode: Live, Session: TurnSession, DependsOn: []string{"codex-version"}, Run: checkHooksFire},
 	{Name: "permission-deny", Mode: Live, Session: DenySession, DependsOn: []string{"codex-version"}, Run: checkPermissionDeny},

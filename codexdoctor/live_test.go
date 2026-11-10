@@ -45,6 +45,29 @@ func TestLaunchFlags(t *testing.T) {
 	}
 }
 
+func TestQuestionFlag(t *testing.T) {
+	t.Parallel()
+	const key = "default_mode_request_user_input"
+	cases := []struct {
+		name, listing string
+		want          Status
+	}{
+		{"present and true", "other_thing  stable  true\n" + key + "  under development  true\n", Pass},
+		{"missing row", "other_thing  stable  true\n", Fail},
+		{"removed stage", key + "  removed  true\n", Fail},
+		{"false state", key + "  under development  false\n", Fail},
+	}
+	for _, c := range cases {
+		r := runOne(t, "question-flag", Recording{Features: c.listing}, nil)
+		if r.Status != c.want {
+			t.Errorf("%s: %+v, want %s", c.name, r, c.want)
+		}
+		if c.want == Fail && !strings.Contains(r.Detail, harness.CodexQuestionToolFlag) {
+			t.Errorf("%s: detail %q does not name the flag", c.name, r.Detail)
+		}
+	}
+}
+
 func TestOSC7501Title(t *testing.T) {
 	t.Parallel()
 	good := Recording{Frames: []Frame{{Data: []byte("\x1b]0;⠋ gx-codex-rec\a\x1b]7501;state=working:app=codex\a")}}}

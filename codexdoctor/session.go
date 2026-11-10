@@ -59,7 +59,7 @@ type Drivers struct {
 	// lives under it.
 	DataDir string
 
-	launch, turn, deny, commit, imagePaste, imageSlash func() (Recording, error)
+	launch, features, turn, deny, commit, imagePaste, imageSlash func() (Recording, error)
 }
 
 func NewDrivers(env []string) *Drivers {
@@ -67,6 +67,7 @@ func NewDrivers(env []string) *Drivers {
 	d.imagePaste = sync.OnceValues(d.runImagePaste)
 	d.imageSlash = sync.OnceValues(d.runImageSlash)
 	d.launch = sync.OnceValues(d.runLaunch)
+	d.features = sync.OnceValues(d.runFeatures)
 	d.turn = sync.OnceValues(d.runTurn)
 	d.deny = sync.OnceValues(d.runDeny)
 	d.commit = sync.OnceValues(d.runCommit)
@@ -79,6 +80,8 @@ func (d *Drivers) Session(name string) (Recording, error) {
 	switch name {
 	case LaunchSession:
 		return d.launch()
+	case FeaturesSession:
+		return d.features()
 	case TurnSession:
 		return d.turn()
 	case DenySession:
@@ -142,6 +145,29 @@ func (d *Drivers) runLaunch() (Recording, error) {
 		rec.Launch.Err, rec.Launch.Stderr = err.Error(), stderr.String()
 	}
 	return rec, nil
+}
+
+// runFeatures lists Codex's features with the question flag applied, in a
+// throwaway home so the person's config cannot change the answer.
+func (d *Drivers) runFeatures() (Recording, error) {
+	base, err := tempDir("gx-doctor-features-")
+	if err != nil {
+		return Recording{}, err
+	}
+	defer os.RemoveAll(base)
+	bin, err := codexPath(d.Env)
+	if err != nil {
+		return Recording{}, err
+	}
+	cmd := exec.Command(bin, "-c", harness.CodexQuestionToolFlag, "features", "list")
+	cmd.Dir = base
+	cmd.Env = withEnv(d.Env, "HOME="+base, "CODEX_HOME="+filepath.Join(base, "codex-home"))
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := runWithTimeout(cmd, d.Timeout); err != nil {
+		return Recording{}, fmt.Errorf("codex features list: %w", err)
+	}
+	return Recording{Features: stdout.String()}, nil
 }
 
 func (d *Drivers) runTurn() (Recording, error) {

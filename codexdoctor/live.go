@@ -42,6 +42,26 @@ func checkLaunchFlags(in Input) (string, bool) {
 	return fmt.Sprintf("codex failed: %s", l.Err), false
 }
 
+// checkQuestionFlag reads the features listing: a missing row, a `removed`
+// stage or a `false` state means Codex no longer honours the flag.
+func checkQuestionFlag(in Input) (string, bool) {
+	key, _, _ := strings.Cut(strings.TrimPrefix(harness.CodexQuestionToolFlag, "features."), "=")
+	for line := range strings.SplitSeq(in.Features, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 2 || f[0] != key {
+			continue
+		}
+		if slices.Contains(f[1:len(f)-1], "removed") {
+			return fmt.Sprintf("%s: feature %s is removed in this Codex", harness.CodexQuestionToolFlag, key), false
+		}
+		if f[len(f)-1] != "true" {
+			return fmt.Sprintf("%s: feature %s is %s despite the flag", harness.CodexQuestionToolFlag, key, f[len(f)-1]), false
+		}
+		return key + " is on", true
+	}
+	return fmt.Sprintf("%s: this Codex does not know feature %s", harness.CodexQuestionToolFlag, key), false
+}
+
 // rejectedArgs finds each flag and each -c key of args that stderr mentions.
 func rejectedArgs(args []string, stderr string) []string {
 	var named []string
