@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
@@ -32,8 +34,11 @@ func (c *Chat) Cards(dir string, m Meta, snap Snapshot) []wire.QuestionCard {
 // permissionCards is the card of the permission dialog a Blocked Claude session
 // shows, or none when it is not blocked on one or the screen does not parse.
 func (c *Chat) permissionCards(dir string, m Meta, snap Snapshot) []wire.QuestionCard {
-	if m.Status.State != wire.SessionBlocked || m.Status.Kind != "permission" || m.Harness == string(harness.Codex) {
+	if m.Status.State != wire.SessionBlocked || m.Status.Kind != "permission" {
 		return nil
+	}
+	if m.Harness == string(harness.Codex) {
+		return c.codexPermissionCards(dir, m)
 	}
 	conn, err := holder.DialHolder(dir)
 	if err != nil {
@@ -45,6 +50,31 @@ func (c *Chat) permissionCards(dir string, m Meta, snap Snapshot) []wire.Questio
 		return nil
 	}
 	return PermissionCard(rows, personTurns(snap.Msgs), harness.LookupEnv(c.cfg.Env, "HOME"))
+}
+
+// codexPermissionCards is the Allow and Deny card of an approval the
+// PermissionRequest hook caught. A screen-only approval gets none: the hook
+// request is the only exact source, and its id is the card id.
+func (c *Chat) codexPermissionCards(dir string, m Meta) []wire.QuestionCard {
+	req, hooked, err := holder.ReadPermissionRequest(dir)
+	if err != nil {
+		c.log.Warn("read hook request for permission card", "session", m.ID, "err", err)
+		return nil
+	}
+	if !hooked {
+		return nil
+	}
+	return []wire.QuestionCard{{
+		Source: wire.CardSourcePermission,
+		ID:     req.ID,
+		Questions: []wire.QuestionCardQuestion{{
+			Kind: "options", Title: "Allow this?", Body: cmp.Or(req.Description, req.Tool),
+			Options: []wire.QuestionCardOption{
+				{ID: string(agentrunner.DecisionAllow), Label: "Allow"},
+				{ID: string(agentrunner.DecisionDeny), Label: "Deny"},
+			},
+		}},
+	}}
 }
 
 func personTurns(msgs []wire.SessionChatMessage) int {

@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
@@ -53,6 +55,9 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 		return sessions.Refusal(wire.ReasonStale, "the question moved on; review it first"), nil
 	}
 	if req.Source == wire.CardSourcePermission {
+		if meta.Harness == string(harness.Codex) {
+			return p.answerCodexCard(req, *card, source)
+		}
 		return p.answerPermissionCard(req, *card, source)
 	}
 	prompt := wire.SessionPromptRequest{
@@ -78,6 +83,17 @@ func (p *Prompt) currentCard(id, dir string, meta sessions.Meta, source string) 
 		}
 	}
 	return nil, nil
+}
+
+// answerCodexCard routes a hooked Codex card's Allow or Deny through the
+// permission answer. The card id is the hook request id; the answer re-reads
+// the request and refuses an id that moved on. A dismiss denies.
+func (p *Prompt) answerCodexCard(req wire.SessionAnswerRequest, card wire.QuestionCard, source string) (wire.SessionResult, error) {
+	decision := cmp.Or(answerAt(req.Answers, 0).Choice, string(agentrunner.DecisionDeny))
+	if !slices.ContainsFunc(card.Questions[0].Options, func(o wire.QuestionCardOption) bool { return o.ID == decision }) {
+		return sessions.Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("choice %q is not an option of the dialog", decision)), nil
+	}
+	return p.keysSession(wire.SessionKeysRequest{ID: req.ID, Permission: decision, RequestID: card.ID}, source)
 }
 
 // answerPermissionCard sends the chosen option's digit. An answer that picks no
