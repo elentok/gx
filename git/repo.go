@@ -62,8 +62,18 @@ func FindRepo(dir string) (*Repo, error) {
 // whether it's a worktree root, etc.
 func IdentifyDir(dir string) (*DirInfo, error) {
 	// IdentifyDir runs on hot paths and every git child process is a fork/exec,
-	// so the common case (inside a worktree) is one rev-parse. --show-toplevel
-	// fails outside a worktree, which sends bare repos to the second call.
+	// so the common case (inside a plain worktree) reads the files git would
+	// read and forks nothing.
+	if f, ok := fastWorktreeFields(dir); ok {
+		return identifyWorktree(dir, f.commonDir, f.topLevel)
+	}
+	return identifyDirSlow(dir)
+}
+
+// identifyDirSlow asks git. The common case (inside a worktree) is one
+// rev-parse; --show-toplevel fails outside a worktree, which sends bare repos
+// to the second call.
+func identifyDirSlow(dir string) (*DirInfo, error) {
 	fields := strings.Split(run.AllowFail(dir, []string{"rev-parse", "--git-dir", "--is-inside-work-tree", "--git-common-dir", "--show-toplevel"}), "\n")
 	if len(fields) == 4 && fields[1] == "true" {
 		return identifyWorktree(dir, fields[2], fields[3])
