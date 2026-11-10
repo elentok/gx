@@ -19,6 +19,15 @@ func TestCreateEpic_WaitsForProjectMigration(t *testing.T) {
 	})
 }
 
+func TestParseEpicFields_RefusesPRFields(t *testing.T) {
+	for _, key := range []string{"pr_number: 7", "pr_url: https://example.com/pr/7"} {
+		_, err := ParseEpicFields("kind: loop\n" + key + "\n")
+		if err == nil || !strings.Contains(err.Error(), "server-stamped") {
+			t.Errorf("%s: err = %v, want server-stamped refusal", key, err)
+		}
+	}
+}
+
 func TestCreateEpic_RejectsCallerCreatedAtAndWritesNothing(t *testing.T) {
 	root := t.TempDir()
 	fields := EpicFields{Kind: KindLoop, CreatedAt: time.Now()}

@@ -74,6 +74,14 @@ func init() {
 	Default.Register(Step{Name: "process-storm", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// ci-fix-pr-text-types: new ticket type values; no older ticket carries them.
+	Default.Register(Step{Name: "ci-fix-pr-text-types", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
+	// pr-epic-fields: pr_number and pr_url are optional and read as zero when absent.
+	Default.Register(Step{Name: "pr-epic-fields", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

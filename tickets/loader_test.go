@@ -369,6 +369,26 @@ func TestLoad_TicketMDFrontmatterSuppliesEpicFields(t *testing.T) {
 	}
 }
 
+func TestLoad_PRFields(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "with", "ticket.md"), "---\nstatus: open\npr_number: 42\npr_url: https://example.com/pr/42\n---\n# E\n")
+	writeFile(t, filepath.Join(dir, "without", "ticket.md"), "---\nstatus: open\n---\n# E\n")
+
+	epics, err := Load(dir)
+	if err != nil || len(epics) != 2 {
+		t.Fatalf("Load = %v, %v", epics, err)
+	}
+	for _, e := range epics {
+		wantN, wantURL := 0, ""
+		if e.Name == "with" {
+			wantN, wantURL = 42, "https://example.com/pr/42"
+		}
+		if e.PRNumber != wantN || e.PRURL != wantURL {
+			t.Errorf("%s: PR = %d %q, want %d %q", e.Name, e.PRNumber, e.PRURL, wantN, wantURL)
+		}
+	}
+}
+
 func TestLoad_MergedAtRoundTrips(t *testing.T) {
 	dir := t.TempDir()
 	epicPath := filepath.Join(dir, "e")

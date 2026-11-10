@@ -127,6 +127,13 @@ const (
 	// adds one to the root epic when restoring a person's uncommitted files left
 	// conflict markers in the target's checkout. It is commitless and top-level.
 	TypeTrunkConflict TicketType = "trunk-conflict"
+	// TypeCIFix is system-generated only: the PR flow adds one to the epic when
+	// the pull request's CI fails. It is commitless; its fix lands as a commit
+	// on the epic branch by the agent, not as a merge of its own.
+	TypeCIFix TicketType = "ci-fix"
+	// TypePRText is system-generated only: the PR flow adds one to write the
+	// pull request's title and description. It is commitless.
+	TypePRText TicketType = "pr-text"
 )
 
 // MinExpectedContextWindow is the smallest non-zero expected_context_window.
@@ -146,6 +153,8 @@ var validTypes = map[TicketType]bool{
 	TypeDiagnose:           true,
 	TypeVerify:             true,
 	TypeTrunkConflict:      true,
+	TypeCIFix:              true,
+	TypePRText:             true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -390,7 +399,7 @@ type MuteRecord struct {
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeImplement unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge || t.Type == TypeDiagnose || t.Type == TypeVerify || t.Type == TypeTrunkConflict
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge || t.Type == TypeDiagnose || t.Type == TypeVerify || t.Type == TypeTrunkConflict || t.Type == TypeCIFix || t.Type == TypePRText
 }
 
 // FinishedCommitless reports a claimed ticket whose agent reported

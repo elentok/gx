@@ -90,6 +90,9 @@ type Epic struct {
 	// MergedAt is when the epic's branch merged into its target; a Merged epic
 	// is one with it set.
 	MergedAt time.Time
+	// PRNumber and PRURL name the epic's pull request; zero until stamped.
+	PRNumber int
+	PRURL    string
 	// QueuedAt is when the epic was first added to the queue; zero on an epic
 	// queued before the field existed.
 	QueuedAt time.Time

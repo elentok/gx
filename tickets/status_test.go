@@ -58,6 +58,8 @@ func TestTicket_ShowsCommitlessSuffix(t *testing.T) {
 		{"grilling, commitless", "grilling", true, false},
 		{"conflict-resolution, commitless", "conflict-resolution", true, false},
 		{"merge, commitless", "merge", true, false},
+		{"ci-fix, commitless", "ci-fix", true, false},
+		{"pr-text, commitless", "pr-text", true, false},
 	}
 
 	for _, c := range cases {
