@@ -208,6 +208,31 @@ test("s with nothing focused enters the sidebar's select mode, not the page's", 
   expect(screen.queryByRole("button", { name: "Done" })).toBeTruthy();
 });
 
+test("no Select or Cancel button shows while the page selects; Done is the exit", async () => {
+  await rowsLoaded();
+  fireEvent.click(within(screen.getByTestId("page-header-actions")).getByRole("button", { name: "Select" }));
+  expect(within(screen.getByTestId("page-header-actions")).queryByRole("button", { name: /^(Select|Cancel)$/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  expect(inSelectMode()).toBe(false);
+});
+
+test("leaving the page ends its select mode while the sidebar's stays on", async () => {
+  const router = renderArchive(async () => ({ epics: [arow("a")] }));
+  await screen.findByText("Title a");
+  layOutTwoColumns();
+  fireEvent.keyDown(document.body, { key: "s" });
+  row("a").focus();
+  fireEvent.keyDown(row("a"), { key: "s" });
+  expect(document.querySelectorAll('[data-part="select-bar"]')).toHaveLength(2);
+  await act(() => router.navigate("/epics"));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/epics"));
+  expect(document.querySelectorAll('[data-part="select-bar"]')).toHaveLength(1);
+  await act(() => router.navigate("/archive"));
+  await screen.findByText("Title a");
+  expect(inSelectMode()).toBe(false);
+  expect(document.querySelectorAll('[data-part="select-bar"]')).toHaveLength(1);
+});
+
 test("keys typed in a field are left alone", async () => {
   await rowsLoaded();
   const input = document.createElement("input");

@@ -17,9 +17,8 @@ import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { EpicRing } from "./EpicRing";
 import { MergeButton, StashMergeButton } from "../epics/MergeButton";
 import { archiveHref, designHref, epicHref } from "../hrefs";
-import { bulkUnarchive } from "../select/bulkWrites";
-import { showToast } from "../ui/toaster";
-import { WriteError } from "../useWrite";
+import { formatDate } from "../formatDate";
+import { unarchiveWithToasts } from "../select/bulkWrites";
 import { QueueButton } from "../epics/QueueButton";
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
 import { Markdown } from "../markdown/Markdown";
@@ -196,24 +195,17 @@ function EpicBar({
   );
 }
 
-const archivedOn = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-
 // The archived page's bar: the stamp, the link to the Design's -impl archive page, and Unarchive. No other action.
 function ArchivedBar({ address, detail }: { address: string; detail: EpicDetail }) {
   const navigate = useNavigate();
   const unarchive = async () => {
-    try {
-      const [r] = await bulkUnarchive([address]);
-      if (r?.status === TargetDone) navigate(epicHref(r.new_address ?? address).slice(1));
-      else showToast({ type: "error", title: `${slugOf(address)}: ${r?.message || r?.reason || "refused"}` });
-    } catch (err) {
-      showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." });
-    }
+    const [r] = (await unarchiveWithToasts([address], slugOf)) ?? [];
+    if (r?.status === TargetDone) navigate(epicHref(r.new_address ?? address).slice(1));
   };
   return (
     <Box display="flex" flexWrap="wrap" alignItems="center" justifyContent="flex-end" gap="3">
       {detail.archived_at && (
-        <Badge data-testid="archived-stamp">{`Archived ${archivedOn(detail.archived_at)}`}</Badge>
+        <Badge data-testid="archived-stamp">{`Archived ${formatDate(detail.archived_at)}`}</Badge>
       )}
       {detail.kind === "map" && detail.impl_address && (
         <Button tone="muted" emphasis="secondary" onClick={() => navigate(archiveHref(detail.impl_address ?? "").slice(1))}>
@@ -382,12 +374,17 @@ type EpicPageProps = {
 
 // The body reads `useWide`, so it renders inside DetailPage's page mode.
 export function EpicPage(props: EpicPageProps) {
-  const { list } = useEpicList(props.fetchList, useConnectionContext());
   return (
     <DetailPage title={{ kind: "Epic", name: slugOf(props.address) }}>
-      <EpicPageBody {...props} list={list} />
+      {props.readOnly ? <EpicPageBody {...props} list={null} /> : <ActiveEpicPageBody {...props} />}
     </DetailPage>
   );
+}
+
+// Only the active page reads the epic list: an archived address can equal an active one.
+function ActiveEpicPageBody(props: EpicPageProps) {
+  const { list } = useEpicList(props.fetchList, useConnectionContext());
+  return <EpicPageBody {...props} list={list} />;
 }
 
 function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list, readOnly }: EpicPageProps & { list: EpicList | null }) {

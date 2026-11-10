@@ -1,4 +1,6 @@
-import { Box, chakra, Input, Link, Text } from "@chakra-ui/react";
+import { Box, chakra, Input, Text } from "@chakra-ui/react";
+import { ARCHIVE_HREF } from "../hrefs";
+import { HeaderLink } from "../page/HeaderLink";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { MissingBanner } from "../checks/MissingBanner";
@@ -189,28 +191,10 @@ export function EpicsPage({
           subtitle={list ? `${list.epics.length} ${list.epics.length === 1 ? "epic" : "epics"}` : undefined}
           actions={
             <>
-              <Link
-                href="#/archive"
-                display="inline-flex"
-                alignItems="center"
-                h="40px"
-                px="4"
-                flexShrink="0"
-                whiteSpace="nowrap"
-                fontWeight="600"
-                color="text"
-                bg="surface.raised"
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="8px"
-                textDecoration="none"
-                _hover={{ borderColor: "text.dim", textDecoration: "none" }}
-              >
-                Archive
-              </Link>
-              {hasEpics && (
-                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.state.on ? select.leave : select.enter}>
-                  {select.state.on ? "Cancel" : "Select"}
+              <HeaderLink href={ARCHIVE_HREF}>Archive</HeaderLink>
+              {hasEpics && !select.state.on && (
+                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.enter}>
+                  Select
                 </Button>
               )}
               {hasEpics && newDesign}

@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import type { EpicList } from "../epics/list";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
@@ -7,7 +8,8 @@ import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 
 const bulkUnarchive = vi.hoisted(() => vi.fn());
-vi.mock("../select/bulkWrites", async (orig) => ({ ...(await orig<object>()), bulkUnarchive }));
+// bulkUnarchive is called inside unarchiveWithToasts, so the stub sits at the POST it makes.
+vi.mock("../design/open", async (orig) => ({ ...(await orig<object>()), postJson: () => async (body: { targets: string[] }) => ({ results: await bulkUnarchive(body.targets) }) }));
 
 afterEach(() => {
   cleanup();
@@ -31,12 +33,12 @@ const detail = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   ...over,
 });
 
-function render(path: string, d: EpicDetail | "not-found") {
+function render(path: string, d: EpicDetail | "not-found", activeList: EpicList = { epics: [], follow_ups: [] }) {
   const state = { snapshot: { sessions: [], pending: [] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
   const router = createMemoryRouter(
     appRoutes({
-      epicList: async () => ({ epics: [], follow_ups: [] }),
+      epicList: async () => activeList,
       // The active fetcher must stay unused on this route.
       epic: async () => {
         throw new Error("active detail fetched");
@@ -81,6 +83,14 @@ test("Unarchive posts and navigates to the renamed active epic", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Unarchive" }));
   await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:blog-impl-2"));
   expect(bulkUnarchive).toHaveBeenCalledWith(["gx:blog-impl"]);
+});
+
+test("the ring comes from the archived detail, not an active epic with the same address", async () => {
+  const active = { address: "gx:blog-impl", addresses: ["gx:blog-impl"], title: "blog", state: "running", section: "running", done: 0, total: 1 } as unknown as EpicList["epics"][number];
+  render("/archive/gx:blog-impl", detail(), { epics: [active], follow_ups: [] });
+  await screen.findByTestId("archived-stamp");
+  const ring = within(screen.getByTestId("page-header-actions")).getAllByText(/\d\/\d/)[0].closest("[data-tone]");
+  expect(ring?.getAttribute("data-tone")).toBe("done");
 });
 
 test("an unknown address shows the not-found state", async () => {

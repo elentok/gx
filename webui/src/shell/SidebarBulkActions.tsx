@@ -4,7 +4,7 @@ import { useConnectionContext } from "../connection";
 import { TargetDone, TargetRefused, type TargetResult } from "../generated/server";
 import { isExited } from "../agents/sessionWrites";
 import type { SessionInfo } from "../generated/server";
-import { bulkArchive, bulkHold, bulkMove, bulkRemove, bulkStop, bulkUnarchive, bulkUnhold } from "../select/bulkWrites";
+import { bulkArchive, bulkHold, bulkMove, bulkRemove, bulkStop, bulkUnhold, unarchiveWithToasts } from "../select/bulkWrites";
 import { skipLines, visibleActions, type ActionView, type SelectAction } from "../select/selectModel";
 import { Button } from "../ui/button/Button";
 import { GxMenu } from "../ui/menu/Menu";
@@ -49,11 +49,14 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: 
       const results = await call();
       // undefined: the call stopped to ask a question; nothing ran yet.
       if (!results) return;
-      for (const r of results) {
-        if (r.status !== TargetDone) showToast({ type: "error", title: `${sel.nameOf(r.target)}: ${r.message || r.reason || "refused"}` });
-      }
-      for (const r of results) {
-        if (r.status === TargetDone && r.new_address) showToast({ type: "info", title: `${v.action === "unarchive" ? "Unarchived" : "Archived"} as ${r.new_address.split(":").pop()}` });
+      // Unarchive reports its own results.
+      if (v.action !== "unarchive") {
+        for (const r of results) {
+          if (r.status !== TargetDone) showToast({ type: "error", title: `${sel.nameOf(r.target)}: ${r.message || r.reason || "refused"}` });
+        }
+        for (const r of results) {
+          if (r.status === TargetDone && r.new_address) showToast({ type: "info", title: `Archived as ${r.new_address.split(":").pop()}` });
+        }
       }
       onResults?.(results);
       if (v.fit.skipped.length > 0) showToast({ type: "info", title: "Not run on some rows", description: skipLines(v.fit, sel.nameOf).join("; ") });
@@ -152,7 +155,7 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: 
         </Button>
       )}
       {unarchiveView && (
-        <Button size="sm" emphasis="secondary" tone="running" title={tip(unarchiveView)} disabled={pending} onClick={() => void run(unarchiveView, () => bulkUnarchive(unarchiveView.fit.fits))}>
+        <Button size="sm" emphasis="secondary" tone="running" title={tip(unarchiveView)} disabled={pending} onClick={() => void run(unarchiveView, () => unarchiveWithToasts(unarchiveView.fit.fits, sel.nameOf))}>
           {unarchiveView.label}
         </Button>
       )}

@@ -1,5 +1,7 @@
 import { postJson, rowToken } from "../design/open";
-import type { SessionInfo, SessionResult, TargetResult, TargetsResult } from "../generated/server";
+import { TargetDone, type SessionInfo, type SessionResult, type TargetResult, type TargetsResult } from "../generated/server";
+import { showToast } from "../ui/toaster";
+import { WriteError } from "../useWrite";
 import { postWorkspace } from "../workspaces/postWorkspace";
 
 /** The many-target writers: one POST for all `targets`, one result per target in the server's answer. */
@@ -32,6 +34,21 @@ export async function bulkArchive(targets: string[], opts: { dryRun?: boolean; y
 export async function bulkUnarchive(targets: string[]): Promise<TargetResult[]> {
   const res = await postJson<SessionResult & TargetsResult>("/v1/epics/unarchive")({ targets });
   return res.results ?? [];
+}
+
+/** Unarchives and reports refusals and renames as toasts. Returns the results, or undefined when the call itself failed. */
+export async function unarchiveWithToasts(targets: string[], nameOf: (target: string) => string): Promise<TargetResult[] | undefined> {
+  try {
+    const results = await bulkUnarchive(targets);
+    for (const r of results) {
+      if (r.status !== TargetDone) showToast({ type: "error", title: `${nameOf(r.target)}: ${r.message || r.reason || "refused"}` });
+      else if (r.new_address) showToast({ type: "info", title: `Unarchived as ${r.new_address.split(":").pop()}` });
+    }
+    return results;
+  } catch (err) {
+    showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." });
+    return undefined;
+  }
 }
 
 export const bulkStop =(sessions: SessionInfo[]) => postSessions("/v1/sessions/stop", sessions, false);

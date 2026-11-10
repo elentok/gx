@@ -1,4 +1,6 @@
-import { Box, Link, Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
+import { formatDate } from "../formatDate";
+import { HeaderLink } from "../page/HeaderLink";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext } from "../connection";
@@ -6,7 +8,7 @@ import { TargetDone, type ArchivedEpicRow, type TargetResult } from "../generate
 import { EPICS_HREF } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
-import { bulkUnarchive } from "../select/bulkWrites";
+import { unarchiveWithToasts } from "../select/bulkWrites";
 import { PAGE_ATTR, usePageKeys } from "../select/pageKeys";
 import { rowOfArchived } from "../select/selectModel";
 import { SidebarBulkActions } from "../shell/SidebarBulkActions";
@@ -17,14 +19,10 @@ import { GxMenu } from "../ui/menu/Menu";
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { Spinner } from "../ui/spinner/Spinner";
-import { showToast } from "../ui/toaster";
 import { useFetched } from "../useFetched";
-import { WriteError } from "../useWrite";
 import { fetchArchived, type FetchArchived } from "./archive";
 
 const ONLY_UNARCHIVE = ["unarchive" as const];
-
-const dateOf = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
 function ArchiveRow({
   row,
@@ -69,7 +67,7 @@ function ArchiveRow({
           {row.title}
         </Text>
         <Text color="text.muted" fontSize="14px">
-          {[row.project, row.kind === "map" ? "Design" : "Epic", row.archived_at && dateOf(row.archived_at), row.workspace].filter(Boolean).join(" · ")}
+          {[row.project, row.kind === "map" ? "Design" : "Epic", row.archived_at && formatDate(row.archived_at), row.workspace].filter(Boolean).join(" · ")}
         </Text>
       </Box>
       {!select && (
@@ -102,16 +100,8 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
     if (done.length > 0) setGone((g) => new Set([...g, ...done]));
   };
   const unarchiveOne = async (row: ArchivedEpicRow) => {
-    try {
-      const results = await bulkUnarchive([row.address]);
-      left(results);
-      for (const r of results) {
-        if (r.status !== TargetDone) showToast({ type: "error", title: `${row.title}: ${r.message || r.reason || "refused"}` });
-        else if (r.new_address) showToast({ type: "info", title: `Unarchived as ${r.new_address.split(":").pop()}` });
-      }
-    } catch (err) {
-      showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." });
-    }
+    const results = await unarchiveWithToasts([row.address], () => row.title);
+    if (results) left(results);
   };
 
   return (
@@ -122,28 +112,10 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
           title="Archive"
           actions={
             <>
-              <Link
-                href={EPICS_HREF}
-                display="inline-flex"
-                alignItems="center"
-                h="40px"
-                px="4"
-                flexShrink="0"
-                whiteSpace="nowrap"
-                fontWeight="600"
-                color="text"
-                bg="surface.raised"
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="8px"
-                textDecoration="none"
-                _hover={{ borderColor: "text.dim", textDecoration: "none" }}
-              >
-                ← Epics
-              </Link>
-              {epics.length > 0 && (
-                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.state.on ? select.leave : select.enter}>
-                  {select.state.on ? "Cancel" : "Select"}
+              <HeaderLink href={EPICS_HREF}>← Epics</HeaderLink>
+              {epics.length > 0 && !select.state.on && (
+                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.enter}>
+                  Select
                 </Button>
               )}
             </>
