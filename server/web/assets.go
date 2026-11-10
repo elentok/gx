@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/webui"
 )
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the
@@ -57,7 +59,17 @@ func devFrontendProxy(port int) http.Handler {
 	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
 		http.Error(w, fmt.Sprintf("502: the Vite dev server that gx started at %s is not answering (%v).", u.Host, err), http.StatusBadGateway)
 	}
-	return proxy
+	// The built worker would cache the shell and hide Vite's pages; this one
+	// removes any such worker from the browser instead of forwarding to Vite.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/sw.js" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+			w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache")
+			_, _ = w.Write(webui.DevWorker)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	})
 }
 
 // ServeAsset serves index.html at "/" only, and the file at any other path.

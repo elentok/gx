@@ -15,6 +15,11 @@ var placeholder embed.FS
 //go:embed all:dist
 var dist embed.FS
 
+// DevWorker is the self-removing service worker gx serves as /sw.js while Vite runs.
+//
+//go:embed src/pwa/devWorker.js
+var DevWorker []byte
+
 // Assets is the built web UI when dist/index.html exists, else the placeholder page.
 func Assets() fs.FS {
 	return pick(dist, placeholder)

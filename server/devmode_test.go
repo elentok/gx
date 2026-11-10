@@ -270,3 +270,30 @@ func TestDevMode_ModulesNeedNoCookieOverHTTPS(t *testing.T) {
 		t.Errorf("API with a cookie = %d, want the local snapshot", code)
 	}
 }
+
+func TestDevMode_SW_SelfRemovingWorkerOnlyWhileViteRuns(t *testing.T) {
+	checkout := servertest.WriteDevCheckout(t, true)
+	r := startDevRig(t, checkout, false)
+	sw := func() string {
+		_, body := servertest.WebDoCookie(t, http.MethodGet, r.base+"/sw.js", r.cookie)
+		return body
+	}
+	off := sw()
+	if strings.Contains(off, "unregister") {
+		t.Fatal("the worker with Dev mode off is the self-removing one")
+	}
+
+	r.setKey(t, checkout, true)
+	r.fake.Release()
+	r.waitPage(t, servertest.ViteStubPage)
+	on := sw()
+	if !strings.Contains(on, "gx-shell-") || !strings.Contains(on, "unregister") {
+		t.Fatalf("worker while Vite runs = %q, want the self-removing worker", on)
+	}
+
+	r.fake.Crash()
+	r.waitDown(t, "exited")
+	if got := sw(); got != off {
+		t.Fatalf("worker while Vite is down = %q, want the built worker %q", got, off)
+	}
+}
