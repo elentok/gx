@@ -1,5 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react";
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext } from "../connection";
 import { TargetDone, type ArchivedEpicRow, type TargetResult } from "../generated/server";
@@ -7,6 +7,7 @@ import { EPICS_HREF } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
 import { bulkUnarchive } from "../select/bulkWrites";
+import { PAGE_ATTR, usePageKeys } from "../select/pageKeys";
 import { rowOfArchived } from "../select/selectModel";
 import { SidebarBulkActions } from "../shell/SidebarBulkActions";
 import { SelectBar, SelectBox, useSelectApi } from "../shell/SidebarSelect";
@@ -37,17 +38,13 @@ function ArchiveRow({
   onUnarchive: () => void;
 }) {
   const act = select ? select.onToggle : onOpen;
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.target === e.currentTarget && e.key === "Enter") act();
-  };
   return (
     <Box
       as="li"
       listStyleType="none"
-      tabIndex={0}
+      {...{ [PAGE_ATTR]: row.address }}
       aria-label={row.title}
       onClick={act}
-      onKeyDown={onKeyDown}
       position="relative"
       display="flex"
       alignItems="center"
@@ -97,6 +94,8 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
   const rows = useMemo(() => epics.map(rowOfArchived), [epics]);
   const names = useMemo(() => new Map(epics.map((r) => [r.address, r.title] as const)), [epics]);
   const select = useSelectApi(rows, names, !!data);
+  const area = useRef<HTMLDivElement>(null);
+  usePageKeys(area, select);
 
   const left = (results: TargetResult[]) => {
     const done = results.filter((r) => r.status === TargetDone).map((r) => r.target);
@@ -117,6 +116,7 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
 
   return (
     <DetailPage title={{ kind: "Epics", name: "Archive" }}>
+      <Box ref={area}>
       <Box mt="4">
         <PageHeader
           title="Archive"
@@ -181,6 +181,7 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
           </Box>
         </>
       )}
+      </Box>
     </DetailPage>
   );
 }

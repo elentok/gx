@@ -112,7 +112,9 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const stop = e.target instanceof Element ? e.target.closest<HTMLElement>(`[${NAV_ATTR}]`) : null;
-      if (e.defaultPrevented || !stop || !stop.closest("aside")) return;
+      // With nothing focused the key lands on the body: `s` then enters the sidebar's select mode.
+      const unfocused = e.target === document.body || e.target === document.documentElement;
+      if (e.defaultPrevented || !(unfocused || stop?.closest("aside"))) return;
       const { state, rows, enter, toggle } = ref.current;
       const intent = selectIntent(e, state.on, hasLayer() || isTextTarget(e.target));
       if (intent === "enter-select") {
@@ -120,7 +122,7 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
         enter();
         return;
       }
-      if (intent !== "toggle") return;
+      if (intent !== "toggle" || !stop) return;
       const nav = stop.getAttribute(NAV_ATTR) ?? "";
       const key = nav.startsWith("row:") ? nav.slice(4) : nav.startsWith("agent:") ? nav.slice(6) : "";
       if (!key) return;

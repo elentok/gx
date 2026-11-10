@@ -609,3 +609,71 @@ test("a card that leaves the list leaves the selection", async () => {
   act(() => emit());
   await waitFor(() => expect(screen.getByTestId("select-count").textContent).toBe("1 selected"));
 });
+
+const cards = () => Array.from(document.querySelectorAll<HTMLElement>("[data-page-item]"));
+const cardOf = (name: string) => cards().find((c) => c.getAttribute("data-page-item") === `gx:${name}`)!;
+const focusedCard = () => document.activeElement?.getAttribute("data-page-item");
+const selectBox = (name: string) => screen.queryByRole("checkbox", { name: `Select ${name}` }) as HTMLInputElement | null;
+
+// jsdom has no layout: two cards per row, and the second section starts below the first.
+const cardsLoaded = async () => {
+  await loaded(listOf([row("a", { section: "implementing" }), row("b", { section: "implementing" }), row("c", { section: "implementing" }), row("d", { section: "needs-you" })]));
+  cards().forEach((c, i) => {
+    c.getBoundingClientRect = () => ({ left: (i % 2) * 400, top: Math.floor(i / 2) * 200 }) as DOMRect;
+  });
+};
+
+test("the cards are one tab stop, and arrows and hjkl move by position", async () => {
+  await cardsLoaded();
+  expect(cards().filter((c) => c.tabIndex === 0)).toHaveLength(1);
+  const order = cards().map((c) => c.getAttribute("data-page-item"));
+  const [first, second, third] = order.map((o) => cardOf(o!.slice(3)));
+  first.focus();
+  fireEvent.keyDown(first, { key: "ArrowRight" });
+  expect(document.activeElement).toBe(second);
+  fireEvent.keyDown(second, { key: "j" });
+  expect(document.activeElement).toBe(cards()[3]);
+  fireEvent.keyDown(cards()[3], { key: "ArrowLeft" });
+  expect(document.activeElement).toBe(third);
+  fireEvent.keyDown(third, { key: "k" });
+  expect(document.activeElement).toBe(first);
+  expect(cards().filter((c) => c.tabIndex === 0)).toEqual([first]);
+});
+
+test("s with a card focused enters the page's select mode; Space and Enter toggle there", async () => {
+  await cardsLoaded();
+  const a = cardOf("a");
+  a.focus();
+  fireEvent.keyDown(a, { key: " " });
+  expect(selectBox("a")).toBeNull();
+  fireEvent.keyDown(a, { key: "s" });
+  expect(selectBox("a")?.checked).toBe(false);
+  fireEvent.keyDown(a, { key: " " });
+  expect(selectBox("a")?.checked).toBe(true);
+  fireEvent.keyDown(a, { key: "Enter" });
+  expect(selectBox("a")?.checked).toBe(false);
+  fireEvent.keyDown(a, { key: "Escape" });
+  expect(selectBox("a")).toBeNull();
+});
+
+test("Enter on a card opens its title link outside select mode", async () => {
+  await cardsLoaded();
+  const a = cardOf("a");
+  const open = vi.fn((e: Event) => e.preventDefault());
+  a.querySelector("a")!.addEventListener("click", open);
+  fireEvent.keyDown(a, { key: "Enter" });
+  expect(open).toHaveBeenCalledTimes(1);
+});
+
+test("s with nothing focused leaves the page's select mode off", async () => {
+  await cardsLoaded();
+  fireEvent.keyDown(document.body, { key: "s" });
+  expect(selectBox("a")).toBeNull();
+  expect(focusedCard()).toBeNull();
+});
+
+test("s typed in the filter is left alone", async () => {
+  await cardsLoaded();
+  fireEvent.keyDown(await filterBox(), { key: "s" });
+  expect(selectBox("a")).toBeNull();
+});

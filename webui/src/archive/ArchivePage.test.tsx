@@ -150,3 +150,68 @@ test("an event refetches and updates the rows; a burst refetches once", async ()
   expect(fetchList).toHaveBeenCalledTimes(2);
   await waitFor(() => expect(names()).toEqual(["Title c", "Title a"]));
 });
+
+// jsdom has no layout: give the rows a two-column grid so Up and Down have rows to move between.
+const layOutTwoColumns = () =>
+  screen.getAllByRole("listitem").forEach((li, i) => {
+    li.getBoundingClientRect = () => ({ left: (i % 2) * 400, top: Math.floor(i / 2) * 100 }) as DOMRect;
+  });
+
+const rowsLoaded = async () => {
+  renderArchive(async () => ({ epics: [arow("a"), arow("b"), arow("c")] }));
+  await screen.findByText("Title a");
+  layOutTwoColumns();
+};
+const focused = () => document.activeElement?.getAttribute("aria-label");
+const row = (name: string) => screen.getByRole("listitem", { name: `Title ${name}` });
+const inSelectMode = () => screen.queryByRole("checkbox", { name: "Select Title a" }) !== null;
+
+test("the rows are one tab stop, and arrows and hjkl move by position", async () => {
+  await rowsLoaded();
+  expect(screen.getAllByRole("listitem").map((li) => li.tabIndex)).toEqual([0, -1, -1]);
+  row("a").focus();
+  fireEvent.keyDown(row("a"), { key: "ArrowRight" });
+  expect(focused()).toBe("Title b");
+  fireEvent.keyDown(row("b"), { key: "j" });
+  expect(focused()).toBe("Title c");
+  fireEvent.keyDown(row("b"), { key: "l" });
+  expect(focused()).toBe("Title c");
+  fireEvent.keyDown(row("c"), { key: "ArrowUp" });
+  expect(focused()).toBe("Title a");
+  fireEvent.keyDown(row("a"), { key: "j" });
+  expect(focused()).toBe("Title c");
+  fireEvent.keyDown(row("c"), { key: "h" });
+  expect(focused()).toBe("Title b");
+  expect(screen.getAllByRole("listitem").map((li) => li.tabIndex)).toEqual([-1, 0, -1]);
+});
+
+test("s with a row focused enters the page's select mode; Space toggles there and does nothing outside it", async () => {
+  await rowsLoaded();
+  row("a").focus();
+  fireEvent.keyDown(row("a"), { key: " " });
+  expect(inSelectMode()).toBe(false);
+  fireEvent.keyDown(row("a"), { key: "s" });
+  expect(inSelectMode()).toBe(true);
+  fireEvent.keyDown(row("a"), { key: " " });
+  expect((screen.getByRole("checkbox", { name: "Select Title a" }) as HTMLInputElement).checked).toBe(true);
+  fireEvent.keyDown(row("a"), { key: "Enter" });
+  expect((screen.getByRole("checkbox", { name: "Select Title a" }) as HTMLInputElement).checked).toBe(false);
+  fireEvent.keyDown(row("a"), { key: "Escape" });
+  expect(inSelectMode()).toBe(false);
+});
+
+test("s with nothing focused enters the sidebar's select mode, not the page's", async () => {
+  await rowsLoaded();
+  fireEvent.keyDown(document.body, { key: "s" });
+  expect(inSelectMode()).toBe(false);
+  expect(within(screen.getByTestId("page-header-actions")).getByRole("button", { name: "Select" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Done" })).toBeTruthy();
+});
+
+test("keys typed in a field are left alone", async () => {
+  await rowsLoaded();
+  const input = document.createElement("input");
+  row("a").parentElement!.appendChild(input);
+  fireEvent.keyDown(input, { key: "s" });
+  expect(inSelectMode()).toBe(false);
+});

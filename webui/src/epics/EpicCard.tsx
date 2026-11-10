@@ -25,6 +25,7 @@ import {
   type EpicListRow,
   type Workspace,
 } from "../generated/server";
+import { PAGE_ATTR, PAGE_OPEN_ATTR } from "../select/pageKeys";
 import { SelectBox } from "../shell/SidebarSelect";
 import { followUpsFocus } from "../workspaces/followUpsBadge";
 import { ItemMenu, itemOfCard, postUnhold, type ItemWriters } from "../workspaces/itemActions";
@@ -223,6 +224,7 @@ export function EpicCard({
   return (
     <Box
       data-kind={kind}
+      {...{ [PAGE_ATTR]: row.address }}
       data-section={row.section}
       data-focus={row.card_kind === CardKindFollowUps ? followUpsFocus(row.project) : undefined}
       opacity={held ? 0.6 : undefined}
@@ -257,7 +259,7 @@ export function EpicCard({
           live={isLive(row)}
         />
         <Box minW="0">
-          <Link href={titleHref(row)} color="inherit" fontFamily="condensed" fontSize="24px" fontWeight="600" lineHeight="1.15">
+          <Link href={titleHref(row)} {...{ [PAGE_OPEN_ATTR]: "" }} color="inherit" fontFamily="condensed" fontSize="24px" fontWeight="600" lineHeight="1.15">
             {row.name}
           </Link>
           <Text fontSize="15px">

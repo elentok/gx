@@ -7,6 +7,7 @@ import { postSaveChecks, type SaveChecks } from "../checks/setup";
 import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status";
 import { useConnectionContext } from "../connection";
 import { CardKindFollowUps, type Workspace } from "../generated/server";
+import { usePageKeys } from "../select/pageKeys";
 import { rowOfCard, type SelectAction } from "../select/selectModel";
 import { SidebarBulkActions } from "../shell/SidebarBulkActions";
 import { SelectBar, useSelectApi, type SelectApi } from "../shell/SidebarSelect";
@@ -149,6 +150,8 @@ export function EpicsPage({
   const selectRows = shown.flatMap((s) => s.rows.map((r) => rowOfCard(r, isOpen(s))));
   const names = new Map(shown.flatMap((s) => s.rows.map((r) => [r.address, r.name] as const)));
   const select = useSelectApi(selectRows, names, !!list);
+  const area = useRef<HTMLDivElement>(null);
+  usePageKeys(area, select);
   // Route state `focus` names a card (the sidebar's follow-ups popover): open its section once, then scroll to it.
   const focus = (useLocation().state as { focus?: string } | null)?.focus;
   const focused = useRef<string | undefined>(undefined);
@@ -178,6 +181,7 @@ export function EpicsPage({
 
   return (
     <DetailPage title={{ kind: "Epics" }}>
+      <Box ref={area}>
       <Box mt="4">
         <PageHeader
           title="Epics"
@@ -277,6 +281,7 @@ export function EpicsPage({
         ))
       )}
       {setupProject && <SetupDialog project={setupProject} save={saveChecks} onSaved={rereadChecks} onClose={() => setSettingUp(undefined)} />}
+      </Box>
     </DetailPage>
   );
 }
