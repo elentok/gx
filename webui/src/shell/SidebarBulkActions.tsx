@@ -2,7 +2,9 @@ import { Box, Text } from "@chakra-ui/react";
 import { useRef, useState } from "react";
 import { useConnectionContext } from "../connection";
 import { TargetDone, type TargetResult } from "../generated/server";
-import { bulkHold, bulkMove, bulkUnhold } from "../select/bulkWrites";
+import { isExited } from "../agents/sessionWrites";
+import type { SessionInfo } from "../generated/server";
+import { bulkHold, bulkMove, bulkRemove, bulkStop, bulkUnhold } from "../select/bulkWrites";
 import { skipLines, visibleActions, type ActionView, type SelectAction } from "../select/selectModel";
 import { Button } from "../ui/button/Button";
 import { GxMenu } from "../ui/menu/Menu";
@@ -12,7 +14,7 @@ import { WriteError } from "../useWrite";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { useSidebarSelect } from "./SidebarSelect";
 
-const SHOWN: SelectAction[] = ["move", "hold", "unhold"];
+const SHOWN: SelectAction[] = ["move", "hold", "unhold", "stop", "remove"];
 
 /** Move, Hold and Take off hold in the select bar: each runs on the selected rows it fits. */
 export function SidebarBulkActions() {
@@ -21,9 +23,11 @@ export function SidebarBulkActions() {
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
   const [confirm, setConfirm] = useState<{ keys: string[]; sessions: string[] }>();
+  const [stopConfirm, setStopConfirm] = useState<{ view: ActionView; sessions: SessionInfo[] }>();
+  const [removeConfirm, setRemoveConfirm] = useState<{ view: ActionView; sessions: SessionInfo[] }>();
 
   const views = visibleActions(sel.state, sel.rows).filter((v) => SHOWN.includes(v.action));
-  if (views.length === 0 && !confirm) return null;
+  if (views.length === 0 && !confirm && !stopConfirm && !removeConfirm) return null;
 
   const tip = (v: ActionView) =>
     [`Runs on ${v.fit.fits.map(sel.nameOf).join(", ")}`, ...skipLines(v.fit, sel.nameOf)].join("\n");
@@ -62,7 +66,17 @@ export function SidebarBulkActions() {
       return undefined;
     });
 
+  const nameOfSession = (s: SessionInfo) => sel.nameOf(s.id);
+  const sessionsOf =(keys: string[]) => keys.flatMap((k) => sel.rows.find((r) => r.key === k)?.session ?? []);
+
+  // Stop asks once, listing the rows; Exited rows were already skipped "not live" by the fit.
+  const stop = (v: ActionView) => setStopConfirm({ view: v, sessions: sessionsOf(v.fit.fits) });
+  // Remove asks once and says which rows are live.
+  const remove = (v: ActionView) => setRemoveConfirm({ view: v, sessions: sessionsOf(v.fit.fits) });
+
   const byAction = (a: SelectAction) => views.find((v) => v.action === a);
+  const stopView = byAction("stop");
+  const removeView = byAction("remove");
   const move = byAction("move");
   const holdView = byAction("hold");
   const unhold = byAction("unhold");
@@ -94,6 +108,60 @@ export function SidebarBulkActions() {
         <Button size="sm" emphasis="secondary" tone="running" title={tip(unhold)} disabled={pending} onClick={() => void run(unhold, () => bulkUnhold(unhold.fit.fits))}>
           {unhold.label}
         </Button>
+      )}
+      {stopView && (
+        <Button size="sm" emphasis="secondary" tone="paused" title={tip(stopView)} disabled={pending} onClick={() => stop(stopView)}>
+          {stopView.label}
+        </Button>
+      )}
+      {removeView && (
+        <Button size="sm" emphasis="secondary" tone="paused" title={tip(removeView)} disabled={pending} onClick={() => remove(removeView)}>
+          {removeView.label}
+        </Button>
+      )}
+      {stopConfirm && (
+        <Modal label="Stop selected" onClose={() => setStopConfirm(undefined)} maxW="sm">
+          <Text>Stop {stopConfirm.sessions.map(nameOfSession).join(", ")}?</Text>
+          <Box display="flex" gap="2" justifyContent="flex-end">
+            <Button emphasis="secondary" onClick={() => setStopConfirm(undefined)} autoFocus>
+              Cancel
+            </Button>
+            <Button
+              tone="paused"
+              onClick={() => {
+                const { view, sessions } = stopConfirm;
+                setStopConfirm(undefined);
+                void run(view, () => bulkStop(sessions));
+              }}
+            >
+              Stop
+            </Button>
+          </Box>
+        </Modal>
+      )}
+      {removeConfirm && (
+        <Modal label="Remove selected" onClose={() => setRemoveConfirm(undefined)} maxW="sm">
+          <Text>
+            Remove {removeConfirm.sessions.map(nameOfSession).join(", ")}? Their sessions are deleted.
+            {removeConfirm.sessions.some((s) => !isExited(s)) &&
+              ` Live and stopped first: ${removeConfirm.sessions.filter((s) => !isExited(s)).map(nameOfSession).join(", ")}.`}
+          </Text>
+          <Box display="flex" gap="2" justifyContent="flex-end">
+            <Button emphasis="secondary" onClick={() => setRemoveConfirm(undefined)} autoFocus>
+              Keep
+            </Button>
+            <Button
+              tone="paused"
+              onClick={() => {
+                const { view, sessions } = removeConfirm;
+                setRemoveConfirm(undefined);
+                void run(view, () => bulkRemove(sessions));
+              }}
+            >
+              Remove
+            </Button>
+          </Box>
+        </Modal>
       )}
       {confirm && (
         <Modal label="Hold selected" onClose={() => setConfirm(undefined)} maxW="sm">
