@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Connection } from "../connection";
-import { CardSourceRound, type SessionChatResponse, type SessionRoundCard } from "../generated/server";
+import { CardSourceRound, type QuestionCard, type SessionChatResponse, type SessionRoundCard } from "../generated/server";
 import { fetchJson, useDetail, type DetailResult } from "../ticket/detail";
 
 export type FetchChat = (sessionId: string) => Promise<DetailResult<SessionChatResponse>>;
@@ -32,10 +32,10 @@ export const useSessionChat = (sessionId: string | undefined, conn: Connection, 
 const roundCardOf = (chat: SessionChatResponse | null | undefined) =>
   chat?.questions.find((c) => c.source === CardSourceRound);
 
-/** The printed round's questions, as the sheet's cards; empty when no round is open. */
-export const roundOf = (chat: SessionChatResponse | null | undefined): SessionRoundCard[] =>
-  (roundCardOf(chat)?.questions ?? []).map((q) => ({
-    label: q.label ?? "",
+/** A card's questions as the sheet's cards. A question with no label is named by its place, so answers never collide. */
+export const sheetCardsOf = (card: QuestionCard | undefined): SessionRoundCard[] =>
+  (card?.questions ?? []).map((q, i) => ({
+    label: q.label || String(i + 1),
     title: q.title,
     body: q.body,
     kind: q.kind,
@@ -46,6 +46,9 @@ export const roundOf = (chat: SessionChatResponse | null | undefined): SessionRo
     links: q.links,
     note: q.note,
   }));
+
+/** The printed round's questions, as the sheet's cards; empty when no round is open. */
+export const roundOf = (chat: SessionChatResponse | null | undefined): SessionRoundCard[] => sheetCardsOf(roundCardOf(chat));
 
 /** Names the pending round by the server's card id: a new round (or none) is a different key. */
 export const roundKeyOf = (chat: SessionChatResponse | null | undefined) => roundCardOf(chat)?.id ?? "";

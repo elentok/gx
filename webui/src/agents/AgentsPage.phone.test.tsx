@@ -1,6 +1,8 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
-import { entryOptions, render, session, stubNewSession, useAgentsPageHooks } from "./agentsTestKit";
+import { roundCards } from "../design/roundFixture";
+import type { SessionFailure, SessionRoundCard } from "../generated/server";
+import { chat, chatOf, entryOptions, render, session, stubNewSession, useAgentsPageHooks } from "./agentsTestKit";
 
 useAgentsPageHooks();
 
@@ -24,6 +26,16 @@ test("phone: a design session's header links to its design page", () => {
 test("phone: a plain session's header has no design link", () => {
   render([session("s-2", "p")], "/agents/s-2", true, {}, false);
   expect(screen.queryByRole("link", { name: "Open design page →" })).toBeNull();
+});
+
+test("phone: a round shows the sheet beside the banner, with no sideways scroll", async () => {
+  const round = [{ label: "1", title: "Which?", body: "Which?", kind: "options", options: [{ id: "a", label: "A" }] }] as unknown as SessionRoundCard[];
+  const failure = { kind: "stalled", label: "Failure stalled", text: "" } as SessionFailure;
+  render([session("s-1", "p", { failure })], "/agents/s-1", true, chatOf(chat({ questions: roundCards(round) })), false);
+  expect(await screen.findByRole("group", { name: "Questions" })).toBeTruthy();
+  expect(screen.getByText("Failure stalled")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Screen" })).toBeTruthy();
+  expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth);
 });
 
 test("phone: the empty panel's New session button opens the form as a sheet", async () => {

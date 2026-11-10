@@ -56,11 +56,12 @@ test("a busy session shows a plain Working row, and an empty chat says so", asyn
   expect(await screen.findByText("No messages yet")).toBeTruthy();
 });
 
-test("a round in the chat shows no question sheet", async () => {
-  const round = [{ label: "Pick", title: "Which?", options: [{ label: "A" }] }] as unknown as SessionRoundCard[];
+test("a round in the chat shows the question sheet with a Submit", async () => {
+  const round = [{ label: "Pick", title: "Which?", kind: "options", options: [{ id: "a", label: "A" }] }] as unknown as SessionRoundCard[];
   render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat({ questions: roundCards(round) })));
   expect(await screen.findByText("hello there")).toBeTruthy();
-  expect(screen.queryByText("Which?")).toBeNull();
+  expect(await screen.findByRole("group", { name: "Questions" })).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();
 });
 
