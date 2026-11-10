@@ -6,7 +6,7 @@ import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
 import { Question } from "../ui/question-sheet/Question";
-import type { Answers } from "../ui/question-sheet/round";
+import { allAnswered, type Answers } from "../ui/question-sheet/round";
 import { QuestionSheet } from "./QuestionSheet";
 
 afterEach(cleanup);
@@ -258,5 +258,34 @@ describe("a move scrolls the body to the top", () => {
       target: { value: "hi" },
     });
     expect(body().scrollTop).toBe(120);
+  });
+});
+
+describe("the Submit rule", () => {
+  const cards = [
+    { label: "1", title: "A", kind: "yes-no" },
+    {
+      label: "2",
+      title: "B",
+      kind: "options",
+      options: [
+        { id: "go", label: "Go" },
+        { id: "change", label: "Tell Claude what to change", text: true },
+      ],
+    },
+    { label: "3", title: "C", kind: "multi-select", options: [{ id: "x", label: "X" }] },
+  ];
+
+  test("a card is answered only when every question is", () => {
+    expect(allAnswered(cards, { "1": { choice: "yes" }, "2": { choice: "go" } })).toBe(false);
+    expect(allAnswered(cards, { "1": { choice: "yes" }, "2": { choice: "go" }, "3": { choices: ["X"] } })).toBe(true);
+    expect(allAnswered(cards, { "1": { huh: true }, "2": { choice: "go" }, "3": { choices: [] } })).toBe(false);
+  });
+
+  test("a picked text row stays unanswered while its text is empty", () => {
+    const base = { "1": { choice: "yes" }, "3": { choices: ["X"] } };
+    expect(allAnswered(cards, { ...base, "2": { choice: "change" } })).toBe(false);
+    expect(allAnswered(cards, { ...base, "2": { choice: "change", text: "  " } })).toBe(false);
+    expect(allAnswered(cards, { ...base, "2": { choice: "change", text: "shorter" } })).toBe(true);
   });
 });

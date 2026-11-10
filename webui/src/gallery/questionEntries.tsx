@@ -40,7 +40,7 @@ export const questionEntries: GalleryEntry[] = [
         label: "dots",
         node: (
           <QuestionDots
-            round={[{ label: "1" }, { label: "2" }, { label: "3" }]}
+            round={["1", "2", "3"].map((label) => ({ label, title: "", kind: "options" }))}
             answers={{ "1": { choice: "a" } }}
             current={1}
             onPick={() => {}}

@@ -78,23 +78,31 @@ function Choice({
 
 const letterOf = (k: number) => String.fromCharCode(65 + (k % 26));
 
-// One question of a round. `big` is the Questions-view size.
+// One question of a card. `big` is the Questions-view size. `huh` is for printed-round cards only, and
+// `notes` for cards that take a note (hook and Codex cards); callers of other cards pass false.
 export function Question({
   card,
   answer,
   onChange,
   onPicked,
   big,
+  huh = true,
+  notes = true,
 }: {
   card: QuestionCard;
   answer: Answer;
   onChange: (a: Answer) => void;
   onPicked: () => void;
   big?: boolean;
+  huh?: boolean;
+  notes?: boolean;
 }) {
   const [noteOpen, setNoteOpen] = useState(!!answer.note);
   const choices = choicesOf(card);
   const text = card.kind === "text" || choices.length === 0;
+  const multi = card.kind === "multi-select";
+  const chosen = answer.choices ?? [];
+  const textRow = choices.find((c) => c.text && (multi ? chosen.includes(c.label) : answer.choice === c.id));
   const lettered = card.kind !== "yes-no";
   return (
     <Box display="flex" flexDirection="column" gap={big ? "3" : "2"}>
@@ -157,7 +165,7 @@ export function Question({
       ) : (
         <Box display="flex" flexDirection="column" gap="2">
           {choices.map((c, k) => {
-            const on = answer.choice === c.id;
+            const on = multi ? chosen.includes(c.label) : answer.choice === c.id;
             return (
               <Choice
                 key={c.id}
@@ -168,42 +176,62 @@ export function Question({
                 on={on}
                 recommended={card.recommended === c.id}
                 onClick={() => {
+                  if (multi) {
+                    onChange({ ...answer, huh: false, choices: on ? chosen.filter((l) => l !== c.label) : [...chosen, c.label] });
+                    return;
+                  }
                   onChange({ ...answer, huh: false, choice: on ? undefined : c.id });
                   if (!on) onPicked();
                 }}
               />
             );
           })}
+          {textRow && (
+            <ExpandableTextField
+              size="sm"
+              rows={big ? 5 : 2}
+              label={`${textRow.label} (question ${card.label})`}
+              name="question-row-text"
+              title={`${textRow.label} - ${nameOf(card)}`}
+              placeholder={textRow.label}
+              value={answer.text ?? ""}
+              onChange={(t) => onChange({ ...answer, huh: false, text: t })}
+            />
+          )}
         </Box>
       )}
-      <Box>
-        <Choice
-          label="Huh?"
-          on={!!answer.huh}
-          recommended={false}
-          onClick={() => {
-            const on = !answer.huh;
-            onChange({ ...answer, huh: on, choice: on ? undefined : answer.choice });
-            if (on) onPicked();
-          }}
-        />
-      </Box>
-      <Box>
-        <Button
-          emphasis="ghost"
-          tone="muted"
-          size="sm"
-          aria-label={`Note on question ${card.label}`}
-          aria-pressed={noteOpen}
-          onClick={() => setNoteOpen((o) => !o)}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M3 13l.7-3L10.5 3.2a1.4 1.4 0 0 1 2 2L5.7 12 3 13z" />
-          </svg>
-          Note
-        </Button>
-      </Box>
-      {noteOpen && (
+      {huh && (
+        <Box>
+          <Choice
+            label="Huh?"
+            on={!!answer.huh}
+            recommended={false}
+            onClick={() => {
+              const on = !answer.huh;
+              onChange({ ...answer, huh: on, choice: on ? undefined : answer.choice });
+              if (on) onPicked();
+            }}
+          />
+        </Box>
+      )}
+      {notes && (
+        <Box>
+          <Button
+            emphasis="ghost"
+            tone="muted"
+            size="sm"
+            aria-label={`Note on question ${card.label}`}
+            aria-pressed={noteOpen}
+            onClick={() => setNoteOpen((o) => !o)}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+              <path d="M3 13l.7-3L10.5 3.2a1.4 1.4 0 0 1 2 2L5.7 12 3 13z" />
+            </svg>
+            Note
+          </Button>
+        </Box>
+      )}
+      {notes && noteOpen && (
         <NoteBox
           name={`question ${card.label}`}
           fieldName="question-note"
@@ -225,7 +253,7 @@ export function QuestionDots({
   current,
   onPick,
 }: {
-  round: { label: string }[];
+  round: QuestionCard[];
   answers: Answers;
   current?: number;
   onPick: (k: number) => void;
@@ -233,7 +261,7 @@ export function QuestionDots({
   return (
     <Box display="flex" gap="1.5" flexWrap="wrap">
       {round.map((c, k) => {
-        const answered = isAnswered(answers[c.label]);
+        const answered = isAnswered(answers[c.label], c);
         const on = k === current;
         return (
           <chakra.button

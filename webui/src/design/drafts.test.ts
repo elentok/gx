@@ -1,4 +1,5 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { readRoundDraft, writeRoundDraft } from "../drafts";
 import {
   deleteDraft,
   draftLabel,
@@ -100,4 +101,24 @@ test("a 500 body throws its text", async () => {
   await expect(saveDraft(req)).rejects.toThrow("disk full");
   await expect(listDrafts()).rejects.toThrow("disk full");
   await expect(setLastProject("x")).rejects.toThrow("disk full");
+});
+
+describe.each([
+  ["round", "round-7"],
+  ["claude-dialog", "claude-dialog:abc123"],
+  ["codex-question", "codex-question:thread-1:call-2"],
+  ["permission", "permission:tool-use-9"],
+  ["ticket-ask", "ticket-ask:gx/epic/12:3"],
+])("round draft for a %s id", (_, id) => {
+  afterEach(() => localStorage.clear());
+
+  test("kept while the id stays the same", () => {
+    writeRoundDraft("s1", id, { answers: { "1": { choice: "a" } } });
+    expect(readRoundDraft("s1", id)).toEqual({ answers: { "1": { choice: "a" } } });
+  });
+
+  test("dropped when the id changes", () => {
+    writeRoundDraft("s1", id, { answers: { "1": { choice: "a" } } });
+    expect(readRoundDraft("s1", `${id}-next`)).toBeNull();
+  });
 });

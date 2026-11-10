@@ -91,7 +91,7 @@ export function QuestionSheet({
     );
   };
 
-  const done = round.filter((c) => isAnswered(answers[c.label])).length;
+  const done = round.filter((c) => isAnswered(answers[c.label], c)).length;
   const goto = (k: number) => {
     setIndex(k);
     setOpen(true);
