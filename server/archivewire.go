@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/elentok/gx/server/archive"
 	"github.com/elentok/gx/server/sessions"
 )
@@ -23,8 +25,11 @@ func newArchive(s *Server) *archive.Archive {
 // rekeySession rewrites a Session's ticket and fix_of in its meta.
 func (s *Server) rekeySession(id string, rekey func(ticket, fixOf string) (string, string)) error {
 	dir, _, res, err := s.sessions.SessionDir(id)
-	if err != nil || res.Refused {
+	if err != nil {
 		return err
+	}
+	if res.Refused {
+		return fmt.Errorf("session %s: %s", id, res.Message)
 	}
 	return s.sessions.UpdateSessionMeta(dir, id, func(m *sessions.Meta) bool {
 		ticket, fixOf := rekey(m.Ticket, m.FixOf)

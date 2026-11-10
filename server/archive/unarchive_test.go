@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
@@ -86,6 +87,19 @@ func TestUnarchive_RoundTripReturnsToItsWorkspaceWithoutHold(t *testing.T) {
 	}
 	if held := r.heldKeys(t); slices.Contains(held, "proj:done") {
 		t.Errorf("hold mark came back: %v", held)
+	}
+}
+
+func TestUnarchive_FailedSessionRekeyIsAFailedTarget(t *testing.T) {
+	r := start(t, "done")
+	id := r.stoppedFixSession(t, "proj:done/01")
+	// Archived while writable, so only Unarchive meets the lock.
+	r.archive(t, true, false, "proj:done")
+	r.lock(t, id)
+
+	got := r.unarchive(t, "proj:done")[0]
+	if got.Status != wire.TargetFailed || !strings.Contains(got.Message, "re-key session") {
+		t.Fatalf("unarchive = %+v, want a failed target naming the re-key", got)
 	}
 }
 

@@ -38,10 +38,10 @@ type Deps struct {
 	// returns it to Default.
 	SetMember func(key, workspace string) error
 	Remove    func(key string) error
-	// RekeySession rewrites a Session's ticket and fix_of through rekey.
 	// CleanupDesign removes a Design's worktree and branch when it allows it.
 	CleanupDesign func(project, epic string)
-	RekeySession  func(id string, rekey func(ticket, fixOf string) (string, string)) error
+	// RekeySession rewrites a Session's ticket and fix_of through rekey.
+	RekeySession func(id string, rekey func(ticket, fixOf string) (string, string)) error
 }
 
 // Archive runs the archive writes.
@@ -158,7 +158,7 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 		}
 		onTrunk = row.MergedToTrunk
 	}
-	name := freeName(tickets.ArchiveDir(dir), base, len(halves) > 1)
+	name := freeNameIn(tickets.ArchiveDir(dir), base, len(halves) > 1)
 	var live []string
 	for _, h := range halves {
 		live = append(live, workspaces.LiveEpicSessions(a.d, h.key, allKinds)...)
@@ -181,12 +181,20 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 		return r, nil
 	}
 	out.OnTrunk = nil
+	// The Design cleanup refuses under a live Design Session, so it runs once
+	// write has stopped the Sessions of every half and before the rename.
+	var cleanup func()
 	if len(halves) > 1 && onTrunk {
-		a.d.CleanupDesign(project, base)
+		cleanup = func() { a.d.CleanupDesign(project, base) }
 	}
-	if err := a.write(dir, halves, name); err != nil {
+	if err := a.write(dir, halves, name, cleanup); err != nil {
 		if r, ok := errors.AsType[refusal](err); ok {
 			return refuse(r.reason, r.Error())
+		}
+		if f, ok := errors.AsType[failure](err); ok {
+			failed := wire.FailedTarget(target, f)
+			failed.NewAddress = out.NewAddress
+			return failed, nil
 		}
 		return wire.TargetResult{}, err
 	}
@@ -203,19 +211,26 @@ type refusal struct {
 func (r refusal) Error() string { return r.err.Error() }
 func (r refusal) Unwrap() error { return r.err }
 
+// failure is an error after the move began: the epic moved but a later step
+// did not finish, so the target reports failed instead of done.
+type failure struct{ err error }
+
+func (f failure) Error() string { return f.err.Error() }
+func (f failure) Unwrap() error { return f.err }
+
 // half is one epic of a row: a loop epic, a Design or its -impl epic.
 type half struct{ epic, key string }
 
-// freeName is the epic's name, or the first free `-N` suffix when .archive has
+// freeNameIn is the epic's name, or the first free `-N` suffix when dir has
 // it. A pair needs both `name` and `name-impl` free.
-func freeName(archiveDir, epic string, pair bool) string {
+func freeNameIn(dir, epic string, pair bool) string {
 	taken := func(name string) bool {
 		names := []string{name}
 		if pair {
 			names = append(names, name+tickets.ImplEpicSuffix)
 		}
 		for _, n := range names {
-			if _, err := os.Stat(filepath.Join(archiveDir, n)); !os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(dir, n)); !os.IsNotExist(err) {
 				return true
 			}
 		}
@@ -229,8 +244,9 @@ func freeName(archiveDir, epic string, pair bool) string {
 }
 
 // write runs the effects in order; the first half is the Design of a pair.
-// Sessions the stop already ended stay stopped.
-func (a *Archive) write(dir string, halves []half, name string) error {
+// Sessions the stop already ended stay stopped. cleanup, when set, runs after
+// every Session is stopped and before the rename.
+func (a *Archive) write(dir string, halves []half, name string, cleanup func()) error {
 	for _, h := range halves {
 		if _, err := workspaces.StopEpicSessions(a.d, h.key, allKinds); err != nil {
 			return err
@@ -238,6 +254,9 @@ func (a *Archive) write(dir string, halves []half, name string) error {
 		if err := a.d.Unhold(h.key); err != nil {
 			return err
 		}
+	}
+	if cleanup != nil {
+		cleanup()
 	}
 	archive := tickets.ArchiveDir(dir)
 	if err := os.MkdirAll(archive, 0o755); err != nil {
@@ -266,6 +285,7 @@ func (a *Archive) write(dir string, halves []half, name string) error {
 			return refusal{wire.ReasonArchiveRenameFailed, err}
 		}
 	}
+	var rekeyErrs []error
 	for i, m := range moves {
 		fields := map[string]any{"archived_at": time.Now().UTC()}
 		if m.workspace != workspaces.DefaultName {
@@ -278,16 +298,21 @@ func (a *Archive) write(dir string, halves []half, name string) error {
 		if err := tickets.OverwriteEpicFields(filepath.Join(archive, m.name), fields); err != nil {
 			return err
 		}
-		a.rekey(tickets.EpicAddress, m.key, tickets.ArchiveKey(m.key, m.name))
+		rekeyErrs = append(rekeyErrs, a.rekey(tickets.EpicAddress, m.key, tickets.ArchiveKey(m.key, m.name)))
 	}
 	a.d.Events.Publish(wire.EventWorkspacesChanged, "")
+	if err := errors.Join(rekeyErrs...); err != nil {
+		return failure{err}
+	}
 	return nil
 }
 
 // rekey points every Session of the epic keyed `from`, live or exited, at the
-// key `to`. epicOf cuts a ticket address down to its epic key; an archive key
-// needs tickets.ArchiveEpicKey, as its first slash is not the ticket's.
-func (a *Archive) rekey(epicOf func(string) string, from, to string) {
+// key `to`, and joins the errors of those it could not. epicOf cuts a ticket
+// address down to its epic key; an archive key needs tickets.ArchiveEpicKey,
+// as its first slash is not the ticket's.
+func (a *Archive) rekey(epicOf func(string) string, from, to string) error {
+	var errs []error
 	rekeyOne := func(addr string) string {
 		if epicOf(addr) == from {
 			return to + strings.TrimPrefix(addr, from)
@@ -301,8 +326,11 @@ func (a *Archive) rekey(epicOf func(string) string, from, to string) {
 		err := a.d.RekeySession(si.ID, func(ticket, fixOf string) (string, string) {
 			return rekeyOne(ticket), rekeyOne(fixOf)
 		})
-		if err == nil {
-			a.d.Events.Publish(wire.EventSessionChanged, si.ID)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("re-key session %s: %w", si.ID, err))
+			continue
 		}
+		a.d.Events.Publish(wire.EventSessionChanged, si.ID)
 	}
+	return errors.Join(errs...)
 }

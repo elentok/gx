@@ -151,10 +151,6 @@ type Epic struct {
 	forks *forkCache
 }
 
-// WithTickets returns a copy of e holding ts and no fork or index cache, so
-// every lookup reads ts as it stands. A caller that edits ts in place (a
-// status flip in a plan simulation) uses it, because a cache holds Ticket
-// values and would keep serving the old ones.
 // Branch is the epic's effective git branch: branch_name when set, else its
 // name. A rename keeps the branch.
 func (e Epic) Branch() string {
@@ -165,11 +161,15 @@ func (e Epic) Branch() string {
 }
 
 // ImplBranch is the branch of a Design's implementation half.
-func ImplBranch(design Epic) string { return design.Branch() + "-impl" }
+func ImplBranch(design Epic) string { return design.Branch() + ImplEpicSuffix }
 
 // DesignBranch is the branch of a Design's design half.
 func DesignBranch(design Epic) string { return design.Branch() + "-design" }
 
+// WithTickets returns a copy of e holding ts and no fork or index cache, so
+// every lookup reads ts as it stands. A caller that edits ts in place (a
+// status flip in a plan simulation) uses it, because a cache holds Ticket
+// values and would keep serving the old ones.
 func (e Epic) WithTickets(ts []Ticket) Epic {
 	e.Tickets = ts
 	e.forks = nil

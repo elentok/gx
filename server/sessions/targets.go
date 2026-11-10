@@ -45,9 +45,11 @@ func (mg *Manager) SessionTargetsWrite(do func(id string, yes bool) (wire.Sessio
 			if err == nil && !res.Refused {
 				res, err = do(t.ID, req.Yes)
 			}
+			// An earlier target may already be stopped or removed, so an
+			// internal error is this target's result, not the request's.
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+				out.Results = append(out.Results, wire.FailedTarget(t.ID, err))
+				continue
 			}
 			if res.Refused {
 				out.Results = append(out.Results, wire.RefusedTarget(t.ID, res.Reason, res.Message))

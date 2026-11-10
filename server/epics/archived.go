@@ -10,11 +10,9 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
 )
-
-// defaultWorkspace is the Default workspace's name; server/workspaces owns it.
-const defaultWorkspace = "Default workspace"
 
 // ArchivedList serves the archived epics and Designs, newest archived first.
 func (s *Epics) ArchivedList(w http.ResponseWriter, _ *http.Request) {
@@ -69,7 +67,7 @@ func archivedRows(project string, archived []tickets.Epic, knownWorkspaces map[s
 			Title:      cmp.Or(tickets.BodyTitle(e.Body, ""), e.Name),
 			ArchivedAt: e.ArchivedAt, CompletedAt: e.CompletedAt,
 			Kind: wire.EpicKindLoop, Addresses: []string{addr},
-			Workspace: defaultWorkspace,
+			Workspace: workspaces.DefaultName,
 		}
 		if e.IsMap {
 			row.Kind = wire.EpicKindMap

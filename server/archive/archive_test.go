@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
@@ -210,6 +211,43 @@ func TestArchive_LiveSessionsNeedYesThenStopAndAreRekeyed(t *testing.T) {
 		return
 	}
 	t.Fatalf("session %s not listed", fix)
+}
+
+// stoppedFixSession is a stopped Session of ticket.
+func (r rig) stoppedFixSession(t *testing.T, ticket string) string {
+	t.Helper()
+	res, err := r.H.Client.Sessions.Create(r.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Ticket: ticket, FixOf: ticket})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	id := res.Session.ID
+	if _, err := r.H.Client.Sessions.Stop(r.Ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// lock makes the Session's files unwritable, so a re-key of it fails.
+func (r rig) lock(t *testing.T, id string) {
+	t.Helper()
+	dir := filepath.Join(r.H.SessionsDir, id)
+	meta := filepath.Join(dir, "meta.json")
+	for path, mode := range map[string]os.FileMode{meta: 0o444, dir: 0o555} {
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(path, 0o755) })
+	}
+}
+
+func TestArchive_FailedSessionRekeyIsAFailedTarget(t *testing.T) {
+	r := start(t, "done")
+	r.lock(t, r.stoppedFixSession(t, "proj:done/01"))
+
+	got := r.archive(t, true, false, "proj:done")[0]
+	if got.Status != wire.TargetFailed || !strings.Contains(got.Message, "re-key session") {
+		t.Fatalf("archive = %+v, want a failed target naming the re-key", got)
+	}
 }
 
 func TestArchive_PublishesWorkspacesChanged(t *testing.T) {

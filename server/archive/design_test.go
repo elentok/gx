@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -14,7 +15,7 @@ import (
 
 // startPair is a store whose Design foo is at step, with a done foo-impl epic
 // unless noImpl.
-func startPair(t *testing.T, step string, noImpl bool) rig {
+func startPair(t *testing.T, step string, noImpl bool, opts ...func(*server.Config)) rig {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteCompleteEpic(t, store, "foo")
@@ -25,7 +26,7 @@ func startPair(t *testing.T, step string, noImpl bool) rig {
 	if !noImpl {
 		servertest.WriteCompleteEpic(t, store, "foo-impl")
 	}
-	return rig{servertest.StartDesignsIn(t, store), store}
+	return rig{servertest.StartDesignsIn(t, store, opts...), store}
 }
 
 func TestArchiveDesign_PairArchivesAsOneRow(t *testing.T) {
@@ -137,6 +138,25 @@ func TestArchiveDesign_OnTrunkPairLosesItsDesignWorktreeAndBranch(t *testing.T) 
 
 	if got := r.archive(t, false, false, "proj:foo")[0]; got.Status != wire.TargetDone {
 		t.Fatalf("archive = %+v", got)
+	}
+	if _, err := os.Stat(wt); !os.IsNotExist(err) {
+		t.Errorf("design worktree kept (stat err %v)", err)
+	}
+	if r.branchExists(t, "foo-design") {
+		t.Error("design branch kept")
+	}
+}
+
+func TestArchiveDesign_OnTrunkPairWithLiveDesignSessionLosesItsDesignWorktreeAndBranch(t *testing.T) {
+	// The exit-driven cleanup is held back, so only Archive's own can remove them in time.
+	r := startPair(t, "done", false, func(c *server.Config) { c.SessionExitCleanupDelay = 5 * time.Second })
+	wt := r.withDesignWorktree(t, false)
+	if res := r.Open(t, "proj:foo", false); res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+
+	if got := r.archive(t, true, false, "proj:foo")[0]; got.Status != wire.TargetDone || len(got.Sessions) == 0 {
+		t.Fatalf("archive = %+v, want done after stopping the Design Session", got)
 	}
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Errorf("design worktree kept (stat err %v)", err)

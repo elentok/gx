@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
@@ -64,7 +63,7 @@ func (a *Archive) unarchiveOne(target string) (wire.TargetResult, error) {
 		halves = append(halves, half{epic: impl})
 	}
 	head := tickets.LoadEpicTicketMD(filepath.Join(archiveDir, base))
-	name := freeActiveName(dir, base, len(halves) > 1)
+	name := freeNameIn(dir, base, len(halves) > 1)
 
 	out := wire.TargetResult{Target: target, Status: wire.TargetDone}
 	if name != base {
@@ -77,31 +76,14 @@ func (a *Archive) unarchiveOne(target string) (wire.TargetResult, error) {
 		if r, ok := errors.AsType[refusal](err); ok {
 			return wire.RefusedTarget(target, r.reason, r.Error()), nil
 		}
+		if f, ok := errors.AsType[failure](err); ok {
+			failed := wire.FailedTarget(target, f)
+			failed.NewAddress = out.NewAddress
+			return failed, nil
+		}
 		return wire.TargetResult{}, err
 	}
 	return out, nil
-}
-
-// freeActiveName is the archived name, or the first free `-N` suffix when an
-// active epic has it. A pair needs both `name` and `name-impl` free.
-func freeActiveName(projectDir, base string, pair bool) string {
-	taken := func(name string) bool {
-		names := []string{name}
-		if pair {
-			names = append(names, name+tickets.ImplEpicSuffix)
-		}
-		for _, n := range names {
-			if _, err := os.Stat(filepath.Join(projectDir, n)); !os.IsNotExist(err) {
-				return true
-			}
-		}
-		return false
-	}
-	name := base
-	for n := 2; taken(name); n++ {
-		name = base + "-" + strconv.Itoa(n)
-	}
-	return name
 }
 
 // restore moves the halves out of .archive under name (the Design's name; the
@@ -125,6 +107,7 @@ func (a *Archive) restore(dir, project string, halves []half, name string, head 
 			return refusal{wire.ReasonArchiveRenameFailed, err}
 		}
 	}
+	var rekeyErrs []error
 	for i, h := range halves {
 		path := filepath.Join(dir, finals[i])
 		if err := tickets.ClearEpicFields(path, "archived_at", "archived_workspace"); err != nil {
@@ -144,10 +127,13 @@ func (a *Archive) restore(dir, project string, halves []half, name string, head 
 			}
 		}
 		archiveKey := tickets.ArchiveKey(project+":"+h.epic, h.epic)
-		a.rekey(tickets.ArchiveEpicKey, archiveKey, project+":"+finals[i])
+		rekeyErrs = append(rekeyErrs, a.rekey(tickets.ArchiveEpicKey, archiveKey, project+":"+finals[i]))
 	}
 	a.placeInWorkspace(project+":"+finals[0], head.ArchivedWorkspace)
 	a.d.Events.Publish(wire.EventWorkspacesChanged, "")
+	if err := errors.Join(rekeyErrs...); err != nil {
+		return failure{err}
+	}
 	return nil
 }
 

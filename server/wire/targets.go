@@ -6,6 +6,9 @@ const (
 	TargetRefused = "refused"
 	// TargetFits is a dry run's answer for a target that would be done.
 	TargetFits = "fits"
+	// TargetFailed is a target whose write hit an internal error part-way. Its
+	// Message says what; the other targets' results still stand.
+	TargetFailed = "failed"
 )
 
 // TargetResult is what one target of a many-target write came to. A refusal is
@@ -57,6 +60,11 @@ type TargetsResult struct {
 // RefusedTarget is the result of a target the write refused.
 func RefusedTarget(target, reason, message string) TargetResult {
 	return TargetResult{Target: target, Status: TargetRefused, Reason: reason, Message: message}
+}
+
+// FailedTarget is the result of a target whose write failed with err.
+func FailedTarget(target string, err error) TargetResult {
+	return TargetResult{Target: target, Status: TargetFailed, Message: err.Error()}
 }
 
 // ReasonNeedsYes refuses a target whose write stops live Sessions and came without yes.
