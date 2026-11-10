@@ -293,6 +293,16 @@ question's type (`yes-no`, `options` or `text`), its options, and which option i
 question without one is a free-text question. A question in a **Grilling round** carries one too.
 Not the **Pause reason text**, which is the question's summary line.
 
+**Question sheet** — the panel in a web chat that shows the chat's **Question cards**. The Design and
+Triage chats call it the Questions view today.
+
+**Question card** — one item in a **Question sheet**. The server builds it from one source and gives it
+a source, an id and a type. Not a **Pause round**'s question, which is one question a Paused ticket
+asks.
+
+**Live blocker** — the permission, plan or dialog prompt that currently blocks a session. While one is
+open, only its **Question card** shows in the **Question sheet**.
+
 **Design Question** — the chat message a Design sends once per **Grilling round** when it starts waiting
 for the person: epic, step, round number, the round's first question and the Design link. It is decided
 once, when the wait starts, by the **open-on-screen rule** (a visible web tab always counts, a focused TUI
