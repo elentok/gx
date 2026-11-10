@@ -223,6 +223,36 @@ test.describe("14. Working row", () => {
     await fixture.cliEnv({ GX_AGENT_SESSION: id }, "agent", "step", "spec");
     await expect(row).toHaveText(/Working: Spec/);
 
+    // Esc opens the confirm with Interrupt focused and Esc closes it, on the Design page and on the session's Agents page.
+    const confirm = page.getByRole("alertdialog", nav("Interrupt the agent?"));
+    const confirmInterrupt = confirm.getByRole("button", { name: "Interrupt", exact: true });
+    const escOpensAndCloses = async () => {
+      await page.keyboard.press("Escape");
+      await expect(confirm).toBeVisible();
+      await expect(confirmInterrupt).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(confirm).toHaveCount(0);
+      await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible();
+    };
+    await escOpensAndCloses();
+    await page.evaluate((sid) => (location.hash = `#/agents/${sid}`), id);
+    await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible();
+    // gx drives this session, so Interrupt is off until the composer is turned on.
+    await page.getByRole("button", { name: "Turn on composer" }).click();
+    await page.getByRole("button", { name: "Turn on composer" }).last().click();
+    await expect(page.getByRole("button", { name: "Interrupt", exact: true })).toBeEnabled();
+    await escOpensAndCloses();
+    await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
+    await expect(row).toBeVisible();
+
+    // The Interrupt button confirms and the session leaves Working.
+    await page.getByRole("button", { name: "Interrupt", exact: true }).click();
+    await expect(confirm).toBeVisible();
+    await confirmInterrupt.click();
+    await expect(confirm).toHaveCount(0);
+    await expect(row).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^(Send|Continue)/ }).first()).toBeVisible();
+
     // The design chat's row names a shell call in flight.
     await start("agents-tools");
     await expect(card(page, "design-epic")).toBeVisible();
