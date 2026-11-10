@@ -554,8 +554,6 @@ func startupConfig(cfg Config) config.Config {
 	c.TicketStore.Path = cfg.TicketStore
 	c.Server.TCPListen = cfg.TCPAddr != ""
 	c.Server.Web.Listen = cfg.WebAddr
-	c.Server.Web.DevFrontend = cfg.WebDevURL != ""
-	c.Server.Web.DevURL = cfg.WebDevURL
 	if cfg.AgentRunner != "" {
 		c.AgentRunner = cfg.AgentRunner
 	}

@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/elentok/gx/server/settings"
@@ -27,7 +28,6 @@ import (
 // Config is what the web listener reads from the server config.
 type Config struct {
 	Addr         string // "" turns the web listener off
-	DevURL       string
 	StateDir     string
 	Clock        func() time.Time // nil means time.Now
 	InterfaceIPs func() []net.IP  // nil means the machine's interfaces
@@ -40,14 +40,15 @@ type Host interface {
 }
 
 // Web owns the web listener and its login gate. After Bind, nothing writes its
-// fields, so readers need no lock.
+// fields except ui, which is atomic, so readers need no lock.
 type Web struct {
 	cfg  Config
 	log  *slog.Logger
 	host Host
 
-	ln       net.Listener // nil unless Config.Addr is set and bound
-	dev      http.Handler // nil unless Config.DevURL is set and valid
+	built    http.Handler                 // the embedded files
+	ui       atomic.Pointer[http.Handler] // the handler in force for non-API GETs
+	ln       net.Listener                 // nil unless Config.Addr is set and bound
 	srv      *http.Server
 	err      string        // why the bind failed
 	listenIP net.IP        // nil when the listener binds every interface
@@ -59,8 +60,21 @@ type Web struct {
 
 // New makes a Web that is off until Bind opens the listener.
 func New(cfg Config, log *slog.Logger, host Host) *Web {
-	return &Web{cfg: cfg, log: log, host: host}
+	w := &Web{cfg: cfg, log: log, host: host, built: ServeAsset(webui.Assets())}
+	w.UseBuiltUI()
+	return w
 }
+
+// UseViteProxy serves the UI from the Vite dev server on a loopback port. The
+// listener keeps serving; the next request sees the new handler.
+func (w *Web) UseViteProxy(port int) {
+	h := devFrontendProxy(port)
+	w.ui.Store(&h)
+	w.log.Warn("web UI is served from the Vite dev server", "port", port)
+}
+
+// UseBuiltUI serves the UI from the built files again.
+func (w *Web) UseBuiltUI() { w.ui.Store(&w.built) }
 
 // Listener is the bound listener, nil when the web UI is off or failed to bind.
 func (w *Web) Listener() net.Listener { return w.ln }
@@ -95,16 +109,6 @@ func (w *Web) Bind() {
 	}
 	if err := removeLegacyWebToken(w.cfg.StateDir); err != nil {
 		w.log.Warn("could not delete the old web token file", "err", err)
-	}
-	if w.cfg.DevURL != "" {
-		proxy, err := devFrontendProxy(w.cfg.DevURL)
-		if err != nil {
-			w.err = err.Error()
-			w.log.Error("web dev frontend rejected", "err", err)
-			return
-		}
-		w.dev = proxy
-		w.log.Warn("web UI is served from a dev frontend", "url", w.cfg.DevURL)
 	}
 	auth, err := webauth.OpenWebAuth(w.cfg.StateDir, w.now)
 	if err != nil {
@@ -180,7 +184,6 @@ func (w *Web) now() time.Time {
 // handler is the web mux: the snapshot, the event stream and the embedded
 // assets, plus the allowlisted writes. Every other request is a 404.
 func (w *Web) handler() http.Handler {
-	static := ServeAsset(webui.Assets())
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		routes := w.host.Routes()
 		if !w.isRead(r) {
@@ -203,10 +206,8 @@ func (w *Web) handler() http.Handler {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/"):
 			http.NotFound(rw, r)
-		case w.dev != nil:
-			w.dev.ServeHTTP(rw, r)
 		default:
-			static.ServeHTTP(rw, r)
+			(*w.ui.Load()).ServeHTTP(rw, r)
 		}
 	})
 }

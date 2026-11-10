@@ -211,8 +211,6 @@ type Config struct {
 	// WebAddr, when set, adds a separate read-only HTTP listener for the web UI.
 	// A bind failure is reported in the handshake and never stops the server.
 	WebAddr string
-	// WebDevURL, when set with WebAddr, proxies the web UI's non-API requests to a Vite dev server.
-	WebDevURL string
 
 	// Clock is the web auth clock: the web TLS leaf's expiry checks, the login
 	// store and the cookie renewal read it. Nil means time.Now.

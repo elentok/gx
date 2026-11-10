@@ -20,6 +20,12 @@ func WebWritePatterns() []string { return web.WritePatterns(assembleRoutes(nil))
 // WebURL is the web listener's base URL, or "" when it is off or failed to bind.
 func (s *Server) WebURL() string { return s.web.URL() }
 
+// WebUseViteProxy serves the web UI from the Vite dev server on a loopback port.
+func (s *Server) WebUseViteProxy(port int) { s.web.UseViteProxy(port) }
+
+// WebUseBuiltUI serves the web UI from the built files again.
+func (s *Server) WebUseBuiltUI() { s.web.UseBuiltUI() }
+
 // webHost is what the web listener asks the server for. It is its own type so
 // these methods stay off Server.
 type webHost struct{ s *Server }
@@ -30,7 +36,6 @@ func (h webHost) Routes() []wire.Route { return h.s.routes }
 func (s *Server) newWeb() *web.Web {
 	return web.New(web.Config{
 		Addr:         s.cfg.WebAddr,
-		DevURL:       s.cfg.WebDevURL,
 		StateDir:     s.cfg.StateDir,
 		Clock:        s.cfg.Clock,
 		InterfaceIPs: s.cfg.WebInterfaceIPs,

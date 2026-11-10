@@ -12,6 +12,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -40,19 +41,12 @@ func checkWriteRequest(r *http.Request, rawBody bool) string {
 	return ""
 }
 
-// devFrontendProxy forwards requests to a Vite dev server on loopback. The
-// Host header is rewritten so Vite accepts it, and websocket upgrades pass
-// through for hot reload. Only loopback targets are allowed, so the read-only
-// listener cannot be pointed at other hosts.
-func devFrontendProxy(raw string) (http.Handler, error) {
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "http" || u.Host == "" {
-		return nil, fmt.Errorf("server.web.dev-url %q must be an http URL", raw)
-	}
-	host := u.Hostname()
-	if host != "localhost" && !(net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback()) {
-		return nil, fmt.Errorf("server.web.dev-url %q must be a loopback address", raw)
-	}
+// devFrontendProxy forwards requests to the Vite dev server gx started on a
+// loopback port. The Host header is rewritten so Vite accepts it, and
+// websocket upgrades pass through for hot reload. The target is always
+// 127.0.0.1, so the listener cannot be pointed at other hosts.
+func devFrontendProxy(port int) http.Handler {
+	u := &url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(port))}
 	proxy := httputil.NewSingleHostReverseProxy(u)
 	direct := proxy.Director
 	proxy.Director = func(r *http.Request) {
@@ -61,9 +55,9 @@ func devFrontendProxy(raw string) (http.Handler, error) {
 	}
 	// Without this the browser gets an empty 502 and shows a blank page.
 	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
-		http.Error(w, fmt.Sprintf("502: the dev frontend at %s is not answering (%v). Start it with `npm run dev` in webui/, or turn off server.web.dev-frontend.", raw, err), http.StatusBadGateway)
+		http.Error(w, fmt.Sprintf("502: the Vite dev server that gx started at %s is not answering (%v).", u.Host, err), http.StatusBadGateway)
 	}
-	return proxy, nil
+	return proxy
 }
 
 // ServeAsset serves index.html at "/" only, and the file at any other path.
