@@ -3,7 +3,9 @@ package sessions_test
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -21,6 +23,24 @@ func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
 		t.Fatalf("interrupt = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, f.Conv, strconv.Quote(agentfake.ProgramInterruptEntry)+"\n")
+}
+
+func TestSessionInterrupt_SendsOneEscToACodexSession(t *testing.T) {
+	t.Parallel()
+	f := servertest.StartCodexPromptSession(t)
+	if res := f.Prompt(t, "work"); res.Refused {
+		t.Fatalf("prompt = %+v", res)
+	}
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+	res, err := f.H.Client.Sessions.Interrupt(f.Ctx, f.ID)
+	if err != nil || res.Refused {
+		t.Fatalf("interrupt = %+v, %v", res, err)
+	}
+	waitForSubmitted(t, f.Conv, "\"work\"\n"+strconv.Quote(agentfake.ProgramEscEntry)+"\n")
+	time.Sleep(300 * time.Millisecond)
+	if got := submitted(t, f.Conv); strings.Contains(got, agentfake.ProgramInterruptEntry) {
+		t.Errorf("codex got a ctrl-c: %q", got)
+	}
 }
 
 func TestSessionInterrupt_RefusesAnIdleSession(t *testing.T) {

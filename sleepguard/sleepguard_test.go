@@ -117,6 +117,7 @@ var allowed = map[string]int{
 	"server/server_test.go":                                   1,
 	"server/sessions/retry_prompt_test.go":                    1, // negative wait: no second interrupt or prompt follows the retry
 	"server/sessions/sessionchatwatch_test.go":                2,
+	"server/sessions/sessioninterrupt_test.go":                1, // negative wait: Codex gets no Ctrl+C after its Esc
 	"server/sessions/prompt/action_test.go":                   7,
 	"server/sessions/prompt/autoadvance_countdown_test.go":    6, // negative waits: a countdown would start and end in the window; includes a held Design
 	"server/sessions/prompt/autoadvance_guard_test.go":        2,

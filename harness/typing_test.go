@@ -151,6 +151,18 @@ func TestTyping_ClearKey(t *testing.T) {
 	}
 }
 
+func TestTyping_InterruptKey(t *testing.T) {
+	for kind, want := range map[string]string{"claude": "\x03", "codex": "\x1b"} {
+		ty, err := harness.LookupTyping(agentKind(kind))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := ty.InterruptKey(); got != want {
+			t.Errorf("%s InterruptKey = %q, want %q", kind, got, want)
+		}
+	}
+}
+
 // vimConfig points claude's config at a temp dir whose .claude.json has mode.
 func vimConfig(t *testing.T, mode string) {
 	t.Helper()

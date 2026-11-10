@@ -32,6 +32,9 @@ type Typing interface {
 	InputIsEmpty(styledRows []string) InputState
 	// ClearKey is the key a full clear repeats.
 	ClearKey() string
+	// InterruptKey is the one key that ends a Working turn and keeps the
+	// session.
+	InterruptKey() string
 	// ReadyToType runs before any typed text and reports whether typing can
 	// start; false means give up. It may press keys and re-read through io.
 	ReadyToType(io TypingIO) bool
@@ -117,6 +120,8 @@ func (claudeHarness) InputIsEmpty(styledRows []string) InputState {
 
 func (claudeHarness) ClearKey() string { return claudeInput.ClearKey() }
 
+func (claudeHarness) InterruptKey() string { return "\x03" }
+
 func (claudeHarness) SubmitKey(bool) string { return "\r" }
 
 func (claudeHarness) PastesText(string) bool { return false }
@@ -126,6 +131,10 @@ type codexTyping struct{ markerTyping }
 func (codexTyping) ReadyToType(TypingIO) bool { return true }
 
 func (codexTyping) InputPresses(string) int { return 0 }
+
+// InterruptKey is Esc: Codex reads Ctrl+C as quit when idle and as an
+// interrupt when busy, so Esc is the one safe key.
+func (codexTyping) InterruptKey() string { return "\x1b" }
 
 // SubmitKey is Tab while a turn runs, which queues the text until it ends.
 func (codexTyping) SubmitKey(working bool) string {
