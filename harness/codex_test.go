@@ -141,6 +141,37 @@ func TestCodexArgs_HookSet(t *testing.T) {
 	}
 }
 
+func TestCodexArgs_QuestionTool(t *testing.T) {
+	t.Parallel()
+	args := harness.CodexArgs(harness.CodexArgsInput{QuestionTool: true})
+	joined := strings.Join(args, " ")
+	if !slices.Contains(args, "--no-daemon") || !strings.Contains(joined, "-c "+harness.CodexQuestionToolFlag) {
+		t.Errorf("args %q lack --no-daemon or the question flag", args)
+	}
+	if strings.Contains(joined, "request_user_input\"") || strings.Contains(joined, "guard-question") {
+		t.Errorf("args %q keep the question guard", args)
+	}
+	if !strings.Contains(joined, "guard-bash") {
+		t.Errorf("args %q lost the Bash guard", args)
+	}
+	guarded := strings.Join(harness.CodexArgs(harness.CodexArgsInput{}), " ")
+	if strings.Contains(guarded, "--no-daemon") || strings.Contains(guarded, harness.CodexQuestionToolFlag) {
+		t.Errorf("guarded args carry the question tool: %q", guarded)
+	}
+}
+
+func TestCodexHarness_LaunchWithoutSystemPrompt(t *testing.T) {
+	t.Parallel()
+	h, err := harness.Lookup(harness.Codex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	launch := h.Launch(harness.LaunchOptions{Args: []string{"--model", "m"}, NoSystemPrompt: true})
+	if !slices.Equal(launch.Args, []string{"--model", "m"}) {
+		t.Errorf("Launch args = %q, want no developer_instructions", launch.Args)
+	}
+}
+
 func TestCodexArgs_RootsAreDeduped(t *testing.T) {
 	t.Parallel()
 	args := strings.Join(harness.CodexArgs(harness.CodexArgsInput{WritableRoots: []string{"/a/.git", "/a/.git", "/b"}}), " ")

@@ -99,9 +99,17 @@ var DefaultCodexHookCommands = CodexHookCommands{
 
 // CodexHookArgs is the -c pairs that install the PreToolUse, SessionStart and
 // PermissionRequest hooks.
-func CodexHookArgs(c CodexHookCommands) []string {
+func CodexHookArgs(c CodexHookCommands) []string { return codexHookArgs(c, true) }
+
+// codexHookArgs is CodexHookArgs; guardQuestion false leaves out the group
+// that blocks the question tool.
+func codexHookArgs(c CodexHookCommands, guardQuestion bool) []string {
+	pre := codexHookGroup("Bash", c.GuardBash)
+	if guardQuestion {
+		pre += "," + codexHookGroup(CodexQuestionTool, c.GuardQuestion)
+	}
 	return []string{
-		"-c", "hooks.PreToolUse=[" + codexHookGroup("Bash", c.GuardBash) + "," + codexHookGroup(CodexQuestionTool, c.GuardQuestion) + "]",
+		"-c", "hooks.PreToolUse=[" + pre + "]",
 		"-c", "hooks.SessionStart=[" + codexHookGroup("", c.Session) + "]",
 		"-c", codexPermissionHookEvent + "[" + codexHookGroup("", c.Permission) + "]",
 	}
@@ -118,7 +126,10 @@ const (
 // Launch adds the GX system prompt, on a fresh session only: Resume must not
 // carry it again (an instruction survives a resume).
 func (codexHarness) Launch(opts LaunchOptions) Command {
-	args := append(slices.Clone(opts.Args), "-c", "developer_instructions="+tomlString(GXSystemPromptFor(Codex)))
+	args := slices.Clone(opts.Args)
+	if !opts.NoSystemPrompt {
+		args = append(args, "-c", "developer_instructions="+tomlString(GXSystemPromptFor(Codex)))
+	}
 	return codexCommand(args, opts.Env)
 }
 
@@ -211,7 +222,15 @@ type CodexArgsInput struct {
 	// Hooks replaces DefaultCodexHookCommands; `gx codex doctor` passes a
 	// recording script. Nil means the defaults.
 	Hooks *CodexHookCommands
+	// QuestionTool is for a plain chat: the question tool is on (the flag and
+	// --no-daemon) and its guard hook group is left out. The zero value is
+	// the guarded launch every other caller keeps.
+	QuestionTool bool
 }
+
+// CodexQuestionToolFlag is the feature key that turns the question tool on in
+// Default mode.
+const CodexQuestionToolFlag = "features.default_mode_request_user_input=true"
 
 // CodexArgs is the one launch shape every Codex launch uses (queue, Agents
 // tab, design, Fix agent, Investigate, code-review, verify, evolve). It never
@@ -232,7 +251,12 @@ func CodexArgs(in CodexArgsInput) []string {
 	if in.Hooks != nil {
 		hooks = *in.Hooks
 	}
-	args = append(args, CodexHookArgs(hooks)...)
+	args = append(args, codexHookArgs(hooks, !in.QuestionTool)...)
+	if in.QuestionTool {
+		// --no-daemon keeps Codex off the shared background server, which
+		// refuses the flag (and, on resume, shows a dialog).
+		args = append(args, "--no-daemon", "-c", CodexQuestionToolFlag)
+	}
 	if roots := dedupe(in.WritableRoots); len(roots) > 0 {
 		args = append(args, "-c", "sandbox_workspace_write.writable_roots="+tomlStringArray(roots))
 	}

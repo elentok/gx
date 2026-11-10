@@ -94,7 +94,7 @@ func parseCodexArgs(args []string) (codexOptions, error) {
 	for _, name := range []string{"sandbox", "s", "ask-for-approval", "a", "model", "m", "cd", "C"} {
 		flags.String(name, "", "")
 	}
-	for _, name := range []string{"approve-for-me", "dangerously-bypass-hook-trust"} {
+	for _, name := range []string{"approve-for-me", "dangerously-bypass-hook-trust", "no-daemon"} {
 		flags.Bool(name, false, "")
 	}
 	flags.Func("c", "", func(setting string) error {

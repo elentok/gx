@@ -38,6 +38,8 @@ type LaunchOptions struct {
 	Env []string
 	// Cwd is the dir the session runs in. Codex resume takes it as --cd.
 	Cwd string
+	// NoSystemPrompt leaves the GX system prompt off a fresh Codex launch.
+	NoSystemPrompt bool
 }
 
 // Command is what to run for a session.

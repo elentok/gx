@@ -304,6 +304,8 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 		Args:      launchArgs(meta, mg.settings.Load().AgentsClaudeArgs, codexRoots(mg, meta)),
 		Env:       env,
 		Cwd:       meta.Dir,
+		// A plain Codex chat gets the question tool and no GX prompt.
+		NoSystemPrompt: isPlainCodex(meta),
 	}
 	launch := h.Launch(opts)
 	if resume {
@@ -359,7 +361,7 @@ func procCapArgs(mg *Manager) []string {
 func launchArgs(meta *Meta, claudeArgs, codexRoots []string) []string {
 	switch meta.Harness {
 	case string(harness.Codex):
-		return harness.CodexArgs(harness.CodexArgsInput{Model: meta.Model, Effort: meta.Effort, WritableRoots: codexRoots})
+		return harness.CodexArgs(harness.CodexArgsInput{Model: meta.Model, Effort: meta.Effort, WritableRoots: codexRoots, QuestionTool: isPlainCodex(meta)})
 	case string(harness.Claude):
 	default:
 		return nil
@@ -379,6 +381,11 @@ func launchArgs(meta *Meta, claudeArgs, codexRoots []string) []string {
 		args = append(args, "--remote-control", meta.RemoteControl)
 	}
 	return args
+}
+
+// isPlainCodex is a Codex chat with no flow, ticket or fix-of.
+func isPlainCodex(meta *Meta) bool {
+	return meta.Harness == string(harness.Codex) && meta.Flow == "" && meta.Ticket == "" && meta.FixOf == ""
 }
 
 // codexRoots are the writable roots of a Codex session: its dir's git dirs and
