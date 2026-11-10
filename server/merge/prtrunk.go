@@ -20,6 +20,12 @@ import (
 // failed update stores a pr-dirty-trunk or pr-trunk-update block (and its one
 // notice, until the kind changes) and reports false; the caller retries.
 func (s *Merger) SyncTrunkAfterMerge(root queue.RootRef) bool {
+	return s.syncTrunk(root, true)
+}
+
+// syncTrunk is SyncTrunkAfterMerge; notify says whether success sends the merged
+// notice. A hand Mark as merged sends none: the person did the merge.
+func (s *Merger) syncTrunk(root queue.RootRef, notify bool) bool {
 	dir, repo, err := s.projects.Of(root.Project)
 	if err != nil {
 		s.log.Warn("land merged PR: resolve project", "root", root, "err", err)
@@ -44,6 +50,17 @@ func (s *Merger) SyncTrunkAfterMerge(root queue.RootRef) bool {
 		s.pauseTrunkUpdate(root, e, p)
 		return false
 	}
+	s.stampAndDequeueMerged(root, e, repo, unlock)
+	if notify {
+		s.notifyEpicOutcome(root.Project, dir, ralphloop.OneIteration{Epic: e.Name, Ticket: one}, e, true)
+	}
+	return true
+}
+
+// stampAndDequeueMerged is the shared tail of every merge that lands: under the
+// Trunk lock the caller holds (released here) it stamps merged_at once, then
+// clears the merge block, dequeues the root and publishes the events.
+func (s *Merger) stampAndDequeueMerged(root queue.RootRef, e tickets.Epic, repo string, unlock func()) {
 	// Read the stamp under the lock: a hand-merge detection racing us stamps first.
 	if tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero() {
 		added, deleted, cerr := rlmerge.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
@@ -60,8 +77,6 @@ func (s *Merger) SyncTrunkAfterMerge(root queue.RootRef) bool {
 		s.events.Publish(wire.EventQueueChanged, root.String())
 		s.events.Publish(wire.EventRootCompleted, root.String())
 	}
-	s.notifyEpicOutcome(root.Project, dir, ralphloop.OneIteration{Epic: e.Name, Ticket: one}, e, true)
-	return true
 }
 
 // pauseTrunkUpdate stores p, with its notice only when the stored kind differs:

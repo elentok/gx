@@ -44,6 +44,7 @@ var allowed = map[string]int{
 	"server/devmode_failure_test.go":                          1, // negative wait: a crashed Vite is not restarted on its own
 	"server/designs/designready_test.go":                      1, // negative wait: no Ready message follows a rescan
 	"server/prflow/giveup_test.go":                            1, // negative wait: giving up on CI sends no second notice
+	"server/prflow/markmerged_test.go":                        1, // negative wait: a hand Mark as merged sends no merged notice
 	"server/ticketwrite/blocked_pause_test.go":                3, // negative waits: no pause before the dwell ends, after a re-check, or on a usage limit
 	"server/budget/extrausage_internal_test.go":               2, // poll loop with a deadline; negative wait: no second notice is sent
 	"server/servertest/longticket_test.go":                    1, // a delayed transcript write

@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	"github.com/elentok/gx/config"
-	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
@@ -44,7 +43,7 @@ func (s *Merger) EpicMarkMerged(req wire.QueueRequest) (wire.QueueResult, error)
 		}
 	}
 	if pf, _ := config.ReadProjectFile(m.dir); pf.DeliveryIsPR() {
-		if s.SyncTrunkAfterMerge(m.root) {
+		if s.syncTrunk(m.root, false) {
 			_ = prflow.Append(m.epic.Path, prflow.Entry{Kind: prflow.KindTrunkUpdated})
 			return wire.QueueResult{}, nil
 		}
@@ -61,22 +60,7 @@ func (s *Merger) stampMarkedMerged(m mergeEpicRef) error {
 	if err != nil {
 		return err
 	}
-	unlock := s.guards.Trunks.Lock(m.repo, target)
-	if tickets.LoadEpicTicketMD(m.epic.Path).MergedAt.IsZero() {
-		added, deleted, cerr := rlmerge.EpicTrailerLines(m.repo, "refs/heads/"+m.epic.Name, m.epic.Name)
-		s.stampMergedEpic(m.root, m.epic, added, deleted, cerr)
-		s.StampEpic(m.root, m.epic.Path, "merged_at")
-	}
-	unlock()
-	s.clearMergeBlock(m.root, m.epic.Path)
-	removed, err := s.queue.RemoveRoot(m.root)
-	if err != nil {
-		s.log.Warn("dequeue marked-merged root", "root", m.root, "err", err)
-	}
-	if removed {
-		s.events.Publish(wire.EventQueueChanged, m.root.String())
-		s.events.Publish(wire.EventRootCompleted, m.root.String())
-	}
+	s.stampAndDequeueMerged(m.root, m.epic, m.repo, s.guards.Trunks.Lock(m.repo, target))
 	return nil
 }
 

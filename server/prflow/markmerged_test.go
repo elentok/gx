@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/servertest"
@@ -135,5 +136,40 @@ func TestMarkMerged_DirtyTrunkKeepsMergedAtEmptyUntilTheTrunkIsClean(t *testing.
 	f.Tick(t)
 	if e := tickets.LoadEpicAt(f.EpicDir()); e.MergedAt.IsZero() || e.MergeBlockKind != "" {
 		t.Errorf("after cleaning, merged_at %v, block %q", e.MergedAt, e.MergeBlockKind)
+	}
+}
+
+// handMergedChatRig is handMergedRig with chat notices counted.
+func handMergedChatRig(t *testing.T) (*rigs.PRFlow, func(string) int) {
+	t.Helper()
+	f, count := chatRig(t)
+	servertest.WriteTicketWith(t, f.Store, "proj", "epic-a", "01", "root", servertest.TicketOpts{Status: "done"})
+	servertest.CommitOnBranch(t, f.Origin.Local, "epic-a")
+	openPR(f)
+	f.StampPR(t, 5, prURL)
+	f.Origin.SimulateSquashMerge("epic-a")
+	return f, count
+}
+
+func TestMarkMerged_SendsNoMergedNoticeButAWatcherDetectedMergeDoes(t *testing.T) {
+	hand, handCount := handMergedChatRig(t)
+	hand.GH.Update(func(s *ghfake.State) { s.PRs[0].State = "OPEN" })
+	if res := markMerged(t, hand); res.Refused {
+		t.Fatalf("refused: %+v", res)
+	}
+	if tickets.LoadEpicAt(hand.EpicDir()).MergedAt.IsZero() {
+		t.Fatal("merged_at not stamped")
+	}
+
+	// The watcher-detected merge is the control: once its notice has flushed,
+	// the hand merge's would have too.
+	watched, watchedCount := handMergedChatRig(t)
+	watched.Tick(t)
+	if got := rigs.WaitForChat(watchedCount, rigs.EpicMergedText); got != 1 {
+		t.Fatalf("watcher-detected merge sent %d merged notices, want 1", got)
+	}
+	time.Sleep(2 * servertest.FlushInterval) // negative wait
+	if got := handCount(rigs.EpicMergedText); got != 0 {
+		t.Errorf("hand Mark as merged sent %d merged notices, want none", got)
 	}
 }
