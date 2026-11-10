@@ -4,7 +4,15 @@ import { NoteBox } from "../../design/NoteBox";
 import { Markdown } from "../../markdown/Markdown";
 import { Button } from "../button/Button";
 import { ExpandableTextField } from "../expandable-text/ExpandableTextField";
-import { choicesOf, isAnswered, nameOf, type Answer, type Answers, type QuestionCard } from "./round";
+import {
+  choicesOf,
+  isAnswered,
+  nameOf,
+  type Answer,
+  type Answers,
+  type QuestionCard,
+  type QuestionMode,
+} from "./round";
 
 function Choice({
   label,
@@ -62,13 +70,23 @@ function Choice({
           </Text>
         )}
         {recommended && (
-          <Text as="span" fontSize="xs" color={on ? "surface" : "tone.waiting.fg"}>
+          <Text
+            as="span"
+            fontSize="xs"
+            color={on ? "surface" : "tone.waiting.fg"}
+          >
             ★ recommended
           </Text>
         )}
       </Box>
       {consequence && (
-        <Text as="span" id={`${uid}-consequence`} fontSize="sm" fontWeight="normal" color={dim}>
+        <Text
+          as="span"
+          id={`${uid}-consequence`}
+          fontSize="sm"
+          fontWeight="normal"
+          color={dim}
+        >
           {consequence}
         </Text>
       )}
@@ -78,38 +96,47 @@ function Choice({
 
 const letterOf = (k: number) => String.fromCharCode(65 + (k % 26));
 
-// One question of a card. `big` is the Questions-view size. `huh` is for printed-round cards only, and
-// `notes` for cards that take a note (hook and Codex cards); callers of other cards pass false.
+// One question of a card. `big` is the Questions-view size. `mode` says whether it shows Huh? and a note.
 export function Question({
   card,
   answer,
   onChange,
   onPicked,
   big,
-  huh = true,
-  notes = true,
+  mode = "round",
 }: {
   card: QuestionCard;
   answer: Answer;
   onChange: (a: Answer) => void;
   onPicked: () => void;
   big?: boolean;
-  huh?: boolean;
-  notes?: boolean;
+  mode?: QuestionMode;
 }) {
+  const huh = mode === "round";
+  const notes = mode !== "plain";
   const [noteOpen, setNoteOpen] = useState(!!answer.note);
   const choices = choicesOf(card);
   const text = card.kind === "text" || choices.length === 0;
   const multi = card.kind === "multi-select";
   const chosen = answer.choices ?? [];
-  const textRow = choices.find((c) => c.text && (multi ? chosen.includes(c.label) : answer.choice === c.id));
+  const textRow = choices.find(
+    (c) => c.text && (multi ? chosen.includes(c.id) : answer.choice === c.id),
+  );
   const lettered = card.kind !== "yes-no";
   return (
     <Box display="flex" flexDirection="column" gap={big ? "3" : "2"}>
       {card.context &&
         (card.contextHref ? (
           // A new tab, so the draft and the place in the questions stay put while the ticket is read.
-          <chakra.a href={card.contextHref} target="_blank" rel="noreferrer" fontSize="xs" color="text.dim" textDecoration="underline" aria-label={`Open ticket: ${card.context}`}>
+          <chakra.a
+            href={card.contextHref}
+            target="_blank"
+            rel="noreferrer"
+            fontSize="xs"
+            color="text.dim"
+            textDecoration="underline"
+            aria-label={`Open ticket: ${card.context}`}
+          >
             {card.context} ↗
           </chakra.a>
         ) : (
@@ -122,7 +149,9 @@ export function Question({
         fontSize={big ? "title" : "subtitle"}
         fontWeight="600"
       >{`${nameOf(card)} - ${card.title}`}</Markdown>
-      {card.body && <Markdown fontSize={big ? "lg" : "md"}>{card.body}</Markdown>}
+      {card.body && (
+        <Markdown fontSize={big ? "lg" : "md"}>{card.body}</Markdown>
+      )}
       {card.links && card.links.length > 0 && (
         <Box display="flex" flexWrap="wrap" gap="2">
           {card.links.map((l) => (
@@ -165,7 +194,7 @@ export function Question({
       ) : (
         <Box display="flex" flexDirection="column" gap="2">
           {choices.map((c, k) => {
-            const on = multi ? chosen.includes(c.label) : answer.choice === c.id;
+            const on = multi ? chosen.includes(c.id) : answer.choice === c.id;
             return (
               <Choice
                 key={c.id}
@@ -177,10 +206,20 @@ export function Question({
                 recommended={card.recommended === c.id}
                 onClick={() => {
                   if (multi) {
-                    onChange({ ...answer, huh: false, choices: on ? chosen.filter((l) => l !== c.label) : [...chosen, c.label] });
+                    onChange({
+                      ...answer,
+                      huh: false,
+                      choices: on
+                        ? chosen.filter((id) => id !== c.id)
+                        : [...chosen, c.id],
+                    });
                     return;
                   }
-                  onChange({ ...answer, huh: false, choice: on ? undefined : c.id });
+                  onChange({
+                    ...answer,
+                    huh: false,
+                    choice: on ? undefined : c.id,
+                  });
                   if (!on) onPicked();
                 }}
               />
@@ -208,7 +247,11 @@ export function Question({
             recommended={false}
             onClick={() => {
               const on = !answer.huh;
-              onChange({ ...answer, huh: on, choice: on ? undefined : answer.choice });
+              onChange({
+                ...answer,
+                huh: on,
+                choice: on ? undefined : answer.choice,
+              });
               if (on) onPicked();
             }}
           />
@@ -224,7 +267,16 @@ export function Question({
             aria-pressed={noteOpen}
             onClick={() => setNoteOpen((o) => !o)}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
               <path d="M3 13l.7-3L10.5 3.2a1.4 1.4 0 0 1 2 2L5.7 12 3 13z" />
             </svg>
             Note

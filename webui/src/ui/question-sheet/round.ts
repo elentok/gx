@@ -1,5 +1,17 @@
-/** `choices` is a multi-select answer: the labels of the chosen options. */
-export type Answer = { choice?: string; choices?: string[]; text?: string; note?: string; huh?: boolean };
+/**
+ * What a card offers besides its options: "round" (a printed round: Huh? and a note), "notes" (a note only:
+ * hook and Codex cards) or "plain" (neither: a screen-read dialog, a permission or plan card).
+ */
+export type QuestionMode = "round" | "notes" | "plain";
+
+/** `choices` is a multi-select answer: the ids of the chosen options, as the server reads them. */
+export type Answer = {
+  choice?: string;
+  choices?: string[];
+  text?: string;
+  note?: string;
+  huh?: boolean;
+};
 export type Answers = Record<string, Answer>;
 
 export interface QuestionChoice {
@@ -44,7 +56,9 @@ export const choicesOf = (c: QuestionCard): QuestionChoice[] =>
 /** Whether the picked option or options include a text row, which needs text before the question counts. */
 const needsText = (a: Answer, card?: QuestionCard) => {
   const picked = new Set([a.choice, ...(a.choices ?? [])]);
-  return !!card?.options?.some((o) => o.text && (picked.has(o.id) || picked.has(o.label))) && !a.text?.trim();
+  return (
+    !!card?.options?.some((o) => o.text && picked.has(o.id)) && !a.text?.trim()
+  );
 };
 
 /** With `card`, a picked text row also needs its text. Without it, any choice, text or Huh? counts. */
@@ -56,4 +70,5 @@ export const isAnswered = (a?: Answer, card?: QuestionCard) => {
 };
 
 /** The Submit rule: a card is answered only when each of its questions is. */
-export const allAnswered = (cards: QuestionCard[], answers: Answers) => cards.every((c) => isAnswered(answers[c.label], c));
+export const allAnswered = (cards: QuestionCard[], answers: Answers) =>
+  cards.every((c) => isAnswered(answers[c.label], c));

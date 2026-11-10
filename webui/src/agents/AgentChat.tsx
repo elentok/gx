@@ -20,7 +20,7 @@ import {
 } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
-import { allAnswered } from "../ui/question-sheet/round";
+import { allAnswered, type QuestionMode } from "../ui/question-sheet/round";
 
 /** The first open card, docked above the banner. The caller keys it by card id, so a new card starts a fresh draft. */
 function CardSheet({
@@ -36,7 +36,10 @@ function CardSheet({
   post: PostAnswer;
   refetch: () => void;
 }) {
-  const { draft, setAnswers, setIndex, clear } = useRoundDraft(session.id, card.id);
+  const { draft, setAnswers, setIndex, clear } = useRoundDraft(
+    session.id,
+    card.id,
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   // Codex typed some keys and stopped: another Submit would type the rest on top of them.
@@ -46,7 +49,12 @@ function CardSheet({
   const claude = card.source === CardSourceClaudeDialog;
   const hook = claude && !card.fallback;
   const dismissable = claude || card.source === CardSourcePermission;
-  const notes = hook || card.source === CardSourceCodex;
+  const mode: QuestionMode =
+    card.source === CardSourceRound
+      ? "round"
+      : hook || card.source === CardSourceCodex
+        ? "notes"
+        : "plain";
 
   const send = async (answers: SessionAnswer[], release?: boolean) => {
     if (pending) return;
@@ -62,10 +70,13 @@ function CardSheet({
         last_message: lastMessage,
       });
       if (res.refused) {
-        if (res.reason === ReasonCodexNotReady) setError("Codex is not ready for the answer yet. Retry in a moment.");
+        if (res.reason === ReasonCodexNotReady)
+          setError("Codex is not ready for the answer yet. Retry in a moment.");
         else if (res.reason === ReasonCodexStopped) {
           setStopped(true);
-          setError("Codex took part of the answer and stopped. Open Screen to finish it.");
+          setError(
+            "Codex took part of the answer and stopped. Open Screen to finish it.",
+          );
         } else setError(res.message ?? "The answer was refused.");
         if (res.reason === ReasonStale) refetch();
       } else {
@@ -80,21 +91,51 @@ function CardSheet({
   };
 
   return (
-    <Box display="flex" flexDirection="column" gap="2" maxH="50dvh" minH="0" flex="none">
-      <QuestionSheet round={cards} answers={draft.answers} onAnswers={setAnswers} initialIndex={draft.index} onIndex={setIndex} notes={notes} huh={card.source === CardSourceRound} />
+    <Box
+      display="flex"
+      flexDirection="column"
+      gap="2"
+      maxH="50dvh"
+      minH="0"
+      flex="none"
+    >
+      <QuestionSheet
+        round={cards}
+        answers={draft.answers}
+        onAnswers={setAnswers}
+        initialIndex={draft.index}
+        onIndex={setIndex}
+        mode={mode}
+      />
       {error && <Text role="alert">{error}</Text>}
       <Box display="flex" gap="2" justifyContent="flex-end" flexWrap="wrap">
         {hook && (
-          <Button emphasis="ghost" tone="muted" disabled={pending} onClick={() => send([], true)}>
+          <Button
+            emphasis="ghost"
+            tone="muted"
+            disabled={pending}
+            onClick={() => send([], true)}
+          >
             Answer in the terminal
           </Button>
         )}
         {dismissable && (
-          <Button emphasis="ghost" tone="muted" disabled={pending} onClick={() => send([])}>
+          <Button
+            emphasis="ghost"
+            tone="muted"
+            disabled={pending}
+            onClick={() => send([])}
+          >
             Dismiss
           </Button>
         )}
-        <Button emphasis="main" disabled={!ready || pending || stopped} onClick={() => ready && send(cards.map((c) => draft.answers[c.label] ?? {}))}>
+        <Button
+          emphasis="main"
+          disabled={!ready || pending || stopped}
+          onClick={() =>
+            ready && send(cards.map((c) => draft.answers[c.label] ?? {}))
+          }
+        >
           Submit
         </Button>
       </Box>
@@ -120,8 +161,23 @@ export function AgentChat({
   return (
     // Sized by its content first, so the "No messages yet" row beside it cannot squeeze a card and banner under the composer.
     <Box display="flex" flexDirection="column" gap="3" flex="1 1 auto" minH="0">
-      <ChatMessages chat={chat} busy={busy} sessionId={session.id} showTools working={<WorkingRow current={chat.current} others={chat.others} />} />
-      {card && <CardSheet key={card.id} session={session} card={card} lastMessage={chat.messages.at(-1)?.id} post={post} refetch={refetch} />}
+      <ChatMessages
+        chat={chat}
+        busy={busy}
+        sessionId={session.id}
+        showTools
+        working={<WorkingRow current={chat.current} others={chat.others} />}
+      />
+      {card && (
+        <CardSheet
+          key={card.id}
+          session={session}
+          card={card}
+          lastMessage={chat.messages.at(-1)?.id}
+          post={post}
+          refetch={refetch}
+        />
+      )}
       {failure && (
         <FailureBanner
           failure={failure}

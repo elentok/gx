@@ -48,7 +48,7 @@ export function Composer({
   post,
   answer = postAnswer,
   roundId = "",
-  interrupt =postInterruptSession,
+  interrupt = postInterruptSession,
   setAutoAdvance = postAutoAdvance,
   setAutoQueue = postAutoQueue,
   cancelAutoAdvance = postCancelAutoAdvance,
@@ -174,7 +174,11 @@ export function Composer({
   const slot: Partial<ComponentProps<typeof Button>> = wide ? { whiteSpace: "nowrap", flex: "none" } : { flex: "1", minW: "0", h: "44px", justifyContent: "center", borderRadius: "10px" };
   // Notes (on a question or in the composer) and images are worth sending without any answer.
   const hasQuestionNote = round.some((c) => !!answers[c.label]?.note?.trim());
-  const noAnswers = !wide && unanswered.length === round.length && !hasQuestionNote && !hasContent;
+  const noAnswers =
+    !wide &&
+    unanswered.length === round.length &&
+    !hasQuestionNote &&
+    !hasContent;
   // Interrupt while the agent works; Continue after a run-end line unless a note or round is waiting to go.
   const mainButton = working ? (
     <InterruptControl
@@ -218,7 +222,11 @@ export function Composer({
       />
     </>
   ) : (
-    <Button {...slot} disabled={!enabled || !images.canSend(text)} onClick={sendText}>
+    <Button
+      {...slot}
+      disabled={!enabled || !images.canSend(text)}
+      onClick={sendText}
+    >
       {pending && <Spinner size="sm" />}
       Send
     </Button>
@@ -264,7 +272,16 @@ export function Composer({
               aria-label="Note"
               title={wide ? undefined : "Note"}
               aria-expanded={open}
-              {...(wide ? {} : { w: "44px", h: "44px", px: "0", justifyContent: "center", flex: "none", position: "relative" })}
+              {...(wide
+                ? {}
+                : {
+                    w: "44px",
+                    h: "44px",
+                    px: "0",
+                    justifyContent: "center",
+                    flex: "none",
+                    position: "relative",
+                  })}
               onClick={() => setOpen(!open)}
             >
               <PiNotePencil size={wide ? undefined : 20} />
@@ -302,14 +319,20 @@ export function Composer({
             fieldName="design-note"
             label="Message"
             title={inRound ? "Note on this round" : "Message to the agent"}
-            placeholder={inRound ? "A note on this round" : "A message to the agent"}
+            placeholder={
+              inRound ? "A note on this round" : "A message to the agent"
+            }
             value={text}
             disabled={!enabled}
             autoFocus
             onChange={setText}
             onSubmit={onSubmit}
             footer={footerLine}
-            completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
+            completion={{
+              target: { sessionId: session.id },
+              harness: session.harness,
+              off: !enabled,
+            }}
           />
         )}
         {open && codexSkillHint(session.harness, text) && (

@@ -4,7 +4,11 @@ import type { SessionRoundCard } from "../generated/server";
 import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe";
 import { Button } from "../ui/button/Button";
 import { Question, QuestionDots } from "../ui/question-sheet/Question";
-import { isAnswered, type Answers } from "../ui/question-sheet/round";
+import {
+  isAnswered,
+  type Answers,
+  type QuestionMode,
+} from "../ui/question-sheet/round";
 
 // A Grilling round docked above the composer. The caller keys it by round, so a new round opens a fresh sheet,
 // and owns the answers, since the composer's Send reads them.
@@ -16,8 +20,7 @@ export function QuestionSheet({
   initialIndex = 0,
   onIndex,
   questions = false,
-  notes = true,
-  huh = true,
+  mode = "round",
 }: {
   round: (SessionRoundCard & { context?: string; contextHref?: string })[];
   answers: Answers;
@@ -29,10 +32,8 @@ export function QuestionSheet({
   onIndex?: (index: number) => void;
   /** The Questions view: the sheet fills its column, renders big and cannot fold. The page owns it. */
   questions?: boolean;
-  /** False for cards that take no note: a screen-read dialog, a permission or plan card. */
-  notes?: boolean;
-  /** False for every card but a printed round: only a round's questions can be sent back as Huh?. */
-  huh?: boolean;
+  /** What each card offers besides its options. Only a printed round can be sent back as Huh?. */
+  mode?: QuestionMode;
 }) {
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -190,8 +191,7 @@ export function QuestionSheet({
               >
                 <Question
                   big={questions}
-                  notes={notes}
-                  huh={huh}
+                  mode={mode}
                   card={c}
                   answer={answers[c.label] ?? {}}
                   onChange={(a) =>

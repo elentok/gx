@@ -18,9 +18,20 @@ const options = (extra: Partial<QuestionCard> = {}): QuestionCard => ({
   ...extra,
 });
 
-const show = (card: QuestionCard, props: Partial<Parameters<typeof Question>[0]> = {}) => {
+const show = (
+  card: QuestionCard,
+  props: Partial<Parameters<typeof Question>[0]> = {},
+) => {
   const onChange = vi.fn();
-  render(<Question card={card} answer={{}} onChange={onChange} onPicked={vi.fn()} {...props} />);
+  render(
+    <Question
+      card={card}
+      answer={{}}
+      onChange={onChange}
+      onPicked={vi.fn()}
+      {...props}
+    />,
+  );
   return onChange;
 };
 
@@ -36,26 +47,55 @@ test("a card's links show as new-tab links", () => {
   expect(link.getAttribute("target")).toBe("_blank");
 });
 
-test("multi-select toggles options and answers with the chosen labels", () => {
-  const onChange = show(options({ kind: "multi-select" }), { answer: { choices: ["Alpha"] } });
-  expect(screen.getByRole("button", { name: "Alpha" }).getAttribute("aria-pressed")).toBe("true");
+test("multi-select toggles options and answers with the chosen option ids", () => {
+  const onChange = show(options({ kind: "multi-select" }), {
+    answer: { choices: ["a"] },
+  });
+  expect(
+    screen.getByRole("button", { name: "Alpha" }).getAttribute("aria-pressed"),
+  ).toBe("true");
   fireEvent.click(screen.getByRole("button", { name: "Beta" }));
-  expect(onChange).toHaveBeenLastCalledWith({ choices: ["Alpha", "Beta"], huh: false });
+  expect(onChange).toHaveBeenLastCalledWith({
+    choices: ["a", "b"],
+    huh: false,
+  });
   fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
   expect(onChange).toHaveBeenLastCalledWith({ choices: [], huh: false });
 });
 
+test("multi-select's Other row answers with the id other and asks for its text", () => {
+  const onChange = show(options({ kind: "multi-select" }));
+  fireEvent.click(screen.getByRole("button", { name: "Other" }));
+  expect(onChange).toHaveBeenLastCalledWith({ choices: ["other"], huh: false });
+  cleanup();
+  show(options({ kind: "multi-select" }), { answer: { choices: ["other"] } });
+  expect(
+    screen.getByRole("textbox", { name: /Other \(question 1\)/ }),
+  ).toBeTruthy();
+});
+
 test("the note field shows only when the card takes notes", () => {
   show(options());
-  expect(screen.getByRole("button", { name: /Note on question 1/ })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: /Note on question 1/ }),
+  ).toBeTruthy();
   cleanup();
-  show(options(), { notes: false });
-  expect(screen.queryByRole("button", { name: /Note on question 1/ })).toBeNull();
+  show(options(), { mode: "plain" });
+  expect(
+    screen.queryByRole("button", { name: /Note on question 1/ }),
+  ).toBeNull();
+  cleanup();
+  show(options(), { mode: "notes" });
+  expect(
+    screen.getByRole("button", { name: /Note on question 1/ }),
+  ).toBeTruthy();
 });
 
 test("a picked text row shows its text field", () => {
   show(options(), { answer: { choice: "other" } });
-  expect(screen.getByRole("textbox", { name: /Other \(question 1\)/ })).toBeTruthy();
+  expect(
+    screen.getByRole("textbox", { name: /Other \(question 1\)/ }),
+  ).toBeTruthy();
   cleanup();
   show(options(), { answer: { choice: "a" } });
   expect(screen.queryByRole("textbox")).toBeNull();
@@ -64,7 +104,9 @@ test("a picked text row shows its text field", () => {
 test("a fresh card has no pressed option and no recommended badge", () => {
   show(options());
   for (const name of ["Alpha", "Beta", "Other"]) {
-    expect(screen.getByRole("button", { name }).getAttribute("aria-pressed")).toBe("false");
+    expect(
+      screen.getByRole("button", { name }).getAttribute("aria-pressed"),
+    ).toBe("false");
   }
   expect(screen.queryByText(/recommended/)).toBeNull();
 });
@@ -78,6 +120,6 @@ test("Huh? shows only when the card is a printed round", () => {
   show(options());
   expect(screen.getByRole("button", { name: "Huh?" })).toBeTruthy();
   cleanup();
-  show(options(), { huh: false });
+  show(options(), { mode: "notes" });
   expect(screen.queryByRole("button", { name: "Huh?" })).toBeNull();
 });
