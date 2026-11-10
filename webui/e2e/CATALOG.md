@@ -152,6 +152,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 ## Editor (`vi-editor`)
 
 - Cmd-Enter in the agent composer's editor closes it and sends.
+- In a Working session's large editor, the first Esc leaves insert mode and opens no interrupt confirm; the second Esc opens it.
 - 1280px mouse: an 860 by 680 modal; mode text left of the footer; Cmd-K over it; 1280px touch is at most 680px high.
 - 390px: `j` moves one screen line inside a wrapped paragraph; a click resets the column `j` keeps.
 - Escape in the editor over the question sheet closes neither.

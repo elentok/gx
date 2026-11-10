@@ -87,6 +87,25 @@ test.describe("124. Vi editor: open, close and submit", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect.poll(() => fixture.cli("agents", "chat", idle.id)).toContain("sent from the editor");
   });
+
+  test("Esc in a Working session's editor: the first leaves insert mode, the second opens the interrupt confirm", async ({ page, start }) => {
+    const fixture = await start("agents");
+    const working = (await sessions(fixture))[1];
+    await setViMode(fixture, page, true);
+    await go(page, `#/agents/${working.id}`);
+    await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible();
+    await composer(page).getByRole("button", nav("Open the note in a large editor")).click();
+    const dialog = page.getByRole("dialog", { name: /^Message to / });
+    const editor = dialog.getByRole("textbox", { name: /text$/ });
+    await expect(editor).toBeFocused();
+    const confirm = page.getByRole("alertdialog", nav("Interrupt the agent?"));
+    await page.keyboard.press("Escape");
+    await expect(confirm).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(confirm).toBeVisible();
+    await expect(confirm.getByRole("button", { name: "Interrupt", exact: true })).toBeFocused();
+  });
 });
 
 test.describe("123. Vi editor: layouts and touch bar", () => {
