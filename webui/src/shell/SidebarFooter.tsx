@@ -48,6 +48,8 @@ function FooterLink({ href, label, badge, children }: { href: string; label: str
 function EpicsMenu({ needsYou }: { needsYou: number }) {
   const navigate = useNavigate();
   const shell = useShell();
+  const conn = useConnectionContext();
+  const { list } = useEpicList(undefined, conn);
   const go = (path: string) => () => {
     navigate(path);
     shell?.closeSliding();
@@ -66,7 +68,7 @@ function EpicsMenu({ needsYou }: { needsYou: number }) {
         </FooterButton>
       }
       items={[
-        { value: "epics", label: "Epics", onSelect: go("/epics") },
+        { value: "epics", label: "Epics", hint: list?.epics?.length, inlineHint: true, onSelect: go("/epics") },
         { value: "archive", label: "Archive", onSelect: go("/archive") },
       ]}
     />

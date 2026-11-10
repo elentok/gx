@@ -92,8 +92,18 @@ test("the Epics icon opens a menu with Epics and Archive, and Archive navigates 
   await waitFor(() => expect(router.state.location.pathname).toBe("/archive"));
 });
 
+test("the Epics menu entry shows the epic count", async () => {
+  const epics = [{ address: "gx:a" }, { address: "gx:b" }, { address: "gx:c" }];
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics, follow_ups: [] }))));
+  setupWithRouter();
+  fireEvent.click(screen.getByRole("button", { name: "Epics" }));
+  const item = await screen.findByRole("menuitem", { name: /^Epics/ });
+  await waitFor(() => expect(item.textContent).toBe("Epics3"));
+  vi.unstubAllGlobals();
+});
+
 function stubUsage(ok: boolean) {
-  const summary = { mode: "limits", limits: { five_hour: { used_percentage: 10, resets_at: Date.now() / 1000 + 3600, received_at: Date.now() / 1000 } } };
+  const summary = { epics: [], follow_ups: [], mode: "limits", limits: { five_hour: { used_percentage: 10, resets_at: Date.now() / 1000 + 3600, received_at: Date.now() / 1000 } } };
   vi.stubGlobal("fetch", vi.fn(async () => (ok ? new Response(JSON.stringify(summary)) : new Response("", { status: 500 }))));
 }
 
