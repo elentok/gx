@@ -11,6 +11,7 @@ import { CloseSignalContext } from "../ui/closeSignal";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { hasLayer } from "../ui/modal/layers";
 import { Strip } from "../ui/strip/Strip";
+import { useDevToast } from "../dev/useDevToast";
 import { useDevice, type Device } from "../useWide";
 import { isMac } from "../platform";
 import { CommandPalette } from "./CommandPalette";
@@ -174,6 +175,7 @@ export function AppShell({
   const { snapshot, connected } = useConnectionState(conn);
   const { workspaces } = useWorkspaces(conn);
   useShortcuts({ fetcher: fetchEpicList, active, setActive });
+  useDevToast();
   const [newWorkspace, setNewWorkspace] = useState(false);
   const [manageWorkspaces, setManageWorkspaces] = useState(false);
   // The snapshot learns of a new workspace from the server's event; activating it earlier would resolve straight back to Default.
