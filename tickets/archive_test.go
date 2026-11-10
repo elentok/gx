@@ -1,100 +1,57 @@
-package tickets
+package tickets_test
 
 import (
-	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/tickets"
 )
 
-func TestCountArchivedEpics_MissingArchiveDirReturnsZero(t *testing.T) {
-	count, err := CountArchivedEpics(t.TempDir())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestArchiveKey_RoundTrip(t *testing.T) {
+	cases := []struct {
+		addr, name, key string
+	}{
+		{"proj:foo", "foo", "proj:.archive/foo"},
+		{"proj:foo/01", "foo", "proj:.archive/foo/01"},
+		{"proj:foo", "foo-2", "proj:.archive/foo-2"},
+		{"proj:foo/01", "foo-2", "proj:.archive/foo-2/01"},
 	}
-	if count != 0 {
-		t.Fatalf("expected 0, got %d", count)
-	}
-}
-
-func TestCountArchivedEpics_EmptyArchiveDirReturnsZero(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(ArchiveDir(dir), ".keep"), "")
-
-	count, err := CountArchivedEpics(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if count != 0 {
-		t.Fatalf("expected 0, got %d", count)
-	}
-}
-
-func TestCountArchivedEpics_CountsEpicDirectories(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(ArchiveDir(dir), "epic-one", "issues", "01-first.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
-	writeFile(t, filepath.Join(ArchiveDir(dir), "epic-two", "issues", "01-first.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
-
-	count, err := CountArchivedEpics(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if count != 2 {
-		t.Fatalf("expected 2, got %d", count)
+	for _, c := range cases {
+		key := tickets.ArchiveKey(c.addr, c.name)
+		if key != c.key {
+			t.Errorf("ArchiveKey(%q, %q) = %q, want %q", c.addr, c.name, key, c.key)
+		}
+		if !tickets.IsArchiveKey(key) {
+			t.Errorf("IsArchiveKey(%q) = false", key)
+		}
+		back, ok := tickets.ArchiveKeyAddress(key)
+		want := c.addr
+		if c.name == "foo-2" {
+			want = map[string]string{"proj:foo": "proj:foo-2", "proj:foo/01": "proj:foo-2/01"}[c.addr]
+		}
+		if !ok || back != want {
+			t.Errorf("ArchiveKeyAddress(%q) = %q, %v, want %q", key, back, ok, want)
+		}
 	}
 }
 
-func TestLoadArchived_MissingArchiveDirReturnsEmpty(t *testing.T) {
-	epics, err := LoadArchived(t.TempDir())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(epics) != 0 {
-		t.Fatalf("expected no epics, got %v", epics)
-	}
-}
-
-func TestLoadArchived_EmptyArchiveDirReturnsEmpty(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(ArchiveDir(dir), ".keep"), "")
-
-	epics, err := LoadArchived(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(epics) != 0 {
-		t.Fatalf("expected no epics, got %v", epics)
+func TestArchiveEpicKey_DropsTicketSuffix(t *testing.T) {
+	for in, want := range map[string]string{
+		"proj:.archive/foo-2/01": "proj:.archive/foo-2",
+		"proj:.archive/foo-2":    "proj:.archive/foo-2",
+	} {
+		if got := tickets.ArchiveEpicKey(in); got != want {
+			t.Errorf("ArchiveEpicKey(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 
-func TestLoadArchived_DiscoversEpicsAndTicketsMatchingCount(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(ArchiveDir(dir), "my-epic", "issues", "01-first-ticket.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
-	writeFile(t, filepath.Join(ArchiveDir(dir), "my-epic", "issues", "02-second-ticket.md"),
-		"---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
-
-	epics, err := LoadArchived(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(epics) != 1 {
-		t.Fatalf("expected 1 epic, got %d", len(epics))
-	}
-
-	epic := epics[0]
-	if epic.Name != "my-epic" {
-		t.Errorf("Name = %q, want %q", epic.Name, "my-epic")
-	}
-	if epic.TotalCount() != 2 {
-		t.Fatalf("expected 2 tickets, got %d", epic.TotalCount())
-	}
-
-	count, err := CountArchivedEpics(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if count != len(epics) {
-		t.Fatalf("CountArchivedEpics = %d, want %d (LoadArchived epic count)", count, len(epics))
+func TestArchiveKeyAddress_NotAnArchiveKey(t *testing.T) {
+	for _, s := range []string{"proj:foo", "proj:foo/01", "proj", "", "proj:.archive", "proj:.archive/"} {
+		if tickets.IsArchiveKey(s) {
+			t.Errorf("IsArchiveKey(%q) = true", s)
+		}
+		if got, ok := tickets.ArchiveKeyAddress(s); ok {
+			t.Errorf("ArchiveKeyAddress(%q) = %q, true", s, got)
+		}
 	}
 }

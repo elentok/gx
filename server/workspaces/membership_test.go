@@ -221,6 +221,66 @@ func TestStorePlace_QueueAndOneOffAgents(t *testing.T) {
 	}
 }
 
+func TestStorePlace_ArchiveKeysPlaceAsEpicAndOthersAreUnchanged(t *testing.T) {
+	s, err := workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory {
+		return fakeDir{designs: map[string]bool{"proj:map": true}}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.Place([]wire.SessionInfo{
+		{ID: "design", Design: true, Ticket: "proj:.archive/foo-2"},
+		{ID: "fix", FixOf: "proj:.archive/foo-2/01"},
+		{ID: "queue", Queue: true, Ticket: "proj:.archive/foo-2/01"},
+		{ID: "project-fix", FixOf: "proj"},
+		{ID: "one-off", Queue: true, Ticket: "proj:one-offs/03"},
+		{ID: "chat"},
+		{ID: "impl", Queue: true, Ticket: "proj:map-impl/02"},
+	})
+	want := []wire.SessionPlacement{
+		{Session: "design", Kind: wire.PlacementEpic, Epic: "proj:.archive/foo-2"},
+		{Session: "fix", Kind: wire.PlacementEpic, Epic: "proj:.archive/foo-2"},
+		{Session: "queue", Kind: wire.PlacementEpic, Epic: "proj:.archive/foo-2"},
+		{Session: "project-fix", Kind: wire.PlacementOther},
+		{Session: "one-off", Kind: wire.PlacementOther},
+		{Session: "chat", Kind: wire.PlacementChat, Workspace: s.Workspace("chat")},
+		{Session: "impl", Kind: wire.PlacementEpic, Epic: "proj:map"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("placements = %+v, want %+v", got, want)
+	}
+}
+
+func TestWorkspacesRoutes_ArchiveKeySessionPlacesAsEpicWithNoRow(t *testing.T) {
+	f, ctx := startMembership(t)
+	res, err := f.H.Client.Sessions.Create(ctx, wire.CreateSessionRequest{
+		Project: "proj", Dir: t.TempDir(), Ticket: "proj:.archive/foo-2/01", FixOf: "proj:.archive/foo-2/01",
+	})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	snap, err := f.H.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := wire.SessionPlacement{Session: res.Session.ID, Kind: wire.PlacementEpic, Epic: "proj:.archive/foo-2"}
+	found := false
+	for _, p := range snap.Placements {
+		if p.Session == want.Session {
+			found = true
+			if p != want {
+				t.Errorf("placement = %+v, want %+v", p, want)
+			}
+		}
+		if p.Kind == wire.PlacementOther {
+			t.Errorf("Other holds %+v, want empty", p)
+		}
+	}
+	if !found {
+		t.Errorf("no placement for %s in %+v", want.Session, snap.Placements)
+	}
+}
+
 // lockProbeDir tries a store write from inside Epic; a write that completes
 // there means Join checked the epic without holding the store lock.
 type lockProbeDir struct {

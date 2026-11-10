@@ -75,8 +75,14 @@ func (s *Store) place(si wire.SessionInfo) wire.SessionPlacement {
 		return wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementChat, Workspace: s.Workspace(si.ID)}
 	}
 	other := wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementOther}
+	addr := cmp.Or(si.FixOf, si.Ticket)
+	// An archived epic's agents match no sidebar row, so they show nowhere. Test
+	// this before parsing: an archive key must not fall to Other.
+	if tickets.IsArchiveKey(addr) {
+		return wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementEpic, Epic: tickets.ArchiveEpicKey(addr)}
+	}
 	// A project-level Fix agent has a bare project name here, which does not parse.
-	a, err := tickets.ParseQueuedAddress(cmp.Or(si.FixOf, si.Ticket))
+	a, err := tickets.ParseQueuedAddress(addr)
 	if err != nil || tickets.IsOneOffsEpicName(a.Epic) {
 		return other
 	}
