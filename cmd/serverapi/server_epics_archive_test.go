@@ -2,6 +2,7 @@ package serverapi
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -57,6 +58,47 @@ func TestServerCleanupWrite_ArchiveJSONIsAnEnvelopeForOneTarget(t *testing.T) {
 	}
 	if r := res.Results[0]; r.Status != wire.TargetFits || r.OnTrunk == nil || *r.OnTrunk {
 		t.Errorf("result = %+v, want fits and on_trunk false", r)
+	}
+}
+
+func TestServerCleanupWrite_ArchiveDesignTargetsJSON(t *testing.T) {
+	store := t.TempDir()
+	design := func(name, step string, withImpl bool) {
+		servertest.WriteCompleteEpic(t, store, name)
+		md := "---\nkind: map\ndesign_step: " + step + "\n---\n"
+		if err := os.WriteFile(filepath.Join(store, "proj", name, "ticket.md"), []byte(md), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if withImpl {
+			servertest.WriteCompleteEpic(t, store, name+"-impl")
+		}
+	}
+	design("foo", "done", true)
+	design("bar", "chart", true)
+	design("baz", "done", true)
+	f := servertest.StartDesignsIn(t, store)
+
+	out, err := runServer(t, f.H, "epics", "archive", "proj:foo", "proj:bar", "proj:baz-impl", "--json")
+	if exit, ok := err.(*cmdbase.ExitError); !ok || exit.Code != 1 {
+		t.Fatalf("err = %v, want exit 1 for the refused Design", err)
+	}
+	var res wire.TargetsResult
+	if json.Unmarshal([]byte(out), &res) != nil || len(res.Results) != 3 {
+		t.Fatalf("out = %q, want 3 results", out)
+	}
+	want := []struct{ target, status, reason string }{
+		{"proj:foo", wire.TargetDone, ""},
+		{"proj:bar", wire.TargetRefused, wire.ReasonArchiveNotFinished},
+		{"proj:baz-impl", wire.TargetDone, ""},
+	}
+	for i, w := range want {
+		if r := res.Results[i]; r.Target != w.target || r.Status != w.status || r.Reason != w.reason {
+			t.Errorf("result %d = %+v, want %+v", i, r, w)
+		}
+	}
+	got := archivedNames(t, store)
+	if !got["foo"] || !got["foo-impl"] || !got["baz"] || !got["baz-impl"] || got["bar"] {
+		t.Errorf("archived = %v", got)
 	}
 }
 

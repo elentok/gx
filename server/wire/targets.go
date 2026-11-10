@@ -36,6 +36,8 @@ type ArchiveRequest struct {
 const (
 	ReasonArchiveNotFinished  = "not-finished"
 	ReasonArchiveRenameFailed = "rename-failed"
+	// ReasonArchiveImplNotArchivable refuses a Design whose -impl epic cannot archive.
+	ReasonArchiveImplNotArchivable = "impl-not-archivable"
 )
 
 // Refused reports whether the target was refused.

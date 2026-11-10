@@ -22,7 +22,7 @@ import (
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
-// DesignNotFinishedText is the refusal of a Design until Designs archive.
+// DesignNotFinishedText is the refusal of a Design before its design step is done.
 const DesignNotFinishedText = "a Design archives once its design step is done"
 
 // Deps is what Archive reads from the Server. The embedded Directory is the
@@ -35,7 +35,9 @@ type Deps struct {
 	Workspace func(key string) string
 	Unhold    func(key string) error
 	// RekeySession rewrites a Session's ticket and fix_of through rekey.
-	RekeySession func(id string, rekey func(ticket, fixOf string) (string, string)) error
+	// CleanupDesign removes a Design's worktree and branch when it allows it.
+	CleanupDesign func(project, epic string)
+	RekeySession  func(id string, rekey func(ticket, fixOf string) (string, string)) error
 }
 
 // Archive runs the archive writes.
@@ -90,32 +92,79 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 		}
 		return wire.TargetResult{}, err
 	}
-	key := project + ":" + epic
-	if a.isDesign(key) {
-		return refuse(wire.ReasonArchiveNotFinished, DesignNotFinishedText)
+	repoOf := func() (string, error) {
+		repo := ticketgit.ProjectRepoRoot(a.d.TicketStore, tickets.ProjectName(dir))
+		if repo == "" {
+			return "", fmt.Errorf("project %q has no repo", project)
+		}
+		return repo, nil
 	}
-	if a.d.RootQueued(key) {
-		return refuse(wire.ReasonCleanupQueued, "the epic is queued")
+	scan := func(name string) (*cleanupscan.EpicScan, error) {
+		repo, err := repoOf()
+		if err != nil {
+			return nil, err
+		}
+		return cleanupscan.ScanEpic(a.d.TicketStore, repo, name)
 	}
-	repo := ticketgit.ProjectRepoRoot(a.d.TicketStore, tickets.ProjectName(dir))
-	if repo == "" {
-		return wire.TargetResult{}, fmt.Errorf("project %q has no repo", project)
+
+	// A target given as the -impl address resolves to its Design's row.
+	base, asImpl := epic, false
+	if d, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && a.d.DesignExists(project+":"+d) {
+		base, asImpl = d, true
 	}
-	row, err := cleanupscan.ScanEpic(a.d.TicketStore, repo, epic)
-	if err != nil {
-		return wire.TargetResult{}, err
+	halves := []half{{epic: base, key: project + ":" + base}}
+	var onTrunk bool
+	if a.d.DesignExists(halves[0].key) {
+		step := tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(dir, base)).DesignStep)
+		if step != tickets.StepDone {
+			return refuse(wire.ReasonArchiveNotFinished, DesignNotFinishedText)
+		}
+		if a.d.RootQueued(halves[0].key) {
+			return refuse(wire.ReasonCleanupQueued, "the epic is queued")
+		}
+		impl := base + tickets.ImplEpicSuffix
+		if _, err := os.Stat(filepath.Join(dir, impl)); err == nil {
+			implKey := project + ":" + impl
+			if a.d.RootQueued(implKey) {
+				return refuse(wire.ReasonArchiveImplNotArchivable, "the -impl epic is queued")
+			}
+			row, err := scan(impl)
+			if err != nil {
+				return wire.TargetResult{}, err
+			}
+			if row == nil || !row.AllDone {
+				return refuse(wire.ReasonArchiveImplNotArchivable, "the -impl epic has tickets that are not done")
+			}
+			onTrunk = row.MergedToTrunk
+			halves = append(halves, half{epic: impl, key: implKey})
+		}
+	} else {
+		if a.d.RootQueued(halves[0].key) {
+			return refuse(wire.ReasonCleanupQueued, "the epic is queued")
+		}
+		row, err := scan(base)
+		if err != nil {
+			return wire.TargetResult{}, err
+		}
+		switch {
+		case row == nil:
+			return refuse(wire.ReasonCleanupUnknown, "no such epic")
+		case !row.AllDone:
+			return refuse(wire.ReasonCleanupNotDone, "the epic has tickets that are not done")
+		}
+		onTrunk = row.MergedToTrunk
 	}
-	switch {
-	case row == nil:
-		return refuse(wire.ReasonCleanupUnknown, "no such epic")
-	case !row.AllDone:
-		return refuse(wire.ReasonCleanupNotDone, "the epic has tickets that are not done")
+	name := freeName(tickets.ArchiveDir(dir), base, len(halves) > 1)
+	var live []string
+	for _, h := range halves {
+		live = append(live, workspaces.LiveEpicSessions(a.d, h.key, allKinds)...)
 	}
-	name := freeName(tickets.ArchiveDir(dir), epic)
-	live := workspaces.LiveEpicSessions(a.d, key, allKinds)
-	out := wire.TargetResult{Target: target, Status: wire.TargetDone, Sessions: live, OnTrunk: &row.MergedToTrunk}
-	if name != epic {
+	out := wire.TargetResult{Target: target, Status: wire.TargetDone, Sessions: live, OnTrunk: &onTrunk}
+	if name != base {
 		out.NewAddress = project + ":" + name
+		if asImpl {
+			out.NewAddress += tickets.ImplEpicSuffix
+		}
 	}
 	if dryRun {
 		out.Status = wire.TargetFits
@@ -128,7 +177,10 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 		return r, nil
 	}
 	out.OnTrunk = nil
-	if err := a.write(dir, key, epic, name); err != nil {
+	if len(halves) > 1 && onTrunk {
+		a.d.CleanupDesign(project, base)
+	}
+	if err := a.write(dir, halves, name); err != nil {
 		if r, ok := errors.AsType[refusal](err); ok {
 			return refuse(r.reason, r.Error())
 		}
@@ -147,57 +199,83 @@ type refusal struct {
 func (r refusal) Error() string { return r.err.Error() }
 func (r refusal) Unwrap() error { return r.err }
 
-func (a *Archive) isDesign(key string) bool {
-	if a.d.DesignExists(key) {
-		return true
-	}
-	design, ok := strings.CutSuffix(key, tickets.ImplEpicSuffix)
-	return ok && a.d.DesignExists(design)
-}
+// half is one epic of a row: a loop epic, a Design or its -impl epic.
+type half struct{ epic, key string }
 
-// freeName is the epic's name, or the first free `-N` suffix when .archive has it.
-func freeName(archiveDir, epic string) string {
-	name := epic
-	for n := 2; ; n++ {
-		if _, err := os.Stat(filepath.Join(archiveDir, name)); os.IsNotExist(err) {
-			return name
+// freeName is the epic's name, or the first free `-N` suffix when .archive has
+// it. A pair needs both `name` and `name-impl` free.
+func freeName(archiveDir, epic string, pair bool) string {
+	taken := func(name string) bool {
+		names := []string{name}
+		if pair {
+			names = append(names, name+tickets.ImplEpicSuffix)
 		}
+		for _, n := range names {
+			if _, err := os.Stat(filepath.Join(archiveDir, n)); !os.IsNotExist(err) {
+				return true
+			}
+		}
+		return false
+	}
+	name := epic
+	for n := 2; taken(name); n++ {
 		name = epic + "-" + strconv.Itoa(n)
 	}
+	return name
 }
 
-// write runs the effects in order. Sessions the stop already ended stay stopped.
-func (a *Archive) write(dir, key, epic, name string) error {
-	if _, err := workspaces.StopEpicSessions(a.d, key, allKinds); err != nil {
-		return err
+// write runs the effects in order; the first half is the Design of a pair.
+// Sessions the stop already ended stay stopped.
+func (a *Archive) write(dir string, halves []half, name string) error {
+	for _, h := range halves {
+		if _, err := workspaces.StopEpicSessions(a.d, h.key, allKinds); err != nil {
+			return err
+		}
+		if err := a.d.Unhold(h.key); err != nil {
+			return err
+		}
 	}
-	if err := a.d.Unhold(key); err != nil {
-		return err
-	}
-	workspace := a.d.Workspace(key)
 	archive := tickets.ArchiveDir(dir)
 	if err := os.MkdirAll(archive, 0o755); err != nil {
 		return err
 	}
-	branch := epic
-	if e, ok := a.d.Epic(key); ok {
-		branch = cmp.Or(e.BranchName, epic)
+	type move struct {
+		half
+		name, workspace, branch string
 	}
-	dest := filepath.Join(archive, name)
-	if err := os.Rename(filepath.Join(dir, epic), dest); err != nil {
-		return refusal{wire.ReasonArchiveRenameFailed, err}
+	moves := make([]move, len(halves))
+	for i, h := range halves {
+		m := move{half: h, name: name, workspace: a.d.Workspace(h.key), branch: h.epic}
+		if i > 0 {
+			m.name += tickets.ImplEpicSuffix
+		}
+		if e, ok := a.d.Epic(h.key); ok {
+			m.branch = cmp.Or(e.BranchName, h.epic)
+		}
+		moves[i] = m
 	}
-	fields := map[string]any{"archived_at": time.Now().UTC()}
-	if workspace != workspaces.DefaultName {
-		fields["archived_workspace"] = workspace
+	for i, m := range moves {
+		if err := os.Rename(filepath.Join(dir, m.epic), filepath.Join(archive, m.name)); err != nil {
+			for _, done := range moves[:i] {
+				_ = os.Rename(filepath.Join(archive, done.name), filepath.Join(dir, done.epic))
+			}
+			return refusal{wire.ReasonArchiveRenameFailed, err}
+		}
 	}
-	if name != epic {
-		fields["branch_name"] = branch
+	for i, m := range moves {
+		fields := map[string]any{"archived_at": time.Now().UTC()}
+		if m.workspace != workspaces.DefaultName {
+			fields["archived_workspace"] = m.workspace
+		}
+		// branch_name goes on the Design only; the -impl branch follows its name.
+		if i == 0 && m.name != m.epic {
+			fields["branch_name"] = m.branch
+		}
+		if err := tickets.OverwriteEpicFields(filepath.Join(archive, m.name), fields); err != nil {
+			return err
+		}
+		a.rekey(m.key, m.name)
 	}
-	if err := tickets.OverwriteEpicFields(dest, fields); err != nil {
-		return err
-	}
-	a.rekey(key, name)
 	a.d.Events.Publish(wire.EventWorkspacesChanged, "")
 	return nil
 }

@@ -3336,9 +3336,13 @@ export interface ArchiveRequest {
 export const ReasonArchiveNotFinished = "not-finished";
 export const ReasonArchiveRenameFailed = "rename-failed";
 /**
+ * ReasonArchiveImplNotArchivable refuses a Design whose -impl epic cannot archive.
+ */
+export const ReasonArchiveImplNotArchivable = "impl-not-archivable";
+/**
  * Refusal reasons of archive. The cleanup reasons cover queued, not done and unknown.
  */
-export type ReasonArchive = typeof ReasonArchiveNotFinished | typeof ReasonArchiveRenameFailed;
+export type ReasonArchive = typeof ReasonArchiveNotFinished | typeof ReasonArchiveRenameFailed | typeof ReasonArchiveImplNotArchivable;
 /**
  * TargetsResult is the envelope of a many-target write, in argument order.
  */

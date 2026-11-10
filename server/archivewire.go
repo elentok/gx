@@ -8,12 +8,13 @@ import (
 // newArchive wires Archive to the workspace store, the index and the sessions.
 func newArchive(s *Server) *archive.Archive {
 	return archive.New(archive.Deps{
-		Directory:    workspacesDirectory{s},
-		TicketStore:  s.cfg.TicketStore,
-		Events:       s.events,
-		Workspace:    s.workspaces.Workspace,
-		Unhold:       s.workspaces.Unhold,
-		RekeySession: s.rekeySession,
+		Directory:     workspacesDirectory{s},
+		TicketStore:   s.cfg.TicketStore,
+		Events:        s.events,
+		Workspace:     s.workspaces.Workspace,
+		Unhold:        s.workspaces.Unhold,
+		CleanupDesign: s.designs.CleanupDesign,
+		RekeySession:  s.rekeySession,
 	})
 }
 
