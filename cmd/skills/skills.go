@@ -36,6 +36,9 @@ type Deps struct {
 	// BundleSkills names the skills gx's bundle owns; nil reads the embedded
 	// bundle. Tests inject it because the embed cannot change.
 	BundleSkills func() ([]string, error)
+	// devRoot is the checkout a dev install in progress links from, before the
+	// manifest records it, so the clash sync can run ahead of the install.
+	devRoot string
 }
 
 // DefaultDeps wires the production skill locations for the given env and
@@ -243,11 +246,12 @@ kept and reported conflicted until --force names it.`,
 // source. It records the joined problem the way Refresh does (cleared when the
 // run is clean) and fails when any part had a problem.
 func runSkillsInstallAll(d Deps, force skills.ForcePolicy, out io.Writer) error {
-	var problems []string
+	// Sources first: a source link still holding a name the bundle just added
+	// would otherwise count as an unrelated collision and abort the bundle.
+	problems := syncSources(d, force, out)
 	if err := runSkillsInstall(d, force, out); err != nil {
 		problems = append(problems, err.Error())
 	}
-	problems = append(problems, syncSources(d, force, out)...)
 	problem := joinProblems(problems)
 	if path, err := d.StatusPath(); err == nil {
 		_ = skills.WriteProblem(path, problem)
@@ -300,22 +304,54 @@ func runSkillsInstallDev(d Deps, force skills.ForcePolicy, out io.Writer) error 
 		return err
 	}
 
+	// Sources holding a name the checkout owns drop it before the install, so
+	// the checkout's skill lands in this run instead of colliding with a link.
+	d.devRoot = devRoot
+	problems := dedupe(syncSources(d, force, out))
 	if err := installSkills(d, force, out, skills.DevSourcePrefix+devRoot, sources, skills.ModeSymlink); err != nil {
 		return err
 	}
-	// Sources holding a name the checkout owns drop it now, not at the next
-	// bare install.
-	if problems := dedupe(syncSources(d, force, out)); len(problems) > 0 {
+	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "\n"))
 	}
 	return nil
 }
 
+// checkoutSkillNames lists the skill directories of a dev checkout. It can
+// hold skills the embed lacks, so the embed's names would miss them.
+func checkoutSkillNames(root string) ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(root, "skills"))
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	return names, nil
+}
+
 // bundleOwner returns the skill names gx's bundle owns and who installed them:
-// the dev checkout in a dev install, else the built-in bundle. The dev
-// checkout carries the same names as the embed.
+// the dev checkout's own skill directories in a dev install (recorded, or in
+// progress), else the built-in bundle's names. Deps.BundleSkills overrides the
+// names in tests.
 func bundleOwner(d Deps) (map[string]bool, string, error) {
+	devRoot := d.devRoot
+	if devRoot == "" {
+		if manifestPath, err := d.ManifestPath(); err == nil {
+			if m, err := skills.Load(manifestPath); err == nil {
+				devRoot, _ = skills.DevRoot(m)
+			}
+		}
+	}
 	namesOf := skills.BundleSkillNames
+	owner := "gx's skill bundle"
+	if devRoot != "" {
+		namesOf = func() ([]string, error) { return checkoutSkillNames(devRoot) }
+		owner = "the dev checkout " + devRoot
+	}
 	if d.BundleSkills != nil {
 		namesOf = d.BundleSkills
 	}
@@ -326,14 +362,6 @@ func bundleOwner(d Deps) (map[string]bool, string, error) {
 	owned := map[string]bool{}
 	for _, name := range names {
 		owned[name] = true
-	}
-	owner := "gx's skill bundle"
-	if manifestPath, err := d.ManifestPath(); err == nil {
-		if m, err := skills.Load(manifestPath); err == nil {
-			if root, ok := skills.DevRoot(m); ok {
-				owner = "the dev checkout " + root
-			}
-		}
 	}
 	return owned, owner, nil
 }

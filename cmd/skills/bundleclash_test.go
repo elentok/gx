@@ -109,3 +109,68 @@ func TestSkillsInstallDev_SourceNameOwnedByCheckoutIsDropped(t *testing.T) {
 		t.Error("mine was removed")
 	}
 }
+
+func TestSkillsInstall_BundleNameLandsSameRunAsSourceLinkDrop(t *testing.T) {
+	t.Parallel()
+	var outcomes []string
+	for _, args := range [][]string{{"install"}, {"install", "--force-all"}} {
+		var stdout bytes.Buffer
+		d := fakeSkillsDeps(t, &stdout)
+		claude, _ := agentRootsOf(t, d)
+		src := clashSource(t, "gx-verify", "mine")
+		d.BundleSkills = func() ([]string, error) { return nil, nil }
+		if err := run(t, d, "install", src); err != nil {
+			t.Fatalf("source install: %v", err)
+		}
+		d.BundleSkills = nil
+
+		err := run(t, d, args...)
+		requireBundleClash(t, err, "gx-verify", src)
+		if strings.Contains(err.Error(), "conflict") {
+			t.Errorf("%v: bundle install aborted as conflicted: %v", args, err)
+		}
+		if _, lerr := os.Readlink(filepath.Join(claude, "gx-verify")); lerr == nil {
+			t.Errorf("%v: gx-verify is still a source link", args)
+		}
+		if !exists(filepath.Join(claude, "gx-verify", "SKILL.md")) {
+			t.Errorf("%v: bundle gx-verify missing after one run", args)
+		}
+		outcomes = append(outcomes, strings.ReplaceAll(err.Error(), src, "SRC"))
+	}
+	if len(outcomes) == 2 && outcomes[0] != outcomes[1] {
+		t.Errorf("--force-all changed the outcome:\n%s\n---\n%s", outcomes[0], outcomes[1])
+	}
+}
+
+func TestSkillsInstallDev_CheckoutNamesLandSameRunAsSourceLinkDrop(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	repo := testutil.TempRepo(t)
+	writeDevBundle(t, repo)
+	writeFile(t, filepath.Join(repo, "skills", "newcomer", "SKILL.md"), "newcomer")
+	d := fakeSkillsDevDeps(t, &stdout, repo)
+	claude, _ := agentRootsOf(t, d)
+	src := clashSource(t, "gx-verify", "newcomer", "mine")
+	d.BundleSkills = func() ([]string, error) { return nil, nil }
+	if err := run(t, d, "install", src); err != nil {
+		t.Fatalf("source install: %v", err)
+	}
+	d.BundleSkills = nil
+
+	err := run(t, d, "install", "--dev")
+	if err == nil || !strings.Contains(err.Error(), "dev checkout") || strings.Contains(err.Error(), "conflict") {
+		t.Fatalf("want only a dev checkout clash error, got %v", err)
+	}
+	if !exists(filepath.Join(claude, "gx-verify", "SKILL.md")) {
+		t.Error("checkout gx-verify missing after one run")
+	}
+	if target, _ := os.Readlink(filepath.Join(claude, "gx-verify")); strings.Contains(target, "src") {
+		t.Errorf("gx-verify still links the source: %s", target)
+	}
+	if exists(filepath.Join(claude, "newcomer")) {
+		t.Error("source link for the checkout-only newcomer survived")
+	}
+	if !exists(filepath.Join(claude, "mine")) {
+		t.Error("mine was removed")
+	}
+}
