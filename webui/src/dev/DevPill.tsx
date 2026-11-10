@@ -3,24 +3,25 @@ import type { DevState } from "../generated/server";
 import type { Tone } from "../ui/tone";
 import { useCoarsePointer } from "../useWide";
 
-const LOOK: Partial<Record<DevState, { text: string; tone: Tone; title: string; busy?: boolean }>> = {
-  installing: { text: "Dev · installing", tone: "muted", title: "Dev mode: Installing dependencies", busy: true },
-  starting: { text: "Dev · starting", tone: "muted", title: "Dev mode: Starting Vite", busy: true },
-  running: { text: "Dev", tone: "done", title: "Dev mode: Vite is running" },
-  down: { text: "Dev · down", tone: "deadlocked", title: "Dev mode: Vite is down" },
+/** Each visible Dev state's pill text, popover status and tone; `off` shows nothing. */
+export const DEV_LOOK: Partial<Record<DevState, { text: string; status: string; tone: Tone; busy?: boolean }>> = {
+  installing: { text: "Dev · installing", status: "Installing dependencies", tone: "muted", busy: true },
+  starting: { text: "Dev · starting", status: "Starting Vite", tone: "muted", busy: true },
+  running: { text: "Dev", status: "Vite is running", tone: "done" },
+  down: { text: "Dev · down", status: "Vite is down", tone: "deadlocked" },
 };
 
 /** The sidebar-footer pill for Dev mode; renders nothing while Dev mode is off. */
 export function DevPill({ state }: { state: DevState }) {
   const coarse = useCoarsePointer();
-  const look = LOOK[state];
+  const look = DEV_LOOK[state];
   if (!look) return null;
   return (
     <Box
       as="span"
       data-part="dev-pill"
       data-tone={look.tone}
-      title={look.title}
+      title={`Dev mode: ${look.status}`}
       display="inline-flex"
       alignItems="center"
       gap="6px"

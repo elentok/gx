@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsEntry, SettingsWriteResult } from "../generated/server";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { renderThemed } from "../ui/render";
+import { DevFrontendRow } from "./DevFrontendRow";
 import { SettingsRow } from "./SettingsRow";
 
 const entry = (over: Partial<SettingsEntry>): SettingsEntry => ({
@@ -239,7 +240,7 @@ describe("SettingsRow", () => {
       const onWrite = vi.fn(async () => ({}) as SettingsWriteResult);
       const view = renderThemed(
         <ConnectionContext.Provider value={conn}>
-          <SettingsRow entry={devRow} pendingRestart={false} onWrite={onWrite} />
+          <DevFrontendRow entry={devRow} pendingRestart={false} onWrite={onWrite} />
         </ConnectionContext.Provider>,
       );
       return { ...view, onWrite };

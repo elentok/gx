@@ -10,6 +10,8 @@ import { useDevice } from "../useWide";
 import { Chip } from "../ui/chip/Chip";
 import { entryLabel, groupBySection, searchEntries } from "./settingsApi";
 import { Group } from "./parts";
+import { DEV_FRONTEND_KEY } from "../dev";
+import { DevFrontendRow } from "./DevFrontendRow";
 import { SettingsRow, type WriteSetting } from "./SettingsRow";
 import { ChecksEditor } from "./ChecksEditor";
 import { CHECKS_KEY } from "./checks";
@@ -184,11 +186,17 @@ const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
   </Box>
 );
 
-type SectionBodyProps = Pick<ShellProps, "entries" | "project" | "pendingRestart" | "onWrite" | "repoChecksFile"> & { section: string };
+/** One row; the dev-frontend key gets its wrapper, which supplies the lock reason. */
+function settingsRow(e: SettingsEntry, pendingRestart: string[] | undefined, onWrite: WriteSetting, project: string | undefined) {
+  const Row = e.key === DEV_FRONTEND_KEY ? DevFrontendRow : SettingsRow;
+  return <Row key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} project={project} />;
+}
+
+type SectionBodyProps =Pick<ShellProps, "entries" | "project" | "pendingRestart" | "onWrite" | "repoChecksFile"> & { section: string };
 
 /** One section's rows: Identity and Merging, the Checks editor, or plain rows. Shared by the sidebar shell and the phone page. */
 export function SectionBody({ entries, project, section, pendingRestart, onWrite, repoChecksFile }: SectionBodyProps) {
-  const row = (e: SettingsEntry) => <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} project={project} />;
+  const row = (e: SettingsEntry) => settingsRow(e, pendingRestart, onWrite, project);
   const sectionEntries = entries.filter((e) => e.section === section);
   if (project !== undefined && section === "Project") {
     return (
@@ -221,7 +229,7 @@ export function SettingsShellView(props: ShellProps) {
   const [query, setQuery] = useState("");
   const searching = query.trim() !== "";
   const section = props.section ?? (props.project === undefined ? GLOBAL_SECTIONS[0] : projectSections(props.entries)[0]);
-  const row = (e: SettingsEntry) => <SettingsRow key={e.key} entry={e} pendingRestart={pendingRestart?.includes(e.key) ?? false} onWrite={onWrite} project={props.project} />;
+  const row = (e: SettingsEntry) => settingsRow(e, pendingRestart, onWrite, props.project);
   const hits = searchEntries(props.entries, query);
   const scopeName = props.project === undefined ? "global settings" : `project ${props.project}`;
   return (

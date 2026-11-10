@@ -1,19 +1,9 @@
 import { Box, Text } from "@chakra-ui/react";
 import { Button } from "../ui/button/Button";
-import type { Tone } from "../ui/tone";
 import { postDevFrontend as defaultPostDevFrontend, postDevRestart as defaultPostDevRestart } from "../dev";
-import type { DevState, DevStatus } from "../generated/server";
+import type { DevStatus } from "../generated/server";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
-import { DevPill } from "./DevPill";
-
-const STATUS: Partial<Record<DevState, string>> = {
-  installing: "Installing dependencies",
-  starting: "Starting Vite",
-  running: "Vite is running",
-  down: "Vite is down",
-};
-
-const TONE: Record<DevState, Tone> = { off: "muted", installing: "muted", starting: "muted", running: "done", down: "deadlocked" };
+import { DEV_LOOK, DevPill } from "./DevPill";
 
 interface Props {
   dev: DevStatus;
@@ -23,8 +13,8 @@ interface Props {
 
 /** The Dev pill; a click opens the status, reason, last Vite log lines, checkout path and actions. */
 export function DevPopover({ dev, postDevFrontend = defaultPostDevFrontend, postDevRestart = defaultPostDevRestart }: Props) {
-  const status = STATUS[dev.state];
-  if (!status) return null;
+  const look = DEV_LOOK[dev.state];
+  if (!look) return null;
   const log = dev.log_tail ?? [];
   const content = (
     <Box px="3" py="2" w="300px" maxW="100%">
@@ -40,10 +30,10 @@ export function DevPopover({ dev, postDevFrontend = defaultPostDevFrontend, post
           borderRadius="full"
           fontSize="11px"
           letterSpacing="0.04em"
-          color={`tone.${TONE[dev.state]}.fg`}
-          bg={`tone.${TONE[dev.state]}.bg`}
+          color={`tone.${look.tone}.fg`}
+          bg={`tone.${look.tone}.bg`}
         >
-          {status}
+          {look.status}
         </Text>
       </Text>
       {dev.reason && (

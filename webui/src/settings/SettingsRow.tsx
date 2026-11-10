@@ -1,7 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../generated/server";
-import { DEV_FRONTEND_KEY, useDev } from "../dev";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { Modal } from "../ui/modal/Modal";
@@ -300,21 +299,18 @@ function projectTexts(e: SettingsEntry, project: string) {
   };
 }
 
-export function SettingsRow({
-  entry,
-  pendingRestart,
-  onWrite,
-  project,
-}: {
+export interface SettingsRowProps {
   entry: SettingsEntry;
   pendingRestart: boolean;
   onWrite: WriteSetting;
   /** The project on the page; its overridable keys show inherit and override states. */
   project?: string;
-}) {
+  /** Switches the control off and shows this reason beside it. */
+  lockReason?: string;
+}
+
+export function SettingsRow({ entry, pendingRestart, onWrite, project, lockReason }: SettingsRowProps) {
   const write = useWrite({ toastRefusal: false });
-  // Presence comes from the snapshot's Dev block, which repaints on dev-changed; the entries are read once.
-  const noDevCheckout = entry.key === DEV_FRONTEND_KEY && !useDev().has_checkout;
   const [draft, setDraft] = useState<string>();
   const [saved, setSaved] = useState(false);
   const [restartNeeded, setRestartNeeded] = useState(false);
@@ -417,7 +413,7 @@ export function SettingsRow({
             dirty={dirty}
             invalid={refused}
             pending={write.pending}
-            locked={noDevCheckout}
+            locked={lockReason !== undefined}
             setDraft={setDraft}
             save={saveValue}
             remove={() => send(removeChange(entry.key))}
@@ -428,9 +424,9 @@ export function SettingsRow({
           {valueText(entry)}
         </Text>
       )}
-      {noDevCheckout && (
+      {lockReason && (
         <Text fontSize="sm" color="text.muted">
-          Off: gx has no Dev checkout. Set the Dev checkout path below.
+          {lockReason}
         </Text>
       )}
       {errorText && (
