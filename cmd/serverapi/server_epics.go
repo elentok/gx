@@ -49,6 +49,8 @@ func newServerEpicsCmd(d Deps) *cobra.Command {
 	cmd.AddCommand(merge)
 	cmd.AddCommand(newServerEpicsArchiveCmd(d))
 	cmd.AddCommand(newServerEpicsUnarchiveCmd(d))
+	cmd.AddCommand(newServerEpicsArchivedCmd(d))
+	cmd.AddCommand(newServerEpicsArchivedDetailCmd(d))
 
 	createPR := &cobra.Command{
 		Use:   "create-pr <project:epic>",

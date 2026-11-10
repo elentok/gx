@@ -113,6 +113,8 @@ type EpicDetail struct {
 	AgentTime int             `json:"agent_time"`
 	CostTotal float64         `json:"cost_total"`
 	Rows      []EpicDetailRow `json:"rows"`
+	// ArchivedAt is set on an archived epic's detail only; it is absent for an active one.
+	ArchivedAt time.Time `json:"archived_at,omitzero"`
 	// Queueable is set when the Queue action applies; see epicQueueable.
 	Queueable bool `json:"queueable"`
 	// Queued is set when the epic holds a queue item. A Waiting epic that is not

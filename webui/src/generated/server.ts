@@ -995,6 +995,10 @@ export interface EpicDetail {
   cost_total: number /* float64 */;
   rows: EpicDetailRow[];
   /**
+   * ArchivedAt is set on an archived epic's detail only; it is absent for an active one.
+   */
+  archived_at?: string;
+  /**
    * Queueable is set when the Queue action applies; see epicQueueable.
    */
   queueable: boolean;

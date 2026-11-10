@@ -48,35 +48,50 @@ func (s *Epics) EpicDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no epic "+address, http.StatusNotFound)
 		return
 	}
-	wire.WriteJSON(w, s.buildEpicDetail(root, epics, epics[i], time.Now()))
+	wire.WriteJSON(w, s.buildEpicDetail(root, epics, epics[i], time.Now(), false))
 }
 
-func (s *Epics) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
+// buildEpicDetail builds one epic's detail. archived marks an epic loaded out
+// of .archive: its address can match an active epic's, so no live state (queue,
+// runs, sessions, PR, pause actions) is read for it.
+func (s *Epics) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time, archived bool) wire.EpicDetail {
+	var d wire.EpicDetail
 	if e.IsMap {
-		return s.buildMapDetail(root, epics, e, now)
+		d = s.buildMapDetail(root, epics, e, now, archived)
+	} else {
+		d = s.buildLoopDetail(root, e, now, archived)
 	}
-	return s.buildLoopDetail(root, e, now)
+	if archived {
+		d.ArchivedAt = e.ArchivedAt
+	}
+	return d
 }
 
-func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
+func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time, archived bool) wire.EpicDetail {
 	byName := map[string]tickets.Epic{}
 	for _, other := range epics {
 		byName[other.Name] = other
 	}
-	queued := s.Queue.RootQueued(root)
+	queued := !archived && s.Queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
-		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
+		Queueable: !archived && queue.EpicQueueable(e, queued), Queued: queued,
 	}
-	if deletable, err := s.DesignUncharted(root.String(), e); err != nil {
-		s.Log.Warn("design deletable check", "epic", root.String(), "err", err)
-	} else {
-		d.Deletable = deletable
+	if !archived {
+		if deletable, err := s.DesignUncharted(root.String(), e); err != nil {
+			s.Log.Warn("design deletable check", "epic", root.String(), "err", err)
+		} else {
+			d.Deletable = deletable
+		}
 	}
 	d.Steps = mapSteps(e, byName)
 	step := queue.MapProgress(e)
-	d.DesignSection = designSection(d.Address, e, step, s.designActivities()[d.Address])
+	var activity designActivity
+	if !archived {
+		activity = s.designActivities()[d.Address]
+	}
+	d.DesignSection = designSection(d.Address, e, step, activity)
 	d.RingProgress = designPercent(e, step)
 	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
@@ -99,22 +114,30 @@ func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e ticke
 	return d
 }
 
-func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
-	queued := s.Queue.RootQueued(root)
+func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time, archived bool) wire.EpicDetail {
+	queued := !archived && s.Queue.RootQueued(root)
+	startedAt, delivery := noRunStartedAt, ""
+	if !archived {
+		startedAt, delivery = s.Runs.StartedAtOf, s.Delivery(root.Project)
+	}
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
-		State: EpicStateFor(root, e, s.Delivery(root.Project), s.Runs.StartedAtOf),
+		State: EpicStateFor(root, e, delivery, startedAt),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
-		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
+		Queueable: !archived && queue.EpicQueueable(e, queued), Queued: queued,
 		Draft: e.Status == string(schema.StatusDraft),
 	}
-	if EpicMergeBlocked(e) {
+	if !archived && EpicMergeBlocked(e) {
 		d.MergeBlockKind, d.MergeBlockReason, d.MergeBlockFiles = e.MergeBlockKind, e.MergeBlockReason, e.MergeBlockFiles
 		d.Actions = mergeBlockActions(e.MergeBlockKind)
 		d.ActionInfo = actionInfo(d.Actions)
 	}
 	for _, t := range e.Tickets {
-		d.Rows = append(d.Rows, s.rowFor(root, e, t))
+		if archived {
+			d.Rows = append(d.Rows, s.staticRow(root, e, t))
+		} else {
+			d.Rows = append(d.Rows, s.rowFor(root, e, t))
+		}
 		if t.Status == string(schema.StatusDone) {
 			d.AgentTime += t.ElapsedTime
 			d.CostTotal += t.ActualCost
@@ -127,7 +150,9 @@ func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Tim
 		}
 		d.WallClock = int(end.Sub(e.StartedAt).Seconds())
 	}
-	s.decoratePRDetail(&d, root, e)
+	if !archived {
+		s.decoratePRDetail(&d, root, e)
+	}
 	d.Stats = epicStats(e, e.MergedAt, now)
 	d.Stats.Friction = epicFriction(e.Friction)
 	d.Stats.LinesAdded, d.Stats.LinesRemoved = e.LinesAdded, e.LinesRemoved
@@ -171,18 +196,27 @@ func baseRow(root queue.RootRef, e tickets.Epic, t tickets.Ticket, status ticket
 	}
 }
 
-// rowFor builds a loop epic's full row for t.
-func (s *Epics) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
-	status := e.RenderedStatus(t)
-	row := baseRow(root, e, t, status)
+// noRunStartedAt is the run lookup of an archived epic: nothing is running.
+func noRunStartedAt(string) (time.Time, bool) { return time.Time{}, false }
+
+// staticRow is a loop epic's row built from the ticket files alone.
+func (s *Epics) staticRow(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
+	row := baseRow(root, e, t, e.RenderedStatus(t))
 	row.Elapsed, row.Cost = t.ElapsedTime, t.ActualCost
 	if t.LongTicketTurns > 0 {
 		row.LongTicketTurns, row.LongTicketThreshold = t.LongTicketTurns, s.Settings.Load().LongTicketTurns
 	}
-	row.HarnessLabel = s.Harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if t.Parent != nil {
 		row.Parent = root.TicketAddress(*t.Parent)
 	}
+	return row
+}
+
+// rowFor builds a loop epic's full row for t: staticRow plus the live parts.
+func (s *Epics) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
+	row := s.staticRow(root, e, t)
+	status := e.RenderedStatus(t)
+	row.HarnessLabel = s.Harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if at, ok := s.Runs.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 		row.ClaimedAt = at
 		row.LaunchStep = s.launchStep(row.Address)

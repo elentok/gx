@@ -73,6 +73,7 @@ type Sessions interface {
 type Workspaces interface {
 	Workspace(key string) string
 	IsHeld(key string) bool
+	Listed() []wire.Workspace
 }
 
 // Deps is what the epic read models need from the root server. The function

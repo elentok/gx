@@ -155,6 +155,20 @@ func (r *Reads) EpicDetail(ctx context.Context, address string) (wire.EpicDetail
 	return d, err
 }
 
+// ArchivedEpics returns the archived epics and Designs, newest first.
+func (r *Reads) ArchivedEpics(ctx context.Context) (wire.ArchivedEpicList, error) {
+	var l wire.ArchivedEpicList
+	err := r.t.get(ctx, "/v1/epics/archived", &l)
+	return l, err
+}
+
+// ArchivedEpicDetail returns an archived epic's detail by its archive address.
+func (r *Reads) ArchivedEpicDetail(ctx context.Context, address string) (wire.EpicDetail, error) {
+	var d wire.EpicDetail
+	err := r.t.get(ctx, "/v1/epics/archived/detail?address="+url.QueryEscape(address), &d)
+	return d, err
+}
+
 // Stats returns the per-day stats for one range in days (0 is the server's
 // default) and one project (empty means all).
 func (r *Reads) Stats(ctx context.Context, days int, project string) (wire.Stats, error) {

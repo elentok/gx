@@ -20,5 +20,7 @@ func Routes(get func() *Epics) []wire.Route {
 		read("GET /v1/tickets/detail", (*Epics).Detail),
 		read("GET /v1/epics", (*Epics).EpicList),
 		read("GET /v1/epics/detail", (*Epics).EpicDetail),
+		read("GET /v1/epics/archived", (*Epics).ArchivedList),
+		read("GET /v1/epics/archived/detail", (*Epics).ArchivedDetail),
 	}
 }

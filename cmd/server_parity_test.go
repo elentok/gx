@@ -166,6 +166,8 @@ var routeVerbs = map[string]string{
 	"POST /v1/projects/retry-migration":         "project retry-migration",
 	"GET /v1/epics":                             "server epics",
 	"GET /v1/epics/detail":                      "server epics detail",
+	"GET /v1/epics/archived":                    "server epics archived",
+	"GET /v1/epics/archived/detail":             "server epics archived-detail",
 	"GET /v1/stats":                             "server stats",
 	"GET /v1/tips":                              "server tips",
 }
