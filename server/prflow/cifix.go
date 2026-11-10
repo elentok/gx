@@ -1,6 +1,7 @@
 package prflow
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -197,11 +198,14 @@ func (w *Watcher) startCIFix(r pr.Runner, repo string, t Target, v View) error {
 			Project: t.Project, Epic: t.Epic, Number: t.Number, URL: t.URL, HeadSHA: v.HeadSHA, Check: c,
 			Skills: w.host.CIFixSkills(t.Project), PerCheck: perCheck, PerPR: perPR,
 		})
+		if res == CIFixStarted {
+			// Queue even when the activity entry failed (err set): an unqueued
+			// ticket would be orphaned, since it already blocks a second fork.
+			qerr := w.host.QueueRoot(queue.RootRef{Project: t.Project, Epic: t.Epic}, id)
+			return errors.Join(err, qerr)
+		}
 		if err != nil {
 			return err
-		}
-		if res == CIFixStarted {
-			return w.host.QueueRoot(queue.RootRef{Project: t.Project, Epic: t.Epic}, id)
 		}
 		if res == CIFixBusy {
 			return nil

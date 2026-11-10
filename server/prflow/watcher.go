@@ -3,6 +3,7 @@ package prflow
 import (
 	"context"
 	"errors"
+	"log"
 	"slices"
 	"sync"
 	"time"
@@ -189,11 +190,16 @@ func (w *Watcher) Run(ctx context.Context) {
 // pending, else the idle one; after failures, doubling from that up to the cap
 // (or the retry-after, if longer).
 func (w *Watcher) Delay() time.Duration {
+	grace := w.host.NoChecksGrace()
+	now := w.now()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	base := IdleInterval
-	for _, v := range w.views {
-		if v.CI == pr.ChecksPending {
+	for k, v := range w.views {
+		// A draft with no checks is about to be marked ready when its grace
+		// window ends, so it polls as fast as pending CI.
+		inGrace := v.CI == pr.ChecksNone && v.Draft && now.Sub(w.seen[k].at) < grace
+		if v.CI == pr.ChecksPending || inGrace {
 			base = PendingInterval
 			break
 		}
@@ -315,8 +321,10 @@ func (w *Watcher) pollProject(project string, ts []Target) error {
 		w.mu.Lock()
 		w.views[epicKey{t.Project, t.Epic}] = v
 		w.mu.Unlock()
+		// An action error belongs to this epic: log it and go on with the
+		// others. It is not a GitHub outage.
 		if err := w.act(r, repo, t, v); err != nil {
-			return err
+			log.Printf("pr watcher: %s:%s: %v", t.Project, t.Epic, err)
 		}
 	}
 	return nil

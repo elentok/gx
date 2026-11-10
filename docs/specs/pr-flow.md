@@ -160,7 +160,7 @@ button. The epic page shows a **PR activity list** of what gx did.
   running `gh`, GraphQL requests and classifying errors are reused and extended with exit 4, 403, 404
   and 429 kinds). One GraphQL query per poll covers all watched PRs for cheap fields (state, draft,
   head SHA, merge commit, mergeable); the per-check detail (check name, status, conclusion, job id,
-  run id, workflow id) is fetched when the rollup is failing or the head SHA changed. The interval is
+  run id, workflow id) is fetched when the rollup is failing or changed, or the head SHA changed. The interval is
   30 to 60 seconds while CI is pending and 2 to 5 minutes otherwise (the implementer picks the exact
   values). Rate limits and `retry-after` back
   off.

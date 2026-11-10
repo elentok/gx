@@ -2,6 +2,8 @@ package prflow_test
 
 import (
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -207,5 +209,65 @@ func TestWatcher_SkipsMergedEpicsAndEpicsWithoutAPR(t *testing.T) {
 	other.Tick(t)
 	if calls := other.GH.CallsMatching("api graphql"); len(calls) != 0 {
 		t.Fatalf("a merged epic was polled: %v", calls)
+	}
+}
+
+func TestWatcher_ActErrorIsPerEpicAndNotAnOutage(t *testing.T) {
+	f := rigs.StartPRFlow(t, rigs.PRFlowOpts{})
+	servertest.WriteTicket(t, f.Store, "proj", "epic-b", "01", "root", "")
+	epicB := filepath.Join(f.Store, "proj", "epic-b")
+	if err := tickets.StampEpicFields(epicB, map[string]any{"pr_number": 6, "pr_url": "https://github.com/o/r/pull/6"}); err != nil {
+		t.Fatal(err)
+	}
+	openPR(f)
+	f.GH.Update(func(s *ghfake.State) {
+		s.PRs = append(s.PRs, ghfake.PR{Number: 6, URL: "https://github.com/o/r/pull/6", Head: "epic-b", Base: "main", State: "OPEN", Draft: true, HeadSHA: "sha2", Mergeable: "MERGEABLE"})
+		s.Checks = map[string][]ghfake.Check{
+			"sha1": {{Name: "build", Status: "COMPLETED", Conclusion: "SUCCESS", JobID: 1, RunID: 1, WorkflowID: 1}},
+			"sha2": {{Name: "build", Status: "COMPLETED", Conclusion: "SUCCESS", JobID: 2, RunID: 2, WorkflowID: 2}},
+		}
+		s.Failures = []ghfake.Failure{{Match: "pr ready 5", Code: 1, Stderr: "boom"}}
+	})
+	f.StampPR(t, 5, prURL)
+	f.Tick(t)
+
+	if calls := f.GH.CallsMatching("pr ready 6"); len(calls) != 1 {
+		t.Fatalf("epic B was not marked ready after epic A's action failed: %v", f.GH.Calls())
+	}
+	w := f.H.Server.PRWatcher()
+	for _, epic := range []string{"epic-a", "epic-b"} {
+		if v, _ := w.View("proj", epic); v.Unreachable {
+			t.Fatalf("%s view = %+v, want reachable after an action error", epic, v)
+		}
+	}
+	if got := kinds(t, f); slices.Contains(got, prflow.KindGitHubDown) {
+		t.Fatalf("activity = %v, an action error is not an outage", got)
+	}
+	if d := w.Delay(); d != prflow.IdleInterval {
+		t.Fatalf("delay = %v, want no backoff after an action error", d)
+	}
+}
+
+func TestWatcher_DelayPollsFastInsideTheNoChecksGraceWindow(t *testing.T) {
+	f := rigs.StartPRFlow(t, rigs.PRFlowOpts{})
+	openPR(f)
+	setChecks(f, "sha1")
+	now := time.Now()
+	w := f.H.Server.PRWatcher()
+	w.SetClock(func() time.Time { return now })
+	f.StampPR(t, 5, prURL)
+	f.Tick(t)
+	for name, c := range map[string]struct {
+		after time.Duration
+		want  time.Duration
+	}{
+		"inside":  {time.Second, prflow.PendingInterval},
+		"outside": {10 * time.Second, prflow.IdleInterval},
+	} {
+		now = now.Add(c.after)
+		if d := w.Delay(); d != c.want {
+			t.Errorf("%s the window: delay = %v, want %v", name, d, c.want)
+		}
+		now = now.Add(-c.after)
 	}
 }

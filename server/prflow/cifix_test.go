@@ -1,7 +1,9 @@
 package prflow_test
 
 import (
+	"context"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -219,5 +221,27 @@ func TestForkCIFix_CapsComeFromTheActivityLog(t *testing.T) {
 	}
 	if n := len(ciFixTickets(f)); n != 3 {
 		t.Fatalf("ci-fix tickets = %d, want 3 (the cap creates none)", n)
+	}
+}
+
+func TestCIFix_FailedActivityAppendStillQueuesTheForkedTicket(t *testing.T) {
+	f := rigs.StartPRFlow(t, rigs.PRFlowOpts{})
+	failingPR(t, f, "sha1", done("build", "FAILURE", 11))
+	reran(t, f, "sha1", "11/build")
+	// Reads still work, appends do not.
+	if err := os.Chmod(filepath.Join(f.EpicDir(), prflow.ActivityFile), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	f.Tick(t)
+	got := ciFixTickets(f)
+	if len(got) != 1 {
+		t.Fatalf("ci-fix tickets = %d, want 1", len(got))
+	}
+	q, err := f.H.Client.Queue.Items(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(q) != 1 || !strings.HasSuffix(q[0].Address, "/"+got[0].Identifier) {
+		t.Fatalf("queue = %+v, want the ci-fix ticket %s queued", q, got[0].Identifier)
 	}
 }
