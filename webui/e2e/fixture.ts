@@ -58,6 +58,8 @@ interface FixtureOutput {
   restart_dir?: string;
   /** Only the migrate scenarios have the migration control files and the bare-server script. */
   migrate_dir?: string;
+  /** The `dev-mode` scenario's fake pnpm control file. */
+  dev_control_file?: string;
 }
 
 export interface Fixture {
@@ -148,6 +150,8 @@ export interface Fixture {
   readonly transcripts: Record<string, string>;
   /** The `limit-burn` scenario's Codex sessions dir; append a `token_count` line to its rollout to make the usage scan save a Codex sample. Empty elsewhere. */
   readonly codexSessionsDir: string;
+  /** The `dev-mode` scenario's fake pnpm control file; write `{"vite":"crash"}` to take Vite down. Empty elsewhere. */
+  readonly devControlFile: string;
 }
 
 /** The value after `--name` in an argv, or undefined. */
@@ -248,6 +252,7 @@ async function startFixture(
     releaseRateLimit: () => writeFile(out.ratelimit_release_file ?? "", ""),
     transcripts: out.transcripts ?? {},
     codexSessionsDir: out.codex_sessions_dir ?? "",
+    devControlFile: out.dev_control_file ?? "",
     async cli(...args) {
       const { stdout } = await run(out.gx, args, { env, cwd: tmpdir() });
       return stdout;

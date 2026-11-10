@@ -32,7 +32,10 @@ import (
 // parallel test per recovery (hung relaunch, live task, dirty worktree, Codex task, classifier
 // outage, unreachable holder, process storm) so they run side by side with a short launch grace.
 // Each needs a real pane, holder or process tree, which vitest and Go tests cannot stand in for.
-const maxFlows = 137
+// Dev mode flow (+1): the pill journey needs the scripted fake Vite over a real server round trip (SSE reload,
+// the dev worker's unregistration in a real browser); the DevPill, DevPopover and settings row vitest tests
+// cover each state alone.
+const maxFlows = 138
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
