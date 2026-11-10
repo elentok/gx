@@ -120,4 +120,109 @@ test("Bulk actions", async ({ page, start }) => {
   await page.getByRole("link", nav("Archive")).click();
   await expect(page).toHaveURL(/#\/archive$/);
   await expect(page.getByRole("heading", nav("Archive"))).toBeVisible();
+
+  // Entry 27: "← Epics" returns to the Epics page.
+  await page.getByRole("link", nav("← Epics")).click();
+  await expect(page).toHaveURL(/#\/epics$/);
+  await page.getByRole("link", nav("Archive")).click();
+  await expect(page).toHaveURL(/#\/archive$/);
+
+  // Entry 28: newest first, with project, kind, date and workspace; the order and fields match the CLI.
+  const rows = page.locator("li[aria-label]");
+  const cliRows = async (): Promise<{ title: string; address: string; workspace: string; kind: string }[]> =>
+    JSON.parse(await fx.cli("server", "epics", "archived", "--json")).epics;
+  const listed = await cliRows();
+  expect(listed.length).toBeGreaterThan(3);
+  await expect(rows).toHaveCount(listed.length);
+  await expect(rows).toHaveText(listed.map((r) => new RegExp(`^${r.title}`)));
+  for (const r of listed) {
+    const row = rows.filter({ hasText: r.title }).first();
+    await expect(row).toContainText(`demo · ${r.kind === "map" ? "Design" : "Epic"} ·`);
+    await expect(row).toContainText(r.workspace);
+  }
+  const rowOf = (title: string) => rows.filter({ has: page.getByText(title, { exact: true }) });
+
+  // Entry 36: a click on a row, and Enter on the focused row, open the read-only detail.
+  await rowOf("arch-bare").click();
+  await expect(page).toHaveURL(/#\/archive\/demo:arch-bare$/);
+  await expect(page.getByTestId("archived-stamp")).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/archive$/);
+  await rowOf("arch-stamped").focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#\/archive\/demo:arch-stamped$/);
+
+  // Entry 37: the detail has summary, tickets, cost and times, and Unarchive as the only action; tickets are not links.
+  await expect(page.getByRole("heading", nav("arch-stamped"))).toBeVisible();
+  await expect(page.getByTestId("archived-stamp")).toContainText("Archived");
+  await expect(page.getByRole("button", nav("Unarchive"))).toBeVisible();
+  await expect(page.locator('a[href^="#/t/"]')).toHaveCount(0);
+  await expect(page.getByText("built", { exact: true })).toBeVisible();
+
+  // Entry 32 and 38: Unarchive from the detail puts the epic back in its named workspace, active on the Epics page.
+  const membersBefore = JSON.parse(await fx.cli("server", "workspaces", "list", "--json")).workspaces.find((w: { name: string }) => w.name === "bulk").members + 1;
+  await page.getByRole("button", nav("Unarchive")).click();
+  await expect(page).toHaveURL(/#\/e\/demo:arch-stamped$/);
+  await epicsButton(page).click();
+  await page.getByRole("menuitem", { name: /^Archive/ }).click();
+  await expect(rowOf("arch-stamped")).toHaveCount(0);
+  const bulkMembers = async () => {
+    const all: { name: string; members: number }[] = JSON.parse(await fx.cli("server", "workspaces", "list", "--json")).workspaces;
+    return all.find((w) => w.name === "bulk")!.members;
+  };
+  await expect.poll(bulkMembers).toBe(membersBefore);
+  await openEpics(page);
+  await expect(page.getByRole("link", nav("arch-stamped")).first()).toBeVisible();
+  await page.getByRole("link", nav("Archive")).click();
+
+  // Entry 39: Unarchive from a row menu.
+  await rowOf("arch-stale").getByRole("button", { name: /actions/i }).click();
+  await page.getByRole("menuitem", nav("Unarchive")).click();
+  await expect(rowOf("arch-stale")).toHaveCount(0);
+
+  // Entry 41: an epic archived through the CLI appears without a reload, and leaves after a CLI Unarchive.
+  const cliArchived = await fx.cli("server", "epics", "archive", "demo:bulk-unmerged", "--json");
+  expect(JSON.parse(cliArchived).results).toHaveLength(1);
+  await expect(rowOf("bulk-unmerged")).toHaveCount(1);
+  const address = (await cliRows()).find((r) => r.title === "bulk-unmerged")!.address;
+  await fx.cli("server", "epics", "unarchive", address, "--json");
+  await expect(rowOf("bulk-unmerged")).toHaveCount(0);
+
+  // Entry 57: at 744 px and 390 px the checkboxes and the bar work and nothing scrolls sideways, on both pages.
+  const pageSelect = page.getByTestId("page-header-actions").getByRole("button", nav("Select"));
+  const sideways = () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  for (const width of [744, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const hash of ["#/archive", "#/epics"]) {
+      await page.evaluate((h) => (location.hash = h), hash);
+      await expect(page.getByRole("heading", nav(hash === "#/archive" ? "Archive" : "Epics"))).toBeVisible();
+      await pageSelect.click();
+      await expect(bar).toBeVisible();
+      await page.getByRole("checkbox", { name: /^Select / }).first().check();
+      await expect(count).toHaveText("1 selected");
+      await expect(bar).toBeInViewport();
+      expect(await sideways(), `${hash} at ${width}`).toBe(false);
+      await bar.getByRole("button", nav("Done")).click();
+      await expect(bar).toHaveCount(0);
+    }
+    // The sidebar's own bar and checkboxes, in the slide-over.
+    await page.evaluate(() => (location.hash = "#/epics"));
+    await page.getByRole("button", nav("Show sidebar")).click();
+    await enter();
+    await box("bulk-done-solo").check();
+    await expect(count).toHaveText("1 selected");
+    await expect(bar).toBeInViewport();
+    expect(await sideways(), `sidebar at ${width}`).toBe(false);
+    await bar.getByRole("button", nav("Done")).click();
+    await expect(bar).toHaveCount(0);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  // Entry 30: after the last row is unarchived the page shows the empty state.
+  await page.evaluate(() => (location.hash = "#/archive"));
+  await expect(page.getByRole("heading", nav("Archive"))).toBeVisible();
+  await pageSelect.click();
+  for (const r of await cliRows()) await page.getByRole("checkbox", nav(`Select ${r.title}`)).check();
+  await barButton("Unarchive").click();
+  await expect(page.getByText("Nothing is archived")).toBeVisible();
 });
