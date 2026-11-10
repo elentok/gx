@@ -1,0 +1,5 @@
+interface:
+  display_name: "Verify Epic"
+  short_description: "Verify an epic's finished work end to end"
+policy:
+  allow_implicit_invocation: false
