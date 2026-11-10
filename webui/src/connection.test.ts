@@ -73,7 +73,7 @@ function setup(opts: { snapshotFails?: () => boolean } = {}) {
       })();
     },
   });
-  return { conn, log, streams, reload };
+  return { conn, log, streams, reload, restartServer: () => (seq = 0) };
 }
 
 function setVisibility(v: "visible" | "hidden") {
@@ -138,6 +138,21 @@ test("a reload event replayed after a reconnect does not reload again", async ()
   streams[1].push('id: 5\nevent: reload\ndata: {}\n\n');
   await vi.advanceTimersByTimeAsync(0);
   expect(reload).toHaveBeenCalledTimes(1);
+  conn.stop();
+});
+
+test("a low-id reload after a gx restart still reloads", async () => {
+  const { conn, streams, reload, restartServer } = setup();
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  streams[0].push('id: 50\nevent: reload\ndata: {}\n\n');
+  await vi.advanceTimersByTimeAsync(0);
+  restartServer();
+  streams[0].end();
+  await vi.advanceTimersByTimeAsync(1000);
+  streams[1].push('id: 3\nevent: reload\ndata: {}\n\n');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(reload).toHaveBeenCalledTimes(2);
   conn.stop();
 });
 

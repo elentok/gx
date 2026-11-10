@@ -88,7 +88,21 @@ export function createConnection(deps: ConnectionDeps = {}) {
   const clientId = deps.clientId ?? `web-${randomId()}`;
   const reload = deps.reload ?? (() => window.location.reload());
   // A reconnect can replay a reload event this page already acted on; ids only grow, so one id is never acted on twice.
+  // Ids restart low after a gx restart, so a snapshot seq going backwards clears this.
   let lastReloadId = -1;
+  let lastSeq = -1;
+
+  function noteSeq(seq: number) {
+    if (seq < lastSeq) lastReloadId = -1;
+    lastSeq = seq;
+  }
+
+  function maybeReload(block: string) {
+    const id = eventId(block);
+    if (id !== undefined && id <= lastReloadId) return;
+    if (id !== undefined) lastReloadId = id;
+    reload();
+  }
 
   const cached = deps.cache?.load() ?? null;
   let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, liveSnapshot: false, tick: 0, streams: 0 };
@@ -169,6 +183,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
         refreshQueued = false;
         const snap = await getSnapshot();
         if (g !== gen) return;
+        noteSeq(snap.seq);
         set({ snapshot: snap });
       } while (refreshQueued);
     } catch {
@@ -201,13 +216,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
         const events = blocks.filter((b) => /^event:/m.test(b));
         if (events.length > 0) void refresh(g);
         for (const b of events) {
-          if (eventName(b) === RELOAD_EVENT) {
-            const id = eventId(b);
-            if (id === undefined || id > lastReloadId) {
-              if (id !== undefined) lastReloadId = id;
-              reload();
-            }
-          }
+          if (eventName(b) === RELOAD_EVENT) maybeReload(b);
           eventListeners.forEach((l) => l(eventAddress(b), eventName(b)));
         }
       }
@@ -229,6 +238,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
     }
     if (g !== gen) return;
     backoff = BACKOFF_MIN_MS;
+    noteSeq(snap.seq);
     set({ snapshot: snap, loadedOnce: true, liveSnapshot: true });
     void consume(g, snap.seq);
   }
