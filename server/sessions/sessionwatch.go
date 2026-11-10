@@ -199,6 +199,9 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 			})
 			first.NoteState(st.State)
 			mg.NoteFailure(id)
+			if st.State == wire.SessionBlocked {
+				mg.NoteQuestionCards(id)
+			}
 			poll.SetActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
 			// Marked before the Design check reads the transcript.
 			mark, marked := chat.TurnMark{}, false

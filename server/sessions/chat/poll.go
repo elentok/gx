@@ -68,6 +68,7 @@ func (p *Poll) run(stop <-chan struct{}, done chan<- struct{}) {
 		}
 		// A stall is only time passing, so no status change reports it.
 		p.c.src.NoteFailure(p.id)
+		p.c.src.NoteCards(p.id)
 		if path == "" {
 			path = p.transcript()
 		}

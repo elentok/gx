@@ -22,6 +22,7 @@ const (
 	notifyKindProgress         = "progress-update"
 	notifyKindDesignQuestion   = "design-question"
 	notifyKindDesignReady      = "design-ready"
+	notifyKindChatQuestion     = "chat-question"
 	notifyKindConflictStarted  = "conflict-resolution-started"
 	// notifyKindMuted/notifyKindGloballyMuted tag the gate's own
 	// edge-triggered "muting this"/"globally muted" notice (see

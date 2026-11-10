@@ -52,6 +52,8 @@ type Source interface {
 	StepFinal(ref FlowRef) bool
 	// NoteFailure raises the banner of a session whose failure is new.
 	NoteFailure(id string)
+	// NoteCards tells a plain chat's new question cards to the person.
+	NoteCards(id string)
 	// Stopped is closed when the session watches stop.
 	Stopped() <-chan struct{}
 	HasChatReader(harness string) bool

@@ -58,6 +58,7 @@ func (c chatSource) AskReleased(session, question string) bool {
 }
 func (c chatSource) StepFinal(ref chat.FlowRef) bool { return c.s.prompt.StepFinal(ref) }
 func (c chatSource) NoteFailure(id string)           { c.s.sessions.NoteFailure(id) }
+func (c chatSource) NoteCards(id string)             { c.s.sessions.NoteQuestionCards(id) }
 func (c chatSource) Stopped() <-chan struct{}        { return c.s.sessions.Watches.Stop }
 func (c chatSource) CodexHome() (string, error)      { return c.s.projects.CodexHome() }
 func (c chatSource) Publish(event, id string)        { c.s.events.Publish(event, id) }

@@ -68,7 +68,7 @@ type askFixture struct {
 
 // startAskFixture starts the fixture's plain Claude session; link, when set,
 // then links it to a Design or Triage flow.
-func startAskFixture(t *testing.T, link *wire.LinkSessionRequest) askFixture {
+func startAskFixture(t *testing.T, link *wire.LinkSessionRequest, cfg ...func(*server.Config)) askFixture {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
@@ -96,6 +96,9 @@ func startAskFixture(t *testing.T, link *wire.LinkSessionRequest) askFixture {
 			c.LaunchProofCaps.Poll = 20 * time.Millisecond
 			c.DialogFallbackDelay = 300 * time.Millisecond
 			c.KeysSettleStep = 20 * time.Millisecond
+			for _, f := range cfg {
+				f(c)
+			}
 		},
 		servertest.WithEnv("PATH="+bin+string(os.PathListSeparator)+gxBin(t)+string(os.PathListSeparator)+os.Getenv("PATH"),
 			"HOME="+home, "CLAUDE_CONFIG_DIR="+filepath.Join(home, ".claude"), "XDG_STATE_HOME="+xdg),

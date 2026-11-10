@@ -80,6 +80,7 @@ func (s infoSource) HeldAsks(string) []wire.AskHookRequest { return nil }
 func (s infoSource) AskReleased(string, string) bool       { return false }
 func (s infoSource) StepFinal(chat.FlowRef) bool           { return false }
 func (s infoSource) NoteFailure(string)                    {}
+func (s infoSource) NoteCards(string)                      {}
 func (s infoSource) Stopped() <-chan struct{}              { return nil }
 func (s infoSource) HasChatReader(string) bool             { return false }
 func (s infoSource) CodexHome() (string, error)            { return s.codexHome, nil }

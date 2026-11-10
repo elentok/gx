@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/osnotify"
@@ -192,6 +193,57 @@ func (mg *Manager) sendDesignQuestion(id string, q DesignQuestion) bool {
 	project := m.Info().Project
 	mg.alerts.DesignQuestion(project, mg.projects.ChatOverride(project), addr.Epic, string(step), q.Round, q.Text, designLink(mg.host.WebURL(), m))
 	return true
+}
+
+// NoteQuestionCards sends one push for each dialog, Codex or permission card a
+// plain chat newly shows, unless the session is open on screen. Other session
+// classes send none: they have their own Question or banner.
+func (mg *Manager) NoteQuestionCards(id string) {
+	if mg.OpenOnScreen(id) {
+		return
+	}
+	dir, m, res, err := mg.SessionDir(id)
+	if res.Refused || err != nil {
+		return
+	}
+	cm := m.ChatMeta()
+	if chat.ClassOf(cm) != chat.ClassPlain {
+		return
+	}
+	for _, card := range mg.chat.Cards(dir, cm, chat.Snapshot{}) {
+		if card.Source != wire.CardSourceClaudeDialog && card.Source != wire.CardSourceCodex && card.Source != wire.CardSourcePermission {
+			continue
+		}
+		// The permission id holds the turn, which an empty snapshot leaves at
+		// zero, so the block's own start time tells two blocks of one dialog apart.
+		key := fmt.Sprintf("chat-question:%s:%s:%s", id, card.Source, card.ID)
+		if card.Source == wire.CardSourcePermission {
+			key += fmt.Sprintf(":%d", m.StatusChangedAt.UnixNano())
+		}
+		// A mark that cannot be taken sends nothing: a message may be lost, never doubled.
+		isNew, err := mg.alerts.MarkOnce(key)
+		if err != nil {
+			mg.log.Warn("chat question mark", "session", id, "err", err)
+			continue
+		}
+		if !isNew {
+			continue
+		}
+		info := m.Info()
+		mg.alerts.ChatQuestion(info.Project, mg.projects.ChatOverride(info.Project), info.Name, cardText(card), designLink(mg.host.WebURL(), m))
+	}
+}
+
+// cardText is the first question of a card, as the push tells it.
+func cardText(card wire.QuestionCard) string {
+	if len(card.Questions) == 0 {
+		return ""
+	}
+	q := card.Questions[0]
+	if q.Title != "" {
+		return q.Title
+	}
+	return q.Body
 }
 
 // designLink is the Design page of a Design session, without the token; empty

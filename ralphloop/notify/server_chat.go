@@ -274,6 +274,19 @@ func (c *ServerChat) DesignQuestion(project string, override *ServerChatConfig, 
 	}
 }
 
+// ChatQuestion tells the project's destinations that a plain chat session waits
+// on a dialog, Codex or permission card. Like DesignQuestion it is never
+// per-source muted; the source is the server.
+func (c *ServerChat) ChatQuestion(project string, override *ServerChatConfig, session, question, link string) {
+	if c == nil {
+		return
+	}
+	msg := chatQuestionMessage(project, session, question, link)
+	for _, s := range c.projectSinks(override) {
+		s.sendMessage(msg, serverSource, "")
+	}
+}
+
 // DesignReady tells the project's destinations that the Design of a map
 // finished and its implEpic holds tickets ready to queue. The source is the
 // Design's own epic, the same as its Question.

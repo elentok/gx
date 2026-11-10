@@ -334,6 +334,22 @@ func designQuestionMessage(project, epic, step string, round int, question, link
 	}
 }
 
+// chatQuestionMessage is the "a plain chat waits on a card" message. The
+// subject is the session's name; an empty link leaves its line out.
+func chatQuestionMessage(project, session, question, link string) chatMessage {
+	lines := []string{question}
+	if link != "" {
+		lines = append(lines, link)
+	}
+	return chatMessage{
+		icon: "❓", status: "Question", subject: session,
+		lines:   lines,
+		project: project,
+		kind:    notifyKindChatQuestion,
+		urgency: urgencyAnswer,
+	}
+}
+
 // designReadyMessage is the "a Design finished" message. implEpic is the new
 // epic's name. An empty link (web listener off) leaves its line out.
 func designReadyMessage(project, implEpic string, count int, link string) chatMessage {
