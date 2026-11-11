@@ -24,7 +24,7 @@ import (
 )
 
 // DesignNotFinishedText is the refusal of a Design before its design step is done.
-const DesignNotFinishedText = "a Design archives once its design step is done"
+const DesignNotFinishedText = "a Design archives once its design step is done or its work is merged"
 
 // Deps is what Archive reads from the Server. The embedded Directory is the
 // one the workspace store uses, so Hold and Archive share one stop path.
@@ -122,7 +122,19 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 	if a.d.DesignExists(halves[0].key) {
 		step := tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(dir, base)).DesignStep)
 		if step != tickets.StepDone {
-			return refuse(wire.ReasonArchiveNotFinished, DesignNotFinishedText)
+			// A Design stuck before done still archives once its work merged:
+			// the -impl epic, or the map itself when it has no -impl.
+			work := base
+			if _, err := os.Stat(filepath.Join(dir, base+tickets.ImplEpicSuffix)); err == nil {
+				work = base + tickets.ImplEpicSuffix
+			}
+			row, err := scan(work)
+			if err != nil {
+				return wire.TargetResult{}, err
+			}
+			if row == nil || !row.AllDone || !row.MergedToTrunk {
+				return refuse(wire.ReasonArchiveNotFinished, DesignNotFinishedText)
+			}
 		}
 		if a.d.RootQueued(halves[0].key) {
 			return refuse(wire.ReasonCleanupQueued, "the epic is queued")

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 )
 
 // startPair is a store whose Design foo is at step, with a done foo-impl epic
@@ -199,5 +200,29 @@ func TestArchiveDesign_SecondRenameFailureRollsBack(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(r.store, "proj", "foo", "ticket.md")); err != nil {
 		t.Errorf("Design not restored: %v", err)
+	}
+}
+
+func TestArchiveDesign_StuckBeforeDoneArchivesOnceItsImplMerged(t *testing.T) {
+	r := startPair(t, "chart", false)
+	if err := tickets.StampEpicFields(filepath.Join(r.store, "proj", "foo-impl"), map[string]any{"merged_at": time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	got := r.archive(t, false, false, "proj:foo")[0]
+	if got.Status != wire.TargetDone {
+		t.Fatalf("archive = %+v, want done", got)
+	}
+	if a := r.archived(t); !a["foo"] || !a["foo-impl"] {
+		t.Errorf("archived = %v, want foo and foo-impl", a)
+	}
+}
+
+func TestArchiveDesign_StuckBeforeDoneWithoutImplArchivesOnceMerged(t *testing.T) {
+	r := startPair(t, "chart", true)
+	if err := tickets.StampEpicFields(filepath.Join(r.store, "proj", "foo"), map[string]any{"merged_at": time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.archive(t, false, false, "proj:foo")[0]; got.Status != wire.TargetDone {
+		t.Fatalf("archive = %+v, want done", got)
 	}
 }
