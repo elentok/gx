@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.49.1 - 2026-11-11
+
+- Added Archive to the item menu, and a persistent "Archiving" toast for bulk archive. The archive logs how long each phase takes to the server log.
+- Changed Dev mode to a "Dev details" submenu under the Dev mode toggle, with the status as its hint. The footer Dev pill and its popover are gone, the menu trigger is a three-dot icon, and the "Vite is down" toast no longer has a Details button.
+- Changed the chat header to drop the gap under it when the meta row is empty.
+- Changed the bulk Archive dialog to show one trunk warning, scroll its list, and keep its buttons in view.
+- Fixed a send after a pasted image being swallowed, which left the message waiting for a nudge. Image sends now wait 300ms after the paste.
+- Fixed the composer footer drawing over scrolled text. The note and footer now sit in one opaque strip, and the composer scrolls so the last line stays in view while typing.
+- Fixed fill pages on phone and tablet. They now sit fixed below the shell strips, so iOS 26 no longer draws a blur over the header in web app mode.
+- Fixed a new chat flashing "Session not found" on creation. The page shows "Creating chat…" until the session appears.
+- Fixed Archive for a Design with no `-impl` epic. A merged one with no tickets archives, and one stuck before done archives once its work is merged. The archive dry run reports the Design's own trunk state.
+- Fixed a done ticket with a cross-epic `blocked_by` failing closed, which kept such epics from archiving.
+
 ## v0.49.0 - 2026-11-11
 
 - Added question cards for agent questions in the web UI. Chats show a card when an agent waits on you, with the same card for each source: a printed round, a Queue agent's `gx tickets ask` question, a Claude AskUserQuestion dialog, a Claude permission prompt, a Claude plan approval (with the full plan), a Codex question tool overlay, and a hooked Codex approval (Allow and Deny). The card handles multi-select, notes and a required text row. The Agents-page chat shows a question sheet with per-source actions (dismiss, terminal, retry, plan text). A plain chat sends a push once when it waits on a dialog, and a Fix session sends a Question push.
