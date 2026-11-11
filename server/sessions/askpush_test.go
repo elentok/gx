@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // pushRig is an ask fixture whose server chats to a recording Slack hook.
@@ -23,12 +24,18 @@ type pushRig struct {
 
 func startPushRig(t *testing.T, link *wire.LinkSessionRequest, seed func(gate string)) *pushRig {
 	t.Helper()
+	return startPushRigAs(t, wire.CreateSessionRequest{}, link, seed)
+}
+
+// startPushRigAs is startPushRig with the session made from create.
+func startPushRigAs(t *testing.T, create wire.CreateSessionRequest, link *wire.LinkSessionRequest, seed func(gate string)) *pushRig {
+	t.Helper()
 	chat := rigs.NewSlackHook(t)
 	gate := filepath.Join(t.TempDir(), "gate.json")
 	if seed != nil {
 		seed(gate)
 	}
-	f := startAskFixture(t, link, func(c *server.Config) {
+	f := startAskFixtureAs(t, create, link, func(c *server.Config) {
 		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: servertest.FlushInterval}
 	})
 	return &pushRig{f: f, chat: chat, started: chat.WaitStarted(t), gate: gate}
@@ -85,6 +92,20 @@ func TestChatQuestionPush_NotSentWhileOpenOnScreen(t *testing.T) {
 	r.f.waitBlocked(t)
 	if got := r.questions(); got != 0 {
 		t.Errorf("Question pushes = %d, want none while open", got)
+	}
+}
+
+// A Fix agent is not a plain chat: a question dialog on its screen lists no
+// dialog card and sends no Question push. Its launch installs no ask hook, so
+// the dialog is the one the hookless fallback would otherwise turn into a card.
+func TestChatQuestionPush_FixSessionListsNoDialogCardAndSendsNone(t *testing.T) {
+	t.Parallel()
+	r := startPushRigAs(t, wire.CreateSessionRequest{FixOf: "proj"}, nil, nil)
+	r.f.block(t, "input needed", agentfake.AskDialogRows("Which color?", "red", "blue"))
+	r.f.waitBlocked(t)
+	r.f.noCardFor(t)
+	if got := r.questions(); got != 0 {
+		t.Errorf("Question pushes = %d, want none", got)
 	}
 }
 

@@ -72,6 +72,13 @@ type askFixture struct {
 // then links it to a Design or Triage flow.
 func startAskFixture(t *testing.T, link *wire.LinkSessionRequest, cfg ...func(*server.Config)) askFixture {
 	t.Helper()
+	return startAskFixtureAs(t, wire.CreateSessionRequest{}, link, cfg...)
+}
+
+// startAskFixtureAs is startAskFixture with the session made from create (a Fix
+// agent has FixOf set). Project, Dir and Harness are filled in.
+func startAskFixtureAs(t *testing.T, create wire.CreateSessionRequest, link *wire.LinkSessionRequest, cfg ...func(*server.Config)) askFixture {
+	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
@@ -118,7 +125,8 @@ func startAskFixture(t *testing.T, link *wire.LinkSessionRequest, cfg ...func(*s
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: dir, Harness: "claude"})
+	create.Project, create.Dir, create.Harness = "proj", dir, "claude"
+	res, err := h.Client.Sessions.Create(ctx, create)
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
