@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/epicstats"
 )
 
 // BackfillEpicTotals stamps lines_added and lines_removed, and total_tokens and
@@ -12,7 +13,7 @@ import (
 // counts the epic's trailer commits and is only called for an epic missing its
 // line counts, so a root with none never touches git; ok false means the epic
 // has no repo to count in, and its lines stay unstamped. Tokens and cost are the
-// sums SumEpicStats gives at merge: stamped only when every done ticket is.
+// sums epicstats.Sum gives at merge: stamped only when every done ticket is.
 // Stamping never overwrites, so a rerun changes nothing.
 func BackfillEpicTotals(root string, lines func(tickets.Epic) (added, removed int, ok bool, err error)) ([]tickets.MigrationChange, error) {
 	return backfillEpics(root, func(epic *tickets.Epic) ([]tickets.MigrationChange, error) {
@@ -32,7 +33,7 @@ func BackfillEpicTotals(root string, lines func(tickets.Epic) (added, removed in
 			}
 		}
 		if epic.TotalTokens == nil {
-			if stats := tickets.SumEpicStats(epic.Tickets); stats.TotalTokens != nil {
+			if stats := epicstats.Sum(epic.Tickets); stats.TotalTokens != nil {
 				fields["total_tokens"], fields["actual_cost"] = *stats.TotalTokens, stats.ActualCost
 				notes = append(notes, "tokens and cost backfilled from ticket stamps")
 			}

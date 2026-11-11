@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/epicstats"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/tickets/ticketmigrate"
@@ -382,7 +383,7 @@ func (s *Merger) StampEpic(root queue.RootRef, epicPath string, keys ...string) 
 // stampTotals records the epic's summed tokens, cost, Codex marker and friction.
 // A failed stamp is logged, never fatal, like stampEpic's.
 func (s *Merger) stampTotals(root queue.RootRef, e tickets.Epic) {
-	if err := tickets.StampEpicFields(e.Path, tickets.SumEpicStats(e.Tickets).Fields()); err != nil {
+	if err := tickets.StampEpicFields(e.Path, epicstats.Sum(e.Tickets).Fields()); err != nil {
 		s.log.Warn("stamp epic totals", "root", root, "err", err)
 	}
 }

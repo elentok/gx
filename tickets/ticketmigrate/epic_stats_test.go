@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/epicstats"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -16,7 +17,7 @@ func TestSumEpicStats_FrictionIncludesCancelledButTokensStayDoneOnly(t *testing.
 		{Status: "cancelled", TotalTokens: &cancelledTokens, ActualCost: 5, HadCodex: true, Friction: &schema.FrictionSummary{TotalPausedSecs: 7}},
 	}
 
-	got := tickets.SumEpicStats(ts)
+	got := epicstats.Sum(ts)
 
 	if got.Friction.TotalPausedSecs != 17 {
 		t.Errorf("Friction.TotalPausedSecs = %d, want 17", got.Friction.TotalPausedSecs)

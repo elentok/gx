@@ -54,20 +54,24 @@ func (b projectsBack) FailuresChanged() {
 	s.guards.Kick() // a clear ends a Migration block: claim now, not at the next tick
 }
 
+// migrationView holds the Migrator and its Server-level accessors; the Server
+// embeds it so these methods stay off the Server's own method count.
+type migrationView struct{ migrator *projects.Migrator }
+
 // MigrationsDone is closed when the start-up migration of every project has
 // ended, whether each project passed or failed. It is closed even when there is
 // no ticket store.
-func (s *Server) MigrationsDone() <-chan struct{} { return s.migrator.Done() }
+func (v migrationView) MigrationsDone() <-chan struct{} { return v.migrator.Done() }
 
 // MigrationRunning reports whether a migration run of project is in flight.
-func (s *Server) MigrationRunning(project string) bool { return s.migrator.Running(project) }
+func (v migrationView) MigrationRunning(project string) bool { return v.migrator.Running(project) }
 
 // MigrationFailures reads the saved failed migrations of the projects now in
 // the ticket store. The CLI writes the record, so each call reads the file.
-func (s *Server) MigrationFailures() []wire.MigrationFailure { return s.migrator.Failures() }
+func (v migrationView) MigrationFailures() []wire.MigrationFailure { return v.migrator.Failures() }
 
 // StartupDone closes once the startup steps, the first rescan among them, ended.
-func (s *Server) StartupDone() <-chan struct{} { return s.migrator.StartupDone() }
+func (v migrationView) StartupDone() <-chan struct{} { return v.migrator.StartupDone() }
 
 // WorktreeDir is where the project's iteration worktrees live.
 func (s *Server) WorktreeDir(project string) string { return s.projects.WorktreeDir(project) }

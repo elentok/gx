@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/archivekey"
 )
 
 // Unarchive brings each target back out of .archive on its own, in order. It
@@ -126,8 +127,8 @@ func (a *Archive) restore(dir, project string, halves []half, name string, head 
 				return err
 			}
 		}
-		archiveKey := tickets.ArchiveKey(project+":"+h.epic, h.epic)
-		rekeyErrs = append(rekeyErrs, a.rekey(tickets.ArchiveEpicKey, archiveKey, project+":"+finals[i]))
+		archiveKey := archivekey.New(project+":"+h.epic, h.epic)
+		rekeyErrs = append(rekeyErrs, a.rekey(archivekey.Epic, archiveKey, project+":"+finals[i]))
 	}
 	a.placeInWorkspace(project+":"+finals[0], head.ArchivedWorkspace)
 	a.d.Events.Publish(wire.EventWorkspacesChanged, "")

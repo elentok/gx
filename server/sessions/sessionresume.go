@@ -41,7 +41,7 @@ func (rs *Resumer) ResumeSession(req wire.SessionRequest) (wire.SessionResult, e
 	}
 	meta.RestoredAt = time.Now()
 	if meta.HandoffTier && meta.Exit == wire.SessionExitCrashed {
-		rs.mg.applyTier(&meta, meta.Tier)
+		applyTier(rs.mg, &meta, meta.Tier)
 	}
 	if err := rs.startResumedHolder(dir, &meta, time.Time{}); err != nil {
 		rs.mg.endFailedStart(dir, &meta)

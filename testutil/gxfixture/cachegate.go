@@ -57,7 +57,7 @@ var (
 )
 
 // gateDir sits outside the project repo, so the trunk stays clean.
-func (f *fixture) gateDir() string { return filepath.Join(f.root, "gate") }
+func gateDir(f *fixture) string { return filepath.Join(f.root, "gate") }
 
 // setupFakeGo writes <gate dir>/bin/go and bin/ps and puts the bin first on
 // the server's PATH. A flow holds a build by creating <gate dir>/go-hold and
@@ -69,7 +69,7 @@ func (f *fixture) setupFakeGo() error {
 
 // putBinFirst writes the scripts into <gate dir>/bin and puts that bin first on the server's PATH.
 func (f *fixture) putBinFirst(scripts map[string]string) error {
-	bin := filepath.Join(f.gateDir(), "bin")
+	bin := filepath.Join(gateDir(f), "bin")
 	if err := os.MkdirAll(bin, 0o755); err != nil {
 		return err
 	}

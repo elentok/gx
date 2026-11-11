@@ -145,7 +145,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 	if sc.Flow != "" {
 		meta.Flow, meta.FlowKey = sc.Flow, sc.FlowKey
 	}
-	mg.applyTier(&meta, tier)
+	applyTier(mg, &meta, tier)
 	dir, err := mg.saveNewSession(&meta, req.UniqueName)
 	if errors.Is(err, errSessionNameTaken) {
 		return Refusal(wire.ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
@@ -178,7 +178,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 
 // applyTier sets the session's tier and the model and effort it resolves to for
 // the session's harness and project.
-func (mg *Manager) applyTier(meta *Meta, tier agent.Tier) {
+func applyTier(mg *Manager, meta *Meta, tier agent.Tier) {
 	meta.Tier = tier
 	meta.Model, meta.Effort = agent.ResolveTier(mg.projects.AgentsConfig(meta.Project), agent.AgentFor(meta.Harness), tier)
 }

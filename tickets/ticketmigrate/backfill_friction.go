@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/epicstats"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -34,7 +35,7 @@ func BackfillFriction(root string, friction func(epicName string, t tickets.Tick
 		if !epic.HasTicketMD || epic.MergedAt.IsZero() || epic.Friction != nil {
 			return changes, nil
 		}
-		if err := tickets.StampEpicFieldsInner(epic.Path, map[string]any{"friction": tickets.SumEpicStats(epic.Tickets).Friction}); err != nil {
+		if err := tickets.StampEpicFieldsInner(epic.Path, map[string]any{"friction": epicstats.Sum(epic.Tickets).Friction}); err != nil {
 			return changes, err
 		}
 		return append(changes, tickets.MigrationChange{

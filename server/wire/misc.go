@@ -236,3 +236,28 @@ const (
 	// between Vite and the built files.
 	EventReload = "reload"
 )
+
+// EventSessionChatChanged announces that a working session's transcript grew
+// or shrank; its address is the session id.
+const EventSessionChatChanged = "session-chat-changed"
+
+// ReasonSessionNotWorking refuses an interrupt of a session with no turn to end.
+const ReasonSessionNotWorking = "session-not-working"
+
+// QueueMode is the queue's mode, as reported in QueueResult.Mode.
+type QueueMode string
+
+const (
+	QueueModeRunning QueueMode = "running"
+	QueueModePaused  QueueMode = "paused"
+)
+
+// Tip is one entry of the tips page. Folders is filled by the call for tips
+// that point at the project worktree folders.
+type Tip struct {
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Body     string   `json:"body"`
+	Platform string   `json:"platform"` // GOOS value the tip applies to
+	Folders  []string `json:"folders,omitempty"`
+}

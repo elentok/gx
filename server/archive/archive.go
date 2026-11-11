@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/archivekey"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
@@ -298,7 +299,7 @@ func (a *Archive) write(dir string, halves []half, name string, cleanup func()) 
 		if err := tickets.OverwriteEpicFields(filepath.Join(archive, m.name), fields); err != nil {
 			return err
 		}
-		rekeyErrs = append(rekeyErrs, a.rekey(tickets.EpicAddress, m.key, tickets.ArchiveKey(m.key, m.name)))
+		rekeyErrs = append(rekeyErrs, a.rekey(tickets.EpicAddress, m.key, archivekey.New(m.key, m.name)))
 	}
 	a.d.Events.Publish(wire.EventWorkspacesChanged, "")
 	if err := errors.Join(rekeyErrs...); err != nil {
@@ -309,7 +310,7 @@ func (a *Archive) write(dir string, halves []half, name string, cleanup func()) 
 
 // rekey points every Session of the epic keyed `from`, live or exited, at the
 // key `to`, and joins the errors of those it could not. epicOf cuts a ticket
-// address down to its epic key; an archive key needs tickets.ArchiveEpicKey,
+// address down to its epic key; an archive key needs archivekey.Epic,
 // as its first slash is not the ticket's.
 func (a *Archive) rekey(epicOf func(string) string, from, to string) error {
 	var errs []error

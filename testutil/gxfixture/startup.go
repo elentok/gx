@@ -218,7 +218,7 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 // addScenarioOutput fills the Output fields that only some scenarios have.
 func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts map[string]string) {
 	if sc.FakeGo || sc.FakeNpm {
-		res.GateDir = f.gateDir()
+		res.GateDir = gateDir(f)
 	}
 	if sc.FakeGH != nil {
 		res.GHState, res.Origin = fakeGH{f}.ghState(), fakeGH{f}.origin()

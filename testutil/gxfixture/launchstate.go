@@ -85,7 +85,7 @@ func (f *fixture) setupFakeNpm(failing bool) error {
 	if err := f.putBinFirst(map[string]string{"npm": body}); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(f.gateDir(), "npm-hold"), nil, 0o644)
+	return os.WriteFile(filepath.Join(gateDir(f), "npm-hold"), nil, 0o644)
 }
 
 // configFile is the global config the server loaded; a test edits it and reloads.

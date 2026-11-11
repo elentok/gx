@@ -113,10 +113,10 @@ type Server struct {
 	harness        *harnesschoice.Harness
 	settingsWriter *settingsapi.Writer
 	projects       *projects.Registry
-	migrator       *projects.Migrator
-	checks         *projects.Checks
-	cleanup        *cleanup.Cleanup
-	archive        *archive.Archive
+	migrationView
+	checks  *projects.Checks
+	cleanup *cleanup.Cleanup
+	archive *archive.Archive
 
 	queue      *queue.Queue
 	afk        *queue.AFK

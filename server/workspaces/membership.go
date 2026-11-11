@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/archivekey"
 )
 
 // Directory is what the membership rules and placement need from the server:
@@ -78,8 +79,8 @@ func (s *Store) place(si wire.SessionInfo) wire.SessionPlacement {
 	addr := cmp.Or(si.FixOf, si.Ticket)
 	// An archived epic's agents match no sidebar row, so they show nowhere. Test
 	// this before parsing: an archive key must not fall to Other.
-	if tickets.IsArchiveKey(addr) {
-		return wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementEpic, Epic: tickets.ArchiveEpicKey(addr)}
+	if archivekey.Is(addr) {
+		return wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementEpic, Epic: archivekey.Epic(addr)}
 	}
 	// A project-level Fix agent has a bare project name here, which does not parse.
 	a, err := tickets.ParseQueuedAddress(addr)

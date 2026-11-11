@@ -111,7 +111,7 @@ func (rs *Resumer) stopForRestart(dir, id string) {
 // one and launches it under the worker tier. The caller holds metaMu.
 func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
 	return rs.restartConversation(dir, meta, old, func(meta *Meta, _ int) {
-		rs.mg.applyTier(meta, agent.TierWorker)
+		applyTier(rs.mg, meta, agent.TierWorker)
 		meta.HandoffTier = true
 		meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
 	})
