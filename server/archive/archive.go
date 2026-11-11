@@ -169,6 +169,13 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 			}
 			onTrunk = row.MergedToTrunk
 			halves = append(halves, half{epic: impl, key: implKey})
+		} else {
+			// No -impl: the map's own merge is the one the dialog warns about.
+			row, err := scan(base)
+			if err != nil {
+				return wire.TargetResult{}, err
+			}
+			onTrunk = row != nil && row.MergedToTrunk
 		}
 	} else {
 		if a.d.RootQueued(halves[0].key) {

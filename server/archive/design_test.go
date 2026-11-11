@@ -239,3 +239,18 @@ func TestArchiveDesign_MergedMapWithoutTicketsOrImplArchives(t *testing.T) {
 		t.Fatalf("archive = %+v, want done", got)
 	}
 }
+
+func TestArchiveDesign_DryRunWithoutImplReportsTrunkFromTheMap(t *testing.T) {
+	for _, merged := range []bool{true, false} {
+		r := startPair(t, "done", true)
+		if merged {
+			if err := tickets.StampEpicFields(filepath.Join(r.store, "proj", "foo"), map[string]any{"merged_at": time.Now().UTC()}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got := r.archive(t, false, true, "proj:foo")[0]
+		if got.OnTrunk == nil || *got.OnTrunk != merged {
+			t.Errorf("merged=%v: on_trunk = %v", merged, got.OnTrunk)
+		}
+	}
+}
