@@ -54,7 +54,7 @@ function SessionHeader({
   const device = useDevice();
   const compact = keyboardOpen && device !== "desktop";
   return (
-    <Box as="header" mb="3" display={compact ? "none" : undefined}>
+    <Box as="header" display={compact ? "none" : undefined}>
       <PageHeader
         title={s.name || s.id}
         subtitle={wide ? `Chat · ${s.project}` : `Chat · ${s.project} · ${stateLabel(s)}`}
@@ -66,6 +66,7 @@ function SessionHeader({
             {actions}
           </>
         }
+        metaFlush={!wide}
         meta={
           <Box display="flex" alignItems="center" flexWrap="wrap" gap="2">
             {wide && (

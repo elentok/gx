@@ -96,6 +96,11 @@ function Field({
     menu!.pending.current = null;
     area.current?.setSelectionRange(at, at);
   }, [value, menu, selection]);
+  // The browser scrolls the caret into the textarea's padding box, which the note/footer strip covers. Typing at the end scrolls to the very end instead, which keeps the last line above the padding.
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (el && document.activeElement === el && el.selectionStart === value.length) el.scrollTop = el.scrollHeight;
+  }, [value]);
   const open = () =>
     setSelection({
       start: area.current?.selectionStart ?? 0,

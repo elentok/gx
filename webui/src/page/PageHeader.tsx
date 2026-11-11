@@ -11,6 +11,7 @@ export function PageHeader({
   subtitle,
   actions,
   meta,
+  metaFlush,
   caret,
   children,
 }: {
@@ -25,6 +26,8 @@ export function PageHeader({
   actions?: ReactNode;
   /** The meta bar under a hairline. Nothing renders when it is empty. */
   meta?: ReactNode;
+  /** Drops the room under the hairline, for a meta bar that has nothing to show. */
+  metaFlush?: boolean;
   children?: ReactNode;
 }) {
   const wide = useWide();
@@ -84,7 +87,7 @@ export function PageHeader({
         h1
       )}
       {meta ? (
-        <Box data-testid="page-header-meta" mt="10px" pt="8px" borderTopWidth="1px" borderColor="hairline">
+        <Box data-testid="page-header-meta" mt="10px" pt={metaFlush ? "0" : "8px"} borderTopWidth="1px" borderColor="hairline">
           {meta}
         </Box>
       ) : null}
