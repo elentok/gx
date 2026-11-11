@@ -57,6 +57,10 @@ test("Bulk actions", async ({ page, start }) => {
   await barButton("Hold").click();
   await expect(box("bulk-clash")).toHaveCount(0);
   await expect(dialog("Hold selected")).toHaveCount(0);
+  // The held row stays selected, so the mode stays on until Done.
+  await expect(bar).toBeVisible();
+  await bar.getByRole("button", nav("Done")).click();
+  await expect(bar).toHaveCount(0);
 
   // Entry 14: Stop confirms once and lists the rows; the Exited agent is skipped as not live.
   await sidebar.getByRole("button", nav("Expand bulk-paused")).click();
@@ -71,8 +75,8 @@ test("Bulk actions", async ({ page, start }) => {
   await expect(dialog("Stop selected")).toHaveCount(0);
   await expect(page.getByText("Not run on some rows")).toBeVisible();
   await expect(page.getByText(/Claude Code.*not live/)).toBeVisible();
-  // The stopped row leaves the selection; the skipped one stays.
-  await expect(count).toHaveText("1 selected");
+  // Both rows stay in the list (the stopped one as Exited), so both stay selected.
+  await expect(count).toHaveText("2 selected");
   await bar.getByRole("button", nav("Done")).click();
   await expect(bar).toHaveCount(0);
 

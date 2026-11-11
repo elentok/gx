@@ -65,13 +65,19 @@ export const pageOwnsKey = (t: EventTarget | null) => !unfocused(t) && !inSideba
  */
 export function useSelectApi(rows: SelectRow[], names: Map<string, string>, loaded: boolean, ownsKey: (t: EventTarget | null) => boolean = pageOwnsKey): SelectApi {
   const [state, setState] = useState<SelectState>(initialSelect);
-  // A row that leaves the list leaves the selection.
-  useEffect(() => {
-    if (loaded) setState((s) => prune(s, rows));
-  }, [loaded, rows]);
-
   const stateRef = useRef(state);
   stateRef.current = state;
+  // A run's moved rows leave the list only on a later refetch, after afterRun ran on the old rows.
+  // The flag stays up until a prune changes something, so an unrelated list update in between does not eat it.
+  const runPending = useRef(false);
+  // A row that leaves the list leaves the selection.
+  useEffect(() => {
+    if (!loaded) return;
+    const next = prune(stateRef.current, rows, runPending.current);
+    if (next === stateRef.current) return;
+    runPending.current = false;
+    setState(next);
+  }, [loaded, rows]);
   const ownsKeyRef = useRef(ownsKey);
   ownsKeyRef.current = ownsKey;
   useEffect(() => {
@@ -87,15 +93,24 @@ export function useSelectApi(rows: SelectRow[], names: Map<string, string>, load
     () => ({
       state,
       rows,
-      enter: () => setState(enter),
-      leave: () => setState(leave),
+      enter: () => {
+        runPending.current = false;
+        setState(enter);
+      },
+      leave: () => {
+        runPending.current = false;
+        setState(leave);
+      },
       toggle: (key) => setState((s) => toggle(s, key)),
       toggleGroup: (group) => setState((s) => toggleGroup(s, rows, group)),
       groupState: (group) => groupState(state, rows, group),
       selectAll: () => setState((s) => selectAll(s, rows)),
       selectNone: () => setState(selectNone),
       nameOf: (key) => names.get(key) ?? key,
-      afterRun: () => setState((s) => prune(s, rows, true)),
+      afterRun: () => {
+        runPending.current = true;
+        setState((s) => prune(s, rows, true));
+      },
     }),
     [state, rows, names],
   );
