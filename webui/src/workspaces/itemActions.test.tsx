@@ -37,7 +37,7 @@ const labels = () => screen.getAllByRole("menuitem").map((i) => i.textContent);
 test("a Design offers Move and Hold, never Remove; Move lists every workspace with the current one marked and posts the pick", async () => {
   const w = writers();
   await open(design, w);
-  expect(labels()).toEqual(["Move to workspace›", "Hold"]);
+  expect(labels()).toEqual(["Move to workspace›", "Hold", "Archive"]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }));
   const work = await screen.findByRole("menuitem", { name: /Work/ });
   expect(work.getAttribute("aria-current")).toBe("true");
@@ -145,4 +145,31 @@ test("a queue agent's chat gets no Stop or Remove", async () => {
 test("an item with nothing to offer renders no button", () => {
   renderThemed(<ItemMenu item={{ ...design, kind: "chat" }} workspaces={[]} writers={writers()} />);
   expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
+});
+
+test("Archive asks first from a dry run, listing live sessions and the trunk warning, then archives with yes", async () => {
+  const archive = vi.fn(async (_key: string, opts: { dryRun?: boolean; yes?: boolean }) =>
+    opts.dryRun ? { sessions: ["agent-1"], on_trunk: false } : {},
+  );
+  await open({ ...design, kind: "epic" }, writers({ archive }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(archive).toHaveBeenCalledWith("p:shop", { dryRun: true });
+  expect(dialog.textContent).toContain("Live sessions will stop: agent-1.");
+  expect(dialog.textContent).toContain("is not merged to trunk");
+  fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+  await waitFor(() => expect(archive).toHaveBeenCalledWith("p:shop", { yes: true }));
+});
+
+test("Archive refused by the dry run opens no dialog", async () => {
+  const archive = vi.fn(async () => ({ refused: true, message: "the epic is queued" }));
+  await open({ ...design, kind: "epic" }, writers({ archive }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+  await waitFor(() => expect(archive).toHaveBeenCalled());
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("a chat has no Archive item", async () => {
+  await open({ key: "s1", name: "Chat", kind: "chat", workspace: "Work", session: session("s1", "p") }, writers());
+  expect(labels()).not.toContain("Archive");
 });

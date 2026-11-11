@@ -21,6 +21,8 @@ import { Modal } from "../ui/modal/Modal";
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu";
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
 import { useWrite, WriteError, type Refusable } from "../useWrite";
+import { bulkArchive } from "../select/bulkWrites";
+import { showToast, toaster } from "../ui/toaster";
 import { postWorkspace } from "./postWorkspace";
 
 /** What the menu needs of a Design or epic card, a chat or a jump row. One-off, Follow-ups and Other get no menu. */
@@ -59,12 +61,18 @@ export function useCardActions(card: EpicListRow | undefined, workspaces: Worksp
 /** The one result of a one-target write, flat as `useWrite` wants it. */
 export interface ItemWriteResult extends Refusable {
   sessions?: string[];
+  /** An archive dry run's answer: whether gx sees the epic on trunk. */
+  on_trunk?: boolean;
+  /** The name an archive took when it clashed with one already archived. */
+  new_address?: string;
 }
 
 export interface ItemWriters {
   move: (key: string, to: string) => Promise<ItemWriteResult>;
   hold: (epic: string, yes?: boolean) => Promise<ItemWriteResult>;
   unhold: (epic: string) => Promise<ItemWriteResult>;
+  /** One epic's archive; `dryRun` only asks what it would stop. */
+  archive?: (epic: string, opts: { dryRun?: boolean; yes?: boolean }) => Promise<ItemWriteResult>;
   /** A chat's Stop and Remove; the agent page's defaults when absent. */
   stop?: StopSession;
   remove?: RemoveSession;
@@ -82,9 +90,17 @@ export const postMove = (key: string, to: string) => postOne("move", { name: to,
 export const postHold = (epic: string, yes?: boolean) => postOne("hold", { targets: [epic], ...(yes ? { yes } : {}) });
 export const postUnhold = (epic: string) => postOne("unhold", { targets: [epic] });
 
-export const defaultWriters: ItemWriters = { move: postMove, hold: postHold, unhold: postUnhold };
+export async function postArchive(epic: string, opts: { dryRun?: boolean; yes?: boolean }): Promise<ItemWriteResult> {
+  const r = (await bulkArchive([epic], opts))[0];
+  if (!r) throw new WriteError("The server answered with no result.");
+  return { refused: r.status === TargetRefused, reason: r.reason, message: r.message, sessions: r.sessions, on_trunk: r.on_trunk, new_address: r.new_address };
+}
 
-type Dialog = { kind: "hold"; sessions: string[] };
+export const defaultWriters: ItemWriters = { move: postMove, hold: postHold, unhold: postUnhold, archive: postArchive };
+
+const ARCHIVE_BUSY_TOAST = "item-archive-busy";
+
+type Dialog = { kind: "hold"; sessions: string[] } | { kind: "archive"; sessions: string[]; onTrunk?: boolean };
 
 interface DialogProps {
   item: ItemRef;
@@ -109,6 +125,36 @@ function HoldDialog({ item, writers, run, close, sessions }: DialogProps & { ses
           }}
         >
           Hold and end sessions
+        </Button>
+      </Box>
+    </Modal>
+  );
+}
+
+function ArchiveDialog({ item, writers, run, close, sessions, onTrunk }: DialogProps & { sessions: string[]; onTrunk?: boolean }) {
+  const archive = writers.archive ?? postArchive;
+  return (
+    <Modal label={`Archive ${item.name}`} onClose={close} maxW="md">
+      <Text fontWeight="bold">Archive {item.name}? Live agents stop and the epic leaves the sidebar. Unarchive brings it back.</Text>
+      {sessions.length > 0 && <Text>Live sessions will stop: {sessions.join(", ")}.</Text>}
+      {onTrunk === false && (
+        <Text color="tone.waiting.fg">⚠ {item.name} is not merged to trunk. Archiving keeps its branch, but the work is not on trunk.</Text>
+      )}
+      <Box display="flex" gap="2" justifyContent="flex-end">
+        <Button emphasis="secondary" onClick={close} autoFocus>
+          Cancel
+        </Button>
+        <Button
+          tone="running"
+          onClick={() => {
+            close();
+            showToast({ type: "info", title: `Archiving ${item.name}…`, id: ARCHIVE_BUSY_TOAST, persistent: true });
+            void run(() => archive(item.key, { yes: true }).finally(() => toaster.remove(ARCHIVE_BUSY_TOAST)), {
+              success: (res) => ({ type: "success", title: `Archived ${res.new_address ? res.new_address.split(":").pop() : item.name}` }),
+            });
+          }}
+        >
+          Archive
         </Button>
       </Box>
     </Modal>
@@ -176,12 +222,29 @@ export function useItemActions(
             onSelect: () => void hold(),
           },
     ]);
+    const archive = writers.archive ?? postArchive;
+    // A dry run first: the dialog lists the live sessions it stops and warns when the epic is not on trunk.
+    groups.push([
+      {
+        value: "archive",
+        label: "Archive",
+        disabled: pending,
+        onSelect: () =>
+          void run(async () => {
+            const dry = await archive(item.key, { dryRun: true });
+            if (dry.refused) return dry;
+            setDialog({ kind: "archive", sessions: dry.sessions ?? [], onTrunk: dry.on_trunk });
+            return dry;
+          }),
+      },
+    ]);
   }
 
   const props = { item, writers, run, close };
   const dialogs: ReactNode = (
     <>
-      {dialog ? <HoldDialog {...props} sessions={dialog.sessions} /> : null}
+      {dialog?.kind === "hold" ? <HoldDialog {...props} sessions={dialog.sessions} /> : null}
+      {dialog?.kind === "archive" ? <ArchiveDialog {...props} sessions={dialog.sessions} onTrunk={dialog.onTrunk} /> : null}
       {manage.dialog}
     </>
   );

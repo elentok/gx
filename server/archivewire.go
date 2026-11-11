@@ -18,6 +18,7 @@ func newArchive(s *Server) *archive.Archive {
 		SetMember:     s.workspaces.SetMember,
 		Remove:        s.workspaces.Remove,
 		CleanupDesign: s.designs.CleanupDesign,
+		Log:           s.log,
 		RekeySession:  s.rekeySession,
 	})
 }

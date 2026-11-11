@@ -296,7 +296,7 @@ test("a Design in a workspace appends Move and Hold after the existing items", a
   expect(at("Copy design ID")).toBeGreaterThan(at("New session"));
   expect(at("Move to workspace")).toBeGreaterThan(at("Copy design ID"));
   expect(at("Remove from workspace")).toBe(-1);
-  expect(labels.at(-1)).toBe("Hold");
+  expect(labels.slice(-2)).toEqual(["Hold", "Archive"]);
 });
 
 test("a held Design offers Take off hold and says On hold in its subtitle", async () => {
