@@ -149,23 +149,31 @@ function Field({
         onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
         onKeyDown={onKeyDown}
       />
-      {note !== undefined && (
-        <Text
+      {(note !== undefined || footer) && (
+        // Opaque, so text scrolling through the textarea's bottom padding does not show under the note or footer.
+        <Box
           position="absolute"
-          bottom={footer ? "8" : "1.5"}
-          left="3"
-          right="46px"
-          fontSize="xs"
-          lineHeight="1.5"
-          pointerEvents="none"
-          truncate
-          color={note?.red ? "tone.deadlocked.fg" : "text.dim"}
+          bottom="1px"
+          left="1px"
+          right="1px"
+          px="calc(var(--chakra-spacing-3) - 1px)"
+          pt="1"
+          pb="1.5"
+          bg={bg ?? "surface.raised"}
+          borderBottomRadius={`calc(${radius} - 1px)`}
         >
-          {note?.text}
-        </Text>
-      )}
-      {footer && (
-        <Box position="absolute" bottom="1.5" left="3" right="3">
+          {note !== undefined && (
+            <Text
+              fontSize="xs"
+              lineHeight="1.5"
+              pointerEvents="none"
+              truncate
+              pe="34px"
+              color={note?.red ? "tone.deadlocked.fg" : "text.dim"}
+            >
+              {note?.text}
+            </Text>
+          )}
           {footer}
         </Box>
       )}
