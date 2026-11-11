@@ -104,7 +104,7 @@ test("Archive posts a dry run first and confirms even with no live Session and n
   expect(dialog.textContent).not.toContain("trunk");
 });
 
-test("the confirm lists live sessions and one warning per epic not on trunk; Confirm sends one real call with yes", async () => {
+test("the confirm lists live sessions and one trunk warning naming the epics not on trunk; Confirm sends one real call with yes", async () => {
   const calls = setup((b) =>
     b.dry_run ? { results: [fits("p:blog", { on_trunk: false, sessions: ["s1", "s2"] }), fits("p:shop")] } : { results: b.targets.map((t) => ({ target: t, status: "done" })) },
   );
@@ -112,8 +112,7 @@ test("the confirm lists live sessions and one warning per epic not on trunk; Con
   fireEvent.click(bar().getByRole("button", { name: "Archive 2" }));
   const dialog = await screen.findByRole("dialog");
   expect(dialog.textContent).toContain("Live sessions will stop: s1, s2.");
-  expect(dialog.textContent).toContain("Blog is not merged to trunk.");
-  expect(dialog.textContent).not.toContain("Shop is not merged");
+  expect(dialog.textContent).toContain("Not merged to trunk: Blog.");
   fireEvent.click(within(dialog).getByRole("button", { name: "Archive" }));
   await waitFor(() => expect(calls).toHaveLength(2));
   expect(calls[1]).toEqual({ targets: ["p:blog", "p:shop"], yes: true });
@@ -162,4 +161,15 @@ test("rows the dry run refuses are listed with the reason, do not run, and stay 
   // The fixture's list never drops the archived Shop, so it stays selected too; leaving the list is prune's job.
   expect(screen.getByTestId("select-count").textContent).toBe("2 selected");
   expect(box("Select Blog").checked).toBe(true);
+});
+
+test("several epics not on trunk share one warning, and the list scrolls above the buttons", async () => {
+  setup((b) => (b.dry_run ? { results: [fits("p:blog", { on_trunk: false }), fits("p:shop", { on_trunk: false })] } : { results: [] }));
+  await selectRows("Blog", "Shop");
+  fireEvent.click(bar().getByRole("button", { name: "Archive 2" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog.textContent?.match(/Not merged to trunk/g)).toHaveLength(1);
+  expect(dialog.textContent).toContain("Not merged to trunk: Blog, Shop.");
+  const buttons = within(dialog).getByRole("button", { name: "Archive" }).parentElement;
+  expect(buttons?.previousElementSibling && getComputedStyle(buttons.previousElementSibling).overflowY).toBe("auto");
 });

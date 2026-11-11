@@ -167,6 +167,8 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: 
       )}
       {archiveConfirm && (
         <Modal label="Archive selected" onClose={() => setArchiveConfirm(undefined)} maxW="md">
+          {/* The list scrolls on a short screen; the buttons below stay in view. */}
+          <Box display="flex" flexDirection="column" gap="2" overflowY="auto" minH="0" flex="1">
           <Text fontWeight="bold">
             Archive {archiveConfirm.fits.length} {archiveConfirm.fits.length === 1 ? "epic" : "epics"}? Live agents stop and the epics leave the sidebar. Unarchive brings them back.
           </Text>
@@ -178,18 +180,17 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: 
           {archiveConfirm.fits.flatMap((r) => r.sessions ?? []).length > 0 && (
             <Text>Live sessions will stop: {archiveConfirm.fits.flatMap((r) => r.sessions ?? []).join(", ")}.</Text>
           )}
-          {archiveConfirm.fits
-            .filter((r) => r.on_trunk === false)
-            .map((r) => (
-              <Text key={r.target} color="tone.waiting.fg">
-                ⚠ {sel.nameOf(r.target)} is not merged to trunk. Archiving keeps its branch, but the work is not on trunk.
-              </Text>
-            ))}
+          {archiveConfirm.fits.some((r) => r.on_trunk === false) && (
+            <Text color="tone.waiting.fg">
+              ⚠ Not merged to trunk: {archiveConfirm.fits.filter((r) => r.on_trunk === false).map((r) => sel.nameOf(r.target)).join(", ")}. Archiving keeps their branches, but the work is not on trunk.
+            </Text>
+          )}
           {archiveConfirm.refused.map((r) => (
             <Text key={r.target}>
               {sel.nameOf(r.target)} will not run: {r.message || r.reason || "refused"}.
             </Text>
           ))}
+          </Box>
           <Box display="flex" gap="2" justifyContent="flex-end">
             <Button emphasis="secondary" onClick={() => setArchiveConfirm(undefined)} autoFocus>
               Cancel
