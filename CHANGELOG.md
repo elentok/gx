@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.49.0 - 2026-11-11
+
+- Added question cards for agent questions in the web UI. Chats show a card when an agent waits on you, with the same card for each source: a printed round, a Queue agent's `gx tickets ask` question, a Claude AskUserQuestion dialog, a Claude permission prompt, a Claude plan approval (with the full plan), a Codex question tool overlay, and a hooked Codex approval (Allow and Deny). The card handles multi-select, notes and a required text row. The Agents-page chat shows a question sheet with per-source actions (dismiss, terminal, retry, plan text). A plain chat sends a push once when it waits on a dialog, and a Fix session sends a Question push.
+- Added a PreToolUse hook that holds Claude's AskUserQuestion dialog for the web. You can answer, dismiss or release the held question. A dialog the hook missed shows as a keystroke-fallback card, and gx answers it by keys and stops on any mismatch.
+- Added Codex question support. A plain Codex chat launches with the question tool on, gx answers the tool by keys with screen checks, and gx answers Codex's incompatible-feature-settings dialog at startup. `gx codex doctor` fails when Codex stops honouring the question flag.
+- Added `POST /v1/sessions/answer`, which answers a printed round with the composer's prompt. The Design composer uses it.
+- Added bulk actions and Archive for epics. The sidebar and the Epics page have a select mode with bulk Move, Hold, Take off hold, Stop, Remove and Archive. A new Archive page lists archived epics and Designs, with a read-only view and Unarchive. A Design archives together with its `-impl` epic as one row. Archiving stops sessions first. An epic can have a branch-name field.
+- Added Esc to interrupt a Chat session. Esc opens the Interrupt confirm on wide screens. In the Vi editor, Esc leaves INSERT or VISUAL first and interrupts from NORMAL. The chat log shows a Turn interrupted separator.
+- Added Skill sources. You can install, re-sync, uninstall and switch the mode of a third-party skill source. `gx skills list` shows sources, and Codex gets a duplicate warning.
+- Changed page cards to use an inset focus ring, with the sidebar and the page as one Tab stop each.
+- Fixed Select mode so it ends after a run that empties the selection.
+- Fixed Unhold so it refuses a target that is not on hold, with `not-on-hold`.
+- Fixed a page refetch from a previous address dropping the current page's fetch, which blanked a hook card.
+- Fixed a Claude Fix session with a question dialog on screen showing no card and sending no Question push.
+- Fixed fixture CLI calls so they time out after 30s.
+
 ## v0.48.0 - 2026-11-10
 
 - Added a PR flow for epics. A project can set `delivery` to `pr` and turn on Auto-PR. gx then opens a draft PR through `gh`, writes the PR title and body with a `pr-text` ticket (bundled `gx-pr-text` skill), and watches the PR from the server. It marks the PR ready when CI is green, with a grace window for PRs that have no checks. A failed CI run is rerun once. If it still fails, gx starts one short `ci-fix` ticket per failed run (bundled `gx-ci-fix` skill), up to a cap. If a rerun passes, gx files a follow-up in the project's `follow-ups` epic. Config keys `skills.pr-text` and `skills.ci-fix` choose the skills. A conflicting PR branch is rebased with a PR-mode Merge ticket, and foreign commits block it. When the PR is merged or closed, gx updates the local Trunk, stamps `merged_at` and releases dependent epics. Dirty-trunk and trunk-update blocks have Merge again and Stash, merge and restore buttons. A Delivery change mid-flow is applied: `pr` never auto-merges, and a switch to `merge` cancels `pr-text`.
