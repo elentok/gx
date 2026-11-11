@@ -25,9 +25,14 @@ const (
 	imagesDir = chat.ImagesDir
 )
 
+// imageStore is the Prompt-image half of Prompt: it reads Prompt's state
+// through the embedded pointer, which keeps Prompt's own method count under
+// the sizeguard limit. Its methods are promoted onto Prompt.
+type imageStore struct{ *Prompt }
+
 // imageUploadHandler serves POST /v1/sessions/images?id=<session>: the body is
 // one image's raw bytes.
-func (p *Prompt) imageUploadHandler(w http.ResponseWriter, r *http.Request) {
+func (p *imageStore) imageUploadHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, imageBodyCap))
 	var tooBig *http.MaxBytesError
 	if errors.As(err, &tooBig) {
@@ -48,7 +53,7 @@ func (p *Prompt) imageUploadHandler(w http.ResponseWriter, r *http.Request) {
 
 // saveSessionImage stores one Prompt image in the session's images folder
 // under the session gates.
-func (p *Prompt) saveSessionImage(sessionID string, data []byte) (wire.SessionImageResult, error) {
+func (p *imageStore) saveSessionImage(sessionID string, data []byte) (wire.SessionImageResult, error) {
 	dir, gate, err := p.imageSessionDir(sessionID)
 	if gate.Refused || err != nil {
 		return gate, err
@@ -58,7 +63,7 @@ func (p *Prompt) saveSessionImage(sessionID string, data []byte) (wire.SessionIm
 
 // imageSessionDir is the session gate of the upload and delete routes: the
 // session's state dir, or the refusal that stops the write.
-func (p *Prompt) imageSessionDir(sessionID string) (string, wire.SessionImageResult, error) {
+func (p *imageStore) imageSessionDir(sessionID string) (string, wire.SessionImageResult, error) {
 	dir, meta, res, err := p.sessions.SessionDir(sessionID)
 	if res.Refused || err != nil {
 		return "", imageRefusalOf(res), err
@@ -94,7 +99,7 @@ func imageSent(sessionDir, id string) bool {
 // resolveImages is the absolute paths of the saved, unsent images ids name, in
 // order, or the refusal that stops the prompt. resend allows images already
 // marked sent: a failed send's replay pastes them again.
-func (p *Prompt) resolveImages(sessionDir string, ids []string, resend bool) ([]string, *wire.SessionResult) {
+func (p *imageStore) resolveImages(sessionDir string, ids []string, resend bool) ([]string, *wire.SessionResult) {
 	if len(ids) > wire.MaxPromptImages {
 		r := sessions.Refusal(wire.ReasonImageTooMany, fmt.Sprintf("at most %d images per prompt", wire.MaxPromptImages))
 		return nil, &r
@@ -118,7 +123,7 @@ func (p *Prompt) resolveImages(sessionDir string, ids []string, resend bool) ([]
 }
 
 // markImagesSent records that ids were pasted.
-func (p *Prompt) markImagesSent(sessionDir string, ids []string) error {
+func (p *imageStore) markImagesSent(sessionDir string, ids []string) error {
 	p.imageMu.Lock()
 	defer p.imageMu.Unlock()
 	for _, id := range ids {
@@ -131,7 +136,7 @@ func (p *Prompt) markImagesSent(sessionDir string, ids []string) error {
 
 // imageServeHandler serves GET /v1/sessions/images?session=<id>&id=<image>.
 // Any miss, in the session or the image, is a 404.
-func (p *Prompt) imageServeHandler(w http.ResponseWriter, r *http.Request) {
+func (p *imageStore) imageServeHandler(w http.ResponseWriter, r *http.Request) {
 	dir, _, res, err := p.sessions.SessionDir(r.URL.Query().Get("session"))
 	if res.Refused || err != nil {
 		http.NotFound(w, r)
@@ -155,7 +160,7 @@ func (p *Prompt) imageServeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // imageDeleteHandler serves POST /v1/sessions/images/delete.
-func (p *Prompt) imageDeleteHandler(w http.ResponseWriter, r *http.Request) {
+func (p *imageStore) imageDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	var req wire.SessionImageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -171,7 +176,7 @@ func (p *Prompt) imageDeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 // deleteSessionImage removes a saved image under the upload's session gates.
 // A refusal of an already-sent image goes here, after the lookup.
-func (p *Prompt) deleteSessionImage(req wire.SessionImageRequest) (wire.SessionImageResult, error) {
+func (p *imageStore) deleteSessionImage(req wire.SessionImageRequest) (wire.SessionImageResult, error) {
 	dir, gate, err := p.imageSessionDir(req.ID)
 	if gate.Refused || err != nil {
 		return gate, err

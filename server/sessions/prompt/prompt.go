@@ -109,6 +109,8 @@ type Prompt struct {
 	// autoQueuer holds the auto-queue methods, which keeps Prompt's own method
 	// count under the sizeguard limit. Its methods are promoted onto Prompt.
 	*autoQueuer
+	*imageStore
+	*turnSettler
 
 	cfg          Config
 	log          *slog.Logger
@@ -144,6 +146,8 @@ func New(d Deps) *Prompt {
 		onTriageIdle: d.OnTriageIdle,
 	}
 	p.autoQueuer = &autoQueuer{p}
+	p.imageStore = &imageStore{p}
+	p.turnSettler = &turnSettler{p}
 	return p
 }
 

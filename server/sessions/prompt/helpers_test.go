@@ -67,6 +67,16 @@ func (f designsFixture) shared() servertest.DesignsFixture {
 	return servertest.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
 }
 
+func (f promptFixture) answer(t *testing.T, req wire.SessionAnswerRequest) wire.SessionResult {
+	t.Helper()
+	req.ID = f.id
+	res, err := f.h.Client.Sessions.Answer(f.ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
 func sessionSnapshotOf(t *testing.T, f designsFixture, id string) wire.SessionInfo {
 	t.Helper()
 	return rigs.SessionSnapshotOf(t, f.shared(), id)

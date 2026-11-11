@@ -184,3 +184,11 @@ func TestDesignActionable_EndingOnAProseQuestionRaisesNoContinue(t *testing.T) {
 		t.Error("a plain run end must still raise its Continue")
 	}
 }
+
+func TestEpicState_FollowUpsEpicIsNotReady(t *testing.T) {
+	t.Parallel()
+	s := epicState{step: tickets.StepBranch, impl: tickets.Epic{Name: tickets.FollowUpsEpic, Status: "open"}}
+	if got := s.notReady(); !strings.Contains(got, "follow-ups") {
+		t.Errorf("reason = %q, want follow-ups", got)
+	}
+}

@@ -15,9 +15,12 @@ const DefaultTurnSettleTimeout = 2 * time.Second
 
 const turnSettlePoll = 50 * time.Millisecond
 
+// turnSettler is the turn-settling half of Prompt, split out like imageStore.
+type turnSettler struct{ *Prompt }
+
 // MarkTurn records the transcript of a session that just went idle. A session
 // whose harness has no chat, or no transcript yet, is not marked.
-func (p *Prompt) MarkTurn(dir, id string) (chat.TurnMark, bool) {
+func (p *turnSettler) MarkTurn(dir, id string) (chat.TurnMark, bool) {
 	meta, err := sessions.ReadMeta(dir)
 	if err != nil || !p.settings.Load().HasChatReader(meta.Harness) {
 		return chat.TurnMark{}, false
@@ -39,7 +42,7 @@ func (p *Prompt) MarkTurn(dir, id string) (chat.TurnMark, bool) {
 // message. When the transcript grew since mark, SettleTurn redoes the Design
 // check and announces the chat again. The session turning busy (cancel) ends
 // the wait.
-func (p *Prompt) SettleTurn(dir, id string, mark chat.TurnMark, design chat.DesignRef, cancel <-chan struct{}) {
+func (p *turnSettler) SettleTurn(dir, id string, mark chat.TurnMark, design chat.DesignRef, cancel <-chan struct{}) {
 	deadline := time.NewTimer(p.cfg.TurnSettleTimeout)
 	defer deadline.Stop()
 	tick := time.NewTicker(turnSettlePoll)

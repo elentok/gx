@@ -1,4 +1,4 @@
-package prompt_test
+package promptflows_test
 
 import (
 	"bytes"
