@@ -32,6 +32,9 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 	designWeb := func(do func() func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) { mg().SessionWriteDesignWeb(do())(w, r) }
 	}
+	interruptWeb := func(do func() func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) { mg().SessionWriteInterruptWeb(do())(w, r) }
+	}
 	interrupt := func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().InterruptSession }
 	resume := func() func(wire.SessionRequest) (wire.SessionResult, error) { return rs().ResumeSession }
 	return []wire.Route{
@@ -65,6 +68,6 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 		{Pattern: "POST /v1/sessions/link", Handler: res((*Resumer).SessionLinkWrite)},
 		{Pattern: "POST /v1/sessions/step", Handler: res((*Resumer).SessionStepWrite)},
 		{Pattern: "POST /v1/sessions/resume", Web: wire.WebWrite, Handler: write(resume), WebHandler: designWeb(resume)},
-		{Pattern: "POST /v1/sessions/interrupt", Web: wire.WebWrite, Handler: write(interrupt), WebHandler: agentWeb(interrupt)},
+		{Pattern: "POST /v1/sessions/interrupt", Web: wire.WebWrite, Handler: write(interrupt), WebHandler: interruptWeb(interrupt)},
 	}
 }

@@ -94,3 +94,26 @@ func (mg *Manager) checkAgentWrite(t wire.SessionTarget) (wire.SessionResult, er
 	}
 	return wire.SessionResult{}, nil
 }
+
+// SessionWriteInterruptWeb is sessionWrite for a web interrupt: any session
+// except a Queue agent, which ralph-loop drives, and only with the state token
+// of the session the page saw.
+func (mg *Manager) SessionWriteInterruptWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+	return sessionWriteAs(mg.checkInterruptWrite, do)
+}
+
+// checkInterruptWrite returns the refusal for a web interrupt of a Queue
+// session or of a session whose state moved since the page saw it.
+func (mg *Manager) checkInterruptWrite(req wire.SessionRequest) (wire.SessionResult, error) {
+	_, meta, res, err := mg.SessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	if meta.Info().Queue {
+		return Refusal(wire.ReasonSessionQueue, fmt.Sprintf("session %s is a Queue agent; ralph-loop drives it", req.ID)), nil
+	}
+	if req.State != SessionStateToken(meta.Info()) {
+		return Refusal(wire.ReasonStale, "the session changed; review its current state"), nil
+	}
+	return wire.SessionResult{}, nil
+}
