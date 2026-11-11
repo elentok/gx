@@ -40,10 +40,18 @@ export interface RadioGroupItem {
   value: string;
   current: string;
   onValueChange: (value: string) => void;
-  options: { value: string; label: ReactNode; hint?: ReactNode; disabled?: boolean }[];
+  options: {
+    value: string;
+    label: ReactNode;
+    hint?: ReactNode;
+    disabled?: boolean;
+  }[];
 }
 
-export interface SubmenuItem extends Omit<ItemBase, "disabled" | "disabledReason"> {
+export interface SubmenuItem extends Omit<
+  ItemBase,
+  "disabled" | "disabledReason"
+> {
   kind: "submenu";
   items: MenuEntry[];
 }
@@ -59,11 +67,19 @@ export interface ContentItem {
   content: ReactNode;
 }
 
-export type MenuEntry = ActionItem | CheckboxItem | RadioGroupItem | SubmenuItem | SeparatorItem | ContentItem;
+export type MenuEntry =
+  | ActionItem
+  | CheckboxItem
+  | RadioGroupItem
+  | SubmenuItem
+  | SeparatorItem
+  | ContentItem;
 
 /** Joins groups of entries into one list with a rule between non-empty groups. */
 export function menuGroups(groups: MenuEntry[][]): MenuEntry[] {
-  return groups.filter((g) => g.length > 0).flatMap((g, i) => (i > 0 ? [{ kind: "separator" } as const, ...g] : g));
+  return groups
+    .filter((g) => g.length > 0)
+    .flatMap((g, i) => (i > 0 ? [{ kind: "separator" } as const, ...g] : g));
 }
 
 /** The one place item styling and focus state are drawn. */
@@ -79,12 +95,18 @@ const itemStyle = {
 
 function rowLayout(inlineHint?: boolean) {
   return inlineHint
-    ? ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: "10px" } as const)
+    ? ({
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "10px",
+      } as const)
     : ({ flexDirection: "column", alignItems: "flex-start" } as const);
 }
 
 function Label({ item }: { item: ItemBase }) {
-  const hint = item.disabled && item.disabledReason ? item.disabledReason : item.hint;
+  const hint =
+    item.disabled && item.disabledReason ? item.disabledReason : item.hint;
   return (
     <>
       <Text as="span">{item.label}</Text>
@@ -121,7 +143,10 @@ function Entry({ entry }: { entry: MenuEntry }) {
       );
     case "radio-group":
       return (
-        <ChakraMenu.RadioItemGroup value={entry.current} onValueChange={(e) => entry.onValueChange(e.value)}>
+        <ChakraMenu.RadioItemGroup
+          value={entry.current}
+          onValueChange={(e) => entry.onValueChange(e.value)}
+        >
           {entry.options.map((o) => (
             <ChakraMenu.RadioItem
               key={o.value}
@@ -138,18 +163,45 @@ function Entry({ entry }: { entry: MenuEntry }) {
       );
     case "submenu":
       return (
-        <ChakraMenu.Root positioning={{ placement: "right-start", gutter: 2 }} lazyMount unmountOnExit>
+        <ChakraMenu.Root
+          positioning={{ placement: "right-start", gutter: 2 }}
+          lazyMount
+          unmountOnExit
+        >
           <ChakraMenu.TriggerItem {...rowLayout(true)} {...itemStyle}>
             {entry.inlineHint ? (
-              <Label item={entry} />
+              <>
+                <Text as="span">{entry.label}</Text>
+                <Box display="flex" alignItems="center" gap="2" minW="0">
+                  {entry.hint && (
+                    <Text
+                      as="span"
+                      fontSize="xs"
+                      fontWeight="400"
+                      color="text.muted"
+                    >
+                      {entry.hint}
+                    </Text>
+                  )}
+                  <Text as="span" aria-hidden>
+                    ›
+                  </Text>
+                </Box>
+              </>
             ) : (
-              <Box display="flex" flexDirection="column" alignItems="flex-start">
-                <Label item={entry} />
-              </Box>
+              <>
+                <Box
+                  display="flex"
+                  flexDirection="column"
+                  alignItems="flex-start"
+                >
+                  <Label item={entry} />
+                </Box>
+                <Text as="span" aria-hidden>
+                  ›
+                </Text>
+              </>
             )}
-            <Text as="span" aria-hidden>
-              ›
-            </Text>
           </ChakraMenu.TriggerItem>
           <Panel entries={entry.items} />
         </ChakraMenu.Root>
@@ -178,7 +230,12 @@ function Panel({ entries }: { entries: MenuEntry[] }) {
   return (
     <Portal>
       <ChakraMenu.Positioner>
-        <ChakraMenu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="280px">
+        <ChakraMenu.Content
+          bg="surface.raised"
+          borderWidth="1px"
+          borderColor="border"
+          minW="280px"
+        >
           {entries.map((e, i) => (
             <Fragment key={"value" in e ? e.value : `sep-${i}`}>
               <Entry entry={e} />
@@ -222,10 +279,12 @@ const SETTLE_MS = 2000;
  * its first text field where it marks one (tablet and desktop), else the panel.
  */
 function keepFocusInDialog() {
-  const dialog = () => [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')].at(-1);
+  const dialog = () =>
+    [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')].at(-1);
   const takeBack = (e: FocusEvent) => {
     const d = dialog();
-    if (d && !d.contains(e.target as Node)) (d.querySelector<HTMLElement>("[data-first-field]") ?? d).focus();
+    if (d && !d.contains(e.target as Node))
+      (d.querySelector<HTMLElement>("[data-first-field]") ?? d).focus();
   };
   const stop = () => {
     clearTimeout(timer);
@@ -240,7 +299,15 @@ function keepFocusInDialog() {
   document.addEventListener("keydown", stop, true);
 }
 
-function WideMenu({ trigger, items, onClosed, onOpenChange, closeSignal, placement = "bottom-end", boundary }: MenuProps) {
+function WideMenu({
+  trigger,
+  items,
+  onClosed,
+  onOpenChange,
+  closeSignal,
+  placement = "bottom-end",
+  boundary,
+}: MenuProps) {
   const [open, setOpen] = useState(false);
   useReportOpen(open, onOpenChange);
   useOnCloseSignal(closeSignal, () => setOpen(false));

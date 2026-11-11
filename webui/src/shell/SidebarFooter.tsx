@@ -4,8 +4,6 @@ import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList } from "../epics/list";
 import type { Workspace } from "../generated/server";
-import { DevPopover } from "../dev/DevPopover";
-import { useDev } from "../dev";
 import { STATS_HREF } from "../hrefs";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { Tray } from "../ui/tray/Tray";
@@ -158,10 +156,8 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
   const unhealthy = !!health && [health.cpu, health.memory, health.disk].some((m) => m.state === "high" || m.state === "critical");
   const needsYou = snapshot?.needs_you_total ?? 0;
   const desktop = useDevice() === "desktop";
-  const dev = useDev();
   const indicators = (
     <>
-      <DevPopover dev={dev} />
       {unhealthy && (
         <Indicator label="System health is high or critical" tone="waiting">
           <WarningIcon />
@@ -179,7 +175,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       )}
     </>
   );
-  const anyIndicator = dev.state !== "off" || unhealthy || snapshot?.mode === "paused" || !connected;
+  const anyIndicator = unhealthy || snapshot?.mode === "paused" || !connected;
   return (
     <Box as="footer" data-part="sidebar-footer" flex="none" display="flex" flexDirection="column" gap="1" p="2" borderTopWidth="1px" borderColor="border">
       {/* At the 280px sidebar the optional indicators cannot share the row without shrinking a box, so they take a line above it. */}
@@ -188,7 +184,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
           {indicators}
         </Box>
       )}
-      {/* Off desktop the boxes keep their size and the pill sits in this row; when the row is too narrow for them all, the indicators and the menu wrap together, so the pill stays left of the menu. */}
+      {/* Off desktop the boxes keep their size; when the row is too narrow for them all, the indicators and the menu wrap together. */}
       <Box display="flex" alignItems="center" gap="1" flexWrap={desktop ? "nowrap" : "wrap"}>
       <GxMenu
         placement="top-start"

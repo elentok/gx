@@ -260,7 +260,7 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
                     w="full"
                     minH="48px"
                     ps="3"
-                    pe="3"
+                    pe={r.chevron ? "8" : "3"}
                     gap="10px"
                     textAlign="left"
                     borderRadius="8px"

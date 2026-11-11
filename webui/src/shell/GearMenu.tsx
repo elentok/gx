@@ -2,7 +2,13 @@ import { Box } from "@chakra-ui/react";
 import { useState } from "react";
 import { postAfk as defaultPostAfk, toggleAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
-import { SortActivity, SortDefault, SortName, SortNeedsYou, type Workspace } from "../generated/server";
+import {
+  SortActivity,
+  SortDefault,
+  SortName,
+  SortNeedsYou,
+  type Workspace,
+} from "../generated/server";
 import { CLEANUP_HREF, SETTINGS_HREF, TIPS_HREF } from "../hrefs";
 import { forceRefresh } from "../pwa/forceRefresh";
 import { CertLink, useCert } from "../auth/cert";
@@ -12,6 +18,8 @@ import { RestartDialog } from "../restart/RestartDialog";
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
 import { showToast } from "../ui/toaster";
 import { postDevFrontend as defaultPostDevFrontend, useDev } from "../dev";
+import { DevDetails } from "../dev/DevPopover";
+import { DEV_LOOK } from "../dev/DevPill";
 import { postViMode as defaultPostViMode } from "../vimode";
 import { WriteError } from "../useWrite";
 import { postWorkspace } from "../workspaces/postWorkspace";
@@ -34,27 +42,46 @@ const SORT_OPTIONS = [
   { value: SortName, label: "Alphabetically by name" },
 ];
 
-const defaultPostSort = (workspace: string, sort: string) => postWorkspace("sort", { name: workspace, sort });
+const defaultPostSort = (workspace: string, sort: string) =>
+  postWorkspace("sort", { name: workspace, sort });
 
 // A failed write leaves the control as the last snapshot showed it.
 function guarded(write: Promise<unknown>) {
   void write.catch((err) =>
-    showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." }),
+    showToast({
+      type: "error",
+      title:
+        err instanceof WriteError
+          ? err.message
+          : "Could not reach gx. Try again.",
+    }),
   );
 }
 
-function BurgerIcon() {
+function DotsIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3.5 5h13" />
-      <path d="M3.5 10h13" />
-      <path d="M3.5 15h13" />
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden
+    >
+      <circle cx="10" cy="4.5" r="1.7" />
+      <circle cx="10" cy="10" r="1.7" />
+      <circle cx="10" cy="15.5" r="1.7" />
     </svg>
   );
 }
 
 // The app menu: the old top bar's menu, opened from the sidebar footer.
-export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViMode, postDevFrontend = defaultPostDevFrontend, postSort = defaultPostSort, activeWorkspace }: Props) {
+export function GearMenu({
+  postAfk = defaultPostAfk,
+  postViMode = defaultPostViMode,
+  postDevFrontend = defaultPostDevFrontend,
+  postSort = defaultPostSort,
+  activeWorkspace,
+}: Props) {
   const dev = useDev();
   const { snapshot, connected } = useConnectionState(useConnectionContext());
   const shell = useShell();
@@ -66,7 +93,12 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
   const afk = snapshot?.afk ?? false;
   const viMode = snapshot?.vi_mode ?? false;
   const devOn = dev.state !== "off";
-  const toggle = (label: string, value: string, on: boolean, flip: () => void): MenuEntry => ({
+  const toggle = (
+    label: string,
+    value: string,
+    on: boolean,
+    flip: () => void,
+  ): MenuEntry => ({
     kind: "checkbox",
     value,
     label,
@@ -93,7 +125,24 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
         ],
       }
     : { value: "sort", label: "Sort", disabled: true, onSelect: () => {} };
-  const trustHint = registration.state === "failed" && registration.error === "SecurityError" && cert;
+  const devDetails: MenuEntry = {
+    kind: "submenu",
+    value: "dev-details",
+    label: "Dev details",
+    hint: DEV_LOOK[dev.state]?.status,
+    inlineHint: true,
+    items: [
+      {
+        kind: "content",
+        value: "dev-details-body",
+        content: <DevDetails dev={dev} showOff={false} showHeader={false} />,
+      },
+    ],
+  };
+  const trustHint =
+    registration.state === "failed" &&
+    registration.error === "SecurityError" &&
+    cert;
   const installEntries: MenuEntry[] = trustHint
     ? [
         {
@@ -101,7 +150,8 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
           value: "root-trust-hint",
           content: (
             <Box px="3" py="1.5" fontSize="sm" color="text.muted">
-              Can't install: this browser doesn't trust gx. <CertLink href={cert.cer_path}>Install the certificate</CertLink>
+              Can't install: this browser doesn't trust gx.{" "}
+              <CertLink href={cert.cer_path}>Install the certificate</CertLink>
             </Box>
           ),
         },
@@ -112,9 +162,15 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
           {
             value: "install",
             label: "Install app",
-            hint: install.mode === "prompt" && install.desktopCaption ? "Chrome / Edge" : undefined,
+            hint:
+              install.mode === "prompt" && install.desktopCaption
+                ? "Chrome / Edge"
+                : undefined,
             inlineHint: true,
-            onSelect: () => (install.mode === "prompt" ? void install.promptInstall() : setSheetOpen(true)),
+            onSelect: () =>
+              install.mode === "prompt"
+                ? void install.promptInstall()
+                : setSheetOpen(true),
           },
         ];
   return (
@@ -123,16 +179,29 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
         placement="top-end"
         trigger={
           <FooterButton aria-label="Menu" title="Menu" {...interactiveStyle}>
-            <BurgerIcon />
+            <DotsIcon />
           </FooterButton>
         }
         items={[
           toggle("AFK", "afk", afk, () => toggleAfk(afk, postAfk)),
-          toggle("Vi mode", "vimode", viMode, () => guarded(postViMode(!viMode))),
-          ...(dev.has_checkout ? [toggle("Dev mode", "devmode", devOn, () => postDevFrontend(!devOn))] : []),
+          toggle("Vi mode", "vimode", viMode, () =>
+            guarded(postViMode(!viMode)),
+          ),
+          ...(dev.has_checkout
+            ? [
+                toggle("Dev mode", "devmode", devOn, () =>
+                  postDevFrontend(!devOn),
+                ),
+              ]
+            : []),
+          ...(devOn ? [devDetails] : []),
           sort,
           { kind: "separator" },
-          { value: "restart", label: "Restart server", onSelect: () => setRestartOpen(true) },
+          {
+            value: "restart",
+            label: "Restart server",
+            onSelect: () => setRestartOpen(true),
+          },
           {
             value: "settings",
             label: "More settings...",
@@ -159,11 +228,26 @@ export function GearMenu({ postAfk = defaultPostAfk, postViMode = defaultPostViM
           },
           { kind: "separator" },
           ...installEntries,
-          { value: "force-refresh", label: "Force refresh", onSelect: () => void forceRefresh(connected) },
+          {
+            value: "force-refresh",
+            label: "Force refresh",
+            onSelect: () => void forceRefresh(connected),
+          },
         ]}
       />
-      {sheetOpen && (install.mode === "ios" || install.mode === "mac-safari") && <InstallSheet mode={install.mode} onClose={() => setSheetOpen(false)} />}
-      {restartOpen && <RestartDialog liveInstance={snapshot?.instance} onClose={() => setRestartOpen(false)} />}
+      {sheetOpen &&
+        (install.mode === "ios" || install.mode === "mac-safari") && (
+          <InstallSheet
+            mode={install.mode}
+            onClose={() => setSheetOpen(false)}
+          />
+        )}
+      {restartOpen && (
+        <RestartDialog
+          liveInstance={snapshot?.instance}
+          onClose={() => setRestartOpen(false)}
+        />
+      )}
     </>
   );
 }
@@ -184,7 +268,12 @@ function MenuSwitch({ on }: { on: boolean }) {
       justifyContent={on ? "flex-end" : "flex-start"}
       transition="background 0.1s"
     >
-      <Box w="12px" h="12px" borderRadius="full" bg={on ? "surface" : "text.dim"} />
+      <Box
+        w="12px"
+        h="12px"
+        borderRadius="full"
+        bg={on ? "surface" : "text.dim"}
+      />
     </Box>
   );
 }

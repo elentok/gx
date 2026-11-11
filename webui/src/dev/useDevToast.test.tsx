@@ -16,7 +16,6 @@ const TITLE = "Vite is down. gx serves the built files.";
 
 function setup(first: DevState) {
   const postDevRestart = vi.fn();
-  const openPopover = vi.fn();
   let state = { snapshot: { dev: { state: first } }, connected: true } as unknown as ConnectionState;
   const subs = new Set<() => void>();
   const conn = {
@@ -24,7 +23,7 @@ function setup(first: DevState) {
     subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
   } as unknown as Connection;
   function Probe() {
-    useDevToast({ postDevRestart, openPopover });
+    useDevToast({ postDevRestart });
     return null;
   }
   renderThemed(
@@ -37,7 +36,7 @@ function setup(first: DevState) {
       state = { ...state, snapshot: { dev: { state: next } } } as unknown as ConnectionState;
       subs.forEach((fn) => fn());
     });
-  return { set, postDevRestart, openPopover };
+  return { set, postDevRestart };
 }
 
 const created = vi.spyOn(toaster, "create");
@@ -71,11 +70,9 @@ test("down then running then down fires twice", () => {
   expect(shown()).toBe(2);
 });
 
-test("Details and Restart Vite call their handlers", async () => {
-  const { set, openPopover, postDevRestart } = setup("running");
+test("Restart Vite calls its handler", async () => {
+  const { set, postDevRestart } = setup("running");
   set("down");
-  fireEvent.click(await screen.findByRole("button", { name: "Details" }));
-  expect(openPopover).toHaveBeenCalledTimes(1);
   fireEvent.click(await screen.findByRole("button", { name: "Restart Vite" }));
   expect(postDevRestart).toHaveBeenCalledTimes(1);
 });

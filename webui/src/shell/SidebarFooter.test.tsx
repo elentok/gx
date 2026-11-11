@@ -39,31 +39,10 @@ test("warning, paused and disconnected icons show with their tooltips when they 
   expect(offline()).not.toBeNull();
 });
 
-test("the Dev pill is the only indicator and still gets the indicator line", () => {
+test("Dev mode alone adds no indicator to the footer", () => {
   setup({ mode: "running", dev: { state: "running", has_checkout: true } });
-  const line = document.querySelector('[data-part="indicators"]');
-  expect(line?.querySelector('[data-part="dev-pill"]')?.textContent).toBe("Dev");
-  cleanup();
-  setup({ mode: "running", dev: { state: "off", has_checkout: true } });
   expect(document.querySelector('[data-part="indicators"]')).toBeNull();
-});
-
-test.each(["tablet", "phone"] as const)("on %s the Dev pill sits in the row before the Menu button, not in an indicator line", (device) => {
-  const state = { snapshot: { mode: "running", dev: { state: "running", has_checkout: true } }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
-  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
-  const router = createMemoryRouter([{ path: "/", element: <SidebarFooter /> }]);
-  renderThemed(
-    <DeviceContext.Provider value={device}>
-      <ConnectionContext.Provider value={conn}>
-        <RouterProvider router={router} />
-      </ConnectionContext.Provider>
-    </DeviceContext.Provider>,
-  );
-  expect(document.querySelector('[data-part="indicators"]')).toBeNull();
-  const pill = document.querySelector('[data-part="dev-pill"]')!;
-  const menu = screen.getByRole("button", { name: "Menu" });
-  expect(pill.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(pill.closest("button")!.parentElement).toBe(menu.parentElement);
+  expect(document.querySelector('[data-part="dev-pill"]')).toBeNull();
 });
 
 test("the + New menu lists the three items and New workspace calls its prop", async () => {

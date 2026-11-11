@@ -281,11 +281,9 @@ test("the ios sheet text does not mention trust", async () => {
   expect((await screen.findByRole("dialog")).textContent).not.toMatch(/trust/i);
 });
 
-test("the Menu trigger is a burger: three horizontal lines and no circle", () => {
+test("the Menu trigger is three vertical dots", () => {
   setup();
   const svg = screen.getByRole("button", { name: "Menu", hidden: true }).querySelector("svg")!;
-  expect(svg.querySelector("circle")).toBeNull();
-  const paths = [...svg.querySelectorAll("path")].map((p) => p.getAttribute("d"));
-  expect(paths).toHaveLength(3);
-  for (const d of paths) expect(d).toMatch(/^M[\d.]+ [\d.]+h[\d.]+$/);
+  expect(svg.querySelectorAll("circle")).toHaveLength(3);
+  expect(svg.querySelector("path")).toBeNull();
 });
