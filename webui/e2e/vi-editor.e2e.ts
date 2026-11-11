@@ -33,6 +33,10 @@ const openEditor = async (page: Page, width: number, height = 900) => {
   await expect(card(page, "design-epic")).toBeVisible();
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
   await page.getByRole("button", nav("Start design session")).click();
+  // The first turn disables the field; wait it out so the field stays enabled for the whole test.
+  const working = page.getByRole("status").filter({ hasText: "Working:" });
+  await expect(working).toBeVisible();
+  await expect(working).toBeHidden({ timeout: 45_000 });
   await page.getByRole("button", nav("Note")).click();
   await page.getByRole("button", nav("Open the note in a large editor")).click();
   const dialog = page.getByRole("dialog", nav(MESSAGE));
