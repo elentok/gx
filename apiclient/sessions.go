@@ -10,6 +10,7 @@ import (
 // Sessions is the sub-client for interactive sessions, designs and the TUI
 // toggles that ride on them. It shares Client's transport.
 type Sessions struct {
+	designs
 	t *transport
 }
 
@@ -18,107 +19,6 @@ type Sessions struct {
 func (s *Sessions) Create(ctx context.Context, req wire.CreateSessionRequest) (wire.SessionResult, error) {
 	var res wire.SessionResult
 	err := s.t.post(ctx, "/v1/sessions/create", req, &res)
-	return res, err
-}
-
-// OpenDesign returns the Design's live session or starts one. A refusal is a
-// result (Refused set), not an error.
-func (s *Sessions) OpenDesign(ctx context.Context, req wire.DesignOpenRequest) (wire.SessionResult, error) {
-	var res wire.SessionResult
-	err := s.t.post(ctx, "/v1/designs/open", req, &res)
-	return res, err
-}
-
-// DeleteDesign deletes an uncharted design's epic. A refusal is a result
-// (Refused set), not an error.
-func (s *Sessions) DeleteDesign(ctx context.Context, req wire.DesignDeleteRequest) (wire.SessionResult, error) {
-	var res wire.SessionResult
-	err := s.t.post(ctx, "/v1/designs/delete", req, &res)
-	return res, err
-}
-
-// DesignWorktree returns a map's design worktree, made and rebased if needed,
-// or the trunk checkout after Branch. A refusal is a result (Refused set), not
-// an error.
-func (s *Sessions) DesignWorktree(ctx context.Context, req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error) {
-	var res wire.DesignWorktreeResult
-	err := s.t.post(ctx, "/v1/designs/worktree", req, &res)
-	return res, err
-}
-
-// DesignDrafts lists the New Design drafts, most recently edited first.
-func (s *Sessions) DesignDrafts(ctx context.Context) ([]wire.DesignDraftItem, error) {
-	var items []wire.DesignDraftItem
-	err := s.t.get(ctx, "/v1/designs/drafts", &items)
-	return items, err
-}
-
-// DesignDraft reads one draft. A gone draft is a refused result, not an error.
-func (s *Sessions) DesignDraft(ctx context.Context, id string) (wire.DesignDraftSaveResult, error) {
-	var res wire.DesignDraftSaveResult
-	err := s.t.get(ctx, "/v1/designs/drafts/read?id="+url.QueryEscape(id), &res)
-	return res, err
-}
-
-// SaveDesignDraft saves a draft's text fields against req.Revision. A stale
-// revision or a gone draft is a refused result, not an error.
-func (s *Sessions) SaveDesignDraft(ctx context.Context, req wire.DesignDraftSaveRequest) (wire.DesignDraftSaveResult, error) {
-	var res wire.DesignDraftSaveResult
-	err := s.t.post(ctx, "/v1/designs/drafts/save", req, &res)
-	return res, err
-}
-
-// AddDesignDraftImage saves one image, as its raw bytes, on a draft. A refusal
-// is a result (Refused set), not an error.
-func (s *Sessions) AddDesignDraftImage(ctx context.Context, id string, data []byte) (wire.SessionImageResult, error) {
-	var res wire.SessionImageResult
-	err := s.t.postBody(ctx, "/v1/designs/drafts/images?id="+url.QueryEscape(id), "application/octet-stream", data, &res)
-	return res, err
-}
-
-// DesignDraftImage reads one image of a draft: its bytes and detected Content-Type.
-func (s *Sessions) DesignDraftImage(ctx context.Context, id, image string) ([]byte, string, error) {
-	return s.t.getBytes(ctx, "/v1/designs/drafts/images?id="+url.QueryEscape(id)+"&image="+url.QueryEscape(image))
-}
-
-// DesignImages lists the ids and file names in a map epic's images/ folder.
-func (s *Sessions) DesignImages(ctx context.Context, epic string) ([]wire.SessionImageResult, error) {
-	var res []wire.SessionImageResult
-	err := s.t.get(ctx, "/v1/designs/images?epic="+url.QueryEscape(epic), &res)
-	return res, err
-}
-
-// DesignImage reads one image of a map epic's images/ folder.
-func (s *Sessions) DesignImage(ctx context.Context, epic, id string) ([]byte, string, error) {
-	return s.t.getBytes(ctx, "/v1/designs/images/read?epic="+url.QueryEscape(epic)+"&id="+url.QueryEscape(id))
-}
-
-// RemoveDesignDraftImage deletes one image of a draft. A refusal is a result.
-func (s *Sessions) RemoveDesignDraftImage(ctx context.Context, id, image string) (wire.SessionImageResult, error) {
-	var res wire.SessionImageResult
-	err := s.t.post(ctx, "/v1/designs/drafts/images/delete", wire.DraftImageRequest{ID: id, Image: image}, &res)
-	return res, err
-}
-
-// DeleteDesignDraftdeletes a draft. A draft already gone is not an error.
-func (s *Sessions) DeleteDesignDraft(ctx context.Context, id string) (wire.DesignDraftSaveResult, error) {
-	var res wire.DesignDraftSaveResult
-	err := s.t.post(ctx, "/v1/designs/drafts/delete", wire.DesignDraftDeleteRequest{ID: id}, &res)
-	return res, err
-}
-
-// DesignLastProject reads the project the New Design form last used ("" on a
-// fresh server).
-func (s *Sessions) DesignLastProject(ctx context.Context) (wire.DesignLastProject, error) {
-	var res wire.DesignLastProject
-	err := s.t.get(ctx, "/v1/designs/drafts/last-project", &res)
-	return res, err
-}
-
-// SetDesignLastProject records the last-used project; the newest write wins.
-func (s *Sessions) SetDesignLastProject(ctx context.Context, project string) (wire.DesignLastProject, error) {
-	var res wire.DesignLastProject
-	err := s.t.post(ctx, "/v1/designs/drafts/last-project", wire.DesignLastProject{Project: project}, &res)
 	return res, err
 }
 

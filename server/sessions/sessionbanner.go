@@ -46,10 +46,10 @@ type bannerTrigger struct {
 // TriggerBanner schedules the session's banner, or merges into the one
 // already waiting: attention beats done, and a reason replaces none.
 func (mg *Manager) TriggerBanner(id string, snd sound.Name, reason string) {
-	mg.triggerBanner(id, snd, reason, false)
+	triggerBanner(mg, id, snd, reason, false)
 }
 
-func (mg *Manager) triggerBanner(id string, snd sound.Name, reason string, questionSent bool) {
+func triggerBanner(mg *Manager, id string, snd sound.Name, reason string, questionSent bool) {
 	b := &mg.banners
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -73,7 +73,7 @@ func (mg *Manager) triggerBanner(id string, snd sound.Name, reason string, quest
 		defer delay.Stop()
 		select {
 		case <-delay.C:
-			mg.fireBanner(id)
+			fireBanner(mg, id)
 		case <-mg.Watches.Stop:
 		}
 	})
@@ -159,11 +159,11 @@ type DesignQuestion struct {
 // is new, and then replaces the AFK alert of this wait's banner. Closing the
 // session afterwards sends nothing more.
 func (mg *Manager) TriggerQuestionBanner(id string, snd sound.Name, reason string, q DesignQuestion) {
-	sent := mg.sendDesignQuestion(id, q)
-	mg.triggerBanner(id, snd, reason, sent)
+	sent := sendDesignQuestion(mg, id, q)
+	triggerBanner(mg, id, snd, reason, sent)
 }
 
-func (mg *Manager) sendDesignQuestion(id string, q DesignQuestion) bool {
+func sendDesignQuestion(mg *Manager, id string, q DesignQuestion) bool {
 	if q.Round < 1 || q.Text == "" || mg.OpenOnScreen(id) {
 		return false
 	}
@@ -266,7 +266,7 @@ func (mg *Manager) OpenOnScreen(id string) bool {
 	return mg.focus.webOnScreen(id) || (mg.focus.onScreen(id) && !mg.afk.IsOn())
 }
 
-func (mg *Manager) fireBanner(id string) {
+func fireBanner(mg *Manager, id string) {
 	b := &mg.banners
 	b.mu.Lock()
 	t := b.pending[id]
