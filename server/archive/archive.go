@@ -146,7 +146,8 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 			if err != nil {
 				return wire.TargetResult{}, err
 			}
-			if row == nil || !row.AllDone || !row.MergedToTrunk {
+			// A map with no -impl may have no tickets at all, which never counts as all done.
+			if row == nil || !row.MergedToTrunk || (!row.AllDone && work != base) {
 				return refuse(wire.ReasonArchiveNotFinished, DesignNotFinishedText)
 			}
 		}

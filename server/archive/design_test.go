@@ -226,3 +226,16 @@ func TestArchiveDesign_StuckBeforeDoneWithoutImplArchivesOnceMerged(t *testing.T
 		t.Fatalf("archive = %+v, want done", got)
 	}
 }
+
+func TestArchiveDesign_MergedMapWithoutTicketsOrImplArchives(t *testing.T) {
+	r := startPair(t, "branch", true)
+	if err := os.RemoveAll(filepath.Join(r.store, "proj", "foo", "issues")); err != nil {
+		t.Fatal(err)
+	}
+	if err := tickets.StampEpicFields(filepath.Join(r.store, "proj", "foo"), map[string]any{"merged_at": time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.archive(t, false, false, "proj:foo")[0]; got.Status != wire.TargetDone {
+		t.Fatalf("archive = %+v, want done", got)
+	}
+}
