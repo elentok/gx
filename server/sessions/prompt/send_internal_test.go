@@ -49,7 +49,7 @@ type failingPaster struct {
 	pasted []string
 }
 
-func (p *failingPaster) Paste(s string) error {
+func (p *failingPaster) TypeTextBy(s string, _ bool) error {
 	if len(p.pasted) == p.failAt {
 		return errors.New("paste failed")
 	}

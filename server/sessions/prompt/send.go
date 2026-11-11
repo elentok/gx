@@ -108,10 +108,12 @@ type imageSet struct {
 	sent  func(id string)
 }
 
-// paste pastes each image path as its own bracketed paste, in order.
-func (s imageSet) paste(c interface{ Paste(string) error }) error {
+// paste pastes each image path as its own bracketed paste, in order, waiting
+// out the paste settle after each: an Enter sent while claude still ingests an
+// image is swallowed, and the send then idles until the nudge grace ends.
+func (s imageSet) paste(c interface{ TypeTextBy(string, bool) error }) error {
 	for i, path := range s.paths {
-		if err := c.Paste(path); err != nil {
+		if err := c.TypeTextBy(path, true); err != nil {
 			return err
 		}
 		if s.sent != nil {
