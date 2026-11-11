@@ -11,7 +11,7 @@ import { PageHeader } from "../page/PageHeader";
 import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { ActionCard, needsActionCard } from "./ActionCard";
 import type { Sent } from "./answer";
 import { useTicketDetail, type FetchDetail } from "./detail";
@@ -96,7 +96,7 @@ export function TicketPage({
             )}
           </>
         ) : (
-          <Spinner label="Loading ticket" />
+          <FullScreenLoader label="Loading ticket" />
         )}
     </DetailPage>
   );

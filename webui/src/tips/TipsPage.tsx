@@ -5,7 +5,7 @@ import { PageHeader } from "../page/PageHeader";
 import { PageIcon } from "../page/PageIcon";
 import { SectionHeading } from "../page/SectionHeading";
 import { Button } from "../ui/button/Button";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { useTips, type FetchTips, type Tip } from "./tips";
 
 function TipSection({ tip }: { tip: Tip }) {
@@ -45,7 +45,7 @@ export function TipsPage({ fetchTips }: { fetchTips?: FetchTips }) {
           </Button>
         </Box>
       ) : !tips ? (
-        <Spinner label="Loading tips" />
+        <FullScreenLoader label="Loading tips" />
       ) : tips.length === 0 ? (
         <Text mt="6" color="text.muted">
           No tips for this machine

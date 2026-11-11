@@ -44,6 +44,7 @@ import { Modal } from "../ui/modal/Modal";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { Spinner } from "../ui/spinner/Spinner";
 import { StatCard } from "../ui/stat-card/StatCard";
 import { DiskStrip } from "../ui/disk-strip/DiskStrip";
@@ -412,6 +413,7 @@ export const galleryEntries: GalleryEntry[] = [
     ),
   },
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
+  { name: "FullScreenLoader", cases: [{ label: "default", node: <FullScreenLoader label="Loading things" /> }] },
   { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },
   { name: "StickyTopContainer", cases: perTone((tone) => <StickyTopContainer ruled>{tone}</StickyTopContainer>) },
   {

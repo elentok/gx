@@ -9,7 +9,7 @@ import { PageIcon } from "../page/PageIcon";
 import { SectionHeading } from "../page/SectionHeading";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { refusalText, useWrite } from "../useWrite";
 import { sizeText } from "../health/formatBytes";
 import { groupReport, postCleanup as defaultPost, useCleanup, type CleanupAction, type CleanupGroup, type FetchCleanup, type PostCleanup } from "./cleanup";
@@ -155,7 +155,7 @@ export function CleanupPage({ fetchCleanup, fetchEpics, postCleanup = defaultPos
           </Button>
         </Box>
       ) : !report ? (
-        <Spinner label="Loading cleanup" />
+        <FullScreenLoader label="Loading cleanup" />
       ) : groups.length === 0 ? (
         <Text mt="6" color="text.muted">
           Nothing to clean up

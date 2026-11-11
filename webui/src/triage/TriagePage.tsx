@@ -17,7 +17,7 @@ import { DetailPage } from "../page/DetailPage";
 import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { triageModel } from "../stepped/model";
 import { SteppedPage } from "../stepped/SteppedPage";
 import { useWide } from "../useWide";
@@ -228,6 +228,6 @@ function TriagePageBody({ project, deps }: { project: string; deps: TriageDeps }
         {detail && <TriageHistory items={detail.history} />}
       </Box>
     );
-  if (!detail) return <Spinner label="Loading Triage" />;
+  if (!detail) return <FullScreenLoader label="Loading Triage" />;
   return <TriageBody project={project} view={detail} deps={deps} refetch={refetch} />;
 }

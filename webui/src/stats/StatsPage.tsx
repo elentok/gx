@@ -10,7 +10,7 @@ import { Button } from "../ui/button/Button";
 import type { ReactNode } from "react";
 import type { StatsAmount } from "../generated/server";
 import type { DaySeries } from "../ui/day-chart/DayChart";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { StatCard } from "../ui/stat-card/StatCard";
 import type { Tone } from "../ui/tone";
 import { amounts, compact, costCardProps, sumNullable } from "./costCards";
@@ -234,7 +234,7 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
           </Button>
         </Box>
       ) : !stats ? (
-        <Spinner label="Loading stats" />
+        <FullScreenLoader label="Loading stats" />
       ) : (
         <>
           <Throughput stats={stats} />

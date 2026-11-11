@@ -1,6 +1,6 @@
 import { Box, Heading, Kbd, Text } from "@chakra-ui/react";
-import { useEffect } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { FetchChat } from "../design/chat";
 import { useFocusReport } from "../design/focus";
@@ -8,11 +8,14 @@ import type { FetchScreen } from "../design/screen";
 import { DetailPage } from "../page/DetailPage";
 import { openNewAgent } from "../shell/newItemOpen";
 import { Button } from "../ui/button/Button";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { useWide } from "../useWide";
 import { SessionView } from "./SessionView";
 
 import { readLast, writeLast } from "./lastAgent";
+
+// How long a just-created session may take to reach the snapshot before we call it gone.
+const CREATING_GRACE_MS = 10_000;
 
 function GoneNotice({ id }: { id: string }) {
   return (
@@ -56,7 +59,16 @@ export function AgentsPage({ fetchChat, fetchScreen }: { fetchChat?: FetchChat; 
   const sessions = snapshot?.sessions;
   const session = selected ? sessions?.find((s) => s.id === selected) : undefined;
   const listed = !!session;
-  const gone = !!selected && !!sessions && liveSnapshot && !listed;
+  const justCreated = !!(useLocation().state as { creating?: boolean } | null)?.creating;
+  const [graceOver, setGraceOver] = useState(false);
+  useEffect(() => {
+    setGraceOver(false);
+    if (!justCreated) return;
+    const t = setTimeout(() => setGraceOver(true), CREATING_GRACE_MS);
+    return () => clearTimeout(t);
+  }, [justCreated, selected]);
+  const creating = justCreated && !listed && !graceOver;
+  const gone = !!selected && !!sessions && liveSnapshot && !listed && !creating;
   useFocusReport(conn, listed ? selected : undefined, streams);
   useEffect(() => {
     if (!sessions || !liveSnapshot) return;
@@ -69,9 +81,10 @@ export function AgentsPage({ fetchChat, fetchScreen }: { fetchChat?: FetchChat; 
   return (
     <DetailPage title={{ kind: "Agents" }} fill>
       {!sessions ? (
-        <Spinner label="Loading agents" />
+        <FullScreenLoader label="Loading agents" />
       ) : (
         <Box as="main" flex="1" minH="0" minW="0">
+          {creating && <FullScreenLoader label="Creating chat…" />}
           {gone && <GoneNotice id={selected!} />}
           {!selected && <EmptyState empty={sessions.length === 0} onNew={openNewAgent} />}
           {session && <SessionView session={session} fetchChat={fetchChat} fetchScreen={fetchScreen} />}

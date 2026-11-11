@@ -28,7 +28,7 @@ import { PageIcon } from "../page/PageIcon";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
 import type { FixAgent } from "./fixAgent";
 import { MoreStats } from "./MoreStats";
@@ -453,7 +453,7 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list, readOn
           <MoreStats detail={detail} />
         </>
       ) : (
-        <Spinner label="Loading epic" />
+        <FullScreenLoader label="Loading epic" />
       )}
     </>
   );

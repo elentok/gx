@@ -7,7 +7,7 @@ import { EpicRing } from "../epic/EpicRing";
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list";
 import { PageIcon } from "../page/PageIcon";
 import { DetailPage } from "../page/DetailPage";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import type { FetchChat } from "./chat";
 import type { PostFocus } from "./focus";
 import { MapImageStrip } from "./MapImageStrip";
@@ -145,7 +145,7 @@ function DesignPageBody({
       {failed ? (
         <Text color="text.muted">Could not load Designs</Text>
       ) : !list ? (
-        <Spinner label="Loading Designs" />
+        <FullScreenLoader label="Loading Designs" />
       ) : (
         <DesignBody
           address={address}

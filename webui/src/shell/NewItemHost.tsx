@@ -47,7 +47,7 @@ function AgentDialog() {
       onClose={closeNewItem}
       onCreated={(id) => {
         closeNewItem();
-        navigate(`/agents/${id}`);
+        navigate(`/agents/${id}`, { state: { creating: true } });
         shell?.closeSliding();
       }}
     />

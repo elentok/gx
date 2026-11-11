@@ -31,7 +31,7 @@ it("shows every exported primitive in the gallery", () => {
 // ModeText takes a vi mode, which picks its tone: its cases are the three modes.
 // Question's cases are an options card, a yes-no card and the progress dots.
 // MoreActionsButton's cases are its four states. Menu's cases are each device type, closed and open.
-const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText", "MoreActionsButton", "Menu", "Question"];
+const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText", "MoreActionsButton", "Menu", "Question", "FullScreenLoader"];
 
 it("shows the Menu on each device type, closed and open", () => {
   const labels = galleryEntries.find((e) => e.name === "Menu")?.cases.map((c) => c.label) ?? [];

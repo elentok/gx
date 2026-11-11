@@ -20,7 +20,7 @@ import { PageHeader } from "../page/PageHeader";
 import { PageIcon } from "../page/PageIcon";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { useFetched } from "../useFetched";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import { EpicCard } from "./EpicCard";
@@ -254,7 +254,7 @@ export function EpicsPage({
           </Button>
         </Box>
       ) : !list ? (
-        <Spinner label="Loading epics" />
+        <FullScreenLoader label="Loading epics" />
       ) : list.epics.length === 0 ? (
         <EmptyState title="No epics yet.">{newDesign}</EmptyState>
       ) : shown.length === 0 ? (

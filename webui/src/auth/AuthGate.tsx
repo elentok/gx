@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { onSignedOut } from "../apiFetch";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { CertContext } from "./cert";
 import { fetchAuthState, type AuthState } from "./authState";
 import { LoginPage } from "./LoginPage";
@@ -28,7 +28,7 @@ export function AuthGate({
   // A 401 is the signed-out signal. Re-read the state: a `gx server web-reset` leaves nothing to sign in to, so the page has to move to setup.
   useEffect(() => onSignedOut(refresh), [refresh]);
 
-  if (!auth) return <Spinner label="Loading" />;
+  if (!auth) return <FullScreenLoader label="Loading" />;
   // Same Provider as signed-in, so the tree keeps its shape and the app is not remounted on the transition.
   if (auth === "unknown") return <CertContext.Provider value={{}}>{children}</CertContext.Provider>;
   if (auth.state === "signed-in") return <CertContext.Provider value={{ cert: auth }}>{children}</CertContext.Provider>;

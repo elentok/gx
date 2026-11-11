@@ -18,7 +18,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState";
 import { GxMenu } from "../ui/menu/Menu";
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
-import { Spinner } from "../ui/spinner/Spinner";
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
 import { useFetched } from "../useFetched";
 import { fetchArchived, type FetchArchived } from "./archive";
 
@@ -133,7 +133,7 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
           Could not load the archive
         </Text>
       ) : !data ? (
-        <Spinner label="Loading archive" />
+        <FullScreenLoader label="Loading archive" />
       ) : epics.length === 0 ? (
         <EmptyState title="Nothing is archived" />
       ) : (
