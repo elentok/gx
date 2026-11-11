@@ -302,7 +302,7 @@ func (mg *Manager) fireBanner(id string) {
 	}
 	set := mg.settings.Load()
 	if set.AgentsBanners {
-		mg.sendSessionBanner(info, title, body, link)
+		sendSessionBanner(mg, info, title, body, link)
 	}
 	if set.AgentsSounds.Enabled {
 		mg.Watches.Start(func() { mg.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
@@ -311,7 +311,7 @@ func (mg *Manager) fireBanner(id string) {
 
 func bannerTitle(info wire.SessionInfo) string { return info.Project + " · " + info.Name }
 
-func (mg *Manager) sendSessionBanner(info wire.SessionInfo, title, body, link string) {
+func sendSessionBanner(mg *Manager, info wire.SessionInfo, title, body, link string) {
 	term, connected := mg.focus.clickTarget()
 	note := osnotify.Notification{
 		Title:    title,

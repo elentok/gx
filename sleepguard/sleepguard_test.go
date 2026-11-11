@@ -115,7 +115,7 @@ var allowed = map[string]int{
 	"server/sched/runner_test.go":                             1,
 	"server/server_notify_test.go":                            1,
 	"server/server_test.go":                                   1,
-	"server/sessions/askfallback_test.go":                     1, // negative wait: no fallback card lists for a picker, a permission prompt or an unreadable layout
+	"server/sessions/askflows/askfallback_test.go":            1, // negative wait: no fallback card lists for a picker, a permission prompt or an unreadable layout
 	"server/sessions/retry_prompt_test.go":                    1, // negative wait: no second interrupt or prompt follows the retry
 	"server/sessions/sessionchatwatch_test.go":                2,
 	"server/sessions/sessioninterrupt_test.go":                1, // negative wait: Codex gets no Ctrl+C after its Esc
@@ -129,7 +129,7 @@ var allowed = map[string]int{
 	"server/sessions/prompt/keys_test.go":                     2, // negative waits: no nudge follows a person's key; a guarded key keeps the countdown
 	"server/sessions/prompt/sessionprompt_test.go":            5, // four negative waits: no nudge or Continue follows a typed / command; a failure is not raised within the grace window
 	"server/sessions/prompt/design_question_test.go":          1, // negative wait: no Question follows within a few chat flushes
-	"server/sessions/askpush_test.go":                         1, // negative wait: no second or other-class Question follows within a few chat flushes
+	"server/sessions/askflows/askpush_test.go":                1, // negative wait: no second or other-class Question follows within a few chat flushes
 	"server/sessions/prompt/firstprompt_failure_test.go":      1,
 	"server/sessions/prompt/firstprompt_launch_test.go":       1, // negative wait: a resend would come within a few ResendEvery
 	"server/sessions/prompt/firstprompt_test.go":              3,

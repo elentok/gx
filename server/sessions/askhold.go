@@ -32,10 +32,9 @@ type heldAsk struct {
 
 // HoldAsk registers the question and waits for ResolveAsk. When ctx ends first
 // (the hook went away) it returns a release, which leaves Claude's own dialog.
-func (mg *Manager) HoldAsk(ctx context.Context, req wire.AskHookRequest) wire.AskHookResult {
+func (a *askHolds) HoldAsk(ctx context.Context, req wire.AskHookRequest) wire.AskHookResult {
 	key := askKey{req.Session, req.ToolUseID}
 	h := &heldAsk{req: req, result: make(chan wire.AskHookResult, 1)}
-	a := &mg.asks
 	a.mu.Lock()
 	if _, ok := a.released[key]; ok {
 		a.mu.Unlock()
@@ -65,8 +64,7 @@ func (mg *Manager) HoldAsk(ctx context.Context, req wire.AskHookRequest) wire.As
 }
 
 // HeldAsks lists a session's held questions.
-func (mg *Manager) HeldAsks(session string) []wire.AskHookRequest {
-	a := &mg.asks
+func (a *askHolds) HeldAsks(session string) []wire.AskHookRequest {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	var out []wire.AskHookRequest
@@ -81,8 +79,7 @@ func (mg *Manager) HeldAsks(session string) []wire.AskHookRequest {
 
 // ForgetReleasedAsks drops a session's released dialogs: the session ended or
 // a new blocker started, so a later dialog with the same question is a new one.
-func (mg *Manager) ForgetReleasedAsks(session string) {
-	a := &mg.asks
+func (a *askHolds) ForgetReleasedAsks(session string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for k := range a.released {
@@ -93,8 +90,7 @@ func (mg *Manager) ForgetReleasedAsks(session string) {
 }
 
 // ResolveAsk gives a held question its result and reports whether one was held.
-func (mg *Manager) ResolveAsk(session, toolUseID string, res wire.AskHookResult) bool {
-	a := &mg.asks
+func (a *askHolds) ResolveAsk(session, toolUseID string, res wire.AskHookResult) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	h, ok := a.held[askKey{session, toolUseID}]
@@ -112,8 +108,7 @@ func (mg *Manager) ResolveAsk(session, toolUseID string, res wire.AskHookResult)
 
 // ReleaseAsk releases a held question to Claude's terminal dialog and
 // remembers its id.
-func (mg *Manager) ReleaseAsk(session, toolUseID string) bool {
-	a := &mg.asks
+func (a *askHolds) ReleaseAsk(session, toolUseID string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	key := askKey{session, toolUseID}
@@ -140,8 +135,7 @@ func (mg *Manager) ReleaseAsk(session, toolUseID string) bool {
 
 // AskReleased reports whether the session handed a dialog showing question
 // back to the terminal, so the screen fallback must not list it again.
-func (mg *Manager) AskReleased(session, question string) bool {
-	a := &mg.asks
+func (a *askHolds) AskReleased(session, question string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for k, qs := range a.released {
@@ -154,11 +148,11 @@ func (mg *Manager) AskReleased(session, question string) bool {
 
 // AskHoldWrite is POST /v1/sessions/ask-hold: the hook's call, which blocks
 // until the question has a result.
-func (mg *Manager) AskHoldWrite(w http.ResponseWriter, r *http.Request) {
+func (a *askHolds) AskHoldWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.AskHookRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Session == "" || req.ToolUseID == "" {
 		http.Error(w, "ask-hold needs a session and a tool_use_id", http.StatusBadRequest)
 		return
 	}
-	wire.WriteJSON(w, mg.HoldAsk(r.Context(), req))
+	wire.WriteJSON(w, a.HoldAsk(r.Context(), req))
 }
