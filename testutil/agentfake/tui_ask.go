@@ -6,16 +6,21 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/elentok/gx/testutil/agentfake/claudesettings"
 )
+
+// AskExitSuffix names the file beside an AskCall's OutFile that holds the hook's exit code.
+const AskExitSuffix = ".exit"
 
 // AskCall is the AskUserQuestion call an ActionAskQuestion runs the hook for.
 type AskCall struct {
 	ToolUseID string        `json:"tool_use_id"`
 	Questions []AskQuestion `json:"questions"`
 	// OutFile, when set, receives the hook's stdout, so a test reads its result.
+	// The hook's exit code lands in OutFile+AskExitSuffix once it ends.
 	OutFile string `json:"out_file,omitempty"`
 	// TimeoutMs, when set, stands in for claude's hook timeout: the hook is
 	// killed after it. Dialog, when set, is the screen the fake shows on
@@ -80,6 +85,9 @@ func (t *tui) askQuestion(call *AskCall) error {
 	}
 	go func() {
 		_ = cmd.Wait()
+		if call.OutFile != "" {
+			_ = os.WriteFile(call.OutFile+AskExitSuffix, []byte(strconv.Itoa(cmd.ProcessState.ExitCode())), 0o644)
+		}
 		if call.Dialog != nil {
 			// A hook that ends with no answer (timeout or release) leaves
 			// Claude's own dialog open.

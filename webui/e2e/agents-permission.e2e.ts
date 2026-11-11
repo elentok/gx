@@ -203,6 +203,30 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1280, height: 800 });
 
+  // Story 8: Answer in the terminal makes the hook print nothing and exit 0, and the released dialog lists no fallback card.
+  const termSession = (await claudeIdle(fixture, 1))!;
+  const termConv = await conversationOf(fixture, termSession.id);
+  const termOut = join(mkdtempSync(join(tmpdir(), "ask-term-")), "hook.json");
+  await fixture.controlClaude(termConv, {
+    action: "askquestion",
+    ask: {
+      tool_use_id: "toolu_terminal",
+      out_file: termOut,
+      dialog: askDialog("Which term?", "x", "y"),
+      questions: [{ header: "Term", question: "Which term?", multiSelect: false, options: [{ label: "x", description: "x" }, { label: "y", description: "y" }] }],
+    },
+  });
+  await go(page, `#/agents/${termSession.id}`);
+  await expect(sheet).toContainText("Which term?");
+  await page.getByRole("button", { name: "Answer in the terminal" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect.poll(() => readFileSync(`${termOut}.exit`, "utf8"), SLOW).toBe("0");
+  expect(readFileSync(termOut, "utf8")).toBe("");
+  await expect.poll(() => stateOf(fixture, termSession.id), SLOW).toBe("blocked");
+  const termChat = await page.evaluate((id) => fetch(`/v1/sessions/chat?session=${encodeURIComponent(id)}`).then((r) => r.text()), termSession.id);
+  expect(termChat).not.toContain("toolu_terminal");
+  expect(termChat).not.toContain("Which term?");
+
   // Dismiss on a hook card: a second ask on an idle session, so the first hook card can still move to the terminal below.
   const asked = (await claudeIdle(fixture))!;
   const askedConv = await conversationOf(fixture, asked.id);
@@ -316,6 +340,12 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   const hook = await blockedAt(fixture, "codex", "rg codex-hook");
   await open(page, `#/agents/${hook.id}`);
   await expect(failure(page)).toContainText("rg codex-hook");
+  // Story 28: the Agents-page card offers Allow and Deny and nothing else.
+  const hookSheet = page.getByRole("group", { name: "Questions" });
+  await expect(hookSheet).toBeVisible();
+  await expect(hookSheet).toContainText("Allow this?");
+  await expect(hookSheet.getByRole("button", { name: /^(Allow|Deny)$/ })).toHaveCount(2);
+  await expect(hookSheet.getByRole("button", { name: "Other", exact: true })).toHaveCount(0);
   await noticeButton(page, "Allow once").click();
   await leavesBlocked(fixture, hook.id);
   await expect.poll(() => fixture.codexDecisions()).toEqual([{ behavior: "allow", message: "" }]);
