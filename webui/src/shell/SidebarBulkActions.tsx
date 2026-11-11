@@ -9,10 +9,12 @@ import { skipLines, visibleActions, type ActionView, type SelectAction } from ".
 import { Button } from "../ui/button/Button";
 import { GxMenu } from "../ui/menu/Menu";
 import { Modal } from "../ui/modal/Modal";
-import { showToast } from "../ui/toaster";
+import { showToast, toaster } from "../ui/toaster";
 import { WriteError } from "../useWrite";
 import { useWorkspaces } from "../workspaces/useActiveWorkspace";
 import type { SelectApi } from "./SidebarSelect";
+
+const BUSY_TOAST = "bulk-action-busy";
 
 const SIDEBAR_ACTIONS: SelectAction[] = ["move", "hold", "unhold", "stop", "remove", "archive"];
 
@@ -41,10 +43,12 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: 
     [`Runs on ${v.fit.fits.map(sel.nameOf).join(", ")}`, ...skipLines(v.fit, sel.nameOf)].join("\n");
 
   /** Runs one write; reports refusals and the rows the action did not fit, and ends the mode when nothing is left. */
-  async function run(v: ActionView, call: () => Promise<TargetResult[] | undefined>) {
+  async function run(v: ActionView, call: () => Promise<TargetResult[] | undefined>, busy?: string) {
     if (inFlight.current) return;
     inFlight.current = true;
     setPending(true);
+    // A slow write shows a toast that stays until it ends.
+    if (busy) showToast({ type: "info", title: busy, id: BUSY_TOAST, persistent: true });
     try {
       const results = await call();
       // undefined: the call stopped to ask a question; nothing ran yet.
@@ -64,6 +68,7 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: 
     } catch (err) {
       showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." });
     } finally {
+      if (busy) toaster.remove(BUSY_TOAST);
       inFlight.current = false;
       setPending(false);
     }
@@ -91,7 +96,8 @@ export function SidebarBulkActions({ sel, shown = SIDEBAR_ACTIONS, onResults }: 
   const confirmArchive = ({ view, fits, refused }: ArchiveConfirm) => {
     setArchiveConfirm(undefined);
     // Rows the dry run refused do not run; they join the results so they stay selected with their reasons.
-    void run(view, async () => [...refused, ...(await bulkArchive(fits.map((r) => r.target), { yes: true }))]);
+    const n = fits.length;
+    void run(view, async () => [...refused, ...(await bulkArchive(fits.map((r) => r.target), { yes: true }))], `Archiving ${n} ${n === 1 ? "epic" : "epics"}…`);
   };
 
   const nameOfSession =(s: SessionInfo) => sel.nameOf(s.id);

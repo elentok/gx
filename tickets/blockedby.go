@@ -44,6 +44,11 @@ func (e *Epic) flagDanglingBlockers() {
 			t.BlockedByErr = err.Error()
 			continue
 		}
+		// A finished ticket is never claimed, so failing it closed only hides
+		// that it is done (and blocks archiving its epic), as ResolveCrossEpic knows.
+		if t.IsTerminal() {
+			continue
+		}
 		if refs := append(qualifiedRefs(t.BlockedBy), epicQualified...); len(refs) > 0 {
 			t.BlockedByErr = fmt.Sprintf("blocked_by %s crosses epics; only the server resolves that", strings.Join(refs, ", "))
 		}

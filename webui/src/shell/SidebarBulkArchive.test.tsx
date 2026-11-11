@@ -128,6 +128,14 @@ test("Cancel sends no real call and keeps the selection", async () => {
   expect(screen.getByTestId("select-count").textContent).toBe("1 selected");
 });
 
+test("a persistent Archiving toast shows while the real call runs", async () => {
+  setup((b) => (b.dry_run ? dryOnly(b) : { results: b.targets.map((t) => ({ target: t, status: "done" })) }));
+  await selectRows("Blog", "Shop");
+  fireEvent.click(bar().getByRole("button", { name: "Archive 2" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Archive" }));
+  await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Archiving 2 epics…", persistent: true })));
+});
+
 test("a clash rename shows in the toast as Archived as ...-2", async () => {
   setup((b) => (b.dry_run ? dryOnly(b) : { results: [{ target: "p:blog", status: "done", new_address: "p:blog-2" }, { target: "p:shop", status: "done" }] }));
   await selectRows("Blog", "Shop");
@@ -150,7 +158,7 @@ test("rows the dry run refuses are listed with the reason, do not run, and stay 
   fireEvent.click(within(dialog).getByRole("button", { name: "Archive" }));
   await waitFor(() => expect(calls).toHaveLength(2));
   expect(calls[1]).toEqual({ targets: ["p:shop"], yes: true });
-  await waitFor(() => expect(toast.mock.calls.map(([t]) => t.title)).toEqual(["Blog: impl epic not finished"]));
+  await waitFor(() => expect(toast.mock.calls.map(([t]) => t.title)).toEqual(["Archiving 1 epic…", "Blog: impl epic not finished"]));
   // The fixture's list never drops the archived Shop, so it stays selected too; leaving the list is prune's job.
   expect(screen.getByTestId("select-count").textContent).toBe("2 selected");
   expect(box("Select Blog").checked).toBe(true);

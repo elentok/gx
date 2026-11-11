@@ -334,3 +334,17 @@ func TestLoadResolved_ReadsReleasePolicyFromProjectFile(t *testing.T) {
 		t.Errorf("on-done, completed_at: got %v, want open", got)
 	}
 }
+
+func TestFlagDanglingBlockers_CrossEpicRefDoesNotHideDoneTickets(t *testing.T) {
+	e := Epic{Name: "d", BlockedBy: []string{"p:other"}, Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}
+	e.flagDanglingBlockers()
+	if got := e.RenderedStatus(e.Tickets[0]); got != StatusDone {
+		t.Errorf("done ticket: got %v, want done", got)
+	}
+	if got := e.RenderedStatus(e.Tickets[1]); got != StatusError {
+		t.Errorf("open ticket: got %v, want error (fails closed)", got)
+	}
+}

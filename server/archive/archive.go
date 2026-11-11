@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -51,6 +52,14 @@ type Archive struct {
 	mu sync.Mutex // one archive at a time, so two clashes cannot take the same suffix
 }
 
+// timed logs how long one phase of an archive took, to find a slow step.
+func timed(target, phase string) func() {
+	start := time.Now()
+	return func() {
+		slog.Info("archive phase", "target", target, "phase", phase, "ms", time.Since(start).Milliseconds())
+	}
+}
+
 // New builds Archive.
 func New(d Deps) *Archive { return &Archive{d: d} }
 
@@ -61,7 +70,9 @@ func (a *Archive) Epics(req wire.ArchiveRequest) (wire.TargetsResult, error) {
 	defer a.mu.Unlock()
 	res := wire.TargetsResult{Results: make([]wire.TargetResult, 0, len(req.Targets))}
 	for _, target := range req.Targets {
+		done := timed(target, "total (dry="+strconv.FormatBool(req.DryRun)+")")
 		r, err := a.one(target, req.Yes, req.DryRun)
+		done()
 		if err != nil {
 			return wire.TargetsResult{}, err
 		}
@@ -105,6 +116,7 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 		return repo, nil
 	}
 	scan := func(name string) (*cleanupscan.EpicScan, error) {
+		defer timed(target, "scan "+name)()
 		repo, err := repoOf()
 		if err != nil {
 			return nil, err
@@ -200,7 +212,7 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 	if len(halves) > 1 && onTrunk {
 		cleanup = func() { a.d.CleanupDesign(project, base) }
 	}
-	if err := a.write(dir, halves, name, cleanup); err != nil {
+	if err := a.write(target, dir, halves, name, cleanup); err != nil {
 		if r, ok := errors.AsType[refusal](err); ok {
 			return refuse(r.reason, r.Error())
 		}
@@ -259,7 +271,8 @@ func freeNameIn(dir, epic string, pair bool) string {
 // write runs the effects in order; the first half is the Design of a pair.
 // Sessions the stop already ended stay stopped. cleanup, when set, runs after
 // every Session is stopped and before the rename.
-func (a *Archive) write(dir string, halves []half, name string, cleanup func()) error {
+func (a *Archive) write(target, dir string, halves []half, name string, cleanup func()) error {
+	endStop := timed(target, "stop sessions and unhold")
 	for _, h := range halves {
 		if _, err := workspaces.StopEpicSessions(a.d, h.key, allKinds); err != nil {
 			return err
@@ -268,9 +281,13 @@ func (a *Archive) write(dir string, halves []half, name string, cleanup func()) 
 			return err
 		}
 	}
+	endStop()
 	if cleanup != nil {
+		endCleanup := timed(target, "design cleanup")
 		cleanup()
+		endCleanup()
 	}
+	defer timed(target, "rename, stamp and rekey")()
 	archive := tickets.ArchiveDir(dir)
 	if err := os.MkdirAll(archive, 0o755); err != nil {
 		return err
