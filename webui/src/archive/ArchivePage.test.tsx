@@ -166,6 +166,12 @@ const focused = () => document.activeElement?.getAttribute("aria-label");
 const row = (name: string) => screen.getByRole("listitem", { name: `Title ${name}` });
 const inSelectMode = () => screen.queryByRole("checkbox", { name: "Select Title a" }) !== null;
 
+test("a focused row carries the inset focus ring", async () => {
+  await rowsLoaded();
+  row("a").focus();
+  expect(document.activeElement?.getAttribute("data-focus-ring")).toBe("inset");
+});
+
 test("the rows are one tab stop, and arrows and hjkl move by position", async () => {
   await rowsLoaded();
   expect(screen.getAllByRole("listitem").map((li) => li.tabIndex)).toEqual([0, -1, -1]);

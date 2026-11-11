@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -29,6 +30,22 @@ func (r rig) active(t *testing.T, name string) tickets.Epic {
 		t.Fatalf("no active epic %s", name)
 	}
 	return e
+}
+
+// workspaceOf is the workspace the Epics list shows for the epic card at address.
+func (r rig) workspaceOf(t *testing.T, address string) string {
+	t.Helper()
+	list, err := r.H.Client.Reads.Epics(r.Ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range list.Epics {
+		if e.Address == address {
+			return e.Workspace
+		}
+	}
+	t.Fatalf("no epic row %s", address)
+	return ""
 }
 
 func (r rig) members(t *testing.T, workspace string) int {
@@ -122,6 +139,9 @@ func TestUnarchive_DeletedWorkspaceLandsInDefault(t *testing.T) {
 	}
 	if !r.isActive("done") {
 		t.Fatal("epic not moved back")
+	}
+	if got := r.workspaceOf(t, "proj:done"); got != workspaces.DefaultName {
+		t.Errorf("workspace = %q, want %q", got, workspaces.DefaultName)
 	}
 }
 

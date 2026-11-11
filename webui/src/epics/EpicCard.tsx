@@ -225,6 +225,7 @@ export function EpicCard({
     <Box
       data-kind={kind}
       {...{ [PAGE_ATTR]: row.address }}
+      data-focus-ring="inset"
       data-section={row.section}
       data-focus={row.card_kind === CardKindFollowUps ? followUpsFocus(row.project) : undefined}
       opacity={held ? 0.6 : undefined}

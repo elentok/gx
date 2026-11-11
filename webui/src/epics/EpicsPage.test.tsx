@@ -681,6 +681,12 @@ test("each area is one tab stop: Tab from the sidebar lands on the page cards on
   expect(steps).toBeLessThan(tabOrder().length);
 });
 
+test("a focused card carries the inset focus ring", async () => {
+  await cardsLoaded();
+  cardOf("a").focus();
+  expect(document.activeElement?.getAttribute("data-focus-ring")).toBe("inset");
+});
+
 test("s with a card focused enters the page's select mode; Space and Enter toggle there", async () => {
   await cardsLoaded();
   const a = cardOf("a");

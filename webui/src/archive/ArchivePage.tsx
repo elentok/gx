@@ -41,6 +41,7 @@ function ArchiveRow({
       as="li"
       listStyleType="none"
       {...{ [PAGE_ATTR]: row.address }}
+      data-focus-ring="inset"
       aria-label={row.title}
       onClick={act}
       position="relative"
