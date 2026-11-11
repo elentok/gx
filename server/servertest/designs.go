@@ -110,9 +110,17 @@ func StartPromptSession(t *testing.T, grace time.Duration) PromptFixture {
 // as a chat destination or the alerts.
 func StartPromptSessionWith(t *testing.T, grace time.Duration, opts ...func(*server.Config)) PromptFixture {
 	t.Helper()
+	return StartPromptSessionAs(t, grace, wire.CreateSessionRequest{Ticket: "proj:map"}, opts...)
+}
+
+// StartPromptSessionAs is StartPromptSessionWith with the session made from
+// create, such as a Fix agent. Its project, dir and harness are the fixture's.
+func StartPromptSessionAs(t *testing.T, grace time.Duration, create wire.CreateSessionRequest, opts ...func(*server.Config)) PromptFixture {
+	t.Helper()
 	cfg := t.TempDir()
 	f := StartDesigns(t, append([]func(*server.Config){func(c *server.Config) { c.PromptGrace = grace }, WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg)}, opts...)...)
-	res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+	create.Project, create.Dir, create.Harness = "proj", t.TempDir(), string(agentfake.HarnessKind)
+	res, err := f.H.Client.Sessions.Create(f.Ctx, create)
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

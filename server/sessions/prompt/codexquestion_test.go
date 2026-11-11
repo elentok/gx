@@ -6,11 +6,14 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/codex"
@@ -331,14 +334,24 @@ func TestSessionAnswer_CodexQuestionWrappedQuestionIsNotAMismatch(t *testing.T) 
 	wantKeys(t, f, "1", "1", "1")
 }
 
-// A Fix agent is not a plain chat: an open question call is no codex card.
+// A Fix agent is not a plain chat: an open question call is no codex card and
+// sends no Question push.
 func TestCodexQuestion_FixSessionListsNoCodexCard(t *testing.T) {
 	t.Parallel()
+	chatHook := rigs.NewSlackHook(t)
 	f := servertest.StartCodexPromptSessionAs(t, func(c *server.Config) {
 		c.PromptGrace = servertest.FirstPromptGrace
 		c.CodexQuestionWait = time.Second
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chatHook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
 	}, wire.CreateSessionRequest{Ticket: "proj:plain/01", FixOf: "proj:plain/01"})
+	started := chatHook.WaitStarted(t)
 	openCodexQuestion(t, f, agentfake.QuestionCall{})
+	time.Sleep(10 * servertest.FlushInterval) // negative wait: no event marks the chat flush
+	for _, p := range chatHook.PostsFrom(started) {
+		if strings.Contains(p, "❓ Question") {
+			t.Errorf("chat post %q, want no Question push", p)
+		}
+	}
 	chat, err := f.H.Client.Sessions.Chat(f.Ctx, f.ID)
 	if err != nil {
 		t.Fatal(err)
