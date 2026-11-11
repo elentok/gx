@@ -1,16 +1,12 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
-	"bufio"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -79,30 +75,6 @@ type tui struct {
 	askUI *askUI
 }
 
-type PendingWork struct {
-	Cfg     WorkerConfig
-	Address string
-}
-
-// DesignState is set once a /gx-design prompt arrives; rounds counts the ones
-// played.
-type DesignState struct {
-	Active bool
-	rounds int
-	Turns  int
-	// script is the turn script of the map this session designs, from
-	// WorkerConfig.DesignByMap; nil falls back to WorkerConfig.Design.
-	script []string
-}
-
-// TuiEvent is one key from the terminal, one control, or the end of input.
-type TuiEvent struct {
-	Key     byte
-	Control *Control
-	Resized bool
-	Err     error
-}
-
 func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 	events := TuiEvents(in, ctl)
 	// A delayed redraw is posted back to the loop as a resize event so the loop
@@ -117,7 +89,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 	if t.opts.mouse {
 		fmt.Fprint(t.out, "\x1b[?1049h\x1b[?1000h\x1b[?1006h")
 	}
-	fmt.Fprint(t.out, bracketedPasteOn)
+	fmt.Fprint(t.out, BracketedPasteOn)
 	if t.opts.trust {
 		t.draw()
 	} else if err := t.startSession(); err != nil {
@@ -183,8 +155,8 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if err := t.cancel(); err != nil {
 				return 0, err
 			}
-		case ev.Key == ctrlU && t.opts.clearIgnored:
-		case ev.Key == ctrlU:
+		case ev.Key == CtrlU && t.opts.clearIgnored:
+		case ev.Key == CtrlU:
 			t.typed.Reset()
 			if t.opts.clearLeavesI {
 				t.opts.clearLeavesI = false
@@ -197,45 +169,6 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			redraw()
 		}
 	}
-}
-
-func PtyClosed(err error) bool {
-	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EIO)
-}
-
-// TuiEvents merges the keys read from in with the controls read from ctl.
-func TuiEvents(in io.Reader, ctl io.Reader) <-chan TuiEvent {
-	events := make(chan TuiEvent)
-	go func() {
-		r := bufio.NewReader(in)
-		for {
-			b, err := r.ReadByte()
-			if err != nil {
-				events <- TuiEvent{Err: err}
-				return
-			}
-			events <- TuiEvent{Key: b}
-		}
-	}()
-	go func() {
-		scanner := bufio.NewScanner(ctl)
-		for scanner.Scan() {
-			var c Control
-			if err := json.Unmarshal(scanner.Bytes(), &c); err != nil {
-				events <- TuiEvent{Err: fmt.Errorf("bad control line %q: %w", scanner.Text(), err)}
-				return
-			}
-			events <- TuiEvent{Control: &c}
-		}
-	}()
-	winch := make(chan os.Signal, 1)
-	signal.Notify(winch, syscall.SIGWINCH)
-	go func() {
-		for range winch {
-			events <- TuiEvent{Resized: true}
-		}
-	}()
-	return events
 }
 
 // mouseSeqKey collects an escape sequence: an SGR mouse report counts its

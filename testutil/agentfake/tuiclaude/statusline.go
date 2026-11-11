@@ -1,9 +1,10 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"time"
@@ -13,18 +14,6 @@ import (
 
 // statusLineTimeout bounds the command so a hung one cannot stall the fake.
 const statusLineTimeout = 10 * time.Second
-
-// StatusLinePayload is the JSON claude sends the statusLine command. Without
-// usage there is no rate_limits key.
-func StatusLinePayload(model string, usage *UsageConfig) ([]byte, error) {
-	payload := map[string]any{
-		"model": map[string]any{"display_name": model},
-	}
-	if usage != nil {
-		payload["rate_limits"] = usage
-	}
-	return json.Marshal(payload)
-}
 
 // runStatusLine runs the settings' statusLine command after a turn. Like
 // claude, it ignores the command's output and failure.

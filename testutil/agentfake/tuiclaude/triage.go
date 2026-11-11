@@ -1,4 +1,6 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"fmt"
@@ -39,7 +41,7 @@ func (t *tui) triageTurn(text string) error {
 		if err != nil {
 			msg = fmt.Sprintf("Error: %v\n\n✅ triage: stopped on an error. Next: %s", err, p.Next())
 		}
-		if err := appendReply(path, t.opts.model, []map[string]any{{"type": "text", "text": msg}}); err != nil {
+		if err := AppendReply(path, t.opts.model, []map[string]any{{"type": "text", "text": msg}}); err != nil {
 			fmt.Fprintln(os.Stderr, "fakeclaude triage:", err)
 		}
 		time.Sleep(DesignTurnTime)

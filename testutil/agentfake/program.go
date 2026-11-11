@@ -142,7 +142,7 @@ func ProgramConversationPath(dir string, pid int) string {
 // SendProgramControl writes c to the side channel of the fake program
 // running conversationID, waiting for the program to open it.
 func SendProgramControl(conversationID string, c Control) error {
-	return sendControlWhenReady(func() (string, bool) {
+	return SendControlWhenReady(func() (string, bool) {
 		dir := TestDir(conversationID)
 		ctl := filepath.Join(dir, conversationID+".ctl")
 		// The ready file outlives the program; the FIFO does not.
@@ -354,7 +354,7 @@ func (p *program) becomeReady() {
 	p.ready = true
 	// A real claude asks for bracketed paste; gx's holder pastes bracketed only
 	// when the child has.
-	fmt.Fprint(p.out, bracketedPasteOn)
+	fmt.Fprint(p.out, BracketedPasteOn)
 	p.box.Draw()
 }
 
@@ -419,7 +419,7 @@ func (p *program) key(b byte) error {
 			return LogSubmitted(p.convID, "<tab>")
 		case 0x7f:
 			return LogSubmitted(p.convID, "<backspace>")
-		case ctrlU:
+		case CtrlU:
 			if p.box.logClear {
 				if err := LogSubmitted(p.convID, ProgramClearEntry); err != nil {
 					return err
@@ -488,9 +488,9 @@ func (p *program) control(c Control) error {
 		}
 		fmt.Fprintf(p.out, "size=%dx%d\r\n", cols, rows)
 	case ActionDescendants:
-		return spawnDescendantsInto(&p.descendants, c.Count, c.Depth)
+		return SpawnDescendantsInto(&p.descendants, c.Count, c.Depth)
 	case ActionStopDescendants:
-		stopDescendantsIn(&p.descendants)
+		StopDescendantsIn(&p.descendants)
 	default:
 		return fmt.Errorf("unknown program control action %q", c.Action)
 	}
@@ -512,10 +512,10 @@ func (p *program) closeDialog(entry string) error {
 }
 
 func (p *program) report(state, kind, msg string) {
-	writeReport(p.out, state, kind, msg)
+	WriteReport(p.out, state, kind, msg)
 }
 
-func writeReport(out io.Writer, state, kind, msg string) {
+func WriteReport(out io.Writer, state, kind, msg string) {
 	WriteAppReport(out, "agentfake", state, kind, msg)
 }
 

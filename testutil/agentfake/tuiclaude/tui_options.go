@@ -1,4 +1,6 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"cmp"
@@ -75,25 +77,6 @@ type tuiOptions struct {
 	model string
 	// settings is --settings: inline JSON or a path to a JSON file.
 	settings string
-}
-
-// HangThisLaunch counts this launch in the counter file of a
-// TUIHangLaunchesEnv spec and reports whether it is within the first n. The
-// Claude and Codex fakes share the spec.
-func HangThisLaunch(spec string) bool {
-	n, file, ok := strings.Cut(spec, ":")
-	limit, err := strconv.Atoi(n)
-	if !ok || err != nil {
-		return false
-	}
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-	prior, _ := f.Seek(0, io.SeekEnd)
-	_, _ = f.WriteString("x")
-	return int(prior) < limit
 }
 
 // vimWedge parses a TUIVimWedgeEnv spec into the footer row to draw and
@@ -174,8 +157,8 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 }
 
 func runTUIClaude() (int, error) {
-	if isClaudeProbe(os.Args[1:]) {
-		return runClaudeProbe()
+	if IsClaudeProbe(os.Args[1:]) {
+		return RunClaudeProbe()
 	}
 	opts, err := parseTUIArgs(os.Args[1:])
 	if err != nil {
@@ -237,9 +220,9 @@ func runTUIClaude() (int, error) {
 		ack:        ack,
 		opts:       opts,
 		started:    now,
-		pidPath:    pidPathFor(home, os.Getpid()),
+		pidPath:    PidPathFor(home, os.Getpid()),
 		ctlPath:    ctlPath,
-		transcript: tuiTranscriptPath(home, cwd, opts.sessionID),
+		transcript: TUITranscriptPath(home, cwd, opts.sessionID),
 		pid: PidFile{
 			Pid:        os.Getpid(),
 			SessionID:  opts.sessionID,

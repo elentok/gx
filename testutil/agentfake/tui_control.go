@@ -180,9 +180,6 @@ func QuestionMenuDialog() []string {
 	}
 }
 
-// ActionExit makes the TUI fake exit with Control.Code.
-const ActionExit = "exit"
-
 // Pid status file values, as real claude writes them.
 const (
 	StatusBusy    = "busy"
@@ -216,7 +213,7 @@ func PidFilePath(home string, pid int) string {
 
 // pidPathFor is PidFilePath, moved under CLAUDE_CONFIG_DIR when it is set, as
 // real claude does.
-func pidPathFor(home string, pid int) string {
+func PidPathFor(home string, pid int) string {
 	if dir, err := harness.ClaudeSessionsDirIn(os.Environ()); err == nil {
 		return filepath.Join(dir, strconv.Itoa(pid)+".json")
 	}
@@ -225,7 +222,7 @@ func pidPathFor(home string, pid int) string {
 
 // tuiTranscriptPath is transcript.PathIn, moved under CLAUDE_CONFIG_DIR when
 // it is set, as real claude does.
-func tuiTranscriptPath(home, cwd, sessionID string) string {
+func TUITranscriptPath(home, cwd, sessionID string) string {
 	if dir, err := harness.ClaudeProjectsDirIn(os.Environ()); err == nil {
 		return filepath.Join(dir, transcript.Slugify(cwd), sessionID+".jsonl")
 	}
@@ -287,7 +284,7 @@ func SendTUIControl(home, sessionID string, c Control) error {
 		handled = st.Size()
 	}
 	ctlPath := TUIControlPath(home, sessionID)
-	if err := sendControlWhenReady(func() (string, bool) {
+	if err := SendControlWhenReady(func() (string, bool) {
 		_, err := os.Stat(ctlPath)
 		return ctlPath, err == nil
 	}, c); err != nil {
@@ -302,21 +299,6 @@ func SendTUIControl(home, sessionID string, c Control) error {
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("agentfake: control %s not handled", c.Action)
-		}
-	}
-}
-
-// sendControlWhenReady writes c to the side-channel FIFO that ready reports,
-// waiting until ready says the fake has it open. A FIFO that merely exists has
-// no reader yet, and a write to it fails with ENXIO.
-func sendControlWhenReady(ready func() (path string, ok bool), c Control) error {
-	for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(10 * time.Millisecond) {
-		path, ok := ready()
-		if ok {
-			return SendControl(path, c)
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("agentfake: %s never opened", path)
 		}
 	}
 }

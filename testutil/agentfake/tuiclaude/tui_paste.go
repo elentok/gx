@@ -1,18 +1,12 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
-)
-
-const (
-	bracketedPasteOn = "\x1b[?2004h"
-	pasteStart       = "\x1b[200~"
-	pasteEnd         = "\x1b[201~"
 )
 
 // pasteState tracks a bracketed paste across the keys that make it up.
@@ -37,7 +31,7 @@ func (t *tui) pasteKey(key byte) bool {
 	p := &t.paste
 	if p.pasting {
 		p.buf = append(p.buf, key)
-		if body, ok := bytes.CutSuffix(p.buf, []byte(pasteEnd)); ok {
+		if body, ok := bytes.CutSuffix(p.buf, []byte(PasteEnd)); ok {
 			p.pasting, p.buf = false, nil
 			t.pasted(string(body))
 		}
@@ -45,8 +39,8 @@ func (t *tui) pasteKey(key byte) bool {
 	}
 	if len(p.escSeen) > 0 {
 		cand := append(p.escSeen, key)
-		if strings.HasPrefix(pasteStart, string(cand)) {
-			if string(cand) != pasteStart {
+		if strings.HasPrefix(PasteStart, string(cand)) {
+			if string(cand) != PasteStart {
 				p.escSeen = cand
 				return true
 			}
@@ -84,33 +78,6 @@ func (t *tui) pasted(body string) {
 	t.draw()
 }
 
-var imageMediaTypes = map[string]string{
-	".png":  "image/png",
-	".jpg":  "image/jpeg",
-	".jpeg": "image/jpeg",
-	".gif":  "image/gif",
-	".webp": "image/webp",
-}
-
-// ImageMediaType is the media type of an image path's extension, empty for a
-// non-image.
-func ImageMediaType(path string) string {
-	return imageMediaTypes[strings.ToLower(filepath.Ext(path))]
-}
-
-// IsImageFile reports whether path is an absolute path to an existing PNG,
-// JPEG, GIF or WebP file.
-func IsImageFile(path string) bool {
-	if !filepath.IsAbs(path) || strings.ContainsAny(path, "\r\n") {
-		return false
-	}
-	if ImageMediaType(path) == "" {
-		return false
-	}
-	info, err := os.Stat(path)
-	return err == nil && info.Mode().IsRegular()
-}
-
 // writeImagePrompt appends the two lines claude writes for a prompt with pasted
 // images: the user's text, chips and image blocks, then a meta line naming where
 // each image came from.
@@ -124,8 +91,8 @@ func writeImagePrompt(path, text string, images []string) error {
 		}})
 		sources = append(sources, map[string]any{"type": "text", "text": "[Image: source: " + img + "]"})
 	}
-	if err := appendEntry(path, "user", blocks, map[string]any{"promptId": promptID}); err != nil {
+	if err := AppendEntry(path, "user", blocks, map[string]any{"promptId": promptID}); err != nil {
 		return err
 	}
-	return appendEntry(path, "user", sources, map[string]any{"isMeta": true, "promptId": promptID, "uuid": "fake-meta-" + promptID})
+	return AppendEntry(path, "user", sources, map[string]any{"isMeta": true, "promptId": promptID, "uuid": "fake-meta-" + promptID})
 }

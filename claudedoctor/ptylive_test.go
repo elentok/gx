@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/tuiclaude"
 )
 
 // The test binary doubles as the PTY holder and, under it, as the TUI fake.
@@ -31,7 +32,7 @@ func TestMain(m *testing.M) {
 		return
 	}
 	if os.Getenv(agentfake.TUIEnv) == "1" {
-		agentfake.TUIClaude()
+		tuiclaude.TUIClaude()
 	}
 	// Backstop: this binary launched as `agent-holder` by something that did not
 	// set holderEnv would fall through to m.Run and re-run the whole suite, whose

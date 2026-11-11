@@ -86,7 +86,7 @@ const ProgramEscEntry = "<esc>"
 
 // promptMarker is colored like claude's, so even a plain draft has an SGR on
 // screen: a read with no styling at all cannot tell a draft from a placeholder.
-const promptMarker = "\x1b[35m❯\x1b[0m "
+const PromptMarker = "\x1b[35m❯\x1b[0m "
 
 // InputBox is claude's input box: lines of a draft, the last one being edited.
 type InputBox struct {
@@ -111,7 +111,7 @@ type InputBox struct {
 }
 
 func NewInputBox(out io.Writer, draft string) *InputBox {
-	return &InputBox{out: out, Marker: promptMarker, Lines: strings.Split(draft, "\n")}
+	return &InputBox{out: out, Marker: PromptMarker, Lines: strings.Split(draft, "\n")}
 }
 
 func (b *InputBox) Text() string { return strings.Join(b.Lines, "\n") }
@@ -123,9 +123,9 @@ func pasteMarker(params string, final byte) (string, bool) {
 	case final != '~':
 		return "", false
 	case params == "200":
-		return pasteStart, true
+		return PasteStart, true
 	case params == "201":
-		return pasteEnd, true
+		return PasteEnd, true
 	}
 	return "", false
 }
@@ -136,13 +136,13 @@ func (b *InputBox) Mark(marker string) {
 	b.Lines[len(b.Lines)-1] += marker
 	// A long paste would redraw the whole input once per byte; it draws once
 	// the paste ends.
-	b.pasting = marker == pasteStart
+	b.pasting = marker == PasteStart
 	if !b.pasting {
 		b.Draw()
 	}
 }
 
-var pasteMarkers = strings.NewReplacer(pasteStart, "", pasteEnd, "")
+var pasteMarkers = strings.NewReplacer(PasteStart, "", PasteEnd, "")
 
 func (b *InputBox) Draw() {
 	var sb strings.Builder
@@ -238,10 +238,10 @@ func (b *InputBox) control(c Control) bool {
 
 // writeEditorMode records editorMode vim in the settings file, keeping its
 // other keys, where claudesettings.LaunchEditorMode (and gx's claudeVimMode) read it.
-func (b *InputBox) writeEditorMode() error { return writeVimSetting(b.configPath) }
+func (b *InputBox) writeEditorMode() error { return WriteVimSetting(b.configPath) }
 
 // writeVimSetting records editorMode vim in the settings file at path.
-func writeVimSetting(path string) error {
+func WriteVimSetting(path string) error {
 	settings := map[string]any{}
 	if data, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(data, &settings)

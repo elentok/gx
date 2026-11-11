@@ -44,8 +44,8 @@ const (
 // rules — a half-circle spinner glyph for "working", an eight-spoked
 // asterisk for "idle", each followed by a space, terminated with BEL.
 const (
-	idleTitle    = "\x1b]0;✳ Claude Code\x07"
-	workingTitle = "\x1b]0;◑ Claude Code\x07"
+	IdleTitle    = "\x1b]0;✳ Claude Code\x07"
+	WorkingTitle = "\x1b]0;◑ Claude Code\x07"
 )
 
 // Options are the parsed --mode/--duration flags.
@@ -81,31 +81,31 @@ func Run(opts Options, in io.Reader, out io.Writer) error {
 
 	switch opts.Mode {
 	case ModeIdle:
-		fmt.Fprint(out, idleTitle)
+		fmt.Fprint(out, IdleTitle)
 		for scanner.Scan() {
 			// Idle agent: input is received but never changes state.
 		}
 		return nil
 
 	case ModeSlowWorking:
-		fmt.Fprint(out, workingTitle)
+		fmt.Fprint(out, WorkingTitle)
 		time.Sleep(opts.Duration)
-		fmt.Fprint(out, idleTitle)
+		fmt.Fprint(out, IdleTitle)
 		for scanner.Scan() {
 		}
 		return nil
 
 	case ModeCompact:
-		fmt.Fprint(out, idleTitle)
+		fmt.Fprint(out, IdleTitle)
 		for scanner.Scan() {
-			fmt.Fprint(out, workingTitle)
+			fmt.Fprint(out, WorkingTitle)
 			time.Sleep(opts.Duration)
-			fmt.Fprint(out, idleTitle)
+			fmt.Fprint(out, IdleTitle)
 		}
 		return nil
 
 	case ModeStall:
-		fmt.Fprint(out, idleTitle)
+		fmt.Fprint(out, IdleTitle)
 		for scanner.Scan() {
 			// Stalled agent: input received, no title change ever emitted.
 		}

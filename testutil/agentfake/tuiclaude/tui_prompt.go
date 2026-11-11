@@ -1,4 +1,6 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"fmt"
@@ -48,14 +50,14 @@ func (t *tui) submit() error {
 		case promptWorker:
 			t.prompt = text
 			if t.opts.classifierOutage > 0 {
-				t.outageWork = &PendingWork{cfg, address}
+				t.outageWork = &PendingWork{Cfg: cfg, Address: address}
 			}
 			if cfg.Transcript {
 				path, err := t.transcriptPath()
 				if err != nil {
 					return err
 				}
-				if err := appendMessage(path, "user", text); err != nil {
+				if err := AppendMessage(path, "user", text); err != nil {
 					return err
 				}
 			}
@@ -64,14 +66,14 @@ func (t *tui) submit() error {
 				t.dialog = BashPermissionDialog(PermissionCommand)
 				return t.setStatus(StatusWaiting, "permission prompt")
 			case BehaviourQuestionMenu:
-				t.resume = &PendingWork{cfg, address}
+				t.resume = &PendingWork{Cfg: cfg, Address: address}
 				t.dialog = QuestionMenuDialog()
 				return t.setStatus(StatusWaiting, "question menu")
 			case BehaviourRateLimit:
-				t.resume = &PendingWork{cfg, address}
+				t.resume = &PendingWork{Cfg: cfg, Address: address}
 				return t.rateLimit(cfg)
 			case BehaviourStall, BehaviourStallNoRecord:
-				t.resume = &PendingWork{cfg, address}
+				t.resume = &PendingWork{Cfg: cfg, Address: address}
 				dropRecord := cfg.Behaviour[address] == BehaviourStallNoRecord
 				go func() {
 					// Long enough for a poll to see the turn start, and the launch
@@ -89,8 +91,8 @@ func (t *tui) submit() error {
 			case BehaviourWriteAsk:
 				// A kept agent gets the answer as its next prompt and finishes on it;
 				// a relaunch sees the file and finishes at once.
-				if !fileExists(UncommittedFile) {
-					t.resume = &PendingWork{cfg, address}
+				if !FileExists(UncommittedFile) {
+					t.resume = &PendingWork{Cfg: cfg, Address: address}
 				}
 			}
 			go t.work(cfg, address)
@@ -145,7 +147,7 @@ func (t *tui) skillPromptKnobs(text string) (bool, error) {
 	case t.opts.unknownSkill || time.Since(t.started) < t.opts.registryDelay:
 		t.notice = UnknownCommandText(skill)
 		t.draw()
-		return true, appendLine(path, map[string]any{
+		return true, AppendLine(path, map[string]any{
 			"type":      "system",
 			"subtype":   "informational",
 			"content":   t.notice,
@@ -157,7 +159,7 @@ func (t *tui) skillPromptKnobs(text string) (bool, error) {
 		// An armed command output writes the command line itself.
 		name := strings.TrimPrefix(skill, "/")
 		args := strings.TrimSpace(strings.TrimPrefix(text, skill))
-		return false, appendEntry(path, "user", "<command-message>"+name+"</command-message>\n<command-name>"+skill+"</command-name>\n<command-args>"+args+"</command-args>", nil)
+		return false, AppendEntry(path, "user", "<command-message>"+name+"</command-message>\n<command-name>"+skill+"</command-name>\n<command-args>"+args+"</command-args>", nil)
 	}
 	return false, nil
 }
@@ -223,15 +225,6 @@ func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
 	return address, cfg, true
 }
 
-// isAsk reports whether the behaviour's turn is a single gx ask call.
-func isAsk(behaviour string) bool {
-	switch behaviour {
-	case BehaviourAsk, BehaviourAskOptions, BehaviourWriteAsk, BehaviourAskEmptyFinish:
-		return true
-	}
-	return false
-}
-
 // work does the ticket's work off the input loop, then sends the turn's end
 // down the control channel like a test would.
 func (t *tui) work(cfg WorkerConfig, address string) {
@@ -251,7 +244,7 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	// An ask is one gx call, and an outage turn is one appended record, so under
 	// load the whole turn can fit between two polls of the pid file: the launch
 	// then sees no turn and pauses as agent_prompt_stalled.
-	if isAsk(cfg.Behaviour[address]) || failing {
+	if IsAsk(cfg.Behaviour[address]) || failing {
 		time.Sleep(max(0, stallTurnLength-time.Since(began)))
 	}
 	if cfg.Behaviour[address] == BehaviourFail {
@@ -274,17 +267,17 @@ func appendClassifierNoVerdict(path string) error {
 	const id = "toolu_noverdict"
 	call := []any{map[string]any{"type": "tool_use", "id": id, "name": "Bash", "input": map[string]any{"command": "gx tickets show"}}}
 	failure := []any{map[string]any{"type": "tool_result", "tool_use_id": id, "is_error": true, "content": "Error: auto mode classifier gave no verdict"}}
-	if err := appendMessage(path, "assistant", call); err != nil {
+	if err := AppendMessage(path, "assistant", call); err != nil {
 		return err
 	}
-	return appendMessage(path, "user", failure)
+	return AppendMessage(path, "user", failure)
 }
 
 // fastTurn runs an armed fast turn: working, then done, with no busy status.
 func (t *tui) fastTurn() error {
 	t.fast = false
-	writeReport(t.out, "working", "", "")
-	writeReport(t.out, "done", "", "")
+	WriteReport(t.out, "working", "", "")
+	WriteReport(t.out, "done", "", "")
 	return nil
 }
 

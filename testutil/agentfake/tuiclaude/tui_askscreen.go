@@ -1,4 +1,6 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"encoding/json"
@@ -8,22 +10,6 @@ import (
 	"time"
 	"unicode/utf8"
 )
-
-// AskScreen is an AskUserQuestion dialog with no hook: the TUI fake draws the
-// real layouts, takes the keys claude takes (arrows, digits, Enter, Esc and
-// typed text) and writes what it did to files, so a test can read the keys.
-type AskScreen struct {
-	Questions []AskQuestion `json:"questions"`
-	// KeysFile receives one line per key read: "down", "up", "enter", "esc", or
-	// the character typed.
-	KeysFile string `json:"keys_file,omitempty"`
-	// AnswersFile receives the answers as JSON once the dialog ends: an object
-	// keyed by question, or the string "cancelled".
-	AnswersFile string `json:"answers_file,omitempty"`
-	// MutateAfterKeys, when above zero, rewrites the question once that many
-	// keys have been read, as a dialog closed and reopened under a person.
-	MutateAfterKeys int `json:"mutate_after_keys,omitempty"`
-}
 
 // askUI is the live state of an AskScreen.
 type askUI struct {

@@ -1,4 +1,4 @@
-package agentfake
+package tuiclaude
 
 import (
 	"path/filepath"

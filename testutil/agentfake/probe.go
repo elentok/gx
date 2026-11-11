@@ -90,13 +90,13 @@ func (c ProbeConfig) wait() (fail bool, err error) {
 
 // isClaudeProbe is true for the non-interactive launch commandlist.ProbeClaude
 // makes.
-func isClaudeProbe(args []string) bool {
+func IsClaudeProbe(args []string) bool {
 	return slices.Contains(args, "-p")
 }
 
 // runClaudeProbe answers the stream-json initialize request with the
 // configured commands and exits. It writes no transcript or session record.
-func runClaudeProbe() (int, error) {
+func RunClaudeProbe() (int, error) {
 	cfg, err := loadProbeConfig()
 	if err != nil {
 		return 0, err

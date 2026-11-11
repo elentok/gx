@@ -138,7 +138,7 @@ func TestIsAsk_EveryBehaviourThatAsksHoldsTheTurn(t *testing.T) {
 		if !strings.Contains(readLog(t, gxLog), "tickets ask p:e/01") {
 			t.Fatalf("%s: no ask in the gx log", b)
 		}
-		if !isAsk(b) {
+		if !IsAsk(b) {
 			t.Errorf("isAsk(%q) = false, want true", b)
 		}
 	}
@@ -185,7 +185,7 @@ func TestWorkTicket_HoldDelaysOnlyTheFinishAndTimesOut(t *testing.T) {
 
 	// The launch is not delayed: the worker is up and marks the prompt as received.
 	deadline := time.Now().Add(5 * time.Second)
-	for !fileExists(cfg.Hold + StartedSuffix) {
+	for !FileExists(cfg.Hold + StartedSuffix) {
 		if time.Now().After(deadline) {
 			t.Fatal("worker never marked the prompt as received")
 		}

@@ -1,4 +1,6 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"bytes"
@@ -11,37 +13,6 @@ import (
 
 	"github.com/elentok/gx/testutil/agentfake/claudesettings"
 )
-
-// AskExitSuffix names the file beside an AskCall's OutFile that holds the hook's exit code.
-const AskExitSuffix = ".exit"
-
-// AskCall is the AskUserQuestion call an ActionAskQuestion runs the hook for.
-type AskCall struct {
-	ToolUseID string        `json:"tool_use_id"`
-	Questions []AskQuestion `json:"questions"`
-	// OutFile, when set, receives the hook's stdout, so a test reads its result.
-	// The hook's exit code lands in OutFile+AskExitSuffix once it ends.
-	OutFile string `json:"out_file,omitempty"`
-	// TimeoutMs, when set, stands in for claude's hook timeout: the hook is
-	// killed after it. Dialog, when set, is the screen the fake shows on
-	// "input needed" once the hook ends without an answer (timeout or release).
-	TimeoutMs int      `json:"timeout_ms,omitempty"`
-	Dialog    []string `json:"dialog,omitempty"`
-}
-
-// AskQuestion is one question of an AskCall, in claude's own field names.
-type AskQuestion struct {
-	Header      string      `json:"header"`
-	Question    string      `json:"question"`
-	MultiSelect bool        `json:"multiSelect"`
-	Options     []AskOption `json:"options"`
-}
-
-// AskOption is one choice of an AskQuestion.
-type AskOption struct {
-	Label       string `json:"label"`
-	Description string `json:"description"`
-}
 
 // askQuestion runs the settings' AskUserQuestion hook with the PreToolUse
 // payload and holds the session busy until it exits. The hook's output is not

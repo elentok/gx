@@ -1,4 +1,6 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"encoding/json"
@@ -735,12 +737,12 @@ func TestTUIClaude_RateLimitWorkerWritesTheErrorThenFinishesOnContinue(t *testin
 		t.Errorf("rate-limit error = %+v", e)
 	}
 	f.waitStatus(StatusIdle, "")
-	if fileExists(hold + StartedSuffix) {
+	if FileExists(hold + StartedSuffix) {
 		t.Fatal("the worker started its work under the rate limit")
 	}
 
 	f.typeLine("continue")
-	f.waitFor("worker started", func() bool { return fileExists(hold + StartedSuffix) })
+	f.waitFor("worker started", func() bool { return FileExists(hold + StartedSuffix) })
 	f.waitStatus(StatusIdle, "")
 }
 
@@ -787,12 +789,12 @@ func TestTUIClaude_QuestionMenuWorkerBlocksOnANonApprovableDialogUntilEsc(t *tes
 		t.Fatal(err)
 	}
 	f.waitStatus(StatusIdle, "")
-	if fileExists(hold + StartedSuffix) {
+	if FileExists(hold + StartedSuffix) {
 		t.Fatal("the worker started its work before the retry prompt")
 	}
 
 	f.typeLine("/gx-implement p:e/01")
-	f.waitFor("worker started", func() bool { return fileExists(hold + StartedSuffix) })
+	f.waitFor("worker started", func() bool { return FileExists(hold + StartedSuffix) })
 	f.waitStatus(StatusIdle, "")
 }
 

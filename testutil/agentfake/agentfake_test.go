@@ -28,8 +28,8 @@ func TestRun_Idle_EmitsIdleTitleOnceAndIgnoresInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if out.String() != idleTitle {
-		t.Fatalf("output = %q, want %q", out.String(), idleTitle)
+	if out.String() != IdleTitle {
+		t.Fatalf("output = %q, want %q", out.String(), IdleTitle)
 	}
 }
 
@@ -44,7 +44,7 @@ func TestRun_SlowWorking_WorksThenGoesIdle(t *testing.T) {
 	if elapsed < 10*time.Millisecond {
 		t.Fatalf("elapsed = %s, want >= 10ms", elapsed)
 	}
-	want := workingTitle + idleTitle
+	want := WorkingTitle + IdleTitle
 	if out.String() != want {
 		t.Fatalf("output = %q, want %q", out.String(), want)
 	}
@@ -56,7 +56,7 @@ func TestRun_Compact_GoesWorkingOnEachPromptThenIdleAgain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	want := idleTitle + workingTitle + idleTitle + workingTitle + idleTitle
+	want := IdleTitle + WorkingTitle + IdleTitle + WorkingTitle + IdleTitle
 	if out.String() != want {
 		t.Fatalf("output = %q, want %q", out.String(), want)
 	}
@@ -68,7 +68,7 @@ func TestRun_Stall_NeverEmitsWorkingTitleAfterInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if out.String() != idleTitle {
-		t.Fatalf("output = %q, want %q (no working title)", out.String(), idleTitle)
+	if out.String() != IdleTitle {
+		t.Fatalf("output = %q, want %q (no working title)", out.String(), IdleTitle)
 	}
 }

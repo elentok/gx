@@ -1,4 +1,6 @@
-package agentfake
+package tuiclaude
+
+import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
 	"encoding/json"
@@ -15,13 +17,6 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/elentok/gx/backgroundtask"
 	"github.com/elentok/gx/testutil/agentfake/claudesettings"
-)
-
-const EscKey = 0x1b
-
-const (
-	CtrlC = 0x03
-	ctrlU = 0x15
 )
 
 // interrupt is Esc: it denies a dialog and keeps the session. On a running
@@ -113,7 +108,7 @@ func (t *tui) handleControl(c Control) error {
 		t.ignoreAllow = true
 		return nil
 	case ActionReport:
-		writeReport(t.out, c.State, c.Kind, c.Message)
+		WriteReport(t.out, c.State, c.Kind, c.Message)
 		return nil
 	case ActionConversation:
 		t.pid.SessionID = c.ConversationID
@@ -133,7 +128,7 @@ func (t *tui) handleControl(c Control) error {
 	case ActionVimToggle:
 		t.vim = true
 		t.draw()
-		return writeVimSetting(claudesettings.Path())
+		return WriteVimSetting(claudesettings.Path())
 	default:
 		return fmt.Errorf("unknown control action %q", c.Action)
 	}
@@ -194,12 +189,6 @@ func (t *tui) writeBackgroundMarker(running bool) error {
 			"\n" + `{"isSidechain":false,"type":"assistant","timestamp":"` + ts + `","message":{"role":"assistant","stop_reason":"end_turn","content":[]}}`
 	}
 	return t.appendTranscript(line)
-}
-
-// ToolCall is a tool call Claude has started: its name and input.
-type ToolCall struct {
-	Name  string         `json:"name"`
-	Input map[string]any `json:"input,omitempty"`
 }
 
 // startToolCalls appends one assistant line per call, as claude writes them,
@@ -318,7 +307,7 @@ func colored(s string) string {
 
 // draw clears the terminal and redraws the screen for the current state.
 func (t *tui) draw() {
-	title := idleTitle
+	title := IdleTitle
 	var rows []string
 	switch {
 	case t.opts.trust:
@@ -339,12 +328,12 @@ func (t *tui) draw() {
 			rows = t.dialog
 		}
 	case t.pid.Status == StatusBusy:
-		title = workingTitle
+		title = WorkingTitle
 		rows = []string{"> " + t.prompt, "✻ Working…"}
 	case t.opts.draft != "":
-		input := promptMarker + t.typed.String()
+		input := PromptMarker + t.typed.String()
 		if t.typed.Len() == 0 {
-			input = promptMarker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m"
+			input = PromptMarker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m"
 		}
 		rows = []string{colored("✻ Welcome to Claude Code"), "", input}
 	case !t.opts.plainScreen && t.typed.Len() == 0:

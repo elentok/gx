@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/tuiclaude"
 	"golang.org/x/sys/unix"
 )
 
@@ -49,7 +50,7 @@ func TestMain(m *testing.M) {
 		agentfake.Program()
 	}
 	if os.Getenv(agentfake.TUIEnv) == "1" {
-		agentfake.TUIClaude()
+		tuiclaude.TUIClaude()
 	}
 	if os.Getenv(agentfake.ClaudeEnv) == "1" {
 		agentfake.Claude()

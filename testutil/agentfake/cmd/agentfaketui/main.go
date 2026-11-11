@@ -3,8 +3,8 @@
 // claude session runs it.
 package main
 
-import "github.com/elentok/gx/testutil/agentfake"
+import "github.com/elentok/gx/testutil/agentfake/tuiclaude"
 
 func main() {
-	agentfake.TUIClaude()
+	tuiclaude.TUIClaude()
 }

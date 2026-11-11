@@ -290,7 +290,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `ui/agents/jump` — the jump-to-agent popup
 - `e2e/` — end-to-end tests (slow, CI only)
 - `testutil/` — fakes and helpers: `testutil/agentfake` (fake Claude, shared core),
-  `testutil/agentfake/codex` (fake Codex, imports `agentfake`), `testutil/herdrfake`,
+  `testutil/agentfake/codex` (fake Codex, imports `agentfake`),
+  `testutil/agentfake/tuiclaude` (fake interactive claude, `TUIClaude`; imports `agentfake`),
+  `testutil/herdrfake`,
   `testutil/runnerfake`, `testutil/herdrctl`, `testutil/teatestv2`, `testutil/claudeenv`,
   `testutil/vitefake` (scripted fake `pnpm` for Dev mode fixtures; control file via
   `VITEFAKE_CONTROL`, binary in `cmd/pnpm`)

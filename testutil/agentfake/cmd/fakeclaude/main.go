@@ -4,8 +4,8 @@
 // prompt. Design-chat mode joins it here.
 package main
 
-import "github.com/elentok/gx/testutil/agentfake"
+import "github.com/elentok/gx/testutil/agentfake/tuiclaude"
 
 func main() {
-	agentfake.TUIClaude()
+	tuiclaude.TUIClaude()
 }

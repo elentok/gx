@@ -208,7 +208,7 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 	case BehaviourRefuseAsk:
 		return refuseThenAsk(cfg, address)
 	case BehaviourAskEmptyFinish:
-		if !fileExists(UncommittedFile) {
+		if !FileExists(UncommittedFile) {
 			if err := os.WriteFile(UncommittedFile, []byte("asked\n"), 0o644); err != nil {
 				return err
 			}
@@ -218,12 +218,12 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 			return err
 		}
 		go func() {
-			waitHold(cfg)
+			WaitHold(cfg)
 			_ = finishTicket(cfg, address)
 		}()
 		return nil
 	case BehaviourWriteAsk:
-		if !fileExists(UncommittedFile) {
+		if !FileExists(UncommittedFile) {
 			if err := os.WriteFile(UncommittedFile, []byte("kept\n"), 0o644); err != nil {
 				return err
 			}
@@ -231,25 +231,25 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 		}
 	case BehaviourStorm:
 		var tree *exec.Cmd
-		if err := spawnDescendantsInto(&tree, StormDescendants, 1); err != nil {
+		if err := SpawnDescendantsInto(&tree, StormDescendants, 1); err != nil {
 			return err
 		}
 		time.Sleep(stormHold)
-		stopDescendantsIn(&tree)
+		StopDescendantsIn(&tree)
 		return nil
 	case BehaviourBackgroundTask:
 		return nil
 	case BehaviourBackgroundDirty:
 		return os.WriteFile(UncommittedFile, []byte("kept\n"), 0o644)
 	}
-	waitHold(cfg)
+	WaitHold(cfg)
 	return finishTicket(cfg, address)
 }
 
-func waitHold(cfg WorkerConfig) {
+func WaitHold(cfg WorkerConfig) {
 	limit, _ := time.ParseDuration(cfg.HoldTimeout)
 	start := time.Now()
-	for fileExists(cfg.Hold) && (limit <= 0 || time.Since(start) < limit) {
+	for FileExists(cfg.Hold) && (limit <= 0 || time.Since(start) < limit) {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
@@ -277,18 +277,18 @@ func RunWorker(in io.Reader, out io.Writer) error {
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return err
 	}
-	fmt.Fprint(out, idleTitle)
+	fmt.Fprint(out, IdleTitle)
 	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
 		if len(fields) == 0 {
 			continue
 		}
-		fmt.Fprint(out, workingTitle)
+		fmt.Fprint(out, WorkingTitle)
 		if err := WorkTicket(cfg, fields[len(fields)-1]); err != nil {
 			return err
 		}
-		fmt.Fprint(out, idleTitle)
+		fmt.Fprint(out, IdleTitle)
 	}
 	return nil
 }
@@ -382,7 +382,7 @@ func reportFinished(cfg WorkerConfig, address string, withCheck bool) error {
 	return nil
 }
 
-func fileExists(path string) bool {
+func FileExists(path string) bool {
 	if path == "" {
 		return false
 	}
