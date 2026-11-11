@@ -15,7 +15,7 @@ const ArchivedWorkspaceGone = "gone-ws"
 // BulkActionsScenario seeds what the bulk actions act on: finished epics (with
 // and without trunk evidence), a queued one, a held one, Designs before, at and
 // past done (one with an -impl epic), a live Design and Fix session, a Queue
-// agent, an Exited agent, and archived epics: with and without archived_at, one
+// agent, an Exited agent, and archived epics: one with an Exited Fix agent, with and without archived_at, one
 // whose stored workspace is gone, a Design pair, and one whose name an active
 // epic also has. Names stay short enough for a 390 px sidebar row.
 func BulkActionsScenario() scenario {
@@ -24,6 +24,8 @@ func BulkActionsScenario() scenario {
 		heldEpic   = project + ":bulk-held"
 		queued     = project + ":bulk-queued"
 		fixTicket  = project + ":bulk-paused/01"
+		// archivedAgents has a Fix agent that the Archive step below Exits.
+		archivedAgents = project + ":bulk-agents"
 	)
 	open := []ticket{{"01", "first", servertest.TicketOpts{}}}
 	done := []ticket{{"01", "built", servertest.TicketOpts{Status: "done"}}}
@@ -39,6 +41,7 @@ func BulkActionsScenario() scenario {
 			{project, "bulk-done-solo", nil},
 			{project, "bulk-early", nil},
 			{project, "bulk-clash", done},
+			{project, "bulk-agents", []ticket{{"01", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}}}},
 		},
 		EpicMeta: map[string]string{
 			project + ":bulk-merged":   "status: open\ncompleted_at: 2026-01-01T10:00:00Z\nmerged_at: 2026-01-01T11:00:00Z\n",
@@ -65,8 +68,14 @@ func BulkActionsScenario() scenario {
 		Chat:        true,
 		Queue:       []string{queued},
 		PromptGrace: "1s",
-		FixAgents:   []string{fixTicket},
-		Sessions:    []sessionSpec{{Project: project, Prompt: "hello", Crash: true, Read: true}},
+		FixAgents:   []string{fixTicket, archivedAgents + "/01"},
+		// A Fix agent starts on a paused ticket; the epic must be done to archive.
+		DoneAfterFixAgents: map[string]string{archivedAgents + "/01": "repair"},
+		// Archiving stops that Fix agent, which stays Exited under the archived epic.
+		StepsAfterSessions: [][]string{
+			{"server", "epics", "archive", archivedAgents, "--yes"},
+		},
+		Sessions: []sessionSpec{{Project: project, Prompt: "hello", Crash: true, Read: true}},
 		Steps: [][]string{
 			{"server", "workspaces", "create", WorkspaceBulk},
 			{"server", "workspaces", "move", heldEpic, WorkspaceBulk},

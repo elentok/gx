@@ -65,6 +65,13 @@ func TestBulkActions_SeedsCardsAgentsWorkspacesAndArchivedEpics(t *testing.T) {
 		t.Fatalf("agents: design=%v fix=%v queue=%v exited=%v, want all", d, f, q, e)
 	}
 
+	// The archived epic keeps its Fix agent, Exited and keyed under the archive.
+	if !slices.ContainsFunc(sessions, func(si wire.SessionInfo) bool {
+		return si.Status.State == wire.SessionExited && strings.Contains(si.FixOf, ".archive/bulk-agents/")
+	}) {
+		t.Errorf("no Exited Fix agent under the archived bulk-agents in %+v", sessions)
+	}
+
 	var ws wire.WorkspaceList
 	if err := json.Unmarshal([]byte(r.Gx(t, "server", "workspaces", "list", "--json")), &ws); err != nil {
 		t.Fatal(err)

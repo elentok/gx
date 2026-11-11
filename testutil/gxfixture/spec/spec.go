@@ -226,6 +226,10 @@ type Scenario struct {
 	// WorkingFixAgents are the FixAgents tickets whose agent is then given a plain
 	// prompt, which the fake never finishes, so the agent reads Working, not Idle.
 	WorkingFixAgents []string
+	// DoneAfterFixAgents maps a FixAgents ticket address to its slug: once the
+	// Fix agent runs, the ticket is rewritten as done, so the epic can be archived
+	// with that agent on it (a Fix agent only starts on a paused ticket).
+	DoneAfterFixAgents map[string]string
 	// Triage seeds Triage records before the server starts (see TriageScenario).
 	Triage []TriageSeed
 	// TriageAgent tunes the fake Triage agent (see triageplay.Config).

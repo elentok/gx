@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { session } from "../agents/agentsTestKit";
@@ -13,7 +13,9 @@ import {
 } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { DeviceContext } from "../useWide";
+import type { SelectRow } from "../select/selectModel";
 import { AppShell } from "./AppShell";
+import { useSelectApi } from "./SidebarSelect";
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("../ui/toaster", async (orig) => ({ ...(await orig<typeof import("../ui/toaster")>()), showToast: toast }));
@@ -230,6 +232,18 @@ test("Escape ends the mode", async () => {
   fireEvent.keyDown(document.body, { key: "Escape" });
   expect(screen.queryByTestId("select-count")).toBeNull();
   expect(screen.getByRole("button", { name: "Select" })).toBeTruthy();
+});
+
+test("a run whose rows leave the list after it ended still ends the mode", () => {
+  const key = (k: string): SelectRow => ({ key: k, kind: "epic", visible: true, selectable: true });
+  const { result, rerender } = renderHook(({ list }) => useSelectApi(list, new Map(), true), { initialProps: { list: [key("p:a")] } });
+  act(() => result.current.enter());
+  act(() => result.current.toggle("p:a"));
+  // The call returns before the list learns the row moved, so afterRun still sees p:a.
+  act(() => result.current.afterRun());
+  expect(result.current.state.on).toBe(true);
+  rerender({ list: [] });
+  expect(result.current.state.on).toBe(false);
 });
 
 test("a row that leaves the list leaves the selection", async () => {

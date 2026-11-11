@@ -241,6 +241,31 @@ func TestScanWorktrees_ArchivedEpicOfSameBranchGivesNoRecommendation(t *testing.
 	}
 }
 
+func TestScanWorktrees_KeptDesignBranchesOfAnArchivedDesignAreListedUnrecommended(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	scanCommitOnBranch(t, dir, "foo-design", old)
+	scanCommitOnBranch(t, dir, "foo-impl", old)
+
+	// The Design was unarchived as foo-2 around a new active foo; its branches
+	// are still named after the branch_name.
+	design := testEpic("foo-2", "01", "done")
+	design.BranchName = "foo"
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scans := scanByBranch(t, repo, []tickets.Epic{testEpic("foo", "01", "open"), design})
+
+	for _, branch := range []string{"foo-design", "foo-impl"} {
+		scan, ok := scans[branch]
+		if !ok {
+			t.Fatalf("%s not listed in %+v", branch, scans)
+		}
+		if scan.MergedToTrunk || scan.Recommendation != "" {
+			t.Errorf("%s = %+v, want listed as unmerged with no recommendation", branch, scan)
+		}
+	}
+}
+
 func TestScanWorktrees_ActiveWorkNeverRecommended(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

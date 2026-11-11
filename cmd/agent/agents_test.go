@@ -62,6 +62,36 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 	}
 }
 
+func TestAgentsList_JSONKeepsTheSameIDsUnderTheUnarchivedAddress(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteCompleteEpic(t, store, "foo")
+	f := servertest.StartDesignsIn(t, store)
+	res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Ticket: "proj:foo/01", FixOf: "proj:foo/01"})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	id := res.Session.ID
+	if r, err := f.H.Client.Admin.ArchiveEpics(f.Ctx, []string{"proj:foo"}, true, false); err != nil || r.Results[0].Status != wire.TargetDone {
+		t.Fatalf("archive = %+v, %v", r, err)
+	}
+	servertest.WriteCompleteEpic(t, store, "foo") // a new active foo takes the name
+	if r, err := f.H.Client.Admin.UnarchiveEpics(f.Ctx, []string{"proj:foo"}); err != nil || r.Results[0].NewAddress != "proj:foo-2" {
+		t.Fatalf("unarchive = %+v, %v", r, err)
+	}
+
+	var out bytes.Buffer
+	if err := runAgentsList(f.Ctx, f.H.Client, &out, true); err != nil {
+		t.Fatal(err)
+	}
+	var listed []wire.SessionInfo
+	if err := json.Unmarshal(out.Bytes(), &listed); err != nil {
+		t.Fatalf("list output %q: %v", out.String(), err)
+	}
+	if len(listed) != 1 || listed[0].ID != id || listed[0].Ticket != "proj:foo-2/01" || listed[0].FixOf != "proj:foo-2/01" {
+		t.Errorf("list = %s, want session %s under proj:foo-2/01", out.String(), id)
+	}
+}
+
 func TestAgentsChat_JSON(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())

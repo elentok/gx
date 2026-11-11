@@ -55,10 +55,11 @@ test("Bulk actions", async ({ page, start }) => {
   await box("bulk-early").uncheck();
   await box("bulk-clash").check();
   await barButton("Hold").click();
-  await expect(box("bulk-clash")).toHaveCount(0);
   await expect(dialog("Hold selected")).toHaveCount(0);
-  // The held row stays selected, so the mode stays on until Done.
+  // The held row stays selected, in the collapsed On hold section, so the mode stays on until Done.
   await expect(bar).toBeVisible();
+  await expect(count).toHaveText("1 selected");
+  await expect(box("bulk-clash")).toHaveCount(0);
   await bar.getByRole("button", nav("Done")).click();
   await expect(bar).toHaveCount(0);
 
@@ -202,6 +203,15 @@ test("Bulk actions", async ({ page, start }) => {
   const address = (await cliRows()).find((r) => r.title === "bulk-unmerged")!.address;
   await fx.cli("server", "epics", "unarchive", address, "--json");
   await expect(rowOf("bulk-unmerged")).toHaveCount(0);
+
+  // Entry 34: the Fix agent Exited by the Archive shows nowhere while archived, and under its row after Unarchive.
+  const fixLinks = sidebar.getByRole("link", { name: /^Fix agent / });
+  const fixBefore = await fixLinks.count();
+  await rowOf("bulk-agents").getByRole("button", { name: /actions/i }).click();
+  await page.getByRole("menuitem", nav("Unarchive")).click();
+  await expect(rowOf("bulk-agents")).toHaveCount(0);
+  await sidebar.getByRole("button", nav("Expand bulk-agents")).click();
+  await expect(fixLinks).toHaveCount(fixBefore + 1);
 
   // Entry 57: at 744 px and 390 px the checkboxes and the bar work and nothing scrolls sideways, on both pages.
   const pageSelect = page.getByTestId("page-header-actions").getByRole("button", nav("Select"));

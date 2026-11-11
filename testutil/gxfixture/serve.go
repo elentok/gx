@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
@@ -218,6 +219,13 @@ func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
 		}
 		if err := workFixAgent(ctx, f.root, cl, res.Session.ID, before); err != nil {
 			return fmt.Errorf("work fix agent %s: %w", req.Address, err)
+		}
+	}
+	for addr, slug := range sc.DoneAfterFixAgents {
+		project, rest, _ := strings.Cut(addr, ":")
+		epicName, id, _ := strings.Cut(rest, "/")
+		if err := servertest.WriteTicketFile(f.store, project, epicName, id, slug, servertest.TicketOpts{Status: "done"}); err != nil {
+			return fmt.Errorf("finish %s: %w", addr, err)
 		}
 	}
 	return nil

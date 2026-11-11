@@ -61,6 +61,25 @@ func TestServerCleanupWrite_ArchiveJSONIsAnEnvelopeForOneTarget(t *testing.T) {
 	}
 }
 
+func TestServerCleanupWrite_ArchiveJSONWithANameClashGivesTheNextSuffix(t *testing.T) {
+	f, store := archiveFixture(t, "one")
+	if err := os.MkdirAll(filepath.Join(store, "proj", ".archive", "one"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runServer(t, f.H, "epics", "archive", "proj:one", "--json")
+	var res wire.TargetsResult
+	if err != nil || json.Unmarshal([]byte(out), &res) != nil || len(res.Results) != 1 {
+		t.Fatalf("out = %q, err = %v, want a results envelope", out, err)
+	}
+	if r := res.Results[0]; r.Status != wire.TargetDone || r.NewAddress != "proj:one-2" {
+		t.Errorf("result = %+v, want done with new_address proj:one-2", r)
+	}
+	if !archivedNames(t, store)["one-2"] {
+		t.Errorf("archived = %v, want one-2", archivedNames(t, store))
+	}
+}
+
 func TestServerCleanupWrite_ArchiveDesignTargetsJSON(t *testing.T) {
 	store := t.TempDir()
 	design := func(name, step string, withImpl bool) {
