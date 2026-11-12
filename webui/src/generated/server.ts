@@ -3791,7 +3791,10 @@ export interface TriageRow {
   person_changed?: boolean;
   gone?: boolean;
   write_state?: string;
-  new_address?: string;
+  /**
+   * NewAddresses are every ticket the row became.
+   */
+  new_addresses?: string[];
   refusal?: string;
   can_keep?: boolean;
   can_retry?: boolean;

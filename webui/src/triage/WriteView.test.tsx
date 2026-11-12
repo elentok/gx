@@ -35,13 +35,17 @@ const refusal = "close: ticket is claimed, not draft or open"
 
 test("rows show state, new address and what was done", () => {
   const rows = [
-    rowOf(1, { write_state: "done", new_address: "follow-ups-2026-11-08/01" }),
+    rowOf(1, {
+      write_state: "done",
+      new_addresses: ["follow-ups-2026-11-08/01", "follow-ups-2026-11-08/02"],
+    }),
     rowOf(2, { write_state: "done", action: "close", destination: "obsolete" }),
     rowOf(3, { write_state: "pending" }),
     rowOf(4, { write_state: "gone" }),
   ]
   render(<WriteView project="gx" view={viewOf(rows)} refetch={() => {}} />)
   screen.getByText("→ follow-ups-2026-11-08/01")
+  screen.getByText("→ follow-ups-2026-11-08/02")
   screen.getByText("moved")
   screen.getByText("closed, obsolete")
   screen.getByText("pending")

@@ -114,7 +114,7 @@ type Row struct {
 	Earlier []Answered `json:"earlier,omitempty"`
 	Write   WriteState `json:"write,omitempty"`
 	// NewAddresses are the tickets the row became. NewAddress is the single
-	// address an older record stored; it is only read, never written.
+	// address an older record stored; Load moves it into the list.
 	NewAddresses []string `json:"newAddresses,omitempty"`
 	NewAddress   string   `json:"newAddress,omitempty"`
 	// Group marks the rows that were promoted into one ticket group.
@@ -340,6 +340,13 @@ func (s *Store) Load(id string) (*Record, error) {
 	var rec Record
 	if err := json.Unmarshal(raw, &rec); err != nil {
 		return nil, fmt.Errorf("reading triage %s: %w", id, err)
+	}
+	for i := range rec.Rows {
+		r := &rec.Rows[i]
+		if r.NewAddress != "" && len(r.NewAddresses) == 0 {
+			r.NewAddresses = []string{r.NewAddress}
+		}
+		r.NewAddress = ""
 	}
 	return &rec, nil
 }

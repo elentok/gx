@@ -86,10 +86,11 @@ type TriageRow struct {
 	PersonChanged bool   `json:"person_changed,omitempty"`
 	Gone          bool   `json:"gone,omitempty"`
 	WriteState    string `json:"write_state,omitempty"`
-	NewAddress    string `json:"new_address,omitempty"`
-	Refusal       string `json:"refusal,omitempty"`
-	CanKeep       bool   `json:"can_keep,omitempty"`
-	CanRetry      bool   `json:"can_retry,omitempty"`
+	// NewAddresses are every ticket the row became.
+	NewAddresses []string `json:"new_addresses,omitempty"`
+	Refusal      string   `json:"refusal,omitempty"`
+	CanKeep      bool     `json:"can_keep,omitempty"`
+	CanRetry     bool     `json:"can_retry,omitempty"`
 	// MergeOrphan marks a row set to merge into a row that is no longer a
 	// ready or map epic; approve stays refused until it is re-pointed.
 	MergeOrphan bool `json:"merge_orphan,omitempty"`

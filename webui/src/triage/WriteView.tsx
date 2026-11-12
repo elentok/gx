@@ -62,7 +62,11 @@ function WriteRow({
         {row.address}
       </Text>
       {failed && <Chip tone={TONES[state]}>{state}</Chip>}
-      {row.new_address && <Text color="text.dim">→ {row.new_address}</Text>}
+      {row.new_addresses?.map((a) => (
+        <Text key={a} color="text.dim">
+          → {a}
+        </Text>
+      ))}
     </Box>
   )
   if (!failed)

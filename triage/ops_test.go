@@ -341,6 +341,28 @@ func TestWriteRow_ListNeedsEveryTicketAndTheArchivedFollowUp(t *testing.T) {
 	assertDone(t, s, settle())
 }
 
+func TestWriteRow_FollowUpMovedButNotArchivedIsNotDone(t *testing.T) {
+	s, rec := atWrite(t)
+	rec, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, []string{"proj:map-x/01"}, "")
+	must(t, rec, err)
+	rec, err = s.WriteRow(rec.ID, rec.Revision, rowB, WriteGone, nil, "")
+	must(t, rec, err)
+	tickettest.WriteFile(t, filepath.Join(s.ProjectDir(), "map-x", "issues", "01-t.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# T\n")
+	elsewhere := filepath.Join(s.ProjectDir(), "elsewhere", "issues")
+	if err := os.MkdirAll(elsewhere, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(s.ProjectDir(), "follow-ups", "issues", "01-a.md"), filepath.Join(elsewhere, "01-a.md")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.SetLastPass(rec.ID, rec.Revision, true)
+	must(t, got, err)
+	if got.State != StateLive {
+		t.Fatalf("done though the follow-up only moved: %+v", got)
+	}
+}
+
 func TestOldSingleNewAddressStillFinishes(t *testing.T) {
 	s, rec := atWrite(t)
 	rec.Rows[0].Write, rec.Rows[0].NewAddress = WriteDone, "proj:map/01"
@@ -349,8 +371,17 @@ func TestOldSingleNewAddressStillFinishes(t *testing.T) {
 		t.Fatal(err)
 	}
 	live, _ := s.LoadLive()
-	if got := live.Rows[0].Addresses(); len(got) != 1 || got[0] != "proj:map/01" {
-		t.Fatalf("old address not read: %+v", live.Rows[0])
+	if got := live.Rows[0].NewAddresses; len(got) != 1 || got[0] != "proj:map/01" || live.Rows[0].NewAddress != "" {
+		t.Fatalf("old address not normalised: %+v", live.Rows[0])
+	}
+	tickettest.WriteFile(t, filepath.Join(s.ProjectDir(), "map", "issues", "01-t.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# T\n")
+	archived := filepath.Join(s.ProjectDir(), "follow-ups-archived", "issues")
+	if err := os.MkdirAll(archived, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(s.ProjectDir(), "follow-ups", "issues", "01-a.md"), filepath.Join(archived, "01-a.md")); err != nil {
+		t.Fatal(err)
 	}
 	rec, err := s.SetLastPass(live.ID, live.Revision, true)
 	must(t, rec, err)

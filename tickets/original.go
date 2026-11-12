@@ -53,6 +53,21 @@ func IsPromoted(t Ticket) bool {
 	return false
 }
 
+// HasTicket reports whether epics hold a ticket at addr.
+func HasTicket(epics []Epic, addr Address) bool {
+	for _, e := range epics {
+		if e.Name != addr.Epic {
+			continue
+		}
+		for _, t := range e.Tickets {
+			if t.Identifier == addr.ID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // IsTerminalStatus reports whether a raw ticket status is done or cancelled.
 func IsTerminalStatus(status string) bool {
 	return status == string(schema.StatusDone) || status == string(schema.StatusCancelled)

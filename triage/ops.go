@@ -92,30 +92,17 @@ func (r *Record) row(address string) (*Row, error) {
 
 func (r *Row) gone() bool { return r.Write == WriteGone }
 
-// Addresses are the tickets the row became, whether the record stored a list
-// or an older single address.
-func (r *Row) Addresses() []string {
-	if len(r.NewAddresses) > 0 {
-		return r.NewAddresses
-	}
-	if r.NewAddress != "" {
-		return []string{r.NewAddress}
-	}
-	return nil
-}
-
 // FirstAddress is the first ticket the row became, or "".
 func (r *Row) FirstAddress() string {
-	if a := r.Addresses(); len(a) > 0 {
-		return a[0]
+	if len(r.NewAddresses) > 0 {
+		return r.NewAddresses[0]
 	}
 	return ""
 }
 
-// complete reports whether every ticket of a row that stored a list exists and
-// its follow-up has left follow-ups (archived or moved). Older single-address
-// rows and rows without tickets are complete as written.
-func (r *Row) complete(projectDir string) bool {
+// complete reports whether every ticket the row became exists and its
+// follow-up is archived. A row that became no tickets is complete as written.
+func (r *Row) complete(epics []tickets.Epic) bool {
 	if len(r.NewAddresses) == 0 {
 		return true
 	}
@@ -123,33 +110,32 @@ func (r *Row) complete(projectDir string) bool {
 	if err != nil {
 		return true
 	}
-	epics, err := tickets.Load(projectDir)
-	if err != nil {
-		return false
-	}
-	exists := func(a tickets.Address) bool {
-		for _, e := range epics {
-			if e.Name != a.Epic {
-				continue
-			}
-			for _, t := range e.Tickets {
-				if t.Identifier == a.ID {
-					return true
-				}
-			}
-		}
-		return false
-	}
-	if exists(from) {
+	if !followUpArchived(epics, from) {
 		return false
 	}
 	for _, s := range r.NewAddresses {
 		a, err := tickets.ParseAddress(s, tickets.AddressContext{})
-		if err != nil || !exists(a) {
+		if err != nil || !tickets.HasTicket(epics, a) {
 			return false
 		}
 	}
 	return true
+}
+
+// followUpArchived reports whether the follow-up sits in follow-ups-archived,
+// under its own id or as the original of a moved ticket.
+func followUpArchived(epics []tickets.Epic, from tickets.Address) bool {
+	for _, e := range epics {
+		if e.Name != tickets.ArchivedFollowUpsEpic {
+			continue
+		}
+		for _, t := range e.Tickets {
+			if t.Identifier == from.ID || tickets.IsOriginal(t, from) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func requireStep(rec *Record, what string, steps ...string) error {
@@ -579,7 +565,7 @@ func (s *Store) KeepForLater(id string, revision int, address string) (*Record, 
 		if row.Write != WriteFailed {
 			return phaseErr("row %s is %s, not failed", address, row.Write)
 		}
-		if moved := row.Addresses(); len(moved) > 0 {
+		if moved := row.NewAddresses; len(moved) > 0 {
 			return phaseErr("row %s already moved to %s", address, strings.Join(moved, ", "))
 		}
 		row.Person.KeepForLater = true
@@ -605,11 +591,23 @@ func finishIfDone(rec *Record, projectDir string) {
 	if rec.State != StateLive || rec.Step != tickets.StepWrite || !rec.LastPassComplete {
 		return
 	}
+	var epics []tickets.Epic
+	loaded := false
 	for _, row := range rec.Rows {
 		if row.Write != WriteDone && !row.Person.KeepForLater && !row.gone() {
 			return
 		}
-		if row.Write == WriteDone && !row.complete(projectDir) {
+		if row.Write != WriteDone || len(row.NewAddresses) == 0 {
+			continue
+		}
+		if !loaded {
+			var err error
+			if epics, err = tickets.Load(projectDir); err != nil {
+				return
+			}
+			loaded = true
+		}
+		if !row.complete(epics) {
 			return
 		}
 	}

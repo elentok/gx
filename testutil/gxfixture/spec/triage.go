@@ -138,13 +138,13 @@ func TriageScenario(shape string) (Scenario, bool) {
 				atApprove(rec, func(i int, p *triage.PlanRow) { p.Action = actions[i] })
 				rec.Step = tickets.StepWrite
 				rec.Rows[0].Write = triage.WriteDone
-				rec.Rows[0].NewAddress = project + ":triage-ready/01"
+				rec.Rows[0].NewAddresses = []string{project + ":triage-ready/01"}
 				// Failed before its move: the follow-up never left follow-ups.
 				rec.Rows[1].Write = triage.WriteFailed
 				rec.Rows[1].Refusal = "ticket claimed by another agent"
 				// Failed after its move: the ticket is already in the new epic.
 				rec.Rows[2].Write = triage.WriteFailed
-				rec.Rows[2].NewAddress = project + ":triage-map/01"
+				rec.Rows[2].NewAddresses = []string{project + ":triage-map/01"}
 				rec.Rows[2].Refusal = "epic add failed"
 			}}}
 			sc.Steps = [][]string{open(project)}
@@ -168,7 +168,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 					return triage.Row{
 						Address: fmt.Sprintf("%s:follow-ups/%02d", project, 50+n), Title: title, Category: "bug",
 						Verdict: triage.VerdictRelevant, Plan: &triage.PlanRow{RowID: title, Action: action},
-						Write: triage.WriteDone, NewAddress: newAddr,
+						Write: triage.WriteDone, NewAddresses: []string{newAddr},
 					}
 				}
 				rec.Rows = append(rec.Rows,

@@ -192,13 +192,13 @@ func TestView_FailedRowsOfferKeepAndRetry(t *testing.T) {
 	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{{RowID: addrA, Action: "ready"}, {RowID: addrB, Action: "ready"}}, nil))
 	rec = mustRec(s.Approve(rec.ID, rec.Revision))
 	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrA, triagerec.WriteFailed, nil, "refused"))
-	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrB, triagerec.WriteFailed, []string{"proj:ready/01"}, "set failed"))
+	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrB, triagerec.WriteFailed, []string{"proj:ready/01", "proj:ready/02"}, "set failed"))
 	v := show(t, f)
 	a, b := v.Rows[0], v.Rows[1]
 	if !a.CanKeep || !a.CanRetry || a.Refusal != "refused" {
 		t.Fatalf("before the move: %+v", a)
 	}
-	if b.CanKeep || !b.CanRetry || b.NewAddress != "proj:ready/01" {
+	if b.CanKeep || !b.CanRetry || len(b.NewAddresses) != 2 || b.NewAddresses[1] != "proj:ready/02" {
 		t.Fatalf("after the move: %+v", b)
 	}
 	if v.CanAbandon {
@@ -208,7 +208,11 @@ func TestView_FailedRowsOfferKeepAndRetry(t *testing.T) {
 
 func TestOfferRules(t *testing.T) {
 	row := func(w triagerec.WriteState, newAddr string, keep bool) triagerec.Row {
-		return triagerec.Row{Write: w, NewAddress: newAddr, Person: triagerec.PersonFields{KeepForLater: keep}}
+		var addrs []string
+		if newAddr != "" {
+			addrs = []string{newAddr}
+		}
+		return triagerec.Row{Write: w, NewAddresses: addrs, Person: triagerec.PersonFields{KeepForLater: keep}}
 	}
 	cases := []struct {
 		name               string

@@ -30,7 +30,7 @@ var flowSteps = []struct {
 // follow-up is still in follow-ups.
 func CanKeep(live bool, step string, r triagerec.Row) bool {
 	return live && step == tickets.StepWrite && r.Write == triagerec.WriteFailed &&
-		len(r.Addresses()) == 0 && !r.Person.KeepForLater
+		len(r.NewAddresses) == 0 && !r.Person.KeepForLater
 }
 
 // CanRetry is whether a row offers Retry: any failed row at write, including
@@ -254,7 +254,7 @@ func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (wire.TriageRow
 		Address: r.Address, Title: r.Title, Category: r.Category,
 		Verdict: r.Verdict, Evidence: r.Evidence, Files: r.Files,
 		Answers: r.Person.Answers, Gone: r.Write == triagerec.WriteGone,
-		WriteState: string(r.Write), NewAddress: r.FirstAddress(), Refusal: r.Refusal,
+		WriteState: string(r.Write), NewAddresses: r.NewAddresses, Refusal: r.Refusal,
 		CanKeep: CanKeep(live, rec.Step, r), CanRetry: CanRetry(live, rec.Step, r),
 	}
 	if r.Plan != nil {
