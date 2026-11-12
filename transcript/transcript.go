@@ -225,36 +225,20 @@ const initialTailBytes = 64 * 1024
 // doesn't exist at all — e.g. the agent hasn't written its first turn out
 // yet). Malformed lines are skipped rather than failing the read.
 func LastAssistantUsage(path string) (Usage, bool, error) {
-	var usage Usage
-	found := false
-	err := tailScan(path, func(lines []string) bool {
-		for _, raw := range slices.Backward(lines) {
-			entry, ok := parseLine(raw)
-			if !ok || entry.Type != "assistant" {
-				continue
-			}
-			usage, found = usageFromLine(entry), true
-			return true
-		}
-		return false
-	})
-	if err != nil {
+	newest, _, found, _, err := scanAssistantUsage(path, func(Usage) bool { return true })
+	if err != nil || !found {
 		return Usage{}, false, err
 	}
-	return usage, found, nil
+	return newest, true, nil
 }
 
-// LastAssistantReading is the newest assistant line's Model with the usage of
-// the newest assistant line that has any occupancy. Claude Code writes
-// synthetic assistant lines with zero usage; those must not read as an empty
-// context. ok=false means no assistant line at all; a transcript whose
-// assistant lines all have zero occupancy returns the newest one's usage, with
-// Occupancy() of zero.
-func LastAssistantReading(path string) (Usage, bool, error) {
-	var newest, reading Usage
-	found, nonzero := false, false
-	err := tailScan(path, func(lines []string) bool {
-		found, nonzero = false, false
+// scanAssistantUsage walks assistant lines from the newest backwards and stops
+// at the first whose usage satisfies stop. newest is the newest assistant
+// line's usage; stopped is the usage that satisfied stop (stoppedOK reports
+// whether one did). found=false means no assistant line at all.
+func scanAssistantUsage(path string, stop func(Usage) bool) (newest, stopped Usage, found, stoppedOK bool, err error) {
+	err = tailScan(path, func(lines []string) bool {
+		found, stoppedOK = false, false
 		for _, raw := range slices.Backward(lines) {
 			entry, ok := parseLine(raw)
 			if !ok || entry.Type != "assistant" {
@@ -264,13 +248,24 @@ func LastAssistantReading(path string) (Usage, bool, error) {
 			if !found {
 				newest, found = u, true
 			}
-			if u.Occupancy() > 0 {
-				reading, nonzero = u, true
+			if stop(u) {
+				stopped, stoppedOK = u, true
 				return true
 			}
 		}
 		return false
 	})
+	return newest, stopped, found, stoppedOK, err
+}
+
+// LastAssistantReading is the newest assistant line's Model with the usage of
+// the newest assistant line that has any occupancy. Claude Code writes
+// synthetic assistant lines with zero usage; those must not read as an empty
+// context. ok=false means no assistant line at all; a transcript whose
+// assistant lines all have zero occupancy returns the newest one's usage, with
+// Occupancy() of zero.
+func LastAssistantReading(path string) (Usage, bool, error) {
+	newest, reading, found, nonzero, err := scanAssistantUsage(path, func(u Usage) bool { return u.Occupancy() > 0 })
 	if err != nil || !found {
 		return Usage{}, false, err
 	}

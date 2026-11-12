@@ -85,7 +85,7 @@ func LastContextTokensIn(home, cwd, sessionID string) (tokens int, ok bool, err 
 // for a caller that already found the file by session id. ok is false while the
 // rollout has no token_count.
 func ReadContextTokens(path string) (tokens int, ok bool, err error) {
-	return readContextTokens(path, "", "")
+	return scanContextTokens(path, true, func(sessionLine) bool { return true })
 }
 
 // VerifyIdentityIn reports whether the Codex home has rollout metadata for
@@ -387,15 +387,23 @@ type quotaWindow struct {
 }
 
 func readContextTokens(path, cwd, sessionID string) (tokens int, ok bool, err error) {
+	return scanContextTokens(path, false, func(meta sessionLine) bool {
+		return meta.Payload.ID == sessionID && sameDir(meta.Payload.Cwd, cwd)
+	})
+}
+
+// scanContextTokens returns the last token_count input tokens that follow a
+// session_meta line accepted by matchSession. matchBeforeMeta says whether
+// token events before any session_meta count: a path-based read (the caller
+// already chose the file) accepts them.
+func scanContextTokens(path string, matchBeforeMeta bool, matchSession func(meta sessionLine) bool) (tokens int, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, false, err
 	}
 	defer f.Close()
 
-	// An empty sessionID is the path-based read: the caller already chose the file.
-	anySession := sessionID == ""
-	matchingSession := anySession
+	matchingSession := matchBeforeMeta
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	for scanner.Scan() {
@@ -404,7 +412,7 @@ func readContextTokens(path, cwd, sessionID string) (tokens int, ok bool, err er
 			continue
 		}
 		if line.Type == "session_meta" {
-			matchingSession = anySession || line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd)
+			matchingSession = matchSession(line)
 			continue
 		}
 		if matchingSession && line.Type == "event_msg" && line.Payload.Type == "token_count" && line.Payload.Info.LastTokenUsage.InputTokens > 0 {
