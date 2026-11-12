@@ -1,10 +1,10 @@
-import { Box, Code, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import type { TicketDetail } from "../generated/server";
-import { Badge } from "../ui/badge/Badge";
-import { Button } from "../ui/button/Button";
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
-import { postDecision, type Decision, type PostDecision } from "./permission";
+import { Box, Code, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import type { TicketDetail } from "../generated/server"
+import { Badge } from "../ui/badge/Badge"
+import { Button } from "../ui/button/Button"
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
+import { postDecision, type Decision, type PostDecision } from "./permission"
 
 // The pending permission prompt of a blocked agent. Only Allow once and Deny: a standing
 // permission is never granted from here. A hint means the prompt can only be approved in the TUI.
@@ -14,51 +14,51 @@ export function PermissionCard({
   onDone,
   onStale,
 }: {
-  detail: TicketDetail;
-  post?: PostDecision;
+  detail: TicketDetail
+  post?: PostDecision
   /** The decision reached the agent; refetch so the card goes away. */
-  onDone?: () => void;
+  onDone?: () => void
   /** The refusal means the prompt moved on: refetch so the current card shows. */
-  onStale?: () => void;
+  onStale?: () => void
 }) {
-  const card = detail.permission;
-  const [note, setNote] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [seenId, setSeenId] = useState(card?.request_id);
+  const card = detail.permission
+  const [note, setNote] = useState("")
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState("")
+  const [seenId, setSeenId] = useState(card?.request_id)
 
   // A new prompt is a new card: the old note does not belong to it. The error stays, since it
   // is usually why the card changed.
   if (seenId !== card?.request_id) {
-    setSeenId(card?.request_id);
-    setNote("");
+    setSeenId(card?.request_id)
+    setNote("")
   }
 
-  if (!card) return null;
+  if (!card) return null
 
   const decide = async (decision: Decision) => {
-    if (pending) return;
-    setPending(true);
-    setError("");
+    if (pending) return
+    setPending(true)
+    setError("")
     try {
       const res = await post({
         address: detail.address,
         decision,
         request_id: card.request_id,
         ...(decision === "deny" && note.trim() ? { text: note } : {}),
-      });
+      })
       if (res.refused) {
-        setError(res.message);
-        onStale?.();
+        setError(res.message)
+        onStale?.()
       } else {
-        onDone?.();
+        onDone?.()
       }
     } catch {
-      setError("Could not send the decision. Try again.");
+      setError("Could not send the decision. Try again.")
     } finally {
-      setPending(false);
+      setPending(false)
     }
-  };
+  }
 
   return (
     <Box
@@ -107,5 +107,5 @@ export function PermissionCard({
         </>
       )}
     </Box>
-  );
+  )
 }

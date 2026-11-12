@@ -1,6 +1,6 @@
-import { chakra } from "@chakra-ui/react";
-import type { ComponentProps } from "react";
-import { useWide } from "../../useWide";
+import { chakra } from "@chakra-ui/react"
+import type { ComponentProps } from "react"
+import { useWide } from "../../useWide"
 
 const dots = (
   <svg viewBox="0 0 20 20" aria-hidden width="20" height="20" fill="currentColor">
@@ -8,23 +8,26 @@ const dots = (
     <circle cx="10" cy="10" r="1.7" />
     <circle cx="15.5" cy="10" r="1.7" />
   </svg>
-);
+)
 
-const hovered = { bg: "surface.raised", color: "text" } as const;
-const opened = { ...hovered, boxShadow: "inset 0 0 0 1px var(--chakra-colors-border)" } as const;
+const hovered = { bg: "surface.raised", color: "text" } as const
+const opened = { ...hovered, boxShadow: "inset 0 0 0 1px var(--chakra-colors-border)" } as const
 
 /** The button's diameter; anything that reserves its space (a sidebar row's menu spacer) reads it here. */
 export function useMoreActionsSize(): string {
-  return useWide() ? "36px" : "40px";
+  return useWide() ? "36px" : "40px"
 }
 
 /**
  * The page header's round "More actions" trigger for a `GxMenu`. `pinned` holds it in a state, so the
  * gallery can show hover, focus and open side by side.
  */
-export function MoreActionsButton({ pinned, ...rest }: { pinned?: "hover" | "focus" | "open" } & ComponentProps<typeof chakra.button>) {
-  const phone = !useWide();
-  const size = useMoreActionsSize();
+export function MoreActionsButton({
+  pinned,
+  ...rest
+}: { pinned?: "hover" | "focus" | "open" } & ComponentProps<typeof chakra.button>) {
+  const phone = !useWide()
+  const size = useMoreActionsSize()
   return (
     <chakra.button
       type="button"
@@ -42,7 +45,9 @@ export function MoreActionsButton({ pinned, ...rest }: { pinned?: "hover" | "foc
       // A phone's hit area is 44px around the 40px circle.
       _before={phone ? { content: '""', position: "absolute", inset: "-2px" } : undefined}
       {...(pinned === "hover" && hovered)}
-      {...(pinned === "focus" && { boxShadow: "0 0 0 2px {colors.surface}, 0 0 0 4px {colors.tone.running.fg}" })}
+      {...(pinned === "focus" && {
+        boxShadow: "0 0 0 2px {colors.surface}, 0 0 0 4px {colors.tone.running.fg}",
+      })}
       {...(pinned === "open" && opened)}
       _hover={hovered}
       _open={opened}
@@ -51,5 +56,5 @@ export function MoreActionsButton({ pinned, ...rest }: { pinned?: "hover" | "foc
     >
       {dots}
     </chakra.button>
-  );
+  )
 }

@@ -1,19 +1,19 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
-import { afterEach, expect, test, vi } from "vitest";
-import type { InterruptSession } from "../design/open";
-import type { PostPrompt } from "../design/prompt";
-import type { SessionInfo } from "../generated/server";
-import { typeInLargeEditor } from "../ui/expandable-text/testing";
-import { renderThemed } from "../ui/render";
-import { toaster } from "../ui/toaster";
-import { WideContext } from "../useWide";
-import { AgentComposer } from "./AgentComposer";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { MemoryRouter } from "react-router"
+import { afterEach, expect, test, vi } from "vitest"
+import type { InterruptSession } from "../design/open"
+import type { PostPrompt } from "../design/prompt"
+import type { SessionInfo } from "../generated/server"
+import { typeInLargeEditor } from "../ui/expandable-text/testing"
+import { renderThemed } from "../ui/render"
+import { toaster } from "../ui/toaster"
+import { WideContext } from "../useWide"
+import { AgentComposer } from "./AgentComposer"
 
 afterEach(() => {
-  cleanup();
-  localStorage.clear();
-});
+  cleanup()
+  localStorage.clear()
+})
 
 const session = (state = "idle"): SessionInfo => ({
   id: "s-a",
@@ -28,9 +28,17 @@ const session = (state = "idle"): SessionInfo => ({
   actionable: {},
   auto_advance: true,
   auto_queue: false,
-});
+})
 
-function render(over: { s?: SessionInfo; connected?: boolean; post?: PostPrompt; reason?: string; wide?: boolean } = {}) {
+function render(
+  over: {
+    s?: SessionInfo
+    connected?: boolean
+    post?: PostPrompt
+    reason?: string
+    wide?: boolean
+  } = {},
+) {
   return renderThemed(
     <MemoryRouter>
       <WideContext.Provider value={over.wide ?? true}>
@@ -42,301 +50,328 @@ function render(over: { s?: SessionInfo; connected?: boolean; post?: PostPrompt;
         />
       </WideContext.Provider>
     </MemoryRouter>,
-  );
+  )
 }
 
-const box = () => screen.getByRole("textbox", { name: "Message" });
-const send = () => screen.getByRole("button", { name: "Send" });
+const box = () => screen.getByRole("textbox", { name: "Message" })
+const send = () => screen.getByRole("button", { name: "Send" })
 
 test("the box is open with Send beside it and none of the design parts", () => {
-  render({ reason: "Why it is off" });
-  expect(box()).toBeTruthy();
-  expect(box().getAttribute("autocomplete")).toBe("off");
-  expect(box().getAttribute("name")).toBe("chat-message");
-  expect(send()).toBeTruthy();
-  expect(screen.getByText("Why it is off")).toBeTruthy();
+  render({ reason: "Why it is off" })
+  expect(box()).toBeTruthy()
+  expect(box().getAttribute("autocomplete")).toBe("off")
+  expect(box().getAttribute("name")).toBe("chat-message")
+  expect(send()).toBeTruthy()
+  expect(screen.getByText("Why it is off")).toBeTruthy()
   for (const name of [/Auto/, /Continue/, /Interrupt/, /Note/]) {
-    expect(screen.queryByRole("button", { name })).toBeNull();
+    expect(screen.queryByRole("button", { name })).toBeNull()
   }
-});
+})
 
 test("the footer shows the model, plus the badge once there is a count", () => {
-  const { unmount } = render({ s: { ...session(), model: "claude-opus-4-7", effort: "high" } });
-  expect(screen.getByText("Claude Opus 4.7 · high")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Context" })).toBeNull();
-  unmount();
+  const { unmount } = render({ s: { ...session(), model: "claude-opus-4-7", effort: "high" } })
+  expect(screen.getByText("Claude Opus 4.7 · high")).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Context" })).toBeNull()
+  unmount()
   renderThemed(
     <MemoryRouter>
       <WideContext.Provider value={true}>
-        <AgentComposer session={{ ...session(), context_tokens: 70_000, context_level: "green" }} connected ceiling={200_000} />
+        <AgentComposer
+          session={{ ...session(), context_tokens: 70_000, context_level: "green" }}
+          connected
+          ceiling={200_000}
+        />
       </WideContext.Provider>
     </MemoryRouter>,
-  );
-  expect(screen.getByRole("button", { name: "Context" }).textContent).toBe("70K");
-});
+  )
+  expect(screen.getByRole("button", { name: "Context" }).textContent).toBe("70K")
+})
 
 test("a session without chat shows the model alone, never a badge", () => {
-  render({ s: { ...session(), harness: "other", model: "claude-opus-4-7", context_tokens: 70_000, context_level: "green" } });
-  expect(screen.queryByRole("button", { name: "Context" })).toBeNull();
-  expect(screen.getByText("Claude Opus 4.7")).toBeTruthy();
-});
+  render({
+    s: {
+      ...session(),
+      harness: "other",
+      model: "claude-opus-4-7",
+      context_tokens: 70_000,
+      context_level: "green",
+    },
+  })
+  expect(screen.queryByRole("button", { name: "Context" })).toBeNull()
+  expect(screen.getByText("Claude Opus 4.7")).toBeTruthy()
+})
 
 test("Send is off while empty and on once there is text", () => {
-  render();
-  expect((send() as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.change(box(), { target: { value: "hi" } });
-  expect((send() as HTMLButtonElement).disabled).toBe(false);
-});
+  render()
+  expect((send() as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.change(box(), { target: { value: "hi" } })
+  expect((send() as HTMLButtonElement).disabled).toBe(false)
+})
 
 test("Send is off when not connected, but the box stays editable", () => {
-  render({ connected: false });
-  fireEvent.change(box(), { target: { value: "hi" } });
-  expect((box() as HTMLTextAreaElement).value).toBe("hi");
-  expect((box() as HTMLTextAreaElement).disabled).toBe(false);
-  expect((send() as HTMLButtonElement).disabled).toBe(true);
-});
+  render({ connected: false })
+  fireEvent.change(box(), { target: { value: "hi" } })
+  expect((box() as HTMLTextAreaElement).value).toBe("hi")
+  expect((box() as HTMLTextAreaElement).disabled).toBe(false)
+  expect((send() as HTMLButtonElement).disabled).toBe(true)
+})
 
 test("a Working session swaps Send for Interrupt, posting the state token after a confirm; the box stays editable", async () => {
-  const interrupt = vi.fn(async () => ({ ok: true })) as unknown as InterruptSession;
+  const interrupt = vi.fn(async () => ({ ok: true })) as unknown as InterruptSession
   renderThemed(
     <MemoryRouter>
       <WideContext.Provider value={true}>
         <AgentComposer session={session("working")} connected interrupt={interrupt} />
       </WideContext.Provider>
     </MemoryRouter>,
-  );
-  fireEvent.change(box(), { target: { value: "hi" } });
-  expect((box() as HTMLTextAreaElement).value).toBe("hi");
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Interrupt" }));
-  const confirm = await screen.findByRole("alertdialog", { name: "Interrupt the agent?" });
-  expect(interrupt).not.toHaveBeenCalled();
-  fireEvent.click(within(confirm).getByRole("button", { name: "Interrupt" }));
-  await waitFor(() => expect(interrupt).toHaveBeenCalled());
-  const body = (interrupt as unknown as { mock: { calls: { id: string; state: string }[][] } }).mock.calls[0][0];
-  expect(body.id).toBe("s-a");
-  expect(body.state).toMatch(/^s-a:working:\d+$/);
-});
+  )
+  fireEvent.change(box(), { target: { value: "hi" } })
+  expect((box() as HTMLTextAreaElement).value).toBe("hi")
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: "Interrupt" }))
+  const confirm = await screen.findByRole("alertdialog", { name: "Interrupt the agent?" })
+  expect(interrupt).not.toHaveBeenCalled()
+  fireEvent.click(within(confirm).getByRole("button", { name: "Interrupt" }))
+  await waitFor(() => expect(interrupt).toHaveBeenCalled())
+  const body = (interrupt as unknown as { mock: { calls: { id: string; state: string }[][] } }).mock
+    .calls[0][0]
+  expect(body.id).toBe("s-a")
+  expect(body.state).toMatch(/^s-a:working:\d+$/)
+})
 
 test("Esc opens the confirm in this composer, from the message box", async () => {
-  render({ s: session("working") });
-  box().focus();
-  fireEvent.keyDown(box(), { key: "Escape" });
-  expect(await screen.findByRole("alertdialog", { name: "Interrupt the agent?" })).toBeTruthy();
-});
+  render({ s: session("working") })
+  box().focus()
+  fireEvent.keyDown(box(), { key: "Escape" })
+  expect(await screen.findByRole("alertdialog", { name: "Interrupt the agent?" })).toBeTruthy()
+})
 
 test("a refused send shows its reason inline only, no toast, and keeps the draft", async () => {
-  const toast = vi.spyOn(toaster, "create");
-  const post = vi.fn(async () => ({ refused: true, message: "text may not start with !" })) as unknown as PostPrompt;
-  render({ post });
-  fireEvent.change(box(), { target: { value: "!ls" } });
-  fireEvent.click(send());
-  expect(await screen.findByText("text may not start with !")).toBeTruthy();
-  expect(toast).not.toHaveBeenCalled();
-  expect((box() as HTMLTextAreaElement).value).toBe("!ls");
-  toast.mockRestore();
-});
+  const toast = vi.spyOn(toaster, "create")
+  const post = vi.fn(async () => ({
+    refused: true,
+    message: "text may not start with !",
+  })) as unknown as PostPrompt
+  render({ post })
+  fireEvent.change(box(), { target: { value: "!ls" } })
+  fireEvent.click(send())
+  expect(await screen.findByText("text may not start with !")).toBeTruthy()
+  expect(toast).not.toHaveBeenCalled()
+  expect((box() as HTMLTextAreaElement).value).toBe("!ls")
+  toast.mockRestore()
+})
 
-const HINT = "Codex skills start with $. Type $gx-... instead.";
-const codex = (): SessionInfo => ({ ...session(), harness: "codex" });
+const HINT = "Codex skills start with $. Type $gx-... instead."
+const codex = (): SessionInfo => ({ ...session(), harness: "codex" })
 
 test("the $ hint shows for a Codex /gx- draft, not for Claude or other drafts", () => {
-  render({ s: codex() });
-  fireEvent.change(box(), { target: { value: "/gx-design x" } });
-  expect(screen.getByText(HINT)).toBeTruthy();
-  fireEvent.change(box(), { target: { value: "/clear" } });
-  expect(screen.queryByText(HINT)).toBeNull();
-  fireEvent.change(box(), { target: { value: "$gx-design x" } });
-  expect(screen.queryByText(HINT)).toBeNull();
-  cleanup();
-  render();
-  fireEvent.change(box(), { target: { value: "/gx-design x" } });
-  expect(screen.queryByText(HINT)).toBeNull();
-});
+  render({ s: codex() })
+  fireEvent.change(box(), { target: { value: "/gx-design x" } })
+  expect(screen.getByText(HINT)).toBeTruthy()
+  fireEvent.change(box(), { target: { value: "/clear" } })
+  expect(screen.queryByText(HINT)).toBeNull()
+  fireEvent.change(box(), { target: { value: "$gx-design x" } })
+  expect(screen.queryByText(HINT)).toBeNull()
+  cleanup()
+  render()
+  fireEvent.change(box(), { target: { value: "/gx-design x" } })
+  expect(screen.queryByText(HINT)).toBeNull()
+})
 
 test("the $ hint yields to a refusal line", async () => {
-  const post = vi.fn(async () => ({ refused: true, message: "text may not start with !" })) as unknown as PostPrompt;
-  render({ s: codex(), post });
-  fireEvent.change(box(), { target: { value: "/gx-design x" } });
-  fireEvent.click(send());
-  expect(await screen.findByText("text may not start with !")).toBeTruthy();
-  expect(screen.queryByText(HINT)).toBeNull();
-});
+  const post = vi.fn(async () => ({
+    refused: true,
+    message: "text may not start with !",
+  })) as unknown as PostPrompt
+  render({ s: codex(), post })
+  fireEvent.change(box(), { target: { value: "/gx-design x" } })
+  fireEvent.click(send())
+  expect(await screen.findByText("text may not start with !")).toBeTruthy()
+  expect(screen.queryByText(HINT)).toBeNull()
+})
 
 test("Send is off while a send is pending, then clears the box", async () => {
-  let release: (v: { refused: false }) => void = () => {};
-  const post = vi.fn(() => new Promise<{ refused: false }>((r) => (release = r))) as unknown as PostPrompt;
-  render({ post });
-  fireEvent.change(box(), { target: { value: "hi" } });
-  fireEvent.click(send());
-  await waitFor(() => expect((send() as HTMLButtonElement).disabled).toBe(true));
-  expect(post).toHaveBeenCalledWith(expect.objectContaining({ id: "s-a", text: "hi" }));
-  release({ refused: false });
-  await waitFor(() => expect((box() as HTMLTextAreaElement).value).toBe(""));
-});
+  let release: (v: { refused: false }) => void = () => {}
+  const post = vi.fn(
+    () => new Promise<{ refused: false }>((r) => (release = r)),
+  ) as unknown as PostPrompt
+  render({ post })
+  fireEvent.change(box(), { target: { value: "hi" } })
+  fireEvent.click(send())
+  await waitFor(() => expect((send() as HTMLButtonElement).disabled).toBe(true))
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({ id: "s-a", text: "hi" }))
+  release({ refused: false })
+  await waitFor(() => expect((box() as HTMLTextAreaElement).value).toBe(""))
+})
 
-const ok = { refused: false } as Awaited<ReturnType<PostPrompt>>;
+const ok = { refused: false } as Awaited<ReturnType<PostPrompt>>
 const cmdEnter = (el: HTMLElement, mod: "metaKey" | "ctrlKey" = "metaKey") =>
-  fireEvent.keyDown(el, { key: "Enter", [mod]: true });
+  fireEvent.keyDown(el, { key: "Enter", [mod]: true })
 
 test("the placeholder names the session and no hairline tops the composer", () => {
-  render();
-  expect((box() as HTMLTextAreaElement).placeholder).toBe(`Message ${session().name || session().id}`);
-  expect(getComputedStyle(screen.getByRole("form", { name: "Composer" })).borderTopWidth).not.toBe("1px");
-});
+  render()
+  expect((box() as HTMLTextAreaElement).placeholder).toBe(
+    `Message ${session().name || session().id}`,
+  )
+  expect(getComputedStyle(screen.getByRole("form", { name: "Composer" })).borderTopWidth).not.toBe(
+    "1px",
+  )
+})
 
 test("Cmd or Ctrl+Enter sends like the Send button", async () => {
   for (const mod of ["metaKey", "ctrlKey"] as const) {
-    const post = vi.fn<PostPrompt>(async () => ok);
-    render({ post });
-    fireEvent.change(box(), { target: { value: "hello" } });
-    cmdEnter(box(), mod);
-    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-    expect(post).toHaveBeenCalledWith({ id: "s-a", text: "hello" });
-    await waitFor(() => expect((box() as HTMLTextAreaElement).value).toBe(""));
-    cleanup();
-    localStorage.clear();
+    const post = vi.fn<PostPrompt>(async () => ok)
+    render({ post })
+    fireEvent.change(box(), { target: { value: "hello" } })
+    cmdEnter(box(), mod)
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+    expect(post).toHaveBeenCalledWith({ id: "s-a", text: "hello" })
+    await waitFor(() => expect((box() as HTMLTextAreaElement).value).toBe(""))
+    cleanup()
+    localStorage.clear()
   }
-});
+})
 
 test("the key does nothing while Send is disabled", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  cmdEnter(box());
-  fireEvent.change(box(), { target: { value: "  " } });
-  cmdEnter(box());
-  cleanup();
-  const offline = vi.fn<PostPrompt>(async () => ok);
-  render({ post: offline, connected: false });
-  fireEvent.change(box(), { target: { value: "hello" } });
-  cmdEnter(box());
-  await new Promise((r) => setTimeout(r, 20));
-  expect(post).not.toHaveBeenCalled();
-  expect(offline).not.toHaveBeenCalled();
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  cmdEnter(box())
+  fireEvent.change(box(), { target: { value: "  " } })
+  cmdEnter(box())
+  cleanup()
+  const offline = vi.fn<PostPrompt>(async () => ok)
+  render({ post: offline, connected: false })
+  fireEvent.change(box(), { target: { value: "hello" } })
+  cmdEnter(box())
+  await new Promise((r) => setTimeout(r, 20))
+  expect(post).not.toHaveBeenCalled()
+  expect(offline).not.toHaveBeenCalled()
+})
 
 test("the key in the large editor sends on a wide screen and does nothing on a narrow one", async () => {
   for (const wide of [true, false]) {
-    const post = vi.fn<PostPrompt>(async () => ok);
-    render({ post, wide });
-    fireEvent.change(box(), { target: { value: "hello" } });
-    fireEvent.click(screen.getByLabelText("Open the note in a large editor"));
-    const editor = await screen.findByRole("textbox", { name: /text$/ });
-    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-    if (wide) await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    const post = vi.fn<PostPrompt>(async () => ok)
+    render({ post, wide })
+    fireEvent.change(box(), { target: { value: "hello" } })
+    fireEvent.click(screen.getByLabelText("Open the note in a large editor"))
+    const editor = await screen.findByRole("textbox", { name: /text$/ })
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true })
+    if (wide) await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
     else {
-      await new Promise((r) => setTimeout(r, 20));
-      expect(post).not.toHaveBeenCalled();
-      expect(screen.getByRole("dialog")).toBeTruthy();
+      await new Promise((r) => setTimeout(r, 20))
+      expect(post).not.toHaveBeenCalled()
+      expect(screen.getByRole("dialog")).toBeTruthy()
     }
-    cleanup();
-    localStorage.clear();
+    cleanup()
+    localStorage.clear()
   }
-});
+})
 
 test("plain Enter adds a newline and does not send", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  fireEvent.change(box(), { target: { value: "hello" } });
-  expect(fireEvent.keyDown(box(), { key: "Enter" })).toBe(true);
-  await new Promise((r) => setTimeout(r, 20));
-  expect(post).not.toHaveBeenCalled();
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  fireEvent.change(box(), { target: { value: "hello" } })
+  expect(fireEvent.keyDown(box(), { key: "Enter" })).toBe(true)
+  await new Promise((r) => setTimeout(r, 20))
+  expect(post).not.toHaveBeenCalled()
+})
 
 test("the Message field has an expand button and its editor is titled for the session", async () => {
-  render();
-  fireEvent.click(screen.getByRole("button", { name: "Open the note in a large editor" }));
-  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(`Message to ${session().id}`);
-  await typeInLargeEditor(`Message to ${session().id}`, "from editor");
-  expect((box() as HTMLTextAreaElement).value).toBe("from editor");
-});
+  render()
+  fireEvent.click(screen.getByRole("button", { name: "Open the note in a large editor" }))
+  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(`Message to ${session().id}`)
+  await typeInLargeEditor(`Message to ${session().id}`, "from editor")
+  expect((box() as HTMLTextAreaElement).value).toBe("from editor")
+})
 
 test("the narrow layout ignores the key", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, wide: false });
-  fireEvent.change(box(), { target: { value: "hello" } });
-  cmdEnter(box());
-  await new Promise((r) => setTimeout(r, 20));
-  expect(post).not.toHaveBeenCalled();
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post, wide: false })
+  fireEvent.change(box(), { target: { value: "hello" } })
+  cmdEnter(box())
+  await new Promise((r) => setTimeout(r, 20))
+  expect(post).not.toHaveBeenCalled()
+})
 
-const uploads = vi.hoisted(() => ({ upload: vi.fn() }));
+const uploads = vi.hoisted(() => ({ upload: vi.fn() }))
 vi.mock("../design/sessionImages", () => ({
   uploadSessionImage: uploads.upload,
   deleteSessionImage: vi.fn(async () => ({})),
   sessionImageUrl: (_s: string, id: string) => `/img/${id}`,
-}));
+}))
 
 const pngFile = () =>
-  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", { type: "image/png" });
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", {
+    type: "image/png",
+  })
 
 test("Add image works while the session is busy and Send stays off until the upload is ready", async () => {
-  let finish: (id: string) => void = () => undefined;
-  uploads.upload.mockReturnValueOnce(new Promise<string>((r) => (finish = r)));
-  render({ s: session("running") });
-  fireEvent.change(box(), { target: { value: "hi" } });
-  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
-  await screen.findByLabelText("Uploading");
-  expect(screen.getByText("0 failed · 1 uploading")).toBeTruthy();
-  expect((send() as HTMLButtonElement).disabled).toBe(true);
-  finish("i1");
-  await screen.findByText("1 of 10 images");
-  expect(screen.getByRole("button", { name: "Remove image" })).toBeTruthy();
-});
+  let finish: (id: string) => void = () => undefined
+  uploads.upload.mockReturnValueOnce(new Promise<string>((r) => (finish = r)))
+  render({ s: session("running") })
+  fireEvent.change(box(), { target: { value: "hi" } })
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } })
+  await screen.findByLabelText("Uploading")
+  expect(screen.getByText("0 failed · 1 uploading")).toBeTruthy()
+  expect((send() as HTMLButtonElement).disabled).toBe(true)
+  finish("i1")
+  await screen.findByText("1 of 10 images")
+  expect(screen.getByRole("button", { name: "Remove image" })).toBeTruthy()
+})
 
 test("Send stays off while an image failed", async () => {
-  uploads.upload.mockRejectedValueOnce(new Error("Upload failed"));
-  render();
-  fireEvent.change(box(), { target: { value: "hi" } });
-  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
-  await screen.findByText("Upload failed, tap to retry");
-  expect((send() as HTMLButtonElement).disabled).toBe(true);
-});
+  uploads.upload.mockRejectedValueOnce(new Error("Upload failed"))
+  render()
+  fireEvent.change(box(), { target: { value: "hi" } })
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } })
+  await screen.findByText("Upload failed, tap to retry")
+  expect((send() as HTMLButtonElement).disabled).toBe(true)
+})
 
 async function addImages(...ids: string[]) {
   for (const id of ids) {
-    uploads.upload.mockResolvedValueOnce(id);
-    fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
+    uploads.upload.mockResolvedValueOnce(id)
+    fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } })
   }
-  await screen.findByText(`${ids.length} of 10 images`);
+  await screen.findByText(`${ids.length} of 10 images`)
 }
 
 test("a ready image with no text turns Send on and the post carries the ids in attach order", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  await addImages("i1", "i2");
-  expect((send() as HTMLButtonElement).disabled).toBe(false);
-  fireEvent.click(send());
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0]).toMatchObject({ text: "", images: ["i1", "i2"] });
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Remove image" })).toBeNull());
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  await addImages("i1", "i2")
+  expect((send() as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(send())
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+  expect(post.mock.calls[0][0]).toMatchObject({ text: "", images: ["i1", "i2"] })
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Remove image" })).toBeNull())
+})
 
 test("the key sends an images-only message on a wide screen", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  await addImages("i1");
-  cmdEnter(box());
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].images).toEqual(["i1"]);
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  await addImages("i1")
+  cmdEnter(box())
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+  expect(post.mock.calls[0][0].images).toEqual(["i1"])
+})
 
 test("a refused send keeps the images and the text", async () => {
-  const post = vi.fn(async () => ({ refused: true, message: "nope" })) as unknown as PostPrompt;
-  render({ post });
-  fireEvent.change(box(), { target: { value: "hi" } });
-  await addImages("i1");
-  fireEvent.click(send());
-  await screen.findByText("nope");
-  expect(screen.getByRole("button", { name: "Remove image" })).toBeTruthy();
-  expect((box() as HTMLTextAreaElement).value).toBe("hi");
-});
+  const post = vi.fn(async () => ({ refused: true, message: "nope" })) as unknown as PostPrompt
+  render({ post })
+  fireEvent.change(box(), { target: { value: "hi" } })
+  await addImages("i1")
+  fireEvent.click(send())
+  await screen.findByText("nope")
+  expect(screen.getByRole("button", { name: "Remove image" })).toBeTruthy()
+  expect((box() as HTMLTextAreaElement).value).toBe("hi")
+})
 
 test("a text-only post has no images field", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  fireEvent.change(box(), { target: { value: "hi" } });
-  fireEvent.click(send());
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect("images" in post.mock.calls[0][0]).toBe(false);
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  fireEvent.change(box(), { target: { value: "hi" } })
+  fireEvent.click(send())
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+  expect("images" in post.mock.calls[0][0]).toBe(false)
+})

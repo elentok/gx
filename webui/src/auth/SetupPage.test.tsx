@@ -1,162 +1,181 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
-import { renderThemed } from "../ui/render";
-import type { AuthResult, AuthState } from "./authState";
-import { SetupPage } from "./SetupPage";
-import { TEST_CERT } from "./testCert";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { afterEach, expect, test, vi } from "vitest"
+import { renderThemed } from "../ui/render"
+import type { AuthResult, AuthState } from "./authState"
+import { SetupPage } from "./SetupPage"
+import { TEST_CERT } from "./testCert"
 
 afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-  window.location.hash = "";
-  sessionStorage.clear();
-});
+  cleanup()
+  vi.unstubAllGlobals()
+  window.location.hash = ""
+  sessionStorage.clear()
+})
 
-const authOf = (totp_on: boolean): AuthState => ({ ...TEST_CERT, state: "setup", totp_on, setup_code_required: false });
+const authOf = (totp_on: boolean): AuthState => ({
+  ...TEST_CERT,
+  state: "setup",
+  totp_on,
+  setup_code_required: false,
+})
 
 function stubStart(result: AuthResult) {
-  const fetchMock = vi.fn(async () => new Response(JSON.stringify(result)));
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(result)))
+  vi.stubGlobal("fetch", fetchMock)
+  return fetchMock
 }
 
 test("the code from the hash fills the field and leaves the URL", () => {
-  window.location.hash = "#/setup?code=K7QM-3XPD";
-  renderThemed(<SetupPage auth={authOf(true)} onDone={() => {}} />);
-  expect((screen.getByLabelText("Setup code") as HTMLInputElement).value).toBe("K7QM-3XPD");
-  expect(window.location.hash).toBe("#/setup");
-});
+  window.location.hash = "#/setup?code=K7QM-3XPD"
+  renderThemed(<SetupPage auth={authOf(true)} onDone={() => {}} />)
+  expect((screen.getByLabelText("Setup code") as HTMLInputElement).value).toBe("K7QM-3XPD")
+  expect(window.location.hash).toBe("#/setup")
+})
 
 test("a wrong code shows the message that sends the person back to the CLI", async () => {
-  stubStart({ refused: true, reason: "setup-code-wrong" });
-  renderThemed(<SetupPage auth={authOf(true)} onDone={() => {}} />);
-  fireEvent.change(screen.getByLabelText("Setup code"), { target: { value: "K7QM-3XPP" } });
-  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  stubStart({ refused: true, reason: "setup-code-wrong" })
+  renderThemed(<SetupPage auth={authOf(true)} onDone={() => {}} />)
+  fireEvent.change(screen.getByLabelText("Setup code"), { target: { value: "K7QM-3XPP" } })
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }))
   expect((await screen.findByRole("alert")).textContent).toBe(
     "That code is wrong or expired. Run gx server status for a new one.",
-  );
-});
+  )
+})
 
 test("the step count follows TOTP", () => {
-  renderThemed(<SetupPage auth={authOf(false)} onDone={() => {}} />);
-  expect(screen.getByText(/step 1 of 2/)).toBeTruthy();
-});
+  renderThemed(<SetupPage auth={authOf(false)} onDone={() => {}} />)
+  expect(screen.getByText(/step 1 of 2/)).toBeTruthy()
+})
 
 async function toPasswordStep(totpOn: boolean, onDone = () => {}) {
-  renderThemed(<SetupPage auth={authOf(totpOn)} onDone={onDone} />);
-  fireEvent.change(screen.getByLabelText("Setup code"), { target: { value: "K7QM-3XPD" } });
-  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  await screen.findByText("Choose a password");
+  renderThemed(<SetupPage auth={authOf(totpOn)} onDone={onDone} />)
+  fireEvent.change(screen.getByLabelText("Setup code"), { target: { value: "K7QM-3XPD" } })
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }))
+  await screen.findByText("Choose a password")
 }
 
 function submitPasswords(password: string, again: string, button: string) {
-  fireEvent.change(screen.getByLabelText(/^Password(?! again)/), { target: { value: password } });
-  fireEvent.change(screen.getByLabelText("Password again"), { target: { value: again } });
-  fireEvent.click(screen.getByRole("button", { name: button }));
+  fireEvent.change(screen.getByLabelText(/^Password(?! again)/), { target: { value: password } })
+  fireEvent.change(screen.getByLabelText("Password again"), { target: { value: again } })
+  fireEvent.click(screen.getByRole("button", { name: button }))
 }
 
 test("an accepted code moves on to the password step", async () => {
-  stubStart({});
-  await toPasswordStep(false);
-  expect(screen.getByText(/step 2 of 2/)).toBeTruthy();
-  expect(screen.getByText("At least 6 characters.")).toBeTruthy();
-});
+  stubStart({})
+  await toPasswordStep(false)
+  expect(screen.getByText(/step 2 of 2/)).toBeTruthy()
+  expect(screen.getByText("At least 6 characters.")).toBeTruthy()
+})
 
 test("a short password is refused", async () => {
-  stubStart({});
-  await toPasswordStep(true);
-  submitPasswords("short", "short", "Continue");
-  expect((await screen.findByRole("alert")).textContent).toBe("The password needs at least 6 characters.");
-});
+  stubStart({})
+  await toPasswordStep(true)
+  submitPasswords("short", "short", "Continue")
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    "The password needs at least 6 characters.",
+  )
+})
 
 test("a mismatch is refused", async () => {
-  stubStart({});
-  await toPasswordStep(true);
-  submitPasswords("correct horse battery", "correct horse batterz", "Continue");
-  expect((await screen.findByRole("alert")).textContent).toBe("The two passwords don't match.");
-});
+  stubStart({})
+  await toPasswordStep(true)
+  submitPasswords("correct horse battery", "correct horse batterz", "Continue")
+  expect((await screen.findByRole("alert")).textContent).toBe("The two passwords don't match.")
+})
 
-const URI = "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP4N2Q7ZLA&issuer=gx";
+const URI = "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP4N2Q7ZLA&issuer=gx"
 
 async function toTotpStep(onDone = () => {}) {
-  stubStart({ secret: "JBSWY3DPEHPK3PXP4N2Q7ZLA", uri: URI });
-  await toPasswordStep(true, onDone);
-  submitPasswords("correct horse battery", "correct horse battery", "Continue");
-  await screen.findByText("Add gx to your authenticator app");
+  stubStart({ secret: "JBSWY3DPEHPK3PXP4N2Q7ZLA", uri: URI })
+  await toPasswordStep(true, onDone)
+  submitPasswords("correct horse battery", "correct horse battery", "Continue")
+  await screen.findByText("Add gx to your authenticator app")
 }
 
 test("a good password moves on to step 3 with the secret and the otpauth link", async () => {
-  await toTotpStep();
-  expect(screen.getByText(/step 3 of 3/)).toBeTruthy();
-  expect(screen.getByText("JBSW Y3DP EHPK 3PXP 4N2Q 7ZLA")).toBeTruthy();
-  expect(screen.getByRole("link", { name: "Add to authenticator app" }).getAttribute("href")).toBe(URI);
-});
+  await toTotpStep()
+  expect(screen.getByText(/step 3 of 3/)).toBeTruthy()
+  expect(screen.getByText("JBSW Y3DP EHPK 3PXP 4N2Q 7ZLA")).toBeTruthy()
+  expect(screen.getByRole("link", { name: "Add to authenticator app" }).getAttribute("href")).toBe(
+    URI,
+  )
+})
 
 test("a TOTP mismatch shows the clock message and does not sign in", async () => {
-  const onDone = vi.fn();
-  await toTotpStep(onDone);
-  stubStart({ refused: true, reason: "totp-mismatch" });
-  fireEvent.change(screen.getByLabelText("Enter the code it shows"), { target: { value: "482931" } });
-  fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+  const onDone = vi.fn()
+  await toTotpStep(onDone)
+  stubStart({ refused: true, reason: "totp-mismatch" })
+  fireEvent.change(screen.getByLabelText("Enter the code it shows"), {
+    target: { value: "482931" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Finish setup" }))
   expect((await screen.findByRole("alert")).textContent).toBe(
     "That code doesn't match. Check the clock on your phone and try again.",
-  );
-  expect(onDone).not.toHaveBeenCalled();
-  expect(window.location.hash).not.toBe("#/");
-});
+  )
+  expect(onDone).not.toHaveBeenCalled()
+  expect(window.location.hash).not.toBe("#/")
+})
 
 test("the right TOTP code finishes setup and goes to the app", async () => {
-  const onDone = vi.fn();
-  await toTotpStep(onDone);
-  const fetchMock = stubStart({});
-  fireEvent.change(screen.getByLabelText("Enter the code it shows"), { target: { value: "123456" } });
-  fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
-  await waitFor(() => expect(onDone).toHaveBeenCalled());
-  const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
+  const onDone = vi.fn()
+  await toTotpStep(onDone)
+  const fetchMock = stubStart({})
+  fireEvent.change(screen.getByLabelText("Enter the code it shows"), {
+    target: { value: "123456" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Finish setup" }))
+  await waitFor(() => expect(onDone).toHaveBeenCalled())
+  const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit]
   expect(JSON.parse(init.body as string)).toEqual({
     code: "K7QM-3XPD",
     totp_code: "123456",
-  });
-  expect(window.location.hash).toBe("#/");
-});
+  })
+  expect(window.location.hash).toBe("#/")
+})
 
 test("with TOTP off a good password finishes setup and goes to the app", async () => {
-  const fetchMock = stubStart({});
-  const onDone = vi.fn();
-  await toPasswordStep(false, onDone);
-  submitPasswords("correct horse battery", "correct horse battery", "Finish setup");
-  await waitFor(() => expect(onDone).toHaveBeenCalled());
-  const [url, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
-  expect(url).toMatch(/\/v1\/web\/auth\/setup-finish$/);
-  expect(JSON.parse(init.body as string)).toEqual({ code: "K7QM-3XPD", password: "correct horse battery" });
-  expect(window.location.hash).toBe("#/");
-});
+  const fetchMock = stubStart({})
+  const onDone = vi.fn()
+  await toPasswordStep(false, onDone)
+  submitPasswords("correct horse battery", "correct horse battery", "Finish setup")
+  await waitFor(() => expect(onDone).toHaveBeenCalled())
+  const [url, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit]
+  expect(url).toMatch(/\/v1\/web\/auth\/setup-finish$/)
+  expect(JSON.parse(init.body as string)).toEqual({
+    code: "K7QM-3XPD",
+    password: "correct horse battery",
+  })
+  expect(window.location.hash).toBe("#/")
+})
 
 test("a refusal from setup finish is shown", async () => {
-  stubStart({});
-  await toPasswordStep(false);
-  stubStart({ refused: true, reason: "setup-code-wrong" });
-  submitPasswords("correct horse battery", "correct horse battery", "Finish setup");
+  stubStart({})
+  await toPasswordStep(false)
+  stubStart({ refused: true, reason: "setup-code-wrong" })
+  submitPasswords("correct horse battery", "correct horse battery", "Finish setup")
   expect((await screen.findByRole("alert")).textContent).toBe(
     "That code is wrong or expired. Run gx server status for a new one.",
-  );
-});
+  )
+})
 
 test("the password goes to setup-password at step 2, not to setup-finish", async () => {
-  await toTotpStep();
-  const calls = vi.mocked(fetch).mock.calls as unknown as [string, RequestInit][];
-  const [url, init] = calls.at(-1)!;
-  expect(url).toMatch(/\/v1\/web\/auth\/setup-password$/);
-  expect(JSON.parse(init.body as string)).toEqual({ code: "K7QM-3XPD", password: "correct horse battery" });
-});
+  await toTotpStep()
+  const calls = vi.mocked(fetch).mock.calls as unknown as [string, RequestInit][]
+  const [url, init] = calls.at(-1)!
+  expect(url).toMatch(/\/v1\/web\/auth\/setup-password$/)
+  expect(JSON.parse(init.body as string)).toEqual({
+    code: "K7QM-3XPD",
+    password: "correct horse battery",
+  })
+})
 
 test("after a reload on the authenticator step it comes back with the same key and no new request", async () => {
-  await toTotpStep();
-  cleanup();
+  await toTotpStep()
+  cleanup()
 
-  const again = stubStart({});
-  renderThemed(<SetupPage auth={authOf(true)} onDone={() => {}} />);
-  expect(screen.getByText(/step 3 of 3/)).toBeTruthy();
-  expect(screen.getByText("JBSW Y3DP EHPK 3PXP 4N2Q 7ZLA")).toBeTruthy();
-  expect(again).not.toHaveBeenCalled();
-});
+  const again = stubStart({})
+  renderThemed(<SetupPage auth={authOf(true)} onDone={() => {}} />)
+  expect(screen.getByText(/step 3 of 3/)).toBeTruthy()
+  expect(screen.getByText("JBSW Y3DP EHPK 3PXP 4N2Q 7ZLA")).toBeTruthy()
+  expect(again).not.toHaveBeenCalled()
+})

@@ -1,6 +1,6 @@
-import { expect, test } from "vitest";
-import { DetailPage } from "./DetailPage";
-import { formatTitle, type PageTitle } from "./title";
+import { expect, test } from "vitest"
+import { DetailPage } from "./DetailPage"
+import { formatTitle, type PageTitle } from "./title"
 
 test.each<[PageTitle, string]>([
   [{ kind: "Epics" }, "Epics · gx"],
@@ -14,30 +14,30 @@ test.each<[PageTitle, string]>([
   [{ kind: "Epic", name: "" }, "Epic · gx"],
   [{ kind: "Design", name: "" }, "Design · gx"],
 ])("%j formats as %s", (title, expected) => {
-  expect(formatTitle(title)).toBe(expected);
-});
+  expect(formatTitle(title)).toBe(expected)
+})
 
 test.each<[number, string]>([
   [0, "Epics · gx"],
   [2, "(2) Epics · gx"],
 ])("%i actionable sessions format as %s", (count, expected) => {
-  expect(formatTitle({ kind: "Epics" }, count)).toBe(expected);
-});
+  expect(formatTitle({ kind: "Epics" }, count)).toBe(expected)
+})
 
 test("the separator is a space, U+00B7 and a space", () => {
-  expect(formatTitle({ kind: "Epic", name: "a" })).toBe("a · Epic · gx");
-});
+  expect(formatTitle({ kind: "Epic", name: "a" })).toBe("a · Epic · gx")
+})
 
 test("a name holding the separator or a colon passes through unchanged", () => {
-  expect(formatTitle({ kind: "Ticket", name: "a · b: c" })).toBe("a · b: c · Ticket · gx");
-});
+  expect(formatTitle({ kind: "Ticket", name: "a · b: c" })).toBe("a · b: c · Ticket · gx")
+})
 
 test.each(["Epic", "Design", "Ticket"] as const)("the name leads every %s title", (kind) => {
-  expect(formatTitle({ kind, name: "the-name" }).startsWith("the-name · ")).toBe(true);
-});
+  expect(formatTitle({ kind, name: "the-name" }).startsWith("the-name · ")).toBe(true)
+})
 
 // Never rendered: tsc alone enforces that the page frame's title prop stays required.
 export function MissingTitle() {
   // @ts-expect-error title is required
-  return <DetailPage>x</DetailPage>;
+  return <DetailPage>x</DetailPage>
 }

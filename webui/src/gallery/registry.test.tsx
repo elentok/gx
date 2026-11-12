@@ -1,73 +1,93 @@
 // @vitest-environment node
 // Importing vite.config pulls in esbuild, which breaks under jsdom.
 /// <reference types="vite/client" />
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import type { ReactElement } from "react";
-import { expect, it } from "vitest";
-import config from "../../vite.config";
-import type { Health } from "../generated/server";
-import { TONES } from "../ui/tone";
-import { galleryEntries } from "./registry";
+import { existsSync } from "node:fs"
+import { join } from "node:path"
+import type { ReactElement } from "react"
+import { expect, it } from "vitest"
+import config from "../../vite.config"
+import type { Health } from "../generated/server"
+import { TONES } from "../ui/tone"
+import { galleryEntries } from "./registry"
 
 // Every primitive is src/ui/<folder>/<Name>.tsx; tests and non-component files don't match.
 // CodeEditor is LargeEditor's lazy chunk, shown through LargeEditor; PhoneMenu is Menu's phone mode.
 const primitiveFiles = Object.keys(import.meta.glob("../ui/*/[A-Z]*.tsx")).filter(
-  (f) => !f.endsWith(".test.tsx") && !f.endsWith("/CodeEditor.tsx") && !f.endsWith("/PhoneMenu.tsx"),
-);
-const primitiveNames = primitiveFiles.map((f) => f.split("/").pop()?.replace(".tsx", "") ?? f);
+  (f) =>
+    !f.endsWith(".test.tsx") && !f.endsWith("/CodeEditor.tsx") && !f.endsWith("/PhoneMenu.tsx"),
+)
+const primitiveNames = primitiveFiles.map((f) => f.split("/").pop()?.replace(".tsx", "") ?? f)
 
 it("finds the primitives on disk", () => {
-  expect(primitiveNames.length).toBeGreaterThan(0);
-});
+  expect(primitiveNames.length).toBeGreaterThan(0)
+})
 
 it("shows every exported primitive in the gallery", () => {
-  const shown = galleryEntries.map((e) => e.name);
-  for (const name of primitiveNames) expect(shown, name).toContain(name);
-});
+  const shown = galleryEntries.map((e) => e.name)
+  for (const name of primitiveNames) expect(shown, name).toContain(name)
+})
 
 // Coloured by harness, not by tone: its cases are the harness and the label states.
 // The text fields have no tone: their cases are the closed, disabled and with-text states.
 // ModeText takes a vi mode, which picks its tone: its cases are the three modes.
 // Question's cases are an options card, a yes-no card and the progress dots.
 // MoreActionsButton's cases are its four states. Menu's cases are each device type, closed and open.
-const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText", "MoreActionsButton", "Menu", "Question", "FullScreenLoader"];
+const untoned = [
+  "HarnessLabel",
+  "InfoTip",
+  "ExpandableTextField",
+  "LargeEditor",
+  "ModeText",
+  "MoreActionsButton",
+  "Menu",
+  "Question",
+  "FullScreenLoader",
+]
 
 it("shows the Menu on each device type, closed and open", () => {
-  const labels = galleryEntries.find((e) => e.name === "Menu")?.cases.map((c) => c.label) ?? [];
-  expect(labels).toEqual(["phone closed", "phone open", "tablet closed", "tablet open", "desktop closed", "desktop open"]);
-});
+  const labels = galleryEntries.find((e) => e.name === "Menu")?.cases.map((c) => c.label) ?? []
+  expect(labels).toEqual([
+    "phone closed",
+    "phone open",
+    "tablet closed",
+    "tablet open",
+    "desktop closed",
+    "desktop open",
+  ])
+})
 
 it("shows every primitive in every tone", () => {
   for (const name of primitiveNames.filter((n) => !untoned.includes(n))) {
-    const labels = galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? [];
-    for (const tone of TONES) expect(labels, `${name} ${tone}`).toContain(tone);
+    const labels = galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? []
+    for (const tone of TONES) expect(labels, `${name} ${tone}`).toContain(tone)
   }
-});
+})
 
 it("shows the Button in every role, tone and size", () => {
-  const labels = galleryEntries.find((e) => e.name === "Button")?.cases.map((c) => c.label) ?? [];
+  const labels = galleryEntries.find((e) => e.name === "Button")?.cases.map((c) => c.label) ?? []
   for (const role of ["main", "secondary", "ghost"]) {
     for (const tone of TONES) {
-      for (const size of ["sm", "md"]) expect(labels, `${role} ${tone} ${size}`).toContain(`${role} ${tone} ${size}`);
+      for (const size of ["sm", "md"])
+        expect(labels, `${role} ${tone} ${size}`).toContain(`${role} ${tone} ${size}`)
     }
   }
-  expect(labels).toContain("disabled");
-  for (const old of ["solid", "tinted", "outline"]) expect(labels).not.toContain(old);
-});
+  expect(labels).toContain("disabled")
+  for (const old of ["solid", "tinted", "outline"]) expect(labels).not.toContain(old)
+})
 
 it("shows the MoreActionsButton in its four states", () => {
-  const labels = galleryEntries.find((e) => e.name === "MoreActionsButton")?.cases.map((c) => c.label) ?? [];
-  expect(labels).toEqual(["rest", "hover", "focus", "open"]);
-});
+  const labels =
+    galleryEntries.find((e) => e.name === "MoreActionsButton")?.cases.map((c) => c.label) ?? []
+  expect(labels).toEqual(["rest", "hover", "focus", "open"])
+})
 
 it("shows the InfoTip as chip, closed and open", () => {
-  const labels = galleryEntries.find((e) => e.name === "InfoTip")?.cases.map((c) => c.label) ?? [];
-  expect(labels).toEqual(["chip", "closed", "open"]);
-});
+  const labels = galleryEntries.find((e) => e.name === "InfoTip")?.cases.map((c) => c.label) ?? []
+  expect(labels).toEqual(["chip", "closed", "open"])
+})
 
 it("shows the EpicCard in every state the spec lists", () => {
-  const labels = galleryEntries.find((e) => e.name === "EpicCard")?.cases.map((c) => c.label) ?? [];
+  const labels = galleryEntries.find((e) => e.name === "EpicCard")?.cases.map((c) => c.label) ?? []
   for (const label of [
     "running",
     "queued",
@@ -83,51 +103,89 @@ it("shows the EpicCard in every state the spec lists", () => {
     "follow-ups",
     "two in a row, one footer",
   ]) {
-    expect(labels, label).toContain(label);
+    expect(labels, label).toContain(label)
   }
-});
+})
 
 it("shows the epic page in every state the spec lists", () => {
-  const labels = galleryEntries.find((e) => e.name === "EpicPage")?.cases.map((c) => c.label) ?? [];
-  for (const label of ["running", "finished", "Design", "draft -impl", "merge-blocked", "empty", "needs-repair", "needs-repair dialog"]) {
-    expect(labels, label).toContain(label);
+  const labels = galleryEntries.find((e) => e.name === "EpicPage")?.cases.map((c) => c.label) ?? []
+  for (const label of [
+    "running",
+    "finished",
+    "Design",
+    "draft -impl",
+    "merge-blocked",
+    "empty",
+    "needs-repair",
+    "needs-repair dialog",
+  ]) {
+    expect(labels, label).toContain(label)
   }
-});
+})
 
 it("shows the jump menu rows in every case the spec lists", () => {
-  const labels = galleryEntries.find((e) => e.name === "JumpRow")?.cases.map((c) => c.label) ?? [];
-  for (const label of ["design", "implementation", "one-off", "follow-ups", "Needs you", "current", "cursor", "finished"]) {
-    expect(labels, label).toContain(label);
+  const labels = galleryEntries.find((e) => e.name === "JumpRow")?.cases.map((c) => c.label) ?? []
+  for (const label of [
+    "design",
+    "implementation",
+    "one-off",
+    "follow-ups",
+    "Needs you",
+    "current",
+    "cursor",
+    "finished",
+  ]) {
+    expect(labels, label).toContain(label)
   }
-});
+})
 
 it("shows the Tray busy and critical cases in the mock's meter states", () => {
-  const cases = galleryEntries.find((e) => e.name === "Tray")?.cases ?? [];
+  const cases = galleryEntries.find((e) => e.name === "Tray")?.cases ?? []
   const states = (label: string) => {
-    const health = (cases.find((c) => c.label === label)?.node as ReactElement<{ health: Health }>).props.health;
-    return [health.cpu.state, health.memory.state, health.disk.state];
-  };
-  expect(states("busy")).toEqual(["high", "normal", "high"]);
-  expect(states("critical")).toEqual(["critical", "critical", "critical"]);
-});
+    const health = (cases.find((c) => c.label === label)?.node as ReactElement<{ health: Health }>)
+      .props.health
+    return [health.cpu.state, health.memory.state, health.disk.state]
+  }
+  expect(states("busy")).toEqual(["high", "normal", "high"])
+  expect(states("critical")).toEqual(["critical", "critical", "critical"])
+})
 
 it("shows the sidebar for each device with an Other case, and the Manage workspaces states", () => {
-  const labelsOf = (name: string) => galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? [];
-  const sidebar = labelsOf("Sidebar");
-  for (const device of ["desktop", "tablet", "phone"]) expect(sidebar.some((l) => l.startsWith(device)), device).toBe(true);
-  expect(sidebar.some((l) => l.includes("Other"))).toBe(true);
-  expect(sidebar).toContain("desktop, On hold collapsed");
-  expect(sidebar).toContain("desktop, On hold expanded");
-  expect(labelsOf("WorkspaceSwitcher")).toEqual(["menu open"]);
-  expect(labelsOf("ManageWorkspaces")).toEqual(["default", "rename in progress", "delete confirmation"]);
+  const labelsOf = (name: string) =>
+    galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? []
+  const sidebar = labelsOf("Sidebar")
+  for (const device of ["desktop", "tablet", "phone"])
+    expect(
+      sidebar.some((l) => l.startsWith(device)),
+      device,
+    ).toBe(true)
+  expect(sidebar.some((l) => l.includes("Other"))).toBe(true)
+  expect(sidebar).toContain("desktop, On hold collapsed")
+  expect(sidebar).toContain("desktop, On hold expanded")
+  expect(labelsOf("WorkspaceSwitcher")).toEqual(["menu open"])
+  expect(labelsOf("ManageWorkspaces")).toEqual([
+    "default",
+    "rename in progress",
+    "delete confirmation",
+  ])
   for (const name of ["Sidebar", "WorkspaceSwitcher", "ManageWorkspaces"]) {
-    for (const c of galleryEntries.find((e) => e.name === name)?.cases ?? []) expect(c.label, name).not.toBe("");
+    for (const c of galleryEntries.find((e) => e.name === name)?.cases ?? [])
+      expect(c.label, name).not.toBe("")
   }
-});
+})
 
 it("shows the jump menu row kinds and every Design footer state of mock 09", () => {
-  const labelsOf = (name: string) => galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? [];
-  expect(labelsOf("JumpMenuRows")).toEqual(["Design", "epic", "chat", "agent with the epic subtitle", "row from another workspace", "held row", "row menu"]);
+  const labelsOf = (name: string) =>
+    galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? []
+  expect(labelsOf("JumpMenuRows")).toEqual([
+    "Design",
+    "epic",
+    "chat",
+    "agent with the epic subtitle",
+    "row from another workspace",
+    "held row",
+    "row menu",
+  ])
   expect(labelsOf("DesignFooter")).toEqual([
     "design-phone-footer-empty",
     "design-phone-footer-answered",
@@ -138,10 +196,10 @@ it("shows the jump menu row kinds and every Design footer state of mock 09", () 
     "design-phone-footer-320-countdown",
     "design-tablet-footer",
     "design-tablet-footer-countdown",
-  ]);
-});
+  ])
+})
 
 it("keeps gallery.html out of the production build input", () => {
-  expect(existsSync(join(__dirname, "../../gallery.html"))).toBe(true);
-  expect(config.build?.rollupOptions?.input).toBe("index.html");
-});
+  expect(existsSync(join(__dirname, "../../gallery.html"))).toBe(true)
+  expect(config.build?.rollupOptions?.input).toBe("index.html")
+})

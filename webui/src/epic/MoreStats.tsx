@@ -1,8 +1,8 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import { useWide } from "../useWide";
-import type { EpicDetail } from "./detail";
-import { statPreview, statRows } from "./stats";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import { useWide } from "../useWide"
+import type { EpicDetail } from "./detail"
+import { statPreview, statRows } from "./stats"
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -23,15 +23,15 @@ function Chevron({ open }: { open: boolean }) {
     >
       <path d="M6 3.5 10.5 8 6 12.5" />
     </chakra.svg>
-  );
+  )
 }
 
 // A collapsed card that opens onto the epic's stat rows; absent when there are none.
 export function MoreStats({ detail }: { detail: EpicDetail }) {
-  const [open, setOpen] = useState(false);
-  const wide = useWide();
-  const rows = statRows(detail);
-  if (rows.length === 0) return null;
+  const [open, setOpen] = useState(false)
+  const wide = useWide()
+  const rows = statRows(detail)
+  if (rows.length === 0) return null
   return (
     <Box mt="28px" bg="surface.raised" borderWidth="1px" borderColor="hairline" borderRadius="12px">
       <Box
@@ -66,7 +66,15 @@ export function MoreStats({ detail }: { detail: EpicDetail }) {
         </Text>
       </Box>
       {open && (
-        <Box as="dl" display="grid" gridTemplateColumns="auto 1fr" columnGap="4" rowGap="1" px="3" pb="3">
+        <Box
+          as="dl"
+          display="grid"
+          gridTemplateColumns="auto 1fr"
+          columnGap="4"
+          rowGap="1"
+          px="3"
+          pb="3"
+        >
           {rows.map((r) => (
             <Box key={r.label} display="contents" data-stat-row={r.label}>
               <Text as="dt" color="text.muted">
@@ -85,5 +93,5 @@ export function MoreStats({ detail }: { detail: EpicDetail }) {
         </Box>
       )}
     </Box>
-  );
+  )
 }

@@ -1,30 +1,41 @@
-import { chakra } from "@chakra-ui/react";
-import type { ComponentProps, ReactNode } from "react";
-import type { Tone } from "../tone";
+import { chakra } from "@chakra-ui/react"
+import type { ComponentProps, ReactNode } from "react"
+import type { Tone } from "../tone"
 
-export type ButtonSize = "sm" | "md";
-export type ButtonEmphasis = "main" | "secondary" | "ghost";
+export type ButtonSize = "sm" | "md"
+export type ButtonEmphasis = "main" | "secondary" | "ghost"
 
 type Props = Omit<ComponentProps<typeof chakra.button>, "color" | "variant" | "size"> & {
-  emphasis?: ButtonEmphasis;
-  tone?: Tone;
-  size?: ButtonSize;
-  children: ReactNode;
-};
+  emphasis?: ButtonEmphasis
+  tone?: Tone
+  size?: ButtonSize
+  children: ReactNode
+}
 
 // Action button. Tone picks the color, emphasis picks how much of it fills the button.
-export function Button({ emphasis = "main", tone = "done", size = "md", children, ...rest }: Props) {
-  const fg = `tone.${tone}.fg`;
+export function Button({
+  emphasis = "main",
+  tone = "done",
+  size = "md",
+  children,
+  ...rest
+}: Props) {
+  const fg = `tone.${tone}.fg`
   const style = {
     main: { bg: fg, color: "surface", borderColor: fg, _hover: { filter: "brightness(1.12)" } },
-    secondary: { bg: "surface.raised", color: "text", borderColor: "border", _hover: { borderColor: "text.dim" } },
+    secondary: {
+      bg: "surface.raised",
+      color: "text",
+      borderColor: "border",
+      _hover: { borderColor: "text.dim" },
+    },
     ghost: {
       bg: "transparent",
       color: tone === "muted" ? "text.muted" : fg,
       borderColor: "transparent",
       _hover: { bg: `tone.${tone}.bg` },
     },
-  }[emphasis];
+  }[emphasis]
   return (
     <chakra.button
       data-emphasis={emphasis}
@@ -49,5 +60,5 @@ export function Button({ emphasis = "main", tone = "done", size = "md", children
     >
       {children}
     </chakra.button>
-  );
+  )
 }

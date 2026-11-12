@@ -1,6 +1,6 @@
-import { Box, Popover, Portal, Text } from "@chakra-ui/react";
-import { useRef, type RefObject } from "react";
-import { Button } from "../ui/button/Button";
+import { Box, Popover, Portal, Text } from "@chakra-ui/react"
+import { useRef, type RefObject } from "react"
+import { Button } from "../ui/button/Button"
 
 // Interrupt asks first: a small confirm anchored on the button, so a stray click can't end the agent's turn.
 export function InterruptPopover({
@@ -11,17 +11,17 @@ export function InterruptPopover({
   onClose,
   initialFocus = "cancel",
 }: {
-  open: boolean;
-  disabled: boolean;
+  open: boolean
+  disabled: boolean
   /** The Interrupt button the popover anchors on. */
-  anchorRef: RefObject<HTMLElement | null>;
-  onConfirm: () => void;
-  onClose: () => void;
+  anchorRef: RefObject<HTMLElement | null>
+  onConfirm: () => void
+  onClose: () => void
   /** Which button takes focus on open: Cancel for a click, Interrupt for the Esc key. */
-  initialFocus?: "cancel" | "confirm";
+  initialFocus?: "cancel" | "confirm"
 }) {
-  const cancel = useRef<HTMLButtonElement>(null);
-  const confirm = useRef<HTMLButtonElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null)
+  const confirm = useRef<HTMLButtonElement>(null)
   return (
     <Popover.Root
       open={open}
@@ -70,12 +70,7 @@ export function InterruptPopover({
               justifyContent="flex-end"
               gap="2"
             >
-              <Button
-                ref={cancel}
-                size="sm"
-                emphasis="secondary"
-                onClick={onClose}
-              >
+              <Button ref={cancel} size="sm" emphasis="secondary" onClick={onClose}>
                 Cancel
               </Button>
               <Button
@@ -92,5 +87,5 @@ export function InterruptPopover({
         </Popover.Positioner>
       </Portal>
     </Popover.Root>
-  );
+  )
 }

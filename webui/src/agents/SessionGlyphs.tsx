@@ -1,20 +1,30 @@
-import { Box, Spinner, Text } from "@chakra-ui/react";
-import { SessionExitCrashed, SessionWorking, type SessionInfo } from "../generated/server";
-import { isTriage } from "../design/view";
-import { hasAttentionMarks, isActionable, statusMark } from "./rules";
+import { Box, Spinner, Text } from "@chakra-ui/react"
+import { SessionExitCrashed, SessionWorking, type SessionInfo } from "../generated/server"
+import { isTriage } from "../design/view"
+import { hasAttentionMarks, isActionable, statusMark } from "./rules"
 
 /** The status glyph; Working is a spinner, as in the mock. */
 export function StatusMark({ session: s }: { session: SessionInfo }) {
-  const { glyph, tone, faded } = statusMark(s);
-  const label = s.exit === SessionExitCrashed ? "crashed" : s.status.state;
+  const { glyph, tone, faded } = statusMark(s)
+  const label = s.exit === SessionExitCrashed ? "crashed" : s.status.state
   return (
-    <Text as="span" role="img" aria-label={label} color={`tone.${tone}.fg`} opacity={faded ? 0.5 : 1} display="inline-flex" w="4" justifyContent="center" flex="none">
+    <Text
+      as="span"
+      role="img"
+      aria-label={label}
+      color={`tone.${tone}.fg`}
+      opacity={faded ? 0.5 : 1}
+      display="inline-flex"
+      w="4"
+      justifyContent="center"
+      flex="none"
+    >
       {s.status.state === SessionWorking ? <Spinner size="xs" borderWidth="2px" /> : glyph}
     </Text>
-  );
+  )
 }
 
-const actionableReason = (s: SessionInfo) => s.actionable.reason || s.status.message || "Blocked";
+const actionableReason = (s: SessionInfo) => s.actionable.reason || s.status.message || "Blocked"
 
 /** The status glyph and the Design diamond that lead a session row. */
 export function SessionGlyphs({ session: s }: { session: SessionInfo }) {
@@ -32,11 +42,17 @@ export function SessionGlyphs({ session: s }: { session: SessionInfo }) {
         </Text>
       )}
     </>
-  );
+  )
 }
 
 /** The unread dot and the actionable star; `tooltip` shows the reason on hover. */
-export function SessionBadges({ session: s, tooltip }: { session: SessionInfo; tooltip?: boolean }) {
+export function SessionBadges({
+  session: s,
+  tooltip,
+}: {
+  session: SessionInfo
+  tooltip?: boolean
+}) {
   return (
     <>
       {hasAttentionMarks(s) && s.unread.unread && (
@@ -83,5 +99,5 @@ export function SessionBadges({ session: s, tooltip }: { session: SessionInfo; t
           </Text>
         ))}
     </>
-  );
+  )
 }

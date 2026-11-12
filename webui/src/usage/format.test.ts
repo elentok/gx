@@ -1,39 +1,60 @@
-import { describe, expect, it } from "vitest";
-import { chipText, chipTooltip, exactTime, forecastLine, isPastReset, isStale, limitTone, resetsIn, seenAgo, sinceLabel, wholePercent } from "./format";
+import { describe, expect, it } from "vitest"
+import {
+  chipText,
+  chipTooltip,
+  exactTime,
+  forecastLine,
+  isPastReset,
+  isStale,
+  limitTone,
+  resetsIn,
+  seenAgo,
+  sinceLabel,
+  wholePercent,
+} from "./format"
 
 describe("forecastLine and chip text", () => {
   it("formats each forecast", () => {
-    expect(forecastLine(undefined)).toBeUndefined();
-    expect(forecastLine({ status: "none", pace: 0, at_reset: 0 })).toBeUndefined();
-    expect(forecastLine({ status: "needs_data", pace: 0, at_reset: 0 })).toEqual({ text: "Forecast needs 3 days of data", warn: false });
-    expect(forecastLine({ status: "projected", pace: 5, at_reset: 72 })).toEqual({ text: "~72% at reset", warn: false });
-    const at = Math.floor(new Date(2026, 10, 5, 14, 0).getTime() / 1000);
+    expect(forecastLine(undefined)).toBeUndefined()
+    expect(forecastLine({ status: "none", pace: 0, at_reset: 0 })).toBeUndefined()
+    expect(forecastLine({ status: "needs_data", pace: 0, at_reset: 0 })).toEqual({
+      text: "Forecast needs 3 days of data",
+      warn: false,
+    })
+    expect(forecastLine({ status: "projected", pace: 5, at_reset: 72 })).toEqual({
+      text: "~72% at reset",
+      warn: false,
+    })
+    const at = Math.floor(new Date(2026, 10, 5, 14, 0).getTime() / 1000)
     expect(forecastLine({ status: "projected", pace: 5, at_reset: 130, runs_out_at: at })).toEqual({
       text: "Runs out ~Thu 14:00, before the reset",
       warn: true,
-    });
-  });
+    })
+  })
 
   it("formats the chip and its tooltip", () => {
-    expect(chipText({ today: 7, yesterday: 5, direction: "up" })).toBe("▲ 7 vs 5 pts");
-    expect(chipText({ today: 3, yesterday: 4, direction: "down" })).toBe("▼ 3 vs 4 pts");
-    expect(chipText({ today: 4, yesterday: 4, direction: "equal" })).toBe("= 4 vs 4 pts");
-    expect(chipTooltip({ today: 7, yesterday: 5, direction: "up" })).toBe("Burn today 7 pts so far, yesterday 5");
-  });
+    expect(chipText({ today: 7, yesterday: 5, direction: "up" })).toBe("▲ 7 vs 5 pts")
+    expect(chipText({ today: 3, yesterday: 4, direction: "down" })).toBe("▼ 3 vs 4 pts")
+    expect(chipText({ today: 4, yesterday: 4, direction: "equal" })).toBe("= 4 vs 4 pts")
+    expect(chipTooltip({ today: 7, yesterday: 5, direction: "up" })).toBe(
+      "Burn today 7 pts so far, yesterday 5",
+    )
+  })
 
   it("shows a partial-day burn unscaled", () => {
     // Today is half over; 3 pts stay 3, not 6.
-    expect(chipText({ today: 3, yesterday: 8, direction: "down" })).toBe("▼ 3 vs 8 pts");
-    expect(chipTooltip({ today: 3, yesterday: 8, direction: "down" })).toBe("Burn today 3 pts so far, yesterday 8");
-  });
+    expect(chipText({ today: 3, yesterday: 8, direction: "down" })).toBe("▼ 3 vs 8 pts")
+    expect(chipTooltip({ today: 3, yesterday: 8, direction: "down" })).toBe(
+      "Burn today 3 pts so far, yesterday 8",
+    )
+  })
+})
 
-});
-
-const MIN = 60;
-const HOUR = 60 * MIN;
-const DAY = 24 * HOUR;
-const NOW_SEC = 1_800_000_000;
-const NOW = NOW_SEC * 1000;
+const MIN = 60
+const HOUR = 60 * MIN
+const DAY = 24 * HOUR
+const NOW_SEC = 1_800_000_000
+const NOW = NOW_SEC * 1000
 
 describe("wholePercent and limitTone", () => {
   it.each([
@@ -45,10 +66,10 @@ describe("wholePercent and limitTone", () => {
     [94.5, 95, "deadlocked"],
     [95, 95, "deadlocked"],
   ] as const)("%s shows %s and is %s", (p, whole, tone) => {
-    expect(wholePercent(p)).toBe(whole);
-    expect(limitTone(wholePercent(p))).toBe(tone);
-  });
-});
+    expect(wholePercent(p)).toBe(whole)
+    expect(limitTone(wholePercent(p))).toBe(tone)
+  })
+})
 
 describe("isStale", () => {
   it.each([
@@ -56,9 +77,9 @@ describe("isStale", () => {
     [600, false],
     [601, true],
   ])("%ss old is stale=%s", (age, stale) => {
-    expect(isStale(NOW_SEC - age, NOW)).toBe(stale);
-  });
-});
+    expect(isStale(NOW_SEC - age, NOW)).toBe(stale)
+  })
+})
 
 describe("isPastReset", () => {
   it.each([
@@ -66,9 +87,9 @@ describe("isPastReset", () => {
     [NOW_SEC, true],
     [NOW_SEC - 1, true],
   ])("reset at %s is past=%s", (at, past) => {
-    expect(isPastReset(at, NOW)).toBe(past);
-  });
-});
+    expect(isPastReset(at, NOW)).toBe(past)
+  })
+})
 
 describe("resetsIn", () => {
   it.each([
@@ -77,18 +98,18 @@ describe("resetsIn", () => {
     [45 * MIN, "resets in 45m"],
     [30, "resets in <1m"],
   ])("%ss ahead is %s", (ahead, text) => {
-    expect(resetsIn(NOW_SEC + ahead, NOW)).toBe(text);
-  });
-});
+    expect(resetsIn(NOW_SEC + ahead, NOW)).toBe(text)
+  })
+})
 
 describe("seenAgo", () => {
   it.each([
     [3 * HOUR, "seen 3h ago"],
     [6 * HOUR, "seen 6h ago"],
   ])("%ss ago is %s", (ago, text) => {
-    expect(seenAgo(NOW_SEC - ago, NOW)).toBe(text);
-  });
-});
+    expect(seenAgo(NOW_SEC - ago, NOW)).toBe(text)
+  })
+})
 
 describe("exactTime", () => {
   it("matches the Intl call in the browser zone", () => {
@@ -99,24 +120,24 @@ describe("exactTime", () => {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-    }).format(new Date(NOW_SEC * 1000));
-    expect(exactTime(NOW_SEC)).toBe(expected);
-  });
-});
+    }).format(new Date(NOW_SEC * 1000))
+    expect(exactTime(NOW_SEC)).toBe(expected)
+  })
+})
 
 describe("sinceLabel", () => {
   it("names the weekday of the key", () => {
-    expect(sinceLabel("2026-10-30")).toBe("since Fri, Oct 30");
-  });
+    expect(sinceLabel("2026-10-30")).toBe("since Fri, Oct 30")
+  })
 
   it("does not shift the day in a western zone", () => {
-    const old = process.env.TZ;
-    process.env.TZ = "America/Los_Angeles";
+    const old = process.env.TZ
+    process.env.TZ = "America/Los_Angeles"
     try {
-      expect(sinceLabel("2026-10-30")).toBe("since Fri, Oct 30");
+      expect(sinceLabel("2026-10-30")).toBe("since Fri, Oct 30")
     } finally {
-      if (old === undefined) delete process.env.TZ;
-      else process.env.TZ = old;
+      if (old === undefined) delete process.env.TZ
+      else process.env.TZ = old
     }
-  });
-});
+  })
+})

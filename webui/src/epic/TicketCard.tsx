@@ -1,15 +1,15 @@
-import { Box, chakra, Link, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import { useNavigate } from "react-router";
-import { ticketHref } from "../hrefs";
-import { useWide } from "../useWide";
-import { VerdictLine } from "../verdict";
-import { LongRunningBadge } from "../page/LongRunningBadge";
-import { Button } from "../ui/button/Button";
-import { HarnessLabel } from "../ui/harness-label/HarnessLabel";
-import { type EpicDetailRow } from "./detail";
-import { FixAgentDialog } from "./FixAgentDialog";
-import type { FixAgent } from "./fixAgent";
+import { Box, chakra, Link, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import { useNavigate } from "react-router"
+import { ticketHref } from "../hrefs"
+import { useWide } from "../useWide"
+import { VerdictLine } from "../verdict"
+import { LongRunningBadge } from "../page/LongRunningBadge"
+import { Button } from "../ui/button/Button"
+import { HarnessLabel } from "../ui/harness-label/HarnessLabel"
+import { type EpicDetailRow } from "./detail"
+import { FixAgentDialog } from "./FixAgentDialog"
+import type { FixAgent } from "./fixAgent"
 import {
   cardLook,
   type CardLook,
@@ -19,9 +19,9 @@ import {
   isRunning,
   rowChips,
   toneOf,
-} from "./rows";
+} from "./rows"
 
-const toneVar = (tone: string) => `var(--chakra-colors-tone-${tone}-fg)`;
+const toneVar = (tone: string) => `var(--chakra-colors-tone-${tone}-fg)`
 
 // A 30% arc on a faint track, spinning.
 function Spinner() {
@@ -37,14 +37,7 @@ function Spinner() {
       animation="spin 1.05s linear infinite"
       _motionReduce={{ animation: "none" }}
     >
-      <circle
-        cx="5"
-        cy="5"
-        r="4"
-        fill="none"
-        stroke="rgba(108,180,255,0.3)"
-        strokeWidth="2"
-      />
+      <circle cx="5" cy="5" r="4" fill="none" stroke="rgba(108,180,255,0.3)" strokeWidth="2" />
       <circle
         cx="5"
         cy="5"
@@ -56,7 +49,7 @@ function Spinner() {
         strokeDasharray="7.54 25.13"
       />
     </chakra.svg>
-  );
+  )
 }
 
 // The done card's mark: a bare check, no circle.
@@ -80,25 +73,16 @@ function Check() {
         strokeLinejoin="round"
       />
     </chakra.svg>
-  );
+  )
 }
 
 function Dot({ row }: { row: EpicDetailRow }) {
-  const tone = toneOf(row);
-  let mark;
-  if (isRunning(row)) mark = <Spinner />;
-  else if (isFolded(row) && !isCancelled(row)) mark = <Check />;
+  const tone = toneOf(row)
+  let mark
+  if (isRunning(row)) mark = <Spinner />
+  else if (isFolded(row) && !isCancelled(row)) mark = <Check />
   else
-    mark = (
-      <Box
-        as="span"
-        data-dot
-        w="10px"
-        h="10px"
-        borderRadius="full"
-        bg={`tone.${tone}.fg`}
-      />
-    );
+    mark = <Box as="span" data-dot w="10px" h="10px" borderRadius="full" bg={`tone.${tone}.fg`} />
   return (
     <Box
       as="span"
@@ -112,11 +96,11 @@ function Dot({ row }: { row: EpicDetailRow }) {
     >
       {mark}
     </Box>
-  );
+  )
 }
 
 const metaColor = (row: EpicDetailRow) =>
-  isRunning(row) ? "tone.running.fg" : cardLook(row).kind === "note" ? "tone.paused.fg" : "text.dim";
+  isRunning(row) ? "tone.running.fg" : cardLook(row).kind === "note" ? "tone.paused.fg" : "text.dim"
 
 // Wide: one row. Phone: the meta drops to a second line, indented under the title.
 function Line({
@@ -126,22 +110,22 @@ function Line({
   titleLink,
   bold,
 }: {
-  row: EpicDetailRow;
-  meta: string;
-  wide: boolean;
-  titleLink?: boolean;
-  bold?: boolean;
+  row: EpicDetailRow
+  meta: string
+  wide: boolean
+  titleLink?: boolean
+  bold?: boolean
 }) {
-  const chips = rowChips(row);
+  const chips = rowChips(row)
   const title = titleLink ? (
     <Link href={ticketHref(row.address)} color="inherit" display="inline">
       {row.title}
     </Link>
   ) : (
     row.title
-  );
+  )
   // Done and cancelled cards are two lines on a phone even with no meta, so the list stays one height.
-  const reserveLine = !wide && isFolded(row) && !meta;
+  const reserveLine = !wide && isFolded(row) && !meta
   const metaNode = (meta || reserveLine) && (
     <Text
       as="span"
@@ -160,7 +144,7 @@ function Line({
     >
       {reserveLine ? " " : meta}
     </Text>
-  );
+  )
   return (
     <Box
       display="flex"
@@ -169,80 +153,71 @@ function Line({
       gap={wide ? "12px" : "2px"}
       minW="0"
     >
-      <Box display="flex" flexDirection="column" gap="2px" minW="0" flex={wide ? "1 1 0" : undefined}>
       <Box
         display="flex"
-        alignItems="center"
-        gap={wide ? "12px" : "10px"}
+        flexDirection="column"
+        gap="2px"
         minW="0"
+        flex={wide ? "1 1 0" : undefined}
       >
-        <Dot row={row} />
-        <Text
-          as="span"
-          fontFamily="mono"
-          fontSize="16px"
-          color="text.dim"
-          flexShrink={0}
-          whiteSpace="nowrap"
-          w={wide ? "48px" : "44px"}
-        >
-          {idOf(row.address)}
-        </Text>
-        <Text
-          as="span"
-          color={
-            isCancelled(row)
-              ? "text.dim"
-              : isFolded(row)
-                ? "text.muted"
-                : "white"
-          }
-          data-title
-          fontSize="16px"
-          fontWeight={bold ? 500 : undefined}
-          minW="0"
-          flex="1 1 0"
-          overflowWrap="anywhere"
-        >
-          {title}
-        </Text>
-        <LongRunningBadge of={row} />
-      </Box>
-      {chips && (
-        <Box data-chips pl={wide ? "88px" : "80px"} minW="0">
-          <HarnessLabel {...chips} dot />
+        <Box display="flex" alignItems="center" gap={wide ? "12px" : "10px"} minW="0">
+          <Dot row={row} />
+          <Text
+            as="span"
+            fontFamily="mono"
+            fontSize="16px"
+            color="text.dim"
+            flexShrink={0}
+            whiteSpace="nowrap"
+            w={wide ? "48px" : "44px"}
+          >
+            {idOf(row.address)}
+          </Text>
+          <Text
+            as="span"
+            color={isCancelled(row) ? "text.dim" : isFolded(row) ? "text.muted" : "white"}
+            data-title
+            fontSize="16px"
+            fontWeight={bold ? 500 : undefined}
+            minW="0"
+            flex="1 1 0"
+            overflowWrap="anywhere"
+          >
+            {title}
+          </Text>
+          <LongRunningBadge of={row} />
         </Box>
-      )}
+        {chips && (
+          <Box data-chips pl={wide ? "88px" : "80px"} minW="0">
+            <HarnessLabel {...chips} dot />
+          </Box>
+        )}
       </Box>
       {metaNode}
     </Box>
-  );
+  )
 }
 
 // On phones the card's buttons span the row at touch height.
-const phoneButton = (wide: boolean) => (wide ? {} : { w: "100%", h: "44px" });
+const phoneButton = (wide: boolean) => (wide ? {} : { w: "100%", h: "44px" })
 
 function CardFrame({
   row,
   wide,
   children,
 }: {
-  row: EpicDetailRow;
-  wide: boolean;
-  children: React.ReactNode;
+  row: EpicDetailRow
+  wide: boolean
+  children: React.ReactNode
 }) {
   // Done and cancelled cards are outline only.
-  const folded = isFolded(row);
+  const folded = isFolded(row)
   return (
     <Box
       bg={folded ? undefined : "surface.raised"}
       borderWidth="1px"
       borderColor={
-        folded
-          ? "hairline.folded"
-          : isRunning(row)
-            ? "rgba(108,180,255,0.40)"
-            : "hairline"
+        folded ? "hairline.folded" : isRunning(row) ? "rgba(108,180,255,0.40)" : "hairline"
       }
       borderRadius="12px"
       minH={wide ? (folded ? "44px" : "48px") : undefined}
@@ -255,7 +230,7 @@ function CardFrame({
         {children}
       </Box>
     </Box>
-  );
+  )
 }
 
 // A needs-you or repair-paused ticket: the title is the link and its question or hint sits in a second row.
@@ -266,15 +241,15 @@ function NoteCard({
   note,
   fixAgent,
 }: {
-  row: EpicDetailRow;
-  meta: string;
-  wide: boolean;
-  note: Extract<CardLook, { kind: "note" }>;
-  fixAgent?: FixAgent;
+  row: EpicDetailRow
+  meta: string
+  wide: boolean
+  note: Extract<CardLook, { kind: "note" }>
+  fixAgent?: FixAgent
 }) {
-  const navigate = useNavigate();
-  const [fixing, setFixing] = useState(false);
-  const { answerPath } = note;
+  const navigate = useNavigate()
+  const [fixing, setFixing] = useState(false)
+  const { answerPath } = note
   return (
     <Box
       bg="rgba(255,112,102,0.07)"
@@ -318,12 +293,7 @@ function NoteCard({
           </Button>
         )}
         {note.fix && (
-          <Button
-            tone="paused"
-            size="sm"
-            onClick={() => setFixing(true)}
-            {...phoneButton(wide)}
-          >
+          <Button tone="paused" size="sm" onClick={() => setFixing(true)} {...phoneButton(wide)}>
             Fix it with an agent
           </Button>
         )}
@@ -337,7 +307,7 @@ function NoteCard({
         />
       )}
     </Box>
-  );
+  )
 }
 
 // A live ticket as one anchor to its page, or a NoteCard when it needs a person.
@@ -349,22 +319,18 @@ export function TicketCard({
   verdict,
   plain,
 }: {
-  row: EpicDetailRow;
-  meta: string;
-  indent: number;
-  fixAgent?: FixAgent;
-  verdict?: string;
+  row: EpicDetailRow
+  meta: string
+  indent: number
+  fixAgent?: FixAgent
+  verdict?: string
   /** Plain text for the archive: no link and no note actions, since the ticket page reads only the active index. */
-  plain?: boolean;
+  plain?: boolean
 }) {
-  const look = cardLook(row);
-  const wide = useWide();
+  const look = cardLook(row)
+  const wide = useWide()
   return (
-    <Box
-      data-indent={indent}
-      data-tone={toneOf(row)}
-      ml={`${indent * (wide ? 28 : 20)}px`}
-    >
+    <Box data-indent={indent} data-tone={toneOf(row)} ml={`${indent * (wide ? 28 : 20)}px`}>
       {plain ? (
         <CardFrame row={row} wide={wide}>
           <Line row={row} meta={meta} wide={wide} />
@@ -385,5 +351,5 @@ export function TicketCard({
         </Link>
       )}
     </Box>
-  );
+  )
 }

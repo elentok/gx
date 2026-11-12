@@ -1,16 +1,16 @@
-import { Box, Spinner, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState, type ComponentProps } from "react";
-import { PiNotePencil } from "react-icons/pi";
-import { useComposerDraft } from "../drafts";
+import { Box, Spinner, Text } from "@chakra-ui/react"
+import { useEffect, useRef, useState, type ComponentProps } from "react"
+import { PiNotePencil } from "react-icons/pi"
+import { useComposerDraft } from "../drafts"
 import {
   CardSourceRound,
   type SessionInfo,
   SessionNext,
   SessionRoundCard,
-} from "../generated/server";
-import { Button } from "../ui/button/Button";
-import { AutoAdvanceBar, AutoCountdown, type RunCall } from "./AutoAdvanceBar";
-import type { AutoMenuState } from "./AutoMenu";
+} from "../generated/server"
+import { Button } from "../ui/button/Button"
+import { AutoAdvanceBar, AutoCountdown, type RunCall } from "./AutoAdvanceBar"
+import type { AutoMenuState } from "./AutoMenu"
 import {
   postAutoAdvance,
   postAutoQueue,
@@ -22,21 +22,21 @@ import {
   type InterruptSession,
   type SetAutoAdvance,
   type SetAutoQueue,
-} from "./open";
-import { codexSkillHint } from "./chat";
-import { ComposerImages } from "./ComposerImages";
-import { FooterLine } from "./FooterLine";
-import { InterruptControl } from "./InterruptControl";
-import { useComposerImages } from "./useComposerImages";
-import { NoteBox } from "./NoteBox";
-import { postAnswer, type PostAnswer, type PostPrompt } from "./prompt";
-import type { Answers } from "../ui/question-sheet/round";
-import { ReasonStale } from "../ticket/answer";
-import { unansweredOf } from "./round";
-import { SendPopover } from "./SendPopover";
-import { usePromptSend } from "./usePromptSend";
-import { useWide } from "../useWide";
-import { promptable } from "./view";
+} from "./open"
+import { codexSkillHint } from "./chat"
+import { ComposerImages } from "./ComposerImages"
+import { FooterLine } from "./FooterLine"
+import { InterruptControl } from "./InterruptControl"
+import { useComposerImages } from "./useComposerImages"
+import { NoteBox } from "./NoteBox"
+import { postAnswer, type PostAnswer, type PostPrompt } from "./prompt"
+import type { Answers } from "../ui/question-sheet/round"
+import { ReasonStale } from "../ticket/answer"
+import { unansweredOf } from "./round"
+import { SendPopover } from "./SendPopover"
+import { usePromptSend } from "./usePromptSend"
+import { useWide } from "../useWide"
+import { promptable } from "./view"
 
 // Under the chat, one line: the Auto menu, then Note and the main action. Nothing sends unless the session is Idle.
 export function Composer({
@@ -62,52 +62,52 @@ export function Composer({
   ceiling,
 }: {
   /** The smart-zone ceiling from the snapshot; the badge needs it. */
-  ceiling?: number;
-  session: SessionInfo;
+  ceiling?: number
+  session: SessionInfo
   /** The id of the last chat message the page saw. */
-  lastMessage?: string;
-  next?: SessionNext;
+  lastMessage?: string
+  next?: SessionNext
   /** Shown under Continue: the map's next ticket title, or the step label. */
-  nextTitle?: string;
-  connected: boolean;
-  post?: PostPrompt;
+  nextTitle?: string
+  connected: boolean
+  post?: PostPrompt
   /** Posts the open round's answers; the server words the prompt. */
-  answer?: PostAnswer;
+  answer?: PostAnswer
   /** The server's card id of the open round. */
-  roundId?: string;
-  interrupt?: InterruptSession;
-  setAutoAdvance?: SetAutoAdvance;
-  setAutoQueue?: SetAutoQueue;
-  cancelAutoAdvance?: CancelAutoAdvance;
-  cancelAutoQueue?: CancelAutoAdvance;
+  roundId?: string
+  interrupt?: InterruptSession
+  setAutoAdvance?: SetAutoAdvance
+  setAutoQueue?: SetAutoQueue
+  cancelAutoAdvance?: CancelAutoAdvance
+  cancelAutoQueue?: CancelAutoAdvance
   /** The conversation moved under the person: refetch the chat, keep the draft. */
-  onStale?: () => void;
+  onStale?: () => void
   /** The open Grilling round: Send answers all of it in one prompt. */
-  round?: SessionRoundCard[];
-  answers?: Answers;
+  round?: SessionRoundCard[]
+  answers?: Answers
   /** The round went out. */
-  onRoundSent?: () => void;
+  onRoundSent?: () => void
   /** A row of the unanswered popover: open the sheet at that question. */
-  onReview?: (index: number) => void;
+  onReview?: (index: number) => void
   /** The Auto popover's open state, kept by the caller so a remount of the composer does not close it. */
-  autoMenu?: AutoMenuState;
+  autoMenu?: AutoMenuState
 }) {
-  const wide = useWide();
-  const [gapsOpen, setGapsOpen] = useState(false);
-  const sendRef = useRef<HTMLButtonElement>(null);
-  const [text, setText] = useComposerDraft(session.id);
+  const wide = useWide()
+  const [gapsOpen, setGapsOpen] = useState(false)
+  const sendRef = useRef<HTMLButtonElement>(null)
+  const [text, setText] = useComposerDraft(session.id)
   // Shared text is never hidden behind a closed Note: it opens on load and on every change (another tab).
-  const images = useComposerImages(session.id);
-  const hasImages = images.images.length > 0;
-  const shared = text !== "" || hasImages;
+  const images = useComposerImages(session.id)
+  const hasImages = images.images.length > 0
+  const shared = text !== "" || hasImages
   // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
-  const working = session.status.state === "working" && !promptable(session);
-  const [open, setOpen] = useState(shared);
+  const working = session.status.state === "working" && !promptable(session)
+  const [open, setOpen] = useState(shared)
   // Adding an image while the agent works must not force the note open.
   useEffect(() => {
-    if (shared && !working) setOpen(true);
-  }, [shared, working]);
-  const hasContent = images.hasContent(text);
+    if (shared && !working) setOpen(true)
+  }, [shared, working])
+  const hasContent = images.hasContent(text)
   const { send, write, enabled, pending } = usePromptSend({
     session,
     lastMessage,
@@ -115,14 +115,14 @@ export function Composer({
     post,
     onStale,
     toastRefusal: true,
-  });
+  })
 
-  const run: RunCall = (call) => (connected ? write(call) : Promise.resolve());
+  const run: RunCall = (call) => (connected ? write(call) : Promise.resolve())
 
-  const inRound = round.length > 0;
+  const inRound = round.length > 0
   const sendRound = () => {
-    setGapsOpen(false);
-    if (!enabled) return;
+    setGapsOpen(false)
+    if (!enabled) return
     return write(
       async () => {
         const res = await answer({
@@ -133,52 +133,50 @@ export function Composer({
           note: text.trim() || undefined,
           last_message: lastMessage,
           ...images.payload,
-        });
-        if (res.refused && res.reason === ReasonStale) onStale?.();
-        return res;
+        })
+        if (res.refused && res.reason === ReasonStale) onStale?.()
+        return res
       },
       {
         onDone: () => {
-          setText("");
-          images.clear();
-          onRoundSent?.();
+          setText("")
+          images.clear()
+          onRoundSent?.()
         },
       },
-    );
-  };
-  const unanswered = unansweredOf(round, answers);
+    )
+  }
+  const unanswered = unansweredOf(round, answers)
   // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
   const onSendRound = () => {
-    if (gapsOpen) setGapsOpen(false);
-    else if (images.blocking) return;
-    else if (unanswered.length > 0) setGapsOpen(true);
-    else sendRound();
-  };
+    if (gapsOpen) setGapsOpen(false)
+    else if (images.blocking) return
+    else if (unanswered.length > 0) setGapsOpen(true)
+    else sendRound()
+  }
 
   const sendText = () =>
     send({ text, ...images.payload }, () => {
-      setText("");
-      images.clear();
-    });
+      setText("")
+      images.clear()
+    })
   // Cmd/Ctrl+Enter runs the main button only when that is Send or Send answers; a phone has no key send.
   const onSubmit = wide
     ? () => {
-        if (!enabled) return;
-        if (inRound) onSendRound();
-        else if (images.canSend(text)) sendText();
+        if (!enabled) return
+        if (inRound) onSendRound()
+        else if (images.canSend(text)) sendText()
       }
-    : undefined;
+    : undefined
 
-  const canContinue = !!next?.action.action?.length;
+  const canContinue = !!next?.action.action?.length
   // On the phone the main button takes the row's remaining width; a round with no answers dims Send.
-  const slot: Partial<ComponentProps<typeof Button>> = wide ? { whiteSpace: "nowrap", flex: "none" } : { flex: "1", minW: "0", h: "44px", justifyContent: "center", borderRadius: "10px" };
+  const slot: Partial<ComponentProps<typeof Button>> = wide
+    ? { whiteSpace: "nowrap", flex: "none" }
+    : { flex: "1", minW: "0", h: "44px", justifyContent: "center", borderRadius: "10px" }
   // Notes (on a question or in the composer) and images are worth sending without any answer.
-  const hasQuestionNote = round.some((c) => !!answers[c.label]?.note?.trim());
-  const noAnswers =
-    !wide &&
-    unanswered.length === round.length &&
-    !hasQuestionNote &&
-    !hasContent;
+  const hasQuestionNote = round.some((c) => !!answers[c.label]?.note?.trim())
+  const noAnswers = !wide && unanswered.length === round.length && !hasQuestionNote && !hasContent
   // Interrupt while the agent works; Continue after a run-end line unless a note or round is waiting to go.
   const mainButton = working ? (
     <InterruptControl
@@ -215,22 +213,16 @@ export function Composer({
         sendDisabled={!enabled || images.blocking}
         anchorRef={sendRef}
         onSendAnyway={sendRound}
-        onAnswer={(c) =>
-          onReview?.(round.findIndex((r) => r.label === c.label))
-        }
+        onAnswer={(c) => onReview?.(round.findIndex((r) => r.label === c.label))}
         onClose={() => setGapsOpen(false)}
       />
     </>
   ) : (
-    <Button
-      {...slot}
-      disabled={!enabled || !images.canSend(text)}
-      onClick={sendText}
-    >
+    <Button {...slot} disabled={!enabled || !images.canSend(text)} onClick={sendText}>
       {pending && <Spinner size="sm" />}
       Send
     </Button>
-  );
+  )
 
   const autoAdvanceBar = autoMenu && (
     <AutoAdvanceBar
@@ -244,9 +236,9 @@ export function Composer({
       menu={autoMenu}
       phone={!wide}
     />
-  );
+  )
 
-  const footerLine = <FooterLine session={session} ceiling={ceiling} />;
+  const footerLine = <FooterLine session={session} ceiling={ceiling} />
 
   return (
     <Box
@@ -319,9 +311,7 @@ export function Composer({
             fieldName="design-note"
             label="Message"
             title={inRound ? "Note on this round" : "Message to the agent"}
-            placeholder={
-              inRound ? "A note on this round" : "A message to the agent"
-            }
+            placeholder={inRound ? "A note on this round" : "A message to the agent"}
             value={text}
             disabled={!enabled}
             autoFocus
@@ -352,5 +342,5 @@ export function Composer({
         )}
       </ComposerImages>
     </Box>
-  );
+  )
 }

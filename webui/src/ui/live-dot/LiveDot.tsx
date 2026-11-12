@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
-import type { Tone } from "../tone";
+import { Box } from "@chakra-ui/react"
+import type { Tone } from "../tone"
 
 export function LiveDot({ tone = "running", label }: { tone?: Tone; label: string }) {
   return (
@@ -14,5 +14,5 @@ export function LiveDot({ tone = "running", label }: { tone?: Tone; label: strin
       borderRadius="full"
       bg={`tone.${tone}.fg`}
     />
-  );
+  )
 }

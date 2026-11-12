@@ -1,29 +1,34 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import qrcode from "qrcode-generator";
-import { ErrorLine, Field } from "./AuthFields";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import qrcode from "qrcode-generator"
+import { ErrorLine, Field } from "./AuthFields"
 
 function qrSvg(uri: string): string {
-  const qr = qrcode(0, "M");
-  qr.addData(uri);
-  qr.make();
-  return qr.createSvgTag({ scalable: true, margin: 0 });
+  const qr = qrcode(0, "M")
+  qr.addData(uri)
+  qr.make()
+  return qr.createSvgTag({ scalable: true, margin: 0 })
 }
 
 // Groups of four, the way authenticator apps show a key to type by hand.
 function spaced(secret: string): string {
-  return secret.replace(/(.{4})(?=.)/g, "$1 ");
+  return secret.replace(/(.{4})(?=.)/g, "$1 ")
 }
 
 export interface AddAuthenticatorProps {
-  secret: string;
+  secret: string
   /** The otpauth:// URI that the QR code and the link both hold. */
-  uri: string;
-  error?: string;
-  codeLabel?: string;
+  uri: string
+  error?: string
+  codeLabel?: string
 }
 
 /** QR code, add link, key and code field. The caller supplies the form, heading and submit button. */
-export function AddAuthenticator({ secret, uri, error, codeLabel = "Enter the code it shows" }: AddAuthenticatorProps) {
+export function AddAuthenticator({
+  secret,
+  uri,
+  error,
+  codeLabel = "Enter the code it shows",
+}: AddAuthenticatorProps) {
   return (
     <>
       <Box data-mock-part="totp-qr" display="flex" justifyContent="center">
@@ -57,5 +62,5 @@ export function AddAuthenticator({ secret, uri, error, codeLabel = "Enter the co
         autoFocus
       />
     </>
-  );
+  )
 }

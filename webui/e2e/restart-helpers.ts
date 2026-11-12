@@ -1,26 +1,27 @@
-import type { Page } from "@playwright/test";
-import { expect, menu, menuButton, nav, type Fixture } from "./fixture";
+import type { Page } from "@playwright/test"
+import { expect, menu, menuButton, nav, type Fixture } from "./fixture"
 
 // Shared by the restart flows (restart.e2e.ts, restart-run.e2e.ts). They run on the restart-*
 // scenarios, whose server path is a fake gx binary that a flow steers through its control files
 // (check.json, slow, old, start, gx).
 
-export const restartItem = (page: Page) => menu(page).getByRole("menuitem", nav("Restart server"));
-export const dialog = (page: Page) => page.getByRole("dialog", nav("Restart server"));
-export const restartButton = (page: Page) => dialog(page).getByRole("button", { name: /^Restart( anyway)?$/ });
+export const restartItem = (page: Page) => menu(page).getByRole("menuitem", nav("Restart server"))
+export const dialog = (page: Page) => page.getByRole("dialog", nav("Restart server"))
+export const restartButton = (page: Page) =>
+  dialog(page).getByRole("button", { name: /^Restart( anyway)?$/ })
 
 export const openDialog = async (page: Page) => {
-  await menuButton(page).click();
-  await restartItem(page).click();
-  await expect(dialog(page)).toBeVisible();
-};
+  await menuButton(page).click()
+  await restartItem(page).click()
+  await expect(dialog(page)).toBeVisible()
+}
 
 /** The build text in the sidebar header, e.g. what the dialog calls the running version. */
 export const buildText = async (page: Page) => {
-  const build = page.getByTestId("server-build");
-  await expect(build).toBeVisible();
-  return (await build.textContent())!.trim();
-};
+  const build = page.getByTestId("server-build")
+  await expect(build).toBeVisible()
+  return (await build.textContent())!.trim()
+}
 
 /** What `restart-check` prints when every project passes, on restart-projects (projects demo and broken). */
 export const passing = (
@@ -31,20 +32,25 @@ export const passing = (
   JSON.stringify({
     version,
     config,
-    projects: ["demo", "broken"].map((name) => ({ name, ok: true, files: [], pending: pending[name] ?? 0 })),
-  });
+    projects: ["demo", "broken"].map((name) => ({
+      name,
+      ok: true,
+      files: [],
+      pending: pending[name] ?? 0,
+    })),
+  })
 
 /** The pid line of `gx server status` (it has no start time): it changes on every restart. */
 export const pidLine = async (fixture: Fixture) => {
-  const status = await fixture.cli("server", "status");
-  const line = status.split("\n").find((l) => l.startsWith("pid:"));
-  expect(line, `no pid in:\n${status}`).toBeTruthy();
-  return line!;
-};
+  const status = await fixture.cli("server", "status")
+  const line = status.split("\n").find((l) => l.startsWith("pid:"))
+  expect(line, `no pid in:\n${status}`).toBeTruthy()
+  return line!
+}
 
 /** Waits for the dialog to go away on its own (the tab reloaded onto the new server). */
 export const expectReloaded = async (page: Page) => {
-  await expect(page.getByText("Restarting...")).toBeVisible();
-  await expect(dialog(page)).toHaveCount(0, { timeout: 45_000 });
-  await expect(menuButton(page)).toBeVisible();
-};
+  await expect(page.getByText("Restarting...")).toBeVisible()
+  await expect(dialog(page)).toHaveCount(0, { timeout: 45_000 })
+  await expect(menuButton(page)).toBeVisible()
+}

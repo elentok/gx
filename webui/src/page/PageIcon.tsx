@@ -2,14 +2,14 @@ const PATHS = {
   epic: "M3 4.5h10M3 8h10M3 11.5h6",
   design: "M10.5 2.5l3 3-7.5 7.5H3v-3l7.5-7.5z",
   triage: "M2 9l2-5.5h8L14 9v3.5H2V9zM2 9h3.5l.8 1.5h3.4L10.5 9H14",
-  epics:"M3 3.5h10M3 6.5h10M3 9.5h10M3 12.5h6",
+  epics: "M3 3.5h10M3 6.5h10M3 9.5h10M3 12.5h6",
   stats: "M3.5 13V8M8 13V3M12.5 13V6",
   cleanup: "M3.5 4.5h9M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5M7 7v4M9 7v4",
   tips: "M8 2.5a4 4 0 0 0-2 7.5v1.5h4V10a4 4 0 0 0-2-7.5zM6.5 13.5h3",
   settings: "M3 5h10M3 11h10M6 3v4M10 9v4",
   ticket: "M3 4h10v8H3zM6 7h4M6 9.5h3",
   agent: "M3 3.5h10v7H8l-3 2.5v-2.5H3z",
-} as const;
+} as const
 
 /** The large icon in a PageHeader for the pages that have a kind. */
 export function PageIcon({ kind }: { kind: keyof typeof PATHS }) {
@@ -28,5 +28,5 @@ export function PageIcon({ kind }: { kind: keyof typeof PATHS }) {
     >
       <path d={PATHS[kind]} />
     </svg>
-  );
+  )
 }

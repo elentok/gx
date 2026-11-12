@@ -1,16 +1,16 @@
-import { useCallback } from "react";
-import { useWide } from "../../useWide";
+import { useCallback } from "react"
+import { useWide } from "../../useWide"
 
 // Dialogs the person has pressed or typed in. Focus that landed inside a dialog on its own (a select
 // or a load grabbing it) is not the person moving, so only these dialogs keep their focus.
-const touched = new WeakSet<Element>();
+const touched = new WeakSet<Element>()
 if (typeof document !== "undefined") {
   const mark = (e: Event) => {
-    const dialog = e.target instanceof Element ? e.target.closest('[role="dialog"]') : null;
-    if (dialog) touched.add(dialog);
-  };
-  document.addEventListener("pointerdown", mark, true);
-  document.addEventListener("keydown", mark, true);
+    const dialog = e.target instanceof Element ? e.target.closest('[role="dialog"]') : null
+    if (dialog) touched.add(dialog)
+  }
+  document.addEventListener("pointerdown", mark, true)
+  document.addEventListener("keydown", mark, true)
 }
 
 /**
@@ -21,17 +21,17 @@ if (typeof document !== "undefined") {
  * another field inside the dialog keeps their place.
  */
 export function useFocusFirstField() {
-  const wide = useWide();
+  const wide = useWide()
   return useCallback(
     (el: HTMLElement | null) => {
-      if (!el || !wide) return;
+      if (!el || !wide) return
       // Lets a closing menu hand focus here when its own focus return lands after this mount.
-      el.dataset.firstField = "";
-      const active = document.activeElement;
-      const dialog = el.closest('[role="dialog"]');
-      if (active && dialog?.contains(active) && active !== dialog && touched.has(dialog)) return;
-      el.focus();
+      el.dataset.firstField = ""
+      const active = document.activeElement
+      const dialog = el.closest('[role="dialog"]')
+      if (active && dialog?.contains(active) && active !== dialog && touched.has(dialog)) return
+      el.focus()
     },
     [wide],
-  );
+  )
 }

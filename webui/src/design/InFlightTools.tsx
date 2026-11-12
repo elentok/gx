@@ -1,23 +1,29 @@
-import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import type { SessionInFlightTool } from "../generated/server";
+import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import type { SessionInFlightTool } from "../generated/server"
 
 const VERBS: Record<string, string> = {
   shell: "running shell: ",
   agent: "waiting for sub-agent: ",
   search: "searching: ",
-};
+}
 
 const KIND_WORDS: Record<string, string> = {
   shell: "shell",
   agent: "sub-agent",
   search: "search",
   other: "tool",
-};
+}
 
 /** The Working row's tool in flight: its wording, then a "(+N more)" button that lists the older calls. */
-export function InFlightTools({ current, others = [] }: { current: SessionInFlightTool; others?: SessionInFlightTool[] }) {
-  const [open, setOpen] = useState(false);
+export function InFlightTools({
+  current,
+  others = [],
+}: {
+  current: SessionInFlightTool
+  others?: SessionInFlightTool[]
+}) {
+  const [open, setOpen] = useState(false)
   return (
     <Box as="span" display="flex" minW="0" gap="1">
       <Text as="span" minW="0" truncate>
@@ -85,5 +91,5 @@ export function InFlightTools({ current, others = [] }: { current: SessionInFlig
         </>
       )}
     </Box>
-  );
+  )
 }

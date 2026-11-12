@@ -1,24 +1,24 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react"
 import {
   LimitForecastProjected,
   type StatsLimitBurn,
   type StatsLimitBurns,
-} from "../generated/server";
-import { forecastLine } from "../usage/format";
-import { StatCard } from "../ui/stat-card/StatCard";
+} from "../generated/server"
+import { forecastLine } from "../usage/format"
+import { StatCard } from "../ui/stat-card/StatCard"
 
 const monthDay = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
-});
+})
 
 // Built from parts in local time: Date.parse of a "2026-10-09" key would be UTC and shift the day west of UTC.
 function startLabel(dayKey: string): string {
-  const [y, m, d] = dayKey.split("-").map(Number);
-  return `starts ${monthDay.format(new Date(y, m - 1, d))}`;
+  const [y, m, d] = dayKey.split("-").map(Number)
+  return `starts ${monthDay.format(new Date(y, m - 1, d))}`
 }
 
-const points = (n: number) => String(Math.round(n));
+const points = (n: number) => String(Math.round(n))
 
 function LimitBurnCard({
   title,
@@ -28,20 +28,18 @@ function LimitBurnCard({
   weekly,
   project,
 }: {
-  title: string;
-  color: "claude" | "codex";
-  burn: StatsLimitBurn;
-  days: string[];
-  weekly: boolean;
-  project: string;
+  title: string
+  color: "claude" | "codex"
+  burn: StatsLimitBurn
+  days: string[]
+  weekly: boolean
+  project: string
 }) {
-  const values = burn.days.map((d) => (d.no_data ? null : d.burn));
-  const showPace = weekly && burn.forecast?.status === LimitForecastProjected;
-  const forecast = weekly ? forecastLine(burn.forecast) : undefined;
-  const dayNotes = burn.days.map((d) =>
-    d.reset_day ? ["↺ window reset"] : undefined,
-  );
-  const partial = burn.start_day !== undefined;
+  const values = burn.days.map((d) => (d.no_data ? null : d.burn))
+  const showPace = weekly && burn.forecast?.status === LimitForecastProjected
+  const forecast = weekly ? forecastLine(burn.forecast) : undefined
+  const dayNotes = burn.days.map((d) => (d.reset_day ? ["↺ window reset"] : undefined))
+  const partial = burn.start_day !== undefined
 
   return (
     <StatCard
@@ -65,18 +63,14 @@ function LimitBurnCard({
               color="text.muted"
             >
               {showPace ? (
-                <span>
-                  7-day average: {points(burn.forecast!.pace)} points a day
-                </span>
+                <span>7-day average: {points(burn.forecast!.pace)} points a day</span>
               ) : (
                 <span />
               )}
               {forecast && (
                 <span
                   style={
-                    forecast.warn
-                      ? { color: "var(--chakra-colors-tone-deadlocked-fg)" }
-                      : undefined
+                    forecast.warn ? { color: "var(--chakra-colors-tone-deadlocked-fg)" } : undefined
                   }
                 >
                   {forecast.text}
@@ -90,13 +84,7 @@ function LimitBurnCard({
           )}
           {project && (
             <>
-              <Text
-                as="span"
-                fontSize="xs"
-                color="text.dim"
-                display="block"
-                mt="1"
-              >
+              <Text as="span" fontSize="xs" color="text.dim" display="block" mt="1">
                 All projects
               </Text>
               <Text fontSize="xs" color="text.dim">
@@ -107,7 +95,7 @@ function LimitBurnCard({
         </>
       }
     />
-  );
+  )
 }
 
 export function LimitBurnCards({
@@ -115,9 +103,9 @@ export function LimitBurnCards({
   burns,
   project,
 }: {
-  days: string[];
-  burns: StatsLimitBurns;
-  project: string;
+  days: string[]
+  burns: StatsLimitBurns
+  project: string
 }) {
   const card = (
     title: string,
@@ -133,7 +121,7 @@ export function LimitBurnCards({
       weekly={weekly}
       project={project}
     />
-  );
+  )
   return (
     <>
       {card("Claude weekly burn", "claude", burns.claude_weekly, true)}
@@ -141,5 +129,5 @@ export function LimitBurnCards({
       {card("Claude 5-hour burn", "claude", burns.claude_5h, false)}
       {card("Codex 5-hour burn", "codex", burns.codex_5h, false)}
     </>
-  );
+  )
 }

@@ -1,13 +1,13 @@
-import { Box, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
-import type { Tone } from "../tone";
+import { Box, Text } from "@chakra-ui/react"
+import type { ReactNode } from "react"
+import type { Tone } from "../tone"
 
 interface CardProps {
-  title?: string;
-  tone?: Tone;
+  title?: string
+  tone?: Tone
   // Runs a light round the border in the tone's color, for an epic with work in flight.
-  live?: boolean;
-  children: ReactNode;
+  live?: boolean
+  children: ReactNode
 }
 
 export function Card({ title, tone = "muted", live, children }: CardProps) {
@@ -20,13 +20,20 @@ export function Card({ title, tone = "muted", live, children }: CardProps) {
       )}
       {children}
     </>
-  );
+  )
   if (!live) {
     return (
-      <Box data-tone={tone} bg="surface.raised" borderWidth="1px" borderColor="border" borderRadius="md" p="3">
+      <Box
+        data-tone={tone}
+        bg="surface.raised"
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="md"
+        p="3"
+      >
         {body}
       </Box>
-    );
+    )
   }
   // The 1px padding shows the rotating gradient behind the body as the border.
   return (
@@ -45,5 +52,5 @@ export function Card({ title, tone = "muted", live, children }: CardProps) {
         {body}
       </Box>
     </Box>
-  );
+  )
 }

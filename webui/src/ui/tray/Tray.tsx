@@ -1,39 +1,46 @@
-import { footerHover } from "../../shell/FooterButton";
-import { Box, chakra, Popover, Portal } from "@chakra-ui/react";
-import { useState } from "react";
-import type { Health, MeterHealth } from "../../generated/server";
-import { useCloseSignal, useOnCloseSignal } from "../closeSignal";
-import { HealthPopover } from "../../health/HealthPopover";
-import { METERS } from "./meters";
-import { STATE_COLOR } from "./stateColor";
+import { footerHover } from "../../shell/FooterButton"
+import { Box, chakra, Popover, Portal } from "@chakra-ui/react"
+import { useState } from "react"
+import type { Health, MeterHealth } from "../../generated/server"
+import { useCloseSignal, useOnCloseSignal } from "../closeSignal"
+import { HealthPopover } from "../../health/HealthPopover"
+import { METERS } from "./meters"
+import { STATE_COLOR } from "./stateColor"
 
 // Levels 0 to 4 fill a fifth more each, so level 0 still shows a sliver and level 4 fills the bar.
-const fillPercent = (level: number) => (Math.min(Math.max(level, 0), 4) + 1) * 20;
+const fillPercent = (level: number) => (Math.min(Math.max(level, 0), 4) + 1) * 20
 
 export function trayLabel(health: Health): string {
-  return `System health: ${METERS.map(({ key, name }) => `${name} ${health[key].state}`).join("; ")}`;
+  return `System health: ${METERS.map(({ key, name }) => `${name} ${health[key].state}`).join("; ")}`
 }
 
 // Chakra's `sm` breakpoint. Below it the popover ends 2px from the screen edge, as in the mock.
-const PHONE_QUERY = "(max-width: 39.99em)";
-const PHONE_EDGE_GAP = 2;
+const PHONE_QUERY = "(max-width: 39.99em)"
+const PHONE_EDGE_GAP = 2
 
 // Stretches the anchor's right edge to the screen edge, so "bottom-end" ends the popover there.
-const phoneAnchorRect: NonNullable<NonNullable<Popover.RootProps["positioning"]>["getAnchorRect"]> = (el) => {
-  if (!el || typeof window.matchMedia !== "function" || !window.matchMedia(PHONE_QUERY).matches) return null;
-  const { x, y, width, height } = el.getBoundingClientRect();
-  return { x, y, width: window.innerWidth - PHONE_EDGE_GAP - x, height };
-};
+const phoneAnchorRect: NonNullable<
+  NonNullable<Popover.RootProps["positioning"]>["getAnchorRect"]
+> = (el) => {
+  if (!el || typeof window.matchMedia !== "function" || !window.matchMedia(PHONE_QUERY).matches)
+    return null
+  const { x, y, width, height } = el.getBoundingClientRect()
+  return { x, y, width: window.innerWidth - PHONE_EDGE_GAP - x, height }
+}
 
 export function Tray({ health, connected = true }: { health: Health; connected?: boolean }) {
-  const [open, setOpen] = useState(false);
-  useOnCloseSignal(useCloseSignal(), () => setOpen(false));
+  const [open, setOpen] = useState(false)
+  useOnCloseSignal(useCloseSignal(), () => setOpen(false))
   // The body mounts only while open, so its polling starts and stops with the popover.
   return (
     <Popover.Root
       open={open}
       onOpenChange={(e) => setOpen(e.open)}
-      positioning={{ placement: "bottom-end", getAnchorRect: phoneAnchorRect, overflowPadding: PHONE_EDGE_GAP }}
+      positioning={{
+        placement: "bottom-end",
+        getAnchorRect: phoneAnchorRect,
+        overflowPadding: PHONE_EDGE_GAP,
+      }}
       lazyMount
       unmountOnExit
     >
@@ -80,14 +87,22 @@ export function Tray({ health, connected = true }: { health: Health; connected?:
         </Popover.Positioner>
       </Portal>
     </Popover.Root>
-  );
+  )
 }
 
 function Meter({ letter, meter }: { letter: string; meter: MeterHealth }) {
-  const color = STATE_COLOR[meter.state].fg;
-  const unknown = meter.state === "unknown";
+  const color = STATE_COLOR[meter.state].fg
+  const unknown = meter.state === "unknown"
   return (
-    <Box aria-hidden display="flex" flexDirection="column" alignItems="center" gap="1px" data-meter={letter} data-state={meter.state}>
+    <Box
+      aria-hidden
+      display="flex"
+      flexDirection="column"
+      alignItems="center"
+      gap="1px"
+      data-meter={letter}
+      data-state={meter.state}
+    >
       <Box
         data-part="bar"
         w="5px"
@@ -98,11 +113,21 @@ function Meter({ letter, meter }: { letter: string; meter: MeterHealth }) {
         bg={unknown ? "transparent" : "hairline"}
         boxShadow={unknown ? "inset 0 0 0 1px var(--chakra-colors-text-faint)" : undefined}
       >
-        {!unknown && <Box data-part="fill" position="absolute" left="0" right="0" bottom="0" h={`${fillPercent(meter.level)}%`} bg={color} />}
+        {!unknown && (
+          <Box
+            data-part="fill"
+            position="absolute"
+            left="0"
+            right="0"
+            bottom="0"
+            h={`${fillPercent(meter.level)}%`}
+            bg={color}
+          />
+        )}
       </Box>
       <Box as="span" fontFamily="mono" fontWeight="600" fontSize="8px" lineHeight="1" color={color}>
         {letter}
       </Box>
     </Box>
-  );
+  )
 }

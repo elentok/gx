@@ -1,5 +1,5 @@
-import { Question, QuestionDots } from "../ui/question-sheet/Question";
-import type { GalleryEntry } from "./registry";
+import { Question, QuestionDots } from "../ui/question-sheet/Question"
+import type { GalleryEntry } from "./registry"
 
 export const questionEntries: GalleryEntry[] = [
   {
@@ -29,7 +29,13 @@ export const questionEntries: GalleryEntry[] = [
         label: "yes-no",
         node: (
           <Question
-            card={{ label: "2", title: "Proceed?", kind: "yes-no", yes: "Go ahead", no: "Stop here" }}
+            card={{
+              label: "2",
+              title: "Proceed?",
+              kind: "yes-no",
+              yes: "Go ahead",
+              no: "Stop here",
+            }}
             answer={{}}
             onChange={() => {}}
             onPicked={() => {}}
@@ -49,4 +55,4 @@ export const questionEntries: GalleryEntry[] = [
       },
     ],
   },
-];
+]

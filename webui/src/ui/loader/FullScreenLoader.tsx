@@ -1,4 +1,4 @@
-import { Box, Image, Spinner, Text } from "@chakra-ui/react";
+import { Box, Image, Spinner, Text } from "@chakra-ui/react"
 
 // A centered loader that fills the content area: mascot, spinner and a label. Use it when a whole view waits on something.
 export function FullScreenLoader({ label }: { label: string }) {
@@ -18,5 +18,5 @@ export function FullScreenLoader({ label }: { label: string }) {
       <Spinner size="lg" borderWidth="3px" color="tone.muted.fg" />
       <Text color="text.muted">{label}</Text>
     </Box>
-  );
+  )
 }

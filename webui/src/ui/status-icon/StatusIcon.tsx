@@ -1,7 +1,7 @@
-import { Box } from "@chakra-ui/react";
-import type { Tone } from "../tone";
+import { Box } from "@chakra-ui/react"
+import type { Tone } from "../tone"
 
-export type StatusKind = "done" | "asking" | "waiting" | "children" | "attention";
+export type StatusKind = "done" | "asking" | "waiting" | "children" | "attention"
 
 export const STATUS_LABELS: Record<StatusKind, string> = {
   done: "Done",
@@ -9,7 +9,7 @@ export const STATUS_LABELS: Record<StatusKind, string> = {
   waiting: "Waiting",
   children: "Waiting for children",
   attention: "Needs attention",
-};
+}
 
 // Every icon is a circle of the same size, so a row of mixed statuses lines up.
 const MARKS: Record<StatusKind, string> = {
@@ -18,15 +18,34 @@ const MARKS: Record<StatusKind, string> = {
   waiting: "",
   children: "",
   attention: "M8 5v3.4M8 11v.1",
-};
+}
 
 export function StatusIcon({ kind, tone }: { kind: StatusKind; tone: Tone }) {
   return (
-    <Box as="span" role="img" aria-label={STATUS_LABELS[kind]} color={`tone.${tone}.fg`} display="inline-flex" alignItems="center" justifyContent="center" w="4" h="4">
-      <svg viewBox="0 0 16 16" width="100%" height="100%" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <Box
+      as="span"
+      role="img"
+      aria-label={STATUS_LABELS[kind]}
+      color={`tone.${tone}.fg`}
+      display="inline-flex"
+      alignItems="center"
+      justifyContent="center"
+      w="4"
+      h="4"
+    >
+      <svg
+        viewBox="0 0 16 16"
+        width="100%"
+        height="100%"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <circle cx="8" cy="8" r="5.5" strokeDasharray={kind === "children" ? "2 2.4" : undefined} />
         {MARKS[kind] && <path d={MARKS[kind]} />}
       </svg>
     </Box>
-  );
+  )
 }

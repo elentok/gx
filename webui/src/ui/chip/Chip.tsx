@@ -1,6 +1,6 @@
-import { Box } from "@chakra-ui/react";
-import type { ReactNode } from "react";
-import type { Tone } from "../tone";
+import { Box } from "@chakra-ui/react"
+import type { ReactNode } from "react"
+import type { Tone } from "../tone"
 
 // Pill for queue-level states such as Paused.
 export function Chip({
@@ -9,10 +9,10 @@ export function Chip({
   outlined = true,
   children,
 }: {
-  tone?: Tone;
-  fontSize?: string;
-  outlined?: boolean;
-  children: ReactNode;
+  tone?: Tone
+  fontSize?: string
+  outlined?: boolean
+  children: ReactNode
 }) {
   return (
     <Box
@@ -32,5 +32,5 @@ export function Chip({
     >
       {children}
     </Box>
-  );
+  )
 }

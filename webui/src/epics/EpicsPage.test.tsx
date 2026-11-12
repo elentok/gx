@@ -1,12 +1,12 @@
-import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test, vi } from "vitest";
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicList, EpicListRow } from "../generated/server";
-import { appRoutes } from "../routes";
-import { closeNewItem, openNewDesign } from "../shell/newItemOpen";
-import { renderThemed } from "../ui/render";
-import type { FetchEpicList } from "./list";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { createMemoryRouter, RouterProvider } from "react-router"
+import { afterEach, expect, test, vi } from "vitest"
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
+import type { EpicList, EpicListRow } from "../generated/server"
+import { appRoutes } from "../routes"
+import { closeNewItem, openNewDesign } from "../shell/newItemOpen"
+import { renderThemed } from "../ui/render"
+import type { FetchEpicList } from "./list"
 
 // The New Design form opens on the server's drafts; here there are none and saves go nowhere.
 vi.mock("../design/drafts", async (importOriginal) => ({
@@ -14,14 +14,14 @@ vi.mock("../design/drafts", async (importOriginal) => ({
   listDrafts: async () => [],
   saveDraft: async () => ({ kind: "deleted" }),
   deleteDraft: async () => ({ kind: "deleted" }),
-}));
+}))
 
 afterEach(() => {
-  closeNewItem();
-  cleanup();
-  vi.unstubAllGlobals();
-  vi.useRealTimers();
-});
+  closeNewItem()
+  cleanup()
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
 
 const state: ConnectionState = {
   snapshot: undefined as unknown as ConnectionState["snapshot"],
@@ -30,13 +30,13 @@ const state: ConnectionState = {
   liveSnapshot: true,
   tick: 0,
   streams: 0,
-};
+}
 const conn = {
   getState: () => state,
   subscribe: () => () => {},
   onEvent: () => () => {},
   refresh: () => {},
-} as unknown as Connection;
+} as unknown as Connection
 
 const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   address: `gx:${name}`,
@@ -53,52 +53,60 @@ const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   section: "ready-to-queue",
   addresses: [`gx:${name}`],
   ...over,
-});
+})
 
-const listOf = (epics: EpicListRow[], over: Partial<EpicList> = {}): EpicList => ({ epics, follow_ups: [], ...over });
+const listOf = (epics: EpicListRow[], over: Partial<EpicList> = {}): EpicList => ({
+  epics,
+  follow_ups: [],
+  ...over,
+})
 
 function eventConn() {
-  const listeners = new Set<() => void>();
+  const listeners = new Set<() => void>()
   const c = {
     getState: () => state,
     subscribe: () => () => {},
     onEvent: (l: () => void) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
+      listeners.add(l)
+      return () => listeners.delete(l)
     },
-  } as unknown as Connection;
-  return { conn: c, emit: () => listeners.forEach((l) => l()) };
+  } as unknown as Connection
+  return { conn: c, emit: () => listeners.forEach((l) => l()) }
 }
 
 function renderEpics(fetchList: FetchEpicList, withConn: Connection = conn) {
-  const router = createMemoryRouter(appRoutes({ epicList: fetchList }), { initialEntries: ["/epics"] });
+  const router = createMemoryRouter(appRoutes({ epicList: fetchList }), {
+    initialEntries: ["/epics"],
+  })
   const view = renderThemed(
     <ConnectionContext.Provider value={withConn}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
-  );
-  return { ...view, router };
+  )
+  return { ...view, router }
 }
 
-const filterBox = () => screen.findByRole("searchbox", { name: "Filter epics" });
+const filterBox = () => screen.findByRole("searchbox", { name: "Filter epics" })
 
 // The New Design host (in the shell) reads the list and posts through fetch, not the page's injected fetcher.
 const stubFetch = (list: EpicList, post: (body: unknown) => unknown = () => ({ refused: false })) =>
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
-      if (init?.method === "POST") return new Response(JSON.stringify(post(JSON.parse(String(init.body)))), { status: 200 });
-      if (String(url).includes("/v1/epics")) return new Response(JSON.stringify(list), { status: 200 });
-      return new Response("not stubbed", { status: 404 });
+      if (init?.method === "POST")
+        return new Response(JSON.stringify(post(JSON.parse(String(init.body)))), { status: 200 })
+      if (String(url).includes("/v1/epics"))
+        return new Response(JSON.stringify(list), { status: 200 })
+      return new Response("not stubbed", { status: 404 })
     }),
-  );
+  )
 
 const loaded = async (list: EpicList) => {
-  stubFetch(list);
-  renderEpics(async () => list);
-  await filterBox();
-  await waitFor(() => expect(screen.queryByRole("status", { name: "Loading epics" })).toBeNull());
-};
+  stubFetch(list)
+  renderEpics(async () => list)
+  await filterBox()
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Loading epics" })).toBeNull())
+}
 
 const mixed = () =>
   listOf([
@@ -109,22 +117,26 @@ const mixed = () =>
     row("idea", { kind: "map", card_kind: "design", section: "ready-to-design" }),
     row("done-a", { state: "finished", section: "finished" }),
     row("done-b", { state: "finished", section: "finished" }),
-  ]);
+  ])
 
 // The toaster's own container is a region too; only the sections name themselves.
-const sectionRegions = () => screen.queryAllByRole("region").filter((r) => r.hasAttribute("aria-labelledby"));
-const regionNames = () => sectionRegions().map((r) => r.getAttribute("aria-labelledby"));
-const toggle = (title: string) => screen.getByRole("button", { name: new RegExp(`^.?\\s*${title}`) });
+const sectionRegions = () =>
+  screen.queryAllByRole("region").filter((r) => r.hasAttribute("aria-labelledby"))
+const regionNames = () => sectionRegions().map((r) => r.getAttribute("aria-labelledby"))
+const toggle = (title: string) =>
+  screen.getByRole("button", { name: new RegExp(`^.?\\s*${title}`) })
 
 test("the page has an Epics heading with the epic count and the New Design action", async () => {
-  await loaded(mixed());
-  expect(screen.getByRole("heading", { level: 1, name: "Epics" })).toBeTruthy();
-  expect(screen.getByTestId("page-header-subtitle").textContent).toMatch(/^\d+ epics?$/);
-  expect(within(screen.getByTestId("page-header-actions")).getByRole("button", { name: "New Design" })).toBeTruthy();
-});
+  await loaded(mixed())
+  expect(screen.getByRole("heading", { level: 1, name: "Epics" })).toBeTruthy()
+  expect(screen.getByTestId("page-header-subtitle").textContent).toMatch(/^\d+ epics?$/)
+  expect(
+    within(screen.getByTestId("page-header-actions")).getByRole("button", { name: "New Design" }),
+  ).toBeTruthy()
+})
 
 test("six sections show in order with counts, Ready to design and Finished start collapsed", async () => {
-  await loaded(mixed());
+  await loaded(mixed())
   expect(regionNames()).toEqual([
     "epics-needs-you",
     "epics-implementing",
@@ -132,313 +144,366 @@ test("six sections show in order with counts, Ready to design and Finished start
     "epics-designing",
     "epics-ready-to-design",
     "epics-finished",
-  ]);
-  expect(toggle("Needs you").getAttribute("aria-expanded")).toBe("true");
-  expect(toggle("Ready to design").getAttribute("aria-expanded")).toBe("false");
-  expect(toggle("Finished").getAttribute("aria-expanded")).toBe("false");
-  expect(toggle("Finished").textContent).toContain("2");
-  expect(screen.getByRole("link", { name: "need" })).toBeTruthy();
-  expect(screen.queryByRole("link", { name: "idea" })).toBeNull();
-  expect(screen.queryByRole("link", { name: "done-a" })).toBeNull();
-});
+  ])
+  expect(toggle("Needs you").getAttribute("aria-expanded")).toBe("true")
+  expect(toggle("Ready to design").getAttribute("aria-expanded")).toBe("false")
+  expect(toggle("Finished").getAttribute("aria-expanded")).toBe("false")
+  expect(toggle("Finished").textContent).toContain("2")
+  expect(screen.getByRole("link", { name: "need" })).toBeTruthy()
+  expect(screen.queryByRole("link", { name: "idea" })).toBeNull()
+  expect(screen.queryByRole("link", { name: "done-a" })).toBeNull()
+})
 
 test("an empty section is hidden", async () => {
-  await loaded(listOf([row("need", { section: "needs-you" }), row("done-a", { state: "finished", section: "finished" })]));
-  expect(regionNames()).toEqual(["epics-needs-you", "epics-finished"]);
-});
+  await loaded(
+    listOf([
+      row("need", { section: "needs-you" }),
+      row("done-a", { state: "finished", section: "finished" }),
+    ]),
+  )
+  expect(regionNames()).toEqual(["epics-needs-you", "epics-finished"])
+})
 
 test("a Follow-ups card sits in the section its row names", async () => {
-  const fu = (name: string, section: string) => row(name, { card_kind: "follow-ups", project: name, section });
-  await loaded(listOf([fu("a", "designing"), fu("b", "needs-you"), fu("c", "ready-to-design")]));
-  expect(regionNames()).toEqual(["epics-needs-you", "epics-designing", "epics-ready-to-design"]);
-});
+  const fu = (name: string, section: string) =>
+    row(name, { card_kind: "follow-ups", project: name, section })
+  await loaded(listOf([fu("a", "designing"), fu("b", "needs-you"), fu("c", "ready-to-design")]))
+  expect(regionNames()).toEqual(["epics-needs-you", "epics-designing", "epics-ready-to-design"])
+})
 
 test("a toggle opens a collapsed section and closes an open one", async () => {
-  await loaded(mixed());
-  fireEvent.click(toggle("Finished"));
-  expect(toggle("Finished").getAttribute("aria-expanded")).toBe("true");
-  expect(screen.getByRole("link", { name: "done-a" })).toBeTruthy();
-  fireEvent.click(toggle("Needs you"));
-  expect(screen.queryByRole("link", { name: "need" })).toBeNull();
-});
+  await loaded(mixed())
+  fireEvent.click(toggle("Finished"))
+  expect(toggle("Finished").getAttribute("aria-expanded")).toBe("true")
+  expect(screen.getByRole("link", { name: "done-a" })).toBeTruthy()
+  fireEvent.click(toggle("Needs you"))
+  expect(screen.queryByRole("link", { name: "need" })).toBeNull()
+})
 
 test("Finished shows the first recently-finished cards, the count follows", async () => {
-  await loaded({ ...mixed(), recently_finished: 1 });
-  expect(toggle("Finished").textContent).toContain("1");
-  fireEvent.click(toggle("Finished"));
-  expect(screen.getByRole("link", { name: "done-a" })).toBeTruthy();
-  expect(screen.queryByRole("link", { name: "done-b" })).toBeNull();
-});
+  await loaded({ ...mixed(), recently_finished: 1 })
+  expect(toggle("Finished").textContent).toContain("1")
+  fireEvent.click(toggle("Finished"))
+  expect(screen.getByRole("link", { name: "done-a" })).toBeTruthy()
+  expect(screen.queryByRole("link", { name: "done-b" })).toBeNull()
+})
 
 test("a few hundred finished epics load, show the cap, and filter past it", async () => {
-  const many = Array.from({ length: 300 }, (_, i) => row(`done-${i}`, { state: "finished", section: "finished" }));
-  await loaded(listOf(many, { recently_finished: 20 }));
-  fireEvent.click(toggle("Finished"));
-  expect(screen.getAllByRole("link", { name: /^done-/ })).toHaveLength(20);
+  const many = Array.from({ length: 300 }, (_, i) =>
+    row(`done-${i}`, { state: "finished", section: "finished" }),
+  )
+  await loaded(listOf(many, { recently_finished: 20 }))
+  fireEvent.click(toggle("Finished"))
+  expect(screen.getAllByRole("link", { name: /^done-/ })).toHaveLength(20)
 
-  expect(screen.queryByLabelText(/large editor/i)).toBeNull();
-  fireEvent.change(await filterBox(), { target: { value: "done-29" } });
-  expect(screen.getAllByRole("link", { name: /^done-/ })).toHaveLength(11);
-});
+  expect(screen.queryByLabelText(/large editor/i)).toBeNull()
+  fireEvent.change(await filterBox(), { target: { value: "done-29" } })
+  expect(screen.getAllByRole("link", { name: /^done-/ })).toHaveLength(11)
+})
 
 test("the filter opens a matching collapsed section, hides the others, and reaches past the cap", async () => {
-  await loaded({ ...mixed(), recently_finished: 1 });
-  fireEvent.change(await filterBox(), { target: { value: "DONE-B" } });
-  expect(regionNames()).toEqual(["epics-finished"]);
-  expect(screen.getByRole("link", { name: "done-b" })).toBeTruthy();
-  expect(toggle("Finished").textContent).toContain("1");
-  fireEvent.change(await filterBox(), { target: { value: "" } });
-  expect(regionNames()).toHaveLength(6);
-  expect(screen.queryByRole("link", { name: "done-b" })).toBeNull();
-});
+  await loaded({ ...mixed(), recently_finished: 1 })
+  fireEvent.change(await filterBox(), { target: { value: "DONE-B" } })
+  expect(regionNames()).toEqual(["epics-finished"])
+  expect(screen.getByRole("link", { name: "done-b" })).toBeTruthy()
+  expect(toggle("Finished").textContent).toContain("1")
+  fireEvent.change(await filterBox(), { target: { value: "" } })
+  expect(regionNames()).toHaveLength(6)
+  expect(screen.queryByRole("link", { name: "done-b" })).toBeNull()
+})
 
 const twoProjects = () =>
   listOf([
     row("g1", { project: "gx" }),
     row("o1", { project: "other" }),
     row("fu", { project: "other", card_kind: "follow-ups" as never }),
-  ]);
-const projectButton = () => screen.getByRole("button", { name: "Project" });
+  ])
+const projectButton = () => screen.getByRole("button", { name: "Project" })
 const pick = async (name: string) => {
-  fireEvent.click(projectButton());
-  fireEvent.click(await screen.findByRole("checkbox", { name }));
-};
+  fireEvent.click(projectButton())
+  fireEvent.click(await screen.findByRole("checkbox", { name }))
+}
 
 test("the project picker shows only with two or more projects, defaulting to All projects", async () => {
-  await loaded(mixed());
-  expect(screen.queryByRole("button", { name: "Project" })).toBeNull();
-  cleanup();
-  await loaded(twoProjects());
-  expect(projectButton().textContent).toContain("All projects");
-  expect(screen.getAllByRole("link", { name: /^(g1|o1|fu)$/ })).toHaveLength(3);
-});
+  await loaded(mixed())
+  expect(screen.queryByRole("button", { name: "Project" })).toBeNull()
+  cleanup()
+  await loaded(twoProjects())
+  expect(projectButton().textContent).toContain("All projects")
+  expect(screen.getAllByRole("link", { name: /^(g1|o1|fu)$/ })).toHaveLength(3)
+})
 
 test("the project picker lists projects that have no epics", async () => {
-  await loaded(listOf([row("g1", { project: "gx" })], { projects: ["empty", "gx"] }));
-  fireEvent.click(projectButton());
-  expect(await screen.findByRole("checkbox", { name: "empty" })).toBeTruthy();
-});
+  await loaded(listOf([row("g1", { project: "gx" })], { projects: ["empty", "gx"] }))
+  fireEvent.click(projectButton())
+  expect(await screen.findByRole("checkbox", { name: "empty" })).toBeTruthy()
+})
 
 test("the project picker filters every card, follow-ups included, combined with text, and is stored", async () => {
-  await loaded(twoProjects());
-  await pick("other");
-  expect(screen.queryByRole("link", { name: "g1" })).toBeNull();
-  expect(screen.getByRole("link", { name: "o1" })).toBeTruthy();
-  expect(screen.getByRole("link", { name: "fu" })).toBeTruthy();
-  fireEvent.change(await filterBox(), { target: { value: "o1" } });
-  expect(screen.queryByRole("link", { name: "fu" })).toBeNull();
-  expect(localStorage.getItem("gx.epics.project")).toBe('["other"]');
-});
+  await loaded(twoProjects())
+  await pick("other")
+  expect(screen.queryByRole("link", { name: "g1" })).toBeNull()
+  expect(screen.getByRole("link", { name: "o1" })).toBeTruthy()
+  expect(screen.getByRole("link", { name: "fu" })).toBeTruthy()
+  fireEvent.change(await filterBox(), { target: { value: "o1" } })
+  expect(screen.queryByRole("link", { name: "fu" })).toBeNull()
+  expect(localStorage.getItem("gx.epics.project")).toBe('["other"]')
+})
 
 test("several projects can be picked at once", async () => {
-  await loaded(listOf([row("g1", { project: "gx" }), row("o1", { project: "other" }), row("b1", { project: "blog" })]));
-  await pick("gx");
-  fireEvent.click(screen.getByRole("checkbox", { name: "other" }));
-  expect(screen.getByRole("link", { name: "g1" })).toBeTruthy();
-  expect(screen.getByRole("link", { name: "o1" })).toBeTruthy();
-  expect(screen.queryByRole("link", { name: "b1" })).toBeNull();
-  expect(projectButton().textContent).toContain("2 projects");
-});
+  await loaded(
+    listOf([
+      row("g1", { project: "gx" }),
+      row("o1", { project: "other" }),
+      row("b1", { project: "blog" }),
+    ]),
+  )
+  await pick("gx")
+  fireEvent.click(screen.getByRole("checkbox", { name: "other" }))
+  expect(screen.getByRole("link", { name: "g1" })).toBeTruthy()
+  expect(screen.getByRole("link", { name: "o1" })).toBeTruthy()
+  expect(screen.queryByRole("link", { name: "b1" })).toBeNull()
+  expect(projectButton().textContent).toContain("2 projects")
+})
 
 test("a stored project is restored, in the old plain format too", async () => {
-  localStorage.setItem("gx.epics.project", "gx");
-  await loaded(twoProjects());
-  expect(projectButton().textContent).toContain("gx");
-  expect(screen.queryByRole("link", { name: "o1" })).toBeNull();
-});
+  localStorage.setItem("gx.epics.project", "gx")
+  await loaded(twoProjects())
+  expect(projectButton().textContent).toContain("gx")
+  expect(screen.queryByRole("link", { name: "o1" })).toBeNull()
+})
 
 test("a stale stored project acts as All projects without being rewritten", async () => {
-  localStorage.setItem("gx.epics.project", '["gone"]');
-  await loaded(twoProjects());
-  expect(projectButton().textContent).toContain("All projects");
-  expect(screen.getAllByRole("link", { name: /^(g1|o1|fu)$/ })).toHaveLength(3);
-  expect(localStorage.getItem("gx.epics.project")).toBe('["gone"]');
-});
+  localStorage.setItem("gx.epics.project", '["gone"]')
+  await loaded(twoProjects())
+  expect(projectButton().textContent).toContain("All projects")
+  expect(screen.getAllByRole("link", { name: /^(g1|o1|fu)$/ })).toHaveLength(3)
+  expect(localStorage.getItem("gx.epics.project")).toBe('["gone"]')
+})
 
 test("a filter with no match says No match", async () => {
-  await loaded(mixed());
-  fireEvent.change(await filterBox(), { target: { value: "zzz" } });
-  expect(screen.getByText("No match")).toBeTruthy();
-  expect(sectionRegions()).toHaveLength(0);
-});
+  await loaded(mixed())
+  fireEvent.change(await filterBox(), { target: { value: "zzz" } })
+  expect(screen.getByText("No match")).toBeTruthy()
+  expect(sectionRegions()).toHaveLength(0)
+})
 
 test("no epics shows the empty state with a New Design button", async () => {
-  await loaded(listOf([]));
-  expect(screen.getByText("No epics yet.")).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: "New Design" })).toHaveLength(1);
-});
+  await loaded(listOf([]))
+  expect(screen.getByText("No epics yet.")).toBeTruthy()
+  expect(screen.getAllByRole("button", { name: "New Design" })).toHaveLength(1)
+})
 
 test("the follow-ups counts line is gone", async () => {
-  await loaded(listOf([row("x")], { follow_ups: [{ project: "gx", open: 3, bugs: 3, ideas: 0, other: 0, triage: "none", left: 0 }] }));
-  expect(screen.queryByText(/Follow-ups/)).toBeNull();
-});
+  await loaded(
+    listOf([row("x")], {
+      follow_ups: [
+        { project: "gx", open: 3, bugs: 3, ideas: 0, other: 0, triage: "none", left: 0 },
+      ],
+    }),
+  )
+  expect(screen.queryByText(/Follow-ups/)).toBeNull()
+})
 
 test("New Design opens the form in a dialog, Close closes it", async () => {
-  await loaded(mixed());
-  expect(screen.queryByRole("dialog")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "New Design" }));
-  expect(await screen.findByRole("textbox", { name: "Epic slug" })).toBeTruthy();
-  const dialog = screen.getByRole("dialog", { name: "New Design" });
-  fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
-  expect(screen.queryByRole("dialog")).toBeNull();
-});
+  await loaded(mixed())
+  expect(screen.queryByRole("dialog")).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: "New Design" }))
+  expect(await screen.findByRole("textbox", { name: "Epic slug" })).toBeTruthy()
+  const dialog = screen.getByRole("dialog", { name: "New Design" })
+  fireEvent.click(within(dialog).getByRole("button", { name: "Close" }))
+  expect(screen.queryByRole("dialog")).toBeNull()
+})
 
 test("the New Design project starts on the page's filtered project", async () => {
-  localStorage.setItem("gx.epics.project", "gx");
-  await loaded(listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]));
-  fireEvent.click(screen.getByRole("button", { name: "New Design" }));
-  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("gx");
-});
+  localStorage.setItem("gx.epics.project", "gx")
+  await loaded(listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]))
+  fireEvent.click(screen.getByRole("button", { name: "New Design" }))
+  expect(
+    ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value,
+  ).toBe("gx")
+})
 
 test("the New Design project ignores a filter of several projects", async () => {
-  localStorage.setItem("gx.epics.project", '["gx","other"]');
-  await loaded(listOf([row("a"), row("b", { project: "blog", address: "blog:b" }), row("c", { project: "other", address: "other:c" })]));
-  fireEvent.click(screen.getByRole("button", { name: "New Design" }));
-  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("blog");
-});
+  localStorage.setItem("gx.epics.project", '["gx","other"]')
+  await loaded(
+    listOf([
+      row("a"),
+      row("b", { project: "blog", address: "blog:b" }),
+      row("c", { project: "other", address: "other:c" }),
+    ]),
+  )
+  fireEvent.click(screen.getByRole("button", { name: "New Design" }))
+  expect(
+    ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value,
+  ).toBe("blog")
+})
 
 test("the stored one-project filter keeps steering New design after leaving the Epics page", async () => {
   // Unfiltered, the form starts on the first project ("blog"), so "gx" proves the filter reached it.
-  localStorage.setItem("gx.epics.project", "gx");
-  const list = listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]);
-  stubFetch(list);
-  const { router } = renderEpics(async () => list);
-  await filterBox();
-  await waitFor(() => expect(screen.queryByRole("status", { name: "Loading epics" })).toBeNull());
-  act(() => openNewDesign());
-  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("gx");
-  act(() => closeNewItem());
-  await act(() => router.navigate("/agents"));
-  await waitFor(() => expect(screen.queryByRole("searchbox", { name: "Filter epics" })).toBeNull());
-  act(() => openNewDesign());
-  expect(((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value).toBe("gx");
-});
+  localStorage.setItem("gx.epics.project", "gx")
+  const list = listOf([row("a"), row("b", { project: "blog", address: "blog:b" })])
+  stubFetch(list)
+  const { router } = renderEpics(async () => list)
+  await filterBox()
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Loading epics" })).toBeNull())
+  act(() => openNewDesign())
+  expect(
+    ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value,
+  ).toBe("gx")
+  act(() => closeNewItem())
+  await act(() => router.navigate("/agents"))
+  await waitFor(() => expect(screen.queryByRole("searchbox", { name: "Filter epics" })).toBeNull())
+  act(() => openNewDesign())
+  expect(
+    ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value,
+  ).toBe("gx")
+})
 
 test("Start posts new_design and opens the new Design page", async () => {
-  const open = vi.fn(() => ({ refused: false }));
-  stubFetch(mixed(), open);
-  const { router } = renderEpics(async () => mixed());
-  await filterBox();
-  fireEvent.click(await screen.findByRole("button", { name: "New Design" }));
-  fireEvent.change(await screen.findByRole("textbox", { name: "Epic slug" }), { target: { value: "fresh" } });
-  const dialog = screen.getByRole("dialog", { name: "New Design" });
-  fireEvent.change(within(dialog).getByRole("textbox", { name: "Rough idea" }), { target: { value: "an idea" } });
-  await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Start design" })));
-  expect(open).toHaveBeenCalledWith({ epic: "fresh", new_design: true, idea: "an idea", project: "gx" });
-  await waitFor(() => expect(router.state.location.pathname).toBe("/d/gx:fresh"));
-});
+  const open = vi.fn(() => ({ refused: false }))
+  stubFetch(mixed(), open)
+  const { router } = renderEpics(async () => mixed())
+  await filterBox()
+  fireEvent.click(await screen.findByRole("button", { name: "New Design" }))
+  fireEvent.change(await screen.findByRole("textbox", { name: "Epic slug" }), {
+    target: { value: "fresh" },
+  })
+  const dialog = screen.getByRole("dialog", { name: "New Design" })
+  fireEvent.change(within(dialog).getByRole("textbox", { name: "Rough idea" }), {
+    target: { value: "an idea" },
+  })
+  await act(async () =>
+    fireEvent.click(within(dialog).getByRole("button", { name: "Start design" })),
+  )
+  expect(open).toHaveBeenCalledWith({
+    epic: "fresh",
+    new_design: true,
+    idea: "an idea",
+    project: "gx",
+  })
+  await waitFor(() => expect(router.state.location.pathname).toBe("/d/gx:fresh"))
+})
 
 test("the first load shows a spinner under the filter", async () => {
-  renderEpics(() => new Promise(() => {}));
-  expect(await screen.findByRole("status", { name: "Loading epics" })).toBeTruthy();
-  expect(await filterBox()).toBeTruthy();
-  expect(sectionRegions()).toHaveLength(0);
-});
+  renderEpics(() => new Promise(() => {}))
+  expect(await screen.findByRole("status", { name: "Loading epics" })).toBeTruthy()
+  expect(await filterBox()).toBeTruthy()
+  expect(sectionRegions()).toHaveLength(0)
+})
 
 test("a failed first fetch shows Could not load epics, and Retry fetches again", async () => {
-  let calls = 0;
+  let calls = 0
   renderEpics(async () => {
-    if (++calls === 1) throw new Error("down");
-    return listOf([row("x")]);
-  });
-  await screen.findByText("Could not load epics");
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Retry" })));
-  expect(await screen.findByRole("link", { name: "x" })).toBeTruthy();
-  expect(screen.queryByText("Could not load epics")).toBeNull();
-  expect(calls).toBe(2);
-});
+    if (++calls === 1) throw new Error("down")
+    return listOf([row("x")])
+  })
+  await screen.findByText("Could not load epics")
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Retry" })))
+  expect(await screen.findByRole("link", { name: "x" })).toBeTruthy()
+  expect(screen.queryByText("Could not load epics")).toBeNull()
+  expect(calls).toBe(2)
+})
 
 test("a burst of events gives one refetch, and filter text survives it", async () => {
-  vi.useFakeTimers({ shouldAdvanceTime: true });
-  const { conn: c, emit } = eventConn();
-  const fetchList = vi.fn(async () => listOf([row("x")]));
-  renderEpics(fetchList, c);
-  const box = await filterBox();
-  fireEvent.change(box, { target: { value: "x" } });
-  await waitFor(() => expect(fetchList).toHaveBeenCalledTimes(1));
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const { conn: c, emit } = eventConn()
+  const fetchList = vi.fn(async () => listOf([row("x")]))
+  renderEpics(fetchList, c)
+  const box = await filterBox()
+  fireEvent.change(box, { target: { value: "x" } })
+  await waitFor(() => expect(fetchList).toHaveBeenCalledTimes(1))
   act(() => {
-    emit();
-    vi.advanceTimersByTime(200);
-    emit();
-    vi.advanceTimersByTime(200);
-    emit();
-  });
-  expect(fetchList).toHaveBeenCalledTimes(1);
+    emit()
+    vi.advanceTimersByTime(200)
+    emit()
+    vi.advanceTimersByTime(200)
+    emit()
+  })
+  expect(fetchList).toHaveBeenCalledTimes(1)
   await act(async () => {
-    vi.advanceTimersByTime(500);
-  });
-  expect(fetchList).toHaveBeenCalledTimes(2);
-  expect((box as HTMLInputElement).value).toBe("x");
-});
+    vi.advanceTimersByTime(500)
+  })
+  expect(fetchList).toHaveBeenCalledTimes(2)
+  expect((box as HTMLInputElement).value).toBe("x")
+})
 
 test("a failed refetch keeps the last list", async () => {
-  vi.useFakeTimers({ shouldAdvanceTime: true });
-  const { conn: c, emit } = eventConn();
-  let calls = 0;
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const { conn: c, emit } = eventConn()
+  let calls = 0
   renderEpics(async () => {
-    if (++calls > 1) throw new Error("down");
-    return listOf([row("keep")]);
-  }, c);
-  await screen.findByRole("link", { name: "keep" });
-  act(() => emit());
+    if (++calls > 1) throw new Error("down")
+    return listOf([row("keep")])
+  }, c)
+  await screen.findByRole("link", { name: "keep" })
+  act(() => emit())
   await act(async () => {
-    vi.advanceTimersByTime(500);
-  });
-  expect(calls).toBe(2);
-  expect(screen.getByRole("link", { name: "keep" })).toBeTruthy();
-  expect(screen.queryByText("Could not load epics")).toBeNull();
-});
+    vi.advanceTimersByTime(500)
+  })
+  expect(calls).toBe(2)
+  expect(screen.getByRole("link", { name: "keep" })).toBeTruthy()
+  expect(screen.queryByText("Could not load epics")).toBeNull()
+})
 
 function stateConn() {
-  const subs = new Set<() => void>();
-  let current = state;
+  const subs = new Set<() => void>()
+  let current = state
   const c = {
     getState: () => current,
     subscribe: (l: () => void) => {
-      subs.add(l);
-      return () => subs.delete(l);
+      subs.add(l)
+      return () => subs.delete(l)
     },
     onEvent: () => () => {},
-  } as unknown as Connection;
+  } as unknown as Connection
   return {
     conn: c,
     setConnected: (connected: boolean) => {
-      current = { ...current, connected };
-      subs.forEach((l) => l());
+      current = { ...current, connected }
+      subs.forEach((l) => l())
     },
-  };
+  }
 }
 
 test("the list refetches when the connection comes back", async () => {
-  const { conn: c, setConnected } = stateConn();
-  let calls = 0;
-  renderEpics(async () => listOf([row(++calls === 1 ? "old" : "new")]), c);
-  await screen.findByRole("link", { name: "old" });
-  act(() => setConnected(false));
-  expect(calls).toBe(1);
-  act(() => setConnected(true));
-  expect(await screen.findByRole("link", { name: "new" })).toBeTruthy();
-  expect(calls).toBe(2);
-});
+  const { conn: c, setConnected } = stateConn()
+  let calls = 0
+  renderEpics(async () => listOf([row(++calls === 1 ? "old" : "new")]), c)
+  await screen.findByRole("link", { name: "old" })
+  act(() => setConnected(false))
+  expect(calls).toBe(1)
+  act(() => setConnected(true))
+  expect(await screen.findByRole("link", { name: "new" })).toBeTruthy()
+  expect(calls).toBe(2)
+})
 
 test("a failed first fetch is retried when the connection comes back", async () => {
-  const { conn: c, setConnected } = stateConn();
-  let calls = 0;
+  const { conn: c, setConnected } = stateConn()
+  let calls = 0
   renderEpics(async () => {
-    if (++calls === 1) throw new Error("down");
-    return listOf([row("x")]);
-  }, c);
-  await screen.findByText("Could not load epics");
-  act(() => setConnected(false));
-  act(() => setConnected(true));
-  expect(await screen.findByRole("link", { name: "x" })).toBeTruthy();
-  expect(calls).toBe(2);
-});
+    if (++calls === 1) throw new Error("down")
+    return listOf([row("x")])
+  }, c)
+  await screen.findByText("Could not load epics")
+  act(() => setConnected(false))
+  act(() => setConnected(true))
+  expect(await screen.findByRole("link", { name: "x" })).toBeTruthy()
+  expect(calls).toBe(2)
+})
 
 const wsConn = (): Connection => {
-  const s = { ...state, snapshot: { workspaces: [{ name: "Default", default: true }, { name: "Side" }] } } as unknown as ConnectionState;
-  return { getState: () => s, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
-};
+  const s = {
+    ...state,
+    snapshot: { workspaces: [{ name: "Default", default: true }, { name: "Side" }] },
+  } as unknown as ConnectionState
+  return {
+    getState: () => s,
+    subscribe: () => () => {},
+    onEvent: () => () => {},
+    refresh: () => {},
+  } as unknown as Connection
+}
 
 const inWorkspaces = () =>
   listOf([
@@ -446,281 +511,328 @@ const inWorkspaces = () =>
     row("away", { section: "implementing", workspace: "Side" }),
     row("loose", { section: "implementing" }),
     row("frozen", { section: "on-hold", workspace: "Side" }),
-  ]);
+  ])
 
 // The shell sidebar lists the same epics; only the page's section regions count.
-const cardNames = () => sectionRegions().flatMap((r) => within(r).queryAllByRole("link").map((a) => a.textContent));
+const cardNames = () =>
+  sectionRegions().flatMap((r) =>
+    within(r)
+      .queryAllByRole("link")
+      .map((a) => a.textContent),
+  )
 
 test("the workspace filter defaults to All workspaces, filters locally and stores nothing", async () => {
-  const setItem = vi.spyOn(Storage.prototype, "setItem");
-  renderEpics(async () => inWorkspaces(), wsConn());
-  const select = (await screen.findByRole("combobox", { name: "Workspace" })) as HTMLSelectElement;
-  await waitFor(() => expect(cardNames()).toContain("loose"));
-  expect(select.value).toBe("");
-  expect(cardNames()).toEqual(["home", "away", "loose"]);
-  setItem.mockClear();
-  fireEvent.change(select, { target: { value: "Side" } });
-  expect(cardNames()).toEqual(["away"]);
-  expect(setItem).not.toHaveBeenCalled();
-  setItem.mockRestore();
-});
+  const setItem = vi.spyOn(Storage.prototype, "setItem")
+  renderEpics(async () => inWorkspaces(), wsConn())
+  const select = (await screen.findByRole("combobox", { name: "Workspace" })) as HTMLSelectElement
+  await waitFor(() => expect(cardNames()).toContain("loose"))
+  expect(select.value).toBe("")
+  expect(cardNames()).toEqual(["home", "away", "loose"])
+  setItem.mockClear()
+  fireEvent.change(select, { target: { value: "Side" } })
+  expect(cardNames()).toEqual(["away"])
+  expect(setItem).not.toHaveBeenCalled()
+  setItem.mockRestore()
+})
 
 test("On hold is last, collapsed with a count, and a text match opens it", async () => {
-  renderEpics(async () => inWorkspaces(), wsConn());
-  await waitFor(() => expect(cardNames()).toContain("home"));
-  expect(regionNames().at(-1)).toBe("epics-on-hold");
-  expect(toggle("On hold").textContent).toContain("1");
-  expect(cardNames()).not.toContain("frozen");
-  fireEvent.change(await filterBox(), { target: { value: "froz" } });
-  expect(cardNames()).toEqual(["frozen"]);
-});
+  renderEpics(async () => inWorkspaces(), wsConn())
+  await waitFor(() => expect(cardNames()).toContain("home"))
+  expect(regionNames().at(-1)).toBe("epics-on-hold")
+  expect(toggle("On hold").textContent).toContain("1")
+  expect(cardNames()).not.toContain("frozen")
+  fireEvent.change(await filterBox(), { target: { value: "froz" } })
+  expect(cardNames()).toEqual(["frozen"])
+})
 
-const T0 = Date.parse("2026-01-01T10:00:00Z");
-const timed = () => listOf([row("busy", { section: "implementing", time_kind: "elapsed", time_start: new Date(T0).toISOString() })]);
-const timeText = () => screen.getByTestId("time").textContent;
+const T0 = Date.parse("2026-01-01T10:00:00Z")
+const timed = () =>
+  listOf([
+    row("busy", {
+      section: "implementing",
+      time_kind: "elapsed",
+      time_start: new Date(T0).toISOString(),
+    }),
+  ])
+const timeText = () => screen.getByTestId("time").textContent
 const fakeClock = (at: number) => {
-  vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
-  vi.setSystemTime(at);
-};
+  vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] })
+  vi.setSystemTime(at)
+}
 
 test("the page clock moves a card's label every 30 seconds", async () => {
-  fakeClock(T0 + 5 * 60_000);
-  await loaded(timed());
-  expect(timeText()).toBe("5m");
+  fakeClock(T0 + 5 * 60_000)
+  await loaded(timed())
+  expect(timeText()).toBe("5m")
   act(() => {
-    vi.setSystemTime(T0 + 35 * 60_000);
-    vi.advanceTimersByTime(30_000);
-  });
-  expect(timeText()).toBe("35m");
-});
+    vi.setSystemTime(T0 + 35 * 60_000)
+    vi.advanceTimersByTime(30_000)
+  })
+  expect(timeText()).toBe("35m")
+})
 
 test("a repaint of the same payload at a later time shows the later label", async () => {
-  fakeClock(T0 + 5 * 60_000);
-  await loaded(timed());
-  expect(timeText()).toBe("5m");
-  cleanup();
-  vi.setSystemTime(T0 + 2 * 3_600_000);
-  await loaded(timed());
-  expect(timeText()).toBe("2h");
-});
+  fakeClock(T0 + 5 * 60_000)
+  await loaded(timed())
+  expect(timeText()).toBe("5m")
+  cleanup()
+  vi.setSystemTime(T0 + 2 * 3_600_000)
+  await loaded(timed())
+  expect(timeText()).toBe("2h")
+})
 
 test("cards without a time start no clock", async () => {
-  fakeClock(T0);
-  await loaded(listOf([row("busy", { section: "implementing" })]));
-  const untimed = vi.getTimerCount();
-  cleanup();
-  await loaded(timed());
-  expect(vi.getTimerCount()).toBeGreaterThan(untimed);
-});
+  fakeClock(T0)
+  await loaded(listOf([row("busy", { section: "implementing" })]))
+  const untimed = vi.getTimerCount()
+  cleanup()
+  await loaded(timed())
+  expect(vi.getTimerCount()).toBeGreaterThan(untimed)
+})
 
 test("route state focus opens Ready to design and scrolls to the Follow-ups card", async () => {
-  const scrollIntoView = vi.fn();
-  Element.prototype.scrollIntoView = scrollIntoView;
+  const scrollIntoView = vi.fn()
+  Element.prototype.scrollIntoView = scrollIntoView
   const list = listOf([
     row("need", { section: "needs-you" }),
-    row("follow-ups", { kind: "map", card_kind: "follow-ups", section: "ready-to-design", project: "gx" }),
-  ]);
+    row("follow-ups", {
+      kind: "map",
+      card_kind: "follow-ups",
+      section: "ready-to-design",
+      project: "gx",
+    }),
+  ])
   const router = createMemoryRouter(appRoutes({ epicList: async () => list }), {
     initialEntries: [{ pathname: "/epics", state: { focus: "follow-ups:gx" } }],
-  });
+  })
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
-  );
-  await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
-  expect(document.querySelector('[data-focus="follow-ups:gx"]')).not.toBeNull();
-  expect(screen.getByRole("button", { name: /Ready to design/ }).getAttribute("aria-expanded")).toBe("true");
-});
+  )
+  await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+  expect(document.querySelector('[data-focus="follow-ups:gx"]')).not.toBeNull()
+  expect(
+    screen.getByRole("button", { name: /Ready to design/ }).getAttribute("aria-expanded"),
+  ).toBe("true")
+})
 
-const actionsBar = () => screen.getByTestId("page-header-actions");
+const actionsBar = () => screen.getByTestId("page-header-actions")
 const startSelect = async (list: EpicList) => {
-  await loaded(list);
-  fireEvent.click(within(actionsBar()).getByRole("button", { name: "Select" }));
-};
-const barButtons = () => within(document.querySelector('[data-part="select-bar"]') as HTMLElement).getAllByRole("button").map((b) => b.textContent ?? "");
+  await loaded(list)
+  fireEvent.click(within(actionsBar()).getByRole("button", { name: "Select" }))
+}
+const barButtons = () =>
+  within(document.querySelector('[data-part="select-bar"]') as HTMLElement)
+    .getAllByRole("button")
+    .map((b) => b.textContent ?? "")
 
 test("Select shows a corner checkbox on each loop card and the sticky bar", async () => {
-  await loaded(mixed());
-  expect(screen.queryByTestId("select-count")).toBeNull();
-  expect(screen.queryByRole("checkbox")).toBeNull();
-  fireEvent.click(within(actionsBar()).getByRole("button", { name: "Select" }));
-  expect(screen.getByTestId("select-count").textContent).toBe("0 selected");
-  expect(screen.getByRole("checkbox", { name: "Select need" })).toBeTruthy();
-  expect(within(actionsBar()).queryByRole("button", { name: "Select" })).toBeNull();
-  expect(getComputedStyle(document.querySelector('[data-part="select-bar"]') as HTMLElement).position).toBe("sticky");
-  fireEvent.click(screen.getByRole("button", { name: "Done" }));
-  expect(screen.queryByTestId("select-count")).toBeNull();
-  expect(within(actionsBar()).getByRole("button", { name: "Select" })).toBeTruthy();
-});
+  await loaded(mixed())
+  expect(screen.queryByTestId("select-count")).toBeNull()
+  expect(screen.queryByRole("checkbox")).toBeNull()
+  fireEvent.click(within(actionsBar()).getByRole("button", { name: "Select" }))
+  expect(screen.getByTestId("select-count").textContent).toBe("0 selected")
+  expect(screen.getByRole("checkbox", { name: "Select need" })).toBeTruthy()
+  expect(within(actionsBar()).queryByRole("button", { name: "Select" })).toBeNull()
+  expect(
+    getComputedStyle(document.querySelector('[data-part="select-bar"]') as HTMLElement).position,
+  ).toBe("sticky")
+  fireEvent.click(screen.getByRole("button", { name: "Done" }))
+  expect(screen.queryByTestId("select-count")).toBeNull()
+  expect(within(actionsBar()).getByRole("button", { name: "Select" })).toBeTruthy()
+})
 
 test("the bar offers only Move, Hold, Take off hold and Archive, never Stop or Remove", async () => {
-  await startSelect(mixed());
-  fireEvent.click(toggle("Finished"));
-  fireEvent.click(screen.getByRole("button", { name: "Select all" }));
-  const labels = barButtons();
-  expect(labels.some((l) => l.startsWith("Move"))).toBe(true);
-  expect(labels.some((l) => l.startsWith("Hold"))).toBe(true);
-  expect(labels.some((l) => l.startsWith("Archive"))).toBe(true);
-  expect(labels.some((l) => /^(Stop|Remove)/.test(l))).toBe(false);
-});
+  await startSelect(mixed())
+  fireEvent.click(toggle("Finished"))
+  fireEvent.click(screen.getByRole("button", { name: "Select all" }))
+  const labels = barButtons()
+  expect(labels.some((l) => l.startsWith("Move"))).toBe(true)
+  expect(labels.some((l) => l.startsWith("Hold"))).toBe(true)
+  expect(labels.some((l) => l.startsWith("Archive"))).toBe(true)
+  expect(labels.some((l) => /^(Stop|Remove)/.test(l))).toBe(false)
+})
 
 test("Select all skips cards in a collapsed section", async () => {
-  await startSelect(mixed());
-  fireEvent.click(screen.getByRole("button", { name: "Select all" }));
-  expect(screen.getByTestId("select-count").textContent).toBe("4 selected");
-  fireEvent.click(screen.getByRole("button", { name: "Select none" }));
-  fireEvent.click(toggle("Finished"));
-  fireEvent.click(screen.getByRole("button", { name: "Select all" }));
-  expect(screen.getByTestId("select-count").textContent).toBe("6 selected");
-});
+  await startSelect(mixed())
+  fireEvent.click(screen.getByRole("button", { name: "Select all" }))
+  expect(screen.getByTestId("select-count").textContent).toBe("4 selected")
+  fireEvent.click(screen.getByRole("button", { name: "Select none" }))
+  fireEvent.click(toggle("Finished"))
+  fireEvent.click(screen.getByRole("button", { name: "Select all" }))
+  expect(screen.getByTestId("select-count").textContent).toBe("6 selected")
+})
 
 test("the header Archive link has no count and targets the Archive page", async () => {
-  await loaded(mixed());
-  const link = within(actionsBar()).getByRole("link", { name: "Archive" });
-  expect(link.getAttribute("href")).toBe("#/archive");
-  expect(link.textContent).toBe("Archive");
-});
+  await loaded(mixed())
+  const link = within(actionsBar()).getByRole("link", { name: "Archive" })
+  expect(link.getAttribute("href")).toBe("#/archive")
+  expect(link.textContent).toBe("Archive")
+})
 
 test("leaving the page ends its select mode", async () => {
-  const list = mixed();
-  stubFetch(list);
-  const { router } = renderEpics(async () => list);
-  await filterBox();
-  fireEvent.click(await within(await screen.findByTestId("page-header-actions")).findByRole("button", { name: "Select" }));
-  expect(screen.getByTestId("select-count")).toBeTruthy();
-  await act(() => router.navigate("/stats"));
-  await act(() => router.navigate("/epics"));
-  await filterBox();
-  expect(screen.queryByTestId("select-count")).toBeNull();
-});
+  const list = mixed()
+  stubFetch(list)
+  const { router } = renderEpics(async () => list)
+  await filterBox()
+  fireEvent.click(
+    await within(await screen.findByTestId("page-header-actions")).findByRole("button", {
+      name: "Select",
+    }),
+  )
+  expect(screen.getByTestId("select-count")).toBeTruthy()
+  await act(() => router.navigate("/stats"))
+  await act(() => router.navigate("/epics"))
+  await filterBox()
+  expect(screen.queryByTestId("select-count")).toBeNull()
+})
 
 test("a card that leaves the list leaves the selection", async () => {
-  let list = listOf([row("a", { section: "implementing" }), row("b", { section: "implementing" })]);
-  const { conn: c, emit } = eventConn();
-  stubFetch(list);
-  renderEpics(async () => list, c);
-  await filterBox();
-  fireEvent.click(await within(await screen.findByTestId("page-header-actions")).findByRole("button", { name: "Select" }));
-  fireEvent.click(await screen.findByRole("checkbox", { name: "Select a" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "Select b" }));
-  expect(screen.getByTestId("select-count").textContent).toBe("2 selected");
-  list = listOf([row("b", { section: "implementing" })]);
-  act(() => emit());
-  await waitFor(() => expect(screen.getByTestId("select-count").textContent).toBe("1 selected"));
-});
+  let list = listOf([row("a", { section: "implementing" }), row("b", { section: "implementing" })])
+  const { conn: c, emit } = eventConn()
+  stubFetch(list)
+  renderEpics(async () => list, c)
+  await filterBox()
+  fireEvent.click(
+    await within(await screen.findByTestId("page-header-actions")).findByRole("button", {
+      name: "Select",
+    }),
+  )
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Select a" }))
+  fireEvent.click(screen.getByRole("checkbox", { name: "Select b" }))
+  expect(screen.getByTestId("select-count").textContent).toBe("2 selected")
+  list = listOf([row("b", { section: "implementing" })])
+  act(() => emit())
+  await waitFor(() => expect(screen.getByTestId("select-count").textContent).toBe("1 selected"))
+})
 
-const cards = () => Array.from(document.querySelectorAll<HTMLElement>("[data-page-item]"));
-const cardOf = (name: string) => cards().find((c) => c.getAttribute("data-page-item") === `gx:${name}`)!;
-const focusedCard = () => document.activeElement?.getAttribute("data-page-item");
-const selectBox = (name: string) => screen.queryByRole("checkbox", { name: `Select ${name}` }) as HTMLInputElement | null;
+const cards = () => Array.from(document.querySelectorAll<HTMLElement>("[data-page-item]"))
+const cardOf = (name: string) =>
+  cards().find((c) => c.getAttribute("data-page-item") === `gx:${name}`)!
+const focusedCard = () => document.activeElement?.getAttribute("data-page-item")
+const selectBox = (name: string) =>
+  screen.queryByRole("checkbox", { name: `Select ${name}` }) as HTMLInputElement | null
 
 // jsdom has no layout: two cards per row, and the second section starts below the first.
 const cardsLoaded = async () => {
-  await loaded(listOf([row("a", { section: "implementing" }), row("b", { section: "implementing" }), row("c", { section: "implementing" }), row("d", { section: "needs-you" })]));
+  await loaded(
+    listOf([
+      row("a", { section: "implementing" }),
+      row("b", { section: "implementing" }),
+      row("c", { section: "implementing" }),
+      row("d", { section: "needs-you" }),
+    ]),
+  )
   cards().forEach((c, i) => {
-    c.getBoundingClientRect = () => ({ left: (i % 2) * 400, top: Math.floor(i / 2) * 200 }) as DOMRect;
-  });
-};
+    c.getBoundingClientRect = () =>
+      ({ left: (i % 2) * 400, top: Math.floor(i / 2) * 200 }) as DOMRect
+  })
+}
 
 test("the cards are one tab stop, and arrows and hjkl move by position", async () => {
-  await cardsLoaded();
-  expect(cards().filter((c) => c.tabIndex === 0)).toHaveLength(1);
-  const order = cards().map((c) => c.getAttribute("data-page-item"));
-  const [first, second, third] = order.map((o) => cardOf(o!.slice(3)));
-  first.focus();
-  fireEvent.keyDown(first, { key: "ArrowRight" });
-  expect(document.activeElement).toBe(second);
-  fireEvent.keyDown(second, { key: "j" });
-  expect(document.activeElement).toBe(cards()[3]);
-  fireEvent.keyDown(cards()[3], { key: "ArrowLeft" });
-  expect(document.activeElement).toBe(third);
-  fireEvent.keyDown(third, { key: "k" });
-  expect(document.activeElement).toBe(first);
-  expect(cards().filter((c) => c.tabIndex === 0)).toEqual([first]);
-});
+  await cardsLoaded()
+  expect(cards().filter((c) => c.tabIndex === 0)).toHaveLength(1)
+  const order = cards().map((c) => c.getAttribute("data-page-item"))
+  const [first, second, third] = order.map((o) => cardOf(o!.slice(3)))
+  first.focus()
+  fireEvent.keyDown(first, { key: "ArrowRight" })
+  expect(document.activeElement).toBe(second)
+  fireEvent.keyDown(second, { key: "j" })
+  expect(document.activeElement).toBe(cards()[3])
+  fireEvent.keyDown(cards()[3], { key: "ArrowLeft" })
+  expect(document.activeElement).toBe(third)
+  fireEvent.keyDown(third, { key: "k" })
+  expect(document.activeElement).toBe(first)
+  expect(cards().filter((c) => c.tabIndex === 0)).toEqual([first])
+})
 
 // jsdom does not move focus on Tab and user-event is not a dependency, so step through the tab order by hand.
-const tabOrder = () => Array.from(document.querySelectorAll<HTMLElement>("a[href], button, input, [tabindex]")).filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled);
+const tabOrder = () =>
+  Array.from(document.querySelectorAll<HTMLElement>("a[href], button, input, [tabindex]")).filter(
+    (el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled,
+  )
 const tab = (back = false) => {
-  const order = tabOrder();
-  const at = order.indexOf(document.activeElement as HTMLElement);
-  order[(at + (back ? -1 : 1) + order.length) % order.length].focus();
-};
+  const order = tabOrder()
+  const at = order.indexOf(document.activeElement as HTMLElement)
+  order[(at + (back ? -1 : 1) + order.length) % order.length].focus()
+}
 
 test("each area is one tab stop: Tab from the sidebar lands on the page cards once, Shift+Tab returns", async () => {
-  const list = listOf(["a", "b", "c"].map((n) => row(n, { section: "implementing", workspace: "Default" })));
-  stubFetch(list);
-  renderEpics(async () => list, wsConn());
-  await filterBox();
-  const sidebar = screen.getByTestId("sidebar-body");
-  await within(sidebar).findAllByRole("link");
-  await waitFor(() => expect(cards()).toHaveLength(3));
-  const inSidebar = (el: Element | null) => !!el && sidebar.contains(el);
+  const list = listOf(
+    ["a", "b", "c"].map((n) => row(n, { section: "implementing", workspace: "Default" })),
+  )
+  stubFetch(list)
+  renderEpics(async () => list, wsConn())
+  await filterBox()
+  const sidebar = screen.getByTestId("sidebar-body")
+  await within(sidebar).findAllByRole("link")
+  await waitFor(() => expect(cards()).toHaveLength(3))
+  const inSidebar = (el: Element | null) => !!el && sidebar.contains(el)
   // Only the roving items count: the per-row "More actions" buttons are separate stops (see the ticket's Spec deviations).
-  const rowStops = tabOrder().filter((el) => inSidebar(el) && el.hasAttribute("data-nav"));
-  const cardStops = tabOrder().filter((el) => el.hasAttribute("data-page-item"));
-  expect(rowStops).toHaveLength(1);
-  expect(cardStops).toHaveLength(1);
+  const rowStops = tabOrder().filter((el) => inSidebar(el) && el.hasAttribute("data-nav"))
+  const cardStops = tabOrder().filter((el) => el.hasAttribute("data-page-item"))
+  expect(rowStops).toHaveLength(1)
+  expect(cardStops).toHaveLength(1)
 
   // A full Tab cycle from the sidebar row passes the page cards exactly once, and Shift+Tab from the card gets back to the row.
-  const [sidebarRow] = rowStops;
-  const [card] = cardStops;
-  sidebarRow.focus();
-  const forward: HTMLElement[] = [];
+  const [sidebarRow] = rowStops
+  const [card] = cardStops
+  sidebarRow.focus()
+  const forward: HTMLElement[] = []
   do {
-    tab();
-    forward.push(document.activeElement as HTMLElement);
-  } while (document.activeElement !== sidebarRow && forward.length < tabOrder().length);
-  expect(forward.filter((el) => el.hasAttribute("data-page-item"))).toEqual([card]);
+    tab()
+    forward.push(document.activeElement as HTMLElement)
+  } while (document.activeElement !== sidebarRow && forward.length < tabOrder().length)
+  expect(forward.filter((el) => el.hasAttribute("data-page-item"))).toEqual([card])
 
-  card.focus();
-  let steps = 0;
-  while (document.activeElement !== sidebarRow && steps++ < tabOrder().length) tab(true);
-  expect(document.activeElement).toBe(sidebarRow);
-  expect(steps).toBeLessThan(tabOrder().length);
-});
+  card.focus()
+  let steps = 0
+  while (document.activeElement !== sidebarRow && steps++ < tabOrder().length) tab(true)
+  expect(document.activeElement).toBe(sidebarRow)
+  expect(steps).toBeLessThan(tabOrder().length)
+})
 
 test("a focused card carries the inset focus ring", async () => {
-  await cardsLoaded();
-  cardOf("a").focus();
-  expect(document.activeElement?.getAttribute("data-focus-ring")).toBe("inset");
-});
+  await cardsLoaded()
+  cardOf("a").focus()
+  expect(document.activeElement?.getAttribute("data-focus-ring")).toBe("inset")
+})
 
 test("s with a card focused enters the page's select mode; Space and Enter toggle there", async () => {
-  await cardsLoaded();
-  const a = cardOf("a");
-  a.focus();
-  fireEvent.keyDown(a, { key: " " });
-  expect(selectBox("a")).toBeNull();
-  fireEvent.keyDown(a, { key: "s" });
-  expect(selectBox("a")?.checked).toBe(false);
-  fireEvent.keyDown(a, { key: " " });
-  expect(selectBox("a")?.checked).toBe(true);
-  fireEvent.keyDown(a, { key: "Enter" });
-  expect(selectBox("a")?.checked).toBe(false);
-  fireEvent.keyDown(a, { key: "Escape" });
-  expect(selectBox("a")).toBeNull();
-});
+  await cardsLoaded()
+  const a = cardOf("a")
+  a.focus()
+  fireEvent.keyDown(a, { key: " " })
+  expect(selectBox("a")).toBeNull()
+  fireEvent.keyDown(a, { key: "s" })
+  expect(selectBox("a")?.checked).toBe(false)
+  fireEvent.keyDown(a, { key: " " })
+  expect(selectBox("a")?.checked).toBe(true)
+  fireEvent.keyDown(a, { key: "Enter" })
+  expect(selectBox("a")?.checked).toBe(false)
+  fireEvent.keyDown(a, { key: "Escape" })
+  expect(selectBox("a")).toBeNull()
+})
 
 test("Enter on a card opens its title link outside select mode", async () => {
-  await cardsLoaded();
-  const a = cardOf("a");
-  const open = vi.fn((e: Event) => e.preventDefault());
-  a.querySelector("a")!.addEventListener("click", open);
-  fireEvent.keyDown(a, { key: "Enter" });
-  expect(open).toHaveBeenCalledTimes(1);
-});
+  await cardsLoaded()
+  const a = cardOf("a")
+  const open = vi.fn((e: Event) => e.preventDefault())
+  a.querySelector("a")!.addEventListener("click", open)
+  fireEvent.keyDown(a, { key: "Enter" })
+  expect(open).toHaveBeenCalledTimes(1)
+})
 
 test("s with nothing focused leaves the page's select mode off", async () => {
-  await cardsLoaded();
-  fireEvent.keyDown(document.body, { key: "s" });
-  expect(selectBox("a")).toBeNull();
-  expect(focusedCard()).toBeNull();
-});
+  await cardsLoaded()
+  fireEvent.keyDown(document.body, { key: "s" })
+  expect(selectBox("a")).toBeNull()
+  expect(focusedCard()).toBeNull()
+})
 
 test("s typed in the filter is left alone", async () => {
-  await cardsLoaded();
-  fireEvent.keyDown(await filterBox(), { key: "s" });
-  expect(selectBox("a")).toBeNull();
-});
+  await cardsLoaded()
+  fireEvent.keyDown(await filterBox(), { key: "s" })
+  expect(selectBox("a")).toBeNull()
+})

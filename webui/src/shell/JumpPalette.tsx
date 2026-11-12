@@ -1,9 +1,9 @@
-import { Box, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useLocation } from "react-router";
-import { isActionable } from "../agents/rules";
-import { useConnectionContext, useConnectionState } from "../connection";
-import { useEpicList, isCurrent, type FetchEpicList } from "../epics/list";
+import { Box, Text } from "@chakra-ui/react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useLocation } from "react-router"
+import { isActionable } from "../agents/rules"
+import { useConnectionContext, useConnectionState } from "../connection"
+import { useEpicList, isCurrent, type FetchEpicList } from "../epics/list"
 import {
   CardKindDesign,
   CardKindImplementation,
@@ -18,28 +18,32 @@ import {
   type SessionInfo,
   type SessionPlacement,
   type Workspace,
-} from "../generated/server";
-import { ItemMenu, itemOfCard, type ItemRef } from "../workspaces/itemActions";
-import { agentHref } from "../hrefs";
-import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMenu";
-import { useWide } from "../useWide";
-import { cardStatus, sessionStatus, type SidebarStatus } from "../workspaces/sidebarModel";
-import { setJumpOpen, useJumpOpen } from "./jumpOpen";
-import { currentAddress } from "./SidebarRows";
-import { useDismissLayer } from "./useDismissLayer";
+} from "../generated/server"
+import { ItemMenu, itemOfCard, type ItemRef } from "../workspaces/itemActions"
+import { agentHref } from "../hrefs"
+import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMenu"
+import { useWide } from "../useWide"
+import { cardStatus, sessionStatus, type SidebarStatus } from "../workspaces/sidebarModel"
+import { setJumpOpen, useJumpOpen } from "./jumpOpen"
+import { currentAddress } from "./SidebarRows"
+import { useDismissLayer } from "./useDismissLayer"
 
-const isCard = (r: EpicListRow) => r.card_kind === CardKindDesign || r.card_kind === CardKindImplementation;
+const isCard = (r: EpicListRow) =>
+  r.card_kind === CardKindDesign || r.card_kind === CardKindImplementation
 
-const dot = (
-  <Box aria-hidden boxSize="10px" borderRadius="full" bg="text.dim" flex="none" />
-);
+const dot = <Box aria-hidden boxSize="10px" borderRadius="full" bg="text.dim" flex="none" />
 
 function Words({ status }: { status: SidebarStatus }) {
   return (
-    <Text as="span" fontSize="13px" flex="none" color={status.tone === "muted" ? "text.faint" : `tone.${status.tone}.fg`}>
+    <Text
+      as="span"
+      fontSize="13px"
+      flex="none"
+      color={status.tone === "muted" ? "text.faint" : `tone.${status.tone}.fg`}
+    >
       {status.words}
     </Text>
-  );
+  )
 }
 
 /** Words, then the item's "..." menu when it has one. A click on the menu must not pick the row. */
@@ -53,11 +57,16 @@ function trailingOf(status: SidebarStatus, item: ItemRef | undefined, workspaces
         </Box>
       )}
     </>
-  );
+  )
 }
 
-function agentRow(s: SessionInfo, subtitle = "", item?: ItemRef, workspaces: Workspace[] = []): ListRowData {
-  const name = s.name || s.ticket || s.id;
+function agentRow(
+  s: SessionInfo,
+  subtitle = "",
+  item?: ItemRef,
+  workspaces: Workspace[] = [],
+): ListRowData {
+  const name = s.name || s.ticket || s.id
   return {
     key: s.id,
     title: name,
@@ -66,59 +75,90 @@ function agentRow(s: SessionInfo, subtitle = "", item?: ItemRef, workspaces: Wor
     searchText: [name, s.project, s.ticket, subtitle].join(" "),
     lead: dot,
     trailing: trailingOf(sessionStatus(s), item, workspaces),
-  };
+  }
 }
 
 export interface PaletteInput {
-  rows: EpicListRow[];
-  sessions: SessionInfo[];
-  placements: SessionPlacement[];
-  workspaces?: Workspace[];
-  workspace: string;
-  current: string;
+  rows: EpicListRow[]
+  sessions: SessionInfo[]
+  placements: SessionPlacement[]
+  workspaces?: Workspace[]
+  workspace: string
+  current: string
 }
 
 /**
  * The jump palette's sections. Empty filter: the active workspace's Designs, epics and chats, then
  * Needs you for the rest. The sections marked `hiddenUntilSearch` hold everything else.
  */
-export function buildPalette({ rows, sessions, placements, workspaces = [], workspace, current }: PaletteInput): ListSection[] {
-  const byId = new Map(sessions.map((s) => [s.id, s]));
+export function buildPalette({
+  rows,
+  sessions,
+  placements,
+  workspaces = [],
+  workspace,
+  current,
+}: PaletteInput): ListSection[] {
+  const byId = new Map(sessions.map((s) => [s.id, s]))
   const placed = placements.flatMap((p) => {
-    const s = byId.get(p.session);
-    return s ? [{ p, s }] : [];
-  });
-  const cards = rows.filter(isCard);
-  const mine = (r: EpicListRow) => r.workspace === workspace;
+    const s = byId.get(p.session)
+    return s ? [{ p, s }] : []
+  })
+  const cards = rows.filter(isCard)
+  const mine = (r: EpicListRow) => r.workspace === workspace
   const row = (r: EpicListRow, subtitle?: string): ListRowData => {
-    return { ...epicRow(r, isCurrent(r, current)), subtitle: subtitle ?? "", trailing: trailingOf(cardStatus(r), itemOfCard(r), workspaces) };
-  };
-  const elsewhere = (r: EpicListRow) => (mine(r) ? undefined : r.workspace);
-  const held = (r: EpicListRow) => r.section === SectionOnHold;
-  const staged = (r: EpicListRow) => r.section === SectionReadyToDesign || r.section === SectionFinished;
-  const open = cards.filter((r) => !held(r) && !staged(r));
+    return {
+      ...epicRow(r, isCurrent(r, current)),
+      subtitle: subtitle ?? "",
+      trailing: trailingOf(cardStatus(r), itemOfCard(r), workspaces),
+    }
+  }
+  const elsewhere = (r: EpicListRow) => (mine(r) ? undefined : r.workspace)
+  const held = (r: EpicListRow) => r.section === SectionOnHold
+  const staged = (r: EpicListRow) =>
+    r.section === SectionReadyToDesign || r.section === SectionFinished
+  const open = cards.filter((r) => !held(r) && !staged(r))
 
-  const chats = placed.filter(({ p }) => p.kind === PlacementChat);
+  const chats = placed.filter(({ p }) => p.kind === PlacementChat)
   const chatRow = ({ p, s }: { p: SessionPlacement; s: SessionInfo }) =>
     agentRow(
       s,
       p.workspace === workspace ? "" : (p.workspace ?? ""),
-      p.workspace ? { key: s.id, name: s.name || s.ticket || s.id, kind: "chat", workspace: p.workspace } : undefined,
+      p.workspace
+        ? { key: s.id, name: s.name || s.ticket || s.id, kind: "chat", workspace: p.workspace }
+        : undefined,
       workspaces,
-    );
-  const epicName = (epic: string) => cards.find((r) => r.address === epic || r.addresses?.includes(epic))?.name ?? epic;
+    )
+  const epicName = (epic: string) =>
+    cards.find((r) => r.address === epic || r.addresses?.includes(epic))?.name ?? epic
 
   return [
-    { key: "designs", title: "Designs", rows: open.filter((r) => mine(r) && r.card_kind === CardKindDesign).map((r) => row(r)) },
-    { key: "epics", title: "Epics", rows: open.filter((r) => mine(r) && r.card_kind !== CardKindDesign).map((r) => row(r)) },
-    { key: "chats", title: "Chats", rows: chats.filter(({ p }) => p.workspace === workspace).map(chatRow) },
+    {
+      key: "designs",
+      title: "Designs",
+      rows: open.filter((r) => mine(r) && r.card_kind === CardKindDesign).map((r) => row(r)),
+    },
+    {
+      key: "epics",
+      title: "Epics",
+      rows: open.filter((r) => mine(r) && r.card_kind !== CardKindDesign).map((r) => row(r)),
+    },
+    {
+      key: "chats",
+      title: "Chats",
+      rows: chats.filter(({ p }) => p.workspace === workspace).map(chatRow),
+    },
     {
       key: "needs-you",
       title: "Needs you elsewhere",
       rows: [
-        ...open.filter((r) => !mine(r) && r.section === SectionNeedsYou).map((r) => row(r, elsewhere(r))),
+        ...open
+          .filter((r) => !mine(r) && r.section === SectionNeedsYou)
+          .map((r) => row(r, elsewhere(r))),
         ...chats.filter(({ p, s }) => p.workspace !== workspace && isActionable(s)).map(chatRow),
-        ...placed.filter(({ p, s }) => p.kind === PlacementOther && isActionable(s)).map(({ s }) => agentRow(s)),
+        ...placed
+          .filter(({ p, s }) => p.kind === PlacementOther && isActionable(s))
+          .map(({ s }) => agentRow(s)),
       ],
     },
     {
@@ -126,74 +166,104 @@ export function buildPalette({ rows, sessions, placements, workspaces = [], work
       title: "Other workspaces",
       hiddenUntilSearch: true,
       rows: [
-        ...open.filter((r) => !mine(r) && r.section !== SectionNeedsYou).map((r) => row(r, elsewhere(r))),
+        ...open
+          .filter((r) => !mine(r) && r.section !== SectionNeedsYou)
+          .map((r) => row(r, elsewhere(r))),
         ...chats.filter(({ p, s }) => p.workspace !== workspace && !isActionable(s)).map(chatRow),
       ],
     },
-    { key: "on-hold", title: "On hold", hiddenUntilSearch: true, rows: cards.filter(held).map((r) => row(r, "On hold")) },
+    {
+      key: "on-hold",
+      title: "On hold",
+      hiddenUntilSearch: true,
+      rows: cards.filter(held).map((r) => row(r, "On hold")),
+    },
     {
       key: "ready-to-design",
       title: "Ready to design",
       hiddenUntilSearch: true,
-      rows: cards.filter((r) => !held(r) && r.section === SectionReadyToDesign).map((r) => row(r, elsewhere(r))),
+      rows: cards
+        .filter((r) => !held(r) && r.section === SectionReadyToDesign)
+        .map((r) => row(r, elsewhere(r))),
     },
     {
       key: "finished",
       title: "Finished",
       hiddenUntilSearch: true,
-      rows: cards.filter((r) => !held(r) && r.section === SectionFinished).map((r) => row(r, elsewhere(r))),
+      rows: cards
+        .filter((r) => !held(r) && r.section === SectionFinished)
+        .map((r) => row(r, elsewhere(r))),
     },
     {
       key: "agents",
       title: "Agents",
       hiddenUntilSearch: true,
       rows: [
-        ...placed.filter(({ p }) => p.kind === PlacementEpic && !!p.epic).map(({ p, s }) => agentRow(s, epicName(p.epic ?? ""))),
-        ...placed.filter(({ p, s }) => p.kind === PlacementOther && !isActionable(s)).map(({ s }) => agentRow(s)),
+        ...placed
+          .filter(({ p }) => p.kind === PlacementEpic && !!p.epic)
+          .map(({ p, s }) => agentRow(s, epicName(p.epic ?? ""))),
+        ...placed
+          .filter(({ p, s }) => p.kind === PlacementOther && !isActionable(s))
+          .map(({ s }) => agentRow(s)),
       ],
     },
-  ];
+  ]
 }
 
 /** Cmd/Ctrl+K on every page, in text fields too. A popover on tablet and desktop, a full screen on a phone. */
 export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; active: string }) {
-  const conn = useConnectionContext();
-  const { list } = useEpicList(fetcher, conn);
-  const snapshot = useConnectionState(conn).snapshot;
-  const pathname = useLocation().pathname;
-  const phone = !useWide();
-  const open = useJumpOpen();
-  const setOpen = setJumpOpen;
-  const root = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setJumpOpen(false), []);
-  const { isTop, hasLayer } = useDismissLayer({ open, close, root, phone });
+  const conn = useConnectionContext()
+  const { list } = useEpicList(fetcher, conn)
+  const snapshot = useConnectionState(conn).snapshot
+  const pathname = useLocation().pathname
+  const phone = !useWide()
+  const open = useJumpOpen()
+  const setOpen = setJumpOpen
+  const root = useRef<HTMLDivElement>(null)
+  const close = useCallback(() => setJumpOpen(false), [])
+  const { isTop, hasLayer } = useDismissLayer({ open, close, root, phone })
 
-  useEffect(() => () => setJumpOpen(false), []);
+  useEffect(() => () => setJumpOpen(false), [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        if (open ? isTop() : !hasLayer()) setOpen((o) => !o);
+        e.preventDefault()
+        if (open ? isTop() : !hasLayer()) setOpen((o) => !o)
       }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, isTop, hasLayer]);
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [open, isTop, hasLayer])
 
-  const rows = list?.epics;
-  const sessions = snapshot?.sessions;
-  const placements = snapshot?.placements;
-  const workspaces = snapshot?.workspaces;
-  const current = currentAddress(pathname);
+  const rows = list?.epics
+  const sessions = snapshot?.sessions
+  const placements = snapshot?.placements
+  const workspaces = snapshot?.workspaces
+  const current = currentAddress(pathname)
   const sections = useMemo(
-    () => buildPalette({ rows: rows ?? [], sessions: sessions ?? [], placements: placements ?? [], workspaces, workspace: active, current }),
+    () =>
+      buildPalette({
+        rows: rows ?? [],
+        sessions: sessions ?? [],
+        placements: placements ?? [],
+        workspaces,
+        workspace: active,
+        current,
+      }),
     [rows, sessions, placements, workspaces, active, current],
-  );
-  if (!open) return null;
+  )
+  if (!open) return null
   return (
     <Box ref={root} display="contents">
-      <Menu sections={sections} label="Jump to" placeholder="Jump to…" phone={phone} floating onClose={() => setOpen(false)} />
+      <Menu
+        sections={sections}
+        label="Jump to"
+        placeholder="Jump to…"
+        phone={phone}
+        floating
+        onClose={() => setOpen(false)}
+      />
     </Box>
-  );
+  )
 }

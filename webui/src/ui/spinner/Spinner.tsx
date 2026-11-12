@@ -1,5 +1,5 @@
-import { Box, Spinner as ChakraSpinner } from "@chakra-ui/react";
-import type { Tone } from "../tone";
+import { Box, Spinner as ChakraSpinner } from "@chakra-ui/react"
+import type { Tone } from "../tone"
 
 // Centered in both directions in the space the page leaves, for a page that has no data yet.
 export function Spinner({ label, tone = "muted" }: { label: string; tone?: Tone }) {
@@ -15,5 +15,5 @@ export function Spinner({ label, tone = "muted" }: { label: string; tone?: Tone 
     >
       <ChakraSpinner size="xl" borderWidth="3px" color={`tone.${tone}.fg`} />
     </Box>
-  );
+  )
 }

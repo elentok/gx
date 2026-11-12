@@ -1,26 +1,37 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useSearchParams } from "react-router";
-import { useConnectionContext } from "../connection";
-import { useEpicList, type FetchEpicList } from "../epics/list";
-import { DetailPage } from "../page/DetailPage";
-import { PageHeader } from "../page/PageHeader";
-import { PageIcon } from "../page/PageIcon";
-import { SectionHeading } from "../page/SectionHeading";
-import { Button } from "../ui/button/Button";
-import type { ReactNode } from "react";
-import type { StatsAmount } from "../generated/server";
-import type { DaySeries } from "../ui/day-chart/DayChart";
-import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
-import { StatCard } from "../ui/stat-card/StatCard";
-import type { Tone } from "../ui/tone";
-import { amounts, compact, costCardProps, sumNullable } from "./costCards";
-import { LimitBurnCards } from "./LimitBurnCards";
-import { parseRange, RANGES, useStats, type FetchStats, type Stats } from "./stats";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useSearchParams } from "react-router"
+import { useConnectionContext } from "../connection"
+import { useEpicList, type FetchEpicList } from "../epics/list"
+import { DetailPage } from "../page/DetailPage"
+import { PageHeader } from "../page/PageHeader"
+import { PageIcon } from "../page/PageIcon"
+import { SectionHeading } from "../page/SectionHeading"
+import { Button } from "../ui/button/Button"
+import type { ReactNode } from "react"
+import type { StatsAmount } from "../generated/server"
+import type { DaySeries } from "../ui/day-chart/DayChart"
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
+import { StatCard } from "../ui/stat-card/StatCard"
+import type { Tone } from "../ui/tone"
+import { amounts, compact, costCardProps, sumNullable } from "./costCards"
+import { LimitBurnCards } from "./LimitBurnCards"
+import { parseRange, RANGES, useStats, type FetchStats, type Stats } from "./stats"
 
-const sum = (values: number[]) => values.reduce((a, v) => a + v, 0);
-const perDay = (values: number[]) => (values.length === 0 ? 0 : sum(values) / values.length).toFixed(1);
+const sum = (values: number[]) => values.reduce((a, v) => a + v, 0)
+const perDay = (values: number[]) =>
+  (values.length === 0 ? 0 : sum(values) / values.length).toFixed(1)
 
-function Section({ id, title, tone, children }: { id: string; title: string; tone: Tone; children: ReactNode }) {
+function Section({
+  id,
+  title,
+  tone,
+  children,
+}: {
+  id: string
+  title: string
+  tone: Tone
+  children: ReactNode
+}) {
   return (
     <Box mt="6" role="region" aria-labelledby={id}>
       <SectionHeading id={id} tone={tone}>
@@ -30,68 +41,102 @@ function Section({ id, title, tone, children }: { id: string; title: string; ton
         {children}
       </Box>
     </Box>
-  );
+  )
 }
 
 function Throughput({ stats }: { stats: Stats }) {
-  const { days, throughput: t } = stats;
+  const { days, throughput: t } = stats
   return (
     <Section id="stats-throughput" title="Throughput" tone="running">
-        <StatCard title="Tickets merged" days={days} series={[{ key: "tickets", label: "Tickets", tone: "running", values: t.tickets_merged }]} />
-        <StatCard title="Epics merged" days={days} series={[{ key: "epics", label: "Epics", tone: "done", values: t.epics_merged }]} />
-        <StatCard title="Designs completed" days={days} series={[{ key: "designs", label: "Designs", tone: "waiting", values: t.designs_completed }]} />
-        <StatCard
-          title="Lines of code"
-          days={days}
-          chart="diverging"
-          headline={`+${sum(t.lines_added)} −${sum(t.lines_removed)}`}
-          small=""
-          series={[
-            { key: "added", label: "Added", tone: "running", values: t.lines_added },
-            { key: "removed", label: "Removed", tone: "deadlocked", values: t.lines_removed },
-          ]}
-        />
-        <StatCard
-          title="Follow-ups"
-          days={days}
-          chart="side-by-side"
-          headline={`${sum(t.follow_ups_created)} created · ${sum(t.follow_ups_finished)} finished`}
-          small={`${perDay(t.follow_ups_created)}/day created · ${perDay(t.follow_ups_finished)}/day finished`}
-          series={[
-            { key: "created", label: "Created", tone: "waiting", values: t.follow_ups_created },
-            { key: "finished", label: "Finished", tone: "done", values: t.follow_ups_finished },
-          ]}
-        />
-        <StatCard
-          title="Waiting for design"
-          days={days}
-          chart="line"
-          headline={t.waiting_for_design.at(-1) ?? 0}
-          small="maps open now"
-          series={[{ key: "waiting", label: "Open maps", tone: "waiting", values: t.waiting_for_design }]}
-        />
+      <StatCard
+        title="Tickets merged"
+        days={days}
+        series={[{ key: "tickets", label: "Tickets", tone: "running", values: t.tickets_merged }]}
+      />
+      <StatCard
+        title="Epics merged"
+        days={days}
+        series={[{ key: "epics", label: "Epics", tone: "done", values: t.epics_merged }]}
+      />
+      <StatCard
+        title="Designs completed"
+        days={days}
+        series={[
+          { key: "designs", label: "Designs", tone: "waiting", values: t.designs_completed },
+        ]}
+      />
+      <StatCard
+        title="Lines of code"
+        days={days}
+        chart="diverging"
+        headline={`+${sum(t.lines_added)} −${sum(t.lines_removed)}`}
+        small=""
+        series={[
+          { key: "added", label: "Added", tone: "running", values: t.lines_added },
+          { key: "removed", label: "Removed", tone: "deadlocked", values: t.lines_removed },
+        ]}
+      />
+      <StatCard
+        title="Follow-ups"
+        days={days}
+        chart="side-by-side"
+        headline={`${sum(t.follow_ups_created)} created · ${sum(t.follow_ups_finished)} finished`}
+        small={`${perDay(t.follow_ups_created)}/day created · ${perDay(t.follow_ups_finished)}/day finished`}
+        series={[
+          { key: "created", label: "Created", tone: "waiting", values: t.follow_ups_created },
+          { key: "finished", label: "Finished", tone: "done", values: t.follow_ups_finished },
+        ]}
+      />
+      <StatCard
+        title="Waiting for design"
+        days={days}
+        chart="line"
+        headline={t.waiting_for_design.at(-1) ?? 0}
+        small="maps open now"
+        series={[
+          { key: "waiting", label: "Open maps", tone: "waiting", values: t.waiting_for_design },
+        ]}
+      />
     </Section>
-  );
+  )
 }
 
 function Cost({ stats, project }: { stats: Stats; project: string }) {
   return (
     <Section id="stats-cost" title="Cost and effort" tone="waiting">
       <LimitBurnCards days={stats.days} burns={stats.limit_burn} project={project} />
-      <StatCard {...costCardProps(stats, "Tokens", (g) => g.tokens, (h) => h.tokens, compact, (stamps) => (stamps ? " · older days from ticket stamps (lighter)" : ""))} />
-      <StatCard {...costCardProps(stats, "Spend (est.)", (g) => g.spend, (h) => h.dollars, (n) => `$${compact(n)}`, () => " · Codex counts $0")} />
+      <StatCard
+        {...costCardProps(
+          stats,
+          "Tokens",
+          (g) => g.tokens,
+          (h) => h.tokens,
+          compact,
+          (stamps) => (stamps ? " · older days from ticket stamps (lighter)" : ""),
+        )}
+      />
+      <StatCard
+        {...costCardProps(
+          stats,
+          "Spend (est.)",
+          (g) => g.spend,
+          (h) => h.dollars,
+          (n) => `$${compact(n)}`,
+          () => " · Codex counts $0",
+        )}
+      />
     </Section>
-  );
+  )
 }
 
-const thousands = (n: number) => Math.round(n).toLocaleString("en-US");
+const thousands = (n: number) => Math.round(n).toLocaleString("en-US")
 
 function Grilling({ stats }: { stats: Stats }) {
-  const { days, grilling: g } = stats;
+  const { days, grilling: g } = stats
   const card = (title: string, label: string, data: StatsAmount[]) => {
-    const values = amounts(data);
-    const total = sumNullable(values);
-    const dataDays = values.filter((v) => v !== null).length;
+    const values = amounts(data)
+    const total = sumNullable(values)
+    const dataDays = values.filter((v) => v !== null).length
     return (
       <StatCard
         title={title}
@@ -100,43 +145,74 @@ function Grilling({ stats }: { stats: Stats }) {
         headline={thousands(total)}
         small={`${thousands(dataDays === 0 ? 0 : total / dataDays)}/day`}
       />
-    );
-  };
+    )
+  }
   return (
     <Section id="stats-grilling" title="Grilling" tone="done">
       {card("Words read", "Words", g.words)}
       {card("Questions asked", "Questions", g.questions)}
     </Section>
-  );
+  )
 }
 
-const REASON_TONES: Tone[] = ["paused", "waiting", "running", "deadlocked", "done"];
-const ENDING_SOURCES = ["web", "tui", "cli", "gx", "unknown"];
-const ENDING_LABELS: Record<string, string> = { web: "Web", tui: "TUI", cli: "CLI", gx: "gx", unknown: "Unknown" };
+const REASON_TONES: Tone[] = ["paused", "waiting", "running", "deadlocked", "done"]
+const ENDING_SOURCES = ["web", "tui", "cli", "gx", "unknown"]
+const ENDING_LABELS: Record<string, string> = {
+  web: "Web",
+  tui: "TUI",
+  cli: "CLI",
+  gx: "gx",
+  unknown: "Unknown",
+}
 
-const countSeries = (key: string, days: { [key: string]: number }[]) => days.map((d) => d[key] ?? 0);
-const keysOf = (days: { [key: string]: number }[]) => [...new Set(days.flatMap((d) => Object.keys(d)))].sort();
+const countSeries = (key: string, days: { [key: string]: number }[]) => days.map((d) => d[key] ?? 0)
+const keysOf = (days: { [key: string]: number }[]) =>
+  [...new Set(days.flatMap((d) => Object.keys(d)))].sort()
 
 function formatDuration(secs: number) {
-  if (secs < 60) return `${secs}s`;
-  if (secs < 3600) return `${Math.round(secs / 60)}m`;
-  return `${Math.floor(secs / 3600)}h ${Math.round((secs % 3600) / 60)}m`;
+  if (secs < 60) return `${secs}s`
+  if (secs < 3600) return `${Math.round(secs / 60)}m`
+  return `${Math.floor(secs / 3600)}h ${Math.round((secs % 3600) / 60)}m`
 }
 
 function Friction({ stats }: { stats: Stats }) {
-  const { days, friction: f } = stats;
+  const { days, friction: f } = stats
 
   // The server names the top reasons (plus "other" when more exist); the rest are summed into "other" and listed in the tooltip.
-  const top = f.pause_reasons.filter((r) => r !== "other");
-  const foldedKeys = keysOf(f.pauses_by_reason).filter((k) => !top.includes(k));
-  const pauseSeries: DaySeries[] = top.map((r, i) => ({ key: r, label: r, tone: REASON_TONES[i % REASON_TONES.length], values: countSeries(r, f.pauses_by_reason) }));
+  const top = f.pause_reasons.filter((r) => r !== "other")
+  const foldedKeys = keysOf(f.pauses_by_reason).filter((k) => !top.includes(k))
+  const pauseSeries: DaySeries[] = top.map((r, i) => ({
+    key: r,
+    label: r,
+    tone: REASON_TONES[i % REASON_TONES.length],
+    values: countSeries(r, f.pauses_by_reason),
+  }))
   if (f.pause_reasons.includes("other")) {
-    pauseSeries.push({ key: "other", label: "other", tone: "muted", values: f.pauses_by_reason.map((d) => sum(foldedKeys.map((k) => d[k] ?? 0))) });
+    pauseSeries.push({
+      key: "other",
+      label: "other",
+      tone: "muted",
+      values: f.pauses_by_reason.map((d) => sum(foldedKeys.map((k) => d[k] ?? 0))),
+    })
   }
-  const folded = foldedKeys.map((k) => ({ key: k, label: k, values: countSeries(k, f.pauses_by_reason) }));
+  const folded = foldedKeys.map((k) => ({
+    key: k,
+    label: k,
+    values: countSeries(k, f.pauses_by_reason),
+  }))
 
-  const eventSeries: DaySeries[] = keysOf(f.run_events).map((k, i) => ({ key: k, label: k, tone: REASON_TONES[i % REASON_TONES.length], values: countSeries(k, f.run_events) }));
-  const endingSeries: DaySeries[] = ENDING_SOURCES.map((k, i) => ({ key: k, label: ENDING_LABELS[k], tone: REASON_TONES[i % REASON_TONES.length], values: countSeries(k, f.pause_endings) }));
+  const eventSeries: DaySeries[] = keysOf(f.run_events).map((k, i) => ({
+    key: k,
+    label: k,
+    tone: REASON_TONES[i % REASON_TONES.length],
+    values: countSeries(k, f.run_events),
+  }))
+  const endingSeries: DaySeries[] = ENDING_SOURCES.map((k, i) => ({
+    key: k,
+    label: ENDING_LABELS[k],
+    tone: REASON_TONES[i % REASON_TONES.length],
+    values: countSeries(k, f.pause_endings),
+  }))
 
   return (
     <Section id="stats-friction" title="Friction" tone="paused">
@@ -148,25 +224,40 @@ function Friction({ stats }: { stats: Stats }) {
         chart="stacked"
         series={endingSeries}
         headline={f.web_share === undefined ? "—" : `${Math.round(f.web_share * 100)}% web`}
-        small={f.median_resume_secs === undefined ? "" : `median ${formatDuration(f.median_resume_secs)} to resume`}
+        small={
+          f.median_resume_secs === undefined
+            ? ""
+            : `median ${formatDuration(f.median_resume_secs)} to resume`
+        }
       />
     </Section>
-  );
+  )
 }
 
-const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`
 
 function Launch({ stats }: { stats: Stats }) {
-  const { days, launch: l } = stats;
-  const steps = Object.entries(l.step_median_ms).sort(([a], [b]) => a.localeCompare(b));
+  const { days, launch: l } = stats
+  const steps = Object.entries(l.step_median_ms).sort(([a], [b]) => a.localeCompare(b))
   return (
     <Section id="stats-launch" title="Launch" tone="running">
       <StatCard
         title="Launch time"
         days={days}
         headline={l.median_ms === undefined ? "—" : seconds(l.median_ms)}
-        small={l.share_under_target === undefined ? "" : `${Math.round(l.share_under_target * 100)}% under ${seconds(l.target_ms)}`}
-        series={[{ key: "median", label: "Median (s)", tone: "running", values: amounts(l.days).map((v) => (v === null ? null : v / 1000)) }]}
+        small={
+          l.share_under_target === undefined
+            ? ""
+            : `${Math.round(l.share_under_target * 100)}% under ${seconds(l.target_ms)}`
+        }
+        series={[
+          {
+            key: "median",
+            label: "Median (s)",
+            tone: "running",
+            values: amounts(l.days).map((v) => (v === null ? null : v / 1000)),
+          },
+        ]}
       />
       <Box data-testid="launch-steps" display="flex" flexDirection="column" gap="1">
         <Text fontWeight="medium">Median per step</Text>
@@ -182,33 +273,57 @@ function Launch({ stats }: { stats: Stats }) {
         )}
       </Box>
     </Section>
-  );
+  )
 }
 
-const selectProps = { fontSize: "sm", px: "2", py: "1", borderWidth: "1px", borderRadius: "md", bg: "transparent" } as const;
+const selectProps = {
+  fontSize: "sm",
+  px: "2",
+  py: "1",
+  borderWidth: "1px",
+  borderRadius: "md",
+  bg: "transparent",
+} as const
 
-export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats; fetchEpics?: FetchEpicList }) {
-  const conn = useConnectionContext();
-  const [params, setParams] = useSearchParams();
-  const range = parseRange(params.get("range"));
-  const project = params.get("project") ?? "";
-  const { stats, failed, retry } = useStats({ range, project }, fetchStats, conn);
-  const { list } = useEpicList(fetchEpics, conn);
+export function StatsPage({
+  fetchStats,
+  fetchEpics,
+}: {
+  fetchStats?: FetchStats
+  fetchEpics?: FetchEpicList
+}) {
+  const conn = useConnectionContext()
+  const [params, setParams] = useSearchParams()
+  const range = parseRange(params.get("range"))
+  const project = params.get("project") ?? ""
+  const { stats, failed, retry } = useStats({ range, project }, fetchStats, conn)
+  const { list } = useEpicList(fetchEpics, conn)
 
-  const projects = [...new Set([...(list?.epics.map((e) => e.project) ?? []), ...(project ? [project] : [])])].sort();
+  const projects = [
+    ...new Set([...(list?.epics.map((e) => e.project) ?? []), ...(project ? [project] : [])]),
+  ].sort()
   const set = (key: string, value: string) =>
     setParams((p) => {
-      const next = new URLSearchParams(p);
-      if (value) next.set(key, value);
-      else next.delete(key);
-      return next;
-    });
+      const next = new URLSearchParams(p)
+      if (value) next.set(key, value)
+      else next.delete(key)
+      return next
+    })
 
   return (
     <DetailPage title={{ kind: "Stats" }}>
-      <PageHeader title="Stats" icon={<PageIcon kind="stats" />} subtitle={`${project || "All projects"} · last ${range} days`} />
+      <PageHeader
+        title="Stats"
+        icon={<PageIcon kind="stats" />}
+        subtitle={`${project || "All projects"} · last ${range} days`}
+      />
       <Box display="flex" alignItems="center" gap="4" mt="4">
-        <chakra.select aria-label="Project" value={project} onChange={(e) => set("project", e.target.value)} {...selectProps}>
+        <chakra.select
+          aria-label="Project"
+          value={project}
+          onChange={(e) => set("project", e.target.value)}
+          {...selectProps}
+        >
           <option value="">All projects</option>
           {projects.map((p) => (
             <option key={p} value={p}>
@@ -216,7 +331,12 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
             </option>
           ))}
         </chakra.select>
-        <chakra.select aria-label="Range" value={range} onChange={(e) => set("range", e.target.value)} {...selectProps}>
+        <chakra.select
+          aria-label="Range"
+          value={range}
+          onChange={(e) => set("range", e.target.value)}
+          {...selectProps}
+        >
           {RANGES.map((r) => (
             <option key={r} value={r}>
               {r}d
@@ -243,5 +363,5 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
         </>
       )}
     </DetailPage>
-  );
+  )
 }

@@ -1,14 +1,14 @@
-import { Box, Spinner, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import { copyText } from "../clipboard";
-import { useConnectionContext } from "../connection";
-import type { DesignOpenRequest, SessionInfo } from "../generated/server";
-import { Button } from "../ui/button/Button";
-import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu";
-import { MoreActionsButton } from "../ui/menu/MoreActionsButton";
-import { useWide } from "../useWide";
-import { agentDetails } from "./agentDetails";
-import { useWrite } from "../useWrite";
+import { Box, Spinner, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import { copyText } from "../clipboard"
+import { useConnectionContext } from "../connection"
+import type { DesignOpenRequest, SessionInfo } from "../generated/server"
+import { Button } from "../ui/button/Button"
+import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
+import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
+import { useWide } from "../useWide"
+import { agentDetails } from "./agentDetails"
+import { useWrite } from "../useWrite"
 import {
   postDeleteDesign,
   postOpenDesign,
@@ -18,21 +18,21 @@ import {
   type DeleteDesign,
   type OpenFlow,
   type StopSession,
-} from "./open";
+} from "./open"
 
 /** The shared write hook, with a connection refresh after every accepted write. */
 export function useDesignWrite() {
-  const conn = useConnectionContext();
-  const { run, pending } = useWrite();
+  const conn = useConnectionContext()
+  const { run, pending } = useWrite()
   const runThenRefresh: typeof run = (call, opts) =>
     run(call, {
       ...opts,
       onDone: (res) => {
-        conn.refresh();
-        opts?.onDone?.(res);
+        conn.refresh()
+        opts?.onDone?.(res)
       },
-    });
-  return { run: runThenRefresh, pending };
+    })
+  return { run: runThenRefresh, pending }
 }
 
 export const Failure = ({ children }: { children: string }) =>
@@ -40,7 +40,7 @@ export const Failure = ({ children }: { children: string }) =>
     <Text role="alert" fontSize="sm" color="tone.deadlocked.fg">
       {children}
     </Text>
-  ) : null;
+  ) : null
 
 /** Starts the flow's session. `onStarted` runs once it exists, e.g. to go to the Design page. */
 export function StartDesignButton({
@@ -49,20 +49,24 @@ export function StartDesignButton({
   onStarted,
   label = "Start design session",
 }: {
-  address: string;
-  open?: OpenFlow;
-  onStarted?: () => void;
-  label?: string;
+  address: string
+  open?: OpenFlow
+  onStarted?: () => void
+  label?: string
 }) {
-  const { run, pending } = useDesignWrite();
+  const { run, pending } = useDesignWrite()
   return (
     <Box display="flex" alignItems="center" gap="2">
-      <Button tone="running" disabled={pending} onClick={() => run(() => open({ epic: address }), { onDone: onStarted })}>
+      <Button
+        tone="running"
+        disabled={pending}
+        onClick={() => run(() => open({ epic: address }), { onDone: onStarted })}
+      >
         {pending && <Spinner size="sm" />}
         {label}
       </Button>
     </Box>
-  );
+  )
 }
 
 /** Opens a new session for the Design; asks first, and sends the state token, when the shown one is live. */
@@ -72,10 +76,14 @@ export function startNew(
   shown: SessionInfo,
   open: OpenFlow = postOpenDesign,
 ) {
-  const isLive = shown.status.state !== "exited";
-  if (isLive && !window.confirm("Stop the current session and start a new one?")) return;
-  const body: DesignOpenRequest = { epic: address, new: true, ...(isLive ? { state: stateToken(shown) } : {}) };
-  run(() => open(body));
+  const isLive = shown.status.state !== "exited"
+  if (isLive && !window.confirm("Stop the current session and start a new one?")) return
+  const body: DesignOpenRequest = {
+    epic: address,
+    new: true,
+    ...(isLive ? { state: stateToken(shown) } : {}),
+  }
+  run(() => open(body))
 }
 
 /** The live sessions: pick one to show it, or stop one that is not shown. */
@@ -90,18 +98,34 @@ function liveSessionEntries(
     kind: "content",
     value: "live-sessions",
     content: (
-      <Text px="3" pt="2" pb="0.5" fontFamily="mono" fontSize="11px" letterSpacing="0.07em" textTransform="uppercase" color="text.muted">
+      <Text
+        px="3"
+        pt="2"
+        pb="0.5"
+        fontFamily="mono"
+        fontSize="11px"
+        letterSpacing="0.07em"
+        textTransform="uppercase"
+        color="text.muted"
+      >
         Live sessions · {live.length}
       </Text>
     ),
-  };
+  }
   return [
     heading,
     ...live.flatMap((s): MenuEntry[] => {
-      const name = s.name || s.id;
-      const isShown = s.id === shown.id;
+      const name = s.name || s.id
+      const isShown = s.id === shown.id
       return [
-        { value: `session-${s.id}`, label: name, hint: isShown ? "✓" : undefined, inlineHint: true, current: isShown, onSelect: () => onSelect(s.id) },
+        {
+          value: `session-${s.id}`,
+          label: name,
+          hint: isShown ? "✓" : undefined,
+          inlineHint: true,
+          current: isShown,
+          onSelect: () => onSelect(s.id),
+        },
         ...(isShown
           ? []
           : [
@@ -114,13 +138,21 @@ function liveSessionEntries(
                 onSelect: () => onStop(s),
               },
             ]),
-      ];
+      ]
     }),
-  ];
+  ]
 }
 
 /** The in-place confirm "Delete design" turns into before it deletes. */
-function ConfirmDelete({ pending, onKeep, onDelete }: { pending: boolean; onKeep: () => void; onDelete: () => void }) {
+function ConfirmDelete({
+  pending,
+  onKeep,
+  onDelete,
+}: {
+  pending: boolean
+  onKeep: () => void
+  onDelete: () => void
+}) {
   return (
     <Box display="flex" alignItems="center" gap="2" px="3" py="1.5">
       <Text fontSize="sm">Delete this design?</Text>
@@ -132,7 +164,7 @@ function ConfirmDelete({ pending, onKeep, onDelete }: { pending: boolean; onKeep
         Delete
       </Button>
     </Box>
-  );
+  )
 }
 
 /**
@@ -156,52 +188,66 @@ export function DesignActionsMenu({
   onOpenChange,
 }: {
   /** True while the menu is open; the page holds its keyboard layout then. */
-  onOpenChange?: (open: boolean) => void;
-  address: string;
+  onOpenChange?: (open: boolean) => void
+  address: string
   /** Items another flow adds beside Copy ID, such as the Triage's Abandon. */
-  extraItems?: MenuEntry[];
+  extraItems?: MenuEntry[]
   /** Delete, Hold, the epic link and the model row belong to a Design only; another flow's menu leaves them out. */
-  designItems?: boolean;
+  designItems?: boolean
   /** The Move, Remove and Hold sections. Their dialogs belong to the page, so they outlive this menu. */
-  itemGroups?: MenuEntry[][];
+  itemGroups?: MenuEntry[][]
   /** Goes to the Design's epic page; the first menu item. */
-  onOpenEpic?: () => void;
-  shown?: SessionInfo;
+  onOpenEpic?: () => void
+  shown?: SessionInfo
   /** Live design sessions, newest first. */
-  live: SessionInfo[];
+  live: SessionInfo[]
   /** The map has no Destination and no tickets yet, so it can still be deleted. */
-  deletable?: boolean;
-  onSelect: (id: string) => void;
-  onDeleted: () => void;
-  open?: OpenFlow;
-  stop?: StopSession;
-  remove?: DeleteDesign;
+  deletable?: boolean
+  onSelect: (id: string) => void
+  onDeleted: () => void
+  open?: OpenFlow
+  stop?: StopSession
+  remove?: DeleteDesign
 }) {
-  const { run, pending } = useDesignWrite();
-  const [confirming, setConfirming] = useState(false);
-  const wide = useWide();
-  const canDelete = designItems && deletable && live.length === 0;
+  const { run, pending } = useDesignWrite()
+  const [confirming, setConfirming] = useState(false)
+  const wide = useWide()
+  const canDelete = designItems && deletable && live.length === 0
 
-  const groups: MenuEntry[][] = [];
-  const agent = shown && agentSection(shown, wide);
-  if (agent) groups.push(agent);
-  if (designItems && onOpenEpic) groups.push([{ value: "open-design-epic", label: "Open design epic ↗", onSelect: onOpenEpic }]);
-  const sessionItems: MenuEntry[] = [];
+  const groups: MenuEntry[][] = []
+  const agent = shown && agentSection(shown, wide)
+  if (agent) groups.push(agent)
+  if (designItems && onOpenEpic)
+    groups.push([{ value: "open-design-epic", label: "Open design epic ↗", onSelect: onOpenEpic }])
+  const sessionItems: MenuEntry[] = []
   if (shown)
     sessionItems.push({
       value: "new-session",
       disabled: pending,
       label: "New session",
-      hint: shown.status.state === "exited" ? "Start a fresh session" : "Stop this session and start a fresh one",
+      hint:
+        shown.status.state === "exited"
+          ? "Start a fresh session"
+          : "Stop this session and start a fresh one",
       onSelect: () => startNew(run, address, shown, open),
-    });
+    })
   if (shown && live.length > 1)
-    sessionItems.push(...liveSessionEntries(live, shown, pending, onSelect, (s) => run(() => stop({ id: s.id, state: rowToken(s) }))));
-  if (sessionItems.length > 0) groups.push(sessionItems);
+    sessionItems.push(
+      ...liveSessionEntries(live, shown, pending, onSelect, (s) =>
+        run(() => stop({ id: s.id, state: rowToken(s) })),
+      ),
+    )
+  if (sessionItems.length > 0) groups.push(sessionItems)
   const copySection: MenuEntry[] = [
-    { value: "copy-design-id", label: designItems ? "Copy design ID" : "Copy triage ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) },
-  ];
-  copySection.push(...extraItems);
+    {
+      value: "copy-design-id",
+      label: designItems ? "Copy design ID" : "Copy triage ID",
+      hint: address,
+      inlineHint: true,
+      onSelect: () => void copyText(address, null),
+    },
+  ]
+  copySection.push(...extraItems)
   if (canDelete && !confirming)
     copySection.push({
       value: "delete-design",
@@ -209,9 +255,9 @@ export function DesignActionsMenu({
       danger: true,
       closeOnSelect: false,
       onSelect: () => setConfirming(true),
-    });
-  groups.push(copySection);
-  if (designItems) groups.push(...itemGroups);
+    })
+  groups.push(copySection)
+  if (designItems) groups.push(...itemGroups)
   if (canDelete && confirming)
     groups.push([
       {
@@ -225,28 +271,46 @@ export function DesignActionsMenu({
           />
         ),
       },
-    ]);
-  return <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} onOpenChange={onOpenChange} onClosed={() => setConfirming(false)} />;
+    ])
+  return (
+    <GxMenu
+      trigger={<MoreActionsButton />}
+      items={menuGroups(groups)}
+      onOpenChange={onOpenChange}
+      onClosed={() => setConfirming(false)}
+    />
+  )
 }
 
 /**
  * The menu's Agent block for what the footer line leaves out (Tier, the switched note, and Effort on a phone); none when it has no rows.
  */
 export function agentSection(session: SessionInfo, wide: boolean): MenuEntry[] | undefined {
-  const agent = agentDetails(session);
-  const rows: AgentRow[] = [];
-  if (agent.tier) rows.push({ key: "Tier", value: agent.tier });
-  if (!wide && agent.effort) rows.push({ key: "Effort", value: agent.effort });
-  if (agent.switched) rows.push({ note: "switched by hand" });
-  return rows.length > 0 ? [{ kind: "content", value: "agent", content: <AgentBlock rows={rows} /> }] : undefined;
+  const agent = agentDetails(session)
+  const rows: AgentRow[] = []
+  if (agent.tier) rows.push({ key: "Tier", value: agent.tier })
+  if (!wide && agent.effort) rows.push({ key: "Effort", value: agent.effort })
+  if (agent.switched) rows.push({ note: "switched by hand" })
+  return rows.length > 0
+    ? [{ kind: "content", value: "agent", content: <AgentBlock rows={rows} /> }]
+    : undefined
 }
 
-type AgentRow = { key: string; value: string } | { note: string };
+type AgentRow = { key: string; value: string } | { note: string }
 
 function AgentBlock({ rows }: { rows: AgentRow[] }) {
   return (
     <Box>
-      <Text fontFamily="mono" fontSize="11px" letterSpacing="0.07em" textTransform="uppercase" color="text.muted" px="3" pt="2" pb="0.5">
+      <Text
+        fontFamily="mono"
+        fontSize="11px"
+        letterSpacing="0.07em"
+        textTransform="uppercase"
+        color="text.muted"
+        px="3"
+        pt="2"
+        pb="0.5"
+      >
         Agent
       </Text>
       {rows.map((row) => (
@@ -256,7 +320,12 @@ function AgentBlock({ rows }: { rows: AgentRow[] }) {
           // The model name is long; it sits under its label rather than wrapping beside it.
           flexDirection={"key" in row && row.key === "Model" ? "column" : "row"}
           justifyContent="space-between"
-          gap="3" px="3" py="5px" fontSize="13.5px" color="text.dim">
+          gap="3"
+          px="3"
+          py="5px"
+          fontSize="13.5px"
+          color="text.dim"
+        >
           {"key" in row && <span>{row.key}</span>}
           <Text as="b" fontFamily="mono" fontSize="13px" fontWeight="500" color="text">
             {"note" in row ? row.note : row.value}
@@ -264,5 +333,5 @@ function AgentBlock({ rows }: { rows: AgentRow[] }) {
         </Box>
       ))}
     </Box>
-  );
+  )
 }

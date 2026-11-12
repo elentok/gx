@@ -1,13 +1,13 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
-import { Button } from "../ui/button/Button";
-import { Modal } from "../ui/modal/Modal";
-import { refusalText, useWrite } from "../useWrite";
-import { postKeys, type PostKeys } from "./keys";
-import { fetchScreen, type FetchScreen } from "./screen";
-import { changedRows, sameScreen } from "./screenDiff";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useEffect, useRef, useState } from "react"
+import { Button } from "../ui/button/Button"
+import { Modal } from "../ui/modal/Modal"
+import { refusalText, useWrite } from "../useWrite"
+import { postKeys, type PostKeys } from "./keys"
+import { fetchScreen, type FetchScreen } from "./screen"
+import { changedRows, sameScreen } from "./screenDiff"
 
-const FADE_MS = 3000;
+const FADE_MS = 3000
 
 // Label on the button, name the keys route takes.
 const KEYS: [label: string, key: string][] = [
@@ -19,9 +19,10 @@ const KEYS: [label: string, key: string][] = [
   ["←", "left"],
   ["→", "right"],
   ["Ctrl+C", "ctrl+c"],
-];
+]
 
-const keyLabel = (label: string) => ({ "↑": "Up", "↓": "Down", "←": "Left", "→": "Right" })[label] ?? label;
+const keyLabel = (label: string) =>
+  ({ "↑": "Up", "↓": "Down", "←": "Left", "→": "Right" })[label] ?? label
 
 /**
  * A screen as plain text rows; the target is whatever the fetcher takes. It reads once on open and again on Refresh,
@@ -34,73 +35,87 @@ export function ScreenModal({
   poster = postKeys,
   onClose,
 }: {
-  target: string;
-  fetcher?: FetchScreen;
-  keys?: boolean;
-  poster?: PostKeys;
-  onClose: () => void;
+  target: string
+  fetcher?: FetchScreen
+  keys?: boolean
+  poster?: PostKeys
+  onClose: () => void
 }) {
-  const [rows, setRows] = useState<string[]>();
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [text, setText] = useState("");
-  const { run, pending, refusal, error: sendError } = useWrite({ toastRefusal: false });
+  const [rows, setRows] = useState<string[]>()
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [text, setText] = useState("")
+  const { run, pending, refusal, error: sendError } = useWrite({ toastRefusal: false })
   // The rows a key is compared against, kept in a ref so a Refresh between keys is the baseline too.
-  const rowsRef = useRef<string[] | undefined>(undefined);
-  const fadeRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [marked, setMarked] = useState<number[]>([]);
-  const [unchanged, setUnchanged] = useState(false);
-  useEffect(() => () => clearTimeout(fadeRef.current), []);
+  const rowsRef = useRef<string[] | undefined>(undefined)
+  const fadeRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [marked, setMarked] = useState<number[]>([])
+  const [unchanged, setUnchanged] = useState(false)
+  useEffect(() => () => clearTimeout(fadeRef.current), [])
 
   const load = async () => {
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
     try {
-      const res = await fetcher(target);
+      const res = await fetcher(target)
       if (res.kind === "ok") {
-        rowsRef.current = res.detail.rows;
-        setRows(res.detail.rows);
-      } else setError("This session has no screen.");
+        rowsRef.current = res.detail.rows
+        setRows(res.detail.rows)
+      } else setError("This session has no screen.")
     } catch {
-      setError("Could not load the screen. Try Refresh.");
+      setError("Could not load the screen. Try Refresh.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
   useEffect(() => {
-    void load();
+    void load()
     // Only a different target reloads; Refresh is the other way in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target]);
+  }, [target])
 
   const show = (next: string[]) => {
-    const prev = rowsRef.current;
-    rowsRef.current = next;
-    setRows(next);
-    setMarked(prev ? changedRows(prev, next) : []);
-    setUnchanged(!!prev && sameScreen(prev, next));
-    clearTimeout(fadeRef.current);
+    const prev = rowsRef.current
+    rowsRef.current = next
+    setRows(next)
+    setMarked(prev ? changedRows(prev, next) : [])
+    setUnchanged(!!prev && sameScreen(prev, next))
+    clearTimeout(fadeRef.current)
     fadeRef.current = setTimeout(() => {
-      setMarked([]);
-      setUnchanged(false);
-    }, FADE_MS);
-  };
+      setMarked([])
+      setUnchanged(false)
+    }, FADE_MS)
+  }
 
   const send = (body: { key?: string; text?: string }, after?: () => void) =>
     run(() => poster({ id: target, settle: true, ...body }), {
       onDone: (res) => {
-        after?.();
-        if (res.rows) show(res.rows);
-        else void load();
+        after?.()
+        if (res.rows) show(res.rows)
+        else void load()
       },
-    });
+    })
 
-  const problem = refusal ? refusalText(refusal) : sendError;
+  const problem = refusal ? refusalText(refusal) : sendError
 
   return (
-    <Modal label="Screen" onClose={onClose} w={{ md: "min(1200px, 92vw)" }} px={{ md: "5" }} py={{ md: "4.5" }} gap={{ md: "3" }}>
+    <Modal
+      label="Screen"
+      onClose={onClose}
+      w={{ md: "min(1200px, 92vw)" }}
+      px={{ md: "5" }}
+      py={{ md: "4.5" }}
+      gap={{ md: "3" }}
+    >
       <Box display="flex" gap="2" alignItems="center" justifyContent="space-between">
-        <Text as="h3" m="0" fontFamily="condensed" fontSize="22px" textTransform="uppercase" letterSpacing="0.02em">
+        <Text
+          as="h3"
+          m="0"
+          fontFamily="condensed"
+          fontSize="22px"
+          textTransform="uppercase"
+          letterSpacing="0.02em"
+        >
           Screen
         </Text>
         <Box display="flex" gap="2">
@@ -146,7 +161,13 @@ export function ScreenModal({
       {keys && (
         <>
           <Box display="flex" flexDirection="column" gap="1.5" aria-label="Keys" role="group">
-            <Text fontSize="xs" color="text.dim" textTransform="uppercase" letterSpacing="0.06em" fontWeight="600">
+            <Text
+              fontSize="xs"
+              color="text.dim"
+              textTransform="uppercase"
+              letterSpacing="0.06em"
+              fontWeight="600"
+            >
               Keys
             </Text>
             <Box display="flex" flexWrap="wrap" gap="1.5">
@@ -175,11 +196,17 @@ export function ScreenModal({
             flexDirection="column"
             gap="1.5"
             onSubmit={(e: React.FormEvent) => {
-              e.preventDefault();
-              if (text) void send({ text }, () => setText(""));
+              e.preventDefault()
+              if (text) void send({ text }, () => setText(""))
             }}
           >
-            <Text fontSize="xs" color="text.dim" textTransform="uppercase" letterSpacing="0.06em" fontWeight="600">
+            <Text
+              fontSize="xs"
+              color="text.dim"
+              textTransform="uppercase"
+              letterSpacing="0.06em"
+              fontWeight="600"
+            >
               Type text
             </Text>
             <Box display="flex" gap="2">
@@ -196,7 +223,14 @@ export function ScreenModal({
                 borderRadius="8px"
                 bg="surface.raised"
               />
-              <Button type="submit" emphasis="secondary" disabled={pending} h={{ base: "44px", md: "40px" }} fontWeight="400" fontSize="13px">
+              <Button
+                type="submit"
+                emphasis="secondary"
+                disabled={pending}
+                h={{ base: "44px", md: "40px" }}
+                fontWeight="400"
+                fontSize="13px"
+              >
                 Type
               </Button>
             </Box>
@@ -205,5 +239,5 @@ export function ScreenModal({
         </>
       )}
     </Modal>
-  );
+  )
 }

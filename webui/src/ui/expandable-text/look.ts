@@ -3,4 +3,4 @@ export const fieldLook = {
   color: "text",
   bg: "surface.raised",
   borderColor: "hairline",
-} as const;
+} as const

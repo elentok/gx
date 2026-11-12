@@ -1,15 +1,9 @@
-import { Box } from "@chakra-ui/react";
-import type { ReactNode } from "react";
-import type { Tone } from "../tone";
+import { Box } from "@chakra-ui/react"
+import type { ReactNode } from "react"
+import type { Tone } from "../tone"
 
 // Thin full-width banner, e.g. the Offline notice.
-export function Strip({
-  tone = "muted",
-  children,
-}: {
-  tone?: Tone;
-  children: ReactNode;
-}) {
+export function Strip({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {
   // The tone background is translucent; the opaque surface behind it keeps what scrolls under from showing.
   return (
     <Box bg="surface">
@@ -29,5 +23,5 @@ export function Strip({
         {children}
       </Box>
     </Box>
-  );
+  )
 }

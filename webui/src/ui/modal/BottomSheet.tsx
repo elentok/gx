@@ -1,43 +1,71 @@
-import { Box, type BoxProps } from "@chakra-ui/react";
-import type { ReactNode, Ref } from "react";
-import { useWide } from "../../useWide";
-import { Modal } from "./Modal";
-import { useVisualViewportHeight } from "./useVisualViewportHeight";
+import { Box, type BoxProps } from "@chakra-ui/react"
+import type { ReactNode, Ref } from "react"
+import { useWide } from "../../useWide"
+import { Modal } from "./Modal"
+import { useVisualViewportHeight } from "./useVisualViewportHeight"
 
 /** The sheet panel's corners and width, shared by a Modal and a Menu that sit at the bottom of the screen. */
-export const sheetPanel = { w: "full", borderTopRadius: "xl", borderBottomRadius: "0" } as const;
+export const sheetPanel = { w: "full", borderTopRadius: "xl", borderBottomRadius: "0" } as const
 
 /** The pill at the top of a bottom sheet. */
 export const GrabHandle = (props: BoxProps) => (
-  <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" borderRadius="full" bg="border" flexShrink="0" {...props} />
-);
+  <Box
+    aria-hidden
+    data-testid="grab-handle"
+    alignSelf="center"
+    w="36px"
+    h="4px"
+    borderRadius="full"
+    bg="border"
+    flexShrink="0"
+    {...props}
+  />
+)
 
 interface BottomSheetProps extends Omit<BoxProps, "children"> {
-  label: string;
-  onClose: () => void;
+  label: string
+  onClose: () => void
   /** Keep the TopBar uncovered. */
-  belowTopBar?: boolean;
+  belowTopBar?: boolean
   /** Follow the visual viewport's height so the on-screen keyboard does not hide the footer; otherwise the sheet is as tall as its content, up to 80%. */
-  fillViewport?: boolean;
+  fillViewport?: boolean
   /** The panel's props on a wide screen, where this is a centered Modal and not a sheet. */
-  desktop?: BoxProps;
+  desktop?: BoxProps
   /** On a wide screen, follow the visual viewport like a filling sheet; the panel is at most 680px tall. */
-  followViewport?: boolean;
+  followViewport?: boolean
   /** Escape closes the topmost layer; false to ignore it. */
-  closeOnEscape?: boolean;
+  closeOnEscape?: boolean
   /** A press on the backdrop closes the sheet on a phone; false to ignore it. A wide screen's backdrop always closes. */
-  closeOnNarrowBackdrop?: boolean;
-  ref?: Ref<HTMLDivElement>;
-  children: ReactNode;
+  closeOnNarrowBackdrop?: boolean
+  ref?: Ref<HTMLDivElement>
+  children: ReactNode
 }
 
 /** A Modal that is a bottom sheet on a phone, with a grab handle, and a centered dialog on a wide screen. */
-export function BottomSheet({ belowTopBar, fillViewport, desktop, followViewport, closeOnNarrowBackdrop = true, children, ...modal }: BottomSheetProps) {
-  const sheetMode = !useWide();
-  const viewport = useVisualViewportHeight(belowTopBar);
+export function BottomSheet({
+  belowTopBar,
+  fillViewport,
+  desktop,
+  followViewport,
+  closeOnNarrowBackdrop = true,
+  children,
+  ...modal
+}: BottomSheetProps) {
+  const sheetMode = !useWide()
+  const viewport = useVisualViewportHeight(belowTopBar)
   if (!sheetMode) {
-    const follow = followViewport ? { backdrop: { inset: undefined, ...viewport.overlay }, h: viewport.sheetHeight, maxH: "680px" } : {};
-    return <Modal {...modal} {...desktop} {...follow}>{children}</Modal>;
+    const follow = followViewport
+      ? {
+          backdrop: { inset: undefined, ...viewport.overlay },
+          h: viewport.sheetHeight,
+          maxH: "680px",
+        }
+      : {}
+    return (
+      <Modal {...modal} {...desktop} {...follow}>
+        {children}
+      </Modal>
+    )
   }
   return (
     <Modal
@@ -50,5 +78,5 @@ export function BottomSheet({ belowTopBar, fillViewport, desktop, followViewport
       <GrabHandle mt="2" />
       {children}
     </Modal>
-  );
+  )
 }

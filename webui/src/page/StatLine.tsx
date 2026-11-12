@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react"
 
 // One dim line of values joined by " · ".
 export function StatLine({ values }: { values: string[] }) {
@@ -6,5 +6,5 @@ export function StatLine({ values }: { values: string[] }) {
     <Text mt="2" fontSize="sm" color="text.muted">
       {values.join(" · ")}
     </Text>
-  );
+  )
 }

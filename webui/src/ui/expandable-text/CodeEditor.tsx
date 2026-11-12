@@ -1,72 +1,77 @@
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { Compartment, EditorState, Prec } from "@codemirror/state";
-import { EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view";
-import { getCM, vim, Vim } from "@replit/codemirror-vim";
-import { Box } from "@chakra-ui/react";
-import { useEffect, useImperativeHandle, useRef, type MutableRefObject, type Ref } from "react";
-import type { MenuKey } from "../../commands/useCompletion";
-import type { Selection } from "./LargeEditor";
-import { fieldLook } from "./look";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
+import { Compartment, EditorState, Prec } from "@codemirror/state"
+import { EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view"
+import { getCM, vim, Vim } from "@replit/codemirror-vim"
+import { Box } from "@chakra-ui/react"
+import { useEffect, useImperativeHandle, useRef, type MutableRefObject, type Ref } from "react"
+import type { MenuKey } from "../../commands/useCompletion"
+import type { Selection } from "./LargeEditor"
+import { fieldLook } from "./look"
 
-export type ViMode = "INSERT" | "NORMAL" | "VISUAL";
+export type ViMode = "INSERT" | "NORMAL" | "VISUAL"
 
 /**
  * The editor's host carries its vi mode here while vi is on. InterruptControl reads it by this name from the
  * DOM, which keeps it free of CodeMirror and lets it judge an Esc before vim handles it.
  */
-const VI_MODE_ATTR = "data-vi-mode";
+const VI_MODE_ATTR = "data-vi-mode"
 
 /** What the host can ask of the editor. */
 export type CodeEditorHandle = {
   /** Sends vi Escape and keeps focus in the editor. */
-  escape: () => void;
-};
+  escape: () => void
+}
 
 // The vim registry is module-level, so ZZ finds its editor's callback through the view it fires in.
-const closers = new WeakMap<object, () => void>();
-let mapped = false;
+const closers = new WeakMap<object, () => void>()
+let mapped = false
 
 function mapOnce() {
-  if (mapped) return;
-  mapped = true;
+  if (mapped) return
+  mapped = true
   for (const ctx of ["normal", "visual"]) {
     // Screen lines, not paragraphs.
-    Vim.map("j", "gj", ctx);
-    Vim.map("k", "gk", ctx);
-    Vim.map("gs", "0", ctx);
+    Vim.map("j", "gj", ctx)
+    Vim.map("k", "gk", ctx)
+    Vim.map("gs", "0", ctx)
     // Replaces vim's "end of previous word".
-    Vim.map("ge", "$", ctx);
+    Vim.map("ge", "$", ctx)
   }
-  Vim.defineAction("closeEditor", (cm: object) => closers.get(cm)?.());
-  Vim.mapCommand("ZZ", "action", "closeEditor", {}, { context: "normal" });
+  Vim.defineAction("closeEditor", (cm: object) => closers.get(cm)?.())
+  Vim.mapCommand("ZZ", "action", "closeEditor", {}, { context: "normal" })
 }
 
 function modeOf(mode: string): ViMode {
-  if (mode === "visual") return "VISUAL";
-  return mode === "insert" || mode === "replace" ? "INSERT" : "NORMAL";
+  if (mode === "visual") return "VISUAL"
+  return mode === "insert" || mode === "replace" ? "INSERT" : "NORMAL"
 }
 
 const theme = EditorView.theme({
-  "&": { height: "100%", fontSize: fieldLook.fontSize, color: "inherit", backgroundColor: "transparent" },
+  "&": {
+    height: "100%",
+    fontSize: fieldLook.fontSize,
+    color: "inherit",
+    backgroundColor: "transparent",
+  },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "inherit", lineHeight: "1.55", overflow: "auto" },
   ".cm-content": { padding: "12px" },
   ".cm-line": { padding: "0" },
   ".cm-placeholder": { color: "var(--chakra-colors-text-dim)" },
-});
+})
 
 /** The first and last differing positions, so an outside edit keeps the caret where it was. */
 function diff(a: string, b: string) {
-  let start = 0;
-  const max = Math.min(a.length, b.length);
-  while (start < max && a[start] === b[start]) start++;
-  let endA = a.length;
-  let endB = b.length;
+  let start = 0
+  const max = Math.min(a.length, b.length)
+  while (start < max && a[start] === b[start]) start++
+  let endA = a.length
+  let endB = b.length
   while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
-    endA--;
-    endB--;
+    endA--
+    endB--
   }
-  return { from: start, to: endA, insert: b.slice(start, endB) };
+  return { from: start, to: endA, insert: b.slice(start, endB) }
 }
 
 /** A CodeMirror 6 editor over the parent's text. Loaded lazily by LargeEditor. */
@@ -86,78 +91,94 @@ export default function CodeEditor({
   caret,
   handle,
 }: {
-  label: string;
-  value: string;
-  onChange: (text: string) => void;
-  placeholder?: string;
+  label: string
+  value: string
+  onChange: (text: string) => void
+  placeholder?: string
   /** The selection to open with. Read once. */
-  selection: Selection;
-  onSelectionChange: (selection: Selection) => void;
+  selection: Selection
+  onSelectionChange: (selection: Selection) => void
   /** Vi keys on or off. Applies live. */
-  viMode: boolean;
+  viMode: boolean
   /** The vi mode, on every change. Not called with vi mode off. */
-  onModeChange?: (mode: ViMode) => void;
+  onModeChange?: (mode: ViMode) => void
   /** ZZ in normal mode. */
-  onZZ?: () => void;
+  onZZ?: () => void
   /** Mod-Enter. The key is handled either way, so it never inserts a line or reaches a form. */
-  onSubmit?: () => void;
+  onSubmit?: () => void
   /** Mod-g. Left unhandled when absent. */
-  onToggle?: () => void;
+  onToggle?: () => void
   /** Every keydown first; true means the host used it (a completion menu), so the editor skips it. */
-  onMenuKey?: (e: MenuKey) => boolean;
+  onMenuKey?: (e: MenuKey) => boolean
   /** Where the caret goes after the next outside edit, then cleared. */
-  caret?: MutableRefObject<number | null>;
-  handle?: Ref<CodeEditorHandle>;
+  caret?: MutableRefObject<number | null>
+  handle?: Ref<CodeEditorHandle>
 }) {
-  const host = useRef<HTMLDivElement>(null);
-  const view = useRef<EditorView | null>(null);
-  const callbacks = useRef({ onChange, onSelectionChange, onModeChange, onZZ, onSubmit, onToggle, onMenuKey });
-  callbacks.current = { onChange, onSelectionChange, onModeChange, onZZ, onSubmit, onToggle, onMenuKey };
-  const external = useRef(false);
-  const viSlot = useRef(new Compartment());
-  const stopVi = useRef<(() => void) | null>(null);
+  const host = useRef<HTMLDivElement>(null)
+  const view = useRef<EditorView | null>(null)
+  const callbacks = useRef({
+    onChange,
+    onSelectionChange,
+    onModeChange,
+    onZZ,
+    onSubmit,
+    onToggle,
+    onMenuKey,
+  })
+  callbacks.current = {
+    onChange,
+    onSelectionChange,
+    onModeChange,
+    onZZ,
+    onSubmit,
+    onToggle,
+    onMenuKey,
+  }
+  const external = useRef(false)
+  const viSlot = useRef(new Compartment())
+  const stopVi = useRef<(() => void) | null>(null)
 
   // Turns the engine on: it starts in insert mode and reports every mode change.
   const startVi = (v: EditorView) => {
-    mapOnce();
-    const cm = getCM(v);
-    if (!cm) return;
-    const dom = v.dom.parentElement;
+    mapOnce()
+    const cm = getCM(v)
+    if (!cm) return
+    const dom = v.dom.parentElement
     const onMode = (e: { mode: string }) => {
-      const mode = modeOf(e.mode);
-      dom?.setAttribute(VI_MODE_ATTR, mode);
-      callbacks.current.onModeChange?.(mode);
-    };
-    cm.on("vim-mode-change", onMode);
-    dom?.setAttribute(VI_MODE_ATTR, "INSERT");
-    closers.set(cm, () => callbacks.current.onZZ?.());
+      const mode = modeOf(e.mode)
+      dom?.setAttribute(VI_MODE_ATTR, mode)
+      callbacks.current.onModeChange?.(mode)
+    }
+    cm.on("vim-mode-change", onMode)
+    dom?.setAttribute(VI_MODE_ATTR, "INSERT")
+    closers.set(cm, () => callbacks.current.onZZ?.())
     // Entering insert mode with i collapses the selection; put it back.
-    const { anchor, head } = v.state.selection.main;
-    Vim.handleKey(cm, "i", "mapping");
-    v.dispatch({ selection: { anchor, head } });
-    callbacks.current.onModeChange?.("INSERT");
+    const { anchor, head } = v.state.selection.main
+    Vim.handleKey(cm, "i", "mapping")
+    v.dispatch({ selection: { anchor, head } })
+    callbacks.current.onModeChange?.("INSERT")
     stopVi.current = () => {
-      cm.off("vim-mode-change", onMode);
-      dom?.removeAttribute(VI_MODE_ATTR);
-      closers.delete(cm);
-    };
-  };
+      cm.off("vim-mode-change", onMode)
+      dom?.removeAttribute(VI_MODE_ATTR)
+      closers.delete(cm)
+    }
+  }
 
   useImperativeHandle(
     handle,
     () => ({
       escape() {
-        const v = view.current;
-        const cm = v && getCM(v);
-        if (cm) Vim.handleKey(cm, "<Esc>", "user");
-        v?.focus();
+        const v = view.current
+        const cm = v && getCM(v)
+        if (cm) Vim.handleKey(cm, "<Esc>", "user")
+        v?.focus()
       },
     }),
     [],
-  );
+  )
 
   useEffect(() => {
-    const clamp = (n: number) => Math.min(n, value.length);
+    const clamp = (n: number) => Math.min(n, value.length)
     const v = new EditorView({
       parent: host.current!,
       state: EditorState.create({
@@ -178,15 +199,19 @@ export default function CodeEditor({
                 preventDefault: true,
                 stopPropagation: true,
                 run: () => {
-                  if (!callbacks.current.onToggle) return false;
-                  callbacks.current.onToggle();
-                  return true;
+                  if (!callbacks.current.onToggle) return false
+                  callbacks.current.onToggle()
+                  return true
                 },
               },
             ]),
           ),
           // Before vim, so Escape closes an open menu before it leaves insert mode.
-          Prec.highest(EditorView.domEventHandlers({ keydown: (e) => callbacks.current.onMenuKey?.(e) ?? false })),
+          Prec.highest(
+            EditorView.domEventHandlers({
+              keydown: (e) => callbacks.current.onMenuKey?.(e) ?? false,
+            }),
+          ),
           viSlot.current.of(viMode ? vim() : []),
           history(),
           // No indentWithTab: Tab and Shift-Tab keep moving focus.
@@ -198,62 +223,76 @@ export default function CodeEditor({
           // A click or tap forgets the stored column, so the next j starts from the clicked spot.
           EditorView.domEventHandlers({
             pointerdown: (_e, v) => {
-              const vimState = getCM(v)?.state.vim;
-              if (vimState) vimState.lastMotion = null;
+              const vimState = getCM(v)?.state.vim
+              if (vimState) vimState.lastMotion = null
             },
           }),
           EditorView.updateListener.of((u) => {
-            if (u.docChanged && !external.current) callbacks.current.onChange(u.state.doc.toString());
+            if (u.docChanged && !external.current)
+              callbacks.current.onChange(u.state.doc.toString())
             if (u.selectionSet || u.docChanged) {
-              const { from, to } = u.state.selection.main;
-              callbacks.current.onSelectionChange({ start: from, end: to });
+              const { from, to } = u.state.selection.main
+              callbacks.current.onSelectionChange({ start: from, end: to })
             }
           }),
         ],
       }),
-    });
-    view.current = v;
-    if (viMode) startVi(v);
-    v.focus();
+    })
+    view.current = v
+    if (viMode) startVi(v)
+    v.focus()
     // The editor is created once; later props are applied by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => {
-      stopVi.current?.();
-      stopVi.current = null;
-      v.destroy();
-    };
-  }, []);
+      stopVi.current?.()
+      stopVi.current = null
+      v.destroy()
+    }
+  }, [])
 
-  const firstVi = useRef(true);
+  const firstVi = useRef(true)
   useEffect(() => {
     // The first run is the creation above.
     if (firstVi.current) {
-      firstVi.current = false;
-      return;
+      firstVi.current = false
+      return
     }
-    const v = view.current;
-    if (!v) return;
-    stopVi.current?.();
-    stopVi.current = null;
-    v.dispatch({ effects: viSlot.current.reconfigure(viMode ? vim() : []) });
-    if (viMode) startVi(v);
+    const v = view.current
+    if (!v) return
+    stopVi.current?.()
+    stopVi.current = null
+    v.dispatch({ effects: viSlot.current.reconfigure(viMode ? vim() : []) })
+    if (viMode) startVi(v)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viMode]);
+  }, [viMode])
 
   useEffect(() => {
-    const v = view.current;
-    if (!v) return;
-    const current = v.state.doc.toString();
-    if (current === value) return;
-    external.current = true;
+    const v = view.current
+    if (!v) return
+    const current = v.state.doc.toString()
+    if (current === value) return
+    external.current = true
     try {
-      const at = caret?.current;
-      caret && (caret.current = null);
-      v.dispatch({ changes: diff(current, value), ...(at == null ? {} : { selection: { anchor: Math.min(at, value.length) } }) });
+      const at = caret?.current
+      caret && (caret.current = null)
+      v.dispatch({
+        changes: diff(current, value),
+        ...(at == null ? {} : { selection: { anchor: Math.min(at, value.length) } }),
+      })
     } finally {
-      external.current = false;
+      external.current = false
     }
-  }, [value]);
+  }, [value])
 
-  return <Box ref={host} flex="1" minH="0" overflow="hidden" borderWidth="1px" borderRadius="10px" {...fieldLook} />;
+  return (
+    <Box
+      ref={host}
+      flex="1"
+      minH="0"
+      overflow="hidden"
+      borderWidth="1px"
+      borderRadius="10px"
+      {...fieldLook}
+    />
+  )
 }

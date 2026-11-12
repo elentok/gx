@@ -1,70 +1,67 @@
-import { Box, Menu as ChakraMenu, Portal, Text } from "@chakra-ui/react";
-import { Fragment, useState, type ReactElement, type ReactNode } from "react";
-import { useWide } from "../../useWide";
-import { useCloseSignal, useOnCloseSignal } from "../closeSignal";
-import { PhoneMenu } from "./PhoneMenu";
-import { useReportOpen } from "./useReportOpen";
+import { Box, Menu as ChakraMenu, Portal, Text } from "@chakra-ui/react"
+import { Fragment, useState, type ReactElement, type ReactNode } from "react"
+import { useWide } from "../../useWide"
+import { useCloseSignal, useOnCloseSignal } from "../closeSignal"
+import { PhoneMenu } from "./PhoneMenu"
+import { useReportOpen } from "./useReportOpen"
 
 interface ItemBase {
   /** Unique within the menu; also the key. */
-  value: string;
-  label: ReactNode;
+  value: string
+  label: ReactNode
   /** A smaller line under the label, or at the right edge with `inlineHint`. */
-  hint?: ReactNode;
-  inlineHint?: boolean;
-  disabled?: boolean;
+  hint?: ReactNode
+  inlineHint?: boolean
+  disabled?: boolean
   /** Why the item is disabled; shown as its hint and as its title. */
-  disabledReason?: string;
+  disabledReason?: string
 }
 
 export interface ActionItem extends ItemBase {
-  kind?: "action";
-  danger?: boolean;
+  kind?: "action"
+  danger?: boolean
   /** Marks the item that is the current choice (aria-current); false marks it as not current. */
-  current?: boolean;
+  current?: boolean
   /** False keeps the menu open after the pick. */
-  closeOnSelect?: boolean;
-  onSelect: () => void;
+  closeOnSelect?: boolean
+  onSelect: () => void
 }
 
 export interface CheckboxItem extends ItemBase {
-  kind: "checkbox";
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-  closeOnSelect?: boolean;
+  kind: "checkbox"
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+  closeOnSelect?: boolean
 }
 
 export interface RadioGroupItem {
-  kind: "radio-group";
+  kind: "radio-group"
   /** Names the group; also the key. */
-  value: string;
-  current: string;
-  onValueChange: (value: string) => void;
+  value: string
+  current: string
+  onValueChange: (value: string) => void
   options: {
-    value: string;
-    label: ReactNode;
-    hint?: ReactNode;
-    disabled?: boolean;
-  }[];
+    value: string
+    label: ReactNode
+    hint?: ReactNode
+    disabled?: boolean
+  }[]
 }
 
-export interface SubmenuItem extends Omit<
-  ItemBase,
-  "disabled" | "disabledReason"
-> {
-  kind: "submenu";
-  items: MenuEntry[];
+export interface SubmenuItem extends Omit<ItemBase, "disabled" | "disabledReason"> {
+  kind: "submenu"
+  items: MenuEntry[]
 }
 
 export interface SeparatorItem {
-  kind: "separator";
+  kind: "separator"
 }
 
 /** A free-form row (a key-value block, a row with its own button). */
 export interface ContentItem {
-  kind: "content";
-  value: string;
-  content: ReactNode;
+  kind: "content"
+  value: string
+  content: ReactNode
 }
 
 export type MenuEntry =
@@ -73,13 +70,13 @@ export type MenuEntry =
   | RadioGroupItem
   | SubmenuItem
   | SeparatorItem
-  | ContentItem;
+  | ContentItem
 
 /** Joins groups of entries into one list with a rule between non-empty groups. */
 export function menuGroups(groups: MenuEntry[][]): MenuEntry[] {
   return groups
     .filter((g) => g.length > 0)
-    .flatMap((g, i) => (i > 0 ? [{ kind: "separator" } as const, ...g] : g));
+    .flatMap((g, i) => (i > 0 ? [{ kind: "separator" } as const, ...g] : g))
 }
 
 /** The one place item styling and focus state are drawn. */
@@ -91,7 +88,7 @@ const itemStyle = {
   fontSize: "15px",
   _highlighted: { bg: "surface" },
   _disabled: { cursor: "not-allowed", color: "text.muted" },
-} as const;
+} as const
 
 function rowLayout(inlineHint?: boolean) {
   return inlineHint
@@ -101,12 +98,11 @@ function rowLayout(inlineHint?: boolean) {
         justifyContent: "space-between",
         gap: "10px",
       } as const)
-    : ({ flexDirection: "column", alignItems: "flex-start" } as const);
+    : ({ flexDirection: "column", alignItems: "flex-start" } as const)
 }
 
 function Label({ item }: { item: ItemBase }) {
-  const hint =
-    item.disabled && item.disabledReason ? item.disabledReason : item.hint;
+  const hint = item.disabled && item.disabledReason ? item.disabledReason : item.hint
   return (
     <>
       <Text as="span">{item.label}</Text>
@@ -116,15 +112,15 @@ function Label({ item }: { item: ItemBase }) {
         </Text>
       )}
     </>
-  );
+  )
 }
 
 function Entry({ entry }: { entry: MenuEntry }) {
   switch (entry.kind) {
     case "separator":
-      return <ChakraMenu.Separator bg="border" mx="1" my="1.5" />;
+      return <ChakraMenu.Separator bg="border" mx="1" my="1.5" />
     case "content":
-      return <Box>{entry.content}</Box>;
+      return <Box>{entry.content}</Box>
     case "checkbox":
       return (
         <ChakraMenu.CheckboxItem
@@ -140,7 +136,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
           <Label item={entry} />
           {!entry.inlineHint && <ChakraMenu.ItemIndicator />}
         </ChakraMenu.CheckboxItem>
-      );
+      )
     case "radio-group":
       return (
         <ChakraMenu.RadioItemGroup
@@ -161,7 +157,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
             </ChakraMenu.RadioItem>
           ))}
         </ChakraMenu.RadioItemGroup>
-      );
+      )
     case "submenu":
       return (
         <ChakraMenu.Root
@@ -175,12 +171,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
                 <Text as="span">{entry.label}</Text>
                 <Box display="flex" alignItems="center" gap="2" minW="0">
                   {entry.hint && (
-                    <Text
-                      as="span"
-                      fontSize="xs"
-                      fontWeight="400"
-                      color="text.muted"
-                    >
+                    <Text as="span" fontSize="xs" fontWeight="400" color="text.muted">
                       {entry.hint}
                     </Text>
                   )}
@@ -191,11 +182,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
               </>
             ) : (
               <>
-                <Box
-                  display="flex"
-                  flexDirection="column"
-                  alignItems="flex-start"
-                >
+                <Box display="flex" flexDirection="column" alignItems="flex-start">
                   <Label item={entry} />
                 </Box>
                 <Text as="span" aria-hidden>
@@ -206,7 +193,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
           </ChakraMenu.TriggerItem>
           <Panel entries={entry.items} />
         </ChakraMenu.Root>
-      );
+      )
     default:
       return (
         <ChakraMenu.Item
@@ -222,7 +209,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
         >
           <Label item={entry} />
         </ChakraMenu.Item>
-      );
+      )
   }
 }
 
@@ -231,12 +218,7 @@ function Panel({ entries }: { entries: MenuEntry[] }) {
   return (
     <Portal>
       <ChakraMenu.Positioner>
-        <ChakraMenu.Content
-          bg="surface.raised"
-          borderWidth="1px"
-          borderColor="border"
-          minW="280px"
-        >
+        <ChakraMenu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="280px">
           {entries.map((e, i) => (
             <Fragment key={"value" in e ? e.value : `sep-${i}`}>
               <Entry entry={e} />
@@ -245,7 +227,7 @@ function Panel({ entries }: { entries: MenuEntry[] }) {
         </ChakraMenu.Content>
       </ChakraMenu.Positioner>
     </Portal>
-  );
+  )
 }
 
 /**
@@ -254,25 +236,25 @@ function Panel({ entries }: { entries: MenuEntry[] }) {
  * opened from it.
  */
 export function GxMenu(props: MenuProps) {
-  const inherited = useCloseSignal();
-  const all = { ...props, closeSignal: props.closeSignal ?? inherited };
+  const inherited = useCloseSignal()
+  const all = { ...props, closeSignal: props.closeSignal ?? inherited }
   // On a phone the menu is an anchored popover with in-place submenus; placement is a desktop concern.
-  return useWide() ? <WideMenu {...all} /> : <PhoneMenu {...all} />;
+  return useWide() ? <WideMenu {...all} /> : <PhoneMenu {...all} />
 }
 
 export interface MenuProps {
-  trigger: ReactElement;
-  items: MenuEntry[];
-  onClosed?: () => void;
+  trigger: ReactElement
+  items: MenuEntry[]
+  onClosed?: () => void
   /** True while the menu is open, false once it closes or unmounts. */
-  onOpenChange?: (open: boolean) => void;
-  closeSignal?: unknown;
-  placement?: "bottom-end" | "bottom-start" | "top-end" | "top-start";
+  onOpenChange?: (open: boolean) => void
+  closeSignal?: unknown
+  placement?: "bottom-end" | "bottom-start" | "top-end" | "top-start"
   /** Keeps the panel inside this element instead of the viewport (a narrow sidebar on a tablet). */
-  boundary?: () => Element;
+  boundary?: () => Element
 }
 
-const SETTLE_MS = 2000;
+const SETTLE_MS = 2000
 
 /**
  * Zag returns focus to the trigger after a close and offers no way to skip it, at a moment it does
@@ -280,24 +262,23 @@ const SETTLE_MS = 2000;
  * its first text field where it marks one (tablet and desktop), else the panel.
  */
 function keepFocusInDialog() {
-  const dialog = () =>
-    [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')].at(-1);
+  const dialog = () => [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')].at(-1)
   const takeBack = (e: FocusEvent) => {
-    const d = dialog();
+    const d = dialog()
     if (d && !d.contains(e.target as Node))
-      (d.querySelector<HTMLElement>("[data-first-field]") ?? d).focus();
-  };
+      (d.querySelector<HTMLElement>("[data-first-field]") ?? d).focus()
+  }
   const stop = () => {
-    clearTimeout(timer);
-    document.removeEventListener("focusin", takeBack);
-    document.removeEventListener("pointerdown", stop, true);
-    document.removeEventListener("keydown", stop, true);
-  };
+    clearTimeout(timer)
+    document.removeEventListener("focusin", takeBack)
+    document.removeEventListener("pointerdown", stop, true)
+    document.removeEventListener("keydown", stop, true)
+  }
   // The return can land late under load, so the window ends when the person acts, not only on a timer.
-  const timer = setTimeout(stop, SETTLE_MS);
-  document.addEventListener("focusin", takeBack);
-  document.addEventListener("pointerdown", stop, true);
-  document.addEventListener("keydown", stop, true);
+  const timer = setTimeout(stop, SETTLE_MS)
+  document.addEventListener("focusin", takeBack)
+  document.addEventListener("pointerdown", stop, true)
+  document.addEventListener("keydown", stop, true)
 }
 
 function WideMenu({
@@ -309,9 +290,9 @@ function WideMenu({
   placement = "bottom-end",
   boundary,
 }: MenuProps) {
-  const [open, setOpen] = useState(false);
-  useReportOpen(open, onOpenChange);
-  useOnCloseSignal(closeSignal, () => setOpen(false));
+  const [open, setOpen] = useState(false)
+  useReportOpen(open, onOpenChange)
+  useOnCloseSignal(closeSignal, () => setOpen(false))
   return (
     <ChakraMenu.Root
       open={open}
@@ -320,15 +301,15 @@ function WideMenu({
       loopFocus
       positioning={{ placement, boundary }}
       onOpenChange={(e) => {
-        setOpen(e.open);
-        if (e.open) return;
+        setOpen(e.open)
+        if (e.open) return
         // Not gated on the dialog being mounted yet: its layer registers in an effect, after this runs.
-        keepFocusInDialog();
-        onClosed?.();
+        keepFocusInDialog()
+        onClosed?.()
       }}
     >
       <ChakraMenu.Trigger asChild>{trigger}</ChakraMenu.Trigger>
       <Panel entries={items} />
     </ChakraMenu.Root>
-  );
+  )
 }

@@ -1,17 +1,17 @@
-import { Box, Text } from "@chakra-ui/react";
-import { Button } from "../ui/button/Button";
+import { Box, Text } from "@chakra-ui/react"
+import { Button } from "../ui/button/Button"
 import {
   postDevFrontend as defaultPostDevFrontend,
   postDevRestart as defaultPostDevRestart,
-} from "../dev";
-import type { DevStatus } from "../generated/server";
-import { GxMenu, type MenuEntry } from "../ui/menu/Menu";
-import { DEV_LOOK, DevPill } from "./DevPill";
+} from "../dev"
+import type { DevStatus } from "../generated/server"
+import { GxMenu, type MenuEntry } from "../ui/menu/Menu"
+import { DEV_LOOK, DevPill } from "./DevPill"
 
 interface Props {
-  dev: DevStatus;
-  postDevFrontend?: (on: boolean) => void;
-  postDevRestart?: () => void;
+  dev: DevStatus
+  postDevFrontend?: (on: boolean) => void
+  postDevRestart?: () => void
 }
 
 /** Status, reason, last Vite log lines, checkout path and actions; nothing while Dev mode is off. */
@@ -22,9 +22,9 @@ export function DevDetails({
   showOff = true,
   showHeader = true,
 }: Props & { showOff?: boolean; showHeader?: boolean }) {
-  const look = DEV_LOOK[dev.state];
-  if (!look) return null;
-  const log = dev.log_tail ?? [];
+  const look = DEV_LOOK[dev.state]
+  if (!look) return null
+  const log = dev.log_tail ?? []
   return (
     <Box px="3" py="2" w="300px" maxW="100%">
       {showHeader && (
@@ -79,12 +79,7 @@ export function DevDetails({
           overflow="hidden"
         >
           {log.map((line, i) => (
-            <Box
-              key={i}
-              color={
-                /error|exited/i.test(line) ? "tone.deadlocked.fg" : undefined
-              }
-            >
+            <Box key={i} color={/error|exited/i.test(line) ? "tone.deadlocked.fg" : undefined}>
               {line}
             </Box>
           ))}
@@ -114,32 +109,27 @@ export function DevDetails({
           </Button>
         )}
         {showOff && (
-          <Button
-            size="sm"
-            emphasis="secondary"
-            onClick={() => postDevFrontend(false)}
-          >
+          <Button size="sm" emphasis="secondary" onClick={() => postDevFrontend(false)}>
             Turn off Dev mode
           </Button>
         )}
       </Box>
     </Box>
-  );
+  )
 }
 
 /** The Dev pill; a click opens the details. */
 export function DevPopover(props: Props) {
-  const { dev } = props;
-  const look = DEV_LOOK[dev.state];
-  if (!look) return null;
-  const content = <DevDetails {...props} />;
-  const items: MenuEntry[] = [{ kind: "content", value: "dev", content }];
+  const { dev } = props
+  const look = DEV_LOOK[dev.state]
+  if (!look) return null
+  const content = <DevDetails {...props} />
+  const items: MenuEntry[] = [{ kind: "content", value: "dev", content }]
   return (
     <GxMenu
       placement="top-end"
       boundary={() =>
-        document.querySelector('[data-part="sidebar-footer"]')?.parentElement ??
-        document.body
+        document.querySelector('[data-part="sidebar-footer"]')?.parentElement ?? document.body
       }
       trigger={
         <button
@@ -157,5 +147,5 @@ export function DevPopover(props: Props) {
       }
       items={items}
     />
-  );
+  )
 }

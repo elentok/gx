@@ -1,11 +1,11 @@
-import { Box, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import { ChatMessages, WorkingRow } from "../design/ChatCore";
-import { sheetCardsOf } from "../design/chat";
-import { FailureBanner, visibleFailure } from "../design/FailureBanner";
-import { postAnswer, type PostAnswer } from "../design/prompt";
-import { QuestionSheet } from "../design/QuestionSheet";
-import { useRoundDraft } from "../design/roundDraft";
+import { Box, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import { ChatMessages, WorkingRow } from "../design/ChatCore"
+import { sheetCardsOf } from "../design/chat"
+import { FailureBanner, visibleFailure } from "../design/FailureBanner"
+import { postAnswer, type PostAnswer } from "../design/prompt"
+import { QuestionSheet } from "../design/QuestionSheet"
+import { useRoundDraft } from "../design/roundDraft"
 import {
   CardSourceClaudeDialog,
   CardSourceCodex,
@@ -17,13 +17,13 @@ import {
   type SessionAnswer,
   type SessionChatResponse,
   type SessionInfo,
-} from "../generated/server";
-import { ReasonStale } from "../ticket/answer";
-import { Button } from "../ui/button/Button";
-import { allAnswered, type QuestionMode } from "../ui/question-sheet/round";
+} from "../generated/server"
+import { ReasonStale } from "../ticket/answer"
+import { Button } from "../ui/button/Button"
+import { allAnswered, type QuestionMode } from "../ui/question-sheet/round"
 
 // Codex calls whose keys were partly typed. Module-level so leaving the page and coming back keeps Submit off.
-const stoppedCalls = new Set<string>();
+const stoppedCalls = new Set<string>()
 
 /** The first open card, docked above the banner. The caller keys it by card id, so a new card starts a fresh draft. */
 function CardSheet({
@@ -33,36 +33,33 @@ function CardSheet({
   post,
   refetch,
 }: {
-  session: SessionInfo;
-  card: QuestionCard;
-  lastMessage?: string;
-  post: PostAnswer;
-  refetch: () => void;
+  session: SessionInfo
+  card: QuestionCard
+  lastMessage?: string
+  post: PostAnswer
+  refetch: () => void
 }) {
-  const { draft, setAnswers, setIndex, clear } = useRoundDraft(
-    session.id,
-    card.id,
-  );
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const { draft, setAnswers, setIndex, clear } = useRoundDraft(session.id, card.id)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState("")
   // Codex typed some keys and stopped: another Submit would type the rest on top of them.
-  const [stopped, setStopped] = useState(() => stoppedCalls.has(card.id));
-  const cards = sheetCardsOf(card);
-  const ready = allAnswered(cards, draft.answers);
-  const claude = card.source === CardSourceClaudeDialog;
-  const hook = claude && !card.fallback;
-  const dismissable = claude || card.source === CardSourcePermission;
+  const [stopped, setStopped] = useState(() => stoppedCalls.has(card.id))
+  const cards = sheetCardsOf(card)
+  const ready = allAnswered(cards, draft.answers)
+  const claude = card.source === CardSourceClaudeDialog
+  const hook = claude && !card.fallback
+  const dismissable = claude || card.source === CardSourcePermission
   const mode: QuestionMode =
     card.source === CardSourceRound
       ? "round"
       : hook || card.source === CardSourceCodex
         ? "notes"
-        : "plain";
+        : "plain"
 
   const send = async (answers: SessionAnswer[], release?: boolean) => {
-    if (pending) return;
-    setPending(true);
-    setError("");
+    if (pending) return
+    setPending(true)
+    setError("")
     try {
       const res = await post({
         id: session.id,
@@ -71,38 +68,29 @@ function CardSheet({
         answers,
         release,
         last_message: lastMessage,
-      });
+      })
       if (res.refused) {
         if (res.reason === ReasonCodexNotReady)
-          setError("Codex is not ready for the answer yet. Retry in a moment.");
+          setError("Codex is not ready for the answer yet. Retry in a moment.")
         else if (res.reason === ReasonCodexStopped) {
-          stoppedCalls.add(card.id);
-          setStopped(true);
-          setError(
-            "Codex took part of the answer and stopped. Open Screen to finish it.",
-          );
-        } else setError(res.message ?? "The answer was refused.");
-        if (res.reason === ReasonStale) refetch();
+          stoppedCalls.add(card.id)
+          setStopped(true)
+          setError("Codex took part of the answer and stopped. Open Screen to finish it.")
+        } else setError(res.message ?? "The answer was refused.")
+        if (res.reason === ReasonStale) refetch()
       } else {
-        clear();
-        refetch();
+        clear()
+        refetch()
       }
     } catch {
-      setError("Could not send the answer. Try again.");
+      setError("Could not send the answer. Try again.")
     } finally {
-      setPending(false);
+      setPending(false)
     }
-  };
+  }
 
   return (
-    <Box
-      display="flex"
-      flexDirection="column"
-      gap="2"
-      maxH="50dvh"
-      minH="0"
-      flex="none"
-    >
+    <Box display="flex" flexDirection="column" gap="2" maxH="50dvh" minH="0" flex="none">
       <QuestionSheet
         round={cards}
         answers={draft.answers}
@@ -114,37 +102,25 @@ function CardSheet({
       {error && <Text role="alert">{error}</Text>}
       <Box display="flex" gap="2" justifyContent="flex-end" flexWrap="wrap">
         {hook && (
-          <Button
-            emphasis="ghost"
-            tone="muted"
-            disabled={pending}
-            onClick={() => send([], true)}
-          >
+          <Button emphasis="ghost" tone="muted" disabled={pending} onClick={() => send([], true)}>
             Answer in the terminal
           </Button>
         )}
         {dismissable && (
-          <Button
-            emphasis="ghost"
-            tone="muted"
-            disabled={pending}
-            onClick={() => send([])}
-          >
+          <Button emphasis="ghost" tone="muted" disabled={pending} onClick={() => send([])}>
             Dismiss
           </Button>
         )}
         <Button
           emphasis="main"
           disabled={!ready || pending || stopped}
-          onClick={() =>
-            ready && send(cards.map((c) => draft.answers[c.label] ?? {}))
-          }
+          onClick={() => ready && send(cards.map((c) => draft.answers[c.label] ?? {}))}
         >
           Submit
         </Button>
       </Box>
     </Box>
-  );
+  )
 }
 
 /** The chat of a Claude or Codex session on the Agents page: the messages, a plain Working row, the question sheet and the failure notice. */
@@ -154,14 +130,14 @@ export function AgentChat({
   refetch,
   post = postAnswer,
 }: {
-  session: SessionInfo;
-  chat: SessionChatResponse;
-  refetch: () => void;
-  post?: PostAnswer;
+  session: SessionInfo
+  chat: SessionChatResponse
+  refetch: () => void
+  post?: PostAnswer
 }) {
-  const busy = session.status.state === "working" && !session.status.background;
-  const failure = visibleFailure(session.failure);
-  const card = chat.questions[0];
+  const busy = session.status.state === "working" && !session.status.background
+  const failure = visibleFailure(session.failure)
+  const card = chat.questions[0]
   return (
     // Sized by its content first, so the "No messages yet" row beside it cannot squeeze a card and banner under the composer.
     <Box display="flex" flexDirection="column" gap="3" flex="1 1 auto" minH="0">
@@ -193,5 +169,5 @@ export function AgentChat({
         />
       )}
     </Box>
-  );
+  )
 }

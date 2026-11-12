@@ -1,17 +1,17 @@
-import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Button } from "../ui/button/Button";
-import { fetchArchive } from "./chat";
+import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react"
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { Button } from "../ui/button/Button"
+import { fetchArchive } from "./chat"
 import type {
   SessionBackgroundTask,
   SessionChatImage,
   SessionChatMessage,
   SessionChatResponse,
-} from "../generated/server";
-import { ImageViewer } from "./ImageViewer";
-import { InFlightTools } from "./InFlightTools";
-import { sessionImageUrl } from "./sessionImages";
-import { Markdown } from "../markdown/Markdown";
+} from "../generated/server"
+import { ImageViewer } from "./ImageViewer"
+import { InFlightTools } from "./InFlightTools"
+import { sessionImageUrl } from "./sessionImages"
+import { Markdown } from "../markdown/Markdown"
 
 // The part of the chat both the Design page and the Agents page show: the scrolling messages and the working row.
 
@@ -19,25 +19,39 @@ const KIND_NAMES: Record<string, string> = {
   shell: "shell",
   monitor: "Monitor",
   agent: "subagent",
-};
+}
 
-const MAX_THUMBS = 3;
+const MAX_THUMBS = 3
 
 // Layout by tile count (thumbnails plus the "+N" tile): the first of three takes the left column; four make a square.
-const GRID_LAYOUT: Record<number, { cols: string; rows?: string; aspectRatio: string; tallFirst?: boolean }> = {
+const GRID_LAYOUT: Record<
+  number,
+  { cols: string; rows?: string; aspectRatio: string; tallFirst?: boolean }
+> = {
   1: { cols: "1fr", aspectRatio: "4/3" },
   2: { cols: "1fr 1fr", aspectRatio: "2/1" },
   3: { cols: "2fr 1fr", rows: "1fr 1fr", aspectRatio: "3/2", tallFirst: true },
   4: { cols: "1fr 1fr", rows: "1fr 1fr", aspectRatio: "1/1" },
-};
+}
 
 // Up to three thumbnails; the rest fold into a separate "+N" tile. A tap opens the full-size view at that image.
 function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sessionId: string }) {
-  const [viewing, setViewing] = useState<number>();
-  const shown = images.slice(0, MAX_THUMBS);
-  const extra = images.length - shown.length;
-  const layout = GRID_LAYOUT[shown.length + (extra > 0 ? 1 : 0)];
-  const tile = { w: "100%", h: "100%", minH: "0", borderRadius: "md", overflow: "hidden", display: "block", p: "0", border: "0", bg: "surface", cursor: "pointer" };
+  const [viewing, setViewing] = useState<number>()
+  const shown = images.slice(0, MAX_THUMBS)
+  const extra = images.length - shown.length
+  const layout = GRID_LAYOUT[shown.length + (extra > 0 ? 1 : 0)]
+  const tile = {
+    w: "100%",
+    h: "100%",
+    minH: "0",
+    borderRadius: "md",
+    overflow: "hidden",
+    display: "block",
+    p: "0",
+    border: "0",
+    bg: "surface",
+    cursor: "pointer",
+  }
   return (
     <Box
       data-mock-part="chat-thumbs"
@@ -88,27 +102,48 @@ function ChatImageGrid({ images, sessionId }: { images: SessionChatImage[]; sess
         </Box>
       )}
       {viewing !== undefined && (
-        <ImageViewer images={images} source={(img) => sessionImageUrl(sessionId, img.id ?? "")} start={viewing} onClose={() => setViewing(undefined)} />
+        <ImageViewer
+          images={images}
+          source={(img) => sessionImageUrl(sessionId, img.id ?? "")}
+          start={viewing}
+          onClose={() => setViewing(undefined)}
+        />
       )}
     </Box>
-  );
+  )
 }
 
 function Separator({ children }: { children: string }) {
   return (
-    <Text role="separator" textAlign="center" fontSize="xs" color="text.dim" borderBlockStart="1px solid" borderColor="border" pt="1">
+    <Text
+      role="separator"
+      textAlign="center"
+      fontSize="xs"
+      color="text.dim"
+      borderBlockStart="1px solid"
+      borderColor="border"
+      pt="1"
+    >
       {children}
     </Text>
-  );
+  )
 }
 
-function Entry({ m, showTools, sessionId }: { m: SessionChatMessage; showTools: boolean; sessionId: string }) {
-  if (m.kind === "compacted") return <Separator>Context compacted</Separator>;
-  if (m.kind === "interrupted") return <Separator>Turn interrupted</Separator>;
-  if (m.kind === "tools") return showTools ? <ToolCalls m={m} /> : null;
+function Entry({
+  m,
+  showTools,
+  sessionId,
+}: {
+  m: SessionChatMessage
+  showTools: boolean
+  sessionId: string
+}) {
+  if (m.kind === "compacted") return <Separator>Context compacted</Separator>
+  if (m.kind === "interrupted") return <Separator>Turn interrupted</Separator>
+  if (m.kind === "tools") return showTools ? <ToolCalls m={m} /> : null
   if (m.kind === "prompt") {
-    const images = m.images ?? [];
-    const hasImages = images.length > 0;
+    const images = m.images ?? []
+    const hasImages = images.length > 0
     return (
       <Box
         alignSelf="flex-end"
@@ -131,7 +166,7 @@ function Entry({ m, showTools, sessionId }: { m: SessionChatMessage; showTools: 
           </Box>
         )}
       </Box>
-    );
+    )
   }
   if (m.kind === "command") {
     return (
@@ -149,42 +184,67 @@ function Entry({ m, showTools, sessionId }: { m: SessionChatMessage; showTools: 
       >
         {m.text}
       </Text>
-    );
+    )
   }
-  if (m.kind === "output") return <CommandOutput text={m.text} />;
-  return <Markdown fontSize="base">{m.text}</Markdown>;
+  if (m.kind === "output") return <CommandOutput text={m.text} />
+  return <Markdown fontSize="base">{m.text}</Markdown>
 }
 
 // A run of tool calls, folded: the count in the summary, one line per call (shell commands, files) when opened.
 function ToolCalls({ m }: { m: SessionChatMessage }) {
-  const calls = m.calls ?? [];
-  const n = m.tool_count ?? calls.length;
+  const calls = m.calls ?? []
+  const n = m.tool_count ?? calls.length
   return (
     <Box as="details" fontSize="xs" color="text.dim" data-testid="tool-calls">
       <Box as="summary" cursor="pointer">
         {n === 1 ? "1 tool call" : `${n} tool calls`}
         {m.last_tool ? ` · last: ${m.last_tool}` : ""}
       </Box>
-      <Box as="ul" listStyleType="none" m="0" mt="1" p="0" fontFamily="mono" display="flex" flexDirection="column" gap="0.5">
+      <Box
+        as="ul"
+        listStyleType="none"
+        m="0"
+        mt="1"
+        p="0"
+        fontFamily="mono"
+        display="flex"
+        flexDirection="column"
+        gap="0.5"
+      >
         {calls.map((c, i) => (
-          <Box as="li" key={i} whiteSpace="pre-wrap" wordBreak="break-all" borderInlineStart="2px solid" borderColor="border" px="2.5">
+          <Box
+            as="li"
+            key={i}
+            whiteSpace="pre-wrap"
+            wordBreak="break-all"
+            borderInlineStart="2px solid"
+            borderColor="border"
+            px="2.5"
+          >
             {c}
           </Box>
         ))}
       </Box>
     </Box>
-  );
+  )
 }
 
-const OUTPUT_LINE_LIMIT = 12;
+const OUTPUT_LINE_LIMIT = 12
 
 // Plain text on purpose: command output is not Markdown, so `*` and `#` must stay literal.
 function CommandOutput({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const lines = text.split("\n");
-  const cut = !expanded && lines.length > OUTPUT_LINE_LIMIT;
+  const [expanded, setExpanded] = useState(false)
+  const lines = text.split("\n")
+  const cut = !expanded && lines.length > OUTPUT_LINE_LIMIT
   return (
-    <Box alignSelf="flex-end" maxW="85%" display="flex" flexDirection="column" alignItems="flex-end" gap="1.5">
+    <Box
+      alignSelf="flex-end"
+      maxW="85%"
+      display="flex"
+      flexDirection="column"
+      alignItems="flex-end"
+      gap="1.5"
+    >
       <Text
         as="pre"
         data-testid="command-output"
@@ -210,7 +270,7 @@ function CommandOutput({ text }: { text: string }) {
         </Button>
       )}
     </Box>
-  );
+  )
 }
 
 function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
@@ -238,23 +298,30 @@ function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
         </Box>
       ))}
     </Box>
-  );
+  )
 }
 
-const KIND_PLURALS: Record<string, string> = { shell: "shells", monitor: "monitors", agent: "subagents" };
+const KIND_PLURALS: Record<string, string> = {
+  shell: "shells",
+  monitor: "monitors",
+  agent: "subagents",
+}
 
 /** "2 subagents, 1 shell": what the turn waits on besides the model, by task kind. */
 export function backgroundSummary(tasks: SessionBackgroundTask[]): string {
-  const counts = new Map<string, number>();
-  for (const t of tasks) counts.set(t.kind, (counts.get(t.kind) ?? 0) + 1);
+  const counts = new Map<string, number>()
+  for (const t of tasks) counts.set(t.kind, (counts.get(t.kind) ?? 0) + 1)
   return [...counts]
-    .map(([kind, n]) => `${n} ${n === 1 ? (KIND_NAMES[kind] ?? kind) : (KIND_PLURALS[kind] ?? `${kind}s`)}`)
-    .join(", ");
+    .map(
+      ([kind, n]) =>
+        `${n} ${n === 1 ? (KIND_NAMES[kind] ?? kind) : (KIND_PLURALS[kind] ?? `${kind}s`)}`,
+    )
+    .join(", ")
 }
 
 export interface WorkingStep {
-  step?: string;
-  title?: string;
+  step?: string
+  title?: string
 }
 
 // Inline, not the page-centered Spinner: this one sits at the bottom of the chat.
@@ -264,16 +331,10 @@ export function WorkingRow({
   background = [],
   current,
   others,
-}: WorkingStep & Pick<SessionChatResponse, "current" | "others"> & { background?: SessionBackgroundTask[] }) {
+}: WorkingStep &
+  Pick<SessionChatResponse, "current" | "others"> & { background?: SessionBackgroundTask[] }) {
   return (
-    <Box
-      role="status"
-      display="flex"
-      alignItems="center"
-      gap="2"
-      fontSize="sm"
-      color="text.muted"
-    >
+    <Box role="status" display="flex" alignItems="center" gap="2" fontSize="sm" color="text.muted">
       <ChakraSpinner size="sm" />
       {/* A flex row with minW 0, so a long tool label truncates (InFlightTools) instead of widening the page. */}
       <Text as="span" display="flex" minW="0" flex="1">
@@ -285,11 +346,15 @@ export function WorkingRow({
         </Text>
         {current && <InFlightTools current={current} others={others} />}
         {background.length > 0 && (
-          <Text as="span" flexShrink="0" whiteSpace="pre">{` · waiting on ${backgroundSummary(background)}`}</Text>
+          <Text
+            as="span"
+            flexShrink="0"
+            whiteSpace="pre"
+          >{` · waiting on ${backgroundSummary(background)}`}</Text>
         )}
       </Text>
     </Box>
-  );
+  )
 }
 
 // The messages scroll alone. They open at the newest one and follow new ones until the reader scrolls up.
@@ -297,16 +362,15 @@ function ChatScroller({
   children,
   signal,
 }: {
-  children: ReactNode;
+  children: ReactNode
   /** Changes whenever the content grows. */
-  signal: unknown;
+  signal: unknown
 }) {
-  const el = useRef<HTMLDivElement>(null);
-  const stuck = useRef(true);
+  const el = useRef<HTMLDivElement>(null)
+  const stuck = useRef(true)
   useLayoutEffect(() => {
-    if (el.current && stuck.current)
-      el.current.scrollTop = el.current.scrollHeight;
-  }, [signal]);
+    if (el.current && stuck.current) el.current.scrollTop = el.current.scrollHeight
+  }, [signal])
   return (
     <Box
       ref={el}
@@ -318,15 +382,15 @@ function ChatScroller({
       flexDirection="column"
       gap="3"
       onScroll={(e) => {
-        const t = e.currentTarget;
-        stuck.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80;
+        const t = e.currentTarget
+        stuck.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80
       }}
     >
       {/* A short chat sits at the bottom, next to the composer; the spacer shrinks away once the chat scrolls. */}
       <Box flex="1" aria-hidden />
       {children}
     </Box>
-  );
+  )
 }
 
 // The Codex notices. An archived rollout is decoded only when the person asks; the page load never does.
@@ -335,38 +399,53 @@ function CodexNotices({
   sessionId,
   onDecoded,
 }: {
-  chat: SessionChatResponse;
-  sessionId: string;
-  onDecoded: (messages: SessionChatMessage[]) => void;
+  chat: SessionChatResponse
+  sessionId: string
+  onDecoded: (messages: SessionChatMessage[]) => void
 }) {
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string>()
   const decode = () => {
-    setError(undefined);
+    setError(undefined)
     fetchArchive(sessionId).then(
-      (r) => (r.kind === "ok" ? onDecoded(r.detail.messages) : setError("No archived rollout for this session.")),
+      (r) =>
+        r.kind === "ok"
+          ? onDecoded(r.detail.messages)
+          : setError("No archived rollout for this session."),
       (e: Error) => setError(e.message),
-    );
-  };
+    )
+  }
   return (
     <>
       {chat.archived && (
-        <Box role="status" display="flex" alignItems="center" gap="3" flexWrap="wrap" fontSize="sm" color="text.muted">
+        <Box
+          role="status"
+          display="flex"
+          alignItems="center"
+          gap="3"
+          flexWrap="wrap"
+          fontSize="sm"
+          color="text.muted"
+        >
           <Text as="span">Codex archived this conversation</Text>
           <Button emphasis="secondary" onClick={decode}>
             Decode
           </Button>
-          {error && <Text as="span" color="tone.deadlocked.fg">{error}</Text>}
+          {error && (
+            <Text as="span" color="tone.deadlocked.fg">
+              {error}
+            </Text>
+          )}
         </Box>
       )}
       {chat.unreadable && (
         <Text role="status" fontSize="sm" color="text.muted">
           gx cannot read this Codex conversation
-          {chat.codex_version && ` (Codex ${chat.codex_version})`}. The terminal and the agent are unaffected. Run `gx
-          codex doctor`.
+          {chat.codex_version && ` (Codex ${chat.codex_version})`}. The terminal and the agent are
+          unaffected. Run `gx codex doctor`.
         </Text>
       )}
     </>
-  );
+  )
 }
 
 /** The scrolling messages, the background strip and, while the agent works, the caller's working row. */
@@ -378,23 +457,29 @@ export function ChatMessages({
   showTools = false,
   head,
 }: {
-  chat: SessionChatResponse;
+  chat: SessionChatResponse
   /** The first entry of the log, above the messages. */
-  head?: ReactNode;
+  head?: ReactNode
   /** Shows each folded run of tool calls; the Design page leaves them out. */
-  showTools?: boolean;
-  busy: boolean;
+  showTools?: boolean
+  busy: boolean
   /** Shown at the bottom while `busy`. */
-  working?: ReactNode;
+  working?: ReactNode
   /** The session the chat belongs to: the archive route needs it. */
-  sessionId: string;
+  sessionId: string
 }) {
   // /clear keeps the session and changes the conversation: the decoded archive is dropped and the scroller
   // remounts, so it sticks to the bottom again. The draft lives with the session and is untouched.
-  const conversationId = chat.conversation_id;
-  const [decoded, setDecoded] = useState<{ sessionId: string; conversationId: string; messages: SessionChatMessage[] }>();
+  const conversationId = chat.conversation_id
+  const [decoded, setDecoded] = useState<{
+    sessionId: string
+    conversationId: string
+    messages: SessionChatMessage[]
+  }>()
   const messages =
-    decoded?.sessionId === sessionId && decoded.conversationId === conversationId ? decoded.messages : chat.messages;
+    decoded?.sessionId === sessionId && decoded.conversationId === conversationId
+      ? decoded.messages
+      : chat.messages
   return (
     <ChatScroller
       key={conversationId}
@@ -419,5 +504,5 @@ export function ChatMessages({
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       {busy && working}
     </ChatScroller>
-  );
+  )
 }

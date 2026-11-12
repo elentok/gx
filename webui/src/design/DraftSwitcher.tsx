@@ -1,23 +1,23 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
-import type { DesignDraftItem } from "../generated/server";
-import { Button } from "../ui/button/Button";
-import { draftLabel, timeAgo } from "./drafts";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useEffect, useRef, useState } from "react"
+import type { DesignDraftItem } from "../generated/server"
+import { Button } from "../ui/button/Button"
+import { draftLabel, timeAgo } from "./drafts"
 
 interface Props {
   /** The open draft's title. */
-  label: string;
+  label: string
   /** The open draft's server id, once it has one. */
-  currentId?: string;
+  currentId?: string
   /** Fetches the drafts, most recent first; runs each time the menu opens. */
-  load: () => Promise<DesignDraftItem[]>;
-  onPick: (id: string) => void;
-  onNew: () => void;
-  onRename: () => void;
+  load: () => Promise<DesignDraftItem[]>
+  onPick: (id: string) => void
+  onNew: () => void
+  onRename: () => void
   /** Deletes a draft; the menu then drops its row. */
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>
   /** Starts with the menu open; the gallery shows it that way. */
-  defaultOpen?: boolean;
+  defaultOpen?: boolean
 }
 
 const rowStyle = {
@@ -37,44 +37,65 @@ const rowStyle = {
   textAlign: "left",
   cursor: "pointer",
   _hover: { bg: "surface" },
-} as const;
+} as const
 
 /** The title row's draft menu: one row per draft, then New draft. */
-export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename, onDelete, defaultOpen = false }: Props) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [items, setItems] = useState<DesignDraftItem[]>([]);
-  const root = useRef<HTMLDivElement>(null);
+export function DraftSwitcher({
+  label,
+  currentId,
+  load,
+  onPick,
+  onNew,
+  onRename,
+  onDelete,
+  defaultOpen = false,
+}: Props) {
+  const [open, setOpen] = useState(defaultOpen)
+  const [items, setItems] = useState<DesignDraftItem[]>([])
+  const root = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return
     const away = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    return () => document.removeEventListener("mousedown", away);
-  }, [open]);
+      if (!root.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", away)
+    return () => document.removeEventListener("mousedown", away)
+  }, [open])
 
   // Fetches on every open, so the list is never older than the menu.
   useEffect(() => {
-    if (open) load().then(setItems, () => {});
+    if (open) load().then(setItems, () => {})
     // `load` is a fresh closure each render; only opening should refetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-  const [asked, setAsked] = useState<string>();
+  }, [open])
+  const [asked, setAsked] = useState<string>()
   const remove = async (id: string) => {
-    setAsked(undefined);
-    await onDelete(id);
-    setItems((all) => all.filter((d) => d.id !== id));
-  };
-  const toggle = () => setOpen(!open);
+    setAsked(undefined)
+    await onDelete(id)
+    setItems((all) => all.filter((d) => d.id !== id))
+  }
+  const toggle = () => setOpen(!open)
   const choose = (act: () => void) => {
-    setOpen(false);
-    act();
-  };
+    setOpen(false)
+    act()
+  }
 
   return (
     <Box ref={root} minW="0">
-      <chakra.button type="button" aria-haspopup="menu" aria-expanded={open} onClick={toggle} display="flex" alignItems="center" gap="1" minW="0" maxW="100%" fontWeight="600" cursor="pointer">
+      <chakra.button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={toggle}
+        display="flex"
+        alignItems="center"
+        gap="1"
+        minW="0"
+        maxW="100%"
+        fontWeight="600"
+        cursor="pointer"
+      >
         <Text as="span" truncate>
           {label}
         </Text>
@@ -82,7 +103,15 @@ export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename,
           ▾
         </chakra.span>
       </chakra.button>
-      {open && <Box data-testid="switcher-scrim" position="absolute" inset="0" bg="rgba(0,0,0,.5)" zIndex="9" />}
+      {open && (
+        <Box
+          data-testid="switcher-scrim"
+          position="absolute"
+          inset="0"
+          bg="rgba(0,0,0,.5)"
+          zIndex="9"
+        />
+      )}
       {open && (
         <Box
           role="menu"
@@ -102,16 +131,28 @@ export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename,
           boxShadow="0 10px 30px rgba(0,0,0,.5)"
         >
           {items.map((d) => {
-            const here = d.id === currentId;
-            const asking = asked === d.id;
+            const here = d.id === currentId
+            const asking = asked === d.id
             return (
-              <Box key={d.id} display="flex" alignItems="center" borderBottomWidth="1px" borderColor="border" bg={here ? "tone.running.bg" : undefined}>
+              <Box
+                key={d.id}
+                display="flex"
+                alignItems="center"
+                borderBottomWidth="1px"
+                borderColor="border"
+                bg={here ? "tone.running.bg" : undefined}
+              >
                 {asking ? (
                   <Box display="flex" alignItems="center" gap="2" w="100%" px="12px" minH="52px">
                     <Text flex="1" fontSize="sm" color="tone.paused.fg" fontWeight="600">
                       Discard this draft and its images?
                     </Text>
-                    <Button type="button" emphasis="ghost" tone="muted" onClick={() => setAsked(undefined)}>
+                    <Button
+                      type="button"
+                      emphasis="ghost"
+                      tone="muted"
+                      onClick={() => setAsked(undefined)}
+                    >
                       Keep
                     </Button>
                     <Button type="button" tone="paused" onClick={() => remove(d.id)}>
@@ -120,28 +161,74 @@ export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename,
                   </Box>
                 ) : (
                   <>
-                    <chakra.button type="button" role="menuitem" onClick={() => choose(() => (here ? undefined : onPick(d.id)))} {...rowStyle} borderBottomWidth="0" flex="1" minW="0">
+                    <chakra.button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => choose(() => (here ? undefined : onPick(d.id)))}
+                      {...rowStyle}
+                      borderBottomWidth="0"
+                      flex="1"
+                      minW="0"
+                    >
                       <Text fontWeight="600" fontSize="14px" truncate maxW="100%">
                         {draftLabel(d)}
                       </Text>
                       <Text fontSize="12px" color="text.dim" truncate maxW="100%">
-                        {d.project} · {d.image_count > 0 && `${d.image_count} ${d.image_count === 1 ? "image" : "images"} · `}{here ? "editing now" : `edited ${timeAgo(d.edited_at)}`}
+                        {d.project} ·{" "}
+                        {d.image_count > 0 &&
+                          `${d.image_count} ${d.image_count === 1 ? "image" : "images"} · `}
+                        {here ? "editing now" : `edited ${timeAgo(d.edited_at)}`}
                       </Text>
                     </chakra.button>
-                    <chakra.button type="button" aria-label="Delete draft" title="Delete draft" onClick={() => (d.slug.trim() || d.idea.trim() || d.name || d.image_count > 0 ? setAsked(d.id) : remove(d.id))} w="36px" h="36px" mr="6px" flexShrink="0" borderRadius="8px" color="text.dim" _hover={{ bg: "surface", color: "text" }}>
+                    <chakra.button
+                      type="button"
+                      aria-label="Delete draft"
+                      title="Delete draft"
+                      onClick={() =>
+                        d.slug.trim() || d.idea.trim() || d.name || d.image_count > 0
+                          ? setAsked(d.id)
+                          : remove(d.id)
+                      }
+                      w="36px"
+                      h="36px"
+                      mr="6px"
+                      flexShrink="0"
+                      borderRadius="8px"
+                      color="text.dim"
+                      _hover={{ bg: "surface", color: "text" }}
+                    >
                       🗑
                     </chakra.button>
                   </>
                 )}
               </Box>
-            );
+            )
           })}
-          <chakra.button type="button" role="menuitem" onClick={() => choose(onNew)} {...rowStyle} minH="46px" color="tone.running.fg" fontWeight="600" fontSize="14px">
+          <chakra.button
+            type="button"
+            role="menuitem"
+            onClick={() => choose(onNew)}
+            {...rowStyle}
+            minH="46px"
+            color="tone.running.fg"
+            fontWeight="600"
+            fontSize="14px"
+          >
             <span>
               <chakra.span aria-hidden>＋ </chakra.span>New draft
             </span>
           </chakra.button>
-          <chakra.button type="button" role="menuitem" onClick={() => choose(onRename)} {...rowStyle} minH="0" py="8px" fontSize="12px" color="text.dim" bg="surface">
+          <chakra.button
+            type="button"
+            role="menuitem"
+            onClick={() => choose(onRename)}
+            {...rowStyle}
+            minH="0"
+            py="8px"
+            fontSize="12px"
+            color="text.dim"
+            bg="surface"
+          >
             <span>
               <chakra.span aria-hidden>✎</chakra.span>Name this draft
             </span>
@@ -149,5 +236,5 @@ export function DraftSwitcher({ label, currentId, load, onPick, onNew, onRename,
         </Box>
       )}
     </Box>
-  );
+  )
 }

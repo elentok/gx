@@ -1,8 +1,8 @@
-import { Box, Text } from "@chakra-ui/react";
-import { Fragment } from "react";
-import type { ModelLabel } from "../../modelName";
+import { Box, Text } from "@chakra-ui/react"
+import { Fragment } from "react"
+import type { ModelLabel } from "../../modelName"
 
-const NAMES: Record<string, string> = { claude: "Claude", codex: "Codex" };
+const NAMES: Record<string, string> = { claude: "Claude", codex: "Codex" }
 
 /**
  * One dim line of `model · tier · effort`, for dense lists. The model reads as its `modelName`, which
@@ -17,25 +17,32 @@ export function HarnessLabel({
   note,
   dot = false,
 }: {
-  harness: string;
-  tierLabel: string;
-  model: ModelLabel;
-  effort: string;
+  harness: string
+  tierLabel: string
+  model: ModelLabel
+  effort: string
   /** Server text for a queue row (`pinned`, `follows default`). */
-  note?: string;
+  note?: string
   /** Ticket cards show the harness dot before the line; the Design header does not. */
-  dot?: boolean;
+  dot?: boolean
 }) {
   // The model label already names the harness, so the dot never repeats the name beside one.
-  const showName = harness && !model;
-  const showDot = harness && (dot || !model);
-  const parts = [model, tierLabel, effort, note ?? ""].filter(Boolean);
+  const showName = harness && !model
+  const showDot = harness && (dot || !model)
+  const parts = [model, tierLabel, effort, note ?? ""].filter(Boolean)
   // One inline flow: it wraps between words (a real space), never inside the harness or a word.
-  const words = parts.flatMap((part) => part.split(" · "));
+  const words = parts.flatMap((part) => part.split(" · "))
   return (
     <Text as="span" fontFamily="mono" fontSize="12px" color="text.dim">
       {showDot && (
-        <Box as="span" display="inline-flex" alignItems="center" gap="5px" whiteSpace="nowrap" mr="2">
+        <Box
+          as="span"
+          display="inline-flex"
+          alignItems="center"
+          gap="5px"
+          whiteSpace="nowrap"
+          mr="2"
+        >
           <Box as="i" w="7px" h="7px" borderRadius="full" bg={`harness.${harness}`} />
           {showName && (NAMES[harness] ?? harness)}
         </Box>
@@ -50,5 +57,5 @@ export function HarnessLabel({
         </Fragment>
       ))}
     </Text>
-  );
+  )
 }

@@ -1,8 +1,8 @@
-import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { Button } from "../ui/button/Button";
-import { BottomSheet } from "../ui/modal/BottomSheet";
-import type { DesignDraft } from "../generated/server";
+import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
+import { Button } from "../ui/button/Button"
+import { BottomSheet } from "../ui/modal/BottomSheet"
+import type { DesignDraft } from "../generated/server"
 import {
   deleteDraft,
   draftLabel,
@@ -18,34 +18,39 @@ import {
   type ReadDraft,
   type SaveDraft,
   type SetLastProject,
-} from "./drafts";
-import { removeDraftImage, uploadDraftImage, type RemoveDraftImage, type UploadDraftImage } from "./draftImageApi";
-import { DraftImages } from "./DraftImages";
-import { AttachButton, imageFiles, useAttachIcon } from "./ComposerImages";
-import { DraftSlots, type DraftImages as DraftImagesState, type ImageSlot } from "./useDraftImages";
-import { useShell } from "../shell/ShellContext";
-import { postOpenDesign, type OpenDesign } from "./open";
-import { saveUnsaved, type Restored } from "./unsaved";
-import { moveLegacyDraft } from "./legacyDraft";
-import { useDesignWrite } from "./SessionControls";
-import { useWide } from "../useWide";
-import { useFocusFirstField } from "../ui/modal/useFocusFirstField";
-import { DraftSwitcher } from "./DraftSwitcher";
-import { DraftBanner } from "./DraftBanner";
-import { hasText, type Fields } from "./draftFields";
-import { useDraftAutosave } from "./useDraftAutosave";
-import { useDraftSwitching, type SwitchDraft } from "./useDraftSwitching";
+} from "./drafts"
+import {
+  removeDraftImage,
+  uploadDraftImage,
+  type RemoveDraftImage,
+  type UploadDraftImage,
+} from "./draftImageApi"
+import { DraftImages } from "./DraftImages"
+import { AttachButton, imageFiles, useAttachIcon } from "./ComposerImages"
+import { DraftSlots, type DraftImages as DraftImagesState, type ImageSlot } from "./useDraftImages"
+import { useShell } from "../shell/ShellContext"
+import { postOpenDesign, type OpenDesign } from "./open"
+import { saveUnsaved, type Restored } from "./unsaved"
+import { moveLegacyDraft } from "./legacyDraft"
+import { useDesignWrite } from "./SessionControls"
+import { useWide } from "../useWide"
+import { useFocusFirstField } from "../ui/modal/useFocusFirstField"
+import { DraftSwitcher } from "./DraftSwitcher"
+import { DraftBanner } from "./DraftBanner"
+import { hasText, type Fields } from "./draftFields"
+import { useDraftAutosave } from "./useDraftAutosave"
+import { useDraftSwitching, type SwitchDraft } from "./useDraftSwitching"
 
 /** The draft calls the form makes; the prop defaults to the real ones. */
 export interface DraftsClient {
-  list: ListDrafts;
-  read: ReadDraft;
-  save: SaveDraft;
-  remove: DeleteDraft;
-  getLastProject: GetLastProject;
-  setLastProject: SetLastProject;
-  uploadImage: UploadDraftImage;
-  removeImage: RemoveDraftImage;
+  list: ListDrafts
+  read: ReadDraft
+  save: SaveDraft
+  remove: DeleteDraft
+  getLastProject: GetLastProject
+  setLastProject: SetLastProject
+  uploadImage: UploadDraftImage
+  removeImage: RemoveDraftImage
 }
 
 const realDrafts: DraftsClient = {
@@ -57,14 +62,14 @@ const realDrafts: DraftsClient = {
   setLastProject,
   uploadImage: uploadDraftImage,
   removeImage: removeDraftImage,
-};
+}
 
 /** Why Start is unavailable, or undefined when it is ready. */
 function startBlocker(draft: Fields, imgs: DraftImagesState): string | undefined {
-  if (!draft.slug.trim()) return "Name the epic to start.";
-  if (!draft.idea.trim()) return "Write an idea to start.";
-  if (imgs.failed) return `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`;
-  if (imgs.uploading) return "Wait for the upload to finish";
+  if (!draft.slug.trim()) return "Name the epic to start."
+  if (!draft.idea.trim()) return "Write an idea to start."
+  if (imgs.failed) return `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`
+  if (imgs.uploading) return "Wait for the upload to finish"
 }
 
 const field = {
@@ -75,7 +80,7 @@ const field = {
   borderColor: "transparent",
   borderRadius: "8px",
   _placeholder: { color: "text.dim" },
-} as const;
+} as const
 
 const sheetProps = {
   label: "New Design",
@@ -85,55 +90,55 @@ const sheetProps = {
   p: "0",
   gap: "0",
   overflow: "hidden",
-} as const;
+} as const
 
 interface FormProps {
-  projects: string[];
-  open?: OpenDesign;
+  projects: string[]
+  open?: OpenDesign
   /** Runs with the new Design's address once its map exists; `startFailure` is why the session did not start. */
-  onStarted: (address: string, startFailure?: string) => void;
+  onStarted: (address: string, startFailure?: string) => void
   /** Closing keeps the draft. */
-  onClose: () => void;
-  drafts?: DraftsClient;
+  onClose: () => void
+  drafts?: DraftsClient
 }
 
 /** The New Design writing sheet: epic name and rough idea for a Design with no map yet. It opens on the latest server draft and autosaves it until Start or Discard. */
 export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
   // `undefined` is still loading; `null` is no draft to open.
-  const [initial, setInitial] = useState<DesignDraft | null | undefined>();
-  const [restored, setRestored] = useState<Restored>();
+  const [initial, setInitial] = useState<DesignDraft | null | undefined>()
+  const [restored, setRestored] = useState<Restored>()
   // A new generation remounts the form on another draft.
-  const [generation, setGeneration] = useState(0);
-  const slots = useRef(new DraftSlots());
+  const [generation, setGeneration] = useState(0)
+  const slots = useRef(new DraftSlots())
   // The server's last project used; a server that cannot answer leaves the first project.
-  const [lastProject, setLast] = useState("");
-  const fetchLast = () => drafts.getLastProject().catch(() => "");
+  const [lastProject, setLast] = useState("")
+  const fetchLast = () => drafts.getLastProject().catch(() => "")
   useEffect(() => {
-    let live = true;
-    (async () => {
-      const last = await fetchLast();
-      const stuck = await saveUnsaved(drafts.save);
+    let live = true
+    ;(async () => {
+      const last = await fetchLast()
+      const stuck = await saveUnsaved(drafts.save)
       if (stuck) {
         if (live) {
-          setLast(last);
-          setRestored(stuck.state);
-          setInitial(stuck.draft);
+          setLast(last)
+          setRestored(stuck.state)
+          setInitial(stuck.draft)
         }
-        return;
+        return
       }
-      await moveLegacyDraft(drafts.save);
-      const latest = await openLatest(drafts);
+      await moveLegacyDraft(drafts.save)
+      const latest = await openLatest(drafts)
       if (live) {
-        setLast(last);
-        setInitial(latest);
+        setLast(last)
+        setInitial(latest)
       }
-    })().catch(() => live && setInitial(null));
+    })().catch(() => live && setInitial(null))
     return () => {
-      live = false;
-    };
+      live = false
+    }
     // The client is fixed for the form's life.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   if (initial === undefined) {
     return (
@@ -142,19 +147,30 @@ export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
           <Spinner />
         </Box>
       </BottomSheet>
-    );
+    )
   }
-  const slot = slots.current.current(initial?.images);
+  const slot = slots.current.current(initial?.images)
   const switchTo: SwitchDraft = async (next, leaving) => {
     // An upload or failed tile stays with its draft, so returning finds it.
-    slots.current.switchTo(next, leaving);
+    slots.current.switchTo(next, leaving)
     // A blank draft starts on the project last picked, which this form may just have set.
-    if (!next) setLast(await fetchLast());
-    setRestored(undefined);
-    setInitial(next);
-    setGeneration((g) => g + 1);
-  };
-  return <DraftForm key={generation} {...props} drafts={drafts} initial={initial} lastProject={lastProject} restored={restored} slot={slot} onSwitch={switchTo} />;
+    if (!next) setLast(await fetchLast())
+    setRestored(undefined)
+    setInitial(next)
+    setGeneration((g) => g + 1)
+  }
+  return (
+    <DraftForm
+      key={generation}
+      {...props}
+      drafts={drafts}
+      initial={initial}
+      lastProject={lastProject}
+      restored={restored}
+      slot={slot}
+      onSwitch={switchTo}
+    />
+  )
 }
 
 function DraftForm({
@@ -169,72 +185,116 @@ function DraftForm({
   slot,
   onSwitch,
 }: FormProps & {
-  drafts: DraftsClient;
-  initial: DesignDraft | null;
-  lastProject: string;
-  restored?: Restored;
-  slot: ImageSlot;
-  onSwitch: SwitchDraft;
+  drafts: DraftsClient
+  initial: DesignDraft | null
+  lastProject: string
+  restored?: Restored
+  slot: ImageSlot
+  onSwitch: SwitchDraft
 }) {
-  const sheetMode = !useWide();
-  const workspace = useShell()?.workspace;
-  const slugInput = useRef<HTMLInputElement | null>(null);
-  const focusFirst = useFocusFirstField();
+  const sheetMode = !useWide()
+  const workspace = useShell()?.workspace
+  const slugInput = useRef<HTMLInputElement | null>(null)
+  const focusFirst = useFocusFirstField()
   // Stable, so a re-render does not run the focus again.
   const slugRef = useCallback(
     (el: HTMLInputElement | null) => {
-      slugInput.current = el;
-      focusFirst(el);
+      slugInput.current = el
+      focusFirst(el)
     },
     [focusFirst],
-  );
-  const autosave = useDraftAutosave({ drafts, initial, restored, projects, lastProject, slot });
-  const { draft, patch, pickProject, name, saveName, status, banner, bannerActions, moved, movedFrom, imgs } = autosave;
-  const { switchDraft, newDraft, deleteOther, loadDrafts } = useDraftSwitching({ drafts, autosave, onSwitch, focusSlug: () => slugInput.current?.focus() });
-  const [confirming, setConfirming] = useState(false);
+  )
+  const autosave = useDraftAutosave({ drafts, initial, restored, projects, lastProject, slot })
+  const {
+    draft,
+    patch,
+    pickProject,
+    name,
+    saveName,
+    status,
+    banner,
+    bannerActions,
+    moved,
+    movedFrom,
+    imgs,
+  } = autosave
+  const { switchDraft, newDraft, deleteOther, loadDrafts } = useDraftSwitching({
+    drafts,
+    autosave,
+    onSwitch,
+    focusSlug: () => slugInput.current?.focus(),
+  })
+  const [confirming, setConfirming] = useState(false)
   // The name field under the title row; `undefined` is closed.
-  const [naming, setNaming] = useState<string>();
-  const { run, pending } = useDesignWrite();
-  const fileInput = useRef<HTMLInputElement>(null);
-  const attachIcon = useAttachIcon();
+  const [naming, setNaming] = useState<string>()
+  const { run, pending } = useDesignWrite()
+  const fileInput = useRef<HTMLInputElement>(null)
+  const attachIcon = useAttachIcon()
 
   const close = () => {
-    autosave.flush();
-    onClose();
-  };
+    autosave.flush()
+    onClose()
+  }
   const discard = () => {
-    autosave.discard();
-    onClose();
-  };
+    autosave.discard()
+    onClose()
+  }
   const commitName = (text: string) => {
-    setNaming(undefined);
-    saveName(text);
-  };
+    setNaming(undefined)
+    saveName(text)
+  }
 
   const submit = (e: FormEvent) => {
-    e.preventDefault();
-    const slug = draft.slug.trim();
+    e.preventDefault()
+    const slug = draft.slug.trim()
     run(
-      () => autosave.start((draft_id) => open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project, draft_id, ...(workspace ? { workspace } : {}) })),
+      () =>
+        autosave.start((draft_id) =>
+          open({
+            epic: slug,
+            new_design: true,
+            idea: draft.idea,
+            project: draft.project,
+            draft_id,
+            ...(workspace ? { workspace } : {}),
+          }),
+        ),
       {
         onDone: (res) => {
           // With start_error the map exists though no session started; the Design page offers the retry.
-          onStarted(`${draft.project}:${slug}`, res.start_error);
+          onStarted(`${draft.project}:${slug}`, res.start_error)
         },
       },
-    );
-  };
+    )
+  }
 
-  const hasWork = hasText(draft) || !!name || imgs.count > 0;
+  const hasWork = hasText(draft) || !!name || imgs.count > 0
   // The title follows the name field while it is open.
-  const shownName = naming !== undefined ? naming.trim() || undefined : name;
-  const label = draft.slug || draft.idea || shownName ? draftLabel({ name: shownName, ...draft }) : draftLabel();
-  const reason = startBlocker(draft, imgs);
+  const shownName = naming !== undefined ? naming.trim() || undefined : name
+  const label =
+    draft.slug || draft.idea || shownName ? draftLabel({ name: shownName, ...draft }) : draftLabel()
+  const reason = startBlocker(draft, imgs)
 
   return (
     <BottomSheet {...sheetProps} onClose={close} as="form" onSubmit={submit}>
-      <Box position="relative" display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
-        <DraftSwitcher label={label} currentId={autosave.internals.server.current.id} load={loadDrafts} onPick={switchDraft} onNew={newDraft} onRename={() => setNaming(name ?? "")} onDelete={deleteOther} />
+      <Box
+        position="relative"
+        display="flex"
+        alignItems="center"
+        gap="2"
+        px="3"
+        pt="2"
+        flexShrink="0"
+      >
+        <DraftSwitcher
+          label={label}
+          currentId={autosave.internals.server.current.id}
+          load={loadDrafts}
+          onPick={switchDraft}
+          onNew={newDraft}
+          onRename={() => setNaming(name ?? "")}
+          onDelete={deleteOther}
+        />
         <Box flex="1" />
         {status !== "none" && (
           <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
@@ -279,8 +339,8 @@ function DraftForm({
             onChange={(e) => setNaming(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                e.preventDefault();
-                commitName(naming);
+                e.preventDefault()
+                commitName(naming)
               }
             }}
           />
@@ -289,7 +349,15 @@ function DraftForm({
           </Button>
         </Box>
       )}
-      <Box display="flex" alignItems="center" gap="2" p="3" borderBottomWidth="1px" borderColor="border" flexShrink="0">
+      <Box
+        display="flex"
+        alignItems="center"
+        gap="2"
+        p="3"
+        borderBottomWidth="1px"
+        borderColor="border"
+        flexShrink="0"
+      >
         {projects.length > 1 && (
           <>
             <chakra.select
@@ -355,10 +423,10 @@ function DraftForm({
         value={draft.idea}
         onChange={(e) => patch({ idea: e.target.value })}
         onPaste={(e) => {
-          const files = imageFiles(e.clipboardData?.files);
-          if (files.length === 0) return;
-          e.preventDefault();
-          void imgs.addFiles(files);
+          const files = imageFiles(e.clipboardData?.files)
+          if (files.length === 0) return
+          e.preventDefault()
+          void imgs.addFiles(files)
         }}
       />
       <input
@@ -369,8 +437,8 @@ function DraftForm({
         hidden
         data-testid="image-input"
         onChange={(e) => {
-          void imgs.addFiles(imageFiles(e.target.files));
-          e.target.value = "";
+          void imgs.addFiles(imageFiles(e.target.files))
+          e.target.value = ""
         }}
       />
       <Box flexShrink="0" px="3">
@@ -381,13 +449,27 @@ function DraftForm({
           {reason}
         </Text>
       )}
-      <Box display="flex" alignItems="center" gap="2" p="3" borderTopWidth="1px" borderColor="border" bg="surface" flexShrink="0">
+      <Box
+        display="flex"
+        alignItems="center"
+        gap="2"
+        p="3"
+        borderTopWidth="1px"
+        borderColor="border"
+        bg="surface"
+        flexShrink="0"
+      >
         {confirming ? (
           <>
             <Text flex="1" fontSize="sm" color="tone.paused.fg" fontWeight="600">
               Discard this draft and its images?
             </Text>
-            <Button type="button" emphasis="ghost" tone="muted" onClick={() => setConfirming(false)}>
+            <Button
+              type="button"
+              emphasis="ghost"
+              tone="muted"
+              onClick={() => setConfirming(false)}
+            >
               Keep
             </Button>
             <Button type="button" tone="paused" onClick={discard}>
@@ -397,7 +479,12 @@ function DraftForm({
         ) : (
           <>
             {attachIcon && <AttachButton onClick={() => fileInput.current?.click()} />}
-            <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasWork ? setConfirming(true) : discard())}>
+            <Button
+              type="button"
+              emphasis="ghost"
+              tone="muted"
+              onClick={() => (hasWork ? setConfirming(true) : discard())}
+            >
               Discard
             </Button>
             <Box flex="1" />
@@ -414,5 +501,5 @@ function DraftForm({
         )}
       </Box>
     </BottomSheet>
-  );
+  )
 }

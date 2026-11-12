@@ -1,44 +1,63 @@
-import { createHashRouter, Navigate, redirect, useLocation, useParams, type RouteObject } from "react-router";
-import { AgentsPage } from "./agents/AgentsPage";
-import type { AuthState } from "./auth/authState";
-import { AppShell } from "./shell/AppShell";
-import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages";
-import { CertificatePage, SettingsPage, UnknownSettingsPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
-import type { FetchLogins } from "./settings/logins";
-import type { FetchSettings } from "./settings/settingsApi";
-import { sectionPath } from "./settings/SettingsShell";
-import type { FetchChat } from "./design/chat";
-import { DesignPage } from "./design/DesignPage";
-import type { DeleteDesign, OpenDesign, OpenFlow, ResumeSession, StopSession } from "./design/open";
-import type { AbandonTriage, ApproveTriage } from "./triage/api";
-import { TriagePage } from "./triage/TriagePage";
-import type { FetchTriage } from "./triage/useTriage";
-import type { PostFocus } from "./design/focus";
-import type { PostAnswer, PostPrompt } from "./design/prompt";
-import type { FetchScreen } from "./design/screen";
-import type { FetchMapImages } from "./design/mapImages";
-import type { FetchEpicDetail } from "./epic/detail";
-import { EpicPage } from "./epic/EpicPage";
-import type { FixAgent } from "./epic/fixAgent";
-import type { SaveChecks } from "./checks/setup";
-import type { FetchChecksStatus } from "./checks/status";
-import type { FetchArchived } from "./archive/archive";
-import { ArchivePage } from "./archive/ArchivePage";
-import { EpicsPage } from "./epics/EpicsPage";
-import type { FetchEpicList } from "./epics/list";
-import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup";
-import { CleanupPage } from "./cleanup/CleanupPage";
-import type { FetchTips } from "./tips/tips";
-import { TipsPage } from "./tips/TipsPage";
-import type { FetchStats } from "./stats/stats";
-import { StatsPage } from "./stats/StatsPage";
-import type { FetchDetail } from "./ticket/detail";
-import { TicketPage } from "./ticket/TicketPage";
+import {
+  createHashRouter,
+  Navigate,
+  redirect,
+  useLocation,
+  useParams,
+  type RouteObject,
+} from "react-router"
+import { AgentsPage } from "./agents/AgentsPage"
+import type { AuthState } from "./auth/authState"
+import { AppShell } from "./shell/AppShell"
+import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages"
+import {
+  CertificatePage,
+  SettingsPage,
+  UnknownSettingsPage,
+  WebLoginPage,
+  WebLoginsPage,
+} from "./settings/SettingsPage"
+import type { FetchLogins } from "./settings/logins"
+import type { FetchSettings } from "./settings/settingsApi"
+import { sectionPath } from "./settings/SettingsShell"
+import type { FetchChat } from "./design/chat"
+import { DesignPage } from "./design/DesignPage"
+import type { DeleteDesign, OpenDesign, OpenFlow, ResumeSession, StopSession } from "./design/open"
+import type { AbandonTriage, ApproveTriage } from "./triage/api"
+import { TriagePage } from "./triage/TriagePage"
+import type { FetchTriage } from "./triage/useTriage"
+import type { PostFocus } from "./design/focus"
+import type { PostAnswer, PostPrompt } from "./design/prompt"
+import type { FetchScreen } from "./design/screen"
+import type { FetchMapImages } from "./design/mapImages"
+import type { FetchEpicDetail } from "./epic/detail"
+import { EpicPage } from "./epic/EpicPage"
+import type { FixAgent } from "./epic/fixAgent"
+import type { SaveChecks } from "./checks/setup"
+import type { FetchChecksStatus } from "./checks/status"
+import type { FetchArchived } from "./archive/archive"
+import { ArchivePage } from "./archive/ArchivePage"
+import { EpicsPage } from "./epics/EpicsPage"
+import type { FetchEpicList } from "./epics/list"
+import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup"
+import { CleanupPage } from "./cleanup/CleanupPage"
+import type { FetchTips } from "./tips/tips"
+import { TipsPage } from "./tips/TipsPage"
+import type { FetchStats } from "./stats/stats"
+import { StatsPage } from "./stats/StatsPage"
+import type { FetchDetail } from "./ticket/detail"
+import { TicketPage } from "./ticket/TicketPage"
 
-function TicketRoute({ fetchDetail, fetchScreen }: { fetchDetail?: FetchDetail; fetchScreen?: FetchScreen }) {
+function TicketRoute({
+  fetchDetail,
+  fetchScreen,
+}: {
+  fetchDetail?: FetchDetail
+  fetchScreen?: FetchScreen
+}) {
   // An address holds a slash (project:epic/NN), so it arrives as the splat.
-  const address = useParams()["*"] ?? "";
-  return <TicketPage address={address} fetchDetail={fetchDetail} fetchScreen={fetchScreen} />;
+  const address = useParams()["*"] ?? ""
+  return <TicketPage address={address} fetchDetail={fetchDetail} fetchScreen={fetchScreen} />
 }
 
 function EpicRoute({
@@ -48,11 +67,11 @@ function EpicRoute({
   fixAgent,
   readOnly,
 }: {
-  fetchDetail?: FetchEpicDetail;
-  fetchList?: FetchEpicList;
-  openDesign?: OpenDesign;
-  fixAgent?: FixAgent;
-  readOnly?: boolean;
+  fetchDetail?: FetchEpicDetail
+  fetchList?: FetchEpicList
+  openDesign?: OpenDesign
+  fixAgent?: FixAgent
+  readOnly?: boolean
 }) {
   return (
     <EpicPage
@@ -63,14 +82,14 @@ function EpicRoute({
       openDesign={openDesign}
       fixAgent={fixAgent}
     />
-  );
+  )
 }
 
 function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
   // A Design's address holds a colon (project:epic), so it arrives as the splat.
-  const address = useParams()["*"];
-  const startFailure = (useLocation().state as { startFailure?: string } | null)?.startFailure;
-  if (!address) return <Navigate to="/epics" replace />;
+  const address = useParams()["*"]
+  const startFailure = (useLocation().state as { startFailure?: string } | null)?.startFailure
+  if (!address) return <Navigate to="/epics" replace />
   return (
     <DesignPage
       address={address}
@@ -90,12 +109,12 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
         fetchMapImages: fetchers.mapImages,
       }}
     />
-  );
+  )
 }
 
 function TriageRoute({ fetchers }: { fetchers: RouteFetchers }) {
-  const project = useParams()["*"];
-  if (!project) return <Navigate to="/epics" replace />;
+  const project = useParams()["*"]
+  if (!project) return <Navigate to="/epics" replace />
   return (
     <TriagePage
       project={project}
@@ -114,45 +133,48 @@ function TriageRoute({ fetchers }: { fetchers: RouteFetchers }) {
         fetchEpics: fetchers.epicList,
       }}
     />
-  );
+  )
 }
 
 export interface RouteFetchers {
-  abandonTriage?: AbandonTriage;
-  approveTriage?: ApproveTriage;
-  triage?: FetchTriage;
-  openTriage?: OpenFlow;
-  openDesign?: OpenDesign;
-  deleteDesign?: DeleteDesign;
-  stop?: StopSession;
-  resume?: ResumeSession;
-  screen?: FetchScreen;
-  mapImages?: FetchMapImages;
-  ticketScreen?: FetchScreen;
-  ticket?: FetchDetail;
-  epic?: FetchEpicDetail;
-  epicList?: FetchEpicList;
-  archived?: FetchArchived;
-  archivedEpic?: FetchEpicDetail;
-  checksStatus?: FetchChecksStatus;
-  saveChecks?: SaveChecks;
-  stats?: FetchStats;
-  cleanup?: FetchCleanup;
-  cleanupWrite?: PostCleanup;
-  tips?: FetchTips;
-  chat?: FetchChat;
-  prompt?: PostPrompt;
-  answer?: PostAnswer;
-  focus?: PostFocus;
-  fixAgent?: FixAgent;
-  authState?: () => Promise<AuthState>;
-  logins?: FetchLogins;
-  settings?: FetchSettings;
-  signOut?: () => void | Promise<void>;
+  abandonTriage?: AbandonTriage
+  approveTriage?: ApproveTriage
+  triage?: FetchTriage
+  openTriage?: OpenFlow
+  openDesign?: OpenDesign
+  deleteDesign?: DeleteDesign
+  stop?: StopSession
+  resume?: ResumeSession
+  screen?: FetchScreen
+  mapImages?: FetchMapImages
+  ticketScreen?: FetchScreen
+  ticket?: FetchDetail
+  epic?: FetchEpicDetail
+  epicList?: FetchEpicList
+  archived?: FetchArchived
+  archivedEpic?: FetchEpicDetail
+  checksStatus?: FetchChecksStatus
+  saveChecks?: SaveChecks
+  stats?: FetchStats
+  cleanup?: FetchCleanup
+  cleanupWrite?: PostCleanup
+  tips?: FetchTips
+  chat?: FetchChat
+  prompt?: PostPrompt
+  answer?: PostAnswer
+  focus?: PostFocus
+  fixAgent?: FixAgent
+  authState?: () => Promise<AuthState>
+  logins?: FetchLogins
+  settings?: FetchSettings
+  signOut?: () => void | Promise<void>
 }
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
-  return [{ element: <AppShell fetchEpicList={fetchers.epicList} />, children: pageRoutes(fetchers) }, { path: "*", loader: () => redirect("/epics") }];
+  return [
+    { element: <AppShell fetchEpicList={fetchers.epicList} />, children: pageRoutes(fetchers) },
+    { path: "*", loader: () => redirect("/epics") },
+  ]
 }
 
 function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
@@ -164,35 +186,84 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
       fetchEpics={fetchers.epicList}
       signOut={fetchers.signOut}
     />
-  );
+  )
   return [
-    { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} saveChecks={fetchers.saveChecks} /> },
+    {
+      path: "/epics",
+      element: (
+        <EpicsPage
+          fetchList={fetchers.epicList}
+          fetchChecks={fetchers.checksStatus}
+          saveChecks={fetchers.saveChecks}
+        />
+      ),
+    },
     { path: "/archive", element: <ArchivePage fetchList={fetchers.archived} /> },
-    { path: "/archive/*", element: <EpicRoute readOnly fetchDetail={fetchers.archivedEpic} fetchList={fetchers.epicList} /> },
+    {
+      path: "/archive/*",
+      element: (
+        <EpicRoute readOnly fetchDetail={fetchers.archivedEpic} fetchList={fetchers.epicList} />
+      ),
+    },
     // "/agents/*" also matches "/agents"; the splat is the session label.
-    { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} /> },
-    { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
-    { path: "/cleanup", element: <CleanupPage fetchCleanup={fetchers.cleanup} postCleanup={fetchers.cleanupWrite}fetchEpics={fetchers.epicList} /> },
+    {
+      path: "/agents/*",
+      element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} />,
+    },
+    {
+      path: "/stats",
+      element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} />,
+    },
+    {
+      path: "/cleanup",
+      element: (
+        <CleanupPage
+          fetchCleanup={fetchers.cleanup}
+          postCleanup={fetchers.cleanupWrite}
+          fetchEpics={fetchers.epicList}
+        />
+      ),
+    },
     { path: "/tips", element: <TipsPage fetchTips={fetchers.tips} /> },
     { path: "/settings", element: settingsPage },
     { path: "/settings/s/:section", element: settingsPage },
     { path: "/settings/p/:project", element: settingsPage },
     { path: "/settings/p/:project/s/:section", element: settingsPage },
     { path: "/settings/logins", element: <WebLoginsPage fetchList={fetchers.logins} /> },
-    { path: "/settings/logins/:id", element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
-    { path: "/settings/password", element: <ChangePasswordPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
-    { path: "/settings/authenticator", element: <AuthenticatorPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
+    {
+      path: "/settings/logins/:id",
+      element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} />,
+    },
+    {
+      path: "/settings/password",
+      element: <ChangePasswordPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} />,
+    },
+    {
+      path: "/settings/authenticator",
+      element: <AuthenticatorPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} />,
+    },
     { path: "/settings/certificate", element: <CertificatePage fetchAuth={fetchers.authState} /> },
     { path: "/settings/agents", element: <Navigate to={sectionPath("Agents")} replace /> },
     { path: "/settings/*", element: <UnknownSettingsPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/triage/*", element: <TriageRoute fetchers={fetchers} /> },
-    { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
+    {
+      path: "/t/*",
+      element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} />,
+    },
     {
       path: "/e/*",
-      element: <EpicRoute fetchDetail={fetchers.epic} fetchList={fetchers.epicList} openDesign={fetchers.openDesign} fixAgent={fetchers.fixAgent} />,
+      element: (
+        <EpicRoute
+          fetchDetail={fetchers.epic}
+          fetchList={fetchers.epicList}
+          openDesign={fetchers.openDesign}
+          fixAgent={fetchers.fixAgent}
+        />
+      ),
     },
-  ];
+  ]
 }
 
-export const createAppRouter = (fetchDetail?: FetchDetail) => createHashRouter(appRoutes({ ticket: fetchDetail }));
+export const createAppRouter = (fetchDetail?: FetchDetail) =>
+  createHashRouter(appRoutes({ ticket: fetchDetail }))

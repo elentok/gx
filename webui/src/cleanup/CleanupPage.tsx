@@ -1,28 +1,44 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router";
-import { useConnectionContext } from "../connection";
-import { useEpicList, type FetchEpicList } from "../epics/list";
-import { DetailPage } from "../page/DetailPage";
-import { PageHeader } from "../page/PageHeader";
-import { PageIcon } from "../page/PageIcon";
-import { SectionHeading } from "../page/SectionHeading";
-import { Button } from "../ui/button/Button";
-import { Modal } from "../ui/modal/Modal";
-import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
-import { refusalText, useWrite } from "../useWrite";
-import { sizeText } from "../health/formatBytes";
-import { groupReport, postCleanup as defaultPost, useCleanup, type CleanupAction, type CleanupGroup, type FetchCleanup, type PostCleanup } from "./cleanup";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useState, type ReactNode } from "react"
+import { useSearchParams } from "react-router"
+import { useConnectionContext } from "../connection"
+import { useEpicList, type FetchEpicList } from "../epics/list"
+import { DetailPage } from "../page/DetailPage"
+import { PageHeader } from "../page/PageHeader"
+import { PageIcon } from "../page/PageIcon"
+import { SectionHeading } from "../page/SectionHeading"
+import { Button } from "../ui/button/Button"
+import { Modal } from "../ui/modal/Modal"
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
+import { refusalText, useWrite } from "../useWrite"
+import { sizeText } from "../health/formatBytes"
+import {
+  groupReport,
+  postCleanup as defaultPost,
+  useCleanup,
+  type CleanupAction,
+  type CleanupGroup,
+  type FetchCleanup,
+  type PostCleanup,
+} from "./cleanup"
 
 interface Acts {
-  pending: boolean;
+  pending: boolean
   /** The refusal text kept on a row, by row key. */
-  refused: Record<string, string>;
-  act: (key: string, action: CleanupAction, branch?: string, epic?: string) => void;
-  confirmUnmerged: (branch: string) => void;
+  refused: Record<string, string>
+  act: (key: string, action: CleanupAction, branch?: string, epic?: string) => void
+  confirmUnmerged: (branch: string) => void
 }
 
-function UnmergedDialog({ branch, onConfirm, onClose }: { branch: string; onConfirm: () => void; onClose: () => void }) {
+function UnmergedDialog({
+  branch,
+  onConfirm,
+  onClose,
+}: {
+  branch: string
+  onConfirm: () => void
+  onClose: () => void
+}) {
   return (
     <Modal label="Remove unmerged worktree" onClose={onClose} w="md" p="4" gap="3">
       <Text fontWeight="600">{`Remove the worktree of ${branch}?`}</Text>
@@ -36,10 +52,20 @@ function UnmergedDialog({ branch, onConfirm, onClose }: { branch: string; onConf
         </Button>
       </Box>
     </Modal>
-  );
+  )
 }
 
-function Row({ rowKey, name, acts, children }: { rowKey: string; name: string; acts: Acts; children?: ReactNode }) {
+function Row({
+  rowKey,
+  name,
+  acts,
+  children,
+}: {
+  rowKey: string
+  name: string
+  acts: Acts
+  children?: ReactNode
+}) {
   return (
     <Box as="li" display="flex" flexDirection="column" wordBreak="break-all">
       <Box display="flex" justifyContent="space-between" alignItems="center" gap="3">
@@ -54,17 +80,17 @@ function Row({ rowKey, name, acts, children }: { rowKey: string; name: string; a
         </Text>
       )}
     </Box>
-  );
+  )
 }
 
 function Group({ group, acts }: { group: CleanupGroup; acts: Acts }) {
-  const id = `cleanup-${group.id}`;
-  const agent = group.id === "agent";
+  const id = `cleanup-${group.id}`
+  const agent = group.id === "agent"
   const button = (label: string, onClick: () => void) => (
     <Button emphasis="ghost" disabled={acts.pending} onClick={onClick}>
       {label}
     </Button>
-  );
+  )
   return (
     <Box mt="6" role="region" aria-labelledby={id}>
       <SectionHeading id={id} tone={agent ? "waiting" : "running"}>
@@ -82,46 +108,61 @@ function Group({ group, acts }: { group: CleanupGroup; acts: Acts }) {
                 {sizeText(w.size_bytes, "binary")}
               </Text>
             )}
-            {group.id === "merged-worktrees" && !w.dirty && button("Remove", () => acts.act(w.branch, "remove-worktree", w.branch))}
-            {group.id === "merged-branches" && button("Delete branch", () => acts.act(w.branch, "delete-branch", w.branch))}
-            {group.id === "unmerged-worktrees" && button("Remove", () => acts.confirmUnmerged(w.branch))}
+            {group.id === "merged-worktrees" &&
+              !w.dirty &&
+              button("Remove", () => acts.act(w.branch, "remove-worktree", w.branch))}
+            {group.id === "merged-branches" &&
+              button("Delete branch", () => acts.act(w.branch, "delete-branch", w.branch))}
+            {group.id === "unmerged-worktrees" &&
+              button("Remove", () => acts.confirmUnmerged(w.branch))}
           </Row>
         ))}
         {group.epics.map((e) => (
           <Row key={`epic:${e.name}`} rowKey={`epic:${e.name}`} name={e.name} acts={acts}>
-            {group.id === "done-epics" && button("Archive", () => acts.act(`epic:${e.name}`, "archive-epic", undefined, e.name))}
+            {group.id === "done-epics" &&
+              button("Archive", () =>
+                acts.act(`epic:${e.name}`, "archive-epic", undefined, e.name),
+              )}
           </Row>
         ))}
       </Box>
     </Box>
-  );
+  )
 }
 
-export function CleanupPage({ fetchCleanup, fetchEpics, postCleanup = defaultPost }: { fetchCleanup?: FetchCleanup; fetchEpics?: FetchEpicList; postCleanup?: PostCleanup }) {
-  const conn = useConnectionContext();
-  const [params, setParams] = useSearchParams();
-  const { list } = useEpicList(fetchEpics, conn);
-  const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort();
-  const project = params.get("project") ?? projects[0] ?? "";
-  const { report, failed, retry } = useCleanup(project, fetchCleanup, conn);
-  const groups = report ? groupReport(report) : [];
-  const { run, pending } = useWrite({ toastRefusal: false });
-  const [refused, setRefused] = useState<Record<string, string>>({});
-  const [confirming, setConfirming] = useState<string>();
+export function CleanupPage({
+  fetchCleanup,
+  fetchEpics,
+  postCleanup = defaultPost,
+}: {
+  fetchCleanup?: FetchCleanup
+  fetchEpics?: FetchEpicList
+  postCleanup?: PostCleanup
+}) {
+  const conn = useConnectionContext()
+  const [params, setParams] = useSearchParams()
+  const { list } = useEpicList(fetchEpics, conn)
+  const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort()
+  const project = params.get("project") ?? projects[0] ?? ""
+  const { report, failed, retry } = useCleanup(project, fetchCleanup, conn)
+  const groups = report ? groupReport(report) : []
+  const { run, pending } = useWrite({ toastRefusal: false })
+  const [refused, setRefused] = useState<Record<string, string>>({})
+  const [confirming, setConfirming] = useState<string>()
 
   const act: Acts["act"] = (key, action, branch, epic) => {
-    setConfirming(undefined);
-    setRefused((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== key)));
+    setConfirming(undefined)
+    setRefused((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== key)))
     void run(
       async () => {
-        const res = await postCleanup(action, { project, branch, epic });
-        if (res.refused) setRefused((r) => ({ ...r, [key]: refusalText(res) }));
-        return res;
+        const res = await postCleanup(action, { project, branch, epic })
+        if (res.refused) setRefused((r) => ({ ...r, [key]: refusalText(res) }))
+        return res
       },
       { onDone: retry },
-    );
-  };
-  const acts: Acts = { pending, refused, act, confirmUnmerged: setConfirming };
+    )
+  }
+  const acts: Acts = { pending, refused, act, confirmUnmerged: setConfirming }
 
   return (
     <DetailPage title={{ kind: "Cleanup" }}>
@@ -161,7 +202,13 @@ export function CleanupPage({ fetchCleanup, fetchEpics, postCleanup = defaultPos
       ) : (
         groups.map((g) => <Group key={g.id} group={g} acts={acts} />)
       )}
-      {confirming && <UnmergedDialog branch={confirming} onConfirm={() => act(confirming, "remove-unmerged-worktree", confirming)} onClose={() => setConfirming(undefined)} />}
+      {confirming && (
+        <UnmergedDialog
+          branch={confirming}
+          onConfirm={() => act(confirming, "remove-unmerged-worktree", confirming)}
+          onClose={() => setConfirming(undefined)}
+        />
+      )}
     </DetailPage>
-  );
+  )
 }

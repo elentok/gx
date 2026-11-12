@@ -1,19 +1,19 @@
-import { Box, chakra } from "@chakra-ui/react";
-import type { Kind, Tone } from "../tone";
+import { Box, chakra } from "@chakra-ui/react"
+import type { Kind, Tone } from "../tone"
 
 export const KIND_LABELS: Record<Kind, string> = {
   design: "Design",
   implementation: "Implementation",
   oneoff: "One-off",
   followups: "Follow-ups",
-};
+}
 
 const KIND_ICONS: Record<Kind, string> = {
   design: "M3 13l.7-3L10.5 3.2a1.4 1.4 0 0 1 2 2L5.7 12 3 13zM9.2 4.5l2.3 2.3",
   implementation: "M5.5 5L2.5 8l3 3M10.5 5l3 3-3 3M9 3.5l-2 9",
   oneoff: "M9 1.5L3.5 9H8l-1 5.5L12.5 7H8l1-5.5z",
   followups: "M2 9l2-5.5h8L14 9v3.5H2V9zM2 9h3.5l.8 1.5h3.4L10.5 9H14",
-};
+}
 
 const SIZES = {
   md: { px: 64, stroke: 5, font: "15px", badge: true },
@@ -24,33 +24,54 @@ const SIZES = {
   compact: { px: 26, stroke: 3, font: "9px", badge: false },
   // The sidebar rows' ring in shell/SidebarRows.tsx.
   sidebar: { px: 20, stroke: 2.5, font: "8px", badge: false },
-} as const;
+} as const
 
 // Both drawn on a 100-unit path so the comet's 16% share does not depend on the radius.
-const COMET_SEGMENTS = 10;
-const COMET_SHARE = 16;
-const SEGMENT = COMET_SHARE / COMET_SEGMENTS;
+const COMET_SEGMENTS = 10
+const COMET_SHARE = 16
+const SEGMENT = COMET_SHARE / COMET_SEGMENTS
 
 interface Props {
   // 0..1
-  progress: number;
-  tone?: Tone;
-  kind: Kind;
+  progress: number
+  tone?: Tone
+  kind: Kind
   // A percentage, n/m, "…" or empty.
-  label?: string;
-  size?: keyof typeof SIZES;
+  label?: string
+  size?: keyof typeof SIZES
   // A white comet circles the ring while the work is live.
-  live?: boolean;
+  live?: boolean
 }
 
-export function ProgressRing({ progress, tone = "running", kind, label = "", size = "md", live = false }: Props) {
-  const { px, stroke, font, badge } = SIZES[size];
-  const r = (px - stroke) / 2;
-  const c = px / 2;
-  const clamped = Math.min(1, Math.max(0, progress));
+export function ProgressRing({
+  progress,
+  tone = "running",
+  kind,
+  label = "",
+  size = "md",
+  live = false,
+}: Props) {
+  const { px, stroke, font, badge } = SIZES[size]
+  const r = (px - stroke) / 2
+  const c = px / 2
+  const clamped = Math.min(1, Math.max(0, progress))
   return (
-    <Box position="relative" flexShrink={0} w={`${px}px`} h={`${px}px`} data-kind={kind} data-tone={tone}>
-      <chakra.svg viewBox={`0 0 ${px} ${px}`} w="100%" h="100%" fill="none" strokeWidth={stroke} aria-hidden>
+    <Box
+      position="relative"
+      flexShrink={0}
+      w={`${px}px`}
+      h={`${px}px`}
+      data-kind={kind}
+      data-tone={tone}
+    >
+      <chakra.svg
+        viewBox={`0 0 ${px} ${px}`}
+        w="100%"
+        h="100%"
+        fill="none"
+        strokeWidth={stroke}
+        aria-hidden
+      >
         <g transform={`rotate(-90 ${c} ${c})`}>
           <chakra.circle cx={c} cy={c} r={r} stroke="border" />
           <chakra.circle
@@ -144,5 +165,5 @@ export function ProgressRing({ progress, tone = "running", kind, label = "", siz
         </Box>
       )}
     </Box>
-  );
+  )
 }

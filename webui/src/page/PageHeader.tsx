@@ -1,8 +1,8 @@
-import { Box, Heading } from "@chakra-ui/react";
-import { type ReactNode, useEffect } from "react";
-import { MascotToggle } from "../shell/MascotToggle";
-import { useShell } from "../shell/ShellContext";
-import { useWide } from "../useWide";
+import { Box, Heading } from "@chakra-ui/react"
+import { type ReactNode, useEffect } from "react"
+import { MascotToggle } from "../shell/MascotToggle"
+import { useShell } from "../shell/ShellContext"
+import { useWide } from "../useWide"
 
 /** The one header every page uses: icon, title, subtitle, actions, then an optional meta bar. It owns the room above it, since the page container has no top padding. */
 export function PageHeader({
@@ -15,39 +15,57 @@ export function PageHeader({
   caret,
   children,
 }: {
-  title: string;
+  title: string
   /** A small decorative "▾" after the title (the epic and design pages). */
-  caret?: boolean;
+  caret?: boolean
   /** The large icon left of the title. */
-  icon?: ReactNode;
+  icon?: ReactNode
   /** One truncated line of text under the title. Nothing renders when it is empty. */
-  subtitle?: ReactNode;
+  subtitle?: ReactNode
   /** Page controls at the right edge: the progress ring or status icon first, then the "..." menu. */
-  actions?: ReactNode;
+  actions?: ReactNode
   /** The meta bar under a hairline. Nothing renders when it is empty. */
-  meta?: ReactNode;
+  meta?: ReactNode
   /** Drops the room under the hairline, for a meta bar that has nothing to show. */
-  metaFlush?: boolean;
-  children?: ReactNode;
+  metaFlush?: boolean
+  children?: ReactNode
 }) {
-  const wide = useWide();
+  const wide = useWide()
   // Inside the shell the mascot toggle leads the header; a page icon beside it reads as a second toggle.
-  const shell = useShell();
-  const claimHeader = shell?.claimHeader;
-  useEffect(() => claimHeader?.(), [claimHeader]);
+  const shell = useShell()
+  const claimHeader = shell?.claimHeader
+  useEffect(() => claimHeader?.(), [claimHeader])
   const h1 = (
-    <Heading as="h1" fontFamily="inherit" fontWeight="600" fontSize="19px" lineHeight="1.2" overflowWrap="anywhere">
+    <Heading
+      as="h1"
+      fontFamily="inherit"
+      fontWeight="600"
+      fontSize="19px"
+      lineHeight="1.2"
+      overflowWrap="anywhere"
+    >
       {title}
     </Heading>
-  );
-  const rich = icon || subtitle || actions || shell;
+  )
+  const rich = icon || subtitle || actions || shell
   return (
     <Box mt="4">
       {rich ? (
-        <Box display="flex" flexWrap="wrap" alignItems={subtitle ? "flex-start" : "center"} gap={wide ? "14px" : "10px"}>
+        <Box
+          display="flex"
+          flexWrap="wrap"
+          alignItems={subtitle ? "flex-start" : "center"}
+          gap={wide ? "14px" : "10px"}
+        >
           <MascotToggle />
           {icon && !shell ? (
-            <Box data-testid="page-header-icon" flex="none" display="flex" alignItems="center" color="text.dim">
+            <Box
+              data-testid="page-header-icon"
+              flex="none"
+              display="flex"
+              alignItems="center"
+              color="text.dim"
+            >
               {icon}
             </Box>
           ) : null}
@@ -56,7 +74,13 @@ export function PageHeader({
             {caret ? (
               <Box display="flex" alignItems="baseline" gap="6px">
                 {h1}
-                <Box as="span" aria-hidden="true" data-testid="page-header-caret" color="text.dim" fontSize="12px">
+                <Box
+                  as="span"
+                  aria-hidden="true"
+                  data-testid="page-header-caret"
+                  color="text.dim"
+                  fontSize="12px"
+                >
                   ▾
                 </Box>
               </Box>
@@ -78,7 +102,14 @@ export function PageHeader({
             ) : null}
           </Box>
           {actions ? (
-            <Box data-testid="page-header-actions" flex="none" ml="auto" display="flex" alignItems="center" gap="10px">
+            <Box
+              data-testid="page-header-actions"
+              flex="none"
+              ml="auto"
+              display="flex"
+              alignItems="center"
+              gap="10px"
+            >
               {actions}
             </Box>
           ) : null}
@@ -87,11 +118,17 @@ export function PageHeader({
         h1
       )}
       {meta ? (
-        <Box data-testid="page-header-meta" mt="10px" pt={metaFlush ? "0" : "8px"} borderTopWidth="1px" borderColor="hairline">
+        <Box
+          data-testid="page-header-meta"
+          mt="10px"
+          pt={metaFlush ? "0" : "8px"}
+          borderTopWidth="1px"
+          borderColor="hairline"
+        >
           {meta}
         </Box>
       ) : null}
       {children}
     </Box>
-  );
+  )
 }

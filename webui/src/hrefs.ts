@@ -1,33 +1,33 @@
-export const epicHref = (address: string) => `#/e/${address}`;
+export const epicHref = (address: string) => `#/e/${address}`
 
-export const ticketPath = (address: string) => `/t/${address}`;
+export const ticketPath = (address: string) => `/t/${address}`
 
-export const ticketHref = (address: string) => `#${ticketPath(address)}`;
+export const ticketHref = (address: string) => `#${ticketPath(address)}`
 
 /** A Design is its map epic's canonical address (ADR 0027). */
-export const designHref = (address: string) => `#/d/${address}`;
+export const designHref = (address: string) => `#/d/${address}`
 
 /** A Triage is its project's, so the address is the project name. */
-export const triageHref = (project: string) => `#/triage/${project}`;
+export const triageHref = (project: string) => `#/triage/${project}`
 
-export const EPICS_HREF = "#/epics";
+export const EPICS_HREF = "#/epics"
 
-export const ARCHIVE_HREF = "#/archive";
+export const ARCHIVE_HREF = "#/archive"
 
 /** An archived epic's read-only page; the address is the archive address. */
-export const archiveHref = (address: string) => `${ARCHIVE_HREF}/${address}`;
+export const archiveHref = (address: string) => `${ARCHIVE_HREF}/${address}`
 
-export const STATS_HREF = "#/stats";
+export const STATS_HREF = "#/stats"
 
-export const CLEANUP_HREF = "#/cleanup";
-export const TIPS_HREF = "#/tips";
+export const CLEANUP_HREF = "#/cleanup"
+export const TIPS_HREF = "#/tips"
 
-export const AGENTS_HREF = "#/agents";
+export const AGENTS_HREF = "#/agents"
 
-export const SETTINGS_HREF = "#/settings";
+export const SETTINGS_HREF = "#/settings"
 
 /** A session's label is its id. */
-export const agentHref = (label: string) => `${AGENTS_HREF}/${label}`;
+export const agentHref = (label: string) => `${AGENTS_HREF}/${label}`
 
 /** The router path of an agent's page, for navigate(). */
-export const agentPath = (label: string) => agentHref(label).slice(1);
+export const agentPath = (label: string) => agentHref(label).slice(1)

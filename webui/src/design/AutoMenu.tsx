@@ -1,10 +1,10 @@
-import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react";
-import { useRef } from "react";
+import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
+import { useRef } from "react"
 
 // A switch's look: a track with a knob, amber when on. `mini` is the one inside the Auto button.
 function Track({ on, mini }: { on: boolean; mini?: boolean }) {
-  const [w, h, knob] = mini ? [20, 11, 7] : [36, 20, 16];
-  const pad = (h - knob) / 2;
+  const [w, h, knob] = mini ? [20, 11, 7] : [36, 20, 16]
+  const pad = (h - knob) / 2
   return (
     <Box
       aria-hidden
@@ -25,21 +25,21 @@ function Track({ on, mini }: { on: boolean; mini?: boolean }) {
         bg={on ? "surface" : "text.dim"}
       />
     </Box>
-  );
+  )
 }
 
 export type AutoSwitch = {
-  label: string;
+  label: string
   /** What the button shows instead of `label` where it has no room; names and the popover keep `label`. */
-  short?: string;
-  description: string;
-  on: boolean;
-  disabled?: boolean;
-  onFlip?: () => void;
-};
+  short?: string
+  description: string
+  on: boolean
+  disabled?: boolean
+  onFlip?: () => void
+}
 
 /** Controlled by the caller: the round-keyed subtree remounts when a round lands, which must not close the popover. */
-export type AutoMenuState = { open: boolean; setOpen: (open: boolean) => void };
+export type AutoMenuState = { open: boolean; setOpen: (open: boolean) => void }
 
 // The Auto button: one mini switch per row, named as in the popover it opens.
 export function AutoMenu({
@@ -47,12 +47,12 @@ export function AutoMenu({
   state: { open, setOpen },
   tall,
 }: {
-  switches: AutoSwitch[];
-  state: AutoMenuState;
+  switches: AutoSwitch[]
+  state: AutoMenuState
   /** The phone footer's 44px row height. */
-  tall?: boolean;
+  tall?: boolean
 }) {
-  const anchor = useRef<HTMLButtonElement>(null);
+  const anchor = useRef<HTMLButtonElement>(null)
   return (
     <>
       <chakra.button
@@ -160,5 +160,5 @@ export function AutoMenu({
         </Portal>
       </Popover.Root>
     </>
-  );
+  )
 }

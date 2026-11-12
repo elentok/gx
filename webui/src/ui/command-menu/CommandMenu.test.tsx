@@ -1,125 +1,173 @@
-import { fireEvent } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderThemed } from "../render";
-import { TONES } from "../tone";
-import { CommandMenu, type CommandMenuRow } from "./CommandMenu";
+import { fireEvent } from "@testing-library/react"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { renderThemed } from "../render"
+import { TONES } from "../tone"
+import { CommandMenu, type CommandMenuRow } from "./CommandMenu"
 
 const rows: CommandMenuRow[] = [
-  { name: "/clear", description: "Start a new conversation", source: "built-in", segments: [{ text: "/c", match: true }, { text: "lear", match: false }] },
-  { name: "/compact", hint: "[instructions]", description: "Summarize the conversation", source: "built-in", segments: [{ text: "/c", match: true }, { text: "ompact", match: false }] },
-];
+  {
+    name: "/clear",
+    description: "Start a new conversation",
+    source: "built-in",
+    segments: [
+      { text: "/c", match: true },
+      { text: "lear", match: false },
+    ],
+  },
+  {
+    name: "/compact",
+    hint: "[instructions]",
+    description: "Summarize the conversation",
+    source: "built-in",
+    segments: [
+      { text: "/c", match: true },
+      { text: "ompact", match: false },
+    ],
+  },
+]
 
-const base = { rows, selected: 0, status: "ready" as const, typed: "/c", onPick: () => {} };
+const base = { rows, selected: 0, status: "ready" as const, typed: "/c", onPick: () => {} }
 
 describe("CommandMenu", () => {
   it("lists rows as options and marks the selected one", () => {
-    const { getAllByRole, getByRole } = renderThemed(<CommandMenu {...base} selected={1} />);
-    expect(getByRole("listbox")).toBeTruthy();
-    const opts = getAllByRole("option");
-    expect(opts.map((o) => o.getAttribute("aria-selected"))).toEqual(["false", "true"]);
-  });
+    const { getAllByRole, getByRole } = renderThemed(<CommandMenu {...base} selected={1} />)
+    expect(getByRole("listbox")).toBeTruthy()
+    const opts = getAllByRole("option")
+    expect(opts.map((o) => o.getAttribute("aria-selected"))).toEqual(["false", "true"])
+  })
 
   it("highlights the matched segment and shows the hint", () => {
-    const { getAllByRole } = renderThemed(<CommandMenu {...base} />);
-    const mark = getAllByRole("option")[0].querySelector("mark");
-    expect(mark?.textContent).toBe("/c");
-    expect(getAllByRole("option")[1].textContent).toContain("[instructions]");
-  });
+    const { getAllByRole } = renderThemed(<CommandMenu {...base} />)
+    const mark = getAllByRole("option")[0].querySelector("mark")
+    expect(mark?.textContent).toBe("/c")
+    expect(getAllByRole("option")[1].textContent).toContain("[instructions]")
+  })
 
   it("shows name, hint, description and source on a row, and the full key footer", () => {
-    const { getAllByRole, getByText } = renderThemed(<CommandMenu {...base} />);
-    const row = getAllByRole("option")[1];
-    for (const part of ["/compact", "[instructions]", "Summarize the conversation", "built-in"]) expect(row.textContent).toContain(part);
-    for (const part of ["↑↓ select", "Enter fills", "Cmd/Ctrl+Enter sends", "Esc closes"]) expect(getByText(part)).toBeTruthy();
-  });
+    const { getAllByRole, getByText } = renderThemed(<CommandMenu {...base} />)
+    const row = getAllByRole("option")[1]
+    for (const part of ["/compact", "[instructions]", "Summarize the conversation", "built-in"])
+      expect(row.textContent).toContain(part)
+    for (const part of ["↑↓ select", "Enter fills", "Cmd/Ctrl+Enter sends", "Esc closes"])
+      expect(getByText(part)).toBeTruthy()
+  })
 
   it("calls onPick with the clicked row", () => {
-    const onPick = vi.fn();
-    const { getAllByRole } = renderThemed(<CommandMenu {...base} onPick={onPick} />);
-    fireEvent.click(getAllByRole("option")[1]);
-    expect(onPick).toHaveBeenCalledWith(1);
-  });
+    const onPick = vi.fn()
+    const { getAllByRole } = renderThemed(<CommandMenu {...base} onPick={onPick} />)
+    fireEvent.click(getAllByRole("option")[1])
+    expect(onPick).toHaveBeenCalledWith(1)
+  })
 
   it("does not take focus on mousedown", () => {
-    const { getAllByRole } = renderThemed(<CommandMenu {...base} />);
-    expect(fireEvent.mouseDown(getAllByRole("option")[0])).toBe(false);
-  });
+    const { getAllByRole } = renderThemed(<CommandMenu {...base} />)
+    expect(fireEvent.mouseDown(getAllByRole("option")[0])).toBe(false)
+  })
 
   it("shows the key footer on desktop and hides it when compact", () => {
-    const wide = renderThemed(<CommandMenu {...base} />);
-    expect(wide.getByText("Enter fills")).toBeTruthy();
-    expect(wide.getByText("Cmd/Ctrl+Enter sends")).toBeTruthy();
-    wide.unmount();
-    const phone = renderThemed(<CommandMenu {...base} compact />);
-    expect(phone.queryByText("Enter fills")).toBeNull();
-  });
+    const wide = renderThemed(<CommandMenu {...base} />)
+    expect(wide.getByText("Enter fills")).toBeTruthy()
+    expect(wide.getByText("Cmd/Ctrl+Enter sends")).toBeTruthy()
+    wide.unmount()
+    const phone = renderThemed(<CommandMenu {...base} compact />)
+    expect(phone.queryByText("Enter fills")).toBeNull()
+  })
 
   describe("on a phone with an on-screen keyboard", () => {
     const stub = (vv: object, fieldRect: object) => {
-      vi.stubGlobal("visualViewport", { addEventListener() {}, removeEventListener() {}, offsetTop: 0, ...vv });
-      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(fieldRect as DOMRect);
-    };
+      vi.stubGlobal("visualViewport", {
+        addEventListener() {},
+        removeEventListener() {},
+        offsetTop: 0,
+        ...vv,
+      })
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(fieldRect as DOMRect)
+    }
     afterEach(() => {
-      vi.unstubAllGlobals();
-      vi.restoreAllMocks();
-    });
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    })
 
     it("caps an above menu at the room between the viewport top and the field", () => {
-      stub({ height: 400 }, { top: 200, bottom: 240 });
-      const { container } = renderThemed(<CommandMenu {...base} compact />);
-      const menu = container.querySelector<HTMLElement>("[data-placement]")!;
-      expect(getComputedStyle(menu).maxHeight).toBe("186px");
-    });
+      stub({ height: 400 }, { top: 200, bottom: 240 })
+      const { container } = renderThemed(<CommandMenu {...base} compact />)
+      const menu = container.querySelector<HTMLElement>("[data-placement]")!
+      expect(getComputedStyle(menu).maxHeight).toBe("186px")
+    })
 
     it("caps a below menu at the room between the field and the viewport bottom", () => {
-      stub({ height: 400 }, { top: 100, bottom: 140 });
-      const { container } = renderThemed(<CommandMenu {...base} compact placement="below" />);
-      const menu = container.querySelector<HTMLElement>("[data-placement]")!;
-      expect(getComputedStyle(menu).maxHeight).toBe("246px");
-    });
+      stub({ height: 400 }, { top: 100, bottom: 140 })
+      const { container } = renderThemed(<CommandMenu {...base} compact placement="below" />)
+      const menu = container.querySelector<HTMLElement>("[data-placement]")!
+      expect(getComputedStyle(menu).maxHeight).toBe("246px")
+    })
 
     it("leaves the height alone when not compact", () => {
-      stub({ height: 400 }, { top: 200, bottom: 240 });
-      const { container } = renderThemed(<CommandMenu {...base} />);
-      expect(getComputedStyle(container.querySelector<HTMLElement>("[data-placement]")!).maxHeight).toBe("");
-    });
-  });
+      stub({ height: 400 }, { top: 200, bottom: 240 })
+      const { container } = renderThemed(<CommandMenu {...base} />)
+      expect(
+        getComputedStyle(container.querySelector<HTMLElement>("[data-placement]")!).maxHeight,
+      ).toBe("")
+    })
+  })
 
   it("shows the no-match line with the typed token", () => {
-    const { getByText, queryByRole } = renderThemed(<CommandMenu {...base} rows={[]} status="no-match" typed="/zz" />);
-    expect(getByText((_, el) => el?.tagName === "P" && el.textContent === "No command matches /zz. Cmd/Ctrl+Enter sends it as typed.")).toBeTruthy();
-    expect(getByText("/zz").tagName).toBe("SPAN");
-    expect(getByText("Esc closes")).toBeTruthy();
-    expect(queryByRole("listbox")).toBeNull();
-  });
+    const { getByText, queryByRole } = renderThemed(
+      <CommandMenu {...base} rows={[]} status="no-match" typed="/zz" />,
+    )
+    expect(
+      getByText(
+        (_, el) =>
+          el?.tagName === "P" &&
+          el.textContent === "No command matches /zz. Cmd/Ctrl+Enter sends it as typed.",
+      ),
+    ).toBeTruthy()
+    expect(getByText("/zz").tagName).toBe("SPAN")
+    expect(getByText("Esc closes")).toBeTruthy()
+    expect(queryByRole("listbox")).toBeNull()
+  })
 
   it("shortens the no-match line on a phone", () => {
-    const { getByText } = renderThemed(<CommandMenu {...base} rows={[]} status="no-match" typed="/zz" compact />);
-    expect(getByText((_, el) => el?.tagName === "P" && el.textContent === "No command matches /zz. Send sends it as typed.")).toBeTruthy();
-  });
+    const { getByText } = renderThemed(
+      <CommandMenu {...base} rows={[]} status="no-match" typed="/zz" compact />,
+    )
+    expect(
+      getByText(
+        (_, el) =>
+          el?.tagName === "P" &&
+          el.textContent === "No command matches /zz. Send sends it as typed.",
+      ),
+    ).toBeTruthy()
+  })
 
   it("shows one loading line", () => {
-    const { getByText, queryByRole } = renderThemed(<CommandMenu {...base} rows={[]} status="loading" />);
-    expect(getByText("Loading commands…")).toBeTruthy();
-    expect(queryByRole("listbox")).toBeNull();
-  });
+    const { getByText, queryByRole } = renderThemed(
+      <CommandMenu {...base} rows={[]} status="loading" />,
+    )
+    expect(getByText("Loading commands…")).toBeTruthy()
+    expect(queryByRole("listbox")).toBeNull()
+  })
 
   it("shows built-ins plus a warning when the list failed", () => {
-    const { getByText, getAllByRole } = renderThemed(<CommandMenu {...base} status="failed" />);
-    expect(getByText("⚠ Skills could not load. Built-ins only.")).toBeTruthy();
-    expect(getAllByRole("option")).toHaveLength(2);
-  });
+    const { getByText, getAllByRole } = renderThemed(<CommandMenu {...base} status="failed" />)
+    expect(getByText("⚠ Skills could not load. Built-ins only.")).toBeTruthy()
+    expect(getAllByRole("option")).toHaveLength(2)
+  })
 
   it("places the menu above or below the field", () => {
-    const above = renderThemed(<CommandMenu {...base} />);
-    expect(above.container.querySelector("[data-placement]")?.getAttribute("data-placement")).toBe("above");
-    above.unmount();
-    const below = renderThemed(<CommandMenu {...base} placement="below" />);
-    expect(below.container.querySelector("[data-placement]")?.getAttribute("data-placement")).toBe("below");
-  });
+    const above = renderThemed(<CommandMenu {...base} />)
+    expect(above.container.querySelector("[data-placement]")?.getAttribute("data-placement")).toBe(
+      "above",
+    )
+    above.unmount()
+    const below = renderThemed(<CommandMenu {...base} placement="below" />)
+    expect(below.container.querySelector("[data-placement]")?.getAttribute("data-placement")).toBe(
+      "below",
+    )
+  })
 
   it.each(TONES)("carries tone %s", (tone) => {
-    const { container } = renderThemed(<CommandMenu {...base} tone={tone} />);
-    expect(container.querySelector("[data-tone]")?.getAttribute("data-tone")).toBe(tone);
-  });
-});
+    const { container } = renderThemed(<CommandMenu {...base} tone={tone} />)
+    expect(container.querySelector("[data-tone]")?.getAttribute("data-tone")).toBe(tone)
+  })
+})

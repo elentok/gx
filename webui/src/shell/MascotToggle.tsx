@@ -1,19 +1,19 @@
-import { Box, chakra, Image } from "@chakra-ui/react";
-import { useDevice } from "../useWide";
-import { useConnectionContext, useConnectionState } from "../connection";
-import { type Shell, useShell } from "./ShellContext";
+import { Box, chakra, Image } from "@chakra-ui/react"
+import { useDevice } from "../useWide"
+import { useConnectionContext, useConnectionState } from "../connection"
+import { type Shell, useShell } from "./ShellContext"
 
 // The bare mascot that opens the sidebar. On desktop it shows only while the sidebar is collapsed.
 export function MascotToggle() {
-  const shell = useShell();
-  const device = useDevice();
-  if (!shell || (device === "desktop" && shell.sidebarOpen)) return null;
-  return <Toggle shell={shell} />;
+  const shell = useShell()
+  const device = useDevice()
+  if (!shell || (device === "desktop" && shell.sidebarOpen)) return null
+  return <Toggle shell={shell} />
 }
 
 function Toggle({ shell }: { shell: Shell }) {
-  const { snapshot } = useConnectionState(useConnectionContext());
-  const needsYou = !shell.sidebarOpen && (snapshot?.needs_you_total ?? 0) > 0;
+  const { snapshot } = useConnectionState(useConnectionContext())
+  const needsYou = !shell.sidebarOpen && (snapshot?.needs_you_total ?? 0) > 0
   return (
     <chakra.button
       type="button"
@@ -44,5 +44,5 @@ function Toggle({ shell }: { shell: Shell }) {
         />
       )}
     </chakra.button>
-  );
+  )
 }

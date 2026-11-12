@@ -1,299 +1,396 @@
-import { MemoryRouter } from "react-router";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { ProjectWorktrees, SessionResult } from "../generated/server";
-import { renderThemed } from "../ui/render";
-import { clearCommandListCache, type FetchCommands } from "../commands/useCommandList";
-import type { CreateSession, NewSessionBody } from "./newSession";
-import { ShellContext, type Shell } from "../shell/ShellContext";
-import { NewSessionForm } from "./NewSessionForm";
-import { DeviceContext, type Device } from "../useWide";
+import { MemoryRouter } from "react-router"
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
+import type { ProjectWorktrees, SessionResult } from "../generated/server"
+import { renderThemed } from "../ui/render"
+import { clearCommandListCache, type FetchCommands } from "../commands/useCommandList"
+import type { CreateSession, NewSessionBody } from "./newSession"
+import { ShellContext, type Shell } from "../shell/ShellContext"
+import { NewSessionForm } from "./NewSessionForm"
+import { DeviceContext, type Device } from "../useWide"
 
-const shellStub: Shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding: () => {}, claimHeader: () => () => {} };
+const shellStub: Shell = {
+  sidebarOpen: true,
+  toggle: () => {},
+  close: () => {},
+  closeSliding: () => {},
+  claimHeader: () => () => {},
+}
 
-afterEach(cleanup);
+afterEach(cleanup)
 beforeEach(() => {
-  localStorage.clear();
-  clearCommandListCache();
-});
+  localStorage.clear()
+  clearCommandListCache()
+})
 
-const KEY = "gx.newSession.draft";
-const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null");
+const KEY = "gx.newSession.draft"
+const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null")
 const trees: ProjectWorktrees[] = [
-  { project: "gx", root: "/dev/gx", worktrees: ["/dev/gx-stats", "/dev/gx-stats-axis-labels"], tiers: { light: "haiku", worker: "sonnet", strongest: "opus" } },
-  { project: "blog", root: "/dev/blog", worktrees: [], tiers: { light: "haiku", worker: "sonnet", strongest: "opus" } },
-];
-const accepted: SessionResult = { session: { id: "gx-7" } as never };
+  {
+    project: "gx",
+    root: "/dev/gx",
+    worktrees: ["/dev/gx-stats", "/dev/gx-stats-axis-labels"],
+    tiers: { light: "haiku", worker: "sonnet", strongest: "opus" },
+  },
+  {
+    project: "blog",
+    root: "/dev/blog",
+    worktrees: [],
+    tiers: { light: "haiku", worker: "sonnet", strongest: "opus" },
+  },
+]
+const accepted: SessionResult = { session: { id: "gx-7" } as never }
 
-function mount(over: { create?: CreateSession; connected?: boolean; path?: string; last?: string; setLast?: (project: string) => Promise<void>; fetchCommands?: FetchCommands; workspace?: string; device?: Device } = {}) {
-  const posts: NewSessionBody[] = [];
-  const create: CreateSession = over.create ?? (async (body) => (posts.push(body), accepted));
-  const onCreated = vi.fn();
-  const onClose = vi.fn();
-  const state = { connected: over.connected ?? true } as ConnectionState;
+function mount(
+  over: {
+    create?: CreateSession
+    connected?: boolean
+    path?: string
+    last?: string
+    setLast?: (project: string) => Promise<void>
+    fetchCommands?: FetchCommands
+    workspace?: string
+    device?: Device
+  } = {},
+) {
+  const posts: NewSessionBody[] = []
+  const create: CreateSession = over.create ?? (async (body) => (posts.push(body), accepted))
+  const onCreated = vi.fn()
+  const onClose = vi.fn()
+  const state = { connected: over.connected ?? true } as ConnectionState
   const conn = {
     getState: () => state,
     subscribe: () => () => {},
-  } as unknown as Connection;
-  const drafts = { getLastProject: async () => over.last ?? "", setLastProject: over.setLast ?? (async () => {}) };
+  } as unknown as Connection
+  const drafts = {
+    getLastProject: async () => over.last ?? "",
+    setLastProject: over.setLast ?? (async () => {}),
+  }
   renderThemed(
     <MemoryRouter initialEntries={[over.path ?? "/agents"]}>
       <DeviceContext.Provider value={over.device ?? "desktop"}>
         <ConnectionContext.Provider value={conn}>
-          <ShellContext.Provider value={over.workspace === undefined ? undefined : { ...shellStub, workspace: over.workspace }}>
-            <NewSessionForm drafts={drafts} fetchTrees={async () => trees} create={create} fetchCommands={over.fetchCommands} onCreated={onCreated} onClose={onClose} />
+          <ShellContext.Provider
+            value={
+              over.workspace === undefined ? undefined : { ...shellStub, workspace: over.workspace }
+            }
+          >
+            <NewSessionForm
+              drafts={drafts}
+              fetchTrees={async () => trees}
+              create={create}
+              fetchCommands={over.fetchCommands}
+              onCreated={onCreated}
+              onClose={onClose}
+            />
           </ShellContext.Provider>
         </ConnectionContext.Provider>
       </DeviceContext.Provider>
     </MemoryRouter>,
-  );
-  return { posts, onCreated, onClose };
+  )
+  return { posts, onCreated, onClose }
 }
 
-const ready = () => screen.findByRole("combobox", { name: "Worktree" }) as Promise<HTMLInputElement>;
-const type = (name: string, value: string) => fireEvent.change(screen.getByRole(name === "Project" ? "combobox" : "textbox", { name }) as HTMLElement, { target: { value } });
-const typeWorktree = (el: HTMLElement, value: string) => (fireEvent.focus(el), fireEvent.change(el, { target: { value } }));
-const list = () => within(screen.getByRole("listbox", { name: "Worktrees" }));
-const options = () => list().queryAllByRole("option").map((o) => o.textContent);
-const submit = () => fireEvent.click(screen.getByRole("button", { name: "Create session" }));
+const ready = () => screen.findByRole("combobox", { name: "Worktree" }) as Promise<HTMLInputElement>
+const type = (name: string, value: string) =>
+  fireEvent.change(
+    screen.getByRole(name === "Project" ? "combobox" : "textbox", { name }) as HTMLElement,
+    { target: { value } },
+  )
+const typeWorktree = (el: HTMLElement, value: string) => (
+  fireEvent.focus(el), fireEvent.change(el, { target: { value } })
+)
+const list = () => within(screen.getByRole("listbox", { name: "Worktrees" }))
+const options = () =>
+  list()
+    .queryAllByRole("option")
+    .map((o) => o.textContent)
+const submit = () => fireEvent.click(screen.getByRole("button", { name: "Create session" }))
 
 test("fields and defaults: project prefilled, worktree is the project root", async () => {
-  mount({ path: "/e/blog:x" });
-  const wt = await ready();
-  expect((screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe("blog");
-  expect(wt.value).toBe("Project root");
-  for (const name of ["Name", "First prompt"]) expect(screen.getByRole("textbox", { name })).toBeTruthy();
-  for (const name of ["Cancel", "Create session"]) expect(screen.getByRole("button", { name })).toBeTruthy();
-});
+  mount({ path: "/e/blog:x" })
+  const wt = await ready()
+  expect((screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe(
+    "blog",
+  )
+  expect(wt.value).toBe("Project root")
+  for (const name of ["Name", "First prompt"])
+    expect(screen.getByRole("textbox", { name })).toBeTruthy()
+  for (const name of ["Cancel", "Create session"])
+    expect(screen.getByRole("button", { name })).toBeTruthy()
+})
 
 const projectValue = async () => {
-  await ready();
-  return (screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value;
-};
+  await ready()
+  return (screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value
+}
 
 test("a blank form opens on the page project, then the one-project Epics filter, then last used, then the first", async () => {
-  mount({ path: "/d/blog:x", last: "gx" });
-  expect(await projectValue()).toBe("blog");
-  cleanup();
-  localStorage.setItem("gx.epics.project", JSON.stringify(["blog"]));
-  mount({ last: "gx" });
-  expect(await projectValue()).toBe("blog");
-  cleanup();
-  localStorage.clear();
-  mount({ last: "blog" });
-  await ready();
-  await waitFor(() => expect((screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe("blog"));
-  cleanup();
-  mount();
-  expect(await projectValue()).toBe("gx");
-});
+  mount({ path: "/d/blog:x", last: "gx" })
+  expect(await projectValue()).toBe("blog")
+  cleanup()
+  localStorage.setItem("gx.epics.project", JSON.stringify(["blog"]))
+  mount({ last: "gx" })
+  expect(await projectValue()).toBe("blog")
+  cleanup()
+  localStorage.clear()
+  mount({ last: "blog" })
+  await ready()
+  await waitFor(() =>
+    expect((screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe(
+      "blog",
+    ),
+  )
+  cleanup()
+  mount()
+  expect(await projectValue()).toBe("gx")
+})
 
 test("a draft with text keeps its project whatever the page", async () => {
-  localStorage.setItem(KEY, JSON.stringify({ project: "gx", name: "keep" }));
-  mount({ path: "/e/blog:x" });
-  expect(await projectValue()).toBe("gx");
-});
+  localStorage.setItem(KEY, JSON.stringify({ project: "gx", name: "keep" }))
+  mount({ path: "/e/blog:x" })
+  expect(await projectValue()).toBe("gx")
+})
 
 test("creating a chat writes the created project as the last project once", async () => {
-  const setLast = vi.fn(async () => {});
-  const { onCreated } = mount({ path: "/e/blog:x", setLast });
-  await ready();
-  submit();
-  await waitFor(() => expect(onCreated).toHaveBeenCalled());
-  expect(setLast.mock.calls).toEqual([["blog"]]);
-});
+  const setLast = vi.fn(async () => {})
+  const { onCreated } = mount({ path: "/e/blog:x", setLast })
+  await ready()
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(setLast.mock.calls).toEqual([["blog"]])
+})
 
 test("a failed last-project write still completes the create", async () => {
-  const { onCreated } = mount({ setLast: async () => Promise.reject(new Error("down")) });
-  await ready();
-  submit();
-  await waitFor(() => expect(onCreated).toHaveBeenCalledWith("gx-7"));
-});
+  const { onCreated } = mount({ setLast: async () => Promise.reject(new Error("down")) })
+  await ready()
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalledWith("gx-7"))
+})
 
 test("once the projects load, Name has focus on a wide device and Project and First prompt do not", async () => {
-  mount();
-  await ready();
-  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" }));
-});
+  mount()
+  await ready()
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" }))
+})
 
 test("on a phone nothing in the form has focus", async () => {
-  mount({ device: "phone" });
-  await ready();
-  expect(screen.getByRole("dialog").contains(document.activeElement) && document.activeElement !== screen.getByRole("dialog")).toBe(false);
-});
+  mount({ device: "phone" })
+  await ready()
+  expect(
+    screen.getByRole("dialog").contains(document.activeElement) &&
+      document.activeElement !== screen.getByRole("dialog"),
+  ).toBe(false)
+})
 
 test("the picker lists the root and worktrees, filters, and offers the create row", async () => {
-  mount();
-  const wt = await ready();
-  fireEvent.focus(wt);
-  expect(options()).toEqual(["Project root/dev/gx", "gx-stats/dev/gx-stats", "gx-stats-axis-labels/dev/gx-stats-axis-labels"]);
-  typeWorktree(wt, "axis");
-  expect(options()).toEqual(["+ Create worktree “axis”", "gx-stats-axis-labels/dev/gx-stats-axis-labels"]);
-  typeWorktree(wt, "gx-stats");
-  expect(options()[0]).toBe("gx-stats/dev/gx-stats");
-  expect(options().some((o) => o?.startsWith("+ Create"))).toBe(false);
-});
+  mount()
+  const wt = await ready()
+  fireEvent.focus(wt)
+  expect(options()).toEqual([
+    "Project root/dev/gx",
+    "gx-stats/dev/gx-stats",
+    "gx-stats-axis-labels/dev/gx-stats-axis-labels",
+  ])
+  typeWorktree(wt, "axis")
+  expect(options()).toEqual([
+    "+ Create worktree “axis”",
+    "gx-stats-axis-labels/dev/gx-stats-axis-labels",
+  ])
+  typeWorktree(wt, "gx-stats")
+  expect(options()[0]).toBe("gx-stats/dev/gx-stats")
+  expect(options().some((o) => o?.startsWith("+ Create"))).toBe(false)
+})
 
 test("the shell's active workspace rides on the create; no shell sends none", async () => {
-  const withShell = mount({ workspace: "research" });
-  await ready();
-  submit();
-  await waitFor(() => expect(withShell.posts).toHaveLength(1));
-  expect(withShell.posts[0].workspace).toBe("research");
-  cleanup();
-  const bare = mount();
-  await ready();
-  submit();
-  await waitFor(() => expect(bare.posts).toHaveLength(1));
-  expect(bare.posts[0]).not.toHaveProperty("workspace");
-});
+  const withShell = mount({ workspace: "research" })
+  await ready()
+  submit()
+  await waitFor(() => expect(withShell.posts).toHaveLength(1))
+  expect(withShell.posts[0].workspace).toBe("research")
+  cleanup()
+  const bare = mount()
+  await ready()
+  submit()
+  await waitFor(() => expect(bare.posts).toHaveLength(1))
+  expect(bare.posts[0]).not.toHaveProperty("workspace")
+})
 
 test("picking a dir posts dir", async () => {
-  const { posts, onCreated } = mount();
-  typeWorktree(await ready(), "gx-stats");
-  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }));
-  submit();
-  await waitFor(() => expect(onCreated).toHaveBeenCalledWith("gx-7"));
-  expect(posts).toEqual([{ project: "gx", dir: "/dev/gx-stats", name: undefined, prompt: undefined, tier: "worker" }]);
-});
+  const { posts, onCreated } = mount()
+  typeWorktree(await ready(), "gx-stats")
+  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }))
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalledWith("gx-7"))
+  expect(posts).toEqual([
+    { project: "gx", dir: "/dev/gx-stats", name: undefined, prompt: undefined, tier: "worker" },
+  ])
+})
 
 test("the default root posts its dir, with a typed name and prompt", async () => {
-  const { posts, onCreated } = mount();
-  await ready();
-  type("Name", " mine ");
-  type("First prompt", "do it");
-  submit();
-  await waitFor(() => expect(onCreated).toHaveBeenCalled());
-  expect(posts).toEqual([{ project: "gx", dir: "/dev/gx", name: "mine", prompt: "do it", tier: "worker" }]);
-});
+  const { posts, onCreated } = mount()
+  await ready()
+  type("Name", " mine ")
+  type("First prompt", "do it")
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(posts).toEqual([
+    { project: "gx", dir: "/dev/gx", name: "mine", prompt: "do it", tier: "worker" },
+  ])
+})
 
 test("the create row posts worktree", async () => {
-  const { posts, onCreated } = mount();
-  typeWorktree(await ready(), "fresh");
-  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }));
-  submit();
-  await waitFor(() => expect(onCreated).toHaveBeenCalled());
-  expect(posts).toEqual([{ project: "gx", worktree: "fresh", name: undefined, prompt: undefined, tier: "worker" }]);
-});
+  const { posts, onCreated } = mount()
+  typeWorktree(await ready(), "fresh")
+  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }))
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(posts).toEqual([
+    { project: "gx", worktree: "fresh", name: undefined, prompt: undefined, tier: "worker" },
+  ])
+})
 
 test("the tier picker lists three tiers with their models, defaults to worker and posts the pick", async () => {
-  const { posts, onCreated } = mount();
-  await ready();
-  const picker = screen.getByRole("combobox", { name: "Tier" }) as HTMLSelectElement;
-  expect([...picker.options].map((o) => o.textContent)).toEqual(["Light (Claude Haiku)", "Worker (Claude Sonnet)", "Strongest (Claude Opus)"]);
-  expect(picker.value).toBe("worker");
-  fireEvent.change(picker, { target: { value: "strongest" } });
-  submit();
-  await waitFor(() => expect(onCreated).toHaveBeenCalled());
-  expect(posts[0].tier).toBe("strongest");
-});
+  const { posts, onCreated } = mount()
+  await ready()
+  const picker = screen.getByRole("combobox", { name: "Tier" }) as HTMLSelectElement
+  expect([...picker.options].map((o) => o.textContent)).toEqual([
+    "Light (Claude Haiku)",
+    "Worker (Claude Sonnet)",
+    "Strongest (Claude Opus)",
+  ])
+  expect(picker.value).toBe("worker")
+  fireEvent.change(picker, { target: { value: "strongest" } })
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(posts[0].tier).toBe("strongest")
+})
 
 test("the Name placeholder follows the worktree", async () => {
-  mount();
-  const wt = await ready();
-  expect(screen.getByRole("textbox", { name: "Name" }).getAttribute("placeholder")).toBe("gx");
-  typeWorktree(wt, "fresh");
-  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }));
-  expect(screen.getByRole("textbox", { name: "Name" }).getAttribute("placeholder")).toBe("fresh");
-});
+  mount()
+  const wt = await ready()
+  expect(screen.getByRole("textbox", { name: "Name" }).getAttribute("placeholder")).toBe("gx")
+  typeWorktree(wt, "fresh")
+  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }))
+  expect(screen.getByRole("textbox", { name: "Name" }).getAttribute("placeholder")).toBe("fresh")
+})
 
 test("the draft survives a remount and clears on create and on discard", async () => {
-  mount();
-  await ready();
-  type("Name", "keep");
-  expect(saved().name).toBe("keep");
-  cleanup();
-  mount();
-  await ready();
-  expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("keep");
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(saved()).toBeNull();
-  cleanup();
-  const { onCreated } = mount();
-  await ready();
-  type("Name", "again");
-  submit();
-  await waitFor(() => expect(onCreated).toHaveBeenCalled());
-  expect(saved()).toBeNull();
-});
+  mount()
+  await ready()
+  type("Name", "keep")
+  expect(saved().name).toBe("keep")
+  cleanup()
+  mount()
+  await ready()
+  expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("keep")
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
+  expect(saved()).toBeNull()
+  cleanup()
+  const { onCreated } = mount()
+  await ready()
+  type("Name", "again")
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(saved()).toBeNull()
+})
 
 test("a refusal shows in the form with input kept", async () => {
-  const { onCreated } = mount({ create: async () => ({ refused: true, message: "bad worktree name" }) });
-  typeWorktree(await ready(), "bad name");
-  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }));
-  type("First prompt", "/x");
-  submit();
-  expect((await screen.findByRole("alert")).textContent).toBe("bad worktree name");
-  expect((screen.getByRole("textbox", { name: "First prompt" }) as HTMLTextAreaElement).value).toBe("/x");
-  expect((screen.getByRole("combobox", { name: "Worktree" }) as HTMLInputElement).value).toBe("bad name");
-  expect(onCreated).not.toHaveBeenCalled();
-  expect(saved().prompt).toBe("/x");
-});
+  const { onCreated } = mount({
+    create: async () => ({ refused: true, message: "bad worktree name" }),
+  })
+  typeWorktree(await ready(), "bad name")
+  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }))
+  type("First prompt", "/x")
+  submit()
+  expect((await screen.findByRole("alert")).textContent).toBe("bad worktree name")
+  expect((screen.getByRole("textbox", { name: "First prompt" }) as HTMLTextAreaElement).value).toBe(
+    "/x",
+  )
+  expect((screen.getByRole("combobox", { name: "Worktree" }) as HTMLInputElement).value).toBe(
+    "bad name",
+  )
+  expect(onCreated).not.toHaveBeenCalled()
+  expect(saved().prompt).toBe("/x")
+})
 
-const entry = (name: string) => ({ name, arg_hint: "", description: "", source: "skill", aliases: [] });
+const entry = (name: string) => ({
+  name,
+  arg_hint: "",
+  description: "",
+  source: "skill",
+  aliases: [],
+})
 const commandsFor = () => {
-  const targets: unknown[] = [];
+  const targets: unknown[] = []
   const fetchCommands: FetchCommands = async (target) => {
-    targets.push(target);
-    const dir = "dir" in target ? target.dir : "";
-    return { entries: dir === "/dev/gx-stats" ? [entry("feature")] : [entry("review")], degraded: false };
-  };
-  return { fetchCommands, targets };
-};
-const prompt = () => screen.getByRole("textbox", { name: "First prompt" }) as HTMLTextAreaElement;
+    targets.push(target)
+    const dir = "dir" in target ? target.dir : ""
+    return {
+      entries: dir === "/dev/gx-stats" ? [entry("feature")] : [entry("review")],
+      degraded: false,
+    }
+  }
+  return { fetchCommands, targets }
+}
+const prompt = () => screen.getByRole("textbox", { name: "First prompt" }) as HTMLTextAreaElement
 const typeAt = (text: string) => {
-  fireEvent.change(prompt(), { target: { value: text, selectionStart: text.length, selectionEnd: text.length } });
-};
-const menuRows = () => screen.queryAllByRole("option", { name: /^\// }).map((o) => o.textContent);
+  fireEvent.change(prompt(), {
+    target: { value: text, selectionStart: text.length, selectionEnd: text.length },
+  })
+}
+const menuRows = () => screen.queryAllByRole("option", { name: /^\// }).map((o) => o.textContent)
 
 test("/ opens the menu for the chosen worktree and fills on Enter", async () => {
-  const { fetchCommands } = commandsFor();
-  mount({ fetchCommands });
-  typeWorktree(await ready(), "gx-stats");
-  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }));
-  prompt().focus();
-  typeAt("/");
-  await waitFor(() => expect(menuRows().some((r) => r?.includes("/feature"))).toBe(true));
-  expect(menuRows().some((r) => r?.includes("/review"))).toBe(false);
-  expect(screen.queryByText("Cmd/Ctrl+Enter sends")).toBeNull();
-  expect(screen.getByText("fills the text, does not send")).toBeTruthy();
-  fireEvent.keyDown(prompt(), { key: "Enter" });
-  expect(prompt().value).toMatch(/^\/feature /);
-});
+  const { fetchCommands } = commandsFor()
+  mount({ fetchCommands })
+  typeWorktree(await ready(), "gx-stats")
+  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }))
+  prompt().focus()
+  typeAt("/")
+  await waitFor(() => expect(menuRows().some((r) => r?.includes("/feature"))).toBe(true))
+  expect(menuRows().some((r) => r?.includes("/review"))).toBe(false)
+  expect(screen.queryByText("Cmd/Ctrl+Enter sends")).toBeNull()
+  expect(screen.getByText("fills the text, does not send")).toBeTruthy()
+  fireEvent.keyDown(prompt(), { key: "Enter" })
+  expect(prompt().value).toMatch(/^\/feature /)
+})
 
 test("picking a worktree makes no read; typing / reads the current dir once", async () => {
-  const { fetchCommands, targets } = commandsFor();
-  mount({ fetchCommands });
-  typeWorktree(await ready(), "gx-stats");
-  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }));
-  expect(targets).toEqual([]);
-  prompt().focus();
-  typeAt("/");
-  await waitFor(() => expect(targets).toEqual([{ project: "gx", dir: "/dev/gx-stats" }]));
-});
+  const { fetchCommands, targets } = commandsFor()
+  mount({ fetchCommands })
+  typeWorktree(await ready(), "gx-stats")
+  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }))
+  expect(targets).toEqual([])
+  prompt().focus()
+  typeAt("/")
+  await waitFor(() => expect(targets).toEqual([{ project: "gx", dir: "/dev/gx-stats" }]))
+})
 
 test("a created worktree reads the project root's list", async () => {
-  const { fetchCommands, targets } = commandsFor();
-  mount({ fetchCommands });
-  typeWorktree(await ready(), "new-tree");
-  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }));
-  typeAt("/");
-  await waitFor(() => expect(menuRows().some((r) => r?.includes("/review"))).toBe(true));
-  expect(targets).toEqual([{ project: "gx", dir: "/dev/gx" }]);
-});
+  const { fetchCommands, targets } = commandsFor()
+  mount({ fetchCommands })
+  typeWorktree(await ready(), "new-tree")
+  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }))
+  typeAt("/")
+  await waitFor(() => expect(menuRows().some((r) => r?.includes("/review"))).toBe(true))
+  expect(targets).toEqual([{ project: "gx", dir: "/dev/gx" }])
+})
 
 test("Cmd+Enter does not submit; Enter with the menu closed adds a newline", async () => {
-  const { posts } = mount({ fetchCommands: commandsFor().fetchCommands });
-  await ready();
-  typeAt("hello");
-  fireEvent.keyDown(prompt(), { key: "Enter", metaKey: true });
-  fireEvent.keyDown(prompt(), { key: "Enter", ctrlKey: true });
-  expect(posts).toEqual([]);
-});
+  const { posts } = mount({ fetchCommands: commandsFor().fetchCommands })
+  await ready()
+  typeAt("hello")
+  fireEvent.keyDown(prompt(), { key: "Enter", metaKey: true })
+  fireEvent.keyDown(prompt(), { key: "Enter", ctrlKey: true })
+  expect(posts).toEqual([])
+})
 
 test("submit is disabled offline", async () => {
-  mount({ connected: false });
-  await ready();
-  expect((screen.getByRole("button", { name: "Create session" }) as HTMLButtonElement).disabled).toBe(true);
-});
+  mount({ connected: false })
+  await ready()
+  expect(
+    (screen.getByRole("button", { name: "Create session" }) as HTMLButtonElement).disabled,
+  ).toBe(true)
+})

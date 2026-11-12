@@ -1,37 +1,51 @@
-import { Box, Text } from "@chakra-ui/react";
-import type { ComponentProps, ReactNode } from "react";
-import { DayChart, seriesColor, type DayChartKind, type DaySeries } from "../day-chart/DayChart";
-import { LineChart } from "../day-chart/LineChart";
-import { Card } from "../card/Card";
+import { Box, Text } from "@chakra-ui/react"
+import type { ComponentProps, ReactNode } from "react"
+import { DayChart, seriesColor, type DayChartKind, type DaySeries } from "../day-chart/DayChart"
+import { LineChart } from "../day-chart/LineChart"
+import { Card } from "../card/Card"
 
 interface StatCardProps {
-  title: string;
-  days: string[];
-  series: DaySeries[];
-  chart?: DayChartKind | "line";
+  title: string
+  days: string[]
+  series: DaySeries[]
+  chart?: DayChartKind | "line"
   // Series folded into another one: listed in the hover tooltip, never drawn or counted.
-  folded?: ComponentProps<typeof DayChart>["folded"];
+  folded?: ComponentProps<typeof DayChart>["folded"]
   // Overrides for the special cards; the defaults are the sum and the daily average over days with data.
-  headline?: ReactNode;
-  small?: ReactNode;
+  headline?: ReactNode
+  small?: ReactNode
   // Overrides the "some day has no data" rule for the "partial" badge.
-  partial?: boolean;
+  partial?: boolean
   // Rendered under the legend.
-  footer?: ReactNode;
+  footer?: ReactNode
   // For a single-series card whose title already names the series.
-  hideLegend?: boolean;
+  hideLegend?: boolean
   // Per-day bar styles, tooltip notes and extra tooltip rows; see DayChart.
-  dayStyles?: ComponentProps<typeof DayChart>["dayStyles"];
-  dayNotes?: ComponentProps<typeof DayChart>["dayNotes"];
-  extraRows?: ComponentProps<typeof DayChart>["extraRows"];
+  dayStyles?: ComponentProps<typeof DayChart>["dayStyles"]
+  dayNotes?: ComponentProps<typeof DayChart>["dayNotes"]
+  extraRows?: ComponentProps<typeof DayChart>["extraRows"]
 }
 
-export function StatCard({ title, days, series, chart = "bars", folded, headline, small, partial: partialOverride, footer, hideLegend, dayStyles, dayNotes, extraRows }: StatCardProps) {
-  const hasData = (i: number) => series.some((s) => s.values[i] !== null);
-  const dataDays = days.filter((_, i) => hasData(i)).length;
-  const partial = partialOverride ?? dataDays < days.length;
-  const total = series.reduce((a, s) => a + s.values.reduce<number>((b, v) => b + (v ?? 0), 0), 0);
-  const average = dataDays === 0 ? 0 : total / dataDays;
+export function StatCard({
+  title,
+  days,
+  series,
+  chart = "bars",
+  folded,
+  headline,
+  small,
+  partial: partialOverride,
+  footer,
+  hideLegend,
+  dayStyles,
+  dayNotes,
+  extraRows,
+}: StatCardProps) {
+  const hasData = (i: number) => series.some((s) => s.values[i] !== null)
+  const dataDays = days.filter((_, i) => hasData(i)).length
+  const partial = partialOverride ?? dataDays < days.length
+  const total = series.reduce((a, s) => a + s.values.reduce<number>((b, v) => b + (v ?? 0), 0), 0)
+  const average = dataDays === 0 ? 0 : total / dataDays
 
   return (
     <Card title={title}>
@@ -48,12 +62,41 @@ export function StatCard({ title, days, series, chart = "bars", folded, headline
       <Text fontSize="xs" color="text.muted" mb="2">
         {small ?? `${average.toFixed(1)}/day`}
       </Text>
-      {chart === "line" ? <LineChart days={days} tone={series[0].tone} values={series[0].values} /> : <DayChart days={days} series={series} kind={chart} folded={folded} dayStyles={dayStyles} dayNotes={dayNotes} extraRows={extraRows} />}
+      {chart === "line" ? (
+        <LineChart days={days} tone={series[0].tone} values={series[0].values} />
+      ) : (
+        <DayChart
+          days={days}
+          series={series}
+          kind={chart}
+          folded={folded}
+          dayStyles={dayStyles}
+          dayNotes={dayNotes}
+          extraRows={extraRows}
+        />
+      )}
       {!hideLegend && (
-        <Box as="ul" display="flex" gap="3" flexWrap="wrap" mt="2" fontSize="xs" listStyleType="none" aria-label="Legend">
+        <Box
+          as="ul"
+          display="flex"
+          gap="3"
+          flexWrap="wrap"
+          mt="2"
+          fontSize="xs"
+          listStyleType="none"
+          aria-label="Legend"
+        >
           {series.map((s) => (
             <li key={s.key}>
-              <Box as="span" display="inline-block" w="8px" h="8px" borderRadius="sm" mr="1" style={{ background: seriesColor(s) }} />
+              <Box
+                as="span"
+                display="inline-block"
+                w="8px"
+                h="8px"
+                borderRadius="sm"
+                mr="1"
+                style={{ background: seriesColor(s) }}
+              />
               {s.label}
             </li>
           ))}
@@ -61,5 +104,5 @@ export function StatCard({ title, days, series, chart = "bars", folded, headline
       )}
       {footer}
     </Card>
-  );
+  )
 }

@@ -1,41 +1,41 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useEffect, useState, type ReactNode } from "react";
-import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../generated/server";
-import { Button } from "../ui/button/Button";
-import { Chip } from "../ui/chip/Chip";
-import { Modal } from "../ui/modal/Modal";
-import { refusalText, useWrite } from "../useWrite";
-import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useEffect, useState, type ReactNode } from "react"
+import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../generated/server"
+import { Button } from "../ui/button/Button"
+import { Chip } from "../ui/chip/Chip"
+import { Modal } from "../ui/modal/Modal"
+import { refusalText, useWrite } from "../useWrite"
+import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi"
 
 function valueText(e: SettingsEntry): string {
-  if (e.type === "secret") return e.set ? "Set" : "Not set";
-  return displayValue(e.set ? e.value : e.default);
+  if (e.type === "secret") return e.set ? "Set" : "Not set"
+  return displayValue(e.set ? e.value : e.default)
 }
 
 function displayValue(v: unknown): string {
-  if (v === undefined || v === null || v === "") return "—";
-  if (typeof v === "boolean") return v ? "on" : "off";
-  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
-  return typeof v === "object" ? JSON.stringify(v) : String(v);
+  if (v === undefined || v === null || v === "") return "—"
+  if (typeof v === "boolean") return v ? "on" : "off"
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "—"
+  return typeof v === "object" ? JSON.stringify(v) : String(v)
 }
 
-export type WriteSetting = (changes: SettingChange[]) => Promise<SettingsWriteResult>;
+export type WriteSetting = (changes: SettingChange[]) => Promise<SettingsWriteResult>
 
 /** What a control needs: the entry, the draft it shows and how to change or save it. */
 interface ControlProps {
-  entry: SettingsEntry;
-  draft: string;
-  dirty: boolean;
-  invalid: boolean;
-  pending: boolean;
+  entry: SettingsEntry
+  draft: string
+  dirty: boolean
+  invalid: boolean
+  pending: boolean
   /** The control is switched off for a reason shown beside it. */
-  locked: boolean;
-  setDraft: (d: string | undefined) => void;
-  save: (value: unknown) => void;
-  remove: () => void;
+  locked: boolean
+  setDraft: (d: string | undefined) => void
+  save: (value: unknown) => void
+  remove: () => void
 }
 
-const HINTS: Record<string, string> = { duration: "e.g. 30s, 5m, 2h", size: "e.g. 50G" };
+const HINTS: Record<string, string> = { duration: "e.g. 30s, 5m, 2h", size: "e.g. 50G" }
 
 const inputProps = {
   h: "36px",
@@ -46,13 +46,13 @@ const inputProps = {
   borderRadius: "8px",
   bg: "surface",
   color: "text",
-} as const;
+} as const
 
 // The browser sends text for a number; a draft that is not one goes as typed so the server refuses it with its reason.
 const draftValue = (type: string, draft: string): unknown => {
-  const text = draft.trim();
-  return type === "number" && text !== "" && !Number.isNaN(Number(text)) ? Number(text) : text;
-};
+  const text = draft.trim()
+  return type === "number" && text !== "" && !Number.isNaN(Number(text)) ? Number(text) : text
+}
 
 function TextControl({ entry, draft, dirty, invalid, pending, setDraft, save }: ControlProps) {
   return (
@@ -72,7 +72,11 @@ function TextControl({ entry, draft, dirty, invalid, pending, setDraft, save }: 
           {HINTS[entry.type]}
         </Text>
       )}
-      <Button size="sm" disabled={!dirty || pending} onClick={() => save(draftValue(entry.type, draft))}>
+      <Button
+        size="sm"
+        disabled={!dirty || pending}
+        onClick={() => save(draftValue(entry.type, draft))}
+      >
         Save
       </Button>
       {dirty && (
@@ -81,11 +85,11 @@ function TextControl({ entry, draft, dirty, invalid, pending, setDraft, save }: 
         </Button>
       )}
     </>
-  );
+  )
 }
 
 function BoolControl({ entry, draft, pending, locked, save }: ControlProps) {
-  const on = draft === "true";
+  const on = draft === "true"
   return (
     <chakra.button
       type="button"
@@ -100,14 +104,30 @@ function BoolControl({ entry, draft, pending, locked, save }: ControlProps) {
       position="relative"
       bg={on ? "tone.running.fg" : "border"}
     >
-      <Box position="absolute" top="2px" left={on ? "20px" : "2px"} w="18px" h="18px" borderRadius="full" bg="surface" />
+      <Box
+        position="absolute"
+        top="2px"
+        left={on ? "20px" : "2px"}
+        w="18px"
+        h="18px"
+        borderRadius="full"
+        bg="surface"
+      />
     </chakra.button>
-  );
+  )
 }
 
 function EnumControl({ entry, draft, pending, save }: ControlProps) {
   return (
-    <Box display="inline-flex" borderWidth="1px" borderColor="border" borderRadius="8px" overflow="hidden" role="group" aria-label={entryLabel(entry)}>
+    <Box
+      display="inline-flex"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="8px"
+      overflow="hidden"
+      role="group"
+      aria-label={entryLabel(entry)}
+    >
       {(entry.enum ?? []).map((option) => (
         <chakra.button
           key={option}
@@ -126,32 +146,32 @@ function EnumControl({ entry, draft, pending, save }: ControlProps) {
         </chakra.button>
       ))}
     </Box>
-  );
+  )
 }
 
 const listItems = (e: SettingsEntry): unknown[] => {
-  const v = e.set ? e.value : e.default;
-  return Array.isArray(v) ? v : [];
-};
+  const v = e.set ? e.value : e.default
+  return Array.isArray(v) ? v : []
+}
 
 // Each add or remove saves the whole list; an empty list is a real value, not a reset.
 function ListControl({ entry, pending, save }: ControlProps) {
-  const numeric = entry.type === "number-list";
-  const items = listItems(entry);
-  const [text, setText] = useState("");
-  const [problem, setProblem] = useState<string>();
+  const numeric = entry.type === "number-list"
+  const items = listItems(entry)
+  const [text, setText] = useState("")
+  const [problem, setProblem] = useState<string>()
   const add = () => {
-    const value = text.trim();
-    if (value === "") return;
-    const hint = numeric ? numberListHint(value) : undefined;
+    const value = text.trim()
+    if (value === "") return
+    const hint = numeric ? numberListHint(value) : undefined
     if (hint || (numeric && value.includes(","))) {
-      setProblem(hint ?? "Add one number at a time");
-      return;
+      setProblem(hint ?? "Add one number at a time")
+      return
     }
-    setProblem(undefined);
-    setText("");
-    save([...items, numeric ? Number(value) : value]);
-  };
+    setProblem(undefined)
+    setText("")
+    save([...items, numeric ? Number(value) : value])
+  }
   return (
     <Box display="grid" gap="2" w="100%">
       <Box display="flex" gap="1.5" flexWrap="wrap" data-testid="list-tags">
@@ -161,9 +181,27 @@ function ListControl({ entry, pending, save }: ControlProps) {
           </Text>
         )}
         {items.map((item, i) => (
-          <Box key={i} display="inline-flex" alignItems="center" gap="1.5" px="2.5" py="0.5" borderWidth="1px" borderColor="border" borderRadius="full" fontFamily="mono" fontSize="12.5px">
+          <Box
+            key={i}
+            display="inline-flex"
+            alignItems="center"
+            gap="1.5"
+            px="2.5"
+            py="0.5"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="full"
+            fontFamily="mono"
+            fontSize="12.5px"
+          >
             {String(item)}
-            <chakra.button type="button" aria-label={`Remove ${String(item)}`} disabled={pending} onClick={() => save(items.filter((_, j) => j !== i))} color="text.dim">
+            <chakra.button
+              type="button"
+              aria-label={`Remove ${String(item)}`}
+              disabled={pending}
+              onClick={() => save(items.filter((_, j) => j !== i))}
+              color="text.dim"
+            >
               ×
             </chakra.button>
           </Box>
@@ -190,17 +228,17 @@ function ListControl({ entry, pending, save }: ControlProps) {
         </Text>
       )}
     </Box>
-  );
+  )
 }
 
 // The server never sends a secret's value; the field is write-only and emptied the moment it is sent.
 function SecretControl({ entry, pending, save, remove }: ControlProps) {
-  const [replacing, setReplacing] = useState(false);
-  const [text, setText] = useState("");
+  const [replacing, setReplacing] = useState(false)
+  const [text, setText] = useState("")
   const done = () => {
-    setText("");
-    setReplacing(false);
-  };
+    setText("")
+    setReplacing(false)
+  }
   return (
     <>
       <Chip tone={entry.set ? "done" : "muted"}>{entry.set ? "Set" : "Not set"}</Chip>
@@ -219,8 +257,8 @@ function SecretControl({ entry, pending, save, remove }: ControlProps) {
             size="sm"
             disabled={pending || text === ""}
             onClick={() => {
-              save(text);
-              done();
+              save(text)
+              done()
             }}
           >
             Save
@@ -231,18 +269,30 @@ function SecretControl({ entry, pending, save, remove }: ControlProps) {
         </>
       ) : (
         <>
-          <Button size="sm" emphasis="secondary" tone="muted" disabled={pending} onClick={() => setReplacing(true)}>
+          <Button
+            size="sm"
+            emphasis="secondary"
+            tone="muted"
+            disabled={pending}
+            onClick={() => setReplacing(true)}
+          >
             {entry.set ? "Replace" : "Set"}
           </Button>
           {entry.set && (
-            <Button size="sm" emphasis="secondary" tone="deadlocked" disabled={pending} onClick={remove}>
+            <Button
+              size="sm"
+              emphasis="secondary"
+              tone="deadlocked"
+              disabled={pending}
+              onClick={remove}
+            >
               Clear
             </Button>
           )}
         </>
       )}
     </>
-  );
+  )
 }
 
 /** The control for each entry type; a type with no entry here shows its value read-only. */
@@ -256,22 +306,22 @@ const CONTROLS: Record<string, (p: ControlProps) => ReactNode> = {
   size: TextControl,
   string: TextControl,
   enum: EnumControl,
-};
+}
 
 const serverText = (e: SettingsEntry) => {
-  const v = e.set ? e.value : e.default;
-  return v === undefined || v === null ? "" : String(v);
-};
+  const v = e.set ? e.value : e.default
+  return v === undefined || v === null ? "" : String(v)
+}
 
-const SAVED_MS = 2000;
+const SAVED_MS = 2000
 
 // Turning the one-time code on makes the page safer, so only turning it off (or resetting away a set value) asks.
 const needsConfirm = (e: SettingsEntry, change: SettingChange) =>
-  !!e.risky && !(e.risky_off_only && "value" in change && change.value === true);
+  !!e.risky && !(e.risky_off_only && "value" in change && change.value === true)
 
 /** In a project, a key with a global counterpart is inherited until the project file holds it. */
 function projectTexts(e: SettingsEntry, project: string) {
-  const global = displayValue(e.global_value);
+  const global = displayValue(e.global_value)
   if (e.override === "cap") {
     return {
       inherit: (
@@ -281,7 +331,7 @@ function projectTexts(e: SettingsEntry, project: string) {
       ),
       start: `Set a cap for ${project}`,
       back: "Remove cap",
-    };
+    }
   }
   return {
     inherit:
@@ -296,73 +346,101 @@ function projectTexts(e: SettingsEntry, project: string) {
       ),
     start: `Override for ${project}`,
     back: `Use global value (${global})`,
-  };
+  }
 }
 
 export interface SettingsRowProps {
-  entry: SettingsEntry;
-  pendingRestart: boolean;
-  onWrite: WriteSetting;
+  entry: SettingsEntry
+  pendingRestart: boolean
+  onWrite: WriteSetting
   /** The project on the page; its overridable keys show inherit and override states. */
-  project?: string;
+  project?: string
   /** Switches the control off and shows this reason beside it. */
-  lockReason?: string;
+  lockReason?: string
 }
 
-export function SettingsRow({ entry, pendingRestart, onWrite, project, lockReason }: SettingsRowProps) {
-  const write = useWrite({ toastRefusal: false });
-  const [draft, setDraft] = useState<string>();
-  const [saved, setSaved] = useState(false);
-  const [restartNeeded, setRestartNeeded] = useState(false);
-  const [notices, setNotices] = useState<string[]>([]);
+export function SettingsRow({
+  entry,
+  pendingRestart,
+  onWrite,
+  project,
+  lockReason,
+}: SettingsRowProps) {
+  const write = useWrite({ toastRefusal: false })
+  const [draft, setDraft] = useState<string>()
+  const [saved, setSaved] = useState(false)
+  const [restartNeeded, setRestartNeeded] = useState(false)
+  const [notices, setNotices] = useState<string[]>([])
   useEffect(() => {
-    if (!saved) return;
-    const timer = setTimeout(() => setSaved(false), SAVED_MS);
-    return () => clearTimeout(timer);
-  }, [saved]);
+    if (!saved) return
+    const timer = setTimeout(() => setSaved(false), SAVED_MS)
+    return () => clearTimeout(timer)
+  }, [saved])
 
-  const current = serverText(entry);
-  const shown = draft ?? current;
-  const dirty = shown !== current;
+  const current = serverText(entry)
+  const shown = draft ?? current
+  const dirty = shown !== current
   // useWrite keeps the refusal as a Refusable; every write here returns a SettingsWriteResult.
-  const refusal = write.refusal as SettingsWriteResult | undefined;
-  const refused = refusal !== undefined && (!refusal.keys?.length || refusal.keys.includes(entry.key));
-  const errorText = refused ? `Not saved: ${refusalText(refusal)}` : write.error && `Not saved: ${write.error}`;
+  const refusal = write.refusal as SettingsWriteResult | undefined
+  const refused =
+    refusal !== undefined && (!refusal.keys?.length || refusal.keys.includes(entry.key))
+  const errorText = refused
+    ? `Not saved: ${refusalText(refusal)}`
+    : write.error && `Not saved: ${write.error}`
 
-  const [confirming, setConfirming] = useState<SettingChange>();
+  const [confirming, setConfirming] = useState<SettingChange>()
   const run = (change: SettingChange) => {
-    setNotices([]);
+    setNotices([])
     void write.run(() => onWrite([change]), {
       onDone: (res) => {
-        setDraft(undefined);
-        setSaved(true);
-        setNotices(res.notices ?? []);
-        if (res.restart_needed?.includes(entry.key)) setRestartNeeded(true);
+        setDraft(undefined)
+        setSaved(true)
+        setNotices(res.notices ?? [])
+        if (res.restart_needed?.includes(entry.key)) setRestartNeeded(true)
       },
-    });
-  };
-  const send = (change: SettingChange) => (needsConfirm(entry, change) ? setConfirming(change) : run(change));
+    })
+  }
+  const send = (change: SettingChange) =>
+    needsConfirm(entry, change) ? setConfirming(change) : run(change)
 
-  const Control = CONTROLS[entry.type];
-  const defaultText = displayValue(entry.default);
-  const overridable = project !== undefined && !!entry.global_key && !entry.read_only;
-  const texts = overridable ? projectTexts(entry, project) : undefined;
-  const inherited = overridable && !entry.set;
+  const Control = CONTROLS[entry.type]
+  const defaultText = displayValue(entry.default)
+  const overridable = project !== undefined && !!entry.global_key && !entry.read_only
+  const texts = overridable ? projectTexts(entry, project) : undefined
+  const inherited = overridable && !entry.set
   // Turning a project's evolve switch back on removes the key: unset follows the global mode.
-  const followsGlobal = entry.override === "follows-global";
-  const saveValue = (value: unknown) => send(followsGlobal && value === true ? removeChange(entry.key) : setChange(entry.key, value));
+  const followsGlobal = entry.override === "follows-global"
+  const saveValue = (value: unknown) =>
+    send(followsGlobal && value === true ? removeChange(entry.key) : setChange(entry.key, value))
   return (
-    <Box px="3.5" py="3" display="grid" gap="1.5" _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}>
+    <Box
+      px="3.5"
+      py="3"
+      display="grid"
+      gap="1.5"
+      _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}
+    >
       {/* No wrap: a long label wraps itself, so the reset link stays top-right on this row. */}
       <Box data-mock-part="title-row" display="flex" gap="2" alignItems="center">
         <Text fontWeight="600" minW="0">
           {entryLabel(entry)}
         </Text>
-        {entry.set && entry.type !== "secret" && <Box title="Changed from default" w="7px" h="7px" flexShrink="0" borderRadius="full" bg="tone.running.fg" />}
+        {entry.set && entry.type !== "secret" && (
+          <Box
+            title="Changed from default"
+            w="7px"
+            h="7px"
+            flexShrink="0"
+            borderRadius="full"
+            bg="tone.running.fg"
+          />
+        )}
         {entry.risky && <Chip tone="waiting">Careful</Chip>}
         {entry.restart && (
           <Box data-mock-part="restart-badge">
-            <Chip tone="waiting">{restartNeeded || pendingRestart ? "Restart needed to apply" : "Needs restart"}</Chip>
+            <Chip tone="waiting">
+              {restartNeeded || pendingRestart ? "Restart needed to apply" : "Needs restart"}
+            </Chip>
           </Box>
         )}
         {overridable && entry.set && (
@@ -392,7 +470,12 @@ export function SettingsRow({ entry, pendingRestart, onWrite, project, lockReaso
       </Text>
       {inherited && texts ? (
         <Box display="flex" gap="3" alignItems="center" flexWrap="wrap">
-          <Text data-mock-part="inherits-global" fontSize="sm" color="text.muted" css={{ "& b": { color: "var(--chakra-colors-text)" } }}>
+          <Text
+            data-mock-part="inherits-global"
+            fontSize="sm"
+            color="text.muted"
+            css={{ "& b": { color: "var(--chakra-colors-text)" } }}
+          >
             {texts.inherit}
           </Text>
           <Button
@@ -440,7 +523,17 @@ export function SettingsRow({ entry, pendingRestart, onWrite, project, lockReaso
         </Text>
       )}
       {notices.map((n) => (
-        <Text key={n} data-mock-part="switch-notice" role="note" fontSize="sm" bg="tone.waiting.bg" color="tone.waiting.fg" px="3" py="2" borderRadius="md">
+        <Text
+          key={n}
+          data-mock-part="switch-notice"
+          role="note"
+          fontSize="sm"
+          bg="tone.waiting.bg"
+          color="tone.waiting.fg"
+          px="3"
+          py="2"
+          borderRadius="md"
+        >
           {n}
         </Text>
       ))}
@@ -448,7 +541,14 @@ export function SettingsRow({ entry, pendingRestart, onWrite, project, lockReaso
         {entry.key}
       </Text>
       {confirming && (
-        <Modal label={`Change ${entryLabel(entry)}?`} onClose={() => setConfirming(undefined)} maxW="440px" p="5" gap="3" data-mock-part="confirm-dialog">
+        <Modal
+          label={`Change ${entryLabel(entry)}?`}
+          onClose={() => setConfirming(undefined)}
+          maxW="440px"
+          p="5"
+          gap="3"
+          data-mock-part="confirm-dialog"
+        >
           <Text as="h3" fontWeight="700" fontSize="16px">
             Change {entryLabel(entry)}?
           </Text>
@@ -463,8 +563,8 @@ export function SettingsRow({ entry, pendingRestart, onWrite, project, lockReaso
             <Button
               tone="deadlocked"
               onClick={() => {
-                run(confirming);
-                setConfirming(undefined);
+                run(confirming)
+                setConfirming(undefined)
               }}
             >
               Change it
@@ -473,5 +573,5 @@ export function SettingsRow({ entry, pendingRestart, onWrite, project, lockReaso
         </Modal>
       )}
     </Box>
-  );
+  )
 }

@@ -1,8 +1,8 @@
-import { Box, Text } from "@chakra-ui/react";
-import { Button } from "../ui/button/Button";
-import { suggestionCount, type ProjectChecks } from "./status";
+import { Box, Text } from "@chakra-ui/react"
+import { Button } from "../ui/button/Button"
+import { suggestionCount, type ProjectChecks } from "./status"
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
 /** Projects without check config. One project gets its own sentence; several get a list with a button each. */
 export function MissingBanner({
@@ -10,13 +10,13 @@ export function MissingBanner({
   onSetUp,
   onDismiss,
 }: {
-  missing: ProjectChecks[];
-  onSetUp: (project: string) => void;
-  onDismiss: () => void;
+  missing: ProjectChecks[]
+  onSetUp: (project: string) => void
+  onDismiss: () => void
 }) {
-  if (missing.length === 0) return null;
-  const one = missing.length === 1 ? missing[0] : undefined;
-  const found = one ? suggestionCount(one) : 0;
+  if (missing.length === 0) return null
+  const one = missing.length === 1 ? missing[0] : undefined
+  const found = one ? suggestionCount(one) : 0
   return (
     <Box
       role="region"
@@ -37,7 +37,9 @@ export function MissingBanner({
       <Box>
         <Text>
           <Text as="b" color="tone.waiting.fg" fontWeight="600">
-            {one ? `${one.project} has no check config.` : `${missing.length} projects have no check config.`}
+            {one
+              ? `${one.project} has no check config.`
+              : `${missing.length} projects have no check config.`}
           </Text>{" "}
           {`Agents run gx's built-in checks until you set ${one ? "it" : "them"} up.`}
           {one && found > 0 && ` gx found ${plural(found, "command")} to suggest.`}
@@ -45,9 +47,21 @@ export function MissingBanner({
         {!one && (
           <Box as="ul" m="0" mt="1.5" pl="18px">
             {missing.map((p) => (
-              <Box as="li" key={p.project} display="flex" justifyContent="space-between" alignItems="center" mt="1.5">
+              <Box
+                as="li"
+                key={p.project}
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                mt="1.5"
+              >
                 {p.project}
-                <Button emphasis="main" tone="running" aria-label={`Set up checks for ${p.project}`} onClick={() => onSetUp(p.project)}>
+                <Button
+                  emphasis="main"
+                  tone="running"
+                  aria-label={`Set up checks for ${p.project}`}
+                  onClick={() => onSetUp(p.project)}
+                >
                   Set up checks
                 </Button>
               </Box>
@@ -66,5 +80,5 @@ export function MissingBanner({
         )}
       </Box>
     </Box>
-  );
+  )
 }

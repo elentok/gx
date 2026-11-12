@@ -1,9 +1,9 @@
-import { fireEvent } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { renderThemed } from "../render";
-import { DayChart } from "./DayChart";
+import { fireEvent } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
+import { renderThemed } from "../render"
+import { DayChart } from "./DayChart"
 
-const days = ["Mon", "Tue", "Wed"];
+const days = ["Mon", "Tue", "Wed"]
 
 describe("DayChart", () => {
   it("stacks two series on one day", () => {
@@ -16,23 +16,30 @@ describe("DayChart", () => {
           { key: "b", label: "B", tone: "waiting", values: [2, 1, 1] },
         ]}
       />,
-    );
-    const first = [...container.querySelectorAll<SVGRectElement>('[data-bar="0"]')];
-    expect(first.map((r) => r.dataset.series)).toEqual(["a", "b"]);
-    const [a, b] = first;
-    expect(Number(b.getAttribute("y")) + Number(b.getAttribute("height"))).toBe(Number(a.getAttribute("y")));
-  });
+    )
+    const first = [...container.querySelectorAll<SVGRectElement>('[data-bar="0"]')]
+    expect(first.map((r) => r.dataset.series)).toEqual(["a", "b"])
+    const [a, b] = first
+    expect(Number(b.getAttribute("y")) + Number(b.getAttribute("height"))).toBe(
+      Number(a.getAttribute("y")),
+    )
+  })
 
   it("hatches a no-data day and leaves a zero day empty", () => {
-    const { container } = renderThemed(<DayChart days={days} series={[{ key: "a", label: "A", tone: "running", values: [3, null, 0] }]} />);
-    const hatched = container.querySelector<SVGRectElement>("[data-nodata='1']")!;
-    expect(hatched.getAttribute("height")).toBe("110");
-    expect(hatched.getAttribute("fill")).toMatch(/^url\(#/);
-    expect(container.querySelector('[data-bar="1"]')).toBeNull();
-    expect(container.querySelector('[data-bar="2"]')).toBeNull();
-    expect(container.querySelector("[data-nodata='2']")).toBeNull();
-    expect(container.querySelector('[data-bar="0"]')).not.toBeNull();
-  });
+    const { container } = renderThemed(
+      <DayChart
+        days={days}
+        series={[{ key: "a", label: "A", tone: "running", values: [3, null, 0] }]}
+      />,
+    )
+    const hatched = container.querySelector<SVGRectElement>("[data-nodata='1']")!
+    expect(hatched.getAttribute("height")).toBe("110")
+    expect(hatched.getAttribute("fill")).toMatch(/^url\(#/)
+    expect(container.querySelector('[data-bar="1"]')).toBeNull()
+    expect(container.querySelector('[data-bar="2"]')).toBeNull()
+    expect(container.querySelector("[data-nodata='2']")).toBeNull()
+    expect(container.querySelector('[data-bar="0"]')).not.toBeNull()
+  })
 
   it("draws removed bars below the baseline", () => {
     const { container } = renderThemed(
@@ -44,13 +51,15 @@ describe("DayChart", () => {
           { key: "removed", label: "Removed", tone: "paused", values: [2, 1, 1] },
         ]}
       />,
-    );
-    const baseline = Number(container.querySelector("[data-baseline]")!.getAttribute("y1"));
-    const removed = container.querySelector<SVGRectElement>('[data-bar="0"][data-series="removed"]')!;
-    const added = container.querySelector<SVGRectElement>('[data-bar="0"][data-series="added"]')!;
-    expect(Number(removed.getAttribute("y"))).toBe(baseline);
-    expect(Number(added.getAttribute("y")) + Number(added.getAttribute("height"))).toBe(baseline);
-  });
+    )
+    const baseline = Number(container.querySelector("[data-baseline]")!.getAttribute("y1"))
+    const removed = container.querySelector<SVGRectElement>(
+      '[data-bar="0"][data-series="removed"]',
+    )!
+    const added = container.querySelector<SVGRectElement>('[data-bar="0"][data-series="added"]')!
+    expect(Number(removed.getAttribute("y"))).toBe(baseline)
+    expect(Number(added.getAttribute("y")) + Number(added.getAttribute("height"))).toBe(baseline)
+  })
 
   it("puts side-by-side series next to each other", () => {
     const { container } = renderThemed(
@@ -62,29 +71,40 @@ describe("DayChart", () => {
           { key: "b", label: "B", tone: "waiting", values: [1, 1, 1] },
         ]}
       />,
-    );
-    const [a, b] = [...container.querySelectorAll<SVGRectElement>('[data-bar="0"]')];
-    expect(Number(b.getAttribute("x"))).toBeGreaterThan(Number(a.getAttribute("x")));
-    expect(a.getAttribute("y")).toBe(b.getAttribute("y"));
-  });
+    )
+    const [a, b] = [...container.querySelectorAll<SVGRectElement>('[data-bar="0"]')]
+    expect(Number(b.getAttribute("x"))).toBeGreaterThan(Number(a.getAttribute("x")))
+    expect(a.getAttribute("y")).toBe(b.getAttribute("y"))
+  })
 
   it("draws a series in a chart color token", () => {
-    const { container } = renderThemed(<DayChart days={days} series={[{ key: "a", label: "A", tone: "running", color: "codex", values: [1, 1, 1] }]} />);
-    expect(container.querySelector('[data-bar="0"]')!.getAttribute("fill")).toBe("var(--chakra-colors-chart-codex)");
-  });
+    const { container } = renderThemed(
+      <DayChart
+        days={days}
+        series={[{ key: "a", label: "A", tone: "running", color: "codex", values: [1, 1, 1] }]}
+      />,
+    )
+    expect(container.querySelector('[data-bar="0"]')!.getAttribute("fill")).toBe(
+      "var(--chakra-colors-chart-codex)",
+    )
+  })
 
   it("dims or hatches a styled day and leaves others alone", () => {
     const { container } = renderThemed(
-      <DayChart days={days} series={[{ key: "a", label: "A", tone: "running", values: [1, 1, 1] }]} dayStyles={["dim", "hatch", undefined]} />,
-    );
-    const bar = (i: number) => container.querySelector(`[data-bar="${i}"]`)!;
-    expect(bar(0).getAttribute("opacity")).not.toBeNull();
-    expect(bar(1).getAttribute("opacity")).not.toBeNull();
-    expect(bar(2).getAttribute("opacity")).toBeNull();
-    expect(container.querySelector('[data-hatch="1"]')!.getAttribute("fill")).toMatch(/^url\(#/);
-    expect(container.querySelector('[data-hatch="0"]')).toBeNull();
-    expect(container.querySelector('[data-hatch="2"]')).toBeNull();
-  });
+      <DayChart
+        days={days}
+        series={[{ key: "a", label: "A", tone: "running", values: [1, 1, 1] }]}
+        dayStyles={["dim", "hatch", undefined]}
+      />,
+    )
+    const bar = (i: number) => container.querySelector(`[data-bar="${i}"]`)!
+    expect(bar(0).getAttribute("opacity")).not.toBeNull()
+    expect(bar(1).getAttribute("opacity")).not.toBeNull()
+    expect(bar(2).getAttribute("opacity")).toBeNull()
+    expect(container.querySelector('[data-hatch="1"]')!.getAttribute("fill")).toMatch(/^url\(#/)
+    expect(container.querySelector('[data-hatch="0"]')).toBeNull()
+    expect(container.querySelector('[data-hatch="2"]')).toBeNull()
+  })
 
   it("shows per-day notes and extra rows in the tooltip", () => {
     const { container, getByRole } = renderThemed(
@@ -94,12 +114,12 @@ describe("DayChart", () => {
         dayNotes={[["rebuilt from transcripts"], undefined, undefined]}
         extraRows={[[{ label: "Limit", value: "40%" }], undefined, undefined]}
       />,
-    );
-    fireEvent.mouseEnter(container.querySelector("[data-hit='0']")!);
-    expect(getByRole("tooltip").textContent).toBe("MonA: 1Limit: 40%rebuilt from transcripts");
-    fireEvent.mouseEnter(container.querySelector("[data-hit='1']")!);
-    expect(getByRole("tooltip").textContent).toBe("TueA: 1");
-  });
+    )
+    fireEvent.mouseEnter(container.querySelector("[data-hit='0']")!)
+    expect(getByRole("tooltip").textContent).toBe("MonA: 1Limit: 40%rebuilt from transcripts")
+    fireEvent.mouseEnter(container.querySelector("[data-hit='1']")!)
+    expect(getByRole("tooltip").textContent).toBe("TueA: 1")
+  })
 
   it("shows the date, each value and folded series on hover, and no data for a gap", () => {
     const { container, getByRole, queryByRole } = renderThemed(
@@ -108,11 +128,11 @@ describe("DayChart", () => {
         series={[{ key: "a", label: "Tickets", tone: "running", values: [3, null, 0] }]}
         folded={[{ key: "x", label: "Other: docs", values: [1, null, 0] }]}
       />,
-    );
-    expect(queryByRole("tooltip")).toBeNull();
-    fireEvent.mouseEnter(container.querySelector("[data-hit='0']")!);
-    expect(getByRole("tooltip").textContent).toBe("MonTickets: 3Other: docs: 1");
-    fireEvent.mouseEnter(container.querySelector("[data-hit='1']")!);
-    expect(getByRole("tooltip").textContent).toBe("Tueno data");
-  });
-});
+    )
+    expect(queryByRole("tooltip")).toBeNull()
+    fireEvent.mouseEnter(container.querySelector("[data-hit='0']")!)
+    expect(getByRole("tooltip").textContent).toBe("MonTickets: 3Other: docs: 1")
+    fireEvent.mouseEnter(container.querySelector("[data-hit='1']")!)
+    expect(getByRole("tooltip").textContent).toBe("Tueno data")
+  })
+})

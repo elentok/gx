@@ -1,15 +1,15 @@
 /// <reference types="vitest/config" />
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
-import cannedSnapshot from "./src/canned-snapshot.json";
-import { serviceWorkerPlugin } from "./src/pwa/serviceWorkerPlugin";
+import { dirname } from "node:path"
+import { fileURLToPath } from "node:url"
+import react from "@vitejs/plugin-react"
+import { defineConfig } from "vite"
+import cannedSnapshot from "./src/canned-snapshot.json"
+import { serviceWorkerPlugin } from "./src/pwa/serviceWorkerPlugin"
 
 // Serves the canned snapshot at /v1/snapshot so `make web-dev` needs no gx
 // server.
 
-const webuiDir = dirname(fileURLToPath(import.meta.url));
+const webuiDir = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [
@@ -19,16 +19,16 @@ export default defineConfig({
       name: "canned-snapshot",
       configureServer(server) {
         server.middlewares.use("/v1/snapshot", (_req, res) => {
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify(cannedSnapshot));
-        });
+          res.setHeader("Content-Type", "application/json")
+          res.end(JSON.stringify(cannedSnapshot))
+        })
         // An idle stream with heartbeats keeps the page from showing Offline.
         server.middlewares.use("/v1/events", (req, res) => {
-          res.setHeader("Content-Type", "text/event-stream");
-          res.write(": hello\n\n");
-          const beat = setInterval(() => res.write(": hb\n\n"), 15000);
-          req.on("close", () => clearInterval(beat));
-        });
+          res.setHeader("Content-Type", "text/event-stream")
+          res.write(": hello\n\n")
+          const beat = setInterval(() => res.write(": hb\n\n"), 15000)
+          req.on("close", () => clearInterval(beat))
+        })
       },
     },
   ],
@@ -46,8 +46,12 @@ export default defineConfig({
       input: "index.html",
       output: {
         manualChunks(id) {
-          if (/node_modules\/(react|react-dom|scheduler|@chakra-ui|@ark-ui|@zag-js|@emotion)\//.test(id)) {
-            return "vendor";
+          if (
+            /node_modules\/(react|react-dom|scheduler|@chakra-ui|@ark-ui|@zag-js|@emotion)\//.test(
+              id,
+            )
+          ) {
+            return "vendor"
           }
         },
         entryFileNames: "assets/[name]-[hash].js",
@@ -64,4 +68,4 @@ export default defineConfig({
     // Vitest's default timed out a quick test while other sessions loaded the machine.
     testTimeout: 20_000,
   },
-});
+})

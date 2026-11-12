@@ -1,10 +1,10 @@
-import { act, fireEvent, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SettingsEntry, SettingsWriteResult } from "../generated/server";
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import { renderThemed } from "../ui/render";
-import { DevFrontendRow } from "./DevFrontendRow";
-import { SettingsRow } from "./SettingsRow";
+import { act, fireEvent, within } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import type { SettingsEntry, SettingsWriteResult } from "../generated/server"
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
+import { renderThemed } from "../ui/render"
+import { DevFrontendRow } from "./DevFrontendRow"
+import { SettingsRow } from "./SettingsRow"
 
 const entry = (over: Partial<SettingsEntry>): SettingsEntry => ({
   key: "execution-queue.max-agents",
@@ -14,325 +14,427 @@ const entry = (over: Partial<SettingsEntry>): SettingsEntry => ({
   description: "Live agents.",
   set: false,
   ...over,
-});
+})
 
 const setup = (e: SettingsEntry, result: SettingsWriteResult = {}, pendingRestart = false) => {
-  const onWrite = vi.fn(async () => result);
-  const view = renderThemed(<SettingsRow entry={e} pendingRestart={pendingRestart} onWrite={onWrite} />);
-  return { ...view, onWrite };
-};
+  const onWrite = vi.fn(async () => result)
+  const view = renderThemed(
+    <SettingsRow entry={e} pendingRestart={pendingRestart} onWrite={onWrite} />,
+  )
+  return { ...view, onWrite }
+}
 
-const flush = () => act(async () => {});
+const flush = () => act(async () => {})
 
 describe("SettingsRow", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
 
   it("a bool switch sends a set change at once", async () => {
-    const { getByRole, onWrite } = setup(entry({ type: "bool", default: false }));
-    fireEvent.click(getByRole("switch"));
-    await flush();
-    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", value: true }]);
-  });
+    const { getByRole, onWrite } = setup(entry({ type: "bool", default: false }))
+    fireEvent.click(getByRole("switch"))
+    await flush()
+    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", value: true }])
+  })
 
   it("a number saves the draft as a number; Save is disabled until it differs", async () => {
-    const { getByRole, onWrite } = setup(entry({ set: true, value: 6, default: 4 }));
-    const save = getByRole("button", { name: "Save" }) as HTMLButtonElement;
-    expect(save.disabled).toBe(true);
-    fireEvent.change(getByRole("textbox"), { target: { value: "8" } });
-    expect(save.disabled).toBe(false);
-    fireEvent.click(save);
-    await flush();
-    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", value: 8 }]);
-  });
+    const { getByRole, onWrite } = setup(entry({ set: true, value: 6, default: 4 }))
+    const save = getByRole("button", { name: "Save" }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(getByRole("textbox"), { target: { value: "8" } })
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
+    await flush()
+    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", value: 8 }])
+  })
 
   it("Cancel restores the saved value", () => {
-    const { getByRole } = setup(entry({ type: "string", set: true, value: "a" }));
-    const input = getByRole("textbox") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "b" } });
-    fireEvent.click(getByRole("button", { name: "Cancel" }));
-    expect(input.value).toBe("a");
-  });
+    const { getByRole } = setup(entry({ type: "string", set: true, value: "a" }))
+    const input = getByRole("textbox") as HTMLInputElement
+    fireEvent.change(input, { target: { value: "b" } })
+    fireEvent.click(getByRole("button", { name: "Cancel" }))
+    expect(input.value).toBe("a")
+  })
 
   it("shows a unit hint beside duration and size fields", () => {
-    expect(setup(entry({ type: "duration" })).getByText("e.g. 30s, 5m, 2h")).toBeTruthy();
-    expect(setup(entry({ type: "size" })).getByText("e.g. 50G")).toBeTruthy();
-  });
+    expect(setup(entry({ type: "duration" })).getByText("e.g. 30s, 5m, 2h")).toBeTruthy()
+    expect(setup(entry({ type: "size" })).getByText("e.g. 50G")).toBeTruthy()
+  })
 
   it("an enum segment click sends that option", async () => {
-    const { getByRole, onWrite } = setup(entry({ type: "enum", enum: ["a", "b"], default: "a" }));
-    fireEvent.click(getByRole("button", { name: "b" }));
-    await flush();
-    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", value: "b" }]);
-  });
+    const { getByRole, onWrite } = setup(entry({ type: "enum", enum: ["a", "b"], default: "a" }))
+    fireEvent.click(getByRole("button", { name: "b" }))
+    await flush()
+    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", value: "b" }])
+  })
 
   it("shows the dot and Reset link only for a key in the file; Reset sends a remove", async () => {
-    const unset = setup(entry({ default: 4 }));
-    expect(unset.queryByTitle("Changed from default")).toBeNull();
-    expect(unset.queryByText(/Reset to default/)).toBeNull();
-    unset.unmount();
-    const { getByText, getByTitle, onWrite } = setup(entry({ set: true, value: 6, default: 4 }));
-    expect(getByTitle("Changed from default")).toBeTruthy();
-    fireEvent.click(getByText("Reset to default (4)"));
-    await flush();
-    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", remove: true }]);
-  });
+    const unset = setup(entry({ default: 4 }))
+    expect(unset.queryByTitle("Changed from default")).toBeNull()
+    expect(unset.queryByText(/Reset to default/)).toBeNull()
+    unset.unmount()
+    const { getByText, getByTitle, onWrite } = setup(entry({ set: true, value: 6, default: 4 }))
+    expect(getByTitle("Changed from default")).toBeTruthy()
+    fireEvent.click(getByText("Reset to default (4)"))
+    await flush()
+    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", remove: true }])
+  })
 
   it("shows Saved, then removes it after about two seconds", async () => {
-    const { getByRole, queryByText } = setup(entry({ type: "bool" }));
-    fireEvent.click(getByRole("switch"));
-    await flush();
-    expect(queryByText("Saved")).toBeTruthy();
+    const { getByRole, queryByText } = setup(entry({ type: "bool" }))
+    fireEvent.click(getByRole("switch"))
+    await flush()
+    expect(queryByText("Saved")).toBeTruthy()
     await act(async () => {
-      vi.advanceTimersByTime(2100);
-    });
-    expect(queryByText("Saved")).toBeNull();
-  });
+      vi.advanceTimersByTime(2100)
+    })
+    expect(queryByText("Saved")).toBeNull()
+  })
 
   it("a refused save keeps the draft, marks the field and shows the reason", async () => {
     const { getByRole, getByText, queryByText } = setup(entry({ set: true, value: 6 }), {
       refused: true,
       keys: ["execution-queue.max-agents"],
       reason: "must be at least 1",
-    });
-    const input = getByRole("textbox") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "0" } });
-    fireEvent.click(getByRole("button", { name: "Save" }));
-    await flush();
-    expect(input.value).toBe("0");
-    expect(input.getAttribute("aria-invalid")).toBe("true");
-    expect(getByText("Not saved: must be at least 1")).toBeTruthy();
-    expect(queryByText("Saved")).toBeNull();
-  });
+    })
+    const input = getByRole("textbox") as HTMLInputElement
+    fireEvent.change(input, { target: { value: "0" } })
+    fireEvent.click(getByRole("button", { name: "Save" }))
+    await flush()
+    expect(input.value).toBe("0")
+    expect(input.getAttribute("aria-invalid")).toBe("true")
+    expect(getByText("Not saved: must be at least 1")).toBeTruthy()
+    expect(queryByText("Saved")).toBeNull()
+  })
 
   describe("default harness row", () => {
     const harness = (over: Partial<SettingsEntry> = {}) =>
-      entry({ key: "agents.default-harness", path: ["agents", "default-harness"], type: "enum", enum: ["claude", "codex"], default: "claude", value: "claude", ...over });
+      entry({
+        key: "agents.default-harness",
+        path: ["agents", "default-harness"],
+        type: "enum",
+        enum: ["claude", "codex"],
+        default: "claude",
+        value: "claude",
+        ...over,
+      })
 
     it("shows the server's switch notice after the write", async () => {
-      const notice = "Codex is now the default. 2 waiting and 1 running agents keep Claude.";
-      const { getByRole, getByText, onWrite } = setup(harness(), { notices: [notice] });
-      fireEvent.click(getByRole("button", { name: "codex" }));
-      await flush();
-      expect(onWrite).toHaveBeenCalledWith([{ key: "agents.default-harness", value: "codex" }]);
-      expect(getByText(notice)).toBeTruthy();
-    });
+      const notice = "Codex is now the default. 2 waiting and 1 running agents keep Claude."
+      const { getByRole, getByText, onWrite } = setup(harness(), { notices: [notice] })
+      fireEvent.click(getByRole("button", { name: "codex" }))
+      await flush()
+      expect(onWrite).toHaveBeenCalledWith([{ key: "agents.default-harness", value: "codex" }])
+      expect(getByText(notice)).toBeTruthy()
+    })
 
     it("a PATH refusal shows Not saved and keeps the previous value", async () => {
-      const { getByRole, getByText, queryByText } = setup(harness(), { refused: true, keys: ["agents.default-harness"], reason: "codex is not on PATH" });
-      fireEvent.click(getByRole("button", { name: "codex" }));
-      await flush();
-      expect(getByText("Not saved: codex is not on PATH")).toBeTruthy();
-      expect(queryByText("Saved")).toBeNull();
-      expect(getByRole("button", { name: "claude" }).getAttribute("aria-pressed")).toBe("true");
-    });
+      const { getByRole, getByText, queryByText } = setup(harness(), {
+        refused: true,
+        keys: ["agents.default-harness"],
+        reason: "codex is not on PATH",
+      })
+      fireEvent.click(getByRole("button", { name: "codex" }))
+      await flush()
+      expect(getByText("Not saved: codex is not on PATH")).toBeTruthy()
+      expect(queryByText("Saved")).toBeNull()
+      expect(getByRole("button", { name: "claude" }).getAttribute("aria-pressed")).toBe("true")
+    })
 
     it("a project's override row writes agents.default-harness", async () => {
       const view = renderThemed(
-        <SettingsRow entry={harness({ global_key: "agents.default-harness", global_value: "claude" })} pendingRestart={false} onWrite={vi.fn(async () => ({}))} project="gx" />,
-      );
-      expect(view.getByText("Override for gx")).toBeTruthy();
-    });
-  });
+        <SettingsRow
+          entry={harness({ global_key: "agents.default-harness", global_value: "claude" })}
+          pendingRestart={false}
+          onWrite={vi.fn(async () => ({}))}
+          project="gx"
+        />,
+      )
+      expect(view.getByText("Override for gx")).toBeTruthy()
+    })
+  })
 
   it("does not mark a field that a multi-key refusal does not name", async () => {
-    const { getByRole, queryByText } = setup(entry({}), { refused: true, keys: ["other.key"], reason: "bad" });
-    fireEvent.change(getByRole("textbox"), { target: { value: "3" } });
-    fireEvent.click(getByRole("button", { name: "Save" }));
-    await flush();
-    expect(queryByText(/Not saved/)).toBeNull();
-  });
+    const { getByRole, queryByText } = setup(entry({}), {
+      refused: true,
+      keys: ["other.key"],
+      reason: "bad",
+    })
+    fireEvent.change(getByRole("textbox"), { target: { value: "3" } })
+    fireEvent.click(getByRole("button", { name: "Save" }))
+    await flush()
+    expect(queryByText(/Not saved/)).toBeNull()
+  })
 
   it("marks a startup-only key Needs restart, and Restart needed to apply once pending", () => {
-    const idle = setup(entry({ restart: true }));
-    expect(idle.getByText("Needs restart")).toBeTruthy();
-    idle.unmount();
-    expect(setup(entry({ restart: true }), {}, true).getByText("Restart needed to apply")).toBeTruthy();
-  });
+    const idle = setup(entry({ restart: true }))
+    expect(idle.getByText("Needs restart")).toBeTruthy()
+    idle.unmount()
+    expect(
+      setup(entry({ restart: true }), {}, true).getByText("Restart needed to apply"),
+    ).toBeTruthy()
+  })
 
   it("says Restart needed to apply after a save the server reports as pending", async () => {
-    const { getByRole, getByText } = setup(entry({ restart: true, type: "string" }), { restart_needed: ["execution-queue.max-agents"] });
-    fireEvent.change(getByRole("textbox"), { target: { value: "x" } });
-    fireEvent.click(getByRole("button", { name: "Save" }));
-    await flush();
-    expect(getByText("Restart needed to apply")).toBeTruthy();
-  });
+    const { getByRole, getByText } = setup(entry({ restart: true, type: "string" }), {
+      restart_needed: ["execution-queue.max-agents"],
+    })
+    fireEvent.change(getByRole("textbox"), { target: { value: "x" } })
+    fireEvent.click(getByRole("button", { name: "Save" }))
+    await flush()
+    expect(getByText("Restart needed to apply")).toBeTruthy()
+  })
 
   describe("lists", () => {
-    const listEntry = (over: Partial<SettingsEntry>) => entry({ key: "server.tab-env", type: "string-list", set: true, value: ["A=1", "B=2"], ...over });
+    const listEntry = (over: Partial<SettingsEntry>) =>
+      entry({
+        key: "server.tab-env",
+        type: "string-list",
+        set: true,
+        value: ["A=1", "B=2"],
+        ...over,
+      })
 
     it("add and remove send the whole list", async () => {
-      const { getByRole, onWrite } = setup(listEntry({}));
-      fireEvent.change(getByRole("textbox"), { target: { value: "C=3" } });
-      fireEvent.click(getByRole("button", { name: "Add" }));
-      await flush();
-      expect(onWrite).toHaveBeenLastCalledWith([{ key: "server.tab-env", value: ["A=1", "B=2", "C=3"] }]);
-      fireEvent.click(getByRole("button", { name: "Remove A=1" }));
-      await flush();
-      expect(onWrite).toHaveBeenLastCalledWith([{ key: "server.tab-env", value: ["B=2"] }]);
-    });
+      const { getByRole, onWrite } = setup(listEntry({}))
+      fireEvent.change(getByRole("textbox"), { target: { value: "C=3" } })
+      fireEvent.click(getByRole("button", { name: "Add" }))
+      await flush()
+      expect(onWrite).toHaveBeenLastCalledWith([
+        { key: "server.tab-env", value: ["A=1", "B=2", "C=3"] },
+      ])
+      fireEvent.click(getByRole("button", { name: "Remove A=1" }))
+      await flush()
+      expect(onWrite).toHaveBeenLastCalledWith([{ key: "server.tab-env", value: ["B=2"] }])
+    })
 
     it("a number list refuses abc before the write and accepts 90", async () => {
-      const { getByRole, getByText, onWrite } = setup(listEntry({ key: "budget.notification-thresholds", type: "number-list", value: [50] }));
-      fireEvent.change(getByRole("textbox"), { target: { value: "abc" } });
-      fireEvent.click(getByRole("button", { name: "Add" }));
-      await flush();
-      expect(getByText('"abc" is not a number')).toBeTruthy();
-      expect(onWrite).not.toHaveBeenCalled();
-      fireEvent.change(getByRole("textbox"), { target: { value: "90" } });
-      fireEvent.click(getByRole("button", { name: "Add" }));
-      await flush();
-      expect(onWrite).toHaveBeenCalledWith([{ key: "budget.notification-thresholds", value: [50, 90] }]);
-    });
+      const { getByRole, getByText, onWrite } = setup(
+        listEntry({ key: "budget.notification-thresholds", type: "number-list", value: [50] }),
+      )
+      fireEvent.change(getByRole("textbox"), { target: { value: "abc" } })
+      fireEvent.click(getByRole("button", { name: "Add" }))
+      await flush()
+      expect(getByText('"abc" is not a number')).toBeTruthy()
+      expect(onWrite).not.toHaveBeenCalled()
+      fireEvent.change(getByRole("textbox"), { target: { value: "90" } })
+      fireEvent.click(getByRole("button", { name: "Add" }))
+      await flush()
+      expect(onWrite).toHaveBeenCalledWith([
+        { key: "budget.notification-thresholds", value: [50, 90] },
+      ])
+    })
 
     it("an empty set list shows as empty and removing the last tag sends []", async () => {
-      const { getByRole, onWrite } = setup(listEntry({ value: ["x"] }));
-      fireEvent.click(getByRole("button", { name: "Remove x" }));
-      await flush();
-      expect(onWrite).toHaveBeenCalledWith([{ key: "server.tab-env", value: [] }]);
-    });
+      const { getByRole, onWrite } = setup(listEntry({ value: ["x"] }))
+      fireEvent.click(getByRole("button", { name: "Remove x" }))
+      await flush()
+      expect(onWrite).toHaveBeenCalledWith([{ key: "server.tab-env", value: [] }])
+    })
 
     it("an empty set list is an empty tag list with its dot and a Reset", () => {
-      const { getByText, getByTitle, getByRole } = setup(listEntry({ value: [], default: ["a"] }));
-      expect(getByText("Empty list")).toBeTruthy();
-      expect(getByTitle("Changed from default")).toBeTruthy();
-      expect(getByRole("button", { name: /Reset to default/ })).toBeTruthy();
-    });
-  });
+      const { getByText, getByTitle, getByRole } = setup(listEntry({ value: [], default: ["a"] }))
+      expect(getByText("Empty list")).toBeTruthy()
+      expect(getByTitle("Changed from default")).toBeTruthy()
+      expect(getByRole("button", { name: /Reset to default/ })).toBeTruthy()
+    })
+  })
 
   describe("secrets", () => {
-    const secret = (set: boolean) => entry({ key: "notifications.telegram.bot-token", type: "secret", set });
+    const secret = (set: boolean) =>
+      entry({ key: "notifications.telegram.bot-token", type: "secret", set })
 
     it("shows Set or Not set", () => {
-      expect(setup(secret(true)).getByText("Set")).toBeTruthy();
-      expect(setup(secret(false)).getByText("Not set")).toBeTruthy();
-    });
+      expect(setup(secret(true)).getByText("Set")).toBeTruthy()
+      expect(setup(secret(false)).getByText("Not set")).toBeTruthy()
+    })
 
     it("Replace sends the new value and the token never reaches the DOM", async () => {
-      const { getByRole, getByLabelText, onWrite, container } = setup(secret(true));
-      fireEvent.click(getByRole("button", { name: "Replace" }));
-      fireEvent.change(getByLabelText(/New/), { target: { value: "tok-123" } });
-      fireEvent.click(getByRole("button", { name: "Save" }));
-      await flush();
-      expect(onWrite).toHaveBeenCalledWith([{ key: "notifications.telegram.bot-token", value: "tok-123" }]);
-      expect(container.innerHTML).not.toContain("tok-123");
-    });
+      const { getByRole, getByLabelText, onWrite, container } = setup(secret(true))
+      fireEvent.click(getByRole("button", { name: "Replace" }))
+      fireEvent.change(getByLabelText(/New/), { target: { value: "tok-123" } })
+      fireEvent.click(getByRole("button", { name: "Save" }))
+      await flush()
+      expect(onWrite).toHaveBeenCalledWith([
+        { key: "notifications.telegram.bot-token", value: "tok-123" },
+      ])
+      expect(container.innerHTML).not.toContain("tok-123")
+    })
 
     it("Clear sends a remove", async () => {
-      const { getByRole, onWrite } = setup(secret(true));
-      fireEvent.click(getByRole("button", { name: "Clear" }));
-      await flush();
-      expect(onWrite).toHaveBeenCalledWith([{ key: "notifications.telegram.bot-token", remove: true }]);
-    });
+      const { getByRole, onWrite } = setup(secret(true))
+      fireEvent.click(getByRole("button", { name: "Clear" }))
+      await flush()
+      expect(onWrite).toHaveBeenCalledWith([
+        { key: "notifications.telegram.bot-token", remove: true },
+      ])
+    })
 
     it("a chat id string row shows in full", () => {
-      const { getByRole } = setup(entry({ key: "notifications.telegram.chat-id", type: "string", set: true, value: "-1001234567890" }));
-      expect((getByRole("textbox") as HTMLInputElement).value).toBe("-1001234567890");
-    });
-  });
+      const { getByRole } = setup(
+        entry({
+          key: "notifications.telegram.chat-id",
+          type: "string",
+          set: true,
+          value: "-1001234567890",
+        }),
+      )
+      expect((getByRole("textbox") as HTMLInputElement).value).toBe("-1001234567890")
+    })
+  })
 
   describe("server.web.dev-frontend", () => {
-    const REASON = "Off: gx has no Dev checkout. Set the Dev checkout path below.";
-    const devRow = entry({ key: "server.web.dev-frontend", type: "bool", default: false });
+    const REASON = "Off: gx has no Dev checkout. Set the Dev checkout path below."
+    const devRow = entry({ key: "server.web.dev-frontend", type: "bool", default: false })
     const withDev = (has_checkout: boolean) => {
-      const state = { snapshot: { dev: { state: "off", has_checkout } } } as unknown as ConnectionState;
-      const conn = { getState: () => state, subscribe: () => () => {} } as unknown as Connection;
-      const onWrite = vi.fn(async () => ({}) as SettingsWriteResult);
+      const state = {
+        snapshot: { dev: { state: "off", has_checkout } },
+      } as unknown as ConnectionState
+      const conn = { getState: () => state, subscribe: () => () => {} } as unknown as Connection
+      const onWrite = vi.fn(async () => ({}) as SettingsWriteResult)
       const view = renderThemed(
         <ConnectionContext.Provider value={conn}>
           <DevFrontendRow entry={devRow} pendingRestart={false} onWrite={onWrite} />
         </ConnectionContext.Provider>,
-      );
-      return { ...view, onWrite };
-    };
+      )
+      return { ...view, onWrite }
+    }
 
     it("is a disabled switch with the reason line while there is no Dev checkout", () => {
-      const v = withDev(false);
-      expect((v.getByRole("switch") as HTMLButtonElement).disabled).toBe(true);
-      expect(v.getByText(REASON)).toBeTruthy();
-    });
+      const v = withDev(false)
+      expect((v.getByRole("switch") as HTMLButtonElement).disabled).toBe(true)
+      expect(v.getByText(REASON)).toBeTruthy()
+    })
 
     it("is an enabled switch without the reason line with a Dev checkout, and a toggle writes with no dialog", async () => {
-      const v = withDev(true);
-      expect((v.getByRole("switch") as HTMLButtonElement).disabled).toBe(false);
-      expect(v.queryByText(REASON)).toBeNull();
-      fireEvent.click(v.getByRole("switch"));
-      await flush();
-      expect(v.queryByRole("dialog")).toBeNull();
-      expect(v.onWrite).toHaveBeenCalledWith([{ key: "server.web.dev-frontend", value: true }]);
-    });
-  });
+      const v = withDev(true)
+      expect((v.getByRole("switch") as HTMLButtonElement).disabled).toBe(false)
+      expect(v.queryByText(REASON)).toBeNull()
+      fireEvent.click(v.getByRole("switch"))
+      await flush()
+      expect(v.queryByRole("dialog")).toBeNull()
+      expect(v.onWrite).toHaveBeenCalledWith([{ key: "server.web.dev-frontend", value: true }])
+    })
+  })
 
   describe("risky keys", () => {
     const risky = (over: Partial<SettingsEntry>) =>
-      entry({ risky: true, risky_off_only: over.key === "server.web.totp", confirm_text: "This is risky.", ...over });
-    const cases: [string, Partial<SettingsEntry>, (v: ReturnType<typeof setup>) => void, unknown][] = [
-      ["server.web.listen", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
-      ["ticket-store.path", { type: "string", default: "a" }, (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }), "b"],
-      ["server.tcp-listen", { type: "bool", default: false }, (v) => fireEvent.click(v.getByRole("switch")), true],
-      ["server.web.totp", { type: "bool", default: true, set: true, value: true }, (v) => fireEvent.click(v.getByRole("switch")), false],
-      ["server.web.allowed-hosts", { type: "string-list", default: [] }, (v) => {
-        fireEvent.change(v.getByRole("textbox"), { target: { value: "h" } });
-        fireEvent.click(v.getByRole("button", { name: "Add" }));
-      }, ["h"]],
-    ];
+      entry({
+        risky: true,
+        risky_off_only: over.key === "server.web.totp",
+        confirm_text: "This is risky.",
+        ...over,
+      })
+    const cases: [
+      string,
+      Partial<SettingsEntry>,
+      (v: ReturnType<typeof setup>) => void,
+      unknown,
+    ][] = [
+      [
+        "server.web.listen",
+        { type: "string", default: "a" },
+        (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }),
+        "b",
+      ],
+      [
+        "ticket-store.path",
+        { type: "string", default: "a" },
+        (v) => fireEvent.change(v.getByRole("textbox"), { target: { value: "b" } }),
+        "b",
+      ],
+      [
+        "server.tcp-listen",
+        { type: "bool", default: false },
+        (v) => fireEvent.click(v.getByRole("switch")),
+        true,
+      ],
+      [
+        "server.web.totp",
+        { type: "bool", default: true, set: true, value: true },
+        (v) => fireEvent.click(v.getByRole("switch")),
+        false,
+      ],
+      [
+        "server.web.allowed-hosts",
+        { type: "string-list", default: [] },
+        (v) => {
+          fireEvent.change(v.getByRole("textbox"), { target: { value: "h" } })
+          fireEvent.click(v.getByRole("button", { name: "Add" }))
+        },
+        ["h"],
+      ],
+    ]
 
-    it.each(cases)("%s asks before writing; Cancel writes nothing, Change it writes", async (key, over, act1, value) => {
-      const v = setup(risky({ key, ...over }));
-      act1(v);
-      if (over.type === "string") fireEvent.click(v.getByRole("button", { name: "Save" }));
-      await flush();
-      expect(v.getByRole("dialog")).toBeTruthy();
-      expect(v.onWrite).not.toHaveBeenCalled();
-      fireEvent.click(within(v.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
-      await flush();
-      expect(v.queryByRole("dialog")).toBeNull();
-      expect(v.onWrite).not.toHaveBeenCalled();
+    it.each(cases)(
+      "%s asks before writing; Cancel writes nothing, Change it writes",
+      async (key, over, act1, value) => {
+        const v = setup(risky({ key, ...over }))
+        act1(v)
+        if (over.type === "string") fireEvent.click(v.getByRole("button", { name: "Save" }))
+        await flush()
+        expect(v.getByRole("dialog")).toBeTruthy()
+        expect(v.onWrite).not.toHaveBeenCalled()
+        fireEvent.click(within(v.getByRole("dialog")).getByRole("button", { name: "Cancel" }))
+        await flush()
+        expect(v.queryByRole("dialog")).toBeNull()
+        expect(v.onWrite).not.toHaveBeenCalled()
 
-      act1(v);
-      if (over.type === "string") fireEvent.click(v.getByRole("button", { name: "Save" }));
-      await flush();
-      fireEvent.click(v.getByRole("button", { name: "Change it" }));
-      await flush();
-      expect(v.onWrite).toHaveBeenCalledWith([{ key, value }]);
-      expect(v.queryByRole("dialog")).toBeNull();
-    });
+        act1(v)
+        if (over.type === "string") fireEvent.click(v.getByRole("button", { name: "Save" }))
+        await flush()
+        fireEvent.click(v.getByRole("button", { name: "Change it" }))
+        await flush()
+        expect(v.onWrite).toHaveBeenCalledWith([{ key, value }])
+        expect(v.queryByRole("dialog")).toBeNull()
+      },
+    )
 
     it("a risky row carries a Careful chip and a plain row does not", () => {
-      const v = setup(risky({ key: "server.web.listen", type: "string", default: "a" }));
-      expect(v.getByText("Careful")).toBeTruthy();
-      v.unmount();
-      const plain = setup(entry({ key: "server.log-retention", type: "string", default: "a" }));
-      expect(plain.queryByText("Careful")).toBeNull();
-    });
+      const v = setup(risky({ key: "server.web.listen", type: "string", default: "a" }))
+      expect(v.getByText("Careful")).toBeTruthy()
+      v.unmount()
+      const plain = setup(entry({ key: "server.log-retention", type: "string", default: "a" }))
+      expect(plain.queryByText("Careful")).toBeNull()
+    })
 
     it("turning the one-time code on needs no dialog", async () => {
-      const v = setup(risky({ key: "server.web.totp", type: "bool", default: true, set: true, value: false }));
-      fireEvent.click(v.getByRole("switch"));
-      await flush();
-      expect(v.queryByRole("dialog")).toBeNull();
-      expect(v.onWrite).toHaveBeenCalledWith([{ key: "server.web.totp", value: true }]);
-    });
+      const v = setup(
+        risky({ key: "server.web.totp", type: "bool", default: true, set: true, value: false }),
+      )
+      fireEvent.click(v.getByRole("switch"))
+      await flush()
+      expect(v.queryByRole("dialog")).toBeNull()
+      expect(v.onWrite).toHaveBeenCalledWith([{ key: "server.web.totp", value: true }])
+    })
 
     it("shows the entry's confirm text, including that old ticket data is not moved", async () => {
-      const text = "Your existing tickets are not moved.";
-      const v = setup(risky({ key: "ticket-store.path", type: "string", confirm_text: text }));
-      fireEvent.change(v.getByRole("textbox"), { target: { value: "/new" } });
-      fireEvent.click(v.getByRole("button", { name: "Save" }));
-      await flush();
-      expect(v.getByRole("dialog").textContent).toContain("not moved");
-    });
-  });
+      const text = "Your existing tickets are not moved."
+      const v = setup(risky({ key: "ticket-store.path", type: "string", confirm_text: text }))
+      fireEvent.change(v.getByRole("textbox"), { target: { value: "/new" } })
+      fireEvent.click(v.getByRole("button", { name: "Save" }))
+      await flush()
+      expect(v.getByRole("dialog").textContent).toContain("not moved")
+    })
+  })
 
   describe("in a project", () => {
     const inProject = (e: SettingsEntry) => {
-      const onWrite = vi.fn(async () => ({}) as SettingsWriteResult);
-      const view = renderThemed(<SettingsRow entry={e} pendingRestart={false} onWrite={onWrite} project="gx" />);
-      return { ...view, onWrite };
-    };
-    const inherits = (v: { container: HTMLElement }) => v.container.querySelector("[data-mock-part=inherits-global]")?.textContent;
+      const onWrite = vi.fn(async () => ({}) as SettingsWriteResult)
+      const view = renderThemed(
+        <SettingsRow entry={e} pendingRestart={false} onWrite={onWrite} project="gx" />,
+      )
+      return { ...view, onWrite }
+    }
+    const inherits = (v: { container: HTMLElement }) =>
+      v.container.querySelector("[data-mock-part=inherits-global]")?.textContent
     const per = (over: Partial<SettingsEntry>) =>
-      entry({ key: "execution-queue.max-agents-per-epic", global_key: "execution-queue.max-agents-per-epic", global_value: 3, ...over });
+      entry({
+        key: "execution-queue.max-agents-per-epic",
+        global_key: "execution-queue.max-agents-per-epic",
+        global_value: 3,
+        ...over,
+      })
     const cap = (over: Partial<SettingsEntry>) =>
       entry({
         key: "project.max-agents",
@@ -342,7 +444,7 @@ describe("SettingsRow", () => {
         global_key: "execution-queue.max-agents",
         global_value: 6,
         ...over,
-      });
+      })
     const evolve = (over: Partial<SettingsEntry>) =>
       entry({
         key: "project.evolve",
@@ -353,74 +455,78 @@ describe("SettingsRow", () => {
         global_key: "evolve",
         global_value: true,
         ...over,
-      });
+      })
 
     it("the project rows read the registry's labels", () => {
-      expect(inProject(cap({})).getByText("Max live agents for this project")).toBeTruthy();
-      expect(inProject(evolve({})).getByText("Evolve for this project")).toBeTruthy();
-    });
+      expect(inProject(cap({})).getByText("Max live agents for this project")).toBeTruthy()
+      expect(inProject(evolve({})).getByText("Evolve for this project")).toBeTruthy()
+    })
 
     it("the reset link stays on the title row, which never wraps, so a long label wraps instead", () => {
-      const v = inProject(cap({ set: true, value: 2 }));
-      const row = v.container.querySelector("[data-mock-part=title-row]") as HTMLElement;
-      const link = v.getByRole("button", { name: "Remove cap" });
-      expect(row.contains(link)).toBe(true);
-      expect(getComputedStyle(row).flexWrap).not.toBe("wrap");
-      expect(getComputedStyle(link).flexShrink).toBe("0");
-    });
+      const v = inProject(cap({ set: true, value: 2 }))
+      const row = v.container.querySelector("[data-mock-part=title-row]") as HTMLElement
+      const link = v.getByRole("button", { name: "Remove cap" })
+      expect(row.contains(link)).toBe(true)
+      expect(getComputedStyle(row).flexWrap).not.toBe("wrap")
+      expect(getComputedStyle(link).flexShrink).toBe("0")
+    })
 
     it("an unset key shows the global value; Override writes that value", async () => {
-      const v = inProject(per({}));
-      expect(inherits(v)).toBe("Uses the global value 3");
-      expect(v.queryByText("Overridden")).toBeNull();
-      fireEvent.click(v.getByRole("button", { name: "Override for gx" }));
-      await flush();
-      expect(v.onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents-per-epic", value: 3 }]);
-    });
+      const v = inProject(per({}))
+      expect(inherits(v)).toBe("Uses the global value 3")
+      expect(v.queryByText("Overridden")).toBeNull()
+      fireEvent.click(v.getByRole("button", { name: "Override for gx" }))
+      await flush()
+      expect(v.onWrite).toHaveBeenCalledWith([
+        { key: "execution-queue.max-agents-per-epic", value: 3 },
+      ])
+    })
 
     it("a set key shows the control, the Overridden chip and a link that removes it", async () => {
-      const v = inProject(per({ set: true, value: 2 }));
-      expect(v.getByText("Overridden")).toBeTruthy();
-      expect(v.getByRole("textbox")).toBeTruthy();
-      fireEvent.click(v.getByRole("button", { name: "Use global value (3)" }));
-      await flush();
-      expect(v.onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents-per-epic", remove: true }]);
-    });
+      const v = inProject(per({ set: true, value: 2 }))
+      expect(v.getByText("Overridden")).toBeTruthy()
+      expect(v.getByRole("textbox")).toBeTruthy()
+      fireEvent.click(v.getByRole("button", { name: "Use global value (3)" }))
+      await flush()
+      expect(v.onWrite).toHaveBeenCalledWith([
+        { key: "execution-queue.max-agents-per-epic", remove: true },
+      ])
+    })
 
     it("the cap row says there is no cap, sets one and removes it", async () => {
-      const absent = inProject(cap({}));
-      expect(inherits(absent)).toBe("No per-project cap (the global cap of 6 still applies)");
-      fireEvent.click(absent.getByRole("button", { name: "Set a cap for gx" }));
-      await flush();
-      expect(absent.onWrite).toHaveBeenCalledWith([{ key: "project.max-agents", value: 6 }]);
+      const absent = inProject(cap({}))
+      expect(inherits(absent)).toBe("No per-project cap (the global cap of 6 still applies)")
+      fireEvent.click(absent.getByRole("button", { name: "Set a cap for gx" }))
+      await flush()
+      expect(absent.onWrite).toHaveBeenCalledWith([{ key: "project.max-agents", value: 6 }])
 
-      const set = inProject(cap({ set: true, value: 2 }));
-      expect(set.getByText("Overridden")).toBeTruthy();
-      expect(set.queryByText(/Use global value/)).toBeNull();
-      fireEvent.click(set.getByRole("button", { name: "Remove cap" }));
-      await flush();
-      expect(set.onWrite).toHaveBeenCalledWith([{ key: "project.max-agents", remove: true }]);
-    });
+      const set = inProject(cap({ set: true, value: 2 }))
+      expect(set.getByText("Overridden")).toBeTruthy()
+      expect(set.queryByText(/Use global value/)).toBeNull()
+      fireEvent.click(set.getByRole("button", { name: "Remove cap" }))
+      await flush()
+      expect(set.onWrite).toHaveBeenCalledWith([{ key: "project.max-agents", remove: true }])
+    })
 
     it("the evolve switch follows global when absent, writes false on Override and removes the key otherwise", async () => {
-      const absent = inProject(evolve({}));
-      expect(inherits(absent)).toBe("Follows global mode (on)");
-      fireEvent.click(absent.getByRole("button", { name: "Override for gx" }));
-      await flush();
-      expect(absent.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", value: false }]);
+      const absent = inProject(evolve({}))
+      expect(inherits(absent)).toBe("Follows global mode (on)")
+      fireEvent.click(absent.getByRole("button", { name: "Override for gx" }))
+      await flush()
+      expect(absent.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", value: false }])
 
-      const off = inProject(evolve({ set: true, value: false }));
-      expect(off.getByRole("switch").getAttribute("aria-checked")).toBe("false");
-      fireEvent.click(off.getByRole("switch"));
-      await flush();
-      expect(off.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", remove: true }]);
-    });
+      const off = inProject(evolve({ set: true, value: false }))
+      expect(off.getByRole("switch").getAttribute("aria-checked")).toBe("false")
+      fireEvent.click(off.getByRole("switch"))
+      await flush()
+      expect(off.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", remove: true }])
+    })
 
     it("the evolve row's Use global value link removes the key", async () => {
-      const global = inProject(evolve({ set: true, value: false }));
-      fireEvent.click(global.getByRole("button", { name: "Use global value (on)" }));
-      await flush();
-      expect(global.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", remove: true }]);
-    });
-  });
-});
+      const global = inProject(evolve({ set: true, value: false }))
+      fireEvent.click(global.getByRole("button", { name: "Use global value (on)" }))
+      await flush()
+      expect(global.onWrite).toHaveBeenCalledWith([{ key: "project.evolve", remove: true }])
+    })
+  })
+})

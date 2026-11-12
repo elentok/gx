@@ -1,9 +1,9 @@
-import type { CleanNowResult, DiskStatus } from "../generated/server";
-import { apiFetch } from "../apiFetch";
-import { useConnectionContext, useConnectionState } from "../connection";
-import { sizeText } from "../health/formatBytes";
-import { DiskStrip } from "../ui/disk-strip/DiskStrip";
-import { refusalText, useWrite, WriteError } from "../useWrite";
+import type { CleanNowResult, DiskStatus } from "../generated/server"
+import { apiFetch } from "../apiFetch"
+import { useConnectionContext, useConnectionState } from "../connection"
+import { sizeText } from "../health/formatBytes"
+import { DiskStrip } from "../ui/disk-strip/DiskStrip"
+import { refusalText, useWrite, WriteError } from "../useWrite"
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export async function postCleanDisk(disk: string): Promise<CleanNowResult> {
@@ -11,16 +11,17 @@ export async function postCleanDisk(disk: string): Promise<CleanNowResult> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ disk }),
-  });
-  if (!res.ok) throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`);
-  return res.json();
+  })
+  if (!res.ok)
+    throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`)
+  return res.json()
 }
 
 function ConnectedDiskStrip({ disk }: { disk: DiskStatus }) {
-  const conn = useConnectionContext();
-  const { run, pending, refusal } = useWrite();
+  const conn = useConnectionContext()
+  const { run, pending, refusal } = useWrite()
   // A failed clean is read from the snapshot, so an automatic one shows too and a reload keeps it.
-  const failed = disk.last_clean.startsWith("failed") ? disk.last_clean : undefined;
+  const failed = disk.last_clean.startsWith("failed") ? disk.last_clean : undefined
   return (
     <DiskStrip
       name={disk.name}
@@ -31,17 +32,17 @@ function ConnectedDiskStrip({ disk }: { disk: DiskStatus }) {
       problem={refusal ? refusalText(refusal) : failed}
       onClean={() => run(() => postCleanDisk(disk.id), { onDone: () => conn.refresh() })}
     />
-  );
+  )
 }
 
 // One strip per low disk in the snapshot, below the Offline strip.
 export function DiskStrips() {
-  const { snapshot } = useConnectionState(useConnectionContext());
+  const { snapshot } = useConnectionState(useConnectionContext())
   return (
     <>
       {(snapshot?.disks ?? []).map((d) => (
         <ConnectedDiskStrip key={d.id} disk={d} />
       ))}
     </>
-  );
+  )
 }

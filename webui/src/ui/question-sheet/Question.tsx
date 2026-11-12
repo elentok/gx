@@ -1,9 +1,9 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useId, useState } from "react";
-import { NoteBox } from "../../design/NoteBox";
-import { Markdown } from "../../markdown/Markdown";
-import { Button } from "../button/Button";
-import { ExpandableTextField } from "../expandable-text/ExpandableTextField";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useId, useState } from "react"
+import { NoteBox } from "../../design/NoteBox"
+import { Markdown } from "../../markdown/Markdown"
+import { Button } from "../button/Button"
+import { ExpandableTextField } from "../expandable-text/ExpandableTextField"
 import {
   choicesOf,
   isAnswered,
@@ -12,7 +12,7 @@ import {
   type Answers,
   type QuestionCard,
   type QuestionMode,
-} from "./round";
+} from "./round"
 
 function Choice({
   label,
@@ -23,19 +23,19 @@ function Choice({
   recommended,
   onClick,
 }: {
-  label: string;
+  label: string
   /** An options row's A, B, C. Yes, No and Huh? have none. */
-  letter?: string;
+  letter?: string
   /** The option's id, shown muted after the label. */
-  id?: string;
-  consequence?: string;
-  on: boolean;
-  recommended: boolean;
-  onClick: () => void;
+  id?: string
+  consequence?: string
+  on: boolean
+  recommended: boolean
+  onClick: () => void
 }) {
-  const dim = on ? "surface" : "text.dim";
+  const dim = on ? "surface" : "text.dim"
   // The button's name is the label alone; the letter and id are decoration and the consequence its description.
-  const uid = useId();
+  const uid = useId()
   return (
     <chakra.button
       type="button"
@@ -70,31 +70,21 @@ function Choice({
           </Text>
         )}
         {recommended && (
-          <Text
-            as="span"
-            fontSize="xs"
-            color={on ? "surface" : "tone.waiting.fg"}
-          >
+          <Text as="span" fontSize="xs" color={on ? "surface" : "tone.waiting.fg"}>
             ★ recommended
           </Text>
         )}
       </Box>
       {consequence && (
-        <Text
-          as="span"
-          id={`${uid}-consequence`}
-          fontSize="sm"
-          fontWeight="normal"
-          color={dim}
-        >
+        <Text as="span" id={`${uid}-consequence`} fontSize="sm" fontWeight="normal" color={dim}>
           {consequence}
         </Text>
       )}
     </chakra.button>
-  );
+  )
 }
 
-const letterOf = (k: number) => String.fromCharCode(65 + (k % 26));
+const letterOf = (k: number) => String.fromCharCode(65 + (k % 26))
 
 // One question of a card. `big` is the Questions-view size. `mode` says whether it shows Huh? and a note.
 export function Question({
@@ -105,24 +95,24 @@ export function Question({
   big,
   mode = "round",
 }: {
-  card: QuestionCard;
-  answer: Answer;
-  onChange: (a: Answer) => void;
-  onPicked: () => void;
-  big?: boolean;
-  mode?: QuestionMode;
+  card: QuestionCard
+  answer: Answer
+  onChange: (a: Answer) => void
+  onPicked: () => void
+  big?: boolean
+  mode?: QuestionMode
 }) {
-  const huh = mode === "round";
-  const notes = mode !== "plain";
-  const [noteOpen, setNoteOpen] = useState(!!answer.note);
-  const choices = choicesOf(card);
-  const text = card.kind === "text" || choices.length === 0;
-  const multi = card.kind === "multi-select";
-  const chosen = answer.choices ?? [];
+  const huh = mode === "round"
+  const notes = mode !== "plain"
+  const [noteOpen, setNoteOpen] = useState(!!answer.note)
+  const choices = choicesOf(card)
+  const text = card.kind === "text" || choices.length === 0
+  const multi = card.kind === "multi-select"
+  const chosen = answer.choices ?? []
   const textRow = choices.find(
     (c) => c.text && (multi ? chosen.includes(c.id) : answer.choice === c.id),
-  );
-  const lettered = card.kind !== "yes-no";
+  )
+  const lettered = card.kind !== "yes-no"
   return (
     <Box display="flex" flexDirection="column" gap={big ? "3" : "2"}>
       {card.context &&
@@ -149,9 +139,7 @@ export function Question({
         fontSize={big ? "title" : "subtitle"}
         fontWeight="600"
       >{`${nameOf(card)} - ${card.title}`}</Markdown>
-      {card.body && (
-        <Markdown fontSize={big ? "lg" : "md"}>{card.body}</Markdown>
-      )}
+      {card.body && <Markdown fontSize={big ? "lg" : "md"}>{card.body}</Markdown>}
       {card.links && card.links.length > 0 && (
         <Box display="flex" flexWrap="wrap" gap="2">
           {card.links.map((l) => (
@@ -194,7 +182,7 @@ export function Question({
       ) : (
         <Box display="flex" flexDirection="column" gap="2">
           {choices.map((c, k) => {
-            const on = multi ? chosen.includes(c.id) : answer.choice === c.id;
+            const on = multi ? chosen.includes(c.id) : answer.choice === c.id
             return (
               <Choice
                 key={c.id}
@@ -209,21 +197,19 @@ export function Question({
                     onChange({
                       ...answer,
                       huh: false,
-                      choices: on
-                        ? chosen.filter((id) => id !== c.id)
-                        : [...chosen, c.id],
-                    });
-                    return;
+                      choices: on ? chosen.filter((id) => id !== c.id) : [...chosen, c.id],
+                    })
+                    return
                   }
                   onChange({
                     ...answer,
                     huh: false,
                     choice: on ? undefined : c.id,
-                  });
-                  if (!on) onPicked();
+                  })
+                  if (!on) onPicked()
                 }}
               />
-            );
+            )
           })}
           {textRow && (
             <ExpandableTextField
@@ -246,13 +232,13 @@ export function Question({
             on={!!answer.huh}
             recommended={false}
             onClick={() => {
-              const on = !answer.huh;
+              const on = !answer.huh
               onChange({
                 ...answer,
                 huh: on,
                 choice: on ? undefined : answer.choice,
-              });
-              if (on) onPicked();
+              })
+              if (on) onPicked()
             }}
           />
         </Box>
@@ -295,7 +281,7 @@ export function Question({
         />
       )}
     </Box>
-  );
+  )
 }
 
 // A circle per question: ✓ once answered, filled for the current one. Clicking one opens it.
@@ -305,16 +291,16 @@ export function QuestionDots({
   current,
   onPick,
 }: {
-  round: QuestionCard[];
-  answers: Answers;
-  current?: number;
-  onPick: (k: number) => void;
+  round: QuestionCard[]
+  answers: Answers
+  current?: number
+  onPick: (k: number) => void
 }) {
   return (
     <Box display="flex" gap="1.5" flexWrap="wrap">
       {round.map((c, k) => {
-        const answered = isAnswered(answers[c.label], c);
-        const on = k === current;
+        const answered = isAnswered(answers[c.label], c)
+        const on = k === current
         return (
           <chakra.button
             key={c.label}
@@ -328,19 +314,15 @@ export function QuestionDots({
             fontSize={c.label.length > 2 ? "2xs" : "xs"}
             fontWeight="600"
             cursor="pointer"
-            borderColor={
-              answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "border"
-            }
-            bg={
-              answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "transparent"
-            }
+            borderColor={answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "border"}
+            bg={answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "transparent"}
             color={answered || on ? "surface" : "text.muted"}
             onClick={() => onPick(k)}
           >
             {answered ? "✓" : c.label}
           </chakra.button>
-        );
+        )
       })}
     </Box>
-  );
+  )
 }

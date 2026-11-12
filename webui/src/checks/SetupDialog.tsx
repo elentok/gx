@@ -1,36 +1,54 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
-import { refusalText, useWrite } from "../useWrite";
-import { Button } from "../ui/button/Button";
-import { Chip } from "../ui/chip/Chip";
-import { Modal } from "../ui/modal/Modal";
-import { configOf, presetRows, previewOf, savedMessage, type Candidate, type Mode, type Row, type SaveChecks, type SaveTarget } from "./setup";
-import type { ProjectChecks } from "./status";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useState, type ReactNode } from "react"
+import { refusalText, useWrite } from "../useWrite"
+import { Button } from "../ui/button/Button"
+import { Chip } from "../ui/chip/Chip"
+import { Modal } from "../ui/modal/Modal"
+import {
+  configOf,
+  presetRows,
+  previewOf,
+  savedMessage,
+  type Candidate,
+  type Mode,
+  type Row,
+  type SaveChecks,
+  type SaveTarget,
+} from "./setup"
+import type { ProjectChecks } from "./status"
 
 const MODES: { mode: Mode; label: string }[] = [
   { mode: "use", label: "Use command" },
   { mode: "default", label: "gx default" },
   { mode: "off", label: "Off" },
-];
+]
 
-const kindLabel = (kind: string) => kind[0].toUpperCase() + kind.slice(1);
+const kindLabel = (kind: string) => kind[0].toUpperCase() + kind.slice(1)
 
 const Code = ({ children }: { children: string }) => (
   <chakra.code fontFamily="mono" fontSize="xs" color="text.muted">
     {children}
   </chakra.code>
-);
+)
 
-function KindRow({ row, check, onChange }: { row: Row; check: ProjectChecks["kinds"][number]; onChange: (next: Row) => void }) {
-  const found = check.recommended as Candidate | undefined;
-  const suggestions = (check.candidates as Candidate[]).filter((c) => c.command !== found?.command);
-  const listId = `suggest-${check.kind}`;
+function KindRow({
+  row,
+  check,
+  onChange,
+}: {
+  row: Row
+  check: ProjectChecks["kinds"][number]
+  onChange: (next: Row) => void
+}) {
+  const found = check.recommended as Candidate | undefined
+  const suggestions = (check.candidates as Candidate[]).filter((c) => c.command !== found?.command)
+  const listId = `suggest-${check.kind}`
   const source =
     row.mode === "use" && found && row.command === found.command
       ? `Found in ${found.source}`
       : row.mode === "off"
         ? "Agents skip this check."
-        : `Runs the gx default: ${check.default}`;
+        : `Runs the gx default: ${check.default}`
   return (
     <Box
       role="group"
@@ -45,7 +63,14 @@ function KindRow({ row, check, onChange }: { row: Row; check: ProjectChecks["kin
       borderColor="hairline"
       css={{ "& > *": { minWidth: 0 } }}
     >
-      <Text as="b" textTransform="uppercase" letterSpacing="0.05em" fontSize="md" fontFamily="condensed" fontWeight="600">
+      <Text
+        as="b"
+        textTransform="uppercase"
+        letterSpacing="0.05em"
+        fontSize="md"
+        fontFamily="condensed"
+        fontWeight="600"
+      >
         {kindLabel(row.kind)}
       </Text>
       <chakra.input
@@ -81,7 +106,7 @@ function KindRow({ row, check, onChange }: { row: Row; check: ProjectChecks["kin
         overflow="hidden"
       >
         {MODES.map((m) => {
-          const on = row.mode === m.mode;
+          const on = row.mode === m.mode
           return (
             <chakra.label
               key={m.mode}
@@ -110,7 +135,7 @@ function KindRow({ row, check, onChange }: { row: Row; check: ProjectChecks["kin
               />
               {m.label}
             </chakra.label>
-          );
+          )
         })}
       </Box>
       <Box display="flex" alignItems="center" gap="3" gridColumn={{ base: "auto", md: "2 / 4" }}>
@@ -122,7 +147,7 @@ function KindRow({ row, check, onChange }: { row: Row; check: ProjectChecks["kin
         </Text>
       </Box>
     </Box>
-  );
+  )
 }
 
 /** Edits one project's check config and saves it to the repo or to project.json. */
@@ -132,18 +157,20 @@ export function SetupDialog({
   onSaved,
   onClose,
 }: {
-  project: ProjectChecks;
-  save: SaveChecks;
+  project: ProjectChecks
+  save: SaveChecks
   /** Runs after a save the server accepted, so the page can read the status again. */
-  onSaved: () => void;
-  onClose: () => void;
+  onSaved: () => void
+  onClose: () => void
 }) {
-  const [rows, setRows] = useState(() => presetRows(project));
-  const [target, setTarget] = useState<SaveTarget>(project.save_targets.includes("repo") ? "repo" : "project.json");
-  const { run, pending, refusal, error } = useWrite();
-  const problem = refusal ? refusalText(refusal) : error;
-  const checks = configOf(rows);
-  const incomplete = rows.some((r) => r.mode === "use" && r.command.trim() === "");
+  const [rows, setRows] = useState(() => presetRows(project))
+  const [target, setTarget] = useState<SaveTarget>(
+    project.save_targets.includes("repo") ? "repo" : "project.json",
+  )
+  const { run, pending, refusal, error } = useWrite()
+  const problem = refusal ? refusalText(refusal) : error
+  const checks = configOf(rows)
+  const incomplete = rows.some((r) => r.mode === "use" && r.command.trim() === "")
 
   const submit = (body: ReturnType<typeof configOf>) =>
     run(() => save({ project: project.project, target, checks: body }), {
@@ -152,15 +179,30 @@ export function SetupDialog({
         title: savedMessage(target, project.trunk),
       }),
       onDone: () => {
-        onSaved();
-        onClose();
+        onSaved()
+        onClose()
       },
-    });
+    })
 
   return (
-    <Modal label={`Set up checks · ${project.project}`} onClose={onClose} p="5" gap="4" w="100%" maxW="760px" overflowY="auto">
+    <Modal
+      label={`Set up checks · ${project.project}`}
+      onClose={onClose}
+      p="5"
+      gap="4"
+      w="100%"
+      maxW="760px"
+      overflowY="auto"
+    >
       <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Text as="h2" m="0" fontFamily="condensed" fontSize="xl" fontWeight="700" textTransform="uppercase">
+        <Text
+          as="h2"
+          m="0"
+          fontFamily="condensed"
+          fontSize="xl"
+          fontWeight="700"
+          textTransform="uppercase"
+        >
           Set up checks · {project.project}
         </Text>
         <Button emphasis="ghost" tone="muted" aria-label="Close" onClick={onClose}>
@@ -168,15 +210,28 @@ export function SetupDialog({
         </Button>
       </Box>
       <Text fontSize="xs" color="text.dim">
-        Agents run these through <Code>gx check</Code>. A kind on "gx default" stays out of the file.
+        Agents run these through <Code>gx check</Code>. A kind on "gx default" stays out of the
+        file.
       </Text>
       <Box>
         {rows.map((row, i) => (
-          <KindRow key={row.kind} row={row} check={project.kinds[i]} onChange={(next) => setRows((rs) => rs.map((r, j) => (j === i ? next : r)))} />
+          <KindRow
+            key={row.kind}
+            row={row}
+            check={project.kinds[i]}
+            onChange={(next) => setRows((rs) => rs.map((r, j) => (j === i ? next : r)))}
+          />
         ))}
       </Box>
       <Box role="radiogroup" aria-label="Save to" display="grid" gap="2">
-        <Text as="b" textTransform="uppercase" letterSpacing="0.05em" fontSize="md" fontFamily="condensed" fontWeight="600">
+        <Text
+          as="b"
+          textTransform="uppercase"
+          letterSpacing="0.05em"
+          fontSize="md"
+          fontFamily="condensed"
+          fontWeight="600"
+        >
           Save to
         </Text>
         {project.save_targets.includes("repo") && (
@@ -239,7 +294,7 @@ export function SetupDialog({
         </Button>
       </Box>
     </Modal>
-  );
+  )
 }
 
 function TargetOption({
@@ -249,13 +304,13 @@ function TargetOption({
   label,
   note,
 }: {
-  value: SaveTarget;
-  current: SaveTarget;
-  onPick: (t: SaveTarget) => void;
-  label: ReactNode;
-  note: string;
+  value: SaveTarget
+  current: SaveTarget
+  onPick: (t: SaveTarget) => void
+  label: ReactNode
+  note: string
 }) {
-  const on = current === value;
+  const on = current === value
   return (
     <chakra.label
       display="flex"
@@ -269,7 +324,13 @@ function TargetOption({
       borderColor={on ? "tone.running.fg" : "hairline"}
       bg={on ? "tone.running.bg" : "transparent"}
     >
-      <chakra.input type="radio" name="save-target" checked={on} onChange={() => onPick(value)} mt="4px" />
+      <chakra.input
+        type="radio"
+        name="save-target"
+        checked={on}
+        onChange={() => onPick(value)}
+        mt="4px"
+      />
       <Box>
         <Text fontSize="md">{label}</Text>
         <Text fontSize="xs" color="text.dim">
@@ -277,5 +338,5 @@ function TargetOption({
         </Text>
       </Box>
     </chakra.label>
-  );
+  )
 }

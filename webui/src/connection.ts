@@ -1,338 +1,348 @@
-import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react";
-import { apiFetch } from "./apiFetch";
-import { fetchSnapshot,type Snapshot } from "./snapshot";
-import type { SnapshotCache } from "./snapshotCache";
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react"
+import { apiFetch } from "./apiFetch"
+import { fetchSnapshot, type Snapshot } from "./snapshot"
+import type { SnapshotCache } from "./snapshotCache"
 
-export const BACKOFF_MIN_MS = 1000;
-export const BACKOFF_MAX_MS = 15000;
-export const WATCHDOG_MS = 45000;
-export const OFFLINE_DELAY_MS = 5000;
-export const TICK_MS = 60000;
+export const BACKOFF_MIN_MS = 1000
+export const BACKOFF_MAX_MS = 15000
+export const WATCHDOG_MS = 45000
+export const OFFLINE_DELAY_MS = 5000
+export const TICK_MS = 60000
 /** Sent to event listeners (with no address) when the app returns to the foreground. */
-export const RESYNC_EVENT = "resync";
+export const RESYNC_EVENT = "resync"
 
 export interface ConnectionState {
-  snapshot: Snapshot | null;
+  snapshot: Snapshot | null
   /** False once the link has been down for OFFLINE_DELAY_MS; drives the Offline strip. */
-  connected: boolean;
-  loadedOnce: boolean;
+  connected: boolean
+  loadedOnce: boolean
   /** False until the current connection's first server snapshot lands; a cached copy does not count. */
-  liveSnapshot: boolean;
+  liveSnapshot: boolean
   /** Bumps every TICK_MS while the tab is visible so relative times re-render. */
-  tick: number;
+  tick: number
   /** Counts event streams opened so far; a focus report counts only while a stream is open. */
-  streams: number;
+  streams: number
 }
 
 export interface ConnectionDeps {
   /** Names this tab on the event stream. Defaults to a random id per connection. */
-  clientId?: string;
-  fetchSnapshot?: () => Promise<Snapshot>;
-  openStream?: (url: string, signal: AbortSignal) => Promise<AsyncIterable<string>>;
+  clientId?: string
+  fetchSnapshot?: () => Promise<Snapshot>
+  openStream?: (url: string, signal: AbortSignal) => Promise<AsyncIterable<string>>
   /** Seeds the first render with the last snapshot and saves each new one. */
-  cache?: SnapshotCache;
+  cache?: SnapshotCache
   /** Reloads the page on the server's reload event. Defaults to window.location.reload. */
-  reload?: () => void;
+  reload?: () => void
 }
 
 /** The server event that asks every open page to reload (a Dev UI swap). */
-export const RELOAD_EVENT = "reload";
+export const RELOAD_EVENT = "reload"
 
 // The server's heartbeat is an SSE comment line, which EventSource never surfaces, so
 // the stream is read as raw text: any chunk, comment or event, proves the link is alive.
 async function openEventStream(url: string, signal: AbortSignal): Promise<AsyncIterable<string>> {
-  const res = await apiFetch(url, { signal, headers: { Accept: "text/event-stream" } });
-  if (!res.ok || !res.body) throw new Error(`events: HTTP ${res.status}`);
-  const body = res.body;
+  const res = await apiFetch(url, { signal, headers: { Accept: "text/event-stream" } })
+  if (!res.ok || !res.body) throw new Error(`events: HTTP ${res.status}`)
+  const body = res.body
   return (async function* () {
-    const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+    const reader = body.pipeThrough(new TextDecoderStream()).getReader()
     try {
       for (;;) {
-        const { done, value } = await reader.read();
-        if (done) return;
-        yield value;
+        const { done, value } = await reader.read()
+        if (done) return
+        yield value
       }
     } finally {
-      void reader.cancel().catch(() => {});
+      void reader.cancel().catch(() => {})
     }
-  })();
+  })()
 }
 
 function eventAddress(block: string): string | undefined {
-  const line = /^data: ?(.*)$/m.exec(block)?.[1];
-  if (!line) return undefined;
+  const line = /^data: ?(.*)$/m.exec(block)?.[1]
+  if (!line) return undefined
   try {
-    const address = JSON.parse(line).address;
-    return typeof address === "string" && address !== "" ? address : undefined;
+    const address = JSON.parse(line).address
+    return typeof address === "string" && address !== "" ? address : undefined
   } catch {
-    return undefined;
+    return undefined
   }
 }
 
 function eventId(block: string): number | undefined {
-  const id = /^id: ?(\d+)$/m.exec(block)?.[1];
-  return id === undefined ? undefined : Number(id);
+  const id = /^id: ?(\d+)$/m.exec(block)?.[1]
+  return id === undefined ? undefined : Number(id)
 }
 
 function eventName(block: string): string {
-  return /^event: ?(.*)$/m.exec(block)?.[1] ?? "";
+  return /^event: ?(.*)$/m.exec(block)?.[1] ?? ""
 }
 
-export type EventListener = (address: string | undefined, type: string) => void;
+export type EventListener = (address: string | undefined, type: string) => void
 
-export type Connection = ReturnType<typeof createConnection>;
+export type Connection = ReturnType<typeof createConnection>
 
 export function createConnection(deps: ConnectionDeps = {}) {
-  const getSnapshot = deps.fetchSnapshot ?? fetchSnapshot;
-  const openStream = deps.openStream ?? openEventStream;
-  const clientId = deps.clientId ?? `web-${randomId()}`;
-  const reload = deps.reload ?? (() => window.location.reload());
+  const getSnapshot = deps.fetchSnapshot ?? fetchSnapshot
+  const openStream = deps.openStream ?? openEventStream
+  const clientId = deps.clientId ?? `web-${randomId()}`
+  const reload = deps.reload ?? (() => window.location.reload())
   // A reconnect can replay a reload event this page already acted on; ids only grow, so one id is never acted on twice.
   // Ids restart low after a gx restart, so a snapshot seq going backwards clears this.
-  let lastReloadId = -1;
-  let lastSeq = -1;
+  let lastReloadId = -1
+  let lastSeq = -1
 
   function noteSeq(seq: number) {
-    if (seq < lastSeq) lastReloadId = -1;
-    lastSeq = seq;
+    if (seq < lastSeq) lastReloadId = -1
+    lastSeq = seq
   }
 
   function maybeReload(block: string) {
-    const id = eventId(block);
-    if (id !== undefined && id <= lastReloadId) return;
-    if (id !== undefined) lastReloadId = id;
-    reload();
+    const id = eventId(block)
+    if (id !== undefined && id <= lastReloadId) return
+    if (id !== undefined) lastReloadId = id
+    reload()
   }
 
-  const cached = deps.cache?.load() ?? null;
-  let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, liveSnapshot: false, tick: 0, streams: 0 };
-  const listeners = new Set<() => void>();
-  const eventListeners = new Set<EventListener>();
-  let gen = 0;
-  let abort: AbortController | null = null;
-  let backoff = BACKOFF_MIN_MS;
-  let live = false;
-  let refreshing = false;
-  let refreshQueued = false;
-  let watchdog: ReturnType<typeof setTimeout> | undefined;
-  let retry: ReturnType<typeof setTimeout> | undefined;
-  let offline: ReturnType<typeof setTimeout> | undefined;
-  let ticker: ReturnType<typeof setInterval> | undefined;
+  const cached = deps.cache?.load() ?? null
+  let state: ConnectionState = {
+    snapshot: cached,
+    connected: true,
+    loadedOnce: cached !== null,
+    liveSnapshot: false,
+    tick: 0,
+    streams: 0,
+  }
+  const listeners = new Set<() => void>()
+  const eventListeners = new Set<EventListener>()
+  let gen = 0
+  let abort: AbortController | null = null
+  let backoff = BACKOFF_MIN_MS
+  let live = false
+  let refreshing = false
+  let refreshQueued = false
+  let watchdog: ReturnType<typeof setTimeout> | undefined
+  let retry: ReturnType<typeof setTimeout> | undefined
+  let offline: ReturnType<typeof setTimeout> | undefined
+  let ticker: ReturnType<typeof setInterval> | undefined
 
   function set(patch: Partial<ConnectionState>) {
-    state = { ...state, ...patch };
-    if (patch.snapshot) deps.cache?.save(patch.snapshot);
-    listeners.forEach((l) => l());
+    state = { ...state, ...patch }
+    if (patch.snapshot) deps.cache?.save(patch.snapshot)
+    listeners.forEach((l) => l())
   }
 
   function teardown() {
-    gen++;
-    abort?.abort();
-    abort = null;
-    live = false;
-    refreshing = false;
-    refreshQueued = false;
-    clearTimeout(watchdog);
-    clearTimeout(retry);
+    gen++
+    abort?.abort()
+    abort = null
+    live = false
+    refreshing = false
+    refreshQueued = false
+    clearTimeout(watchdog)
+    clearTimeout(retry)
   }
 
   // A torn-down stream makes the held snapshot stale, so it may no longer redirect or call a label gone.
   function dropStream() {
-    teardown();
-    if (state.liveSnapshot) set({ liveSnapshot: false });
+    teardown()
+    if (state.liveSnapshot) set({ liveSnapshot: false })
   }
 
   function markUp() {
-    clearTimeout(offline);
-    offline = undefined;
-    if (!state.connected) set({ connected: true });
+    clearTimeout(offline)
+    offline = undefined
+    if (!state.connected) set({ connected: true })
   }
 
   function markDown() {
-    if (offline || !state.connected) return;
+    if (offline || !state.connected) return
     offline = setTimeout(() => {
-      offline = undefined;
-      set({ connected: false });
-    }, OFFLINE_DELAY_MS);
+      offline = undefined
+      set({ connected: false })
+    }, OFFLINE_DELAY_MS)
   }
 
   function fail() {
-    dropStream();
-    markDown();
-    retry = setTimeout(connect, backoff);
-    backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
+    dropStream()
+    markDown()
+    retry = setTimeout(connect, backoff)
+    backoff = Math.min(backoff * 2, BACKOFF_MAX_MS)
   }
 
   function arm(g: number) {
-    clearTimeout(watchdog);
+    clearTimeout(watchdog)
     watchdog = setTimeout(() => {
-      if (g === gen) fail();
-    }, WATCHDOG_MS);
+      if (g === gen) fail()
+    }, WATCHDOG_MS)
   }
 
   // One fetch in flight, at most one queued behind it. Fetches run one after another, so an
   // older snapshot can never apply after a newer one.
   async function refresh(g: number) {
     if (refreshing) {
-      refreshQueued = true;
-      return;
+      refreshQueued = true
+      return
     }
-    refreshing = true;
+    refreshing = true
     try {
       do {
-        refreshQueued = false;
-        const snap = await getSnapshot();
-        if (g !== gen) return;
-        noteSeq(snap.seq);
-        set({ snapshot: snap });
-      } while (refreshQueued);
+        refreshQueued = false
+        const snap = await getSnapshot()
+        if (g !== gen) return
+        noteSeq(snap.seq)
+        set({ snapshot: snap })
+      } while (refreshQueued)
     } catch {
-      if (g === gen) fail();
+      if (g === gen) fail()
     } finally {
-      if (g === gen) refreshing = false;
+      if (g === gen) refreshing = false
     }
   }
 
   async function consume(g: number, since: number) {
-    const ctl = new AbortController();
-    abort = ctl;
+    const ctl = new AbortController()
+    abort = ctl
     // Armed before the connect so a hung connect trips the watchdog too.
-    arm(g);
+    arm(g)
     try {
-      const stream = await openStream(`/v1/events?since=${since}&client=${encodeURIComponent(clientId)}`, ctl.signal);
-      if (g !== gen) return;
-      live = true;
-      markUp();
-      set({ streams: state.streams + 1 });
-      arm(g);
-      let buf = "";
+      const stream = await openStream(
+        `/v1/events?since=${since}&client=${encodeURIComponent(clientId)}`,
+        ctl.signal,
+      )
+      if (g !== gen) return
+      live = true
+      markUp()
+      set({ streams: state.streams + 1 })
+      arm(g)
+      let buf = ""
       for await (const chunk of stream) {
-        if (g !== gen) return;
-        arm(g);
-        const blocks = (buf + chunk).split("\n\n");
-        buf = blocks.pop() ?? "";
+        if (g !== gen) return
+        arm(g)
+        const blocks = (buf + chunk).split("\n\n")
+        buf = blocks.pop() ?? ""
         // Events carry no state: each one just means "snapshot is stale". The address, when
         // there is one, only lets a ticket page tell whether the event is about it.
-        const events = blocks.filter((b) => /^event:/m.test(b));
-        if (events.length > 0) void refresh(g);
+        const events = blocks.filter((b) => /^event:/m.test(b))
+        if (events.length > 0) void refresh(g)
         for (const b of events) {
-          if (eventName(b) === RELOAD_EVENT) maybeReload(b);
-          eventListeners.forEach((l) => l(eventAddress(b), eventName(b)));
+          if (eventName(b) === RELOAD_EVENT) maybeReload(b)
+          eventListeners.forEach((l) => l(eventAddress(b), eventName(b)))
         }
       }
-      if (g === gen) fail();
+      if (g === gen) fail()
     } catch {
-      if (g === gen) fail();
+      if (g === gen) fail()
     }
   }
 
   async function connect() {
-    dropStream();
-    const g = gen;
-    let snap: Snapshot;
+    dropStream()
+    const g = gen
+    let snap: Snapshot
     try {
-      snap = await getSnapshot();
+      snap = await getSnapshot()
     } catch {
-      if (g === gen) fail();
-      return;
+      if (g === gen) fail()
+      return
     }
-    if (g !== gen) return;
-    backoff = BACKOFF_MIN_MS;
-    noteSeq(snap.seq);
-    set({ snapshot: snap, loadedOnce: true, liveSnapshot: true });
-    void consume(g, snap.seq);
+    if (g !== gen) return
+    backoff = BACKOFF_MIN_MS
+    noteSeq(snap.seq)
+    set({ snapshot: snap, loadedOnce: true, liveSnapshot: true })
+    void consume(g, snap.seq)
   }
 
   function startTick() {
-    if (ticker === undefined) ticker = setInterval(() => set({ tick: state.tick + 1 }), TICK_MS);
+    if (ticker === undefined) ticker = setInterval(() => set({ tick: state.tick + 1 }), TICK_MS)
   }
 
   function stopTick() {
-    clearInterval(ticker);
-    ticker = undefined;
+    clearInterval(ticker)
+    ticker = undefined
   }
 
   // A stream can look alive after the OS suspended the page, so coming back always reconnects
   // and tells page-data hooks to refetch.
   function resync() {
-    void connect();
-    eventListeners.forEach((l) => l(undefined, RESYNC_EVENT));
+    void connect()
+    eventListeners.forEach((l) => l(undefined, RESYNC_EVENT))
   }
 
   function onVisibility() {
     if (document.visibilityState === "visible") {
-      startTick();
-      resync();
+      startTick()
+      resync()
     } else {
-      stopTick();
+      stopTick()
     }
   }
 
   function onOnline() {
-    void connect();
+    void connect()
   }
 
   return {
     clientId,
     getState: () => state,
     subscribe(l: () => void) {
-      listeners.add(l);
-      return () => listeners.delete(l);
+      listeners.add(l)
+      return () => listeners.delete(l)
     },
     onEvent(l: EventListener) {
-      eventListeners.add(l);
-      return () => eventListeners.delete(l);
+      eventListeners.add(l)
+      return () => eventListeners.delete(l)
     },
     /** Re-reads the snapshot now, for a write whose event has not arrived yet. */
     refresh() {
-      void refresh(gen);
+      void refresh(gen)
     },
     start() {
-      document.addEventListener("visibilitychange", onVisibility);
-      window.addEventListener("pageshow", resync);
-      window.addEventListener("online", onOnline);
-      if (document.visibilityState === "visible") startTick();
-      markDown();
-      void connect();
+      document.addEventListener("visibilitychange", onVisibility)
+      window.addEventListener("pageshow", resync)
+      window.addEventListener("online", onOnline)
+      if (document.visibilityState === "visible") startTick()
+      markDown()
+      void connect()
     },
     stop() {
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pageshow", resync);
-      window.removeEventListener("online", onOnline);
-      teardown();
-      stopTick();
-      clearTimeout(offline);
-      offline = undefined;
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("pageshow", resync)
+      window.removeEventListener("online", onOnline)
+      teardown()
+      stopTick()
+      clearTimeout(offline)
+      offline = undefined
     },
-  };
+  }
 }
 
 export function useConnection(deps?: ConnectionDeps): Connection {
-  const ref = useRef<Connection>(undefined);
-  ref.current ??= createConnection(deps);
-  const conn = ref.current;
+  const ref = useRef<Connection>(undefined)
+  ref.current ??= createConnection(deps)
+  const conn = ref.current
   useEffect(() => {
-    conn.start();
-    return () => conn.stop();
-  }, [conn]);
-  return conn;
+    conn.start()
+    return () => conn.stop()
+  }, [conn])
+  return conn
 }
 
 export function useConnectionState(conn: Connection): ConnectionState {
-  return useSyncExternalStore(conn.subscribe, conn.getState);
+  return useSyncExternalStore(conn.subscribe, conn.getState)
 }
 
-export const ConnectionContext = createContext<Connection | null>(null);
+export const ConnectionContext = createContext<Connection | null>(null)
 
 export function useConnectionContext(): Connection {
-  const conn = useContext(ConnectionContext);
-  if (!conn) throw new Error("ConnectionContext is missing");
-  return conn;
+  const conn = useContext(ConnectionContext)
+  if (!conn) throw new Error("ConnectionContext is missing")
+  return conn
 }
 
 // crypto.randomUUID exists only in secure contexts (HTTPS or localhost), and the
 // web UI is often opened over plain HTTP from another device.
 function randomId(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")
 }

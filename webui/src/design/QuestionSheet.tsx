@@ -1,14 +1,10 @@
-import { Box, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
-import type { SessionRoundCard } from "../generated/server";
-import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe";
-import { Button } from "../ui/button/Button";
-import { Question, QuestionDots } from "../ui/question-sheet/Question";
-import {
-  isAnswered,
-  type Answers,
-  type QuestionMode,
-} from "../ui/question-sheet/round";
+import { Box, Text } from "@chakra-ui/react"
+import { useEffect, useRef, useState } from "react"
+import type { SessionRoundCard } from "../generated/server"
+import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe"
+import { Button } from "../ui/button/Button"
+import { Question, QuestionDots } from "../ui/question-sheet/Question"
+import { isAnswered, type Answers, type QuestionMode } from "../ui/question-sheet/round"
 
 // A Grilling round docked above the composer. The caller keys it by round, so a new round opens a fresh sheet,
 // and owns the answers, since the composer's Send reads them.
@@ -22,87 +18,77 @@ export function QuestionSheet({
   questions = false,
   mode = "round",
 }: {
-  round: (SessionRoundCard & { context?: string; contextHref?: string })[];
-  answers: Answers;
-  onAnswers: (update: (all: Answers) => Answers) => void;
+  round: (SessionRoundCard & { context?: string; contextHref?: string })[]
+  answers: Answers
+  onAnswers: (update: (all: Answers) => Answers) => void
   /** A new object opens the sheet at that question. */
-  focus?: { index: number };
+  focus?: { index: number }
   /** The question the sheet opens at, and a listener for every move, so the caller can keep a draft. */
-  initialIndex?: number;
-  onIndex?: (index: number) => void;
+  initialIndex?: number
+  onIndex?: (index: number) => void
   /** The Questions view: the sheet fills its column, renders big and cannot fold. The page owns it. */
-  questions?: boolean;
+  questions?: boolean
   /** What each card offers besides its options. Only a printed round can be sent back as Huh?. */
-  mode?: QuestionMode;
+  mode?: QuestionMode
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(true)
   useEffect(() => {
-    if (questions) setOpen(true);
-  }, [questions]);
-  const [index, setIndex] = useState(() =>
-    Math.min(initialIndex, round.length - 1),
-  );
-  useEffect(() => onIndex?.(index), [index, onIndex]);
-  const row = useRef<HTMLDivElement>(null);
-  const body = useRef<HTMLDivElement>(null);
+    if (questions) setOpen(true)
+  }, [questions])
+  const [index, setIndex] = useState(() => Math.min(initialIndex, round.length - 1))
+  useEffect(() => onIndex?.(index), [index, onIndex])
+  const row = useRef<HTMLDivElement>(null)
+  const body = useRef<HTMLDivElement>(null)
   // A move starts at the question's title, not wherever the last one was left.
   const toTop = () => {
-    if (body.current) body.current.scrollTop = 0;
-  };
-  useEffect(toTop, [index]);
+    if (body.current) body.current.scrollTop = 0
+  }
+  useEffect(toTop, [index])
   // Set while a smooth scroll we started is still moving, so its in-between frames don't set the question.
-  const scrolling = useRef<number | undefined>(undefined);
+  const scrolling = useRef<number | undefined>(undefined)
 
   // Focus waits a render, so a folded sheet is shown (and the question visible) by the time it lands.
-  const [toFocus, setToFocus] = useState<{ index: number }>();
+  const [toFocus, setToFocus] = useState<{ index: number }>()
   useEffect(() => {
-    if (!focus) return;
-    setIndex(focus.index);
-    toTop();
-    setOpen(true);
-    setToFocus(focus);
-  }, [focus]);
+    if (!focus) return
+    setIndex(focus.index)
+    toTop()
+    setOpen(true)
+    setToFocus(focus)
+  }, [focus])
   useEffect(() => {
-    if (!toFocus) return;
+    if (!toFocus) return
     row.current?.children[toFocus.index]
       ?.querySelector<HTMLElement>("button[aria-pressed], textarea")
-      ?.focus({ preventScroll: true });
-  }, [toFocus]);
+      ?.focus({ preventScroll: true })
+  }, [toFocus])
 
   // Keep the scroll position on the current question; scrolling by hand sets the question.
   useEffect(() => {
-    const el = row.current;
+    const el = row.current
     if (
       el &&
       typeof el.scrollTo === "function" &&
       el.clientWidth > 0 &&
       Math.round(el.scrollLeft / el.clientWidth) !== index
     ) {
-      window.clearTimeout(scrolling.current);
-      scrolling.current = window.setTimeout(
-        () => (scrolling.current = undefined),
-        600,
-      );
-      el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" });
+      window.clearTimeout(scrolling.current)
+      scrolling.current = window.setTimeout(() => (scrolling.current = undefined), 600)
+      el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" })
     }
-  }, [index, open]);
-  useEffect(() => () => window.clearTimeout(scrolling.current), []);
+  }, [index, open])
+  useEffect(() => () => window.clearTimeout(scrolling.current), [])
   const onScroll = () => {
-    const el = row.current;
-    if (!el || el.clientWidth === 0 || scrolling.current !== undefined) return;
-    setIndex(
-      Math.min(
-        round.length - 1,
-        Math.max(0, Math.round(el.scrollLeft / el.clientWidth)),
-      ),
-    );
-  };
+    const el = row.current
+    if (!el || el.clientWidth === 0 || scrolling.current !== undefined) return
+    setIndex(Math.min(round.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))))
+  }
 
-  const done = round.filter((c) => isAnswered(answers[c.label], c)).length;
+  const done = round.filter((c) => isAnswered(answers[c.label], c)).length
   const goto = (k: number) => {
-    setIndex(k);
-    setOpen(true);
-  };
+    setIndex(k)
+    setOpen(true)
+  }
 
   return (
     <Box
@@ -119,15 +105,7 @@ export function QuestionSheet({
       minH={questions ? "220px" : "0"}
       flex={questions ? "1" : undefined}
     >
-      <Box
-        px="3"
-        pt="2"
-        pb="2"
-        display="flex"
-        alignItems="center"
-        gap="2"
-        flex="none"
-      >
+      <Box px="3" pt="2" pb="2" display="flex" alignItems="center" gap="2" flex="none">
         <Box flex="1">
           <QuestionDots
             round={round}
@@ -152,20 +130,8 @@ export function QuestionSheet({
           </Button>
         )}
       </Box>
-      <Box
-        display={open ? "flex" : "none"}
-        flexDirection="column"
-        flex="1"
-        minH="0"
-      >
-        <Box
-          ref={body}
-          data-testid="question-body"
-          px="3"
-          minH="0"
-          flex="1"
-          overflowY="auto"
-        >
+      <Box display={open ? "flex" : "none"} flexDirection="column" flex="1" minH="0">
+        <Box ref={body} data-testid="question-body" px="3" minH="0" flex="1" overflowY="auto">
           <Box
             ref={row}
             {...{ [NO_SIDEBAR_SWIPE_ATTR]: "" }}
@@ -194,23 +160,14 @@ export function QuestionSheet({
                   mode={mode}
                   card={c}
                   answer={answers[c.label] ?? {}}
-                  onChange={(a) =>
-                    onAnswers((all) => ({ ...all, [c.label]: a }))
-                  }
+                  onChange={(a) => onAnswers((all) => ({ ...all, [c.label]: a }))}
                   onPicked={() => setIndex(Math.min(k + 1, round.length - 1))}
                 />
               </Box>
             ))}
           </Box>
         </Box>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          flex="none"
-          px="3"
-          pt="2"
-          pb="3"
-        >
+        <Box display="flex" justifyContent="space-between" flex="none" px="3" pt="2" pb="3">
           <Button
             emphasis="ghost"
             tone="muted"
@@ -230,5 +187,5 @@ export function QuestionSheet({
         </Box>
       </Box>
     </Box>
-  );
+  )
 }

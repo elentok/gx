@@ -1,12 +1,12 @@
-export const MAX_IMAGES = 10;
-export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+export const MAX_IMAGES = 10
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
-export const MSG_MAX_IMAGES = "Max 10 images";
-export const MSG_TOO_LARGE = "Too large, max 20 MB";
-export const MSG_BAD_TYPE = "Not a supported image type";
+export const MSG_MAX_IMAGES = "Max 10 images"
+export const MSG_TOO_LARGE = "Too large, max 20 MB"
+export const MSG_BAD_TYPE = "Not a supported image type"
 
 function startsWith(b: Uint8Array, sig: number[], at = 0): boolean {
-  return sig.every((v, i) => b[at + i] === v);
+  return sig.every((v, i) => b[at + i] === v)
 }
 
 /** PNG, JPEG, GIF or WebP decided from the file's first bytes; the name and MIME type are ignored. */
@@ -16,42 +16,42 @@ export function isSupportedImageBytes(b: Uint8Array): boolean {
     startsWith(b, [0xff, 0xd8, 0xff]) ||
     startsWith(b, [0x47, 0x49, 0x46, 0x38]) ||
     (startsWith(b, [0x52, 0x49, 0x46, 0x46]) && startsWith(b, [0x57, 0x45, 0x42, 0x50], 8))
-  );
+  )
 }
 
 async function headBytes(file: File): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsArrayBuffer(file.slice(0, 12));
-  });
+    const reader = new FileReader()
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsArrayBuffer(file.slice(0, 12))
+  })
 }
 
 export interface ImageCheck {
-  accepted: File[];
+  accepted: File[]
   /** The first refusal message, or "" when every file passed. */
-  error: string;
+  error: string
   /** Files refused for their size, type or the count limit, each with its reason. */
-  refused: { name: string; message: string }[];
+  refused: { name: string; message: string }[]
 }
 
 /** Runs before any upload. `existing` counts the images already in the draft. */
 export async function checkImages(files: File[], existing: number): Promise<ImageCheck> {
-  const accepted: File[] = [];
-  const refused: ImageCheck["refused"] = [];
-  let error = "";
+  const accepted: File[] = []
+  const refused: ImageCheck["refused"] = []
+  let error = ""
   for (const file of files) {
-    let message = "";
-    if (existing + accepted.length >= MAX_IMAGES) message = MSG_MAX_IMAGES;
-    else if (file.size > MAX_IMAGE_BYTES) message = MSG_TOO_LARGE;
-    else if (!isSupportedImageBytes(await headBytes(file))) message = MSG_BAD_TYPE;
+    let message = ""
+    if (existing + accepted.length >= MAX_IMAGES) message = MSG_MAX_IMAGES
+    else if (file.size > MAX_IMAGE_BYTES) message = MSG_TOO_LARGE
+    else if (!isSupportedImageBytes(await headBytes(file))) message = MSG_BAD_TYPE
     if (message) {
-      refused.push({ name: file.name, message });
-      error = error || message;
+      refused.push({ name: file.name, message })
+      error = error || message
     } else {
-      accepted.push(file);
+      accepted.push(file)
     }
   }
-  return { accepted, error, refused };
+  return { accepted, error, refused }
 }

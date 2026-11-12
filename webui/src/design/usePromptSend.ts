@@ -1,8 +1,8 @@
-import type { SessionInfo, SessionPromptRequest } from "../generated/server";
-import { ReasonStale } from "../ticket/answer";
-import { useWrite } from "../useWrite";
-import { postPrompt, type PostPrompt } from "./prompt";
-import { promptable } from "./view";
+import type { SessionInfo, SessionPromptRequest } from "../generated/server"
+import { ReasonStale } from "../ticket/answer"
+import { useWrite } from "../useWrite"
+import { postPrompt, type PostPrompt } from "./prompt"
+import { promptable } from "./view"
 
 /** The send call both composers share: one guarded prompt post that refetches the chat when the conversation moved. */
 export function usePromptSend({
@@ -13,19 +13,19 @@ export function usePromptSend({
   onStale,
   toastRefusal,
 }: {
-  session: SessionInfo;
+  session: SessionInfo
   /** The id of the last chat message the page saw. */
-  lastMessage?: string;
-  connected: boolean;
-  post?: PostPrompt;
-  onStale?: () => void;
+  lastMessage?: string
+  connected: boolean
+  post?: PostPrompt
+  onStale?: () => void
   /** Whether a refusal also toasts; off, it shows inline only. */
-  toastRefusal: boolean;
+  toastRefusal: boolean
 }) {
-  const { run: write, pending, refusal, error } = useWrite({ toastRefusal });
-  const enabled = connected && promptable(session) && !pending;
+  const { run: write, pending, refusal, error } = useWrite({ toastRefusal })
+  const enabled = connected && promptable(session) && !pending
   const send = (body: Partial<SessionPromptRequest>, onSent?: () => void) => {
-    if (!enabled) return;
+    if (!enabled) return
     return write(
       async () => {
         const res = await post({
@@ -33,12 +33,12 @@ export function usePromptSend({
           text: "",
           last_message: lastMessage,
           ...body,
-        });
-        if (res.refused && res.reason === ReasonStale) onStale?.();
-        return res;
+        })
+        if (res.refused && res.reason === ReasonStale) onStale?.()
+        return res
       },
       { onDone: onSent },
-    );
-  };
-  return { send, write, enabled, pending, refusal, error };
+    )
+  }
+  return { send, write, enabled, pending, refusal, error }
 }

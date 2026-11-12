@@ -1,32 +1,32 @@
-import { Box, Link, Text } from "@chakra-ui/react";
-import { useEffect, useState, type ComponentProps } from "react";
-import { useNavigate } from "react-router";
-import { useConnectionContext, useConnectionState } from "../connection";
-import { hasChat, useSessionChat, type FetchChat } from "../design/chat";
-import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner";
-import { ScreenModal } from "../design/ScreenModal";
-import type { FetchScreen } from "../design/screen";
-import { designOf, isTriage, promptable } from "../design/view";
-import type { SessionInfo } from "../generated/server";
-import { designHref, triageHref } from "../hrefs";
-import { useDevice, useWide } from "../useWide";
-import { useKeyboardOpen } from "../page/useKeyboardOpen";
-import { Button } from "../ui/button/Button";
-import { Chip } from "../ui/chip/Chip";
-import { Modal } from "../ui/modal/Modal";
-import { PageHeader } from "../page/PageHeader";
-import { AgentChat } from "./AgentChat";
-import { AgentComposer } from "./AgentComposer";
-import { stateLabel, statusMark } from "./rules";
-import { StatusMark } from "./SessionGlyphs";
-import { SessionActions } from "./SessionActions";
+import { Box, Link, Text } from "@chakra-ui/react"
+import { useEffect, useState, type ComponentProps } from "react"
+import { useNavigate } from "react-router"
+import { useConnectionContext, useConnectionState } from "../connection"
+import { hasChat, useSessionChat, type FetchChat } from "../design/chat"
+import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner"
+import { ScreenModal } from "../design/ScreenModal"
+import type { FetchScreen } from "../design/screen"
+import { designOf, isTriage, promptable } from "../design/view"
+import type { SessionInfo } from "../generated/server"
+import { designHref, triageHref } from "../hrefs"
+import { useDevice, useWide } from "../useWide"
+import { useKeyboardOpen } from "../page/useKeyboardOpen"
+import { Button } from "../ui/button/Button"
+import { Chip } from "../ui/chip/Chip"
+import { Modal } from "../ui/modal/Modal"
+import { PageHeader } from "../page/PageHeader"
+import { AgentChat } from "./AgentChat"
+import { AgentComposer } from "./AgentComposer"
+import { stateLabel, statusMark } from "./rules"
+import { StatusMark } from "./SessionGlyphs"
+import { SessionActions } from "./SessionActions"
 
 function DesignLink({ map, ml }: { map: string; ml?: string }) {
   return (
     <Link fontSize="sm" ml={ml} color="tone.running.fg" href={designHref(map)}>
       Open design page →
     </Link>
-  );
+  )
 }
 
 function TriageLink({ project }: { project: string }) {
@@ -34,25 +34,27 @@ function TriageLink({ project }: { project: string }) {
     <Link fontSize="sm" color="tone.running.fg" href={triageHref(project)}>
       Open triage page →
     </Link>
-  );
+  )
 }
 
 function SessionHeader({
   session: s,
   promote,
 }: {
-  session: SessionInfo;
-  promote: ComponentProps<typeof SessionActions>["promote"];
+  session: SessionInfo
+  promote: ComponentProps<typeof SessionActions>["promote"]
 }) {
-  const navigate = useNavigate();
-  const actions = <SessionActions session={s} onRemoved={() => navigate("/agents")} promote={promote} />;
-  const { tone } = statusMark(s);
-  const map = designOf(s);
-  const wide = useWide();
+  const navigate = useNavigate()
+  const actions = (
+    <SessionActions session={s} onRemoved={() => navigate("/agents")} promote={promote} />
+  )
+  const { tone } = statusMark(s)
+  const map = designOf(s)
+  const wide = useWide()
   // With the keyboard up the header would take the height the chat needs; it returns when the keyboard closes.
-  const keyboardOpen = useKeyboardOpen();
-  const device = useDevice();
-  const compact = keyboardOpen && device !== "desktop";
+  const keyboardOpen = useKeyboardOpen()
+  const device = useDevice()
+  const compact = keyboardOpen && device !== "desktop"
   return (
     <Box as="header" display={compact ? "none" : undefined}>
       <PageHeader
@@ -88,58 +90,87 @@ function SessionHeader({
         }
       />
     </Box>
-  );
+  )
 }
 
 /** A non-Claude session has no transcript, so its screen is the only thing to read. */
 function NoChat({ session, fetchScreen }: { session: SessionInfo; fetchScreen?: FetchScreen }) {
-  const [screen, setScreen] = useState(false);
-  const failure = visibleFailure(session.failure);
+  const [screen, setScreen] = useState(false)
+  const failure = visibleFailure(session.failure)
   return (
     <>
       {failure && !needsTranscript(failure) && (
         <FailureBanner failure={failure} session={session} restore={false} address="" />
       )}
-      <Box display="flex" alignItems="center" justifyContent="space-between" gap="3" flexWrap="wrap" borderWidth="1px" borderRadius="md" px="3" py="2">
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="space-between"
+        gap="3"
+        flexWrap="wrap"
+        borderWidth="1px"
+        borderRadius="md"
+        px="3"
+        py="2"
+      >
         <Text color="text.muted" fontSize="sm">
           Chat works for Claude and Codex sessions only.
         </Text>
         <Button emphasis="secondary" onClick={() => setScreen(true)}>
           Show screen
         </Button>
-        {screen && <ScreenModal target={session.id} fetcher={fetchScreen} keys={!session.queue} onClose={() => setScreen(false)} />}
+        {screen && (
+          <ScreenModal
+            target={session.id}
+            fetcher={fetchScreen}
+            keys={!session.queue}
+            onClose={() => setScreen(false)}
+          />
+        )}
       </Box>
     </>
-  );
+  )
 }
 
 /** Why Send is off, first match wins; nothing when the composer may send. */
 function sendReason(s: SessionInfo, connected: boolean): string | undefined {
-  const state = s.status.state;
-  if (!connected) return "Offline. Send turns on when gx reconnects.";
-  if (!hasChat(s.harness)) return "Sending works for Claude and Codex sessions only";
-  if (state === "exited") return "Exited. Restore it in gx, Agents tab.";
+  const state = s.status.state
+  if (!connected) return "Offline. Send turns on when gx reconnects."
+  if (!hasChat(s.harness)) return "Sending works for Claude and Codex sessions only"
+  if (state === "exited") return "Exited. Restore it in gx, Agents tab."
   if (!promptable(s)) {
-    return `${stateLabel(s)}. Send turns on when the session is idle.`;
+    return `${stateLabel(s)}. Send turns on when the session is idle.`
   }
 }
 
 /** Which kind of gx-driven agent this is; undefined for a plain session. */
 function drivenKind(s: SessionInfo): "Queue" | "Design" | "Triage" | undefined {
-  if (s.queue) return "Queue";
-  if (s.design) return "Design";
-  if (isTriage(s)) return "Triage";
+  if (s.queue) return "Queue"
+  if (s.design) return "Design"
+  if (isTriage(s)) return "Triage"
 }
 
 /** The composer stays off for a gx-driven agent until a person confirms; selecting another session resets it. */
 function useComposerUnlock(session: SessionInfo) {
-  const [unlockedId, setUnlockedId] = useState<string>();
-  useEffect(() => setUnlockedId(undefined), [session.id]);
-  const kind = drivenKind(session);
-  return { kind, locked: kind !== undefined && unlockedId !== session.id, unlock: () => setUnlockedId(session.id) };
+  const [unlockedId, setUnlockedId] = useState<string>()
+  useEffect(() => setUnlockedId(undefined), [session.id])
+  const kind = drivenKind(session)
+  return {
+    kind,
+    locked: kind !== undefined && unlockedId !== session.id,
+    unlock: () => setUnlockedId(session.id),
+  }
 }
 
-function UnlockPrompt({ kind, onConfirm, onCancel }: { kind: string; onConfirm: () => void; onCancel: () => void }) {
+function UnlockPrompt({
+  kind,
+  onConfirm,
+  onCancel,
+}: {
+  kind: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
   return (
     <Modal label={`Turn on composer for ${kind} agent`} onClose={onCancel} maxW="sm">
       <Text>gx is driving this agent. Turn on the composer for this {kind} agent anyway?</Text>
@@ -150,7 +181,7 @@ function UnlockPrompt({ kind, onConfirm, onCancel }: { kind: string; onConfirm: 
         <Button onClick={onConfirm}>Turn on composer</Button>
       </Box>
     </Modal>
-  );
+  )
 }
 
 /** The main column for a selected session: its header, chat and composer. */
@@ -159,21 +190,26 @@ export function SessionView({
   fetchChat,
   fetchScreen,
 }: {
-  session: SessionInfo;
-  fetchChat?: FetchChat;
-  fetchScreen?: FetchScreen;
+  session: SessionInfo
+  fetchChat?: FetchChat
+  fetchScreen?: FetchScreen
 }) {
-  const conn = useConnectionContext();
-  const { connected, snapshot } = useConnectionState(conn);
-  const chatty = hasChat(session.harness);
-  const { kind, locked, unlock } = useComposerUnlock(session);
-  const [confirming, setConfirming] = useState(false);
-  const { detail: chat, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat);
+  const conn = useConnectionContext()
+  const { connected, snapshot } = useConnectionState(conn)
+  const chatty = hasChat(session.harness)
+  const { kind, locked, unlock } = useComposerUnlock(session)
+  const [confirming, setConfirming] = useState(false)
+  const { detail: chat, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat)
   // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
   // Each sits right after the message that was last when it was sent, so replies that stream in land below it.
-  const [echoed, setEchoed] = useState<(EchoPrompt & { sessionId: string; seen: number; after?: string })[]>([]);
-  const waiting = echoed.filter((e) => e.sessionId === session.id && echoMatches(chat?.messages ?? [], e) <= e.seen);
-  const shown = chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat;
+  const [echoed, setEchoed] = useState<
+    (EchoPrompt & { sessionId: string; seen: number; after?: string })[]
+  >([])
+  const waiting = echoed.filter(
+    (e) => e.sessionId === session.id && echoMatches(chat?.messages ?? [], e) <= e.seen,
+  )
+  const shown =
+    chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
       <SessionHeader
@@ -191,7 +227,13 @@ export function SessionView({
         }
       />
       {chatty && chat && chat.messages.length === 0 && !chat.archived && !chat.unreadable && (
-        <Text color="text.muted" flex="1" display="flex" alignItems="center" justifyContent="center">
+        <Text
+          color="text.muted"
+          flex="1"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
           No messages yet
         </Text>
       )}
@@ -218,8 +260,8 @@ export function SessionView({
           kind={kind}
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
-            unlock();
-            setConfirming(false);
+            unlock()
+            setConfirming(false)
           }}
         />
       )}
@@ -230,32 +272,48 @@ export function SessionView({
         ceiling={snapshot?.context_ceiling}
         onStale={refetch}
         onSent={(sent, images) => {
-          const echo = { text: stripChips(sent), images };
-          setEchoed((all) => [...all, { ...echo, sessionId: session.id, seen: echoMatches(chat?.messages ?? [], echo), after: chat?.messages.at(-1)?.id }]);
+          const echo = { text: stripChips(sent), images }
+          setEchoed((all) => [
+            ...all,
+            {
+              ...echo,
+              sessionId: session.id,
+              seen: echoMatches(chat?.messages ?? [], echo),
+              after: chat?.messages.at(-1)?.id,
+            },
+          ])
         }}
         reason={locked ? undefined : sendReason(session, connected)}
       />
     </Box>
-  );
+  )
 }
 
-export type EchoPrompt = { text: string; images: string[] };
+export type EchoPrompt = { text: string; images: string[] }
 
 // The transcript text carries "[Image #N]" chips the sent text does not, and stores it trimmed, so both sides drop the chips and the edges.
-const stripChips = (text: string) => text.replace(/\[Image #\d+\]/g, "").trim();
+const stripChips = (text: string) => text.replace(/\[Image #\d+\]/g, "").trim()
 
 // How many transcript messages are this prompt. A slash command shows up as a "command" message, so it counts too. An images-only prompt has
 // no text to match, so it matches the images-only prompts with the same image count.
-export function echoMatches(messages: { kind: string; text?: string; images?: unknown[] }[], e: EchoPrompt): number {
+export function echoMatches(
+  messages: { kind: string; text?: string; images?: unknown[] }[],
+  e: EchoPrompt,
+): number {
   return messages.filter((m) => {
-    if (m.kind !== "prompt" && m.kind !== "command") return false;
-    const text = stripChips(m.text ?? "");
-    return e.text === "" && e.images.length > 0 ? text === "" && (m.images?.length ?? 0) === e.images.length : text === e.text;
-  }).length;
+    if (m.kind !== "prompt" && m.kind !== "command") return false
+    const text = stripChips(m.text ?? "")
+    return e.text === "" && e.images.length > 0
+      ? text === "" && (m.images?.length ?? 0) === e.images.length
+      : text === e.text
+  }).length
 }
 
 // Puts each echo after its anchor message, in send order. An echo sent into an empty chat goes first; one whose anchor is gone goes last.
-export function withEchoes<M extends { id: string }>(messages: M[], echoes: (EchoPrompt & { after?: string })[]): M[] {
+export function withEchoes<M extends { id: string }>(
+  messages: M[],
+  echoes: (EchoPrompt & { after?: string })[],
+): M[] {
   const echo = (e: EchoPrompt, i: number) =>
     ({
       id: `echo-${i}`,
@@ -264,14 +322,14 @@ export function withEchoes<M extends { id: string }>(messages: M[], echoes: (Ech
       text: e.text,
       at: "",
       ...(e.images.length > 0 && { images: e.images.map((id) => ({ id })) }),
-    }) as unknown as M;
-  const known = new Set(messages.map((m) => m.id));
-  const out: M[] = [];
-  echoes.forEach((e, i) => e.after === undefined && out.push(echo(e, i)));
+    }) as unknown as M
+  const known = new Set(messages.map((m) => m.id))
+  const out: M[] = []
+  echoes.forEach((e, i) => e.after === undefined && out.push(echo(e, i)))
   for (const m of messages) {
-    out.push(m);
-    echoes.forEach((e, i) => e.after === m.id && out.push(echo(e, i)));
+    out.push(m)
+    echoes.forEach((e, i) => e.after === m.id && out.push(echo(e, i)))
   }
-  echoes.forEach((e, i) => e.after !== undefined && !known.has(e.after) && out.push(echo(e, i)));
-  return out;
+  echoes.forEach((e, i) => e.after !== undefined && !known.has(e.after) && out.push(echo(e, i)))
+  return out
 }

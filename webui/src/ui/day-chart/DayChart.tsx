@@ -1,77 +1,100 @@
-import { Box, Text } from "@chakra-ui/react";
-import { useId, useState, type ReactNode } from "react";
-import type { Tone } from "../tone";
+import { Box, Text } from "@chakra-ui/react"
+import { useId, useState, type ReactNode } from "react"
+import type { Tone } from "../tone"
 
 export interface DaySeries {
-  key: string;
-  label: string;
-  tone: Tone;
+  key: string
+  label: string
+  tone: Tone
   // A theme color token under `chart` (e.g. "claude"); wins over the tone when drawing.
-  color?: ChartColor;
+  color?: ChartColor
   // One value per day; null means no data for that day.
-  values: (number | null)[];
+  values: (number | null)[]
 }
 
-export type ChartColor = "claude" | "codex" | "blue" | "purple" | "amber" | "green" | "muted";
+export type ChartColor = "claude" | "codex" | "blue" | "purple" | "amber" | "green" | "muted"
 
 // "dim" draws a lighter bar; "hatch" draws it lighter with diagonal stripes over it.
-export type DayStyle = "dim" | "hatch";
+export type DayStyle = "dim" | "hatch"
 
 export interface ExtraRow {
-  label: string;
-  value: string;
+  label: string
+  value: string
 }
 
 // "stacked" and "side-by-side" share one scale; "diverging" draws the second series below the baseline.
-export type DayChartKind = "bars" | "stacked" | "side-by-side" | "diverging";
+export type DayChartKind = "bars" | "stacked" | "side-by-side" | "diverging"
 
 interface DayChartProps {
-  days: string[];
-  series: DaySeries[];
-  kind?: DayChartKind;
+  days: string[]
+  series: DaySeries[]
+  kind?: DayChartKind
   // Series the chart folded into "other": listed in the tooltip, never drawn.
-  folded?: Omit<DaySeries, "tone">[];
-  height?: number;
+  folded?: Omit<DaySeries, "tone">[]
+  height?: number
   // Per-day extras, indexed like `days`: a bar style, tooltip notes and extra tooltip rows.
-  dayStyles?: (DayStyle | undefined)[];
-  dayNotes?: (string[] | undefined)[];
-  extraRows?: (ExtraRow[] | undefined)[];
+  dayStyles?: (DayStyle | undefined)[]
+  dayNotes?: (string[] | undefined)[]
+  extraRows?: (ExtraRow[] | undefined)[]
 }
 
-const SLOT = 10;
-const BAR = 8;
-const DIM_OPACITY = 0.45;
-const toneVar = (tone: Tone) => `var(--chakra-colors-tone-${tone}-fg)`;
+const SLOT = 10
+const BAR = 8
+const DIM_OPACITY = 0.45
+const toneVar = (tone: Tone) => `var(--chakra-colors-tone-${tone}-fg)`
 export const seriesColor = (s: Pick<DaySeries, "tone" | "color">) =>
-  s.color ? `var(--chakra-colors-chart-${s.color})` : toneVar(s.tone);
+  s.color ? `var(--chakra-colors-chart-${s.color})` : toneVar(s.tone)
 
-export function DayChart({ days, series, kind = "bars", folded = [], height = 110, dayStyles, dayNotes, extraRows }: DayChartProps) {
-  const patternId = useId();
-  const [hover, setHover] = useState<number | null>(null);
-  const width = days.length * SLOT;
-  const noData = (i: number) => series.every((s) => s.values[i] === null);
-  const val = (s: DaySeries, i: number) => s.values[i] ?? 0;
+export function DayChart({
+  days,
+  series,
+  kind = "bars",
+  folded = [],
+  height = 110,
+  dayStyles,
+  dayNotes,
+  extraRows,
+}: DayChartProps) {
+  const patternId = useId()
+  const [hover, setHover] = useState<number | null>(null)
+  const width = days.length * SLOT
+  const noData = (i: number) => series.every((s) => s.values[i] === null)
+  const val = (s: DaySeries, i: number) => s.values[i] ?? 0
 
-  let up = 1;
-  let down = 0;
+  let up = 1
+  let down = 0
   days.forEach((_, i) => {
-    if (kind === "stacked") up = Math.max(up, series.reduce((a, s) => a + val(s, i), 0));
+    if (kind === "stacked")
+      up = Math.max(
+        up,
+        series.reduce((a, s) => a + val(s, i), 0),
+      )
     else if (kind === "diverging") {
-      up = Math.max(up, val(series[0], i));
-      down = Math.max(down, val(series[1], i));
-    } else up = Math.max(up, ...series.map((s) => val(s, i)));
-  });
-  const baseY = (height * up) / (up + down);
-  const scale = baseY / up;
+      up = Math.max(up, val(series[0], i))
+      down = Math.max(down, val(series[1], i))
+    } else up = Math.max(up, ...series.map((s) => val(s, i)))
+  })
+  const baseY = (height * up) / (up + down)
+  const scale = baseY / up
 
-  const marks: ReactNode[] = [];
+  const marks: ReactNode[] = []
   days.forEach((_, i) => {
-    const x = i * SLOT;
+    const x = i * SLOT
     if (noData(i)) {
-      marks.push(<rect key={`nd${i}`} data-nodata={i} x={x} y={0} width={BAR} height={height} fill={`url(#${patternId})`} />);
-      return;
+      marks.push(
+        <rect
+          key={`nd${i}`}
+          data-nodata={i}
+          x={x}
+          y={0}
+          width={BAR}
+          height={height}
+          fill={`url(#${patternId})`}
+        />,
+      )
+      return
     }
-    const style = dayStyles?.[i];
+    const style = dayStyles?.[i]
     const bar = (s: DaySeries, bx: number, y: number, w: number, h: number, below = false) =>
       h > 0 && (
         <g key={`${i}-${s.key}`}>
@@ -87,38 +110,63 @@ export function DayChart({ days, series, kind = "bars", folded = [], height = 11
             fill={seriesColor(s)}
             opacity={style ? DIM_OPACITY : undefined}
           />
-          {style === "hatch" && <rect data-hatch={i} x={bx} y={y} width={w} height={h} fill={`url(#${patternId})`} />}
+          {style === "hatch" && (
+            <rect data-hatch={i} x={bx} y={y} width={w} height={h} fill={`url(#${patternId})`} />
+          )}
         </g>
-      );
+      )
     if (kind === "side-by-side") {
-      const w = BAR / series.length;
-      series.forEach((s, si) => marks.push(bar(s, x + si * w, baseY - val(s, i) * scale, w, val(s, i) * scale)));
+      const w = BAR / series.length
+      series.forEach((s, si) =>
+        marks.push(bar(s, x + si * w, baseY - val(s, i) * scale, w, val(s, i) * scale)),
+      )
     } else if (kind === "diverging") {
-      const [add, rem] = series;
-      marks.push(bar(add, x, baseY - val(add, i) * scale, BAR, val(add, i) * scale));
-      marks.push(bar(rem, x, baseY, BAR, val(rem, i) * scale, true));
+      const [add, rem] = series
+      marks.push(bar(add, x, baseY - val(add, i) * scale, BAR, val(add, i) * scale))
+      marks.push(bar(rem, x, baseY, BAR, val(rem, i) * scale, true))
     } else {
-      let y = baseY;
+      let y = baseY
       series.forEach((s) => {
-        const h = val(s, i) * scale;
-        y -= h;
-        marks.push(bar(s, x, y, BAR, h));
-      });
+        const h = val(s, i) * scale
+        y -= h
+        marks.push(bar(s, x, y, BAR, h))
+      })
     }
-  });
+  })
 
-  const rows = hover === null ? [] : [...series, ...folded.map((f) => ({ ...f, tone: "muted" as Tone }))];
-  const fmtValue = (v: number | null | undefined) => (v === null || v === undefined ? "no data" : String(v));
+  const rows =
+    hover === null ? [] : [...series, ...folded.map((f) => ({ ...f, tone: "muted" as Tone }))]
+  const fmtValue = (v: number | null | undefined) =>
+    v === null || v === undefined ? "no data" : String(v)
 
   return (
     <Box position="relative" w="full" minW="0" onMouseLeave={() => setHover(null)}>
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" width="100%" height={height} style={{ display: "block" }}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        width="100%"
+        height={height}
+        style={{ display: "block" }}
+      >
         <defs>
-          <pattern id={patternId} width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <pattern
+            id={patternId}
+            width="3"
+            height="3"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45)"
+          >
             <line x1="0" y1="0" x2="0" y2="3" stroke={toneVar("muted")} strokeWidth="1" />
           </pattern>
         </defs>
-        <line data-baseline x1={0} x2={width} y1={baseY} y2={baseY} stroke="var(--chakra-colors-border)" />
+        <line
+          data-baseline
+          x1={0}
+          x2={width}
+          y1={baseY}
+          y2={baseY}
+          stroke="var(--chakra-colors-border)"
+        />
         {marks}
         {days.map((d, i) => (
           <rect
@@ -157,7 +205,15 @@ export function DayChart({ days, series, kind = "bars", folded = [], height = 11
           ) : (
             rows.map((s) => (
               <Text key={s.key} whiteSpace="nowrap">
-                <Box as="span" display="inline-block" w="8px" h="8px" borderRadius="sm" mr="1" style={{ background: seriesColor(s) }} />
+                <Box
+                  as="span"
+                  display="inline-block"
+                  w="8px"
+                  h="8px"
+                  borderRadius="sm"
+                  mr="1"
+                  style={{ background: seriesColor(s) }}
+                />
                 {s.label}: {fmtValue(s.values[hover])}
               </Text>
             ))
@@ -176,5 +232,5 @@ export function DayChart({ days, series, kind = "bars", folded = [], height = 11
         </Box>
       )}
     </Box>
-  );
+  )
 }

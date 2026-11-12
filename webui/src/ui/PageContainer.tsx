@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { Box } from "@chakra-ui/react"
+import type { ReactNode } from "react"
 
 export function PageContainer({ children, fill }: { children: ReactNode; fill?: boolean }) {
   return (
@@ -15,5 +15,5 @@ export function PageContainer({ children, fill }: { children: ReactNode; fill?: 
     >
       {children}
     </Box>
-  );
+  )
 }

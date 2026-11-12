@@ -1,37 +1,42 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch } from "../apiFetch";
-import { RESYNC_EVENT, type Connection } from "../connection";
-import type { TicketDetail } from "../generated/server";
-import { readPageCache, writePageCache } from "../pageCache";
+import { useCallback, useEffect, useRef, useState } from "react"
+import { apiFetch } from "../apiFetch"
+import { RESYNC_EVENT, type Connection } from "../connection"
+import type { TicketDetail } from "../generated/server"
+import { readPageCache, writePageCache } from "../pageCache"
 
-export type { TicketDetail };
+export type { TicketDetail }
 
-export type DetailResult<T = TicketDetail> = { kind: "ok"; detail: T } | { kind: "not-found" };
+export type DetailResult<T = TicketDetail> = { kind: "ok"; detail: T } | { kind: "not-found" }
 
-export type FetchDetail = (address: string) => Promise<DetailResult>;
+export type FetchDetail = (address: string) => Promise<DetailResult>
 
 export async function fetchJson<T>(url: string, label: string): Promise<DetailResult<T>> {
-  const res = await apiFetch(url);
-  if (res.status === 404 || res.status === 400) return { kind: "not-found" };
-  if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`);
-  return { kind: "ok", detail: await res.json() };
+  const res = await apiFetch(url)
+  if (res.status === 404 || res.status === 400) return { kind: "not-found" }
+  if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`)
+  return { kind: "ok", detail: await res.json() }
 }
 
 export const fetchDetail: FetchDetail = (address) =>
-  fetchJson(`/v1/tickets/detail?address=${encodeURIComponent(address)}`, "detail");
+  fetchJson(`/v1/tickets/detail?address=${encodeURIComponent(address)}`, "detail")
 
 export interface DetailState<T = TicketDetail> {
-  detail: T | null;
-  notFound: boolean;
+  detail: T | null
+  notFound: boolean
   /** Re-reads the detail; call it after each POST. */
-  refetch: () => void;
+  refetch: () => void
 }
 
 // A ticket address is <project>:<epic>/<id>; the page refetches for any ticket of its epic.
-export const epicOfTicket = (address: string) => address.slice(0, Math.max(0, address.lastIndexOf("/")));
+export const epicOfTicket = (address: string) =>
+  address.slice(0, Math.max(0, address.lastIndexOf("/")))
 
-export function useTicketDetail(address: string, conn: Connection, fetcher: FetchDetail = fetchDetail): DetailState {
-  return useDetail(address, conn, fetcher, `${epicOfTicket(address)}/`, "ticket");
+export function useTicketDetail(
+  address: string,
+  conn: Connection,
+  fetcher: FetchDetail = fetchDetail,
+): DetailState {
+  return useDetail(address, conn, fetcher, `${epicOfTicket(address)}/`, "ticket")
 }
 
 // A failed fetch keeps the last detail on screen: the Offline strip says why it may be stale.
@@ -44,55 +49,58 @@ export function useDetail<T>(
   // Names the sessionStorage entry that repaints this page after a reload.
   cacheKey?: string,
 ): DetailState<T> {
-  const [state, setState] = useState<{ address: string; detail: T | null; notFound: boolean }>(() => ({
-    address,
-    detail: cacheKey ? readPageCache<T>(cacheKey, address) : null,
-    notFound: false,
-  }));
-  const latest = useRef(0);
-  const current = useRef(address);
-  current.current = address;
+  const [state, setState] = useState<{ address: string; detail: T | null; notFound: boolean }>(
+    () => ({
+      address,
+      detail: cacheKey ? readPageCache<T>(cacheKey, address) : null,
+      notFound: false,
+    }),
+  )
+  const latest = useRef(0)
+  const current = useRef(address)
+  current.current = address
 
   const refetch = useCallback(() => {
     // A callback kept from an earlier address (a POST that returns after the person moved on) must not bump
     // the counter: that would drop the fetch of the page now shown and leave it blank.
-    if (address !== current.current) return;
-    const n = ++latest.current;
+    if (address !== current.current) return
+    const n = ++latest.current
     fetcher(address).then(
       (r) => {
-        if (n !== latest.current) return;
-        if (cacheKey && r.kind === "ok") writePageCache(cacheKey, r.detail, address);
+        if (n !== latest.current) return
+        if (cacheKey && r.kind === "ok") writePageCache(cacheKey, r.detail, address)
         setState(
           r.kind === "ok"
             ? { address, detail: r.detail, notFound: false }
             : { address, detail: null, notFound: true },
-        );
+        )
       },
       () => {},
-    );
-  }, [address, fetcher, cacheKey]);
+    )
+  }, [address, fetcher, cacheKey])
 
   useEffect(() => {
-    refetch();
+    refetch()
     const off = conn.onEvent((a, type) => {
-      if (type === RESYNC_EVENT || a === address || (watchPrefix && a?.startsWith(watchPrefix))) refetch();
-    });
+      if (type === RESYNC_EVENT || a === address || (watchPrefix && a?.startsWith(watchPrefix)))
+        refetch()
+    })
     // Events sent while the stream was down never reach `onEvent`, so a reopened stream refetches.
     // The first stream replays from the snapshot, so it misses nothing.
-    let streams = conn.getState().streams;
+    let streams = conn.getState().streams
     const offState = conn.subscribe(() => {
-      const next = conn.getState().streams;
-      if (streams > 0 && next > streams) refetch();
-      streams = next;
-    });
+      const next = conn.getState().streams
+      if (streams > 0 && next > streams) refetch()
+      streams = next
+    })
     return () => {
-      off();
-      offState();
-      latest.current++;
-    };
-  }, [address, conn, refetch, watchPrefix]);
+      off()
+      offState()
+      latest.current++
+    }
+  }, [address, conn, refetch, watchPrefix])
 
   // Another ticket's detail must never show under this address while it loads.
-  const mine = state.address === address;
-  return { detail: mine ? state.detail : null, notFound: mine && state.notFound, refetch };
+  const mine = state.address === address
+  return { detail: mine ? state.detail : null, notFound: mine && state.notFound, refetch }
 }

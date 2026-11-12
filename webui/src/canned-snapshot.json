@@ -29,9 +29,7 @@
       "status": "open",
       "rendered_status": "blocked",
       "type": "implement",
-      "blocked_by": [
-        "01"
-      ]
+      "blocked_by": ["01"]
     }
   ],
   "pending": [

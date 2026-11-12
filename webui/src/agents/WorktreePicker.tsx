@@ -1,16 +1,16 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useState, type KeyboardEvent } from "react";
-import { Field, field } from "./formField";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useState, type KeyboardEvent } from "react"
+import { Field, field } from "./formField"
 
 export interface Option {
-  key: string;
-  label: string;
-  path: string;
+  key: string
+  label: string
+  path: string
   /** Set on the "+ Create worktree" row. */
-  create?: string;
+  create?: string
 }
 
-export const baseName = (path: string) => path.replace(/\/+$/, "").split("/").pop() ?? path;
+export const baseName = (path: string) => path.replace(/\/+$/, "").split("/").pop() ?? path
 
 /** The Worktree combobox: filter `rows`, or type a name to offer "+ Create worktree". */
 export function WorktreePicker({
@@ -19,35 +19,35 @@ export function WorktreePicker({
   creating,
   onPick,
 }: {
-  rows: Option[];
-  picked: Option | undefined;
+  rows: Option[]
+  picked: Option | undefined
   /** The new worktree's name once "+ Create worktree" was chosen. */
-  creating: string;
-  onPick: (o: Option) => void;
+  creating: string
+  onPick: (o: Option) => void
 }) {
   // The text being typed; null shows the current choice.
-  const [query, setQuery] = useState<string | null>(null);
+  const [query, setQuery] = useState<string | null>(null)
 
-  const q = query?.trim() ?? "";
-  const options: Option[] = [];
+  const q = query?.trim() ?? ""
+  const options: Option[] = []
   if (q && !rows.some((r) => r.key !== "root" && r.label === q)) {
-    options.push({ key: "create", label: `+ Create worktree “${q}”`, path: "", create: q });
+    options.push({ key: "create", label: `+ Create worktree “${q}”`, path: "", create: q })
   }
-  options.push(...rows.filter((r) => !q || r.label.toLowerCase().includes(q.toLowerCase())));
+  options.push(...rows.filter((r) => !q || r.label.toLowerCase().includes(q.toLowerCase())))
 
   const pick = (o: Option) => {
-    onPick(o);
-    setQuery(null);
-  };
+    onPick(o)
+    setQuery(null)
+  }
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" && query !== null) {
-      e.preventDefault();
-      if (options[0]) pick(options[0]);
+      e.preventDefault()
+      if (options[0]) pick(options[0])
     } else if (e.key === "Escape" && query !== null) {
-      e.stopPropagation();
-      setQuery(null);
+      e.stopPropagation()
+      setQuery(null)
     }
-  };
+  }
 
   return (
     <Field label="Worktree" caret>
@@ -114,5 +114,5 @@ export function WorktreePicker({
         </Box>
       )}
     </Field>
-  );
+  )
 }

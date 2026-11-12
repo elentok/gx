@@ -3,4 +3,4 @@ export const METERS = [
   { key: "cpu", letter: "C", name: "CPU" },
   { key: "memory", letter: "M", name: "memory" },
   { key: "disk", letter: "D", name: "disk" },
-] as const;
+] as const

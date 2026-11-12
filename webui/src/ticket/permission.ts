@@ -1,19 +1,21 @@
-import { apiFetch } from "../apiFetch";
+import { apiFetch } from "../apiFetch"
 
-export type Decision = "allow" | "deny";
+export type Decision = "allow" | "deny"
 
 export interface DecisionBody {
-  address: string;
-  decision: Decision;
+  address: string
+  decision: Decision
   /** The prompt the person saw; the server refuses the decision if another is open now. */
-  request_id: string;
+  request_id: string
   /** Sent on Deny only. */
-  text?: string;
+  text?: string
 }
 
-export type DecisionResult = { refused?: false } | { refused: true; reason: string; message: string };
+export type DecisionResult =
+  | { refused?: false }
+  | { refused: true; reason: string; message: string }
 
-export type PostDecision = (body: DecisionBody) => Promise<DecisionResult>;
+export type PostDecision = (body: DecisionBody) => Promise<DecisionResult>
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postDecision: PostDecision = async (body) => {
@@ -21,8 +23,8 @@ export const postDecision: PostDecision = async (body) => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
-  const result = await res.json().catch(() => null);
-  if (res.ok || (result && result.refused)) return result ?? {};
-  throw new Error(`decision: HTTP ${res.status}`);
-};
+  })
+  const result = await res.json().catch(() => null)
+  if (res.ok || (result && result.refused)) return result ?? {}
+  throw new Error(`decision: HTTP ${res.status}`)
+}

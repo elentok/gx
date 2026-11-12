@@ -1,195 +1,209 @@
-import { execFile, spawn } from "node:child_process";
-import { createHmac } from "node:crypto";
-import { constants } from "node:fs";
-import { mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { promisify } from "node:util";
-import { expect, test as base, type Page } from "@playwright/test";
+import { execFile, spawn } from "node:child_process"
+import { createHmac } from "node:crypto"
+import { constants } from "node:fs"
+import { mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+import { promisify } from "node:util"
+import { expect, test as base, type Page } from "@playwright/test"
 
-const run = promisify(execFile);
+const run = promisify(execFile)
 
 // Every document load of the page adds one to this sessionStorage count, which survives a reload
 // where a window property would not. A test ends with a failure when it counted more reloads than
 // `reloads` allowed (none by default).
-const LOADS = "__gxE2eLoads";
-const countedPages = new WeakSet<Page>();
+const LOADS = "__gxE2eLoads"
+const countedPages = new WeakSet<Page>()
 
-const TOTP_PERIOD_S = 30;
-const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const TOTP_PERIOD_S = 30
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
 /** The RFC 6238 six-digit code for `secret` (unpadded base32) at `step`. */
 function totpCode(secret: string, step: number): string {
-  let bits = "";
-  for (const ch of secret.toUpperCase()) bits += B32.indexOf(ch).toString(2).padStart(5, "0");
-  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
-  const msg = Buffer.alloc(8);
-  msg.writeBigUInt64BE(BigInt(step));
-  const sum = createHmac("sha1", key).update(msg).digest();
-  const offset = sum[sum.length - 1] & 0x0f;
-  return String(sum.readUInt32BE(offset) & 0x7fffffff).slice(-6).padStart(6, "0");
+  let bits = ""
+  for (const ch of secret.toUpperCase()) bits += B32.indexOf(ch).toString(2).padStart(5, "0")
+  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)))
+  const msg = Buffer.alloc(8)
+  msg.writeBigUInt64BE(BigInt(step))
+  const sum = createHmac("sha1", key).update(msg).digest()
+  const offset = sum[sum.length - 1] & 0x0f
+  return String(sum.readUInt32BE(offset) & 0x7fffffff)
+    .slice(-6)
+    .padStart(6, "0")
 }
 
 interface FixtureOutput {
-  web_url: string;
-  cookie_name: string;
+  web_url: string
+  cookie_name: string
   /** Empty in the `web-setup` and `web-login` scenarios, where the page starts signed out. */
-  cookie: string;
+  cookie: string
   /** The web password; absent while the setup is pending (`web-setup`). */
-  password?: string;
+  password?: string
   /** Absent when the server runs with `server.web.totp=false`. */
-  totp_secret?: string;
+  totp_secret?: string
   /** The last TOTP step the fixture used. */
-  totp_step?: number;
-  env: string[];
-  gx: string;
-  hold_file: string;
-  disk_dir: string;
-  health_dir: string;
+  totp_step?: number
+  env: string[]
+  gx: string
+  hold_file: string
+  disk_dir: string
+  health_dir: string
   /** The held fake agent's transcript path; only the `spend` scenario prints it. */
-  agent_transcript?: string;
+  agent_transcript?: string
   /** The live check-lock waiting state; only the `check-lock` scenario prints it. */
-  check_waiting_file?: string;
-  ratelimit_release_file?: string;
+  check_waiting_file?: string
+  ratelimit_release_file?: string
   /** The `limit-burn` live shape's four Claude transcript paths, keyed queue, one_off, design and other; the `context-window` scenario's keyed sessions (green, yellow, orange, red, compact). */
-  transcripts?: Record<string, string>;
+  transcripts?: Record<string, string>
   /** The held Codex worker's sessions dir; only the `limit-burn` scenario prints it. */
-  codex_sessions_dir?: string;
+  codex_sessions_dir?: string
   /** Only the restart scenarios have the fake restart binary's control dir. */
-  restart_dir?: string;
+  restart_dir?: string
   /** Only the migrate scenarios have the migration control files and the bare-server script. */
-  migrate_dir?: string;
+  migrate_dir?: string
   /** The `dev-mode` scenario's fake pnpm control file. */
-  dev_control_file?: string;
+  dev_control_file?: string
 }
 
 export interface Fixture {
   /** Runs a gx CLI verb against this fixture's server and no other. */
-  cli(...args: string[]): Promise<string>;
+  cli(...args: string[]): Promise<string>
   /** Like `cli`, with extra environment variables. */
-  cliEnv(extra: Record<string, string>, ...args: string[]): Promise<string>;
+  cliEnv(extra: Record<string, string>, ...args: string[]): Promise<string>
   /** Like `cli`, with `input` written to the command's stdin. */
-  cliInput(input: string, ...args: string[]): Promise<string>;
+  cliInput(input: string, ...args: string[]): Promise<string>
   /** Like `cliEnv`, with `input` written to the command's stdin. */
-  cliEnvInput(extra: Record<string, string>, input: string, ...args: string[]): Promise<string>;
+  cliEnvInput(extra: Record<string, string>, input: string, ...args: string[]): Promise<string>
   /** Lets the workers frozen by `start(scenario, { hold: true })` finish. */
-  release(): Promise<void>;
+  release(): Promise<void>
   /** Sets the free space the server reads from the fake disk, a size string such as `15G`. */
-  setDiskFree(size: string): Promise<void>;
+  setDiskFree(size: string): Promise<void>
   /** Sets what the next cleanup does: a size string frees to it, `fail` fails, empty does nothing. Set it before free. */
-  setDiskClean(behaviour: string): Promise<void>;
+  setDiskClean(behaviour: string): Promise<void>
   /** Sets the fake CPU and memory the server reads, space-separated pairs such as `cpu=75 mem=85`. */
-  setHealth(values: string): Promise<void>;
+  setHealth(values: string): Promise<void>
   /** Replaces the fake process table the popover's cause lists read: `proc`, `hidden` and `busy` lines. */
-  setProcesses(lines: string): Promise<void>;
+  setProcesses(lines: string): Promise<void>
   /**
    * Writes a control file of the fake restart binary (restart scenarios only): `check.json`, `slow`
    * (seconds), `start` (`up` brings the server back) or `old` (present: no restart-check command).
    * `clearRestartControl` removes one.
    */
-  setRestartControl(name: string, value: string): Promise<void>;
-  clearRestartControl(name: string): Promise<void>;
+  setRestartControl(name: string, value: string): Promise<void>
+  clearRestartControl(name: string): Promise<void>
   /** Stops the fixture server mid-flow. Teardown skips a server that is already stopped. */
-  stopServer(): Promise<void>;
+  stopServer(): Promise<void>
   /**
    * Controls the bare `gx server` process of a migrate scenario: `pid`, `kill` (SIGKILL, waits for exit)
    * or `start` (a new bare process, as launchd starts one). Returns the script's output.
    */
-  serverCtl(verb: "pid" | "kill" | "start"): Promise<string>;
+  serverCtl(verb: "pid" | "kill" | "start"): Promise<string>
   /** Ends the hold of the `migrate-held` scenario: the migration runs once the hold file is gone. */
-  releaseMigration(): Promise<void>;
+  releaseMigration(): Promise<void>
   /**
    * Starts a gx CLI verb without waiting for it. `stderr()` is what it printed so far; `done` resolves
    * with its exit code and stdout once it ends, so a test can see a write that waits.
    */
-  cliStart(...args: string[]): { stderr(): string; done: Promise<{ code: number | null; stdout: string }> };
+  cliStart(...args: string[]): {
+    stderr(): string
+    done: Promise<{ code: number | null; stdout: string }>
+  }
   /** Writes the migrate scenarios' inject.json (extra test steps), read when the server starts. */
-  setInject(steps: Array<{ name: string; fail?: string; notes?: string[] }>): Promise<void>;
+  setInject(steps: Array<{ name: string; fail?: string; notes?: string[] }>): Promise<void>
   /** The parsed `$HOME/.config/gx/config.json`, read fresh on every call. */
-  globalConfig(): Promise<Record<string, any>>;
+  globalConfig(): Promise<Record<string, any>>
   /** The parsed `project.json` of `project` in the fixture's ticket store, read fresh on every call. */
-  projectConfig(project: string): Promise<Record<string, any>>;
+  projectConfig(project: string): Promise<Record<string, any>>
   /** Writes `content` to `path` under the fixture's ticket store (`<project>/<epic>/issues/x.md`), creating dirs. */
-  writeStoreFile(path: string, content: string): Promise<void>;
+  writeStoreFile(path: string, content: string): Promise<void>
   /** Reads a file under the fixture's ticket store. */
-  readStoreFile(path: string): Promise<string>;
+  readStoreFile(path: string): Promise<string>
   /** The uploaded image files in `<DataDir>/sessions/<id>/images`, without the sent markers. */
-  sessionImages(id: string): Promise<string[]>;
+  sessionImages(id: string): Promise<string[]>
   /** The state-dir folder of New Design draft `id`, whether or not it exists. */
-  draftDir(id: string): string;
+  draftDir(id: string): string
   /** Merges `patch` into the top-level keys of `project`'s `project.json`. */
-  patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>;
+  patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
-  launches(): Promise<string[][]>;
+  launches(): Promise<string[][]>
   /** Everything the fake claude of a conversation (the chat's `conversation_id`) read off its terminal, raw; empty before it read any. */
-  input(conversation: string): Promise<string>;
+  input(conversation: string): Promise<string>
   /** Sends a control (`agentfake.Control`, JSON field names) to the fake claude of a conversation and waits until it handled it. */
-  controlClaude(conversation: string, control: Record<string, unknown>): Promise<void>;
+  controlClaude(conversation: string, control: Record<string, unknown>): Promise<void>
   /** What each fake codex PermissionRequest hook answered, oldest first: the decision and the deny reason. */
-  codexDecisions(): Promise<{ behavior: string; message: string }[]>;
+  codexDecisions(): Promise<{ behavior: string; message: string }[]>
   /**
    * A TOTP code for the fixture's secret, in a step later than the last one used for that secret,
    * since the server takes each step once. It waits (up to 30 seconds) only when the steps the
    * server accepts are used up. Every flow that needs a code uses it.
    */
-  nextTotpCode(): Promise<string>;
+  nextTotpCode(): Promise<string>
   /** The code for the current step, for a secret the server no longer holds, so it is refused without a wait. */
-  staleTotpCode(): string;
+  staleTotpCode(): string
   /** Adopts the secret the setup page showed (spaces allowed), for a fixture that started with setup pending. */
-  useTotpSecret(secret: string): void;
+  useTotpSecret(secret: string): void
   /** The web password the fixture's setup used; empty while the setup is pending. */
-  readonly password: string;
+  readonly password: string
   /** The TOTP secret; empty when the server runs with `server.web.totp=false`. */
-  readonly totpSecret: string;
+  readonly totpSecret: string
   /** The `spend` scenario's held agent transcript; append a usage line (create its directory first) to add spend. Empty elsewhere. */
-  readonly agentTranscript: string;
+  readonly agentTranscript: string
   /** Ends the `check-lock` scenario's wait by removing its waiting state. */
-  releaseCheckLock(): Promise<void>;
+  releaseCheckLock(): Promise<void>
   /** Ends the rate-limit hold of the `rate-limited` scenario; the hold lasts until this runs. */
-  releaseRateLimit(): Promise<void>;
+  releaseRateLimit(): Promise<void>
   /** The `limit-burn` live shape's transcript paths by cost group (queue, one_off, design, other) and the `context-window` scenario's by session key (green, yellow, orange, red, compact); append usage lines to them. Empty elsewhere. */
-  readonly transcripts: Record<string, string>;
+  readonly transcripts: Record<string, string>
   /** The `limit-burn` scenario's Codex sessions dir; append a `token_count` line to its rollout to make the usage scan save a Codex sample. Empty elsewhere. */
-  readonly codexSessionsDir: string;
+  readonly codexSessionsDir: string
   /** The `dev-mode` scenario's fake pnpm control file; write `{"vite":"crash"}` to take Vite down. Empty elsewhere. */
-  readonly devControlFile: string;
+  readonly devControlFile: string
 }
 
 /** The value after `--name` in an argv, or undefined. */
 export const flag = (args: string[], name: string) => {
-  const at = args.indexOf(`--${name}`);
-  return at < 0 ? undefined : args[at + 1];
-};
+  const at = args.indexOf(`--${name}`)
+  return at < 0 ? undefined : args[at + 1]
+}
 
 // A rename keeps the server from reading a half-written control file.
 async function writeControl(dir: string, name: string, value: string): Promise<void> {
-  const tmp = join(dir, `${name}.e2e-tmp`);
-  await writeFile(tmp, `${value}\n`);
-  await rename(tmp, join(dir, name));
+  const tmp = join(dir, `${name}.e2e-tmp`)
+  await writeFile(tmp, `${value}\n`)
+  await rename(tmp, join(dir, name))
 }
 
 /** Runs `bin` with `input` on stdin and returns its stdout; a non-zero exit rejects. */
-function runWithInput(bin: string, args: string[], env: NodeJS.ProcessEnv, input: string): Promise<string> {
+function runWithInput(
+  bin: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  input: string,
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(bin, args, { env, cwd: tmpdir(), stdio: ["pipe", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    proc.stdout.on("data", (chunk: Buffer) => (stdout += chunk));
-    proc.stderr.on("data", (chunk: Buffer) => (stderr += chunk));
-    proc.once("error", reject);
-    proc.once("close", (code) => (code === 0 ? resolve(stdout) : reject(new Error(`gx ${args.join(" ")} exited with ${code}: ${stderr}`))));
-    proc.stdin.end(input);
-  });
+    const proc = spawn(bin, args, { env, cwd: tmpdir(), stdio: ["pipe", "pipe", "pipe"] })
+    let stdout = ""
+    let stderr = ""
+    proc.stdout.on("data", (chunk: Buffer) => (stdout += chunk))
+    proc.stderr.on("data", (chunk: Buffer) => (stderr += chunk))
+    proc.once("error", reject)
+    proc.once("close", (code) =>
+      code === 0
+        ? resolve(stdout)
+        : reject(new Error(`gx ${args.join(" ")} exited with ${code}: ${stderr}`)),
+    )
+    proc.stdin.end(input)
+  })
 }
 
 function restartDir(out: FixtureOutput): string {
-  if (!out.restart_dir) throw new Error("this scenario has no fake restart binary");
-  return out.restart_dir;
+  if (!out.restart_dir) throw new Error("this scenario has no fake restart binary")
+  return out.restart_dir
 }
 
 function migrateDir(out: FixtureOutput): string {
-  if (!out.migrate_dir) throw new Error("this scenario has no migration control files");
-  return out.migrate_dir;
+  if (!out.migrate_dir) throw new Error("this scenario has no migration control files")
+  return out.migrate_dir
 }
 
 /** Starts a fresh fixture server for `scenario` and signs the page in. */
@@ -221,30 +235,37 @@ async function startFixture(
       scenario,
     ],
     { stdio: ["ignore", "pipe", "inherit"] },
-  );
-  const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()));
-  let stopping: Promise<void> | undefined;
+  )
+  const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()))
+  let stopping: Promise<void> | undefined
   const stop = () => {
     stopping ??= (async () => {
-      if (proc.exitCode === null && proc.signalCode === null) proc.kill("SIGTERM");
-      await exited;
-    })();
-    return stopping;
-  };
+      if (proc.exitCode === null && proc.signalCode === null) proc.kill("SIGTERM")
+      await exited
+    })()
+    return stopping
+  }
   const out = await new Promise<FixtureOutput>((resolve, reject) => {
-    let buf = "";
+    let buf = ""
     proc.stdout!.on("data", (chunk: Buffer) => {
-      buf += chunk;
-      const line = buf.split("\n")[0];
-      if (buf.includes("\n")) resolve(JSON.parse(line));
-    });
-    proc.once("exit", (code) => reject(new Error(`gxfixture exited with ${code} before it printed its output`)));
-  });
-  const env = { ...process.env, ...Object.fromEntries(out.env.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)])) };
-  let totpSecret = out.totp_secret ?? "";
+      buf += chunk
+      const line = buf.split("\n")[0]
+      if (buf.includes("\n")) resolve(JSON.parse(line))
+    })
+    proc.once("exit", (code) =>
+      reject(new Error(`gxfixture exited with ${code} before it printed its output`)),
+    )
+  })
+  const env = {
+    ...process.env,
+    ...Object.fromEntries(
+      out.env.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)]),
+    ),
+  }
+  let totpSecret = out.totp_secret ?? ""
   // The server refuses a step at or below the last one it accepted for a secret, and a secret it
   // has not accepted yet starts at 0.
-  const lastSteps = new Map<string, number>([[totpSecret, out.totp_step ?? 0]]);
+  const lastSteps = new Map<string, number>([[totpSecret, out.totp_step ?? 0]])
   const fixture: Fixture = {
     password: out.password ?? "",
     totpSecret: out.totp_secret ?? "",
@@ -257,22 +278,28 @@ async function startFixture(
     async cli(...args) {
       // A CLI call that blocks would otherwise eat the whole test timeout with no hint of which call hung.
       try {
-        const { stdout } = await run(out.gx, args, { env, cwd: tmpdir(), timeout: 30_000, killSignal: "SIGQUIT" });
-        return stdout;
+        const { stdout } = await run(out.gx, args, {
+          env,
+          cwd: tmpdir(),
+          timeout: 30_000,
+          killSignal: "SIGQUIT",
+        })
+        return stdout
       } catch (e) {
-        const err = e as { killed?: boolean; stderr?: string };
-        if (err.killed) throw new Error(`gx ${args.join(" ")} hung for 30s; stderr:\n${err.stderr ?? ""}`);
-        throw e;
+        const err = e as { killed?: boolean; stderr?: string }
+        if (err.killed)
+          throw new Error(`gx ${args.join(" ")} hung for 30s; stderr:\n${err.stderr ?? ""}`)
+        throw e
       }
     },
     async cliEnv(extra, ...args) {
-      const { stdout } = await run(out.gx, args, { env: { ...env, ...extra }, cwd: tmpdir() });
-      return stdout;
+      const { stdout } = await run(out.gx, args, { env: { ...env, ...extra }, cwd: tmpdir() })
+      return stdout
     },
     cliInput: (input, ...args) => runWithInput(out.gx, args, env, input),
     cliEnvInput: (extra, input, ...args) => runWithInput(out.gx, args, { ...env, ...extra }, input),
     async release() {
-      await rm(out.hold_file, { force: true });
+      await rm(out.hold_file, { force: true })
     },
     setDiskFree: (size) => writeControl(out.disk_dir, "free", size),
     setDiskClean: (behaviour) => writeControl(out.disk_dir, "clean", behaviour),
@@ -282,126 +309,149 @@ async function startFixture(
     clearRestartControl: (name) => rm(join(restartDir(out), name), { force: true }),
     stopServer: stop,
     async serverCtl(verb) {
-      const { stdout } = await run(join(migrateDir(out), "server"), [verb]);
-      return stdout.trim();
+      const { stdout } = await run(join(migrateDir(out), "server"), [verb])
+      return stdout.trim()
     },
     releaseMigration: () => rm(join(migrateDir(out), "hold"), { force: true }),
     cliStart(...args) {
-      const proc = spawn(out.gx, args, { env, cwd: tmpdir(), stdio: ["ignore", "pipe", "pipe"] });
-      let stdout = "";
-      let stderr = "";
-      proc.stdout.on("data", (chunk: Buffer) => (stdout += chunk));
-      proc.stderr.on("data", (chunk: Buffer) => (stderr += chunk));
-      const done = new Promise<{ code: number | null; stdout: string }>((resolve) => proc.once("close", (code) => resolve({ code, stdout })));
-      return { stderr: () => stderr, done };
+      const proc = spawn(out.gx, args, { env, cwd: tmpdir(), stdio: ["ignore", "pipe", "pipe"] })
+      let stdout = ""
+      let stderr = ""
+      proc.stdout.on("data", (chunk: Buffer) => (stdout += chunk))
+      proc.stderr.on("data", (chunk: Buffer) => (stderr += chunk))
+      const done = new Promise<{ code: number | null; stdout: string }>((resolve) =>
+        proc.once("close", (code) => resolve({ code, stdout })),
+      )
+      return { stderr: () => stderr, done }
     },
     setInject: (steps) => writeControl(migrateDir(out), "inject.json", JSON.stringify(steps)),
     async globalConfig() {
-      return JSON.parse(await readFile(join(env.HOME!, ".config", "gx", "config.json"), "utf8"));
+      return JSON.parse(await readFile(join(env.HOME!, ".config", "gx", "config.json"), "utf8"))
     },
     async projectConfig(project) {
-      return JSON.parse(await readFile(join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json"), "utf8"));
+      return JSON.parse(
+        await readFile(join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json"), "utf8"),
+      )
     },
     async writeStoreFile(path, content) {
-      const file = join(env.XDG_DATA_HOME!, "gx", "tickets", path);
-      await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, content);
+      const file = join(env.XDG_DATA_HOME!, "gx", "tickets", path)
+      await mkdir(dirname(file), { recursive: true })
+      await writeFile(file, content)
     },
     readStoreFile: (path) => readFile(join(env.XDG_DATA_HOME!, "gx", "tickets", path), "utf8"),
     async sessionImages(id) {
-      const names = await readdir(join(env.XDG_DATA_HOME!, "gx", "sessions", id, "images")).catch(() => [] as string[]);
-      return names.filter((n) => !n.startsWith("."));
+      const names = await readdir(join(env.XDG_DATA_HOME!, "gx", "sessions", id, "images")).catch(
+        () => [] as string[],
+      )
+      return names.filter((n) => !n.startsWith("."))
     },
     async patchProjectConfig(project, patch) {
-      const path = join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json");
-      const next = { ...JSON.parse(await readFile(path, "utf8")), ...patch };
-      await writeFile(path, JSON.stringify(next, null, 2));
+      const path = join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json")
+      const next = { ...JSON.parse(await readFile(path, "utf8")), ...patch }
+      await writeFile(path, JSON.stringify(next, null, 2))
     },
     draftDir: (id) => join(env.XDG_STATE_HOME!, "gx", "design-drafts", id),
     async launches() {
-      const dir = join(env.HOME!, ".claude", "agentfake");
-      const files = (await readdir(dir).catch(() => [] as string[])).filter((n) => n.endsWith(".args"));
-      const stamped = await Promise.all(files.map(async (n) => ({ n, at: (await stat(join(dir, n))).mtimeMs })));
-      const ordered = stamped.sort((a, b) => a.at - b.at);
-      return Promise.all(ordered.map(async ({ n }) => JSON.parse(await readFile(join(dir, n), "utf8")) as string[]));
+      const dir = join(env.HOME!, ".claude", "agentfake")
+      const files = (await readdir(dir).catch(() => [] as string[])).filter((n) =>
+        n.endsWith(".args"),
+      )
+      const stamped = await Promise.all(
+        files.map(async (n) => ({ n, at: (await stat(join(dir, n))).mtimeMs })),
+      )
+      const ordered = stamped.sort((a, b) => a.at - b.at)
+      return Promise.all(
+        ordered.map(async ({ n }) => JSON.parse(await readFile(join(dir, n), "utf8")) as string[]),
+      )
     },
     async input(conversation) {
-      return readFile(join(env.HOME!, ".claude", "agentfake", `${conversation}.in`), "utf8").catch(() => "");
+      return readFile(join(env.HOME!, ".claude", "agentfake", `${conversation}.in`), "utf8").catch(
+        () => "",
+      )
     },
     async controlClaude(conversation, control) {
-      const dir = join(env.HOME!, ".claude", "agentfake");
-      const ack = join(dir, `${conversation}.ack`);
-      const handled = (await stat(ack).catch(() => ({ size: 0 }))).size;
+      const dir = join(env.HOME!, ".claude", "agentfake")
+      const ack = join(dir, `${conversation}.ack`)
+      const handled = (await stat(ack).catch(() => ({ size: 0 }))).size
       // A blocking open of a FIFO nobody reads never returns; O_NONBLOCK fails with ENXIO instead, so the test can say which session is dead.
-      const fifo = await open(join(dir, `${conversation}.ctl`), constants.O_WRONLY | constants.O_NONBLOCK).catch((e) => {
-        throw new Error(`no agentfake is reading ${conversation}.ctl: ${(e as Error).message}`);
-      });
-      await fifo.write(`${JSON.stringify({ type: "agentfake_control", ...control })}\n`);
-      await fifo.close();
+      const fifo = await open(
+        join(dir, `${conversation}.ctl`),
+        constants.O_WRONLY | constants.O_NONBLOCK,
+      ).catch((e) => {
+        throw new Error(`no agentfake is reading ${conversation}.ctl: ${(e as Error).message}`)
+      })
+      await fifo.write(`${JSON.stringify({ type: "agentfake_control", ...control })}\n`)
+      await fifo.close()
       // A key sent before the fake handled the control would beat it.
-      await expect.poll(async () => (await stat(ack).catch(() => ({ size: 0 }))).size).toBeGreaterThan(handled);
+      await expect
+        .poll(async () => (await stat(ack).catch(() => ({ size: 0 }))).size)
+        .toBeGreaterThan(handled)
     },
     async codexDecisions() {
-      const dir = join(env.HOME!, ".codex", "agentfake");
-      const files = (await readdir(dir).catch(() => [] as string[])).filter((n) => n.endsWith(".hooks"));
-      const out: { behavior: string; message: string }[] = [];
+      const dir = join(env.HOME!, ".codex", "agentfake")
+      const files = (await readdir(dir).catch(() => [] as string[])).filter((n) =>
+        n.endsWith(".hooks"),
+      )
+      const out: { behavior: string; message: string }[] = []
       for (const n of files) {
         for (const line of (await readFile(join(dir, n), "utf8")).split("\n").filter(Boolean)) {
-          const run = JSON.parse(line) as { event: string; stdout: string };
-          if (run.event !== "PermissionRequest") continue;
-          let decision: { behavior?: string; message?: string } = {};
+          const run = JSON.parse(line) as { event: string; stdout: string }
+          if (run.event !== "PermissionRequest") continue
+          let decision: { behavior?: string; message?: string } = {}
           try {
-            decision = JSON.parse(run.stdout).hookSpecificOutput?.decision ?? {};
+            decision = JSON.parse(run.stdout).hookSpecificOutput?.decision ?? {}
           } catch {
             // A hook that printed no JSON answered nothing.
           }
-          out.push({ behavior: decision.behavior ?? "", message: decision.message ?? "" });
+          out.push({ behavior: decision.behavior ?? "", message: decision.message ?? "" })
         }
       }
-      return out;
+      return out
     },
     async nextTotpCode() {
-      if (!totpSecret) throw new Error("this fixture runs without TOTP");
-      const deadline = Date.now() + (TOTP_PERIOD_S + 1) * 1000;
+      if (!totpSecret) throw new Error("this fixture runs without TOTP")
+      const deadline = Date.now() + (TOTP_PERIOD_S + 1) * 1000
       for (;;) {
-        const current = Math.floor(Date.now() / 1000 / TOTP_PERIOD_S);
-        const step = Math.max(current, (lastSteps.get(totpSecret) ?? 0) + 1);
+        const current = Math.floor(Date.now() / 1000 / TOTP_PERIOD_S)
+        const step = Math.max(current, (lastSteps.get(totpSecret) ?? 0) + 1)
         // The server accepts one step ahead of its clock.
         if (step <= current + 1) {
-          lastSteps.set(totpSecret, step);
-          return totpCode(totpSecret, step);
+          lastSteps.set(totpSecret, step)
+          return totpCode(totpSecret, step)
         }
-        if (Date.now() > deadline) throw new Error("no new TOTP step began in time");
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        if (Date.now() > deadline) throw new Error("no new TOTP step began in time")
+        await new Promise((resolve) => setTimeout(resolve, 250))
       }
     },
     staleTotpCode() {
-      return totpCode(totpSecret, Math.floor(Date.now() / 1000 / TOTP_PERIOD_S));
+      return totpCode(totpSecret, Math.floor(Date.now() / 1000 / TOTP_PERIOD_S))
     },
     useTotpSecret(secret) {
-      totpSecret = secret.replace(/\s/g, "");
+      totpSecret = secret.replace(/\s/g, "")
     },
-  };
+  }
   // The cookie is `__Host-`: set with the URL (secure, no domain), never a domain.
   // The web-setup and web-login scenarios start signed out, with no cookie.
   if (out.cookie) {
-    await page.context().addCookies([{ name: out.cookie_name, value: out.cookie, url: out.web_url, secure: true }]);
+    await page
+      .context()
+      .addCookies([{ name: out.cookie_name, value: out.cookie, url: out.web_url, secure: true }])
   }
   // One script per page: a flow that starts several fixtures would otherwise count each reload once per start.
   if (!countedPages.has(page)) {
-    countedPages.add(page);
+    countedPages.add(page)
     await page.addInitScript((key) => {
       try {
-        const n = sessionStorage.getItem(key);
-        if (n !== null) sessionStorage.setItem(key, String(Number(n) + 1));
+        const n = sessionStorage.getItem(key)
+        if (n !== null) sessionStorage.setItem(key, String(Number(n) + 1))
       } catch {
         // Storage off: the count stays unset and the test fails at the end.
       }
-    }, LOADS);
+    }, LOADS)
   }
-  await page.goto(out.web_url);
-  await page.evaluate((key) => sessionStorage.setItem(key, "0"), LOADS);
-  return { fixture, stop };
+  await page.goto(out.web_url)
+  await page.evaluate((key) => sessionStorage.setItem(key, "0"), LOADS)
+  return { fixture, stop }
 }
 
 /**
@@ -412,116 +462,130 @@ export const test = base.extend<{
   start: (
     scenario: string,
     opts?: {
-      hold?: boolean;
-      autoAdvanceDelay?: string;
-      stallThreshold?: string;
-      config?: Record<string, string>;
-      fakecodex?: boolean;
-      shape?: string;
+      hold?: boolean
+      autoAdvanceDelay?: string
+      stallThreshold?: string
+      config?: Record<string, string>
+      fakecodex?: boolean
+      shape?: string
       /** How long the server serves a command list from its cache. */
-      commandListAge?: string;
+      commandListAge?: string
       /** How many page reloads the flow expects (a restart reloads the tab once); more fail the test. */
-      reloads?: number;
+      reloads?: number
     },
-  ) => Promise<Fixture>;
+  ) => Promise<Fixture>
 }>({
   start: async ({ page }, use) => {
-    const stops: Array<() => Promise<void>> = [];
-    let allowedReloads = 0;
+    const stops: Array<() => Promise<void>> = []
+    let allowedReloads = 0
     await use(async (scenario, opts) => {
-      allowedReloads = opts?.reloads ?? 0;
-      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold, opts?.fakecodex, opts?.shape, opts?.commandListAge);
-      stops.push(stop);
-      return fixture;
-    });
-    const loads = await page.evaluate((key) => sessionStorage.getItem(key), LOADS);
-    await Promise.all(stops.map((stop) => stop()));
-    expect(loads, "no reload count: the page left its origin").not.toBeNull();
-    expect(Number(loads), `the page was reloaded more than the ${allowedReloads} allowed during the flow`).toBeLessThanOrEqual(allowedReloads);
+      allowedReloads = opts?.reloads ?? 0
+      const { fixture, stop } = await startFixture(
+        scenario,
+        page,
+        opts?.hold ?? false,
+        opts?.autoAdvanceDelay,
+        opts?.config,
+        opts?.stallThreshold,
+        opts?.fakecodex,
+        opts?.shape,
+        opts?.commandListAge,
+      )
+      stops.push(stop)
+      return fixture
+    })
+    const loads = await page.evaluate((key) => sessionStorage.getItem(key), LOADS)
+    await Promise.all(stops.map((stop) => stop()))
+    expect(loads, "no reload count: the page left its origin").not.toBeNull()
+    expect(
+      Number(loads),
+      `the page was reloaded more than the ${allowedReloads} allowed during the flow`,
+    ).toBeLessThanOrEqual(allowedReloads)
   },
-});
+})
 
 /** A touch device: `test.use(touch)` in a describe block makes `(pointer: coarse)` match. */
-export const touch = { hasTouch: true, isMobile: true } as const;
+export const touch = { hasTouch: true, isMobile: true } as const
 
 /** Drags one finger from `from` to `to` through CDP touch events, which work in a context without `hasTouch`. */
 export async function swipe(page: Page, from: [number, number], to: [number, number]) {
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true });
-  const at = (x: number, y: number) => [{ x, y }];
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(...from) });
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true })
+  const at = (x: number, y: number) => [{ x, y }]
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(...from) })
   for (let i = 1; i <= 5; i++) {
-    const x = from[0] + ((to[0] - from[0]) * i) / 5;
-    const y = from[1] + ((to[1] - from[1]) * i) / 5;
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(x, y) });
+    const x = from[0] + ((to[0] - from[0]) * i) / 5
+    const y = from[1] + ((to[1] - from[1]) * i) / 5
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(x, y) })
   }
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await cdp.detach();
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] })
+  await cdp.detach()
 }
 
 /** Matches a role's accessible name exactly. */
-export const nav = (name: string) => ({ name, exact: true });
+export const nav = (name: string) => ({ name, exact: true })
 
 /** The footer's Epics menu button; its name gains " · n need you" while cards need you. */
-export const epicsButton = (page: Page) => page.getByRole("button", { name: /^Epics/ });
+export const epicsButton = (page: Page) => page.getByRole("button", { name: /^Epics/ })
 
 /** Opens the Epics page from the footer's Epics menu. */
 export async function openEpics(page: Page) {
-  await epicsButton(page).click();
-  await page.getByRole("menuitem", { name: /^Epics/ }).click();
+  await epicsButton(page).click()
+  await page.getByRole("menuitem", { name: /^Epics/ }).click()
 }
 
 /** The button that opens the app menu, and the menu it opens. */
-export const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
-export const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
+export const menuButton = (page: Page) => page.getByRole("button", nav("Menu"))
+export const menu = (page: Page) => page.getByRole("menu", nav("Menu"))
 
 /** Opens the app menu, sliding the sidebar open first when the viewport hides it. */
 export async function openMenu(page: Page) {
-  const show = page.getByRole("button", nav("Show sidebar"));
+  const show = page.getByRole("button", nav("Show sidebar"))
   // A narrow page first renders the sidebar open, then closes it, so retry until the menu is open.
   await expect(async () => {
-    await menuButton(page).or(show).first().waitFor({ timeout: 2_000 });
-    if (await show.isVisible()) await show.click({ timeout: 2_000 });
-    if (!(await menu(page).isVisible())) await menuButton(page).click({ timeout: 2_000 });
-    await expect(menu(page)).toBeVisible({ timeout: 1_000 });
-  }).toPass();
+    await menuButton(page).or(show).first().waitFor({ timeout: 2_000 })
+    if (await show.isVisible()) await show.click({ timeout: 2_000 })
+    if (!(await menu(page).isVisible())) await menuButton(page).click({ timeout: 2_000 })
+    await expect(menu(page)).toBeVisible({ timeout: 1_000 })
+  }).toPass()
 }
 
 /** The `gx agents list` rows that mention `slug` (tab-separated, the session id first). */
 export const sessionRows = async (fixture: Fixture, slug: string) =>
-  (await fixture.cli("agents", "list")).split("\n").filter((l) => l.includes(slug));
+  (await fixture.cli("agents", "list")).split("\n").filter((l) => l.includes(slug))
 
 /** A section of the Epics page, expanded if it starts collapsed. */
 export async function section(page: Page, title: string) {
-  const region = page.getByRole("region", { name: new RegExp(`^${title}`) });
-  const header = region.getByRole("button", { name: new RegExp(`^${title}`) });
-  if ((await header.getAttribute("aria-expanded")) === "false") await header.click();
-  return region;
+  const region = page.getByRole("region", { name: new RegExp(`^${title}`) })
+  const header = region.getByRole("button", { name: new RegExp(`^${title}`) })
+  if ((await header.getAttribute("aria-expanded")) === "false") await header.click()
+  return region
 }
 
 /** The Epics page card whose title link is `epic`. */
 export const card = (page: Page, epic: string) =>
-  page.locator("[data-kind]").filter({ has: page.getByRole("link", { name: epic, exact: true }) });
+  page.locator("[data-kind]").filter({ has: page.getByRole("link", { name: epic, exact: true }) })
 
 /** Holds every request to `url` until the returned release runs, so a test can see a button while its write is pending. */
 export async function holdRoute(page: Page, url: string): Promise<() => void> {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => (release = resolve));
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => (release = resolve))
   await page.route(url, async (route) => {
-    await gate;
-    await route.continue();
-  });
-  return release;
+    await gate
+    await route.continue()
+  })
+  return release
 }
 
 /** Refuses every `/v1/events` request until the returned release runs, so the page cannot hear the server. */
 export async function blockEvents(page: Page): Promise<() => Promise<void>> {
-  const pattern = "**/v1/events*";
-  await page.route(pattern, (route) => route.abort());
-  return () => page.unroute(pattern);
+  const pattern = "**/v1/events*"
+  await page.route(pattern, (route) => route.abort())
+  return () => page.unroute(pattern)
 }
 
 /** The toasts on screen. */
-export const toasts = (page: Page) => page.getByRole("region", { name: /^Notifications/ }).getByRole("status");
+export const toasts = (page: Page) =>
+  page.getByRole("region", { name: /^Notifications/ }).getByRole("status")
 
-export { expect };
+export { expect }

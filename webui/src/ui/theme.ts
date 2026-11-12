@@ -1,10 +1,5 @@
-import {
-  createSystem,
-  defaultConfig,
-  defineConfig,
-  type SystemStyleObject,
-} from "@chakra-ui/react";
-import { KINDS, TONES, type Kind, type Tone } from "./tone";
+import { createSystem, defaultConfig, defineConfig, type SystemStyleObject } from "@chakra-ui/react"
+import { KINDS, TONES, type Kind, type Tone } from "./tone"
 
 // The only file allowed to hold raw colors and font names; see raw-style.test.ts.
 const toneColors: Record<Tone, { fg: string; bg: string; text?: string }> = {
@@ -14,11 +9,11 @@ const toneColors: Record<Tone, { fg: string; bg: string; text?: string }> = {
   deadlocked: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
   done: { fg: "#55d996", bg: "rgba(85, 217, 150, 0.16)" },
   muted: { fg: "#b4bcc8", bg: "rgba(180, 188, 200, 0.14)" },
-};
+}
 
 const toneTokens = Object.fromEntries(
   TONES.map((t) => {
-    const { fg, bg, text } = toneColors[t];
+    const { fg, bg, text } = toneColors[t]
     return [
       t,
       {
@@ -26,23 +21,20 @@ const toneTokens = Object.fromEntries(
         bg: { value: bg },
         ...(text && { text: { value: text } }),
       },
-    ];
+    ]
   }),
-);
+)
 
 const kindColors: Record<Kind, { fg: string; bg: string }> = {
   design: { fg: "#c4a7ff", bg: "rgba(196, 167, 255, 0.13)" },
   implementation: { fg: "#7ad8d0", bg: "rgba(122, 216, 208, 0.13)" },
   oneoff: { fg: "#f0a6ca", bg: "rgba(240, 166, 202, 0.13)" },
   followups: { fg: "#b4bcc8", bg: "rgba(180, 188, 200, 0.13)" },
-};
+}
 
 const kindTokens = Object.fromEntries(
-  KINDS.map((k) => [
-    k,
-    { fg: { value: kindColors[k].fg }, bg: { value: kindColors[k].bg } },
-  ]),
-);
+  KINDS.map((k) => [k, { fg: { value: kindColors[k].fg }, bg: { value: kindColors[k].bg } }]),
+)
 
 export const themeConfig = defineConfig({
   globalCss: {
@@ -67,8 +59,7 @@ export const themeConfig = defineConfig({
     // A menu holds focus itself and marks the keyboard-highlighted item, so the ring belongs to that item.
     "[role='menu']:focus-visible": { boxShadow: "none !important" },
     "[role='menu']:focus-visible [role='menuitem'][data-highlighted]": {
-      boxShadow:
-        "0 0 0 2px {colors.surface.raised}, 0 0 0 4px {colors.tone.running.fg} !important",
+      boxShadow: "0 0 0 2px {colors.surface.raised}, 0 0 0 4px {colors.tone.running.fg} !important",
     },
     // A field inside a box that draws the ring itself (ExpandableTextField): the field shows none.
     "[data-focus-ring='none']:focus-visible": { boxShadow: "none !important" },
@@ -87,7 +78,10 @@ export const themeConfig = defineConfig({
   theme: {
     keyframes: {
       orbit: { to: { "--gx-orbit-angle": "360deg" } },
-      chatDot: { "0%, 60%, 100%": { transform: "translateY(0)", opacity: 0.5 }, "30%": { transform: "translateY(-2px)", opacity: 1 } },
+      chatDot: {
+        "0%, 60%, 100%": { transform: "translateY(0)", opacity: 0.5 },
+        "30%": { transform: "translateY(-2px)", opacity: 1 },
+      },
       chatShimmer: {
         from: { maskPosition: "100% 0" },
         to: { maskPosition: "0% 0" },
@@ -173,6 +167,6 @@ export const themeConfig = defineConfig({
       },
     },
   },
-});
+})
 
-export const system = createSystem(defaultConfig, themeConfig);
+export const system = createSystem(defaultConfig, themeConfig)

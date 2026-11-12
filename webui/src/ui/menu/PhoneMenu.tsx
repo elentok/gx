@@ -1,4 +1,4 @@
-import { Box, chakra, Portal, Text } from "@chakra-ui/react";
+import { Box, chakra, Portal, Text } from "@chakra-ui/react"
 import {
   cloneElement,
   useEffect,
@@ -10,120 +10,124 @@ import {
   type MouseEvent,
   type ReactElement,
   type ReactNode,
-} from "react";
-import { useOnCloseSignal } from "../closeSignal";
-import type { MenuEntry, MenuProps, SubmenuItem } from "./Menu";
-import { useReportOpen } from "./useReportOpen";
+} from "react"
+import { useOnCloseSignal } from "../closeSignal"
+import type { MenuEntry, MenuProps, SubmenuItem } from "./Menu"
+import { useReportOpen } from "./useReportOpen"
 
-const WIDTH = 280;
-const INSET = 8;
-const GAP = 4;
+const WIDTH = 280
+const INSET = 8
+const GAP = 4
 
 interface Row {
-  key: string;
-  role: "menuitem" | "menuitemcheckbox" | "menuitemradio";
-  label: ReactNode;
-  hint?: ReactNode;
-  inlineHint?: boolean;
-  disabled?: boolean;
-  disabledReason?: string;
-  danger?: boolean;
-  checked?: boolean;
-  chevron?: boolean;
-  current?: boolean;
-  run: () => void;
+  key: string
+  role: "menuitem" | "menuitemcheckbox" | "menuitemradio"
+  label: ReactNode
+  hint?: ReactNode
+  inlineHint?: boolean
+  disabled?: boolean
+  disabledReason?: string
+  danger?: boolean
+  checked?: boolean
+  chevron?: boolean
+  current?: boolean
+  run: () => void
 }
 
-type Node = { row: Row } | { separator: string } | { content: ReactNode; key: string };
+type Node = { row: Row } | { separator: string } | { content: ReactNode; key: string }
 
 interface Place {
-  left: number;
-  maxHeight: number;
-  top?: number;
-  bottom?: number;
+  left: number
+  maxHeight: number
+  top?: number
+  bottom?: number
 }
 
 /** Below the button when it fits, else above (or the roomier side); the right edge sits on the button's, kept inside the screen. */
 function place(rect: DOMRect, height: number): Place {
-  const left = Math.min(Math.max(rect.right - WIDTH, INSET), window.innerWidth - WIDTH - INSET);
-  const below = window.innerHeight - rect.bottom - GAP - INSET;
-  const above = rect.top - GAP - INSET;
-  if (height <= below || below >= above) return { left, top: rect.bottom + GAP, maxHeight: below };
+  const left = Math.min(Math.max(rect.right - WIDTH, INSET), window.innerWidth - WIDTH - INSET)
+  const below = window.innerHeight - rect.bottom - GAP - INSET
+  const above = rect.top - GAP - INSET
+  if (height <= below || below >= above) return { left, top: rect.bottom + GAP, maxHeight: below }
   // Anchored by its bottom edge, so a submenu swap grows upward and the panel keeps its place.
-  return { left, bottom: window.innerHeight - rect.top + GAP, maxHeight: above };
+  return { left, bottom: window.innerHeight - rect.top + GAP, maxHeight: above }
 }
 
 /** The phone menu: an anchored popover over a light dim, with submenus swapped into the same panel. */
 export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal }: MenuProps) {
-  const [anchor, setAnchor] = useState<{ rect: DOMRect; el: HTMLElement } | null>(null);
-  useReportOpen(!!anchor, onOpenChange);
-  const [path, setPath] = useState<SubmenuItem[]>([]);
-  const [active, setActive] = useState<string>();
-  const [placed, setPlaced] = useState<Place>();
-  const panel = useRef<HTMLDivElement>(null);
-  const autoId = useId();
-  const tp = trigger.props as { id?: string; onClick?: (e: MouseEvent<HTMLElement>) => void };
-  const triggerId = tp.id ?? autoId;
+  const [anchor, setAnchor] = useState<{ rect: DOMRect; el: HTMLElement } | null>(null)
+  useReportOpen(!!anchor, onOpenChange)
+  const [path, setPath] = useState<SubmenuItem[]>([])
+  const [active, setActive] = useState<string>()
+  const [placed, setPlaced] = useState<Place>()
+  const panel = useRef<HTMLDivElement>(null)
+  const autoId = useId()
+  const tp = trigger.props as { id?: string; onClick?: (e: MouseEvent<HTMLElement>) => void }
+  const triggerId = tp.id ?? autoId
 
   const reset = () => {
-    setAnchor(null);
-    setPath([]);
-    setActive(undefined);
-    setPlaced(undefined);
-  };
+    setAnchor(null)
+    setPath([])
+    setActive(undefined)
+    setPlaced(undefined)
+  }
   const close = () => {
-    anchor?.el.focus();
-    reset();
-    onClosed?.();
-  };
+    anchor?.el.focus()
+    reset()
+    onClosed?.()
+  }
 
-  useOnCloseSignal(closeSignal, reset);
+  useOnCloseSignal(closeSignal, reset)
 
   useLayoutEffect(() => {
-    if (anchor && !placed && panel.current) setPlaced(place(anchor.rect, panel.current.getBoundingClientRect().height));
-  }, [anchor, placed]);
+    if (anchor && !placed && panel.current)
+      setPlaced(place(anchor.rect, panel.current.getBoundingClientRect().height))
+  }, [anchor, placed])
   // The button's row can move while the menu is open (live reorder): follow the button, not the rect captured at open.
-  const isPlaced = !!placed;
+  const isPlaced = !!placed
   useEffect(() => {
-    if (!anchor || !isPlaced) return;
-    let last = anchor.rect;
+    if (!anchor || !isPlaced) return
+    let last = anchor.rect
     let frame = requestAnimationFrame(function follow() {
-      const rect = anchor.el.getBoundingClientRect();
+      const rect = anchor.el.getBoundingClientRect()
       if (panel.current && (rect.top !== last.top || rect.left !== last.left)) {
-        last = rect;
-        setPlaced(place(rect, panel.current.getBoundingClientRect().height));
+        last = rect
+        setPlaced(place(rect, panel.current.getBoundingClientRect().height))
       }
-      frame = requestAnimationFrame(follow);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [anchor, isPlaced]);
+      frame = requestAnimationFrame(follow)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [anchor, isPlaced])
   // A browser refuses to focus the panel while it is still hidden, so wait until it is placed.
   useEffect(() => {
-    if (anchor && placed) panel.current?.focus();
-  }, [anchor, placed]);
+    if (anchor && placed) panel.current?.focus()
+  }, [anchor, placed])
 
   const enter = (s: SubmenuItem) => {
-    setPath([...path, s]);
-    setActive(undefined);
-  };
+    setPath([...path, s])
+    setActive(undefined)
+  }
   const back = () => {
-    setPath(path.slice(0, -1));
-    setActive(undefined);
-  };
+    setPath(path.slice(0, -1))
+    setActive(undefined)
+  }
 
-  const nodes: Node[] = [];
-  const entries: MenuEntry[] = path.length ? path[path.length - 1].items : items;
+  const nodes: Node[] = []
+  const entries: MenuEntry[] = path.length ? path[path.length - 1].items : items
   if (path.length) {
-    nodes.push({ row: { key: "__back", role: "menuitem", label: "‹ Back", run: back } }, { separator: "__back-sep" });
+    nodes.push(
+      { row: { key: "__back", role: "menuitem", label: "‹ Back", run: back } },
+      { separator: "__back-sep" },
+    )
   }
   entries.forEach((e, i) => {
     switch (e.kind) {
       case "separator":
-        nodes.push({ separator: `sep-${i}` });
-        break;
+        nodes.push({ separator: `sep-${i}` })
+        break
       case "content":
-        nodes.push({ content: e.content, key: e.value });
-        break;
+        nodes.push({ content: e.content, key: e.value })
+        break
       case "checkbox":
         nodes.push({
           row: {
@@ -131,12 +135,12 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
             key: e.value,
             role: "menuitemcheckbox",
             run: () => {
-              e.onCheckedChange(!e.checked);
-              if (e.closeOnSelect !== false) close();
+              e.onCheckedChange(!e.checked)
+              if (e.closeOnSelect !== false) close()
             },
           },
-        });
-        break;
+        })
+        break
       case "radio-group":
         for (const o of e.options) {
           nodes.push({
@@ -146,16 +150,18 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
               role: "menuitemradio",
               checked: o.value === e.current,
               run: () => {
-                e.onValueChange(o.value);
-                close();
+                e.onValueChange(o.value)
+                close()
               },
             },
-          });
+          })
         }
-        break;
+        break
       case "submenu":
-        nodes.push({ row: { ...e, key: e.value, role: "menuitem", chevron: true, run: () => enter(e) } });
-        break;
+        nodes.push({
+          row: { ...e, key: e.value, role: "menuitem", chevron: true, run: () => enter(e) },
+        })
+        break
       default:
         nodes.push({
           row: {
@@ -163,47 +169,47 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
             key: e.value,
             role: "menuitem",
             run: () => {
-              e.onSelect();
-              if (e.closeOnSelect !== false) close();
+              e.onSelect()
+              if (e.closeOnSelect !== false) close()
             },
           },
-        });
+        })
     }
-  });
-  const rows = nodes.flatMap((n) => ("row" in n && !n.row.disabled ? [n.row] : []));
+  })
+  const rows = nodes.flatMap((n) => ("row" in n && !n.row.disabled ? [n.row] : []))
 
   const onKeyDown = (e: KeyboardEvent) => {
-    const at = rows.findIndex((r) => r.key === active);
-    const go = (i: number) => setActive(rows[(i + rows.length) % rows.length]?.key);
-    const row = rows[at];
+    const at = rows.findIndex((r) => r.key === active)
+    const go = (i: number) => setActive(rows[(i + rows.length) % rows.length]?.key)
+    const row = rows[at]
     const handled = (() => {
       switch (e.key) {
         case "ArrowDown":
-          return go(at + 1), true;
+          return (go(at + 1), true)
         case "ArrowUp":
-          return go(at < 0 ? -1 : at - 1), true;
+          return (go(at < 0 ? -1 : at - 1), true)
         case "Home":
-          return go(0), true;
+          return (go(0), true)
         case "End":
-          return go(-1), true;
+          return (go(-1), true)
         case "Enter":
         case " ":
-          return row?.run(), true;
+          return (row?.run(), true)
         case "ArrowRight":
-          return row?.chevron && row.run(), true;
+          return (row?.chevron && row.run(), true)
         case "ArrowLeft":
-          return path.length && back(), true;
+          return (path.length && back(), true)
         case "Escape":
-          return close(), true;
+          return (close(), true)
         default:
-          return false;
+          return false
       }
-    })();
+    })()
     if (handled) {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault()
+      e.stopPropagation()
     }
-  };
+  }
 
   return (
     <>
@@ -212,15 +218,23 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
         "aria-haspopup": "menu",
         "aria-expanded": !!anchor,
         onClick: (e: MouseEvent<HTMLElement>) => {
-          tp.onClick?.(e);
-          if (e.defaultPrevented) return;
-          if (anchor) close();
-          else setAnchor({ rect: e.currentTarget.getBoundingClientRect(), el: e.currentTarget });
+          tp.onClick?.(e)
+          if (e.defaultPrevented) return
+          if (anchor) close()
+          else setAnchor({ rect: e.currentTarget.getBoundingClientRect(), el: e.currentTarget })
         },
       })}
       {anchor && (
         <Portal>
-          <Box position="fixed" inset="0" zIndex="popover" pointerEvents="auto" data-testid="menu-dim" bg="rgba(0,0,0,.35)" onClick={close}>
+          <Box
+            position="fixed"
+            inset="0"
+            zIndex="popover"
+            pointerEvents="auto"
+            data-testid="menu-dim"
+            bg="rgba(0,0,0,.35)"
+            onClick={close}
+          >
             <Box
               ref={panel}
               role="menu"
@@ -242,9 +256,12 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
               style={placed ?? { left: 0, top: 0 }}
             >
               {nodes.map((n) => {
-                if ("separator" in n) return <Box key={n.separator} role="separator" h="1px" bg="border" mx="1.5" my="1" />;
-                if ("content" in n) return <Box key={n.key}>{n.content}</Box>;
-                const r = n.row;
+                if ("separator" in n)
+                  return (
+                    <Box key={n.separator} role="separator" h="1px" bg="border" mx="1.5" my="1" />
+                  )
+                if ("content" in n) return <Box key={n.key}>{n.content}</Box>
+                const r = n.row
                 return (
                   <chakra.button
                     type="button"
@@ -271,8 +288,16 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
                     cursor={r.disabled ? "not-allowed" : "pointer"}
                     color={r.disabled ? "text.muted" : r.danger ? "tone.paused.fg" : "text"}
                     {...(r.inlineHint
-                      ? { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }
-                      : { flexDirection: "column", alignItems: "flex-start", justifyContent: "center" })}
+                      ? {
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }
+                      : {
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          justifyContent: "center",
+                        })}
                     _highlighted={{ bg: "surface" }}
                     _active={{ bg: "surface" }}
                   >
@@ -293,12 +318,12 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
                       </Text>
                     )}
                   </chakra.button>
-                );
+                )
               })}
             </Box>
           </Box>
         </Portal>
       )}
     </>
-  );
+  )
 }

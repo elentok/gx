@@ -1,15 +1,23 @@
-import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test, vi } from "vitest";
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicDetail, EpicDetailRow, EpicList, EpicListRow, MapStep, SessionInfo, SessionRoundCard } from "../generated/server";
-import { appRoutes, type RouteFetchers } from "../routes";
-import { roundCards } from "./roundFixture";
-import { renderThemed } from "../ui/render";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { createMemoryRouter, RouterProvider } from "react-router"
+import { afterEach, expect, test, vi } from "vitest"
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
+import type {
+  EpicDetail,
+  EpicDetailRow,
+  EpicList,
+  EpicListRow,
+  MapStep,
+  SessionInfo,
+  SessionRoundCard,
+} from "../generated/server"
+import { appRoutes, type RouteFetchers } from "../routes"
+import { roundCards } from "./roundFixture"
+import { renderThemed } from "../ui/render"
 
-afterEach(cleanup);
+afterEach(cleanup)
 
-const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
 
 const map = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   address: `gx:${name}`,
@@ -23,7 +31,7 @@ const map = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   queueable: false,
   blocked_by_epics: [],
   ...over,
-});
+})
 
 const session = (name: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id: `s-${name}`,
@@ -40,7 +48,7 @@ const session = (name: string, over: Partial<SessionInfo> = {}): SessionInfo => 
   auto_advance: true,
   auto_queue: false,
   ...over,
-});
+})
 
 const STEPS: [string, string][] = [
   ["chart", "Chart"],
@@ -51,18 +59,22 @@ const STEPS: [string, string][] = [
   ["create-tickets", "Create tickets"],
   ["branch", "Branch"],
   ["done", "Done"],
-];
+]
 
 // The step at `current` is current, those before are done, the rest todo.
 const stepsAt = (current: number): MapStep[] =>
-  STEPS.map(([step, label], i) => ({ step, label, state: i < current ? "done" : i === current ? "current" : "todo" }));
+  STEPS.map(([step, label], i) => ({
+    step,
+    label,
+    state: i < current ? "done" : i === current ? "current" : "todo",
+  }))
 
 const ticketRow = (n: string, title: string, over: Partial<EpicDetailRow> = {}): EpicDetailRow => ({
   address: `gx:a/${n}`,
   title,
   rendered_status: "open",
   ...over,
-});
+})
 
 const detailOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   address: "gx:a",
@@ -78,7 +90,7 @@ const detailOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   queued: false,
   steps: stepsAt(1),
   ...over,
-});
+})
 
 function render(
   epics: EpicListRow[],
@@ -87,111 +99,133 @@ function render(
   detail: EpicDetail = detailOf(),
   fetchers: RouteFetchers = {},
 ) {
-  let state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
-  const listeners = new Set<() => void>();
+  let state = {
+    snapshot: { sessions },
+    connected: true,
+    loadedOnce: true,
+    tick: 0,
+  } as unknown as ConnectionState
+  const listeners = new Set<() => void>()
   const conn = {
     getState: () => state,
     subscribe: (fn: () => void) => {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
+      listeners.add(fn)
+      return () => listeners.delete(fn)
     },
     onEvent: () => () => {},
     refresh: () => {},
-  } as unknown as Connection;
-  const list: EpicList = { epics, follow_ups: [] };
+  } as unknown as Connection
+  const list: EpicList = { epics, follow_ups: [] }
   const router = createMemoryRouter(
-    appRoutes({ epicList: async () => list, epic: async () => ({ kind: "ok", detail }), ...fetchers }),
+    appRoutes({
+      epicList: async () => list,
+      epic: async () => ({ kind: "ok", detail }),
+      ...fetchers,
+    }),
     { initialEntries: [path] },
-  );
+  )
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
-  );
+  )
   const setSessions = (next: SessionInfo[]) => {
-    state = { ...state, snapshot: { sessions: next } } as unknown as ConnectionState;
-    act(() => listeners.forEach((fn) => fn()));
-  };
-  return Object.assign(router, { setSessions });
+    state = { ...state, snapshot: { sessions: next } } as unknown as ConnectionState
+    act(() => listeners.forEach((fn) => fn()))
+  }
+  return Object.assign(router, { setSessions })
 }
 
-const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent;
-const agentBlock = async () => within((await screen.findByText("Agent")).parentElement as HTMLElement);
+const metaText = async () => (await screen.findByTestId("page-header-meta")).textContent
+const agentBlock = async () =>
+  within((await screen.findByText("Agent")).parentElement as HTMLElement)
 
 test("the meta line holds no model and no epic link; the menu's Agent block has the tier and no Model row", async () => {
-  render([map("a")], [session("a", { harness: "codex", tier: "worker", model: "gpt-5.3-codex", effort: "medium" })]);
-  expect(await metaText()).toBe("");
-  expect(screen.queryByRole("link", { name: /Design epic/ })).toBeNull();
-  await openMenu();
-  const block = await agentBlock();
-  expect(block.queryByText("Model")).toBeNull();
-  expect(block.queryByText(/GPT-5.3-Codex/)).toBeNull();
-  expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
-  expect(block.queryByText("Effort")).toBeNull();
-});
+  render(
+    [map("a")],
+    [session("a", { harness: "codex", tier: "worker", model: "gpt-5.3-codex", effort: "medium" })],
+  )
+  expect(await metaText()).toBe("")
+  expect(screen.queryByRole("link", { name: /Design epic/ })).toBeNull()
+  await openMenu()
+  const block = await agentBlock()
+  expect(block.queryByText("Model")).toBeNull()
+  expect(block.queryByText(/GPT-5.3-Codex/)).toBeNull()
+  expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker")
+  expect(block.queryByText("Effort")).toBeNull()
+})
 
 test("on a phone the Agent block shows Effort and Tier, and no model", () =>
   onPhone(async () => {
-    render([map("a")], [session("a", { tier: "worker", model: "sonnet", effort: "medium" })]);
-    await openMenu();
-    const block = await agentBlock();
-    expect(block.queryByText("Model")).toBeNull();
-    expect(block.getByText("Effort").nextSibling?.textContent).toBe("medium");
-    expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker");
-  }));
+    render([map("a")], [session("a", { tier: "worker", model: "sonnet", effort: "medium" })])
+    await openMenu()
+    const block = await agentBlock()
+    expect(block.queryByText("Model")).toBeNull()
+    expect(block.getByText("Effort").nextSibling?.textContent).toBe("medium")
+    expect(block.getByText("Tier").nextSibling?.textContent).toBe("Worker")
+  }))
 
 test("a switched model adds the by-hand row", async () => {
-  render([map("a")], [session("a", { tier: "worker", model: "opus", effort: "max", model_switched: true })]);
-  await openMenu();
-  expect((await agentBlock()).getByText("switched by hand")).toBeTruthy();
-});
+  render(
+    [map("a")],
+    [session("a", { tier: "worker", model: "opus", effort: "max", model_switched: true })],
+  )
+  await openMenu()
+  expect((await agentBlock()).getByText("switched by hand")).toBeTruthy()
+})
 
 test("with no session the menu has no Agent block, and Open design epic is its first item and opens the epic page", async () => {
-  const router = render([map("a")], []);
-  await openMenu();
-  expect(screen.queryByText("Agent")).toBeNull();
-  expect((await screen.findAllByRole("menuitem"))[0].textContent).toBe("Open design epic ↗");
-  fireEvent.click(screen.getByRole("menuitem", { name: "Open design epic ↗" }));
-  await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:a"));
-});
+  const router = render([map("a")], [])
+  await openMenu()
+  expect(screen.queryByText("Agent")).toBeNull()
+  expect((await screen.findAllByRole("menuitem"))[0].textContent).toBe("Open design epic ↗")
+  fireEvent.click(screen.getByRole("menuitem", { name: "Open design epic ↗" }))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:a"))
+})
 
 test("Copy design ID copies the address and shows it as the subtitle, with no session", async () => {
-  const writeText = vi.fn(async () => {});
-  vi.stubGlobal("navigator", { clipboard: { writeText } });
+  const writeText = vi.fn(async () => {})
+  vi.stubGlobal("navigator", { clipboard: { writeText } })
   try {
-    render([map("a")], [], "/d/gx:a", detailOf());
-    await openMenu();
-    const item = await screen.findByRole("menuitem", { name: /Copy design ID/ });
-    expect(item.textContent).toContain("gx:a");
-    expect(deleteItem()).toBeNull();
-    fireEvent.click(item);
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:a"));
+    render([map("a")], [], "/d/gx:a", detailOf())
+    await openMenu()
+    const item = await screen.findByRole("menuitem", { name: /Copy design ID/ })
+    expect(item.textContent).toContain("gx:a")
+    expect(deleteItem()).toBeNull()
+    fireEvent.click(item)
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:a"))
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 test("the title row holds the Design name and More actions, with no picker or state label", async () => {
-  render([map("a"), map("b")], [session("a", { status: { state: "working" } })]);
-  const title = await screen.findByRole("heading", { level: 1 });
-  expect(title.textContent).toBe("a");
-  expect(within(title).queryByRole("button")).toBeNull();
-  expect(screen.queryByRole("link", { name: /^←/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "More actions" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "New session" })).toBeNull();
-  expect(screen.queryByRole("button", { name: /live/ })).toBeNull();
-  expect(screen.queryByLabelText("Filter Designs")).toBeNull();
-  expect(screen.queryByRole("link", { name: /^b/ })).toBeNull();
-  expect(screen.queryByText(/designing|working/i)).toBeNull();
-  expect(screen.getByRole("region", { name: "Chat" })).toBeTruthy();
-  expect(screen.getByRole("region", { name: "Progress" })).toBeTruthy();
-});
+  render([map("a"), map("b")], [session("a", { status: { state: "working" } })])
+  const title = await screen.findByRole("heading", { level: 1 })
+  expect(title.textContent).toBe("a")
+  expect(within(title).queryByRole("button")).toBeNull()
+  expect(screen.queryByRole("link", { name: /^←/ })).toBeNull()
+  expect(screen.getByRole("button", { name: "More actions" })).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "New session" })).toBeNull()
+  expect(screen.queryByRole("button", { name: /live/ })).toBeNull()
+  expect(screen.queryByLabelText("Filter Designs")).toBeNull()
+  expect(screen.queryByRole("link", { name: /^b/ })).toBeNull()
+  expect(screen.queryByText(/designing|working/i)).toBeNull()
+  expect(screen.getByRole("region", { name: "Chat" })).toBeTruthy()
+  expect(screen.getByRole("region", { name: "Progress" })).toBeTruthy()
+})
 
-const ringOf = () => document.querySelector("[data-kind][data-tone]") as HTMLElement;
+const ringOf = () => document.querySelector("[data-kind][data-tone]") as HTMLElement
 
 test.each([
   ["done", { steps: stepsAt(8) }, [], "done", false],
-  ["a live session with an Actionable", {}, [session("a", { actionable: { reason: "question" } })], "waiting", false],
+  [
+    "a live session with an Actionable",
+    {},
+    [session("a", { actionable: { reason: "question" } })],
+    "waiting",
+    false,
+  ],
   ["a working session", {}, [session("a", { status: { state: "working" } })], "running", true],
   ["a starting session", {}, [session("a", { status: { state: "starting" } })], "running", true],
   ["creating tickets", { steps: stepsAt(5), impl_address: "gx:a-impl" }, [], "running", true],
@@ -199,49 +233,55 @@ test.each([
   ["only an Exited session", {}, [session("a", { status: { state: "exited" } })], "muted", false],
   ["no session", {}, [], "muted", false],
 ])("a Design page with %s", async (_n, over, sessions, tone, comet) => {
-  render([map("a")], sessions, "/d/gx:a", detailOf({ ...over, ring_progress: 40 }));
-  expect(await screen.findByText("40%")).toBeTruthy();
-  expect(ringOf().getAttribute("data-kind")).toBe("design");
-  expect(ringOf().getAttribute("data-tone")).toBe(tone);
-  expect(!!screen.queryByTestId("comet")).toBe(comet);
-});
+  render([map("a")], sessions, "/d/gx:a", detailOf({ ...over, ring_progress: 40 }))
+  expect(await screen.findByText("40%")).toBeTruthy()
+  expect(ringOf().getAttribute("data-kind")).toBe("design")
+  expect(ringOf().getAttribute("data-tone")).toBe(tone)
+  expect(!!screen.queryByTestId("comet")).toBe(comet)
+})
 
 test("the ring sits in the header actions after the title at 56px, and at 44px on a phone", async () => {
-  render([map("a")], []);
-  await screen.findByText("0%");
-  const title = screen.getByRole("heading", { level: 1 });
-  expect(title.compareDocumentPosition(ringOf()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 56 56");
-  cleanup();
-  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  render([map("a")], [])
+  await screen.findByText("0%")
+  const title = screen.getByRole("heading", { level: 1 })
+  expect(title.compareDocumentPosition(ringOf()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 56 56")
+  cleanup()
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
   try {
-    render([map("a")], []);
-    await screen.findByText("0%");
-    expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 44 44");
+    render([map("a")], [])
+    await screen.findByText("0%")
+    expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 44 44")
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 test("a tablet-width Design page gives the chat the full width, leaving the footer room", async () => {
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: query === "(min-width: 40em)",
     addEventListener() {},
     removeEventListener() {},
-  }));
+  }))
   try {
-    render([map("a")], []);
-    await screen.findByText("0%");
-    const grid = screen.getByRole("region", { name: "Chat" }).parentElement!;
-    expect(getComputedStyle(grid).gridTemplateColumns).not.toContain("300px");
-    expect(screen.queryByRole("region", { name: "Progress" })).toBeNull();
+    render([map("a")], [])
+    await screen.findByText("0%")
+    const grid = screen.getByRole("region", { name: "Chat" }).parentElement!
+    expect(getComputedStyle(grid).gridTemplateColumns).not.toContain("300px")
+    expect(screen.queryByRole("region", { name: "Progress" })).toBeNull()
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 test("the countdown keeps running after Close dialog", async () => {
-  const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response("{}", { status: 200 }))
   render(
     [map("a")],
     [
@@ -253,61 +293,85 @@ test("the countdown keeps running after Close dialog", async () => {
     ],
     "/d/gx:a",
     detailOf(),
-    { chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], questions: [], background: [] } }) },
-  );
-  fireEvent.click(await screen.findByRole("button", { name: "Close dialog" }));
-  await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith("/v1/sessions/keys", expect.objectContaining({ method: "POST" })));
-  expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-advance/cancel", expect.anything());
-  expect(await screen.findByText(/Continuing in \d+s/)).toBeTruthy();
-  fetchSpy.mockRestore();
-});
+    {
+      chat: async () => ({
+        kind: "ok",
+        detail: { conversation_id: "c1", messages: [], questions: [], background: [] },
+      }),
+    },
+  )
+  fireEvent.click(await screen.findByRole("button", { name: "Close dialog" }))
+  await waitFor(() =>
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/v1/sessions/keys",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  )
+  expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-advance/cancel", expect.anything())
+  expect(await screen.findByText(/Continuing in \d+s/)).toBeTruthy()
+  fetchSpy.mockRestore()
+})
 
 test("without a session the title row offers to start one", async () => {
-  render([map("a")], []);
-  expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();
-});
+  render([map("a")], [])
+  expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy()
+})
 
-const failedStart = { pathname: "/d/gx:a", state: { startFailure: "agent binary missing" } };
+const failedStart = { pathname: "/d/gx:a", state: { startFailure: "agent binary missing" } }
 
 test("a failed start's reason shows above Start design session when the map has no session", async () => {
-  render([map("a")], [], failedStart);
-  const button = await screen.findByRole("button", { name: "Start design session" });
-  const alert = screen.getByRole("alert");
-  expect(alert.textContent).toBe("agent binary missing");
-  expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-});
+  render([map("a")], [], failedStart)
+  const button = await screen.findByRole("button", { name: "Start design session" })
+  const alert = screen.getByRole("alert")
+  expect(alert.textContent).toBe("agent binary missing")
+  expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
 
 test("a failed start's reason stays under the header when an exited session exists", async () => {
-  render([map("a")], [session("a", { status: { state: "exited" } })], failedStart);
-  const button = await screen.findByRole("button", { name: "More actions" });
-  const alert = screen.getByRole("alert");
-  expect(alert.textContent).toBe("agent binary missing");
-  expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-});
+  render([map("a")], [session("a", { status: { state: "exited" } })], failedStart)
+  const button = await screen.findByRole("button", { name: "More actions" })
+  const alert = screen.getByRole("alert")
+  expect(alert.textContent).toBe("agent binary missing")
+  expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
 
 test("a chart-step map with an exited session shows the session header, never the New Design form", async () => {
-  render([map("a")], [session("a", { status: { state: "exited" } })], "/d/gx:a", detailOf({ steps: stepsAt(0) }));
-  await openMenu();
-  fireEvent.click(await screen.findByRole("menuitem", { name: /New session/ }));
-  expect(screen.queryByRole("form", { name: "New Design" })).toBeNull();
-  expect(screen.queryByLabelText("Epic slug")).toBeNull();
-});
+  render(
+    [map("a")],
+    [session("a", { status: { state: "exited" } })],
+    "/d/gx:a",
+    detailOf({ steps: stepsAt(0) }),
+  )
+  await openMenu()
+  fireEvent.click(await screen.findByRole("menuitem", { name: /New session/ }))
+  expect(screen.queryByRole("form", { name: "New Design" })).toBeNull()
+  expect(screen.queryByLabelText("Epic slug")).toBeNull()
+})
 
 test("a Design with no map yet and no session still offers Start design session", async () => {
-  render([], []);
-  expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();
-  expect(screen.queryByRole("form", { name: "New Design" })).toBeNull();
-});
+  render([], [])
+  expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy()
+  expect(screen.queryByRole("form", { name: "New Design" })).toBeNull()
+})
 
-const progress = async () => within(await screen.findByRole("region", { name: "Progress" }));
+const progress = async () => within(await screen.findByRole("region", { name: "Progress" }))
 
 test("Progress shows the eight steps with their marks and the server's labels", async () => {
-  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(2) }));
-  const p = await progress();
-  await p.findByText("Spec");
-  const steps = p.getAllByRole("listitem").filter((li) => li.hasAttribute("data-step"));
-  expect(steps.map((li) => li.textContent)).toEqual(["✓Chart", "✓Resolve tickets", "▶Spec", "○Review", "○Grill findings", "○Create tickets", "○Branch", "○Done"]);
-});
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(2) }))
+  const p = await progress()
+  await p.findByText("Spec")
+  const steps = p.getAllByRole("listitem").filter((li) => li.hasAttribute("data-step"))
+  expect(steps.map((li) => li.textContent)).toEqual([
+    "✓Chart",
+    "✓Resolve tickets",
+    "▶Spec",
+    "○Review",
+    "○Grill findings",
+    "○Create tickets",
+    "○Branch",
+    "○Done",
+  ])
+})
 
 test("while Resolve tickets is current its tickets show: closed folded, current highlighted, blocked locked", async () => {
   const rows = [
@@ -315,71 +379,98 @@ test("while Resolve tickets is current its tickets show: closed folded, current 
     ticketRow("02", "Cancelled one", { rendered_status: "cancelled" }),
     ticketRow("03", "Chat content", { current: true }),
     ticketRow("04", "Later one", { blocked: true }),
-  ];
-  render([map("a")], [], "/d/gx:a", detailOf({ rows, total: 4, done: 2 }));
-  const p = await progress();
-  expect(await p.findByText("2 closed · 1 cancelled")).toBeTruthy();
-  expect(p.queryByText("Chart it")).toBeNull();
-  const current = (await p.findByText("Chat content")).closest("[data-current]");
-  expect(current).toBeTruthy();
-  expect(within(p.getByText("Later one").parentElement as HTMLElement).getByLabelText("Blocked")).toBeTruthy();
-  expect(within(current as HTMLElement).queryByLabelText("Blocked")).toBeNull();
-});
+  ]
+  render([map("a")], [], "/d/gx:a", detailOf({ rows, total: 4, done: 2 }))
+  const p = await progress()
+  expect(await p.findByText("2 closed · 1 cancelled")).toBeTruthy()
+  expect(p.queryByText("Chart it")).toBeNull()
+  const current = (await p.findByText("Chat content")).closest("[data-current]")
+  expect(current).toBeTruthy()
+  expect(
+    within(p.getByText("Later one").parentElement as HTMLElement).getByLabelText("Blocked"),
+  ).toBeTruthy()
+  expect(within(current as HTMLElement).queryByLabelText("Blocked")).toBeNull()
+})
 
 test("the tickets show only while Resolve tickets is current", async () => {
-  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(2), rows: [ticketRow("03", "Chat content", { current: true })] }));
-  const p = await progress();
-  await p.findByText("Spec");
-  expect(p.queryByText("Chat content")).toBeNull();
-});
+  render(
+    [map("a")],
+    [],
+    "/d/gx:a",
+    detailOf({ steps: stepsAt(2), rows: [ticketRow("03", "Chat content", { current: true })] }),
+  )
+  const p = await progress()
+  await p.findByText("Spec")
+  expect(p.queryByText("Chat content")).toBeNull()
+})
 
 test("the implementation epic link shows only at Branch and Done, once the epic exists", async () => {
-  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6) }));
-  await progress();
-  expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
-  cleanup();
-  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(5), impl_address: "gx:a-impl" }));
-  await progress();
-  expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
-  cleanup();
-  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6), impl_address: "gx:a-impl" }));
-  const link = await screen.findByRole("link", { name: /Open implementation epic/ });
-  expect(link.getAttribute("href")).toBe("#/e/gx:a-impl");
-  expect(within(screen.getByRole("region", { name: "Chat" })).getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
-});
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6) }))
+  await progress()
+  expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull()
+  cleanup()
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(5), impl_address: "gx:a-impl" }))
+  await progress()
+  expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull()
+  cleanup()
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6), impl_address: "gx:a-impl" }))
+  const link = await screen.findByRole("link", { name: /Open implementation epic/ })
+  expect(link.getAttribute("href")).toBe("#/e/gx:a-impl")
+  expect(
+    within(screen.getByRole("region", { name: "Chat" })).getByRole("link", {
+      name: /Open implementation epic/,
+    }),
+  ).toBeTruthy()
+})
 
 const onPhone = async (body: () => Promise<void>) => {
-  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
   try {
-    await body();
+    await body()
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-};
-const sheet = () => screen.queryByRole("dialog", { name: "Design progress steps" });
+}
+const sheet = () => screen.queryByRole("dialog", { name: "Design progress steps" })
 
 test("on a phone the step line sits under the name and opens the steps sheet", () =>
   onPhone(async () => {
-    const rows = [ticketRow("02", "Done one", { rendered_status: "done" }), ticketRow("03", "Chat content", { current: true }), ticketRow("04", "Last")];
-    render([map("a")], [], "/d/gx:a", detailOf({ rows, impl_address: "gx:a-impl", ring_progress: 40 }));
-    const line = await screen.findByRole("button", { name: /^Resolve tickets · 2 of 3/ });
-    expect(screen.getByRole("heading", { level: 1 }).compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.queryByRole("progressbar")).toBeNull();
-    expect(screen.queryByRole("region", { name: "Progress" })).toBeNull();
-    expect(sheet()).toBeNull();
-    fireEvent.click(line);
-    const modal = within(sheet() as HTMLElement);
-    expect(modal.getByText("Progress · 40%")).toBeTruthy();
-    expect(modal.getByText("Grill findings")).toBeTruthy();
-    expect(modal.getByText("Chat content")).toBeTruthy();
-  }));
+    const rows = [
+      ticketRow("02", "Done one", { rendered_status: "done" }),
+      ticketRow("03", "Chat content", { current: true }),
+      ticketRow("04", "Last"),
+    ]
+    render(
+      [map("a")],
+      [],
+      "/d/gx:a",
+      detailOf({ rows, impl_address: "gx:a-impl", ring_progress: 40 }),
+    )
+    const line = await screen.findByRole("button", { name: /^Resolve tickets · 2 of 3/ })
+    expect(
+      screen.getByRole("heading", { level: 1 }).compareDocumentPosition(line) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(screen.queryByRole("progressbar")).toBeNull()
+    expect(screen.queryByRole("region", { name: "Progress" })).toBeNull()
+    expect(sheet()).toBeNull()
+    fireEvent.click(line)
+    const modal = within(sheet() as HTMLElement)
+    expect(modal.getByText("Progress · 40%")).toBeTruthy()
+    expect(modal.getByText("Grill findings")).toBeTruthy()
+    expect(modal.getByText("Chat content")).toBeTruthy()
+  }))
 
 test("on a phone the header ring opens the same sheet", () =>
   onPhone(async () => {
-    render([map("a")], [], "/d/gx:a", detailOf({ ring_progress: 40 }));
-    fireEvent.click(await screen.findByRole("button", { name: "Show progress steps" }));
-    expect(within(sheet() as HTMLElement).getByText("Progress · 40%")).toBeTruthy();
-  }));
+    render([map("a")], [], "/d/gx:a", detailOf({ ring_progress: 40 }))
+    fireEvent.click(await screen.findByRole("button", { name: "Show progress steps" }))
+    expect(within(sheet() as HTMLElement).getByText("Progress · 40%")).toBeTruthy()
+  }))
 
 test.each([
   ["Close", () => fireEvent.click(screen.getByRole("button", { name: "Close" }))],
@@ -387,239 +478,281 @@ test.each([
   [
     "a backdrop press",
     () => {
-      const backdrop = (sheet() as HTMLElement).parentElement as HTMLElement;
-      fireEvent.mouseDown(backdrop);
-      fireEvent.click(backdrop);
+      const backdrop = (sheet() as HTMLElement).parentElement as HTMLElement
+      fireEvent.mouseDown(backdrop)
+      fireEvent.click(backdrop)
     },
   ],
 ])("%s closes the phone steps sheet", (_n, close) =>
   onPhone(async () => {
-    render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(1) }));
-    fireEvent.click(await screen.findByRole("button", { name: /^Resolve tickets/ }));
-    expect(sheet()).toBeTruthy();
-    close();
-    expect(sheet()).toBeNull();
+    render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(1) }))
+    fireEvent.click(await screen.findByRole("button", { name: /^Resolve tickets/ }))
+    expect(sheet()).toBeTruthy()
+    close()
+    expect(sheet()).toBeNull()
   }),
-);
+)
 
 test("on a phone the implementation epic link sits in the Chat region at Branch", () =>
   onPhone(async () => {
-    render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6), impl_address: "gx:a-impl" }));
-    const link = await screen.findByRole("link", { name: /Open implementation epic/ });
-    expect(within(screen.getByRole("region", { name: "Chat" })).getByRole("link", { name: /Open implementation epic/ })).toBe(link);
-  }));
+    render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6), impl_address: "gx:a-impl" }))
+    const link = await screen.findByRole("link", { name: /Open implementation epic/ })
+    expect(
+      within(screen.getByRole("region", { name: "Chat" })).getByRole("link", {
+        name: /Open implementation epic/,
+      }),
+    ).toBe(link)
+  }))
 
-const deletable = detailOf({ deletable: true });
+const deletable = detailOf({ deletable: true })
 
-const openMenu = async () => fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
-const deleteItem = () => screen.queryByRole("menuitem", { name: "Delete design" });
+const openMenu = async () =>
+  fireEvent.click(await screen.findByRole("button", { name: "More actions" }))
+const deleteItem = () => screen.queryByRole("menuitem", { name: "Delete design" })
 
 test("Delete design shows only for a deletable Design with no live session, following the sessions live", async () => {
-  const router = render([map("a")], [], "/d/gx:a", deletable);
-  await openMenu();
-  expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy();
-  router.setSessions([session("a")]);
-  await waitFor(() => expect(deleteItem()).toBeNull());
-  router.setSessions([session("a", { status: { state: "exited" } })]);
-  await waitFor(() => expect(deleteItem()).toBeTruthy());
-  cleanup();
-  render([map("a")], [], "/d/gx:a", detailOf());
-  await screen.findByRole("button", { name: "Start design session" });
-  await openMenu();
-  expect(await screen.findByRole("menuitem", { name: /Copy design ID/ })).toBeTruthy();
-  expect(deleteItem()).toBeNull();
-});
+  const router = render([map("a")], [], "/d/gx:a", deletable)
+  await openMenu()
+  expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy()
+  router.setSessions([session("a")])
+  await waitFor(() => expect(deleteItem()).toBeNull())
+  router.setSessions([session("a", { status: { state: "exited" } })])
+  await waitFor(() => expect(deleteItem()).toBeTruthy())
+  cleanup()
+  render([map("a")], [], "/d/gx:a", detailOf())
+  await screen.findByRole("button", { name: "Start design session" })
+  await openMenu()
+  expect(await screen.findByRole("menuitem", { name: /Copy design ID/ })).toBeTruthy()
+  expect(deleteItem()).toBeNull()
+})
 
 test("the long step line on desktop names the ticket", async () => {
-  const rows = [ticketRow("02", "Done one", { rendered_status: "done" }), ticketRow("03", "Chat content", { current: true })];
-  render([map("a")], [], "/d/gx:a", detailOf({ rows }));
-  expect((await screen.findByTestId("page-header-subtitle")).textContent).toMatch(/^Resolve tickets · 03 Chat content \(2 of 2\)/);
-});
+  const rows = [
+    ticketRow("02", "Done one", { rendered_status: "done" }),
+    ticketRow("03", "Chat content", { current: true }),
+  ]
+  render([map("a")], [], "/d/gx:a", detailOf({ rows }))
+  expect((await screen.findByTestId("page-header-subtitle")).textContent).toMatch(
+    /^Resolve tickets · 03 Chat content \(2 of 2\)/,
+  )
+})
 
 test("the detail is fetched once on mount and once more when a session starts or exits", async () => {
-  const epic = vi.fn(async () => ({ kind: "ok" as const, detail: deletable }));
-  const router = render([map("a")], [], "/d/gx:a", deletable, { epic });
-  await screen.findByRole("button", { name: "More actions" });
-  expect(epic).toHaveBeenCalledTimes(1);
-  router.setSessions([session("a")]);
-  await waitFor(() => expect(epic).toHaveBeenCalledTimes(2));
-  router.setSessions([session("a", { status: { state: "exited" } })]);
-  await waitFor(() => expect(epic).toHaveBeenCalledTimes(3));
-});
+  const epic = vi.fn(async () => ({ kind: "ok" as const, detail: deletable }))
+  const router = render([map("a")], [], "/d/gx:a", deletable, { epic })
+  await screen.findByRole("button", { name: "More actions" })
+  expect(epic).toHaveBeenCalledTimes(1)
+  router.setSessions([session("a")])
+  await waitFor(() => expect(epic).toHaveBeenCalledTimes(2))
+  router.setSessions([session("a", { status: { state: "exited" } })])
+  await waitFor(() => expect(epic).toHaveBeenCalledTimes(3))
+})
 
 test("Keep returns with Delete design still listed", async () => {
-  render([map("a")], [], "/d/gx:a", deletable);
-  await openMenu();
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }));
-  expect(await screen.findByText("Delete this design?")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Keep" }));
-  expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy();
-});
+  render([map("a")], [], "/d/gx:a", deletable)
+  await openMenu()
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }))
+  expect(await screen.findByText("Delete this design?")).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: "Keep" }))
+  expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy()
+})
 
 test("confirming Delete calls the route and goes to the Epics page", async () => {
-  const deleteDesign = vi.fn(async () => ({}));
-  const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign });
-  await openMenu();
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-  await waitFor(() => expect(router.state.location.pathname).toBe("/epics"));
-  expect(deleteDesign).toHaveBeenCalledWith({ epic: "gx:a" });
-});
+  const deleteDesign = vi.fn(async () => ({}))
+  const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign })
+  await openMenu()
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }))
+  fireEvent.click(await screen.findByRole("button", { name: "Delete" }))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/epics"))
+  expect(deleteDesign).toHaveBeenCalledWith({ epic: "gx:a" })
+})
 
 const chatFetcher: RouteFetchers = {
-  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], questions: [], background: [] } }),
-};
+  chat: async () => ({
+    kind: "ok",
+    detail: { conversation_id: "c1", messages: [], questions: [], background: [] },
+  }),
+}
 
 test("a Design with map images shows a read-only strip that opens the viewer with the map-image URL", async () => {
-  const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }, { id: "b.png" }] }));
-  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chatFetcher, mapImages });
-  const strip = await screen.findByLabelText("Images");
-  expect(mapImages).toHaveBeenCalledWith("gx:a");
-  expect(within(strip).queryByRole("button", { name: /remove/i })).toBeNull();
-  fireEvent.click(within(strip).getAllByRole("button")[1]);
-  const img = await screen.findByAltText("Image 2 of 2");
-  expect(img.getAttribute("src")).toBe("/v1/designs/images/read?epic=gx%3Aa&id=b.png");
-});
+  const mapImages = vi.fn(async () => ({
+    kind: "ok" as const,
+    detail: [{ id: "a.png" }, { id: "b.png" }],
+  }))
+  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chatFetcher, mapImages })
+  const strip = await screen.findByLabelText("Images")
+  expect(mapImages).toHaveBeenCalledWith("gx:a")
+  expect(within(strip).queryByRole("button", { name: /remove/i })).toBeNull()
+  fireEvent.click(within(strip).getAllByRole("button")[1])
+  const img = await screen.findByAltText("Image 2 of 2")
+  expect(img.getAttribute("src")).toBe("/v1/designs/images/read?epic=gx%3Aa&id=b.png")
+})
 
 test("the map-image strip is the first entry of the chat log, ahead of the messages", async () => {
-  const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }] }));
+  const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }] }))
   const chat: RouteFetchers = {
     chat: async () => ({
       kind: "ok",
       detail: {
         conversation_id: "c1",
-        messages: [{ id: "m1", role: "agent", kind: "text", text: "hello from the agent", at: new Date().toISOString() }],
+        messages: [
+          {
+            id: "m1",
+            role: "agent",
+            kind: "text",
+            text: "hello from the agent",
+            at: new Date().toISOString(),
+          },
+        ],
         questions: [],
         background: [],
       },
     }),
-  };
-  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chat, mapImages });
-  const strip = await screen.findByLabelText("Images");
-  const message = await screen.findByText("hello from the agent");
-  expect(strip.parentElement?.contains(message)).toBe(true);
-  expect(strip.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(within(screen.getByRole("region", { name: "Chat" })).getByLabelText("Images")).toBe(strip);
-});
+  }
+  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chat, mapImages })
+  const strip = await screen.findByLabelText("Images")
+  const message = await screen.findByText("hello from the agent")
+  expect(strip.parentElement?.contains(message)).toBe(true)
+  expect(strip.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(within(screen.getByRole("region", { name: "Chat" })).getByLabelText("Images")).toBe(strip)
+})
 
 test("a Design with no map images shows no strip", async () => {
-  const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [] }));
-  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chatFetcher, mapImages });
-  await waitFor(() => expect(mapImages).toHaveBeenCalled());
-  await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByLabelText("Images")).toBeNull();
-});
+  const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [] }))
+  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chatFetcher, mapImages })
+  await waitFor(() => expect(mapImages).toHaveBeenCalled())
+  await screen.findByRole("heading", { level: 1 })
+  expect(screen.queryByLabelText("Images")).toBeNull()
+})
 
 test("a refused delete shows the reason and keeps the page", async () => {
-  const deleteDesign = vi.fn(async () => ({ refused: true, message: "a session is running" }));
-  const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign });
-  await openMenu();
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-  expect(await screen.findByText("a session is running")).toBeTruthy();
-  expect(router.state.location.pathname).toBe("/d/gx:a");
-});
+  const deleteDesign = vi.fn(async () => ({ refused: true, message: "a session is running" }))
+  const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign })
+  await openMenu()
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }))
+  fireEvent.click(await screen.findByRole("button", { name: "Delete" }))
+  expect(await screen.findByText("a session is running")).toBeTruthy()
+  expect(router.state.location.pathname).toBe("/d/gx:a")
+})
 
 // A fake visual viewport: `open()` shrinks it 450px under the layout viewport, `close()` restores it.
 function withKeyboard(body: (kb: { open: () => void; close: () => void }) => Promise<void>) {
   return onPhone(async () => {
-    const vv = Object.assign(new EventTarget(), { height: 800, scale: 1 });
-    Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
-    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+    const vv = Object.assign(new EventTarget(), { height: 800, scale: 1 })
+    Object.defineProperty(window, "visualViewport", { value: vv, configurable: true })
+    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true })
     const set = (h: number) =>
       act(() => {
-        vv.height = h;
-        vv.dispatchEvent(new Event("resize"));
-      });
+        vv.height = h
+        vv.dispatchEvent(new Event("resize"))
+      })
     try {
-      await body({ open: () => set(350), close: () => set(800) });
+      await body({ open: () => set(350), close: () => set(800) })
     } finally {
-      Object.defineProperty(window, "visualViewport", { value: undefined, configurable: true });
+      Object.defineProperty(window, "visualViewport", { value: undefined, configurable: true })
     }
-  });
+  })
 }
 
 const roundChat = (round: unknown[] | null): RouteFetchers => ({
-  chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], questions: roundCards(round as SessionRoundCard[] | null), background: [] } as never }),
-});
-const askCard = { label: "1", title: "T1", body: "Body 1?", kind: "options", options: [{ id: "a", label: "Alpha" }] };
+  chat: async () => ({
+    kind: "ok",
+    detail: {
+      conversation_id: "c1",
+      messages: [],
+      questions: roundCards(round as SessionRoundCard[] | null),
+      background: [],
+    } as never,
+  }),
+})
+const askCard = {
+  label: "1",
+  title: "T1",
+  body: "Body 1?",
+  kind: "options",
+  options: [{ id: "a", label: "Alpha" }],
+}
 const composer = async () => {
-  if (!screen.queryByLabelText("Message")) fireEvent.click(await screen.findByRole("button", { name: "Note" }));
-  return (await screen.findByLabelText("Message")) as HTMLTextAreaElement;
-};
+  if (!screen.queryByLabelText("Message"))
+    fireEvent.click(await screen.findByRole("button", { name: "Note" }))
+  return (await screen.findByLabelText("Message")) as HTMLTextAreaElement
+}
 const focusComposer = async () => {
-  const field = await composer();
-  act(() => field.focus());
-};
-const blurComposer = () => act(() => (document.activeElement as HTMLElement).blur());
-const tabsRow =() => screen.getByRole("group", { name: "View" }).parentElement?.parentElement as HTMLElement;
-const moreIn = (el: HTMLElement) => within(el).queryByRole("button", { name: "More actions" });
+  const field = await composer()
+  act(() => field.focus())
+}
+const blurComposer = () => act(() => (document.activeElement as HTMLElement).blur())
+const tabsRow = () =>
+  screen.getByRole("group", { name: "View" }).parentElement?.parentElement as HTMLElement
+const moreIn = (el: HTMLElement) => within(el).queryByRole("button", { name: "More actions" })
 
 async function renderRound(round: unknown[] | null = [askCard]) {
-  const mapImages = async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }] });
-  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...roundChat(round), mapImages });
-  await screen.findByRole("heading", { level: 1 });
-  if (round) await screen.findByRole("group", { name: "View" });
-  else await screen.findByRole("button", { name: "Note" });
+  const mapImages = async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }] })
+  render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...roundChat(round), mapImages })
+  await screen.findByRole("heading", { level: 1 })
+  if (round) await screen.findByRole("group", { name: "View" })
+  else await screen.findByRole("button", { name: "Note" })
 }
 
 test("with the keyboard open the header and images go, the tabs stay and carry the ⋯ menu", () =>
   withKeyboard(async (kb) => {
-    await renderRound();
-    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
-    await screen.findByLabelText("Images");
-    expect(moreIn(tabsRow())).toBeNull();
-    await focusComposer();
-    kb.open();
-    await waitFor(() => expect(moreIn(tabsRow())).toBeTruthy());
-    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-    expect(screen.queryByLabelText("Images")).toBeNull();
-    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1);
-    blurComposer();
-    kb.close();
-    await waitFor(() => expect(moreIn(tabsRow())).toBeNull());
-    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
-    expect(await screen.findByLabelText("Images")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1);
-  }));
+    await renderRound()
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }))
+    await screen.findByLabelText("Images")
+    expect(moreIn(tabsRow())).toBeNull()
+    await focusComposer()
+    kb.open()
+    await waitFor(() => expect(moreIn(tabsRow())).toBeTruthy())
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull()
+    expect(screen.queryByLabelText("Images")).toBeNull()
+    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1)
+    blurComposer()
+    kb.close()
+    await waitFor(() => expect(moreIn(tabsRow())).toBeNull())
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy()
+    expect(await screen.findByLabelText("Images")).toBeTruthy()
+    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1)
+  }))
 
 test("with no round open the ⋯ goes with the header and returns when the keyboard closes", () =>
   withKeyboard(async (kb) => {
-    await renderRound(null);
-    await focusComposer();
-    kb.open();
-    await waitFor(() => expect(screen.queryByRole("button", { name: "More actions" })).toBeNull());
-    blurComposer();
-    kb.close();
-    expect(await screen.findByRole("button", { name: "More actions" })).toBeTruthy();
-  }));
+    await renderRound(null)
+    await focusComposer()
+    kb.open()
+    await waitFor(() => expect(screen.queryByRole("button", { name: "More actions" })).toBeNull())
+    blurComposer()
+    kb.close()
+    expect(await screen.findByRole("button", { name: "More actions" })).toBeTruthy()
+  }))
 
 test("the tabs-row menu stays open and anchored through focusout and viewport restore, then the layout returns", () =>
   withKeyboard(async (kb) => {
-    await renderRound();
-    await focusComposer();
-    kb.open();
-    await waitFor(() => expect(moreIn(tabsRow())).toBeTruthy());
-    const more = moreIn(tabsRow()) as HTMLElement;
-    fireEvent.click(more);
-    await screen.findByRole("menuitem", { name: /Copy design ID/ });
-    blurComposer();
-    kb.close();
-    expect(screen.getByRole("menuitem", { name: /Copy design ID/ })).toBeTruthy();
-    expect(moreIn(tabsRow())).toBe(more);
-    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-    fireEvent.click(screen.getByRole("menuitem", { name: /Copy design ID/ }));
-    await waitFor(() => expect(screen.queryByRole("menuitem", { name: /Copy design ID/ })).toBeNull());
-    await waitFor(() => expect(moreIn(tabsRow())).toBeNull());
-    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
-  }));
+    await renderRound()
+    await focusComposer()
+    kb.open()
+    await waitFor(() => expect(moreIn(tabsRow())).toBeTruthy())
+    const more = moreIn(tabsRow()) as HTMLElement
+    fireEvent.click(more)
+    await screen.findByRole("menuitem", { name: /Copy design ID/ })
+    blurComposer()
+    kb.close()
+    expect(screen.getByRole("menuitem", { name: /Copy design ID/ })).toBeTruthy()
+    expect(moreIn(tabsRow())).toBe(more)
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull()
+    fireEvent.click(screen.getByRole("menuitem", { name: /Copy design ID/ }))
+    await waitFor(() =>
+      expect(screen.queryByRole("menuitem", { name: /Copy design ID/ })).toBeNull(),
+    )
+    await waitFor(() => expect(moreIn(tabsRow())).toBeNull())
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy()
+  }))
 
 test("the title-row menu with the keyboard closed leaves the layout alone", () =>
   withKeyboard(async () => {
-    await renderRound();
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    await screen.findByRole("menuitem", { name: /Copy design ID/ });
-    expect(moreIn(tabsRow())).toBeNull();
-    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1);
-  }));
+    await renderRound()
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+    await screen.findByRole("menuitem", { name: /Copy design ID/ })
+    expect(moreIn(tabsRow())).toBeNull()
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy()
+    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1)
+  }))

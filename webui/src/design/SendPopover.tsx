@@ -1,8 +1,8 @@
-import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react";
-import { useEffect, useRef, type RefObject } from "react";
-import type { SessionRoundCard } from "../generated/server";
-import { Button } from "../ui/button/Button";
-import { nameOf } from "../ui/question-sheet/round";
+import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
+import { useEffect, useRef, type RefObject } from "react"
+import type { SessionRoundCard } from "../generated/server"
+import { Button } from "../ui/button/Button"
+import { nameOf } from "../ui/question-sheet/round"
 
 // Send with unanswered questions: a list of the gaps anchored on Send. A row jumps to its question; Send anyway sends.
 export function SendPopover({
@@ -15,23 +15,23 @@ export function SendPopover({
   onAnswer,
   onClose,
 }: {
-  open: boolean;
-  unanswered: SessionRoundCard[];
-  total: number;
-  sendDisabled: boolean;
+  open: boolean
+  unanswered: SessionRoundCard[]
+  total: number
+  sendDisabled: boolean
   /** The Send button the popover anchors on. */
-  anchorRef: RefObject<HTMLElement | null>;
-  onSendAnyway: () => void;
-  onAnswer: (c: SessionRoundCard) => void;
-  onClose: () => void;
+  anchorRef: RefObject<HTMLElement | null>
+  onSendAnyway: () => void
+  onAnswer: (c: SessionRoundCard) => void
+  onClose: () => void
 }) {
-  const sendAnyway = useRef<HTMLButtonElement>(null);
+  const sendAnyway = useRef<HTMLButtonElement>(null)
   // A row hands focus to the question, so the popover must not give it back to Send.
-  const restoreFocus = useRef(true);
+  const restoreFocus = useRef(true)
   useEffect(() => {
-    if (open) restoreFocus.current = true;
-  }, [open]);
-  const n = unanswered.length;
+    if (open) restoreFocus.current = true
+  }, [open])
+  const n = unanswered.length
   return (
     <Popover.Root
       open={open}
@@ -81,22 +81,15 @@ export function SendPopover({
                 {total - n} of {total} answered
               </Text>
             </Box>
-            <Box
-              as="ul"
-              listStyleType="none"
-              m="0"
-              p="0"
-              borderTopWidth="1px"
-              borderColor="border"
-            >
+            <Box as="ul" listStyleType="none" m="0" p="0" borderTopWidth="1px" borderColor="border">
               {unanswered.map((c) => (
                 <Box as="li" key={c.label}>
                   <chakra.button
                     type="button"
                     onClick={() => {
-                      restoreFocus.current = false;
-                      onAnswer(c);
-                      onClose();
+                      restoreFocus.current = false
+                      onAnswer(c)
+                      onClose()
                     }}
                     w="100%"
                     textAlign="left"
@@ -107,12 +100,7 @@ export function SendPopover({
                     cursor="pointer"
                     _hover={{ bg: "tone.done.bg" }}
                   >
-                    <Text
-                      as="span"
-                      fontWeight="700"
-                      color="tone.waiting.fg"
-                      flexShrink="0"
-                    >
+                    <Text as="span" fontWeight="700" color="tone.waiting.fg" flexShrink="0">
                       {nameOf(c)}
                     </Text>
                     <Text as="span" truncate>
@@ -133,12 +121,7 @@ export function SendPopover({
               display="flex"
               justifyContent="flex-end"
             >
-              <Button
-                ref={sendAnyway}
-                size="sm"
-                disabled={sendDisabled}
-                onClick={onSendAnyway}
-              >
+              <Button ref={sendAnyway} size="sm" disabled={sendDisabled} onClick={onSendAnyway}>
                 Send anyway
               </Button>
             </Box>
@@ -146,5 +129,5 @@ export function SendPopover({
         </Popover.Positioner>
       </Portal>
     </Popover.Root>
-  );
+  )
 }

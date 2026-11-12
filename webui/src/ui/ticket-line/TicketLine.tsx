@@ -1,29 +1,29 @@
-import { Box, Link, Text } from "@chakra-ui/react";
-import { Arc } from "../arc/Arc";
-import { StatusIcon, type StatusKind } from "../status-icon/StatusIcon";
-import type { Tone } from "../tone";
+import { Box, Link, Text } from "@chakra-ui/react"
+import { Arc } from "../arc/Arc"
+import { StatusIcon, type StatusKind } from "../status-icon/StatusIcon"
+import type { Tone } from "../tone"
 
 interface TicketLineProps {
-  id: string;
-  title: string;
-  reason?: string;
-  tone?: Tone;
+  id: string
+  title: string
+  reason?: string
+  tone?: Tone
   // Shows the reason in full instead of clamping it to two lines.
-  unclipped?: boolean;
+  unclipped?: boolean
   // Links the title to this ticket's page.
-  address?: string;
-  href?: string;
-  hint?: string;
-  state?: string;
+  address?: string
+  href?: string
+  hint?: string
+  state?: string
   // Puts the reason right after the title, behind a dot, in one line that wraps as text does.
-  inlineReason?: boolean;
+  inlineReason?: boolean
   // The link's words; "Answer →" unless the row asks for something else.
-  linkLabel?: string;
+  linkLabel?: string
   // Puts a spinning arc before the id while an agent works the ticket.
-  live?: boolean;
+  live?: boolean
   // Shows a status icon before the id, and colors the title with the tone instead of plain text.
-  icon?: StatusKind;
-  toneTitle?: boolean;
+  icon?: StatusKind
+  toneTitle?: boolean
 }
 
 export function TicketLine({
@@ -53,18 +53,36 @@ export function TicketLine({
         title
       )}
     </Text>
-  );
+  )
   const stateText = state && (
-    <Text as="span" data-state fontSize="sm" color={`tone.${tone}.fg`} ml={inlineReason ? "2" : undefined}>
+    <Text
+      as="span"
+      data-state
+      fontSize="sm"
+      color={`tone.${tone}.fg`}
+      ml={inlineReason ? "2" : undefined}
+    >
       {state}
     </Text>
-  );
+  )
   return (
     <Box data-tone={tone}>
       <Box display="flex" gap="2" alignItems="baseline">
         {(live || icon) && (
           // An inline-reason row can wrap, so the icon sits on its first line instead of the row's middle.
-          <Box as="span" alignSelf={inlineReason ? "flex-start" : "center"} flexShrink={0} position="relative" top="-1px" display="inline-flex" w="4" h={inlineReason ? "1lh" : "4"} fontSize="md" alignItems="center" justifyContent="center">
+          <Box
+            as="span"
+            alignSelf={inlineReason ? "flex-start" : "center"}
+            flexShrink={0}
+            position="relative"
+            top="-1px"
+            display="inline-flex"
+            w="4"
+            h={inlineReason ? "1lh" : "4"}
+            fontSize="md"
+            alignItems="center"
+            justifyContent="center"
+          >
             {live ? <Arc label="Running" /> : <StatusIcon kind={icon!} tone={tone} />}
           </Box>
         )}
@@ -124,5 +142,5 @@ export function TicketLine({
         </Link>
       )}
     </Box>
-  );
+  )
 }

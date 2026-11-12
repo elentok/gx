@@ -1,15 +1,23 @@
-import { Box } from "@chakra-ui/react";
-import type { Tone } from "../tone";
+import { Box } from "@chakra-ui/react"
+import type { Tone } from "../tone"
 
 export interface Segment {
-  key: string;
-  tone: Tone;
-  count: number;
+  key: string
+  tone: Tone
+  count: number
 }
 
 // Segments with a zero count are not drawn. `value` is what the progressbar role reports as done.
-export function SegmentedBar({ segments, value, label }: { segments: Segment[]; value: number; label: string }) {
-  const total = segments.reduce((sum, s) => sum + s.count, 0);
+export function SegmentedBar({
+  segments,
+  value,
+  label,
+}: {
+  segments: Segment[]
+  value: number
+  label: string
+}) {
+  const total = segments.reduce((sum, s) => sum + s.count, 0)
   return (
     <Box
       role="progressbar"
@@ -36,5 +44,5 @@ export function SegmentedBar({ segments, value, label }: { segments: Segment[]; 
           />
         ))}
     </Box>
-  );
+  )
 }

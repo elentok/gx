@@ -1,12 +1,21 @@
-import { Box, Text } from "@chakra-ui/react";
-import { postJson } from "./design/open";
-import type { LaunchStep, PendingRow, UsageOverrideRequest, UsageOverrideResult } from "./generated/server";
-import { VerdictConcurrencyCap, VerdictUsagePrefixClaude, VerdictUsagePrefixCodex } from "./generated/server";
-import { Button } from "./ui/button/Button";
-import { refusalText, useWrite } from "./useWrite";
+import { Box, Text } from "@chakra-ui/react"
+import { postJson } from "./design/open"
+import type {
+  LaunchStep,
+  PendingRow,
+  UsageOverrideRequest,
+  UsageOverrideResult,
+} from "./generated/server"
+import {
+  VerdictConcurrencyCap,
+  VerdictUsagePrefixClaude,
+  VerdictUsagePrefixCodex,
+} from "./generated/server"
+import { Button } from "./ui/button/Button"
+import { refusalText, useWrite } from "./useWrite"
 
 // The one verdict that means the ticket is starting or running, so it shows nothing.
-const CLAIMED = "claimed";
+const CLAIMED = "claimed"
 
 // The one line slot a ticket's launch step or cap wait shares: a launching ticket shows its step and never the
 // cap wait. Else "<verdict>: <reason>" for a queued, unclaimed ticket, else undefined. The words come from the
@@ -16,8 +25,8 @@ export function verdictText(
   address: string,
   launchStep?: LaunchStep,
 ): string | undefined {
-  const row = pending?.find((p) => p.address === address);
-  return launchOrVerdictText(launchStep, row?.verdict, row?.reason);
+  const row = pending?.find((p) => p.address === address)
+  return launchOrVerdictText(launchStep, row?.verdict, row?.reason)
 }
 
 // verdictText for a caller that holds the step and the verdict directly, like the epic card.
@@ -26,32 +35,44 @@ export function launchOrVerdictText(
   verdictWord: string | undefined,
   reason: string | undefined,
 ): string | undefined {
-  if (launchStep?.label) return `Launching: ${launchStep.label} (${launchStep.position}/${launchStep.total})`;
-  if (!verdictWord || verdictWord === CLAIMED) return undefined;
-  const verdict = verdictWord === VerdictConcurrencyCap ? "Waiting for a slot" : verdictWord;
-  return reason ? `${verdict}: ${reason}` : verdict;
+  if (launchStep?.label)
+    return `Launching: ${launchStep.label} (${launchStep.position}/${launchStep.total})`
+  if (!verdictWord || verdictWord === CLAIMED) return undefined
+  const verdict = verdictWord === VerdictConcurrencyCap ? "Waiting for a slot" : verdictWord
+  return reason ? `${verdict}: ${reason}` : verdict
 }
 
-export type UsageHarness = "claude" | "codex";
+export type UsageHarness = "claude" | "codex"
 
-export type OverrideUsage = (harness: UsageHarness) => Promise<UsageOverrideResult>;
+export type OverrideUsage = (harness: UsageHarness) => Promise<UsageOverrideResult>
 
 const postUsageOverride: OverrideUsage = (harness) =>
-  postJson<UsageOverrideResult>("/v1/usage/override")({ harness } satisfies UsageOverrideRequest);
+  postJson<UsageOverrideResult>("/v1/usage/override")({ harness } satisfies UsageOverrideRequest)
 
 // The harness whose usage gate holds the ticket, from the verdict's prefix; undefined for any other verdict.
 function usageHarness(text: string): UsageHarness | undefined {
-  if (text.startsWith(VerdictUsagePrefixClaude)) return "claude";
-  if (text.startsWith(VerdictUsagePrefixCodex)) return "codex";
-  return undefined;
+  if (text.startsWith(VerdictUsagePrefixClaude)) return "claude"
+  if (text.startsWith(VerdictUsagePrefixCodex)) return "codex"
+  return undefined
 }
 
 // The queue-changed event the server publishes drops the verdict, so an accepted click needs no state here.
-function UsageOverrideButton({ harness, override }: { harness: UsageHarness; override: OverrideUsage }) {
-  const { run, pending, refusal } = useWrite({ toastRefusal: false });
+function UsageOverrideButton({
+  harness,
+  override,
+}: {
+  harness: UsageHarness
+  override: OverrideUsage
+}) {
+  const { run, pending, refusal } = useWrite({ toastRefusal: false })
   return (
     <>
-      <Button emphasis="secondary" size="sm" disabled={pending} onClick={() => run(() => override(harness))}>
+      <Button
+        emphasis="secondary"
+        size="sm"
+        disabled={pending}
+        onClick={() => run(() => override(harness))}
+      >
         Override
       </Button>
       {refusal && (
@@ -60,7 +81,7 @@ function UsageOverrideButton({ harness, override }: { harness: UsageHarness; ove
         </Text>
       )}
     </>
-  );
+  )
 }
 
 export function VerdictLine({
@@ -68,11 +89,11 @@ export function VerdictLine({
   pl,
   overrideUsage = postUsageOverride,
 }: {
-  text: string;
-  pl?: string;
-  overrideUsage?: OverrideUsage;
+  text: string
+  pl?: string
+  overrideUsage?: OverrideUsage
 }) {
-  const harness = usageHarness(text);
+  const harness = usageHarness(text)
   return (
     <Box display="flex" flexWrap="wrap" alignItems="center" gap="2" pl={pl}>
       <Text data-verdict fontSize="13px" color="text.dim" overflowWrap="anywhere">
@@ -80,5 +101,5 @@ export function VerdictLine({
       </Text>
       {harness && <UsageOverrideButton harness={harness} override={overrideUsage} />}
     </Box>
-  );
+  )
 }

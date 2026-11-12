@@ -1,8 +1,9 @@
-import { hasLayer } from "../ui/modal/layers";
+import { hasLayer } from "../ui/modal/layers"
 
 // Anything open that takes Esc first. The completion menu's own handler has not run when we judge, so it is
 // found by its DOM; the Questions view leaves on this same Escape.
-const ON_TOP = '[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"],[data-questions-view]';
+const ON_TOP =
+  '[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"],[data-questions-view]'
 
 /**
  * Whether an Escape keydown aimed at `target` should open the Interrupt confirm.
@@ -13,10 +14,10 @@ const ON_TOP = '[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbo
  * - Any open `ON_TOP` element (dialog, alertdialog, menu, listbox, Questions view) takes the Esc.
  */
 export function escOpensInterrupt(target: EventTarget | null): boolean {
-  const vi = target instanceof Element ? target.closest("[data-vi-mode]") : null;
-  if (vi && vi.getAttribute("data-vi-mode") !== "NORMAL") return false;
-  const own = vi?.closest('[role="dialog"]');
-  if (!vi && hasLayer()) return false;
-  for (const el of document.querySelectorAll(ON_TOP)) if (el !== own) return false;
-  return true;
+  const vi = target instanceof Element ? target.closest("[data-vi-mode]") : null
+  if (vi && vi.getAttribute("data-vi-mode") !== "NORMAL") return false
+  const own = vi?.closest('[role="dialog"]')
+  if (!vi && hasLayer()) return false
+  for (const el of document.querySelectorAll(ON_TOP)) if (el !== own) return false
+  return true
 }

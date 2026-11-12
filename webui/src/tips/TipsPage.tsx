@@ -1,15 +1,15 @@
-import { Box, Text } from "@chakra-ui/react";
-import { useConnectionContext } from "../connection";
-import { DetailPage } from "../page/DetailPage";
-import { PageHeader } from "../page/PageHeader";
-import { PageIcon } from "../page/PageIcon";
-import { SectionHeading } from "../page/SectionHeading";
-import { Button } from "../ui/button/Button";
-import { FullScreenLoader } from "../ui/loader/FullScreenLoader";
-import { useTips, type FetchTips, type Tip } from "./tips";
+import { Box, Text } from "@chakra-ui/react"
+import { useConnectionContext } from "../connection"
+import { DetailPage } from "../page/DetailPage"
+import { PageHeader } from "../page/PageHeader"
+import { PageIcon } from "../page/PageIcon"
+import { SectionHeading } from "../page/SectionHeading"
+import { Button } from "../ui/button/Button"
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
+import { useTips, type FetchTips, type Tip } from "./tips"
 
 function TipSection({ tip }: { tip: Tip }) {
-  const id = `tip-${tip.id}`;
+  const id = `tip-${tip.id}`
   return (
     <Box mt="6" role="region" aria-labelledby={id}>
       <SectionHeading id={id} tone="running">
@@ -26,12 +26,12 @@ function TipSection({ tip }: { tip: Tip }) {
         </Box>
       )}
     </Box>
-  );
+  )
 }
 
 export function TipsPage({ fetchTips }: { fetchTips?: FetchTips }) {
-  const conn = useConnectionContext();
-  const { tips, failed, retry } = useTips(fetchTips, conn);
+  const conn = useConnectionContext()
+  const { tips, failed, retry } = useTips(fetchTips, conn)
   return (
     <DetailPage title={{ kind: "Tips" }}>
       <PageHeader title="Tips" icon={<PageIcon kind="tips" />} />
@@ -52,5 +52,5 @@ export function TipsPage({ fetchTips }: { fetchTips?: FetchTips }) {
         tips.map((t) => <TipSection key={t.id} tip={t} />)
       )}
     </DetailPage>
-  );
+  )
 }

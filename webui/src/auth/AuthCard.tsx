@@ -1,10 +1,17 @@
-import { Box, Image, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { Box, Image, Text } from "@chakra-ui/react"
+import type { ReactNode } from "react"
 
 // Centered card under the `gx` wordmark: the frame of the login, setup and crash screens.
 export function AuthCard({ children, below }: { children: ReactNode; below?: ReactNode }) {
   return (
-    <Box minH="100dvh" display="flex" flexDirection="column" alignItems="center" px="4" py={{ base: "8", md: "16" }}>
+    <Box
+      minH="100dvh"
+      display="flex"
+      flexDirection="column"
+      alignItems="center"
+      px="4"
+      py={{ base: "8", md: "16" }}
+    >
       <Box w="100%" maxW="400px">
         <Box textAlign="center" mb="6" data-mock-part="header">
           <Image src="/gx-login-mark.png" alt="gx" h="10" w="auto" mx="auto" mb="1" />
@@ -28,5 +35,5 @@ export function AuthCard({ children, below }: { children: ReactNode; below?: Rea
         {below}
       </Box>
     </Box>
-  );
+  )
 }

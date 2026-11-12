@@ -1,13 +1,13 @@
-import { Box, type BoxProps } from "@chakra-ui/react";
-import { memo, useMemo } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Box, type BoxProps } from "@chakra-ui/react"
+import { memo, useMemo } from "react"
+import ReactMarkdown, { type Components } from "react-markdown"
+import remarkGfm from "remark-gfm"
 
-const inlineElements = ["strong", "em", "del", "code", "a"];
+const inlineElements = ["strong", "em", "del", "code", "a"]
 
-const remarkPlugins = [remarkGfm];
+const remarkPlugins = [remarkGfm]
 
-const siblingTicketLink = /^(?:issues\/)?(\d+)-[^/]*\.md$/;
+const siblingTicketLink = /^(?:issues\/)?(\d+)-[^/]*\.md$/
 
 function linkComponent(epic: string | undefined): Components["a"] {
   return function MarkdownLink({ href, children }) {
@@ -16,12 +16,12 @@ function linkComponent(epic: string | undefined): Components["a"] {
         <a href={href} target="_blank" rel="noopener noreferrer">
           {children}
         </a>
-      );
+      )
     }
-    const id = href?.match(siblingTicketLink)?.[1];
-    if (epic && id) return <a href={`#/t/${epic}/${id}`}>{children}</a>;
-    return <>{children}</>;
-  };
+    const id = href?.match(siblingTicketLink)?.[1]
+    if (epic && id) return <a href={`#/t/${epic}/${id}`}>{children}</a>
+    return <>{children}</>
+  }
 }
 
 // Server text written in markdown, such as an epic summary or a ticket body. react-markdown builds
@@ -37,7 +37,7 @@ export const Markdown = memo(function Markdown({
   inline,
   ...box
 }: { children: string; epic?: string; smallHeadings?: boolean; inline?: boolean } & BoxProps) {
-  const components = useMemo(() => ({ a: linkComponent(epic) }), [epic]);
+  const components = useMemo(() => ({ a: linkComponent(epic) }), [epic])
   return (
     <Box
       as={inline ? "span" : undefined}
@@ -46,7 +46,11 @@ export const Markdown = memo(function Markdown({
       css={{
         "&[data-small-headings] h2": { fontSize: "md", fontWeight: "600" },
         "& table": { borderCollapse: "collapse", marginBlock: "2" },
-        "& th, & td": { border: "1px solid {colors.border}", paddingInline: "2", paddingBlock: "1" },
+        "& th, & td": {
+          border: "1px solid {colors.border}",
+          paddingInline: "2",
+          paddingBlock: "1",
+        },
         "& > :first-child": { marginTop: 0 },
         "& > :last-child": { marginBottom: 0 },
         "& p, & ul, & ol": { marginBlock: "2" },
@@ -85,5 +89,5 @@ export const Markdown = memo(function Markdown({
         {children}
       </ReactMarkdown>
     </Box>
-  );
-});
+  )
+})

@@ -1,7 +1,15 @@
-import { EpicActionButton } from "./EpicActionButton";
-import { postQueueAdd } from "./queue";
+import { EpicActionButton } from "./EpicActionButton"
+import { postQueueAdd } from "./queue"
 
-export function QueueButton({ address, state, onQueued }: { address: string; state: string; onQueued: () => void }) {
+export function QueueButton({
+  address,
+  state,
+  onQueued,
+}: {
+  address: string
+  state: string
+  onQueued: () => void
+}) {
   return (
     <EpicActionButton
       address={address}
@@ -11,5 +19,5 @@ export function QueueButton({ address, state, onQueued }: { address: string; sta
       pendingLabel="Queueing…"
       onDone={onQueued}
     />
-  );
+  )
 }

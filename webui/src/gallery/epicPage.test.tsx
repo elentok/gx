@@ -1,60 +1,78 @@
-import { cleanup, screen, within } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
-import { renderThemed } from "../ui/render";
-import { galleryEntries } from "./registry";
+import { cleanup, screen, within } from "@testing-library/react"
+import { afterEach, expect, test } from "vitest"
+import { renderThemed } from "../ui/render"
+import { galleryEntries } from "./registry"
 
-afterEach(cleanup);
+afterEach(cleanup)
 
-const cases = galleryEntries.find((e) => e.name === "EpicPage")?.cases ?? [];
+const cases = galleryEntries.find((e) => e.name === "EpicPage")?.cases ?? []
 
-test.each(cases.map((c) => [c.label, c.node] as const))("the %s epic page renders", async (_label, node) => {
-  renderThemed(<>{node}</>);
-  expect(await screen.findByRole("heading", { level: 1 })).toBeTruthy();
-});
+test.each(cases.map((c) => [c.label, c.node] as const))(
+  "the %s epic page renders",
+  async (_label, node) => {
+    renderThemed(<>{node}</>)
+    expect(await screen.findByRole("heading", { level: 1 })).toBeTruthy()
+  },
+)
 
-const renderCase = (label: string) => renderThemed(<>{cases.find((c) => c.label === label)?.node}</>);
+const renderCase = (label: string) =>
+  renderThemed(<>{cases.find((c) => c.label === label)?.node}</>)
 
 test("the cancelled card case reads cancelled", async () => {
-  renderCase("cancelled card");
-  const card = (await screen.findByText("03")).closest("[data-indent]") as HTMLElement;
-  expect(card.textContent).toContain("cancelled");
-});
+  renderCase("cancelled card")
+  const card = (await screen.findByText("03")).closest("[data-indent]") as HTMLElement
+  expect(card.textContent).toContain("cancelled")
+})
 
 test("the running fork case indents the fork's card", async () => {
-  renderCase("running fork");
-  const card = (await screen.findByText("04")).closest("[data-indent]") as HTMLElement;
-  expect(card.getAttribute("data-indent")).toBe("1");
-});
+  renderCase("running fork")
+  const card = (await screen.findByText("04")).closest("[data-indent]") as HTMLElement
+  expect(card.getAttribute("data-indent")).toBe("1")
+})
 
 test("the dirty-trunk case lists its files and both buttons", async () => {
-  renderCase("dirty-trunk");
-  const notice = await screen.findByTestId("merge-block-notice");
-  const files = within(notice).getByTestId("merge-block-files");
-  expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual(["a.go", "b/c.go", "d.go"]);
-  expect(within(notice).getAllByRole("button").map((b) => b.textContent)).toEqual(["Stash, merge and restore", "Merge again"]);
-});
+  renderCase("dirty-trunk")
+  const notice = await screen.findByTestId("merge-block-notice")
+  const files = within(notice).getByTestId("merge-block-files")
+  expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual([
+    "a.go",
+    "b/c.go",
+    "d.go",
+  ])
+  expect(
+    within(notice)
+      .getAllByRole("button")
+      .map((b) => b.textContent),
+  ).toEqual(["Stash, merge and restore", "Merge again"])
+})
 
 test("the PageHeader gallery cases render", () => {
-  const headers = galleryEntries.find((e) => e.name === "PageHeader")?.cases ?? [];
-  expect(headers.map((c) => c.label)).toEqual(["desktop", "tablet", "phone", "no subtitle", "no meta bar"]);
+  const headers = galleryEntries.find((e) => e.name === "PageHeader")?.cases ?? []
+  expect(headers.map((c) => c.label)).toEqual([
+    "desktop",
+    "tablet",
+    "phone",
+    "no subtitle",
+    "no meta bar",
+  ])
   for (const c of headers) {
-    const { getByRole, unmount } = renderThemed(<>{c.node}</>);
-    expect(getByRole("heading", { level: 1 }).textContent).toBe("slow-tests-impl");
-    unmount();
+    const { getByRole, unmount } = renderThemed(<>{c.node}</>)
+    expect(getByRole("heading", { level: 1 }).textContent).toBe("slow-tests-impl")
+    unmount()
   }
-});
+})
 
 test("the jump menu rows and Design footer cases render", () => {
   for (const name of ["JumpMenuRows", "DesignFooter"]) {
     for (const c of galleryEntries.find((e) => e.name === name)?.cases ?? []) {
-      const { container, unmount } = renderThemed(<>{c.node}</>);
-      expect(container.textContent, `${name} ${c.label}`).not.toBe("");
-      unmount();
+      const { container, unmount } = renderThemed(<>{c.node}</>)
+      expect(container.textContent, `${name} ${c.label}`).not.toBe("")
+      unmount()
     }
   }
-});
+})
 
 test("the needs-repair dialog case opens the fix dialog", async () => {
-  renderThemed(<>{cases.find((c) => c.label === "needs-repair dialog")?.node}</>);
-  expect(await screen.findByRole("dialog")).toBeTruthy();
-});
+  renderThemed(<>{cases.find((c) => c.label === "needs-repair dialog")?.node}</>)
+  expect(await screen.findByRole("dialog")).toBeTruthy()
+})

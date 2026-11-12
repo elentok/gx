@@ -1,22 +1,30 @@
-import { Box } from "@chakra-ui/react";
-import { useEffect, useRef, type ReactNode } from "react";
-import { MemoryRouter } from "react-router";
-import { ConnectionContext, type Connection } from "../connection";
-import { CardKindDesign, CardKindImplementation, SectionImplementing, SectionOnHold, type EpicListRow, type SessionInfo, type Workspace } from "../generated/server";
-import { ListRow, type ListRowData } from "../nav/JumpMenu";
-import { AppShell } from "../shell/AppShell";
-import { buildPalette } from "../shell/JumpPalette";
-import { ManageWorkspaces } from "../shell/ManageWorkspaces";
-import { useShell } from "../shell/ShellContext";
-import { WorkspaceSwitcher } from "../shell/WorkspaceSwitcher";
-import { DeviceContext, WideContext, type Device } from "../useWide";
-import type { GalleryEntry } from "./registry";
+import { Box } from "@chakra-ui/react"
+import { useEffect, useRef, type ReactNode } from "react"
+import { MemoryRouter } from "react-router"
+import { ConnectionContext, type Connection } from "../connection"
+import {
+  CardKindDesign,
+  CardKindImplementation,
+  SectionImplementing,
+  SectionOnHold,
+  type EpicListRow,
+  type SessionInfo,
+  type Workspace,
+} from "../generated/server"
+import { ListRow, type ListRowData } from "../nav/JumpMenu"
+import { AppShell } from "../shell/AppShell"
+import { buildPalette } from "../shell/JumpPalette"
+import { ManageWorkspaces } from "../shell/ManageWorkspaces"
+import { useShell } from "../shell/ShellContext"
+import { WorkspaceSwitcher } from "../shell/WorkspaceSwitcher"
+import { DeviceContext, WideContext, type Device } from "../useWide"
+import type { GalleryEntry } from "./registry"
 
 const workspaces: Workspace[] = [
   { name: "Default", default: true, members: 3 },
   { name: "Work", members: 2, needs_you: 1 },
   { name: "Home", members: 0 },
-];
+]
 
 const row = (address: string, over: Partial<EpicListRow>): EpicListRow =>
   ({
@@ -35,16 +43,28 @@ const row = (address: string, over: Partial<EpicListRow>): EpicListRow =>
     section: SectionImplementing,
     status_words: "Idle",
     ...over,
-  }) as EpicListRow;
+  }) as EpicListRow
 
 const rows = [
   row("p:blog", { name: "Blog", status_words: "Waiting on review" }),
   row("p:shop", { name: "Shop", card_kind: CardKindDesign }),
   row("p:old", { name: "Old", section: SectionOnHold, status_words: "Held" }),
-];
+]
 
 const session = (id: string, name: string): SessionInfo =>
-  ({ id, project: "p", name, dir: "/x", harness: "claude", status: { state: "idle" }, status_changed_at: "2026-01-01T00:00:00Z", run_started_at: "2026-01-01T00:00:00Z", unread: {}, actionable: {}, auto_advance: true }) as SessionInfo;
+  ({
+    id,
+    project: "p",
+    name,
+    dir: "/x",
+    harness: "claude",
+    status: { state: "idle" },
+    status_changed_at: "2026-01-01T00:00:00Z",
+    run_started_at: "2026-01-01T00:00:00Z",
+    unread: {},
+    actionable: {},
+    auto_advance: true,
+  }) as SessionInfo
 
 // getState must return the same object each call, or useSyncExternalStore loops.
 const state = {
@@ -67,63 +87,93 @@ const state = {
   connected: true,
   loadedOnce: true,
   tick: 0,
-};
-const connection = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
+}
+const connection = {
+  getState: () => state,
+  subscribe: () => () => {},
+  onEvent: () => () => {},
+  refresh: () => {},
+} as unknown as Connection
 
 /** Runs `step` on the frame's DOM once it returns true; rows load after mount, so it retries on every change. */
-const Drive = ({ step, children }: { step: (root: HTMLElement) => boolean; children: ReactNode }) => {
-  const root = useRef<HTMLDivElement>(null);
+const Drive = ({
+  step,
+  children,
+}: {
+  step: (root: HTMLElement) => boolean
+  children: ReactNode
+}) => {
+  const root = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const el = root.current;
-    if (!el) return;
-    const body = el.ownerDocument.body;
-    if (step(body)) return;
-    const watch = new MutationObserver(() => step(body) && watch.disconnect());
-    watch.observe(body, { childList: true, subtree: true });
-    return () => watch.disconnect();
-  }, [step]);
-  return <div ref={root}>{children}</div>;
-};
+    const el = root.current
+    if (!el) return
+    const body = el.ownerDocument.body
+    if (step(body)) return
+    const watch = new MutationObserver(() => step(body) && watch.disconnect())
+    watch.observe(body, { childList: true, subtree: true })
+    return () => watch.disconnect()
+  }, [step])
+  return <div ref={root}>{children}</div>
+}
 
 const clickButton = (root: HTMLElement, match: (b: HTMLButtonElement) => boolean) => {
-  const button = [...root.querySelectorAll("button")].find(match);
-  button?.click();
-  return !!button;
-};
-const byLabel = (label: string) => (b: HTMLButtonElement) => b.getAttribute("aria-label") === label;
+  const button = [...root.querySelectorAll("button")].find(match)
+  button?.click()
+  return !!button
+}
+const byLabel = (label: string) => (b: HTMLButtonElement) => b.getAttribute("aria-label") === label
 
-const clickLabel = (label: string) => (root: HTMLElement) => clickButton(root, byLabel(label));
-const clickSections = (...titles: string[]) => (root: HTMLElement) => {
-  const buttons = titles.map((t) => [...root.querySelectorAll("button")].find((b) => b.textContent?.startsWith(t)));
-  if (buttons.some((b) => !b)) return false;
-  buttons.forEach((b) => b?.click());
-  return true;
-};
-const noop = () => true;
+const clickLabel = (label: string) => (root: HTMLElement) => clickButton(root, byLabel(label))
+const clickSections =
+  (...titles: string[]) =>
+  (root: HTMLElement) => {
+    const buttons = titles.map((t) =>
+      [...root.querySelectorAll("button")].find((b) => b.textContent?.startsWith(t)),
+    )
+    if (buttons.some((b) => !b)) return false
+    buttons.forEach((b) => b?.click())
+    return true
+  }
+const noop = () => true
 
 // A transform makes fixed children (the slide-over, the dialogs) fill this frame instead of the page.
 const Frame = ({ w, h, children }: { w: string; h: string; children: ReactNode }) => (
-  <Box position="relative" w={w} h={h} transform="translateZ(0)" overflow="hidden" borderWidth="1px" borderColor="border">
+  <Box
+    position="relative"
+    w={w}
+    h={h}
+    transform="translateZ(0)"
+    overflow="hidden"
+    borderWidth="1px"
+    borderColor="border"
+  >
     {children}
   </Box>
-);
+)
 
 // Slides the sidebar open once mounted; the docked desktop sidebar is already open.
 const OpenSidebar = () => {
-  const shell = useShell();
+  const shell = useShell()
   useEffect(() => {
-    if (!shell?.sidebarOpen) shell?.toggle();
+    if (!shell?.sidebarOpen) shell?.toggle()
     // Once on mount; toggling again would close it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return null;
-};
+  }, [])
+  return null
+}
 
 // The jump menu's rows, built by the palette itself from one fixture so each kind reads as it does in the menu.
 const paletteRows = (() => {
-  const sessions = [session("c1", "scratch chat"), session("a1", "builder"), session("c2", "far chat")];
+  const sessions = [
+    session("c1", "scratch chat"),
+    session("a1", "builder"),
+    session("c2", "far chat"),
+  ]
   const sections = buildPalette({
-    rows: [...rows, row("w:docs", { name: "Docs", workspace: "Work", status_words: "Implementing" })],
+    rows: [
+      ...rows,
+      row("w:docs", { name: "Docs", workspace: "Work", status_words: "Implementing" }),
+    ],
     sessions,
     placements: [
       { session: "c1", kind: "chat", workspace: "Default" },
@@ -133,12 +183,12 @@ const paletteRows = (() => {
     workspaces,
     workspace: "Default",
     current: "",
-  });
+  })
   const pick = (section: string, title: string) => {
-    const found = sections.find((s) => s.key === section)?.rows.find((r) => r.title === title);
-    if (!found) throw new Error(`no ${title} row in ${section}`);
-    return found;
-  };
+    const found = sections.find((s) => s.key === section)?.rows.find((r) => r.title === title)
+    if (!found) throw new Error(`no ${title} row in ${section}`)
+    return found
+  }
   return {
     design: pick("designs", "Shop"),
     epic: pick("epics", "Blog"),
@@ -146,10 +196,14 @@ const paletteRows = (() => {
     agent: pick("agents", "builder"),
     elsewhere: pick("elsewhere", "Docs"),
     held: pick("on-hold", "Old"),
-  };
-})();
+  }
+})()
 
-const jumpRowCase = (label: string, row: ListRowData, step: (root: HTMLElement) => boolean = noop) => ({
+const jumpRowCase = (
+  label: string,
+  row: ListRowData,
+  step: (root: HTMLElement) => boolean = noop,
+) => ({
   label,
   node: (
     <ConnectionContext.Provider value={connection}>
@@ -162,15 +216,15 @@ const jumpRowCase = (label: string, row: ListRowData, step: (root: HTMLElement) 
       </MemoryRouter>
     </ConnectionContext.Provider>
   ),
-});
+})
 
-const fetchEpicList = async () => ({ epics: rows, follow_ups: [] });
+const fetchEpicList = async () => ({ epics: rows, follow_ups: [] })
 
 const FRAME: Record<Device, { w: string; h: string }> = {
   desktop: { w: "1000px", h: "640px" },
   tablet: { w: "760px", h: "640px" },
   phone: { w: "390px", h: "640px" },
-};
+}
 
 const sidebarCase = (label: string, device: Device, step: (root: HTMLElement) => boolean) => ({
   label,
@@ -181,7 +235,9 @@ const sidebarCase = (label: string, device: Device, step: (root: HTMLElement) =>
           <MemoryRouter initialEntries={["/e/p:blog"]}>
             <Frame {...FRAME[device]}>
               <Drive step={step}>
-                <AppShell fetchEpicList={fetchEpicList}>{device === "desktop" ? null : <OpenSidebar />}</AppShell>
+                <AppShell fetchEpicList={fetchEpicList}>
+                  {device === "desktop" ? null : <OpenSidebar />}
+                </AppShell>
               </Drive>
             </Frame>
           </MemoryRouter>
@@ -189,16 +245,16 @@ const sidebarCase = (label: string, device: Device, step: (root: HTMLElement) =>
       </WideContext.Provider>
     </DeviceContext.Provider>
   ),
-});
+})
 
 // Types into a field the way a user does, so React sees the change.
 const typeInto = (root: HTMLElement, label: string, value: string) => {
-  const input = root.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
-  if (!input) return false;
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  return true;
-};
+  const input = root.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)
+  if (!input) return false
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value)
+  input.dispatchEvent(new Event("input", { bubbles: true }))
+  return true
+}
 
 const manageCase = (label: string, step: (root: HTMLElement) => boolean) => ({
   label,
@@ -211,7 +267,7 @@ const manageCase = (label: string, step: (root: HTMLElement) => boolean) => ({
       </Frame>
     </ConnectionContext.Provider>
   ),
-});
+})
 
 export const shellEntries: GalleryEntry[] = [
   {
@@ -247,7 +303,13 @@ export const shellEntries: GalleryEntry[] = [
         node: (
           <Frame w="344px" h="260px">
             <Drive step={clickLabel("Workspace: Default")}>
-              <WorkspaceSwitcher workspaces={workspaces} active="Default" onPick={() => {}} onNew={() => {}} onManage={() => {}} />
+              <WorkspaceSwitcher
+                workspaces={workspaces}
+                active="Default"
+                onPick={() => {}}
+                onNew={() => {}}
+                onManage={() => {}}
+              />
             </Drive>
           </Frame>
         ),
@@ -262,4 +324,4 @@ export const shellEntries: GalleryEntry[] = [
       manageCase("delete confirmation", (root) => clickButton(root, byLabel("Delete Work"))),
     ],
   },
-];
+]

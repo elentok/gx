@@ -1,7 +1,7 @@
-import { Box } from "@chakra-ui/react";
-import { useEffect, useRef, type ReactNode } from "react";
-import type { CompletionConfig } from "../commands/useCompletion";
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
+import { Box } from "@chakra-ui/react"
+import { useEffect, useRef, type ReactNode } from "react"
+import type { CompletionConfig } from "../commands/useCompletion"
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
 
 /** A 5-row note that scrolls itself into view when it mounts. */
 export function NoteBox({
@@ -20,32 +20,32 @@ export function NoteBox({
   footer,
 }: {
   /** A line inside the box, under the text. */
-  footer?: ReactNode;
+  footer?: ReactNode
   /** What the note is on, for its labels: "question 2". */
-  name: string;
+  name: string
   /** The textarea's form name; see ExpandableTextField. */
-  fieldName: string;
+  fieldName: string
   /** The large editor's title. */
-  title: string;
-  value: string;
-  placeholder: string;
-  onChange: (text: string) => void;
+  title: string
+  value: string
+  placeholder: string
+  onChange: (text: string) => void
   /** The box's accessible name, when it is not "Note text for <name>". */
-  label?: string;
-  disabled?: boolean;
+  label?: string
+  disabled?: boolean
   /** Focus the box when it mounts. */
-  autoFocus?: boolean;
+  autoFocus?: boolean
   /** Cmd/Ctrl+Enter in the box. */
-  onSubmit?: () => void;
+  onSubmit?: () => void
   /** Opt in to the command completion menu. */
-  completion?: CompletionConfig;
+  completion?: CompletionConfig
   /** Overrides the box's background. */
-  bg?: string;
+  bg?: string
 }) {
-  const box = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    box.current?.scrollIntoView?.({ block: "nearest" });
-  }, []);
+    box.current?.scrollIntoView?.({ block: "nearest" })
+  }, [])
   return (
     <Box ref={box}>
       <ExpandableTextField
@@ -64,5 +64,5 @@ export function NoteBox({
         footer={footer}
       />
     </Box>
-  );
+  )
 }

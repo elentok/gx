@@ -1,11 +1,11 @@
-export type SelectIntent = "enter-select" | "toggle" | "open" | "leave" | "none";
+export type SelectIntent = "enter-select" | "toggle" | "open" | "leave" | "none"
 
 export interface SelectKey {
-  key: string;
-  metaKey?: boolean;
-  ctrlKey?: boolean;
-  altKey?: boolean;
-  shiftKey?: boolean;
+  key: string
+  metaKey?: boolean
+  ctrlKey?: boolean
+  altKey?: boolean
+  shiftKey?: boolean
 }
 
 /**
@@ -13,17 +13,17 @@ export interface SelectKey {
  * has focus (isTextTarget, hasLayer); it is input because those need a DOM.
  */
 export function selectIntent(e: SelectKey, selecting: boolean, guarded: boolean): SelectIntent {
-  if (guarded || e.metaKey || e.ctrlKey || e.altKey) return "none";
+  if (guarded || e.metaKey || e.ctrlKey || e.altKey) return "none"
   switch (e.key) {
     case "s":
-      return selecting ? "none" : "enter-select";
+      return selecting ? "none" : "enter-select"
     case " ":
-      return selecting ? "toggle" : "none";
+      return selecting ? "toggle" : "none"
     case "Enter":
-      return selecting ? "toggle" : "open";
+      return selecting ? "toggle" : "open"
     case "Escape":
-      return selecting ? "leave" : "none";
+      return selecting ? "leave" : "none"
     default:
-      return "none";
+      return "none"
   }
 }

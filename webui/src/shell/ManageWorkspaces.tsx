@@ -1,33 +1,29 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import type {
-  Workspace,
-  WorkspaceRequest,
-  WorkspaceResult,
-} from "../generated/server";
-import { Button } from "../ui/button/Button";
-import { Modal } from "../ui/modal/Modal";
-import { refusalText, useWrite } from "../useWrite";
-import { postWorkspace } from "../workspaces/postWorkspace";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import type { Workspace, WorkspaceRequest, WorkspaceResult } from "../generated/server"
+import { Button } from "../ui/button/Button"
+import { Modal } from "../ui/modal/Modal"
+import { refusalText, useWrite } from "../useWrite"
+import { postWorkspace } from "../workspaces/postWorkspace"
 
 export interface WorkspaceWriters {
-  rename: (name: string, to: string) => Promise<WorkspaceResult>;
-  remove: (name: string) => Promise<WorkspaceResult>;
-  reorder: (order: string[]) => Promise<WorkspaceResult>;
+  rename: (name: string, to: string) => Promise<WorkspaceResult>
+  remove: (name: string) => Promise<WorkspaceResult>
+  reorder: (order: string[]) => Promise<WorkspaceResult>
 }
 
-const post = (route: string, body: WorkspaceRequest) => postWorkspace<WorkspaceResult>(route, body);
+const post = (route: string, body: WorkspaceRequest) => postWorkspace<WorkspaceResult>(route, body)
 
 export const postWorkspaceWriters: WorkspaceWriters = {
   rename: (name, to) => post("rename", { name, to }),
   remove: (name) => post("delete", { name }),
   reorder: (order) => post("reorder", { name: "", order }),
-};
+}
 
 const problemText = (
   refusal: Parameters<typeof refusalText>[0] | undefined,
   error: string | undefined,
-) => (refusal ? refusalText(refusal) : error);
+) => (refusal ? refusalText(refusal) : error)
 
 function ArrowButton({
   label,
@@ -35,10 +31,10 @@ function ArrowButton({
   disabled,
   onClick,
 }: {
-  label: string;
-  up?: boolean;
-  disabled: boolean;
-  onClick: () => void;
+  label: string
+  up?: boolean
+  disabled: boolean
+  onClick: () => void
 }) {
   return (
     <chakra.button
@@ -72,7 +68,7 @@ function ArrowButton({
         <path d={up ? "m3 7.5 3-3 3 3" : "m3 4.5 3 3 3-3"} />
       </svg>
     </chakra.button>
-  );
+  )
 }
 
 function Row({
@@ -84,23 +80,23 @@ function Row({
   onMove,
   onDelete,
 }: {
-  workspace: Workspace;
-  first: boolean;
-  last: boolean;
-  busy: boolean;
-  writers: WorkspaceWriters;
-  onMove: (delta: -1 | 1) => void;
-  onDelete: () => void;
+  workspace: Workspace
+  first: boolean
+  last: boolean
+  busy: boolean
+  writers: WorkspaceWriters
+  onMove: (delta: -1 | 1) => void
+  onDelete: () => void
 }) {
-  const { name } = workspace;
-  const [draft, setDraft] = useState(name);
-  const { run, refusal, error } = useWrite({ toastRefusal: false });
-  const problem = problemText(refusal, error);
+  const { name } = workspace
+  const [draft, setDraft] = useState(name)
+  const { run, refusal, error } = useWrite({ toastRefusal: false })
+  const problem = problemText(refusal, error)
   const save = () => {
-    const to = draft.trim();
-    if (!to || to === name) return setDraft(name);
-    void run(() => writers.rename(name, to));
-  };
+    const to = draft.trim()
+    if (!to || to === name) return setDraft(name)
+    void run(() => writers.rename(name, to))
+  }
   return (
     <Box as="li" display="flex" flexDirection="column" gap="1">
       <Box display="flex" alignItems="center" gap="1">
@@ -118,11 +114,11 @@ function Row({
             onChange={(e) => setDraft(e.target.value)}
             onBlur={save}
             onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Enter") e.currentTarget.blur()
               // A pending edit is cancelled first; Escape on an untouched field still closes the dialog.
               if (e.key === "Escape" && draft !== name) {
-                e.stopPropagation();
-                setDraft(name);
+                e.stopPropagation()
+                setDraft(name)
               }
             }}
             flex="1"
@@ -167,7 +163,7 @@ function Row({
         </Text>
       )}
     </Box>
-  );
+  )
 }
 
 /** Rename, reorder and delete workspaces. The list is the snapshot's, so every accepted write shows once the server's event arrives. */
@@ -176,22 +172,19 @@ export function ManageWorkspaces({
   writers = postWorkspaceWriters,
   onClose,
 }: {
-  workspaces: Workspace[];
-  writers?: WorkspaceWriters;
-  onClose: () => void;
+  workspaces: Workspace[]
+  writers?: WorkspaceWriters
+  onClose: () => void
 }) {
-  const [deleting, setDeleting] = useState<string>();
-  const { run, pending, refusal, error } = useWrite({ toastRefusal: false });
-  const target = workspaces.find((w) => w.name === deleting);
+  const [deleting, setDeleting] = useState<string>()
+  const { run, pending, refusal, error } = useWrite({ toastRefusal: false })
+  const target = workspaces.find((w) => w.name === deleting)
   const move = (index: number, delta: -1 | 1) => {
-    const order = workspaces.map((w) => w.name);
-    [order[index], order[index + delta]] = [
-      order[index + delta]!,
-      order[index]!,
-    ];
-    void run(() => writers.reorder(order));
-  };
-  const problem = problemText(refusal, error);
+    const order = workspaces.map((w) => w.name)
+    ;[order[index], order[index + delta]] = [order[index + delta]!, order[index]!]
+    void run(() => writers.reorder(order))
+  }
+  const problem = problemText(refusal, error)
   return (
     <>
       <Modal
@@ -240,30 +233,22 @@ export function ManageWorkspaces({
         </Box>
       </Modal>
       {target && (
-        <Modal
-          label={`Delete ${target.name}`}
-          onClose={() => setDeleting(undefined)}
-          maxW="sm"
-        >
+        <Modal label={`Delete ${target.name}`} onClose={() => setDeleting(undefined)} maxW="sm">
           <Text>
             {target.members === 0
               ? `Delete ${target.name}? It has no items.`
               : `Delete ${target.name}? Its ${target.members} ${target.members === 1 ? "item goes" : "items go"} back to the Default workspace.`}
           </Text>
           <Box display="flex" gap="2" justifyContent="flex-end">
-            <Button
-              emphasis="secondary"
-              onClick={() => setDeleting(undefined)}
-              autoFocus
-            >
+            <Button emphasis="secondary" onClick={() => setDeleting(undefined)} autoFocus>
               Keep
             </Button>
             <Button
               tone="paused"
               disabled={pending}
               onClick={() => {
-                setDeleting(undefined);
-                void run(() => writers.remove(target.name));
+                setDeleting(undefined)
+                void run(() => writers.remove(target.name))
               }}
             >
               Delete
@@ -272,5 +257,5 @@ export function ManageWorkspaces({
         </Modal>
       )}
     </>
-  );
+  )
 }

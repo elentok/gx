@@ -9,27 +9,27 @@ import {
   ActionStartOver,
   ActionStopTask,
   type Action,
-} from "../generated/server";
-import { apiFetch } from "../apiFetch";
-import { WriteError, type Refusable } from "../useWrite";
+} from "../generated/server"
+import { apiFetch } from "../apiFetch"
+import { WriteError, type Refusable } from "../useWrite"
 
-export const ReasonAgentWorking = "agent-working";
+export const ReasonAgentWorking = "agent-working"
 
 export interface RecoverBody {
-  address: string;
+  address: string
   /** The page's state token; the server refuses the write if the pause moved on. */
-  state: string;
+  state: string
   /** The chosen blocker of an ambiguous-base pause. */
-  base?: string;
+  base?: string
   /** Retry only: stop the working agent first. */
-  stop?: boolean;
+  stop?: boolean
   /** Start over only: why the work is thrown away. */
-  reason?: string;
+  reason?: string
   /** Resume only: a one-time tier for the ticket's next launch. */
-  tier?: string;
+  tier?: string
 }
 
-export type PostRecover = (action: string, body: RecoverBody) => Promise<Refusable>;
+export type PostRecover = (action: string, body: RecoverBody) => Promise<Refusable>
 
 // The web route each button posts to. The resume route also serves the verbs that lift a pause.
 // stash-merge has no route here yet, so the map is partial over the Action union.
@@ -43,22 +43,23 @@ const ROUTES: Partial<Record<Action, string>> = {
   [ActionStopTask]: "/v1/tickets/stop-task",
   [ActionMerge]: "/v1/tickets/merge",
   [ActionStartOver]: "/v1/tickets/start-over",
-};
+}
 
 /** Whether the card has a button for this action; the rest keep their own forms. */
-export const isRecoverAction = (action: string) => action in ROUTES;
+export const isRecoverAction = (action: string) => action in ROUTES
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postRecover: PostRecover = async (action, body) => {
-  const route = ROUTES[action as Action];
-  if (!route) throw new WriteError(`no route for ${action}`);
+  const route = ROUTES[action as Action]
+  if (!route) throw new WriteError(`no route for ${action}`)
   const res = await apiFetch(route, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`);
-  const result = await res.json().catch(() => null);
-  if (result) return result;
-  throw new WriteError(`HTTP ${res.status}`);
-};
+  })
+  if (!res.ok)
+    throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`)
+  const result = await res.json().catch(() => null)
+  if (result) return result
+  throw new WriteError(`HTTP ${res.status}`)
+}

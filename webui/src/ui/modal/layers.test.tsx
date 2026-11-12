@@ -1,38 +1,38 @@
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import { useIsTopLayer } from "./layers";
+import { cleanup, render } from "@testing-library/react"
+import { afterEach, describe, expect, it } from "vitest"
+import { useIsTopLayer } from "./layers"
 
-afterEach(cleanup);
+afterEach(cleanup)
 
 function Layer({ name, tops }: { name: string; tops: Record<string, () => boolean> }) {
-  tops[name] = useIsTopLayer();
-  return null;
+  tops[name] = useIsTopLayer()
+  return null
 }
 
 describe("useIsTopLayer", () => {
   it("reports only the last mounted layer as topmost, and the one beneath again after it unmounts", () => {
-    const tops: Record<string, () => boolean> = {};
-    const { rerender } = render(<Layer name="a" tops={tops} />);
-    expect(tops.a()).toBe(true);
+    const tops: Record<string, () => boolean> = {}
+    const { rerender } = render(<Layer name="a" tops={tops} />)
+    expect(tops.a()).toBe(true)
     rerender(
       <>
         <Layer name="a" tops={tops} />
         <Layer name="b" tops={tops} />
       </>,
-    );
-    expect(tops.a()).toBe(false);
-    expect(tops.b()).toBe(true);
-    rerender(<Layer name="a" tops={tops} />);
-    expect(tops.a()).toBe(true);
-  });
+    )
+    expect(tops.a()).toBe(false)
+    expect(tops.b()).toBe(true)
+    rerender(<Layer name="a" tops={tops} />)
+    expect(tops.a()).toBe(true)
+  })
 
   it("returns the same function across re-renders", () => {
-    const tops: Record<string, () => boolean> = {};
-    const seen: (() => boolean)[] = [];
-    const { rerender } = render(<Layer name="a" tops={tops} />);
-    seen.push(tops.a);
-    rerender(<Layer name="a" tops={tops} />);
-    seen.push(tops.a);
-    expect(seen[1]).toBe(seen[0]);
-  });
-});
+    const tops: Record<string, () => boolean> = {}
+    const seen: (() => boolean)[] = []
+    const { rerender } = render(<Layer name="a" tops={tops} />)
+    seen.push(tops.a)
+    rerender(<Layer name="a" tops={tops} />)
+    seen.push(tops.a)
+    expect(seen[1]).toBe(seen[0])
+  })
+})

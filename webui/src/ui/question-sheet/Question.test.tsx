@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
-import { renderThemed as render } from "../render";
-import { Question } from "./Question";
-import type { QuestionCard } from "./round";
+import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { afterEach, expect, test, vi } from "vitest"
+import { renderThemed as render } from "../render"
+import { Question } from "./Question"
+import type { QuestionCard } from "./round"
 
-afterEach(cleanup);
+afterEach(cleanup)
 
 const options = (extra: Partial<QuestionCard> = {}): QuestionCard => ({
   label: "1",
@@ -16,24 +16,13 @@ const options = (extra: Partial<QuestionCard> = {}): QuestionCard => ({
     { id: "other", label: "Other", text: true },
   ],
   ...extra,
-});
+})
 
-const show = (
-  card: QuestionCard,
-  props: Partial<Parameters<typeof Question>[0]> = {},
-) => {
-  const onChange = vi.fn();
-  render(
-    <Question
-      card={card}
-      answer={{}}
-      onChange={onChange}
-      onPicked={vi.fn()}
-      {...props}
-    />,
-  );
-  return onChange;
-};
+const show = (card: QuestionCard, props: Partial<Parameters<typeof Question>[0]> = {}) => {
+  const onChange = vi.fn()
+  render(<Question card={card} answer={{}} onChange={onChange} onPicked={vi.fn()} {...props} />)
+  return onChange
+}
 
 test("a card's links show as new-tab links", () => {
   show({
@@ -41,85 +30,71 @@ test("a card's links show as new-tab links", () => {
     title: "Pick a variant?",
     kind: "yes-no",
     links: [{ label: "Open the mock", url: "https://claude.ai/artifact/abc" }],
-  });
-  const link = screen.getByRole("link", { name: /Open the mock/ });
-  expect(link.getAttribute("href")).toBe("https://claude.ai/artifact/abc");
-  expect(link.getAttribute("target")).toBe("_blank");
-});
+  })
+  const link = screen.getByRole("link", { name: /Open the mock/ })
+  expect(link.getAttribute("href")).toBe("https://claude.ai/artifact/abc")
+  expect(link.getAttribute("target")).toBe("_blank")
+})
 
 test("multi-select toggles options and answers with the chosen option ids", () => {
   const onChange = show(options({ kind: "multi-select" }), {
     answer: { choices: ["a"] },
-  });
-  expect(
-    screen.getByRole("button", { name: "Alpha" }).getAttribute("aria-pressed"),
-  ).toBe("true");
-  fireEvent.click(screen.getByRole("button", { name: "Beta" }));
+  })
+  expect(screen.getByRole("button", { name: "Alpha" }).getAttribute("aria-pressed")).toBe("true")
+  fireEvent.click(screen.getByRole("button", { name: "Beta" }))
   expect(onChange).toHaveBeenLastCalledWith({
     choices: ["a", "b"],
     huh: false,
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
-  expect(onChange).toHaveBeenLastCalledWith({ choices: [], huh: false });
-});
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Alpha" }))
+  expect(onChange).toHaveBeenLastCalledWith({ choices: [], huh: false })
+})
 
 test("multi-select's Other row answers with the id other and asks for its text", () => {
-  const onChange = show(options({ kind: "multi-select" }));
-  fireEvent.click(screen.getByRole("button", { name: "Other" }));
-  expect(onChange).toHaveBeenLastCalledWith({ choices: ["other"], huh: false });
-  cleanup();
-  show(options({ kind: "multi-select" }), { answer: { choices: ["other"] } });
-  expect(
-    screen.getByRole("textbox", { name: /Other \(question 1\)/ }),
-  ).toBeTruthy();
-});
+  const onChange = show(options({ kind: "multi-select" }))
+  fireEvent.click(screen.getByRole("button", { name: "Other" }))
+  expect(onChange).toHaveBeenLastCalledWith({ choices: ["other"], huh: false })
+  cleanup()
+  show(options({ kind: "multi-select" }), { answer: { choices: ["other"] } })
+  expect(screen.getByRole("textbox", { name: /Other \(question 1\)/ })).toBeTruthy()
+})
 
 test("the note field shows only when the card takes notes", () => {
-  show(options());
-  expect(
-    screen.getByRole("button", { name: /Note on question 1/ }),
-  ).toBeTruthy();
-  cleanup();
-  show(options(), { mode: "plain" });
-  expect(
-    screen.queryByRole("button", { name: /Note on question 1/ }),
-  ).toBeNull();
-  cleanup();
-  show(options(), { mode: "notes" });
-  expect(
-    screen.getByRole("button", { name: /Note on question 1/ }),
-  ).toBeTruthy();
-});
+  show(options())
+  expect(screen.getByRole("button", { name: /Note on question 1/ })).toBeTruthy()
+  cleanup()
+  show(options(), { mode: "plain" })
+  expect(screen.queryByRole("button", { name: /Note on question 1/ })).toBeNull()
+  cleanup()
+  show(options(), { mode: "notes" })
+  expect(screen.getByRole("button", { name: /Note on question 1/ })).toBeTruthy()
+})
 
 test("a picked text row shows its text field", () => {
-  show(options(), { answer: { choice: "other" } });
-  expect(
-    screen.getByRole("textbox", { name: /Other \(question 1\)/ }),
-  ).toBeTruthy();
-  cleanup();
-  show(options(), { answer: { choice: "a" } });
-  expect(screen.queryByRole("textbox")).toBeNull();
-});
+  show(options(), { answer: { choice: "other" } })
+  expect(screen.getByRole("textbox", { name: /Other \(question 1\)/ })).toBeTruthy()
+  cleanup()
+  show(options(), { answer: { choice: "a" } })
+  expect(screen.queryByRole("textbox")).toBeNull()
+})
 
 test("a fresh card has no pressed option and no recommended badge", () => {
-  show(options());
+  show(options())
   for (const name of ["Alpha", "Beta", "Other"]) {
-    expect(
-      screen.getByRole("button", { name }).getAttribute("aria-pressed"),
-    ).toBe("false");
+    expect(screen.getByRole("button", { name }).getAttribute("aria-pressed")).toBe("false")
   }
-  expect(screen.queryByText(/recommended/)).toBeNull();
-});
+  expect(screen.queryByText(/recommended/)).toBeNull()
+})
 
 test("a recommended option shows its badge", () => {
-  show(options({ recommended: "a" }));
-  expect(screen.getByText(/recommended/)).toBeTruthy();
-});
+  show(options({ recommended: "a" }))
+  expect(screen.getByText(/recommended/)).toBeTruthy()
+})
 
 test("Huh? shows only when the card is a printed round", () => {
-  show(options());
-  expect(screen.getByRole("button", { name: "Huh?" })).toBeTruthy();
-  cleanup();
-  show(options(), { mode: "notes" });
-  expect(screen.queryByRole("button", { name: "Huh?" })).toBeNull();
-});
+  show(options())
+  expect(screen.getByRole("button", { name: "Huh?" })).toBeTruthy()
+  cleanup()
+  show(options(), { mode: "notes" })
+  expect(screen.queryByRole("button", { name: "Huh?" })).toBeNull()
+})

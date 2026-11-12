@@ -1,10 +1,10 @@
-import { expect, test } from "vitest";
-import { formatAge } from "./cardTime";
+import { expect, test } from "vitest"
+import { formatAge } from "./cardTime"
 
-const S = 1000;
-const M = 60 * S;
-const H = 60 * M;
-const D = 24 * H;
+const S = 1000
+const M = 60 * S
+const H = 60 * M
+const D = 24 * H
 
 test.each([
   [59 * S, "<1m"],
@@ -23,5 +23,5 @@ test.each([
   [35 * D, "5w"],
   [-5 * M, "<1m"],
 ])("%i ms reads %s", (ms, words) => {
-  expect(formatAge(ms)).toBe(words);
-});
+  expect(formatAge(ms)).toBe(words)
+})

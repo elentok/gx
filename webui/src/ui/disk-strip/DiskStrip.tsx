@@ -1,6 +1,6 @@
-import { Box, Spinner, Text } from "@chakra-ui/react";
-import { Button } from "../button/Button";
-import { Strip } from "../strip/Strip";
+import { Box, Spinner, Text } from "@chakra-ui/react"
+import { Button } from "../button/Button"
+import { Strip } from "../strip/Strip"
 
 // One low disk: its name, free space and a "Clean now" button. A held disk says new tickets wait.
 export function DiskStrip({
@@ -12,19 +12,19 @@ export function DiskStrip({
   problem,
   onClean,
 }: {
-  name: string;
+  name: string
   /** Free space, already formatted. */
-  free: string;
-  held: boolean;
+  free: string
+  held: boolean
   /** A clean runs on this disk, started here or elsewhere. */
-  cleaning: boolean;
+  cleaning: boolean
   /** The clean call from this page is in flight. */
-  pending: boolean;
+  pending: boolean
   /** Why the last clean refused or failed. */
-  problem?: string;
-  onClean: () => void;
+  problem?: string
+  onClean: () => void
 }) {
-  const busy = cleaning || pending;
+  const busy = cleaning || pending
   return (
     <Strip tone={held ? "paused" : "waiting"}>
       <Box display="flex" alignItems="center" justifyContent="center" gap="3" flexWrap="wrap">
@@ -38,5 +38,5 @@ export function DiskStrip({
       </Box>
       {problem && <Text role="alert">{problem}</Text>}
     </Strip>
-  );
+  )
 }

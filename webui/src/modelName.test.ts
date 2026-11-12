@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
-import { type ModelLabel, modelName } from "./modelName";
+import { describe, expect, it } from "vitest"
+import { type ModelLabel, modelName } from "./modelName"
 
 describe("modelName", () => {
   const rows: [string, string | undefined, string][] = [
@@ -21,16 +21,16 @@ describe("modelName", () => {
     ["", "codex", "Codex CLI default"],
     ["my-model", "codex", "Codex my-model"],
     ["no model", undefined, "no model"],
-  ];
+  ]
 
   it.each(rows)("%j with harness %j reads %j", (id, harness, want) => {
-    expect(modelName(id, harness)).toBe(want);
-  });
+    expect(modelName(id, harness)).toBe(want)
+  })
 
   it("rejects a raw string where a ModelLabel is expected", () => {
-    const show = (_label: ModelLabel) => undefined;
+    const show = (_label: ModelLabel) => undefined
     // @ts-expect-error a raw string is not a ModelLabel
-    show("Claude Sonnet 5.5");
-    show(modelName("sonnet"));
-  });
-});
+    show("Claude Sonnet 5.5")
+    show(modelName("sonnet"))
+  })
+})

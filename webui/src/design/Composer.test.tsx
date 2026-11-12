@@ -1,20 +1,10 @@
-import {
-  cleanup,
-  fireEvent,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test, vi } from "vitest";
-import { clearCommandListCache } from "../commands/useCommandList";
-import { typeInLargeEditor } from "../ui/expandable-text/testing";
-import { DeviceContext, WideContext } from "../useWide";
-import {
-  ConnectionContext,
-  type Connection,
-  type ConnectionState,
-} from "../connection";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { createMemoryRouter, RouterProvider } from "react-router"
+import { afterEach, expect, test, vi } from "vitest"
+import { clearCommandListCache } from "../commands/useCommandList"
+import { typeInLargeEditor } from "../ui/expandable-text/testing"
+import { DeviceContext, WideContext } from "../useWide"
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type {
   EpicDetailRow,
   MapStep,
@@ -22,19 +12,19 @@ import type {
   SessionInfo,
   SessionResult,
   SessionRoundCard,
-} from "../generated/server";
-import { appRoutes } from "../routes";
-import { renderThemed } from "../ui/render";
-import { WriteError } from "../useWrite";
-import type { FetchChat } from "./chat";
-import { Composer } from "./Composer";
-import type { PostAnswer, PostPrompt } from "./prompt";
-import { roundCards } from "./roundFixture";
+} from "../generated/server"
+import { appRoutes } from "../routes"
+import { renderThemed } from "../ui/render"
+import { WriteError } from "../useWrite"
+import type { FetchChat } from "./chat"
+import { Composer } from "./Composer"
+import type { PostAnswer, PostPrompt } from "./prompt"
+import { roundCards } from "./roundFixture"
 
 afterEach(() => {
-  cleanup();
-  localStorage.clear();
-});
+  cleanup()
+  localStorage.clear()
+})
 
 const session = (
   state = "idle",
@@ -55,12 +45,13 @@ const session = (
   auto_advance: true,
   auto_queue: false,
   ...auto,
-});
+})
 
 // `round` is the printed round's cards; they reach the component as the server's `round` card in `questions`.
-const chatOf = (
-  { round, ...over }: Partial<SessionChatResponse> & { round?: SessionRoundCard[] } = {},
-): SessionChatResponse => ({
+const chatOf = ({
+  round,
+  ...over
+}: Partial<SessionChatResponse> & { round?: SessionRoundCard[] } = {}): SessionChatResponse => ({
   conversation_id: "c1",
   messages: [
     {
@@ -74,14 +65,14 @@ const chatOf = (
   questions: roundCards(round),
   background: [],
   ...over,
-});
+})
 
 const runEnd: SessionChatResponse["next"] = {
   action: { action: ["/clear", "/gx-design a"] },
-};
+}
 const runEndNoAction: SessionChatResponse["next"] = {
   action: { reason: "✅ Done: Next: nothing" },
-};
+}
 
 const STEP_LABELS: Record<string, string> = {
   chart: "Chart",
@@ -92,43 +83,42 @@ const STEP_LABELS: Record<string, string> = {
   "create-tickets": "Create tickets",
   branch: "Branch",
   done: "Done",
-};
+}
 const stepsAt = (current: string): MapStep[] => {
-  const ids = Object.keys(STEP_LABELS);
+  const ids = Object.keys(STEP_LABELS)
   return ids.map((step, i) => ({
     step,
     label: STEP_LABELS[step],
-    state:
-      i < ids.indexOf(current) ? "done" : step === current ? "current" : "todo",
-  }));
-};
+    state: i < ids.indexOf(current) ? "done" : step === current ? "current" : "todo",
+  }))
+}
 
-const ok: SessionResult = { session: session() };
+const ok: SessionResult = { session: session() }
 
 function render(opts: {
-  state?: string;
-  background?: boolean;
-  auto?: Partial<SessionInfo>;
-  chat?: SessionChatResponse;
-  connected?: boolean;
-  post?: PostPrompt;
-  answer?: PostAnswer;
-  fetchChat?: FetchChat;
-  rows?: EpicDetailRow[];
-  steps?: MapStep[];
-  wide?: boolean;
+  state?: string
+  background?: boolean
+  auto?: Partial<SessionInfo>
+  chat?: SessionChatResponse
+  connected?: boolean
+  post?: PostPrompt
+  answer?: PostAnswer
+  fetchChat?: FetchChat
+  rows?: EpicDetailRow[]
+  steps?: MapStep[]
+  wide?: boolean
 }) {
   const state = {
     snapshot: { sessions: [session(opts.state, opts.background, opts.auto)] },
     connected: opts.connected ?? true,
     loadedOnce: true,
     tick: 0,
-  } as unknown as ConnectionState;
+  } as unknown as ConnectionState
   const conn = {
     getState: () => state,
     subscribe: () => () => {},
     onEvent: () => () => {},
-  } as unknown as Connection;
+  } as unknown as Connection
   const router = createMemoryRouter(
     appRoutes({
       epicList: async () => ({
@@ -166,19 +156,17 @@ function render(opts: {
           impl_address: "gx:a-impl",
         },
       }),
-      chat:
-        opts.fetchChat ??
-        (async () => ({ kind: "ok", detail: opts.chat ?? chatOf() })),
+      chat: opts.fetchChat ?? (async () => ({ kind: "ok", detail: opts.chat ?? chatOf() })),
       prompt: opts.post,
       answer: opts.answer,
     }),
     { initialEntries: ["/d/gx:a"] },
-  );
+  )
   const app = (
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>
-  );
+  )
   renderThemed(
     opts.wide === undefined ? (
       app
@@ -187,569 +175,552 @@ function render(opts: {
         <WideContext.Provider value={opts.wide}>{app}</WideContext.Provider>
       </DeviceContext.Provider>
     ),
-  );
+  )
 }
 
 const openNote = async () => {
-  fireEvent.click(await screen.findByRole("button", { name: "Note" }));
-  return (await screen.findByLabelText("Message")) as HTMLTextAreaElement;
-};
+  fireEvent.click(await screen.findByRole("button", { name: "Note" }))
+  return (await screen.findByLabelText("Message")) as HTMLTextAreaElement
+}
 
 test("the footer line sits above the buttons with Note closed and inside the box with Note open", async () => {
-  render({});
-  const buttons = (await screen.findByRole("button", { name: "Note" })).parentElement!;
-  const line = () => screen.getByTestId("footer-line");
-  expect(line().nextElementSibling).toBe(buttons);
-  const box = await openNote();
-  expect(box.parentElement!.contains(line())).toBe(true);
-});
+  render({})
+  const buttons = (await screen.findByRole("button", { name: "Note" })).parentElement!
+  const line = () => screen.getByTestId("footer-line")
+  expect(line().nextElementSibling).toBe(buttons)
+  const box = await openNote()
+  expect(box.parentElement!.contains(line())).toBe(true)
+})
 
 test("a plain message posts its text with the last message id", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  const box = await openNote();
-  fireEvent.change(box, { target: { value: "hello there" } });
-  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
-  await waitFor(() => expect(send.disabled).toBe(false));
-  fireEvent.click(send);
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  const box = await openNote()
+  fireEvent.change(box, { target: { value: "hello there" } })
+  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement
+  await waitFor(() => expect(send.disabled).toBe(false))
+  fireEvent.click(send)
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
   expect(post).toHaveBeenCalledWith({
     id: "s-a",
     text: "hello there",
     last_message: "m9",
-  });
-  await waitFor(() => expect(box.value).toBe(""));
-});
+  })
+  await waitFor(() => expect(box.value).toBe(""))
+})
 
-const DRAFT = "gx.draft.composer.s-a";
+const DRAFT = "gx.draft.composer.s-a"
 
 test("a stored draft opens the Note box with its text; typing saves it", async () => {
-  localStorage.setItem(DRAFT, "kept text");
-  render({ post: vi.fn<PostPrompt>(async () => ok) });
-  const box = (await screen.findByLabelText("Message")) as HTMLTextAreaElement;
-  expect(box.value).toBe("kept text");
-  fireEvent.change(box, { target: { value: "more" } });
-  expect(localStorage.getItem(DRAFT)).toBe("more");
-});
+  localStorage.setItem(DRAFT, "kept text")
+  render({ post: vi.fn<PostPrompt>(async () => ok) })
+  const box = (await screen.findByLabelText("Message")) as HTMLTextAreaElement
+  expect(box.value).toBe("kept text")
+  fireEvent.change(box, { target: { value: "more" } })
+  expect(localStorage.getItem(DRAFT)).toBe("more")
+})
 
 test("an accepted Send clears the stored draft", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  fireEvent.change(await openNote(), { target: { value: "hello" } });
-  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
-  await waitFor(() => expect(send.disabled).toBe(false));
-  fireEvent.click(send);
-  await waitFor(() => expect(localStorage.getItem(DRAFT)).toBeNull());
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  fireEvent.change(await openNote(), { target: { value: "hello" } })
+  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement
+  await waitFor(() => expect(send.disabled).toBe(false))
+  fireEvent.click(send)
+  await waitFor(() => expect(localStorage.getItem(DRAFT)).toBeNull())
+})
 
 test("a refused Send and a stale refusal keep the stored draft", async () => {
   for (const reason of ["nope", "stale"]) {
-    const post = vi.fn<PostPrompt>(async () => ({ refused: true, reason }));
-    render({ post });
-    fireEvent.change(await openNote(), { target: { value: "hello" } });
-    const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
-    await waitFor(() => expect(send.disabled).toBe(false));
-    fireEvent.click(send);
-    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-    expect(localStorage.getItem(DRAFT)).toBe("hello");
-    cleanup();
-    localStorage.clear();
+    const post = vi.fn<PostPrompt>(async () => ({ refused: true, reason }))
+    render({ post })
+    fireEvent.change(await openNote(), { target: { value: "hello" } })
+    const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement
+    await waitFor(() => expect(send.disabled).toBe(false))
+    fireEvent.click(send)
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+    expect(localStorage.getItem(DRAFT)).toBe("hello")
+    cleanup()
+    localStorage.clear()
   }
-});
+})
 
 test("a draft from another tab updates the open box and opens a closed one", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok) });
-  expect(await screen.findByRole("button", { name: "Note" })).toBeTruthy();
-  expect(screen.queryByLabelText("Message")).toBeNull();
-  localStorage.setItem(DRAFT, "from tab two");
-  window.dispatchEvent(new StorageEvent("storage", { key: DRAFT }));
-  const box = (await screen.findByLabelText("Message")) as HTMLTextAreaElement;
-  expect(box.value).toBe("from tab two");
-  localStorage.setItem(DRAFT, "edited elsewhere");
-  window.dispatchEvent(new StorageEvent("storage", { key: DRAFT }));
-  await waitFor(() => expect(box.value).toBe("edited elsewhere"));
-});
+  render({ post: vi.fn<PostPrompt>(async () => ok) })
+  expect(await screen.findByRole("button", { name: "Note" })).toBeTruthy()
+  expect(screen.queryByLabelText("Message")).toBeNull()
+  localStorage.setItem(DRAFT, "from tab two")
+  window.dispatchEvent(new StorageEvent("storage", { key: DRAFT }))
+  const box = (await screen.findByLabelText("Message")) as HTMLTextAreaElement
+  expect(box.value).toBe("from tab two")
+  localStorage.setItem(DRAFT, "edited elsewhere")
+  window.dispatchEvent(new StorageEvent("storage", { key: DRAFT }))
+  await waitFor(() => expect(box.value).toBe("edited elsewhere"))
+})
 
 test("opening the composer focuses the Message textarea", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok) });
-  const box = await openNote();
-  expect(document.activeElement).toBe(box);
-});
+  render({ post: vi.fn<PostPrompt>(async () => ok) })
+  const box = await openNote()
+  expect(document.activeElement).toBe(box)
+})
 
 test("the composer is disabled while the session is Working", async () => {
   render({
     state: "working",
     post: vi.fn<PostPrompt>(async () => ok),
     chat: chatOf({ next: runEnd }),
-  });
-  const box = await openNote();
-  expect(box.disabled).toBe(true);
-  expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
-});
+  })
+  const box = await openNote()
+  expect(box.disabled).toBe(true)
+  expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull()
+})
 
-const expand = () => screen.getByLabelText("Open the note in a large editor");
+const expand = () => screen.getByLabelText("Open the note in a large editor")
 
 test("the box is 5 rows, scrolls into view and has the expand button; no round: Message to the agent", async () => {
-  const scrollIntoView = vi.fn();
-  Element.prototype.scrollIntoView = scrollIntoView;
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  const box = await openNote();
-  expect(box.rows).toBe(5);
-  expect(scrollIntoView).toHaveBeenCalled();
-  fireEvent.click(expand());
-  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
-    "Message to the agent",
-  );
-  await typeInLargeEditor("Message to the agent", "from the modal");
-  fireEvent.click(screen.getByText("Done"));
-  expect(box.value).toBe("from the modal");
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  const scrollIntoView = vi.fn()
+  Element.prototype.scrollIntoView = scrollIntoView
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  const box = await openNote()
+  expect(box.rows).toBe(5)
+  expect(scrollIntoView).toHaveBeenCalled()
+  fireEvent.click(expand())
+  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("Message to the agent")
+  await typeInLargeEditor("Message to the agent", "from the modal")
+  fireEvent.click(screen.getByText("Done"))
+  expect(box.value).toBe("from the modal")
+  fireEvent.click(screen.getByRole("button", { name: "Send" }))
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
   expect(post).toHaveBeenCalledWith({
     id: "s-a",
     text: "from the modal",
     last_message: "m9",
-  });
-});
+  })
+})
 
 test("with a round the modal is Note on this round and its text goes in the Note part", async () => {
-  Element.prototype.scrollIntoView = vi.fn();
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  render({ answer, chat: chatOf({ round: round() }) });
-  const box = await openNote();
-  expect(box.rows).toBe(5);
+  Element.prototype.scrollIntoView = vi.fn()
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  render({ answer, chat: chatOf({ round: round() }) })
+  const box = await openNote()
+  expect(box.rows).toBe(5)
   // The round's text answer has its own expand button above the note's.
-  fireEvent.click(screen.getAllByLabelText("Open the note in a large editor").at(-1)!);
-  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
-    "Note on this round",
-  );
-  await typeInLargeEditor("Note on this round", "round note");
-  fireEvent.click(screen.getByText("Done"));
-  expect(box.value).toBe("round note");
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
-  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
-  expect(answer.mock.calls[0][0].note).toBe("round note");
-});
+  fireEvent.click(screen.getAllByLabelText("Open the note in a large editor").at(-1)!)
+  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("Note on this round")
+  await typeInLargeEditor("Note on this round", "round note")
+  fireEvent.click(screen.getByText("Done"))
+  expect(box.value).toBe("round note")
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }))
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+  expect(answer.mock.calls[0][0].note).toBe("round note")
+})
 
 test("on a phone a note on a question alone enables Send", async () => {
-  Element.prototype.scrollIntoView = vi.fn();
-  render({ wide: false, chat: chatOf({ round: round() }) });
-  const send = (await screen.findByRole("button", { name: "Send" })) as HTMLButtonElement;
-  expect(send.disabled).toBe(true);
-  const s = within(await sheet());
-  fireEvent.click(s.getAllByRole("button", { name: /^Note on question/ })[0]);
-  fireEvent.change(await s.findByPlaceholderText("Note on this question"), { target: { value: "just a note" } });
-  await waitFor(() => expect(send.disabled).toBe(false));
-});
+  Element.prototype.scrollIntoView = vi.fn()
+  render({ wide: false, chat: chatOf({ round: round() }) })
+  const send = (await screen.findByRole("button", { name: "Send" })) as HTMLButtonElement
+  expect(send.disabled).toBe(true)
+  const s = within(await sheet())
+  fireEvent.click(s.getAllByRole("button", { name: /^Note on question/ })[0])
+  fireEvent.change(await s.findByPlaceholderText("Note on this question"), {
+    target: { value: "just a note" },
+  })
+  await waitFor(() => expect(send.disabled).toBe(false))
+})
 
-const autoButton = () => screen.findByRole("button", { name: /^Auto:/ });
+const autoButton = () => screen.findByRole("button", { name: /^Auto:/ })
 
 // The Auto button opens the popover that holds the switches.
 const openAuto = async () => {
-  fireEvent.click(await autoButton());
-  return screen.findByRole("dialog", { name: "Auto" });
-};
+  fireEvent.click(await autoButton())
+  return screen.findByRole("dialog", { name: "Auto" })
+}
 
 test("one line: Add, Note, Auto, then Send; the note box above the bar", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok) });
-  const auto = await autoButton();
-  const add = screen.getByRole("button", { name: "Add image" });
-  const note = screen.getByRole("button", { name: "Note" });
-  const send = screen.getByRole("button", { name: "Send" });
+  render({ post: vi.fn<PostPrompt>(async () => ok) })
+  const auto = await autoButton()
+  const add = screen.getByRole("button", { name: "Add image" })
+  const note = screen.getByRole("button", { name: "Note" })
+  const send = screen.getByRole("button", { name: "Send" })
   const follows = (a: Node, b: Node) =>
-    !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(follows(add, note)).toBe(true);
-  expect(follows(note, auto)).toBe(true);
-  expect(follows(auto, send)).toBe(true);
-  const box = await openNote();
-  expect(follows(box, auto)).toBe(true);
-  const menu = await openAuto();
-  const sw = within(menu).getByRole("switch", { name: /Auto-advance/ });
-  expect(sw.getAttribute("aria-checked")).toBe("true");
-});
+    !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+  expect(follows(add, note)).toBe(true)
+  expect(follows(note, auto)).toBe(true)
+  expect(follows(auto, send)).toBe(true)
+  const box = await openNote()
+  expect(follows(box, auto)).toBe(true)
+  const menu = await openAuto()
+  const sw = within(menu).getByRole("switch", { name: /Auto-advance/ })
+  expect(sw.getAttribute("aria-checked")).toBe("true")
+})
 
 test("on a phone the footer is one row: Add, Note, Auto, Send", async () => {
-  render({ wide: false, chat: chatOf({ round: round() }) });
-  const auto = await autoButton();
-  const add = screen.getByRole("button", { name: "Add image" });
-  const note = screen.getByRole("button", { name: "Note" });
-  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
-  const order = Array.from(add.parentElement!.children);
+  render({ wide: false, chat: chatOf({ round: round() }) })
+  const auto = await autoButton()
+  const add = screen.getByRole("button", { name: "Add image" })
+  const note = screen.getByRole("button", { name: "Note" })
+  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement
+  const order = Array.from(add.parentElement!.children)
   // Auto sits in a wrapper, so compare the row's direct children.
-  const at = (b: HTMLElement) => order.findIndex((c) => c.contains(b));
-  const places = [add, note, auto, send].map(at);
-  expect(places).toEqual([...places].sort((a, b) => a - b));
-  expect(new Set(places).size).toBe(4);
+  const at = (b: HTMLElement) => order.findIndex((c) => c.contains(b))
+  const places = [add, note, auto, send].map(at)
+  expect(places).toEqual([...places].sort((a, b) => a - b))
+  expect(new Set(places).size).toBe(4)
   for (const icon of [add, note]) {
-    expect(icon.querySelector("svg")).not.toBeNull();
-    expect(icon.textContent).toBe("");
+    expect(icon.querySelector("svg")).not.toBeNull()
+    expect(icon.textContent).toBe("")
   }
-  expect(auto.textContent).toBe("AdvanceQueue");
-  expect(send.disabled).toBe(true);
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
-  await waitFor(() => expect(send.disabled).toBe(false));
-});
+  expect(auto.textContent).toBe("AdvanceQueue")
+  expect(send.disabled).toBe(true)
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }))
+  await waitFor(() => expect(send.disabled).toBe(false))
+})
 
-test.each([false, true])("the footer has 6px above, 8px below and no separator (wide=%s)", async (wide) => {
-  render({ wide, chat: chatOf({ round: round() }) });
-  await autoButton();
-  const style = getComputedStyle(screen.getByRole("form", { name: "Composer" }));
-  expect(style.paddingTop).toBe("6px");
-  expect(style.paddingBottom).toBe("8px");
-  expect(style.borderTopWidth).not.toBe("1px");
-  expect(screen.getByRole("button", { name: "Add image" })).toBeTruthy();
-});
+test.each([false, true])(
+  "the footer has 6px above, 8px below and no separator (wide=%s)",
+  async (wide) => {
+    render({ wide, chat: chatOf({ round: round() }) })
+    await autoButton()
+    const style = getComputedStyle(screen.getByRole("form", { name: "Composer" }))
+    expect(style.paddingTop).toBe("6px")
+    expect(style.paddingBottom).toBe("8px")
+    expect(style.borderTopWidth).not.toBe("1px")
+    expect(screen.getByRole("button", { name: "Add image" })).toBeTruthy()
+  },
+)
 
 test("on a wide screen the round button stays Send answers with the long Auto names", async () => {
-  render({ wide: true, chat: chatOf({ round: round() }) });
-  expect((await autoButton()).textContent).toBe("Auto-advanceAuto-queue");
-  expect(screen.getByRole("button", { name: "Send answers" })).toBeTruthy();
-});
+  render({ wide: true, chat: chatOf({ round: round() }) })
+  expect((await autoButton()).textContent).toBe("Auto-advanceAuto-queue")
+  expect(screen.getByRole("button", { name: "Send answers" })).toBeTruthy()
+})
 
 test("on a wide screen Auto sits right after Note, not beside Send answers", async () => {
-  render({ wide: true, chat: chatOf({ round: round() }) });
-  const auto = await autoButton();
-  const note = screen.getByRole("button", { name: "Note" });
-  const send = screen.getByRole("button", { name: "Send answers" });
-  expect(!!(note.compareDocumentPosition(auto) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-  expect(note.nextElementSibling?.contains(auto)).toBe(true);
-  expect(auto.parentElement?.parentElement?.nextElementSibling).not.toBe(send);
-});
+  render({ wide: true, chat: chatOf({ round: round() }) })
+  const auto = await autoButton()
+  const note = screen.getByRole("button", { name: "Note" })
+  const send = screen.getByRole("button", { name: "Send answers" })
+  expect(!!(note.compareDocumentPosition(auto) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+  expect(note.nextElementSibling?.contains(auto)).toBe(true)
+  expect(auto.parentElement?.parentElement?.nextElementSibling).not.toBe(send)
+})
 
 test("Interrupt replaces Send while working, Continue replaces it after a run-end line", async () => {
-  render({ state: "working" });
-  await screen.findByRole("button", { name: "Interrupt" });
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
-  cleanup();
-  render({ chat: chatOf({ next: runEnd }), steps: stepsAt("spec") });
-  await screen.findByRole("button", { name: /Continue/ });
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
-});
+  render({ state: "working" })
+  await screen.findByRole("button", { name: "Interrupt" })
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
+  cleanup()
+  render({ chat: chatOf({ next: runEnd }), steps: stepsAt("spec") })
+  await screen.findByRole("button", { name: /Continue/ })
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
+})
 
 test("a Working session offers Interrupt in place of Send, posting the state token after a confirm", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({ state: "working", chat: chatOf() });
-  const box = await openNote();
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
-  expect(box.disabled).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Interrupt" }));
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+  render({ state: "working", chat: chatOf() })
+  const box = await openNote()
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
+  expect(box.disabled).toBe(true)
+  fireEvent.click(screen.getByRole("button", { name: "Interrupt" }))
   const confirm = await screen.findByRole("alertdialog", {
     name: "Interrupt the agent?",
-  });
-  expect(
-    fetchSpy.mock.calls.some(([url]) => url === "/v1/sessions/interrupt"),
-  ).toBe(false);
-  fireEvent.click(within(confirm).getByRole("button", { name: "Interrupt" }));
+  })
+  expect(fetchSpy.mock.calls.some(([url]) => url === "/v1/sessions/interrupt")).toBe(false)
+  fireEvent.click(within(confirm).getByRole("button", { name: "Interrupt" }))
   await waitFor(() =>
     expect(fetchSpy).toHaveBeenCalledWith(
       "/v1/sessions/interrupt",
       expect.objectContaining({ method: "POST" }),
     ),
-  );
+  )
   const body = JSON.parse(
-    fetchSpy.mock.calls.find(([url]) => url === "/v1/sessions/interrupt")![1]!
-      .body as string,
-  );
-  expect(body.id).toBe("s-a");
-  expect(body.state).toMatch(/^s-a:working:\d+$/);
-  fetchSpy.mockRestore();
-});
+    fetchSpy.mock.calls.find(([url]) => url === "/v1/sessions/interrupt")![1]!.body as string,
+  )
+  expect(body.id).toBe("s-a")
+  expect(body.state).toMatch(/^s-a:working:\d+$/)
+  fetchSpy.mockRestore()
+})
 
-const postedTo = (
-  fetchSpy: { mock: { calls: Parameters<typeof fetch>[] } },
-  path: string,
-) =>
-  JSON.parse(
-    fetchSpy.mock.calls.find(([url]) => url === path)![1]!.body as string,
-  );
+const postedTo = (fetchSpy: { mock: { calls: Parameters<typeof fetch>[] } }, path: string) =>
+  JSON.parse(fetchSpy.mock.calls.find(([url]) => url === path)![1]!.body as string)
 
 test("the auto-advance switch shows on and off, idle or working, and posts a flip", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({ state: "working" });
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+  render({ state: "working" })
   expect((await autoButton()).getAttribute("aria-label")).toBe(
     "Auto: Auto-advance on, Auto-queue off",
-  );
+  )
   const on = within(await openAuto()).getByRole("switch", {
     name: /Auto-advance on/,
-  });
-  expect(on.getAttribute("aria-checked")).toBe("true");
-  fireEvent.click(on);
+  })
+  expect(on.getAttribute("aria-checked")).toBe("true")
+  fireEvent.click(on)
   await waitFor(() =>
     expect(fetchSpy).toHaveBeenCalledWith(
       "/v1/sessions/auto-advance",
       expect.objectContaining({ method: "POST" }),
     ),
-  );
+  )
   expect(postedTo(fetchSpy, "/v1/sessions/auto-advance")).toMatchObject({
     id: "s-a",
     off: true,
-  });
-  fetchSpy.mockRestore();
-  cleanup();
+  })
+  fetchSpy.mockRestore()
+  cleanup()
 
   const fetchOff = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({ auto: { auto_advance: false } });
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+  render({ auto: { auto_advance: false } })
   const off = within(await openAuto()).getByRole("switch", {
     name: /Auto-advance off/,
-  });
-  expect(off.getAttribute("aria-checked")).toBe("false");
-  fireEvent.click(off);
-  await waitFor(() =>
-    expect(postedTo(fetchOff, "/v1/sessions/auto-advance").off).toBe(false),
-  );
-  fetchOff.mockRestore();
-});
+  })
+  expect(off.getAttribute("aria-checked")).toBe("false")
+  fireEvent.click(off)
+  await waitFor(() => expect(postedTo(fetchOff, "/v1/sessions/auto-advance").off).toBe(false))
+  fetchOff.mockRestore()
+})
 
 test("a countdown shows the seconds left and Cancel posts to the cancel route", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
   render({
     auto: { auto_advance_at: new Date(Date.now() + 9500).toISOString() },
-  });
+  })
   // The seconds depend on render time, so the test waits for the text, not for a number.
-  expect(await screen.findByText(/Continuing in \d+s/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(await screen.findByText(/Continuing in \d+s/)).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
   await waitFor(() =>
     expect(fetchSpy).toHaveBeenCalledWith(
       "/v1/sessions/auto-advance/cancel",
       expect.objectContaining({ method: "POST" }),
     ),
-  );
-  expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a");
-  fetchSpy.mockRestore();
-});
+  )
+  expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a")
+  fetchSpy.mockRestore()
+})
 
-const countdownAuto = { auto_advance_at: new Date(Date.now() + 9500).toISOString() };
+const countdownAuto = { auto_advance_at: new Date(Date.now() + 9500).toISOString() }
 
 test("on the phone the countdown is a strip above the row with its own Cancel", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({ wide: false, auto: countdownAuto });
-  const strip = (await screen.findByText(/Continuing in \d+s/)).parentElement as HTMLElement;
-  const add = screen.getByRole("button", { name: "Add image" });
-  expect(!!(strip.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-  fireEvent.click(within(strip).getByRole("button", { name: "Cancel" }));
-  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a"));
-  fetchSpy.mockRestore();
-});
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+  render({ wide: false, auto: countdownAuto })
+  const strip = (await screen.findByText(/Continuing in \d+s/)).parentElement as HTMLElement
+  const add = screen.getByRole("button", { name: "Add image" })
+  expect(!!(strip.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+  fireEvent.click(within(strip).getByRole("button", { name: "Cancel" }))
+  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a"))
+  fetchSpy.mockRestore()
+})
 
 test("on the phone there is no strip without a countdown", async () => {
-  render({ wide: false });
-  await autoButton();
-  expect(screen.queryByText(/Continuing in/)).toBeNull();
+  render({ wide: false })
+  await autoButton()
+  expect(screen.queryByText(/Continuing in/)).toBeNull()
   // An empty wrapper in the footer column would still add a flex gap above the row.
-  const column = screen.getByRole("button", { name: "Add image" }).parentElement!.parentElement!;
-  const empties = Array.from(column.children).filter((c) => c.childElementCount === 0 && c.textContent === "");
-  expect(empties.length).toBe(1);
-  for (const e of empties) expect(getComputedStyle(e).display).toBe("none");
-});
+  const column = screen.getByRole("button", { name: "Add image" }).parentElement!.parentElement!
+  const empties = Array.from(column.children).filter(
+    (c) => c.childElementCount === 0 && c.textContent === "",
+  )
+  expect(empties.length).toBe(1)
+  for (const e of empties) expect(getComputedStyle(e).display).toBe("none")
+})
 
 test("on a wide screen the countdown stays inline, after Note and before Send", async () => {
-  render({ wide: true, auto: countdownAuto });
-  const text = await screen.findByText(/Continuing in \d+s/);
-  const note = screen.getByRole("button", { name: "Note" });
-  const send = screen.getByRole("button", { name: "Send" });
-  expect(!!(note.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-  expect(!!(text.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-});
+  render({ wide: true, auto: countdownAuto })
+  const text = await screen.findByText(/Continuing in \d+s/)
+  const note = screen.getByRole("button", { name: "Note" })
+  const send = screen.getByRole("button", { name: "Send" })
+  expect(!!(note.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+  expect(!!(text.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+})
 
 test("the Note dot shows with an open note or text on the phone, and never on a wide screen", async () => {
-  render({ wide: false });
-  const note = await screen.findByRole("button", { name: "Note" });
-  expect(note.querySelector("[data-part=note-dot]")).toBeNull();
-  const box = await openNote();
-  expect(note.querySelector("[data-part=note-dot]")).not.toBeNull();
-  fireEvent.click(note);
-  expect(note.querySelector("[data-part=note-dot]")).toBeNull();
-  fireEvent.click(note);
-  expect(box.isConnected).toBe(false);
-  fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "hi" } });
-  fireEvent.click(note);
-  expect(note.querySelector("[data-part=note-dot]")).not.toBeNull();
-  cleanup();
-  render({ wide: true });
-  fireEvent.click(await screen.findByRole("button", { name: "Note" }));
-  expect(document.querySelector("[data-part=note-dot]")).toBeNull();
-});
+  render({ wide: false })
+  const note = await screen.findByRole("button", { name: "Note" })
+  expect(note.querySelector("[data-part=note-dot]")).toBeNull()
+  const box = await openNote()
+  expect(note.querySelector("[data-part=note-dot]")).not.toBeNull()
+  fireEvent.click(note)
+  expect(note.querySelector("[data-part=note-dot]")).toBeNull()
+  fireEvent.click(note)
+  expect(box.isConnected).toBe(false)
+  fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "hi" } })
+  fireEvent.click(note)
+  expect(note.querySelector("[data-part=note-dot]")).not.toBeNull()
+  cleanup()
+  render({ wide: true })
+  fireEvent.click(await screen.findByRole("button", { name: "Note" }))
+  expect(document.querySelector("[data-part=note-dot]")).toBeNull()
+})
 
 test("Auto-queue shows in the menu enabled and off, posts the flip, and has no Coming soon", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({});
-  const menu = within(await openAuto());
-  const queue = menu.getByRole("switch", { name: "Auto-queue off" });
-  expect(queue.getAttribute("aria-checked")).toBe("false");
-  expect((queue as HTMLButtonElement).disabled).toBe(false);
-  expect(document.body.textContent).not.toContain("Coming soon");
-  fireEvent.click(queue);
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+  render({})
+  const menu = within(await openAuto())
+  const queue = menu.getByRole("switch", { name: "Auto-queue off" })
+  expect(queue.getAttribute("aria-checked")).toBe("false")
+  expect((queue as HTMLButtonElement).disabled).toBe(false)
+  expect(document.body.textContent).not.toContain("Coming soon")
+  fireEvent.click(queue)
   await waitFor(() =>
     expect(postedTo(fetchSpy, "/v1/sessions/auto-queue")).toMatchObject({
       id: "s-a",
       on: true,
     }),
-  );
-  fetchSpy.mockRestore();
-});
+  )
+  fetchSpy.mockRestore()
+})
 
 test("Auto-queue reads the session's real state and posts the flip off", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({ auto: { auto_queue: true } });
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+  render({ auto: { auto_queue: true } })
   const queue = within(await openAuto()).getByRole("switch", {
     name: "Auto-queue on",
-  });
-  expect(queue.getAttribute("aria-checked")).toBe("true");
-  fireEvent.click(queue);
-  await waitFor(() =>
-    expect(postedTo(fetchSpy, "/v1/sessions/auto-queue").on).toBe(false),
-  );
-  fetchSpy.mockRestore();
-});
+  })
+  expect(queue.getAttribute("aria-checked")).toBe("true")
+  fireEvent.click(queue)
+  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-queue").on).toBe(false))
+  fetchSpy.mockRestore()
+})
 
-const queueAuto = { auto_queue_at: new Date(Date.now() + 9500).toISOString() };
+const queueAuto = { auto_queue_at: new Date(Date.now() + 9500).toISOString() }
 
-test.each([true, false])("the Auto-queue countdown shows (wide=%s) and its Cancel stops only Auto-queue", async (wide) => {
-  const fetchSpy = vi
-    .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({ wide, auto: queueAuto });
-  expect(await screen.findByText(/^Queuing a in \d+s$/)).toBeTruthy();
-  expect(screen.queryByText(/Continuing in/)).toBeNull();
-  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Cancel auto-queue" }));
-  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-queue/cancel").id).toBe("s-a"));
-  expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-advance/cancel", expect.anything());
-  fetchSpy.mockRestore();
-});
+test.each([true, false])(
+  "the Auto-queue countdown shows (wide=%s) and its Cancel stops only Auto-queue",
+  async (wide) => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+    render({ wide, auto: queueAuto })
+    expect(await screen.findByText(/^Queuing a in \d+s$/)).toBeTruthy()
+    expect(screen.queryByText(/Continuing in/)).toBeNull()
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Cancel auto-queue" }))
+    await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-queue/cancel").id).toBe("s-a"))
+    expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-advance/cancel", expect.anything())
+    fetchSpy.mockRestore()
+  },
+)
 
 test("two countdowns stack and each Cancel is addressable", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({ wide: false, auto: { ...countdownAuto, ...queueAuto } });
-  const advance = (await screen.findByText(/Continuing in \d+s/)).parentElement as HTMLElement;
-  const queue = (await screen.findByText(/Queuing a in \d+s/)).parentElement as HTMLElement;
-  expect(advance.getAttribute("data-part")).toBe("countdown-strip");
-  expect(queue.getAttribute("data-part")).toBe("countdown-strip");
-  expect(advance.parentElement).toBe(queue.parentElement);
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a"));
-  expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-queue/cancel", expect.anything());
-  fetchSpy.mockRestore();
-});
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+  render({ wide: false, auto: { ...countdownAuto, ...queueAuto } })
+  const advance = (await screen.findByText(/Continuing in \d+s/)).parentElement as HTMLElement
+  const queue = (await screen.findByText(/Queuing a in \d+s/)).parentElement as HTMLElement
+  expect(advance.getAttribute("data-part")).toBe("countdown-strip")
+  expect(queue.getAttribute("data-part")).toBe("countdown-strip")
+  expect(advance.parentElement).toBe(queue.parentElement)
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
+  await waitFor(() => expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a"))
+  expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-queue/cancel", expect.anything())
+  fetchSpy.mockRestore()
+})
 
 test("without a countdown there is no countdown text or Cancel", async () => {
-  render({});
-  await autoButton();
-  expect(screen.queryByText(/Continuing in/)).toBeNull();
-  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
-});
+  render({})
+  await autoButton()
+  expect(screen.queryByText(/Continuing in/)).toBeNull()
+  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull()
+})
 
 test("Esc opens the confirm in this composer", async () => {
-  render({ state: "working", chat: chatOf() });
-  await openNote();
-  fireEvent.keyDown(document.body, { key: "Escape" });
-  expect(await screen.findByRole("alertdialog", { name: "Interrupt the agent?" })).toBeTruthy();
-});
+  render({ state: "working", chat: chatOf() })
+  await openNote()
+  fireEvent.keyDown(document.body, { key: "Escape" })
+  expect(await screen.findByRole("alertdialog", { name: "Interrupt the agent?" })).toBeTruthy()
+})
 
 test("Cancel in the Interrupt confirm closes it without posting", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({ state: "working" });
-  fireEvent.click(await screen.findByRole("button", { name: "Interrupt" }));
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }))
+  render({ state: "working" })
+  fireEvent.click(await screen.findByRole("button", { name: "Interrupt" }))
   const confirm = await screen.findByRole("alertdialog", {
     name: "Interrupt the agent?",
-  });
-  fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
-  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-  expect(
-    fetchSpy.mock.calls.some(([url]) => url === "/v1/sessions/interrupt"),
-  ).toBe(false);
-  fetchSpy.mockRestore();
-});
+  })
+  fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }))
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  expect(fetchSpy.mock.calls.some(([url]) => url === "/v1/sessions/interrupt")).toBe(false)
+  fetchSpy.mockRestore()
+})
 
 test("an Idle session has no Interrupt", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok) });
-  await openNote();
-  expect(screen.queryByRole("button", { name: "Interrupt" })).toBeNull();
-});
+  render({ post: vi.fn<PostPrompt>(async () => ok) })
+  await openNote()
+  expect(screen.queryByRole("button", { name: "Interrupt" })).toBeNull()
+})
 
 test("a stale refusal keeps the draft and refetches the chat", async () => {
   const post = vi.fn<PostPrompt>(async () => ({
     refused: true,
     reason: "stale",
     message: "the conversation moved; review it first",
-  }));
+  }))
   const fetchChat = vi.fn<FetchChat>(async () => ({
     kind: "ok",
     detail: chatOf(),
-  }));
-  render({ post, fetchChat });
-  const box = await openNote();
-  const before = fetchChat.mock.calls.length;
-  fireEvent.change(box, { target: { value: "keep me" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(
-    await screen.findByText("the conversation moved; review it first"),
-  ).toBeTruthy();
-  expect(box.value).toBe("keep me");
-  await waitFor(() =>
-    expect(fetchChat.mock.calls.length).toBeGreaterThan(before),
-  );
-});
+  }))
+  render({ post, fetchChat })
+  const box = await openNote()
+  const before = fetchChat.mock.calls.length
+  fireEvent.change(box, { target: { value: "keep me" } })
+  fireEvent.click(screen.getByRole("button", { name: "Send" }))
+  expect(await screen.findByText("the conversation moved; review it first")).toBeTruthy()
+  expect(box.value).toBe("keep me")
+  await waitFor(() => expect(fetchChat.mock.calls.length).toBeGreaterThan(before))
+})
 
 test("Send is disabled while the prompt is pending, and a server error shows its text in a toast", async () => {
-  let fail: (e: Error) => void = () => {};
-  const post = vi.fn<PostPrompt>(
-    () => new Promise((_, reject) => (fail = reject)),
-  );
-  render({ post });
-  const box = await openNote();
-  fireEvent.change(box, { target: { value: "hello" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  let fail: (e: Error) => void = () => {}
+  const post = vi.fn<PostPrompt>(() => new Promise((_, reject) => (fail = reject)))
+  render({ post })
+  const box = await openNote()
+  fireEvent.change(box, { target: { value: "hello" } })
+  fireEvent.click(screen.getByRole("button", { name: "Send" }))
   await waitFor(() =>
-    expect(
-      (screen.getByRole("button", { name: "Send" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true),
-  );
-  fail(new WriteError("session is gone"));
-  expect(await screen.findByText("session is gone")).toBeTruthy();
-  expect(box.value).toBe("hello");
-});
+    expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true),
+  )
+  fail(new WriteError("session is gone"))
+  expect(await screen.findByText("session is gone")).toBeTruthy()
+  expect(box.value).toBe("hello")
+})
 
 test("another refusal shows its message and keeps the draft", async () => {
   const post = vi.fn<PostPrompt>(async () => ({
     refused: true,
     reason: "text-too-long",
     message: "text is over 32768 bytes",
-  }));
-  render({ post });
-  const box = await openNote();
-  fireEvent.change(box, { target: { value: "long" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(await screen.findByText("text is over 32768 bytes")).toBeTruthy();
-  expect(box.value).toBe("long");
-});
+  }))
+  render({ post })
+  const box = await openNote()
+  fireEvent.change(box, { target: { value: "long" } })
+  fireEvent.click(screen.getByRole("button", { name: "Send" }))
+  expect(await screen.findByText("text is over 32768 bytes")).toBeTruthy()
+  expect(box.value).toBe("long")
+})
 
 test("Continue after a run-end line sends the continue action", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ next: runEnd }), steps: stepsAt("spec") });
-  fireEvent.click(await screen.findByRole("button", { name: /Continue/ }));
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post, chat: chatOf({ next: runEnd }), steps: stepsAt("spec") })
+  fireEvent.click(await screen.findByRole("button", { name: /Continue/ }))
   await waitFor(() =>
     expect(post).toHaveBeenCalledWith({
       id: "s-a",
@@ -757,24 +728,20 @@ test("Continue after a run-end line sends the continue action", async () => {
       last_message: "m9",
       continue: true,
     }),
-  );
-});
+  )
+})
 
-test.each([
-  "chart",
-  "resolve-tickets",
-  "spec",
-  "review",
-  "grill-findings",
-  "create-tickets",
-])("Continue shows at the %s step", async (step) => {
-  render({
-    post: vi.fn<PostPrompt>(async () => ok),
-    chat: chatOf({ next: runEnd }),
-    steps: stepsAt(step),
-  });
-  expect(await screen.findByRole("button", { name: /Continue/ })).toBeTruthy();
-});
+test.each(["chart", "resolve-tickets", "spec", "review", "grill-findings", "create-tickets"])(
+  "Continue shows at the %s step",
+  async (step) => {
+    render({
+      post: vi.fn<PostPrompt>(async () => ok),
+      chat: chatOf({ next: runEnd }),
+      steps: stepsAt(step),
+    })
+    expect(await screen.findByRole("button", { name: /Continue/ })).toBeTruthy()
+  },
+)
 
 test("while tickets resolve, Continue names the map's current ticket and says Continue once", async () => {
   const rows: EpicDetailRow[] = [
@@ -785,29 +752,27 @@ test("while tickets resolve, Continue names the map's current ticket and says Co
       rendered_status: "open",
       current: true,
     },
-  ];
+  ]
   render({
     post: vi.fn<PostPrompt>(async () => ok),
     chat: chatOf({ next: runEnd }),
     rows,
     steps: stepsAt("resolve-tickets"),
-  });
+  })
   const button = await screen.findByRole("button", {
     name: "Continue Server pid lock",
-  });
-  expect(button.textContent?.match(/Continue/g)).toHaveLength(1);
-});
+  })
+  expect(button.textContent?.match(/Continue/g)).toHaveLength(1)
+})
 
 test("outside Resolve tickets, Continue is subtitled with the step label", async () => {
   render({
     post: vi.fn<PostPrompt>(async () => ok),
     chat: chatOf({ next: runEnd }),
     steps: stepsAt("grill-findings"),
-  });
-  expect(
-    await screen.findByRole("button", { name: "Continue Grill findings" }),
-  ).toBeTruthy();
-});
+  })
+  expect(await screen.findByRole("button", { name: "Continue Grill findings" })).toBeTruthy()
+})
 
 test.each(["branch", "done"])(
   "at the %s step the run-end line has no action, so no Continue, and Progress links to the implementation epic",
@@ -816,46 +781,41 @@ test.each(["branch", "done"])(
       post: vi.fn<PostPrompt>(async () => ok),
       chat: chatOf({ next: runEndNoAction }),
       steps: stepsAt(step),
-    });
-    await screen.findByRole("button", { name: "Note" });
-    expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
-    expect(
-      (await screen.findAllByText(/Open implementation epic/)).length,
-    ).toBeGreaterThan(0);
+    })
+    await screen.findByRole("button", { name: "Note" })
+    expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull()
+    expect((await screen.findAllByText(/Open implementation epic/)).length).toBeGreaterThan(0)
   },
-);
+)
 
 test("before Branch, Progress has no implementation epic link", async () => {
   render({
     post: vi.fn<PostPrompt>(async () => ok),
     chat: chatOf({ next: runEnd }),
     steps: stepsAt("create-tickets"),
-  });
-  await screen.findByRole("button", { name: /Continue/ });
-  expect(screen.queryByText(/Open implementation epic/)).toBeNull();
-});
+  })
+  await screen.findByRole("button", { name: /Continue/ })
+  expect(screen.queryByText(/Open implementation epic/)).toBeNull()
+})
 
 test("while disconnected the page says so and the buttons are off", async () => {
   render({
     connected: false,
     post: vi.fn<PostPrompt>(async () => ok),
     chat: chatOf({ next: runEnd }),
-  });
+  })
   expect(
     (
       (await screen.findByRole("button", {
         name: /Continue/,
       })) as HTMLButtonElement
     ).disabled,
-  ).toBe(true);
-  expect(screen.getByText("Offline, reconnecting…")).toBeTruthy();
-  expect((await openNote()).disabled).toBe(true);
-});
+  ).toBe(true)
+  expect(screen.getByText("Offline, reconnecting…")).toBeTruthy()
+  expect((await openNote()).disabled).toBe(true)
+})
 
-const askCard = (
-  n: number,
-  over: Partial<SessionRoundCard> = {},
-): SessionRoundCard => ({
+const askCard = (n: number, over: Partial<SessionRoundCard> = {}): SessionRoundCard => ({
   label: String(n),
   title: `T${n}`,
   body: `Body ${n}?`,
@@ -865,36 +825,35 @@ const askCard = (
     { id: "b", label: "Beta" },
   ],
   ...over,
-});
+})
 
 const round = (): SessionRoundCard[] => [
   askCard(1),
   askCard(2, { kind: "yes-no", options: undefined, yes: "Sure", no: "Nope" }),
   askCard(3, { kind: "text", options: undefined }),
-];
+]
 
-const sheet = () => screen.findByRole("group", { name: "Questions" });
+const sheet = () => screen.findByRole("group", { name: "Questions" })
 
 test("Send answers the whole round through one answer request, with no prompt text", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  render({ post, answer, chat: chatOf({ round: round() }) });
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
-  fireEvent.click(s.getByRole("button", { name: "No" }));
+  const post = vi.fn<PostPrompt>(async () => ok)
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  render({ post, answer, chat: chatOf({ round: round() }) })
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }))
+  fireEvent.click(s.getByRole("button", { name: "No" }))
   fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), {
     target: { value: "free text" },
-  });
-  fireEvent.click(s.getByRole("button", { name: "Question 1, answered" }));
-  fireEvent.click(s.getByRole("button", { name: "Note on question 1" }));
-  fireEvent.change(
-    s.getByRole("textbox", { name: "Note text for question 1" }),
-    { target: { value: "because" } },
-  );
-  fireEvent.change(await openNote(), { target: { value: "overall" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
-  expect(post).not.toHaveBeenCalled();
+  })
+  fireEvent.click(s.getByRole("button", { name: "Question 1, answered" }))
+  fireEvent.click(s.getByRole("button", { name: "Note on question 1" }))
+  fireEvent.change(s.getByRole("textbox", { name: "Note text for question 1" }), {
+    target: { value: "because" },
+  })
+  fireEvent.change(await openNote(), { target: { value: "overall" } })
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+  expect(post).not.toHaveBeenCalled()
   expect(answer).toHaveBeenCalledWith({
     id: "s-a",
     source: "round",
@@ -906,189 +865,178 @@ test("Send answers the whole round through one answer request, with no prompt te
     ],
     note: "overall",
     last_message: "m9",
-  });
-});
+  })
+})
 
 test("Huh? goes out as a mark on its question, and sends nothing on the click", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  render({ answer, chat: chatOf({ round: round() }) });
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Huh?" }));
-  expect(answer).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
-  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
-  expect(answer.mock.calls[0][0].answers?.[0]).toMatchObject({ huh: true });
-});
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  render({ answer, chat: chatOf({ round: round() }) })
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Huh?" }))
+  expect(answer).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }))
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+  expect(answer.mock.calls[0][0].answers?.[0]).toMatchObject({ huh: true })
+})
 
 // Q1 answered, Q2 and Q3 not; Send is clicked and the popover is open.
 const sendWithGaps = async (answer: PostAnswer) => {
-  render({ answer, chat: chatOf({ round: round() }) });
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Beta" }));
-  fireEvent.click(s.getByRole("button", { name: "Question 3" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  const popover = await screen.findByRole("alertdialog");
+  render({ answer, chat: chatOf({ round: round() }) })
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Beta" }))
+  fireEvent.click(s.getByRole("button", { name: "Question 3" }))
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  const popover = await screen.findByRole("alertdialog")
   // The popover settles a tick after it opens: focus lands, then it hears Escape and outside presses.
   await waitFor(() =>
     expect(document.activeElement).toBe(
       within(popover).getByRole("button", { name: "Send anyway" }),
     ),
-  );
-  return { s, popover };
-};
+  )
+  return { s, popover }
+}
 
 test("Send with gaps opens a popover listing the unanswered questions; Send anyway has focus and sends", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  const { popover } = await sendWithGaps(answer);
-  const p = within(popover);
-  expect(popover.getAttribute("aria-label")).toBe("Unanswered questions");
-  expect(p.getByText("2 questions are unanswered")).toBeTruthy();
-  expect(p.getByText("1 of 3 answered")).toBeTruthy();
-  expect(p.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-    "Q2T2›",
-    "Q3T3›",
-  ]);
-  expect(p.queryByRole("button", { name: "Answer them" })).toBeNull();
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  const { popover } = await sendWithGaps(answer)
+  const p = within(popover)
+  expect(popover.getAttribute("aria-label")).toBe("Unanswered questions")
+  expect(p.getByText("2 questions are unanswered")).toBeTruthy()
+  expect(p.getByText("1 of 3 answered")).toBeTruthy()
+  expect(p.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Q2T2›", "Q3T3›"])
+  expect(p.queryByRole("button", { name: "Answer them" })).toBeNull()
   await waitFor(() =>
-    expect(document.activeElement).toBe(
-      p.getByRole("button", { name: "Send anyway" }),
-    ),
-  );
-  expect(answer).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(p.getByRole("button", { name: "Send anyway" })),
+  )
+  expect(answer).not.toHaveBeenCalled()
 
-  fireEvent.click(p.getByRole("button", { name: "Send anyway" }));
-  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
-  expect(answer.mock.calls[0][0].answers).toEqual([{ choice: "b", huh: false }, {}, {}]);
-  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-});
+  fireEvent.click(p.getByRole("button", { name: "Send anyway" }))
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+  expect(answer.mock.calls[0][0].answers).toEqual([{ choice: "b", huh: false }, {}, {}])
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+})
 
 test("one gap says 'question is unanswered'", async () => {
-  const { s } = await sendWithGaps(vi.fn<PostAnswer>(async () => ok));
-  fireEvent.click(s.getByRole("button", { name: "Question 2" }));
-  fireEvent.click(s.getByRole("button", { name: "Yes" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
+  const { s } = await sendWithGaps(vi.fn<PostAnswer>(async () => ok))
+  fireEvent.click(s.getByRole("button", { name: "Question 2" }))
+  fireEvent.click(s.getByRole("button", { name: "Yes" }))
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
   expect(
-    within(await screen.findByRole("alertdialog")).getByText(
-      "1 question is unanswered",
-    ),
-  ).toBeTruthy();
-});
+    within(await screen.findByRole("alertdialog")).getByText("1 question is unanswered"),
+  ).toBeTruthy()
+})
 
 test("Escape closes the popover and focuses Send", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  const { popover } = await sendWithGaps(answer);
-  fireEvent.keyDown(popover, { key: "Escape" });
-  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  const { popover } = await sendWithGaps(answer)
+  fireEvent.keyDown(popover, { key: "Escape" })
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
   await waitFor(() =>
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Send answers" }),
-    ),
-  );
-  expect(answer).not.toHaveBeenCalled();
-});
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Send answers" })),
+  )
+  expect(answer).not.toHaveBeenCalled()
+})
 
 test("an outside click closes the popover and focuses Send", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  await sendWithGaps(answer);
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  await sendWithGaps(answer)
   // The popover listens for outside presses a tick after it opens, so press until it hears one.
   await waitFor(() => {
-    fireEvent.pointerDown(document.body);
-    fireEvent.pointerUp(document.body);
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-  });
+    fireEvent.pointerDown(document.body)
+    fireEvent.pointerUp(document.body)
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+  })
   await waitFor(() =>
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Send answers" }),
-    ),
-  );
-  expect(answer).not.toHaveBeenCalled();
-});
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Send answers" })),
+  )
+  expect(answer).not.toHaveBeenCalled()
+})
 
 test("a second Send click closes the popover and sends nothing", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  await sendWithGaps(answer);
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-  expect(answer).not.toHaveBeenCalled();
-});
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  await sendWithGaps(answer)
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  expect(answer).not.toHaveBeenCalled()
+})
 
 test("a popover row opens the sheet at that question and focuses its first control, from the Chat view", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  const { s, popover: gaps } = await sendWithGaps(answer);
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  const { s, popover: gaps } = await sendWithGaps(answer)
   // The sheet is gone in the Chat view; close the popover first and open it again after.
-  fireEvent.keyDown(gaps, { key: "Escape" });
-  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-  fireEvent.click(screen.getByRole("button", { name: "Chat" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  const popover = await screen.findByRole("alertdialog");
+  fireEvent.keyDown(gaps, { key: "Escape" })
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  fireEvent.click(screen.getByRole("button", { name: "Chat" }))
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  const popover = await screen.findByRole("alertdialog")
   await waitFor(() =>
     expect(document.activeElement).toBe(
       within(popover).getByRole("button", { name: "Send anyway" }),
     ),
-  );
-  fireEvent.click(within(popover).getByRole("button", { name: /Q3/ }));
-  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  )
+  fireEvent.click(within(popover).getByRole("button", { name: /Q3/ }))
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      within(screen.getByRole("group", { name: "Questions" })).getByRole("textbox", { name: "Answer to question 3" }),
+      within(screen.getByRole("group", { name: "Questions" })).getByRole("textbox", {
+        name: "Answer to question 3",
+      }),
     ),
-  );
+  )
   expect(
-    within(screen.getByRole("group", { name: "Questions" })).getByRole("button", { name: "Question 3" }).getAttribute("aria-current"),
-  ).toBe("step");
+    within(screen.getByRole("group", { name: "Questions" }))
+      .getByRole("button", { name: "Question 3" })
+      .getAttribute("aria-current"),
+  ).toBe("step")
 
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
   fireEvent.click(
     within(await screen.findByRole("alertdialog")).getByRole("button", {
       name: /Q2/,
     }),
-  );
+  )
   await waitFor(() =>
     expect(document.activeElement).toBe(
       within(screen.getByRole("group", { name: "Questions" })).getByRole("button", { name: "Yes" }),
     ),
-  );
-  expect(answer).not.toHaveBeenCalled();
-});
+  )
+  expect(answer).not.toHaveBeenCalled()
+})
 
 test("Send with every question answered posts at once", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  render({ answer, chat: chatOf({ round: [askCard(1)] }) });
-  fireEvent.click(within(await sheet()).getByRole("button", { name: "Alpha" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
-  expect(screen.queryByRole("alertdialog")).toBeNull();
-});
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  render({ answer, chat: chatOf({ round: [askCard(1)] }) })
+  fireEvent.click(within(await sheet()).getByRole("button", { name: "Alpha" }))
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+  expect(screen.queryByRole("alertdialog")).toBeNull()
+})
 
 test("a stale refusal keeps every answer and note of the round", async () => {
   const answer = vi.fn<PostAnswer>(async () => ({
     refused: true,
     reason: "stale",
     message: "the conversation moved",
-  }));
+  }))
   const fetchChat = vi.fn<FetchChat>(async () => ({
     kind: "ok",
     detail: chatOf({ round: round() }),
-  }));
-  render({ answer, fetchChat });
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
-  const box = await openNote();
-  fireEvent.change(box, { target: { value: "keep" } });
-  const before = fetchChat.mock.calls.length;
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
-  expect(await screen.findByText("the conversation moved")).toBeTruthy();
-  await waitFor(() =>
-    expect(fetchChat.mock.calls.length).toBeGreaterThan(before),
-  );
-  expect(
-    screen.getByRole("button", { name: "Question 1, answered" }),
-  ).toBeTruthy();
-  expect(box.value).toBe("keep");
-});
+  }))
+  render({ answer, fetchChat })
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }))
+  const box = await openNote()
+  fireEvent.change(box, { target: { value: "keep" } })
+  const before = fetchChat.mock.calls.length
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }))
+  expect(await screen.findByText("the conversation moved")).toBeTruthy()
+  await waitFor(() => expect(fetchChat.mock.calls.length).toBeGreaterThan(before))
+  expect(screen.getByRole("button", { name: "Question 1, answered" })).toBeTruthy()
+  expect(box.value).toBe("keep")
+})
 
 test("question bodies and option labels render their markdown", async () => {
   const card = askCard(1, {
@@ -1097,136 +1045,134 @@ test("question bodies and option labels render their markdown", async () => {
       { id: "a", label: "Use `designs/open`" },
       { id: "b", label: "Beta" },
     ],
-  });
-  render({ chat: chatOf({ round: [card] }) });
-  const s = await sheet();
-  expect(within(s).getByText("the old route").tagName).toBe("STRONG");
-  expect(within(s).getAllByRole("listitem")).toHaveLength(2);
-  const option = within(s).getByRole("button", { name: "Use designs/open" });
-  expect(within(option).getByText("designs/open").tagName).toBe("CODE");
-  const label = document.getElementById(option.getAttribute("aria-labelledby") ?? "");
-  expect(label?.querySelector("p, div")).toBeNull();
-});
+  })
+  render({ chat: chatOf({ round: [card] }) })
+  const s = await sheet()
+  expect(within(s).getByText("the old route").tagName).toBe("STRONG")
+  expect(within(s).getAllByRole("listitem")).toHaveLength(2)
+  const option = within(s).getByRole("button", { name: "Use designs/open" })
+  expect(within(option).getByText("designs/open").tagName).toBe("CODE")
+  const label = document.getElementById(option.getAttribute("aria-labelledby") ?? "")
+  expect(label?.querySelector("p, div")).toBeNull()
+})
 
 test("a finished turn with a background task still takes answers", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
+  const answer = vi.fn<PostAnswer>(async () => ok)
   render({
     state: "working",
     background: true,
     answer,
     chat: chatOf({ round: [askCard(1)] }),
-  });
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
-});
+  })
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }))
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+})
 
 test("a question card shows its number and title above the body", async () => {
-  render({ chat: chatOf({ round: [askCard(1, { title: "Pick `one`" })] }) });
-  const s = within(await sheet());
+  render({ chat: chatOf({ round: [askCard(1, { title: "Pick `one`" })] }) })
+  const s = within(await sheet())
   expect(
-    s.getByText(
-      (_, el) => el?.textContent === "Q1 - Pick one" && el.tagName === "SPAN",
-    ),
-  ).toBeTruthy();
-  expect(s.getByText("Body 1?")).toBeTruthy();
-});
+    s.getByText((_, el) => el?.textContent === "Q1 - Pick one" && el.tagName === "SPAN"),
+  ).toBeTruthy()
+  expect(s.getByText("Body 1?")).toBeTruthy()
+})
 
 test("a round's composer has no Focus button", async () => {
-  render({ chat: chatOf({ round: [askCard(1)] }) });
-  await sheet();
-  expect(screen.queryByRole("button", { name: "Focus" })).toBeNull();
-});
+  render({ chat: chatOf({ round: [askCard(1)] }) })
+  await sheet()
+  expect(screen.queryByRole("button", { name: "Focus" })).toBeNull()
+})
 
 const cmdEnter = (box: HTMLElement, mod: "metaKey" | "ctrlKey" = "metaKey") =>
-  fireEvent.keyDown(box, { key: "Enter", [mod]: true });
+  fireEvent.keyDown(box, { key: "Enter", [mod]: true })
 
 test("design page: the key runs Send", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  const box = await openNote();
-  fireEvent.change(box, { target: { value: "hello" } });
-  cmdEnter(box);
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  const box = await openNote()
+  fireEvent.change(box, { target: { value: "hello" } })
+  cmdEnter(box)
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
   expect(post).toHaveBeenCalledWith({
     id: "s-a",
     text: "hello",
     last_message: "m9",
-  });
-});
+  })
+})
 
 test("design page: the key runs Send answers, and with gaps opens the popover", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  render({ answer, chat: chatOf({ round: round() }) });
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Beta" }));
-  const box = await openNote();
-  cmdEnter(box);
-  const popover = await screen.findByRole("alertdialog");
-  expect(within(popover).getByText("2 questions are unanswered")).toBeTruthy();
-  expect(answer).not.toHaveBeenCalled();
-});
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  render({ answer, chat: chatOf({ round: round() }) })
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Beta" }))
+  const box = await openNote()
+  cmdEnter(box)
+  const popover = await screen.findByRole("alertdialog")
+  expect(within(popover).getByText("2 questions are unanswered")).toBeTruthy()
+  expect(answer).not.toHaveBeenCalled()
+})
 
 test("design page: the key sends a complete round", async () => {
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  render({ answer, chat: chatOf({ round: [askCard(1)] }) });
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
-  cmdEnter(await openNote());
-  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
-  expect(answer.mock.calls[0][0].answers).toEqual([{ choice: "a", huh: false }]);
-});
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  render({ answer, chat: chatOf({ round: [askCard(1)] }) })
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }))
+  cmdEnter(await openNote())
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+  expect(answer.mock.calls[0][0].answers).toEqual([{ choice: "a", huh: false }])
+})
 
 test("the key in the large editor sends on a wide screen and does nothing on a narrow one", async () => {
   for (const wide of [true, false]) {
-    const post = vi.fn<PostPrompt>(async () => ok);
-    render({ post, wide });
-    const box = await openNote();
-    fireEvent.change(box, { target: { value: "hello" } });
-    fireEvent.click(expand());
-    const editor = await screen.findByRole("textbox", { name: "Message to the agent text" });
-    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-    if (wide) await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    const post = vi.fn<PostPrompt>(async () => ok)
+    render({ post, wide })
+    const box = await openNote()
+    fireEvent.change(box, { target: { value: "hello" } })
+    fireEvent.click(expand())
+    const editor = await screen.findByRole("textbox", { name: "Message to the agent text" })
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true })
+    if (wide) await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
     else {
-      await new Promise((r) => setTimeout(r, 20));
-      expect(post).not.toHaveBeenCalled();
-      expect(screen.getByRole("dialog", { name: "Message to the agent" })).toBeTruthy();
+      await new Promise((r) => setTimeout(r, 20))
+      expect(post).not.toHaveBeenCalled()
+      expect(screen.getByRole("dialog", { name: "Message to the agent" })).toBeTruthy()
     }
-    cleanup();
+    cleanup()
   }
-});
+})
 
 test("design page: the key does nothing when the main button is Continue", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ next: runEnd }) });
-  const box = await openNote();
-  expect(screen.getByRole("button", { name: /Continue/ })).toBeTruthy();
-  cmdEnter(box);
-  await new Promise((r) => setTimeout(r, 20));
-  expect(post).not.toHaveBeenCalled();
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post, chat: chatOf({ next: runEnd }) })
+  const box = await openNote()
+  expect(screen.getByRole("button", { name: /Continue/ })).toBeTruthy()
+  cmdEnter(box)
+  await new Promise((r) => setTimeout(r, 20))
+  expect(post).not.toHaveBeenCalled()
+})
 
 test("design page: the key does nothing when the main button is Interrupt", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ state: "working", post, chat: chatOf({ next: runEnd }) });
-  const box = await openNote();
-  fireEvent.change(box, { target: { value: "hello" } });
-  cmdEnter(box);
-  await new Promise((r) => setTimeout(r, 20));
-  expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy();
-  expect(post).not.toHaveBeenCalled();
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ state: "working", post, chat: chatOf({ next: runEnd }) })
+  const box = await openNote()
+  fireEvent.change(box, { target: { value: "hello" } })
+  cmdEnter(box)
+  await new Promise((r) => setTimeout(r, 20))
+  expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy()
+  expect(post).not.toHaveBeenCalled()
+})
 
 test("design page: the key does nothing with the Note box closed", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  await screen.findByRole("button", { name: "Note" });
-  expect(screen.queryByLabelText("Message")).toBeNull();
-  cmdEnter(document.body);
-  await new Promise((r) => setTimeout(r, 20));
-  expect(post).not.toHaveBeenCalled();
-});
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  await screen.findByRole("button", { name: "Note" })
+  expect(screen.queryByLabelText("Message")).toBeNull()
+  cmdEnter(document.body)
+  await new Promise((r) => setTimeout(r, 20))
+  expect(post).not.toHaveBeenCalled()
+})
 
 const menuEntries = ["compact", "context", "help"].map((name) => ({
   name,
@@ -1234,145 +1180,157 @@ const menuEntries = ["compact", "context", "help"].map((name) => ({
   arg_hint: "",
   description: name,
   source: "built-in",
-}));
+}))
 
 function stubCommands() {
-  clearCommandListCache();
-  return vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
-    String(url).startsWith("/v1/sessions/commands")
-      ? new Response(JSON.stringify({ degraded: false, entries: menuEntries }), { status: 200 })
-      : new Response(JSON.stringify(ok), { status: 200 }),
-  );
+  clearCommandListCache()
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation(async (url) =>
+      String(url).startsWith("/v1/sessions/commands")
+        ? new Response(JSON.stringify({ degraded: false, entries: menuEntries }), { status: 200 })
+        : new Response(JSON.stringify(ok), { status: 200 }),
+    )
 }
 
 const typeInto = (box: HTMLTextAreaElement, text: string) => {
-  fireEvent.change(box, { target: { value: text } });
-  box.setSelectionRange(text.length, text.length);
-  fireEvent.select(box);
-};
+  fireEvent.change(box, { target: { value: text } })
+  box.setSelectionRange(text.length, text.length)
+  fireEvent.select(box)
+}
 
 test("/ opens the command menu in the Note box and Escape closes it", async () => {
-  const spy = stubCommands();
-  render({});
-  const box = await openNote();
-  typeInto(box, "/co");
-  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
-  fireEvent.keyDown(box, { key: "Escape" });
-  await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
-  spy.mockRestore();
-});
+  const spy = stubCommands()
+  render({})
+  const box = await openNote()
+  typeInto(box, "/co")
+  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2))
+  fireEvent.keyDown(box, { key: "Escape" })
+  await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull())
+  spy.mockRestore()
+})
 
 test("the Note box makes no command read on mount, one on the first /", async () => {
-  const spy = stubCommands();
-  render({});
-  const box = await openNote();
-  const reads = () => spy.mock.calls.filter(([url]) => String(url).startsWith("/v1/sessions/commands")).length;
-  expect(reads()).toBe(0);
-  typeInto(box, "/");
-  await waitFor(() => expect(reads()).toBe(1));
-  spy.mockRestore();
-});
+  const spy = stubCommands()
+  render({})
+  const box = await openNote()
+  const reads = () =>
+    spy.mock.calls.filter(([url]) => String(url).startsWith("/v1/sessions/commands")).length
+  expect(reads()).toBe(0)
+  typeInto(box, "/")
+  await waitFor(() => expect(reads()).toBe(1))
+  spy.mockRestore()
+})
 
 test("$ opens the menu for a Codex design session", async () => {
-  const spy = stubCommands();
-  render({ auto: { harness: "codex" } });
-  typeInto(await openNote(), "$co");
-  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
-  spy.mockRestore();
-});
+  const spy = stubCommands()
+  render({ auto: { harness: "codex" } })
+  typeInto(await openNote(), "$co")
+  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2))
+  spy.mockRestore()
+})
 
 test("$ does not open the menu for a Claude design session", async () => {
-  const spy = stubCommands();
-  render({});
-  typeInto(await openNote(), "$co");
-  expect(screen.queryByRole("listbox")).toBeNull();
-  spy.mockRestore();
-});
+  const spy = stubCommands()
+  render({})
+  typeInto(await openNote(), "$co")
+  expect(screen.queryByRole("listbox")).toBeNull()
+  spy.mockRestore()
+})
 
 test("Cmd+Enter still sends with the menu open", async () => {
-  const spy = stubCommands();
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  const box = await openNote();
-  typeInto(box, "/co");
-  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
-  fireEvent.keyDown(box, { key: "Enter", metaKey: true });
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  spy.mockRestore();
-});
+  const spy = stubCommands()
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  const box = await openNote()
+  typeInto(box, "/co")
+  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2))
+  fireEvent.keyDown(box, { key: "Enter", metaKey: true })
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+  spy.mockRestore()
+})
 
-const uploads = vi.hoisted(() => ({ upload: vi.fn() }));
+const uploads = vi.hoisted(() => ({ upload: vi.fn() }))
 vi.mock("./sessionImages", () => ({
   uploadSessionImage: uploads.upload,
   deleteSessionImage: vi.fn(async () => ({})),
   sessionImageUrl: (_s: string, id: string) => `/img/${id}`,
-}));
+}))
 
 const pngFile = () =>
-  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", { type: "image/png" });
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", {
+    type: "image/png",
+  })
 
 // A draft that already holds ready images, as another tab or an earlier visit leaves it.
 const draftImages = (...ids: string[]) =>
-  localStorage.setItem("gx.draft.images.s-a", JSON.stringify(ids.map((id) => ({ key: `k-${id}`, id }))));
+  localStorage.setItem(
+    "gx.draft.images.s-a",
+    JSON.stringify(ids.map((id) => ({ key: `k-${id}`, id }))),
+  )
 
 test("images: a ready image turns Continue into Send and the post carries the ids", async () => {
-  draftImages("i1", "i2");
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ next: runEnd }), steps: stepsAt("spec") });
-  const send = (await screen.findByRole("button", { name: "Send" })) as HTMLButtonElement;
-  expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
-  expect(send.disabled).toBe(false);
-  fireEvent.click(send);
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0]).toMatchObject({ text: "", images: ["i1", "i2"] });
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Remove image" })).toBeNull());
-});
+  draftImages("i1", "i2")
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post, chat: chatOf({ next: runEnd }), steps: stepsAt("spec") })
+  const send = (await screen.findByRole("button", { name: "Send" })) as HTMLButtonElement
+  expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull()
+  expect(send.disabled).toBe(false)
+  fireEvent.click(send)
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+  expect(post.mock.calls[0][0]).toMatchObject({ text: "", images: ["i1", "i2"] })
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Remove image" })).toBeNull())
+})
 
 test("images: the note opens from the draft on load and the key sends images alone", async () => {
-  draftImages("i1");
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post });
-  cmdEnter(await screen.findByLabelText("Message"));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].images).toEqual(["i1"]);
-});
+  draftImages("i1")
+  const post = vi.fn<PostPrompt>(async () => ok)
+  render({ post })
+  cmdEnter(await screen.findByLabelText("Message"))
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+  expect(post.mock.calls[0][0].images).toEqual(["i1"])
+})
 
 test("images: Send answers carries the ready images", async () => {
-  draftImages("i1");
-  const answer = vi.fn<PostAnswer>(async () => ok);
-  render({ answer, chat: chatOf({ round: round() }) });
-  const s = within(await sheet());
-  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
-  fireEvent.click(s.getByRole("button", { name: "No" }));
-  fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), { target: { value: "x" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
-  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
-  expect(answer.mock.calls[0][0].images).toEqual(["i1"]);
-});
+  draftImages("i1")
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  render({ answer, chat: chatOf({ round: round() }) })
+  const s = within(await sheet())
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }))
+  fireEvent.click(s.getByRole("button", { name: "No" }))
+  fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), {
+    target: { value: "x" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }))
+  await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+  expect(answer.mock.calls[0][0].images).toEqual(["i1"])
+})
 
 test("images: a failed upload keeps Send off", async () => {
-  uploads.upload.mockRejectedValueOnce(new Error("Upload failed"));
-  render({});
-  fireEvent.change(await openNote(), { target: { value: "hi" } });
-  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
-  await screen.findByText("Upload failed, tap to retry");
-  expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
-});
+  uploads.upload.mockRejectedValueOnce(new Error("Upload failed"))
+  render({})
+  fireEvent.change(await openNote(), { target: { value: "hi" } })
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } })
+  await screen.findByText("Upload failed, tap to retry")
+  expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true)
+})
 
 test("images: busy keeps Add working and the note disabled, and Interrupt shows", async () => {
-  draftImages("i1");
-  render({ state: "working" });
-  await screen.findByRole("button", { name: "Interrupt" });
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
-  expect((screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement).disabled).toBe(false);
-  expect(((await screen.findByLabelText("Message")) as HTMLTextAreaElement).disabled).toBe(true);
-});
+  draftImages("i1")
+  render({ state: "working" })
+  await screen.findByRole("button", { name: "Interrupt" })
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
+  expect((screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement).disabled).toBe(
+    false,
+  )
+  expect(((await screen.findByLabelText("Message")) as HTMLTextAreaElement).disabled).toBe(true)
+})
 
 test("images: adding one while busy leaves the note closed", async () => {
-  uploads.upload.mockResolvedValueOnce("i1");
-  render({ state: "working" });
-  await screen.findByRole("button", { name: "Interrupt" });
-  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
-  await screen.findByRole("button", { name: "Remove image" });
-  expect(screen.queryByLabelText("Message")).toBeNull();
-});
+  uploads.upload.mockResolvedValueOnce("i1")
+  render({ state: "working" })
+  await screen.findByRole("button", { name: "Interrupt" })
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } })
+  await screen.findByRole("button", { name: "Remove image" })
+  expect(screen.queryByLabelText("Message")).toBeNull()
+})

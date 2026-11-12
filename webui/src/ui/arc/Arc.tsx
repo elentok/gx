@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
-import type { Tone } from "../tone";
+import { Box } from "@chakra-ui/react"
+import type { Tone } from "../tone"
 
 // Small spinning arc that marks a live ticket or epic inline, next to its name.
 export function Arc({ tone = "running", label }: { tone?: Tone; label: string }) {
@@ -22,5 +22,5 @@ export function Arc({ tone = "running", label }: { tone?: Tone; label: string })
       animation="spin 1.05s linear infinite"
       _motionReduce={{ animation: "none" }}
     />
-  );
+  )
 }

@@ -1,13 +1,18 @@
-import { Box, Input, Text } from "@chakra-ui/react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router";
-import { CardActionAnswer, CardKindDesign, SectionNeedsYou, type EpicListRow } from "../generated/server";
-import { designHref } from "../hrefs";
-import { titleHref } from "../epics/cardLinks";
-import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring";
-import { Button } from "../ui/button/Button";
-import { ProgressRing } from "../ui/progress-ring/ProgressRing";
-import { fuzzyScore } from "./fuzzy";
+import { Box, Input, Text } from "@chakra-ui/react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useNavigate } from "react-router"
+import {
+  CardActionAnswer,
+  CardKindDesign,
+  SectionNeedsYou,
+  type EpicListRow,
+} from "../generated/server"
+import { designHref } from "../hrefs"
+import { titleHref } from "../epics/cardLinks"
+import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring"
+import { Button } from "../ui/button/Button"
+import { ProgressRing } from "../ui/progress-ring/ProgressRing"
+import { fuzzyScore } from "./fuzzy"
 
 /**
  * A Design opens on its Design page, a card whose Answer link the server set
@@ -16,47 +21,47 @@ import { fuzzyScore } from "./fuzzy";
 export const jumpHref = (row: EpicListRow): string =>
   row.card_kind === CardKindDesign
     ? designHref(row.address)
-    : (row.actions?.find((a) => a.kind === CardActionAnswer)?.link ?? titleHref(row));
+    : (row.actions?.find((a) => a.kind === CardActionAnswer)?.link ?? titleHref(row))
 
 /** One row of a row list. `href` is a hash link, such as `#/e/demo:blog`. */
 export type ListRowData = {
-  key: string;
-  title: string;
-  subtitle: string;
-  href: string;
+  key: string
+  title: string
+  subtitle: string
+  href: string
   /** The filter matches this text, case-insensitively. */
-  searchText: string;
-  lead?: ReactNode;
-  trailing?: ReactNode;
-  current?: boolean;
+  searchText: string
+  lead?: ReactNode
+  trailing?: ReactNode
+  current?: boolean
   /** Runs instead of following `href`. */
-  onSelect?: () => void;
-};
+  onSelect?: () => void
+}
 
 export type ListSection = {
-  key: string;
-  title: string;
-  rows: ListRowData[];
+  key: string
+  title: string
+  rows: ListRowData[]
   /** Hidden while the filter is empty. */
-  hiddenUntilSearch?: boolean;
-};
+  hiddenUntilSearch?: boolean
+}
 
 /** The rows that match, best match first; Array.sort is stable, so ties keep the caller's order. */
 function rankRows(rows: ListRowData[], q: string): ListRowData[] {
   return rows
     .flatMap((r) => {
-      const score = fuzzyScore(r.searchText, q);
-      return score === null ? [] : [{ r, score }];
+      const score = fuzzyScore(r.searchText, q)
+      return score === null ? [] : [{ r, score }]
     })
     .sort((a, b) => a.score - b.score)
-    .map((x) => x.r);
+    .map((x) => x.r)
 }
 
 function visibleSections(sections: ListSection[], query: string): ListSection[] {
-  const q = query.trim();
+  const q = query.trim()
   return sections
     .map((s) => (q ? { ...s, rows: rankRows(s.rows, q) } : s))
-    .filter((s) => s.rows.length > 0 && (q !== "" || !s.hiddenUntilSearch));
+    .filter((s) => s.rows.length > 0 && (q !== "" || !s.hiddenUntilSearch))
 }
 
 export function ListRow({
@@ -65,13 +70,13 @@ export function ListRow({
   onPick,
   id,
 }: {
-  row: ListRowData;
+  row: ListRowData
   /** The keyboard cursor is on this row. */
-  active?: boolean;
-  onPick?: () => void;
-  id?: string;
+  active?: boolean
+  onPick?: () => void
+  id?: string
 }) {
-  const current = row.current ?? false;
+  const current = row.current ?? false
   return (
     <Box
       id={id}
@@ -107,12 +112,12 @@ export function ListRow({
       </Box>
       {row.trailing}
     </Box>
-  );
+  )
 }
 
 export function epicRow(row: EpicListRow, current: boolean): ListRowData {
-  const kind = RING_KIND[row.card_kind ?? "implementation"];
-  const needsYou = row.section === SectionNeedsYou;
+  const kind = RING_KIND[row.card_kind ?? "implementation"]
+  const needsYou = row.section === SectionNeedsYou
   return {
     key: row.address,
     title: row.name,
@@ -120,8 +125,16 @@ export function epicRow(row: EpicListRow, current: boolean): ListRowData {
     href: jumpHref(row),
     searchText: row.name,
     current,
-    lead: <ProgressRing progress={ringProgress(row)} tone={ringTone(row)} kind={kind} size="compact" live={isLive(row)} />,
-  };
+    lead: (
+      <ProgressRing
+        progress={ringProgress(row)}
+        tone={ringTone(row)}
+        kind={kind}
+        size="compact"
+        live={isLive(row)}
+      />
+    ),
+  }
 }
 
 /** An epic as a row; gallery cases render it on its own. */
@@ -132,13 +145,13 @@ export function JumpRow({
   onPick,
   id,
 }: {
-  row: EpicListRow;
-  current?: boolean;
-  active?: boolean;
-  onPick?: () => void;
-  id?: string;
+  row: EpicListRow
+  current?: boolean
+  active?: boolean
+  onPick?: () => void
+  id?: string
 }) {
-  return <ListRow row={epicRow(row, current)} active={active} onPick={onPick} id={id} />;
+  return <ListRow row={epicRow(row, current)} active={active} onPick={onPick} id={id} />
 }
 
 export function Menu({
@@ -150,43 +163,43 @@ export function Menu({
   floating,
   onClose,
 }: {
-  sections: ListSection[];
-  label: string;
-  placeholder: string;
-  footer?: ListRowData;
-  phone: boolean;
+  sections: ListSection[]
+  label: string
+  placeholder: string
+  footer?: ListRowData
+  phone: boolean
   /** A popover near the top of the window instead of one hanging under its trigger. */
-  floating?: boolean;
-  onClose: () => void;
+  floating?: boolean
+  onClose: () => void
 }) {
-  const navigate = useNavigate();
-  const [query, setQuery] = useState("");
-  const [cursor, setCursor] = useState(0);
-  const sections = useMemo(() => visibleSections(all, query), [all, query]);
-  const flat = [...sections.flatMap((s) => s.rows), ...(footer ? [footer] : [])];
+  const navigate = useNavigate()
+  const [query, setQuery] = useState("")
+  const [cursor, setCursor] = useState(0)
+  const sections = useMemo(() => visibleSections(all, query), [all, query])
+  const flat = [...sections.flatMap((s) => s.rows), ...(footer ? [footer] : [])]
   const pick = (row: ListRowData) => {
-    onClose();
-    if (row.onSelect) row.onSelect();
-    else navigate(row.href.slice(1));
-  };
-  const activeId = flat[cursor] ? `jump-row-${cursor}` : undefined;
+    onClose()
+    if (row.onSelect) row.onSelect()
+    else navigate(row.href.slice(1))
+  }
+  const activeId = flat[cursor] ? `jump-row-${cursor}` : undefined
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      if (flat.length === 0) return;
-      setCursor((c) => (c + (e.key === "ArrowDown" ? 1 : flat.length - 1)) % flat.length);
+      e.preventDefault()
+      if (flat.length === 0) return
+      setCursor((c) => (c + (e.key === "ArrowDown" ? 1 : flat.length - 1)) % flat.length)
     } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (flat[cursor]) pick(flat[cursor]);
+      e.preventDefault()
+      if (flat[cursor]) pick(flat[cursor])
     }
   }
 
   useEffect(() => {
-    document.getElementById(activeId ?? "")?.scrollIntoView?.({ block: "nearest" });
-  }, [activeId]);
+    document.getElementById(activeId ?? "")?.scrollIntoView?.({ block: "nearest" })
+  }, [activeId])
 
-  let index = 0;
+  let index = 0
   return (
     <Box
       role="dialog"
@@ -201,8 +214,27 @@ export function Menu({
       {...(phone
         ? { position: "fixed", inset: "0", p: "4", gap: "3" }
         : floating
-          ? { position: "fixed", top: "12vh", left: "50%", transform: "translateX(-50%)", w: "460px", maxW: "calc(100vw - 32px)", p: "3", gap: "2", boxShadow: "lg" }
-          : { position: "absolute", top: "100%", left: "0", mt: "2", w: "440px", maxW: "calc(100vw - 32px)", p: "3", gap: "2" })}
+          ? {
+              position: "fixed",
+              top: "12vh",
+              left: "50%",
+              transform: "translateX(-50%)",
+              w: "460px",
+              maxW: "calc(100vw - 32px)",
+              p: "3",
+              gap: "2",
+              boxShadow: "lg",
+            }
+          : {
+              position: "absolute",
+              top: "100%",
+              left: "0",
+              mt: "2",
+              w: "440px",
+              maxW: "calc(100vw - 32px)",
+              p: "3",
+              gap: "2",
+            })}
     >
       <Box display="flex" alignItems="center" gap="2">
         <Input
@@ -218,8 +250,8 @@ export function Menu({
           aria-controls="jump-list"
           aria-activedescendant={activeId}
           onChange={(e) => {
-            setQuery(e.target.value);
-            setCursor(0);
+            setQuery(e.target.value)
+            setCursor(0)
           }}
           onKeyDown={onKeyDown}
         />
@@ -229,7 +261,13 @@ export function Menu({
           </Button>
         )}
       </Box>
-      <Box id="jump-list" role="listbox" overflowY="auto" maxH={phone ? undefined : "60vh"} flex={phone ? "1" : undefined}>
+      <Box
+        id="jump-list"
+        role="listbox"
+        overflowY="auto"
+        maxH={phone ? undefined : "60vh"}
+        flex={phone ? "1" : undefined}
+      >
         {sections.length === 0 && !footer && (
           <Text px="3" py="2" color="text.muted">
             No match
@@ -241,13 +279,28 @@ export function Menu({
               {s.title}
             </Text>
             {s.rows.map((row) => {
-              const i = index++;
-              return <ListRow key={row.key} id={`jump-row-${i}`} row={row} active={i === cursor} onPick={() => pick(row)} />;
+              const i = index++
+              return (
+                <ListRow
+                  key={row.key}
+                  id={`jump-row-${i}`}
+                  row={row}
+                  active={i === cursor}
+                  onPick={() => pick(row)}
+                />
+              )
             })}
           </Box>
         ))}
-        {footer && <ListRow id={`jump-row-${index}`} row={footer} active={index === cursor} onPick={() => pick(footer)} />}
+        {footer && (
+          <ListRow
+            id={`jump-row-${index}`}
+            row={footer}
+            active={index === cursor}
+            onPick={() => pick(footer)}
+          />
+        )}
       </Box>
     </Box>
-  );
+  )
 }

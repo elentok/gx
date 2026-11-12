@@ -1,13 +1,20 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test, vi } from "vitest";
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicDetail, EpicList, EpicListRow, PendingRow, SessionInfo, Workspace } from "../generated/server";
-import { appRoutes } from "../routes";
-import type { FixAgent } from "./fixAgent";
-import { renderThemed } from "../ui/render";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { createMemoryRouter, RouterProvider } from "react-router"
+import { afterEach, expect, test, vi } from "vitest"
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
+import type {
+  EpicDetail,
+  EpicList,
+  EpicListRow,
+  PendingRow,
+  SessionInfo,
+  Workspace,
+} from "../generated/server"
+import { appRoutes } from "../routes"
+import type { FixAgent } from "./fixAgent"
+import { renderThemed } from "../ui/render"
 
-afterEach(cleanup);
+afterEach(cleanup)
 
 const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   address: `gx:${name}`,
@@ -24,7 +31,7 @@ const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   section: "running",
   addresses: [`gx:${name}`],
   ...over,
-});
+})
 
 const detailOf = (address: string, kind: EpicDetail["kind"]): EpicDetail => ({
   address,
@@ -38,22 +45,39 @@ const detailOf = (address: string, kind: EpicDetail["kind"]): EpicDetail => ({
   rows: [],
   queueable: false,
   queued: false,
-});
+})
 
 function render(
   path: string,
   epics: EpicListRow[],
   kind: EpicDetail["kind"] = "loop",
-  extra: { workspaces?: Workspace[]; sessions?: unknown[]; detail?: Partial<EpicDetail>; hang?: boolean; notFound?: boolean; fixAgent?: FixAgent; pending?: PendingRow[] } = {},
+  extra: {
+    workspaces?: Workspace[]
+    sessions?: unknown[]
+    detail?: Partial<EpicDetail>
+    hang?: boolean
+    notFound?: boolean
+    fixAgent?: FixAgent
+    pending?: PendingRow[]
+  } = {},
 ) {
   const state = {
-    snapshot: { workspaces: extra.workspaces, sessions: extra.sessions ?? [], pending: extra.pending ?? [] },
+    snapshot: {
+      workspaces: extra.workspaces,
+      sessions: extra.sessions ?? [],
+      pending: extra.pending ?? [],
+    },
     connected: true,
     loadedOnce: true,
     tick: 0,
-  } as unknown as ConnectionState;
-  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
-  const list: EpicList = { epics, follow_ups: [] };
+  } as unknown as ConnectionState
+  const conn = {
+    getState: () => state,
+    subscribe: () => () => {},
+    onEvent: () => () => {},
+    refresh: () => {},
+  } as unknown as Connection
+  const list: EpicList = { epics, follow_ups: [] }
   const router = createMemoryRouter(
     appRoutes({
       fixAgent: extra.fixAgent,
@@ -62,461 +86,611 @@ function render(
         ? () => new Promise(() => {})
         : extra.notFound
           ? async () => ({ kind: "not-found" })
-          : async (address) => ({ kind: "ok", detail: { ...detailOf(address, kind), ...extra.detail } }),
+          : async (address) => ({
+              kind: "ok",
+              detail: { ...detailOf(address, kind), ...extra.detail },
+            }),
     }),
     { initialEntries: [path] },
-  );
+  )
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
-  );
-  return router;
+  )
+  return router
 }
 
-const joined = row("blog-impl", { addresses: ["gx:blog-impl", "gx:blog"], card_kind: "design" });
+const joined = row("blog-impl", { addresses: ["gx:blog-impl", "gx:blog"], card_kind: "design" })
 
 test("the epic page title is a plain heading, not a dropdown, and there is no back link", async () => {
-  render("/e/gx:blog-impl", [joined, row("other")]);
-  const title = await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByRole("link", { name: /^←/ })).toBeNull();
-  expect(within(title).queryByRole("button")).toBeNull();
-});
+  render("/e/gx:blog-impl", [joined, row("other")])
+  const title = await screen.findByRole("heading", { level: 1 })
+  expect(screen.queryByRole("link", { name: /^←/ })).toBeNull()
+  expect(within(title).queryByRole("button")).toBeNull()
+})
 
 test("a Design's epic page has an Open implementation epic button that goes to the -impl page", async () => {
-  render("/e/gx:blog", [joined], "map");
-  fireEvent.click(await screen.findByRole("button", { name: "Open implementation epic" }));
-  expect(await screen.findByRole("heading", { level: 1, name: /blog-impl/ })).toBeTruthy();
-});
+  render("/e/gx:blog", [joined], "map")
+  fireEvent.click(await screen.findByRole("button", { name: "Open implementation epic" }))
+  expect(await screen.findByRole("heading", { level: 1, name: /blog-impl/ })).toBeTruthy()
+})
 
 test("an -impl epic page has an Open design button that goes back to the Design", async () => {
-  render("/e/gx:blog-impl", [joined]);
-  fireEvent.click(await screen.findByRole("button", { name: "Open design" }));
-  expect(await screen.findByRole("heading", { level: 1, name: /^blog$/ })).toBeTruthy();
-});
+  render("/e/gx:blog-impl", [joined])
+  fireEvent.click(await screen.findByRole("button", { name: "Open design" }))
+  expect(await screen.findByRole("heading", { level: 1, name: /^blog$/ })).toBeTruthy()
+})
 
 test("an -impl epic with no Design shows no partner button", async () => {
-  render("/e/gx:solo-impl", [row("solo-impl")]);
-  await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByRole("button", { name: /Open (design|implementation epic)/ })).toBeNull();
-});
+  render("/e/gx:solo-impl", [row("solo-impl")])
+  await screen.findByRole("heading", { level: 1 })
+  expect(screen.queryByRole("button", { name: /Open (design|implementation epic)/ })).toBeNull()
+})
 
-const statsOf = async () => (await screen.findByTestId("stats-line")).textContent;
-const loop = (over: Partial<EpicDetail>) => ({ detail: { total: 3, wall_clock: 125, cost_total: 1.5, agent_time: 300, ...over } });
+const statsOf = async () => (await screen.findByTestId("stats-line")).textContent
+const loop = (over: Partial<EpicDetail>) => ({
+  detail: { total: 3, wall_clock: 125, cost_total: 1.5, agent_time: 300, ...over },
+})
 
 test.each([
-  ["a waiting epic with no queue item", { state: "waiting" }, "Not queued · took 2m · $1.50 · 5m agent time"],
-  ["a waiting queued epic", { state: "waiting", queued: true }, "Waiting for a slot · took 2m · $1.50 · 5m agent time"],
+  [
+    "a waiting epic with no queue item",
+    { state: "waiting" },
+    "Not queued · took 2m · $1.50 · 5m agent time",
+  ],
+  [
+    "a waiting queued epic",
+    { state: "waiting", queued: true },
+    "Waiting for a slot · took 2m · $1.50 · 5m agent time",
+  ],
   ["a running epic", { state: "running" }, "Running · 2m · $1.50 · 5m agent time"],
   ["a finished epic", { state: "finished" }, "Merged · took 2m · $1.50 · 5m agent time"],
   ["a draft -impl epic", { state: "waiting", draft: true }, "Publishing tickets"],
-  ["an epic that never started", { state: "waiting", queued: true, wall_clock: undefined }, "Waiting for a slot · $1.50 · 5m agent time"],
+  [
+    "an epic that never started",
+    { state: "waiting", queued: true, wall_clock: undefined },
+    "Waiting for a slot · $1.50 · 5m agent time",
+  ],
 ] as [string, Partial<EpicDetail>, string][])("the stats line of %s", async (_n, over, text) => {
-  render("/e/gx:blog-impl", [], "loop", loop(over));
-  expect(await statsOf()).toBe(text);
-});
+  render("/e/gx:blog-impl", [], "loop", loop(over))
+  expect(await statsOf()).toBe(text)
+})
 
 test("the stats line has no segmented bar or done count", async () => {
-  render("/e/gx:blog-impl", [], "loop", loop({ state: "running", done: 1 }));
-  await statsOf();
-  expect(screen.queryByText(/of \d+ done/)).toBeNull();
-  expect(screen.queryByLabelText("Epic progress")).toBeNull();
-});
+  render("/e/gx:blog-impl", [], "loop", loop({ state: "running", done: 1 }))
+  await statsOf()
+  expect(screen.queryByText(/of \d+ done/)).toBeNull()
+  expect(screen.queryByLabelText("Epic progress")).toBeNull()
+})
 
-const closedRow = (elapsed: number) => ({ address: "gx:blog/01", title: "t", rendered_status: "done", elapsed });
+const closedRow = (elapsed: number) => ({
+  address: "gx:blog/01",
+  title: "t",
+  rendered_status: "done",
+  elapsed,
+})
 const claimedRow = (secondsAgo: number) => ({
   address: "gx:blog/02",
   title: "t",
   rendered_status: "claimed",
   claimed_at: new Date(Date.now() - secondsAgo * 1000).toISOString(),
-});
+})
 
 test("a Design's stats line shows the step label, the design time and the cost", async () => {
   render("/e/gx:blog", [designCard], "map", {
     detail: { steps: steps("spec"), rows: [closedRow(120)], stats: { cost: 2.5 } },
-  });
-  expect(await statsOf()).toBe("spec · 2m · $2.50");
-});
+  })
+  expect(await statsOf()).toBe("spec · 2m · $2.50")
+})
 
 test("a Design's stats line leaves out the time and cost when unknown, and shows the Done label when done", async () => {
-  render("/e/gx:blog", [designCard], "map", { detail: { steps: steps("done", ["done"]) } });
-  expect(await statsOf()).toBe("done");
-});
+  render("/e/gx:blog", [designCard], "map", { detail: { steps: steps("done", ["done"]) } })
+  expect(await statsOf()).toBe("done")
+})
 
 test("a sub-minute done row counts in the design time sum", async () => {
   render("/e/gx:blog", [designCard], "map", {
-    detail: { steps: steps("spec"), rows: [closedRow(30), { ...closedRow(30), address: "gx:blog/03" }] },
-  });
-  expect(await statsOf()).toBe("spec · 1m");
-});
+    detail: {
+      steps: steps("spec"),
+      rows: [closedRow(30), { ...closedRow(30), address: "gx:blog/03" }],
+    },
+  })
+  expect(await statsOf()).toBe("spec · 1m")
+})
 
 test("a claimed row adds its time so far only while the Design has a live session", async () => {
-  const detail = { steps: steps("spec"), rows: [closedRow(60), claimedRow(600)] };
-  render("/e/gx:blog", [designCard], "map", { detail, sessions: [session("working")] });
-  expect(await statsOf()).toBe("spec · 11m");
-  cleanup();
-  render("/e/gx:blog", [designCard], "map", { detail, sessions: [session("exited")] });
-  expect(await statsOf()).toBe("spec · 1m");
-  cleanup();
-  render("/e/gx:blog", [designCard], "map", { detail: { steps: steps("spec"), rows: [claimedRow(600)] } });
-  expect(await statsOf()).toBe("spec");
-});
+  const detail = { steps: steps("spec"), rows: [closedRow(60), claimedRow(600)] }
+  render("/e/gx:blog", [designCard], "map", { detail, sessions: [session("working")] })
+  expect(await statsOf()).toBe("spec · 11m")
+  cleanup()
+  render("/e/gx:blog", [designCard], "map", { detail, sessions: [session("exited")] })
+  expect(await statsOf()).toBe("spec · 1m")
+  cleanup()
+  render("/e/gx:blog", [designCard], "map", {
+    detail: { steps: steps("spec"), rows: [claimedRow(600)] },
+  })
+  expect(await statsOf()).toBe("spec")
+})
 
 const live = (rows: object[], kind: EpicDetail["kind"] = "loop", fixAgent?: FixAgent) =>
-  render("/e/gx:blog-impl", [], kind, { fixAgent, detail: { total: rows.length, rows: rows as EpicDetail["rows"] } });
-const cardOf = async (id: string) => (await screen.findByText(id)).closest("[data-indent]") as HTMLElement;
-const tk = (id: string, over: object = {}) => ({ address: `gx:blog/${id}`, title: `title ${id}`, rendered_status: "open", ...over });
+  render("/e/gx:blog-impl", [], kind, {
+    fixAgent,
+    detail: { total: rows.length, rows: rows as EpicDetail["rows"] },
+  })
+const cardOf = async (id: string) =>
+  (await screen.findByText(id)).closest("[data-indent]") as HTMLElement
+const tk = (id: string, over: object = {}) => ({
+  address: `gx:blog/${id}`,
+  title: `title ${id}`,
+  rendered_status: "open",
+  ...over,
+})
 
 test("a live ticket is one link to its page with id, title and meta; paused rows have no Open link", async () => {
-  live([tk("01"), tk("02", { rendered_status: "blocked", blockers: ["01"] }), tk("03", { rendered_status: "paused", reason: "needs a person" })]);
-  const card = await cardOf("01");
-  const links = within(card).getAllByRole("link");
-  expect(links).toHaveLength(1);
-  expect(links[0].getAttribute("href")).toBe("#/t/gx:blog/01");
-  expect(links[0].textContent).toContain("title 01");
-  expect(links[0].textContent).toContain("ready");
-  expect((await cardOf("02")).textContent).toContain("after 01");
-  expect((await cardOf("03")).textContent).toContain("paused · needs a person");
-  expect(screen.queryByText("Open →")).toBeNull();
-});
+  live([
+    tk("01"),
+    tk("02", { rendered_status: "blocked", blockers: ["01"] }),
+    tk("03", { rendered_status: "paused", reason: "needs a person" }),
+  ])
+  const card = await cardOf("01")
+  const links = within(card).getAllByRole("link")
+  expect(links).toHaveLength(1)
+  expect(links[0].getAttribute("href")).toBe("#/t/gx:blog/01")
+  expect(links[0].textContent).toContain("title 01")
+  expect(links[0].textContent).toContain("ready")
+  expect((await cardOf("02")).textContent).toContain("after 01")
+  expect((await cardOf("03")).textContent).toContain("paused · needs a person")
+  expect(screen.queryByText("Open →")).toBeNull()
+})
 
 // Replaces the epic-row half of e2e flow 148 (Long-running badge).
 test("a ticket row carries the Long-running badge only when the server marked it", async () => {
-  live([tk("01", { long_ticket_turns: 120, long_ticket_threshold: 100 }), tk("02")]);
-  expect(within(await cardOf("01")).getByText("Long-running").getAttribute("title")).toBe("120 assistant turns (threshold 100)");
-  expect(within(await cardOf("02")).queryByText("Long-running")).toBeNull();
-});
+  live([tk("01", { long_ticket_turns: 120, long_ticket_threshold: 100 }), tk("02")])
+  expect(
+    within(await cardOf("01"))
+      .getByText("Long-running")
+      .getAttribute("title"),
+  ).toBe("120 assistant turns (threshold 100)")
+  expect(within(await cardOf("02")).queryByText("Long-running")).toBeNull()
+})
 
-const pend = (n: string, verdict: string, reason?: string): PendingRow => ({ address: `gx:blog/${n}`, agent: "", verdict, reason });
+const pend = (n: string, verdict: string, reason?: string): PendingRow => ({
+  address: `gx:blog/${n}`,
+  agent: "",
+  verdict,
+  reason,
+})
 const liveWith = (pending: PendingRow[], rows: object[]) =>
-  render("/e/gx:blog-impl", [], "loop", { pending, detail: { total: rows.length, rows: rows as EpicDetail["rows"] } });
+  render("/e/gx:blog-impl", [], "loop", {
+    pending,
+    detail: { total: rows.length, rows: rows as EpicDetail["rows"] },
+  })
 
 test("a queued ticket's row shows its verdict and reason, and the other rows show none", async () => {
-  liveWith([pend("01", "disk low", "/tmp has 5G free")], [tk("01"), tk("02")]);
-  const card = await cardOf("01");
-  expect(within(card).getByText("disk low: /tmp has 5G free")).toBeTruthy();
-  expect(card.querySelector("[data-meta]")?.textContent).not.toContain("disk low");
-  expect((await cardOf("02")).querySelector("[data-verdict]")).toBeNull();
-});
+  liveWith([pend("01", "disk low", "/tmp has 5G free")], [tk("01"), tk("02")])
+  const card = await cardOf("01")
+  expect(within(card).getByText("disk low: /tmp has 5G free")).toBeTruthy()
+  expect(card.querySelector("[data-meta]")?.textContent).not.toContain("disk low")
+  expect((await cardOf("02")).querySelector("[data-verdict]")).toBeNull()
+})
 
 test("loop rows show harness chips and queue notes; done rows and map rows show none", async () => {
   live([
     tk("01", { harness_note: "follows default" }),
     tk("02", { harness: "codex", harness_note: "pinned" }),
     tk("03", { harness: "claude", harness_note: "keeps Claude (ran before)" }),
-    tk("04", { rendered_status: "claimed", harness: "claude", tier: "worker", model: "claude-sonnet-5-5", effort: "medium" }),
+    tk("04", {
+      rendered_status: "claimed",
+      harness: "claude",
+      tier: "worker",
+      model: "claude-sonnet-5-5",
+      effort: "medium",
+    }),
     tk("06", { rendered_status: "claimed", harness: "claude", tier: "worker" }),
     tk("05", { rendered_status: "done", harness: "codex", harness_note: "pinned" }),
-  ]);
-  const chips = async (id: string) => (await cardOf(id)).querySelector("[data-chips]")?.textContent;
-  expect(await chips("01")).toBeUndefined();
-  expect(await chips("02")).toBe("Codexpinned");
-  expect(await chips("03")).toBe("Claudekeeps Claude (ran before)");
-  expect(await chips("04")).toBe("Claude Sonnet 5.5 · Worker · medium");
-  expect(await chips("06")).toBe("Claude CLI default · Worker");
-  expect(await chips("05")).toBeUndefined();
-  expect((await cardOf("04")).querySelector("[data-chips] i")).not.toBeNull();
-  cleanup();
-  live([tk("01")], "map");
-  expect((await cardOf("01")).querySelector("[data-chips]")).toBeNull();
-});
+  ])
+  const chips = async (id: string) => (await cardOf(id)).querySelector("[data-chips]")?.textContent
+  expect(await chips("01")).toBeUndefined()
+  expect(await chips("02")).toBe("Codexpinned")
+  expect(await chips("03")).toBe("Claudekeeps Claude (ran before)")
+  expect(await chips("04")).toBe("Claude Sonnet 5.5 · Worker · medium")
+  expect(await chips("06")).toBe("Claude CLI default · Worker")
+  expect(await chips("05")).toBeUndefined()
+  expect((await cardOf("04")).querySelector("[data-chips] i")).not.toBeNull()
+  cleanup()
+  live([tk("01")], "map")
+  expect((await cardOf("01")).querySelector("[data-chips]")).toBeNull()
+})
 
 test("a claimed row shows no verdict line", async () => {
-  liveWith([pend("01", "claimed")], [tk("01")]);
-  expect((await cardOf("01")).querySelector("[data-verdict]")).toBeNull();
-});
+  liveWith([pend("01", "claimed")], [tk("01")])
+  expect((await cardOf("01")).querySelector("[data-verdict]")).toBeNull()
+})
 
 test("a claimed row shows 'holder unreachable, retrying' only while the state is on", async () => {
-  live([tk("01", { rendered_status: "claimed", holder_unreachable: true }), tk("02", { rendered_status: "claimed" })]);
-  expect((await cardOf("01")).querySelector("[data-verdict]")?.textContent).toBe("holder unreachable, retrying");
-  expect((await cardOf("02")).querySelector("[data-verdict]")).toBeNull();
-});
+  live([
+    tk("01", { rendered_status: "claimed", holder_unreachable: true }),
+    tk("02", { rendered_status: "claimed" }),
+  ])
+  expect((await cardOf("01")).querySelector("[data-verdict]")?.textContent).toBe(
+    "holder unreachable, retrying",
+  )
+  expect((await cardOf("02")).querySelector("[data-verdict]")).toBeNull()
+})
 
 test("a fork's card is indented and the running card has the spinning dot", async () => {
-  live([tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }), tk("02", { parent: "gx:blog/01" })]);
-  expect((await cardOf("02")).getAttribute("data-indent")).toBe("1");
-  expect(within(await cardOf("01")).getByRole("img", { name: "Running" })).toBeTruthy();
-});
+  live([
+    tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }),
+    tk("02", { parent: "gx:blog/01" }),
+  ])
+  expect((await cardOf("02")).getAttribute("data-indent")).toBe("1")
+  expect(within(await cardOf("01")).getByRole("img", { name: "Running" })).toBeTruthy()
+})
 
 // The svgs fill the mark box, so they must not shrink as flex items.
 test("the spinner is a 14px svg and the done check a 16px svg that do not shrink", async () => {
-  live([tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }), doneTk("02", 1)]);
+  live([
+    tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }),
+    doneTk("02", 1),
+  ])
   const svgOf = async (id: string, name: string) =>
-    within(await cardOf(id)).getByRole("img", { name }) as unknown as SVGElement;
+    within(await cardOf(id)).getByRole("img", { name }) as unknown as SVGElement
   for (const [svg, size] of [
     [await svgOf("01", "Running"), "14px"],
     [await svgOf("02", "Done"), "16px"],
   ] as const) {
-    const style = getComputedStyle(svg);
-    expect([style.width, style.height, style.flexShrink]).toEqual([size, size, "0"]);
+    const style = getComputedStyle(svg)
+    expect([style.width, style.height, style.flexShrink]).toEqual([size, size, "0"])
   }
-});
+})
 
 // jsdom has no layout, so the title's x is the sum of the widths and gaps before it.
-const px = (v: string) => parseFloat(v) || 0;
+const px = (v: string) => parseFloat(v) || 0
 const titleLeft = (card: HTMLElement) => {
-  const mark = card.querySelector("[data-mark]") as HTMLElement;
-  const id = mark.nextElementSibling as HTMLElement;
-  const gap = px(getComputedStyle(mark.parentElement!).gap);
-  return px(getComputedStyle(mark).width) + gap + px(getComputedStyle(id).width) + gap;
-};
+  const mark = card.querySelector("[data-mark]") as HTMLElement
+  const id = mark.nextElementSibling as HTMLElement
+  const gap = px(getComputedStyle(mark.parentElement!).gap)
+  return px(getComputedStyle(mark).width) + gap + px(getComputedStyle(id).width) + gap
+}
 const alignedRows = () => [
   tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }),
   tk("02", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" }),
   doneTk("03", 1),
-];
+]
 
 test.each([
   ["wide", 88],
   ["phone", 80],
 ])("the title starts where the second row does (%s)", async (width, left) => {
-  if (width === "phone") vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  if (width === "phone")
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener() {},
+      removeEventListener() {},
+    }))
   try {
-    live(alignedRows());
-    for (const id of ["01", "02", "03"]) expect(titleLeft(await cardOf(id))).toBe(left);
-    const note = (await cardOf("02")).querySelector("[data-note-row]") as HTMLElement;
-    expect(px(getComputedStyle(note).paddingLeft)).toBe(left);
+    live(alignedRows())
+    for (const id of ["01", "02", "03"]) expect(titleLeft(await cardOf(id))).toBe(left)
+    const note = (await cardOf("02")).querySelector("[data-note-row]") as HTMLElement
+    expect(px(getComputedStyle(note).paddingLeft)).toBe(left)
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 test("live, done and cancelled card titles are all 16px", async () => {
-  live([tk("03"), doneTk("01", 1), doneTk("02", 2, { rendered_status: "cancelled" })]);
-  const live3 = (await cardOf("03")).querySelector("[data-title]") as HTMLElement;
-  expect(getComputedStyle(live3).fontSize).toBe("16px");
+  live([tk("03"), doneTk("01", 1), doneTk("02", 2, { rendered_status: "cancelled" })])
+  const live3 = (await cardOf("03")).querySelector("[data-title]") as HTMLElement
+  expect(getComputedStyle(live3).fontSize).toBe("16px")
   for (const id of ["01", "02"]) {
-    const title = (await cardOf(id)).querySelector("[data-title]") as HTMLElement;
-    expect(getComputedStyle(title).fontSize).toBe("16px");
+    const title = (await cardOf(id)).querySelector("[data-title]") as HTMLElement
+    expect(getComputedStyle(title).fontSize).toBe("16px")
   }
-});
+})
 
 test("card titles wrap instead of ending in an ellipsis", async () => {
-  live([doneTk("01", 1)]);
-  const title = (await cardOf("01")).querySelector("[data-title]") as HTMLElement;
-  const style = getComputedStyle(title);
-  expect(style.whiteSpace).not.toBe("nowrap");
-  expect(style.textOverflow).not.toBe("ellipsis");
-});
+  live([doneTk("01", 1)])
+  const title = (await cardOf("01")).querySelector("[data-title]") as HTMLElement
+  const style = getComputedStyle(title)
+  expect(style.whiteSpace).not.toBe("nowrap")
+  expect(style.textOverflow).not.toBe("ellipsis")
+})
 
 test.each([
   ["phone", true],
   ["wide", false],
 ])("a done card with no meta has a second line only on a phone (%s)", async (width, second) => {
-  if (width === "phone") vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  if (width === "phone")
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener() {},
+      removeEventListener() {},
+    }))
   try {
-    live([doneTk("01", 1, { elapsed: undefined, cost: undefined })]);
-    const card = await cardOf("01");
-    expect(card.textContent?.replace(" ", "")).toBe("01title 01");
-    expect(card.querySelector("[data-meta]") !== null).toBe(second);
+    live([doneTk("01", 1, { elapsed: undefined, cost: undefined })])
+    const card = await cardOf("01")
+    expect(card.textContent?.replace(" ", "")).toBe("01title 01")
+    expect(card.querySelector("[data-meta]") !== null).toBe(second)
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 test("running, needs-answer and needs-repair cards use the mock meta wording", async () => {
   live([
     tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString(), cost: 0.4 }),
-    tk("02", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?", cost: 1 }),
+    tk("02", {
+      rendered_status: "needs-answer",
+      needs_answer: true,
+      question: "Which db?",
+      cost: 1,
+    }),
     tk("03", { rendered_status: "needs-repair", reason: "Run failed" }),
-  ]);
-  expect((await cardOf("01")).textContent).toContain("running · 0s · $0.40");
-  expect((await cardOf("02")).textContent).toContain("needs answer");
-  expect((await cardOf("02")).textContent).not.toContain("needs-answer");
-  expect((await cardOf("03")).textContent).toContain("needs-repair · Run failed");
-});
+  ])
+  expect((await cardOf("01")).textContent).toContain("running · 0s · $0.40")
+  expect((await cardOf("02")).textContent).toContain("needs answer")
+  expect((await cardOf("02")).textContent).not.toContain("needs-answer")
+  expect((await cardOf("03")).textContent).toContain("needs-repair · Run failed")
+})
 
 test("a needs-you card shows its question and an Answer button to the ticket page", async () => {
-  live([tk("01", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" })]);
-  const card = await cardOf("01");
-  expect(within(card).getByText("Which db?")).toBeTruthy();
-  fireEvent.click(within(card).getByRole("button", { name: "Answer" }));
-  expect(await screen.findByLabelText("Loading ticket")).toBeTruthy();
-});
+  live([tk("01", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" })])
+  const card = await cardOf("01")
+  expect(within(card).getByText("Which db?")).toBeTruthy()
+  fireEvent.click(within(card).getByRole("button", { name: "Answer" }))
+  expect(await screen.findByLabelText("Loading ticket")).toBeTruthy()
+})
 
 test("a needs-answer card's second row holds the question, then the Answer button", async () => {
-  live([tk("01", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" })]);
-  const row = (await cardOf("01")).querySelector("[data-note-row]")!;
-  const items = Array.from(row.children);
-  expect(items.map((el) => el.textContent)).toEqual(["Which db?", "Answer"]);
-  expect(items[1].tagName).toBe("BUTTON");
-});
+  live([tk("01", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" })])
+  const row = (await cardOf("01")).querySelector("[data-note-row]")!
+  const items = Array.from(row.children)
+  expect(items.map((el) => el.textContent)).toEqual(["Which db?", "Answer"])
+  expect(items[1].tagName).toBe("BUTTON")
+})
 
 test("a needs-repair card's second row ends with the fix button", async () => {
-  live([tk("01", { rendered_status: "needs-repair", reason: "dirty tree" })]);
-  const row = (await cardOf("01")).querySelector("[data-note-row]")!;
-  expect(row.lastElementChild?.textContent).toBe("Fix it with an agent");
-});
+  live([tk("01", { rendered_status: "needs-repair", reason: "dirty tree" })])
+  const row = (await cardOf("01")).querySelector("[data-note-row]")!
+  expect(row.lastElementChild?.textContent).toBe("Fix it with an agent")
+})
 
 test("a needs-repair card is expanded with its status and reason; an error card is one line", async () => {
-  live([tk("01", { rendered_status: "needs-repair", reason: "dirty tree" }), tk("02", { rendered_status: "error" })]);
-  const repair = await cardOf("01");
-  expect(repair.textContent).toContain("needs-repair · dirty tree");
-  expect(within(repair).getByRole("button", { name: "Fix it with an agent" })).toBeTruthy();
-  expect(document.body.textContent).not.toContain("Fix it in the TUI");
-  const error = await cardOf("02");
-  expect(error.getAttribute("data-tone")).toBe("deadlocked");
-  expect(error.textContent).toContain("error");
-  expect(within(error).getAllByRole("link")).toHaveLength(1);
-});
+  live([
+    tk("01", { rendered_status: "needs-repair", reason: "dirty tree" }),
+    tk("02", { rendered_status: "error" }),
+  ])
+  const repair = await cardOf("01")
+  expect(repair.textContent).toContain("needs-repair · dirty tree")
+  expect(within(repair).getByRole("button", { name: "Fix it with an agent" })).toBeTruthy()
+  expect(document.body.textContent).not.toContain("Fix it in the TUI")
+  const error = await cardOf("02")
+  expect(error.getAttribute("data-tone")).toBe("deadlocked")
+  expect(error.textContent).toContain("error")
+  expect(within(error).getAllByRole("link")).toHaveLength(1)
+})
 
-const repairRow = (over: object = {}) => tk("01", { rendered_status: "needs-repair", state: "tok-1", ...over });
+const repairRow = (over: object = {}) =>
+  tk("01", { rendered_status: "needs-repair", state: "tok-1", ...over })
 const openFixDialog = async () => {
-  fireEvent.click(within(await cardOf("01")).getByRole("button", { name: "Fix it with an agent" }));
-  return within(await screen.findByRole("dialog"));
-};
+  fireEvent.click(within(await cardOf("01")).getByRole("button", { name: "Fix it with an agent" }))
+  return within(await screen.findByRole("dialog"))
+}
 
 test("the fix dialog shows the row's fix_prompt, with or without a reason", async () => {
-  live([repairRow({ reason: "dirty tree", fix_prompt: "/gx-investigate gx:blog/01 is paused for repair: from the server" })]);
-  const dialog = await openFixDialog();
-  expect(dialog.getByText("/gx-investigate gx:blog/01 is paused for repair: from the server")).toBeTruthy();
-  expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy();
-  cleanup();
-  live([repairRow({ fix_prompt: "/gx-investigate gx:blog/01 is paused for repair" })]);
-  expect((await openFixDialog()).getByText("/gx-investigate gx:blog/01 is paused for repair")).toBeTruthy();
-});
+  live([
+    repairRow({
+      reason: "dirty tree",
+      fix_prompt: "/gx-investigate gx:blog/01 is paused for repair: from the server",
+    }),
+  ])
+  const dialog = await openFixDialog()
+  expect(
+    dialog.getByText("/gx-investigate gx:blog/01 is paused for repair: from the server"),
+  ).toBeTruthy()
+  expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy()
+  cleanup()
+  live([repairRow({ fix_prompt: "/gx-investigate gx:blog/01 is paused for repair" })])
+  expect(
+    (await openFixDialog()).getByText("/gx-investigate gx:blog/01 is paused for repair"),
+  ).toBeTruthy()
+})
 
 test("starting the fix agent closes the dialog and opens the agent's page", async () => {
-  const calls: unknown[] = [];
+  const calls: unknown[] = []
   const router = live([repairRow()], "loop", async (body) => {
-    calls.push(body);
-    return { remote_control: false, session: { id: "fix-01" } as SessionInfo };
-  });
-  const dialog = await openFixDialog();
-  fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }));
-  await waitFor(() => expect(router.state.location.pathname).toBe("/agents/fix-01"));
-  expect(screen.queryByRole("dialog", { name: "Fix it with an agent" })).toBeNull();
-  expect(calls).toEqual([{ address: "gx:blog/01", state: "tok-1" }]);
-});
+    calls.push(body)
+    return { remote_control: false, session: { id: "fix-01" } as SessionInfo }
+  })
+  const dialog = await openFixDialog()
+  fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/agents/fix-01"))
+  expect(screen.queryByRole("dialog", { name: "Fix it with an agent" })).toBeNull()
+  expect(calls).toEqual([{ address: "gx:blog/01", state: "tok-1" }])
+})
 
 test("a refused fix agent shows the message and keeps Copy and Start", async () => {
-  live([repairRow()], "loop", async () => ({ remote_control: false, refused: true, message: "Already investigating" }));
-  const dialog = await openFixDialog();
-  fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }));
-  expect(await dialog.findByText("Already investigating")).toBeTruthy();
-  expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy();
-  expect(dialog.getByRole("button", { name: "Start gx agent" })).toBeTruthy();
-});
+  live([repairRow()], "loop", async () => ({
+    remote_control: false,
+    refused: true,
+    message: "Already investigating",
+  }))
+  const dialog = await openFixDialog()
+  fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }))
+  expect(await dialog.findByText("Already investigating")).toBeTruthy()
+  expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy()
+  expect(dialog.getByRole("button", { name: "Start gx agent" })).toBeTruthy()
+})
 
 const doneTk = (id: string, minute: number, over: object = {}) =>
-  tk(id, { rendered_status: "done", elapsed: 300, cost: 1.5, closed_at: `2026-01-01T10:${String(minute).padStart(2, "0")}:00Z`, ...over });
-const doneIds = () => [...document.querySelectorAll("[data-indent]")].map((c) => c.textContent);
+  tk(id, {
+    rendered_status: "done",
+    elapsed: 300,
+    cost: 1.5,
+    closed_at: `2026-01-01T10:${String(minute).padStart(2, "0")}:00Z`,
+    ...over,
+  })
+const doneIds = () => [...document.querySelectorAll("[data-indent]")].map((c) => c.textContent)
 
 test("the done divider counts done and cancelled; it is the first item with no live rows", async () => {
-  live([doneTk("01", 1), doneTk("02", 2, { rendered_status: "cancelled" })]);
-  const divider = await screen.findByText("1 done, 1 cancelled");
-  expect(document.querySelector("[data-done-divider]")).toBe(divider);
-  expect(divider.parentElement?.firstElementChild).toBe(divider);
-  expect(divider.parentElement?.previousElementSibling?.querySelector("[data-indent]")).toBeNull();
-});
+  live([doneTk("01", 1), doneTk("02", 2, { rendered_status: "cancelled" })])
+  const divider = await screen.findByText("1 done, 1 cancelled")
+  expect(document.querySelector("[data-done-divider]")).toBe(divider)
+  expect(divider.parentElement?.firstElementChild).toBe(divider)
+  expect(divider.parentElement?.previousElementSibling?.querySelector("[data-indent]")).toBeNull()
+})
 
 test("the divider follows the live cards", async () => {
-  live([doneTk("01", 1), tk("02")]);
-  const divider = await screen.findByText("1 done");
-  expect(screen.getByText("title 02").compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-});
+  live([doneTk("01", 1), tk("02")])
+  const divider = await screen.findByText("1 done")
+  expect(
+    screen.getByText("title 02").compareDocumentPosition(divider) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+})
 
 test("the done group shows the 3 newest, Show N more reveals the rest and Show fewer hides them", async () => {
-  live([doneTk("01", 1), doneTk("02", 4), doneTk("03", 2), doneTk("04", 3), doneTk("05", 0)]);
-  await screen.findByText("5 done");
-  expect(doneIds().map((t) => t?.slice(0, 2))).toEqual(["02", "04", "03"]);
-  fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
-  expect(doneIds()).toHaveLength(5);
-  fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
-  expect(doneIds()).toHaveLength(3);
-});
+  live([doneTk("01", 1), doneTk("02", 4), doneTk("03", 2), doneTk("04", 3), doneTk("05", 0)])
+  await screen.findByText("5 done")
+  expect(doneIds().map((t) => t?.slice(0, 2))).toEqual(["02", "04", "03"])
+  fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }))
+  expect(doneIds()).toHaveLength(5)
+  fireEvent.click(screen.getByRole("button", { name: "Show fewer" }))
+  expect(doneIds()).toHaveLength(3)
+})
 
 test("a done loop card shows time and cost; a cancelled one reads cancelled; a done fork says what it forks", async () => {
-  live([doneTk("01", 1, { parent: "gx:blog/09" }), doneTk("02", 2, { rendered_status: "cancelled" })]);
-  expect((await cardOf("01")).textContent).toContain("5m · $1.50 · fork of 09");
-  const cancelled = await cardOf("02");
-  expect(cancelled.textContent).toContain("cancelled");
-  expect(cancelled.getAttribute("data-tone")).toBe("muted");
-});
+  live([
+    doneTk("01", 1, { parent: "gx:blog/09" }),
+    doneTk("02", 2, { rendered_status: "cancelled" }),
+  ])
+  expect((await cardOf("01")).textContent).toContain("5m · $1.50 · fork of 09")
+  const cancelled = await cardOf("02")
+  expect(cancelled.textContent).toContain("cancelled")
+  expect(cancelled.getAttribute("data-tone")).toBe("muted")
+})
 
 test("a done Design card shows its time only from a minute up", async () => {
-  live([doneTk("01", 1, { elapsed: 59 }), doneTk("02", 2, { elapsed: 120 })], "map");
-  expect((await cardOf("01")).textContent).not.toMatch(/\d+[smh]/);
-  expect((await cardOf("02")).textContent).toContain("2m");
-});
+  live([doneTk("01", 1, { elapsed: 59 }), doneTk("02", 2, { elapsed: 120 })], "map")
+  expect((await cardOf("01")).textContent).not.toMatch(/\d+[smh]/)
+  expect((await cardOf("02")).textContent).toContain("2m")
+})
 
 const withStats = (detail: Partial<EpicDetail>, kind: EpicDetail["kind"] = "loop") =>
-  render("/e/gx:blog-impl", [], kind, { detail });
+  render("/e/gx:blog-impl", [], kind, { detail })
 const loopStats = {
   lines_added: 1200,
   lines_removed: 300,
   total_tokens: 2_500_000,
   cost: 4.5,
   lead_time: 7200,
-  friction: { pauses_by_reason: { question: 2, error: 1 }, run_events: { retry: 3 }, paused_secs: 600, web_share: 0.5 },
-};
+  friction: {
+    pauses_by_reason: { question: 2, error: 1 },
+    run_events: { retry: 3 },
+    paused_secs: 600,
+    web_share: 0.5,
+  },
+}
 
 test("More stats is collapsed by default with the loop preview, and opens to every stat row", async () => {
-  withStats({ stats: loopStats });
-  const card = await screen.findByRole("button", { name: /^More stats/ });
-  expect(card.getAttribute("aria-expanded")).toBe("false");
-  expect(card.textContent).toContain("+1,200 −300 lines · 2.5M tokens · lead time 2h");
-  expect(document.querySelector("[data-stat-row]")).toBeNull();
-  fireEvent.click(card);
-  expect(card.getAttribute("aria-expanded")).toBe("true");
-  const labels = [...document.querySelectorAll("[data-stat-row]")].map((r) => r.getAttribute("data-stat-row"));
-  expect(labels).toEqual(["Lines", "Tokens", "Cost", "Lead time", "Pauses", "Run events", "Paused time", "Pause endings"]);
-  expect(document.querySelector("[data-stat-row='Lead time']")?.textContent).toContain("created → merged to trunk");
-  expect(document.querySelector("[data-stat-row='Pauses']")?.textContent).toContain("question ×2, error ×1");
-  expect(document.querySelector("[data-stat-row='Pause endings']")?.textContent).toContain("50% web");
-  fireEvent.click(card);
-  expect(card.getAttribute("aria-expanded")).toBe("false");
-});
+  withStats({ stats: loopStats })
+  const card = await screen.findByRole("button", { name: /^More stats/ })
+  expect(card.getAttribute("aria-expanded")).toBe("false")
+  expect(card.textContent).toContain("+1,200 −300 lines · 2.5M tokens · lead time 2h")
+  expect(document.querySelector("[data-stat-row]")).toBeNull()
+  fireEvent.click(card)
+  expect(card.getAttribute("aria-expanded")).toBe("true")
+  const labels = [...document.querySelectorAll("[data-stat-row]")].map((r) =>
+    r.getAttribute("data-stat-row"),
+  )
+  expect(labels).toEqual([
+    "Lines",
+    "Tokens",
+    "Cost",
+    "Lead time",
+    "Pauses",
+    "Run events",
+    "Paused time",
+    "Pause endings",
+  ])
+  expect(document.querySelector("[data-stat-row='Lead time']")?.textContent).toContain(
+    "created → merged to trunk",
+  )
+  expect(document.querySelector("[data-stat-row='Pauses']")?.textContent).toContain(
+    "question ×2, error ×1",
+  )
+  expect(document.querySelector("[data-stat-row='Pause endings']")?.textContent).toContain(
+    "50% web",
+  )
+  fireEvent.click(card)
+  expect(card.getAttribute("aria-expanded")).toBe("false")
+})
 
 test("a Design's More stats preview leaves out lines", async () => {
-  render("/e/gx:blog", [designCard], "map", { detail: { steps: steps("spec"), stats: loopStats } });
-  expect((await screen.findByRole("button", { name: /^More stats/ })).textContent).toContain("2.5M tokens · lead time 2h");
-  expect(screen.queryByText(/lines/)).toBeNull();
-});
+  render("/e/gx:blog", [designCard], "map", { detail: { steps: steps("spec"), stats: loopStats } })
+  expect((await screen.findByRole("button", { name: /^More stats/ })).textContent).toContain(
+    "2.5M tokens · lead time 2h",
+  )
+  expect(screen.queryByText(/lines/)).toBeNull()
+})
 
 test("there is no More stats card without stats", async () => {
-  withStats({ stats: {} });
-  await statsOf();
-  expect(screen.queryByRole("button", { name: /More stats/ })).toBeNull();
-});
+  withStats({ stats: {} })
+  await statsOf()
+  expect(screen.queryByRole("button", { name: /More stats/ })).toBeNull()
+})
 
 test("a Design's cards show the ticket type then the state", async () => {
-  live([tk("01", { type: "prototype" }), tk("02", { type: "grilling", rendered_status: "blocked", blockers: ["04"] })], "map");
-  expect((await cardOf("01")).textContent).toContain("prototype · ready");
-  expect((await cardOf("02")).textContent).toContain("grilling · after 04");
-});
+  live(
+    [
+      tk("01", { type: "prototype" }),
+      tk("02", { type: "grilling", rendered_status: "blocked", blockers: ["04"] }),
+    ],
+    "map",
+  )
+  expect((await cardOf("01")).textContent).toContain("prototype · ready")
+  expect((await cardOf("02")).textContent).toContain("grilling · after 04")
+})
 
 test("the buttons run partner first and the action last, Merge in the done tone", async () => {
-  render("/e/gx:blog-impl", [joined], "loop", { detail: { state: "awaiting-merge" } });
-  await screen.findByRole("button", { name: "Open design" });
-  const buttons = screen.getAllByRole("button", { name: /^(Open design|Merge)$/ });
-  expect(buttons.map((b) => b.textContent)).toEqual(["Open design", "Merge"]);
-  expect(buttons[1].getAttribute("data-tone")).toBe("done");
-});
+  render("/e/gx:blog-impl", [joined], "loop", { detail: { state: "awaiting-merge" } })
+  await screen.findByRole("button", { name: "Open design" })
+  const buttons = screen.getAllByRole("button", { name: /^(Open design|Merge)$/ })
+  expect(buttons.map((b) => b.textContent)).toEqual(["Open design", "Merge"])
+  expect(buttons[1].getAttribute("data-tone")).toBe("done")
+})
 
 test.each([
   ["phone", "1"],
   ["wide", ""],
 ])("the locked Queue wrapper stretches only on a phone (%s)", async (width, grow) => {
-  if (width === "phone") vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  if (width === "phone")
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener() {},
+      removeEventListener() {},
+    }))
   try {
-    render("/e/gx:blog-impl", [], "loop", { detail: { draft: true } });
-    const queue = await screen.findByRole("button", { name: "Queue" });
-    const style = getComputedStyle(queue.parentElement as HTMLElement);
-    expect(style.display).toBe("flex");
-    expect(style.flexGrow).toBe(grow);
+    render("/e/gx:blog-impl", [], "loop", { detail: { draft: true } })
+    const queue = await screen.findByRole("button", { name: "Queue" })
+    const style = getComputedStyle(queue.parentElement as HTMLElement)
+    expect(style.display).toBe("flex")
+    expect(style.flexGrow).toBe(grow)
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 test("a draft -impl epic has a disabled Queue with its tooltip", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: { draft: true } });
-  const queue = (await screen.findByRole("button", { name: "Queue" })) as HTMLButtonElement;
-  expect(queue.disabled).toBe(true);
-  expect(queue.parentElement?.getAttribute("title")).toBe("Queue unlocks once all tickets are published");
-  expect(screen.queryByText("Still publishing tickets")).toBeNull();
-});
+  render("/e/gx:blog-impl", [], "loop", { detail: { draft: true } })
+  const queue = (await screen.findByRole("button", { name: "Queue" })) as HTMLButtonElement
+  expect(queue.disabled).toBe(true)
+  expect(queue.parentElement?.getAttribute("title")).toBe(
+    "Queue unlocks once all tickets are published",
+  )
+  expect(screen.queryByText("Still publishing tickets")).toBeNull()
+})
 
 const dirtyTrunk: Partial<EpicDetail> = {
   state: "paused",
@@ -528,24 +702,31 @@ const dirtyTrunk: Partial<EpicDetail> = {
     "stash-merge": { label: "Stash, merge and restore", tooltip: "Set your changes aside." },
     merge: { label: "Merge again", tooltip: "Merge the ticket's commits again." },
   },
-};
+}
 
 test("the merge-block notice shows only while paused with a reason; an epic without one has none", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: { state: "running", land_block_reason: "stale reason" } });
-  await statsOf();
-  expect(screen.queryByTestId("merge-block-notice")).toBeNull();
-  expect(screen.queryByText(/stale reason/)).toBeNull();
-});
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: { state: "running", land_block_reason: "stale reason" },
+  })
+  await statsOf()
+  expect(screen.queryByTestId("merge-block-notice")).toBeNull()
+  expect(screen.queryByText(/stale reason/)).toBeNull()
+})
 
 test("a needs-rebase pause reads 'Can't merge: <reason>' with its action buttons inside the notice, none in the bar", async () => {
   render("/e/gx:blog-impl", [], "loop", {
-    detail: { state: "paused", land_block_reason: "needs a rebase", actions: ["merge"], action_info: { merge: { label: "Merge again", tooltip: "Try again." } } },
-  });
-  const notice = await screen.findByTestId("merge-block-notice");
-  expect(notice.textContent).toContain("Can't merge: needs a rebase");
-  expect(within(notice).getByRole("button", { name: "Merge again" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Merge" })).toBeNull();
-});
+    detail: {
+      state: "paused",
+      land_block_reason: "needs a rebase",
+      actions: ["merge"],
+      action_info: { merge: { label: "Merge again", tooltip: "Try again." } },
+    },
+  })
+  const notice = await screen.findByTestId("merge-block-notice")
+  expect(notice.textContent).toContain("Can't merge: needs a rebase")
+  expect(within(notice).getByRole("button", { name: "Merge again" })).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Merge" })).toBeNull()
+})
 
 test("a merge-conflict pause shows Merge but not Start over, which the epic address cannot run", async () => {
   render("/e/gx:blog-impl", [], "loop", {
@@ -553,58 +734,76 @@ test("a merge-conflict pause shows Merge but not Start over, which the epic addr
       state: "paused",
       land_block_reason: "merge conflict",
       actions: ["merge", "start-over"],
-      action_info: { merge: { label: "Merge again", tooltip: "Try again." }, "start-over": { label: "Start over", tooltip: "Discard the work." } },
+      action_info: {
+        merge: { label: "Merge again", tooltip: "Try again." },
+        "start-over": { label: "Start over", tooltip: "Discard the work." },
+      },
     },
-  });
-  const notice = await screen.findByTestId("merge-block-notice");
-  expect(within(notice).getAllByRole("button").map((b) => b.textContent)).toEqual(["Merge again"]);
-});
+  })
+  const notice = await screen.findByTestId("merge-block-notice")
+  expect(
+    within(notice)
+      .getAllByRole("button")
+      .map((b) => b.textContent),
+  ).toEqual(["Merge again"])
+})
 
 test("a merge-block notice with no actions renders no button row", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: { state: "paused", land_block_reason: "needs a rebase", actions: [] } });
-  const notice = await screen.findByTestId("merge-block-notice");
-  expect(within(notice).queryAllByRole("button")).toHaveLength(0);
-});
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: { state: "paused", land_block_reason: "needs a rebase", actions: [] },
+  })
+  const notice = await screen.findByTestId("merge-block-notice")
+  expect(within(notice).queryAllByRole("button")).toHaveLength(0)
+})
 
 test("a dirty-trunk pause says the short reason, lists every clashing file, then both verbs in order", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: dirtyTrunk });
-  const notice = await screen.findByTestId("merge-block-notice");
-  expect(notice.textContent).toContain("Can't merge: Trunk has local changes");
-  expect(notice.textContent).not.toContain("and 2 more");
-  const files = within(notice).getByTestId("merge-block-files");
-  expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual(dirtyTrunk.land_block_files!);
-  const buttons = within(notice).getAllByRole("button");
-  expect(buttons.map((b) => b.textContent)).toEqual(["Stash, merge and restore", "Merge again"]);
-  expect(buttons[0].getAttribute("title")).toBe("Set your changes aside.");
-  expect(buttons[1].getAttribute("title")).toBe("Merge the ticket's commits again.");
-});
+  render("/e/gx:blog-impl", [], "loop", { detail: dirtyTrunk })
+  const notice = await screen.findByTestId("merge-block-notice")
+  expect(notice.textContent).toContain("Can't merge: Trunk has local changes")
+  expect(notice.textContent).not.toContain("and 2 more")
+  const files = within(notice).getByTestId("merge-block-files")
+  expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual(
+    dirtyTrunk.land_block_files!,
+  )
+  const buttons = within(notice).getAllByRole("button")
+  expect(buttons.map((b) => b.textContent)).toEqual(["Stash, merge and restore", "Merge again"])
+  expect(buttons[0].getAttribute("title")).toBe("Set your changes aside.")
+  expect(buttons[1].getAttribute("title")).toBe("Merge the ticket's commits again.")
+})
 
 test("the stash button posts to its route with the state token", async () => {
-  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }));
-  vi.stubGlobal("fetch", fetchMock);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }))
+  vi.stubGlobal("fetch", fetchMock)
   try {
     render("/e/gx:blog-impl", [], "loop", {
-      detail: { state: "paused", land_block_reason: "Trunk has local changes", actions: ["stash-merge", "merge"] },
-    });
-    fireEvent.click(await screen.findByRole("button", { name: "Stash, merge and restore" }));
+      detail: {
+        state: "paused",
+        land_block_reason: "Trunk has local changes",
+        actions: ["stash-merge", "merge"],
+      },
+    })
+    fireEvent.click(await screen.findByRole("button", { name: "Stash, merge and restore" }))
     // The shell's limits tray and follow-ups button also read through this mock.
-    const stashCall = () => fetchMock.mock.calls.find(([url]) => url !== "/v1/usage/summary" && url !== "/v1/epics");
-    await waitFor(() => expect(stashCall()).toBeTruthy());
-    const [path, init] = stashCall()!;
-    expect(path).toBe("/v1/epics/stash-merge");
-    expect(JSON.parse(init.body)).toEqual({ address: "gx:blog-impl", state: "paused" });
+    const stashCall = () =>
+      fetchMock.mock.calls.find(([url]) => url !== "/v1/usage/summary" && url !== "/v1/epics")
+    await waitFor(() => expect(stashCall()).toBeTruthy())
+    const [path, init] = stashCall()!
+    expect(path).toBe("/v1/epics/stash-merge")
+    expect(JSON.parse(init.body)).toEqual({ address: "gx:blog-impl", state: "paused" })
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
-const ringOf = () => document.querySelector("[data-kind][data-tone]") as HTMLElement;
+const ringOf = () => document.querySelector("[data-kind][data-tone]") as HTMLElement
 const steps = (current: string, done: string[] = []): EpicDetail["steps"] =>
   ["chart", "spec", "create-tickets", "done"].map((step) => ({
     step,
     label: step,
     state: done.includes(step) ? "done" : step === current ? "current" : "todo",
-  }));
+  }))
 const session = (state: string, actionable = "") => ({
   id: "s1",
   design: true,
@@ -613,252 +812,333 @@ const session = (state: string, actionable = "") => ({
   status_changed_at: "2026-01-01T00:00:00Z",
   run_started_at: "2026-01-01T00:00:00Z",
   actionable: actionable ? { reason: actionable } : {},
-});
-const designCard = row("blog", { card_kind: "design", kind: "map", addresses: ["gx:blog"] });
+})
+const designCard = row("blog", { card_kind: "design", kind: "map", addresses: ["gx:blog"] })
 
 test.each([
   ["done", { steps: steps("done", ["done"]) }, [], "done", false],
-  ["a live session with an Actionable", { steps: steps("spec") }, [session("idle", "question")], "waiting", false],
+  [
+    "a live session with an Actionable",
+    { steps: steps("spec") },
+    [session("idle", "question")],
+    "waiting",
+    false,
+  ],
   ["a working session", { steps: steps("spec") }, [session("working")], "running", true],
   ["a starting session", { steps: steps("spec") }, [session("starting")], "running", true],
-  ["creating tickets", { steps: steps("create-tickets"), impl_address: "gx:blog-impl" }, [], "running", true],
+  [
+    "creating tickets",
+    { steps: steps("create-tickets"), impl_address: "gx:blog-impl" },
+    [],
+    "running",
+    true,
+  ],
   ["an idle live session", { steps: steps("spec") }, [session("idle")], "running", false],
   ["only an Exited session", { steps: steps("spec") }, [session("exited")], "muted", false],
   ["no session", { steps: steps("spec") }, [], "muted", false],
 ])("a Design page with %s", async (_n, detail, sessions, tone, comet) => {
-  render("/e/gx:blog", [designCard], "map", { detail: { ...detail, ring_progress: 40 }, sessions });
-  expect(await screen.findByText("40%")).toBeTruthy();
-  expect(ringOf().getAttribute("data-kind")).toBe("design");
-  expect(ringOf().getAttribute("data-tone")).toBe(tone);
-  expect(!!screen.queryByTestId("comet")).toBe(comet);
-});
+  render("/e/gx:blog", [designCard], "map", { detail: { ...detail, ring_progress: 40 }, sessions })
+  expect(await screen.findByText("40%")).toBeTruthy()
+  expect(ringOf().getAttribute("data-kind")).toBe("design")
+  expect(ringOf().getAttribute("data-tone")).toBe(tone)
+  expect(!!screen.queryByTestId("comet")).toBe(comet)
+})
 
 test("a Design in Needs you reads waiting, even past Branch with no joined card for the page", async () => {
-  render("/e/gx:blog", [row("blog-impl")], "map", { detail: { steps: steps("branch"), design_section: "needs-you" } });
-  await screen.findByText("0%");
-  expect(ringOf().getAttribute("data-tone")).toBe("waiting");
-  expect(screen.queryByTestId("comet")).toBeNull();
-});
+  render("/e/gx:blog", [row("blog-impl")], "map", {
+    detail: { steps: steps("branch"), design_section: "needs-you" },
+  })
+  await screen.findByText("0%")
+  expect(ringOf().getAttribute("data-tone")).toBe("waiting")
+  expect(screen.queryByTestId("comet")).toBeNull()
+})
 
 test.each([
   ["running", "running", true],
   ["merging", "running", true],
   ["finished", "done", false],
   ["paused", "muted", false],
-])("an -impl page whose state is %s (card shows the Design) uses its own kind and tone", async (state, tone, comet) => {
-  const card = row("blog-impl", { card_kind: "design", state: "paused", addresses: ["gx:blog", "gx:blog-impl"] });
-  render("/e/gx:blog-impl", [card], "loop", { detail: { state: state as EpicDetail["state"], done: 2, total: 7 } });
-  expect(await screen.findByText("2/7")).toBeTruthy();
-  expect(ringOf().getAttribute("data-kind")).toBe("implementation");
-  expect(ringOf().getAttribute("data-tone")).toBe(tone);
-  expect(!!screen.queryByTestId("comet")).toBe(comet);
-});
+])(
+  "an -impl page whose state is %s (card shows the Design) uses its own kind and tone",
+  async (state, tone, comet) => {
+    const card = row("blog-impl", {
+      card_kind: "design",
+      state: "paused",
+      addresses: ["gx:blog", "gx:blog-impl"],
+    })
+    render("/e/gx:blog-impl", [card], "loop", {
+      detail: { state: state as EpicDetail["state"], done: 2, total: 7 },
+    })
+    expect(await screen.findByText("2/7")).toBeTruthy()
+    expect(ringOf().getAttribute("data-kind")).toBe("implementation")
+    expect(ringOf().getAttribute("data-tone")).toBe(tone)
+    expect(!!screen.queryByTestId("comet")).toBe(comet)
+  },
+)
 
 test("an -impl page uses its card's tone and comet when the card is for this page", async () => {
-  const card = row("blog-impl", { state: "running", addresses: ["gx:blog-impl", "gx:blog"] });
-  render("/e/gx:blog-impl", [card], "loop", { detail: { state: "paused", done: 1, total: 2 } });
-  await screen.findByText("1/2");
-  expect(ringOf().getAttribute("data-tone")).toBe("running");
-  expect(screen.getByTestId("comet")).toBeTruthy();
-});
+  const card = row("blog-impl", { state: "running", addresses: ["gx:blog-impl", "gx:blog"] })
+  render("/e/gx:blog-impl", [card], "loop", { detail: { state: "paused", done: 1, total: 2 } })
+  await screen.findByText("1/2")
+  expect(ringOf().getAttribute("data-tone")).toBe("running")
+  expect(screen.getByTestId("comet")).toBeTruthy()
+})
 
 test("a Design page whose card shows the -impl epic uses its own kind", async () => {
-  const card = row("blog-impl", { card_kind: "implementation", addresses: ["gx:blog-impl", "gx:blog"] });
-  render("/e/gx:blog", [card], "map", { detail: { steps: steps("spec") } });
-  await screen.findByText("0%");
-  expect(ringOf().getAttribute("data-kind")).toBe("design");
-  expect(ringOf().getAttribute("data-tone")).toBe("muted");
-});
+  const card = row("blog-impl", {
+    card_kind: "implementation",
+    addresses: ["gx:blog-impl", "gx:blog"],
+  })
+  render("/e/gx:blog", [card], "map", { detail: { steps: steps("spec") } })
+  await screen.findByText("0%")
+  expect(ringOf().getAttribute("data-kind")).toBe("design")
+  expect(ringOf().getAttribute("data-tone")).toBe("muted")
+})
 
 test("the follow-ups epic keeps its card's badge", async () => {
-  render("/e/gx:follow-ups", [row("follow-ups", { card_kind: "follow-ups", addresses: ["gx:follow-ups"] })]);
-  await screen.findByText("0/0");
-  expect(ringOf().getAttribute("data-kind")).toBe("followups");
-});
+  render("/e/gx:follow-ups", [
+    row("follow-ups", { card_kind: "follow-ups", addresses: ["gx:follow-ups"] }),
+  ])
+  await screen.findByText("0/0")
+  expect(ringOf().getAttribute("data-kind")).toBe("followups")
+})
 
 test("an empty epic reads 0/0", async () => {
-  render("/e/gx:blog-impl", []);
-  expect(await screen.findByText("0/0")).toBeTruthy();
-});
+  render("/e/gx:blog-impl", [])
+  expect(await screen.findByText("0/0")).toBeTruthy()
+})
 
-const descriptionButton = () => screen.findByRole("button", { name: "Show full description" });
+const descriptionButton = () => screen.findByRole("button", { name: "Show full description" })
 
 test("the stats line stacks under the title, with the description below it when there is a summary", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: { summary: "A short summary" } });
-  const line = await screen.findByTestId("page-header-subtitle");
-  expect(within(line).getByTestId("stats-line")).toBeTruthy();
-  expect(within(line).getByRole("button", { name: "Show full description" }).textContent).toBe("A short summary");
-  expect(screen.getByTestId("page-header-caret")).toBeTruthy();
-  cleanup();
-  render("/e/gx:blog-impl", [], "loop", { detail: { summary: "" } });
-  const bare = await screen.findByTestId("page-header-subtitle");
-  expect(within(bare).getByTestId("stats-line")).toBeTruthy();
-  expect(within(bare).queryByRole("button", { name: "Show full description" })).toBeNull();
-});
+  render("/e/gx:blog-impl", [], "loop", { detail: { summary: "A short summary" } })
+  const line = await screen.findByTestId("page-header-subtitle")
+  expect(within(line).getByTestId("stats-line")).toBeTruthy()
+  expect(within(line).getByRole("button", { name: "Show full description" }).textContent).toBe(
+    "A short summary",
+  )
+  expect(screen.getByTestId("page-header-caret")).toBeTruthy()
+  cleanup()
+  render("/e/gx:blog-impl", [], "loop", { detail: { summary: "" } })
+  const bare = await screen.findByTestId("page-header-subtitle")
+  expect(within(bare).getByTestId("stats-line")).toBeTruthy()
+  expect(within(bare).queryByRole("button", { name: "Show full description" })).toBeNull()
+})
 
 // Enter and Space are the browser's own click on a native button; the e2e flow presses them for real.
 test("a click on the description opens the full text and Escape closes it", async () => {
-  const summary = "word ".repeat(200).trim();
-  render("/e/gx:blog-impl", [], "loop", { detail: { summary } });
-  const button = await descriptionButton();
-  expect(button.tagName).toBe("BUTTON");
-  fireEvent.click(button);
-  const popover = await screen.findByTestId("description-popover");
-  expect(popover.textContent).toBe(summary);
+  const summary = "word ".repeat(200).trim()
+  render("/e/gx:blog-impl", [], "loop", { detail: { summary } })
+  const button = await descriptionButton()
+  expect(button.tagName).toBe("BUTTON")
+  fireEvent.click(button)
+  const popover = await screen.findByTestId("description-popover")
+  expect(popover.textContent).toBe(summary)
   // Zag arms its Escape listener a frame after the lazily mounted content appears, so a first press may be missed.
   await waitFor(() => {
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    expect(screen.queryByTestId("description-popover")).toBeNull();
-  });
-});
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+    expect(screen.queryByTestId("description-popover")).toBeNull()
+  })
+})
 
 test("Copy epic ID is the only menu item and copies project:name", async () => {
-  const writeText = vi.fn(async () => {});
-  vi.stubGlobal("navigator", { clipboard: { writeText } });
+  const writeText = vi.fn(async () => {})
+  vi.stubGlobal("navigator", { clipboard: { writeText } })
   try {
-    render("/e/gx:blog-impl", []);
-    fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
-    const items = await screen.findAllByRole("menuitem");
-    expect(items.map((i) => i.textContent)).toEqual(["Copy epic IDgx:blog-impl"]);
-    fireEvent.click(items[0]);
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:blog-impl"));
+    render("/e/gx:blog-impl", [])
+    fireEvent.click(await screen.findByRole("button", { name: "More actions" }))
+    const items = await screen.findAllByRole("menuitem")
+    expect(items.map((i) => i.textContent)).toEqual(["Copy epic IDgx:blog-impl"])
+    fireEvent.click(items[0])
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:blog-impl"))
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 const spaces: Workspace[] = [
   { name: "Default", default: true, members: 1 },
   { name: "Work", members: 1 },
-];
+]
 const menuLabels = async () => {
   // The sidebar lists the same epic with its own More actions button; the page's is the one outside it.
-  const pageButton = async () => (await screen.findAllByRole("button", { name: "More actions" })).find((b) => !b.closest("aside"))!;
-  fireEvent.click(await waitFor(pageButton));
-  return (await screen.findAllByRole("menuitem")).map((i) => i.textContent);
-};
+  const pageButton = async () =>
+    (await screen.findAllByRole("button", { name: "More actions" })).find(
+      (b) => !b.closest("aside"),
+    )!
+  fireEvent.click(await waitFor(pageButton))
+  return (await screen.findAllByRole("menuitem")).map((i) => i.textContent)
+}
 
 test("a card in a named workspace adds Move, Remove and Hold to the menu", async () => {
-  render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Work" })], "loop", { workspaces: spaces });
-  expect(await menuLabels()).toEqual(["Copy epic IDgx:blog-impl", "Move to workspace›", "Hold", "Archive"]);
-});
+  render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Work" })], "loop", {
+    workspaces: spaces,
+  })
+  expect(await menuLabels()).toEqual([
+    "Copy epic IDgx:blog-impl",
+    "Move to workspace›",
+    "Hold",
+    "Archive",
+  ])
+})
 
 test("a held card offers Take off hold", async () => {
-  render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Default", section: "on-hold" })], "loop", { workspaces: spaces });
-  expect(await menuLabels()).toEqual(["Copy epic IDgx:blog-impl", "Move to workspace›", "Take off hold", "Archive"]);
-});
+  render(
+    "/e/gx:blog-impl",
+    [row("blog-impl", { workspace: "Default", section: "on-hold" })],
+    "loop",
+    { workspaces: spaces },
+  )
+  expect(await menuLabels()).toEqual([
+    "Copy epic IDgx:blog-impl",
+    "Move to workspace›",
+    "Take off hold",
+    "Archive",
+  ])
+})
 
 test("a queued epic's Hold is disabled", async () => {
-  render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Default", queued: true })], "loop", { workspaces: spaces });
-  await menuLabels();
-  const hold = screen.getByRole("menuitem", { name: /^Hold/ });
-  expect(hold.getAttribute("aria-disabled") ?? hold.hasAttribute("data-disabled")).toBeTruthy();
-});
+  render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Default", queued: true })], "loop", {
+    workspaces: spaces,
+  })
+  await menuLabels()
+  const hold = screen.getByRole("menuitem", { name: /^Hold/ })
+  expect(hold.getAttribute("aria-disabled") ?? hold.hasAttribute("data-disabled")).toBeTruthy()
+})
 
 test("the spinner shows before data and an unknown address says not found", async () => {
-  render("/e/gx:blog-impl", [], "loop", { hang: true });
-  expect(screen.getByLabelText("Loading epic")).toBeTruthy();
-  cleanup();
-  render("/e/gx:nope", [], "loop", { notFound: true });
-  expect(await screen.findByText("Epic not found")).toBeTruthy();
-});
+  render("/e/gx:blog-impl", [], "loop", { hang: true })
+  expect(screen.getByLabelText("Loading epic")).toBeTruthy()
+  cleanup()
+  render("/e/gx:nope", [], "loop", { notFound: true })
+  expect(await screen.findByText("Epic not found")).toBeTruthy()
+})
 
 test("a seeded page cache paints the header before the fetch resolves", async () => {
   sessionStorage.setItem(
     "gx.page.epic",
-    JSON.stringify({ id: "gx:blog-impl", value: { ...detailOf("gx:blog-impl", "loop"), done: 2, total: 7 } }),
-  );
-  render("/e/gx:blog-impl", [], "loop", { hang: true });
-  expect(await screen.findByText("2/7")).toBeTruthy();
-  sessionStorage.clear();
-});
+    JSON.stringify({
+      id: "gx:blog-impl",
+      value: { ...detailOf("gx:blog-impl", "loop"), done: 2, total: 7 },
+    }),
+  )
+  render("/e/gx:blog-impl", [], "loop", { hang: true })
+  expect(await screen.findByText("2/7")).toBeTruthy()
+  sessionStorage.clear()
+})
 
 const ciFailing: Partial<EpicDetail> = {
   state: "paused",
   pr: { number: 412, url: "https://github.com/o/r/pull/412", state: "draft", chip: "#412 · draft" },
-  pr_notice: "CI failing: go-test failed 3 times (limit 3 per check). Fix it by hand and push, or press Try again to give the agent 3 more attempts.",
+  pr_notice:
+    "CI failing: go-test failed 3 times (limit 3 per check). Fix it by hand and push, or press Try again to give the agent 3 more attempts.",
   pr_actions: [
     { kind: "open-pr", label: "Open on GitHub", link: "https://github.com/o/r/pull/412" },
     { kind: "try-again", label: "Try again" },
   ],
   pr_activity: [
-    { time: "2026-01-02T14:52:00Z", kind: "warning", text: "Paused: go-test failed 3 times", detail: "Limit reached." },
+    {
+      time: "2026-01-02T14:52:00Z",
+      kind: "warning",
+      text: "Paused: go-test failed 3 times",
+      detail: "Limit reached.",
+    },
     { time: "2026-01-02T14:41:00Z", kind: "good", text: "Fix pushed", ticket: "gx:blog-impl/11" },
   ],
-};
+}
 
 test("a PR epic shows the chip, Open on GitHub and the activity newest first with the fix link", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: ciFailing });
-  expect((await screen.findByTestId("pr-chip")).textContent).toBe("PR #412 · draft");
-  expect(screen.getByRole("button", { name: "Open on GitHub" })).toBeTruthy();
-  const panel = screen.getByTestId("pr-activity");
-  expect(panel.textContent).toContain("2 entries");
-  const items = within(panel).getAllByRole("listitem");
-  expect(items[0].textContent).toContain("Paused: go-test failed 3 times");
-  expect(items[0].textContent).toContain("Limit reached.");
-  expect(items[1].textContent).toContain("Fix pushed");
-  expect(within(items[1]).getByRole("link", { name: "ticket 11" }).getAttribute("href")).toBe("#/t/gx:blog-impl/11");
-});
+  render("/e/gx:blog-impl", [], "loop", { detail: ciFailing })
+  expect((await screen.findByTestId("pr-chip")).textContent).toBe("PR #412 · draft")
+  expect(screen.getByRole("button", { name: "Open on GitHub" })).toBeTruthy()
+  const panel = screen.getByTestId("pr-activity")
+  expect(panel.textContent).toContain("2 entries")
+  const items = within(panel).getAllByRole("listitem")
+  expect(items[0].textContent).toContain("Paused: go-test failed 3 times")
+  expect(items[0].textContent).toContain("Limit reached.")
+  expect(items[1].textContent).toContain("Fix pushed")
+  expect(within(items[1]).getByRole("link", { name: "ticket 11" }).getAttribute("href")).toBe(
+    "#/t/gx:blog-impl/11",
+  )
+})
 
 test("a ci-failing epic shows the notice, and both Try again buttons post the epic address", async () => {
-  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }));
-  vi.stubGlobal("fetch", fetchMock);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }))
+  vi.stubGlobal("fetch", fetchMock)
   try {
-    render("/e/gx:blog-impl", [], "loop", { detail: ciFailing });
-    const notice = await screen.findByTestId("pr-notice");
-    expect(notice.textContent).toContain("CI failing: go-test failed 3 times");
-    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(2);
-    fireEvent.click(within(notice).getByRole("button", { name: "Try again" }));
-    const call = () => fetchMock.mock.calls.find(([url]) => url === "/v1/epics/try-again");
-    await waitFor(() => expect(call()).toBeTruthy());
-    expect(JSON.parse(call()![1].body)).toEqual({ address: "gx:blog-impl", state: "paused" });
+    render("/e/gx:blog-impl", [], "loop", { detail: ciFailing })
+    const notice = await screen.findByTestId("pr-notice")
+    expect(notice.textContent).toContain("CI failing: go-test failed 3 times")
+    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(2)
+    fireEvent.click(within(notice).getByRole("button", { name: "Try again" }))
+    const call = () => fetchMock.mock.calls.find(([url]) => url === "/v1/epics/try-again")
+    await waitFor(() => expect(call()).toBeTruthy())
+    expect(JSON.parse(call()![1].body)).toEqual({ address: "gx:blog-impl", state: "paused" })
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 test("a PR text failure shows its notice the same way", async () => {
   render("/e/gx:blog-impl", [], "loop", {
-    detail: { state: "paused", pr_notice: "PR text failed: the agent could not write it.", pr_actions: [{ kind: "try-again", label: "Try again" }] },
-  });
-  const notice = await screen.findByTestId("pr-notice");
-  expect(notice.textContent).toContain("PR text failed");
-  expect(within(notice).getByRole("button", { name: "Try again" })).toBeTruthy();
-});
+    detail: {
+      state: "paused",
+      pr_notice: "PR text failed: the agent could not write it.",
+      pr_actions: [{ kind: "try-again", label: "Try again" }],
+    },
+  })
+  const notice = await screen.findByTestId("pr-notice")
+  expect(notice.textContent).toContain("PR text failed")
+  expect(within(notice).getByRole("button", { name: "Try again" })).toBeTruthy()
+})
 
 test("with no PR yet the header shows Create PR and the failure reason", async () => {
   render("/e/gx:blog-impl", [], "loop", {
-    detail: { state: "awaiting-pr", pr_actions: [{ kind: "create-pr", label: "Create PR" }], pr_reason: "gh is not signed in" },
-  });
-  expect(await screen.findByRole("button", { name: "Create PR" })).toBeTruthy();
-  expect(screen.getByTestId("pr-reason").textContent).toBe("gh is not signed in");
-  expect(screen.queryByTestId("pr-chip")).toBeNull();
-});
+    detail: {
+      state: "awaiting-pr",
+      pr_actions: [{ kind: "create-pr", label: "Create PR" }],
+      pr_reason: "gh is not signed in",
+    },
+  })
+  expect(await screen.findByRole("button", { name: "Create PR" })).toBeTruthy()
+  expect(screen.getByTestId("pr-reason").textContent).toBe("gh is not signed in")
+  expect(screen.queryByTestId("pr-chip")).toBeNull()
+})
 
 test("the epic page shows Mark as merged when the server offers it and posts the mark-merged call", async () => {
-  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }));
-  vi.stubGlobal("fetch", fetchMock);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }))
+  vi.stubGlobal("fetch", fetchMock)
   try {
     render("/e/gx:blog-impl", [], "loop", {
-      detail: { state: "awaiting-merge", pr_actions: [{ kind: "mark-merged", label: "Mark as merged" }] },
-    });
-    fireEvent.click(await screen.findByRole("button", { name: "Mark as merged" }));
-    const call = () => fetchMock.mock.calls.find(([url]) => url === "/v1/epics/mark-merged");
-    await waitFor(() => expect(call()).toBeTruthy());
-    expect(JSON.parse(call()![1].body)).toEqual({ address: "gx:blog-impl", state: "awaiting-merge" });
+      detail: {
+        state: "awaiting-merge",
+        pr_actions: [{ kind: "mark-merged", label: "Mark as merged" }],
+      },
+    })
+    fireEvent.click(await screen.findByRole("button", { name: "Mark as merged" }))
+    const call = () => fetchMock.mock.calls.find(([url]) => url === "/v1/epics/mark-merged")
+    await waitFor(() => expect(call()).toBeTruthy())
+    expect(JSON.parse(call()![1].body)).toEqual({
+      address: "gx:blog-impl",
+      state: "awaiting-merge",
+    })
   } finally {
-    vi.unstubAllGlobals();
+    vi.unstubAllGlobals()
   }
-});
+})
 
 test("without a mark-merged action the epic page has no Mark as merged button", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: { state: "running" } });
-  await screen.findByTestId("stats-line");
-  expect(screen.queryByRole("button", { name: "Mark as merged" })).toBeNull();
-});
+  render("/e/gx:blog-impl", [], "loop", { detail: { state: "running" } })
+  await screen.findByTestId("stats-line")
+  expect(screen.queryByRole("button", { name: "Mark as merged" })).toBeNull()
+})
 
 test("an epic with no PR activity shows no activity panel", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: { state: "running" } });
-  await screen.findByTestId("stats-line");
-  expect(screen.queryByTestId("pr-activity")).toBeNull();
-});
+  render("/e/gx:blog-impl", [], "loop", { detail: { state: "running" } })
+  await screen.findByTestId("stats-line")
+  expect(screen.queryByTestId("pr-activity")).toBeNull()
+})

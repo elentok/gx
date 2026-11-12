@@ -1,5 +1,5 @@
-import { Link } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { Link } from "@chakra-ui/react"
+import type { ReactNode } from "react"
 
 /** A bordered link styled like the header buttons beside it. */
 export function HeaderLink({ href, children }: { href: string; children: ReactNode }) {
@@ -23,5 +23,5 @@ export function HeaderLink({ href, children }: { href: string; children: ReactNo
     >
       {children}
     </Link>
-  );
+  )
 }

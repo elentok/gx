@@ -1,14 +1,14 @@
-import { Box, Text } from "@chakra-ui/react";
-import { ActionAnswer, type TicketDetail } from "../generated/server";
-import type { Sent } from "./answer";
-import { AnswerForm } from "./AnswerForm";
-import { PermissionCard } from "./PermissionCard";
-import { isRecoverAction } from "./recover";
-import { RecoveryActions } from "./RecoveryActions";
-import { TaskCard } from "./TaskCard";
-import { TicketReading } from "./TicketReading";
+import { Box, Text } from "@chakra-ui/react"
+import { ActionAnswer, type TicketDetail } from "../generated/server"
+import type { Sent } from "./answer"
+import { AnswerForm } from "./AnswerForm"
+import { PermissionCard } from "./PermissionCard"
+import { isRecoverAction } from "./recover"
+import { RecoveryActions } from "./RecoveryActions"
+import { TaskCard } from "./TaskCard"
+import { TicketReading } from "./TicketReading"
 
-const hasOpenQuestion = (detail: TicketDetail) => detail.latest?.outcome === "open";
+const hasOpenQuestion = (detail: TicketDetail) => detail.latest?.outcome === "open"
 
 /** Whether anything on the page asks a person to act, or shows what they just did. */
 export function needsActionCard(detail: TicketDetail, sent: Sent | null): boolean {
@@ -23,7 +23,7 @@ export function needsActionCard(detail: TicketDetail, sent: Sent | null): boolea
     detail.actions.some(isRecoverAction) ||
     !!detail.run_finishing ||
     !!sent
-  );
+  )
 }
 
 const cardProps = {
@@ -35,7 +35,7 @@ const cardProps = {
   borderColor: "border",
   rounded: "md",
   bg: "surface.raised",
-} as const;
+} as const
 
 // Everything the page asks a person to act on, right under the header. The old rounds live here
 // only, so a ticket nobody needs to act on shows no old questions.
@@ -45,12 +45,12 @@ export function ActionCard({
   onSent,
   refetch,
 }: {
-  detail: TicketDetail;
-  sent: Sent | null;
-  onSent: (sent: Sent) => void;
-  refetch: () => void;
+  detail: TicketDetail
+  sent: Sent | null
+  onSent: (sent: Sent) => void
+  refetch: () => void
 }) {
-  if (!needsActionCard(detail, sent)) return null;
+  if (!needsActionCard(detail, sent)) return null
 
   // A broken ticket has nothing to answer or resume, and the parser error is the only file text shown.
   if (detail.error_reason) {
@@ -60,7 +60,13 @@ export function ActionCard({
           {detail.error_reason}
         </Text>
         {detail.parse_error && (
-          <Text color="tone.deadlocked.fg" mt="2" fontFamily="mono" fontSize="sm" whiteSpace="pre-wrap">
+          <Text
+            color="tone.deadlocked.fg"
+            mt="2"
+            fontFamily="mono"
+            fontSize="sm"
+            whiteSpace="pre-wrap"
+          >
             {detail.parse_error}
           </Text>
         )}
@@ -70,7 +76,7 @@ export function ActionCard({
           </Text>
         )}
       </Box>
-    );
+    )
   }
 
   return (
@@ -87,12 +93,12 @@ export function ActionCard({
       <AnswerForm
         detail={detail}
         onSent={(s) => {
-          onSent(s);
-          refetch();
+          onSent(s)
+          refetch()
         }}
         onStale={refetch}
       />
       <RecoveryActions detail={detail} onDone={refetch} onStale={refetch} />
     </Box>
-  );
+  )
 }

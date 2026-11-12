@@ -1,36 +1,42 @@
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, describe, expect, test, vi } from "vitest";
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import { PageHeader } from "../page/PageHeader";
-import { renderThemed } from "../ui/render";
-import { DeviceContext, type Device } from "../useWide";
-import { AppShell } from "./AppShell";
-import { closeNewItem, openNewAgent, openNewDesign } from "./newItemOpen";
-import { EDGE_PX, NO_SIDEBAR_SWIPE_ATTR } from "./useSidebarSwipe";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { createMemoryRouter, RouterProvider } from "react-router"
+import { afterEach, describe, expect, test, vi } from "vitest"
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
+import { PageHeader } from "../page/PageHeader"
+import { renderThemed } from "../ui/render"
+import { DeviceContext, type Device } from "../useWide"
+import { AppShell } from "./AppShell"
+import { closeNewItem, openNewAgent, openNewDesign } from "./newItemOpen"
+import { EDGE_PX, NO_SIDEBAR_SWIPE_ATTR } from "./useSidebarSwipe"
 
 afterEach(() => {
-  closeNewItem();
-  cleanup();
-});
+  closeNewItem()
+  cleanup()
+})
 
-let setState: (patch: Partial<ConnectionState>) => void;
+let setState: (patch: Partial<ConnectionState>) => void
 
 function setup(device: Device, needsYou = 0, override: Partial<ConnectionState> = {}) {
-  let state = { snapshot: { needs_you_total: needsYou, build: "v1.2.3" }, connected: true, loadedOnce: true, tick: 0, ...override } as unknown as ConnectionState;
-  const listeners = new Set<() => void>();
+  let state = {
+    snapshot: { needs_you_total: needsYou, build: "v1.2.3" },
+    connected: true,
+    loadedOnce: true,
+    tick: 0,
+    ...override,
+  } as unknown as ConnectionState
+  const listeners = new Set<() => void>()
   const conn = {
     getState: () => state,
     subscribe: (fn: () => void) => {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
+      listeners.add(fn)
+      return () => listeners.delete(fn)
     },
     onEvent: () => () => {},
-  } as unknown as Connection;
+  } as unknown as Connection
   setState = (patch) => {
-    state = { ...state, ...patch };
-    listeners.forEach((fn) => fn());
-  };
+    state = { ...state, ...patch }
+    listeners.forEach((fn) => fn())
+  }
   const router = createMemoryRouter(
     [
       {
@@ -49,86 +55,99 @@ function setup(device: Device, needsYou = 0, override: Partial<ConnectionState> 
       },
     ],
     { initialEntries: ["/"] },
-  );
+  )
   renderThemed(
     <DeviceContext.Provider value={device}>
       <ConnectionContext.Provider value={conn}>
         <RouterProvider router={router} />
       </ConnectionContext.Provider>
     </DeviceContext.Provider>,
-  );
+  )
 }
 
 // A hidden aside has no accessible name in the testing library, so find it by its label.
-const sidebar = () => document.querySelector<HTMLElement>('aside[aria-label="Sidebar"]')!;
-const isOpen = () => sidebar().getAttribute("data-open") === "true";
-const mascot = () => screen.queryByRole("button", { name: "Show sidebar" });
+const sidebar = () => document.querySelector<HTMLElement>('aside[aria-label="Sidebar"]')!
+const isOpen = () => sidebar().getAttribute("data-open") === "true"
+const mascot = () => screen.queryByRole("button", { name: "Show sidebar" })
 
 describe("offline empty state", () => {
-  const EMPTY = "Can't reach gx. Retrying…";
+  const EMPTY = "Can't reach gx. Retrying…"
 
   test("shows in place of the page with no snapshot and no connection, and goes when a snapshot arrives", () => {
-    setup("desktop", 0, { snapshot: null, connected: false, loadedOnce: false });
-    expect(screen.getByText(EMPTY)).toBeTruthy();
-    expect(screen.queryByText("item")).toBeNull();
-    act(() => setState({ snapshot: { needs_you_total: 0, build: "v1.2.3" } as ConnectionState["snapshot"], connected: true, loadedOnce: true, liveSnapshot: true }));
-    expect(screen.queryByText(EMPTY)).toBeNull();
-    expect(screen.getByText("item")).toBeTruthy();
-  });
+    setup("desktop", 0, { snapshot: null, connected: false, loadedOnce: false })
+    expect(screen.getByText(EMPTY)).toBeTruthy()
+    expect(screen.queryByText("item")).toBeNull()
+    act(() =>
+      setState({
+        snapshot: { needs_you_total: 0, build: "v1.2.3" } as ConnectionState["snapshot"],
+        connected: true,
+        loadedOnce: true,
+        liveSnapshot: true,
+      }),
+    )
+    expect(screen.queryByText(EMPTY)).toBeNull()
+    expect(screen.getByText("item")).toBeTruthy()
+  })
 
   test("a snapshot while disconnected keeps the page", () => {
-    setup("desktop", 0, { connected: false });
-    expect(screen.queryByText(EMPTY)).toBeNull();
-    expect(screen.getByText("item")).toBeTruthy();
-  });
-});
+    setup("desktop", 0, { connected: false })
+    expect(screen.queryByText(EMPTY)).toBeNull()
+    expect(screen.getByText("item")).toBeTruthy()
+  })
+})
 
 test("desktop docks the sidebar at 280px, with the brand, the build and a hide button", () => {
-  setup("desktop");
-  expect(isOpen()).toBe(true);
-  expect(getComputedStyle(sidebar()).width).toBe("280px");
-  expect(sidebar().querySelector("img")?.getAttribute("src")).toBe("/gx-logo-wide.png");
-  expect(screen.getByText("v1.2.3")).toBeTruthy();
-  expect(mascot()).toBeNull();
-});
+  setup("desktop")
+  expect(isOpen()).toBe(true)
+  expect(getComputedStyle(sidebar()).width).toBe("280px")
+  expect(sidebar().querySelector("img")?.getAttribute("src")).toBe("/gx-logo-wide.png")
+  expect(screen.getByText("v1.2.3")).toBeTruthy()
+  expect(mascot()).toBeNull()
+})
 
 test("desktop: hiding the sidebar shows the mascot, which brings it back", () => {
-  setup("desktop");
-  fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
-  expect(isOpen()).toBe(false);
-  fireEvent.click(mascot()!);
-  expect(isOpen()).toBe(true);
-  expect(mascot()).toBeNull();
-});
+  setup("desktop")
+  fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }))
+  expect(isOpen()).toBe(false)
+  fireEvent.click(mascot()!)
+  expect(isOpen()).toBe(true)
+  expect(mascot()).toBeNull()
+})
 
-test.each(["tablet", "phone"] as const)("%s: closed by default, the mascot opens it with a scrim, picking a link closes it", (device) => {
-  setup(device);
-  expect(isOpen()).toBe(false);
-  expect(screen.queryByTestId("scrim")).toBeNull();
-  fireEvent.click(mascot()!);
-  expect(isOpen()).toBe(true);
-  expect(sidebar().getAttribute("data-device")).toBe(device);
-  expect(screen.getByTestId("scrim")).toBeTruthy();
-  fireEvent.click(screen.getByTestId("scrim"));
-  expect(isOpen()).toBe(false);
-  fireEvent.click(mascot()!);
-  const link = document.createElement("a");
-  sidebar().appendChild(link);
-  fireEvent.click(link);
-  expect(isOpen()).toBe(false);
-});
+test.each(["tablet", "phone"] as const)(
+  "%s: closed by default, the mascot opens it with a scrim, picking a link closes it",
+  (device) => {
+    setup(device)
+    expect(isOpen()).toBe(false)
+    expect(screen.queryByTestId("scrim")).toBeNull()
+    fireEvent.click(mascot()!)
+    expect(isOpen()).toBe(true)
+    expect(sidebar().getAttribute("data-device")).toBe(device)
+    expect(screen.getByTestId("scrim")).toBeTruthy()
+    fireEvent.click(screen.getByTestId("scrim"))
+    expect(isOpen()).toBe(false)
+    fireEvent.click(mascot()!)
+    const link = document.createElement("a")
+    sidebar().appendChild(link)
+    fireEvent.click(link)
+    expect(isOpen()).toBe(false)
+  },
+)
 
 test.each([
   ["tablet", false],
   ["phone", false],
   ["desktop", true],
-] as const)("%s: More settings in the gear menu closes a sliding sidebar only (stays open: %s)", async (device, staysOpen) => {
-  setup(device);
-  if (device !== "desktop") fireEvent.click(mascot()!);
-  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "More settings..." }));
-  expect(isOpen()).toBe(staysOpen);
-});
+] as const)(
+  "%s: More settings in the gear menu closes a sliding sidebar only (stays open: %s)",
+  async (device, staysOpen) => {
+    setup(device)
+    if (device !== "desktop") fireEvent.click(mascot()!)
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }))
+    fireEvent.click(await screen.findByRole("menuitem", { name: "More settings..." }))
+    expect(isOpen()).toBe(staysOpen)
+  },
+)
 
 describe("closing the sidebar closes its menus", () => {
   const closers: [string, () => void][] = [
@@ -139,224 +158,272 @@ describe("closing the sidebar closes its menus", () => {
     [
       "a tap through the menu's dim on the toggle",
       () => {
-        const toggle = screen.getByRole("button", { name: "Hide sidebar" });
-        toggle.getBoundingClientRect = () => ({ left: 300, right: 334, top: 10, bottom: 44 }) as DOMRect;
-        fireEvent.click(screen.getByTestId("menu-dim"), { clientX: 310, clientY: 20 });
+        const toggle = screen.getByRole("button", { name: "Hide sidebar" })
+        toggle.getBoundingClientRect = () =>
+          ({ left: 300, right: 334, top: 10, bottom: 44 }) as DOMRect
+        fireEvent.click(screen.getByTestId("menu-dim"), { clientX: 310, clientY: 20 })
       },
     ],
-    ["a swipe starting on the menu's dim", () => swipe(screen.getByTestId("menu-dim"), [300, 300], [200, 300])],
-    ["Ctrl+B with the menu focused", () => fireEvent.keyDown(screen.getByRole("menu"), { key: "b", ctrlKey: true })],
-  ];
+    [
+      "a swipe starting on the menu's dim",
+      () => swipe(screen.getByTestId("menu-dim"), [300, 300], [200, 300]),
+    ],
+    [
+      "Ctrl+B with the menu focused",
+      () => fireEvent.keyDown(screen.getByRole("menu"), { key: "b", ctrlKey: true }),
+    ],
+  ]
   test.each(closers)("%s closes an open gear menu", async (_, close) => {
-    setup("phone");
-    fireEvent.click(mascot()!);
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    await screen.findByRole("menuitem", { name: "More settings..." });
-    close();
-    expect(isOpen()).toBe(false);
-    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "More settings..." })).toBeNull());
-  });
+    setup("phone")
+    fireEvent.click(mascot()!)
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }))
+    await screen.findByRole("menuitem", { name: "More settings..." })
+    close()
+    expect(isOpen()).toBe(false)
+    await waitFor(() =>
+      expect(screen.queryByRole("menuitem", { name: "More settings..." })).toBeNull(),
+    )
+  })
 
   test("a dialog from a menu item stays open and blocks Cmd+B and a swipe", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: [], follow_ups: [], projects: [] }), { status: 200 })));
-    setup("phone");
-    fireEvent.click(mascot()!);
-    fireEvent.click(screen.getByRole("button", { name: "+ New" }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "New design" }));
-    await screen.findByRole("dialog");
-    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
-    swipe(sidebar(), [200, 300], [100, 300]);
-    expect(isOpen()).toBe(true);
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    vi.unstubAllGlobals();
-  });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ epics: [], follow_ups: [], projects: [] }), {
+            status: 200,
+          }),
+      ),
+    )
+    setup("phone")
+    fireEvent.click(mascot()!)
+    fireEvent.click(screen.getByRole("button", { name: "+ New" }))
+    fireEvent.click(await screen.findByRole("menuitem", { name: "New design" }))
+    await screen.findByRole("dialog")
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true })
+    swipe(sidebar(), [200, 300], [100, 300])
+    expect(isOpen()).toBe(true)
+    expect(screen.getByRole("dialog")).toBeTruthy()
+    vi.unstubAllGlobals()
+  })
 
   test("the shared opener opens each form over the page, and closing leaves the page", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("worktrees") ? [] : { epics: [], follow_ups: [], projects: [] }), { status: 200 })),
-    );
-    setup("desktop");
+      vi.fn(
+        async (url: string) =>
+          new Response(
+            JSON.stringify(
+              String(url).includes("worktrees") ? [] : { epics: [], follow_ups: [], projects: [] },
+            ),
+            { status: 200 },
+          ),
+      ),
+    )
+    setup("desktop")
     for (const open of [() => openNewDesign(), openNewAgent]) {
-      act(open);
-      await screen.findByRole("dialog");
-      expect(screen.getByText("item")).toBeTruthy();
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      expect(screen.getByText("item")).toBeTruthy();
+      act(open)
+      await screen.findByRole("dialog")
+      expect(screen.getByText("item")).toBeTruthy()
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+      expect(screen.getByText("item")).toBeTruthy()
     }
-    vi.unstubAllGlobals();
-  });
-});
+    vi.unstubAllGlobals()
+  })
+})
 
 test("the amber dot shows only while the sidebar is closed and something needs me", () => {
-  setup("tablet", 2);
-  expect(screen.getByTestId("mascot-dot")).toBeTruthy();
-  fireEvent.click(mascot()!);
-  expect(screen.queryByTestId("mascot-dot")).toBeNull();
-});
+  setup("tablet", 2)
+  expect(screen.getByTestId("mascot-dot")).toBeTruthy()
+  fireEvent.click(mascot()!)
+  expect(screen.queryByTestId("mascot-dot")).toBeNull()
+})
 
 test("no dot when nothing needs me", () => {
-  setup("tablet", 0);
-  expect(screen.queryByTestId("mascot-dot")).toBeNull();
-});
+  setup("tablet", 0)
+  expect(screen.queryByTestId("mascot-dot")).toBeNull()
+})
 
-test.each(["desktop", "tablet", "phone"] as const)("%s: the header search button opens the jump menu", async (device) => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: [], follow_ups: [] }), { status: 200 })));
-  setup(device);
-  if (device !== "desktop") fireEvent.click(mascot()!);
-  fireEvent.click(screen.getByRole("button", { name: "Search" }));
-  expect(await screen.findByRole("dialog", { name: "Jump to" })).toBeTruthy();
-  fireEvent.keyDown(window, { key: "Escape" });
-  expect(screen.queryByRole("dialog")).toBeNull();
-});
+test.each(["desktop", "tablet", "phone"] as const)(
+  "%s: the header search button opens the jump menu",
+  async (device) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () => new Response(JSON.stringify({ epics: [], follow_ups: [] }), { status: 200 }),
+      ),
+    )
+    setup(device)
+    if (device !== "desktop") fireEvent.click(mascot()!)
+    fireEvent.click(screen.getByRole("button", { name: "Search" }))
+    expect(await screen.findByRole("dialog", { name: "Jump to" })).toBeTruthy()
+    fireEvent.keyDown(window, { key: "Escape" })
+    expect(screen.queryByRole("dialog")).toBeNull()
+  },
+)
 
 function swipe(target: Element, from: [number, number], to: [number, number]) {
-  fireEvent.touchStart(target, { touches: [{ clientX: from[0], clientY: from[1] }] });
-  fireEvent.touchEnd(target, { changedTouches: [{ clientX: to[0], clientY: to[1] }] });
+  fireEvent.touchStart(target, { touches: [{ clientX: from[0], clientY: from[1] }] })
+  fireEvent.touchEnd(target, { changedTouches: [{ clientX: to[0], clientY: to[1] }] })
 }
 
 describe("swipe", () => {
-  afterEach(() => vi.unstubAllGlobals());
-  const standalone = () => vi.stubGlobal("matchMedia", (q: string) => ({
+  afterEach(() => vi.unstubAllGlobals())
+  const standalone = () =>
+    vi.stubGlobal("matchMedia", (q: string) => ({
       matches: q === "(display-mode: standalone)",
       addEventListener: () => {},
       removeEventListener: () => {},
-    }));
+    }))
 
-  test.each(["tablet", "phone"] as const)("%s: swipe left on the sidebar or the scrim closes it", (device) => {
-    setup(device);
-    fireEvent.click(mascot()!);
-    swipe(sidebar(), [200, 300], [100, 310]);
-    expect(isOpen()).toBe(false);
-    fireEvent.click(mascot()!);
-    swipe(screen.getByTestId("scrim"), [300, 300], [200, 300]);
-    expect(isOpen()).toBe(false);
-  });
+  test.each(["tablet", "phone"] as const)(
+    "%s: swipe left on the sidebar or the scrim closes it",
+    (device) => {
+      setup(device)
+      fireEvent.click(mascot()!)
+      swipe(sidebar(), [200, 300], [100, 310])
+      expect(isOpen()).toBe(false)
+      fireEvent.click(mascot()!)
+      swipe(screen.getByTestId("scrim"), [300, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+    },
+  )
 
   test.each([
     ["under 40px", [200, 300], [165, 300]],
     ["mostly vertical", [200, 300], [150, 500]],
     ["rightward", [200, 300], [300, 300]],
   ] as const)("a %s move does not close it", (_, from, to) => {
-    setup("phone");
-    fireEvent.click(mascot()!);
-    swipe(sidebar(), [...from], [...to]);
-    expect(isOpen()).toBe(true);
-  });
+    setup("phone")
+    fireEvent.click(mascot()!)
+    swipe(sidebar(), [...from], [...to])
+    expect(isOpen()).toBe(true)
+  })
 
   test("a tap on a row still navigates and closes through the click", () => {
-    setup("phone");
-    fireEvent.click(mascot()!);
-    const link = document.createElement("a");
-    sidebar().appendChild(link);
-    swipe(link, [100, 100], [102, 101]);
-    expect(isOpen()).toBe(true);
-    fireEvent.click(link);
-    expect(isOpen()).toBe(false);
-  });
+    setup("phone")
+    fireEvent.click(mascot()!)
+    const link = document.createElement("a")
+    sidebar().appendChild(link)
+    swipe(link, [100, 100], [102, 101])
+    expect(isOpen()).toBe(true)
+    fireEvent.click(link)
+    expect(isOpen()).toBe(false)
+  })
 
   test("a horizontal scroller that can still scroll that way swallows the gesture", () => {
-    setup("phone");
-    fireEvent.click(mascot()!);
-    const strip = document.createElement("div");
-    strip.style.overflowX = "auto";
-    Object.defineProperties(strip, { scrollWidth: { value: 500 }, clientWidth: { value: 200 } });
-    sidebar().appendChild(strip);
-    swipe(strip, [200, 300], [100, 300]);
-    expect(isOpen()).toBe(true);
+    setup("phone")
+    fireEvent.click(mascot()!)
+    const strip = document.createElement("div")
+    strip.style.overflowX = "auto"
+    Object.defineProperties(strip, { scrollWidth: { value: 500 }, clientWidth: { value: 200 } })
+    sidebar().appendChild(strip)
+    swipe(strip, [200, 300], [100, 300])
+    expect(isOpen()).toBe(true)
     // Scrolled to its end, the same swipe closes the sidebar.
-    strip.scrollLeft = 300;
-    swipe(strip, [200, 300], [100, 300]);
-    expect(isOpen()).toBe(false);
-  });
+    strip.scrollLeft = 300
+    swipe(strip, [200, 300], [100, 300])
+    expect(isOpen()).toBe(false)
+  })
 
   test("nothing swipes while docked", () => {
-    setup("desktop");
-    swipe(sidebar(), [200, 300], [100, 300]);
-    expect(isOpen()).toBe(true);
-  });
+    setup("desktop")
+    swipe(sidebar(), [200, 300], [100, 300])
+    expect(isOpen()).toBe(true)
+  })
 
   describe("a rightward swipe opens the sidebar", () => {
     test.each([
       ["a tab", () => {}],
       ["the installed app", standalone],
     ])("on %s, from past the edge, on phone and tablet", (_, signal) => {
-      signal();
+      signal()
       for (const device of ["phone", "tablet"] as const) {
-        setup(device);
-        swipe(document.body, [100, 300], [200, 300]);
-        expect(isOpen()).toBe(true);
-        cleanup();
+        setup(device)
+        swipe(document.body, [100, 300], [200, 300])
+        expect(isOpen()).toBe(true)
+        cleanup()
       }
-    });
+    })
 
     test("a start within the edge band opens nothing", () => {
-      setup("phone");
-      swipe(document.body, [5, 300], [100, 300]);
-      expect(isOpen()).toBe(false);
-      swipe(document.body, [EDGE_PX, 300], [200, 300]);
-      expect(isOpen()).toBe(false);
-    });
+      setup("phone")
+      swipe(document.body, [5, 300], [100, 300])
+      expect(isOpen()).toBe(false)
+      swipe(document.body, [EDGE_PX, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+    })
 
     test.each([
       ["under 40px", [100, 300], [135, 300]],
       ["mostly vertical", [100, 300], [150, 500]],
       ["leftward", [200, 300], [100, 300]],
     ] as const)("a %s move opens nothing", (_, from, to) => {
-      setup("phone");
-      swipe(document.body, [...from], [...to]);
-      expect(isOpen()).toBe(false);
-    });
+      setup("phone")
+      swipe(document.body, [...from], [...to])
+      expect(isOpen()).toBe(false)
+    })
 
     test("a second finger cancels it", () => {
-      setup("phone");
-      fireEvent.touchStart(document.body, { touches: [{ clientX: 100, clientY: 300 }, { clientX: 200, clientY: 300 }] });
-      fireEvent.touchEnd(document.body, { changedTouches: [{ clientX: 200, clientY: 300 }] });
-      expect(isOpen()).toBe(false);
-    });
+      setup("phone")
+      fireEvent.touchStart(document.body, {
+        touches: [
+          { clientX: 100, clientY: 300 },
+          { clientX: 200, clientY: 300 },
+        ],
+      })
+      fireEvent.touchEnd(document.body, { changedTouches: [{ clientX: 200, clientY: 300 }] })
+      expect(isOpen()).toBe(false)
+    })
 
     const addScroller = (overflowX: string, scrollWidth: number) => {
-      const el = document.createElement("div");
-      el.style.overflowX = overflowX;
-      Object.defineProperties(el, { scrollWidth: { value: scrollWidth }, clientWidth: { value: 200 } });
-      document.body.appendChild(el);
-      return el;
-    };
+      const el = document.createElement("div")
+      el.style.overflowX = overflowX
+      Object.defineProperties(el, {
+        scrollWidth: { value: scrollWidth },
+        clientWidth: { value: 200 },
+      })
+      document.body.appendChild(el)
+      return el
+    }
 
     test("a start inside a horizontal scroller opens nothing, at its start or its end", () => {
-      setup("phone");
-      const strip = addScroller("auto", 500);
-      swipe(strip, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(false);
-      strip.scrollLeft = 300;
-      swipe(strip, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(false);
-      const child = document.createElement("span");
-      strip.appendChild(child);
-      swipe(child, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(false);
-    });
+      setup("phone")
+      const strip = addScroller("auto", 500)
+      swipe(strip, [100, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+      strip.scrollLeft = 300
+      swipe(strip, [100, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+      const child = document.createElement("span")
+      strip.appendChild(child)
+      swipe(child, [100, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+    })
 
     test.each([
-      ["vertical-only scroll (overflow-x computes auto, nothing overflows)", () => addScroller("auto", 200)],
+      [
+        "vertical-only scroll (overflow-x computes auto, nothing overflows)",
+        () => addScroller("auto", 200),
+      ],
       ["overflow hidden", () => addScroller("hidden", 500)],
     ])("%s does not block", (_, make) => {
-      setup("phone");
-      swipe(make(), [100, 300], [200, 300]);
-      expect(isOpen()).toBe(true);
-    });
+      setup("phone")
+      swipe(make(), [100, 300], [200, 300])
+      expect(isOpen()).toBe(true)
+    })
 
     test("a marked surface blocks", () => {
-      setup("phone");
-      const row = document.createElement("div");
-      row.setAttribute(NO_SIDEBAR_SWIPE_ATTR, "");
-      const card = document.createElement("div");
-      row.appendChild(card);
-      document.body.appendChild(row);
-      swipe(card, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(false);
-    });
+      setup("phone")
+      const row = document.createElement("div")
+      row.setAttribute(NO_SIDEBAR_SWIPE_ATTR, "")
+      const card = document.createElement("div")
+      row.appendChild(card)
+      document.body.appendChild(row)
+      swipe(card, [100, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+    })
 
     test.each([
       ["text", "input"],
@@ -364,61 +431,76 @@ describe("swipe", () => {
       ["range", "input"],
       ["select", "select"],
     ])("a start in a %s field blocks", (kind, tag) => {
-      setup("phone");
-      const el = document.createElement(tag);
-      if (kind === "range") (el as HTMLInputElement).type = "range";
-      document.body.appendChild(el);
-      swipe(el, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(false);
-    });
+      setup("phone")
+      const el = document.createElement(tag)
+      if (kind === "range") (el as HTMLInputElement).type = "range"
+      document.body.appendChild(el)
+      swipe(el, [100, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+    })
 
     test("a checkbox does not block", () => {
-      setup("phone");
-      const el = document.createElement("input");
-      el.type = "checkbox";
-      document.body.appendChild(el);
-      swipe(el, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(true);
-    });
+      setup("phone")
+      const el = document.createElement("input")
+      el.type = "checkbox"
+      document.body.appendChild(el)
+      swipe(el, [100, 300], [200, 300])
+      expect(isOpen()).toBe(true)
+    })
 
     test("an open dialog blocks", async () => {
       vi.stubGlobal(
         "fetch",
-        vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("worktrees") ? [] : { epics: [], follow_ups: [], projects: [] }), { status: 200 })),
-      );
-      setup("phone");
-      act(openNewAgent);
-      await screen.findByRole("dialog");
-      swipe(document.body, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(false);
-      expect(screen.getByRole("dialog")).toBeTruthy();
-    });
+        vi.fn(
+          async (url: string) =>
+            new Response(
+              JSON.stringify(
+                String(url).includes("worktrees")
+                  ? []
+                  : { epics: [], follow_ups: [], projects: [] },
+              ),
+              { status: 200 },
+            ),
+        ),
+      )
+      setup("phone")
+      act(openNewAgent)
+      await screen.findByRole("dialog")
+      swipe(document.body, [100, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+      expect(screen.getByRole("dialog")).toBeTruthy()
+    })
 
     test("an open jump menu blocks", async () => {
-      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ epics: [], follow_ups: [] }), { status: 200 })));
-      setup("phone");
-      fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-      await screen.findByRole("dialog", { name: "Jump to" });
-      expect(isOpen()).toBe(false);
-      swipe(document.body, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(false);
-      expect(screen.getByRole("dialog", { name: "Jump to" })).toBeTruthy();
-    });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () => new Response(JSON.stringify({ epics: [], follow_ups: [] }), { status: 200 }),
+        ),
+      )
+      setup("phone")
+      fireEvent.keyDown(window, { key: "k", ctrlKey: true })
+      await screen.findByRole("dialog", { name: "Jump to" })
+      expect(isOpen()).toBe(false)
+      swipe(document.body, [100, 300], [200, 300])
+      expect(isOpen()).toBe(false)
+      expect(screen.getByRole("dialog", { name: "Jump to" })).toBeTruthy()
+    })
 
     test("nothing opens while docked", () => {
-      setup("desktop");
-      swipe(document.body, [100, 300], [200, 300]);
-      expect(isOpen()).toBe(true);
-    });
-  });
-});
+      setup("desktop")
+      swipe(document.body, [100, 300], [200, 300])
+      expect(isOpen()).toBe(true)
+    })
+  })
+})
 
 test.each([
   ["MacIntel", "Search (⌘K)"],
   ["Linux x86_64", "Search (Ctrl+K)"],
 ])("the search button's tooltip names the platform key (%s)", (platform, title) => {
-  vi.spyOn(navigator, "platform", "get").mockReturnValue(platform);
-  setup("desktop");
-  expect(screen.getByRole("button", { name: "Search" }).getAttribute("title")).toBe(title);
-  vi.restoreAllMocks();
-});
+  vi.spyOn(navigator, "platform", "get").mockReturnValue(platform)
+  setup("desktop")
+  expect(screen.getByRole("button", { name: "Search" }).getAttribute("title")).toBe(title)
+  vi.restoreAllMocks()
+})

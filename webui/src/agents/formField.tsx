@@ -1,4 +1,4 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
+import { Box, chakra, Text } from "@chakra-ui/react"
 
 export const field = {
   fontSize: "16px",
@@ -9,9 +9,19 @@ export const field = {
   borderRadius: "6px",
   px: "3",
   _placeholder: { color: "text.dim" },
-} as const;
+} as const
 
-export function Field({ label, optional, caret, children }: { label: string; optional?: boolean; caret?: boolean; children: React.ReactNode }) {
+export function Field({
+  label,
+  optional,
+  caret,
+  children,
+}: {
+  label: string
+  optional?: boolean
+  caret?: boolean
+  children: React.ReactNode
+}) {
   return (
     <chakra.label display="flex" flexDirection="column" gap="1.5" position="relative">
       <Text as="span" fontSize="13px" color="text.muted">
@@ -20,10 +30,20 @@ export function Field({ label, optional, caret, children }: { label: string; opt
       </Text>
       {children}
       {caret && (
-        <Box aria-hidden position="absolute" right="3" bottom="0" h="40px" display="flex" alignItems="center" color="text.dim" pointerEvents="none">
+        <Box
+          aria-hidden
+          position="absolute"
+          right="3"
+          bottom="0"
+          h="40px"
+          display="flex"
+          alignItems="center"
+          color="text.dim"
+          pointerEvents="none"
+        >
           ▾
         </Box>
       )}
     </chakra.label>
-  );
+  )
 }

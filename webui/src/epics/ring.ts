@@ -8,15 +8,15 @@ import {
   EpicListRunning,
   SectionNeedsYou,
   type EpicListRow,
-} from "../generated/server";
-import type { Kind, Tone } from "../ui/tone";
+} from "../generated/server"
+import type { Kind, Tone } from "../ui/tone"
 
 export const RING_KIND: Record<EpicListRow["card_kind"] & string, Kind> = {
   [CardKindDesign]: "design",
   [CardKindImplementation]: "implementation",
   [CardKindOneOff]: "oneoff",
   [CardKindFollowUps]: "followups",
-};
+}
 
 const PILL_TONE: Record<string, Tone> = {
   Question: "waiting",
@@ -26,25 +26,27 @@ const PILL_TONE: Record<string, Tone> = {
   Deadlocked: "deadlocked",
   "Merge blocked": "deadlocked",
   "Awaiting merge": "done",
-};
-
-/** A PR with every check green waits for a person on GitHub; the server sends it in the implementing section. */
-export const isReadyForReview = (row: EpicListRow) => !!row.pr && row.status_words === "Ready for review";
-
-export const READY_FOR_REVIEW_REASON = "Waiting for you to merge the PR on GitHub.";
-
-export const needsYouTone = (row: EpicListRow): Tone => PILL_TONE[row.state_pill ?? ""] ?? "waiting";
-
-export function ringTone(row: EpicListRow): Tone {
-  if (row.section === SectionNeedsYou) return needsYouTone(row);
-  if (row.state === EpicListFinished || isReadyForReview(row)) return "done";
-  return isLive(row) ? "running" : "muted";
 }
 
-export const isCreatingTickets = (row: EpicListRow) => row.status_words?.startsWith("Creating tickets") ?? false;
+/** A PR with every check green waits for a person on GitHub; the server sends it in the implementing section. */
+export const isReadyForReview = (row: EpicListRow) =>
+  !!row.pr && row.status_words === "Ready for review"
+
+export const READY_FOR_REVIEW_REASON = "Waiting for you to merge the PR on GitHub."
+
+export const needsYouTone = (row: EpicListRow): Tone => PILL_TONE[row.state_pill ?? ""] ?? "waiting"
+
+export function ringTone(row: EpicListRow): Tone {
+  if (row.section === SectionNeedsYou) return needsYouTone(row)
+  if (row.state === EpicListFinished || isReadyForReview(row)) return "done"
+  return isLive(row) ? "running" : "muted"
+}
+
+export const isCreatingTickets = (row: EpicListRow) =>
+  row.status_words?.startsWith("Creating tickets") ?? false
 
 export const isLive = (row: EpicListRow) =>
-  row.state === EpicListRunning || row.state === EpicListMerging || isCreatingTickets(row);
+  row.state === EpicListRunning || row.state === EpicListMerging || isCreatingTickets(row)
 
 export const ringProgress = (row: EpicListRow) =>
-  (row.ring_progress ?? (row.total ? (row.done / row.total) * 100 : 0)) / 100;
+  (row.ring_progress ?? (row.total ? (row.done / row.total) * 100 : 0)) / 100

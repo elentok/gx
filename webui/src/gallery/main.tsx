@@ -1,9 +1,9 @@
-import { Box, ChakraProvider, Heading, Text } from "@chakra-ui/react";
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import "../ui/fonts.css";
-import { system } from "../ui/theme";
-import { galleryEntries } from "./registry";
+import { Box, ChakraProvider, Heading, Text } from "@chakra-ui/react"
+import { StrictMode } from "react"
+import { createRoot } from "react-dom/client"
+import "../ui/fonts.css"
+import { system } from "../ui/theme"
+import { galleryEntries } from "./registry"
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -27,4 +27,4 @@ createRoot(document.getElementById("root")!).render(
       </Box>
     </ChakraProvider>
   </StrictMode>,
-);
+)

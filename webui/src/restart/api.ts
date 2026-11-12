@@ -1,31 +1,31 @@
-import { apiFetch } from "../apiFetch";
-import { postJson } from "../design/open";
+import { apiFetch } from "../apiFetch"
+import { postJson } from "../design/open"
 import type {
   RestartCheckReport,
   RestartRequest,
   RestartResult,
   RetryMigrationRequest,
   RetryMigrationResult,
-} from "../generated/server";
+} from "../generated/server"
 
-export type FetchRestartCheck = () => Promise<RestartCheckReport>;
-export type PostRestart = (body: RestartRequest) => Promise<RestartResult>;
-export type RetryMigration = (body: RetryMigrationRequest) => Promise<RetryMigrationResult>;
+export type FetchRestartCheck = () => Promise<RestartCheckReport>
+export type PostRestart = (body: RestartRequest) => Promise<RestartResult>
+export type RetryMigration = (body: RetryMigrationRequest) => Promise<RetryMigrationResult>
 
-export const postRetryMigration: RetryMigration = postJson("/v1/projects/retry-migration");
+export const postRetryMigration: RetryMigration = postJson("/v1/projects/retry-migration")
 
 export const fetchRestartCheck: FetchRestartCheck = async () => {
-  const res = await apiFetch("/v1/restart/check");
-  if (!res.ok) throw new Error((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`);
-  return res.json();
-};
+  const res = await apiFetch("/v1/restart/check")
+  if (!res.ok) throw new Error((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`)
+  return res.json()
+}
 
 export const postRestart: PostRestart = async (body) => {
   const res = await apiFetch("/v1/restart", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`);
-  return res.json();
-};
+  })
+  if (!res.ok) throw new Error((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`)
+  return res.json()
+}

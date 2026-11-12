@@ -1,40 +1,52 @@
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
-import { MemoryRouter } from "react-router";
-import { ConnectionContext, type Connection } from "../connection";
-import { defaultProject } from "../workspaces/defaultProject";
-import type { DesignDraft, DesignDraftSaveRequest } from "../generated/server";
-import { renderThemed } from "../ui/render";
-import { DeviceContext, type Device } from "../useWide";
-import { WriteError } from "../useWrite";
-import type { DraftResult } from "./drafts";
-import { ShellContext, type Shell } from "../shell/ShellContext";
-import type { OpenDesign } from "./open";
-import { NewDesignForm, type DraftsClient } from "./NewDesignForm";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { afterEach, expect, test, vi } from "vitest"
+import { MemoryRouter } from "react-router"
+import { ConnectionContext, type Connection } from "../connection"
+import { defaultProject } from "../workspaces/defaultProject"
+import type { DesignDraft, DesignDraftSaveRequest } from "../generated/server"
+import { renderThemed } from "../ui/render"
+import { DeviceContext, type Device } from "../useWide"
+import { WriteError } from "../useWrite"
+import type { DraftResult } from "./drafts"
+import { ShellContext, type Shell } from "../shell/ShellContext"
+import type { OpenDesign } from "./open"
+import { NewDesignForm, type DraftsClient } from "./NewDesignForm"
 
 afterEach(() => {
-  cleanup();
-  localStorage.clear();
-  vi.useRealTimers();
-});
+  cleanup()
+  localStorage.clear()
+  vi.useRealTimers()
+})
 
-const ok: OpenDesign = async () => ({ refused: false }) as never;
+const ok: OpenDesign = async () => ({ refused: false }) as never
 
 /** An in-memory draft store: `latest` is the one the form opens on, if any. */
 function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
-  const stored: DesignDraft | undefined = latest && { id: "d1", project: "gx", slug: "", idea: "", images: [], revision: 3, edited_at: "", ...latest };
-  let revision = stored?.revision ?? 0;
+  const stored: DesignDraft | undefined = latest && {
+    id: "d1",
+    project: "gx",
+    slug: "",
+    idea: "",
+    images: [],
+    revision: 3,
+    edited_at: "",
+    ...latest,
+  }
+  let revision = stored?.revision ?? 0
   const save = vi.fn(async (body: DesignDraftSaveRequest): Promise<DraftResult> => {
-    revision++;
+    revision++
     // Like the server: a save stamps a new edited-at unless asked to keep it.
-    const edited_at = body.keep_edited_at ? (stored?.edited_at ?? "") : "stamped";
-    return { kind: "ok", draft: { images: [], ...body, edited_at, id: body.id ?? "created", revision } };
-  });
-  const remove = vi.fn(async (): Promise<DraftResult> => ({ kind: "deleted" }));
-  const setLastProject = vi.fn(async (_project: string) => {});
-  let uploaded = 0;
-  const uploadImage = vi.fn(async (_draft: string, _file: Blob) => `img${++uploaded}`);
-  const removeImage = vi.fn(async (_draft: string, _image: string) => ({}));
+    const edited_at = body.keep_edited_at ? (stored?.edited_at ?? "") : "stamped"
+    return {
+      kind: "ok",
+      draft: { images: [], ...body, edited_at, id: body.id ?? "created", revision },
+    }
+  })
+  const remove = vi.fn(async (): Promise<DraftResult> => ({ kind: "deleted" }))
+  const setLastProject = vi.fn(async (_project: string) => {})
+  let uploaded = 0
+  const uploadImage = vi.fn(async (_draft: string, _file: Blob) => `img${++uploaded}`)
+  const removeImage = vi.fn(async (_draft: string, _image: string) => ({}))
   const client: DraftsClient = {
     uploadImage,
     removeImage,
@@ -44,737 +56,920 @@ function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
     remove,
     getLastProject: async () => lastProject,
     setLastProject,
-  };
-  return { client, save, remove, setLastProject, uploadImage, removeImage };
+  }
+  return { client, save, remove, setLastProject, uploadImage, removeImage }
 }
 
-const connState = { snapshot: { sessions: [] } };
-const connection = { refresh: () => {}, getState: () => connState, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+const connState = { snapshot: { sessions: [] } }
+const connection = {
+  refresh: () => {},
+  getState: () => connState,
+  subscribe: () => () => {},
+  onEvent: () => () => {},
+} as unknown as Connection
 
-async function mount(over: Partial<Parameters<typeof NewDesignForm>[0]> = {}, latest?: Partial<DesignDraft>, lastProject = "", device?: Device, at = "/epics") {
-  const onClose = vi.fn();
-  const onStarted = vi.fn();
-  const fake = fakeDrafts(latest, lastProject);
+async function mount(
+  over: Partial<Parameters<typeof NewDesignForm>[0]> = {},
+  latest?: Partial<DesignDraft>,
+  lastProject = "",
+  device?: Device,
+  at = "/epics",
+) {
+  const onClose = vi.fn()
+  const onStarted = vi.fn()
+  const fake = fakeDrafts(latest, lastProject)
   await act(async () => {
     renderThemed(
       <DeviceContext.Provider value={device}>
         <ConnectionContext.Provider value={connection}>
           <MemoryRouter initialEntries={[at]}>
-            <NewDesignForm projects={["gx", "blog"]} open={ok} drafts={fake.client} onStarted={onStarted} onClose={onClose} {...over} />
+            <NewDesignForm
+              projects={["gx", "blog"]}
+              open={ok}
+              drafts={fake.client}
+              onStarted={onStarted}
+              onClose={onClose}
+              {...over}
+            />
           </MemoryRouter>
         </ConnectionContext.Provider>
       </DeviceContext.Provider>,
-    );
-  });
-  return { onClose, onStarted, ...fake };
+    )
+  })
+  return { onClose, onStarted, ...fake }
 }
-const type = (name: string, value: string) => fireEvent.change(screen.getByRole(name === "Project" ? "combobox" : "textbox", { name }), { target: { value } });
-const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
-const project = () => (screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value;
-const wait = (ms: number) => act(async () => void vi.advanceTimersByTime(ms));
+const type = (name: string, value: string) =>
+  fireEvent.change(screen.getByRole(name === "Project" ? "combobox" : "textbox", { name }), {
+    target: { value },
+  })
+const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }))
+const project = () => (screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value
+const wait = (ms: number) => act(async () => void vi.advanceTimersByTime(ms))
 
 test("fields are named and inputs are 16px", async () => {
-  await mount();
-  const dialog = screen.getByRole("dialog", { name: "New Design" });
-  expect(dialog.getAttribute("aria-modal")).toBe("true");
-  for (const name of ["Epic slug", "Rough idea"]) expect(getComputedStyle(screen.getByRole("textbox", { name })).fontSize).toBe("16px");
-  expect(getComputedStyle(screen.getByRole("combobox", { name: "Project" })).fontSize).toBe("16px");
-  const idea = screen.getByRole("textbox", { name: "Rough idea" });
-  expect(idea.getAttribute("autocomplete")).toBe("off");
-  expect(idea.getAttribute("name")).toBe("design-idea");
-  for (const name of ["Start design", "Discard", "Close"]) expect(screen.getByRole("button", { name })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
-});
+  await mount()
+  const dialog = screen.getByRole("dialog", { name: "New Design" })
+  expect(dialog.getAttribute("aria-modal")).toBe("true")
+  for (const name of ["Epic slug", "Rough idea"])
+    expect(getComputedStyle(screen.getByRole("textbox", { name })).fontSize).toBe("16px")
+  expect(getComputedStyle(screen.getByRole("combobox", { name: "Project" })).fontSize).toBe("16px")
+  const idea = screen.getByRole("textbox", { name: "Rough idea" })
+  expect(idea.getAttribute("autocomplete")).toBe("off")
+  expect(idea.getAttribute("name")).toBe("design-idea")
+  for (const name of ["Start design", "Discard", "Close"])
+    expect(screen.getByRole("button", { name })).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull()
+})
 
 test("only Start design submits: a thumbnail and the viewer's Close do not start the design", async () => {
-  const { onStarted } = await mount({}, { slug: "s", idea: "i", images: ["a.png"] });
-  const form = screen.getByRole("dialog", { name: "New Design" });
-  const submits = () => Array.from(document.querySelectorAll("button")).filter((b) => b.type === "submit");
-  expect(submits().map((b) => b.textContent)).toEqual(["Start design"]);
-  const onSubmit = vi.fn((e: Event) => e.preventDefault());
-  form.addEventListener("submit", onSubmit);
-  await act(async () => click("Open image"));
-  expect(onSubmit).not.toHaveBeenCalled();
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Close ✕/ })));
-  expect(onSubmit).not.toHaveBeenCalled();
-  expect(onStarted).not.toHaveBeenCalled();
-  await act(async () => click("Start design"));
-  expect(onSubmit).toHaveBeenCalledTimes(1);
-});
+  const { onStarted } = await mount({}, { slug: "s", idea: "i", images: ["a.png"] })
+  const form = screen.getByRole("dialog", { name: "New Design" })
+  const submits = () =>
+    Array.from(document.querySelectorAll("button")).filter((b) => b.type === "submit")
+  expect(submits().map((b) => b.textContent)).toEqual(["Start design"])
+  const onSubmit = vi.fn((e: Event) => e.preventDefault())
+  form.addEventListener("submit", onSubmit)
+  await act(async () => click("Open image"))
+  expect(onSubmit).not.toHaveBeenCalled()
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Close ✕/ })))
+  expect(onSubmit).not.toHaveBeenCalled()
+  expect(onStarted).not.toHaveBeenCalled()
+  await act(async () => click("Start design"))
+  expect(onSubmit).toHaveBeenCalledTimes(1)
+})
 
 test("one project hides the select", async () => {
-  await mount({ projects: ["gx"] });
-  expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull();
-});
+  await mount({ projects: ["gx"] })
+  expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull()
+})
 
 test("the form shows a spinner, not its fields, while the drafts load", async () => {
-  let release: () => void = () => {};
-  const gate = new Promise<void>((r) => (release = r));
-  const { client } = fakeDrafts();
-  const onClose = vi.fn();
+  let release: () => void = () => {}
+  const gate = new Promise<void>((r) => (release = r))
+  const { client } = fakeDrafts()
+  const onClose = vi.fn()
   await act(async () => {
     renderThemed(
       <ConnectionContext.Provider value={connection}>
         <MemoryRouter>
-          <NewDesignForm projects={["gx"]} drafts={{ ...client, list: async () => (await gate, []) }} onStarted={() => {}} onClose={onClose} />
+          <NewDesignForm
+            projects={["gx"]}
+            drafts={{ ...client, list: async () => (await gate, []) }}
+            onStarted={() => {}}
+            onClose={onClose}
+          />
         </MemoryRouter>
       </ConnectionContext.Provider>,
-    );
-  });
-  expect(screen.queryByRole("textbox", { name: "Epic slug" })).toBeNull();
-  expect(document.querySelector(".chakra-spinner")).toBeTruthy();
-  await act(async () => release());
-  expect(screen.getByRole("textbox", { name: "Epic slug" })).toBeTruthy();
-});
+    )
+  })
+  expect(screen.queryByRole("textbox", { name: "Epic slug" })).toBeNull()
+  expect(document.querySelector(".chakra-spinner")).toBeTruthy()
+  await act(async () => release())
+  expect(screen.getByRole("textbox", { name: "Epic slug" })).toBeTruthy()
+})
 
 test("starting project of a new draft: the page, the one-project filter, the last used, then the first", async () => {
-  await mount({}, undefined, "gx", undefined, "/e/p:x");
-  expect(project()).toBe("gx");
-  cleanup();
-  await mount({ projects: ["gx", "blog"] }, undefined, "gx", undefined, "/e/blog:x");
-  expect(project()).toBe("blog");
-  cleanup();
-  localStorage.setItem("gx.epics.project", JSON.stringify(["blog"]));
-  await mount({}, undefined, "gx");
-  expect(project()).toBe("blog");
-  localStorage.clear();
-  cleanup();
-  await mount({}, undefined, "blog");
-  expect(project()).toBe("blog");
-  cleanup();
-  await mount({ projects: ["gx", "blog", "web"] }, undefined, "web");
-  expect(project()).toBe("web");
-  cleanup();
-  await mount({}, undefined, "");
-  expect(project()).toBe("gx");
-  cleanup();
-  await mount({}, undefined, "gone");
-  expect(project()).toBe("gx");
-});
+  await mount({}, undefined, "gx", undefined, "/e/p:x")
+  expect(project()).toBe("gx")
+  cleanup()
+  await mount({ projects: ["gx", "blog"] }, undefined, "gx", undefined, "/e/blog:x")
+  expect(project()).toBe("blog")
+  cleanup()
+  localStorage.setItem("gx.epics.project", JSON.stringify(["blog"]))
+  await mount({}, undefined, "gx")
+  expect(project()).toBe("blog")
+  localStorage.clear()
+  cleanup()
+  await mount({}, undefined, "blog")
+  expect(project()).toBe("blog")
+  cleanup()
+  await mount({ projects: ["gx", "blog", "web"] }, undefined, "web")
+  expect(project()).toBe("web")
+  cleanup()
+  await mount({}, undefined, "")
+  expect(project()).toBe("gx")
+  cleanup()
+  await mount({}, undefined, "gone")
+  expect(project()).toBe("gx")
+})
 
 test("a saved draft keeps its project against another page, even with no text", async () => {
-  await mount({}, { slug: "x", project: "gx" }, "blog", undefined, "/e/blog:x");
-  expect(project()).toBe("gx");
-  cleanup();
-  await mount({}, { slug: " ", project: "blog" }, "", undefined, "/e/gx:x");
-  expect(project()).toBe("blog");
-});
+  await mount({}, { slug: "x", project: "gx" }, "blog", undefined, "/e/blog:x")
+  expect(project()).toBe("gx")
+  cleanup()
+  await mount({}, { slug: " ", project: "blog" }, "", undefined, "/e/gx:x")
+  expect(project()).toBe("blog")
+})
 
 test("the form and the shared rule start on the same project for the same inputs", async () => {
-  const projects = ["gx", "blog", "web"];
-  for (const [pathname, lastProject] of [["/e/web:x", "blog"], ["/epics", "blog"], ["/epics", ""], ["/e/nope:x", "gone"]] as const) {
-    await mount({ projects }, undefined, lastProject, undefined, pathname);
-    expect(project()).toBe(defaultProject({ pathname, sessions: [], projects, lastProject }));
-    cleanup();
+  const projects = ["gx", "blog", "web"]
+  for (const [pathname, lastProject] of [
+    ["/e/web:x", "blog"],
+    ["/epics", "blog"],
+    ["/epics", ""],
+    ["/e/nope:x", "gone"],
+  ] as const) {
+    await mount({ projects }, undefined, lastProject, undefined, pathname)
+    expect(project()).toBe(defaultProject({ pathname, sessions: [], projects, lastProject }))
+    cleanup()
   }
-});
+})
 
 test("Epic slug takes focus after the async draft load on a wide device, and a phone keeps it on the panel", async () => {
-  await mount({}, undefined, "", "tablet");
-  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }));
-  cleanup();
-  await mount({}, undefined, "", "phone");
-  expect(document.activeElement).toBe(screen.getByRole("dialog", { name: "New Design" }));
-});
+  await mount({}, undefined, "", "tablet")
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }))
+  cleanup()
+  await mount({}, undefined, "", "phone")
+  expect(document.activeElement).toBe(screen.getByRole("dialog", { name: "New Design" }))
+})
 
 test("a later render does not pull focus back to Epic slug once it has moved", async () => {
-  await mount();
-  const idea = screen.getByRole("textbox", { name: "Rough idea" });
-  idea.focus();
-  type("Rough idea", "words");
-  expect(document.activeElement).toBe(idea);
-  const dialog = screen.getByRole("dialog", { name: "New Design" });
-  dialog.focus();
-  type("Rough idea", "more words");
-  expect(document.activeElement).toBe(dialog);
-});
+  await mount()
+  const idea = screen.getByRole("textbox", { name: "Rough idea" })
+  idea.focus()
+  type("Rough idea", "words")
+  expect(document.activeElement).toBe(idea)
+  const dialog = screen.getByRole("dialog", { name: "New Design" })
+  dialog.focus()
+  type("Rough idea", "more words")
+  expect(document.activeElement).toBe(dialog)
+})
 
 test("picking a project sets the last project used; typing does not", async () => {
-  vi.useFakeTimers();
-  const { setLastProject } = await mount({}, { slug: "x", project: "gx" });
-  type("Epic slug", "xy");
-  type("Rough idea", "an idea");
-  await wait(800);
-  expect(setLastProject).not.toHaveBeenCalled();
-  type("Project", "blog");
-  expect(setLastProject).toHaveBeenCalledExactlyOnceWith("blog");
-});
+  vi.useFakeTimers()
+  const { setLastProject } = await mount({}, { slug: "x", project: "gx" })
+  type("Epic slug", "xy")
+  type("Rough idea", "an idea")
+  await wait(800)
+  expect(setLastProject).not.toHaveBeenCalled()
+  type("Project", "blog")
+  expect(setLastProject).toHaveBeenCalledExactlyOnceWith("blog")
+})
 
 test("a draft whose project is gone moves to the new-draft project with a note, keeping its edited-at", async () => {
-  vi.useFakeTimers();
-  const { save } = await mount({}, { slug: "x", project: "old", edited_at: "2026-01-01T00:00:00Z" }, "blog");
-  expect(project()).toBe("blog");
-  expect(screen.getByText("old no longer exists; moved to blog")).toBeTruthy();
-  await wait(0);
-  expect(save).toHaveBeenCalledTimes(1);
-  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ id: "d1", project: "blog", revision: 3, keep_edited_at: true }));
-  const saved = await save.mock.results[0]!.value;
-  expect(saved.draft.edited_at).toBe("2026-01-01T00:00:00Z");
-  type("Epic slug", "xy");
-  await wait(800);
-  expect(save).toHaveBeenLastCalledWith(expect.not.objectContaining({ keep_edited_at: true }));
-});
+  vi.useFakeTimers()
+  const { save } = await mount(
+    {},
+    { slug: "x", project: "old", edited_at: "2026-01-01T00:00:00Z" },
+    "blog",
+  )
+  expect(project()).toBe("blog")
+  expect(screen.getByText("old no longer exists; moved to blog")).toBeTruthy()
+  await wait(0)
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ id: "d1", project: "blog", revision: 3, keep_edited_at: true }),
+  )
+  const saved = await save.mock.results[0]!.value
+  expect(saved.draft.edited_at).toBe("2026-01-01T00:00:00Z")
+  type("Epic slug", "xy")
+  await wait(800)
+  expect(save).toHaveBeenLastCalledWith(expect.not.objectContaining({ keep_edited_at: true }))
+})
 
 test("the form opens on the latest draft's text and label", async () => {
-  await mount({}, { slug: "fresh", idea: "an idea", project: "blog" });
-  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("fresh");
-  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("an idea");
-  expect(project()).toBe("blog");
-  expect(screen.getByText("fresh", { selector: "span" })).toBeTruthy();
-});
+  await mount({}, { slug: "fresh", idea: "an idea", project: "blog" })
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe(
+    "fresh",
+  )
+  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe(
+    "an idea",
+  )
+  expect(project()).toBe("blog")
+  expect(screen.getByText("fresh", { selector: "span" })).toBeTruthy()
+})
 
 test("typing shows Saving..., saves 800 ms after the last keystroke with the revision, then shows Saved", async () => {
-  vi.useFakeTimers();
-  const { save } = await mount({}, { slug: "fresh", idea: "an idea" });
-  type("Rough idea", "an idea!");
-  expect(screen.getByText("Saving...")).toBeTruthy();
-  await wait(700);
-  type("Rough idea", "an idea!!");
-  await wait(700);
-  expect(save).not.toHaveBeenCalled();
-  await wait(100);
-  expect(save).toHaveBeenCalledTimes(1);
-  expect(save).toHaveBeenLastCalledWith({ id: "d1", project: "gx", slug: "fresh", idea: "an idea!!", revision: 3, name: undefined });
-  expect(screen.getByText("Saved")).toBeTruthy();
-  expect(screen.queryByText("Saving...")).toBeNull();
+  vi.useFakeTimers()
+  const { save } = await mount({}, { slug: "fresh", idea: "an idea" })
+  type("Rough idea", "an idea!")
+  expect(screen.getByText("Saving...")).toBeTruthy()
+  await wait(700)
+  type("Rough idea", "an idea!!")
+  await wait(700)
+  expect(save).not.toHaveBeenCalled()
+  await wait(100)
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(save).toHaveBeenLastCalledWith({
+    id: "d1",
+    project: "gx",
+    slug: "fresh",
+    idea: "an idea!!",
+    revision: 3,
+    name: undefined,
+  })
+  expect(screen.getByText("Saved")).toBeTruthy()
+  expect(screen.queryByText("Saving...")).toBeNull()
 
-  type("Rough idea", "more");
-  await wait(800);
-  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ idea: "more", revision: 4 }));
-  expect(save.mock.calls[0]![0]).not.toHaveProperty("images");
-});
+  type("Rough idea", "more")
+  await wait(800)
+  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ idea: "more", revision: 4 }))
+  expect(save.mock.calls[0]![0]).not.toHaveProperty("images")
+})
 
 test("a new draft is created by its first save and then updated by id", async () => {
-  vi.useFakeTimers();
-  const { save } = await mount();
-  type("Epic slug", "fresh");
-  await wait(800);
-  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ id: undefined, slug: "fresh", revision: 0 }));
-  type("Epic slug", "fresher");
-  await wait(800);
-  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ id: "created", slug: "fresher", revision: 1 }));
-});
+  vi.useFakeTimers()
+  const { save } = await mount()
+  type("Epic slug", "fresh")
+  await wait(800)
+  expect(save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ id: undefined, slug: "fresh", revision: 0 }),
+  )
+  type("Epic slug", "fresher")
+  await wait(800)
+  expect(save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ id: "created", slug: "fresher", revision: 1 }),
+  )
+})
 
 test("a blank form shows no status and saves nothing, even when typed in and cleared", async () => {
-  vi.useFakeTimers();
-  const { save, onClose } = await mount();
-  expect(screen.queryByText("Saved")).toBeNull();
-  expect(screen.queryByText("Saving...")).toBeNull();
-  expect(screen.getByText("New draft")).toBeTruthy();
-  type("Epic slug", "a");
-  type("Epic slug", "");
-  expect(screen.queryByText("Saving...")).toBeNull();
-  await wait(800);
-  click("Close");
-  expect(onClose).toHaveBeenCalled();
-  expect(save).not.toHaveBeenCalled();
-});
+  vi.useFakeTimers()
+  const { save, onClose } = await mount()
+  expect(screen.queryByText("Saved")).toBeNull()
+  expect(screen.queryByText("Saving...")).toBeNull()
+  expect(screen.getByText("New draft")).toBeTruthy()
+  type("Epic slug", "a")
+  type("Epic slug", "")
+  expect(screen.queryByText("Saving...")).toBeNull()
+  await wait(800)
+  click("Close")
+  expect(onClose).toHaveBeenCalled()
+  expect(save).not.toHaveBeenCalled()
+})
 
 test("the title is the name, else the slug, else the idea's first words", async () => {
-  await mount({}, { name: "Named", slug: "slug", idea: "words" });
-  expect(screen.getByText("Named", { selector: "span" })).toBeTruthy();
-  cleanup();
-  await mount({}, { slug: "slug", idea: "words" });
-  type("Epic slug", "");
-  expect(screen.getByText("words", { selector: "span" })).toBeTruthy();
-});
+  await mount({}, { name: "Named", slug: "slug", idea: "words" })
+  expect(screen.getByText("Named", { selector: "span" })).toBeTruthy()
+  cleanup()
+  await mount({}, { slug: "slug", idea: "words" })
+  type("Epic slug", "")
+  expect(screen.getByText("words", { selector: "span" })).toBeTruthy()
+})
 
 test("Close is a text button at the right end of the top bar, after the status, with no ×", async () => {
-  await mount();
-  const close = screen.getByRole("button", { name: "Close" });
-  expect(close.textContent).toBe("Close");
-  expect(close.title).toBe("Close (keeps the draft)");
-  expect(screen.getByRole("dialog").textContent).not.toContain("×");
-  const bar = close.parentElement!;
-  expect(bar.lastElementChild).toBe(close);
-  expect(bar.contains(screen.getByLabelText("Epic slug"))).toBe(false);
-});
+  await mount()
+  const close = screen.getByRole("button", { name: "Close" })
+  expect(close.textContent).toBe("Close")
+  expect(close.title).toBe("Close (keeps the draft)")
+  expect(screen.getByRole("dialog").textContent).not.toContain("×")
+  const bar = close.parentElement!
+  expect(bar.lastElementChild).toBe(close)
+  expect(bar.contains(screen.getByLabelText("Epic slug"))).toBe(false)
+})
 
 test("Close, Escape and a backdrop click close and save at once", async () => {
-  vi.useFakeTimers();
-  const { onClose, save } = await mount();
-  type("Epic slug", "fresh");
-  click("Close");
-  await wait(0);
-  expect(save).toHaveBeenCalledTimes(1);
-  type("Epic slug", "two");
-  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-  await wait(0);
-  expect(save).toHaveBeenCalledTimes(2);
-  type("Epic slug", "three");
-  const backdrop = screen.getByRole("dialog").parentElement!;
-  fireEvent.mouseDown(backdrop);
-  fireEvent.click(backdrop);
-  await wait(0);
-  expect(save).toHaveBeenCalledTimes(3);
-  expect(onClose).toHaveBeenCalledTimes(3);
-});
+  vi.useFakeTimers()
+  const { onClose, save } = await mount()
+  type("Epic slug", "fresh")
+  click("Close")
+  await wait(0)
+  expect(save).toHaveBeenCalledTimes(1)
+  type("Epic slug", "two")
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+  await wait(0)
+  expect(save).toHaveBeenCalledTimes(2)
+  type("Epic slug", "three")
+  const backdrop = screen.getByRole("dialog").parentElement!
+  fireEvent.mouseDown(backdrop)
+  fireEvent.click(backdrop)
+  await wait(0)
+  expect(save).toHaveBeenCalledTimes(3)
+  expect(onClose).toHaveBeenCalledTimes(3)
+})
 
 test("leaving the page saves the pending text", async () => {
-  vi.useFakeTimers();
-  const { save } = await mount();
-  type("Epic slug", "fresh");
-  await act(async () => void window.dispatchEvent(new Event("pagehide")));
-  expect(save).toHaveBeenCalledTimes(1);
-  cleanup();
-  expect(save).toHaveBeenCalledTimes(1);
-});
+  vi.useFakeTimers()
+  const { save } = await mount()
+  type("Epic slug", "fresh")
+  await act(async () => void window.dispatchEvent(new Event("pagehide")))
+  expect(save).toHaveBeenCalledTimes(1)
+  cleanup()
+  expect(save).toHaveBeenCalledTimes(1)
+})
 
 test("unmounting with unsaved text saves it", async () => {
-  vi.useFakeTimers();
-  const { save } = await mount();
-  type("Epic slug", "fresh");
-  cleanup();
-  await wait(0);
-  expect(save).toHaveBeenCalledTimes(1);
-});
+  vi.useFakeTimers()
+  const { save } = await mount()
+  type("Epic slug", "fresh")
+  cleanup()
+  await wait(0)
+  expect(save).toHaveBeenCalledTimes(1)
+})
 
 test("a press in the sheet released on the backdrop keeps it open", async () => {
-  const { onClose } = await mount();
-  fireEvent.mouseDown(screen.getByRole("textbox", { name: "Rough idea" }));
-  fireEvent.click(screen.getByRole("dialog").parentElement!);
-  expect(onClose).not.toHaveBeenCalled();
-});
+  const { onClose } = await mount()
+  fireEvent.mouseDown(screen.getByRole("textbox", { name: "Rough idea" }))
+  fireEvent.click(screen.getByRole("dialog").parentElement!)
+  expect(onClose).not.toHaveBeenCalled()
+})
 
 test("Discard with an empty draft closes at once and deletes nothing", async () => {
-  const { onClose, remove } = await mount();
-  click("Discard");
-  expect(onClose).toHaveBeenCalled();
-  expect(screen.queryByText("Discard this draft and its images?")).toBeNull();
-  expect(remove).not.toHaveBeenCalled();
-});
+  const { onClose, remove } = await mount()
+  click("Discard")
+  expect(onClose).toHaveBeenCalled()
+  expect(screen.queryByText("Discard this draft and its images?")).toBeNull()
+  expect(remove).not.toHaveBeenCalled()
+})
 
 test("Discard with text asks first; Keep returns, Discard deletes the saved draft", async () => {
-  const { onClose, remove, save } = await mount({}, { slug: "fresh" });
-  type("Rough idea", "words");
-  click("Discard");
-  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
-  expect(onClose).not.toHaveBeenCalled();
-  click("Keep");
-  expect(screen.queryByText("Discard this draft and its images?")).toBeNull();
-  click("Discard");
-  click("Discard");
-  expect(onClose).toHaveBeenCalled();
-  await act(async () => {});
-  expect(remove).toHaveBeenCalledWith("d1");
-  expect(save).not.toHaveBeenCalled();
-});
+  const { onClose, remove, save } = await mount({}, { slug: "fresh" })
+  type("Rough idea", "words")
+  click("Discard")
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy()
+  expect(onClose).not.toHaveBeenCalled()
+  click("Keep")
+  expect(screen.queryByText("Discard this draft and its images?")).toBeNull()
+  click("Discard")
+  click("Discard")
+  expect(onClose).toHaveBeenCalled()
+  await act(async () => {})
+  expect(remove).toHaveBeenCalledWith("d1")
+  expect(save).not.toHaveBeenCalled()
+})
 
 test("Start design carries the shell's active workspace; no shell sends none", async () => {
-  const shell: Shell = { sidebarOpen: true, toggle: () => {}, close: () => {}, closeSliding: () => {}, claimHeader: () => () => {}, workspace: "research" };
-  const inShell = vi.fn(ok);
+  const shell: Shell = {
+    sidebarOpen: true,
+    toggle: () => {},
+    close: () => {},
+    closeSliding: () => {},
+    claimHeader: () => () => {},
+    workspace: "research",
+  }
+  const inShell = vi.fn(ok)
   await act(async () => {
     renderThemed(
       <ConnectionContext.Provider value={connection}>
         <MemoryRouter>
           <ShellContext.Provider value={shell}>
-            <NewDesignForm projects={["gx"]} open={inShell} drafts={fakeDrafts().client} onStarted={() => {}} onClose={() => {}} />
+            <NewDesignForm
+              projects={["gx"]}
+              open={inShell}
+              drafts={fakeDrafts().client}
+              onStarted={() => {}}
+              onClose={() => {}}
+            />
           </ShellContext.Provider>
         </MemoryRouter>
       </ConnectionContext.Provider>,
-    );
-  });
-  type("Epic slug", "a");
-  type("Rough idea", "an idea");
-  await act(async () => click("Start design"));
-  expect(inShell.mock.calls[0][0]).toMatchObject({ workspace: "research" });
-  cleanup();
+    )
+  })
+  type("Epic slug", "a")
+  type("Rough idea", "an idea")
+  await act(async () => click("Start design"))
+  expect(inShell.mock.calls[0][0]).toMatchObject({ workspace: "research" })
+  cleanup()
 
-  const bare = vi.fn(ok);
-  await mount({ open: bare });
-  type("Epic slug", "a");
-  type("Rough idea", "an idea");
-  await act(async () => click("Start design"));
-  expect(bare.mock.calls[0][0]).not.toHaveProperty("workspace");
-});
+  const bare = vi.fn(ok)
+  await mount({ open: bare })
+  type("Epic slug", "a")
+  type("Rough idea", "an idea")
+  await act(async () => click("Start design"))
+  expect(bare.mock.calls[0][0]).not.toHaveProperty("workspace")
+})
 
 test("Start design posts the draft id and reports the address, and stops saving", async () => {
-  vi.useFakeTimers();
-  const open = vi.fn(ok);
-  const { onStarted, save } = await mount({ open }, { slug: "old", idea: "old idea" });
-  type("Epic slug", " fresh ");
-  type("Rough idea", "an idea");
-  await act(async () => click("Start design"));
-  expect(open).toHaveBeenCalledWith({ epic: "fresh", new_design: true, idea: "an idea", project: "gx", draft_id: "d1" });
-  expect(onStarted).toHaveBeenCalledWith("gx:fresh", undefined);
-  await wait(800);
-  cleanup();
-  expect(save).not.toHaveBeenCalled();
-});
+  vi.useFakeTimers()
+  const open = vi.fn(ok)
+  const { onStarted, save } = await mount({ open }, { slug: "old", idea: "old idea" })
+  type("Epic slug", " fresh ")
+  type("Rough idea", "an idea")
+  await act(async () => click("Start design"))
+  expect(open).toHaveBeenCalledWith({
+    epic: "fresh",
+    new_design: true,
+    idea: "an idea",
+    project: "gx",
+    draft_id: "d1",
+  })
+  expect(onStarted).toHaveBeenCalledWith("gx:fresh", undefined)
+  await wait(800)
+  cleanup()
+  expect(save).not.toHaveBeenCalled()
+})
 
 test("Start waits for a save in flight and sends the id it created; that save is not repeated", async () => {
-  vi.useFakeTimers();
-  const open = vi.fn(ok);
-  const { client } = fakeDrafts();
-  let release: () => void = () => {};
-  const gate = new Promise<void>((r) => (release = r));
+  vi.useFakeTimers()
+  const open = vi.fn(ok)
+  const { client } = fakeDrafts()
+  let release: () => void = () => {}
+  const gate = new Promise<void>((r) => (release = r))
   const save = vi.fn(async (body: DesignDraftSaveRequest): Promise<DraftResult> => {
-    await gate;
-    return { kind: "ok", draft: { images: [], edited_at: "", ...body, id: "created", revision: 1 } };
-  });
-  await mount({ open, drafts: { ...client, save } });
-  type("Epic slug", "fresh");
-  type("Rough idea", "an idea");
-  await wait(800);
-  await act(async () => click("Start design"));
-  expect(open).not.toHaveBeenCalled();
-  await act(async () => release());
-  expect(open).toHaveBeenCalledWith(expect.objectContaining({ draft_id: "created" }));
-  await wait(2000);
-  expect(save).toHaveBeenCalledTimes(1);
-});
+    await gate
+    return { kind: "ok", draft: { images: [], edited_at: "", ...body, id: "created", revision: 1 } }
+  })
+  await mount({ open, drafts: { ...client, save } })
+  type("Epic slug", "fresh")
+  type("Rough idea", "an idea")
+  await wait(800)
+  await act(async () => click("Start design"))
+  expect(open).not.toHaveBeenCalled()
+  await act(async () => release())
+  expect(open).toHaveBeenCalledWith(expect.objectContaining({ draft_id: "created" }))
+  await wait(2000)
+  expect(save).toHaveBeenCalledTimes(1)
+})
 
 test("a refused Start keeps the text and the draft saves again", async () => {
-  vi.useFakeTimers();
-  const { save } = await mount({ open: async () => ({ refused: true, message: "epic exists" }) as never }, { slug: "old", idea: "old idea" });
-  type("Epic slug", "fresh");
-  await act(async () => click("Start design"));
-  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("fresh");
-  await wait(0);
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "d1", slug: "fresh" }));
-});
+  vi.useFakeTimers()
+  const { save } = await mount(
+    { open: async () => ({ refused: true, message: "epic exists" }) as never },
+    { slug: "old", idea: "old idea" },
+  )
+  type("Epic slug", "fresh")
+  await act(async () => click("Start design"))
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe(
+    "fresh",
+  )
+  await wait(0)
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "d1", slug: "fresh" }))
+})
 
 test("a start_error hands the reason to the page", async () => {
-  const { onStarted } = await mount({ open: async () => ({ epic_created: true, start_error: "agent binary missing" }) as never });
-  type("Epic slug", "fresh");
-  type("Rough idea", "an idea");
-  await act(async () => click("Start design"));
-  expect(onStarted).toHaveBeenCalledWith("gx:fresh", "agent binary missing");
-});
+  const { onStarted } = await mount({
+    open: async () => ({ epic_created: true, start_error: "agent binary missing" }) as never,
+  })
+  type("Epic slug", "fresh")
+  type("Rough idea", "an idea")
+  await act(async () => click("Start design"))
+  expect(onStarted).toHaveBeenCalledWith("gx:fresh", "agent binary missing")
+})
 
 test("a refusal shows in the dialog and keeps saving the draft", async () => {
-  const { onStarted } = await mount({ open: async () => ({ refused: true, message: "name taken" }) as never });
-  type("Epic slug", "fresh");
-  type("Rough idea", "an idea");
-  await act(async () => click("Start design"));
-  expect(await screen.findByText("name taken")).toBeTruthy();
-  expect(onStarted).not.toHaveBeenCalled();
-});
+  const { onStarted } = await mount({
+    open: async () => ({ refused: true, message: "name taken" }) as never,
+  })
+  type("Epic slug", "fresh")
+  type("Rough idea", "an idea")
+  await act(async () => click("Start design"))
+  expect(await screen.findByText("name taken")).toBeTruthy()
+  expect(onStarted).not.toHaveBeenCalled()
+})
 
-const CONFLICT = "This draft changed on another device.";
-const GONE = "This draft was deleted or started on another device.";
+const CONFLICT = "This draft changed on another device."
+const GONE = "This draft was deleted or started on another device."
 
 /** A form whose first save is refused with `kind`; `theirs` is what the server holds when read. */
 async function refused(kind: "conflict" | "gone", theirs: Partial<DesignDraft> = {}) {
-  vi.useFakeTimers();
-  const base = fakeDrafts({ slug: "mine", idea: "my idea", name: "Named", project: "blog", images: ["a.png"] });
-  const refuse = vi.fn(async (): Promise<DraftResult> => ({ kind }));
-  const save = vi.fn(base.save).mockImplementationOnce(refuse);
-  const server: DesignDraft = { id: "d1", project: "gx", slug: "theirs", idea: "their idea", images: ["b.png", "c.png"], revision: 9, edited_at: "", ...theirs };
+  vi.useFakeTimers()
+  const base = fakeDrafts({
+    slug: "mine",
+    idea: "my idea",
+    name: "Named",
+    project: "blog",
+    images: ["a.png"],
+  })
+  const refuse = vi.fn(async (): Promise<DraftResult> => ({ kind }))
+  const save = vi.fn(base.save).mockImplementationOnce(refuse)
+  const server: DesignDraft = {
+    id: "d1",
+    project: "gx",
+    slug: "theirs",
+    idea: "their idea",
+    images: ["b.png", "c.png"],
+    revision: 9,
+    edited_at: "",
+    ...theirs,
+  }
   // The first read opens the form on the local draft; later reads see the server's copy.
-  const read = vi.fn(async (_id: string): Promise<DraftResult> => ({ kind: "ok", draft: server })).mockImplementationOnce(base.client.read);
-  const view = await mount({ drafts: { ...base.client, save, read } }, { slug: "mine", idea: "my idea", name: "Named", project: "blog", images: ["a.png"] });
-  type("Rough idea", "latest");
-  await wait(800);
-  return { ...view, save, read };
+  const read = vi
+    .fn(async (_id: string): Promise<DraftResult> => ({ kind: "ok", draft: server }))
+    .mockImplementationOnce(base.client.read)
+  const view = await mount(
+    { drafts: { ...base.client, save, read } },
+    { slug: "mine", idea: "my idea", name: "Named", project: "blog", images: ["a.png"] },
+  )
+  type("Rough idea", "latest")
+  await wait(800)
+  return { ...view, save, read }
 }
 
 test("a conflict raises the banner; typing sends nothing and Start is off", async () => {
-  const { save } = await refused("conflict");
-  expect(screen.getByText(CONFLICT)).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Load theirs" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Keep mine" })).toBeTruthy();
-  expect(save).toHaveBeenCalledTimes(1);
-  type("Rough idea", "still typing");
-  await wait(2000);
-  expect(save).toHaveBeenCalledTimes(1);
-  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(true);
-});
+  const { save } = await refused("conflict")
+  expect(screen.getByText(CONFLICT)).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Load theirs" })).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Keep mine" })).toBeTruthy()
+  expect(save).toHaveBeenCalledTimes(1)
+  type("Rough idea", "still typing")
+  await wait(2000)
+  expect(save).toHaveBeenCalledTimes(1)
+  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  )
+})
 
 test("Keep mine saves the latest local text over the server's revision and resumes", async () => {
-  const { save } = await refused("conflict");
-  type("Rough idea", "newest");
-  await act(async () => click("Keep mine"));
-  await wait(0);
-  expect(save).toHaveBeenCalledTimes(2);
-  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ id: "d1", idea: "newest", revision: 9 }));
-  expect(screen.queryByText(CONFLICT)).toBeNull();
-  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(false);
-  type("Rough idea", "after");
-  await wait(800);
-  expect(save).toHaveBeenCalledTimes(3);
-});
+  const { save } = await refused("conflict")
+  type("Rough idea", "newest")
+  await act(async () => click("Keep mine"))
+  await wait(0)
+  expect(save).toHaveBeenCalledTimes(2)
+  expect(save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ id: "d1", idea: "newest", revision: 9 }),
+  )
+  expect(screen.queryByText(CONFLICT)).toBeNull()
+  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(
+    false,
+  )
+  type("Rough idea", "after")
+  await wait(800)
+  expect(save).toHaveBeenCalledTimes(3)
+})
 
 test("Load theirs replaces the text and image list and drops local edits", async () => {
-  const { save } = await refused("conflict");
-  await act(async () => click("Load theirs"));
-  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("theirs");
-  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("their idea");
-  expect(project()).toBe("gx");
-  expect(screen.queryByText(CONFLICT)).toBeNull();
-  await wait(2000);
-  expect(save).toHaveBeenCalledTimes(1);
+  const { save } = await refused("conflict")
+  await act(async () => click("Load theirs"))
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe(
+    "theirs",
+  )
+  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe(
+    "their idea",
+  )
+  expect(project()).toBe("gx")
+  expect(screen.queryByText(CONFLICT)).toBeNull()
+  await wait(2000)
+  expect(save).toHaveBeenCalledTimes(1)
   // Their image list is what Discard now warns about.
-  click("Discard");
-  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
-});
+  click("Discard")
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy()
+})
 
 test("a gone refusal raises the gone banner; Keep as new draft saves a new draft with no images", async () => {
-  const { save } = await refused("gone");
-  expect(screen.getByText(GONE)).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Keep mine" })).toBeNull();
-  type("Rough idea", "typed while gone");
-  await wait(2000);
-  expect(save).toHaveBeenCalledTimes(1);
-  await act(async () => click("Keep as new draft"));
-  await wait(0);
-  expect(save).toHaveBeenCalledTimes(2);
-  expect(save).toHaveBeenLastCalledWith({ id: undefined, slug: "mine", idea: "typed while gone", project: "blog", name: "Named", revision: 0 });
-  expect(screen.queryByText(GONE)).toBeNull();
-});
+  const { save } = await refused("gone")
+  expect(screen.getByText(GONE)).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Keep mine" })).toBeNull()
+  type("Rough idea", "typed while gone")
+  await wait(2000)
+  expect(save).toHaveBeenCalledTimes(1)
+  await act(async () => click("Keep as new draft"))
+  await wait(0)
+  expect(save).toHaveBeenCalledTimes(2)
+  expect(save).toHaveBeenLastCalledWith({
+    id: undefined,
+    slug: "mine",
+    idea: "typed while gone",
+    project: "blog",
+    name: "Named",
+    revision: 0,
+  })
+  expect(screen.queryByText(GONE)).toBeNull()
+})
 
 test("Keep mine against a draft that is gone raises the gone banner", async () => {
-  const { read } = await refused("conflict");
-  read.mockResolvedValueOnce({ kind: "gone" });
-  await act(async () => click("Keep mine"));
-  expect(screen.getByText(GONE)).toBeTruthy();
-});
+  const { read } = await refused("conflict")
+  read.mockResolvedValueOnce({ kind: "gone" })
+  await act(async () => click("Keep mine"))
+  expect(screen.getByText(GONE)).toBeTruthy()
+})
 
 test("Start design is disabled while pending, and a server error shows its text in a toast", async () => {
-  let fail: (e: Error) => void = () => {};
-  const { onStarted } = await mount({ open: () => new Promise((_, reject) => (fail = reject)) as never });
-  type("Epic slug", "fresh");
-  type("Rough idea", "an idea");
-  await act(async () => click("Start design"));
-  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(true);
-  await act(async () => fail(new WriteError("slug already exists")));
-  expect(await screen.findByText("slug already exists")).toBeTruthy();
-  expect(onStarted).not.toHaveBeenCalled();
-});
+  let fail: (e: Error) => void = () => {}
+  const { onStarted } = await mount({
+    open: () => new Promise((_, reject) => (fail = reject)) as never,
+  })
+  type("Epic slug", "fresh")
+  type("Rough idea", "an idea")
+  await act(async () => click("Start design"))
+  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  )
+  await act(async () => fail(new WriteError("slug already exists")))
+  expect(await screen.findByText("slug already exists")).toBeTruthy()
+  expect(onStarted).not.toHaveBeenCalled()
+})
 
 test("Tab is trapped by the shared Modal, not by the form", async () => {
-  await mount();
-  type("Epic slug", "fresh");
-  type("Rough idea", "an idea");
-  const start = screen.getByRole("button", { name: "Start design" });
-  start.focus();
-  fireEvent.keyDown(start, { key: "Tab" });
-  expect(document.activeElement).toBe(screen.getByRole("button", { name: /fresh/, expanded: false }));
-  fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
-  expect(document.activeElement).toBe(start);
-});
+  await mount()
+  type("Epic slug", "fresh")
+  type("Rough idea", "an idea")
+  const start = screen.getByRole("button", { name: "Start design" })
+  start.focus()
+  fireEvent.keyDown(start, { key: "Tab" })
+  expect(document.activeElement).toBe(
+    screen.getByRole("button", { name: /fresh/, expanded: false }),
+  )
+  fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true })
+  expect(document.activeElement).toBe(start)
+})
 
 test("Start is disabled with a reason for no slug and for no idea", async () => {
-  await mount();
-  const start = () => screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement;
-  expect(start().disabled).toBe(true);
-  expect(screen.getByText("Name the epic to start.")).toBeTruthy();
-  type("Rough idea", "an idea");
-  expect(start().disabled).toBe(true);
-  expect(screen.getByText("Name the epic to start.")).toBeTruthy();
-  type("Epic slug", "fresh");
-  expect(start().disabled).toBe(false);
-  type("Rough idea", " ");
-  expect(start().disabled).toBe(true);
-  expect(screen.getByText("Write an idea to start.")).toBeTruthy();
-});
+  await mount()
+  const start = () => screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement
+  expect(start().disabled).toBe(true)
+  expect(screen.getByText("Name the epic to start.")).toBeTruthy()
+  type("Rough idea", "an idea")
+  expect(start().disabled).toBe(true)
+  expect(screen.getByText("Name the epic to start.")).toBeTruthy()
+  type("Epic slug", "fresh")
+  expect(start().disabled).toBe(false)
+  type("Rough idea", " ")
+  expect(start().disabled).toBe(true)
+  expect(screen.getByText("Write an idea to start.")).toBeTruthy()
+})
 
 test("the footer is Discard left, Start right, with no stretch", async () => {
-  await mount();
-  const discard = screen.getByRole("button", { name: "Discard" });
-  const start = screen.getByRole("button", { name: "Start design" });
-  expect(discard.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(getComputedStyle(start).flexGrow).not.toBe("2");
-  expect(getComputedStyle(discard).flexGrow).not.toBe("1");
-});
+  await mount()
+  const discard = screen.getByRole("button", { name: "Discard" })
+  const start = screen.getByRole("button", { name: "Start design" })
+  expect(discard.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(getComputedStyle(start).flexGrow).not.toBe("2")
+  expect(getComputedStyle(discard).flexGrow).not.toBe("1")
+})
 
 function stubPhone() {
-  const listeners = new Set<() => void>();
-  const vv = { height: 700, offsetTop: 0, addEventListener: (_: string, f: () => void) => listeners.add(f), removeEventListener: (_: string, f: () => void) => listeners.delete(f) };
-  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
-  vi.stubGlobal("visualViewport", vv);
-  vi.stubGlobal("innerHeight", 800);
+  const listeners = new Set<() => void>()
+  const vv = {
+    height: 700,
+    offsetTop: 0,
+    addEventListener: (_: string, f: () => void) => listeners.add(f),
+    removeEventListener: (_: string, f: () => void) => listeners.delete(f),
+  }
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
+  vi.stubGlobal("visualViewport", vv)
+  vi.stubGlobal("innerHeight", 800)
   return {
-    resize: (height: number, offsetTop = 0) => act(() => ((vv.height = height), (vv.offsetTop = offsetTop), listeners.forEach((f) => f()))),
-  };
+    resize: (height: number, offsetTop = 0) =>
+      act(() => ((vv.height = height), (vv.offsetTop = offsetTop), listeners.forEach((f) => f()))),
+  }
 }
 
 test("a narrow viewport renders the bottom sheet with a grab handle, Close, and a natural-width footer with the reason above it", async () => {
-  stubPhone();
-  await mount();
-  expect(screen.getByTestId("grab-handle")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
-  const start = screen.getByRole("button", { name: "Start design" });
-  const discard = screen.getByRole("button", { name: "Discard" });
-  expect(getComputedStyle(discard).flexGrow).not.toBe("1");
-  expect(getComputedStyle(start).flexGrow).not.toBe("2");
-  const hint = screen.getByText("Name the epic to start.");
-  expect(hint.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  vi.unstubAllGlobals();
-});
+  stubPhone()
+  await mount()
+  expect(screen.getByTestId("grab-handle")).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Close" })).toBeTruthy()
+  const start = screen.getByRole("button", { name: "Start design" })
+  const discard = screen.getByRole("button", { name: "Discard" })
+  expect(getComputedStyle(discard).flexGrow).not.toBe("1")
+  expect(getComputedStyle(start).flexGrow).not.toBe("2")
+  const hint = screen.getByText("Name the epic to start.")
+  expect(hint.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  vi.unstubAllGlobals()
+})
 
 test("the sheet is 88% high and follows the visual viewport while the keyboard is open", async () => {
-  const { resize } = stubPhone();
-  await mount();
-  const dialog = screen.getByRole("dialog");
-  expect(dialog.style.height || getComputedStyle(dialog).height).toBe("692px");
-  resize(800);
-  expect(getComputedStyle(dialog).height).toBe("704px");
-  resize(400);
-  expect(getComputedStyle(dialog).height).toBe("392px");
-  vi.unstubAllGlobals();
-});
+  const { resize } = stubPhone()
+  await mount()
+  const dialog = screen.getByRole("dialog")
+  expect(dialog.style.height || getComputedStyle(dialog).height).toBe("692px")
+  resize(800)
+  expect(getComputedStyle(dialog).height).toBe("704px")
+  resize(400)
+  expect(getComputedStyle(dialog).height).toBe("392px")
+  vi.unstubAllGlobals()
+})
 
 test("the overlay covers the visual viewport, so the keyboard does not hide the sheet", async () => {
-  const { resize } = stubPhone();
-  await mount();
-  const overlay = screen.getByRole("dialog").parentElement!;
-  resize(400, 120);
-  expect(getComputedStyle(overlay).top).toBe("120px");
-  expect(getComputedStyle(overlay).height).toBe("400px");
-  vi.unstubAllGlobals();
-});
+  const { resize } = stubPhone()
+  await mount()
+  const overlay = screen.getByRole("dialog").parentElement!
+  resize(400, 120)
+  expect(getComputedStyle(overlay).top).toBe("120px")
+  expect(getComputedStyle(overlay).height).toBe("400px")
+  vi.unstubAllGlobals()
+})
 
 test("a wide viewport has no grab handle", async () => {
-  await mount();
-  expect(screen.queryByTestId("grab-handle")).toBeNull();
-});
+  await mount()
+  expect(screen.queryByTestId("grab-handle")).toBeNull()
+})
 
-const UNSAVED_KEY = "gx.newDesign.unsaved";
-const unsavedMap = () => JSON.parse(localStorage.getItem(UNSAVED_KEY) ?? "{}");
+const UNSAVED_KEY = "gx.newDesign.unsaved"
+const unsavedMap = () => JSON.parse(localStorage.getItem(UNSAVED_KEY) ?? "{}")
 
 /** A form on draft d1 whose saves throw while `down.on` is set. */
 async function serverDown() {
-  vi.useFakeTimers();
-  localStorage.clear();
-  const base = fakeDrafts({ slug: "mine", idea: "my idea", project: "blog" });
-  const down = { on: true };
+  vi.useFakeTimers()
+  localStorage.clear()
+  const base = fakeDrafts({ slug: "mine", idea: "my idea", project: "blog" })
+  const down = { on: true }
   const save = vi.fn(async (body: DesignDraftSaveRequest) => {
-    if (down.on) throw new WriteError("offline");
-    return base.save(body);
-  });
-  const view = await mount({ drafts: { ...base.client, save } }, { slug: "mine", idea: "my idea", project: "blog" });
-  return { ...view, save, remove: base.remove, down };
+    if (down.on) throw new WriteError("offline")
+    return base.save(body)
+  })
+  const view = await mount(
+    { drafts: { ...base.client, save } },
+    { slug: "mine", idea: "my idea", project: "blog" },
+  )
+  return { ...view, save, remove: base.remove, down }
 }
 
 test("a failing save shows Not saved, and a keystroke and a 5 s tick each retry", async () => {
-  const { save, down } = await serverDown();
-  type("Rough idea", "one");
-  await wait(800);
-  expect(screen.getByText("Not saved")).toBeTruthy();
-  expect(save).toHaveBeenCalledTimes(1);
-  type("Rough idea", "two");
-  await wait(800);
-  expect(save).toHaveBeenCalledTimes(2);
-  await wait(5000);
-  expect(save).toHaveBeenCalledTimes(3);
-  down.on = false;
-  await wait(5000);
-  expect(save).toHaveBeenCalledTimes(4);
-  expect(screen.getByText("Saved")).toBeTruthy();
-  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
-});
+  const { save, down } = await serverDown()
+  type("Rough idea", "one")
+  await wait(800)
+  expect(screen.getByText("Not saved")).toBeTruthy()
+  expect(save).toHaveBeenCalledTimes(1)
+  type("Rough idea", "two")
+  await wait(800)
+  expect(save).toHaveBeenCalledTimes(2)
+  await wait(5000)
+  expect(save).toHaveBeenCalledTimes(3)
+  down.on = false
+  await wait(5000)
+  expect(save).toHaveBeenCalledTimes(4)
+  expect(screen.getByText("Saved")).toBeTruthy()
+  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull()
+})
 
 test("closing while unsaved keeps one entry for the draft", async () => {
-  const { onClose } = await serverDown();
-  type("Rough idea", "typed offline");
-  await wait(800);
-  click("Close");
-  expect(onClose).toHaveBeenCalled();
-  expect(unsavedMap()).toEqual({ d1: { revision: 3, project: "blog", slug: "mine", idea: "typed offline" } });
-});
+  const { onClose } = await serverDown()
+  type("Rough idea", "typed offline")
+  await wait(800)
+  click("Close")
+  expect(onClose).toHaveBeenCalled()
+  expect(unsavedMap()).toEqual({
+    d1: { revision: 3, project: "blog", slug: "mine", idea: "typed offline" },
+  })
+})
 
 test("the next open saves a fallback entry with its revision and clears it", async () => {
-  vi.useFakeTimers();
-  localStorage.setItem(UNSAVED_KEY, JSON.stringify({ d1: { revision: 3, project: "blog", slug: "mine", idea: "kept", name: "N" } }));
-  const { save } = await mount({}, { slug: "mine", idea: "old" });
-  expect(save).toHaveBeenCalledWith({ id: "d1", project: "blog", slug: "mine", idea: "kept", name: "N", revision: 3 });
-  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
-});
+  vi.useFakeTimers()
+  localStorage.setItem(
+    UNSAVED_KEY,
+    JSON.stringify({ d1: { revision: 3, project: "blog", slug: "mine", idea: "kept", name: "N" } }),
+  )
+  const { save } = await mount({}, { slug: "mine", idea: "old" })
+  expect(save).toHaveBeenCalledWith({
+    id: "d1",
+    project: "blog",
+    slug: "mine",
+    idea: "kept",
+    name: "N",
+    revision: 3,
+  })
+  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull()
+})
 
 test.each([
   ["conflict", CONFLICT],
   ["gone", GONE],
-] as const)("a fallback entry refused as %s raises its banner and keeps the text", async (kind, text) => {
-  vi.useFakeTimers();
-  localStorage.setItem(UNSAVED_KEY, JSON.stringify({ d1: { revision: 3, project: "blog", slug: "mine", idea: "kept" } }));
-  const base = fakeDrafts({ slug: "mine", idea: "old" });
-  await mount({ drafts: { ...base.client, save: vi.fn(async (): Promise<DraftResult> => ({ kind })) } });
-  expect(screen.getByText(text)).toBeTruthy();
-  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("kept");
-  expect(Object.keys(unsavedMap())).toEqual(["d1"]);
-});
+] as const)(
+  "a fallback entry refused as %s raises its banner and keeps the text",
+  async (kind, text) => {
+    vi.useFakeTimers()
+    localStorage.setItem(
+      UNSAVED_KEY,
+      JSON.stringify({ d1: { revision: 3, project: "blog", slug: "mine", idea: "kept" } }),
+    )
+    const base = fakeDrafts({ slug: "mine", idea: "old" })
+    await mount({
+      drafts: { ...base.client, save: vi.fn(async (): Promise<DraftResult> => ({ kind })) },
+    })
+    expect(screen.getByText(text)).toBeTruthy()
+    expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe(
+      "kept",
+    )
+    expect(Object.keys(unsavedMap())).toEqual(["d1"])
+  },
+)
 
 test("a fallback entry survives a second failed open and another draft's entry stays beside it", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers()
   localStorage.setItem(
     UNSAVED_KEY,
     JSON.stringify({
       d1: { revision: 3, project: "blog", slug: "a", idea: "A text" },
       d2: { revision: 1, project: "gx", slug: "b", idea: "B text" },
     }),
-  );
-  const base = fakeDrafts({ slug: "a", idea: "old" });
-  await mount({ drafts: { ...base.client, save: vi.fn(async () => Promise.reject(new WriteError("offline"))) } });
-  expect(screen.getByText("Not saved")).toBeTruthy();
-  expect(Object.keys(unsavedMap()).sort()).toEqual(["d1", "d2"]);
-});
+  )
+  const base = fakeDrafts({ slug: "a", idea: "old" })
+  await mount({
+    drafts: { ...base.client, save: vi.fn(async () => Promise.reject(new WriteError("offline"))) },
+  })
+  expect(screen.getByText("Not saved")).toBeTruthy()
+  expect(Object.keys(unsavedMap()).sort()).toEqual(["d1", "d2"])
+})
 
 test("Discard removes the entry", async () => {
-  const { remove } = await serverDown();
-  type("Rough idea", "typed offline");
-  await wait(800);
-  expect(localStorage.getItem(UNSAVED_KEY)).not.toBeNull();
-  click("Discard");
-  click("Discard");
-  await act(async () => {});
-  expect(remove).toHaveBeenCalledWith("d1");
-  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
-});
+  const { remove } = await serverDown()
+  type("Rough idea", "typed offline")
+  await wait(800)
+  expect(localStorage.getItem(UNSAVED_KEY)).not.toBeNull()
+  click("Discard")
+  click("Discard")
+  await act(async () => {})
+  expect(remove).toHaveBeenCalledWith("d1")
+  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull()
+})
 
 test("Start while Not saved leaves no entry, so no draft comes back", async () => {
-  const { onStarted } = await serverDown();
-  type("Rough idea", "typed offline");
-  await wait(800);
-  expect(localStorage.getItem(UNSAVED_KEY)).not.toBeNull();
-  await act(async () => click("Start design"));
-  expect(onStarted).toHaveBeenCalled();
-  cleanup();
-  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull();
-});
+  const { onStarted } = await serverDown()
+  type("Rough idea", "typed offline")
+  await wait(800)
+  expect(localStorage.getItem(UNSAVED_KEY)).not.toBeNull()
+  await act(async () => click("Start design"))
+  expect(onStarted).toHaveBeenCalled()
+  cleanup()
+  expect(localStorage.getItem(UNSAVED_KEY)).toBeNull()
+})
 
-const LEGACY_KEY = "gx.newDesign.draft";
+const LEGACY_KEY = "gx.newDesign.draft"
 
 test("a stored legacy draft with text becomes a server draft with its project and the key is gone", async () => {
-  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: "old", idea: "old idea", project: "blog" }));
-  const { save } = await mount();
-  expect(save).toHaveBeenCalledWith({ project: "blog", slug: "old", idea: "old idea", revision: 0 });
-  expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
-});
+  localStorage.setItem(
+    LEGACY_KEY,
+    JSON.stringify({ slug: "old", idea: "old idea", project: "blog" }),
+  )
+  const { save } = await mount()
+  expect(save).toHaveBeenCalledWith({ project: "blog", slug: "old", idea: "old idea", revision: 0 })
+  expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
+})
 
 test("a refused legacy move keeps the key and the next open retries it", async () => {
-  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: "old", idea: "", project: "blog" }));
-  const base = fakeDrafts();
-  const refuse = vi.fn(async (): Promise<DraftResult> => ({ kind: "conflict" }));
-  await mount({ drafts: { ...base.client, save: refuse } });
-  expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull();
-  cleanup();
-  await mount({ drafts: base.client });
-  expect(base.save).toHaveBeenCalledTimes(1);
-  expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
-});
+  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: "old", idea: "", project: "blog" }))
+  const base = fakeDrafts()
+  const refuse = vi.fn(async (): Promise<DraftResult> => ({ kind: "conflict" }))
+  await mount({ drafts: { ...base.client, save: refuse } })
+  expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull()
+  cleanup()
+  await mount({ drafts: base.client })
+  expect(base.save).toHaveBeenCalledTimes(1)
+  expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
+})
 
 test("a legacy key with no text is deleted and creates nothing", async () => {
-  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: " ", idea: "", project: "blog" }));
-  const { save } = await mount();
-  expect(save).not.toHaveBeenCalled();
-  expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
-});
+  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: " ", idea: "", project: "blog" }))
+  const { save } = await mount()
+  expect(save).not.toHaveBeenCalled()
+  expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
+})
 
 test("a second open after a successful move creates nothing", async () => {
-  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: "old", idea: "x", project: "gx" }));
-  const base = fakeDrafts();
-  await mount({ drafts: base.client });
-  cleanup();
-  await mount({ drafts: base.client });
-  expect(base.save).toHaveBeenCalledTimes(1);
-});
+  localStorage.setItem(LEGACY_KEY, JSON.stringify({ slug: "old", idea: "x", project: "gx" }))
+  const base = fakeDrafts()
+  await mount({ drafts: base.client })
+  cleanup()
+  await mount({ drafts: base.client })
+  expect(base.save).toHaveBeenCalledTimes(1)
+})
 
 /** Two stored drafts: "alpha" (gx, 2 images, opened first) and "beta" (blog, 3 h old). */
 function twoDrafts(aText: Partial<DesignDraft> = {}) {
-  const a: DesignDraft = { id: "a", project: "gx", slug: "alpha", idea: "first idea", images: [], revision: 1, edited_at: new Date().toISOString(), ...aText };
-  const b: DesignDraft = { id: "b", project: "blog", slug: "beta", idea: "second idea", images: [], revision: 1, edited_at: new Date(Date.now() - 3 * 3_600_000).toISOString() };
-  const fake = fakeDrafts();
+  const a: DesignDraft = {
+    id: "a",
+    project: "gx",
+    slug: "alpha",
+    idea: "first idea",
+    images: [],
+    revision: 1,
+    edited_at: new Date().toISOString(),
+    ...aText,
+  }
+  const b: DesignDraft = {
+    id: "b",
+    project: "blog",
+    slug: "beta",
+    idea: "second idea",
+    images: [],
+    revision: 1,
+    edited_at: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+  }
+  const fake = fakeDrafts()
   const client: DraftsClient = {
     ...fake.client,
     list: async () => [
@@ -782,405 +977,472 @@ function twoDrafts(aText: Partial<DesignDraft> = {}) {
       { ...b, image_count: 0 },
     ],
     read: async (id) => ({ kind: "ok", draft: id === "a" ? a : b }),
-  };
-  return { ...fake, client };
+  }
+  return { ...fake, client }
 }
-const openMenu = (name: RegExp) => act(async () => void fireEvent.click(screen.getByRole("button", { name })));
-const pick = (name: string | RegExp) => act(async () => void fireEvent.click(screen.getByRole("menuitem", { name })));
+const openMenu = (name: RegExp) =>
+  act(async () => void fireEvent.click(screen.getByRole("button", { name })))
+const pick = (name: string | RegExp) =>
+  act(async () => void fireEvent.click(screen.getByRole("menuitem", { name })))
 
 test("the draft menu lists label, project, images and time, and marks the open draft", async () => {
-  await mount({ drafts: twoDrafts().client });
-  await openMenu(/alpha/);
-  const rows = screen.getAllByRole("menuitem").map((r) => r.textContent);
-  expect(rows[0]).toContain("alpha");
-  expect(rows[0]).toContain("gx · 2 images · editing now");
-  expect(rows[1]).toContain("beta");
-  expect(rows[1]).toContain("blog · edited 3 h ago");
-  expect(rows[2]).toContain("New draft");
-});
+  await mount({ drafts: twoDrafts().client })
+  await openMenu(/alpha/)
+  const rows = screen.getAllByRole("menuitem").map((r) => r.textContent)
+  expect(rows[0]).toContain("alpha")
+  expect(rows[0]).toContain("gx · 2 images · editing now")
+  expect(rows[1]).toContain("beta")
+  expect(rows[1]).toContain("blog · edited 3 h ago")
+  expect(rows[2]).toContain("New draft")
+})
 
 test("choosing another draft saves the current one first, then shows the other's text and project", async () => {
-  const { client, save } = twoDrafts();
-  await mount({ drafts: client });
-  type("Rough idea", "changed");
-  await openMenu(/alpha/);
-  await pick(/beta/);
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "a", idea: "changed" }));
-  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("beta");
-  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("second idea");
-  expect(project()).toBe("blog");
-});
+  const { client, save } = twoDrafts()
+  await mount({ drafts: client })
+  type("Rough idea", "changed")
+  await openMenu(/alpha/)
+  await pick(/beta/)
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "a", idea: "changed" }))
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe(
+    "beta",
+  )
+  expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe(
+    "second idea",
+  )
+  expect(project()).toBe("blog")
+})
 
 test("New draft shows a blank form with the slug field focused", async () => {
-  await mount({ drafts: twoDrafts().client });
-  await openMenu(/alpha/);
-  await pick("New draft");
-  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("");
-  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }));
-});
+  await mount({ drafts: twoDrafts().client })
+  await openMenu(/alpha/)
+  await pick("New draft")
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("")
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }))
+})
 
 test("New draft on a blank draft refocuses the slug and creates nothing", async () => {
-  const { save, remove } = await mount();
-  await openMenu(/New draft/);
-  screen.getByRole("textbox", { name: "Rough idea" }).focus();
-  await pick("New draft");
-  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }));
-  expect(save).not.toHaveBeenCalled();
-  expect(remove).not.toHaveBeenCalled();
-});
+  const { save, remove } = await mount()
+  await openMenu(/New draft/)
+  screen.getByRole("textbox", { name: "Rough idea" }).focus()
+  await pick("New draft")
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Epic slug" }))
+  expect(save).not.toHaveBeenCalled()
+  expect(remove).not.toHaveBeenCalled()
+})
 
 test("switching away from a blank saved draft deletes it and saves nothing", async () => {
-  const { client, save, remove } = twoDrafts({ slug: "", idea: "" });
-  await mount({ drafts: client });
-  await openMenu(/New draft/);
-  await pick(/beta/);
-  expect(remove).toHaveBeenCalled();
-  expect(save).not.toHaveBeenCalled();
-});
+  const { client, save, remove } = twoDrafts({ slug: "", idea: "" })
+  await mount({ drafts: client })
+  await openMenu(/New draft/)
+  await pick(/beta/)
+  expect(remove).toHaveBeenCalled()
+  expect(save).not.toHaveBeenCalled()
+})
 
 test("Name this draft, Done: the label shows the name and the save carries it", async () => {
-  const { client, save } = twoDrafts();
-  await mount({ drafts: client });
-  await openMenu(/alpha/);
-  await pick("Name this draft");
-  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "Checkout" } });
-  await act(async () => void click("Done"));
-  expect(screen.queryByRole("textbox", { name: "Draft name" })).toBeNull();
-  expect(screen.getByRole("button", { name: /Checkout/ })).toBeTruthy();
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "a", slug: "alpha", name: "Checkout" }));
-});
+  const { client, save } = twoDrafts()
+  await mount({ drafts: client })
+  await openMenu(/alpha/)
+  await pick("Name this draft")
+  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), {
+    target: { value: "Checkout" },
+  })
+  await act(async () => void click("Done"))
+  expect(screen.queryByRole("textbox", { name: "Draft name" })).toBeNull()
+  expect(screen.getByRole("button", { name: /Checkout/ })).toBeTruthy()
+  expect(save).toHaveBeenCalledWith(
+    expect.objectContaining({ id: "a", slug: "alpha", name: "Checkout" }),
+  )
+})
 
 test("the title follows the name field while typing, before Done", async () => {
-  await mount({ drafts: twoDrafts().client });
-  await openMenu(/alpha/);
-  await pick("Name this draft");
-  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "Check" } });
-  expect(screen.getByRole("button", { name: /Check/ })).toBeTruthy();
-  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "" } });
-  expect(screen.queryByRole("button", { name: /Check/ })).toBeNull();
-});
+  await mount({ drafts: twoDrafts().client })
+  await openMenu(/alpha/)
+  await pick("Name this draft")
+  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), {
+    target: { value: "Check" },
+  })
+  expect(screen.getByRole("button", { name: /Check/ })).toBeTruthy()
+  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "" } })
+  expect(screen.queryByRole("button", { name: /Check/ })).toBeNull()
+})
 
 test("a third draft typed and switched away from before the debounce fires is saved", async () => {
-  vi.useFakeTimers();
-  const { save } = await mount();
-  type("Epic slug", "third");
-  await openMenu(/third|New draft/);
-  await pick("New draft");
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: undefined, slug: "third" }));
-});
+  vi.useFakeTimers()
+  const { save } = await mount()
+  type("Epic slug", "third")
+  await openMenu(/third|New draft/)
+  await pick("New draft")
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: undefined, slug: "third" }))
+})
 
 test("a saved draft shows Saved right after a switch, with no edit", async () => {
-  await mount({ drafts: twoDrafts().client });
-  await openMenu(/alpha/);
-  await pick(/beta/);
-  expect(screen.getByText("Saved")).toBeTruthy();
-});
+  await mount({ drafts: twoDrafts().client })
+  await openMenu(/alpha/)
+  await pick(/beta/)
+  expect(screen.getByText("Saved")).toBeTruthy()
+})
 
 test("a name on a blank draft saves it", async () => {
-  const { save } = await mount();
-  await openMenu(/New draft/);
-  await pick("Name this draft");
-  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "Checkout" } });
-  await act(async () => void click("Done"));
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: "Checkout", slug: "", idea: "" }));
-});
+  const { save } = await mount()
+  await openMenu(/New draft/)
+  await pick("Name this draft")
+  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), {
+    target: { value: "Checkout" },
+  })
+  await act(async () => void click("Done"))
+  expect(save).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Checkout", slug: "", idea: "" }),
+  )
+})
 
 test("switching away from a name-only draft keeps it", async () => {
-  const { client, remove } = twoDrafts({ slug: "", idea: "", name: "Checkout" });
-  await mount({ drafts: client });
-  await openMenu(/Checkout/);
-  await pick(/beta/);
-  expect(remove).not.toHaveBeenCalled();
-});
+  const { client, remove } = twoDrafts({ slug: "", idea: "", name: "Checkout" })
+  await mount({ drafts: client })
+  await openMenu(/Checkout/)
+  await pick(/beta/)
+  expect(remove).not.toHaveBeenCalled()
+})
 
 test("New draft on a name-only draft creates a new draft", async () => {
-  const { client } = twoDrafts({ slug: "", idea: "", name: "Checkout" });
-  await mount({ drafts: client });
-  await openMenu(/Checkout/);
-  await pick("New draft");
-  expect(screen.queryByRole("button", { name: /Checkout/ })).toBeNull();
-});
+  const { client } = twoDrafts({ slug: "", idea: "", name: "Checkout" })
+  await mount({ drafts: client })
+  await openMenu(/Checkout/)
+  await pick("New draft")
+  expect(screen.queryByRole("button", { name: /Checkout/ })).toBeNull()
+})
 
 test("Discard on a name-only draft asks Keep or Discard", async () => {
-  const { client } = twoDrafts({ slug: "", idea: "", name: "Checkout" });
-  await mount({ drafts: client });
-  click("Discard");
-  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
-});
+  const { client } = twoDrafts({ slug: "", idea: "", name: "Checkout" })
+  await mount({ drafts: client })
+  click("Discard")
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy()
+})
 
 test("the row trash of a name-only draft asks first", async () => {
-  const { client, remove } = twoDrafts();
-  const list = client.list;
-  await mount({ drafts: { ...client, list: async () => (await list()).map((d) => (d.id === "b" ? { ...d, slug: "", idea: "", name: "Named" } : d)) } });
-  await openMenu(/alpha/);
-  fireEvent.click(screen.getAllByRole("button", { name: "Delete draft" })[1]!);
-  expect(remove).not.toHaveBeenCalled();
-});
+  const { client, remove } = twoDrafts()
+  const list = client.list
+  await mount({
+    drafts: {
+      ...client,
+      list: async () =>
+        (await list()).map((d) => (d.id === "b" ? { ...d, slug: "", idea: "", name: "Named" } : d)),
+    },
+  })
+  await openMenu(/alpha/)
+  fireEvent.click(screen.getAllByRole("button", { name: "Delete draft" })[1]!)
+  expect(remove).not.toHaveBeenCalled()
+})
 
 /** twoDrafts whose list drops what `remove` was asked to delete. */
 function deletable(aText: Partial<DesignDraft> = {}) {
-  const base = twoDrafts(aText);
-  const gone = new Set<string>();
+  const base = twoDrafts(aText)
+  const gone = new Set<string>()
   const remove = vi.fn(async (id: string): Promise<DraftResult> => {
-    gone.add(id);
-    return { kind: "deleted" };
-  });
-  const client: DraftsClient = { ...base.client, remove, list: async () => (await base.client.list()).filter((d) => !gone.has(d.id)) };
-  return { client, remove };
+    gone.add(id)
+    return { kind: "deleted" }
+  })
+  const client: DraftsClient = {
+    ...base.client,
+    remove,
+    list: async () => (await base.client.list()).filter((d) => !gone.has(d.id)),
+  }
+  return { client, remove }
 }
-const trash = (row: number) => act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Delete draft" })[row]));
+const trash = (row: number) =>
+  act(
+    async () => void fireEvent.click(screen.getAllByRole("button", { name: "Delete draft" })[row]),
+  )
 
 test("trash on a row with text asks Keep or Discard; Keep leaves it, Discard deletes it", async () => {
-  const { client, remove } = deletable();
-  await mount({ drafts: client });
-  await openMenu(/alpha/);
-  await trash(1);
-  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
-  await act(async () => void click("Keep"));
-  expect(remove).not.toHaveBeenCalled();
-  expect(screen.getAllByRole("menuitem")[1].textContent).toContain("beta");
-  await trash(1);
-  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]));
-  expect(remove).toHaveBeenCalledWith("b");
-  expect(screen.queryByText(/beta/)).toBeNull();
-});
+  const { client, remove } = deletable()
+  await mount({ drafts: client })
+  await openMenu(/alpha/)
+  await trash(1)
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy()
+  await act(async () => void click("Keep"))
+  expect(remove).not.toHaveBeenCalled()
+  expect(screen.getAllByRole("menuitem")[1].textContent).toContain("beta")
+  await trash(1)
+  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]))
+  expect(remove).toHaveBeenCalledWith("b")
+  expect(screen.queryByText(/beta/)).toBeNull()
+})
 
 test("trash on an empty row deletes at once", async () => {
-  const { client, remove } = deletable();
-  const list = client.list;
-  await mount({ drafts: { ...client, list: async () => (await list()).map((d) => (d.id === "b" ? { ...d, slug: "", idea: "", image_count: 0 } : d)) } });
-  await openMenu(/alpha/);
-  await trash(1);
-  expect(remove).toHaveBeenCalledWith("b");
-  expect(screen.queryByText("Discard this draft and its images?")).toBeNull();
-});
+  const { client, remove } = deletable()
+  const list = client.list
+  await mount({
+    drafts: {
+      ...client,
+      list: async () =>
+        (await list()).map((d) =>
+          d.id === "b" ? { ...d, slug: "", idea: "", image_count: 0 } : d,
+        ),
+    },
+  })
+  await openMenu(/alpha/)
+  await trash(1)
+  expect(remove).toHaveBeenCalledWith("b")
+  expect(screen.queryByText("Discard this draft and its images?")).toBeNull()
+})
 
 test("deleting the open draft opens the next most recent one", async () => {
-  const { client, remove } = deletable();
-  await mount({ drafts: client });
-  await openMenu(/alpha/);
-  await trash(0);
-  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]));
-  expect(remove).toHaveBeenCalledWith("a");
-  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("beta");
-});
+  const { client, remove } = deletable()
+  await mount({ drafts: client })
+  await openMenu(/alpha/)
+  await trash(0)
+  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]))
+  expect(remove).toHaveBeenCalledWith("a")
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe(
+    "beta",
+  )
+})
 
 test("deleting the only draft opens a blank one", async () => {
-  const { client, remove } = deletable();
-  await mount({ drafts: { ...client, list: async () => (await client.list()).filter((d) => d.id === "a") } });
-  await openMenu(/alpha/);
-  await trash(0);
-  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]));
-  expect(remove).toHaveBeenCalledWith("a");
-  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("");
-});
+  const { client, remove } = deletable()
+  await mount({
+    drafts: { ...client, list: async () => (await client.list()).filter((d) => d.id === "a") },
+  })
+  await openMenu(/alpha/)
+  await trash(0)
+  await act(async () => void fireEvent.click(screen.getAllByRole("button", { name: "Discard" })[0]))
+  expect(remove).toHaveBeenCalledWith("a")
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("")
+})
 
-const png = (name = "a.png") => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], name, { type: "image/png" });
+const png = (name = "a.png") =>
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], name, {
+    type: "image/png",
+  })
 const pasteInto = (name: string, file: File) =>
-  fireEvent.paste(screen.getByRole("textbox", { name }), { clipboardData: { files: [file], types: ["Files"] } });
-const addImages = (...files: File[]) => fireEvent.change(screen.getByTestId("image-input"), { target: { files } });
-const LIMITS = "Paste or add images (PNG, JPEG, GIF, WebP, up to 20 MB, 10 per draft)";
+  fireEvent.paste(screen.getByRole("textbox", { name }), {
+    clipboardData: { files: [file], types: ["Files"] },
+  })
+const addImages = (...files: File[]) =>
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files } })
+const LIMITS = "Paste or add images (PNG, JPEG, GIF, WebP, up to 20 MB, 10 per draft)"
 
 test("pasting a PNG in the idea box uploads it to the draft and shows a thumbnail", async () => {
-  const { uploadImage } = await mount({}, { slug: "x" });
-  pasteInto("Rough idea", png());
-  await waitFor(() => expect(screen.getAllByRole("button", { name: "Open image" })).toHaveLength(1));
-  expect(uploadImage).toHaveBeenCalledWith("d1", expect.any(File));
-  expect(screen.getByText("1 of 10 images")).toBeTruthy();
-});
+  const { uploadImage } = await mount({}, { slug: "x" })
+  pasteInto("Rough idea", png())
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "Open image" })).toHaveLength(1))
+  expect(uploadImage).toHaveBeenCalledWith("d1", expect.any(File))
+  expect(screen.getByText("1 of 10 images")).toBeTruthy()
+})
 
 test("pasting into the slug field adds nothing", async () => {
-  const { uploadImage } = await mount({}, { slug: "x" });
-  pasteInto("Epic slug", png());
-  await act(async () => {});
-  expect(uploadImage).not.toHaveBeenCalled();
-  expect(screen.getByText(LIMITS)).toBeTruthy();
-});
+  const { uploadImage } = await mount({}, { slug: "x" })
+  pasteInto("Epic slug", png())
+  await act(async () => {})
+  expect(uploadImage).not.toHaveBeenCalled()
+  expect(screen.getByText(LIMITS)).toBeTruthy()
+})
 
 test("Add image picks files, and the line counts them", async () => {
-  await mount({}, { slug: "x" });
-  expect(screen.getByText(LIMITS)).toBeTruthy();
-  addImages(png("a.png"), png("b.png"));
-  await waitFor(() => expect(screen.getByText("2 of 10 images")).toBeTruthy());
-});
+  await mount({}, { slug: "x" })
+  expect(screen.getByText(LIMITS)).toBeTruthy()
+  addImages(png("a.png"), png("b.png"))
+  await waitFor(() => expect(screen.getByText("2 of 10 images")).toBeTruthy())
+})
 
-test.each(["phone", "tablet"] as const)("on %s the paperclip leads the footer; no tile, limits line or empty row", async (device) => {
-  await mount({}, { slug: "x" }, "", device);
-  const footer = screen.getByRole("button", { name: "Discard" }).parentElement!;
-  expect(footer.firstElementChild).toBe(screen.getByRole("button", { name: "Add image" }));
-  expect(screen.queryByText(LIMITS)).toBeNull();
-  expect(screen.queryByLabelText("Images")).toBeNull();
-  addImages(png("a.png"), png("b.png"));
-  await waitFor(() => expect(screen.getByText("2 of 10 images")).toBeTruthy());
-  expect(screen.getByLabelText("Images")).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: "Add image" })).toHaveLength(1);
-});
+test.each(["phone", "tablet"] as const)(
+  "on %s the paperclip leads the footer; no tile, limits line or empty row",
+  async (device) => {
+    await mount({}, { slug: "x" }, "", device)
+    const footer = screen.getByRole("button", { name: "Discard" }).parentElement!
+    expect(footer.firstElementChild).toBe(screen.getByRole("button", { name: "Add image" }))
+    expect(screen.queryByText(LIMITS)).toBeNull()
+    expect(screen.queryByLabelText("Images")).toBeNull()
+    addImages(png("a.png"), png("b.png"))
+    await waitFor(() => expect(screen.getByText("2 of 10 images")).toBeTruthy())
+    expect(screen.getByLabelText("Images")).toBeTruthy()
+    expect(screen.getAllByRole("button", { name: "Add image" })).toHaveLength(1)
+  },
+)
 
-test.each(["phone", "tablet"] as const)("on %s the line under the images shows an upload in progress and a failure, and not before", async (device) => {
-  const { uploadImage } = await mount({}, { slug: "x" }, "", device);
-  expect(screen.queryByText(/uploading|failed|of 10 images/)).toBeNull();
-  uploadImage.mockReturnValueOnce(new Promise(() => undefined));
-  addImages(png("a.png"));
-  await screen.findByText("1 uploading");
-  const big = png("big.png");
-  Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
-  addImages(big);
-  await screen.findByText("1 image failed. Remove it or retry before starting.");
-});
+test.each(["phone", "tablet"] as const)(
+  "on %s the line under the images shows an upload in progress and a failure, and not before",
+  async (device) => {
+    const { uploadImage } = await mount({}, { slug: "x" }, "", device)
+    expect(screen.queryByText(/uploading|failed|of 10 images/)).toBeNull()
+    uploadImage.mockReturnValueOnce(new Promise(() => undefined))
+    addImages(png("a.png"))
+    await screen.findByText("1 uploading")
+    const big = png("big.png")
+    Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 })
+    addImages(big)
+    await screen.findByText("1 image failed. Remove it or retry before starting.")
+  },
+)
 
 test("on desktop the tile and limits line stay and the footer has no paperclip", async () => {
-  await mount({}, { slug: "x" }, "", "desktop");
-  const footer = screen.getByRole("button", { name: "Discard" }).parentElement!;
-  expect(footer.contains(screen.getByRole("button", { name: "Add image" }))).toBe(false);
-  expect(screen.getByLabelText("Images")).toBeTruthy();
-  expect(screen.getByText(LIMITS)).toBeTruthy();
-});
+  await mount({}, { slug: "x" }, "", "desktop")
+  const footer = screen.getByRole("button", { name: "Discard" }).parentElement!
+  expect(footer.contains(screen.getByRole("button", { name: "Add image" }))).toBe(false)
+  expect(screen.getByLabelText("Images")).toBeTruthy()
+  expect(screen.getByText(LIMITS)).toBeTruthy()
+})
 
 test("a refused file is a failed tile with its reason and Remove, never retried or uploaded", async () => {
-  const { uploadImage } = await mount({}, { slug: "x" });
-  const big = png("big.png");
-  Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
-  addImages(big,new File(["not an image"], "t.txt", { type: "image/png" }));
-  await screen.findByText("Too large, max 20 MB");
-  expect(screen.getByText("Not a supported image type")).toBeTruthy();
-  expect(screen.queryByText(/tap to retry/)).toBeNull();
-  expect(screen.getAllByRole("button", { name: "Remove image" })).toHaveLength(2);
-  expect(uploadImage).not.toHaveBeenCalled();
-});
+  const { uploadImage } = await mount({}, { slug: "x" })
+  const big = png("big.png")
+  Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 })
+  addImages(big, new File(["not an image"], "t.txt", { type: "image/png" }))
+  await screen.findByText("Too large, max 20 MB")
+  expect(screen.getByText("Not a supported image type")).toBeTruthy()
+  expect(screen.queryByText(/tap to retry/)).toBeNull()
+  expect(screen.getAllByRole("button", { name: "Remove image" })).toHaveLength(2)
+  expect(uploadImage).not.toHaveBeenCalled()
+})
 
 test("an 11th image is a failed tile with Remove and no retry", async () => {
-  const { uploadImage } = await mount({}, { slug: "x", images: Array.from({ length: 10 }, (_, i) => `i${i}`) });
-  addImages(png("extra.png"));
-  const tiles = await screen.findAllByText("Max 10 images");
-  expect(tiles.length).toBeGreaterThan(0);
-  expect(screen.queryByText(/tap to retry/)).toBeNull();
-  expect(screen.getAllByRole("button", { name: "Remove image" })).toHaveLength(11);
-  expect(uploadImage).not.toHaveBeenCalled();
-});
+  const { uploadImage } = await mount(
+    {},
+    { slug: "x", images: Array.from({ length: 10 }, (_, i) => `i${i}`) },
+  )
+  addImages(png("extra.png"))
+  const tiles = await screen.findAllByText("Max 10 images")
+  expect(tiles.length).toBeGreaterThan(0)
+  expect(screen.queryByText(/tap to retry/)).toBeNull()
+  expect(screen.getAllByRole("button", { name: "Remove image" })).toHaveLength(11)
+  expect(uploadImage).not.toHaveBeenCalled()
+})
 
 test("a transport failure offers tap to retry, and retry uploads", async () => {
-  const { uploadImage } = await mount({}, { slug: "x" });
-  uploadImage.mockRejectedValueOnce(new Error("Network down"));
-  addImages(png());
-  const tile = await screen.findByText("Network down, tap to retry");
-  fireEvent.click(tile);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Open image" })).toBeTruthy());
-  expect(uploadImage).toHaveBeenCalledTimes(2);
-});
+  const { uploadImage } = await mount({}, { slug: "x" })
+  uploadImage.mockRejectedValueOnce(new Error("Network down"))
+  addImages(png())
+  const tile = await screen.findByText("Network down, tap to retry")
+  fireEvent.click(tile)
+  await waitFor(() => expect(screen.getByRole("button", { name: "Open image" })).toBeTruthy())
+  expect(uploadImage).toHaveBeenCalledTimes(2)
+})
 
 test("Remove deletes the saved image on the server", async () => {
-  const { removeImage } = await mount({}, { slug: "x", images: ["i1", "i2"] });
-  expect(screen.getByText("2 of 10 images")).toBeTruthy();
-  fireEvent.click(screen.getAllByRole("button", { name: "Remove image" })[0]);
-  expect(removeImage).toHaveBeenCalledWith("d1", "i1");
-  expect(screen.getByText("1 of 10 images")).toBeTruthy();
-});
+  const { removeImage } = await mount({}, { slug: "x", images: ["i1", "i2"] })
+  expect(screen.getByText("2 of 10 images")).toBeTruthy()
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove image" })[0])
+  expect(removeImage).toHaveBeenCalledWith("d1", "i1")
+  expect(screen.getByText("1 of 10 images")).toBeTruthy()
+})
 
 test("a draft with only images is not blank: Discard asks first", async () => {
-  await mount({}, { images: ["i1"] });
-  click("Discard");
-  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy();
-});
+  await mount({}, { images: ["i1"] })
+  click("Discard")
+  expect(screen.getByText("Discard this draft and its images?")).toBeTruthy()
+})
 
 test("an image on a draft with no text yet fails with a reason and can be retried after typing", async () => {
-  const { uploadImage } = await mount();
-  addImages(png());
-  await screen.findByText("Write the epic name or an idea first, tap to retry");
-  expect(uploadImage).not.toHaveBeenCalled();
-});
+  const { uploadImage } = await mount()
+  addImages(png())
+  await screen.findByText("Write the epic name or an idea first, tap to retry")
+  expect(uploadImage).not.toHaveBeenCalled()
+})
 
-const start = () => screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement;
-const UPLOADING = "Wait for the upload to finish";
-const FAILED = "Remove the failed image first";
+const start = () => screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement
+const UPLOADING = "Wait for the upload to finish"
+const FAILED = "Remove the failed image first"
 
 /** An upload the test settles later. */
 function held(uploadImage: ReturnType<typeof fakeDrafts>["uploadImage"]) {
-  let settle: { ok: (id: string) => void; fail: (m: string) => void } | undefined;
-  uploadImage.mockImplementationOnce(() => new Promise<string>((ok, fail) => (settle = { ok, fail: (m) => fail(new Error(m)) })));
-  return { ok: (id: string) => act(async () => settle!.ok(id)), fail: (m: string) => act(async () => settle!.fail(m)) };
+  let settle: { ok: (id: string) => void; fail: (m: string) => void } | undefined
+  uploadImage.mockImplementationOnce(
+    () => new Promise<string>((ok, fail) => (settle = { ok, fail: (m) => fail(new Error(m)) })),
+  )
+  return {
+    ok: (id: string) => act(async () => settle!.ok(id)),
+    fail: (m: string) => act(async () => settle!.fail(m)),
+  }
 }
 
 test("Start is off with a reason during a held upload, and on after it lands", async () => {
-  const { uploadImage } = await mount({}, { slug: "x", idea: "y" });
-  expect(start().disabled).toBe(false);
-  const up = held(uploadImage);
-  addImages(png());
-  await screen.findByText(UPLOADING);
-  expect(start().disabled).toBe(true);
-  await up.ok("i9");
-  expect(screen.queryByText(UPLOADING)).toBeNull();
-  expect(start().disabled).toBe(false);
-});
+  const { uploadImage } = await mount({}, { slug: "x", idea: "y" })
+  expect(start().disabled).toBe(false)
+  const up = held(uploadImage)
+  addImages(png())
+  await screen.findByText(UPLOADING)
+  expect(start().disabled).toBe(true)
+  await up.ok("i9")
+  expect(screen.queryByText(UPLOADING)).toBeNull()
+  expect(start().disabled).toBe(false)
+})
 
 test("Start is off with a failed tile, and on again after retry succeeds or the tile is removed", async () => {
-  const { uploadImage } = await mount({}, { slug: "x", idea: "y" });
-  uploadImage.mockRejectedValueOnce(new Error("Network down"));
-  addImages(png());
-  fireEvent.click(await screen.findByText("Network down, tap to retry"));
-  await waitFor(() => expect(start().disabled).toBe(false));
-  uploadImage.mockRejectedValueOnce(new Error("Network down"));
-  addImages(png());
-  await screen.findByText(FAILED);
-  expect(start().disabled).toBe(true);
-  fireEvent.click(screen.getAllByRole("button", { name: "Remove image" }).at(-1)!);
-  expect(start().disabled).toBe(false);
+  const { uploadImage } = await mount({}, { slug: "x", idea: "y" })
+  uploadImage.mockRejectedValueOnce(new Error("Network down"))
+  addImages(png())
+  fireEvent.click(await screen.findByText("Network down, tap to retry"))
+  await waitFor(() => expect(start().disabled).toBe(false))
+  uploadImage.mockRejectedValueOnce(new Error("Network down"))
+  addImages(png())
+  await screen.findByText(FAILED)
+  expect(start().disabled).toBe(true)
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove image" }).at(-1)!)
+  expect(start().disabled).toBe(false)
   // Remove sits inside the form and must not submit it.
-  expect(screen.queryByRole("button", { name: /Start design/ })?.querySelector(".chakra-spinner")).toBeNull();
-});
+  expect(
+    screen.queryByRole("button", { name: /Start design/ })?.querySelector(".chakra-spinner"),
+  ).toBeNull()
+})
 
 test("images alone leave Start off with the idea reason", async () => {
-  await mount({}, { slug: "x", images: ["i1"] });
-  expect(start().disabled).toBe(true);
-  expect(screen.getByText("Write an idea to start.")).toBeTruthy();
-});
+  await mount({}, { slug: "x", images: ["i1"] })
+  expect(start().disabled).toBe(true)
+  expect(screen.getByText("Write an idea to start.")).toBeTruthy()
+})
 
 test("switching drafts during a held upload leaves it running; the tile is ready on return", async () => {
-  const { client, uploadImage } = twoDrafts();
-  const up = held(uploadImage);
+  const { client, uploadImage } = twoDrafts()
+  const up = held(uploadImage)
   // Like the server, the draft lists the image once it has landed.
-  let landed: string[] = [];
+  let landed: string[] = []
   const read: DraftsClient["read"] = async (id) => {
-    const res = await client.read(id);
-    return res.kind === "ok" && id === "a" ? { kind: "ok", draft: { ...res.draft, images: landed } } : res;
-  };
-  await mount({ drafts: { ...client, read } });
-  addImages(png());
-  await screen.findByText(UPLOADING);
-  await openMenu(/alpha/);
-  await pick(/beta/);
-  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("beta");
-  expect(screen.queryByText(UPLOADING)).toBeNull();
-  landed = ["i9"];
-  await up.ok("i9");
-  await openMenu(/beta/);
-  await pick(/alpha/);
-  expect(uploadImage).toHaveBeenCalledWith("a", expect.any(File));
-  expect(screen.getAllByRole("button", { name: "Open image" })).toHaveLength(1);
-});
+    const res = await client.read(id)
+    return res.kind === "ok" && id === "a"
+      ? { kind: "ok", draft: { ...res.draft, images: landed } }
+      : res
+  }
+  await mount({ drafts: { ...client, read } })
+  addImages(png())
+  await screen.findByText(UPLOADING)
+  await openMenu(/alpha/)
+  await pick(/beta/)
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe(
+    "beta",
+  )
+  expect(screen.queryByText(UPLOADING)).toBeNull()
+  landed = ["i9"]
+  await up.ok("i9")
+  await openMenu(/beta/)
+  await pick(/alpha/)
+  expect(uploadImage).toHaveBeenCalledWith("a", expect.any(File))
+  expect(screen.getAllByRole("button", { name: "Open image" })).toHaveLength(1)
+})
 
 test("a failure while away shows as a failed tile on return", async () => {
-  const { client, uploadImage } = twoDrafts();
-  const up = held(uploadImage);
-  await mount({ drafts: client });
-  addImages(png());
-  await openMenu(/alpha/);
-  await pick(/beta/);
-  await up.fail("Draft is gone");
-  await openMenu(/beta/);
-  await pick(/alpha/);
-  expect(screen.getByText("Draft is gone")).toBeTruthy();
-  expect(screen.queryByText(/tap to retry/)).toBeNull();
-});
+  const { client, uploadImage } = twoDrafts()
+  const up = held(uploadImage)
+  await mount({ drafts: client })
+  addImages(png())
+  await openMenu(/alpha/)
+  await pick(/beta/)
+  await up.fail("Draft is gone")
+  await openMenu(/beta/)
+  await pick(/alpha/)
+  expect(screen.getByText("Draft is gone")).toBeTruthy()
+  expect(screen.queryByText(/tap to retry/)).toBeNull()
+})
 
 test("Load theirs shows the server's image list", async () => {
-  await refused("conflict");
-  await act(async () => click("Load theirs"));
-  expect(screen.getByText("2 of 10 images")).toBeTruthy();
-});
+  await refused("conflict")
+  await act(async () => click("Load theirs"))
+  expect(screen.getByText("2 of 10 images")).toBeTruthy()
+})
 
 test("clicking a ready thumbnail opens the viewer on that image's URL", async () => {
-  await mount({}, { slug: "x", images: ["i1", "i2"] });
-  fireEvent.click(screen.getAllByRole("button", { name: "Open image" })[1]!);
-  const img = screen.getByAltText("Image 2 of 2") as HTMLImageElement;
-  expect(img.getAttribute("src")).toBe("/v1/designs/drafts/images?id=d1&image=i2");
-});
+  await mount({}, { slug: "x", images: ["i1", "i2"] })
+  fireEvent.click(screen.getAllByRole("button", { name: "Open image" })[1]!)
+  const img = screen.getByAltText("Image 2 of 2") as HTMLImageElement
+  expect(img.getAttribute("src")).toBe("/v1/designs/drafts/images?id=d1&image=i2")
+})

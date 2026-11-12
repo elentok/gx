@@ -1,18 +1,18 @@
-import { apiFetch } from "../apiFetch";
-import type { SessionAnswerRequest, SessionPromptRequest, SessionResult } from "../generated/server";
-import { readWrite } from "./open";
+import { apiFetch } from "../apiFetch"
+import type { SessionAnswerRequest, SessionPromptRequest, SessionResult } from "../generated/server"
+import { readWrite } from "./open"
 
-export type PostPrompt = (body: SessionPromptRequest) => Promise<SessionResult>;
-export type PostAnswer = (body: SessionAnswerRequest) => Promise<SessionResult>;
+export type PostPrompt = (body: SessionPromptRequest) => Promise<SessionResult>
+export type PostAnswer = (body: SessionAnswerRequest) => Promise<SessionResult>
 
 export const postAnswer: PostAnswer = async (body) => {
   const res = await apiFetch("/v1/sessions/answer", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
-  return readWrite(res);
-};
+  })
+  return readWrite(res)
+}
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postPrompt: PostPrompt = async (body) => {
@@ -20,6 +20,6 @@ export const postPrompt: PostPrompt = async (body) => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
-  return readWrite(res);
-};
+  })
+  return readWrite(res)
+}

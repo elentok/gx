@@ -1,16 +1,19 @@
-import type { Connection } from "../connection";
-import type { EpicDetail, EpicDetailRow } from "../generated/server";
-import { fetchJson, useDetail, type DetailResult, type DetailState } from "../ticket/detail";
+import type { Connection } from "../connection"
+import type { EpicDetail, EpicDetailRow } from "../generated/server"
+import { fetchJson, useDetail, type DetailResult, type DetailState } from "../ticket/detail"
 
-export type { EpicDetail, EpicDetailRow };
+export type { EpicDetail, EpicDetailRow }
 
-export type FetchEpicDetail = (address: string) => Promise<DetailResult<EpicDetail>>;
+export type FetchEpicDetail = (address: string) => Promise<DetailResult<EpicDetail>>
 
 export const fetchEpicDetail: FetchEpicDetail = (address) =>
-  fetchJson(`/v1/epics/detail?address=${encodeURIComponent(address)}`, "epic detail");
+  fetchJson(`/v1/epics/detail?address=${encodeURIComponent(address)}`, "epic detail")
 
 export const fetchArchivedEpicDetail: FetchEpicDetail = (address) =>
-  fetchJson(`/v1/epics/archived/detail?address=${encodeURIComponent(address)}`, "archived epic detail");
+  fetchJson(
+    `/v1/epics/archived/detail?address=${encodeURIComponent(address)}`,
+    "archived epic detail",
+  )
 
 export function useEpicDetail(
   address: string,
@@ -25,5 +28,5 @@ export function useEpicDetail(
     fetcher ?? (archived ? fetchArchivedEpicDetail : fetchEpicDetail),
     `${address}/`,
     archived ? "archived-epic" : "epic",
-  );
+  )
 }

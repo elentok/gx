@@ -1,10 +1,10 @@
-import { Box, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import { ActionAnswer, type TicketDetail } from "../generated/server";
-import { Button } from "../ui/button/Button";
-import { Question } from "../ui/question-sheet/Question";
-import { isAnswered, type Answer, type QuestionCard } from "../ui/question-sheet/round";
-import { postAnswer, ReasonStale, sentOf, type PostAnswer, type Sent } from "./answer";
+import { Box, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import { ActionAnswer, type TicketDetail } from "../generated/server"
+import { Button } from "../ui/button/Button"
+import { Question } from "../ui/question-sheet/Question"
+import { isAnswered, type Answer, type QuestionCard } from "../ui/question-sheet/round"
+import { postAnswer, ReasonStale, sentOf, type PostAnswer, type Sent } from "./answer"
 
 // The sticky answer area. The server decides whether it shows (the detail's actions).
 export function AnswerForm({
@@ -13,58 +13,66 @@ export function AnswerForm({
   onSent,
   onStale,
 }: {
-  detail: TicketDetail;
-  post?: PostAnswer;
-  onSent?: (sent: Sent) => void;
+  detail: TicketDetail
+  post?: PostAnswer
+  onSent?: (sent: Sent) => void
   /** The question changed under the person: refetch so the current one shows. */
-  onStale?: () => void;
+  onStale?: () => void
 }) {
-  const { latest } = detail;
-  const [answer, setAnswer] = useState<Answer>({});
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [sentSeq, setSentSeq] = useState<number | null>(null);
-  const [seenState, setSeenState] = useState(detail.state);
+  const { latest } = detail
+  const [answer, setAnswer] = useState<Answer>({})
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState("")
+  const [sentSeq, setSentSeq] = useState<number | null>(null)
+  const [seenState, setSeenState] = useState(detail.state)
 
   // A new question clears the pick and the text; the note stays so a stale refusal loses nothing.
   if (seenState !== detail.state) {
-    setSeenState(detail.state);
-    setAnswer((a) => ({ note: a.note }));
+    setSeenState(detail.state)
+    setAnswer((a) => ({ note: a.note }))
   }
 
-  if (!latest || !detail.actions.includes(ActionAnswer) || sentSeq === latest.seq) return null;
+  if (!latest || !detail.actions.includes(ActionAnswer) || sentSeq === latest.seq) return null
 
-  const isText = latest.kind !== "yes-no" && latest.kind !== "options";
+  const isText = latest.kind !== "yes-no" && latest.kind !== "options"
   // A choice question may be answered by a note alone; free text needs its text.
-  const ready = isAnswered(answer) || (!isText && !!answer.note?.trim());
+  const ready = isAnswered(answer) || (!isText && !!answer.note?.trim())
 
   const send = async () => {
-    if (!ready || pending) return;
-    setPending(true);
-    setError("");
+    if (!ready || pending) return
+    setPending(true)
+    setError("")
     try {
       const body = {
         address: detail.address,
         state: detail.state ?? "",
-        ...(answer.huh ? { huh: true } : isText ? { text: answer.text } : answer.choice ? { choice: answer.choice } : {}),
+        ...(answer.huh
+          ? { huh: true }
+          : isText
+            ? { text: answer.text }
+            : answer.choice
+              ? { choice: answer.choice }
+              : {}),
         ...(!isText && answer.note?.trim() ? { note: answer.note } : {}),
-      };
-      const res = await post(body);
+      }
+      const res = await post(body)
       if ("refused" in res) {
         setError(
-          res.reason === "agent-not-ready" ? `${res.message} Approve the agent's prompt first, then send again.` : res.message,
-        );
-        if (res.reason === ReasonStale) onStale?.();
+          res.reason === "agent-not-ready"
+            ? `${res.message} Approve the agent's prompt first, then send again.`
+            : res.message,
+        )
+        if (res.reason === ReasonStale) onStale?.()
       } else {
-        setSentSeq(latest.seq);
-        onSent?.(sentOf(latest.seq, detail.address, res, answer.choice || answer.text));
+        setSentSeq(latest.seq)
+        onSent?.(sentOf(latest.seq, detail.address, res, answer.choice || answer.text))
       }
     } catch {
-      setError("Could not send the answer. Try again.");
+      setError("Could not send the answer. Try again.")
     } finally {
-      setPending(false);
+      setPending(false)
     }
-  };
+  }
 
   const card: QuestionCard = {
     label: String(latest.seq),
@@ -76,7 +84,7 @@ export function AnswerForm({
     options: latest.options,
     recommended: latest.recommended,
     links: latest.links,
-  };
+  }
 
   return (
     <Box
@@ -100,5 +108,5 @@ export function AnswerForm({
         Send answer
       </Button>
     </Box>
-  );
+  )
 }

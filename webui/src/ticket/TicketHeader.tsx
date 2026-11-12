@@ -1,18 +1,18 @@
-import { Box } from "@chakra-ui/react";
-import type { TicketDetail } from "../generated/server";
-import { epicHref } from "../hrefs";
-import { slugOf } from "../slug";
-import { StatLine } from "../page/StatLine";
-import { Arc } from "../ui/arc/Arc";
-import { Badge } from "../ui/badge/Badge";
-import { LongRunningBadge } from "../page/LongRunningBadge";
-import { Button } from "../ui/button/Button";
-import { badgeOf, isRunning, statValues } from "./header";
+import { Box } from "@chakra-ui/react"
+import type { TicketDetail } from "../generated/server"
+import { epicHref } from "../hrefs"
+import { slugOf } from "../slug"
+import { StatLine } from "../page/StatLine"
+import { Arc } from "../ui/arc/Arc"
+import { Badge } from "../ui/badge/Badge"
+import { LongRunningBadge } from "../page/LongRunningBadge"
+import { Button } from "../ui/button/Button"
+import { badgeOf, isRunning, statValues } from "./header"
 
 // The line under the h1: a button to the epic, badge (and arc while running), then the stat line.
 export function TicketHeader({ detail, now }: { detail: TicketDetail; now: number }) {
-  const { tone, label } = badgeOf(detail);
-  const values = statValues(detail, now);
+  const { tone, label } = badgeOf(detail)
+  const values = statValues(detail, now)
   return (
     <>
       <Box mt="2" display="flex" alignItems="center" gap="2">
@@ -30,5 +30,5 @@ export function TicketHeader({ detail, now }: { detail: TicketDetail; now: numbe
       </Box>
       {values.length > 0 && <StatLine values={values} />}
     </>
-  );
+  )
 }

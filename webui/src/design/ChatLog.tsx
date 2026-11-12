@@ -1,12 +1,12 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
-import { useEffect, useState, type ReactNode } from "react";
-import { useConnectionContext, useConnectionState } from "../connection";
-import type { SessionChatResponse, SessionInfo } from "../generated/server";
-import { hasChat, roundKeyOf, roundOf } from "./chat";
-import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore";
-import type { AutoMenuState } from "./AutoMenu";
-import { Composer } from "./Composer";
-import { FooterLine } from "./FooterLine";
+import { Box, chakra, Text } from "@chakra-ui/react"
+import { useEffect, useState, type ReactNode } from "react"
+import { useConnectionContext, useConnectionState } from "../connection"
+import type { SessionChatResponse, SessionInfo } from "../generated/server"
+import { hasChat, roundKeyOf, roundOf } from "./chat"
+import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore"
+import type { AutoMenuState } from "./AutoMenu"
+import { Composer } from "./Composer"
+import { FooterLine } from "./FooterLine"
 import {
   FailureBanner,
   GxStopped,
@@ -14,16 +14,16 @@ import {
   replacesComposer,
   visibleFailure,
   type FailureActions,
-} from "./FailureBanner";
-import type { PostAnswer, PostPrompt } from "./prompt";
-import { QuestionSheet } from "./QuestionSheet";
-import { isAnswered } from "../ui/question-sheet/round";
-import { type RoundDraft, useRoundDraft } from "./roundDraft";
+} from "./FailureBanner"
+import type { PostAnswer, PostPrompt } from "./prompt"
+import { QuestionSheet } from "./QuestionSheet"
+import { isAnswered } from "../ui/question-sheet/round"
+import { type RoundDraft, useRoundDraft } from "./roundDraft"
 
 // The footer line where no composer is mounted; the ceiling comes from the snapshot.
 function SessionFooter({ session, modelOnly }: { session: SessionInfo; modelOnly?: boolean }) {
-  const { snapshot } = useConnectionState(useConnectionContext());
-  return <FooterLine session={session} ceiling={snapshot?.context_ceiling} modelOnly={modelOnly} />;
+  const { snapshot } = useConnectionState(useConnectionContext())
+  return <FooterLine session={session} ceiling={snapshot?.context_ceiling} modelOnly={modelOnly} />
 }
 
 // The sheet and the composer share the round's answers (see useRoundDraft: they survive a reload).
@@ -42,26 +42,26 @@ function ChatTail({
   roundDraft,
   autoMenu,
 }: {
-  session: SessionInfo;
-  chat: SessionChatResponse;
-  connected: boolean;
-  post?: PostPrompt;
-  answer?: PostAnswer;
-  onStale: () => void;
-  done?: boolean;
-  nextTitle?: string;
-  actions: FailureActions;
-  questions: boolean;
-  onQuestions: (on: boolean) => void;
-  roundDraft: RoundDraft;
-  autoMenu: AutoMenuState;
+  session: SessionInfo
+  chat: SessionChatResponse
+  connected: boolean
+  post?: PostPrompt
+  answer?: PostAnswer
+  onStale: () => void
+  done?: boolean
+  nextTitle?: string
+  actions: FailureActions
+  questions: boolean
+  onQuestions: (on: boolean) => void
+  roundDraft: RoundDraft
+  autoMenu: AutoMenuState
 }) {
-  const { draft, setAnswers, setIndex, clear } = roundDraft;
-  const { answers } = draft;
-  const [focus, setFocus] = useState<{ index: number }>();
-  const failure = visibleFailure(session.failure, done);
-  const round = roundOf(chat);
-  const { snapshot } = useConnectionState(useConnectionContext());
+  const { draft, setAnswers, setIndex, clear } = roundDraft
+  const { answers } = draft
+  const [focus, setFocus] = useState<{ index: number }>()
+  const failure = visibleFailure(session.failure, done)
+  const round = roundOf(chat)
+  const { snapshot } = useConnectionState(useConnectionContext())
   return (
     // The bottom area: at most half the screen, so only the question body scrolls past that.
     // In the Questions view the cap is gone and the sheet takes the rest of the column.
@@ -95,11 +95,9 @@ function ChatTail({
           {...actions}
         />
       )}
-      {!failure &&
-        session.actionable.gx_raised &&
-        session.actionable.reason && (
-          <GxStopped reason={session.actionable.reason} />
-        )}
+      {!failure && session.actionable.gx_raised && session.actionable.reason && (
+        <GxStopped reason={session.actionable.reason} />
+      )}
       {done || replacesComposer(failure) ? (
         <SessionFooter session={session} />
       ) : (
@@ -117,22 +115,22 @@ function ChatTail({
           round={round}
           answers={answers}
           onRoundSent={() => {
-            clear();
-            onQuestions(false);
+            clear()
+            onQuestions(false)
           }}
           onReview={(index) => {
-            onQuestions(true);
-            setFocus({ index });
+            onQuestions(true)
+            setFocus({ index })
           }}
           autoMenu={autoMenu}
         />
       )}
     </Box>
-  );
+  )
 }
 
 // Every dialog and popover (Send, jump menu, screen, steps) is one of these; Escape closes the top one first.
-const LAYERS = '[role="dialog"],[role="alertdialog"],[role="menu"]';
+const LAYERS = '[role="dialog"],[role="alertdialog"],[role="menu"]'
 
 function ViewToggle({
   answered,
@@ -141,12 +139,12 @@ function ViewToggle({
   onQuestions,
   menu,
 }: {
-  answered: number;
-  total: number;
-  questions: boolean;
-  onQuestions: (on: boolean) => void;
+  answered: number
+  total: number
+  questions: boolean
+  onQuestions: (on: boolean) => void
   /** The ⋯ menu, here while the keyboard layout hides the title row. */
-  menu?: ReactNode;
+  menu?: ReactNode
 }) {
   const tabs = (
     <Box
@@ -166,8 +164,8 @@ function ViewToggle({
         Chat
       </SegButton>
     </Box>
-  );
-  if (!menu) return tabs;
+  )
+  if (!menu) return tabs
   return (
     <Box display="flex" alignItems="center" gap="2" flex="none">
       <Box flex="1" minW="0" display="flex">
@@ -175,7 +173,7 @@ function ViewToggle({
       </Box>
       {menu}
     </Box>
-  );
+  )
 }
 
 function SegButton({
@@ -183,9 +181,9 @@ function SegButton({
   onClick,
   children,
 }: {
-  on: boolean;
-  onClick: () => void;
-  children: ReactNode;
+  on: boolean
+  onClick: () => void
+  children: ReactNode
 }) {
   return (
     <chakra.button
@@ -206,7 +204,7 @@ function SegButton({
     >
       {children}
     </chakra.button>
-  );
+  )
 }
 
 // Everything that depends on the round. The caller keys it by round, so a new round starts blank (and in the
@@ -229,45 +227,42 @@ function ChatBody({
   logTop,
   tabsMenu,
 }: {
-  logTop?: ReactNode;
-  tabsMenu?: ReactNode;
-  session: SessionInfo;
-  roundKey: string;
-  chat: SessionChatResponse;
-  connected: boolean;
-  post?: PostPrompt;
-  answer?: PostAnswer;
-  onStale: () => void;
-  done?: boolean;
-  nextTitle?: string;
-  working?: WorkingStep;
-  actions: FailureActions;
-  questions: boolean;
-  onQuestions: (on: boolean) => void;
-  autoMenu: AutoMenuState;
+  logTop?: ReactNode
+  tabsMenu?: ReactNode
+  session: SessionInfo
+  roundKey: string
+  chat: SessionChatResponse
+  connected: boolean
+  post?: PostPrompt
+  answer?: PostAnswer
+  onStale: () => void
+  done?: boolean
+  nextTitle?: string
+  working?: WorkingStep
+  actions: FailureActions
+  questions: boolean
+  onQuestions: (on: boolean) => void
+  autoMenu: AutoMenuState
 }) {
-  const roundDraft = useRoundDraft(session.id, roundKey);
-  const round = roundOf(chat);
-  const hasRound = round.length > 0;
+  const roundDraft = useRoundDraft(session.id, roundKey)
+  const round = roundOf(chat)
+  const hasRound = round.length > 0
   useEffect(() => {
-    if (!questions) return;
+    if (!questions) return
     // Capture phase: judge the layers as they were before this same Escape closes one of them.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || document.querySelector(LAYERS)) return;
-      onQuestions(false);
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [questions, onQuestions]);
-  const busy = session.status.state === "working" && !session.status.background;
+      if (e.key !== "Escape" || document.querySelector(LAYERS)) return
+      onQuestions(false)
+    }
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+  }, [questions, onQuestions])
+  const busy = session.status.state === "working" && !session.status.background
   return (
     <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
       {hasRound && (
         <ViewToggle
-          answered={
-            round.filter((c) => isAnswered(roundDraft.draft.answers[c.label]))
-              .length
-          }
+          answered={round.filter((c) => isAnswered(roundDraft.draft.answers[c.label])).length}
           total={round.length}
           questions={questions}
           onQuestions={onQuestions}
@@ -280,11 +275,25 @@ function ChatBody({
           head={logTop}
           busy={busy}
           sessionId={session.id}
-          working={step && <WorkingRow {...step} background={chat.background} current={chat.current} others={chat.others} />}
+          working={
+            step && (
+              <WorkingRow
+                {...step}
+                background={chat.background}
+                current={chat.current}
+                others={chat.others}
+              />
+            )
+          }
         />
       )}
       {questions && busy && step && (
-        <WorkingRow {...step} background={chat.background} current={chat.current} others={chat.others} />
+        <WorkingRow
+          {...step}
+          background={chat.background}
+          current={chat.current}
+          others={chat.others}
+        />
       )}
       <ChatTail
         session={session}
@@ -302,7 +311,7 @@ function ChatBody({
         autoMenu={autoMenu}
       />
     </Box>
-  );
+  )
 }
 
 // The chat of a Claude or Codex session. Other harnesses have no chat, so DesignChat never mounts this for them.
@@ -312,25 +321,25 @@ function ChatLog({
   refetch,
   ...rest
 }: {
-  session: SessionInfo;
-  chat: SessionChatResponse;
-  refetch: () => void;
-  post?: PostPrompt;
-  answer?: PostAnswer;
-  done?: boolean;
-  nextTitle?: string;
-  working?: WorkingStep;
-  actions: FailureActions;
-  questions: boolean;
-  onQuestions: (on: boolean) => void;
-  logTop?: ReactNode;
-  tabsMenu?: ReactNode;
+  session: SessionInfo
+  chat: SessionChatResponse
+  refetch: () => void
+  post?: PostPrompt
+  answer?: PostAnswer
+  done?: boolean
+  nextTitle?: string
+  working?: WorkingStep
+  actions: FailureActions
+  questions: boolean
+  onQuestions: (on: boolean) => void
+  logTop?: ReactNode
+  tabsMenu?: ReactNode
 }) {
-  const conn = useConnectionContext();
-  const connected = useConnectionState(conn).connected;
+  const conn = useConnectionContext()
+  const connected = useConnectionState(conn).connected
   // Lives above the keyed ChatBody: a round landing remounts it and must not close the Auto popover.
-  const [autoMenuOpen, setAutoMenuOpen] = useState(false);
-  const roundKey = roundKeyOf(chat);
+  const [autoMenuOpen, setAutoMenuOpen] = useState(false)
+  const roundKey = roundKeyOf(chat)
   return (
     <ChatBody
       key={roundKey}
@@ -342,7 +351,7 @@ function ChatLog({
       onStale={refetch}
       {...rest}
     />
-  );
+  )
 }
 
 /** The center column of a Design: its session's chat, or an empty chat when it has none. */
@@ -362,29 +371,29 @@ export function DesignChat({
   tabsMenu,
 }: {
   /** The ⋯ menu in the view tabs row (keyboard layout). */
-  tabsMenu?: ReactNode;
+  tabsMenu?: ReactNode
   /** The first entry of the Chat view's log. */
-  logTop?: ReactNode;
-  session?: SessionInfo;
+  logTop?: ReactNode
+  session?: SessionInfo
   /** The session's chat, fetched by the page; null while it loads. */
-  chat?: SessionChatResponse | null;
-  refetch: () => void;
-  post?: PostPrompt;
-  answer?: PostAnswer;
+  chat?: SessionChatResponse | null
+  refetch: () => void
+  post?: PostPrompt
+  answer?: PostAnswer
   /** The Design's Progress is Done: no composer, no `ended` banner. */
-  done?: boolean;
+  done?: boolean
   /** The subtitle under Continue: the next ticket's title, or the step label. */
-  nextTitle?: string;
+  nextTitle?: string
   /** The step the busy row names, and the ticket during Resolve tickets. */
-  working?: WorkingStep;
-  actions: FailureActions;
+  working?: WorkingStep
+  actions: FailureActions
   /** The Questions view: only the questions sheet, the failure notices and the composer. The page derives it. */
-  questions: boolean;
-  onQuestions: (on: boolean) => void;
+  questions: boolean
+  onQuestions: (on: boolean) => void
 }) {
-  if (!session) return null;
+  if (!session) return null
   if (!hasChat(session.harness)) {
-    const failure = visibleFailure(session.failure, done);
+    const failure = visibleFailure(session.failure, done)
     return (
       <>
         {failure && !needsTranscript(failure) && (
@@ -395,9 +404,9 @@ export function DesignChat({
         </Text>
         <SessionFooter session={session} modelOnly />
       </>
-    );
+    )
   }
-  if (!chat) return null;
+  if (!chat) return null
   return (
     <ChatLog
       key={session.id}
@@ -415,5 +424,5 @@ export function DesignChat({
       logTop={logTop}
       tabsMenu={tabsMenu}
     />
-  );
+  )
 }
