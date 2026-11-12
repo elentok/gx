@@ -42,10 +42,29 @@ type DraftTicket struct {
 	MockStates     []string `yaml:"mock_states"`
 	ChangedSymbols []string `yaml:"changed_symbols"`
 	ChangedFields  []string `yaml:"changed_fields"`
+	// MakeTargets must exist in the Makefile; Helpers are Go symbols whose
+	// declaration and comment are printed; Migrations asks for the highest
+	// migration number; Playwright checks one -g pattern per flow file.
+	MakeTargets []string          `yaml:"make_targets"`
+	Helpers     []string          `yaml:"helpers"`
+	Migrations  bool              `yaml:"migrations"`
+	Playwright  []PlaywrightCheck `yaml:"playwright"`
 
 	// Callers maps an entry or changed symbol to its caller list, already
 	// labelled; `draft` fills it in, the plan file does not.
 	Callers map[string]string `yaml:"-"`
+	// SeamFacts are printed lines under Test seams. Consumers and FieldTests
+	// map a changed field to its non-test and test mentions.
+	SeamFacts  []string          `yaml:"-"`
+	Consumers  map[string]string `yaml:"-"`
+	FieldTests map[string]string `yaml:"-"`
+}
+
+// PlaywrightCheck names a flow file, the flow numbers to run and the -g pattern.
+type PlaywrightCheck struct {
+	File  string `yaml:"file"`
+	Flows []int  `yaml:"flows"`
+	Grep  string `yaml:"grep"`
 }
 
 // BodyFileName is the body file written next to the manifest.
@@ -109,6 +128,9 @@ func RenderDraftBody(t DraftTicket, scenario, whatToBuild, acceptance string) st
 		}
 	}
 	list(t.TestFiles)
+	for _, f := range t.SeamFacts {
+		fmt.Fprintf(&b, "- %s\n", EscapePlaceholders(f))
+	}
 
 	b.WriteString("\n## Where to look\n\n")
 	if len(t.EntrySymbols)+len(t.ChangedSymbols)+len(t.ChangedFields) == 0 {
@@ -126,6 +148,10 @@ func RenderDraftBody(t DraftTicket, scenario, whatToBuild, acceptance string) st
 			fmt.Fprintf(&b, "  - `%s`\n", EscapePlaceholders(it))
 			if c, ok := t.Callers[it]; ok {
 				fmt.Fprintf(&b, "    - callers (%s)\n", EscapePlaceholders(c))
+			}
+			if c, ok := t.Consumers[it]; ok {
+				fmt.Fprintf(&b, "    - consumers (%s)\n", EscapePlaceholders(c))
+				fmt.Fprintf(&b, "    - existing tests mentioning it (%s)\n", EscapePlaceholders(t.FieldTests[it]))
 			}
 		}
 	}

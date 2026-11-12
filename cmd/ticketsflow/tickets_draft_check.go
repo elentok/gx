@@ -63,6 +63,7 @@ func draftMisses(plan *ticketspec.DraftPlan, root, commit string, procEnv []stri
 	for i := range plan.Tickets {
 		plan.Tickets[i].Callers = callers
 	}
+	misses = append(misses, draftFacts(plan, root, newCallerFinder(root, commit, procEnv), rgOK)...)
 	return misses
 }
 

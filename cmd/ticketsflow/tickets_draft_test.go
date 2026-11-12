@@ -2,11 +2,14 @@ package ticketsflow
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/migrations"
 )
 
 const draftPlan = `scenario: demo
@@ -240,6 +243,108 @@ func TestTicketsDraft_NoGoplsFallsBackToRg(t *testing.T) {
 	}
 	if strings.Contains(strings.ToLower(out), "judg") {
 		t.Errorf("output claims a judgment check:\n%s", out)
+	}
+}
+
+const factsPlan = `tickets:
+  - slug: facts
+    title: Facts thing
+    window: 40000
+    entry_symbols: [runAlpha]
+    test_files: [webui/src/node.test.ts, webui/src/dom.test.ts]
+    make_targets: [web-types]
+    helpers: [AlphaFn]
+    migrations: true
+    changed_fields: [Alpha.Field]
+    changed_symbols: [AlphaFn]
+    playwright:
+      - {file: flow.e2e.ts, flows: [7], grep: "Seven"}
+`
+
+func factsFixture(t *testing.T, d Deps) {
+	t.Helper()
+	cwd, _ := d.Getwd()
+	for name, content := range map[string]string{
+		"Makefile":               "web-types:\n\ttrue\n",
+		"webui/src/node.test.ts": "// @vitest-environment node\nimport 'x'\n",
+		"webui/src/dom.test.ts":  "import 'x'\n",
+		"webui/e2e/flow.e2e.ts":  "test(\"7. Seven things\", async () => {})\n",
+		"cmd/field.go":           "package cmd\n\ntype Alpha struct{ Field int }\n\nfunc useField(a Alpha) int { return a.Field }\n",
+		"cmd/field_test.go":      "package cmd\n\nimport \"testing\"\n\nfunc TestField(t *testing.T) { _ = Alpha{Field: 1} }\n",
+	} {
+		p := filepath.Join(cwd, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestTicketsDraft_PrintsEnvironmentFacts(t *testing.T) {
+	d, plan, manifest := draftSetup(t, factsPlan)
+	factsFixture(t, d)
+	out, err := draftOut(t, d, plan, manifest)
+	if err != nil {
+		t.Fatalf("draft: %v\n%s", err, out)
+	}
+	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
+	for _, want := range []string{
+		"test environment of `webui/src/node.test.ts`: node",
+		"test environment of `webui/src/dom.test.ts`: default",
+		"make target `web-types` exists",
+		"highest migration number in use: ",
+		"helper `AlphaFn` at cmd/sym.go:6",
+		"playwright -g `Seven` on flow.e2e.ts: finds 1 test(s): 7. Seven things",
+		"consumers (rg, not verified: cmd/field.go:",
+		"existing tests mentioning it (rg, not verified: cmd/field_test.go:",
+		"callers (rg result, not verified: ",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body lacks %q:\n%s", want, body)
+		}
+	}
+}
+
+func TestTicketsDraft_VerifiedAtCallers(t *testing.T) {
+	d, plan, manifest := draftSetup(t, factsPlan)
+	factsFixture(t, d)
+	onlyTools(t, true, "rg", "git")
+	if out, err := draftOut(t, d, plan, manifest); err != nil {
+		t.Fatalf("draft: %v\n%s", err, out)
+	}
+	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
+	if !strings.Contains(body, "callers (verified at ") {
+		t.Errorf("body:\n%s", body)
+	}
+}
+
+func TestTicketsDraft_MissingMakeTargetAndAnchoredPatternFail(t *testing.T) {
+	plan := strings.Replace(factsPlan, "[web-types]", "[no-such-target]", 1)
+	plan = strings.Replace(plan, `"Seven"`, `"^7"`, 1)
+	d, planPath, manifest := draftSetup(t, plan)
+	factsFixture(t, d)
+	out, err := draftOut(t, d, planPath, manifest)
+	if err == nil {
+		t.Fatalf("draft passed:\n%s", out)
+	}
+	for _, want := range []string{"make target `no-such-target` is not in Makefile", "finds no tests"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestTicketsDraft_MigrationLineMatchesRegistry(t *testing.T) {
+	d, plan, manifest := draftSetup(t, factsPlan)
+	factsFixture(t, d)
+	runDraftCmd(t, d, plan, manifest)
+	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
+	names := migrations.Default.Names()
+	want := fmt.Sprintf("highest migration number in use: %d (step %s)", len(names), names[len(names)-1])
+	if !strings.Contains(body, want) {
+		t.Errorf("body lacks %q:\n%s", want, body)
 	}
 }
 
