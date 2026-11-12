@@ -1,10 +1,61 @@
 import { Box, Text } from "@chakra-ui/react"
-import { useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 import type { SessionRoundCard } from "../generated/server"
 import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe"
 import { Button } from "../ui/button/Button"
 import { Question, QuestionDots } from "../ui/question-sheet/Question"
-import { isAnswered, type Answers, type QuestionMode } from "../ui/question-sheet/round"
+import {
+  isAnswered,
+  type Answer,
+  type Answers,
+  type QuestionCard,
+  type QuestionMode,
+} from "../ui/question-sheet/round"
+
+const NO_ANSWER: Answer = {}
+
+// One slide. Memoized with stable callbacks, so typing in one question does not re-render all the others.
+const Slide = memo(function Slide({
+  card,
+  k,
+  count,
+  index,
+  answer,
+  big,
+  mode,
+  onAnswer,
+  onPicked,
+}: {
+  card: QuestionCard
+  k: number
+  count: number
+  index: number
+  answer: Answer
+  big: boolean
+  mode: QuestionMode
+  onAnswer: (label: string, a: Answer) => void
+  onPicked: (k: number) => void
+}) {
+  return (
+    <Box
+      flex="0 0 100%"
+      minW="0"
+      css={{ scrollSnapAlign: "start" }}
+      role="group"
+      aria-label={`Question ${card.label} of ${count}`}
+      aria-hidden={k !== index}
+    >
+      <Question
+        big={big}
+        mode={mode}
+        card={card}
+        answer={answer}
+        onChange={(a) => onAnswer(card.label, a)}
+        onPicked={() => onPicked(k)}
+      />
+    </Box>
+  )
+})
 
 // A Grilling round docked above the composer. The caller keys it by round, so a new round opens a fresh sheet,
 // and owns the answers, since the composer's Send reads them.
@@ -150,6 +201,15 @@ export function QuestionSheet({
     setIndex(Math.min(round.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))))
   }
 
+  const onAnswersRef = useRef(onAnswers)
+  onAnswersRef.current = onAnswers
+  const onAnswer = useCallback(
+    (label: string, a: Answer) => onAnswersRef.current((all) => ({ ...all, [label]: a })),
+    [],
+  )
+  const last = round.length - 1
+  const onPicked = useCallback((k: number) => setIndex(Math.min(k + 1, last)), [last])
+
   const done = round.filter((c) => isAnswered(answers[c.label], c)).length
   const goto = (k: number) => {
     setIndex(k)
@@ -213,24 +273,18 @@ export function QuestionSheet({
             }}
           >
             {round.map((c, k) => (
-              <Box
+              <Slide
                 key={c.label}
-                flex="0 0 100%"
-                minW="0"
-                css={{ scrollSnapAlign: "start" }}
-                role="group"
-                aria-label={`Question ${c.label} of ${round.length}`}
-                aria-hidden={k !== index}
-              >
-                <Question
-                  big={questions}
-                  mode={mode}
-                  card={c}
-                  answer={answers[c.label] ?? {}}
-                  onChange={(a) => onAnswers((all) => ({ ...all, [c.label]: a }))}
-                  onPicked={() => setIndex(Math.min(k + 1, round.length - 1))}
-                />
-              </Box>
+                card={c}
+                k={k}
+                count={round.length}
+                index={index}
+                answer={answers[c.label] ?? NO_ANSWER}
+                big={questions}
+                mode={mode}
+                onAnswer={onAnswer}
+                onPicked={onPicked}
+              />
             ))}
           </Box>
         </Box>
