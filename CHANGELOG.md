@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.49.4 - 2026-11-12
+
+- Added keyboard shortcuts to the question sheet: n, p, j, k and N move between questions, Esc leaves a text box, and Cmd+Enter sends the answers.
+- Added the Leader chord `s` to focus the sidebar.
+- Changed Select to sit in the sidebar's workspace row. While selecting, the header shows the count, Select all and Done in place of the workspace picker.
+- Changed each usage tray bar to show the tighter of the 5h and weekly windows.
+- Fixed the first send after `/clear` being refused as stale.
+- Fixed the sidebar row focus ring so it covers the whole row.
+- Fixed the blocked banner showing in chat when the question sheet has its own Dismiss and terminal buttons.
+
 ## v0.49.3 - 2026-11-12
 
 - Added Leader key chords to the web UI. A Keybindings section in settings has two Leader key settings. Pressing the Leader key opens the Chord box, where keys such as c, d and x run actions, and modifier keys keep the box open. Saving settings in the web UI now updates other open pages live.
