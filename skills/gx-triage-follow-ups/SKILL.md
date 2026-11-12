@@ -158,11 +158,35 @@ Per row, in this order:
 3. `gx tickets move <addr> <epic>` or `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted
    --note ...`. A move renumbers the ticket. Capture the printed address, use it for every later
    command and save it with `--new-address`.
-4. `gx tickets set <new-addr> --type ... --status open`. Only `implement` tickets go to the ready
-   epic: the queue does not run `research` tickets.
+4. `gx tickets set <new-addr> --type ... --status open`. Steps 3 and 4 are for map-epic and close
+   rows; ready-epic rows are published (below). Only `implement` tickets go to the ready epic: the
+   queue does not run `research` tickets.
 
-Epics: the ready epic is `gx tickets epic add <project>:follow-ups-<date> --kind loop --status open`.
-This skill never queues it. Area map epics are `gx tickets epic add <project>:<slug> --kind map
+**Ready epic.** `implement` rows are not moved one by one. After every row's answers are saved
+(`gx tickets triage answers` runs first, so the answers sit in the body's Decisions), publish the
+whole ready epic `<project>:follow-ups-<date>` once, unattended, through
+[gx-to-tickets](../gx-to-tickets/SKILL.md) in its "no spec" mode. It never quizzes. The input is the
+follow-up bodies: the brief (`Suggested fix`) with the verify evidence and the answers. Build one
+plan, run `draft`, the writers (when 4 or more), `lint-claims` and one `publish`.
+`gx-to-tickets` creates the epic as a draft, adds the code-review ticket and opens the epic last.
+This skill never runs `epic add` for it and never queues it.
+
+Each manifest entry carries `from: <address of the follow-up>`, a string, or a list for a group. A group
+ticket has one acceptance-criteria group per follow-up and a `blocked_by` that is the union of its
+members' chain edges (the overlapping-files chain from Plan). `gx-to-tickets` has the final say on
+slicing: a group too big at publish is split, and the splits chain by `blocked_by`.
+
+**Row loop.** Run `lint-claims` and `publish --dry-run`. Map each refusal to its row through the
+entry's `from:`, call `gx tickets triage drop-rows`, and retry at most once per row. Each dropped row
+is saved `failed` with the refusal text and its follow-up stays in `follow-ups`; the other rows
+publish. A group is all or nothing, like a split row. A refusal that names no entry (a manifest parse
+error, a plan error, or a failure after the dry-run passed) saves every pending row `failed` with the
+text and stops the loop with no retry.
+
+After `publish`, save each published row's new address with `gx tickets triage write-state
+--new-address` (a list for a split or group).
+
+Area map epics are `gx tickets epic add <project>:<slug> --kind map
 --status open --body -`, the body opening with a frontmatter block carrying
 `destination_unconfirmed: true`, then a **Destination** (provisional: "decide these items, then a spec
 `docs/specs/<slug>.md`"), **Notes** ("Triaged from follow-ups on `<date>`" and the source
@@ -172,11 +196,8 @@ addresses), and empty **Decisions so far** and **Not yet specified**. A design i
 Save each row's result with `gx tickets triage write-state`. One failed row never stops the others:
 save it `failed` with the verb's refusal text unchanged.
 
-**Last pass**, after every row: chain edges (`gx tickets set <new-addr> --blocked-by
-<earlier-new-id>` for overlapping files), the code-review stub (`gx tickets ensure-code-review
-<project>:follow-ups-<date>`, then fill "What to review" with "all follow-up fixes in this epic";
-map epics get none), and `gx tickets close --sweep [project]`. Then `gx tickets triage last-pass`.
-`gx tickets validate` one ticket of each new epic.
+Map epics get no code-review ticket. After every row, run `gx tickets close --sweep [project]`, then
+`gx tickets triage last-pass`, and `gx tickets validate` one ticket of each new epic.
 
 ## 5. Done
 

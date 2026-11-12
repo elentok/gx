@@ -20,6 +20,28 @@ func TestTriageSkillAnchors(t *testing.T) {
 	}
 }
 
+func TestTriageWritePublishesThroughToTickets(t *testing.T) {
+	skill := collapseSpace(readFile(t, "gx-triage-follow-ups/SKILL.md"))
+	for _, want := range []string{
+		"gx-to-tickets", "from:", "drop-rows", "retry at most once", "no retry", "Row loop",
+	} {
+		if !strings.Contains(strings.ToLower(skill), strings.ToLower(want)) {
+			t.Errorf("triage skill lacks %q", want)
+		}
+	}
+	for _, gone := range []string{"epic add <project>:follow-ups-<date>", "**Last pass**"} {
+		if strings.Contains(skill, gone) {
+			t.Errorf("triage skill still has %q", gone)
+		}
+	}
+	toTickets := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	for _, want := range []string{"#### No spec mode", "skip `verify-plan`, `ensure-verify` and the quiz"} {
+		if !strings.Contains(toTickets, normalizeSpace(want)) {
+			t.Errorf("gx-to-tickets lacks %q", want)
+		}
+	}
+}
+
 func TestTrackerDocHasTriageRecord(t *testing.T) {
 	doc := readFile(t, "gx-local-tracker.md")
 	if !strings.Contains(doc, "\n## Triage record\n") {

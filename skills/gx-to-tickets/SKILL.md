@@ -76,6 +76,15 @@ fewer, keep 0.83. The command never changes a number; you apply the ratio by han
 Work from whatever is already in the conversation context. If the user passes a reference (a spec
 path, a ticket address) as an argument, read its full body (`gx tickets show <addr>` for a ticket).
 
+#### No spec mode
+
+When the input is follow-up bodies (gx-triage-follow-ups Write) and no spec, the input is the bodies
+themselves. In this "no spec" mode: skip `verify-plan`, `ensure-verify` and the quiz (the "spec does
+not name the slices" trigger does not apply); no verify ticket is made. Each manifest entry carries
+`from: <address of the follow-up>` (a list for a group). Run `ensure-code-review` for the ready epic, then
+`gx tickets set <epic> --status open` last, only if the epic is still `draft` (a second Triage on the
+same day joins the existing epic).
+
 ### 2. Explore the codebase (optional)
 
 If you have not already explored the codebase, do so to understand the current state of the code.
