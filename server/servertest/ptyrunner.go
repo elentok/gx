@@ -22,7 +22,7 @@ import (
 const (
 	ptyPollInterval = 20 * time.Millisecond
 	ptyStartTimeout = 10 * time.Second
-	ptyPromptGrace  = 500 * time.Millisecond
+	ptyPromptGrace  = 5 * time.Second
 	ptyStopGrace    = 2 * time.Second
 )
 
