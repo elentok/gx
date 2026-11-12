@@ -171,8 +171,8 @@ func TestEpicsDeps_RowForUsesTheHarnessFake(t *testing.T) {
 	d := fakeEpics()
 	d.Harness = fakeHarness{label: wire.HarnessLabel{Harness: "codex"}}
 	s := New(d)
-	e := tickets.Epic{Name: "e"}
-	row := s.rowFor(queue.RootRef{Project: "p", Epic: "e"}, e, tickets.Ticket{Number: 1, Identifier: "t1"})
+	var row wire.EpicDetailRow
+	s.decorateRow(&row, queue.RootRef{Project: "p", Epic: "e"}, tickets.Epic{Name: "e"}, tickets.Ticket{Number: 1, Identifier: "t1"})
 	if row.HarnessLabel.Harness != "codex" {
 		t.Fatalf("harness label = %+v, want codex", row.HarnessLabel)
 	}

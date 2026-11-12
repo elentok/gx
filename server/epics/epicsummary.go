@@ -238,6 +238,9 @@ func EpicStateFor(root queue.RootRef, e tickets.Epic, delivery string, claimedAt
 				continue
 			}
 			addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
+			if claimedAt == nil {
+				break
+			}
 			if _, ok := claimedAt(addr); ok {
 				return wire.EpicStateRunning
 			}

@@ -111,5 +111,7 @@ func (s *Epics) ArchivedDetail(w http.ResponseWriter, r *http.Request) {
 		notFound()
 		return
 	}
-	wire.WriteJSON(w, s.buildEpicDetail(root, archived, archived[i], time.Now(), true))
+	d := s.buildEpicDetail(root, archived, archived[i], time.Now())
+	d.ArchivedAt = archived[i].ArchivedAt
+	wire.WriteJSON(w, d)
 }

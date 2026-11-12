@@ -48,50 +48,59 @@ func (s *Epics) EpicDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no epic "+address, http.StatusNotFound)
 		return
 	}
-	wire.WriteJSON(w, s.buildEpicDetail(root, epics, epics[i], time.Now(), false))
+	d := s.buildEpicDetail(root, epics, epics[i], time.Now())
+	s.decorateLive(&d, root, epics[i])
+	wire.WriteJSON(w, d)
 }
 
-// buildEpicDetail builds one epic's detail. archived marks an epic loaded out
-// of .archive: its address can match an active epic's, so no live state (queue,
-// runs, sessions, PR, pause actions) is read for it.
-func (s *Epics) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time, archived bool) wire.EpicDetail {
-	var d wire.EpicDetail
+// buildEpicDetail builds one epic's detail from the ticket files alone. An
+// archived epic's address can match an active epic's, so it is served as built;
+// decorateLive adds the live state (queue, runs, sessions, PR, pause actions)
+// for active epics only.
+func (s *Epics) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
 	if e.IsMap {
-		d = s.buildMapDetail(root, epics, e, now, archived)
-	} else {
-		d = s.buildLoopDetail(root, e, now, archived)
+		return s.buildMapDetail(root, epics, e, now)
 	}
-	if archived {
-		d.ArchivedAt = e.ArchivedAt
-	}
-	return d
+	return s.buildLoopDetail(root, e, now)
 }
 
-func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time, archived bool) wire.EpicDetail {
-	byName := map[string]tickets.Epic{}
-	for _, other := range epics {
-		byName[other.Name] = other
-	}
-	queued := !archived && s.Queue.RootQueued(root)
-	d := wire.EpicDetail{
-		Address: root.String(), Kind: wire.EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
-		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
-		Queueable: !archived && queue.EpicQueueable(e, queued), Queued: queued,
-	}
-	if !archived {
+// decorateLive adds the live state of an active epic to its static detail d.
+func (s *Epics) decorateLive(d *wire.EpicDetail, root queue.RootRef, e tickets.Epic) {
+	d.Queued = s.Queue.RootQueued(root)
+	d.Queueable = queue.EpicQueueable(e, d.Queued)
+	if e.IsMap {
 		if deletable, err := s.DesignUncharted(root.String(), e); err != nil {
 			s.Log.Warn("design deletable check", "epic", root.String(), "err", err)
 		} else {
 			d.Deletable = deletable
 		}
+		d.DesignSection = designSection(d.Address, e, queue.MapProgress(e), s.designActivities()[d.Address])
+		return
+	}
+	d.State = EpicStateFor(root, e, s.Delivery(root.Project), s.Runs.StartedAtOf)
+	if EpicMergeBlocked(e) {
+		d.MergeBlockKind, d.MergeBlockReason, d.MergeBlockFiles = e.MergeBlockKind, e.MergeBlockReason, e.MergeBlockFiles
+		d.Actions = mergeBlockActions(e.MergeBlockKind)
+		d.ActionInfo = actionInfo(d.Actions)
+	}
+	for i, t := range e.Tickets {
+		s.decorateRow(&d.Rows[i], root, e, t)
+	}
+	s.decoratePRDetail(d, root, e)
+}
+
+func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
+	byName := map[string]tickets.Epic{}
+	for _, other := range epics {
+		byName[other.Name] = other
+	}
+	d := wire.EpicDetail{
+		Address: root.String(), Kind: wire.EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
+		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
 	}
 	d.Steps = mapSteps(e, byName)
 	step := queue.MapProgress(e)
-	var activity designActivity
-	if !archived {
-		activity = s.designActivities()[d.Address]
-	}
-	d.DesignSection = designSection(d.Address, e, step, activity)
+	d.DesignSection = designSection(d.Address, e, step, designActivity{})
 	d.RingProgress = designPercent(e, step)
 	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
@@ -114,30 +123,15 @@ func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e ticke
 	return d
 }
 
-func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time, archived bool) wire.EpicDetail {
-	queued := !archived && s.Queue.RootQueued(root)
-	startedAt, delivery := noRunStartedAt, ""
-	if !archived {
-		startedAt, delivery = s.Runs.StartedAtOf, s.Delivery(root.Project)
-	}
+func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
-		State: EpicStateFor(root, e, delivery, startedAt),
+		State: EpicStateFor(root, e, "", nil),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
-		Queueable: !archived && queue.EpicQueueable(e, queued), Queued: queued,
 		Draft: e.Status == string(schema.StatusDraft),
 	}
-	if !archived && EpicMergeBlocked(e) {
-		d.MergeBlockKind, d.MergeBlockReason, d.MergeBlockFiles = e.MergeBlockKind, e.MergeBlockReason, e.MergeBlockFiles
-		d.Actions = mergeBlockActions(e.MergeBlockKind)
-		d.ActionInfo = actionInfo(d.Actions)
-	}
 	for _, t := range e.Tickets {
-		if archived {
-			d.Rows = append(d.Rows, s.staticRow(root, e, t))
-		} else {
-			d.Rows = append(d.Rows, s.rowFor(root, e, t))
-		}
+		d.Rows = append(d.Rows, s.staticRow(root, e, t))
 		if t.Status == string(schema.StatusDone) {
 			d.AgentTime += t.ElapsedTime
 			d.CostTotal += t.ActualCost
@@ -149,9 +143,6 @@ func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Tim
 			end = now
 		}
 		d.WallClock = int(end.Sub(e.StartedAt).Seconds())
-	}
-	if !archived {
-		s.decoratePRDetail(&d, root, e)
 	}
 	d.Stats = epicStats(e, e.MergedAt, now)
 	d.Stats.Friction = epicFriction(e.Friction)
@@ -196,9 +187,6 @@ func baseRow(root queue.RootRef, e tickets.Epic, t tickets.Ticket, status ticket
 	}
 }
 
-// noRunStartedAt is the run lookup of an archived epic: nothing is running.
-func noRunStartedAt(string) (time.Time, bool) { return time.Time{}, false }
-
 // staticRow is a loop epic's row built from the ticket files alone.
 func (s *Epics) staticRow(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
 	row := baseRow(root, e, t, e.RenderedStatus(t))
@@ -212,9 +200,8 @@ func (s *Epics) staticRow(root queue.RootRef, e tickets.Epic, t tickets.Ticket) 
 	return row
 }
 
-// rowFor builds a loop epic's full row for t: staticRow plus the live parts.
-func (s *Epics) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
-	row := s.staticRow(root, e, t)
+// decorateRow adds the live parts to the static row of t.
+func (s *Epics) decorateRow(row *wire.EpicDetailRow, root queue.RootRef, e tickets.Epic, t tickets.Ticket) {
 	status := e.RenderedStatus(t)
 	row.HarnessLabel = s.Harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if at, ok := s.Runs.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
@@ -233,5 +220,4 @@ func (s *Epics) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wir
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()
 	}
-	return row
 }
