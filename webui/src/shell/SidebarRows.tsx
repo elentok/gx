@@ -126,8 +126,24 @@ function WrenchIcon({ status }: { status: SidebarStatus }) {
 
 /** The Triage icon: an inbox tray, coloured by status. */
 function InboxIcon({ status }: { status: SidebarStatus }) {
+  const working = status.tone === "running"
   return (
-    <Box as="span" data-testid="triage-icon" flex="none" display="grid" color={statusColor(status)}>
+    <Box
+      as="span"
+      data-testid="triage-icon"
+      data-working={working ? "" : undefined}
+      flex="none"
+      display="grid"
+      color={statusColor(status)}
+      css={{
+        "& circle": {
+          transformBox: "fill-box",
+          transformOrigin: "center",
+          animation: "inboxDrop 1.2s ease-in infinite",
+        },
+        "@media (prefers-reduced-motion: reduce)": { "& circle": { animation: "none" } },
+      }}
+    >
       <svg
         width="18"
         height="18"
@@ -142,6 +158,16 @@ function InboxIcon({ status }: { status: SidebarStatus }) {
       >
         <path d="M2.5 11.5l2.2-6.2A1.5 1.5 0 0 1 6.1 4.3h7.8a1.5 1.5 0 0 1 1.4 1l2.2 6.2" />
         <path d="M2.5 11.5v3.2a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3.2h-4.2a2.3 2.3 0 0 1-2.3 1.8h-2a2.3 2.3 0 0 1-2.3-1.8z" />
+        {working && (
+          <circle
+            data-testid="triage-drop"
+            cx="10"
+            cy="6.5"
+            r="1.4"
+            fill="currentColor"
+            stroke="none"
+          />
+        )}
       </svg>
     </Box>
   )

@@ -233,6 +233,17 @@ test("On hold is collapsed with a count and opens on click; Other lists its rows
   expect(scratch.queryByLabelText("Chat")).toBeNull()
 })
 
+test("the Other section's open state survives a reload", async () => {
+  setup("desktop")
+  await body().findByRole("link", { name: /Blog/ })
+  fireEvent.click(body().getByRole("button", { name: "Other" }))
+  expect(localStorage.getItem("gx.sidebar.other-open")).toBe("1")
+  cleanup()
+  setup("desktop")
+  await body().findByRole("link", { name: /Blog/ })
+  expect(await body().findByRole("link", { name: /scratch/ })).toBeTruthy()
+})
+
 test("a chat row reads Chat before its name", async () => {
   setup("desktop")
   await body().findByRole("link", { name: /Blog/ })

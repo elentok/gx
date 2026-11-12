@@ -193,6 +193,25 @@ const rowOf = (r: SidebarRow, visible: boolean): SelectRow => ({
   session: r.session,
 })
 
+const OTHER_OPEN_KEY = "gx.sidebar.other-open"
+
+// Storage is a convenience; the sidebar works without it.
+function readOtherOpen(): boolean {
+  try {
+    return localStorage.getItem(OTHER_OPEN_KEY) === "1"
+  } catch {
+    return false
+  }
+}
+
+function writeOtherOpen(open: boolean) {
+  try {
+    localStorage.setItem(OTHER_OPEN_KEY, open ? "1" : "0")
+  } catch {
+    // See above.
+  }
+}
+
 /** Holds one select model for the whole sidebar, above the rows and the footer, so the selection survives navigation. */
 export function SidebarSelectProvider({
   fetcher,
@@ -204,11 +223,13 @@ export function SidebarSelectProvider({
   children: ReactNode
 }) {
   const model = useSidebarModel(fetcher, active)
-  const [sectionOpen, setOpen] = useState<Record<string, boolean>>({})
-  const setSectionOpen = useCallback(
-    (group: string, open: boolean) => setOpen((o) => ({ ...o, [group]: open })),
-    [],
-  )
+  const [sectionOpen, setOpen] = useState<Record<string, boolean>>(() => ({
+    [GROUP_OTHER]: readOtherOpen(),
+  }))
+  const setSectionOpen = useCallback((group: string, open: boolean) => {
+    setOpen((o) => ({ ...o, [group]: open }))
+    if (group === GROUP_OTHER) writeOtherOpen(open)
+  }, [])
 
   // Agents nested under a row are not visible to Select all: their parent's expanded state is local to the row.
   const rows = useMemo<SelectRow[]>(() => {

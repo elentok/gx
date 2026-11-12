@@ -82,6 +82,11 @@ export const themeConfig = defineConfig({
         "0%, 60%, 100%": { transform: "translateY(0)", opacity: 0.5 },
         "30%": { transform: "translateY(-2px)", opacity: 1 },
       },
+      inboxDrop: {
+        "0%": { transform: "translateY(-3px)", opacity: 0 },
+        "30%": { opacity: 1 },
+        "70%, 100%": { transform: "translateY(3px)", opacity: 0 },
+      },
       chatShimmer: {
         from: { maskPosition: "100% 0" },
         to: { maskPosition: "0% 0" },
