@@ -24,6 +24,8 @@ func TestGuardBashCommand(t *testing.T) {
 		{"cat append heredoc", "cat >> a_test.go <<'EOF'\nfunc T() {}\nEOF", true},
 		{"cat overwrite heredoc", "cat > a.go <<EOF\npackage a\nEOF", true},
 		{"python heredoc", "python3 - <<'PY'\nprint(1)\nPY", true},
+		{"empty python stub chained with a read", "python3 - <<'E' 2>/dev/null; true\nE\nsed -n 98,114p read.go", false},
+		{"whitespace-only python stub", "python3 - <<'E'\n  \n\nE\ngit status", false},
 		{"sed print", `sed -n '1,5p' queue.go`, false},
 		{"sed pipe", `echo a | sed 's/a/b/'`, false},
 		{"plain redirect", `echo hi > out.txt`, false},

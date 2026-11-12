@@ -44,6 +44,31 @@ func withoutHeredocBodies(command string) string {
 	return strings.Join(kept, "\n")
 }
 
+// hasScriptHeredocBody reports whether an interpreter heredoc (python <<EOF)
+// feeds a script that has content. An empty or whitespace-only body runs
+// nothing, so it is allowed.
+func hasScriptHeredocBody(command string) bool {
+	delim := ""
+	inScript := false
+	for line := range strings.SplitSeq(command, "\n") {
+		if delim != "" {
+			if strings.TrimSpace(line) == delim {
+				delim = ""
+				continue
+			}
+			if inScript && strings.TrimSpace(line) != "" {
+				return true
+			}
+			continue
+		}
+		if m := heredocStart.FindStringSubmatch(line); m != nil {
+			delim = m[1]
+			inScript = scriptHeredc.MatchString(line)
+		}
+	}
+	return false
+}
+
 // withoutQuotedText empties quoted strings, keeping the quotes. A ">" inside
 // one (a commit trailer ending in `<noreply@x.com>"`) is not a redirect, while
 // `> "file"` still reads as one. A quote that never closes (an apostrophe in
@@ -83,7 +108,7 @@ func guardBashReason(command, editTool string) string {
 	switch {
 	case sedInPlace.MatchString(command):
 		return "sed -i edits files behind Edit's back. " + hint
-	case scriptHeredc.MatchString(command):
+	case scriptHeredc.MatchString(command) && hasScriptHeredocBody(command):
 		return "A heredoc script that rewrites files is invisible when it hangs. " + hint
 	case heredoc.MatchString(command) && fileRedirect.MatchString(withoutQuotedText(devNull.ReplaceAllString(withoutHeredocBodies(command), ""))):
 		return "A heredoc written into a file skips imports and indentation checks. " + hint
