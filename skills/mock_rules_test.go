@@ -84,6 +84,12 @@ func TestMockRulesAnchors(t *testing.T) {
 			"Skipping the check is never a question to ask a person",
 			"## Spec deviations",
 			"`gx tickets ask`",
+			"\"Fixture-unrenderable states\" in `webui/e2e/CATALOG.md`",
+			"record it `unchecked` under `## Spec deviations` and finish without asking",
+		}},
+		{"catalog", "../webui/e2e/CATALOG.md", []string{
+			"## Fixture-unrenderable states",
+			"`dev-mode` `running`",
 		}},
 		{"prototype", "gx-prototype/UI.md", []string{
 			"### 5a. Store the approved mock",
@@ -110,6 +116,7 @@ func TestMockRulesAnchors(t *testing.T) {
 			"verify-plan --table` prints the estimates",
 			"add 14000 to `expected_context_window` per mock state",
 			"at most 4 mock states per implement ticket",
+			"never list a fixture-unrenderable state",
 			"checks the first 4 states",
 		}},
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{

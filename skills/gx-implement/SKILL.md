@@ -194,6 +194,9 @@ heading. It lists the mock file, the states with their widths, the parts and the
 - Skipping the check is never a question to ask a person: "OK to finish without it?" has one
   answer, run it. Only a tool failure you cannot get past (after the MOCK-CHECK.md setup steps)
   justifies "When only a person can answer", and then you ask about that failure.
+- A state named under "Fixture-unrenderable states" in `webui/e2e/CATALOG.md` cannot be rendered by
+  design. It is not a tool failure and not a question: record it `unchecked` under `## Spec
+  deviations` and finish without asking. It does not block `finished`.
 - Fix each look difference. A difference kept on purpose goes under `## Spec deviations` (below),
   with the reason.
 - A named mock file that is missing is a check that cannot run. Follow "When only a person can

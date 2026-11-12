@@ -45,6 +45,13 @@ JSON file at `config_file` and run `gx server reload-config`; explain then reads
 Retries are off. Locators use roles and visible text, plus `data-testid` `pill` and `reason` on
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
+## Fixture-unrenderable states
+
+These states cannot be screenshotted by design, so a ticket's `## Mock check` never lists them
+(gx-to-tickets reads this list, and gx-implement treats a state named here as `unchecked`, not a tool failure):
+
+- `dev-mode` `running`: Vite's page is the fake's (`vitefake`), which has no gx UI.
+
 Before you write a flow, read "How the fixture behaves" in `skills/gx-ui-check/SKILL.md`: how a fake
 worker outcome maps to ticket status, why fixture CLI writes land late, how to set an epic summary,
 and "read `test-results/**/error-context.md` first on a locator failure".
