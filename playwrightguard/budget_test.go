@@ -40,7 +40,9 @@ import (
 // tests cover each rule alone.
 // Chords flow (+1): split out of the Workspaces flow, which timed out at 120 s in the full run; both now fit
 // their time limits with margin.
-const maxFlows = 140
+// Sidebar rows flow (+1): the Workspaces flow was still 64 s alone after the Chords split, over the
+// 45 s slow limit; its self-contained sidebar-row block runs as its own flow.
+const maxFlows = 141
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
