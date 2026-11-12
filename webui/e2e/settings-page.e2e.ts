@@ -81,7 +81,7 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   await expect(setChips).toHaveCount(1)
   await expect(page.getByText("Not set", { exact: true })).toBeVisible()
   await page.getByRole("button", { name: "Set", exact: true }).click()
-  await page.getByLabel("New Webhook url").fill("https://hooks.slack.example/secret-webhook")
+  await page.getByLabel("New Slack webhook URL").fill("https://hooks.slack.example/secret-webhook")
   await save(page).click()
   await expect(page.getByText("Not set", { exact: true })).toHaveCount(0)
   expect(await page.content()).not.toContain("secret-webhook")
@@ -93,6 +93,71 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   await go(page, globalHash("agents"), "Agents")
   await saveText(page, "Runner wait", "45s")
   await expect(page.getByText("Restart needed to apply").first()).toBeVisible()
+
+  // Keybindings: the two Leader keys and vi escape live here, vi escape no longer in Web UI.
+  await go(page, globalHash("web-ui"), "Web UI")
+  await expect(text(page, "Vi escape sequence")).toHaveCount(0)
+  await go(page, globalHash("keybindings"), "Keybindings")
+  await expect(text(page, "Leader key (Mac)")).toBeVisible()
+  await expect(text(page, "Leader key (other platforms)")).toBeVisible()
+  await expect(text(page, "Vi escape sequence")).toBeVisible()
+
+  // The help text points to the Chord box, and the page lists no chord letters.
+  await expect(page.getByText("Press it to see the chords").first()).toBeVisible()
+  await expect(page.getByText("New chat")).toHaveCount(0)
+  await expect(page.getByText("New design")).toHaveCount(0)
+
+  // Defaults, and each platform uses its own key (a second and a third page on the same server).
+  await expect(text(page, "Leader key (Mac)")).toHaveValue("cmd+e")
+  await expect(text(page, "Leader key (other platforms)")).toHaveValue("ctrl+e")
+  const onPlatform = async (platform: string) => {
+    const p = await page.context().newPage()
+    await p.addInitScript((value) => {
+      Object.defineProperty(Navigator.prototype, "platform", { get: () => value })
+      // The app reads userAgentData.platform first, so a Mac host would still read as a Mac.
+      Object.defineProperty(Navigator.prototype, "userAgentData", {
+        get: () => ({ platform: value }),
+      })
+    }, platform)
+    await p.goto(page.url().split("#")[0]! + "#/")
+    return p
+  }
+  const mac = await onPlatform("MacIntel")
+  const other = await onPlatform("Linux x86_64")
+  const box = (p: Page) => p.getByRole("menu", { name: "Chords" })
+  await mac.bringToFront()
+  await mac.keyboard.press("Control+e")
+  await expect(box(mac)).toHaveCount(0)
+  await mac.keyboard.press("Meta+e")
+  await expect(box(mac)).toBeVisible()
+  await mac.keyboard.press("Escape")
+  await expect(box(mac)).toHaveCount(0)
+  await other.bringToFront()
+  await other.keyboard.press("Meta+e")
+  await expect(box(other)).toHaveCount(0)
+  await other.keyboard.press("Control+e")
+  await expect(box(other)).toBeVisible()
+  await other.keyboard.press("Escape")
+  await expect(box(other)).toHaveCount(0)
+
+  // A Leader key with no Cmd, Ctrl or Alt is refused and the draft stays; alt+e saves.
+  await page.bringToFront()
+  await text(page, "Leader key (Mac)").fill("e")
+  await save(page).click()
+  await expect(page.getByRole("alert").filter({ hasText: "Not saved:" })).toBeVisible()
+  await expect(text(page, "Leader key (Mac)")).toHaveValue("e")
+  // Rows keep their own "Saved" note, so wait on the file instead.
+  const saveLeader = async (label: string, value: string, configKey: string) => {
+    await text(page, label).fill(value)
+    await save(page).click()
+    await expect
+      .poll(async () => (await fixture.globalConfig()).server?.web?.[configKey])
+      .toBe(value === "" ? "" : value)
+  }
+  await saveLeader("Leader key (Mac)", "alt+e", "leader-key-mac")
+
+  await mac.close()
+  await other.close()
 
   // The phone layout has no sideways scroll on the home, a section and the project list.
   await page.setViewportSize({ width: 390, height: 844 })
