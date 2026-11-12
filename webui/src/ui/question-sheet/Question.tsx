@@ -41,6 +41,8 @@ function Choice({
       type="button"
       aria-pressed={on}
       data-answer=""
+      // The sheet clips an outer ring at its sides, so the ring is drawn inside the button.
+      data-focus-ring="inset"
       aria-labelledby={`${uid}-label`}
       aria-describedby={consequence ? `${uid}-consequence` : undefined}
       display="flex"
