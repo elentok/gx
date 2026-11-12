@@ -96,6 +96,15 @@ describe("Modal", () => {
       expect(document.activeElement).toBe(first)
     })
 
+    it("sends focus from the end sentinel to the first element, and from the start one to the last", () => {
+      const { dialog, first, last } = mountTrap()
+      const [start, end] = dialog.querySelectorAll<HTMLElement>("[data-tab-sentinel]")
+      end!.focus()
+      expect(document.activeElement).toBe(first)
+      start!.focus()
+      expect(document.activeElement).toBe(last)
+    })
+
     it("moves Shift-Tab from the first element to the last", () => {
       const { dialog, first, last } = mountTrap()
       first.focus()

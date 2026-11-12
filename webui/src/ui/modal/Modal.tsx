@@ -24,9 +24,38 @@ interface ModalProps extends Omit<BoxProps, "children"> {
 const FOCUSABLE =
   'a[href], button, input, select, textarea, [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
 
+const SENTINEL = "data-tab-sentinel"
+
 function focusables(panel: HTMLElement) {
   return [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (el) => !el.hasAttribute("disabled") && el.getAttribute("type") !== "hidden",
+    (el) =>
+      !el.hasAttribute("disabled") &&
+      !el.hasAttribute(SENTINEL) &&
+      el.getAttribute("type") !== "hidden",
+  )
+}
+
+/**
+ * A zero-size tab stop at one end of the panel. Safari skips buttons and links when it tabs, so `trapTab` cannot know
+ * which element is last there; the browser's next stop after the last control is this sentinel, which sends focus
+ * to the other end.
+ */
+function Sentinel({ end }: { end: boolean }) {
+  return (
+    <Box
+      {...{ [SENTINEL]: "" }}
+      tabIndex={0}
+      aria-hidden="true"
+      position="absolute"
+      w="0"
+      h="0"
+      outline="none"
+      onFocus={(e) => {
+        const items = focusables(e.currentTarget.parentElement!)
+        const target = end ? items[0] : items[items.length - 1]
+        target?.focus()
+      }}
+    />
   )
 }
 
@@ -119,7 +148,9 @@ export function Modal({
           trapTab(e)
         }}
       >
+        <Sentinel end={false} />
         {children}
+        <Sentinel end />
       </Box>
     </Box>
   )
