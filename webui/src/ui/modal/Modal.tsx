@@ -6,6 +6,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react"
+import { createPortal } from "react-dom"
 import { useIsTopLayer } from "./layers"
 
 interface ModalProps extends Omit<BoxProps, "children"> {
@@ -109,7 +110,8 @@ export function Modal({
     if (!panelEl || panelEl.contains(document.activeElement)) return
     panelEl.focus()
   }, [])
-  return (
+  // In the body, so no ancestor stacking context (a sticky footer) puts it under the sidebar.
+  return createPortal(
     <Box
       ref={backdropRef}
       position="fixed"
@@ -152,6 +154,7 @@ export function Modal({
         {children}
         <Sentinel end />
       </Box>
-    </Box>
+    </Box>,
+    document.body,
   )
 }
