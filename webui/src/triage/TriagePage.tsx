@@ -2,7 +2,7 @@ import { Box, Spinner as ChakraSpinner, Text, chakra } from "@chakra-ui/react"
 import { useState } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { flowSession, liveFlowSessions } from "../design/view"
-import type { OpenFlow, ResumeSession, StopSession } from "../design/open"
+import { stateToken, type OpenFlow, type ResumeSession, type StopSession } from "../design/open"
 import {
   postAbandonTriage,
   postOpenTriage,
@@ -68,7 +68,12 @@ const FLOW = "triage"
 const APPROVE = "approve"
 const WRITE = "write"
 
-/** Start, or Continue once a session exists. The open route returns the live Triage, so it never starts a second one. */
+/**
+ * Start, or Continue once a session exists. The open route returns a live
+ * session as it is, so Continue on an idle one asks for a fresh session
+ * (`new`, with the idle session's state token): that is the /clear and skill
+ * the run-end line asks for. A working, blocked or rate-limited session is left alone.
+ */
 function HeaderButton({
   project,
   session,
@@ -79,12 +84,14 @@ function HeaderButton({
   open?: OpenFlow
 }) {
   const { run, pending } = useDesignWrite()
-  const running = !!session && session.status.state !== "exited"
+  const state = session?.status.state
+  const busy = !!session && state !== "exited" && state !== "idle"
+  const body = session && state === "idle" ? { new: true, state: stateToken(session) } : {}
   return (
     <Button
       tone="running"
-      disabled={pending || running}
-      onClick={() => run(() => open({ epic: project }))}
+      disabled={pending || busy}
+      onClick={() => run(() => open({ epic: project, ...body }))}
     >
       {pending && <ChakraSpinner size="sm" />}
       {session ? "Continue" : "Start"}
@@ -304,7 +311,7 @@ function TriageBody({
                 keep={deps.keep}
               />
             )}
-            {live.length > 0 && <RunningBanner phase={phase} view={view} />}
+            {live.some((s) => s.status.state !== "idle") && <RunningBanner phase={phase} view={view} />}
           </>
         )}
       />

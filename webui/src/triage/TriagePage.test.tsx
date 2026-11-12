@@ -191,6 +191,23 @@ test("Continue is disabled while a session runs and enabled once it is stopped, 
   await waitFor(() => expect(openTriage).toHaveBeenCalledWith({ epic: "gx" }))
 })
 
+test("an idle session shows no running strip and Continue asks for a fresh session", async () => {
+  const openTriage = vi.fn(async () => ({}))
+  const idle = session("idle")
+  render([idle], { openTriage })
+  const button = (await screen.findByRole("button", { name: "Continue" })) as HTMLButtonElement
+  expect(button.disabled).toBe(false)
+  expect(screen.queryByText(/Triage session running/)).toBeNull()
+  fireEvent.click(button)
+  await waitFor(() =>
+    expect(openTriage).toHaveBeenCalledWith({
+      epic: "gx",
+      new: true,
+      state: expect.stringMatching(/^s-triage:idle:/),
+    }),
+  )
+})
+
 test("at Approve the header has Approve and no Continue, and the Progress tree lists Questions and Review", async () => {
   const detail = viewOf({
     steps: stepsAt(2),

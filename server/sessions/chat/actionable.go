@@ -17,7 +17,7 @@ func RunEndNext(text string, ref FlowRef, agent string, final bool) (wire.Sessio
 	if line == "" {
 		return wire.SessionActionable{}, false
 	}
-	a := wire.SessionActionable{Reason: strings.TrimSpace(line), Derived: true}
+	a := wire.SessionActionable{Reason: grillround.RunEndFirstLine(line), Derived: true}
 	if !final {
 		a.Action = ContinueAction(ref, agent)
 	}

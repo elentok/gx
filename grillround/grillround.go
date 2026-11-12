@@ -18,8 +18,15 @@ var markerRE = regexp.MustCompile(`(?m)^[ \t]*` + regexp.QuoteMeta(marker))
 
 // RunEndLine matches the closing line of a gx-design run. It only marks that a
 // run ended: the text after "Next:" is the agent's own, and nothing reads a
-// phase from it.
-var RunEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next:.*$`)
+// phase from it. Agents sometimes wrap the line, so "Next:" may sit up to
+// six lines below the "✅ <step>:" line; the match then spans them.
+var RunEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:(?:.*\n){0,6}?.*Next:.*$`)
+
+// RunEndFirstLine is the "✅ <step>: …" line of a RunEndLine match.
+func RunEndFirstLine(match string) string {
+	first, _, _ := strings.Cut(match, "\n")
+	return strings.TrimSpace(first)
+}
 
 // Marker is the text that opens a question, for tests that build round text.
 const Marker = marker
