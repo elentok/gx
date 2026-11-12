@@ -21,6 +21,7 @@ packages:
       - migrate.go
       - queue.go
       - restart.go
+      - schedules.go
       - sessions.go
       - sessiontypes.go
       - settingspage.go

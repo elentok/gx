@@ -2494,6 +2494,77 @@ export interface RestartCheckReport {
 }
 
 //////////
+// source: schedules.go
+
+/**
+ * ScheduleRunStatus is where one Last runs row stands.
+ */
+export type ScheduleRunStatus = string;
+/**
+ * The closed set of Last runs statuses. The values are literals because tygo
+ * cannot resolve constants from another package.
+ */
+export const ScheduleRunQueued: ScheduleRunStatus = "queued";
+/**
+ * The closed set of Last runs statuses. The values are literals because tygo
+ * cannot resolve constants from another package.
+ */
+export const ScheduleRunRunning: ScheduleRunStatus = "running";
+/**
+ * The closed set of Last runs statuses. The values are literals because tygo
+ * cannot resolve constants from another package.
+ */
+export const ScheduleRunFinished: ScheduleRunStatus = "finished";
+/**
+ * The closed set of Last runs statuses. The values are literals because tygo
+ * cannot resolve constants from another package.
+ */
+export const ScheduleRunRanLate: ScheduleRunStatus = "ran-late";
+/**
+ * The closed set of Last runs statuses. The values are literals because tygo
+ * cannot resolve constants from another package.
+ */
+export const ScheduleRunNeedsAnswer: ScheduleRunStatus = "needs-answer";
+/**
+ * The closed set of Last runs statuses. The values are literals because tygo
+ * cannot resolve constants from another package.
+ */
+export const ScheduleRunCancelled: ScheduleRunStatus = "cancelled";
+/**
+ * The closed set of Last runs statuses. The values are literals because tygo
+ * cannot resolve constants from another package.
+ */
+export const ScheduleRunSkipped: ScheduleRunStatus = "skipped";
+/**
+ * ScheduleRun is one row of a Schedule's Last runs: a One-off, or a skipped set time.
+ */
+export interface ScheduleRun {
+  /**
+   * ScheduledFor is RFC 3339; empty for a Run now.
+   */
+  scheduled_for: string;
+  created_at: string;
+  /**
+   * Address is the One-off's address; empty for a skip.
+   */
+  address: string;
+  status: ScheduleRunStatus;
+  /**
+   * Result is the first non-empty line of the One-off's Result section.
+   */
+  result: string;
+  /**
+   * Reason and ReasonText describe a skip only.
+   */
+  reason: string;
+  reason_text: string;
+  /**
+   * AttentionAddress is the blocking ticket of a needs-attention skip.
+   */
+  attention_address: string;
+}
+
+//////////
 // source: sessions.go
 
 /**
