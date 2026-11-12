@@ -188,6 +188,10 @@ session, which costs more than a few lines of change. Follow gx-to-tickets's own
 process, skipping its step 5 (quiz the user) since this runs unattended — publish the drafted
 breakdown directly, same as any other unattended `gx-to-tickets` run.
 
+The fix-ticket rules (verified "Where to look" paths, real ticket ids, chained `--blocked-by` for
+tickets that share a file, acceptance wording checked against existing tests) are in
+[gx-to-tickets](../gx-to-tickets/SKILL.md) section 4d. Follow them.
+
 Pass `--parent <this-ticket-id>` on every `gx tickets add` call. `--parent` makes the new ticket a
 scheduling and UI child of this one: the scheduler's scope resolution and the Queue tab's tree
 nesting both walk the child's own `parent:` field, the only edge there is, and nothing is recorded

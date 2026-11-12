@@ -18,6 +18,19 @@ func TestToTicketsPrefactorChecks(t *testing.T) {
 	}
 }
 
+func TestCodeReviewFixTicketRules(t *testing.T) {
+	toTickets := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	for _, anchor := range []string{"### 4d. Code-review fix tickets", "--blocked-by <earlier-id>", "never batch numbers"} {
+		if !strings.Contains(toTickets, normalizeSpace(anchor)) {
+			t.Errorf("gx-to-tickets/SKILL.md is missing %q", anchor)
+		}
+	}
+	review := normalizeSpace(readFile(t, "gx-code-review/SKILL.md"))
+	if !strings.Contains(review, "(../gx-to-tickets/SKILL.md)") {
+		t.Error("gx-code-review/SKILL.md must link the fix-ticket rules in gx-to-tickets")
+	}
+}
+
 // The split limit lives in two places: the skill text and the Go constant.
 // This test keeps them equal.
 func TestToTicketsSplitLimit(t *testing.T) {

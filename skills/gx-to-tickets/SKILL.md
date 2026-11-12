@@ -311,7 +311,28 @@ How to tell a real miss from a false alarm:
   only.
 
 If no map applies, write an explicit `none — <rationale>`, as with test seams. Code-review fix
-tickets are out of scope here.
+tickets follow the next section instead.
+
+### 4d. Code-review fix tickets
+
+[gx-code-review](../gx-code-review/SKILL.md) files its approved findings through this skill. Fix
+agents pay for every wrong detail, so:
+
+- **Check each "Where to look" path against the diff before filing.** Open the file and confirm the
+  symbol lives there, and that the fix goes through it (a fix named in `install_plan.go` may really
+  belong in `syncSourceDir` in `cmd/skills/skills.go`). Give `file:func` and the component or helper
+  file, not only the e2e files.
+- **Use real ticket ids, never batch numbers.** "Tickets 1 and 2 of this batch" means nothing to the
+  agent. Write `14a`, `14b`. Allocate every ticket first with `gx tickets add`, then write the ids
+  into the bodies.
+- **Chain tickets that touch the same file up front.** Pass `--blocked-by <earlier-id>` on the later
+  `gx tickets add` call (each ticket blocked by the one before it, e.g. `14c --blocked-by 14b`, and
+  `14b --blocked-by 14a`). Otherwise `gx tickets validate` reports "unlanded commitful blockers and
+  no base" and the chain gets added by hand over several rounds.
+- **Reject acceptance wording that contradicts an existing test.** Read each test the ticket must
+  keep passing; "exit is clean" is wrong when an existing test requires an error exit. State which
+  one wins.
+- **Do not bundle unrelated fixes** into one ticket; split at the ticket size cap.
 
 ### 5. Quiz the user
 
