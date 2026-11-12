@@ -222,10 +222,10 @@ agent). "Settings flow" is the `settings` scenario's **200. Settings page, globa
 
 **Mock states**:
 
-- `$(gx tickets root)/gx/chords/mocks/02-mock-chord-box.html`, `chat-page`, 1040px, scenario
+- `$(gx tickets root)/chords/mocks/02-mock-chord-box.html`, `chat-page`, 1040px, scenario
   `workspaces` (existing; open a removable chat in Default, on a Mac context), parts: chord-box,
   leader-chip (⌘E), row-new-chat, row-new-design, row-remove-chat (red), esc-hint.
-- `$(gx tickets root)/gx/chords/mocks/02-mock-chord-box.html`, `other-page`, 1040px, scenario
+- `$(gx tickets root)/chords/mocks/02-mock-chord-box.html`, `other-page`, 1040px, scenario
   `workspaces` (existing; open the Epics page or a design, on a Mac context), parts: chord-box,
   leader-chip (⌘E), row-new-chat, row-new-design, esc-hint. No `row-remove-chat`.
 
