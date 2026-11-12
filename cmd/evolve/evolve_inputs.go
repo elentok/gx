@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -52,12 +53,17 @@ const (
 
 // InputsRow is one ticket of the flag table.
 type InputsRow struct {
-	ID               string         `json:"id"`
-	Type             string         `json:"type"`
-	Parent           string         `json:"parent,omitempty"`
-	Status           string         `json:"status"`
-	ExpectedContext  int            `json:"expected_context"`
-	ActualContext    int            `json:"actual_context"`
+	ID              string `json:"id"`
+	Type            string `json:"type"`
+	Parent          string `json:"parent,omitempty"`
+	Status          string `json:"status"`
+	ExpectedContext int    `json:"expected_context"`
+	ActualContext   int    `json:"actual_context"`
+	// WorkContext is ActualContext minus the session prefix: what the
+	// context-overrun flag compares against ExpectedContext. WorkApprox is true
+	// when the prefix is the fallback, not a stamped value.
+	WorkContext      int            `json:"work_context"`
+	WorkApprox       bool           `json:"work_approx,omitempty"`
 	ElapsedSeconds   int            `json:"elapsed_seconds"`
 	Cost             float64        `json:"cost"`
 	Sessions         []string       `json:"sessions,omitempty"`
@@ -159,6 +165,7 @@ func buildInputsTable(t evolveTarget, evs []runlog.Event, merged map[string]bool
 			FixTickets:      fixes[tk.Identifier],
 			Flags:           []string{},
 		}
+		row.WorkContext, row.WorkApprox = ticketspec.Work(tk)
 		if tk.Parent != nil {
 			row.Parent = *tk.Parent
 		}
@@ -277,8 +284,7 @@ func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
 	// Conflict sessions are listed apart, so any extra session here is a relaunch.
 	add(len(row.Sessions) > 1, flagRelaunch)
 	add(has(string(events.Nudged)), flagNudge)
-	work, _ := ticketspec.Work(tk)
-	add(row.ExpectedContext > 0 && work > 2*row.ExpectedContext, flagOverrun)
+	add(row.ExpectedContext > 0 && row.WorkContext > 2*row.ExpectedContext, flagOverrun)
 	add(median > 0 && row.ElapsedSeconds > 2*median, flagSlow)
 	add(tk.Status == string(schema.StatusDone) && !tk.Commitless && (row.ActualContext == 0 || row.ElapsedSeconds == 0), flagMetricsAbsent)
 	add(len(row.FixTickets) > 0, flagFixTickets)
@@ -381,10 +387,14 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 
 func printInputsTable(w io.Writer, table InputsTable) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tTYPE\tPARENT\tSTATUS\tEXP\tACT\tELAPSED\tCOST\tSESSIONS\tEVENTS\tFLAGS\tSEV")
+	fmt.Fprintln(tw, "ID\tTYPE\tPARENT\tSTATUS\tEXP\tACT\tWORK\tELAPSED\tCOST\tSESSIONS\tEVENTS\tFLAGS\tSEV")
 	for _, r := range table.Rows {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%d\t%ds\t%.2f\t%s\t%s\t%s\t%d\n",
-			r.ID, r.Type, dash(r.Parent), r.Status, r.ExpectedContext, r.ActualContext,
+		work := strconv.Itoa(r.WorkContext)
+		if r.WorkApprox {
+			work = "~" + work
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%d\t%s\t%ds\t%.2f\t%s\t%s\t%s\t%d\n",
+			r.ID, r.Type, dash(r.Parent), r.Status, r.ExpectedContext, r.ActualContext, work,
 			r.ElapsedSeconds, r.Cost, dash(strings.Join(r.Sessions, ",")),
 			dash(formatEventCounts(r.Events)), dash(strings.Join(r.Flags, ",")), r.Severity)
 	}

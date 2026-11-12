@@ -59,11 +59,12 @@ A loud or hand-built command seen in more than one session is a finding: its sug
 ### Verify parts
 
 A verify part is a ticket with `expected_context_window`, so the table's `context-overrun` flag
-already covers it: actual tokens above 2 times the budget. That flag is
+already covers it: work tokens (the `WORK` column, ACT minus the session prefix; `~` marks the
+fallback prefix) above 2 times the budget. Read `WORK` against the budget, never `ACT`. That flag is
 the only automatic check; don't add another. Compare every verify part yourself, flagged or not,
 using only the table and the ticket body (`gx tickets show`), never its session:
 
-- Its actual tokens against its budget.
+- Its work tokens against its budget.
 - Its budget against the sum of the per-story estimates in its body, plus the part base from
   `gx tickets verify-plan --table`. They should match; if not, the part was written wrong.
 

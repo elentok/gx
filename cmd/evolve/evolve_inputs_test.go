@@ -208,6 +208,45 @@ func TestEvolveInputs_TableOutput(t *testing.T) {
 	}
 }
 
+func TestEvolveInputs_TableShowsWorkNextToAct(t *testing.T) {
+	t.Parallel()
+	f := inputsFixture(t)
+	for name, fm := range map[string]string{
+		"09-stamped.md":  "id: \"09\"\nstatus: done\ntype: implement\nexpected_context_window: 20000\nprefix_tokens: 40000\nactual_context_window: 90000\nelapsed_time: 100\nactual_cost: 1\n",
+		"10-fallback.md": "id: \"10\"\nstatus: done\ntype: implement\nexpected_context_window: 20000\nactual_context_window: 98000\nelapsed_time: 100\nactual_cost: 1\n",
+	} {
+		if err := os.WriteFile(filepath.Join(f.epic, "issues", name), []byte("---\n"+fm+"---\nBody.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var out bytes.Buffer
+	if err := runEvolveInputs(f.env, &out, "proj:epic", false); err != nil {
+		t.Fatal(err)
+	}
+	cells := map[string][]string{}
+	var header []string
+	for line := range strings.SplitSeq(out.String(), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		if fields[0] == "ID" {
+			header = fields
+		}
+		cells[fields[0]] = fields
+	}
+	col := slices.Index(header, "WORK")
+	if col < 0 || slices.Index(header, "ACT") != col-1 {
+		t.Fatalf("header = %v, want WORK right after ACT", header)
+	}
+	if got := cells["09"][col]; got != "50000" {
+		t.Errorf("09 WORK = %q, want 50000", got)
+	}
+	if got := cells["10"][col]; got != "~50000" {
+		t.Errorf("10 WORK = %q, want ~50000 (fallback prefix)", got)
+	}
+}
+
 func TestEvolveInputs_UnreadableSessionIsMissingWithWarning(t *testing.T) {
 	t.Parallel()
 	fx := inputsFixture(t)
