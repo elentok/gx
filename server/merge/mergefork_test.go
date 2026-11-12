@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -156,6 +157,43 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 		t.Error("root still queued after the merge")
 	}
 	waitUntil(t, "the dependent to launch", func() bool { return f.others.Load() > 0 })
+}
+
+// Story 59 of the pr-flow spec: delivery flips to pr while the Merge ticket runs.
+// The ticket finishes, but a pr project never merges locally, so the epic is
+// completed and left for a PR (Awaiting PR), with no second Merge ticket.
+func TestMergeFork_DeliverySwitchToPRMidRunFinishesTheTicketAndLeavesTheEpicForAPR(t *testing.T) {
+	t.Parallel()
+	var f *forkFixture
+	f = newForkFixture(t, func(_ *forkFixture, _ int) {
+		if err := servertest.WriteProjectRepo(f.Store, "proj", f.Repo, `,"auto-ff-merge":true,"delivery":"pr"`); err != nil {
+			t.Error(err)
+		}
+	})
+	if err := servertest.WriteProjectRepo(f.Store, "proj", f.Repo, `,"auto-ff-merge":true,"delivery":"merge"`); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.QueueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
+
+	if got := f.merges.Load(); got != 1 {
+		t.Errorf("merge turns = %d, want 1", got)
+	}
+	if files := f.mergeTicketFiles(t); len(files) != 1 {
+		t.Errorf("merge tickets = %v, want only the running one", files)
+	}
+	f.assertStamps(t, false)
+	if out := f.Git(t, "branch", "--contains", schedEpic, "main"); strings.TrimSpace(out) != "" {
+		t.Errorf("main holds the epic's tip after the switch to pr: %s", out)
+	}
+	if got := f.H.Server.EpicState(queue.RootRef{Project: "proj", Epic: schedEpic}, tickets.LoadEpicAt(filepath.Join(f.Store, "proj", schedEpic))); got != wire.EpicStateAwaitingPR {
+		t.Errorf("epic state = %q, want %q", got, wire.EpicStateAwaitingPR)
+	}
+	if md := f.epicMD(t); strings.Contains(md, "pr_number:") || strings.Contains(md, "pr_url:") {
+		t.Errorf("epic got a PR:\n%s", md)
+	}
 }
 
 func TestMergeFork_AnEpicWithAPRIsNeverMergedLocally(t *testing.T) {
