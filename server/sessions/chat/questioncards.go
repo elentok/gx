@@ -61,12 +61,19 @@ var classSlots = map[SessionClass][]CardSlot{
 }
 
 // askAddress is the ticket whose ask a session's chat lists: the run of a Queue
-// agent, or what a Fix agent fixes (which may be a project name, then no ask).
+// agent, what a Fix agent fixes (which may be a project name, then no ask), or
+// the ticket a plain session belongs to. Flow sessions (Design, Triage) keep no
+// fallback: their Ticket is a map address, not a ticket with an ask.
 func askAddress(m Meta) string {
-	if m.RunTicket != "" {
+	switch {
+	case m.RunTicket != "":
 		return m.RunTicket
+	case m.FixOf != "":
+		return m.FixOf
+	case ClassOf(m) == ClassPlain:
+		return m.Ticket
 	}
-	return m.FixOf
+	return ""
 }
 
 // TicketAskCard is an open ticket ask as a Question card. Its id is the ticket
