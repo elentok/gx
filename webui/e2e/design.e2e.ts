@@ -87,7 +87,8 @@ test.describe("5. Start a design session and answer a round", () => {
     ).toHaveAccessibleDescription("Runs the step now.")
     await questions.getByRole("button", { name: "Huh?" }).click()
     await expect(questions.getByText("2 of 2 answered")).toBeVisible()
-    const release = await holdRoute(page, "**/v1/sessions/prompt")
+    // A round goes through the answer endpoint, so that is the request to hold open.
+    const release = await holdRoute(page, "**/v1/sessions/answer")
     await page.getByRole("button", nav("Send answers")).click()
     await expect(page.getByRole("button", nav("Send answers"))).toBeDisabled()
     release()
