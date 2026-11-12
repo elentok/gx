@@ -21,7 +21,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/syshealth"
 )
 
@@ -147,7 +147,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 	}
 	if r.ProcCap != nil {
 		if limit := r.ProcCap(r.log); limit > 0 {
-			if err := r.CLI.PaneRun(tab.RootPaneID, nativerunner.UlimitCommand(limit)); err != nil {
+			if err := r.CLI.PaneRun(tab.RootPaneID, proccap.UlimitCommand(limit)); err != nil {
 				_ = r.CLI.TabClose(tab.TabID)
 				return agentrunner.Session{}, fmt.Errorf("cap the pane's processes: %w", err)
 			}

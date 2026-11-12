@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/proccap"
 )
 
 func testEnv(t *testing.T) []string {
@@ -17,7 +18,7 @@ func testEnv(t *testing.T) []string {
 
 func TestNew_HeadlessAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
 	state := t.TempDir()
-	_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), state, 0, nil)
+	_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), state, 0, Options{}, nil)
 	h, ok := runnerFor("headless", "proj").(*nativerunner.Headless)
 	if !ok {
 		t.Fatalf("runnerFor(headless, proj) = %T, want *Headless", runnerFor("headless", "proj"))
@@ -35,7 +36,7 @@ func TestNew_EveryRunnerCarriesN(t *testing.T) {
 		n    time.Duration
 		want time.Duration
 	}{{9 * time.Second, 9 * time.Second}, {0, agentrunner.DefaultN}} {
-		_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), tc.n, nil)
+		_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), tc.n, Options{}, nil)
 		got := map[string]time.Duration{
 			"herdr":    runnerFor("herdr", "p").(*herdrrunner.Runner).WaitN(),
 			"headless": runnerFor("headless", "p").(*nativerunner.Headless).WaitN(),
@@ -51,7 +52,7 @@ func TestNew_EveryRunnerCarriesN(t *testing.T) {
 
 func TestNew_PtyAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
 	state := t.TempDir()
-	r, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), state, 0, nil)
+	r, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), state, 0, Options{}, nil)
 	if r.Name() != "pty" {
 		t.Errorf("default runner Name = %q, want pty", r.Name())
 	}
@@ -68,7 +69,7 @@ func TestNew_PtyAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
 }
 
 func TestNew_BuildsAnyRunnerPerPairLazily(t *testing.T) {
-	_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, nil)
+	_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, Options{}, nil)
 	herdrA := runnerFor("herdr", "a")
 	if herdrA == nil || herdrA.Name() != "herdr" {
 		t.Fatalf("runnerFor(herdr, a) = %v, want a herdr runner", herdrA)
@@ -88,25 +89,41 @@ func TestNew_BuildsAnyRunnerPerPairLazily(t *testing.T) {
 }
 
 func TestNew_HeadlessDefaultRunnerHasARoot(t *testing.T) {
-	r, _ := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, nil)
+	r, _ := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, Options{}, nil)
 	if h, ok := r.(*nativerunner.Headless); !ok || h.Root == "" {
 		t.Errorf("default runner = %#v, want a *Headless with a Root", r)
 	}
 }
 
 func TestNew_NamesComeFromTheRunners(t *testing.T) {
-	if r, _ := New(agentrunner.ChoiceHerdr, testEnv(t), t.TempDir(), 0, nil); r.Name() != "herdr" {
+	if r, _ := New(agentrunner.ChoiceHerdr, testEnv(t), t.TempDir(), 0, Options{}, nil); r.Name() != "herdr" {
 		t.Errorf("herdr Name = %q", r.Name())
 	}
-	if r, _ := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, nil); r.Name() != "headless" {
+	if r, _ := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, Options{}, nil); r.Name() != "headless" {
 		t.Errorf("headless Name = %q", r.Name())
 	}
 }
 
 func TestNew_HerdrServerCanBuildHeadless(t *testing.T) {
-	_, runnerFor := New(agentrunner.ChoiceHerdr, testEnv(t), t.TempDir(), 0, nil)
+	_, runnerFor := New(agentrunner.ChoiceHerdr, testEnv(t), t.TempDir(), 0, Options{}, nil)
 	if _, ok := runnerFor("headless", "proj").(*nativerunner.Headless); !ok {
 		t.Error("a herdr server must still reach a headless run's runner")
+	}
+}
+
+func TestNew_ProcHeadroomReachesEveryRunnerWithoutAnOverride(t *testing.T) {
+	_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, Options{ProcHeadroom: func() int { return 7 }}, nil)
+	count := func() (int, error) { return 100, nil }
+	hl := runnerFor("headless", "p").(*nativerunner.Headless)
+	pty := runnerFor("pty", "p").(*nativerunner.Pty)
+	for name, src := range map[string]proccap.Source{"headless": hl.ProcCap, "pty": pty.ProcCap} {
+		src.Count = count
+		if got := src.Limit(nil); got != 107 {
+			t.Errorf("%s cap = %d, want 107", name, got)
+		}
+	}
+	if got := runnerFor("herdr", "p").(*herdrrunner.Runner).ProcCap(nil); got <= 0 {
+		t.Errorf("herdr cap = %d, want a positive cap", got)
 	}
 }
 
@@ -123,7 +140,7 @@ func TestNew_PtyOverrideReachesThePty(t *testing.T) {
 		PromptGrace:  3 * time.Millisecond,
 		StopGrace:    4 * time.Millisecond,
 	}
-	_, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), t.TempDir(), 0, override)
+	_, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), t.TempDir(), 0, Options{}, override)
 	p := runnerFor("pty", "proj").(*nativerunner.Pty)
 	if !reflect.DeepEqual(p.Holder, override.Holder) || p.Claude != override.Claude || p.Codex != override.Codex || p.Procs != override.Procs {
 		t.Errorf("holder/claude/codex/procs = %v %q %q %v, want the override's", p.Holder, p.Claude, p.Codex, p.Procs)
@@ -135,7 +152,7 @@ func TestNew_PtyOverrideReachesThePty(t *testing.T) {
 }
 
 func TestNew_NoPtyOverrideLeavesThePtyFieldsEmpty(t *testing.T) {
-	_, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), t.TempDir(), 0, nil)
+	_, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), t.TempDir(), 0, Options{}, nil)
 	p := runnerFor("pty", "proj").(*nativerunner.Pty)
 	if p.Holder != nil || p.Claude != "" || p.Codex != "" || p.Procs != nil ||
 		p.PollInterval != 0 || p.StartTimeout != 0 || p.PromptGrace != 0 || p.StopGrace != 0 {

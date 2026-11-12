@@ -3,7 +3,6 @@
 package runnerbuild
 
 import (
-	"log/slog"
 	"sync"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/sessionlookup"
 )
 
@@ -31,8 +31,12 @@ type PtyOverride struct {
 	PromptGrace  time.Duration
 	StopGrace    time.Duration
 	LaunchCaps   claudeui.LaunchProofCaps
-	// ProcHeadroom is the live watchdog.ulimit-headroom; see Pty.ProcHeadroom.
-	// The headless and herdr runners read it too.
+}
+
+// Options is what production configures on the runners.
+type Options struct {
+	// ProcHeadroom is the live watchdog.ulimit-headroom every runner reads at
+	// each launch; nil means no process cap.
 	ProcHeadroom func() int
 }
 
@@ -42,7 +46,7 @@ type PtyOverride struct {
 // per project; runnerFor is nil for a runner it cannot build. The returned
 // runner answers host health and projects runnerFor never sees, so it is built
 // for FallbackProject.
-func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, pty *PtyOverride) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
+func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, opts Options, pty *PtyOverride) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
 	type pair struct{ runner, project string }
 	dirs := config.DirsFrom(env)
 	home, _ := dirs.Home()
@@ -60,18 +64,12 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 		case agentrunner.ChoiceHerdr:
 			h := herdrrunner.NewIn(herdr.CLI{Env: env}, home, sessionlookup.RootsFrom(env).CodexHome)
 			h.N = n
-			if pty != nil {
-				h.ProcCap = func(log *slog.Logger) int { return nativerunner.LiveProcCap(pty.ProcHeadroom, nil, log) }
-			}
+			h.ProcCap = proccap.Source{Headroom: opts.ProcHeadroom}.Limit
 			r = h
 		case agentrunner.ChoiceHeadless:
-			hl := &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
-			if pty != nil {
-				hl.ProcHeadroom = pty.ProcHeadroom
-			}
-			r = hl
+			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n, ProcCap: proccap.Source{Headroom: opts.ProcHeadroom}}
 		case agentrunner.ChoicePTY:
-			p := &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n, Env: env}
+			p := &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n, Env: env, ProcCap: proccap.Source{Headroom: opts.ProcHeadroom}}
 			if pty != nil {
 				p.Holder = pty.Holder
 				p.Claude = pty.Claude
@@ -82,7 +80,6 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 				p.PromptGrace = pty.PromptGrace
 				p.StopGrace = pty.StopGrace
 				p.LaunchCaps = pty.LaunchCaps
-				p.ProcHeadroom = pty.ProcHeadroom
 			}
 			r = p
 		default:

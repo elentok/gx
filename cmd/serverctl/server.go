@@ -166,12 +166,13 @@ func runServer(ctx context.Context, d Deps) error {
 	// The runners are built before the server, so the live headroom is read
 	// through srvRef once the server exists; before that the config's value.
 	var srvRef atomic.Pointer[server.Server]
-	ptyOverride := &runnerbuild.PtyOverride{ProcHeadroom: func() int {
+	runnerOpts := runnerbuild.Options{ProcHeadroom: func() int {
 		if s := srvRef.Load(); s != nil {
 			return s.Settings().Load().Watchdog.UlimitHeadroom
 		}
 		return cfg.Watchdog.UlimitHeadroom
 	}}
+	ptyOverride := &runnerbuild.PtyOverride{}
 	// Test hook: gxfixture widens how long a launch prompt may sit on an unknown
 	// command, so a skill registry that fills late can still deliver it.
 	if v := os.Getenv("GX_LAUNCH_UNKNOWN_GRACE"); v != "" {
@@ -181,7 +182,7 @@ func runServer(ctx context.Context, d Deps) error {
 		}
 		ptyOverride.LaunchCaps = claudeui.LaunchProofCaps{UnknownGrace: grace, Grace: 3 * grace}
 	}
-	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, ptyOverride)
+	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, runnerOpts, ptyOverride)
 	var tcpAddr string
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr

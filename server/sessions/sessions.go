@@ -27,6 +27,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
@@ -348,11 +349,11 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 // procCapArgs is the holder's cap flag for a launch now, from the live
 // headroom setting.
 func procCapArgs(mg *Manager) []string {
-	count := mg.cfg.ProcCount
-	if count == nil {
-		count = nativerunner.DefaultProcCount
+	src := proccap.Source{
+		Headroom: func() int { return mg.settings.Load().Watchdog.UlimitHeadroom },
+		Count:    mg.cfg.ProcCount,
 	}
-	return nativerunner.ProcCapArgs(nativerunner.ProcCap(count, mg.settings.Load().Watchdog.UlimitHeadroom, mg.log))
+	return proccap.Args(src.Limit(mg.log))
 }
 
 // launchArgs is the extra harness args of a launch or resume. Only Claude and

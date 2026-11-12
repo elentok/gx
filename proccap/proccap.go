@@ -1,4 +1,8 @@
-package nativerunner
+// Package proccap computes the process cap (`ulimit -u` headroom) an agent
+// launches under and builds the commands that apply it. The runners, the
+// session manager and runnerbuild share it, so none depends on another's
+// runner package for it.
+package proccap
 
 import (
 	"fmt"
@@ -7,11 +11,11 @@ import (
 	"github.com/elentok/gx/syshealth"
 )
 
-// ProcCap is the process limit for an agent launched now: the current process
+// Cap is the process limit for an agent launched now: the current process
 // count plus headroom. The cap is fixed at launch, so a fork storm fails with
 // EAGAIN instead of spreading. A count that cannot be read gives no cap (0)
 // and the reason is logged: a launch never fails over it.
-func ProcCap(count func() (int, error), headroom int, log *slog.Logger) int {
+func Cap(count func() (int, error), headroom int, log *slog.Logger) int {
 	if headroom <= 0 {
 		// Unset settings, not a request for a cap at the current count.
 		return 0
@@ -26,17 +30,26 @@ func ProcCap(count func() (int, error), headroom int, log *slog.Logger) int {
 	return n + headroom
 }
 
-// LiveProcCap is ProcCap with the headroom read at call time, so a settings
-// change reaches the next launch. A nil headroom gets no cap; a nil count gets
-// the default counter.
-func LiveProcCap(headroom func() int, count func() (int, error), log *slog.Logger) int {
-	if headroom == nil {
+// Source is where a launch reads its cap from. It is the one place the
+// counter can be injected.
+type Source struct {
+	// Headroom is read at each launch, so a settings change reaches the next
+	// one. Nil means no cap.
+	Headroom func() int
+	// Count counts processes; nil means DefaultCount. Tests inject it.
+	Count func() (int, error)
+}
+
+// Limit is the cap for a launch now; zero is none.
+func (s Source) Limit(log *slog.Logger) int {
+	if s.Headroom == nil {
 		return 0
 	}
+	count := s.Count
 	if count == nil {
-		count = DefaultProcCount
+		count = DefaultCount
 	}
-	return ProcCap(count, headroom(), log)
+	return Cap(count, s.Headroom(), log)
 }
 
 // UlimitCommand is the shell command that applies the cap to the shell
@@ -55,9 +68,9 @@ func CappedCommand(limit int, name string, args []string) (string, []string) {
 	return "/bin/sh", append([]string{"-c", UlimitCommand(limit) + ` && exec "$@"`, "sh", name}, args...)
 }
 
-// DefaultProcCount counts every process the OS reports. That is at least the
+// DefaultCount counts every process the OS reports. That is at least the
 // uid's own count, so the cap is never tighter than the uid's real usage.
-func DefaultProcCount() (int, error) {
+func DefaultCount() (int, error) {
 	t, err := syshealth.DefaultProcess().Read()
 	if err != nil {
 		return 0, err
@@ -65,8 +78,8 @@ func DefaultProcCount() (int, error) {
 	return len(t.Processes), nil
 }
 
-// ProcCapArgs is the holder flag that carries the cap; none for no cap.
-func ProcCapArgs(limit int) []string {
+// Args is the holder flag that carries the cap; none for no cap.
+func Args(limit int) []string {
 	if limit <= 0 {
 		return nil
 	}

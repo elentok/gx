@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -207,7 +208,7 @@ func (p *Pty) launcher() ptyLauncher {
 }
 
 func (p *Pty) procCap() int {
-	return LiveProcCap(p.ProcHeadroom, p.ProcCount, p.log)
+	return p.ProcCap.Limit(p.log)
 }
 
 // launchCaps is the launch proof's caps with LaunchCaps' set fields applied.
@@ -405,7 +406,7 @@ func (l ptyLauncher) spawn(opts agentrunner.StartOptions, dir, sessionID string)
 		// The holder takes the session id too, so its cmdline passes the
 		// liveness check like the agent's.
 		[]string{"--session-id", sessionID, "--harness", string(kind), "--dir", dir},
-		ProcCapArgs(limit),
+		proccap.Args(limit),
 		[]string{"--", launch.Name},
 		launch.Args)
 	cmd := exec.Command(holderArgv[0], args...)

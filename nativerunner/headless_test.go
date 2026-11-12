@@ -19,6 +19,7 @@ import (
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/tuiclaude"
 	"golang.org/x/sys/unix"
@@ -349,8 +350,10 @@ func TestHeadless_StartLaunchesClaudeUnderTheProcCap(t *testing.T) {
 		t.Fatal(err)
 	}
 	limit := min(hard.Max, 3000)
-	h.runner.ProcHeadroom = func() int { return 10 }
-	h.runner.ProcCount = func() (int, error) { return int(limit) - 10, nil }
+	h.runner.ProcCap = proccap.Source{
+		Headroom: func() int { return 10 },
+		Count:    func() (int, error) { return int(limit) - 10, nil },
+	}
 	s := h.start(t, "epic-cap")
 
 	rec := h.launch(t)

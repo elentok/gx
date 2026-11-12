@@ -26,7 +26,7 @@ type SessionsConfig struct {
 	Env              []string
 	Holder           []string
 	// ProcCount counts processes for the holder's cap; nil means
-	// nativerunner.DefaultProcCount.
+	// proccap.DefaultCount.
 	ProcCount               func() (int, error)
 	Notifier                osnotify.Notifier
 	Player                  sound.Player

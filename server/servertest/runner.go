@@ -69,7 +69,7 @@ func resolveRunner(cfg *server.Config, ch *runnerChoice) (pty bool) {
 		return false
 	}
 	if ch.herdr {
-		cfg.Runner, _ = runnerbuild.New(agentrunner.ChoiceHerdr, cfg.Env, cfg.StateDir, cfg.RunnerWait, nil)
+		cfg.Runner, _ = runnerbuild.New(agentrunner.ChoiceHerdr, cfg.Env, cfg.StateDir, cfg.RunnerWait, runnerbuild.Options{}, nil)
 	}
 	return !ch.herdr
 }

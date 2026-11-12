@@ -139,7 +139,7 @@ func (h *Harness) buildPty() {
 	// The fake gives the launch record by default; a test's own env in cfg.Env
 	// still wins.
 	env := append(h.cfg.Env[:len(h.cfg.Env):len(h.cfg.Env)], agentfake.TUIEnv+"=1")
-	_, runnerFor := runnerbuild.New("pty", env, h.StateDir, h.cfg.RunnerWait, &runnerbuild.PtyOverride{
+	_, runnerFor := runnerbuild.New("pty", env, h.StateDir, h.cfg.RunnerWait, runnerbuild.Options{}, &runnerbuild.PtyOverride{
 		Holder:       []string{exe, holderArg},
 		Claude:       exe,
 		Procs:        NewProcessTable(),
@@ -151,7 +151,7 @@ func (h *Harness) buildPty() {
 	})
 	// The fake herdr executable is this binary too; the TUI env would make it
 	// answer as a Claude fake, so herdr is built over the plain env.
-	_, herdrFor := runnerbuild.New("herdr", h.cfg.Env, h.StateDir, h.cfg.RunnerWait, nil)
+	_, herdrFor := runnerbuild.New("herdr", h.cfg.Env, h.StateDir, h.cfg.RunnerWait, runnerbuild.Options{}, nil)
 	var mu sync.Mutex
 	wrapped := map[*nativerunner.Pty]*ptyRunner{}
 	wrap := func(r agentrunner.Runner) agentrunner.Runner {
