@@ -83,8 +83,7 @@ func TestSchedulerPrevious_RunningPreviousRunSkips(t *testing.T) {
 
 func TestSchedulerPrevious_BlockingRunSkipsUntilCancelled(t *testing.T) {
 	cases := map[string]servertest.TicketOpts{
-		"paused":       {PauseReason: "question"},
-		"needs-repair": {Status: "needs-repair"},
+		"paused": {PauseReason: "question"},
 	}
 	for name, opts := range cases {
 		t.Run(name, func(t *testing.T) {

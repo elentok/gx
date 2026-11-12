@@ -36,7 +36,7 @@ func Decide(prev *tickets.Ticket, address string) Decision {
 		return Decision{Action: ActionStart}
 	case prev.Status == "open" && prev.ClaimedAt.IsZero():
 		return Decision{Action: ActionReplace, Address: address}
-	case prev.Status == "paused", prev.Status == "needs-answer", prev.Status == "needs-repair":
+	case prev.Status == "paused":
 		return Decision{Action: ActionSkip, Reason: ReasonPreviousRunNeedsAttention, Address: address}
 	default:
 		return Decision{Action: ActionSkip, Reason: ReasonPreviousRunStarted, Address: address}

@@ -23,8 +23,6 @@ func TestDecide(t *testing.T) {
 		{"queued after a claim", &tickets.Ticket{Status: "open", ClaimedAt: claimed}, Decision{Action: ActionSkip, Reason: ReasonPreviousRunStarted, Address: addr}},
 		{"running", &tickets.Ticket{Status: "claimed", ClaimedAt: claimed}, Decision{Action: ActionSkip, Reason: ReasonPreviousRunStarted, Address: addr}},
 		{"paused", &tickets.Ticket{Status: "paused"}, Decision{Action: ActionSkip, Reason: ReasonPreviousRunNeedsAttention, Address: addr}},
-		{"needs-answer", &tickets.Ticket{Status: "needs-answer"}, Decision{Action: ActionSkip, Reason: ReasonPreviousRunNeedsAttention, Address: addr}},
-		{"needs-repair", &tickets.Ticket{Status: "needs-repair"}, Decision{Action: ActionSkip, Reason: ReasonPreviousRunNeedsAttention, Address: addr}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
