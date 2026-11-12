@@ -140,12 +140,15 @@ func (f sessionSeeder) seedImages(id string, harness string) error {
 // seedInterrupted appends the lines of one interrupted turn, as each harness
 // writes them, and waits until the chat shows the separator.
 func (f sessionSeeder) seedInterrupted(id string, harness string) error {
-	lines := []string{`{"type":"user","uuid":"u-interrupted","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}`}
-	if harness == "codex" {
+	var lines []string
+	switch harness {
+	case "codex":
 		lines = []string{
 			`{"timestamp":"2026-01-01T10:00:00Z","type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}}`,
 			`{"timestamp":"2026-01-01T10:00:00Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"<turn_aborted>\nThe user interrupted the previous turn on purpose.\n</turn_aborted>"}]}}`,
 		}
+	default:
+		lines = []string{`{"type":"user","uuid":"u-interrupted","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"` + transcript.InterruptedByUserText + `"}]}}`}
 	}
 	if err := f.appendChatLines(id, harness, lines); err != nil {
 		return err

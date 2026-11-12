@@ -327,8 +327,11 @@ func SummarizeCall(name string, in map[string]any) string {
 	return name
 }
 
+// InterruptedByUserText is the text Claude writes as a user message when a turn is interrupted.
+const InterruptedByUserText = "[Request interrupted by user]"
+
 var interruptTexts = map[string]bool{
-	"[Request interrupted by user]":              true,
+	InterruptedByUserText:                        true,
 	"[Request interrupted by user for tool use]": true,
 }
 

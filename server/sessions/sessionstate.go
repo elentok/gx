@@ -13,8 +13,9 @@ import (
 )
 
 // InterruptSession ends a Working session's current turn and keeps the session,
-// with the harness's own interrupt key (Esc for Codex, Ctrl+C for Claude). The holder protocol has no interrupt verb: its
-// keys reach claude as typed.
+// with the harness's own interrupt key (Esc for Codex, Ctrl+C for Claude).
+// The holder protocol has no interrupt verb: its keys reach the harness as
+// typed.
 func (mg *Manager) InterruptSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	mg.Watches.MetaMu.Lock()
 	defer mg.Watches.MetaMu.Unlock()
