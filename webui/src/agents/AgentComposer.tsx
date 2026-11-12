@@ -98,6 +98,7 @@ export function AgentComposer({
     >
       <ComposerImages
         state={images}
+        gap="3"
         send={
           working ? (
             <InterruptControl
@@ -122,6 +123,7 @@ export function AgentComposer({
           value={text}
           onChange={setText}
           onSubmit={onSubmit}
+          insetRing
           note={line ?? null}
           footer={<FooterLine session={session} ceiling={ceiling} modelOnly={!hasChat(session.harness)} />}
           completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}

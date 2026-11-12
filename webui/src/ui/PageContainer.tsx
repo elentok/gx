@@ -6,6 +6,8 @@ export function PageContainer({ children, fill }: { children: ReactNode; fill?: 
     <Box
       p="4"
       pt="0"
+      // A full-height page ends in its composer. On desktop its bottom row lines up with the docked sidebar's footer (8px of padding); phone and tablet keep the same small gap.
+      {...(fill && { pb: "1.5" })}
       maxW="1366px"
       mx="auto"
       data-page-container

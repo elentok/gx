@@ -55,6 +55,7 @@ export function ComposerImages({
   afterAdd,
   phone = false,
   footer,
+  gap = "2",
 }: {
   /** A dim line between the text box and the button row; leave it out when the box carries it. */
   footer?: ReactNode;
@@ -64,6 +65,8 @@ export function ComposerImages({
   /** Sits right next to Add, before the status line. */
   afterAdd?: ReactNode;
   phone?: boolean;
+  /** Space between the stacked parts: thumbnails, text box, button row. */
+  gap?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const onPaste = (e: ClipboardEvent) => {
@@ -83,7 +86,7 @@ export function ComposerImages({
   };
   const line = lineText(state);
   return (
-    <Box display="flex" flexDirection="column" gap="2" onPaste={onPaste} onDragOver={onDragOver} onDrop={onDrop}>
+    <Box display="flex" flexDirection="column" gap={gap} onPaste={onPaste} onDragOver={onDragOver} onDrop={onDrop}>
       {state.images.length > 0 && (
         <ImageStrip images={state.images} onRetry={state.retry} onRemove={state.remove} />
       )}

@@ -42,6 +42,8 @@ interface FieldProps {
   note?: { text: string; red?: boolean } | null;
   /** A line inside the box, under the text and the note. */
   footer?: ReactNode;
+  /** Draws the focus ring inside the box, so its edge lines up with the content around it. */
+  insetRing?: boolean;
 }
 
 /** A textarea with an expand button that opens a large editor on the same text. The parent owns the text; there is no copy and no save step. */
@@ -85,6 +87,7 @@ function Field({
   menu,
   note,
   footer,
+  insetRing,
 }: Omit<FieldProps, "completion"> & { menu?: Menu }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -124,6 +127,8 @@ function Field({
     if (menu?.onKeyDown(e)) return;
     if (onSubmit) submitOnCmdEnter(e, onSubmit);
   };
+  // The note/footer strip stops short of the border, and of the inset ring too when there is one.
+  const ring = insetRing ? "2px" : "1px";
   return (
     <Box position="relative">
       <Textarea
@@ -133,6 +138,7 @@ function Field({
         borderRadius={radius}
         {...(bg ? { bg } : {})}
         autoFocus={autoFocus}
+        {...(insetRing ? { "data-focus-ring": "inset-field" } : {})}
         rows={rows}
         lineHeight="1.5"
         display="block"
@@ -158,14 +164,14 @@ function Field({
         // Opaque, so text scrolling through the textarea's bottom padding does not show under the note or footer.
         <Box
           position="absolute"
-          bottom="1px"
-          left="1px"
-          right="1px"
-          px="calc(var(--chakra-spacing-3) - 1px)"
+          bottom={ring}
+          left={ring}
+          right={ring}
+          px={`calc(var(--chakra-spacing-3) - ${ring})`}
           pt="1"
           pb="1.5"
           bg={bg ?? "surface.raised"}
-          borderBottomRadius={`calc(${radius} - 1px)`}
+          borderBottomRadius={`calc(${radius} - ${ring})`}
         >
           {note !== undefined && (
             <Text

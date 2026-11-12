@@ -53,6 +53,10 @@ export const themeConfig = defineConfig({
     "[role='menu']:focus-visible [role='menuitem'][data-highlighted]": {
       boxShadow: "0 0 0 2px {colors.surface.raised}, 0 0 0 4px {colors.tone.running.fg} !important",
     },
+    // A field whose box must line up with the content around it: the ring sits inside the border, radius kept.
+    "[data-focus-ring='inset-field']:focus-visible": {
+      boxShadow: "inset 0 0 0 2px {colors.tone.running.fg} !important",
+    },
     "[data-focus-ring='inset']:focus-visible": {
       borderRadius: "8px",
       boxShadow: "inset 0 0 0 2px {colors.tone.running.fg} !important",
