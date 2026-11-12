@@ -38,7 +38,14 @@ import type { SaveChecks } from "./checks/setup"
 import type { FetchChecksStatus } from "./checks/status"
 import type { FetchArchived } from "./archive/archive"
 import { ArchivePage } from "./archive/ArchivePage"
-import type { FetchSchedules, PostSwitch } from "./schedules/schedules"
+import type {
+  FetchScheduleShow,
+  FetchSchedules,
+  PostCreate,
+  PostEdit,
+  PostSwitch,
+} from "./schedules/schedules"
+import { SchedulePage } from "./schedules/SchedulePage"
 import { SchedulesPage } from "./schedules/SchedulesPage"
 import { EpicsPage } from "./epics/EpicsPage"
 import type { FetchEpicList } from "./epics/list"
@@ -84,6 +91,20 @@ function EpicRoute({
       fetchList={fetchList}
       openDesign={openDesign}
       fixAgent={fixAgent}
+    />
+  )
+}
+
+function ScheduleRoute({ fetchers }: { fetchers: RouteFetchers }) {
+  const address = useParams()["*"]
+  return (
+    <SchedulePage
+      key={address}
+      address={address && address !== "new" ? address : undefined}
+      fetchList={fetchers.schedules}
+      fetchShow={fetchers.scheduleShow}
+      create={fetchers.createSchedule}
+      edit={fetchers.editSchedule}
     />
   )
 }
@@ -157,6 +178,9 @@ export interface RouteFetchers {
   archived?: FetchArchived
   schedules?: FetchSchedules
   switchSchedule?: PostSwitch
+  scheduleShow?: FetchScheduleShow
+  createSchedule?: PostCreate
+  editSchedule?: PostEdit
   archivedEpic?: FetchEpicDetail
   checksStatus?: FetchChecksStatus
   saveChecks?: SaveChecks
@@ -233,7 +257,9 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
       path: "/schedules",
       element: <SchedulesPage fetchList={fetchers.schedules} post={fetchers.switchSchedule} />,
     },
-    { path: "/schedules/*", element: <Text p="6">Not built yet</Text> },
+    { path: "/schedules/new", element: <ScheduleRoute fetchers={fetchers} /> },
+    // A Schedule's address holds a colon (project:slug), so it arrives as the splat.
+    { path: "/schedules/*", element: <ScheduleRoute fetchers={fetchers} /> },
     { path: "/tips", element: <TipsPage fetchTips={fetchers.tips} /> },
     { path: "/settings", element: settingsPage },
     { path: "/settings/s/:section", element: settingsPage },
