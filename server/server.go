@@ -16,11 +16,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git/pr"
+	schedrec "github.com/elentok/gx/schedules"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/sched"
+	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/sessions"
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
@@ -95,6 +97,9 @@ type Server struct {
 	settings settings.Holder
 	disks    *disk.Disk
 	health   *health.Health
+	// schedState and schedRunner start Scheduled runs at each set time.
+	schedState  *schedules.State
+	schedRunner *schedules.Scheduler
 	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
 	sessionChat *chat.Chat
 	// prompt holds the auto-advance countdowns and the turn settling.
@@ -370,6 +375,15 @@ func New(cfg Config) (*Server, error) {
 	host := queueHost{sessionHost{s}, s.harness}
 	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: host})
 	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: host, TicketStore: cfg.TicketStore})
+	schedState, err := schedules.Open(cfg.StateDir)
+	if err != nil {
+		return nil, fmt.Errorf("open schedule state: %w", err)
+	}
+	s.schedState = schedState
+	s.schedRunner = &schedules.Scheduler{
+		Store: schedrec.NewStore(cfg.TicketStore), State: schedState, Submit: s.oneOffs, Log: log,
+		Now: cfg.SchedulesClock, Interval: cfg.SchedulesInterval, Ready: s.migrator.StartupDone(),
+	}
 	s.harness.GiveLog(cfg.Runner)
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
@@ -675,6 +689,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(progressDone); s.progress.Run(freshCtx) }()
 	prWatchDone := make(chan struct{})
 	go func() { defer close(prWatchDone); s.prWatch.Run(freshCtx) }()
+	schedulesDone := make(chan struct{})
+	go func() { defer close(schedulesDone); s.schedRunner.Run(freshCtx) }()
 	s.health.FileStartIncident(time.Now())
 	var err error
 	select {
@@ -723,6 +739,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		{"wait-sweep", sweepDone},
 		{"wait-progress", progressDone},
 		{"wait-pr-watch", prWatchDone},
+		{"wait-schedules", schedulesDone},
 	} {
 		recordShutdown(w.name)
 		<-w.done

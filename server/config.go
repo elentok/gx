@@ -141,6 +141,10 @@ type Config struct {
 	GoCacheDir func() (string, error)
 	// DiskPollInterval is how often the disk watcher reads; zero means one minute.
 	DiskPollInterval time.Duration
+	// SchedulesClock is the Schedule scheduler's clock; nil means time.Now.
+	SchedulesClock func() time.Time
+	// SchedulesInterval is how often the scheduler checks; zero means one minute.
+	SchedulesInterval time.Duration
 	// MigrationFailurePollInterval is how often the server checks the migration
 	// failure record for a change; zero means 2 seconds.
 	MigrationFailurePollInterval time.Duration

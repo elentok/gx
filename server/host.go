@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -35,6 +36,9 @@ func (s *Server) TicketOps() *ticketops.Ops { return s.ops }
 
 // OneOffs gives tests the one-off submit seam (SubmitScheduled).
 func (s *Server) OneOffs() *queue.OneOffs { return s.oneOffs }
+
+// Schedules gives tests the per-machine Schedule state the scheduler uses.
+func (s *Server) Schedules() *schedules.State { return s.schedState }
 
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recovery.RecoverAsync(f) }
 

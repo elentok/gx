@@ -114,6 +114,7 @@ var allowed = map[string]int{
 	"server/recovery/recovery_investigate_test.go":            1,
 	"server/recovery/recovery_gates_test.go":                  6,
 	"server/sched/runner_test.go":                             1,
+	"server/schedules/scheduler_test.go":                      1, // negative wait: a second run or a skip would show within a few checks
 	"server/server_notify_test.go":                            1,
 	"server/server_test.go":                                   1,
 	"server/sessions/askflows/askfallback_test.go":            1, // negative wait: no fallback card lists for a picker, a permission prompt or an unreadable layout
