@@ -92,8 +92,27 @@ func (f sessionSeeder) seedDeadSessions(sc scenario) error {
 	return nil
 }
 
+// settledControlFiles waits until the control files stop appearing. Queue, Fix
+// and Design agents start their fakes after the server accepts them, so a
+// snapshot taken right away would count their late files as a new session's.
+func (f sessionSeeder) settledControlFiles() []string {
+	const quietPolls = 5
+	deadline := time.Now().Add(sessionWaitTimeout)
+	last, quiet := f.controlFiles(), 0
+	for quiet < quietPolls && time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+		cur := f.controlFiles()
+		if slices.Equal(cur, last) {
+			quiet++
+		} else {
+			last, quiet = cur, 0
+		}
+	}
+	return last
+}
+
 func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
-	before, codexBefore := f.controlFiles(), f.codexIDs()
+	before, codexBefore := f.settledControlFiles(), f.codexIDs()
 	id, err := f.createSession(s.Project, f.repoDir(sc, s.Project), s.Prompt, s.Harness)
 	if err != nil {
 		return err
