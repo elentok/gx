@@ -115,6 +115,82 @@ func TestTygoCoversWireTypes(t *testing.T) {
 	}
 }
 
+// agentConstValues returns the string values of every const of the named type
+// declared in ralphloop/agent/agent.go, in source order.
+func agentConstValues(t *testing.T, typeName string) []string {
+	t.Helper()
+	f, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "..", "ralphloop", "agent", "agent.go"), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vals []string
+	for _, d := range f.Decls {
+		gd, ok := d.(*ast.GenDecl)
+		if !ok || gd.Tok != token.CONST {
+			continue
+		}
+		for _, s := range gd.Specs {
+			vs := s.(*ast.ValueSpec)
+			if id, ok := vs.Type.(*ast.Ident); !ok || id.Name != typeName {
+				continue
+			}
+			for _, v := range vs.Values {
+				if lit, ok := v.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					vals = append(vals, strings.Trim(lit.Value, `"`))
+				}
+			}
+		}
+	}
+	return vals
+}
+
+// TestTygoAgentUnionsMatchGoConsts guards the hard-coded agent.ContextLevel
+// and agent.Tier unions in tygo.yaml. A Go constant added or removed without
+// a tygo.yaml edit would leave the generated TypeScript union stale.
+func TestTygoAgentUnionsMatchGoConsts(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "tygo.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		Packages []struct {
+			TypeMappings map[string]string `yaml:"type_mappings"`
+		} `yaml:"packages"`
+	}
+	if err := yaml.Unmarshal(raw, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	quoted := regexp.MustCompile(`"([^"]*)"`)
+	for _, c := range []struct{ mapping, goType string }{
+		{"agent.ContextLevel", "ContextLevel"},
+		{"agent.Tier", "Tier"},
+	} {
+		union, found := "", false
+		for _, p := range cfg.Packages {
+			if u, ok := p.TypeMappings[c.mapping]; ok {
+				union, found = u, true
+			}
+		}
+		if !found {
+			t.Errorf("tygo.yaml has no type_mappings entry for %s", c.mapping)
+			continue
+		}
+		var got []string
+		for _, m := range quoted.FindAllStringSubmatch(union, -1) {
+			got = append(got, m[1])
+		}
+		want := agentConstValues(t, c.goType)
+		if len(want) == 0 {
+			t.Fatalf("found no %s constants in ralphloop/agent/agent.go", c.goType)
+		}
+		sort.Strings(got)
+		sort.Strings(want)
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("tygo.yaml %s union is %v, Go constants are %v: update type_mappings", c.mapping, got, want)
+		}
+	}
+}
+
 // TestGeneratedTypesAreUnique catches tygo merging two const groups that share
 // a name prefix (both `Reason*` groups became `type Reason`), which breaks the
 // webui build with TS2300.
