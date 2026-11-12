@@ -215,8 +215,16 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 	cut := false
 	listing := false
 	passed, failed := 0, 0
+	listMode := bytes.HasPrefix(out, []byte("Listing tests:"))
+	var flows []string
 	for l := range strings.SplitSeq(string(bytes.TrimRight(out, "\n")), "\n") {
 		l = strings.TrimRight(l, "\r")
+		if listMode {
+			if m := playwrightListed.FindStringSubmatch(l); m != nil {
+				flows = append(flows, m[2])
+			}
+			continue
+		}
 		if m := playwrightFailure.FindStringSubmatch(l); m != nil {
 			closeUnit()
 			cur, lines, cut, listing = &Unit{Location: m[1], Name: m[2]}, nil, false, false
@@ -251,6 +259,9 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 		lines = append(lines, strings.TrimPrefix(l, "    "))
 	}
 	closeUnit()
+	if len(flows) > 0 {
+		return Outcome{Listing: flows}
+	}
 	if passed+failed == 0 && len(failures) == 0 {
 		return Outcome{}
 	}

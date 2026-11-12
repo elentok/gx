@@ -46,6 +46,19 @@ func TestPlaywrightParse_KeepsOnlyTheFirstErrorOfEachFailure(t *testing.T) {
 	}
 }
 
+func TestPlaywrightParse_ListModeReturnsOneNumberedTitlePerFlow(t *testing.T) {
+	out := `Listing tests:
+  [chromium] › design.e2e.ts:12:5 › 5. Allow once
+  [chromium] › design.e2e.ts:30:5 › 13. All-defaulted round
+Total: 2 tests in 1 file
+`
+	got := Playwright{}.Parse([]byte(out), 0)
+	want := []string{"5. Allow once", "13. All-defaulted round"}
+	if !slices.Equal(got.Listing, want) {
+		t.Errorf("listing = %q, want %q", got.Listing, want)
+	}
+}
+
 // A failure whose block has no parsable heading is still named in the list
 // under "N failed", so the record must keep it.
 func TestPlaywrightParse_FailureListNamesFailuresWithoutAHeading(t *testing.T) {

@@ -111,6 +111,9 @@ type Outcome struct {
 	// TestDurations maps a test name (as in Tests) to its duration in
 	// milliseconds. A tool that does not time its tests leaves it nil.
 	TestDurations map[string]int64
+	// Listing holds one line per test of a list-only run. It is printed in
+	// place of "no tests ran".
+	Listing []string
 }
 
 // Options configure one run.
@@ -376,6 +379,8 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 		}
 		fmt.Fprintln(o.Out, e.Log)
 		return ExitFail
+	case len(outcome.Listing) > 0:
+		fmt.Fprintf(o.Out, "LIST %s: %d tests\n%s\n%s\n", tool.Name(), len(outcome.Listing), strings.Join(outcome.Listing, "\n"), e.Log)
 	case outcome.Units == 0:
 		fmt.Fprintf(o.Out, "PASS %s: no tests ran in %s\n%s\n", tool.Name(), dur, e.Log)
 	default:
