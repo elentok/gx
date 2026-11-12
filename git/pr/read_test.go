@@ -220,6 +220,72 @@ func TestPRChecks_FeedsClassifier(t *testing.T) {
 	}
 }
 
+// fakeGHPages answers by cursor: the page whose request carries "c=<cursor>"
+// is returned; the first request (no cursor) gets pages[""].
+func fakeGHPages(t *testing.T, pages map[string]string) pr.Runner {
+	t.Helper()
+	bin := t.TempDir()
+	script := "#!/bin/sh\ncase \"$*\" in\n"
+	for cursor, body := range pages {
+		if cursor != "" {
+			script += "*c=" + cursor + "*)\ncat <<'OUT'\n" + body + "\nOUT\n;;\n"
+		}
+	}
+	script += "*)\ncat <<'OUT'\n" + pages[""] + "\nOUT\n;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return pr.Runner{Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + t.TempDir()}, Dir: t.TempDir()}
+}
+
+func checksPage(next, nodes string) string {
+	more, cursor := "false", "null"
+	if next != "" {
+		more, cursor = "true", `"`+next+`"`
+	}
+	return `{"data":{"repository":{"pullRequest":{"commits":{"nodes":[{"commit":{"oid":"abc","statusCheckRollup":{"contexts":{"pageInfo":{"hasNextPage":` +
+		more + `,"endCursor":` + cursor + `},"nodes":[` + nodes + `]}}}}]}}}}}`
+}
+
+func TestPRChecks_PagesPastFirstHundred(t *testing.T) {
+	t.Parallel()
+	r := fakeGHPages(t, map[string]string{
+		"":     checksPage("CUR1", `{"__typename":"CheckRun","name":"a","status":"COMPLETED","conclusion":"SUCCESS"}`),
+		"CUR1": checksPage("", `{"__typename":"CheckRun","name":"b","status":"COMPLETED","conclusion":"FAILURE"}`),
+	})
+	sha, checks, err := r.PRChecks("o/r", 9)
+	if err != nil || sha != "abc" || len(checks) != 2 || checks[1].Name != "b" {
+		t.Fatalf("sha=%q checks=%+v err=%v", sha, checks, err)
+	}
+	if result, _ := pr.ClassifyChecks(sha, checks); result != pr.ChecksFailed {
+		t.Fatalf("result = %v, want failed from page 2", result)
+	}
+}
+
+func TestPRChecks_PageErrorReturnsNoPartialList(t *testing.T) {
+	t.Parallel()
+	r := fakeGHPages(t, map[string]string{
+		"":     checksPage("CUR1", `{"__typename":"CheckRun","name":"a","status":"COMPLETED","conclusion":"SUCCESS"}`),
+		"CUR1": `{"errors":[{"message":"boom"}]}`,
+	})
+	_, checks, err := r.PRChecks("o/r", 9)
+	if err == nil || checks != nil {
+		t.Fatalf("checks=%+v err=%v, want error and no checks", checks, err)
+	}
+}
+
+func TestPRChecks_CapsPages(t *testing.T) {
+	t.Parallel()
+	// Every page claims another one: the loop must stop with an error.
+	r := fakeGHPages(t, map[string]string{
+		"":     checksPage("CUR1", `{"__typename":"CheckRun","name":"a","status":"COMPLETED","conclusion":"SUCCESS"}`),
+		"CUR1": checksPage("CUR1", `{"__typename":"CheckRun","name":"a","status":"COMPLETED","conclusion":"SUCCESS"}`),
+	})
+	if _, checks, err := r.PRChecks("o/r", 9); err == nil || checks != nil {
+		t.Fatalf("checks=%d err=%v, want page-cap error", len(checks), err)
+	}
+}
+
 func TestRunnerDoesNotUseProcessEnv(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("gh"); err == nil {

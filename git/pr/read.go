@@ -172,21 +172,44 @@ func (r Runner) WatchQuery(repo string, numbers []int) (map[int]WatchState, erro
 	return out, nil
 }
 
-const prChecksQuery = `query($o:String!,$n:String!,$p:Int!){
+// maxPRChecksPages bounds the contexts paging so a misbehaving cursor cannot loop.
+const maxPRChecksPages = 10
+
+const prChecksQuery = `query($o:String!,$n:String!,$p:Int!,$c:String){
   repository(owner:$o,name:$n){ pullRequest(number:$p){ commits(last:1){ nodes{ commit{ oid
-    statusCheckRollup{ contexts(first:100){ nodes{ __typename
+    statusCheckRollup{ contexts(first:100,after:$c){ pageInfo{ hasNextPage endCursor } nodes{ __typename
       ... on CheckRun{ databaseId name status conclusion detailsUrl
         checkSuite{ workflowRun{ databaseId workflow{ databaseId } } } }
       ... on StatusContext{ context state targetUrl } } } } } } } } }
 }`
 
 // PRChecks fetches the per-check detail of a PR's current head, for the
-// classifier (ClassifyChecks). It reads the first 100 checks.
+// classifier (ClassifyChecks). It pages the contexts connection; an error on
+// any page returns no partial list.
 func (r Runner) PRChecks(repo string, number int) (headSHA string, checks []Check, err error) {
 	owner, name, ok := strings.Cut(repo, "/")
 	if !ok {
 		return "", nil, fmt.Errorf("repo %q is not owner/name", repo)
 	}
+	cursor := ""
+	for range maxPRChecksPages {
+		sha, page, next, err := r.prChecksPage(owner, name, number, cursor)
+		if err != nil {
+			return "", nil, err
+		}
+		headSHA = sha
+		checks = append(checks, page...)
+		if next == "" {
+			return headSHA, checks, nil
+		}
+		cursor = next
+	}
+	return "", nil, fmt.Errorf("PR %s#%d has more than %d pages of checks", repo, number, maxPRChecksPages)
+}
+
+// prChecksPage reads one page of contexts. next is the cursor of the following
+// page, or "" when this was the last.
+func (r Runner) prChecksPage(owner, name string, number int, cursor string) (headSHA string, checks []Check, next string, err error) {
 	var env struct {
 		Errors graphQLErrors `json:"errors"`
 		Data   struct {
@@ -198,6 +221,10 @@ func (r Runner) PRChecks(repo string, number int) (headSHA string, checks []Chec
 								OID               string `json:"oid"`
 								StatusCheckRollup *struct {
 									Contexts struct {
+										PageInfo struct {
+											HasNextPage bool   `json:"hasNextPage"`
+											EndCursor   string `json:"endCursor"`
+										} `json:"pageInfo"`
 										Nodes []checkContextNode `json:"nodes"`
 									} `json:"contexts"`
 								} `json:"statusCheckRollup"`
@@ -209,23 +236,29 @@ func (r Runner) PRChecks(repo string, number int) (headSHA string, checks []Chec
 		} `json:"data"`
 	}
 	args := []string{"-f", "o=" + owner, "-f", "n=" + name, "-F", "p=" + strconv.Itoa(number)}
+	if cursor != "" {
+		args = append(args, "-f", "c="+cursor)
+	}
 	if err := r.graphQL(prChecksQuery, args, &env); err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	if err := env.Errors.err(); err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	nodes := env.Data.Repository.PullRequest.Commits.Nodes
 	if len(nodes) == 0 {
-		return "", nil, nil
+		return "", nil, "", nil
 	}
 	commit := nodes[0].Commit
-	if commit.StatusCheckRollup != nil {
-		for _, n := range commit.StatusCheckRollup.Contexts.Nodes {
+	if rollup := commit.StatusCheckRollup; rollup != nil {
+		for _, n := range rollup.Contexts.Nodes {
 			checks = append(checks, n.toCheck(commit.OID))
 		}
+		if rollup.Contexts.PageInfo.HasNextPage {
+			next = rollup.Contexts.PageInfo.EndCursor
+		}
 	}
-	return commit.OID, checks, nil
+	return commit.OID, checks, next, nil
 }
 
 type checkContextNode struct {
