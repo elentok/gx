@@ -19,7 +19,7 @@ packages:
       - limitburn.go
       - limitsstore.go
       - migrate.go
-      - recentlyfinished.go
+      - queue.go
       - restart.go
       - sessions.go
       - sessiontypes.go

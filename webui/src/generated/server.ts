@@ -2085,6 +2085,21 @@ export interface Snapshot {
    */
   recently_finished: FinishedEpic[];
 }
+/**
+ * FinishedEpic is one entry of the snapshot's Recently finished list.
+ */
+export interface FinishedEpic {
+  address: string;
+  name: string;
+  project: string;
+  done: number /* int */;
+  total: number /* int */;
+  completed_at: string;
+  /**
+   * OneOff marks a ticket entry: Address is the ticket's, Done and Total are 0.
+   */
+  one_off: boolean;
+}
 
 //////////
 // source: limitburn.go
@@ -2240,48 +2255,161 @@ export interface RetryMigrationResult {
 }
 
 //////////
-// source: pause.go
+// source: queue.go
 
+/**
+ * QueueItem is one queued ticket and the agent it will run under.
+ */
+export interface QueueItem {
+  address: string;
+  agent: string;
+  /**
+   * EnqueuedAt is set by the server on enqueue, never taken from a client. Items
+   * from a queue file written before the field existed have none.
+   */
+  enqueued_at?: string;
+}
+/**
+ * QueueResult is what every queue write returns: the queue after the write, or
+ * a refusal (the queue is then untouched).
+ */
+export interface QueueResult {
+  queue?: QueueItem[];
+  /**
+   * Mode is set by pause, resume and flush: running or paused.
+   */
+  mode?: QueueMode;
+  /**
+   * ExtraUsage is the warning an enqueue carries while the account
+   * auto-purchases extra usage.
+   */
+  extra_usage?: boolean;
+  /**
+   * Merged, MergeTicket and Paused are an epic merge's outcome: a direct
+   * merge, the address of the merge ticket it forked, or a pause of the root
+   * with PauseKind and Message.
+   */
+  merged?: boolean;
+  merge_ticket?: string;
+  /**
+   * TrunkConflict is the address of the trunk-conflict ticket "Stash, merge and
+   * restore" added.
+   */
+  trunk_conflict?: string;
+  parked?: boolean;
+  park_kind?: string;
+  /**
+   * Outcome is an answer's result: delivered or adopted. A stale refusal
+   * carries the current Question and its State token.
+   */
+  outcome?: string;
+  question?: any /* tickets.LogEvent */;
+  state?: string;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+/**
+ * QueueRequest is the body of the queue writes; each uses the fields it needs.
+ */
+export interface QueueRequest {
+  address: string;
+  agent?: string;
+  /**
+   * Position is the 1-based slot a move puts the ticket in.
+   */
+  position?: number /* int */;
+  /**
+   * Project and Items are what a replace swaps in.
+   */
+  project?: string;
+  items?: QueueItem[];
+  /**
+   * PauseReason is the one-line reason a pause writes into the ticket.
+   */
+  park_reason?: string;
+  /**
+   * Stop lets a cancel stop the live pane of a claimed ticket instead of refusing.
+   */
+  stop?: boolean;
+  /**
+   * Front makes an add merge at the head of the queue instead of the tail.
+   */
+  front?: boolean;
+  /**
+   * Text is what a nudge types into the live pane.
+   */
+  text?: string;
+  /**
+   * Verb is the action a recommend stores; Text carries its diagnosis.
+   */
+  verb?: string;
+  /**
+   * Decision is allow or deny, for answering a blocked permission request.
+   */
+  decision?: string;
+  /**
+   * RequestID names the permission request a decision answers; empty answers
+   * whatever is open (the TUI and CLI).
+   */
+  request_id?: string;
+  /**
+   * Choice, Note, State and Source are an answer's choice (an option id, yes or
+   * no), its note, the state token of the question it answers and where it
+   * came from. The server sets Source from the request's origin and ignores
+   * the body. A free-text answer uses Text.
+   */
+  choice?: string;
+  note?: string;
+  /**
+   * Huh answers with the fixed Huh? message instead of a choice or text.
+   */
+  huh?: boolean;
+  state?: string;
+  source?: string;
+}
+/**
+ * ReasonServerNotRunning is produced by the CLI, never the server.
+ */
+export const ReasonServerNotRunning = "server-not-running";
+export const ReasonUnknownTicket = "unknown-ticket";
+export const ReasonInvestigateStop = "investigate-stop";
+export const ReasonInvalidAddress = "invalid-address";
+export const ReasonInvalidAgent = "invalid-agent";
+export const ReasonAlreadyQueued = "already-queued";
+export const ReasonNotQueued = "not-queued";
+export const ReasonBadPosition = "bad-position";
+export const ReasonTicketLive = "ticket-live";
+export const ReasonMapEpic = "map-epic";
+export const ReasonNoOpenTickets = "no-open-tickets";
+export const ReasonEpicDraft = "epic-draft";
+export const ReasonEpicNotOpen = "epic-not-open";
+export const ReasonFollowUpsEpic = "follow-ups-epic";
+export const ReasonAlreadyMerged = "already-merged";
+export const ReasonMergePending = "merge-pending";
+export const ReasonNotComplete = "not-complete";
+export const ReasonBranchMissing = "branch-missing";
+export const ReasonOneOffsEpic = "one-offs-epic";
+export const ReasonNotDirtyTrunk = "not-dirty-trunk";
+export const ReasonLocalAhead = "local-ahead";
+export const ReasonNeedsRebase = "needs-rebase";
+export const ReasonHasPR = "has-pr";
+export const ReasonPROpenFailed = "pr-open-failed";
+/**
+ * Refusal reasons of the queue writes. Stable: clients switch on them.
+ */
+export type Reason = typeof ReasonServerNotRunning | typeof ReasonUnknownTicket | typeof ReasonInvestigateStop | typeof ReasonInvalidAddress | typeof ReasonInvalidAgent | typeof ReasonAlreadyQueued | typeof ReasonNotQueued | typeof ReasonBadPosition | typeof ReasonTicketLive | typeof ReasonMapEpic | typeof ReasonNoOpenTickets | typeof ReasonEpicDraft | typeof ReasonEpicNotOpen | typeof ReasonFollowUpsEpic | typeof ReasonAlreadyMerged | typeof ReasonMergePending | typeof ReasonNotComplete | typeof ReasonBranchMissing | typeof ReasonOneOffsEpic | typeof ReasonNotDirtyTrunk | typeof ReasonLocalAhead | typeof ReasonNeedsRebase | typeof ReasonHasPR | typeof ReasonPROpenFailed;
+/**
+ * EventQueueChanged is emitted once per queue write; Address is the ticket it
+ * touched. Clients re-read the queue on it.
+ */
+export const EventQueueChanged = "queue-changed";
 /**
  * QueueMode is the queue's mode, as reported in QueueResult.Mode.
  */
 export const QueueModeRunning = "running";
 export const QueueModePaused = "paused";
 export type QueueMode = typeof QueueModeRunning | typeof QueueModePaused;
-
-//////////
-// source: projectworktrees.go
-
-/**
- * ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
- * repo root, the dirs of its other worktrees and the model each tier runs under
- * for the chat harness (empty when that tier inherits the CLI's own setting).
- */
-export interface ProjectWorktrees {
-  project: string;
-  root: string;
-  worktrees: string[];
-  tiers: { [key: string]: string};
-}
-
-//////////
-// source: recentlyfinished.go
-
-/**
- * FinishedEpic is one entry of the snapshot's Recently finished list.
- */
-export interface FinishedEpic {
-  address: string;
-  name: string;
-  project: string;
-  done: number /* int */;
-  total: number /* int */;
-  completed_at: string;
-  /**
-   * OneOff marks a ticket entry: Address is the ticket's, Done and Total are 0.
-   */
-  one_off: boolean;
-}
 
 //////////
 // source: restart.go
@@ -3550,21 +3678,6 @@ export interface TargetsResult {
 export const ReasonNeedsYes = "needs-yes";
 
 //////////
-// source: tips.go
-
-/**
- * Tip is one entry of the tips page. Folders is filled by the call for tips
- * that point at the project worktree folders.
- */
-export interface Tip {
-  id: string;
-  title: string;
-  body: string;
-  platform: string; // GOOS value the tip applies to
-  folders?: string[];
-}
-
-//////////
 // source: triage.go
 
 /**
@@ -4010,6 +4123,28 @@ export interface PendingRow {
  * EventWorkspacesChanged announces that a workspace, a membership or a hold mark changed.
  */
 export const EventWorkspacesChanged = "workspaces-changed";
+/**
+ * ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
+ * repo root, the dirs of its other worktrees and the model each tier runs under
+ * for the chat harness (empty when that tier inherits the CLI's own setting).
+ */
+export interface ProjectWorktrees {
+  project: string;
+  root: string;
+  worktrees: string[];
+  tiers: { [key: string]: string};
+}
+/**
+ * Tip is one entry of the tips page. Folders is filled by the call for tips
+ * that point at the project worktree folders.
+ */
+export interface Tip {
+  id: string;
+  title: string;
+  body: string;
+  platform: string; // GOOS value the tip applies to
+  folders?: string[];
+}
 /**
  * Workspace is one workspace as the list and the snapshot show it.
  */

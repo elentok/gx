@@ -112,3 +112,11 @@ const (
 // EventQueueChanged is emitted once per queue write; Address is the ticket it
 // touched. Clients re-read the queue on it.
 const EventQueueChanged = "queue-changed"
+
+// QueueMode is the queue's mode, as reported in QueueResult.Mode.
+type QueueMode string
+
+const (
+	QueueModeRunning QueueMode = "running"
+	QueueModePaused  QueueMode = "paused"
+)
