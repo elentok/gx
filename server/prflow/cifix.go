@@ -150,13 +150,7 @@ func OutcomeOf(ticketPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for line := range strings.SplitSeq(res, "\n") {
-		line = strings.TrimLeft(strings.TrimSpace(line), "-* ")
-		if rest, ok := strings.CutPrefix(line, "Outcome:"); ok {
-			return strings.Trim(strings.TrimSpace(rest), "`* "), nil
-		}
-	}
-	return "", nil
+	return line(res, "Outcome"), nil
 }
 
 // startCIFix forks a ci-fix ticket for the first failed check of the open PR's

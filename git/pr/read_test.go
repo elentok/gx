@@ -214,9 +214,9 @@ func TestPRChecks_FeedsClassifier(t *testing.T) {
 	if c := checks[0]; c.JobID != "11" || c.RunID != "22" || c.WorkflowID != "33" || c.URL != "https://x/runs/22/job/11" {
 		t.Fatalf("build: %+v", c)
 	}
-	result, failed := pr.ClassifyChecks(sha, checks)
-	if result != pr.ChecksFailed || len(failed) != 1 || failed[0].Name != "build" {
-		t.Fatalf("result=%v failed=%v", result, failed)
+	s := pr.Summarize(sha, checks)
+	if s.Result != pr.ChecksFailed || len(s.Failed) != 1 || s.Failed[0].Name != "build" {
+		t.Fatalf("result=%v failed=%v", s.Result, s.Failed)
 	}
 }
 
@@ -257,7 +257,7 @@ func TestPRChecks_PagesPastFirstHundred(t *testing.T) {
 	if err != nil || sha != "abc" || len(checks) != 2 || checks[1].Name != "b" {
 		t.Fatalf("sha=%q checks=%+v err=%v", sha, checks, err)
 	}
-	if result, _ := pr.ClassifyChecks(sha, checks); result != pr.ChecksFailed {
+	if result := pr.Summarize(sha, checks).Result; result != pr.ChecksFailed {
 		t.Fatalf("result = %v, want failed from page 2", result)
 	}
 }

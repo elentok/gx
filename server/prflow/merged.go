@@ -25,10 +25,11 @@ func (w *Watcher) closeOrMerge(t Target, v View) (handled bool, err error) {
 func (w *Watcher) Merged(t Target) error {
 	// A person marked it merged: that path writes its own entries and retries
 	// the Trunk update, so a poll already in flight must not add a second set.
-	if logged(t.Dir, KindMarkedMerged) {
+	entries, _ := Read(t.Dir)
+	if hasKind(entries, KindMarkedMerged) {
 		return nil
 	}
-	if !logged(t.Dir, KindPRMerged) {
+	if !hasKind(entries, KindPRMerged) {
 		// Before the entry, so a crash retries the cancel along with the update.
 		w.host.CancelFlowTickets(t)
 		if err := tickets.ClearEpicFields(t.Dir, blockKindKey, blockReasonKey); err != nil {
@@ -78,10 +79,10 @@ func (w *Watcher) closed(t Target) error {
 // mergeRecorded is whether the log says the PR merged, by GitHub or by hand:
 // either way the PR is no longer polled and the Trunk update is retried.
 func mergeRecorded(dir string) bool {
-	return logged(dir, KindPRMerged) || logged(dir, KindMarkedMerged)
+	entries, err := Read(dir)
+	return err == nil && (hasKind(entries, KindPRMerged) || hasKind(entries, KindMarkedMerged))
 }
 
-func logged(dir string, k Kind) bool {
-	entries, err := Read(dir)
-	return err == nil && slices.ContainsFunc(entries, func(e Entry) bool { return e.Kind == k })
+func hasKind(entries []Entry, k Kind) bool {
+	return slices.ContainsFunc(entries, func(e Entry) bool { return e.Kind == k })
 }

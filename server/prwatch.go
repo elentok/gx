@@ -38,8 +38,8 @@ func (p PRFlow) live(root queue.RootRef) (prstate.Live, bool) {
 		Draft: v.Draft, Merged: v.State == "MERGED", Unreachable: v.Unreachable,
 		Pending: v.Checks.Pending, Failed: v.Checks.Failed, Green: v.Checks.Green,
 	}
-	if len(v.Failed) > 0 {
-		l.FailedName = v.Failed[0].Name
+	if len(v.FailedChecks) > 0 {
+		l.FailedName = v.FailedChecks[0].Name
 	}
 	return l, true
 }

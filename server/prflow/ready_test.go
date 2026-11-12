@@ -61,7 +61,7 @@ func TestReady_NotGreenNeverMarks(t *testing.T) {
 			if n := readyCalls(f); n != 0 {
 				t.Fatalf("pr ready calls = %d, want 0", n)
 			}
-			if v, _ := f.H.Server.PR.Watcher().View("proj", "epic-a"); !v.Draft || len(v.Failed) != 0 {
+			if v, _ := f.H.Server.PR.Watcher().View("proj", "epic-a"); !v.Draft || len(v.FailedChecks) != 0 {
 				t.Fatalf("view = %+v, want a draft with no failures", v)
 			}
 		})

@@ -78,8 +78,8 @@ func TestWatcher_PollsAnEpicWithAPRNumber(t *testing.T) {
 	})
 	f.Tick(t)
 	v, _ = w.View("proj", "epic-a")
-	if v.CI != pr.ChecksFailed || v.Checks.Failed != 1 || len(v.Failed) != 1 {
-		t.Fatalf("CI = %v counts = %+v failed = %v, want one failed", v.CI, v.Checks, v.Failed)
+	if v.CI != pr.ChecksFailed || v.Checks.Failed != 1 || len(v.FailedChecks) != 1 {
+		t.Fatalf("CI = %v counts = %+v failed = %v, want one failed", v.CI, v.Checks, v.FailedChecks)
 	}
 	if d := w.Delay(); d != prflow.IdleInterval {
 		t.Fatalf("delay = %v, want %v with nothing pending", d, prflow.IdleInterval)

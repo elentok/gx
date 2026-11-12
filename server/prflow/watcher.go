@@ -88,7 +88,6 @@ type View struct {
 	Rollup string
 	Checks pr.CheckCounts
 	CI     pr.ChecksResult
-	Failed []pr.CheckKey
 	// FailedChecks is the failed checks of the head with their run and job ids.
 	FailedChecks []pr.Check
 	// HeadChecks is the newest check per key on the head, whatever its state.
@@ -339,19 +338,15 @@ func (w *Watcher) nextView(r pr.Runner, repo string, t Target, st pr.WatchState)
 	failing := st.Rollup == "FAILURE" || st.Rollup == "ERROR"
 	detail := v.Number == 0 || v.HeadSHA != st.HeadSHA || v.Rollup != st.Rollup || failing
 	next := View{Number: t.Number, URL: t.URL, State: st.State, Draft: st.IsDraft, HeadSHA: st.HeadSHA,
-		Rollup: st.Rollup, Mergeable: st.Mergeable, Checks: v.Checks, CI: v.CI, Failed: v.Failed, FailedChecks: v.FailedChecks,
+		Rollup: st.Rollup, Mergeable: st.Mergeable, Checks: v.Checks, CI: v.CI, FailedChecks: v.FailedChecks,
 		HeadChecks: v.HeadChecks}
 	if detail {
 		head, checks, err := r.PRChecks(repo, t.Number)
 		if err != nil {
 			return v, err
 		}
-		var failed []pr.CheckKey
-		next.CI, failed = pr.ClassifyChecks(head, checks)
-		next.Failed = failed
-		next.FailedChecks = pr.FailedChecks(head, checks)
-		next.Checks = pr.CountChecks(head, checks)
-		next.HeadChecks = pr.HeadChecks(head, checks)
+		s := pr.Summarize(head, checks)
+		next.CI, next.Checks, next.FailedChecks, next.HeadChecks = s.Result, s.Counts, s.FailedChecks, s.Head
 	}
 	return next, nil
 }

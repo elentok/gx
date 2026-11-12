@@ -15,7 +15,7 @@ func TestCountChecks(t *testing.T) {
 		{Name: "c", HeadSHA: "head", Status: "IN_PROGRESS"}, done("1", "d", "old", "FAILURE"),
 		done("1", "b", "head", "SUCCESS"), // a rerun replaces the earlier b
 	}
-	if got, want := CountChecks("head", checks), (CheckCounts{Pending: 1, Green: 2}); got != want {
+	if got, want := Summarize("head", checks).Counts, (CheckCounts{Pending: 1, Green: 2}); got != want {
 		t.Fatalf("counts = %+v, want %+v", got, want)
 	}
 }
@@ -53,12 +53,20 @@ func TestClassifyChecks(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, failed := ClassifyChecks("head", c.checks)
-			if got != c.want {
-				t.Errorf("result: expected %v, got %v", c.want, got)
+			s := Summarize("head", c.checks)
+			if s.Result != c.want {
+				t.Errorf("result: expected %v, got %v", c.want, s.Result)
 			}
-			if !reflect.DeepEqual(failed, c.failed) {
-				t.Errorf("failed: expected %v, got %v", c.failed, failed)
+			if !reflect.DeepEqual(s.Failed, c.failed) {
+				t.Errorf("failed: expected %v, got %v", c.failed, s.Failed)
+			}
+			if len(s.FailedChecks) != len(c.failed) {
+				t.Fatalf("failed checks: expected %d, got %v", len(c.failed), s.FailedChecks)
+			}
+			for i, k := range c.failed {
+				if s.FailedChecks[i].Key() != k {
+					t.Errorf("failed check %d: expected key %v, got %v", i, k, s.FailedChecks[i].Key())
+				}
 			}
 		})
 	}
