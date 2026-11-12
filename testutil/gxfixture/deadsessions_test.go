@@ -79,7 +79,7 @@ func (r *running) restartAfterKill(t *testing.T) {
 		_ = stop.Run()
 		<-exited
 	})
-	waitFor(t, "the restarted server to answer", func() bool {
+	testutil.WaitFor(t, 30*time.Second, "the restarted server to answer", func() bool {
 		probe := exec.Command(fixturetest.GxBin, "server", "status", "--json")
 		probe.Env = r.Env
 		out, err := probe.Output()
@@ -90,24 +90,14 @@ func (r *running) restartAfterKill(t *testing.T) {
 	})
 }
 
-func waitFor(t *testing.T, what string, ok func() bool) {
-	t.Helper()
-	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
-		if ok() {
-			return
-		}
-	}
-	t.Fatalf("timed out waiting for %s", what)
-}
-
 // TestRestartSessions_OptInOffResumesNothing restarts over dead sessions with the opt-in off: nothing
 // is launched, and the sessions stay Exited.
 func TestRestartSessions_OptInOffResumesNothing(t *testing.T) {
 	r := start(t, "restart-sessions")
 	r.restartAfterKill(t)
-	// The server has answered, so its start path has run; give a wrongly
-	// resumed session time to show up.
-	time.Sleep(2 * time.Second)
+	// The sessions must be settled as Exited with no processes; a wrongly
+	// resumed session would leave Exited or start a holder.
+	r.wantAllCrashed(t, spec.RestartSessionCount)
 	if holders, agents := r.ProcessCounts(t); holders != 0 || agents != 0 {
 		t.Errorf("holders = %d, agents = %d, want none with the opt-in off", holders, agents)
 	}
@@ -124,8 +114,11 @@ func TestRestartSessions_OptInResumesEachSessionOnce(t *testing.T) {
 			if wantHolders != spec.RestartSessionCount {
 				t.Fatalf("holders = %d before the restart, want %d", wantHolders, spec.RestartSessionCount)
 			}
+			if wantAgents == 0 {
+				t.Fatal("no agents under the holders before the restart")
+			}
 			r.restartAfterKill(t)
-			waitFor(t, "every session to be resumed once", func() bool {
+			testutil.WaitFor(t, 30*time.Second, "every session to be resumed once", func() bool {
 				holders, agents := r.ProcessCounts(t)
 				return holders == wantHolders && agents == wantAgents
 			})

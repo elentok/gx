@@ -19,13 +19,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/procwatch"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
@@ -372,24 +373,28 @@ func (r *Running) Repo() string { return filepath.Join(r.Root(), "repo") }
 // Home is the fixture's HOME.
 func (r *Running) Home() string { return filepath.Join(r.Root(), "home") }
 
-// ProcessCounts counts the live agent-holder processes and the live agents (any
-// other process naming a session id) of the fixture's saved sessions.
+// ProcessCounts counts the live agent-holder processes of the fixture's saved
+// sessions and the live agents: the descendants of those holders (the agent
+// command line does not name its session id, but it runs under its holder).
 func (r *Running) ProcessCounts(t *testing.T) (holders, agents int) {
 	t.Helper()
 	var list []wire.SessionInfo
 	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range testutil.PsLines(t, r.Env) {
-		for _, s := range list {
-			if !strings.Contains(line, s.ID) {
-				continue
-			}
-			if strings.Contains(line, "agent-holder") {
-				holders++
-			} else {
-				agents++
-			}
+	rows := testutil.PsRows(t, r.Env)
+	procs := make([]syshealth.Process, len(rows))
+	for i, row := range rows {
+		procs[i] = syshealth.Process{PID: row.PID, PPID: row.PPID}
+	}
+	forest := procwatch.NewForest(procs)
+	for _, row := range rows {
+		if !strings.Contains(row.Command, "agent-holder") {
+			continue
+		}
+		if slices.ContainsFunc(list, func(s wire.SessionInfo) bool { return strings.Contains(row.Command, s.ID) }) {
+			holders++
+			agents += len(forest.Descendants(row.PID))
 		}
 	}
 	return holders, agents
@@ -403,22 +408,12 @@ func (r *Running) ProcessCounts(t *testing.T) (holders, agents int) {
 func (r *Running) KillSessionProcesses(t *testing.T, ids []string) {
 	t.Helper()
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(50 * time.Millisecond) {
-		psCmd := exec.Command("ps", "-axww", "-o", "pid=,ppid=,command=")
-		psCmd.Env = r.Env
-		ps, err := psCmd.Output()
-		if err != nil {
-			t.Fatal(err)
-		}
-		children := map[string][]string{}
-		var doomed []string
-		for line := range strings.SplitSeq(string(ps), "\n") {
-			fields := strings.Fields(line)
-			if len(fields) < 3 {
-				continue
-			}
-			children[fields[1]] = append(children[fields[1]], fields[0])
-			if slices.ContainsFunc(ids, func(id string) bool { return strings.Contains(line, id) }) {
-				doomed = append(doomed, fields[0])
+		children := map[int][]int{}
+		var doomed []int
+		for _, row := range testutil.PsRows(t, r.Env) {
+			children[row.PPID] = append(children[row.PPID], row.PID)
+			if slices.ContainsFunc(ids, func(id string) bool { return strings.Contains(row.Command, id) }) {
+				doomed = append(doomed, row.PID)
 			}
 		}
 		for i := 0; i < len(doomed); i++ {
@@ -426,7 +421,7 @@ func (r *Running) KillSessionProcesses(t *testing.T, ids []string) {
 		}
 		killed := 0
 		for _, pid := range doomed {
-			if n, err := strconv.Atoi(pid); err == nil && syscall.Kill(n, syscall.SIGKILL) == nil {
+			if syscall.Kill(pid, syscall.SIGKILL) == nil {
 				killed++
 			}
 		}
