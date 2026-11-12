@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -578,4 +579,106 @@ func TestPublishSecondRunSameDayJoinsExistingEpic(t *testing.T) {
 	if got := strings.Join(issueNames(t, project, "follow-ups-2026-11-12"), " "); got != "01-a.md 02-b.md 03-c.md" {
 		t.Errorf("issues = %s", got)
 	}
+}
+
+// blockedByRE matches the blocked_by frontmatter key and its list items.
+var blockedByRE = regexp.MustCompile(`(?m)^blocked_by:.*(\n\s*- .*)*`)
+
+// groupEntry is one manifest ticket of groupFixture.
+type groupEntry struct{ slug, window, blockedBy, from string }
+
+// groupFixture is open follow-ups 01..03 and a manifest of implement tickets.
+func groupFixture(t *testing.T, entries ...groupEntry) (d Deps, project, manifest string) {
+	t.Helper()
+	d, project, _ = setupPublish(t)
+	for _, id := range []string{"01", "02", "03"} {
+		writeEpicTicket(t, project, "follow-ups", id+"-f.md",
+			"---\nid: \""+id+"\"\nstatus: open\ntype: research\ncategory: bug\n---\n\n# Follow-up "+id+"\n")
+	}
+	dir := t.TempDir()
+	var m strings.Builder
+	for _, e := range entries {
+		writeTicketFile(t, filepath.Join(dir, e.slug+".md"), "# "+e.slug+"\n"+shapeSections)
+		fmt.Fprintf(&m, "- slug: %s\n  type: implement\n  body: %s.md\n", e.slug, e.slug)
+		if e.from != "" {
+			fmt.Fprintf(&m, "  from: %s\n", e.from)
+		}
+		if e.window != "" {
+			fmt.Fprintf(&m, "  expected_context_window: %s\n", e.window)
+		}
+		if e.blockedBy != "" {
+			fmt.Fprintf(&m, "  blocked_by: %s\n", e.blockedBy)
+		}
+	}
+	return d, project, writeManifest(t, dir, m.String())
+}
+
+func TestPublishGroupOpensOneTicketWithUnionBlockedBy(t *testing.T) {
+	// Members 01 and 02 chain behind two different tickets; the group ticket
+	// carries both edges.
+	d, project, manifest := groupFixture(t,
+		groupEntry{"dep1", "", "", "follow-ups/03"},
+		groupEntry{"dep2", "", "", ""},
+		groupEntry{"g", "20000", "[dep1, dep2]", "[follow-ups/01, follow-ups/02]"},
+	)
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	if got := strings.Join(issueNames(t, project, "e"), " "); got != "01-dep1.md 02-dep2.md 03-g.md" {
+		t.Fatalf("issues = %s, want one ticket for the group", got)
+	}
+	raw, _ := os.ReadFile(filepath.Join(project, "e", "issues", "03-g.md"))
+	if !strings.Contains(string(raw), "mine:follow-ups/02") {
+		t.Errorf("group ticket lacks its members:\n%s", raw)
+	}
+	if edges := string(blockedByRE.Find(raw)); !strings.Contains(edges, "01") || !strings.Contains(edges, "02") {
+		t.Errorf("group ticket blocked_by is not the union of 01 and 02:\n%s", raw)
+	}
+	// Archiving renumbers, so find each follow-up by its title.
+	want := map[string]string{"# Follow-up 01": "mine:e/03", "# Follow-up 02": "mine:e/03", "# Follow-up 03": "mine:e/01"}
+	for _, name := range issueNames(t, project, "follow-ups-archived") {
+		raw := archivedFollowUp(t, project, name)
+		for title, addr := range want {
+			if strings.Contains(raw, title) {
+				if !strings.Contains(raw, "note: promoted to "+addr) {
+					t.Errorf("%s want note promoted to %s:\n%s", title, addr, raw)
+				}
+				delete(want, title)
+			}
+		}
+	}
+	if len(want) != 0 {
+		t.Errorf("follow-ups not archived: %v", want)
+	}
+}
+
+func TestPublishGroupSplitChainsAndOverCapIsRefused(t *testing.T) {
+	t.Run("split halves chain by blocked_by", func(t *testing.T) {
+		d, project, manifest := groupFixture(t,
+			groupEntry{"g1", "30000", "", "[follow-ups/01, follow-ups/02]"},
+			groupEntry{"g2", "30000", "[g1]", "follow-ups/03"},
+		)
+		if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+			t.Fatalf("publish: %v", err)
+		}
+		raw, _ := os.ReadFile(filepath.Join(project, "e", "issues", "02-g2.md"))
+		if !strings.Contains(string(blockedByRE.Find(raw)), "01") {
+			t.Errorf("g2 does not wait on g1:\n%s", raw)
+		}
+	})
+	t.Run("group past the cap writes nothing", func(t *testing.T) {
+		d, project, manifest := groupFixture(t,
+			groupEntry{"g", fmt.Sprint(ticketspec.SplitLimitTokens + 1), "", "[follow-ups/01, follow-ups/02]"},
+		)
+		err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d)
+		if err == nil || !strings.Contains(err.Error(), "split limit") {
+			t.Fatalf("err = %v, want a split-limit refusal", err)
+		}
+		if names := issueNames(t, project, "e"); len(names) != 0 {
+			t.Errorf("wrote %v", names)
+		}
+		if got := issueNames(t, project, "follow-ups"); len(got) != 3 {
+			t.Errorf("follow-ups = %v, want all 3 still there", got)
+		}
+	})
 }
