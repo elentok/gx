@@ -237,7 +237,7 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 		res.CodexSessionsDir = filepath.Join(f.root, "home", ".codex", "sessions")
 	}
 	if sc.Restart != nil {
-		res.RestartDir = f.restartDir()
+		res.RestartDir = restartDir(f.root)
 	}
 	if sc.Migrate {
 		res.MigrateDir = f.migrateDir()

@@ -55,12 +55,12 @@ server)
 esac
 `
 
-func (f *fixture) restartDir() string { return filepath.Join(f.root, "restart") }
+func restartDir(root string) string { return filepath.Join(root, "restart") }
 
 // setupRestart writes the control files and the fake binary, and points the
 // server at it. projects are the scenario's project names.
 func (f *fixture) setupRestart(r restartSpec, projects []string) error {
-	ctl := f.restartDir()
+	ctl := restartDir(f.root)
 	if err := os.MkdirAll(ctl, 0o755); err != nil {
 		return err
 	}
