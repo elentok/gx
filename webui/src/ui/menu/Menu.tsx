@@ -2,6 +2,7 @@ import { Box, Menu as ChakraMenu, Portal, Text } from "@chakra-ui/react"
 import { Fragment, useState, type ReactElement, type ReactNode } from "react"
 import { useWide } from "../../useWide"
 import { useCloseSignal, useOnCloseSignal } from "../closeSignal"
+import { focusTopDialog } from "../modal/layers"
 import { PhoneMenu } from "./PhoneMenu"
 import { useReportOpen } from "./useReportOpen"
 
@@ -262,12 +263,7 @@ const SETTLE_MS = 2000
  * its first text field where it marks one (tablet and desktop), else the panel.
  */
 function keepFocusInDialog() {
-  const dialog = () => [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')].at(-1)
-  const takeBack = (e: FocusEvent) => {
-    const d = dialog()
-    if (d && !d.contains(e.target as Node))
-      (d.querySelector<HTMLElement>("[data-first-field]") ?? d).focus()
-  }
+  const takeBack = (e: FocusEvent) => focusTopDialog(e.target as Node)
   const stop = () => {
     clearTimeout(timer)
     document.removeEventListener("focusin", takeBack)

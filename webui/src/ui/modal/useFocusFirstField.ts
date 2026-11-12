@@ -1,5 +1,6 @@
 import { useCallback } from "react"
 import { useWide } from "../../useWide"
+import { FIRST_FIELD_ATTR } from "./layers"
 
 // Dialogs the person has pressed or typed in. Focus that landed inside a dialog on its own (a select
 // or a load grabbing it) is not the person moving, so only these dialogs keep their focus.
@@ -26,7 +27,7 @@ export function useFocusFirstField() {
     (el: HTMLElement | null) => {
       if (!el || !wide) return
       // Lets a closing menu hand focus here when its own focus return lands after this mount.
-      el.dataset.firstField = ""
+      el.setAttribute(FIRST_FIELD_ATTR, "")
       const active = document.activeElement
       const dialog = el.closest('[role="dialog"]')
       if (active && dialog?.contains(active) && active !== dialog && touched.has(dialog)) return

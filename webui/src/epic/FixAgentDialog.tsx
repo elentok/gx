@@ -7,6 +7,7 @@ import { Failure } from "../design/SessionControls"
 import { agentPath } from "../hrefs"
 import { refusalText, useWrite } from "../useWrite"
 import { Button } from "../ui/button/Button"
+import { useIsTopLayer } from "../ui/modal/layers"
 import { postFixAgent, type FixAgent } from "./fixAgent"
 import type { FixAgentRequest } from "../generated/server"
 
@@ -28,6 +29,7 @@ export function FixAgentDialog({
   // The refusal shows in the dialog, which stays open, so it is not also toasted.
   const { run, pending, refusal } = useWrite({ toastRefusal: false })
   const promptRef = useRef<HTMLElement>(null)
+  useIsTopLayer()
 
   return (
     <Box
