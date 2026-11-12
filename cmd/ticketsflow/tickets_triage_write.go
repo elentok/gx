@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -366,7 +367,18 @@ func newTriageDropRowsCmd(d Deps) *cobra.Command {
 			if len(rows) == 0 {
 				return errors.New("--row is required")
 			}
-			dropped, err := triage.DropRows(manifest, rows)
+			cwd, err := d.Getwd()
+			if err != nil {
+				return err
+			}
+			// An address that does not resolve is compared as written.
+			canon := func(a string) string {
+				if full, _, err := ticketref.FindTicket(d.dirs(), cwd, a); err == nil {
+					return full.String()
+				}
+				return a
+			}
+			dropped, err := triage.DropRows(manifest, rows, canon)
 			if err != nil {
 				return err
 			}

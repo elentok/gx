@@ -79,18 +79,6 @@ func LoadEntries(path string) ([]ManifestEntry, error) {
 	return entries, nil
 }
 
-// SaveEntries writes entries to the manifest at path.
-func SaveEntries(path string, entries []ManifestEntry) error {
-	if entries == nil {
-		entries = []ManifestEntry{}
-	}
-	data, err := yaml.Marshal(entries)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
-}
-
 func buildManifest(entries []ManifestEntry, dir string, epicIDs []string) (*Manifest, error) {
 	var errs []error
 	fail := func(format string, a ...any) { errs = append(errs, fmt.Errorf(format, a...)) }

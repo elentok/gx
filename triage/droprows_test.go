@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/tickets/ticketspec"
@@ -56,7 +57,7 @@ func entriesBySlug(t *testing.T, p string) map[string]ticketspec.ManifestEntry {
 func TestDropRows_MiddleOfChainClosesTheGap(t *testing.T) {
 	p := dropFixture(t, chainManifest)
 	// The group entry b is dropped whole by naming only one of its rows.
-	dropped, err := DropRows(p, []string{"proj:follow-ups/03"})
+	dropped, err := DropRows(p, []string{"proj:follow-ups/03"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +85,7 @@ func TestDropRows_MiddleOfChainClosesTheGap(t *testing.T) {
 
 func TestDropRows_TwoRowsAtOnceLeavesNoDanglingSlug(t *testing.T) {
 	p := dropFixture(t, chainManifest)
-	dropped, err := DropRows(p, []string{"proj:follow-ups/01", "proj:follow-ups/02"})
+	dropped, err := DropRows(p, []string{"proj:follow-ups/01", "proj:follow-ups/02"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,12 +101,42 @@ func TestDropRows_TwoRowsAtOnceLeavesNoDanglingSlug(t *testing.T) {
 func TestDropRows_UnknownRowIsANoOp(t *testing.T) {
 	p := dropFixture(t, chainManifest)
 	before, _ := os.ReadFile(p)
-	dropped, err := DropRows(p, []string{"proj:follow-ups/99"})
+	dropped, err := DropRows(p, []string{"proj:follow-ups/99"}, nil)
 	if err != nil || len(dropped) != 0 {
 		t.Fatalf("dropped %v, err %v", dropped, err)
 	}
 	after, _ := os.ReadFile(p)
 	if string(before) != string(after) {
 		t.Error("manifest changed")
+	}
+}
+
+func TestDropRows_ShortFromAndComments(t *testing.T) {
+	short := func(a string) string { return strings.TrimPrefix(a, "proj:") }
+	tests := []struct {
+		name, manifest, row string
+		wantDropped         []string
+	}{
+		{"short from, full row", "# keep me\n- slug: a\n  type: implement\n  body: a.md\n  from: follow-ups/01\n# tail\n- slug: c\n  type: implement\n  body: c.md\n  blocked_by: [a]\n", "proj:follow-ups/01", []string{"a"}},
+		{"full from, short row", "# keep me\n- slug: a\n  type: implement\n  body: a.md\n  from: proj:follow-ups/01\n# tail\n- slug: c\n  type: implement\n  body: c.md\n  blocked_by: [a]\n", "follow-ups/01", []string{"a"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := dropFixture(t, tt.manifest)
+			dropped, err := DropRows(p, []string{tt.row}, short)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(dropped, tt.wantDropped) {
+				t.Fatalf("dropped = %v", dropped)
+			}
+			got, _ := os.ReadFile(p)
+			if !strings.Contains(string(got), "# tail") {
+				t.Errorf("comment lost:\n%s", got)
+			}
+			if m := entriesBySlug(t, p); len(m["c"].BlockedBy) != 0 {
+				t.Errorf("c blocked_by = %v", m["c"].BlockedBy)
+			}
+		})
 	}
 }
