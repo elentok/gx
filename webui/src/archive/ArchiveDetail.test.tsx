@@ -11,9 +11,7 @@ const bulkUnarchive = vi.hoisted(() => vi.fn())
 // bulkUnarchive is called inside unarchiveWithToasts, so the stub sits at the POST it makes.
 vi.mock("../design/open", async (orig) => ({
   ...(await orig<object>()),
-  postJson: () => async (body: { targets: string[] }) => ({
-    results: await bulkUnarchive(body.targets),
-  }),
+  postTargetsTo: (_path: string, body: { targets: string[] }) => bulkUnarchive(body.targets),
 }))
 
 afterEach(() => {

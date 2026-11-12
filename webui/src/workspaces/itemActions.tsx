@@ -6,14 +6,12 @@ import {
   SectionOnHold,
   type EpicListRow,
   ReasonNeedsYes,
-  TargetRefused,
   type HoldRequest,
   type SessionInfo,
-  type TargetsResult,
   type Workspace,
   type WorkspaceRequest,
 } from "../generated/server"
-import type { StopSession } from "../design/open"
+import { postTargetsTo, refusalOf, type StopSession } from "../design/open"
 import { useSessionManage } from "../agents/useSessionManage"
 import type { RemoveSession } from "../agents/sessionWrites"
 import { Button } from "../ui/button/Button"
@@ -23,7 +21,6 @@ import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
 import { useWrite, WriteError, type Refusable } from "../useWrite"
 import { bulkArchive } from "../select/bulkWrites"
 import { showToast, toaster } from "../ui/toaster"
-import { postWorkspace } from "./postWorkspace"
 
 /** What the menu needs of a Design or epic card, a chat or a jump row. One-off, Follow-ups and Other get no menu. */
 export interface ItemRef {
@@ -83,15 +80,9 @@ async function postOne(
   route: string,
   body: WorkspaceRequest | HoldRequest,
 ): Promise<ItemWriteResult> {
-  const { results } = await postWorkspace<TargetsResult>(route, body)
-  const r = results[0]
+  const [r] = await postTargetsTo(`/v1/workspaces/${route}`, body)
   if (!r) throw new WriteError("The server answered with no result.")
-  return {
-    refused: r.status === TargetRefused,
-    reason: r.reason,
-    message: r.message,
-    sessions: r.sessions,
-  }
+  return { ...refusalOf(r), sessions: r.sessions }
 }
 
 export const postMove = (key: string, to: string) => postOne("move", { name: to, targets: [key] })
@@ -106,9 +97,7 @@ export async function postArchive(
   const r = (await bulkArchive([epic], opts))[0]
   if (!r) throw new WriteError("The server answered with no result.")
   return {
-    refused: r.status === TargetRefused,
-    reason: r.reason,
-    message: r.message,
+    ...refusalOf(r),
     sessions: r.sessions,
     on_trunk: r.on_trunk,
     new_address: r.new_address,

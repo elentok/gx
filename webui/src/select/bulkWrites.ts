@@ -1,25 +1,15 @@
-import { postJson, rowToken } from "../design/open"
-import {
-  TargetDone,
-  type SessionInfo,
-  type SessionResult,
-  type TargetResult,
-  type TargetsResult,
-} from "../generated/server"
+import { postTargetsTo, rowToken } from "../design/open"
+import { TargetDone, type SessionInfo, type TargetResult } from "../generated/server"
 import { showToast } from "../ui/toaster"
 import { WriteError } from "../useWrite"
-import { postWorkspace } from "../workspaces/postWorkspace"
 
-/** The many-target writers: one POST for all `targets`, one result per target in the server's answer. */
-async function postTargets(
+/** The workspace writers: one POST for all `targets`, one result per target in the server's answer. */
+const postTargets = (
   route: string,
   body:
     | { name: string; targets: string[] }
     | { targets: string[]; dry_run?: boolean; yes?: boolean },
-): Promise<TargetResult[]> {
-  const { results } = await postWorkspace<TargetsResult>(route, body)
-  return results ?? []
-}
+) => postTargetsTo(`/v1/workspaces/${route}`, body)
 
 export const bulkMove = (targets: string[], to: string) =>
   postTargets("move", { name: to, targets })
@@ -35,36 +25,23 @@ export const bulkHold = (targets: string[], opts: { dryRun?: boolean; yes?: bool
 export const bulkUnhold = (targets: string[]) => postTargets("unhold", { targets })
 
 /** Each session goes with its row token, so a row that changed since it was selected is refused as stale. */
-async function postSessions(
-  path: string,
-  sessions: SessionInfo[],
-  yes: boolean,
-): Promise<TargetResult[]> {
-  const res = await postJson<SessionResult & TargetsResult>(path)({
+const postSessions = (path: string, sessions: SessionInfo[], yes: boolean) =>
+  postTargetsTo(path, {
     targets: sessions.map((s) => ({ id: s.id, state: rowToken(s) })),
     yes,
   })
-  return res.results ?? []
-}
 
 /** `dryRun` asks what an archive would stop and whether each epic is on trunk, without archiving; `yes` confirms the stop of live sessions. */
-export async function bulkArchive(
-  targets: string[],
-  opts: { dryRun?: boolean; yes?: boolean } = {},
-): Promise<TargetResult[]> {
-  const res = await postJson<SessionResult & TargetsResult>("/v1/epics/archive")({
+export const bulkArchive = (targets: string[], opts: { dryRun?: boolean; yes?: boolean } = {}) =>
+  postTargetsTo("/v1/epics/archive", {
     targets,
     ...(opts.dryRun ? { dry_run: true } : {}),
     ...(opts.yes ? { yes: true } : {}),
   })
-  return res.results ?? []
-}
 
 /** Targets are archive addresses; a clash with a live epic comes back renamed in `new_address`. */
-export async function bulkUnarchive(targets: string[]): Promise<TargetResult[]> {
-  const res = await postJson<SessionResult & TargetsResult>("/v1/epics/unarchive")({ targets })
-  return res.results ?? []
-}
+export const bulkUnarchive = (targets: string[]) =>
+  postTargetsTo("/v1/epics/unarchive", { targets })
 
 /** Unarchives and reports refusals and renames as toasts. Returns the results, or undefined when the call itself failed. */
 export async function unarchiveWithToasts(

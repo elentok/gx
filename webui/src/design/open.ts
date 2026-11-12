@@ -1,12 +1,14 @@
-import type {
-  AutoAdvanceRequest,
-  AutoQueueRequest,
-  DesignDeleteRequest,
-  DesignOpenRequest,
-  SessionInfo,
-  SessionRequest,
-  SessionResult,
-  TargetsResult,
+import {
+  TargetRefused,
+  type AutoAdvanceRequest,
+  type AutoQueueRequest,
+  type DesignDeleteRequest,
+  type DesignOpenRequest,
+  type SessionInfo,
+  type SessionRequest,
+  type SessionResult,
+  type TargetResult,
+  type TargetsResult,
 } from "../generated/server"
 import { apiFetch } from "../apiFetch"
 import { WriteError } from "../useWrite"
@@ -48,16 +50,22 @@ export async function readWrite<R extends SessionResult>(res: Response): Promise
 
 export const postOpenDesign: OpenDesign = postJson("/v1/designs/open")
 export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete")
+/** POSTs to a many-target route: one result per target in the server's answer. */
+export async function postTargetsTo<Req>(path: string, body: Req): Promise<TargetResult[]> {
+  const res = await postJson<SessionResult & TargetsResult>(path)(body)
+  return res.results ?? []
+}
+
+/** The refusable shape `useWrite` reads, from one target's result. */
+export const refusalOf = (r: TargetResult): SessionResult =>
+  r.status === TargetRefused ? { refused: true, reason: r.reason, message: r.message } : {}
+
 /** A stop or remove of one session on the many-target route, answered as the refusable shape the pages use. `body.state` is a rowToken. */
 export const postTarget =
   (path: string, yes = false) =>
   async ({ id, state }: SessionRequest): Promise<SessionResult> => {
-    const res = await postJson<SessionResult & TargetsResult>(path)({
-      targets: [{ id, state }],
-      yes,
-    })
-    const r = res.results[0]
-    return r?.status === "refused" ? { refused: true, reason: r.reason, message: r.message } : {}
+    const [r] = await postTargetsTo(path, { targets: [{ id, state }], yes })
+    return r ? refusalOf(r) : {}
   }
 
 export const postStopSession: StopSession = postTarget("/v1/sessions/stop")
