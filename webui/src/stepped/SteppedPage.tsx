@@ -77,7 +77,7 @@ export interface SteppedPageProps {
   designMenu?: DesignMenu
   /** Extra items for the ⋯ menu, beside Copy ID. */
   menuItems?: MenuEntry[]
-  /** Shown below the columns. */
+  /** Under the Progress column; at the page's foot where Progress sits in a sheet. */
   footer?: ReactNode
 }
 
@@ -309,10 +309,11 @@ export function SteppedPage({
             overflowY="auto"
           >
             {model && <Progress model={model} rows={ticketRows} stepRows={stepRows} />}
+            {footer && <Box mt="4">{footer}</Box>}
           </Box>
         )}
       </Box>
-      {footer && (
+      {footer && !stepsInline && (
         <Box flex="none" maxH="30vh" overflowY="auto" mt="3">
           {footer}
         </Box>
