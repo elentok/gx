@@ -153,6 +153,11 @@ func (s *Epics) cardList() (wire.EpicList, error) {
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
 	s.applyWorkspaces(list.Epics)
 	s.applyFollowUpWorkspaces(list.Epics, list.FollowUps)
+	if s.Seen != nil {
+		if err := s.Seen.Apply(list.Epics); err != nil {
+			s.Log.Warn("epic seen store", "err", err)
+		}
+	}
 	sortCards(list.Epics, func(r wire.EpicListRow) int { return r.QueueSlot })
 	return list, nil
 }

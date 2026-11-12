@@ -95,6 +95,10 @@ type Deps struct {
 
 	Workspaces Workspaces
 
+	// Seen keeps the last Needs-you or Merged state a person saw per card. Nil
+	// means no card is ever unread.
+	Seen *SeenStore
+
 	// CapHeld gives the cap verdict of the epic's next ready ticket, when a cap
 	// holds it back.
 	CapHeld     func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool)

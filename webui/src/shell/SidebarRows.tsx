@@ -348,6 +348,7 @@ function AgentLink({
           textOverflow="ellipsis"
           whiteSpace="nowrap"
           fontSize="13px"
+          fontWeight={agent.unread ? "bold" : undefined}
         >
           {agent.label}
         </Box>
@@ -494,6 +495,7 @@ function Row({
             overflow="hidden"
             textOverflow="ellipsis"
             whiteSpace="nowrap"
+            fontWeight={row.unread ? "bold" : undefined}
           >
             {row.title}
           </Box>

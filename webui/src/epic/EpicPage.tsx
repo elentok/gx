@@ -2,7 +2,7 @@ import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
 import { copyText } from "../clipboard"
 import { GxMenu, menuGroups } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
-import { Fragment, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { OpenDesign } from "../design/open"
@@ -26,6 +26,7 @@ import { archiveHref, designHref, epicHref } from "../hrefs"
 import { formatDate } from "../formatDate"
 import { unarchiveWithToasts } from "../select/bulkWrites"
 import { QueueButton } from "../epics/QueueButton"
+import { postEpicMarkSeen } from "../epics/queue"
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list"
 import { Markdown } from "../markdown/Markdown"
 import { DetailPage } from "../page/DetailPage"
@@ -503,6 +504,11 @@ function EpicPageBody({
   const partner = joinedCard?.addresses?.find((a) => a !== address)
   // The card speaks for this page only while its active (first) address is this epic.
   const card = joinedCard?.addresses?.[0] === address ? joinedCard : undefined
+  // Opening an unread epic marks it seen. A later change to Needs you or Merged raises it again.
+  const unread = !readOnly && !!card?.unread
+  useEffect(() => {
+    if (unread) void postEpicMarkSeen(address).catch(() => {})
+  }, [unread, address])
 
   return (
     <>

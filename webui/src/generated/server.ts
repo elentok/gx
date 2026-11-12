@@ -1308,6 +1308,18 @@ export interface EpicListRow {
    * Workspaces is set on a Follow-ups card only: the workspaces of its project.
    */
   workspaces?: string[];
+  /**
+   * Unread is set on an Implementation card that is in Needs you or Merged and
+   * whose state a person has not seen yet. Opening the epic clears it.
+   */
+  unread?: boolean;
+}
+/**
+ * EpicSeenRequest is the body of POST /v1/epics/mark-seen: the card whose
+ * current state a person has seen.
+ */
+export interface EpicSeenRequest {
+  address: string;
 }
 /**
  * FollowUpTriage is the Triage state a project's sidebar badge shows. Waiting is

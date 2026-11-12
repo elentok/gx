@@ -10,8 +10,13 @@ import {
 import { isTriage } from "../design/view"
 import type { Tone } from "../ui/tone"
 
-/** Queue, Design and Triage agents carry only a status mark: no Unread, no Actionable, no count. */
+/** Queue, Design and Triage agents carry only a status mark: no Actionable, no count. */
 export const hasAttentionMarks = (s: SessionInfo) => !s.queue && !s.design && !isTriage(s)
+
+/** Chats and Design sessions show Unread; Queue and Triage agents do not. */
+export const hasUnreadMark = (s: SessionInfo) => !s.queue && !isTriage(s)
+
+export const isUnread = (s: SessionInfo) => hasUnreadMark(s) && s.unread.unread
 
 /** A Blocked session always waits on the person, with or without a recorded reason. */
 export const isActionable = (s: SessionInfo) =>

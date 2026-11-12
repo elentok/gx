@@ -1142,3 +1142,19 @@ test("an epic with no PR activity shows no activity panel", async () => {
   await screen.findByTestId("stats-line")
   expect(screen.queryByTestId("pr-activity")).toBeNull()
 })
+
+test("opening an unread epic marks it seen; a read one posts nothing", async () => {
+  const fetchMock = vi.fn(async () => new Response("{}"))
+  vi.stubGlobal("fetch", fetchMock)
+  try {
+    render("/e/gx:solo", [row("solo", { addresses: ["gx:solo"], unread: true })])
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/v1/epics/mark-seen", expect.anything()))
+    cleanup()
+    fetchMock.mockClear()
+    render("/e/gx:calm", [row("calm", { addresses: ["gx:calm"] })])
+    await screen.findByRole("heading", { level: 1 })
+    expect(fetchMock).not.toHaveBeenCalledWith("/v1/epics/mark-seen", expect.anything())
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})

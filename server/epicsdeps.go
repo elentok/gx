@@ -29,6 +29,7 @@ func (s *Server) epicsDeps() epics.Deps {
 		Sessions: s.sessions,
 
 		Workspaces: s.workspaces,
+		Seen:       epics.OpenSeen(s.cfg.StateDir),
 
 		CapHeld:     func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool) { return s.explain.CapHeld(root, e) },
 		AutoFFMerge: func(project string) bool { return s.merger.AutoFFMerge(project) },

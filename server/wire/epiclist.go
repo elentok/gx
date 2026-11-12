@@ -134,6 +134,15 @@ type EpicListRow struct {
 	Workspace string `json:"workspace,omitempty"`
 	// Workspaces is set on a Follow-ups card only: the workspaces of its project.
 	Workspaces []string `json:"workspaces,omitempty"`
+	// Unread is set on an Implementation card that is in Needs you or Merged and
+	// whose state a person has not seen yet. Opening the epic clears it.
+	Unread bool `json:"unread,omitempty"`
+}
+
+// EpicSeenRequest is the body of POST /v1/epics/mark-seen: the card whose
+// current state a person has seen.
+type EpicSeenRequest struct {
+	Address string `json:"address"`
 }
 
 // FollowUpTriage is the Triage state a project's sidebar badge shows. Waiting is

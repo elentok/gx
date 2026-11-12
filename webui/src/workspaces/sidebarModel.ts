@@ -17,7 +17,7 @@ import {
   type SessionPlacement,
   type Sort,
 } from "../generated/server"
-import { isActionable, stateLabel } from "../agents/rules"
+import { isActionable, isUnread, stateLabel } from "../agents/rules"
 import { RING_KIND, isLive, ringProgress } from "../epics/ring"
 import { agentHref, designHref, triageHref } from "../hrefs"
 import { isArchivable } from "../select/selectModel"
@@ -43,6 +43,8 @@ export interface SidebarAgent {
   fix?: boolean
   /** The session this row was built from, for the agent menu. */
   session: SessionInfo
+  /** The session has Unread; the row title is drawn bold. */
+  unread?: boolean
 }
 
 export interface SidebarRow {
@@ -66,6 +68,8 @@ export interface SidebarRow {
   archivable?: boolean
   /** A chat's session, for its menu's Stop and Remove. */
   session?: SessionInfo
+  /** A chat, or a Design with a session, has Unread; the title is drawn bold. */
+  unread?: boolean
   agents: SidebarAgent[]
 }
 
@@ -115,6 +119,7 @@ const agentRow = (s: SessionInfo): SidebarAgent => ({
   status: sessionStatus(s),
   fix: !!s.fix_of,
   session: s,
+  ...(isUnread(s) ? { unread: true } : {}),
 })
 
 function cardRow(
@@ -134,6 +139,8 @@ function cardRow(
     ...(held ? { held: true } : {}),
     ...(r.queued ? { queued: true } : {}),
     ...(isArchivable(r) ? { archivable: true } : {}),
+    // A Design is unread by its sessions; an epic by the server's Needs-you or Merged mark.
+    ...((kind === "design" ? sessions.some(isUnread) : r.unread) ? { unread: true } : {}),
     // A Design is one row: its session shows on the Design page, not nested under it.
     agents: kind === "design" ? [] : agents,
   }
@@ -254,6 +261,7 @@ export function buildSidebar({
           href: agentHref(s.id),
           status,
           session: s,
+          ...(isUnread(s) ? { unread: true } : {}),
           agents: [],
         },
         name: s.name || s.id,

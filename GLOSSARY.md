@@ -455,8 +455,10 @@ using. _Avoid_: "state" for this (state is the runner's coarse view).
 
 **Unread** — an interactive session did something worth seeing (finished a turn, became blocked or
 rate-limited, or exited) while no person was looking at it. Viewing the session marks it read.
-Says nothing about whether the person must act. _Avoid_: needs attention (retired name, see ADR
-0018), unseen.
+Says nothing about whether the person must act. An Implementation card is also Unread while it
+sits in Needs you or Merged and the person has not opened it since it got there. The web sidebar
+draws Unread as a bold title; Queue and Triage agents carry none. _Avoid_: needs attention
+(retired name, see ADR 0018), unseen.
 
 **Actionable** — the agent needs something specific from the person: an answer to a permission
 prompt, question or dialog (while Blocked), a next step the agent itself raised, or prompts gx could

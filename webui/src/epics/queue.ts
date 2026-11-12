@@ -49,3 +49,12 @@ export const postEpicMarkMerged: PostEpicWrite = (body) =>
   postEpicWrite("/v1/epics/mark-merged", body)
 
 export const postEpicTryAgain: PostEpicWrite = (body) => postEpicWrite("/v1/epics/try-again", body)
+
+/** Records the card's current Needs-you or Merged state as seen, which clears its sidebar bold. */
+export async function postEpicMarkSeen(address: string): Promise<void> {
+  await apiFetch("/v1/epics/mark-seen", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address }),
+  })
+}

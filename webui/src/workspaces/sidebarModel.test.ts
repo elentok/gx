@@ -54,6 +54,32 @@ describe("buildSidebar", () => {
     expect(s2.rows[0].status.tone).not.toBe("running")
   })
 
+  it("marks a chat, a Design and a server-flagged epic unread; a Queue agent never is", () => {
+    const unread = { unread: { unread: true } }
+    const rows = [
+      row("p:d", { card_kind: CardKindDesign, section: SectionDesigning }),
+      row("p:e", { unread: true }),
+      row("p:f", {}),
+    ]
+    const sessions = [
+      session("chat", "p", { ...unread, design: false }),
+      session("d1", "p", { ...unread, design: true }),
+      session("q1", "p", { ...unread, queue: true }),
+    ]
+    const placements = [
+      place("chat", "chat", { workspace: "Default" }),
+      place("d1", "epic", { epic: "p:d" }),
+      place("q1", "epic", { epic: "p:e" }),
+    ]
+    const s = buildSidebar({ ...base, rows, sessions, placements })
+    const unreadOf = (t: string) => s.rows.find((r) => r.title === t)?.unread
+    expect(unreadOf("chat")).toBe(true)
+    expect(unreadOf("p:d")).toBe(true)
+    expect(unreadOf("p:e")).toBe(true)
+    expect(unreadOf("p:f")).toBeUndefined()
+    expect(s.rows.find((r) => r.title === "p:e")?.agents[0].unread).toBeUndefined()
+  })
+
   it("makes one row per Design and epic, with a joined card as the Design row", () => {
     const rows = [
       row("p:a", {
