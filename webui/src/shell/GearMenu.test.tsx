@@ -137,6 +137,8 @@ test("the Sort submenu offers three radios with the stored value checked, and a 
     ["Needs you first, then by name", "false"],
     ["By last activity, newest first", "true"],
     ["Alphabetically by name", "false"],
+    ["By project, then by name", "false"],
+    ["By status, then by name", "false"],
   ]);
   fireEvent.click(radios[2]);
   await waitFor(() => expect(postSort).toHaveBeenCalledWith("research", "name"));

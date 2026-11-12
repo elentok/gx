@@ -154,6 +154,7 @@ function Entry({ entry }: { entry: MenuEntry }) {
               disabled={o.disabled}
               {...rowLayout(false)}
               {...itemStyle}
+              ps="8"
             >
               <Label item={o} />
               <ChakraMenu.ItemIndicator />

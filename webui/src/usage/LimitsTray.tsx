@@ -1,3 +1,4 @@
+import { footerHover } from "../shell/FooterButton";
 import { Box, chakra, Popover, Portal } from "@chakra-ui/react";
 import { useState } from "react";
 import type { Connection } from "../connection";
@@ -68,7 +69,7 @@ export function LimitsTray({ conn, fetcher }: { conn: Connection; fetcher?: Fetc
           borderColor="transparent"
           borderRadius="md"
           cursor="pointer"
-          _hover={{ bg: "tone.muted.bg", borderColor: "border" }}
+          {...footerHover}
         >
           <Bar letter="C" name="Claude" limits={summary.limits} now={state.now} />
           <Bar letter="X" name="Codex" limits={summary.codex} now={state.now} />

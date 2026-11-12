@@ -102,6 +102,8 @@ const (
 	SortNeedsYou = "needs-you"
 	SortActivity = "activity"
 	SortName     = "name"
+	SortProject  = "project"
+	SortStatus   = "status"
 )
 
 // SortDefault is what a workspace reads as until a Sort is set.

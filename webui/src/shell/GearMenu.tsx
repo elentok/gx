@@ -7,6 +7,8 @@ import {
   SortDefault,
   SortName,
   SortNeedsYou,
+  SortProject,
+  SortStatus,
   type Workspace,
 } from "../generated/server";
 import { CLEANUP_HREF, SETTINGS_HREF, TIPS_HREF } from "../hrefs";
@@ -40,6 +42,8 @@ const SORT_OPTIONS = [
   { value: SortNeedsYou, label: "Needs you first, then by name" },
   { value: SortActivity, label: "By last activity, newest first" },
   { value: SortName, label: "Alphabetically by name" },
+  { value: SortProject, label: "By project, then by name" },
+  { value: SortStatus, label: "By status, then by name" },
 ];
 
 const defaultPostSort = (workspace: string, sort: string) =>

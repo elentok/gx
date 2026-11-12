@@ -1,3 +1,4 @@
+import { footerHover } from "../../shell/FooterButton";
 import { Box, chakra, Popover, Portal } from "@chakra-ui/react";
 import { useState } from "react";
 import type { Health, MeterHealth } from "../../generated/server";
@@ -53,7 +54,7 @@ export function Tray({ health, connected = true }: { health: Health; connected?:
           cursor="pointer"
           opacity={connected ? 1 : 0.45}
           data-stale={connected ? undefined : ""}
-          _hover={{ bg: "tone.muted.bg", borderColor: "border" }}
+          {...footerHover}
         >
           {METERS.map(({ key, letter }) => (
             <Meter key={key} letter={letter} meter={health[key]} />

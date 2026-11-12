@@ -60,7 +60,7 @@ func (s state) clone() state {
 }
 
 func validSort(v string) bool {
-	return v == wire.SortNeedsYou || v == wire.SortActivity || v == wire.SortName
+	return v == wire.SortNeedsYou || v == wire.SortActivity || v == wire.SortName || v == wire.SortProject || v == wire.SortStatus
 }
 
 // sortOf reads a workspace's Sort; a missing entry or an unknown value is the default.

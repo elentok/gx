@@ -67,10 +67,15 @@ export const FooterButton = forwardRef<HTMLElement, Props>(function FooterButton
   );
 });
 
+/** The one hover/open look every footer control shares (a tint, no border change). */
+export const footerHover = {
+  _hover: { bg: "tone.muted.bg" },
+  _open: { bg: "tone.muted.bg" },
+} as const;
+
 /** The clickable variants' look; indicators omit it. */
 export const interactiveStyle = {
   color: "text.dim",
   cursor: "pointer",
-  _hover: { bg: "surface.raised" },
-  _open: { bg: "surface.raised" },
+  ...footerHover,
 } as const;

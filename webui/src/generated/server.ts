@@ -4079,10 +4079,12 @@ export type ReasonWorkspace = typeof ReasonWorkspaceBlankName | typeof ReasonWor
 export const SortNeedsYou = "needs-you";
 export const SortActivity = "activity";
 export const SortName = "name";
+export const SortProject = "project";
+export const SortStatus = "status";
 /**
  * Sort values of a workspace. The labels live in the web.
  */
-export type Sort = typeof SortNeedsYou | typeof SortActivity | typeof SortName;
+export type Sort = typeof SortNeedsYou | typeof SortActivity | typeof SortName | typeof SortProject | typeof SortStatus;
 /**
  * SortDefault is what a workspace reads as until a Sort is set.
  */

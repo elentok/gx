@@ -10,7 +10,7 @@ import { Tray } from "../ui/tray/Tray";
 import { LimitsTray } from "../usage/LimitsTray";
 import { badgeLine, badgeText, badgeTotal, badgeWaiting, inWorkspace } from "../workspaces/followUpsBadge";
 import { useDevice } from "../useWide";
-import { FooterButton, interactiveStyle } from "./FooterButton";
+import { FooterButton, footerHover, interactiveStyle } from "./FooterButton";
 import { GearMenu } from "./GearMenu";
 import { openNewAgent, openNewDesign } from "./newItemOpen";
 import { useShell } from "./ShellContext";
@@ -189,7 +189,7 @@ export function SidebarFooter({ onNewWorkspace = () => {}, activeWorkspace }: { 
       <GxMenu
         placement="top-start"
         trigger={
-          <chakra.button type="button" h="34px" px="3" flex="none" whiteSpace="nowrap" borderRadius="8px" bg="surface.raised" borderWidth="1px" borderColor="hairline" color="text" cursor="pointer">
+          <chakra.button type="button" h="34px" px="3" flex="none" whiteSpace="nowrap" borderRadius="8px" bg="surface.raised" borderWidth="1px" borderColor="hairline" color="text" cursor="pointer" {...footerHover}>
             + New
           </chakra.button>
         }

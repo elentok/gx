@@ -204,6 +204,38 @@ describe("buildSidebar", () => {
       expect(s.other.map((a) => a.id)).toEqual(["o2", "o1"]);
     });
 
+    it("By project groups rows per project, chats last under Chats", () => {
+      const rows = [row("z:a", { project: "zed", name: "a" }), row("b:b", { project: "bee", name: "b" }), row("b:a", { project: "bee", name: "a" })];
+      const sessions = [session("c1", "p", { name: "chat" })];
+      const placements = [place("c1", "chat", { workspace: "Default" })];
+      const s = buildSidebar({ ...base, rows, sessions, placements, sort: "project" });
+      expect(s.rows.map((r) => [r.group, r.key])).toEqual([
+        ["bee", "b:a"],
+        ["bee", "b:b"],
+        ["Chats", "c1"],
+        ["zed", "z:a"],
+      ]);
+    });
+
+    it("By status groups rows per status: Needs you, Working, then the rest", () => {
+      const rows = [
+        row("p:a", { status_words: "Idle" }),
+        row("p:b", { section: SectionNeedsYou }),
+        row("p:c", { status_words: "Blocked" }),
+      ];
+      const s = buildSidebar({ ...base, rows, sessions: [], placements: [], sort: "status" });
+      expect(s.rows.map((r) => [r.group, r.key])).toEqual([
+        ["Needs you", "p:b"],
+        ["Blocked", "p:c"],
+        ["Idle", "p:a"],
+      ]);
+    });
+
+    it("other Sorts leave rows ungrouped", () => {
+      const s = buildSidebar({ ...base, rows: [row("p:a", {})], sessions: [], placements: [], sort: "name" });
+      expect(s.rows[0].group).toBeUndefined();
+    });
+
     describe("nested agents, Other and On hold under every Sort", () => {
       const at = (iso: string) => ({ status_changed_at: iso }) as Partial<SessionInfo>;
       const ids = (xs: { id: string }[]) => xs.map((x) => x.id);

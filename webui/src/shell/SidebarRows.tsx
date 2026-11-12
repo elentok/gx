@@ -1,5 +1,5 @@
 import { Box, chakra } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicList, type FetchEpicList } from "../epics/list";
@@ -250,6 +250,17 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
   );
 }
 
+/** A separator for a By project or By status group. */
+function GroupHeader({ title }: { title: string }) {
+  return (
+    <li role="presentation" data-part="group-header">
+      <Box px="3" pt="3" pb="1" borderTopWidth="1px" borderColor="border" mt="1" fontSize="11px" letterSpacing="0.08em" textTransform="uppercase" color="text.muted">
+        {title}
+      </Box>
+    </li>
+  );
+}
+
 function Section({ id, group, title, children }: { id: string; group: string; title: string; children: ReactNode }) {
   const sel = useSidebarSelect();
   const open = !!sel.sectionOpen[group];
@@ -295,8 +306,11 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
   if (!model) return null;
   return (
     <>
-      {model.rows.map((r) => (
-        <Row key={r.key} row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
+      {model.rows.map((r, i) => (
+        <Fragment key={r.key}>
+          {r.group !== undefined && r.group !== model.rows[i - 1]?.group && <GroupHeader title={r.group} />}
+          <Row row={r} current={r.href === `#${pathname}`} active={active} workspaces={workspaces} />
+        </Fragment>
       ))}
       {model.held.length > 0 && (
         <Section id="hold" group={GROUP_ON_HOLD} title={`On hold (${model.held.length})`}>
