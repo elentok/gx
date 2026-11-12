@@ -12,6 +12,12 @@ type KnownHarness = keyof typeof HARNESS_NAMES
 
 const capitalise = (word: string) => word.charAt(0).toUpperCase() + word.slice(1)
 
+// Bedrock/Vertex IDs: "us.anthropic.claude-opus-5-5-v1:0" -> "claude-opus-5-5".
+function stripCloudPrefix(base: string): string {
+  const match = /^(?:[a-z]{2,6}\.)?anthropic\.(claude-.+?)(?:-v\d+(?::\d+)?)?$/.exec(base)
+  return match ? match[1] : base
+}
+
 function inferHarness(base: string): KnownHarness | undefined {
   if (base.startsWith("claude-") || CLAUDE_ALIASES.has(base)) return "claude"
   if (base.startsWith("gpt-")) return "codex"
@@ -40,7 +46,7 @@ export function modelName(id: string, harness?: string): ModelLabel {
   if (text === "") return label(known ? `${HARNESS_NAMES[known]} CLI default` : "")
 
   const suffix = /\[([^\]]*)\]$/.exec(text)
-  const base = suffix ? text.slice(0, suffix.index) : text
+  const base = stripCloudPrefix(suffix ? text.slice(0, suffix.index) : text)
   const oneM = suffix?.[1].toLowerCase() === "1m" ? " (1M)" : ""
 
   const resolved = known ?? inferHarness(base)

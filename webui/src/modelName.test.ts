@@ -5,6 +5,9 @@ import { type ModelLabel, modelName } from "./modelName"
 describe("modelName", () => {
   const rows: [string, string | undefined, string][] = [
     ["claude-sonnet-5-5", "claude", "Claude Sonnet 5.5"],
+    ["us.anthropic.claude-opus-5-5", undefined, "Claude Opus 5.5"],
+    ["us.anthropic.claude-sonnet-5-5", "claude", "Claude Sonnet 5.5"],
+    ["anthropic.claude-opus-4-1-20250805-v1:0", undefined, "Claude Opus 4.1"],
     ["claude-sonnet-5-5", undefined, "Claude Sonnet 5.5"],
     ["claude-opus-4-1-20250805", "claude", "Claude Opus 4.1"],
     ["claude-opus-5[1m]", undefined, "Claude Opus 5 (1M)"],
