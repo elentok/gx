@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -107,6 +108,9 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 	if !ok && args[0] != "conflicts" && args[0] != goCleanCache && args[0] != failures {
 		// conflicts, failures and go-clean-cache are not brief.Tools: they keep no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
+	}
+	if slices.Contains(args[1:], "-C") {
+		return briefUsageError(c, "put -C before the tool: gx brief -C <dir> "+args[0])
 	}
 	cwd, err := d.Getwd()
 	if err != nil {

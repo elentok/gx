@@ -309,6 +309,7 @@ func TestBrief_UsageErrorsExit2WithOneLine(t *testing.T) {
 		{"unknown tool", []string{"nosuch"}, "nosuch"},
 		{"bare -C", []string{"-C", "dir"}, "missing tool"},
 		{"bare -C glued", []string{"-Cdir"}, "missing tool"},
+		{"-C after tool", []string{"vitest", "-C", "webui", "run"}, "put -C before the tool"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
