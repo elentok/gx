@@ -75,11 +75,19 @@ func buildStats(in statsInput) wire.Stats {
 		},
 		launch: newLaunchTally(n),
 	}
+	b.promoted = map[string]*promotedFollowUp{}
 	for _, se := range in.Epics {
 		if project == "" || se.Project == project {
+			b.collectPromoted(se.Project, se.Epic)
+		}
+	}
+	for _, se := range in.Epics {
+		if project == "" || se.Project == project {
+			b.project = se.Project
 			b.addEpic(se.Epic)
 		}
 	}
+	b.finishPromoted()
 	b.friction.fill(&out.Friction)
 	b.launch.fill(&out.Launch)
 	out.Cost = statsCostOf(pickCostSource(costSourceInput{
@@ -99,6 +107,9 @@ type statsBuilder struct {
 	impl     costSeries
 	friction frictionTally
 	launch   launchTally
+
+	project  string                       // the project of the epic being added
+	promoted map[string]*promotedFollowUp // by follow-up address
 }
 
 func (b *statsBuilder) addEpic(e tickets.Epic) {
@@ -142,6 +153,9 @@ func (b *statsBuilder) addTicket(e tickets.Epic, tk tickets.Ticket, cost costSer
 	finished := b.win.Bucket(tk.FinishedAt())
 	b.friction.addTicket(finished, tk)
 	b.launch.addTicket(b.win, tk)
+	if b.addPromoted(tk) {
+		return
+	}
 	if originalEpic(tk, e.Name) == followUpsEpic {
 		// A move finishes nothing: it sets neither done_at nor cancelled_at.
 		if i := b.win.Bucket(tk.CreatedAt); i >= 0 {
@@ -149,6 +163,89 @@ func (b *statsBuilder) addTicket(e tickets.Epic, tk tickets.Ticket, cost costSer
 		}
 		if finished >= 0 {
 			b.tp.FollowUpsFinished[finished]++
+		}
+	}
+}
+
+// promotedFollowUp tracks one archived follow-up closed as promoted: it is
+// created on its own day and finishes when the last ticket naming it is done
+// or cancelled. A split gives it several tickets; a group shares one ticket
+// across several follow-ups, so each follow-up counts once either way.
+type promotedFollowUp struct {
+	tickets int
+	open    bool
+	last    time.Time
+}
+
+func (b *statsBuilder) address(project, raw string) string {
+	addr, err := tickets.ParseAddress(raw, tickets.AddressContext{Project: project})
+	if err != nil {
+		return ""
+	}
+	return addr.String()
+}
+
+// collectPromoted registers the promoted follow-ups of one epic and counts
+// them as created.
+func (b *statsBuilder) collectPromoted(project string, e tickets.Epic) {
+	if e.Name != tickets.ArchivedFollowUpsEpic {
+		return
+	}
+	for _, tk := range e.Tickets {
+		if !isPromoted(tk) {
+			continue
+		}
+		key := tickets.Address{Project: project, Epic: followUpsEpic, ID: tk.Identifier}.String()
+		if len(tk.OriginalAddress) > 0 {
+			key = b.address(project, tk.OriginalAddress[0])
+		}
+		b.promoted[key] = &promotedFollowUp{}
+		if i := b.win.Bucket(tk.CreatedAt); i >= 0 {
+			b.tp.FollowUpsCreated[i]++
+		}
+	}
+}
+
+func isPromoted(tk tickets.Ticket) bool {
+	for line := range strings.SplitSeq(schema.Section(tk.Body, "Resolution"), "\n") {
+		if strings.TrimSpace(line) == "- reason: promoted" {
+			return true
+		}
+	}
+	return false
+}
+
+// addPromoted reports whether tk is a promoted follow-up or a ticket made from
+// one. Neither adds to the follow-up series here: the follow-up was counted as
+// created already and finishes in finishPromoted.
+func (b *statsBuilder) addPromoted(tk tickets.Ticket) bool {
+	if isPromoted(tk) && tk.Status == string(schema.StatusCancelled) {
+		return true
+	}
+	found := false
+	for _, raw := range tk.OriginalAddress {
+		p := b.promoted[b.address(b.project, raw)]
+		if p == nil {
+			continue
+		}
+		found = true
+		p.tickets++
+		if tk.FinishedAt().IsZero() {
+			p.open = true
+		} else if tk.FinishedAt().After(p.last) {
+			p.last = tk.FinishedAt()
+		}
+	}
+	return found
+}
+
+func (b *statsBuilder) finishPromoted() {
+	for _, p := range b.promoted {
+		if p.tickets == 0 || p.open {
+			continue
+		}
+		if i := b.win.Bucket(p.last); i >= 0 {
+			b.tp.FollowUpsFinished[i]++
 		}
 	}
 }
@@ -377,7 +474,7 @@ func WebShare(endings map[string]int) *float64 {
 func originalEpic(tk tickets.Ticket, current string) string {
 	var raw string
 	if len(tk.OriginalAddress) > 0 {
-		raw = tk.OriginalAddress[0] // a list is handled by the stats ticket
+		raw = tk.OriginalAddress[0] // a list names follow-ups of one epic
 	}
 	if raw == "" {
 		for line := range strings.SplitSeq(schema.Section(tk.Body, "Resolution"), "\n") {

@@ -237,6 +237,52 @@ func TestStats_FollowUpsCountByOriginalAddress(t *testing.T) {
 	}
 }
 
+func TestStats_PromotedFollowUpsCountOnceByTheirOwnDates(t *testing.T) {
+	t.Parallel()
+	promoted := func(id string, created int) string {
+		return rigs.IssueMD(id, "cancelled", "original_address: proj:follow-ups/"+id+"\ncreated_at: "+statsStamp(created)+"\ncancelled_at: "+statsStamp(created-1)+"\n", "P"+id) +
+			"\n## Resolution\n\n- reason: promoted\n"
+	}
+	made := func(id, orig string, done int) string {
+		return rigs.IssueMD(id, "done", "original_address: "+orig+"\ncreated_at: "+statsStamp(10)+"\ndone_at: "+statsStamp(done)+"\n", "T"+id)
+	}
+	s := statsStore(t, func(store string) {
+		rigs.WriteProjectEpic(t, store, "proj", "follow-ups-archived", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": promoted("01", 9), // single
+			"02-b.md": promoted("02", 8), // split into 2 tickets
+			"03-c.md": promoted("03", 7), // group of 3 (with 04, 05)
+			"04-d.md": promoted("04", 7),
+			"05-e.md": promoted("05", 6),
+		})
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": made("01", "proj:follow-ups/01", 5),
+			"02-b.md": made("02", "proj:follow-ups/02", 4),
+			"03-c.md": made("03", "proj:follow-ups/02", 2),
+			"04-d.md": made("04", "[proj:follow-ups/03, proj:follow-ups/04, proj:follow-ups/05]", 3),
+		})
+	})("?range=30")
+	for _, c := range []struct {
+		name   string
+		series []int
+		day    int
+		want   int
+	}{
+		{"created", s.Throughput.FollowUpsCreated, 9, 1},
+		{"created", s.Throughput.FollowUpsCreated, 8, 1},
+		{"created", s.Throughput.FollowUpsCreated, 7, 2},
+		{"created", s.Throughput.FollowUpsCreated, 6, 1},
+		{"created", s.Throughput.FollowUpsCreated, 10, 0},
+		{"finished", s.Throughput.FollowUpsFinished, 5, 1},
+		{"finished", s.Throughput.FollowUpsFinished, 4, 0},
+		{"finished", s.Throughput.FollowUpsFinished, 3, 3},
+		{"finished", s.Throughput.FollowUpsFinished, 2, 1},
+	} {
+		if got := statsAt(t, s, c.series, c.day); got != c.want {
+			t.Errorf("follow-ups %s on day %d = %d, want %d", c.name, c.day, got, c.want)
+		}
+	}
+}
+
 func TestStats_WaitingForDesignCountsOpenMapDays(t *testing.T) {
 	t.Parallel()
 	mapMD := func(status string, created int, completed int) string {
