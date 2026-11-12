@@ -45,23 +45,22 @@ export function matchesKey(
 }
 
 const MAC_SYMBOLS: Record<Modifier, string> = { ctrl: "⌃", alt: "⌥", shift: "⇧", cmd: "⌘" }
+const MAC_ORDER: readonly Modifier[] = ["ctrl", "alt", "shift", "cmd"]
 const WORDS: Record<Modifier, string> = { cmd: "Cmd", ctrl: "Ctrl", alt: "Alt", shift: "Shift" }
 
 /** The Leader key for the Chord box chip: "⌘E" on a Mac, "Ctrl+E" elsewhere. Empty for an unparsable setting. */
 export function displayKey(setting: string | undefined): string {
   const k = parseKey(setting)
   if (!k) return ""
-  const mods = MODIFIERS.filter((m) => k.mods.has(m))
   const char = k.char.toUpperCase()
   if (isMac()) {
-    const order: Modifier[] = ["ctrl", "alt", "shift", "cmd"]
     return (
-      order
-        .filter((m) => k.mods.has(m))
+      MAC_ORDER.filter((m) => k.mods.has(m))
         .map((m) => MAC_SYMBOLS[m])
         .join("") + char
     )
   }
+  const mods = MODIFIERS.filter((m) => k.mods.has(m))
   return [...mods.map((m) => WORDS[m]), char].join("+")
 }
 
@@ -75,10 +74,12 @@ export type Chord = {
   available: (ctx: ChordContext) => boolean
 }
 
-const isAgentPage = (path: string) => /^\/agents\/[^/]+\/?$/.test(path)
+/** The session id of an `/agents/:id` page, or undefined for any other path. */
+export const agentIdOf = (path: string): string | undefined =>
+  /^\/agents\/([^/]+)\/?$/.exec(path)?.[1]
 
 const canRemove = (ctx: ChordContext) =>
-  isAgentPage(ctx.path) && ctx.session !== undefined && canManage(ctx.session)
+  agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && canManage(ctx.session)
 
 /** The chord table. `remove` is the Remove opener, handed in so this module does not depend on it. */
 export function chordTable(remove: () => void): Chord[] {

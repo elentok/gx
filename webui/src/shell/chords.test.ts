@@ -1,8 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { SessionInfo } from "../generated/server"
-import { chordTable, displayKey, letterOf, matchesKey } from "./chords"
+import { agentIdOf, chordTable, displayKey, letterOf, matchesKey } from "./chords"
 
 afterEach(() => vi.restoreAllMocks())
+
+describe("agentIdOf", () => {
+  it("reads the id of an agent page, with or without a trailing slash", () => {
+    expect(agentIdOf("/agents/s1")).toBe("s1")
+    expect(agentIdOf("/agents/s1/")).toBe("s1")
+  })
+
+  it("is undefined elsewhere", () => {
+    expect(agentIdOf("/")).toBeUndefined()
+    expect(agentIdOf("/agents")).toBeUndefined()
+    expect(agentIdOf("/agents/s1/files")).toBeUndefined()
+  })
+})
 
 const mac = () => vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel")
 const linux = () => vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64")

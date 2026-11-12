@@ -176,7 +176,12 @@ const chordBoxEntry: GalleryEntry = {
       label: "other page",
       node: (
         <Frame w="1040px" h="230px">
-          <ChordBox leader="cmd+e" ctx={{ path: "/" }} onClose={() => {}} />
+          <ChordBox
+            leader="cmd+e"
+            ctx={{ path: "/" }}
+            chords={chordTable(() => {})}
+            onClose={() => {}}
+          />
         </Frame>
       ),
     },

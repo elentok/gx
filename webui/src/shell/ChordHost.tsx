@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
-import { useLeaderKey } from "../leaderKey"
+import { leaderKeyOf } from "../leaderKey"
 import { hasLayer } from "../ui/modal/layers"
 import { ChordBox } from "./ChordBox"
-import { chordTable, letterOf, matchesKey, type Chord } from "./chords"
+import { agentIdOf, chordTable, letterOf, matchesKey, type Chord } from "./chords"
 import { openRemoveConfirm } from "./removeConfirmOpen"
 
 const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift"])
 const BOX = '[role="menu"][aria-label="Chords"]'
+
+// A ref that always holds the latest value, for the once-mounted listener.
+function useLatest<T>(value: T) {
+  const ref = useRef(value)
+  ref.current = value
+  return ref
+}
 
 /**
  * Owns the Chord box: one capture-phase keydown listener opens it on the Leader key and, while it
@@ -16,18 +23,17 @@ const BOX = '[role="menu"][aria-label="Chords"]'
  * `chords` replaces the real table (tests pass their own).
  */
 export function ChordHost({ chords }: { chords?: Chord[] }) {
-  const leader = useLeaderKey()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { snapshot } = useConnectionState(useConnectionContext())
-  const sessionId = /^\/agents\/([^/]+)\/?$/.exec(pathname)?.[1]
+  const leader = leaderKeyOf(snapshot)
+  const sessionId = agentIdOf(pathname)
   const session = sessionId ? snapshot?.sessions?.find((s) => s.id === sessionId) : undefined
   const ctx = useMemo(() => ({ path: pathname, session }), [pathname, session])
 
   const [open, setOpen] = useState(false)
   // The listener is mounted once and reads everything at event time.
-  const live = useRef({ leader, ctx, session, navigate })
-  live.current = { leader, ctx, session, navigate }
+  const live = useLatest({ leader, ctx, session, navigate })
   const openRef = useRef(false)
   const close = () => {
     openRef.current = false
@@ -43,8 +49,7 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       }),
     [chords],
   )
-  const tableRef = useRef(table)
-  tableRef.current = table
+  const tableRef = useLatest(table)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -83,10 +88,7 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
   }, [])
 
   // A page change closes the box with no action.
-  useEffect(() => {
-    openRef.current = false
-    setOpen(false)
-  }, [pathname])
+  useEffect(close, [pathname])
 
   if (!open) return null
   return <ChordBox leader={leader} ctx={ctx} chords={table} onClose={close} />

@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from "vitest"
 import { hasLayer } from "../ui/modal/layers"
 import { renderThemed } from "../ui/render"
 import { ChordBox } from "./ChordBox"
-import type { Chord } from "./chords"
+import { chordTable, type Chord } from "./chords"
 
 afterEach(() => {
   cleanup()
@@ -51,8 +51,10 @@ test("a row click runs its action, then closes", () => {
   expect(calls).toEqual(["run", "close"])
 })
 
-test("defaults to the real chord table", () => {
-  renderThemed(<ChordBox leader="cmd+e" ctx={ctx} onClose={() => {}} />)
+test("lists the real chord table", () => {
+  renderThemed(
+    <ChordBox leader="cmd+e" ctx={ctx} chords={chordTable(() => {})} onClose={() => {}} />,
+  )
   expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
     "cNew chat",
     "dNew design",
@@ -60,7 +62,9 @@ test("defaults to the real chord table", () => {
 })
 
 test("is on the layer stack while mounted", () => {
-  const { unmount } = renderThemed(<ChordBox leader="cmd+e" ctx={ctx} onClose={() => {}} />)
+  const { unmount } = renderThemed(
+    <ChordBox leader="cmd+e" ctx={ctx} chords={[]} onClose={() => {}} />,
+  )
   expect(hasLayer()).toBe(true)
   unmount()
   expect(hasLayer()).toBe(false)

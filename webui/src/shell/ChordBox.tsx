@@ -1,14 +1,10 @@
 import { Box } from "@chakra-ui/react"
-import { useMemo } from "react"
 import { useIsTopLayer } from "../ui/modal/layers"
-import { chordTable, displayKey, type Chord, type ChordContext } from "./chords"
-
-const realTable = () => chordTable(() => {})
+import { displayKey, type Chord, type ChordContext } from "./chords"
 
 /**
  * The Chord box: lists the chords available in `ctx`, under the Leader key chip. It has no key
- * handling and no timer; whoever mounts it decides when it opens and closes. The default table's
- * Remove chord does nothing, so a caller that can remove passes its own table.
+ * handling and no timer; whoever mounts it decides when it opens and closes.
  */
 export function ChordBox({
   leader,
@@ -16,15 +12,14 @@ export function ChordBox({
   chords,
   onClose,
 }: {
-  leader: string | undefined
+  leader: string
   ctx: ChordContext
-  chords?: Chord[]
+  chords: Chord[]
   onClose: () => void
 }) {
   // Joins the layer stack while mounted so Esc handlers elsewhere defer to it.
   useIsTopLayer()
-  const table = useMemo(() => chords ?? realTable(), [chords])
-  const rows = table.filter((c) => c.available(ctx))
+  const rows = chords.filter((c) => c.available(ctx))
 
   return (
     <Box
