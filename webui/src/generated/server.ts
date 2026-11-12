@@ -850,14 +850,14 @@ export interface DiskReport {
   disks: DiskStatus[];
 }
 /**
- * ReasonUnknownDisk refuses a "clean now" for a disk the watcher does not know.
+ * CleanNowReasonUnknownDisk refuses a "clean now" for a disk the watcher does not know.
  */
-export const ReasonUnknownDisk = "unknown-disk";
+export const CleanNowReasonUnknownDisk = "unknown-disk";
 /**
- * ReasonCleanRunning refuses a "clean now" while any clean runs on the disk.
+ * CleanNowReasonCleanRunning refuses a "clean now" while any clean runs on the disk.
  */
-export const ReasonCleanRunning = "clean-running";
-export type Reason = typeof ReasonUnknownDisk | typeof ReasonCleanRunning;
+export const CleanNowReasonCleanRunning = "clean-running";
+export type CleanNowReason = typeof CleanNowReasonUnknownDisk | typeof CleanNowReasonCleanRunning;
 /**
  * CleanNowRequest names the disk to clean.
  */

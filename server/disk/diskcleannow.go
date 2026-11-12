@@ -17,10 +17,10 @@ func (s *Disk) cleanNow(id string) wire.CleanNowResult {
 	switch {
 	case st == nil:
 		d.mu.Unlock()
-		return wire.CleanNowResult{Refused: true, Reason: wire.ReasonUnknownDisk, Message: "unknown disk " + id}
+		return wire.CleanNowResult{Refused: true, Reason: wire.CleanNowReasonUnknownDisk, Message: "unknown disk " + id}
 	case st.cleaning:
 		d.mu.Unlock()
-		return wire.CleanNowResult{Refused: true, Reason: wire.ReasonCleanRunning, Message: "clean already running"}
+		return wire.CleanNowResult{Refused: true, Reason: wire.CleanNowReasonCleanRunning, Message: "clean already running"}
 	}
 	probe, projects, before := st.probe, st.projects, st.reading.Free
 	st.beginClean(before)

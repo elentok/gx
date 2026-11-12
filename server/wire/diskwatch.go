@@ -50,10 +50,10 @@ type DiskReport struct {
 }
 
 const (
-	// ReasonUnknownDisk refuses a "clean now" for a disk the watcher does not know.
-	ReasonUnknownDisk = "unknown-disk"
-	// ReasonCleanRunning refuses a "clean now" while any clean runs on the disk.
-	ReasonCleanRunning = "clean-running"
+	// CleanNowReasonUnknownDisk refuses a "clean now" for a disk the watcher does not know.
+	CleanNowReasonUnknownDisk = "unknown-disk"
+	// CleanNowReasonCleanRunning refuses a "clean now" while any clean runs on the disk.
+	CleanNowReasonCleanRunning = "clean-running"
 )
 
 // CleanNowRequest names the disk to clean.

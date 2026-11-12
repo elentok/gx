@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -111,5 +112,23 @@ func TestTygoCoversWireTypes(t *testing.T) {
 	sort.Strings(unlisted)
 	for _, u := range unlisted {
 		t.Errorf("%s is in a file tygo.yaml does not list: add the file to include_files or the type to notGenerated", u)
+	}
+}
+
+// TestGeneratedTypesAreUnique catches tygo merging two const groups that share
+// a name prefix (both `Reason*` groups became `type Reason`), which breaks the
+// webui build with TS2300.
+func TestGeneratedTypesAreUnique(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "webui", "src", "generated", "server.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decl := regexp.MustCompile(`(?m)^export (?:type|interface|const) (\w+)\b`)
+	seen := map[string]bool{}
+	for _, m := range decl.FindAllStringSubmatch(string(src), -1) {
+		if seen[m[1]] {
+			t.Errorf("generated/server.ts declares %s twice: rename a Go const group so its names stop sharing a prefix", m[1])
+		}
+		seen[m[1]] = true
 	}
 }

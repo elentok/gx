@@ -150,7 +150,7 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 		r.setFree(3 * gb)
 		r.waitCalls(t, 1)
 		res := r.cleanNow(t)
-		if !res.Refused || res.Reason != wire.ReasonCleanRunning || res.Message != "clean already running" {
+		if !res.Refused || res.Reason != wire.CleanNowReasonCleanRunning || res.Message != "clean already running" {
 			t.Errorf("result = %+v", res)
 		}
 		r.clean.release()
@@ -175,7 +175,7 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 		t.Parallel()
 		r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 		res, err := r.h.Client.Admin.CleanDisk(context.Background(), "nope")
-		if err != nil || !res.Refused || res.Reason != wire.ReasonUnknownDisk {
+		if err != nil || !res.Refused || res.Reason != wire.CleanNowReasonUnknownDisk {
 			t.Errorf("result = %+v, %v", res, err)
 		}
 	})
@@ -218,7 +218,7 @@ func TestWebDiskClean_PostReachesTheHandler(t *testing.T) {
 	h, base := servertest.StartWeb(t)
 	cookie := servertest.Login(t, h.StateDir, base)
 	code, body := servertest.WebPostJSON(t, base+"/v1/disk/clean", `{"disk":"nope"}`, cookie, "", servertest.JSONPost(base))
-	if code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonUnknownDisk {
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != wire.CleanNowReasonUnknownDisk {
 		t.Errorf("web disk clean = %d %s", code, body)
 	}
 }
