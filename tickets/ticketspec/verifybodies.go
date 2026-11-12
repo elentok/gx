@@ -106,60 +106,68 @@ func isVerifySlug(slug string) bool {
 	return slug == "verify" || slug == "verify-collect" || strings.HasPrefix(slug, "verify-part-")
 }
 
-// dropVerifyRows removes the verify, verify-part-N and verify-collect rows from
-// manifest, so a re-run replaces them instead of duplicating them.
-func dropVerifyRows(manifest []byte) ([]byte, error) {
+// dropRows removes the rows of manifest that drop selects (it gets the row's
+// slug and body) and returns the body of each removed row.
+func dropRows(manifest []byte, drop func(slug, body string) bool) (out []byte, bodies []string, err error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(manifest, &doc); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.SequenceNode {
-		return manifest, nil
+		return manifest, nil, nil
 	}
 	seq := doc.Content[0]
 	seq.Content = slices.DeleteFunc(seq.Content, func(item *yaml.Node) bool {
 		if item.Kind != yaml.MappingNode {
 			return false
 		}
+		var slug, body string
 		for i := 0; i+1 < len(item.Content); i += 2 {
-			if item.Content[i].Value == "slug" {
-				return isVerifySlug(item.Content[i+1].Value)
+			switch item.Content[i].Value {
+			case "slug":
+				slug = item.Content[i+1].Value
+			case "body":
+				body = item.Content[i+1].Value
 			}
 		}
-		return false
+		if !drop(slug, body) {
+			return false
+		}
+		bodies = append(bodies, body)
+		return true
 	})
 	if len(seq.Content) == 0 {
-		return nil, nil
+		return nil, bodies, nil
 	}
-	return yaml.Marshal(&doc)
+	out, err = yaml.Marshal(&doc)
+	return out, bodies, err
 }
 
-// AppendManifest returns manifest (possibly empty) with one entry per ticket
-// added at the end. Existing verify rows are dropped first.
-func AppendManifest(manifest []byte, ts []VerifyTicket) ([]byte, error) {
-	type row struct {
-		Slug      string   `yaml:"slug"`
-		Type      string   `yaml:"type"`
-		BlockedBy []string `yaml:"blocked_by,omitempty"`
-		Window    int      `yaml:"expected_context_window"`
-		Body      string   `yaml:"body"`
-	}
-	rows := make([]row, 0, len(ts))
-	for _, t := range ts {
-		rows = append(rows, row{t.Slug, t.Type, t.BlockedBy, t.ExpectedContextWindow, t.BodyFileName()})
-	}
+// appendRows adds rows at the end of manifest (possibly empty).
+func appendRows(manifest []byte, rows []ManifestRow) ([]byte, error) {
 	add, err := yaml.Marshal(rows)
 	if err != nil {
 		return nil, err
 	}
-	out, err := dropVerifyRows(manifest)
+	if len(manifest) > 0 && manifest[len(manifest)-1] != '\n' {
+		manifest = append(manifest, '\n')
+	}
+	return append(manifest, add...), nil
+}
+
+// AppendManifest returns manifest (possibly empty) with one entry per ticket
+// added at the end. Existing verify rows are dropped first, so a re-run
+// replaces them instead of duplicating them.
+func AppendManifest(manifest []byte, ts []VerifyTicket) ([]byte, error) {
+	rows := make([]ManifestRow, 0, len(ts))
+	for _, t := range ts {
+		rows = append(rows, ManifestRow{t.Slug, t.Type, t.BlockedBy, t.ExpectedContextWindow, t.BodyFileName()})
+	}
+	out, _, err := dropRows(manifest, func(slug, _ string) bool { return isVerifySlug(slug) })
 	if err != nil {
 		return nil, err
 	}
-	if len(out) > 0 && out[len(out)-1] != '\n' {
-		out = append(out, '\n')
-	}
-	return append(out, add...), nil
+	return appendRows(out, rows)
 }
 
 // fence puts text in a code fence long enough to hold any backticks in it, so

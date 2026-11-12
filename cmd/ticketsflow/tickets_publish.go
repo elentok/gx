@@ -68,7 +68,20 @@ func (p *publishPlan) rows() []publishedTicket {
 // are added here.
 var publishPreWriteChecks = []func(*publishPlan) []error{
 	checkRenderedTickets,
+	checkDraftMarkers,
 	checkPublishShape,
+}
+
+// checkDraftMarkers refuses a body with an unwritten `draft` part. Unlike the
+// shape check, --allow-check-misses does not skip it.
+func checkDraftMarkers(p *publishPlan) []error {
+	var errs []error
+	for _, t := range p.Tickets {
+		if ticketspec.HasDraftMarker(t.Body) {
+			errs = append(errs, fmt.Errorf("%s: body still has a %s marker; write What to build and Acceptance criteria", t.Slug, ticketspec.DraftMarker))
+		}
+	}
+	return errs
 }
 
 // checkPublishShape refuses implement tickets missing a required section or over

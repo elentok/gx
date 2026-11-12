@@ -99,6 +99,9 @@ func LintClaims(entries, existing []LintEntry, env LintEnv) LintReport {
 			}
 		}
 		planned := pb.String()
+		if HasDraftMarker(e.Body) {
+			r.Misses = append(r.Misses, LintFinding{e.Name, "still has a " + DraftMarker + " marker: write What to build and Acceptance criteria", true})
+		}
 		for _, c := range ExtractClaims(e.Body, env.TopDirs) {
 			if c.Kind == ClaimLineRef {
 				r.Warnings = append(r.Warnings, LintFinding{e.Name, fmt.Sprintf("%s: name a symbol, not a line", c.Text), false})

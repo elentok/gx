@@ -28,6 +28,7 @@ func Commands(d Deps) []*cobra.Command {
 		newTicketsPublishCmd(d),
 		newTicketsLintClaimsCmd(d),
 		newTicketsVerifyPlanCmd(d),
+		newTicketsDraftCmd(d),
 		newTicketsFollowUpCmd(d),
 		newTicketsEpicCmd(d),
 		newTicketsFilterRunLogCmd(d),

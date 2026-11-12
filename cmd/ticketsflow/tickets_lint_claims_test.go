@@ -105,6 +105,20 @@ func TestLintClaims_CommandsPathsPatternsFlows(t *testing.T) {
 	}
 }
 
+func TestLintClaims_DraftMarkerRefuses(t *testing.T) {
+	f := newLintFixture(t)
+	f.ticket("01", "implement", "", "## What to build\n\n<!-- TODO -->\n")
+	out, code := f.lint()
+	if code != 1 {
+		t.Errorf("exit = %d, want 1", code)
+	}
+	wantLines(t, out, "miss: 01: still has a <!-- TODO --> marker")
+	f.ticket("01", "implement", "", "## What to build\n\nDone.\n")
+	if out, code := f.lint(); code != 0 {
+		t.Errorf("no marker: exit = %d\n%s", code, out)
+	}
+}
+
 func TestLintClaims_BareFileNamesAndCaseClashes(t *testing.T) {
 	f := newLintFixture(t)
 	f.file("web/DraftImages.tsx", "export {}\n")
