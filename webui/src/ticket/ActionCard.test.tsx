@@ -498,10 +498,13 @@ const oneOff = (status: string): TicketDetail => ({
   status,
 })
 
-test.each(["open", "claimed", "paused"])("a %s One-off shows Cancel", async (status) => {
-  renderTicket(() => oneOff(status))
-  expect(await screen.findByRole("button", { name: "Cancel" })).toBeTruthy()
-})
+test.each(["open", "claimed", "needs-answer", "needs-repair"])(
+  "a %s One-off shows Cancel",
+  async (status) => {
+    renderTicket(() => oneOff(status))
+    expect(await screen.findByRole("button", { name: "Cancel" })).toBeTruthy()
+  },
+)
 
 test.each([
   ["a done One-off", oneOff("done")],

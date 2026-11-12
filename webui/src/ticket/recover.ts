@@ -18,7 +18,8 @@ export const ReasonAgentWorking = "agent-working"
 /** Not a detail action: the page offers Cancel for a One-off from its address and status. */
 export const ActionCancel = "cancel"
 
-const CANCELLABLE_STATUSES = ["open", "claimed", "paused"]
+// A paused ticket reaches the page as its legacy word (needs-answer or needs-repair), never "paused".
+const CANCELLABLE_STATUSES = ["open", "claimed", "needs-answer", "needs-repair"]
 
 /** A One-off that has not ended. The server refuses any other ticket. */
 export const canCancel = (detail: { address: string; status: string }) =>
