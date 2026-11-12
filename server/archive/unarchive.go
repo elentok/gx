@@ -66,23 +66,9 @@ func (a *Archive) unarchiveOne(target string) (wire.TargetResult, error) {
 	head := tickets.LoadEpicTicketMD(filepath.Join(archiveDir, base))
 	name := freeNameIn(dir, base, len(halves) > 1)
 
-	out := wire.TargetResult{Target: target, Status: wire.TargetDone}
-	if name != base {
-		out.NewAddress = project + ":" + name
-		if asImpl {
-			out.NewAddress += tickets.ImplEpicSuffix
-		}
-	}
+	out := wire.TargetResult{Target: target, Status: wire.TargetDone, NewAddress: newAddress(project, name, base, asImpl)}
 	if err := a.restore(dir, project, halves, name, head); err != nil {
-		if r, ok := errors.AsType[refusal](err); ok {
-			return wire.RefusedTarget(target, r.reason, r.Error()), nil
-		}
-		if f, ok := errors.AsType[failure](err); ok {
-			failed := wire.FailedTarget(target, f)
-			failed.NewAddress = out.NewAddress
-			return failed, nil
-		}
-		return wire.TargetResult{}, err
+		return writeFailed(target, out.NewAddress, err)
 	}
 	return out, nil
 }

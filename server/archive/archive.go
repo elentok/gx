@@ -126,85 +126,21 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 		return cleanupscan.ScanEpic(a.d.TicketStore, repo, name)
 	}
 
-	// A target given as the -impl address resolves to its Design's row.
-	base, asImpl := epic, false
-	if d, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && a.d.DesignExists(project+":"+d) {
-		base, asImpl = d, true
+	base, asImpl := a.resolveBase(project, epic)
+	halves, onTrunk, err := a.checkArchivable(project, dir, base, scan)
+	if r, ok := errors.AsType[refusal](err); ok {
+		return refuse(r.reason, r.Error())
 	}
-	halves := []half{{epic: base, key: project + ":" + base}}
-	var onTrunk bool
-	if a.d.DesignExists(halves[0].key) {
-		step := tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(dir, base)).DesignStep)
-		if step != tickets.StepDone {
-			// A Design stuck before done still archives once its work merged:
-			// the -impl epic, or the map itself when it has no -impl.
-			work := base
-			if _, err := os.Stat(filepath.Join(dir, base+tickets.ImplEpicSuffix)); err == nil {
-				work = base + tickets.ImplEpicSuffix
-			}
-			row, err := scan(work)
-			if err != nil {
-				return wire.TargetResult{}, err
-			}
-			// A map with no -impl may have no tickets at all, which never counts as all done.
-			if row == nil || !row.MergedToTrunk || (!row.AllDone && work != base) {
-				return refuse(wire.ReasonArchiveNotFinished, DesignNotFinishedText)
-			}
-		}
-		if a.d.RootQueued(halves[0].key) {
-			return refuse(wire.ReasonCleanupQueued, "the epic is queued")
-		}
-		impl := base + tickets.ImplEpicSuffix
-		if _, err := os.Stat(filepath.Join(dir, impl)); err == nil {
-			implKey := project + ":" + impl
-			if a.d.RootQueued(implKey) {
-				return refuse(wire.ReasonArchiveImplNotArchivable, "the -impl epic is queued")
-			}
-			row, err := scan(impl)
-			if err != nil {
-				return wire.TargetResult{}, err
-			}
-			if row == nil || !row.AllDone {
-				return refuse(wire.ReasonArchiveImplNotArchivable, "the -impl epic has tickets that are not done")
-			}
-			onTrunk = row.MergedToTrunk
-			halves = append(halves, half{epic: impl, key: implKey})
-		} else {
-			// No -impl: the map's own merge is the one the dialog warns about.
-			row, err := scan(base)
-			if err != nil {
-				return wire.TargetResult{}, err
-			}
-			onTrunk = row != nil && row.MergedToTrunk
-		}
-	} else {
-		if a.d.RootQueued(halves[0].key) {
-			return refuse(wire.ReasonCleanupQueued, "the epic is queued")
-		}
-		row, err := scan(base)
-		if err != nil {
-			return wire.TargetResult{}, err
-		}
-		switch {
-		case row == nil:
-			return refuse(wire.ReasonCleanupUnknown, "no such epic")
-		case !row.AllDone:
-			return refuse(wire.ReasonCleanupNotDone, "the epic has tickets that are not done")
-		}
-		onTrunk = row.MergedToTrunk
+	if err != nil {
+		return wire.TargetResult{}, err
 	}
 	name := freeNameIn(tickets.ArchiveDir(dir), base, len(halves) > 1)
 	var live []string
 	for _, h := range halves {
 		live = append(live, workspaces.LiveEpicSessions(a.d, h.key, allKinds)...)
 	}
-	out := wire.TargetResult{Target: target, Status: wire.TargetDone, Sessions: live, OnTrunk: &onTrunk}
-	if name != base {
-		out.NewAddress = project + ":" + name
-		if asImpl {
-			out.NewAddress += tickets.ImplEpicSuffix
-		}
-	}
+	out := wire.TargetResult{Target: target, Status: wire.TargetDone, Sessions: live, OnTrunk: &onTrunk,
+		NewAddress: newAddress(project, name, base, asImpl)}
 	if dryRun {
 		out.Status = wire.TargetFits
 		return out, nil
@@ -223,17 +159,113 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 		cleanup = func() { a.d.CleanupDesign(project, base) }
 	}
 	if err := a.write(target, dir, halves, name, cleanup); err != nil {
-		if r, ok := errors.AsType[refusal](err); ok {
-			return refuse(r.reason, r.Error())
-		}
-		if f, ok := errors.AsType[failure](err); ok {
-			failed := wire.FailedTarget(target, f)
-			failed.NewAddress = out.NewAddress
-			return failed, nil
-		}
-		return wire.TargetResult{}, err
+		return writeFailed(target, out.NewAddress, err)
 	}
 	return out, nil
+}
+
+// resolveBase maps a target given as the -impl address onto its Design's row.
+func (a *Archive) resolveBase(project, epic string) (base string, asImpl bool) {
+	if d, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && a.d.DesignExists(project+":"+d) {
+		return d, true
+	}
+	return epic, false
+}
+
+// newAddress is the row's address after a rename, or "" when the name is kept.
+func newAddress(project, name, base string, asImpl bool) string {
+	if name == base {
+		return ""
+	}
+	addr := project + ":" + name
+	if asImpl {
+		addr += tickets.ImplEpicSuffix
+	}
+	return addr
+}
+
+// writeFailed turns an error from write or restore into the target's result:
+// a refusal, a failure after the move began, or an error for the caller.
+func writeFailed(target, newAddr string, err error) (wire.TargetResult, error) {
+	if r, ok := errors.AsType[refusal](err); ok {
+		return wire.RefusedTarget(target, r.reason, r.Error()), nil
+	}
+	if f, ok := errors.AsType[failure](err); ok {
+		failed := wire.FailedTarget(target, f)
+		failed.NewAddress = newAddr
+		return failed, nil
+	}
+	return wire.TargetResult{}, err
+}
+
+// checkArchivable applies the refusal rules to base's row and returns its
+// halves and whether its merge is on trunk. A refusal comes back as a refusal error.
+func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (*cleanupscan.EpicScan, error)) ([]half, bool, error) {
+	halves := []half{{epic: base, key: project + ":" + base}}
+	queued := func(key, reason, msg string) error {
+		if a.d.RootQueued(key) {
+			return refusal{reason, errors.New(msg)}
+		}
+		return nil
+	}
+	if !a.d.DesignExists(halves[0].key) {
+		if err := queued(halves[0].key, wire.ReasonCleanupQueued, "the epic is queued"); err != nil {
+			return nil, false, err
+		}
+		row, err := scan(base)
+		if err != nil {
+			return nil, false, err
+		}
+		switch {
+		case row == nil:
+			return nil, false, refusal{wire.ReasonCleanupUnknown, errors.New("no such epic")}
+		case !row.AllDone:
+			return nil, false, refusal{wire.ReasonCleanupNotDone, errors.New("the epic has tickets that are not done")}
+		}
+		return halves, row.MergedToTrunk, nil
+	}
+	impl := base + tickets.ImplEpicSuffix
+	_, statErr := os.Stat(filepath.Join(dir, impl))
+	hasImpl := statErr == nil
+	if tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(dir, base)).DesignStep) != tickets.StepDone {
+		// A Design stuck before done still archives once its work merged:
+		// the -impl epic, or the map itself when it has no -impl.
+		work := base
+		if hasImpl {
+			work = impl
+		}
+		row, err := scan(work)
+		if err != nil {
+			return nil, false, err
+		}
+		// A map with no -impl may have no tickets at all, which never counts as all done.
+		if row == nil || !row.MergedToTrunk || (!row.AllDone && work != base) {
+			return nil, false, refusal{wire.ReasonArchiveNotFinished, errors.New(DesignNotFinishedText)}
+		}
+	}
+	if err := queued(halves[0].key, wire.ReasonCleanupQueued, "the epic is queued"); err != nil {
+		return nil, false, err
+	}
+	if !hasImpl {
+		// No -impl: the map's own merge is the one the dialog warns about.
+		row, err := scan(base)
+		if err != nil {
+			return nil, false, err
+		}
+		return halves, row != nil && row.MergedToTrunk, nil
+	}
+	implKey := project + ":" + impl
+	if err := queued(implKey, wire.ReasonArchiveImplNotArchivable, "the -impl epic is queued"); err != nil {
+		return nil, false, err
+	}
+	row, err := scan(impl)
+	if err != nil {
+		return nil, false, err
+	}
+	if row == nil || !row.AllDone {
+		return nil, false, refusal{wire.ReasonArchiveImplNotArchivable, errors.New("the -impl epic has tickets that are not done")}
+	}
+	return append(halves, half{epic: impl, key: implKey}), row.MergedToTrunk, nil
 }
 
 const allKinds = workspaces.OwnSessions | workspaces.FixSessions | workspaces.DesignSessions
