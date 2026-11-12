@@ -66,6 +66,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"to-tickets estimate", "gx-to-tickets/SKILL.md", []string{"1.12", "1.28", "0.83", "60K"}},
 		{"to-tickets calibration", "gx-to-tickets/SKILL.md", []string{"gx tickets calibration", "0.83"}},
 		{"to-tickets publish", "gx-to-tickets/SKILL.md", []string{"gx tickets publish", "--manifest", "--dry-run", "{{slug}}"}},
+		{"to-tickets 4c literal commands and helper fit", "gx-to-tickets/SKILL.md", []string{"**Literal commands**", "**Seam commands are dry-run**", "**Reused helpers fit**", "**Criteria vs must-keep-passing tests**"}},
 		{"to-tickets 4c helper rule and slug ID", "gx-to-tickets/SKILL.md", []string{"**Names a seam or hint relies on**", "seam that finds nothing is not a seam", "that ticket's ID."}},
 		{"implement edit rules", "gx-implement/SKILL.md", []string{
 			"**Make one Edit per contiguous region, not one per line.**",

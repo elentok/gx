@@ -270,6 +270,18 @@ cite the file (`file:func`) in the ticket next to the claim:
 - **Names a seam or hint relies on**: for a fake, helper or generated type that a seam or hint
   names, run the `rg` the implementing agent would run and confirm it hits. A seam that finds
   nothing is not a seam.
+- **Literal commands**: for a regenerate or test step, write the exact command (e.g. `go test
+  ./schema -run TestSchema -update`), never "check the Makefile". Find it by running or reading
+  the real target, not from memory.
+- **Seam commands are dry-run**: before publishing, run each seam's command once (or its compile/
+  `-run -list` form if the test does not exist yet) and confirm it resolves. A command you did not
+  run is not a seam.
+- **Reused helpers fit**: when a ticket says "reuse X", read X and check that it counts or covers
+  what this ticket needs (e.g. a counter keyed by session ids cannot see other agents). If it does
+  not fit, say so and name the change it needs.
+- **Criteria vs must-keep-passing tests**: for a fix ticket, read each test the ticket says must
+  keep passing and check every criterion against it. If a criterion contradicts a test, say which
+  one wins. Give the exact site (`file:func`) of each change, never "where rows are rendered".
 - **Wiring**: name the hidden registration points (route tables, allowlists, parity tests, the
   query-and-prop path that feeds a page) and give `file:func` for anything the ticket says only by
   line number or role. For a new server route, point at `.ai/index.md` "Adding a server route".
