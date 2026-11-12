@@ -107,6 +107,55 @@ test("clicking the switch writes and the row updates without opening the row", a
   expect(screen.queryByText("Not built yet")).toBeNull()
 })
 
+const BANNER = /^Every schedule is off on this machine/
+
+const answerOf = (project: string, slug: string, on: boolean) =>
+  ({
+    refused: false,
+    reason: "",
+    message: "",
+    schedule: sched({ project, slug, switch: on, next_run: on ? sched({}).next_run : "" }),
+    prompt: "",
+    last_runs: [],
+  }) as ScheduleShowResult
+
+test("an empty list shows the example text, New and no banner", async () => {
+  renderPage([])
+  expect(await screen.findByText(/^No scheduled prompts yet\./)).toBeTruthy()
+  expect(screen.getByText(/for example every day at 07:00 and 21:00/)).toBeTruthy()
+  expect(screen.getByRole("button", { name: "New" })).toBeTruthy()
+  expect(screen.queryByText(BANNER)).toBeNull()
+})
+
+test("the banner shows when every switch is off", async () => {
+  renderPage([sched({ switch: false, next_run: "" })])
+  expect(await screen.findByText(BANNER)).toBeTruthy()
+})
+
+test("the banner is hidden while one switch is on", async () => {
+  renderPage([sched({}), sched({ slug: "b", name: "B", switch: false, next_run: "" })])
+  await screen.findByText("Morning")
+  expect(screen.queryByText(BANNER)).toBeNull()
+})
+
+test("turning the last switch off shows the banner and turning one on hides it", async () => {
+  const post = vi.fn<PostSwitch>(async (p, s, on) => answerOf(p, s, on))
+  renderPage([sched({})], post)
+  const sw = await screen.findByRole("switch", { name: "Run on this machine" })
+  expect(screen.queryByText(BANNER)).toBeNull()
+  fireEvent.click(sw)
+  expect(await screen.findByText(BANNER)).toBeTruthy()
+  fireEvent.click(screen.getByRole("switch", { name: "Run on this machine" }))
+  await waitFor(() => expect(screen.queryByText(BANNER)).toBeNull())
+})
+
+test("a Schedule whose project is not found says so and shows no next run", async () => {
+  renderPage([sched({ project_found: false })])
+  expect(await screen.findByText("project not found")).toBeTruthy()
+  expect(screen.queryByText(/^Next /)).toBeNull()
+  expect(screen.getByText("Morning")).toBeTruthy()
+})
+
 test("clicking a row opens the Schedule", async () => {
   const router = renderPage([sched({})])
   fireEvent.click(await screen.findByText("Morning"))
