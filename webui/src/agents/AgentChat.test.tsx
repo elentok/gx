@@ -4,8 +4,11 @@ import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { PostAnswer } from "../design/prompt"
-import type {
-  QuestionCard,
+import {
+  CardSourceClaudeDialog,
+  CardSourceCodex,
+  CardSourcePermission,
+  type QuestionCard,
   SessionChatResponse,
   SessionFailure,
   SessionInfo,
@@ -403,6 +406,17 @@ test("the banner still shows with a card visible", async () => {
   await screen.findByText("Which way?")
   expect(screen.getByText("Failure stalled")).toBeTruthy()
   expect(screen.getByRole("button", { name: "Screen" })).toBeTruthy()
+})
+
+test.each([
+  [CardSourceClaudeDialog, false],
+  [CardSourcePermission, false],
+  [CardSourceCodex, true],
+])("a blocked notice beside a %s card shows: %s", async (source, shown) => {
+  const failure = { kind: "blocked", label: "Failure blocked", text: "" } as SessionFailure
+  render(session({ failure }), chat({ questions: [sourceCard(source)] }))
+  await screen.findByText(/Pick one\?/)
+  expect(!!screen.queryByText("Failure blocked")).toBe(shown)
 })
 
 test("a gx-raised Actionable shows no gx stopped", async () => {

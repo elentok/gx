@@ -11,6 +11,7 @@ import {
   CardSourceCodex,
   CardSourcePermission,
   CardSourceRound,
+  FailureKindBlocked,
   ReasonCodexNotReady,
   ReasonCodexStopped,
   type QuestionCard,
@@ -123,6 +124,15 @@ function CardSheet({
   )
 }
 
+/** A blocked notice repeats a sheet that already has Dismiss (and Answer in the terminal), so only one area acts. Codex cards have no such buttons and keep the notice. */
+function sheetCoversBlock(kind: string, card?: QuestionCard): boolean {
+  return (
+    kind === FailureKindBlocked &&
+    !!card &&
+    (card.source === CardSourceClaudeDialog || card.source === CardSourcePermission)
+  )
+}
+
 /** The chat of a Claude or Codex session on the Agents page: the messages, a plain Working row, the question sheet and the failure notice. */
 export function AgentChat({
   session,
@@ -158,7 +168,7 @@ export function AgentChat({
           refetch={refetch}
         />
       )}
-      {failure && (
+      {failure && !sheetCoversBlock(failure.kind, card) && (
         <FailureBanner
           failure={failure}
           session={session}
