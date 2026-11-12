@@ -381,7 +381,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.schedState = schedState
 	s.schedRunner = &schedules.Scheduler{
-		Store: schedrec.NewStore(cfg.TicketStore), State: schedState, Submit: s.oneOffs, Log: log,
+		Store: schedrec.NewStore(cfg.TicketStore), State: schedState, Submit: s.oneOffs, TicketStore: cfg.TicketStore, Log: log,
 		Now: cfg.SchedulesClock, Interval: cfg.SchedulesInterval, Ready: s.migrator.StartupDone(),
 	}
 	s.harness.GiveLog(cfg.Runner)
@@ -499,6 +499,7 @@ func New(cfg Config) (*Server, error) {
 	s.PR = PRFlow{s}
 	s.epics = epics.New(s.epicsDeps())
 	s.ops = newTicketOps(s)
+	s.schedRunner.Cancel = s.ops.Cancel
 	s.prompt.AnswerTicket = s.ops.Answer
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished

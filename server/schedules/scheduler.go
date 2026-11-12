@@ -20,12 +20,15 @@ type Submitter interface {
 // Scheduler starts a run for each due Schedule. One check does both the timer
 // work and the catch-up after a sleep or restart.
 type Scheduler struct {
-	Store    *schedrec.Store
-	State    *State
-	Submit   Submitter
-	Log      *slog.Logger
-	Now      func() time.Time // nil means time.Now
-	Interval time.Duration    // zero means DefaultInterval
+	Store  *schedrec.Store
+	State  *State
+	Submit Submitter
+	// Cancel settles a queued previous run; the server sets it once its ticket operations exist.
+	Cancel      func(wire.QueueRequest) (wire.QueueResult, error)
+	TicketStore string
+	Log         *slog.Logger
+	Now         func() time.Time // nil means time.Now
+	Interval    time.Duration    // zero means DefaultInterval
 	// Ready is closed once the server may queue runs.
 	Ready <-chan struct{}
 }
@@ -99,7 +102,9 @@ func (sc *Scheduler) checkOne(s schedrec.Schedule, now time.Time) {
 		if !sc.record(sc.State.AppendSkip(k, sk), k) {
 			return
 		}
-	} else if !sc.start(s, due) {
+	} else if ok, retry := sc.prepare(k, due, now); retry {
+		return
+	} else if ok && !sc.start(s, due) {
 		return
 	}
 	sc.record(sc.State.SetBaseline(k, now), k)
@@ -112,7 +117,7 @@ func (sc *Scheduler) start(s schedrec.Schedule, due time.Time) bool {
 		Project: s.Project,
 		Agent:   s.Harness,
 		Name:    s.Slug,
-		Unique:  "schedule:" + s.Project + "/" + s.Slug + "@" + sc.State.MachineID(),
+		Unique:  sc.dedupeKey(Key{Project: s.Project, Slug: s.Slug}),
 	}, due)
 	switch {
 	case err != nil:
