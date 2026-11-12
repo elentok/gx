@@ -1,4 +1,4 @@
-import { Box, chakra, Text } from "@chakra-ui/react"
+import { Box, Text } from "@chakra-ui/react"
 import { useEffect, useState, type KeyboardEvent } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext } from "../connection"
@@ -11,50 +11,9 @@ import { useFetched } from "../useFetched"
 import { useWrite } from "../useWrite"
 import { formatNextRun, formatWhen } from "./format"
 import { fetchSchedules, postSwitch, type FetchSchedules, type PostSwitch } from "./schedules"
+import { Switch } from "./Switch"
 
 const addressOf = (s: ScheduleInfo) => `${s.project}:${s.slug}`
-
-function Switch({
-  on,
-  disabled,
-  onToggle,
-}: {
-  on: boolean
-  disabled: boolean
-  onToggle: () => void
-}) {
-  return (
-    <chakra.button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label="Run on this machine"
-      data-mock-part="switch"
-      disabled={disabled}
-      onClick={(e) => {
-        e.stopPropagation()
-        onToggle()
-      }}
-      onKeyDown={(e: KeyboardEvent) => e.stopPropagation()}
-      flex="none"
-      w="40px"
-      h="22px"
-      borderRadius="full"
-      position="relative"
-      bg={on ? "tone.running.fg" : "border"}
-    >
-      <Box
-        position="absolute"
-        top="2px"
-        left={on ? "20px" : "2px"}
-        w="18px"
-        h="18px"
-        borderRadius="full"
-        bg="surface"
-      />
-    </chakra.button>
-  )
-}
 
 function ScheduleRow({
   item,

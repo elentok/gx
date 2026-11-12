@@ -2,14 +2,20 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext } from "../connection"
-import type { ScheduleShowResult } from "../generated/server"
+import type {
+  ScheduleInfo,
+  ScheduleRun,
+  ScheduleRunNowResult,
+  ScheduleShowResult,
+} from "../generated/server"
+import { ticketHref } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
 import { HeaderLink } from "../page/HeaderLink"
 import { Button } from "../ui/button/Button"
 import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useFetched } from "../useFetched"
-import { refusalText, useWrite } from "../useWrite"
+import { refusalText, useWrite, type Refusable } from "../useWrite"
 import {
   DAYS,
   formOf,
@@ -25,16 +31,24 @@ import {
   type FormErrors,
   type ScheduleForm,
 } from "./form"
+import { LastRuns } from "./LastRuns"
 import {
   fetchScheduleShow,
   fetchSchedules,
   postCreate,
+  postDelete,
   postEdit,
+  postRunNow,
+  postSwitch,
   type FetchSchedules,
   type FetchScheduleShow,
   type PostCreate,
+  type PostDelete,
   type PostEdit,
+  type PostRunNow,
+  type PostSwitch,
 } from "./schedules"
+import { Switch } from "./Switch"
 
 const DAY_LABEL: Record<string, string> = {
   mon: "Mon",
@@ -100,10 +114,142 @@ function Row({
   )
 }
 
+interface ExistingTools {
+  info: ScheduleInfo
+  runs: ScheduleRun[]
+  runNow: PostRunNow
+  switchTo: PostSwitch
+  remove: PostDelete
+  refetch: () => void
+}
+
+function RunNowRefusal({ refusal, project }: { refusal: Refusable; project: string }) {
+  const attention = (refusal as ScheduleRunNowResult).attention_address
+  let text = refusalText(refusal)
+  if (refusal.reason === "previous-run-started") text = "previous run started"
+  else if (refusal.reason === "previous-run-needs-attention") text = "previous run needs attention"
+  else if (refusal.reason === "unknown-project") text = `no project ${project} in the ticket store`
+  return (
+    <Text role="alert" color="tone.error.fg" fontSize="14px" mt="2">
+      {text}
+      {attention && (
+        <>
+          {" "}
+          <chakra.a href={ticketHref(attention)} textDecoration="underline">
+            {attention}
+          </chakra.a>
+        </>
+      )}
+    </Text>
+  )
+}
+
+function ScheduleHeader({
+  existing,
+  tools,
+}: {
+  existing: { project: string; slug: string }
+  tools: ExistingTools
+}) {
+  const runWrite = useWrite({ toastRefusal: false })
+  const switchWrite = useWrite()
+  const [answered, setAnswered] = useState<boolean>()
+  useEffect(() => setAnswered(undefined), [tools.info.switch])
+  const on = answered ?? tools.info.switch
+  const runNow = () =>
+    void runWrite.run(() => tools.runNow(existing.project, existing.slug), {
+      onDone: tools.refetch,
+    })
+  const toggle = () =>
+    void switchWrite.run(() => tools.switchTo(existing.project, existing.slug, !on), {
+      onDone: (res) => {
+        setAnswered(res.schedule.switch)
+        tools.refetch()
+      },
+    })
+  return (
+    <Box data-mock-part="schedule-header" mt="2">
+      <Box display="flex" alignItems="center" gap="3">
+        {!tools.info.project_found && (
+          <Text data-mock-part="next-run" color="text.muted" fontSize="14px">
+            project not found
+          </Text>
+        )}
+        <Box flex="1" />
+        <Button
+          data-mock-part="run-now"
+          emphasis="secondary"
+          onClick={runNow}
+          disabled={runWrite.pending}
+        >
+          Run now
+        </Button>
+        <Switch on={on} disabled={switchWrite.pending} onToggle={toggle} />
+      </Box>
+      {!on && (
+        <Text color="text.muted" fontSize="13px" mt="1">
+          Runs once now. The switch is off on this machine.
+        </Text>
+      )}
+      {runWrite.refusal && <RunNowRefusal refusal={runWrite.refusal} project={existing.project} />}
+    </Box>
+  )
+}
+
+function DeleteSchedule({
+  existing,
+  remove,
+}: {
+  existing: { project: string; slug: string }
+  remove: PostDelete
+}) {
+  const navigate = useNavigate()
+  const write = useWrite()
+  const [asking, setAsking] = useState(false)
+  if (!asking)
+    return (
+      <Box data-mock-part="delete-link" mt="8" pb="4">
+        <chakra.button
+          type="button"
+          color="text.muted"
+          fontSize="14px"
+          onClick={() => setAsking(true)}
+        >
+          Delete this schedule
+        </chakra.button>
+      </Box>
+    )
+  return (
+    <Box data-mock-part="delete-link" mt="8" pb="4">
+      <Text fontSize="14px">
+        Delete this schedule? Queued runs that never started are cancelled. Live and paused runs
+        continue.
+      </Text>
+      <Box display="flex" gap="3" mt="2">
+        <Button
+          tone="deadlocked"
+          disabled={write.pending}
+          onClick={() =>
+            void write.run(() => remove(existing.project, existing.slug), {
+              onDone: () => navigate("/schedules"),
+            })
+          }
+        >
+          Delete
+        </Button>
+        <Button emphasis="secondary" onClick={() => setAsking(false)}>
+          Cancel
+        </Button>
+      </Box>
+    </Box>
+  )
+}
+
 function Editor({
   base,
   setBase,
   existing,
+  tools,
   projects,
   defaultHarness,
   postCreateFn,
@@ -112,6 +258,7 @@ function Editor({
   base: ScheduleForm
   setBase: (f: ScheduleForm) => void
   existing?: { project: string; slug: string }
+  tools?: ExistingTools
   projects: string[]
   defaultHarness: string
   postCreateFn: PostCreate
@@ -191,6 +338,7 @@ function Editor({
           </Text>
         )}
       </Box>
+      {existing && tools && <ScheduleHeader existing={existing} tools={tools} />}
 
       <Row part="row-days" label="Days" error={inline("days")}>
         <Box data-mock-part="days" display="flex" flexWrap="wrap" gap="2" alignItems="center">
@@ -245,7 +393,9 @@ function Editor({
                 placeholder="HH:MM"
                 value={t}
                 onChange={(e) =>
-                  set({ times: form.times.map((x, j) => (j === i ? e.target.value : x)) })
+                  set({
+                    times: form.times.map((x, j) => (j === i ? e.target.value : x)),
+                  })
                 }
                 w="88px"
               />
@@ -340,6 +490,8 @@ function Editor({
         </Box>
       </Row>
 
+      {tools && <LastRuns runs={tools.runs} />}
+
       {write.refusal && !refusedAt && (
         <Text role="alert" color="tone.error.fg" fontSize="14px" mt="2">
           {refusalText(write.refusal)}
@@ -376,6 +528,7 @@ function Editor({
           </Button>
         </Box>
       )}
+      {existing && tools && <DeleteSchedule existing={existing} remove={tools.remove} />}
     </Box>
   )
 }
@@ -387,17 +540,29 @@ export function SchedulePage({
   fetchShow = fetchScheduleShow,
   create = postCreate,
   edit = postEdit,
+  runNow = postRunNow,
+  switchTo = postSwitch,
+  remove = postDelete,
 }: {
   address?: string
   fetchList?: FetchSchedules
   fetchShow?: FetchScheduleShow
   create?: PostCreate
   edit?: PostEdit
+  runNow?: PostRunNow
+  switchTo?: PostSwitch
+  remove?: PostDelete
 }) {
   return (
     <DetailPage title={{ kind: "Scheduled prompts", name: address ? address : "New" }}>
       {address ? (
-        <Existing address={address} fetchShow={fetchShow} edit={edit} create={create} />
+        <Existing
+          address={address}
+          fetchShow={fetchShow}
+          edit={edit}
+          create={create}
+          post={{ runNow, switchTo, remove }}
+        />
       ) : (
         <Fresh fetchList={fetchList} create={create} edit={edit} />
       )}
@@ -437,17 +602,24 @@ function Existing({
   fetchShow,
   create,
   edit,
+  post,
 }: {
   address: string
   fetchShow: FetchScheduleShow
   create: PostCreate
   edit: PostEdit
+  post: Pick<ExistingTools, "runNow" | "switchTo" | "remove">
 }) {
   const conn = useConnectionContext()
   const i = address.indexOf(":")
   const project = address.slice(0, i)
   const slug = address.slice(i + 1)
-  const { data, failed } = useFetched("schedule", () => fetchShow(project, slug), conn, address)
+  const { data, failed, retry } = useFetched(
+    "schedule",
+    () => fetchShow(project, slug),
+    conn,
+    address,
+  )
   const [base, setBase] = useState<ScheduleForm>()
   const loaded = data && !data.refused ? formOf(data) : undefined
   const loadedKey = JSON.stringify(loaded)
@@ -474,6 +646,12 @@ function Existing({
       base={base}
       setBase={setBase}
       existing={{ project, slug }}
+      tools={{
+        ...post,
+        info: data.schedule,
+        runs: data.last_runs,
+        refetch: retry,
+      }}
       projects={[]}
       defaultHarness={data.schedule.default_harness}
       postCreateFn={create}

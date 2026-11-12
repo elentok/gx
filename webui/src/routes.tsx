@@ -42,7 +42,9 @@ import type {
   FetchScheduleShow,
   FetchSchedules,
   PostCreate,
+  PostDelete,
   PostEdit,
+  PostRunNow,
   PostSwitch,
 } from "./schedules/schedules"
 import { SchedulePage } from "./schedules/SchedulePage"
@@ -105,6 +107,9 @@ function ScheduleRoute({ fetchers }: { fetchers: RouteFetchers }) {
       fetchShow={fetchers.scheduleShow}
       create={fetchers.createSchedule}
       edit={fetchers.editSchedule}
+      runNow={fetchers.runNowSchedule}
+      switchTo={fetchers.switchSchedule}
+      remove={fetchers.deleteSchedule}
     />
   )
 }
@@ -181,6 +186,8 @@ export interface RouteFetchers {
   scheduleShow?: FetchScheduleShow
   createSchedule?: PostCreate
   editSchedule?: PostEdit
+  runNowSchedule?: PostRunNow
+  deleteSchedule?: PostDelete
   archivedEpic?: FetchEpicDetail
   checksStatus?: FetchChecksStatus
   saveChecks?: SaveChecks
