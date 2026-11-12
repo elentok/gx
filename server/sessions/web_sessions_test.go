@@ -2,8 +2,10 @@ package sessions_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -135,6 +137,43 @@ func TestSessionRowToken(t *testing.T) {
 	}
 	if old := sessions.SessionStateToken(row(wire.SessionWorking, at)); old == working {
 		t.Errorf("the old token format %q equals the row token", old)
+	}
+}
+
+// The web's rowToken embeds run_started_at as the raw JSON string, so it
+// matches SessionRowToken only while the server's wire time keeps RFC3339Nano.
+// webui/src/design/rowToken.test.ts reads the same fixture.
+func TestSessionRowToken_MatchesTheSharedWebFixture(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(filepath.Join("..", "wire", "testdata", "row_tokens.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Name         string `json:"name"`
+		ID           string `json:"id"`
+		RunStartedAt string `json:"run_started_at"`
+		State        string `json:"state"`
+		Token        string `json:"token"`
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			var info wire.SessionInfo
+			body := fmt.Sprintf(`{"id":%q,"run_started_at":%q,"status":{"state":%q}}`, tc.ID, tc.RunStartedAt, tc.State)
+			if err := json.Unmarshal([]byte(body), &info); err != nil {
+				t.Fatal(err)
+			}
+			if got := sessions.SessionRowToken(info); got != tc.Token {
+				t.Errorf("SessionRowToken = %q, want %q", got, tc.Token)
+			}
+			out, err := json.Marshal(info.RunStartedAt)
+			if err != nil || string(out) != fmt.Sprintf("%q", tc.RunStartedAt) {
+				t.Errorf("wire time marshals to %s, %v, want %q", out, err, tc.RunStartedAt)
+			}
+		})
 	}
 }
 

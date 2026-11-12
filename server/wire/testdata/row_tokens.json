@@ -1,0 +1,23 @@
+[
+  {
+    "name": "UTC with nanoseconds",
+    "id": "s1",
+    "run_started_at": "2026-01-02T03:04:05.000000006Z",
+    "state": "working",
+    "token": "s1:2026-01-02T03:04:05.000000006Z:live"
+  },
+  {
+    "name": "zero nanoseconds drop the fraction",
+    "id": "s2",
+    "run_started_at": "2026-01-02T03:04:05Z",
+    "state": "idle",
+    "token": "s2:2026-01-02T03:04:05Z:live"
+  },
+  {
+    "name": "non-UTC offset is kept",
+    "id": "s3",
+    "run_started_at": "2026-01-02T03:04:05.5+02:00",
+    "state": "exited",
+    "token": "s3:2026-01-02T03:04:05.5+02:00:exited"
+  }
+]
