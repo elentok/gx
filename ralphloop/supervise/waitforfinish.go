@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/transcript"
 )
 
 // SmartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
@@ -680,7 +679,8 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 		stillFresh := reading.AwaitingTurnEnd
 		for _, m := range reading.Tasks {
 			id := m.TaskID
-			switch classifyTask(m, reportedAt, hs.isGone) {
+			class := classifyTask(m, reportedAt, hs.isGone)
+			switch class {
 			case taskGone:
 			case taskIgnored:
 				if hs.ignore(id) {
@@ -696,13 +696,10 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 						return false, err
 					}
 				}
-			default:
-				if m.Status != transcript.BackgroundTaskResolved && m.Status != transcript.BackgroundTaskOutstandingAgedOut {
-					continue
-				}
+			case taskResolved, taskAgedOut:
 				if hs.release(id) {
 					detail := fmt.Sprintf("background task %s", id)
-					if m.Status == transcript.BackgroundTaskOutstandingAgedOut {
+					if class == taskAgedOut {
 						detail += " aged out"
 					}
 					if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, detail); err != nil {
@@ -712,12 +709,11 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 			}
 		}
 		if stillFresh && d.GateReleased != nil && d.GateReleased() {
-			for id := range hs.held {
+			for _, id := range hs.releaseAll() {
 				if err := p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: recovery forced the release", id)); err != nil {
 					return false, err
 				}
 			}
-			clear(hs.held)
 			stillFresh = false
 		}
 		if !stillFresh {

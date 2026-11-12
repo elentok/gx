@@ -57,8 +57,12 @@ func BackgroundTaskLive(d deps.Deps, p LaunchParams, sessionID string) bool {
 type taskClass int
 
 const (
-	// taskOther is any task that is not outstanding-fresh.
+	// taskOther is any task with a status no gate acts on.
 	taskOther taskClass = iota
+	// taskResolved is a task that finished.
+	taskResolved
+	// taskAgedOut is an outstanding task too old to wait on.
+	taskAgedOut
 	// taskGone is a fresh task whose process is known to be gone.
 	taskGone
 	// taskIgnored is a fresh task that started before the finished report.
@@ -72,7 +76,13 @@ const (
 // whether a task's process is known dead; reportedAt is zero when no finished
 // report applies.
 func classifyTask(m transcript.BackgroundTaskMarker, reportedAt time.Time, gone func(id string) bool) taskClass {
-	if m.Status != transcript.BackgroundTaskOutstandingFresh {
+	switch m.Status {
+	case transcript.BackgroundTaskOutstandingFresh:
+	case transcript.BackgroundTaskResolved:
+		return taskResolved
+	case transcript.BackgroundTaskOutstandingAgedOut:
+		return taskAgedOut
+	default:
 		return taskOther
 	}
 	if gone(m.TaskID) {
@@ -119,6 +129,16 @@ func (s *holdState) release(id string) bool {
 	was := s.held[id]
 	delete(s.held, id)
 	return was
+}
+
+// releaseAll empties the held set and returns the ids it held.
+func (s *holdState) releaseAll() []string {
+	ids := make([]string, 0, len(s.held))
+	for id := range s.held {
+		ids = append(ids, id)
+	}
+	clear(s.held)
+	return ids
 }
 
 // ignore drops id from the held set, marks it ignored and reports whether that
