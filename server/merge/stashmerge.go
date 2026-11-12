@@ -89,7 +89,7 @@ func (s *Landing) prStashMergeLocked(m mergeEpicRef, target string) (*wire.Queue
 	if ff, err := git.IsAncestor(m.repo, "refs/heads/"+target, remote); err != nil {
 		return nil, err
 	} else if !ff {
-		r := queue.Refusal(wire.ReasonNotDirtyTrunk, target+" has commits that are not on origin/"+target+", so it cannot fast-forward")
+		r := queue.Refusal(wire.ReasonLocalAhead, target+" has commits that are not on origin/"+target+", so it cannot fast-forward")
 		return &r, nil
 	}
 	clashing := clashingBetween(repo.Root, dir, "refs/heads/"+target, remote)

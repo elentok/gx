@@ -103,6 +103,7 @@ const (
 	ReasonBranchMissing    = "branch-missing"
 	ReasonOneOffsEpic      = "one-offs-epic"
 	ReasonNotDirtyTrunk    = "not-dirty-trunk"
+	ReasonLocalAhead       = "local-ahead"
 	ReasonNeedsRebase      = "needs-rebase"
 	ReasonHasPR            = "has-pr"
 	ReasonPROpenFailed     = "pr-open-failed"

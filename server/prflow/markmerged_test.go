@@ -115,6 +115,27 @@ func TestMarkMerged_OpenPRStopsWatchingCancelsFixesAndStampsAfterTheFastForward(
 	}
 }
 
+func TestStashMerge_RefusesWithLocalAheadWhenLocalMainHasCommitsOriginLacks(t *testing.T) {
+	f, _ := handMergedRig(t)
+	if err := os.WriteFile(filepath.Join(f.Origin.Local, "epic-a.txt"), []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if res := markMerged(t, f); res.Reason != string(schema.PausePRDirtyTrunk) {
+		t.Fatalf("mark-merged = %+v, want a pr-dirty-trunk pause", res)
+	}
+	if err := os.WriteFile(filepath.Join(f.Origin.Local, "ahead.txt"), []byte("local"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	servertest.GitOut(t, f.Origin.Local, "add", "ahead.txt")
+	servertest.GitOut(t, f.Origin.Local, "commit", "-q", "-m", "local only")
+
+	res, err := f.H.Client.Tickets.EpicStashMerge(t.Context(), "proj:epic-a")
+
+	if err != nil || res.Reason != wire.ReasonLocalAhead {
+		t.Errorf("stash-merge = %+v, %v, want the local-ahead refusal", res, err)
+	}
+}
+
 func TestMarkMerged_DirtyTrunkKeepsMergedAtEmptyUntilTheTrunkIsClean(t *testing.T) {
 	f, _ := handMergedRig(t)
 	clash := filepath.Join(f.Origin.Local, "epic-a.txt")
