@@ -417,7 +417,7 @@ func (f *fixture) waitForEnd(ctx context.Context, sc scenario, exited <-chan err
 	case err := <-exited:
 		// A migrate scenario's flow kills and starts the server itself (migrate.go);
 		// a cache-gate flow stops it to run gx brief go-clean-cache without one.
-		if sc.Restart == nil && !sc.Migrate && !sc.FakeGo {
+		if sc.Restart == nil && !sc.Migrate && !sc.FakeGo && !sc.ServerStops {
 			return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
 		}
 		f.restarted = true

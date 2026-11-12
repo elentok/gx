@@ -274,6 +274,7 @@ var scenarios = map[string]scenario{
 	"dead-many":                spec.DeadManyScenario(),
 	"dead-question":            spec.DeadQuestionScenario(),
 	"dead-design":              spec.DeadDesignScenario(),
+	"restart-sessions":         spec.RestartSessionsScenario(),
 	"live-task-gate-dirty":     spec.LiveTaskGateDirty,
 	"slow-holder":              spec.SlowHolder,
 	"holder-unreachable":       spec.HolderUnreachable,

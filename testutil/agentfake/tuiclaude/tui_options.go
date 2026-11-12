@@ -183,6 +183,8 @@ func runTUIClaude() (int, error) {
 	if err := os.MkdirAll(filepath.Dir(ctlPath), 0o755); err != nil {
 		return 0, err
 	}
+	// A killed run with the same id (a resumed session) leaves its FIFO behind.
+	_ = os.Remove(ctlPath)
 	if err := syscall.Mkfifo(ctlPath, 0o600); err != nil {
 		return 0, err
 	}

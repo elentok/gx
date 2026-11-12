@@ -113,6 +113,7 @@ var allowed = map[string]allowance{
 	"cmd/ticketsmigrate/tickets_migrate_question_test.go":    allow("migrates the legacy Needs Answer section", "park", "needsanswer"),
 	"cmd/ticketsmigrate/tickets_migrate_store_start_test.go": allow("imports old-shape tickets with the legacy statuses and Needs Answer heading", "needsanswer", "needsrepair"),
 	"config/agents_test.go":                                  allow("tests the resume-on-start alias", "resumeonstart"),
+	"testutil/gxfixture/deadsessions_test.go":                allow("starts a server with the resume-on-start alias", "resumeonstart"),
 	"events/legacy_test.go":                                  allow("tests the legacy event reader", "park", "needsanswer", "needsrepair", "land", "reset"),
 	"ralphloop/ticketops/claim_test.go":                      allow("tests demoting the legacy Needs Answer and Needs Repair sections", "park", "needsanswer", "needsrepair"),
 	"ralphloop/ticketops/resumeticket_test.go":               allow("tests demoting the legacy Needs Repair section", "needsrepair"),

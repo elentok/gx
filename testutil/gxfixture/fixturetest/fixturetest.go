@@ -17,6 +17,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -367,6 +369,50 @@ func (r *Running) ProcessCounts(t *testing.T) (holders, agents int) {
 		}
 	}
 	return holders, agents
+}
+
+// KillSessionProcesses SIGKILLs every holder and agent process naming one of
+// the session ids, and their descendants (the agent does not name its id but
+// inherits the holder's socket, which then still accepts), leaving the sessions
+// as a crashed holder would. It does not need the server, which is why the
+// caller passes the ids. It returns once no such process is left.
+func (r *Running) KillSessionProcesses(t *testing.T, ids []string) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		psCmd := exec.Command("ps", "-axww", "-o", "pid=,ppid=,command=")
+		psCmd.Env = r.Env
+		ps, err := psCmd.Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		children := map[string][]string{}
+		var doomed []string
+		for line := range strings.SplitSeq(string(ps), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) < 3 {
+				continue
+			}
+			children[fields[1]] = append(children[fields[1]], fields[0])
+			if slices.ContainsFunc(ids, func(id string) bool { return strings.Contains(line, id) }) {
+				doomed = append(doomed, fields[0])
+			}
+		}
+		for i := 0; i < len(doomed); i++ {
+			doomed = append(doomed, children[doomed[i]]...)
+		}
+		killed := 0
+		for _, pid := range doomed {
+			if n, err := strconv.Atoi(pid); err == nil && syscall.Kill(n, syscall.SIGKILL) == nil {
+				killed++
+			}
+		}
+		if len(doomed) == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d session processes survived SIGKILL", killed)
+		}
+	}
 }
 
 // Sleepers counts the live processes of the fake agents' forked trees on the

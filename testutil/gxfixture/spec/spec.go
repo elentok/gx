@@ -164,6 +164,8 @@ type Scenario struct {
 	Env []string
 	// Restart points the server's restart at a fake gx binary (see restart.go).
 	Restart *RestartSpec
+	// ServerStops lets a flow stop the server and start another itself, without the fixture ending.
+	ServerStops bool
 	// Chat turns the fake's chat knob on, so a plain prompt is a chat turn.
 	Chat bool
 	// ChatCapture points the server's Slack webhook and Telegram base URL at a

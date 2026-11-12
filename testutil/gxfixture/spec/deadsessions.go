@@ -11,6 +11,20 @@ import "github.com/elentok/gx/tickets"
 // DeadSessionCount is how many sessions the many-dead scenario seeds.
 const DeadSessionCount = 40
 
+// RestartSessionCount is how many live sessions the restart-sessions scenario seeds.
+const RestartSessionCount = 3
+
+// RestartSessionsScenario is RestartSessionCount live idle sessions. A flow
+// stops the server, kills their holders and starts the server again, which is
+// the start path the dead scenarios above skip (their sessions exit at seed time).
+func RestartSessionsScenario() scenario {
+	sessions := make([]sessionSpec, RestartSessionCount)
+	for i := range sessions {
+		sessions[i] = sessionSpec{Project: project, Prompt: "hello"}
+	}
+	return scenario{Chat: true, ServerStops: true, Sessions: sessions}
+}
+
 // DeadManyScenario is DeadSessionCount saved sessions, all dead.
 func DeadManyScenario() scenario {
 	return scenario{DeadSessions: DeadSessionCount}
