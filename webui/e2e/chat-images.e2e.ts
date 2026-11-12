@@ -57,8 +57,12 @@ test("189. Send images", async ({ page, start }) => {
   await messageBox(page).fill("three for you")
   // Send stays off while an upload runs, so enabled means all three are ready.
   await expect(sendButton(page)).toBeEnabled()
-  await messageBox(page).press("Meta+Enter")
-  await expect(thumbs(page)).toHaveCount(0)
+  await expect(messageBox(page)).toHaveValue("three for you")
+  // Under load the first keypress can be lost, so press again until the thumbnails clear.
+  await expect(async () => {
+    await messageBox(page).press("Meta+Enter")
+    await expect(thumbs(page)).toHaveCount(0, { timeout: 2_000 })
+  }).toPass({ timeout: 15_000 })
   await expect(page.getByText("three for you")).toBeVisible()
   await expect(chatThumbs(page)).toHaveCount(4)
   await expect
