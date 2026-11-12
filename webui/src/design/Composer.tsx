@@ -28,7 +28,7 @@ import { ComposerImages } from "./ComposerImages"
 import { FooterLine } from "./FooterLine"
 import { InterruptControl } from "./InterruptControl"
 import { useComposerImages } from "./useComposerImages"
-import { NoteBox } from "./NoteBox"
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
 import { postAnswer, type PostAnswer, type PostPrompt } from "./prompt"
 import type { Answers } from "../ui/question-sheet/round"
 import { ReasonStale } from "../ticket/answer"
@@ -238,6 +238,7 @@ export function Composer({
     />
   )
 
+  const hint = codexSkillHint(session.harness, text)
   const footerLine = <FooterLine session={session} ceiling={ceiling} />
 
   return (
@@ -245,8 +246,8 @@ export function Composer({
       position="sticky"
       bottom="0"
       bg="surface"
-      pt="6px"
-      pb="8px"
+      pt="3"
+      pb="0"
       display="flex"
       flexDirection="column"
       gap="2"
@@ -256,6 +257,7 @@ export function Composer({
       <ComposerImages
         state={images}
         phone={!wide}
+        gap="3"
         footer={!open && footerLine}
         afterAdd={
           <>
@@ -306,10 +308,10 @@ export function Composer({
         }
       >
         {open && (
-          <NoteBox
-            name="the composer"
-            fieldName="design-note"
+          <ExpandableTextField
+            rows={3}
             label="Message"
+            name="design-note"
             title={inRound ? "Note on this round" : "Message to the agent"}
             placeholder={inRound ? "A note on this round" : "A message to the agent"}
             value={text}
@@ -317,6 +319,8 @@ export function Composer({
             autoFocus
             onChange={setText}
             onSubmit={onSubmit}
+            insetRing
+            note={hint ? { text: hint } : null}
             footer={footerLine}
             completion={{
               target: { sessionId: session.id },
@@ -324,11 +328,6 @@ export function Composer({
               off: !enabled,
             }}
           />
-        )}
-        {open && codexSkillHint(session.harness, text) && (
-          <Text fontSize="xs" color="text.dim">
-            {codexSkillHint(session.harness, text)}
-          </Text>
         )}
         {!wide && autoMenu && (
           <AutoCountdown

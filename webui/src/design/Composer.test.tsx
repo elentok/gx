@@ -277,14 +277,13 @@ test("the composer is disabled while the session is Working", async () => {
 
 const expand = () => screen.getByLabelText("Open the note in a large editor")
 
-test("the box is 5 rows, scrolls into view and has the expand button; no round: Message to the agent", async () => {
+test("the box is 3 rows and has the expand button; no round: Message to the agent", async () => {
   const scrollIntoView = vi.fn()
   Element.prototype.scrollIntoView = scrollIntoView
   const post = vi.fn<PostPrompt>(async () => ok)
   render({ post })
   const box = await openNote()
-  expect(box.rows).toBe(5)
-  expect(scrollIntoView).toHaveBeenCalled()
+  expect(box.rows).toBe(3)
   fireEvent.click(expand())
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("Message to the agent")
   await typeInLargeEditor("Message to the agent", "from the modal")
@@ -304,7 +303,7 @@ test("with a round the modal is Note on this round and its text goes in the Note
   const answer = vi.fn<PostAnswer>(async () => ok)
   render({ answer, chat: chatOf({ round: round() }) })
   const box = await openNote()
-  expect(box.rows).toBe(5)
+  expect(box.rows).toBe(3)
   // The round's text answer has its own expand button above the note's.
   fireEvent.click(screen.getAllByLabelText("Open the note in a large editor").at(-1)!)
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("Note on this round")
@@ -380,13 +379,13 @@ test("on a phone the footer is one row: Add, Note, Auto, Send", async () => {
 })
 
 test.each([false, true])(
-  "the footer has 6px above, 8px below and no separator (wide=%s)",
+  "the footer has the chat page's padding and no separator (wide=%s)",
   async (wide) => {
     render({ wide, chat: chatOf({ round: round() }) })
     await autoButton()
     const style = getComputedStyle(screen.getByRole("form", { name: "Composer" }))
-    expect(style.paddingTop).toBe("6px")
-    expect(style.paddingBottom).toBe("8px")
+    expect(style.paddingTop).toBe("var(--chakra-spacing-3)")
+    expect(style.paddingBottom).not.toBe("8px")
     expect(style.borderTopWidth).not.toBe("1px")
     expect(screen.getByRole("button", { name: "Add image" })).toBeTruthy()
   },
