@@ -79,8 +79,19 @@ func NewOneOffs(d OneOffsDeps) *OneOffs { return &OneOffs{OneOffsDeps: d} }
 // write, and a refusal after the write removes the ticket again, so a refused
 // submit leaves nothing behind for a retry to collide with.
 func (o *OneOffs) Submit(req wire.OneOffRequest) (wire.OneOffResult, error) {
+	return o.submit(req, time.Time{})
+}
+
+// SubmitScheduled is Submit for the scheduler: the ticket also carries the set
+// time the run was meant for. No request field reaches it, so callers outside
+// the server cannot fake one.
+func (o *OneOffs) SubmitScheduled(req wire.OneOffRequest, scheduledFor time.Time) (wire.OneOffResult, error) {
+	return o.submit(req, scheduledFor)
+}
+
+func (o *OneOffs) submit(req wire.OneOffRequest, scheduledFor time.Time) (wire.OneOffResult, error) {
 	var plan oneOffPlan
-	if res, err := o.oneOffValidate(req, &plan); err != nil || res.Refused {
+	if res, err := o.oneOffValidate(req, scheduledFor, &plan); err != nil || res.Refused {
 		return res, err
 	}
 	written, err := o.oneOffWrite(plan)
@@ -92,7 +103,7 @@ func (o *OneOffs) Submit(req wire.OneOffRequest) (wire.OneOffResult, error) {
 
 // oneOffValidate checks the submit and fills plan. A refusal (or error) means
 // plan is unusable; nothing has been written.
-func (o *OneOffs) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.OneOffResult, error) {
+func (o *OneOffs) oneOffValidate(req wire.OneOffRequest, scheduledFor time.Time, plan *oneOffPlan) (wire.OneOffResult, error) {
 	if req.NoUnique {
 		req.Unique = ""
 	}
@@ -131,7 +142,7 @@ func (o *OneOffs) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire
 	} else if dup != nil {
 		return dup.refusal(project, dir)
 	}
-	tk := schema.Ticket{Status: schema.StatusOpen, Type: typ, Notify: req.Notify, Unique: req.Unique, ExpectedContextWindow: req.ExpectedContextWindow}
+	tk := schema.Ticket{Status: schema.StatusOpen, Type: typ, Notify: req.Notify, Unique: req.Unique, ScheduledFor: scheduledFor, ExpectedContextWindow: req.ExpectedContextWindow}
 	if refused := o.oneOffOptionsRefusal(project, req); refused != nil {
 		return *refused, nil
 	}

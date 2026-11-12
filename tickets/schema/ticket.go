@@ -297,6 +297,8 @@ type Ticket struct {
 	// Unique is a one-off submit's dedupe key: a submit in the same project with
 	// the same key is refused while this ticket is not done or cancelled.
 	Unique string
+	// ScheduledFor is the set time a Schedule meant this run for; only the scheduler writes it.
+	ScheduledFor time.Time
 	// Agent names the agent that runs the ticket, picked by whoever wrote it.
 	// The server reads it at claim; empty or unknown falls back to the queue
 	// item's agent, then the project default.

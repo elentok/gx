@@ -221,7 +221,7 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 	ticket.Notify = parsed.Notify
 	ticket.Manual = parsed.Manual
 	ticket.NoRecover = parsed.NoRecover
-	ticket.Unique = parsed.Unique
+	ticket.Unique, ticket.ScheduledFor = parsed.Unique, parsed.ScheduledFor
 	ticket.Agent = parsed.Agent
 	ticket.ModelRan = parsed.ModelRan
 	ticket.ModelExpected = parsed.ModelExpected

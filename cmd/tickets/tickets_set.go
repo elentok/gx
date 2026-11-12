@@ -82,6 +82,7 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
     a new claim
   exported_at (RFC3339 timestamp) — when gx exported the ticket
   created_at (RFC3339 timestamp) — when the ticket was created
+  scheduled_for (RFC3339 timestamp) — the set time a Schedule meant this run for; written only by the server's scheduler
   original_address — the address the ticket was created under or, for a promoted
     ticket, the follow-up address(es) it came from; a string, or a list when several;
     kept when it moves

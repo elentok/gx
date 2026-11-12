@@ -70,6 +70,8 @@ type TicketOpts struct {
 	OriginalAddress string
 	// Unique is the ticket's unique: frontmatter field (a one-off's dedupe key), omitted when empty.
 	Unique string
+	// ScheduledFor and CreatedAt are RFC 3339 stamps, omitted when empty.
+	ScheduledFor, CreatedAt string
 	// ClaimedAt, DoneAt and CancelledAt are RFC 3339 stamps, omitted when empty.
 	ClaimedAt, DoneAt, CancelledAt string
 	// LongTicketTurns is the turn count the long-ticket alert marked the ticket with; omitted when 0.
@@ -161,7 +163,7 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	if opts.Unique != "" {
 		fm += "unique: " + opts.Unique + "\n"
 	}
-	for _, stamp := range [][2]string{{"claimed_at", opts.ClaimedAt}, {"done_at", opts.DoneAt}, {"cancelled_at", opts.CancelledAt}} {
+	for _, stamp := range [][2]string{{"claimed_at", opts.ClaimedAt}, {"done_at", opts.DoneAt}, {"cancelled_at", opts.CancelledAt}, {"created_at", opts.CreatedAt}, {"scheduled_for", opts.ScheduledFor}} {
 		if stamp[1] != "" {
 			fm += stamp[0] + ": " + stamp[1] + "\n"
 		}

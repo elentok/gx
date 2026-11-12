@@ -2,9 +2,11 @@ package queue_test
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
@@ -363,5 +366,64 @@ func TestOneOff_DuplicateLiveRefusedByUniqueKey(t *testing.T) {
 	evs, err := os.ReadFile(filepath.Join(h.TicketStore, "proj", strings.Split(strings.TrimPrefix(first.Address, "proj:"), "/")[0], "run-log.jsonl"))
 	if err != nil || !strings.Contains(string(evs), `"type":"submit-refused"`) || !strings.Contains(string(evs), `"kind":"duplicate-live"`) {
 		t.Errorf("run log lacks the submit-refused event: %v\n%s", err, evs)
+	}
+}
+
+func oneOffTicketFile(t *testing.T, h *servertest.Harness, addr string) string {
+	t.Helper()
+	a, err := tickets.ParseAddress(addr, tickets.AddressContext{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _ := filepath.Glob(filepath.Join(h.TicketStore, a.Project, a.Epic, "issues", a.ID+"-*.md"))
+	if len(files) != 1 {
+		t.Fatalf("ticket files for %s = %v", addr, files)
+	}
+	return servertest.ReadFile(t, files[0])
+}
+
+func TestOneOff_SubmitScheduledWritesScheduledForAndLaterCreatedAt(t *testing.T) {
+	t.Parallel()
+	h, repo := rigs.StartOneOffHarness(t)
+	set := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	res, err := h.Server.OneOffs().SubmitScheduled(wire.OneOffRequest{Prompt: "nightly", Cwd: repo}, set)
+	if err != nil || res.Refused {
+		t.Fatalf("submit scheduled: %+v, %v", res, err)
+	}
+	raw := oneOffTicketFile(t, h, res.Address)
+	if !strings.Contains(raw, "scheduled_for: "+set.Format(time.RFC3339)+"\n") {
+		t.Errorf("ticket lacks scheduled_for %s:\n%s", set.Format(time.RFC3339), raw)
+	}
+	tk, err := schema.ParseTicketFromRaw(raw, "01-nightly.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tk.ScheduledFor.Equal(set) || !tk.CreatedAt.After(tk.ScheduledFor) {
+		t.Errorf("scheduled_for = %v, created_at = %v; want created_at after %v", tk.ScheduledFor, tk.CreatedAt, set)
+	}
+}
+
+func TestOneOff_RunNowAndRawBodyWriteNoScheduledFor(t *testing.T) {
+	t.Parallel()
+	h, repo := rigs.StartOneOffHarness(t)
+	res, err := h.Client.Queue.OneOff(context.Background(), wire.OneOffRequest{Prompt: "now", Cwd: repo})
+	if err != nil || res.Refused {
+		t.Fatalf("one-off: %+v, %v", res, err)
+	}
+	if raw := oneOffTicketFile(t, h, res.Address); strings.Contains(raw, "scheduled_for") {
+		t.Errorf("plain one-off wrote scheduled_for:\n%s", raw)
+	}
+	// The route decodes the body into wire.OneOffRequest, so an extra key is dropped.
+	var req wire.OneOffRequest
+	body := `{"prompt":"sneaky","cwd":` + strconv.Quote(repo) + `,"scheduled_for":"2020-01-01T00:00:00Z"}`
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatal(err)
+	}
+	res, err = h.Server.OneOffs().Submit(req)
+	if err != nil || res.Refused {
+		t.Fatalf("submit: %+v, %v", res, err)
+	}
+	if raw := oneOffTicketFile(t, h, res.Address); strings.Contains(raw, "scheduled_for") {
+		t.Errorf("raw body set scheduled_for:\n%s", raw)
 	}
 }

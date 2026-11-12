@@ -94,6 +94,10 @@ func init() {
 	Default.Register(Step{Name: "epic-archive-fields", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// ticket-scheduled-for: scheduled_for is optional; absent is the default.
+	Default.Register(Step{Name: "ticket-scheduled-for", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

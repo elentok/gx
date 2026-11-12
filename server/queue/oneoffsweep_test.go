@@ -148,6 +148,21 @@ func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
 	}
 }
 
+func TestSweep_ArchivedOneOffKeepsScheduledForAndCreatedAt(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	const set, created = "2026-10-01T02:00:00Z", "2026-10-01T02:05:00Z"
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "late", servertest.TicketOpts{Type: "prompt", Status: "done", ScheduledFor: set, CreatedAt: created})
+	startSweep(t, store)
+	waitForFile(t, filepath.Join(store, "proj", queue.OneOffsEpic, "issues", "01-late.md"), false)
+	got := servertest.ReadFile(t, filepath.Join(store, "proj", queue.OneOffsArchivedEpic, "issues", "01-late.md"))
+	for _, want := range []string{"scheduled_for: " + set, "created_at: " + created} {
+		if !strings.Contains(got, want) {
+			t.Errorf("archived one-off lacks %q:\n%s", want, got)
+		}
+	}
+}
+
 func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()

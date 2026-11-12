@@ -33,6 +33,9 @@ func (s *Server) Landing() *merge.Landing { return s.landing }
 // TicketOps gives tests the ticket operations (ResumeAs, ResumeAsWeb, ...).
 func (s *Server) TicketOps() *ticketops.Ops { return s.ops }
 
+// OneOffs gives tests the one-off submit seam (SubmitScheduled).
+func (s *Server) OneOffs() *queue.OneOffs { return s.oneOffs }
+
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recovery.RecoverAsync(f) }
 
 func (s *Server) EpicState(root queue.RootRef, e tickets.Epic) wire.EpicState {

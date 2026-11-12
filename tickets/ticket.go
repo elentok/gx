@@ -99,6 +99,8 @@ type Ticket struct {
 	// Unique mirrors schema.Ticket.Unique.
 	Unique string
 
+	ScheduledFor time.Time // mirrors schema.Ticket.ScheduledFor
+
 	// Agent mirrors schema.Ticket.Agent.
 	Agent string
 

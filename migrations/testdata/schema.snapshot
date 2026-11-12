@@ -16,6 +16,7 @@ struct schema.Ticket
   Manual bool 
   NoRecover bool 
   Unique string 
+  ScheduledFor time.Time 
   Agent string 
   ModelRan string 
   ModelExpected string 

@@ -28,6 +28,7 @@ func TestTicket_StatsFieldsRoundTrip(t *testing.T) {
 		Type:            TypeImplement,
 		CreatedAt:       time.Date(2026, 10, 1, 1, 2, 3, 0, time.UTC),
 		CancelledAt:     time.Date(2026, 10, 2, 1, 2, 3, 0, time.UTC),
+		ScheduledFor:    time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC),
 		OriginalAddress: OriginalAddresses{"gx:epic/01"},
 		TotalTokens:     &tokens,
 		ActualCost:      1.5,
@@ -60,7 +61,7 @@ func TestTicket_LaunchRoundTrips(t *testing.T) {
 
 func TestTicket_UnstampedWritesNoStatsFields(t *testing.T) {
 	_, out := roundTrip(t, Ticket{ID: "01", Status: StatusOpen, Type: TypeImplement})
-	for _, key := range []string{"created_at", "original_address", "cancelled_at", "total_tokens", "had_codex", "friction", "launch"} {
+	for _, key := range []string{"created_at", "original_address", "cancelled_at", "scheduled_for", "total_tokens", "had_codex", "friction", "launch"} {
 		if strings.Contains(out, key) {
 			t.Errorf("unstamped ticket wrote %s:\n%s", key, out)
 		}
