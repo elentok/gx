@@ -13,7 +13,7 @@ export interface FetchedState<T> {
 /**
  * Fetches on mount, whenever `id` changes and on server events, and keeps the last result in the page cache under `key`.
  * Data of another `id` is never shown: a changed `id` repaints from its own cache entry or returns null. A failed refetch keeps
- * the last data; `failed` only shows while nothing is loaded.
+ * the last data; `failed` only shows while nothing is loaded. `refetchOnFocus` also refetches when the window regains focus.
  */
 export function useFetched<T>(
   key: string,
@@ -21,6 +21,7 @@ export function useFetched<T>(
   conn?: Connection,
   id = "",
   debounceMs?: number,
+  refetchOnFocus = false,
 ): FetchedState<T> {
   const latest = useRef(fetcher)
   latest.current = fetcher
@@ -46,6 +47,12 @@ export function useFetched<T>(
 
   const retry = useCallback(() => setAttempt((n) => n + 1), [])
   useRefetchOnEvents(conn, retry, debounceMs)
+  // For state the server does not announce, such as files edited outside the app.
+  useEffect(() => {
+    if (!refetchOnFocus) return
+    window.addEventListener("focus", retry)
+    return () => window.removeEventListener("focus", retry)
+  }, [refetchOnFocus, retry])
 
   const data = loaded?.id === id ? loaded.data : readPageCache<T>(key, id)
   return { data, failed: failed && data === null, retry }
