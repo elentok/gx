@@ -8,11 +8,13 @@ import { ErrorBoundary } from "./ErrorBoundary"
 import { registerWorker } from "./pwa/registerWorker"
 import { sessionSnapshotCache } from "./snapshotCache"
 import "./ui/fonts.css"
+import { installButtonTabStops } from "./ui/buttonTabStops"
 import { system } from "./ui/theme"
 import { AppToaster } from "./ui/toaster"
 
 installClientErrorReporting()
 void registerWorker()
+installButtonTabStops()
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
