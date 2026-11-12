@@ -21,6 +21,24 @@ func TestLoad_MissingScratchDirReturnsEmpty(t *testing.T) {
 	}
 }
 
+func TestLoad_IgnoresSchedulesFolder(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".schedules", "nightly.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("---\nversion: 1\nname: Nightly\n---\nDo it.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(epics) != 0 {
+		t.Fatalf("expected no epics, got %v", epics)
+	}
+}
+
 func TestLoad_EmptyScratchDirReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	epics, err := Load(dir)

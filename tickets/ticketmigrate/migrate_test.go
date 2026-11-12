@@ -47,6 +47,24 @@ func TestMigrate_BackfillsClaimedAtAndDoneAtOnce(t *testing.T) {
 	}
 }
 
+func TestMigrate_IgnoresSchedulesFolder(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".schedules", "nightly.md")
+	content := "---\nversion: 1\nname: Nightly\nstatus: done\n---\nDo it.\n"
+	tickettest.WriteFile(t, path, content)
+
+	result, err := Migrate(dir)
+	if err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if len(result.Changes) != 0 {
+		t.Fatalf("Changes = %v, want none", result.Changes)
+	}
+	if got, _ := os.ReadFile(path); string(got) != content {
+		t.Errorf("schedule file changed: %q", got)
+	}
+}
+
 func TestMigrate_IterationStatusRoundTripsUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "my-epic", "issues", "01-first-ticket.md")
