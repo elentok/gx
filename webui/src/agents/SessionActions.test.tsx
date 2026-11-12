@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { postStopSession, rowToken } from "../design/open"
 import type { SessionInfo } from "../generated/server"
+import { RemoveConfirmHost } from "../shell/RemoveConfirmHost"
 import { renderThemed } from "../ui/render"
 import { SessionActions } from "./SessionActions"
 import { exitedDesigns, postRemoveSession, removeSession } from "./sessionWrites"
@@ -35,7 +36,12 @@ test("Remove on a live session is one call with the row token", async () => {
   const stop = vi.fn()
   const remove = vi.fn(async () => ({}))
   const onRemoved = vi.fn()
-  renderThemed(<SessionActions session={live} onRemoved={onRemoved} stop={stop} remove={remove} />)
+  renderThemed(
+    <>
+      <SessionActions session={live} onRemoved={onRemoved} stop={stop} remove={remove} />
+      <RemoveConfirmHost />
+    </>,
+  )
   await openMenu()
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
   fireEvent.click(await screen.findByRole("button", { name: "Remove" }))
@@ -84,11 +90,14 @@ test("Remove forgets the session as the Agents page's last agent, so the page do
   const live = session()
   const done = exited(live)
   renderThemed(
-    <SessionActions
-      session={done}
-      onRemoved={() => {}}
-      remove={vi.fn(async () => ({ session: done }))}
-    />,
+    <>
+      <SessionActions
+        session={done}
+        onRemoved={() => {}}
+        remove={vi.fn(async () => ({ session: done }))}
+      />
+      <RemoveConfirmHost />
+    </>,
   )
   await openMenu()
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))

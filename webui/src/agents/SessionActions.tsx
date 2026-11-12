@@ -68,7 +68,6 @@ export function SessionActions({
   return (
     <Box>
       <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
-      {manage.dialog}
     </Box>
   )
 }

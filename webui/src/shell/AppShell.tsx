@@ -19,6 +19,7 @@ import { JumpPalette } from "./JumpPalette"
 import { setJumpOpen } from "./jumpOpen"
 import { MascotToggle } from "./MascotToggle"
 import { NewItemHost } from "./NewItemHost"
+import { RemoveConfirmHost } from "./RemoveConfirmHost"
 import { ShellContext, type Shell } from "./ShellContext"
 import { SidebarFooter } from "./SidebarFooter"
 import { LIST_ATTR, useSidebarKeys } from "./SidebarKeys"
@@ -365,6 +366,7 @@ export function AppShell({
         <JumpPalette fetcher={fetchEpicList} active={active} />
         <CommandPalette />
         <NewItemHost />
+        <RemoveConfirmHost />
       </Box>
     </ShellContext.Provider>
   )

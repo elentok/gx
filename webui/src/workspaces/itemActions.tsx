@@ -308,7 +308,6 @@ export function useItemActions(
       {dialog?.kind === "archive" ? (
         <ArchiveDialog {...props} sessions={dialog.sessions} onTrunk={dialog.onTrunk} />
       ) : null}
-      {manage.dialog}
     </>
   )
 

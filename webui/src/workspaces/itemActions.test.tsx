@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { HoldQueuedText, ReasonNeedsYes, type Workspace } from "../generated/server"
 import { session } from "../agents/agentsTestKit"
+import { RemoveConfirmHost } from "../shell/RemoveConfirmHost"
 import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
 import { ItemMenu, postHold, type ItemRef, type ItemWriters } from "./itemActions"
@@ -147,6 +148,7 @@ test("an exited chat offers Remove only; Remove asks first, then removes and rep
         writers={writers({ remove })}
         onRemoved={onRemoved}
       />
+      <RemoveConfirmHost />
     </WideContext.Provider>,
   )
   fireEvent.click(screen.getByRole("button", { name: "More actions" }))

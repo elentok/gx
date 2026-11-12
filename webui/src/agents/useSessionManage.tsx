@@ -1,36 +1,20 @@
-import { Box, Text } from "@chakra-ui/react"
-import { useState, type ReactNode } from "react"
 import { postStopSession, rowToken, type StopSession } from "../design/open"
 import type { SessionInfo } from "../generated/server"
+import { openRemoveConfirm } from "../shell/removeConfirmOpen"
 import { useWrite } from "../useWrite"
-import { Button } from "../ui/button/Button"
-import { Modal } from "../ui/modal/Modal"
 import type { MenuEntry } from "../ui/menu/Menu"
-import { forgetLast } from "./lastAgent"
-import {
-  canManage,
-  isExited,
-  postRemoveSession,
-  removeSession,
-  type RemoveSession,
-} from "./sessionWrites"
+import { canManage, isExited, type RemoveSession } from "./sessionWrites"
 
-/** Stop (while live) and Remove menu items for a session a person manages, plus Remove's confirmation. Shared by the agent page and the sidebar's chat rows. */
+/** Stop (while live) and Remove menu items for a session a person manages. Remove opens the shared confirm, rendered by RemoveConfirmHost. Shared by the agent page and the sidebar's chat rows. */
 export function useSessionManage(
   session: SessionInfo | undefined,
   onRemoved: () => void,
-  {
-    stop = postStopSession,
-    remove = postRemoveSession,
-  }: { stop?: StopSession; remove?: RemoveSession } = {},
-): { items: MenuEntry[]; dialog: ReactNode } {
+  { stop = postStopSession, remove }: { stop?: StopSession; remove?: RemoveSession } = {},
+): { items: MenuEntry[] } {
   const { run, pending } = useWrite()
-  const [confirming, setConfirming] = useState(false)
-  if (!session || !canManage(session)) return { items: [], dialog: null }
-  const live = !isExited(session)
-  const name = session.name || session.id
+  if (!session || !canManage(session)) return { items: [] }
   const items: MenuEntry[] = []
-  if (live)
+  if (!isExited(session))
     items.push({
       value: "stop",
       label: "Stop",
@@ -43,36 +27,7 @@ export function useSessionManage(
     label: "Remove",
     danger: true,
     disabled: pending,
-    onSelect: () => setConfirming(true),
+    onSelect: () => openRemoveConfirm({ session, onRemoved, remove }),
   })
-  const dialog = confirming ? (
-    <Modal label={`Remove ${name}`} onClose={() => setConfirming(false)} maxW="sm">
-      <Text>
-        {live
-          ? `Stop and remove ${name}? Its session is deleted.`
-          : `Remove ${name}? Its session is deleted.`}
-      </Text>
-      <Box display="flex" gap="2" justifyContent="flex-end">
-        <Button emphasis="secondary" onClick={() => setConfirming(false)} autoFocus>
-          Keep
-        </Button>
-        <Button
-          tone="paused"
-          disabled={pending}
-          onClick={() => {
-            setConfirming(false)
-            run(() => removeSession(session, { remove }), {
-              onDone: () => {
-                forgetLast(session.id)
-                onRemoved()
-              },
-            })
-          }}
-        >
-          Remove
-        </Button>
-      </Box>
-    </Modal>
-  ) : null
-  return { items, dialog }
+  return { items }
 }
