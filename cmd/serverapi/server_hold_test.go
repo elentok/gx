@@ -57,7 +57,7 @@ func TestServerHold_NeedsYesWhileDesignSessionsAreLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var res wire.HoldResult
+	var res wire.TargetsResult
 	if err := json.Unmarshal([]byte(out), &res); err != nil || res.Results[0].Refused() || len(res.Held) != 0 {
 		t.Errorf("unhold --json = %q (%+v, %v), want nothing held", out, res, err)
 	}
@@ -66,7 +66,7 @@ func TestServerHold_NeedsYesWhileDesignSessionsAreLive(t *testing.T) {
 func TestServerHold_JSONAndQueuedRefusal(t *testing.T) {
 	f := holdFixture(t)
 	out, err := runServer(t, f.H, "hold", "proj:plain", "--json")
-	var res wire.HoldResult
+	var res wire.TargetsResult
 	if err != nil || json.Unmarshal([]byte(out), &res) != nil || len(res.Held) != 1 || res.Held[0] != "proj:plain" {
 		t.Fatalf("hold --json = %q, %v, want proj:plain held", out, err)
 	}
@@ -103,7 +103,7 @@ func TestServerHold_ManyTargetsPrintLinesSummaryAndExitOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err = runServer(t, f.H, "unhold", "proj:map", "proj:plain", "--json")
-	var res wire.HoldResult
+	var res wire.TargetsResult
 	if json.Unmarshal([]byte(out), &res) != nil || len(res.Results) != 2 ||
 		res.Results[0].Status != wire.TargetDone || res.Results[1].Reason != wire.ReasonNotOnHold {
 		t.Errorf("unhold mix = %q, want done then not-on-hold", out)
@@ -116,7 +116,7 @@ func TestServerHold_ManyTargetsPrintLinesSummaryAndExitOne(t *testing.T) {
 func TestServerHold_JSONIsTheEnvelopeEvenForOneTarget(t *testing.T) {
 	f := holdFixture(t)
 	out, err := runServer(t, f.H, "hold", "proj:nope", "--json")
-	var res wire.HoldResult
+	var res wire.TargetsResult
 	if json.Unmarshal([]byte(out), &res) != nil || len(res.Results) != 1 || res.Results[0].Reason != wire.ReasonHoldUnknown {
 		t.Errorf("--json = %q, want one refused result", out)
 	}
@@ -129,7 +129,7 @@ func TestServerHold_DryRunChangesNothing(t *testing.T) {
 	f := holdFixture(t)
 	id := f.Open(t, "proj:map", false).Session.ID
 	out, err := runServer(t, f.H, "hold", "proj:map", "--dry-run", "--json")
-	var res wire.HoldResult
+	var res wire.TargetsResult
 	if err != nil || json.Unmarshal([]byte(out), &res) != nil || res.Results[0].Status != wire.TargetFits || len(res.Results[0].Sessions) != 1 || res.Results[0].Sessions[0] != id || len(res.Held) != 0 {
 		t.Errorf("--dry-run = %q, %v, want fits listing %s and nothing held", out, err, id)
 	}

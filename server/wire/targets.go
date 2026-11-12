@@ -55,6 +55,9 @@ func (r TargetResult) Refused() bool { return r.Status == TargetRefused }
 // TargetsResult is the envelope of a many-target write, in argument order.
 type TargetsResult struct {
 	Results []TargetResult `json:"results"`
+	// Held is set only by hold and unhold: the held keys after the request.
+	// A target that needs Yes is refused ReasonNeedsYes and lists its sessions.
+	Held []string `json:"held,omitempty"`
 }
 
 // RefusedTarget is the result of a target the write refused.

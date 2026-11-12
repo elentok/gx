@@ -133,7 +133,7 @@ func TestHold_RefusesOneOffsFollowUpsAndUnknown(t *testing.T) {
 	}
 }
 
-func hold(t *testing.T, f servertest.DesignsFixture, yes, dryRun bool, targets ...string) wire.HoldResult {
+func hold(t *testing.T, f servertest.DesignsFixture, yes, dryRun bool, targets ...string) wire.TargetsResult {
 	t.Helper()
 	res, err := f.H.Client.Admin.HoldEpics(f.Ctx, targets, yes, dryRun)
 	if err != nil {

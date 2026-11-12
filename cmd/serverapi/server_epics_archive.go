@@ -22,25 +22,9 @@ func newServerEpicsArchiveCmd(d Deps) *cobra.Command {
 		Short: "archive finished loop epics into the project's .archive; their live sessions stop",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			cl, err := d.Dial()()
-			if err != nil {
-				return err
-			}
-			res, err := cl.Admin.ArchiveEpics(ctx, args, yes, dryRun)
-			switch {
-			case apiclient.IsNotRunning(err):
-				res = wire.TargetsResult{}
-				for _, t := range args {
-					res.Results = append(res.Results, notRunning(t))
-				}
-			case err != nil:
-				return fmt.Errorf("server write failed: %w", err)
-			}
-			return cmdbase.PrintTargets(c.OutOrStdout(), jsonOut, res, res.Results, printArchived)
+			return runTargets(c, d, jsonOut, args, func(ctx context.Context, cl *apiclient.Client) (wire.TargetsResult, error) {
+				return cl.Admin.ArchiveEpics(ctx, args, yes, dryRun)
+			}, printArchived)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "confirm stopping the epics' live sessions")
@@ -76,25 +60,9 @@ func newServerEpicsUnarchiveCmd(d Deps) *cobra.Command {
 		Short: "bring archived epics and Designs back out of the project's .archive",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			cl, err := d.Dial()()
-			if err != nil {
-				return err
-			}
-			res, err := cl.Admin.UnarchiveEpics(ctx, args)
-			switch {
-			case apiclient.IsNotRunning(err):
-				res = wire.TargetsResult{}
-				for _, t := range args {
-					res.Results = append(res.Results, notRunning(t))
-				}
-			case err != nil:
-				return fmt.Errorf("server write failed: %w", err)
-			}
-			return cmdbase.PrintTargets(c.OutOrStdout(), jsonOut, res, res.Results, printUnarchived)
+			return runTargets(c, d, jsonOut, args, func(ctx context.Context, cl *apiclient.Client) (wire.TargetsResult, error) {
+				return cl.Admin.UnarchiveEpics(ctx, args)
+			}, printUnarchived)
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured results as JSON")

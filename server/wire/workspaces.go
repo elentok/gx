@@ -66,14 +66,6 @@ type HoldRequest struct {
 	DryRun  bool     `json:"dry_run,omitempty"`
 }
 
-// HoldResult is a hold or unhold: one result per target and the held keys
-// after the request. A target that needs Yes is refused ReasonNeedsYes and
-// lists the sessions in its Sessions.
-type HoldResult struct {
-	Results []TargetResult `json:"results"`
-	Held    []string       `json:"held"`
-}
-
 // Refusal reasons of hold. The queued text is asserted by the web.
 const (
 	ReasonHoldQueued      = "hold-queued"

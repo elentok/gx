@@ -434,17 +434,7 @@ func newAgentsStopCmd(d Deps) *cobra.Command {
 
 // runAgentsTargets prints the per-session results of a stop or remove.
 func runAgentsTargets(ctx context.Context, w io.Writer, jsonOut bool, ids []string, call func(context.Context) (wire.TargetsResult, error)) error {
-	res, err := call(ctxOrBackground(ctx))
-	switch {
-	case apiclient.IsNotRunning(err):
-		res = wire.TargetsResult{}
-		for _, id := range ids {
-			res.Results = append(res.Results, wire.RefusedTarget(id, wire.ReasonServerNotRunning, notRunningMessage))
-		}
-	case err != nil:
-		return mapServerErr(err)
-	}
-	return cmdbase.PrintTargets(w, jsonOut, res, res.Results, func(w io.Writer, r wire.TargetResult) error {
+	return cmdbase.RunTargets(ctx, w, jsonOut, ids, notRunningMessage, call, mapServerErr, func(w io.Writer, r wire.TargetResult) error {
 		_, err := fmt.Fprintln(w, r.Target)
 		return err
 	})

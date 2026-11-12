@@ -45,7 +45,7 @@ func Routes(get func() *Store, listed func() []wire.Workspace) []wire.Route {
 			}
 		}}
 	}
-	hold := func(pattern string, do func(*Store, wire.HoldRequest) (wire.HoldResult, error)) wire.Route {
+	hold := func(pattern string, do func(*Store, wire.HoldRequest) (wire.TargetsResult, error)) wire.Route {
 		return wire.Route{Pattern: pattern, Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) {
 			var req wire.HoldRequest
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -61,10 +61,10 @@ func Routes(get func() *Store, listed func() []wire.Workspace) []wire.Route {
 		}}
 	}
 	return []wire.Route{
-		hold("POST /v1/workspaces/hold", func(s *Store, r wire.HoldRequest) (wire.HoldResult, error) {
+		hold("POST /v1/workspaces/hold", func(s *Store, r wire.HoldRequest) (wire.TargetsResult, error) {
 			return s.HoldEpics(r.Targets, r.Yes, r.DryRun)
 		}),
-		hold("POST /v1/workspaces/unhold", func(s *Store, r wire.HoldRequest) (wire.HoldResult, error) { return s.UnholdEpics(r.Targets) }),
+		hold("POST /v1/workspaces/unhold", func(s *Store, r wire.HoldRequest) (wire.TargetsResult, error) { return s.UnholdEpics(r.Targets) }),
 		{Pattern: "POST /v1/workspaces/move", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) {
 			var req wire.WorkspaceRequest
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

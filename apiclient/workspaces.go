@@ -54,8 +54,8 @@ func (a *Admin) SetWorkspaceSort(ctx context.Context, name, sort string) (wire.W
 // HoldEpics holds Designs or epics, each on its own; yes confirms exiting a
 // Design's live sessions for the whole request, dryRun writes nothing. A
 // refusal is a result.
-func (a *Admin) HoldEpics(ctx context.Context, targets []string, yes, dryRun bool) (wire.HoldResult, error) {
-	var res wire.HoldResult
+func (a *Admin) HoldEpics(ctx context.Context, targets []string, yes, dryRun bool) (wire.TargetsResult, error) {
+	var res wire.TargetsResult
 	err := a.t.post(ctx, "/v1/workspaces/hold", wire.HoldRequest{Targets: targets, Yes: yes, DryRun: dryRun}, &res)
 	return res, err
 }
@@ -75,8 +75,8 @@ func (a *Admin) UnarchiveEpics(ctx context.Context, targets []string) (wire.Targ
 }
 
 // UnholdEpics clears the holds.
-func (a *Admin) UnholdEpics(ctx context.Context, targets []string) (wire.HoldResult, error) {
-	var res wire.HoldResult
+func (a *Admin) UnholdEpics(ctx context.Context, targets []string) (wire.TargetsResult, error) {
+	var res wire.TargetsResult
 	err := a.t.post(ctx, "/v1/workspaces/unhold", wire.HoldRequest{Targets: targets}, &res)
 	return res, err
 }

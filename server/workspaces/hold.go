@@ -101,12 +101,12 @@ func (s *Store) holdTargetOf(addr string) (holdTarget, *wire.TargetResult) {
 // order. A Design's live sessions exit, which needs yes for the whole request;
 // without it that target is refused and the others still run. A dry run writes
 // nothing and answers fits with the sessions that would exit.
-func (s *Store) HoldEpics(targets []string, yes, dryRun bool) (wire.HoldResult, error) {
-	res := wire.HoldResult{Results: make([]wire.TargetResult, 0, len(targets))}
+func (s *Store) HoldEpics(targets []string, yes, dryRun bool) (wire.TargetsResult, error) {
+	res := wire.TargetsResult{Results: make([]wire.TargetResult, 0, len(targets))}
 	for _, addr := range targets {
 		r, err := s.holdOne(addr, yes, dryRun)
 		if err != nil {
-			return wire.HoldResult{}, err
+			return wire.TargetsResult{}, err
 		}
 		res.Results = append(res.Results, r)
 	}
@@ -150,8 +150,8 @@ func (s *Store) holdOne(addr string, yes, dryRun bool) (wire.TargetResult, error
 }
 
 // UnholdEpics clears the hold on each Design or epic. It asks nothing and starts nothing.
-func (s *Store) UnholdEpics(targets []string) (wire.HoldResult, error) {
-	res := wire.HoldResult{Results: make([]wire.TargetResult, 0, len(targets))}
+func (s *Store) UnholdEpics(targets []string) (wire.TargetsResult, error) {
+	res := wire.TargetsResult{Results: make([]wire.TargetResult, 0, len(targets))}
 	for _, addr := range targets {
 		t, refused := s.holdTargetOf(addr)
 		if refused != nil {
@@ -163,7 +163,7 @@ func (s *Store) UnholdEpics(targets []string) (wire.HoldResult, error) {
 			continue
 		}
 		if err := s.Unhold(t.key); err != nil {
-			return wire.HoldResult{}, err
+			return wire.TargetsResult{}, err
 		}
 		res.Results = append(res.Results, wire.TargetResult{Target: addr, Status: wire.TargetDone})
 	}

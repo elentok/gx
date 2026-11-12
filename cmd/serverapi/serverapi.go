@@ -4,15 +4,33 @@
 package serverapi
 
 import (
+	"context"
+	"fmt"
+	"io"
+
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
-// notRunning is the single refusal a write gets when no server answers.
-func notRunning(target string) wire.TargetResult {
-	return wire.RefusedTarget(target, wire.ReasonServerNotRunning, "no server is running; start it with `gx server start`")
+// notRunningMessage is the refusal every write gets when no server answers.
+const notRunningMessage = "no server is running; start it with `gx server start`"
+
+// runTargets dials, makes a many-target write and prints it (see cmdbase.RunTargets).
+func runTargets(c *cobra.Command, d Deps, jsonOut bool, targets []string,
+	call func(context.Context, *apiclient.Client) (wire.TargetsResult, error),
+	one func(io.Writer, wire.TargetResult) error,
+) error {
+	cl, err := d.Dial()()
+	if err != nil {
+		return err
+	}
+	return cmdbase.RunTargets(c.Context(), c.OutOrStdout(), jsonOut, targets, notRunningMessage,
+		func(ctx context.Context) (wire.TargetsResult, error) { return call(ctx, cl) },
+		func(err error) error { return fmt.Errorf("server write failed: %w", err) },
+		one)
 }
 
 // Deps is what the API verbs need: the shared env and whether stdin is a
