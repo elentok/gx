@@ -2628,6 +2628,45 @@ export interface ScheduleShowResult {
   prompt: string;
   last_runs: ScheduleRun[];
 }
+/**
+ * EventSchedulesChanged is emitted with "<project>:<slug>" as its address
+ * after a Schedule is written, so open pages refetch.
+ */
+export const EventSchedulesChanged = "schedules-changed";
+/**
+ * ScheduleReasonProjectReadOnly refuses an edit that changes the project.
+ */
+export const ScheduleReasonProjectReadOnly = "project-read-only";
+/**
+ * ScheduleCreateRequest is the body of POST /v1/schedules/create. Days are
+ * lowercase three-letter names. An empty Project means scratch, an empty
+ * Harness the Default, a nil LateLimitHours two hours.
+ */
+export interface ScheduleCreateRequest {
+  name: string;
+  prompt: string;
+  days: string[];
+  times: string[];
+  project: string;
+  harness: string;
+  late_limit_hours?: number /* float64 */;
+}
+/**
+ * ScheduleEditRequest is the body of POST /v1/schedules/edit. Project and
+ * Slug name the Schedule; a nil field is left as it is. NewProject exists
+ * only so a project change can be refused.
+ */
+export interface ScheduleEditRequest {
+  project: string;
+  slug: string;
+  new_project?: string;
+  name?: string;
+  prompt?: string;
+  days: string[];
+  times: string[];
+  harness?: string;
+  late_limit_hours?: number /* float64 */;
+}
 
 //////////
 // source: sessions.go

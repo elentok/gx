@@ -7,6 +7,7 @@ import (
 	"time"
 
 	schedrec "github.com/elentok/gx/schedules"
+	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -21,14 +22,16 @@ type Schedules struct {
 	// DefaultHarness is the name the Default resolves to for a project.
 	DefaultHarness func(project string) string
 	Now            func() time.Time // nil means time.Now
+	// Events publishes schedules-changed after a write.
+	Events *broker.Broker
 }
 
 // Routes lists the read routes. The getter is called per request.
 func Routes(get func() *Schedules) []wire.Route {
-	return []wire.Route{
+	return append([]wire.Route{
 		{Pattern: "GET /v1/schedules", Web: wire.WebRead, Handler: func(w http.ResponseWriter, r *http.Request) { get().listRead(w, r) }},
 		{Pattern: "GET /v1/schedules/show", Web: wire.WebRead, Handler: func(w http.ResponseWriter, r *http.Request) { get().showRead(w, r) }},
-	}
+	}, WriteRoutes(get)...)
 }
 
 func (s *Schedules) now() time.Time {

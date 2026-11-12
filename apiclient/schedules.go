@@ -19,6 +19,20 @@ func (s *Schedules) List(ctx context.Context) (wire.SchedulesResult, error) {
 	return res, err
 }
 
+// Create stores a new Schedule, on here only. A refusal is a result.
+func (s *Schedules) Create(ctx context.Context, req wire.ScheduleCreateRequest) (wire.ScheduleShowResult, error) {
+	var res wire.ScheduleShowResult
+	err := s.t.post(ctx, "/v1/schedules/create", req, &res)
+	return res, err
+}
+
+// Edit changes the fields given on an existing Schedule. A refusal is a result.
+func (s *Schedules) Edit(ctx context.Context, req wire.ScheduleEditRequest) (wire.ScheduleShowResult, error) {
+	var res wire.ScheduleShowResult
+	err := s.t.post(ctx, "/v1/schedules/edit", req, &res)
+	return res, err
+}
+
 // Show returns one Schedule with its prompt and Last runs. An unknown one is a
 // refusal result, not an error.
 func (s *Schedules) Show(ctx context.Context, project, slug string) (wire.ScheduleShowResult, error) {

@@ -381,12 +381,16 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("open schedule state: %w", err)
 	}
 	s.schedState = schedState
+	schedStore := schedrec.NewStore(cfg.TicketStore)
+	if cfg.SchedulesClock != nil {
+		schedStore.WithClock(cfg.SchedulesClock)
+	}
 	s.schedRunner = &schedules.Scheduler{
-		Store: schedrec.NewStore(cfg.TicketStore), State: schedState, Submit: s.oneOffs, Notify: s.chat.Notify, TicketStore: cfg.TicketStore, Log: log,
+		Store: schedStore, State: schedState, Submit: s.oneOffs, Notify: s.chat.Notify, TicketStore: cfg.TicketStore, Log: log,
 		Now: cfg.SchedulesClock, Interval: cfg.SchedulesInterval, Ready: s.migrator.StartupDone(),
 	}
 	s.schedules = &schedules.Schedules{
-		Store: s.schedRunner.Store, State: schedState, TicketStore: cfg.TicketStore, Now: cfg.SchedulesClock,
+		Store: s.schedRunner.Store, State: schedState, TicketStore: cfg.TicketStore, Now: cfg.SchedulesClock, Events: events,
 		Projects: func() ([]string, error) {
 			ps, err := idx.ListProjects()
 			names := make([]string, 0, len(ps))

@@ -79,3 +79,38 @@ type ScheduleShowResult struct {
 	Prompt   string        `json:"prompt"`
 	LastRuns []ScheduleRun `json:"last_runs"`
 }
+
+// EventSchedulesChanged is emitted with "<project>:<slug>" as its address
+// after a Schedule is written, so open pages refetch.
+const EventSchedulesChanged = "schedules-changed"
+
+// ScheduleReasonProjectReadOnly refuses an edit that changes the project.
+const ScheduleReasonProjectReadOnly = "project-read-only"
+
+// ScheduleCreateRequest is the body of POST /v1/schedules/create. Days are
+// lowercase three-letter names. An empty Project means scratch, an empty
+// Harness the Default, a nil LateLimitHours two hours.
+type ScheduleCreateRequest struct {
+	Name           string   `json:"name"`
+	Prompt         string   `json:"prompt"`
+	Days           []string `json:"days"`
+	Times          []string `json:"times"`
+	Project        string   `json:"project"`
+	Harness        string   `json:"harness"`
+	LateLimitHours *float64 `json:"late_limit_hours"`
+}
+
+// ScheduleEditRequest is the body of POST /v1/schedules/edit. Project and
+// Slug name the Schedule; a nil field is left as it is. NewProject exists
+// only so a project change can be refused.
+type ScheduleEditRequest struct {
+	Project        string   `json:"project"`
+	Slug           string   `json:"slug"`
+	NewProject     *string  `json:"new_project"`
+	Name           *string  `json:"name"`
+	Prompt         *string  `json:"prompt"`
+	Days           []string `json:"days"`
+	Times          []string `json:"times"`
+	Harness        *string  `json:"harness"`
+	LateLimitHours *float64 `json:"late_limit_hours"`
+}
