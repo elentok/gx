@@ -273,7 +273,7 @@ function DraftForm({
       >
         <DraftSwitcher
           label={label}
-          currentId={autosave.internals.server.current.id}
+          currentId={autosave.currentId()}
           load={loadDrafts}
           onPick={switchDraft}
           onNew={newDraft}

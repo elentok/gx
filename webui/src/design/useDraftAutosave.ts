@@ -209,11 +209,21 @@ export function useDraftAutosave({
     if (phase.current === "finished" || blocked.current) return
     chain.current = chain.current.then(persist).catch(() => setStatus("none"))
   }
-  const stopSaving = () => {
+  /** Start, Discard or a switch has taken the draft over: nothing saves from here on. */
+  const takeOver = () => {
     phase.current = "finished"
+  }
+  const stopSaving = () => {
+    takeOver()
     clearTimeout(timer.current)
     settle()
   }
+  /** Cancels the pending autosave; resolves once the saves in flight are done. */
+  const idle = () => {
+    clearTimeout(timer.current)
+    return chain.current
+  }
+  const currentId = () => server.current.id
 
   // Every effect below reads refs only, so `flush` is safe to call from a stale closure.
   useEffect(() => {
@@ -319,8 +329,12 @@ export function useDraftAutosave({
     discard,
     start,
     flush,
-    /** For the switching hook: the parts of the autosave machine a draft switch drives. */
-    internals: { server, chain, timer, phase, blocked, hasContent, flush, stopSaving },
+    /** For the switching hook and the form: what a draft switch needs, without the refs behind it. */
+    hasContent,
+    stopSaving,
+    takeOver,
+    idle,
+    currentId,
   }
 }
 
