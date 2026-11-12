@@ -526,6 +526,9 @@ var scenarios = map[string]scenario{
 	// design session replays fakeclaude's scripted chat. Its implementation
 	// epic exists, so Progress links to it at Branch and Done.
 	"design": spec.DesignBase,
+	// design-hold: design with the first design turn held busy, so the session
+	// stays running. See spec.DesignHold.
+	"design-hold": spec.DesignHold(),
 	// design-two-live: design plus two live design sessions on design-epic, for
 	// the ⋯ menu's "Live sessions" list. The older one is a plain session made by
 	// `gx agents create` and marked a design session by `gx agent link` (with

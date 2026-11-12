@@ -156,6 +156,16 @@ func DoneAt(stamp string) servertest.TicketOpts {
 	return servertest.TicketOpts{Status: "done", ClaimedAt: closed.Add(-time.Hour).Format(time.RFC3339), DoneAt: stamp}
 }
 
+// DesignHold is the design scenario with the first design turn held busy for
+// good, so a session stays running instead of racing to its Grilling round.
+// Hold also freezes ticket workers, which this scenario does not run.
+func DesignHold() scenario {
+	sc := DesignBase
+	sc.Hold = true
+	sc.DesignHold = true
+	return sc
+}
+
 // DesignScript is the design scenario with the map at step and the design
 // agent playing turns, one per prompt in order.
 // DesignQuestionWait is chat-capture with a design session whose first turn, a
