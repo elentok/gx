@@ -11,13 +11,23 @@ import { useUsageSummary, type FetchSummary } from "./useUsageSummary"
 
 const MIN_FILL = 8
 
-// A provider with no 5h window, or one whose window already reset, shows an empty bar.
+// The bar shows the tighter of the 5h and weekly windows. A window that is
+// missing or already reset counts as empty.
 export function barFill(limits: UsageLimits | undefined, now: number) {
-  const win = limits?.five_hour
-  if (!win || isPastReset(win.resets_at, now))
-    return { percent: MIN_FILL, tone: barTone(0), whole: 0 }
-  const whole = wholePercent(win.used_percentage)
-  return { percent: Math.min(100, Math.max(MIN_FILL, whole)), tone: barTone(whole), whole }
+  const live = [limits?.five_hour, limits?.seven_day].filter(
+    (w): w is NonNullable<typeof w> => !!w && !isPastReset(w.resets_at, now),
+  )
+  if (live.length === 0) return { percent: MIN_FILL, tone: barTone(0), whole: 0, which: "5h" }
+  const five = limits?.five_hour
+  let top = live[0]
+  for (const w of live) if (wholePercent(w.used_percentage) > wholePercent(top.used_percentage)) top = w
+  const whole = wholePercent(top.used_percentage)
+  return {
+    percent: Math.min(100, Math.max(MIN_FILL, whole)),
+    tone: barTone(whole),
+    whole,
+    which: top === five ? "5h" : "weekly",
+  }
 }
 
 function Bar({
@@ -31,7 +41,7 @@ function Bar({
   limits: UsageLimits | undefined
   now: number
 }) {
-  const { percent, tone, whole } = barFill(limits, now)
+  const { percent, tone, whole, which } = barFill(limits, now)
   return (
     <Box
       aria-hidden
@@ -42,7 +52,7 @@ function Bar({
       data-meter={letter}
       data-tone={tone}
       data-percent={whole}
-      title={`${name} 5h limit`}
+      title={`${name} ${which} limit`}
     >
       <Box w="5px" h="15px" borderRadius="2px" overflow="hidden" position="relative" bg="hairline">
         <Box

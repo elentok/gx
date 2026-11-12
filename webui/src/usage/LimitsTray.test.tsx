@@ -50,6 +50,20 @@ describe("barFill", () => {
   })
 })
 
+describe("barFill with a weekly window", () => {
+  it("shows the tighter window", () => {
+    const l = { five_hour: win(3), seven_day: win(80) }
+    expect(barFill(l as never, NOW)).toMatchObject({ whole: 80, which: "weekly", tone: "waiting" })
+    const m = { five_hour: win(90), seven_day: win(80) }
+    expect(barFill(m as never, NOW)).toMatchObject({ whole: 90, which: "5h" })
+  })
+
+  it("ignores a window that already reset", () => {
+    const l = { five_hour: win(3), seven_day: { ...win(80), resets_at: NOW / 1000 - 10 } }
+    expect(barFill(l as never, NOW)).toMatchObject({ whole: 3, which: "5h" })
+  })
+})
+
 describe("LimitsTray", () => {
   it("renders nothing until a fetch succeeds", async () => {
     await setup(async () => {
