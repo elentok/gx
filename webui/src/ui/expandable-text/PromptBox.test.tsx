@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../../connection"
 import { WideContext } from "../../useWide"
 import { renderThemed } from "../render"
-import { ExpandableTextField } from "./ExpandableTextField"
+import { PromptBox } from "./PromptBox"
 import { findLargeEditor, largeEditorText, typeInLargeEditor, viewOf } from "./testing"
 
 afterEach(cleanup)
@@ -23,7 +23,7 @@ function Harness({
 }) {
   const [text, setText] = useState("")
   return (
-    <ExpandableTextField
+    <PromptBox
       label="Note"
       name="test-note"
       title={TITLE}
@@ -48,7 +48,7 @@ test("the textarea turns AutoFill off and has a name", () => {
 
 test("the textarea gets value, rows, label, placeholder and disabled", () => {
   renderThemed(
-    <ExpandableTextField
+    <PromptBox
       label="Note"
       name="test-note"
       title={TITLE}
@@ -100,13 +100,7 @@ test("the editor shows a new value prop and keeps the caret: no copy", async () 
     return (
       <>
         <button onClick={() => setText("hello world!")}>Set new</button>
-        <ExpandableTextField
-          label="Note"
-          name="test-note"
-          title={TITLE}
-          value={text}
-          onChange={onChange}
-        />
+        <PromptBox label="Note" name="test-note" title={TITLE} value={text} onChange={onChange} />
       </>
     )
   }
@@ -145,7 +139,7 @@ test("a disabled field has a disabled expand button", () => {
 
 test("the selection goes to the editor on open and back to the field on close", async () => {
   renderThemed(
-    <ExpandableTextField
+    <PromptBox
       label="Note"
       name="test-note"
       title={TITLE}
@@ -204,7 +198,7 @@ function Keys({
   const [text, setText] = useState("hello world")
   return (
     <form onKeyDown={onKeyDown}>
-      <ExpandableTextField
+      <PromptBox
         label="Note"
         name="test-note"
         title={TITLE}
@@ -359,7 +353,7 @@ const fetcher = async () => ({ degraded: false, entries }) as never
 function Completing({ harness }: { harness: string }) {
   const [text, setText] = useState("")
   return (
-    <ExpandableTextField
+    <PromptBox
       label="Note"
       name="test-note"
       title={TITLE}

@@ -33,7 +33,7 @@ export type EditorMenu = {
   pending: MutableRefObject<number | null>
 }
 
-/** The large editor of an ExpandableTextField. It reads and writes the parent's text directly; Done only closes it. */
+/** The large editor of an PromptBox. It reads and writes the parent's text directly; Done only closes it. */
 export function LargeEditor({
   title,
   value,

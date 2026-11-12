@@ -38,12 +38,10 @@ interface FieldProps {
   note?: { text: string; red?: boolean } | null
   /** A line inside the box, under the text and the note. */
   footer?: ReactNode
-  /** Draws the focus ring inside the box, so its edge lines up with the content around it. The box has no border of its own then; the ring is its only outline. */
-  insetRing?: boolean
 }
 
-/** A textarea with an expand button that opens a large editor on the same text. The parent owns the text; there is no copy and no save step. */
-export function ExpandableTextField(props: FieldProps) {
+/** The one prompt box: a textarea with an expand button that opens a large editor on the same text. The parent owns the text; there is no copy and no save step. */
+export function PromptBox(props: FieldProps) {
   const { completion, ...rest } = props
   return completion ? <Completing {...rest} config={completion} /> : <Field {...rest} />
 }
@@ -97,7 +95,6 @@ function Field({
   menu,
   note,
   footer,
-  insetRing,
 }: Omit<FieldProps, "completion"> & { menu?: Menu }) {
   const area = useRef<HTMLTextAreaElement>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -139,9 +136,8 @@ function Field({
   }
   const raised = bg ?? "surface.raised"
   // The box draws the border, background and focus ring; the textarea inside has none, and the note and footer sit under it in the flow.
-  const ringShadow = insetRing
-    ? "inset 0 0 0 2px {colors.tone.running.fg}"
-    : "0 0 0 2px var(--gx-focus-gap, {colors.surface}), 0 0 0 4px {colors.tone.running.fg}"
+  // Both outlines sit inside the box, so nothing spills into (or is clipped by) the sheet or footer around it.
+  const ringShadow = "inset 0 0 0 2px {colors.tone.running.fg}"
   return (
     <Box
       position="relative"
@@ -149,8 +145,7 @@ function Field({
       flexDirection="column"
       bg={raised}
       borderRadius={radius}
-      borderColor="hairline"
-      borderWidth={insetRing ? "0" : "1px"}
+      boxShadow="inset 0 0 0 1px {colors.hairline}"
       css={{ "&:has(> textarea:focus-visible)": { boxShadow: `${ringShadow} !important` } }}
     >
       <Textarea

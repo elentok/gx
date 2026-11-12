@@ -61,7 +61,7 @@ export const themeConfig = defineConfig({
     "[role='menu']:focus-visible [role='menuitem'][data-highlighted]": {
       boxShadow: "0 0 0 2px {colors.surface.raised}, 0 0 0 4px {colors.tone.running.fg} !important",
     },
-    // A field inside a box that draws the ring itself (ExpandableTextField): the field shows none.
+    // A field inside a box that draws the ring itself (PromptBox): the field shows none.
     "[data-focus-ring='none']:focus-visible": { boxShadow: "none !important" },
     "[data-focus-ring='inset']:focus-visible": {
       borderRadius: "8px",

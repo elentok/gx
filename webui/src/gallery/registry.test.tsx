@@ -35,7 +35,7 @@ it("shows every exported primitive in the gallery", () => {
 const untoned = [
   "HarnessLabel",
   "InfoTip",
-  "ExpandableTextField",
+  "PromptBox",
   "LargeEditor",
   "ModeText",
   "MoreActionsButton",

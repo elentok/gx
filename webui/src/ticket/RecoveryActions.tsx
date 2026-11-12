@@ -10,7 +10,7 @@ import {
   type TicketDetail,
 } from "../generated/server"
 import { Button } from "../ui/button/Button"
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
+import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { Modal } from "../ui/modal/Modal"
 import { useWrite, type Refusable } from "../useWrite"
 import { ReasonStale } from "./answer"
@@ -208,7 +208,7 @@ function StartOverDialog({
     <Modal label={label} onClose={onClose} p="4" w="md" gap="3">
       {tooltip && <Text>{tooltip}</Text>}
       <Text>{DISCARD_NOTICE}</Text>
-      <ExpandableTextField
+      <PromptBox
         label="Reason"
         name="recovery-reason"
         title="Start over reason"

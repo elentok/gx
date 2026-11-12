@@ -3,7 +3,7 @@ import { useId, useState } from "react"
 import { NoteBox } from "../../design/NoteBox"
 import { Markdown } from "../../markdown/Markdown"
 import { Button } from "../button/Button"
-import { ExpandableTextField } from "../expandable-text/ExpandableTextField"
+import { PromptBox } from "../expandable-text/PromptBox"
 import {
   choicesOf,
   isAnswered,
@@ -168,7 +168,7 @@ export function Question({
               {card.note}
             </Text>
           )}
-          <ExpandableTextField
+          <PromptBox
             size="sm"
             rows={big ? 5 : 2}
             label={`Answer to question ${card.label}`}
@@ -212,7 +212,7 @@ export function Question({
             )
           })}
           {textRow && (
-            <ExpandableTextField
+            <PromptBox
               size="sm"
               rows={big ? 5 : 2}
               label={`${textRow.label} (question ${card.label})`}

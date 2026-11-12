@@ -28,7 +28,7 @@ import { ComposerImages } from "./ComposerImages"
 import { FooterLine } from "./FooterLine"
 import { InterruptControl } from "./InterruptControl"
 import { useComposerImages } from "./useComposerImages"
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
+import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { postAnswer, type PostAnswer, type PostPrompt } from "./prompt"
 import type { Answers } from "../ui/question-sheet/round"
 import { ReasonStale } from "../ticket/answer"
@@ -308,7 +308,7 @@ export function Composer({
         }
       >
         {open && (
-          <ExpandableTextField
+          <PromptBox
             rows={3}
             label="Message"
             name="design-note"
@@ -319,7 +319,6 @@ export function Composer({
             autoFocus
             onChange={setText}
             onSubmit={onSubmit}
-            insetRing
             note={hint ? { text: hint } : null}
             footer={footerLine}
             completion={{

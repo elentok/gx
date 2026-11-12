@@ -7,7 +7,7 @@ import { InterruptControl } from "../design/InterruptControl"
 import { postInterruptSession, stateToken, type InterruptSession } from "../design/open"
 import { promptable } from "../design/view"
 import { useComposerImages } from "../design/useComposerImages"
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
+import { PromptBox } from "../ui/expandable-text/PromptBox"
 import type { PostPrompt } from "../design/prompt"
 import { usePromptSend } from "../design/usePromptSend"
 import { useComposerDraft } from "../drafts"
@@ -116,7 +116,7 @@ export function AgentComposer({
           )
         }
       >
-        <ExpandableTextField
+        <PromptBox
           rows={3}
           label="Message"
           name="chat-message"
@@ -125,7 +125,6 @@ export function AgentComposer({
           value={text}
           onChange={setText}
           onSubmit={onSubmit}
-          insetRing
           note={line ?? null}
           footer={
             <FooterLine session={session} ceiling={ceiling} modelOnly={!hasChat(session.harness)} />

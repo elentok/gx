@@ -33,7 +33,7 @@ import { DayChart } from "../ui/day-chart/DayChart"
 import { LineChart } from "../ui/day-chart/LineChart"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { InfoTip } from "../ui/info-tip/InfoTip"
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
+import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { LargeEditor } from "../ui/expandable-text/LargeEditor"
 import { ModeText } from "../ui/expandable-text/ModeText"
 import { LiveDot } from "../ui/live-dot/LiveDot"
@@ -618,12 +618,12 @@ export const galleryEntries: GalleryEntry[] = [
   },
   { name: "Badge", cases: perTone((tone) => <Badge tone={tone}>{tone}</Badge>) },
   {
-    name: "ExpandableTextField",
+    name: "PromptBox",
     cases: [
       {
         label: "closed",
         node: (
-          <ExpandableTextField
+          <PromptBox
             label="Closed"
             name="gallery-note"
             title="Note"
@@ -637,7 +637,7 @@ export const galleryEntries: GalleryEntry[] = [
       {
         label: "disabled",
         node: (
-          <ExpandableTextField
+          <PromptBox
             label="Disabled"
             name="gallery-note"
             title="Note"
@@ -652,7 +652,7 @@ export const galleryEntries: GalleryEntry[] = [
       {
         label: "with text",
         node: (
-          <ExpandableTextField
+          <PromptBox
             label="With text"
             name="gallery-note"
             title="Note"

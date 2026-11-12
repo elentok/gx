@@ -1,7 +1,7 @@
 import { Box } from "@chakra-ui/react"
 import { useEffect, useRef, type ReactNode } from "react"
 import type { CompletionConfig } from "../commands/useCompletion"
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
+import { PromptBox } from "../ui/expandable-text/PromptBox"
 
 /** A 5-row note that scrolls itself into view when it mounts. */
 export function NoteBox({
@@ -23,7 +23,7 @@ export function NoteBox({
   footer?: ReactNode
   /** What the note is on, for its labels: "question 2". */
   name: string
-  /** The textarea's form name; see ExpandableTextField. */
+  /** The textarea's form name; see PromptBox. */
   fieldName: string
   /** The large editor's title. */
   title: string
@@ -48,7 +48,7 @@ export function NoteBox({
   }, [])
   return (
     <Box ref={box}>
-      <ExpandableTextField
+      <PromptBox
         rows={5}
         label={label ?? `Note text for ${name}`}
         name={fieldName}

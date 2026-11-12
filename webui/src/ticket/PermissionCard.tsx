@@ -3,7 +3,7 @@ import { useState } from "react"
 import type { TicketDetail } from "../generated/server"
 import { Badge } from "../ui/badge/Badge"
 import { Button } from "../ui/button/Button"
-import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField"
+import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { postDecision, type Decision, type PostDecision } from "./permission"
 
 // The pending permission prompt of a blocked agent. Only Allow once and Deny: a standing
@@ -87,7 +87,7 @@ export function PermissionCard({
         <Text color="fg.muted">{card.hint}</Text>
       ) : (
         <>
-          <ExpandableTextField
+          <PromptBox
             label="Note for Deny (optional)"
             name="permission-deny-note"
             title="Note for Deny"
