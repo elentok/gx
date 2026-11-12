@@ -35,6 +35,12 @@ steps. The browser commands come from [gx-playwright-cli](../gx-playwright-cli/S
    no other crop and no recheck. Never write `pass` for a state whose PNGs you did not see.
 8. Give every listed state one result line: `pass`, `fail` (with the differences) or `unchecked`
    (with the reason).
+9. Write the result lines to a file in your scratchpad directory, one per state:
+   `<state>: pass <mock.png> <built.png>`, `<state>: fail <differences>` or
+   `<state>: unchecked <reason>`. A `pass` lists the PNG paths you viewed. Run
+   `go run ./testutil/mockcheck/cmd <file>` from the worktree. It refuses a `pass` whose PNGs are
+   missing or do not decode. Fix each reported line (a state you did not see becomes `unchecked`)
+   before you report.
 
 ## What wins
 
