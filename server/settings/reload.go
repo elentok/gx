@@ -214,6 +214,8 @@ func (h *Holder) reportReload(trigger string, res wire.ReloadResult) {
 	level, title, body := reloadBanner(res)
 	h.history.setLast(wire.ReloadRecord{At: time.Now(), Trigger: trigger, Outcome: level, Message: joinBanner(title, body)})
 	if trigger == TriggerWeb {
+		// No OS banner for a save the person just made, but other open pages must refetch the snapshot.
+		h.opts.Events.PublishEvent(wire.Event{Type: wire.EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
 		return
 	}
 	h.Banner(level, title, body)

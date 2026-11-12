@@ -21,7 +21,10 @@ const text = (page: Page, label: string) => page.getByRole("textbox", { name: la
 async function saveText(page: Page, label: string, value: string) {
   await text(page, label).fill(value)
   await save(page).click()
-  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible()
+  // Each row keeps its own "Saved" note for a moment, so two can show together; the Save button
+  // turning off means this row's value is stored.
+  await expect(page.getByRole("status").filter({ hasText: "Saved" }).first()).toBeVisible()
+  await expect(save(page)).toHaveCount(0)
 }
 
 const noSideScroll = async (page: Page) => {
@@ -156,6 +159,35 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   }
   await saveLeader("Leader key (Mac)", "alt+e", "leader-key-mac")
 
+  // The snapshot reaches the other pages after the save, so each poll presses the key again and
+  // closes a box it opened.
+  const opens = async (p: Page, combo: string) => {
+    await p.keyboard.press(combo)
+    const shown = await box(p).isVisible()
+    if (shown) await p.keyboard.press("Escape")
+    return shown
+  }
+
+  // An empty Leader key opens no box on that platform, with no reload.
+  await saveLeader("Leader key (other platforms)", "", "leader-key")
+  await other.bringToFront()
+  await expect.poll(() => opens(other, "Control+e")).toBe(false)
+
+  // Changing the Mac key reaches the open page live: the new key opens the box, the old one does not.
+  await page.bringToFront()
+  await saveLeader("Leader key (Mac)", "alt+j", "leader-key-mac")
+  await mac.bringToFront()
+  await expect
+    .poll(async () => {
+      await mac.keyboard.press("Alt+j")
+      return box(mac).isVisible()
+    })
+    .toBe(true)
+  // The box header shows the new key.
+  await expect(box(mac)).toContainText("⌥J")
+  await mac.keyboard.press("Escape")
+  await expect(box(mac)).toHaveCount(0)
+  expect(await opens(mac, "Alt+e")).toBe(false)
   await mac.close()
   await other.close()
 

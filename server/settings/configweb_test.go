@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/wire"
 )
 
 // Seam: a web-trigger reload with the watcher on runs once and pops no OS
@@ -23,6 +24,16 @@ func TestConfigWeb_ReloadsOnceWithoutBanner(t *testing.T) {
 	res := holder.Reload(settings.TriggerWeb)
 	if res.Refused || !slices.Contains(res.Changed, "execution-queue.max-agents") {
 		t.Fatalf("web reload = %+v, want max-agents changed", res)
+	}
+	// The web save itself tells other open pages (one event, no banner).
+	timeout := time.After(5 * time.Second)
+	for got := false; !got; {
+		select {
+		case ev := <-evs:
+			got = ev.Type == wire.EventConfigReloaded
+		case <-timeout:
+			t.Fatal("a web save published no config-reloaded event")
+		}
 	}
 	// The watcher would reload within a few debounces; it must stay silent.
 	noReloadEvent(t, evs, "the watcher after a web save")
