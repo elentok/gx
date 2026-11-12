@@ -263,26 +263,23 @@ export function SidebarFooter({
     )
   const needsYou = snapshot?.needs_you_total ?? 0
   const desktop = useDevice() === "desktop"
-  const indicators = (
-    <>
-      {unhealthy && (
-        <Indicator label="System health is high or critical" tone="waiting">
-          <WarningIcon />
-        </Indicator>
-      )}
-      {snapshot?.mode === "paused" && (
-        <Indicator label="Server queue is paused" tone="paused">
-          <PausedIcon />
-        </Indicator>
-      )}
-      {!connected && (
-        <Indicator label="Disconnected from the server" tone="muted">
-          <OfflineIcon />
-        </Indicator>
-      )}
-    </>
-  )
-  const anyIndicator = unhealthy || snapshot?.mode === "paused" || !connected
+  const indicators = [
+    unhealthy && (
+      <Indicator key="health" label="System health is high or critical" tone="waiting">
+        <WarningIcon />
+      </Indicator>
+    ),
+    snapshot?.mode === "paused" && (
+      <Indicator key="paused" label="Server queue is paused" tone="paused">
+        <PausedIcon />
+      </Indicator>
+    ),
+    !connected && (
+      <Indicator key="offline" label="Disconnected from the server" tone="muted">
+        <OfflineIcon />
+      </Indicator>
+    ),
+  ].filter(Boolean)
   return (
     <Box
       as="footer"
@@ -296,7 +293,7 @@ export function SidebarFooter({
       borderColor="border"
     >
       {/* At the 280px sidebar the optional indicators cannot share the row without shrinking a box, so they take a line above it. */}
-      {desktop && anyIndicator && (
+      {desktop && indicators.length > 0 && (
         <Box display="flex" flexWrap="wrap" gap="1" data-part="indicators">
           {indicators}
         </Box>
