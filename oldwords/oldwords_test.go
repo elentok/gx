@@ -93,7 +93,6 @@ var allowed = map[string]allowance{
 	"server/wire/queue.go":                          allow("JSON wire fields parked, park_kind, park_reason", "park"),
 	"server/wire/epiclist.go":                       allow("JSON wire field parked", "park"),
 	"server/wire/epicdetail.go":                     allow("JSON wire field needs_answer", "needsanswer"),
-	"server/merge/landing.go":                       allow("Landing is the dirty-trunk landing type, the project `landing` policy", "land"),
 	"server/index/reads.go":                         allow("persisted lock kind \"land\"", "land"),
 	"server/wire/recovery.go":                       allow("persisted event kind land-rolled-back", "land"),
 	"server/ticketops/repair.go":                    allow("hidden unpark verb and the persisted unpark answer choice", "park"),
