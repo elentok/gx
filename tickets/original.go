@@ -2,7 +2,7 @@ package tickets
 
 import (
 	"fmt"
-	"strings"
+	"slices"
 
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -23,13 +23,7 @@ func OriginalLine(addr Address) string {
 // NamesOriginal reports whether a ticket body's Resolution records addr as its
 // original address.
 func NamesOriginal(body string, addr Address) bool {
-	want := OriginalLine(addr)
-	for line := range strings.SplitSeq(schema.Section(body, "Resolution"), "\n") {
-		if strings.TrimSpace(line) == want {
-			return true
-		}
-	}
-	return false
+	return schema.ResolutionHasLine(body, OriginalLine(addr))
 }
 
 // IsOriginal reports whether t was first created under addr: its
@@ -45,12 +39,7 @@ func IsOriginal(t Ticket, addr Address) bool {
 // IsPromoted reports whether a closed follow-up's Resolution gives "promoted"
 // as its reason.
 func IsPromoted(t Ticket) bool {
-	for line := range strings.SplitSeq(schema.Section(t.Body, "Resolution"), "\n") {
-		if strings.TrimSpace(line) == "- reason: promoted" {
-			return true
-		}
-	}
-	return false
+	return schema.ResolutionHasLine(t.Body, "- reason: promoted")
 }
 
 // HasTicket reports whether epics hold a ticket at addr.
@@ -94,13 +83,7 @@ func LoadOneOffs(projectDir string) (live, archived Epic, err error) {
 // archivedFrom is the tickets of the archive epic whose Resolution names addr
 // as their original.
 func archivedFrom(archive Epic, addr Address) []Ticket {
-	var found []Ticket
-	for _, t := range archive.Tickets {
-		if IsOriginal(t, addr) {
-			found = append(found, t)
-		}
-	}
-	return found
+	return slices.DeleteFunc(slices.Clone(archive.Tickets), func(t Ticket) bool { return !IsOriginal(t, addr) })
 }
 
 // FindOriginal looks up the ticket an archived one-off was moved from addr to:

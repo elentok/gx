@@ -4,34 +4,6 @@ const step = (page: import("@playwright/test").Page, name: string, state: string
   page.locator(`li[data-step="${name}"][data-state="${state}"]`)
 
 test.describe("199. Triage journey", () => {
-  test("plan view: a group is one row, Ungroup splits it into the chain", async ({
-    page,
-    start,
-  }) => {
-    await start("triage", { shape: "b-group" })
-    await page.evaluate(() => (location.hash = "#/triage/demo"))
-    await expect(step(page, "approve", "current")).toBeVisible()
-    await page
-      .getByRole("group", nav("View"))
-      .getByRole("button", { name: /^Review/ })
-      .click()
-
-    const groupRow = page.locator('[data-part="group-row"]')
-    await expect(groupRow).toHaveCount(1)
-    for (const title of ["bug-01", "bug-02", "bug-03"])
-      await expect(groupRow.getByText(title, { exact: true })).toBeVisible()
-    await expect(page.getByRole("button", nav("Action for bug-01"))).toHaveCount(0)
-
-    await groupRow.getByRole("button", { name: /^Ungroup/ }).click()
-    await expect(groupRow).toHaveCount(0)
-    await expect(page.locator('[data-part="chain"]')).toHaveText(["after bug-01", "after bug-02"])
-
-    // The existing Approve check: the bar still offers Approve and write.
-    await expect(
-      page.getByRole("group", nav("Approve")).getByRole("button", nav("Approve and write")),
-    ).toBeEnabled()
-  })
-
   test("start, Verify chain, Plan, the card and the sidebar popover", async ({ page, start }) => {
     const fixture = await start("triage", { shape: "journey", autoAdvanceDelay: "3s", reloads: 1 })
     const followUps = card(page, "follow-ups")

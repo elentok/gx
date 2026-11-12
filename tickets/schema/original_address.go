@@ -52,3 +52,14 @@ func (o *OriginalAddresses) UnmarshalYAML(n *yaml.Node) error {
 	}
 	return fmt.Errorf("line %d: original_address must be a string or a list of strings", n.Line)
 }
+
+// ResolutionHasLine reports whether the body's Resolution section holds line,
+// ignoring surrounding whitespace.
+func ResolutionHasLine(body, line string) bool {
+	for l := range strings.SplitSeq(Section(body, "Resolution"), "\n") {
+		if strings.TrimSpace(l) == line {
+			return true
+		}
+	}
+	return false
+}
