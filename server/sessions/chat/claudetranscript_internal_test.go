@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
@@ -14,6 +15,7 @@ import (
 // fakeSource is a Source that serves one session and records what the chat
 // asks it to publish and note.
 type fakeSource struct {
+	metaMu    sync.Mutex // guards meta, which a test may change while a poll reads it
 	dir       string
 	meta      Meta
 	res       wire.SessionResult
@@ -39,7 +41,17 @@ func (f *fakeSource) SessionDir(string) (string, Meta, wire.SessionResult, error
 func (f *fakeSource) ReadableSession(string) (string, Meta, wire.SessionResult, error) {
 	return f.dir, f.meta, f.res, nil
 }
-func (f *fakeSource) ReadMeta(string) (Meta, error) { return f.meta, nil }
+func (f *fakeSource) ReadMeta(string) (Meta, error) {
+	f.metaMu.Lock()
+	defer f.metaMu.Unlock()
+	return f.meta, nil
+}
+
+func (f *fakeSource) setConversation(id string) {
+	f.metaMu.Lock()
+	defer f.metaMu.Unlock()
+	f.meta.ConversationID = id
+}
 func (f *fakeSource) CheckProjectDir(string, string) (*wire.SessionResult, error) {
 	return f.refusal, nil
 }
@@ -141,6 +153,43 @@ func TestPoll_PublishesOnTranscriptGrowth(t *testing.T) {
 	if err := os.WriteFile(path, []byte("{}\n{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	got := <-src.published
+	if got != [2]string{wire.EventSessionChatChanged, "s1"} {
+		t.Fatalf("published %v, want a chat-changed event for s1", got)
+	}
+}
+
+// /clear moves the session to a new conversation and so a new transcript. The
+// page's last-message id belongs to the old file, so the poll must publish for
+// the move, or the page's next send is refused as stale.
+func TestPoll_PublishesWhenTheConversationMoves(t *testing.T) {
+	t.Parallel()
+	config := t.TempDir()
+	cwd := "/work/proj"
+	for _, conv := range []string{"old", "new"} {
+		path := filepath.Join(config, "projects", transcript.Slugify(cwd), conv+".jsonl")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	src := newFakeSource()
+	src.meta = Meta{ID: "s1", Harness: "claude", Dir: cwd, ConversationID: "old"}
+	c := claudeChat(src, config)
+	c.cfg.ChatPollInterval = 5 * 1e6
+	p := c.NewPoll("dir", "s1")
+	defer p.Close()
+	p.SetActive(true)
+	<-src.noted
+	<-src.noted // the old transcript is the baseline
+	select {
+	case got := <-src.published:
+		t.Fatalf("published %v before the conversation moved", got)
+	default:
+	}
+	src.setConversation("new")
 	got := <-src.published
 	if got != [2]string{wire.EventSessionChatChanged, "s1"} {
 		t.Fatalf("published %v, want a chat-changed event for s1", got)
