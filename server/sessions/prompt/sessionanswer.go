@@ -40,30 +40,31 @@ func (p *Prompt) answerHandler(source string) http.HandlerFunc {
 // for its source, and sends the answer: a printed round as the person's prompt,
 // a permission dialog as the digit of the chosen option.
 func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wire.SessionResult, error) {
-	if req.Source == wire.CardSourceTicketAsk {
+	switch req.Source {
+	case wire.CardSourceTicketAsk:
 		return p.answerTicketAsk(req, source)
+	case wire.CardSourceRound, wire.CardSourcePermission, wire.CardSourceCodex, wire.CardSourceClaudeDialog:
+	default:
+		return sessions.Refusal(wire.ReasonAnswerSourceNotSupported, fmt.Sprintf("answers to %q cards are not supported yet", req.Source)), nil
 	}
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if req.Source != wire.CardSourceRound && req.Source != wire.CardSourcePermission && req.Source != wire.CardSourceCodex && req.Source != wire.CardSourceClaudeDialog {
-		return sessions.Refusal(wire.ReasonAnswerSourceNotSupported, fmt.Sprintf("answers to %q cards are not supported yet", req.Source)), nil
-	}
-	card, err := p.currentCard(req.ID, dir, meta, req.Source)
+	snap, err := p.snapshot(req.ID, dir, meta)
 	if err != nil {
 		return wire.SessionResult{}, err
 	}
-	if card == nil || card.ID != req.CardID {
+	card := findCard(p.sessionChat.Cards(dir, meta.ChatMeta(), snap), req)
+	if card == nil {
 		return sessions.Refusal(wire.ReasonStale, "the question moved on; review it first"), nil
 	}
-	if req.Source == wire.CardSourceClaudeDialog {
+	switch req.Source {
+	case wire.CardSourceClaudeDialog:
 		return p.answerClaudeDialog(req, dir), nil
-	}
-	if req.Source == wire.CardSourceCodex {
+	case wire.CardSourceCodex:
 		return p.answerCodexQuestion(req, *card, source)
-	}
-	if req.Source == wire.CardSourcePermission {
+	case wire.CardSourcePermission:
 		if meta.Harness == string(harness.Codex) {
 			return p.answerCodexCard(req, *card, source)
 		}
@@ -85,13 +86,8 @@ func (p *Prompt) answerTicketAsk(req wire.SessionAnswerRequest, source string) (
 	if res.Refused || err != nil {
 		return res, err
 	}
-	var card *wire.QuestionCard
-	for _, c := range p.sessionChat.Cards(dir, meta.ChatMeta(), chat.Snapshot{}) {
-		if c.Source == req.Source {
-			card = &c
-		}
-	}
-	if card == nil || card.ID != req.CardID {
+	card := findCard(p.sessionChat.Cards(dir, meta.ChatMeta(), chat.Snapshot{}), req)
+	if card == nil {
 		return sessions.Refusal(wire.ReasonStale, "the question moved on; review it first"), nil
 	}
 	address, state, _ := chat.SplitTicketAskID(card.ID)
@@ -110,22 +106,27 @@ func (p *Prompt) answerTicketAsk(req wire.SessionAnswerRequest, source string) (
 	return wire.SessionResult{}, nil
 }
 
-// currentCard is the session's current card of source, or nil with none.
-func (p *Prompt) currentCard(id, dir string, meta sessions.Meta, source string) (*wire.QuestionCard, error) {
+// snapshot re-reads the session's transcript; no transcript is an empty one.
+func (p *Prompt) snapshot(id, dir string, meta sessions.Meta) (chat.Snapshot, error) {
 	var snap chat.Snapshot
 	if path, kind, ok := p.sessionChat.Transcript(id, meta.ChatMeta()); ok {
 		var err error
 		snap, err = p.sessionChat.ReadSnapshot(path, kind, meta.FlowRef(), dir)
 		if err != nil && !os.IsNotExist(err) {
-			return nil, err
+			return chat.Snapshot{}, err
 		}
 	}
-	for _, c := range p.sessionChat.Cards(dir, meta.ChatMeta(), snap) {
-		if c.Source == source {
-			return &c, nil
-		}
+	return snap, nil
+}
+
+// findCard is the card the answer targets: the one of its source, and only when
+// its id is the one the person saw. Nil means the question moved on.
+func findCard(cards []wire.QuestionCard, req wire.SessionAnswerRequest) *wire.QuestionCard {
+	i := slices.IndexFunc(cards, func(c wire.QuestionCard) bool { return c.Source == req.Source })
+	if i < 0 || cards[i].ID != req.CardID {
+		return nil
 	}
-	return nil, nil
+	return &cards[i]
 }
 
 // answerCodexCard routes a hooked Codex card's Allow or Deny through the

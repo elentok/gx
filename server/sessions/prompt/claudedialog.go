@@ -14,6 +14,28 @@ import (
 // dismissReason is what Claude reads when the person dismisses a held question.
 const dismissReason = "The user doesn't want to proceed with this question. Do not ask again. STOP and wait for the user to tell you how to proceed."
 
+// pickedIDs is the answer's chosen option ids as 0-based rows of the nOptions
+// numbered options, and whether it picked Other. The error says only that a
+// choice is no option; the caller names the question or dialog.
+func pickedIDs(a wire.SessionAnswer, nOptions int) (picks []int, other bool, err error) {
+	ids := a.Choices
+	if a.Choice != "" {
+		ids = append([]string{a.Choice}, ids...)
+	}
+	for _, id := range ids {
+		if id == "other" {
+			other = true
+			continue
+		}
+		n, err := strconv.Atoi(id)
+		if err != nil || n < 1 || n > nOptions {
+			return nil, false, fmt.Errorf("choice %q is not an option", id)
+		}
+		picks = append(picks, n-1)
+	}
+	return picks, other, nil
+}
+
 // answerClaudeDialog resolves the held AskUserQuestion call of a claude-dialog
 // card (already checked as the current one): Release hands it to the terminal
 // dialog, an answer with nothing picked denies it, and anything else must
@@ -80,29 +102,20 @@ func claudeUpdatedInput(held wire.AskHookRequest, answers []wire.SessionAnswer) 
 	for i, q := range held.Questions {
 		a := answerAt(answers, i)
 		text := strings.TrimSpace(a.Text)
-		ids := a.Choices
-		if a.Choice != "" {
-			ids = append([]string{a.Choice}, ids...)
-		}
 		cq := question{Question: q.Question, Header: q.Header, MultiSelect: q.MultiSelect, Options: []option{}}
 		for _, o := range q.Options {
 			cq.Options = append(cq.Options, option{o.Label, o.Description})
 		}
+		picks, other, err := pickedIDs(a, len(q.Options))
+		if err != nil {
+			return nil, fmt.Sprintf("%v of question %d", err, i+1)
+		}
+		if other && text == "" {
+			return nil, fmt.Sprintf("question %d needs text for Other", i+1)
+		}
 		var parts []string
-		for _, id := range ids {
-			if id == "other" {
-				if text == "" {
-					return nil, fmt.Sprintf("question %d needs text for Other", i+1)
-				}
-				parts = append(parts, text)
-				text = ""
-				continue
-			}
-			n, err := strconv.Atoi(id)
-			if err != nil || n < 1 || n > len(q.Options) {
-				return nil, fmt.Sprintf("choice %q is not an option of question %d", id, i+1)
-			}
-			parts = append(parts, q.Options[n-1].Label)
+		for _, p := range picks {
+			parts = append(parts, q.Options[p].Label)
 		}
 		if text != "" {
 			parts = append(parts, text)

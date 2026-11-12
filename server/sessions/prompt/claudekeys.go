@@ -119,25 +119,14 @@ func dialogPicks(d claudeui.AskDialog, a wire.SessionAnswer) (picks []int, text 
 		return nil, "", badAnswer("the text has a line break or control character")
 	}
 	other := len(d.Options) - 1
-	ids := a.Choices
-	if a.Choice != "" {
-		ids = append([]string{a.Choice}, ids...)
+	picks, pickedOther, err := pickedIDs(a, other)
+	if err != nil {
+		return nil, "", badAnswer(err.Error() + " of the dialog")
 	}
-	for _, id := range ids {
-		if id == "other" {
-			picks = append(picks, other)
-			continue
-		}
-		n, err := strconv.Atoi(id)
-		if err != nil || n < 1 || n > other {
-			return nil, "", badAnswer(fmt.Sprintf("choice %q is not an option of the dialog", id))
-		}
-		picks = append(picks, n-1)
-	}
-	if text != "" && !slices.Contains(picks, other) {
+	if pickedOther || text != "" {
 		picks = append(picks, other)
 	}
-	if slices.Contains(picks, other) && text == "" {
+	if pickedOther && text == "" {
 		return nil, "", badAnswer("Other needs text")
 	}
 	slices.Sort(picks)
