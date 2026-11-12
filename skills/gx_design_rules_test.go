@@ -398,3 +398,16 @@ func TestPrototypeHandOverAsksPickAsGrillingRound(t *testing.T) {
 		t.Error("gx-design Asking questions must name the prototype ticket as HITL")
 	}
 }
+
+func TestGxDesignQuestionBlockIsYAML(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	for _, want := range []string{
+		"[gx-local-tracker.md](../gx-local-tracker.md)",
+		"never JSON",
+		"`type`",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("gx-design/SKILL.md lacks %q", want)
+		}
+	}
+}

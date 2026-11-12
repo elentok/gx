@@ -64,6 +64,11 @@ question that ends a prototype or mock ("Do you agree with B?", "Which look do y
 it as a `❓ **Q1**` card with a `gx-question` block, after the link to the mock. A question in plain
 prose gets no card, so the person sees only the chat and gx never marks the session Actionable.
 
+The `gx-question` block is YAML with a `type` key (`yes-no` or `options`), never JSON and never
+free fields such as `id`, `question` or `recommendation`. The format is in
+[gx-local-tracker.md](../gx-local-tracker.md) "The question block". A block with unknown fields
+does not parse and the question loses its buttons.
+
 The questions must be the last thing in the turn: no tool call, and no text, after them. The UI can
 hide earlier text of a turn once later tool calls or text follow it, so questions printed before a
 trailing call go unseen. Never pad the end with a tool call or a closing line.
