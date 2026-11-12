@@ -49,7 +49,7 @@ func runModelGuardWait(t *testing.T, ticketType, expected string, read func(sinc
 	return f
 }
 
-func modelEvents(t *testing.T, scratchDir string) []runlog.Event {
+func modelEvents(t *testing.T, scratchDir string, typ string) []runlog.Event {
 	t.Helper()
 	evs, _, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil {
@@ -57,7 +57,7 @@ func modelEvents(t *testing.T, scratchDir string) []runlog.Event {
 	}
 	var out []runlog.Event
 	for _, ev := range evs {
-		if ev.Type == string(events.ModelMismatch) {
+		if ev.Type == typ {
 			out = append(out, ev)
 		}
 	}
@@ -126,8 +126,11 @@ func TestWaitForFinish_ModelMismatch_EmptyExpectedSkipsAndLogsOnce(t *testing.T)
 	if f.reads != 0 {
 		t.Errorf("reads = %d, want 0", f.reads)
 	}
-	if got := modelEvents(t, f.scratchDir); len(got) != 1 {
-		t.Errorf("logged %d model events, want 1", len(got))
+	if got := modelEvents(t, f.scratchDir, string(events.ModelCheckSkipped)); len(got) != 1 {
+		t.Errorf("logged %d model-check-skipped events, want 1", len(got))
+	}
+	if got := modelEvents(t, f.scratchDir, string(events.ModelMismatch)); len(got) != 0 {
+		t.Errorf("logged %d model-mismatch events for a skipped check, want 0", len(got))
 	}
 }
 

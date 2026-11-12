@@ -363,6 +363,9 @@ func (r *Reclaimer) ResolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralph
 	}
 	one := ralphloop.OneIteration{
 		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: dir, Agent: agent.AgentKind(t.Agent),
+		// The model the run launched under, so the guard on its finish path still
+		// has an expected model to check.
+		Model: t.Model, Effort: t.Effort,
 		StallNudgeDelay: r.host.StalledNudgeDelay(),
 	}
 	for _, e := range epics {

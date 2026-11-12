@@ -33,8 +33,12 @@ const (
 	// BackgroundTaskStillWaiting is a periodic state-only check of a held task.
 	BackgroundTaskStillWaiting Type = "background-task-still-waiting"
 	PausedRateLimit            Type = "paused-rate-limit"
-	Resumed                    Type = "resumed"
-	VerifyCapStopped           Type = "verify-cap-stopped"
+	// ModelCheckSkipped is an implement launch that got no model check because
+	// it carries no expected model. A note, not a pause: nothing ran on a wrong
+	// model, so it is a Type and not a pause Kind.
+	ModelCheckSkipped Type = "model-check-skipped"
+	Resumed           Type = "resumed"
+	VerifyCapStopped  Type = "verify-cap-stopped"
 	// Paused is a ticket paused for a person; the kind is the pause reason and
 	// its class says whether the person answers or repairs.
 	Paused                  Type = "paused"

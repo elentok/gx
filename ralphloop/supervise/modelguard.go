@@ -54,7 +54,7 @@ func NewModelGuard(d deps.Deps, p LaunchParams, since time.Time) *ModelGuard {
 		return nil
 	}
 	if p.Model == "" {
-		_ = p.LogAgentEvent(string(events.ModelMismatch), "", "model check skipped: the tier resolves to no model") // constructor has no error return; the note is advisory
+		_ = p.LogAgentEvent(string(events.ModelCheckSkipped), "", "model check skipped: the tier resolves to no model") // constructor has no error return; the note is advisory
 		return nil
 	}
 	return &ModelGuard{expected: p.Model, since: since}
