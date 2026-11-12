@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -19,17 +21,25 @@ func (r *running) sessions(t *testing.T) []wire.SessionInfo {
 
 func (r *running) wantAllCrashed(t *testing.T, n int) []wire.SessionInfo {
 	t.Helper()
-	list := r.sessions(t)
-	if len(list) != n {
-		t.Fatalf("%d sessions, want %d", len(list), n)
-	}
-	for _, s := range list {
-		if s.Status.State != wire.SessionExited || s.Exit != wire.SessionExitCrashed {
-			t.Errorf("session %s = %s/%s, want exited/crashed", s.ID, s.Status.State, s.Exit)
+	var list []wire.SessionInfo
+	var holders, agents int
+	// The server marks the dead sessions and reaps their processes after it
+	// starts, so a one-shot read can see the state half way.
+	settled := testutil.Poll(15*time.Second, 100*time.Millisecond, func() bool {
+		list = r.sessions(t)
+		if len(list) != n {
+			return false
 		}
-	}
-	if holders, agents := r.ProcessCounts(t); holders != 0 || agents != 0 {
-		t.Errorf("holders = %d, agents = %d, want none", holders, agents)
+		for _, s := range list {
+			if s.Status.State != wire.SessionExited || s.Exit != wire.SessionExitCrashed {
+				return false
+			}
+		}
+		holders, agents = r.ProcessCounts(t)
+		return holders == 0 && agents == 0
+	})
+	if !settled {
+		t.Fatalf("sessions never settled to %d exited/crashed with no processes: holders = %d, agents = %d, list = %+v", n, holders, agents, list)
 	}
 	return list
 }
