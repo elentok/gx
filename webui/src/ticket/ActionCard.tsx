@@ -3,7 +3,7 @@ import { ActionAnswer, type TicketDetail } from "../generated/server"
 import type { Sent } from "./answer"
 import { AnswerForm } from "./AnswerForm"
 import { PermissionCard } from "./PermissionCard"
-import { isRecoverAction } from "./recover"
+import { canCancel, isRecoverAction } from "./recover"
 import { RecoveryActions } from "./RecoveryActions"
 import { TaskCard } from "./TaskCard"
 import { TicketReading } from "./TicketReading"
@@ -21,6 +21,7 @@ export function needsActionCard(detail: TicketDetail, sent: Sent | null): boolea
     !!detail.task ||
     detail.actions.includes(ActionAnswer) ||
     detail.actions.some(isRecoverAction) ||
+    canCancel(detail) ||
     !!detail.run_finishing ||
     !!sent
   )

@@ -490,3 +490,49 @@ test("a prompted Resume shows that the ticket stays paused", async () => {
     ),
   ).toBeTruthy()
 })
+
+const oneOff = (status: string): TicketDetail => ({
+  ...plain,
+  address: "proj:one-offs/12",
+  epic: "proj:one-offs",
+  status,
+})
+
+test.each(["open", "claimed", "paused"])("a %s One-off shows Cancel", async (status) => {
+  renderTicket(() => oneOff(status))
+  expect(await screen.findByRole("button", { name: "Cancel" })).toBeTruthy()
+})
+
+test.each([
+  ["a done One-off", oneOff("done")],
+  ["a cancelled One-off", oneOff("cancelled")],
+  ["an epic ticket", { ...plain, status: "claimed" } as TicketDetail],
+])("%s shows no Cancel", async (_name, detail) => {
+  renderTicket(() => detail)
+  await screen.findByRole("heading", { level: 1 })
+  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull()
+})
+
+test("confirming Cancel posts the address", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({})))
+  stubFetch(fetchMock)
+  renderTicket(() => oneOff("claimed"))
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }))
+  expect(screen.getByText(/later runs of that Schedule may start/)).toBeTruthy()
+  expect(fetchMock).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole("button", { name: "Cancel run" }))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+  expect(posted(fetchMock)[0]).toEqual([
+    "/v1/tickets/cancel",
+    { address: "proj:one-offs/12", state: "" },
+  ])
+})
+
+test("a refused Cancel shows its reason", async () => {
+  const refusal = { refused: true, reason: "ticket-done", message: "proj:one-offs/12 is done" }
+  stubFetch(vi.fn(async () => new Response(JSON.stringify(refusal))))
+  renderTicket(() => oneOff("open"))
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }))
+  fireEvent.click(screen.getByRole("button", { name: "Cancel run" }))
+  expect((await screen.findByRole("alert")).textContent).toBe("proj:one-offs/12 is done")
+})

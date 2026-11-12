@@ -48,6 +48,18 @@ func (o *Ops) Cancel(req wire.QueueRequest) (wire.QueueResult, error) {
 	})
 }
 
+// CancelOneOffWeb is Cancel for the web, which ends One-offs only.
+func (o *Ops) CancelOneOffWeb(req wire.QueueRequest) (wire.QueueResult, error) {
+	ref, ok, err := o.d.Writer.FindTicket(req.Address)
+	if err != nil {
+		return wire.QueueResult{}, err
+	}
+	if ok && ref.Addr.Epic != queue.OneOffsEpic && ref.Addr.Epic != queue.OneOffsArchivedEpic {
+		return queue.Refusal(wire.ReasonNotOneOff, ref.Addr.String()+" is not a one-off; cancel it from the CLI"), nil
+	}
+	return o.Cancel(req)
+}
+
 // markCancelled closes t's pause round and settles it as cancelled. Its live
 // agent is the caller's to stop.
 func (o *Ops) markCancelled(ref queue.TicketRef, t tickets.Ticket, source string) error {

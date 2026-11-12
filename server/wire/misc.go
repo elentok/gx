@@ -107,6 +107,8 @@ const (
 	ReasonNotMuted         = "not-muted"
 	ReasonIterationRunning = "iteration-running"
 	ReasonTicketDone       = "ticket-done"
+	// ReasonNotOneOff refuses a web cancel of a ticket outside the one-offs epic.
+	ReasonNotOneOff        = "not-one-off"
 	ReasonHerdrUnavailable = "herdr-unavailable"
 	// ReasonAgentWorking refuses a retry while the ticket's agent is still
 	// working; the web maps it to "Stop agent and retry".

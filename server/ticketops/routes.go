@@ -49,7 +49,11 @@ func Routes(get func() *Ops) []wire.Route {
 		{Pattern: "POST /v1/tickets/verify", Handler: func(rw http.ResponseWriter, r *http.Request) { repairWrite(get().repairVerify)(rw, r) }},
 		{Pattern: "POST /v1/tickets/ask", Handler: func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().Ask)(rw, r) }},
 		{Pattern: "POST /v1/tickets/unmute", Handler: func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().Unmute)(rw, r) }},
-		{Pattern: "POST /v1/tickets/cancel", Handler: func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().Cancel)(rw, r) }},
+		{
+			Pattern: "POST /v1/tickets/cancel", Web: wire.WebWrite,
+			Handler:    func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().Cancel)(rw, r) },
+			WebHandler: func(rw http.ResponseWriter, r *http.Request) { queue.HandlerWebStateless(get().CancelOneOffWeb)(rw, r) },
+		},
 		{
 			Pattern: "POST /v1/tickets/retry", Web: wire.WebWrite,
 			Handler:    func(rw http.ResponseWriter, r *http.Request) { get().Retry(false)(rw, r) },

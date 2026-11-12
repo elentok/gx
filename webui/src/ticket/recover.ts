@@ -15,6 +15,15 @@ import { WriteError, type Refusable } from "../useWrite"
 
 export const ReasonAgentWorking = "agent-working"
 
+/** Not a detail action: the page offers Cancel for a One-off from its address and status. */
+export const ActionCancel = "cancel"
+
+const CANCELLABLE_STATUSES = ["open", "claimed", "paused"]
+
+/** A One-off that has not ended. The server refuses any other ticket. */
+export const canCancel = (detail: { address: string; status: string }) =>
+  /^[^:]+:one-offs\//.test(detail.address) && CANCELLABLE_STATUSES.includes(detail.status)
+
 export interface RecoverBody {
   address: string
   /** The page's state token; the server refuses the write if the pause moved on. */
@@ -33,7 +42,8 @@ export type PostRecover = (action: string, body: RecoverBody) => Promise<Refusab
 
 // The web route each button posts to. The resume route also serves the verbs that lift a pause.
 // stash-merge has no route here yet, so the map is partial over the Action union.
-const ROUTES: Partial<Record<Action, string>> = {
+const ROUTES: Partial<Record<Action | typeof ActionCancel, string>> = {
+  [ActionCancel]: "/v1/tickets/cancel",
   [ActionResume]: "/v1/tickets/resume",
   [ActionResumeOnWorker]: "/v1/tickets/resume",
   [ActionChooseBase]: "/v1/tickets/resume",
@@ -46,11 +56,11 @@ const ROUTES: Partial<Record<Action, string>> = {
 }
 
 /** Whether the card has a button for this action; the rest keep their own forms. */
-export const isRecoverAction = (action: string) => action in ROUTES
+export const isRecoverAction = (action: string) => action !== ActionCancel && action in ROUTES
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postRecover: PostRecover = async (action, body) => {
-  const route = ROUTES[action as Action]
+  const route = ROUTES[action as Action | typeof ActionCancel]
   if (!route) throw new WriteError(`no route for ${action}`)
   const res = await apiFetch(route, {
     method: "POST",

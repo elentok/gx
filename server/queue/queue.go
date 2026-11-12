@@ -586,13 +586,23 @@ func HandlerWeb(do func(wire.QueueRequest) (wire.QueueResult, error)) http.Handl
 
 // HandlerAs is the shared body of Handler, HandlerCtx and HandlerWeb.
 func HandlerAs(web bool, do func(wire.QueueRequest, Ctx) (wire.QueueResult, error)) http.HandlerFunc {
+	return handle(web, web, do)
+}
+
+// HandlerWebStateless is HandlerWeb for a write that has no pause round to go stale,
+// such as cancelling a queued or running ticket, so it needs no state token.
+func HandlerWebStateless(do func(wire.QueueRequest) (wire.QueueResult, error)) http.HandlerFunc {
+	return handle(true, false, ignoreCtx(do))
+}
+
+func handle(web, needState bool, do func(wire.QueueRequest, Ctx) (wire.QueueResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req wire.QueueRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if web && req.State == "" {
+		if needState && req.State == "" {
 			wire.WriteJSON(w, Refusal(wire.ReasonStale, "a state token is required; review the current question"))
 			return
 		}
