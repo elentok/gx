@@ -332,7 +332,7 @@ export function SelectButton() {
 export function FooterSlot({ children }: { children: ReactNode }) {
   const sel = useSidebarSelect()
   return sel.state.on ? (
-    <SelectBar sel={sel}>
+    <SelectBar sel={sel} head={false}>
       <SidebarBulkActions sel={sel} />
     </SelectBar>
   ) : (
@@ -340,19 +340,63 @@ export function FooterSlot({ children }: { children: ReactNode }) {
   )
 }
 
+/** The workspace picker, or the select-mode line (count, Select all, Done) in its place while the mode is on. */
+export function HeadSlot({ children }: { children: ReactNode }) {
+  const sel = useSidebarSelect()
+  if (!sel.state.on) return children
+  return (
+    <Box px="2" pb="2" h="44px" display="flex" alignItems="center">
+      <SelectHead sel={sel} />
+    </Box>
+  )
+}
+
+/** The count, Select all/none and Done. */
+function SelectHead({ sel, sticky }: { sel: SelectApi; sticky?: boolean }) {
+  const n = sel.state.keys.length
+  const pickable = sel.rows.filter((r) => r.visible && r.selectable)
+  const all = pickable.length > 0 && pickable.every((r) => sel.state.keys.includes(r.key))
+  return (
+    <Box display="flex" alignItems="center" gap="1.5" flex={sticky ? "none" : "1"} minW="0">
+      <Box
+        as="span"
+        flex={sticky ? "none" : "1"}
+        mr={sticky ? "2" : undefined}
+        fontSize="14px"
+        fontWeight="600"
+        whiteSpace="nowrap"
+        data-testid="select-count"
+      >
+        {n} selected
+      </Box>
+      <Button
+        size="sm"
+        emphasis="ghost"
+        tone="running"
+        onClick={all ? sel.selectNone : sel.selectAll}
+      >
+        {all ? "Select none" : "Select all"}
+      </Button>
+      <Button size="sm" emphasis="ghost" tone="running" onClick={sel.leave}>
+        Done
+      </Button>
+    </Box>
+  )
+}
+
 /** The bar that replaces the footer in select mode. Action buttons go in `children`. `sticky` pins it under a page header instead. */
 export function SelectBar({
   sel,
   sticky,
+  head = true,
   children,
 }: {
   sel: SelectApi
   sticky?: boolean
+  /** Whether the bar shows the count line itself; the sidebar shows it in the header instead. */
+  head?: boolean
   children?: ReactNode
 }) {
-  const n = sel.state.keys.length
-  const pickable = sel.rows.filter((r) => r.visible && r.selectable)
-  const all = pickable.length > 0 && pickable.every((r) => sel.state.keys.includes(r.key))
   return (
     <Box
       as="footer"
@@ -368,6 +412,7 @@ export function SelectBar({
       borderTopWidth="1px"
       borderColor="tone.running.fg"
       bg="surface.raised"
+      _empty={{ display: "none" }}
       {...(sticky
         ? {
             position: "sticky",
@@ -379,30 +424,7 @@ export function SelectBar({
           }
         : {})}
     >
-      <Box display="flex" alignItems="center" gap="1.5" flex={sticky ? "none" : undefined}>
-        <Box
-          as="span"
-          flex={sticky ? "none" : "1"}
-          mr={sticky ? "2" : undefined}
-          fontSize="14px"
-          fontWeight="600"
-          whiteSpace="nowrap"
-          data-testid="select-count"
-        >
-          {n} selected
-        </Box>
-        <Button
-          size="sm"
-          emphasis="ghost"
-          tone="running"
-          onClick={all ? sel.selectNone : sel.selectAll}
-        >
-          {all ? "Select none" : "Select all"}
-        </Button>
-        <Button size="sm" emphasis="ghost" tone="running" onClick={sel.leave}>
-          Done
-        </Button>
-      </Box>
+      {head && <SelectHead sel={sel} sticky={sticky} />}
       {sticky ? <Box ml="auto">{children}</Box> : children}
     </Box>
   )

@@ -25,7 +25,7 @@ import { ShellContext, type Shell } from "./ShellContext"
 import { SidebarFooter } from "./SidebarFooter"
 import { LIST_ATTR, useSidebarKeys } from "./SidebarKeys"
 import { SidebarRows } from "./SidebarRows"
-import { FooterSlot, SelectButton, SidebarSelectProvider } from "./SidebarSelect"
+import { FooterSlot, HeadSlot, SelectButton, SidebarSelectProvider } from "./SidebarSelect"
 import { useActiveWorkspace, useWorkspaces } from "../workspaces/useActiveWorkspace"
 import { ManageWorkspaces } from "./ManageWorkspaces"
 import { useShortcuts } from "./useShortcuts"
@@ -266,7 +266,6 @@ export function AppShell({
                   </Box>
                 )}
                 <Box flex="1" />
-                <SelectButton />
                 <chakra.button
                   type="button"
                   aria-label="Search"
@@ -299,16 +298,19 @@ export function AppShell({
                   <PanelIcon />
                 </chakra.button>
               </Box>
-              <WorkspaceSwitcher
-                workspaces={workspaces}
-                active={active}
-                onPick={setActive}
-                onNew={() => setNewWorkspace(true)}
-                onManage={() => {
-                  setManageWorkspaces(true)
-                  onManageWorkspaces()
-                }}
-              />
+              <HeadSlot>
+                <WorkspaceSwitcher
+                  trailing={<SelectButton />}
+                  workspaces={workspaces}
+                  active={active}
+                  onPick={setActive}
+                  onNew={() => setNewWorkspace(true)}
+                  onManage={() => {
+                    setManageWorkspaces(true)
+                    onManageWorkspaces()
+                  }}
+                />
+              </HeadSlot>
               <Box
                 as="ul"
                 listStyleType="none"

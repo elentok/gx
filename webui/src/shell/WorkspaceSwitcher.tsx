@@ -1,5 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useState, type FormEvent } from "react"
+import { useState, type FormEvent, type ReactNode } from "react"
 import type { Workspace, WorkspaceResult } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { GxMenu } from "../ui/menu/Menu"
@@ -86,7 +86,9 @@ export function WorkspaceSwitcher({
   onPick,
   onNew,
   onManage,
+  trailing,
 }: {
+  trailing?: ReactNode
   workspaces: Workspace[]
   active: string
   onPick: (name: string) => void
@@ -95,82 +97,85 @@ export function WorkspaceSwitcher({
 }) {
   const activeNeeds = workspaces.find((w) => w.name === active)?.needs_you
   return (
-    <Box px="2" pb="2">
-      <GxMenu
-        placement="bottom-start"
-        items={[
-          ...workspaces.map((w) => ({
-            value: `ws:${w.name}`,
-            label: w.default ? (
-              <>
-                {w.name}
-                <Text as="span" color="text.faint" ml="2">
-                  default
+    <Box px="2" pb="2" display="flex" alignItems="center" gap="1">
+      <Box flex="1" minW="0">
+        <GxMenu
+          placement="bottom-start"
+          items={[
+            ...workspaces.map((w) => ({
+              value: `ws:${w.name}`,
+              label: w.default ? (
+                <>
+                  {w.name}
+                  <Text as="span" color="text.faint" ml="2">
+                    default
+                  </Text>
+                </>
+              ) : (
+                w.name
+              ),
+              hint: w.needs_you ? (
+                <Text as="span" color="tone.waiting.fg">
+                  {w.needs_you} needs you
                 </Text>
-              </>
-            ) : (
-              w.name
-            ),
-            hint: w.needs_you ? (
-              <Text as="span" color="tone.waiting.fg">
-                {w.needs_you} needs you
-              </Text>
-            ) : undefined,
-            inlineHint: true,
-            onSelect: () => onPick(w.name),
-          })),
-          { kind: "separator" } as const,
-          { value: "new", label: "New workspace…", onSelect: onNew },
-          { value: "manage", label: "Manage workspaces", onSelect: onManage },
-        ]}
-        trigger={
-          <chakra.button
-            type="button"
-            aria-label={`Workspace: ${active}`}
-            display="flex"
-            alignItems="center"
-            gap="2"
-            w="100%"
-            h="36px"
-            px="3"
-            color="text"
-            fontFamily="inherit"
-            fontSize="15px"
-            fontWeight="600"
-            cursor="pointer"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="8px"
-            data-focus-ring="inset"
-            _hover={{ bg: "surface.raised" }}
-          >
-            <Box as="span" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-              {active}
-            </Box>
-            {activeNeeds ? (
+              ) : undefined,
+              inlineHint: true,
+              onSelect: () => onPick(w.name),
+            })),
+            { kind: "separator" } as const,
+            { value: "new", label: "New workspace…", onSelect: onNew },
+            { value: "manage", label: "Manage workspaces", onSelect: onManage },
+          ]}
+          trigger={
+            <chakra.button
+              type="button"
+              aria-label={`Workspace: ${active}`}
+              display="flex"
+              alignItems="center"
+              gap="2"
+              w="100%"
+              h="36px"
+              px="3"
+              color="text"
+              fontFamily="inherit"
+              fontSize="15px"
+              fontWeight="600"
+              cursor="pointer"
+              borderWidth="1px"
+              borderColor="border"
+              borderRadius="8px"
+              data-focus-ring="inset"
+              _hover={{ bg: "surface.raised" }}
+            >
+              <Box as="span" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+                {active}
+              </Box>
+              {activeNeeds ? (
+                <Box
+                  as="span"
+                  ml="auto"
+                  flex="none"
+                  color="tone.waiting.fg"
+                  fontSize="12px"
+                  fontWeight="500"
+                >
+                  {activeNeeds} needs you
+                </Box>
+              ) : null}
               <Box
                 as="span"
-                ml="auto"
+                ml={activeNeeds ? undefined : "auto"}
                 flex="none"
-                color="tone.waiting.fg"
-                fontSize="12px"
-                fontWeight="500"
+                color="text.dim"
+                aria-hidden
               >
-                {activeNeeds} needs you
+                ▾
               </Box>
-            ) : null}
-            <Box
-              as="span"
-              ml={activeNeeds ? undefined : "auto"}
-              flex="none"
-              color="text.dim"
-              aria-hidden
-            >
-              ▾
-            </Box>
-          </chakra.button>
-        }
-      />
+            </chakra.button>
+          }
+        />
+      </Box>
+      {trailing}
     </Box>
   )
 }
