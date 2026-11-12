@@ -140,7 +140,7 @@ func ParseConfig(data []byte) (Config, error) {
 		if !slices.Contains(Kinds, key) {
 			return nil, fmt.Errorf("unknown kind %q (want %s); %s", key, strings.Join(Kinds, ", "), RebuildHint)
 		}
-		c, err := parseCommand(top[key])
+		c, err := parseCommand(key, top[key])
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", key, err)
 		}
@@ -149,7 +149,7 @@ func ParseConfig(data []byte) (Config, error) {
 	return cfg, nil
 }
 
-func parseCommand(raw json.RawMessage) (Command, error) {
+func parseCommand(kind string, raw json.RawMessage) (Command, error) {
 	raw = bytes.TrimSpace(raw)
 	switch {
 	case string(raw) == "false":
@@ -186,6 +186,9 @@ func parseCommand(raw json.RawMessage) (Command, error) {
 			c.Changed = *pair.Changed
 		}
 		if pair.Limits != nil {
+			if kind != kindTest {
+				return Command{}, fmt.Errorf("limits: only the %q kind takes limits", kindTest)
+			}
 			l, err := parseLimits(pair.Limits)
 			if err != nil {
 				return Command{}, err

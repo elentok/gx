@@ -134,6 +134,8 @@ func TestParseConfigLimits(t *testing.T) {
 		`{"test":{"full":"t","limits":{"slow":{"go":"x"}}}}`:    "slow",
 		`{"test":{"full":"t","limits":{"slow":{"rust":"1s"}}}}`: "rust",
 		`{"test":{"full":"t","limits":{"speed":"1s"}}}`:         "speed",
+		`{"lint":{"full":"l","limits":{"suite":"1m"}}}`:         "lint",
+		`{"lint":{"full":"l","limits":{}}}`:                     "limits",
 	}
 	for in, key := range bad {
 		_, err := ParseConfig([]byte(in))
