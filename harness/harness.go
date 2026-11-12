@@ -96,6 +96,12 @@ type TurnWatcher interface {
 	Turns() int
 }
 
+// AskDirSetter is a Watcher that reads ask-holds markers from the holder's
+// state dir, so a host gives it that dir after Watch.
+type AskDirSetter interface {
+	SetAskDir(dir string)
+}
+
 // PidStatusWatcher is a Watcher that follows a claude-style pid status file
 // and can freeze it. A host checks Watch's result for it: only such a watcher
 // backs the frozen status and deny-reason ops.
