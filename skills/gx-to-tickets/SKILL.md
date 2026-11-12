@@ -350,12 +350,13 @@ acceptance criteria. Verify tickets do not count as agent-written.
   state) to you instead.
 - **After all writers finish**, edit the plan and re-run `draft` once. A re-run keeps the writers'
   parts.
-- **Progress**: print a start line that lists each writer's tickets, then a line as each writer
-  finishes. Each writer appends one-line progress notes to `<manifest>.<writer>.log` next to the
+- **Progress**: give each Agent call a description that starts with `writer N`. Print a start line
+  `writers started: writer 1: <tickets>, ...`, then `writer N finished` as each one ends. Each writer appends one-line progress notes to `<manifest>.<writer>.log` next to the
   manifest.
 
 ### 5. Quiz the user (only when a trigger fires)
 
+Run `gx tickets publish <project:epic> --manifest <file> --dry-run` first: trigger 3 needs its output.
 Skip the quiz unless one of these triggers fires:
 
 1. A ticket estimate is over 45K tokens.
@@ -371,38 +372,7 @@ files) and the epic Summary, then print `quiz skipped: no trigger fired` (or nam
 fired, if you ran the quiz). Open the epic; do not hold it as `draft`. The person corrects it in chat
 or in a fresh run before the Queue-tab launch, and you edit the tickets with `gx tickets` commands.
 
-When a trigger fires, present the proposed breakdown as a numbered list. For each ticket, show:
-
-- **Title**: short descriptive name
-- **Blocked by**: which other tickets (if any) must complete first
-- **What it delivers**: the end-to-end behaviour this ticket makes work
-- **Test seams**: the seams from step 4
-- **Estimated context window**: the token estimate behind step 3's split decision — always shown,
-  not just when a ticket is borderline, so the user can judge granularity against the same number
-  that drove the split
-
-After the implement tickets, show the proposed verify parts (see "Verify tickets" in step 6): per
-part its stories, fixture scenario and expected token budget, plus the collect ticket's budget, or
-the single lone ticket when everything fits in one part.
-
-Before the list, show the draft epic Summary (written as step 6 describes) so the user can correct
-it with the rest of the breakdown.
-
-Ask the user:
-
-- Does the granularity feel right? (too coarse / too fine)
-- Are the blocking edges correct — does each ticket only depend on tickets that genuinely gate it,
-  and are same-file siblings and cross-cutting tickets chained rather than run in parallel?
-- Are the declared seams the right ones to test against?
-- Should any tickets be merged or split further?
-
-Ask them as one round in the format [gx-grilling](../gx-grilling/SKILL.md) defines: a `❓ **Qn**`
-line, a `➡️` recommendation and a `gx-question` block per question. Only a line that starts with
-`❓ **Q` makes the web UI show the round and mark the session as waiting for you; a plain numbered
-list goes unseen. Keep the Summary and the breakdown above the round, and make the round the last
-thing in the turn: no tool call, and no text, after it.
-
-Iterate until the user approves the breakdown.
+When a trigger fires, follow [quiz-format.md](quiz-format.md) and iterate until the user approves the breakdown.
 
 ### 6. Publish the tickets
 
@@ -492,17 +462,9 @@ tickets. Skip this and `ensure-verify` when the epic has no user-visible behavio
 changes no web, CLI or server behavior (a docs-only, skills-only or refactor epic). The spec for epic
 `<name>-impl` is `docs/specs/<name>.md`; this is the resolved spec path.
 
-**Plan the verify tickets.** Write a plan file (YAML). Per story with user-visible behaviour it lists
-the story number, its scenario group, its items by kind (web flow, CLI check, Go test run, skill
-quote) and its mock states by name, plus the fixture scenario. gx does the estimating and packing:
-
-```sh
-gx tickets verify-plan <project:epic> --plan <file> --manifest <manifest>
-```
-
-It reads the spec at `docs/specs/<name>.md`, copies each story's Verification entry and Mock states
-line word for word, packs the parts, and appends the verify entries and their body files to the
-publish manifest. Publish the manifest once, together with the implement tickets. `gx tickets
+**Plan the verify tickets** with `gx tickets verify-plan <project:epic> --plan <file> --manifest
+<manifest>`; the plan format and entry shapes are in [verify-planning.md](verify-planning.md).
+Publish the manifest once, together with the implement tickets. `gx tickets
 verify-plan --table` prints the estimates. Do not copy them into the skill or the tickets.
 
 Implement tickets keep their own rule: add 14000 to `expected_context_window` per mock state in the
@@ -511,11 +473,6 @@ in the ticket), and allow at most 4 mock states per implement ticket. Both the 1
 cap count mock states: one state section of the mock file, one name at one width. Over the cap,
 split the ticket. The first ticket builds the parts and checks the first 4 states. A follow-on
 implement ticket, blocked by the first, checks the remaining states and fixes what differs.
-
-gx gives one lone `verify` entry when every story fits one part. Otherwise it gives top-level
-`verify-part-N` entries and one `verify-collect` entry blocked by every part. The body formats
-follow [gx-verify-epic](../gx-verify-epic/SKILL.md) ("The verify part body"). Every entry sets
-`expected_context_window`. Do not restate the formats here.
 
 After `publish`, run `gx tickets ensure-verify <epic-slug>`. It is a no-op when the epic already has
 a verify ticket.

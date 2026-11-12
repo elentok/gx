@@ -32,6 +32,8 @@ var requiredFiles = []string{
 	"gx-to-tickets/README.md",
 	"gx-to-tickets/prefactor-tickets.md",
 	"gx-to-tickets/wide-refactors.md",
+	"gx-to-tickets/quiz-format.md",
+	"gx-to-tickets/verify-planning.md",
 	"gx-tdd/SKILL.md",
 	"gx-tdd/tests.md",
 	"gx-tdd/mocking.md",

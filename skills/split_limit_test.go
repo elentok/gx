@@ -34,7 +34,7 @@ func TestCodeReviewFixTicketRules(t *testing.T) {
 // Each rare-guidance file is linked once from SKILL.md and the link resolves.
 func TestToTicketsLinkedFiles(t *testing.T) {
 	skill := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
-	for _, name := range []string{"prefactor-tickets.md", "wide-refactors.md"} {
+	for _, name := range []string{"prefactor-tickets.md", "wide-refactors.md", "quiz-format.md", "verify-planning.md"} {
 		if got := strings.Count(skill, "]("+name+")"); got != 1 {
 			t.Errorf("gx-to-tickets/SKILL.md links %q %d times, want 1", name, got)
 		}
@@ -105,6 +105,33 @@ func TestToTicketsDraftWriters(t *testing.T) {
 	}
 	if strings.Contains(s7, "gx tickets draft") {
 		t.Error("gx-design step 7 names the draft command directly")
+	}
+}
+
+// Spec "Skill size": the skill stays below 528 lines.
+func TestToTicketsSkillSize(t *testing.T) {
+	const limit = 528
+	if got := strings.Count(readFile(t, "gx-to-tickets/SKILL.md"), "\n"); got >= limit {
+		t.Errorf("gx-to-tickets/SKILL.md has %d lines, want < %d", got, limit)
+	}
+}
+
+// The dry-run instruction sits in step 5 (trigger 3 needs it) and the writer
+// lines use the wording the trace script's writers_wait bucket matches.
+func TestToTicketsDryRunAndWriterLines(t *testing.T) {
+	text := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	i := strings.Index(text, "### 5.")
+	j := strings.Index(text, "### 6.")
+	if i < 0 || j < i {
+		t.Fatal("gx-to-tickets/SKILL.md steps 5, 6 not found in order")
+	}
+	if got := strings.Count(text[i:j], "--dry-run` first: trigger 3 needs its output"); got != 1 {
+		t.Errorf("step 5 has %d dry-run instructions, want 1", got)
+	}
+	for _, anchor := range []string{"description that starts with `writer N`", "`writer N finished`"} {
+		if got := strings.Count(text, anchor); got != 1 {
+			t.Errorf("gx-to-tickets/SKILL.md has %d copies of %q, want 1", got, anchor)
+		}
 	}
 }
 
