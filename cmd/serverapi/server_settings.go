@@ -68,7 +68,8 @@ func newServerSettingsSetCmd(d Deps) *cobra.Command {
 		Use:   "settings-set",
 		Short: "Change settings, globally or for one project, together or not at all",
 		Long: "Each --set takes KEY=VALUE; VALUE is JSON, or plain text taken as a string. " +
-			"Each --remove takes a KEY. Both repeat.",
+			"Each --remove takes a KEY. Both repeat. " +
+			"A refused value exits 1; with --json the body is still printed first.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			req := wire.SettingsWriteRequest{Project: project}
@@ -114,7 +115,14 @@ func runServerSettingsSet(ctx context.Context, cl *apiclient.Client, w io.Writer
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
+			return err
+		}
+		if res.Refused {
+			// The body already says why; the exit code lets scripts skip parsing it.
+			return &cmdbase.ExitError{Code: 1}
+		}
+		return nil
 	}
 	if res.Refused {
 		return fmt.Errorf("not saved: %s: %s", strings.Join(res.Keys, ", "), res.Reason)

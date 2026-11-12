@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config/registry"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -91,8 +93,10 @@ func TestServerSettingsSet_ResultMatchesEndpoint(t *testing.T) {
 	run := func(req wire.SettingsWriteRequest) wire.SettingsWriteResult {
 		t.Helper()
 		var out bytes.Buffer
-		if err := runServerSettingsSet(ctx, h.Client, &out, req, true); err != nil {
-			t.Fatal(err)
+		runErr := runServerSettingsSet(ctx, h.Client, &out, req, true)
+		var exit *cmdbase.ExitError
+		if runErr != nil && !(errors.As(runErr, &exit) && exit.Code == 1) {
+			t.Fatal(runErr)
 		}
 		var got wire.SettingsWriteResult
 		if err := json.Unmarshal(out.Bytes(), &got); err != nil {
@@ -106,6 +110,9 @@ func TestServerSettingsSet_ResultMatchesEndpoint(t *testing.T) {
 		wantJSON, _ := json.Marshal(want)
 		if string(gotJSON) != string(wantJSON) {
 			t.Errorf("cli = %s, endpoint = %s", gotJSON, wantJSON)
+		}
+		if (runErr != nil) != got.Refused {
+			t.Errorf("err = %v with refused = %v, want a non-zero exit exactly when refused", runErr, got.Refused)
 		}
 		return got
 	}
