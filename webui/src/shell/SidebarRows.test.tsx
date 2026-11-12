@@ -228,7 +228,8 @@ test("On hold is collapsed with a count and opens on click; Other lists its rows
   expect(body().queryByRole("link", { name: /scratch/ })).toBeNull()
   fireEvent.click(body().getByRole("button", { name: "Other" }))
   const scratch = within(body().getByRole("link", { name: /scratch/ }))
-  expect(scratch.getByTestId("icon-slot")).toBeTruthy()
+  // No parent row: no guide line.
+  expect(body().queryAllByTestId("nested-guide")).toHaveLength(0)
   expect(scratch.queryByLabelText("Chat")).toBeNull()
 })
 

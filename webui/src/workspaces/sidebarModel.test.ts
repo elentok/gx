@@ -173,6 +173,7 @@ describe("buildSidebar", () => {
     const s = buildSidebar({ ...base, rows: [], sessions, placements: [place("t1", "other")] })
     expect(s.rows).toEqual([])
     expect(s.other.map((a) => a.id)).toEqual(["t1"])
+    expect(s.other[0].href).toBe("#/triage/p")
   })
 
   it("numbers only own rows, 1 to 9", () => {

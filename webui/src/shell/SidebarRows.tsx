@@ -124,6 +124,29 @@ function WrenchIcon({ status }: { status: SidebarStatus }) {
   )
 }
 
+/** The Triage icon: an inbox tray, coloured by status. */
+function InboxIcon({ status }: { status: SidebarStatus }) {
+  return (
+    <Box as="span" data-testid="triage-icon" flex="none" display="grid" color={statusColor(status)}>
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-label="Triage"
+        role="img"
+      >
+        <path d="M2.5 11.5l2.2-6.2A1.5 1.5 0 0 1 6.1 4.3h7.8a1.5 1.5 0 0 1 1.4 1l2.2 6.2" />
+        <path d="M2.5 11.5v3.2a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3.2h-4.2a2.3 2.3 0 0 1-2.3 1.8h-2a2.3 2.3 0 0 1-2.3-1.8z" />
+      </svg>
+    </Box>
+  )
+}
+
 function Chevron({
   open,
   onToggle,
@@ -236,7 +259,16 @@ function MenuSpacer() {
 }
 
 /** A nested agent row on the parent row's columns: empty chevron cell, icon slot (wrench for a Fix agent), title, status, menu slot. */
-function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
+function AgentLink({
+  agent,
+  last,
+  nested = true,
+}: {
+  agent: SidebarAgent
+  last: boolean
+  /** False under Other: no parent row, so no guide line. */
+  nested?: boolean
+}) {
   const current = agent.href === `#${useLocation().pathname}`
   const navigate = useNavigate()
   // A Queue agent is gx-driven: no menu, just the spacer that keeps the status column aligned.
@@ -245,16 +277,18 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
   const selecting = sel.state.on
   return (
     <RowFrame current={current} selected={selecting && sel.state.keys.includes(agent.id)}>
-      <Box
-        data-testid="nested-guide"
-        aria-hidden
-        position="absolute"
-        left={GUIDE_X}
-        top="0"
-        bottom={last ? "50%" : "0"}
-        w="1.5px"
-        bg="border"
-      />
+      {nested && (
+        <Box
+          data-testid="nested-guide"
+          aria-hidden
+          position="absolute"
+          left={GUIDE_X}
+          top="0"
+          bottom={last ? "50%" : "0"}
+          w="1.5px"
+          bg="border"
+        />
+      )}
       <Box w={`${CHEVRON_W}px`} flex="none" />
       {selecting && managed && <RowCheck id={agent.id} label={agent.label} />}
       <chakra.a
@@ -267,7 +301,13 @@ function AgentLink({ agent, last }: { agent: SidebarAgent; last: boolean }) {
         px="0"
         minH="36px"
       >
-        <IconSlot>{agent.fix && <WrenchIcon status={agent.status} />}</IconSlot>
+        <IconSlot>
+          {agent.fix ? (
+            <WrenchIcon status={agent.status} />
+          ) : (
+            agent.session.flow === "triage" && <InboxIcon status={agent.status} />
+          )}
+        </IconSlot>
         <Box
           as="span"
           flex="1"
@@ -589,7 +629,7 @@ export function SidebarRows({ fetcher, active }: { fetcher?: FetchEpicList; acti
         <Section id="other" group={GROUP_OTHER} title="Other">
           {model.other.map((a, i) => (
             <li key={a.id}>
-              <AgentLink agent={a} last={i === model.other.length - 1} />
+              <AgentLink agent={a} last={i === model.other.length - 1} nested={false} />
             </li>
           ))}
         </Section>

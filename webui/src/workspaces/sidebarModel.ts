@@ -19,7 +19,7 @@ import {
 } from "../generated/server"
 import { isActionable, stateLabel } from "../agents/rules"
 import { RING_KIND, isLive, ringProgress } from "../epics/ring"
-import { agentHref, designHref } from "../hrefs"
+import { agentHref, designHref, triageHref } from "../hrefs"
 import { isArchivable } from "../select/selectModel"
 import { titleHref } from "../epics/cardLinks"
 import type { Kind, Tone } from "../ui/tone"
@@ -110,7 +110,8 @@ function designStatus(r: EpicListRow, sessions: SessionInfo[]): SidebarStatus {
 const agentRow = (s: SessionInfo): SidebarAgent => ({
   id: s.id,
   label: s.name || s.ticket || s.id,
-  href: agentHref(s.id),
+  // A Triage opens its own page, not the agent chat.
+  href: s.flow === "triage" && s.flow_key ? triageHref(s.flow_key) : agentHref(s.id),
   status: sessionStatus(s),
   fix: !!s.fix_of,
   session: s,

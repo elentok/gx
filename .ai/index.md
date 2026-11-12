@@ -367,7 +367,9 @@ Testing a click on a Chakra menu item needs `waitFor`. See "Testing a Chakra men
 Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
-- The web UI does not use prettier. Never run it: it reformats unrelated lines.
+- The web UI formats with Biome (`webui/biome.json`: no semicolons, double quotes, width 100), not prettier.
+  Format changed files with `cd webui && pnpm exec biome format --write <files>`. Never run prettier:
+  it reformats the whole file.
   `gx check` says `webui: no prettier` on the format line for webui files; that is expected, not a pass.
 - Regenerate `webui/src/generated/server.ts` and `wire.ts` with `make web-types`. Wire types live in
   `server/wire` and generate `wire.ts`; `server.ts` re-exports it, so web code keeps importing
