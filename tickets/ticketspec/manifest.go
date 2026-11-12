@@ -30,11 +30,11 @@ var (
 type ManifestEntry struct {
 	Slug                  string   `yaml:"slug"`
 	Type                  string   `yaml:"type"`
-	BlockedBy             []string `yaml:"blocked_by"`
-	ExpectedContextWindow int      `yaml:"expected_context_window"`
+	BlockedBy             []string `yaml:"blocked_by,omitempty"`
+	ExpectedContextWindow int      `yaml:"expected_context_window,omitempty"`
 	BodyFile              string   `yaml:"body"`
 	// From is the follow-up address, or a list, this ticket promotes.
-	From schema.OriginalAddresses `yaml:"from"`
+	From schema.OriginalAddresses `yaml:"from,omitempty"`
 
 	// Body is the raw body read from BodyFile.
 	Body string `yaml:"-"`
@@ -61,6 +61,34 @@ func ParseManifest(path string, epicIDs []string) (*Manifest, error) {
 		return nil, fmt.Errorf("manifest %s: %w", path, err)
 	}
 	return buildManifest(entries, filepath.Dir(path), epicIDs)
+}
+
+// LoadEntries reads the manifest's entries as written, without checking them or
+// reading their bodies, for commands that edit the manifest in place.
+func LoadEntries(path string) ([]ManifestEntry, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var entries []ManifestEntry
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&entries); err != nil {
+		return nil, fmt.Errorf("manifest %s: %w", path, err)
+	}
+	return entries, nil
+}
+
+// SaveEntries writes entries to the manifest at path.
+func SaveEntries(path string, entries []ManifestEntry) error {
+	if entries == nil {
+		entries = []ManifestEntry{}
+	}
+	data, err := yaml.Marshal(entries)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }
 
 func buildManifest(entries []ManifestEntry, dir string, epicIDs []string) (*Manifest, error) {

@@ -348,6 +348,42 @@ func newTriageWriteStateCmd(d Deps) *cobra.Command {
 	return cmd
 }
 
+func newTriageDropRowsCmd(d Deps) *cobra.Command {
+	var manifest string
+	var rows []string
+	cmd := &cobra.Command{
+		Use:   "drop-rows",
+		Short: "remove the entries a failed row made from a publish manifest",
+		Long: "Usage: gx tickets triage drop-rows --manifest <file> --row <address>...\n\n" +
+			"Remove every manifest entry whose from: names a listed row (a group goes whole), delete its body\n" +
+			"file, and replace its slug in the other entries' blocked_by with its own blockers. Prints the\n" +
+			"dropped slugs, or a message when no entry names the rows.",
+		Args: cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			if manifest == "" {
+				return errors.New("--manifest is required")
+			}
+			if len(rows) == 0 {
+				return errors.New("--row is required")
+			}
+			dropped, err := triage.DropRows(manifest, rows)
+			if err != nil {
+				return err
+			}
+			if len(dropped) == 0 {
+				fmt.Fprintf(c.OutOrStdout(), "no manifest entry names %s; nothing dropped\n", strings.Join(rows, ", "))
+				return nil
+			}
+			fmt.Fprintf(c.OutOrStdout(), "dropped %s\n", strings.Join(dropped, ", "))
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringVar(&manifest, "manifest", "", "the publish manifest to edit")
+	f.StringArrayVar(&rows, "row", nil, "a failed row's follow-up address (repeatable)")
+	return cmd
+}
+
 func newTriageEpicsCmd(d Deps) *cobra.Command {
 	var project, ready string
 	var maps []string

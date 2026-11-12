@@ -81,7 +81,7 @@ func newTicketsTriageCmd(d Deps) *cobra.Command {
 	cmd.AddCommand(newTriageCreateCmd(d), newTriageShowCmd(d), newTriagePendingCmd(d), newTriageVerdictCmd(d),
 		newTriagePlanCmd(d), newTriageRowCmd(d), newTriageApproveCmd(d), newTriageAbandonCmd(d),
 		newTriageLocateCmd(d), newTriageAnswersCmd(d), newTriageSeenAgainCmd(d), newTriageWriteStateCmd(d),
-		newTriageEpicsCmd(d), newTriageLastPassCmd(d))
+		newTriageEpicsCmd(d), newTriageLastPassCmd(d), newTriageDropRowsCmd(d))
 	return cmd
 }
 

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -326,5 +328,42 @@ func TestTriage_StaleRevisionIsRefusedAndRecordUnchanged(t *testing.T) {
 	}
 	if strings.TrimSpace(out) != "2" {
 		t.Errorf("printed revision %q, want 2", out)
+	}
+}
+
+func TestDropRows_RewritesTheManifest(t *testing.T) {
+	repo := triageProject(t)
+	dir := t.TempDir()
+	for _, f := range []string{"a.md", "b.md"} {
+		if err := os.WriteFile(filepath.Join(dir, f), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := filepath.Join(dir, "manifest.yaml")
+	body := "- slug: a\n  type: implement\n  body: a.md\n  from: p:f/01\n" +
+		"- slug: b\n  type: implement\n  body: b.md\n  blocked_by: [a]\n  from: p:f/02\n"
+	if err := os.WriteFile(m, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runIn(t, repo, "tickets", "triage", "drop-rows", "--manifest", m, "--row", "p:f/01")
+	if err != nil {
+		t.Fatalf("drop-rows: %v", err)
+	}
+	if !strings.Contains(out, "dropped a") {
+		t.Errorf("output %q", out)
+	}
+	got, _ := os.ReadFile(m)
+	if strings.Contains(string(got), "slug: a") || strings.Contains(string(got), "blocked_by") {
+		t.Errorf("manifest still names a:\n%s", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "a.md")); !os.IsNotExist(err) {
+		t.Errorf("a.md not removed: %v", err)
+	}
+}
+
+func TestDropRows_RequiresManifest(t *testing.T) {
+	repo := triageProject(t)
+	if _, err := runIn(t, repo, "tickets", "triage", "drop-rows", "--row", "p:f/01"); err == nil {
+		t.Fatal("want an error without --manifest")
 	}
 }
