@@ -47,8 +47,7 @@ func (p *pnpmLauncher) Install(ctx context.Context, webuiDir string, out io.Writ
 	if err := cmd.Start(); err != nil {
 		return mapStartErr(err)
 	}
-	proc := &execProcess{cmd: cmd, done: make(chan error, 1)}
-	go func() { proc.done <- cmd.Wait() }()
+	proc := newExecProcess(cmd)
 	select {
 	case err := <-proc.done:
 		return err
@@ -64,9 +63,7 @@ func (p *pnpmLauncher) Start(_ context.Context, webuiDir string, port int, out i
 	if err := cmd.Start(); err != nil {
 		return nil, mapStartErr(err)
 	}
-	proc := &execProcess{cmd: cmd, done: make(chan error, 1)}
-	go func() { proc.done <- cmd.Wait() }()
-	return proc, nil
+	return newExecProcess(cmd), nil
 }
 
 func (p *pnpmLauncher) Probe(ctx context.Context, port int) error {
@@ -91,14 +88,47 @@ func mapStartErr(err error) error {
 // execProcess adapts a started command; the done channel holds Wait's result
 // once, so Wait may be called by one reader.
 type execProcess struct {
-	cmd  *exec.Cmd
-	done chan error
+	done   chan error
+	exited chan struct{} // closed once the child has been reaped; never consumed
+	signal func(kill bool)
+	grace  time.Duration
+}
+
+func newExecProcess(cmd *exec.Cmd) *execProcess {
+	e := &execProcess{
+		done:   make(chan error, 1),
+		exited: make(chan struct{}),
+		signal: func(kill bool) { signalGroup(cmd, kill) },
+		grace:  5 * time.Second,
+	}
+	go func() {
+		err := cmd.Wait()
+		close(e.exited)
+		e.done <- err
+	}()
+	return e
 }
 
 func (e *execProcess) Wait() error { return <-e.done }
 
-// Stop signals the whole process group, then kills it if it lingers.
+// Stop signals the whole process group, then kills it if it lingers. Once the
+// child is reaped its pid and group may be recycled, so nothing is sent then.
 func (e *execProcess) Stop() {
-	signalGroup(e.cmd, false)
-	time.AfterFunc(5*time.Second, func() { signalGroup(e.cmd, true) })
+	select {
+	case <-e.exited:
+		return
+	default:
+	}
+	e.signal(false)
+	timer := time.AfterFunc(e.grace, func() {
+		select {
+		case <-e.exited:
+		default:
+			e.signal(true)
+		}
+	})
+	go func() {
+		<-e.exited
+		timer.Stop()
+	}()
 }
