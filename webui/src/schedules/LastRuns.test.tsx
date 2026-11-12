@@ -49,12 +49,12 @@ test("a skip has no ticket link", () => {
           status: "skipped",
           address: "",
           reason: "late",
-          reason_text: "Past the 2 h Late limit",
+          reason_text: "Past the 2 h Late limit.",
         }),
       ]}
     />,
   )
-  expect(screen.getByText("Past the 2 h Late limit")).toBeTruthy()
+  expect(screen.getByText("Past the 2 h Late limit.")).toBeTruthy()
   expect(screen.queryByRole("link")).toBeNull()
 })
 

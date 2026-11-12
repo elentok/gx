@@ -168,14 +168,13 @@ function ScheduleHeader({
       },
     })
   return (
-    <Box data-mock-part="schedule-header" mt="2">
-      <Box display="flex" alignItems="center" gap="3">
+    <Box data-mock-part="schedule-header" textAlign="right" flexShrink={0}>
+      <Box display="flex" alignItems="center" justifyContent="flex-end" gap="3" minH="40px">
         {!tools.info.project_found && (
           <Text data-mock-part="next-run" color="text.muted" fontSize="14px">
             project not found
           </Text>
         )}
-        <Box flex="1" />
         <Button
           data-mock-part="run-now"
           emphasis="secondary"
@@ -315,30 +314,32 @@ function Editor({
           ← Scheduled prompts
         </chakra.a>
       </Box>
-      <Box data-mock-part="name" mt="4">
-        <chakra.input
-          aria-label="Name"
-          name="schedule-name"
-          autoComplete="off"
-          placeholder="Name"
-          value={form.name}
-          onChange={(e) => set({ name: e.target.value })}
-          w="100%"
-          bg="transparent"
-          fontSize="24px"
-          fontWeight="600"
-          color="text"
-          borderBottomWidth="1px"
-          borderColor="hairline"
-          py="1"
-        />
-        {inline("name") && (
-          <Text role="alert" color="tone.error.fg" fontSize="13px" mt="1">
-            {inline("name")}
-          </Text>
-        )}
+      <Box display="flex" alignItems="flex-start" gap="4" mt="4">
+        <Box data-mock-part="name" flex="1" minW="0">
+          <chakra.input
+            aria-label="Name"
+            name="schedule-name"
+            autoComplete="off"
+            placeholder="Name"
+            value={form.name}
+            onChange={(e) => set({ name: e.target.value })}
+            w="100%"
+            bg="transparent"
+            fontSize="24px"
+            fontWeight="600"
+            color="text"
+            borderBottomWidth="1px"
+            borderColor="hairline"
+            py="1"
+          />
+          {inline("name") && (
+            <Text role="alert" color="tone.error.fg" fontSize="13px" mt="1">
+              {inline("name")}
+            </Text>
+          )}
+        </Box>
+        {existing && tools && <ScheduleHeader existing={existing} tools={tools} />}
       </Box>
-      {existing && tools && <ScheduleHeader existing={existing} tools={tools} />}
 
       <Row part="row-days" label="Days" error={inline("days")}>
         <Box data-mock-part="days" display="flex" flexWrap="wrap" gap="2" alignItems="center">

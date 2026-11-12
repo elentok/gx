@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,11 +19,18 @@ const LastRunsLimit = 10
 // lateAfter is how long after its set time a run may be created and still count as on time.
 const lateAfter = time.Minute
 
+// The status word already says Skipped, so the texts do not repeat it.
 var reasonText = map[string]string{
-	ReasonLate:                      "Skipped: the machine was off past the late limit",
-	ReasonProjectNotFound:           "Skipped: the project is gone",
-	ReasonPreviousRunStarted:        "Skipped: the previous run was still running",
-	ReasonPreviousRunNeedsAttention: "Skipped: the previous run needs attention",
+	ReasonProjectNotFound:           "The project is gone.",
+	ReasonPreviousRunStarted:        "The previous run was still running.",
+	ReasonPreviousRunNeedsAttention: "The previous run needs attention.",
+}
+
+func skipText(reason string, lateLimitHours float64) string {
+	if reason == ReasonLate {
+		return "Past the " + strconv.FormatFloat(lateLimitHours, 'f', -1, 64) + " h Late limit."
+	}
+	return reasonText[reason]
 }
 
 type lastRow struct {
@@ -33,7 +41,7 @@ type lastRow struct {
 
 // LastRuns is the Schedule's newest ten runs: its One-offs from every machine
 // sharing the store (live and archived) plus the skips this machine logged.
-func LastRuns(ticketStore string, st *State, k Key) ([]wire.ScheduleRun, error) {
+func LastRuns(ticketStore string, st *State, k Key, lateLimitHours float64) ([]wire.ScheduleRun, error) {
 	live, archived, err := tickets.LoadOneOffs(filepath.Join(ticketStore, k.Project))
 	if err != nil {
 		return nil, err
@@ -58,7 +66,7 @@ func LastRuns(ticketStore string, st *State, k Key) ([]wire.ScheduleRun, error) 
 				CreatedAt:        sk.LoggedAt.Format(time.RFC3339),
 				Status:           wire.ScheduleRunSkipped,
 				Reason:           sk.Reason,
-				ReasonText:       reasonText[sk.Reason],
+				ReasonText:       skipText(sk.Reason, lateLimitHours),
 				AttentionAddress: sk.Blocking,
 			},
 		})

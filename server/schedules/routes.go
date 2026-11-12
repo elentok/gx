@@ -83,7 +83,7 @@ func (s *Schedules) showRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	runs, err := LastRuns(s.TicketStore, s.State, Key{Project: sc.Project, Slug: sc.Slug})
+	runs, err := LastRuns(s.TicketStore, s.State, Key{Project: sc.Project, Slug: sc.Slug}, sc.LateLimitHours)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -24,7 +24,7 @@ func (r *rig) seed(t *testing.T, epic, id, machine string, opts servertest.Ticke
 
 func (r *rig) lastRuns(t *testing.T) []wire.ScheduleRun {
 	t.Helper()
-	got, err := schedules.LastRuns(r.h.TicketStore, r.h.Server.Schedules(), r.key)
+	got, err := schedules.LastRuns(r.h.TicketStore, r.h.Server.Schedules(), r.key, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,6 +97,9 @@ func TestLastRuns_OnlyNewestTenAndRunNowAndSkipShapes(t *testing.T) {
 	if last.Status != wire.ScheduleRunSkipped || last.Address != "" || last.Reason != schedules.ReasonLate {
 		t.Errorf("oldest kept row = %+v, want the skip", last)
 	}
+	if last.ReasonText != "Past the 2 h Late limit." {
+		t.Errorf("ReasonText = %q", last.ReasonText)
+	}
 }
 
 func TestLastRuns_TwoMachinesShareOneOffsButNotSkips(t *testing.T) {
@@ -112,7 +115,7 @@ func TestLastRuns_TwoMachinesShareOneOffsButNotSkips(t *testing.T) {
 	if got := r.lastRuns(t); len(got) != 2 {
 		t.Errorf("machine a sees %d rows, want the 2 One-offs only: %+v", len(got), got)
 	}
-	got, err := schedules.LastRuns(r.h.TicketStore, other.Server.Schedules(), r.key)
+	got, err := schedules.LastRuns(r.h.TicketStore, other.Server.Schedules(), r.key, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
