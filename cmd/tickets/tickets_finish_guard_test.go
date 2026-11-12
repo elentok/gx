@@ -56,7 +56,7 @@ func (f *finishFixture) record(t *testing.T, exit int, kindFilter string, failed
 func (f *finishFixture) recordTree(t *testing.T, tree string, exit int, kindFilter string, failed ...string) {
 	t.Helper()
 	rec := check.Record{
-		Run: "r", Head: f.head, Exit: exit, KindFilter: kindFilter, Branch: "ralph-loop/e-item-01", TreeID: tree,
+		Run: "r", Time: "2026-01-02T03:04:05Z", Head: f.head, Exit: exit, KindFilter: kindFilter, Branch: "ralph-loop/e-item-01", TreeID: tree,
 		Kinds: []check.KindRecord{{Kind: "test", Failed: failed}},
 	}
 	line, err := json.Marshal(rec)
@@ -163,6 +163,35 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 			t.Fatal("want a refusal")
 		}
 		f.assertUnwritten(t)
+	})
+
+	t.Run("a pass for an older tree is named as stale", func(t *testing.T) {
+		f := newFinishFixture(t)
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+		f.recordTree(t, "abcdef0123456789abcdef0123456789abcdef01", check.ExitPass, "")
+		err := f.finish(t)
+		if err == nil {
+			t.Fatal("want a refusal")
+		}
+		for _, want := range []string{"stale", "abcdef0", "2026-01-02T03:04:05Z", "rerun `gx check`"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("err = %v, want it to contain %q", err, want)
+			}
+		}
+		if strings.Contains(err.Error(), "--commitless") {
+			t.Errorf("err = %v, a pass as last record must not hint --commitless", err)
+		}
+	})
+
+	t.Run("a skip as the last branch record hints --commitless false", func(t *testing.T) {
+		f := newFinishFixture(t)
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+		f.recordTree(t, "abcdef0123456789abcdef0123456789abcdef01", check.ExitPass, "")
+		f.recordTree(t, "1111111123456789abcdef0123456789abcdef01", check.ExitNone, "")
+		err := f.finish(t)
+		if err == nil || !strings.Contains(err.Error(), "--commitless false") {
+			t.Fatalf("err = %v, want a --commitless false hint", err)
+		}
 	})
 
 	t.Run("failing line needs one address per failing test", func(t *testing.T) {

@@ -101,7 +101,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 	}
 	label := ticketref.TicketLabel(path)
 	if failing == nil {
-		return fmt.Errorf("%s: no passing `gx check` run for the current tree of %s; run `gx check` and fix it, or file follow-ups for flakes and pre-existing failures and finish with --check-failures <follow-up addrs>", label, branch)
+		return fmt.Errorf("%s: no passing `gx check` run for the current tree of %s%s; run `gx check` and fix it, or file follow-ups for flakes and pre-existing failures and finish with --check-failures <follow-up addrs>", label, branch, staleRunHint(recs0, branch))
 	}
 
 	// Tests already red on the base are waived: a ticket claimed on a red tree
@@ -146,6 +146,36 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		}
 	}
 	return nil
+}
+
+// staleRunHint explains a refusal when the branch has full-run records for
+// other trees: a pass for an older tree means a later commit made it stale,
+// and a skip as the latest record means the agent must pass --commitless false.
+func staleRunHint(recs []check.Record, branch string) string {
+	var branchRecs []check.Record
+	for _, r := range check.FilterRecords(recs, branch, "") {
+		if r.KindFilter == "" {
+			branchRecs = append(branchRecs, r)
+		}
+	}
+	if len(branchRecs) == 0 {
+		return ""
+	}
+	hint := ""
+	for _, r := range slices.Backward(branchRecs) {
+		if r.Exit == check.ExitPass {
+			tree := r.TreeID
+			if len(tree) > 7 {
+				tree = tree[:7]
+			}
+			hint = fmt.Sprintf(" (the passing run of tree %s at %s is stale: a new commit changed the tree; rerun `gx check`)", tree, r.Time)
+			break
+		}
+	}
+	if branchRecs[len(branchRecs)-1].Exit == check.ExitNone {
+		hint += " (the last `gx check` skipped with no applicable checks; pass --commitless false)"
+	}
+	return hint
 }
 
 // baselineFailures is the failing set of the latest full failed `gx check`
