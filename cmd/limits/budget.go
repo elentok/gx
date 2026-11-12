@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"os"
 	"slices"
 	"text/tabwriter"
 
@@ -107,10 +106,7 @@ func runBudgetWrite(dial func() (*apiclient.Client, error), c *cobra.Command, js
 	}
 	w := c.OutOrStdout()
 	if jsonOut {
-		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
-			return err
-		}
-		return cmdbase.JSONRefusalExit(res.Refused)
+		return cmdbase.EncodeProvenanceRefusal(w, res, res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

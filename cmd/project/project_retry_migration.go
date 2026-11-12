@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -23,10 +22,7 @@ func runProjectRetryMigration(ctx context.Context, cl *apiclient.Client, w io.Wr
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
-			return err
-		}
-		return cmdbase.JSONRefusalExit(res.Refused)
+		return cmdbase.EncodeProvenanceRefusal(w, res, res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

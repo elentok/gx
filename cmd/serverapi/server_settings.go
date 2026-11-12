@@ -115,14 +115,7 @@ func runServerSettingsSet(ctx context.Context, cl *apiclient.Client, w io.Writer
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
-			return err
-		}
-		if res.Refused {
-			// The body already says why; the exit code lets scripts skip parsing it.
-			return &cmdbase.ExitError{Code: 1}
-		}
-		return nil
+		return cmdbase.EncodeProvenanceRefusal(w, res, res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("not saved: %s: %s", strings.Join(res.Keys, ", "), res.Reason)

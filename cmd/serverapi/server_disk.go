@@ -79,11 +79,8 @@ func runDiskClean(ctx context.Context, cl *apiclient.Client, w io.Writer, disk s
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
+		if err := cmdbase.EncodeProvenanceRefusal(w, res, res.Refused); err != nil || res.Refused {
 			return err
-		}
-		if res.Refused {
-			return cmdbase.JSONRefusalExit(true)
 		}
 	} else if !res.Refused {
 		held := "not held"

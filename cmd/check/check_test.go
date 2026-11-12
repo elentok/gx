@@ -223,6 +223,19 @@ func TestCheck_TicketBranchDefaultsToSinceEpicBase(t *testing.T) {
 	}
 }
 
+func TestCheck_LegacyNestedTicketBranchDefaultsToSinceEpicBase(t *testing.T) {
+	repo := checkRepo(t, `{"format":"echo {files}"}`)
+	testutil.MustGitExported(t, repo, "branch", "epicx")
+	testutil.MustGitExported(t, repo, "checkout", "-b", "ralph-loop/epicx/iter-07")
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "wip")
+
+	out, code := runCheckCmd(t, repo, "--kind", "format")
+	if code != 0 || logOf(t, out, "format") != "a.txt\n" {
+		t.Fatalf("clean legacy ticket worktree ahead of base: exit %d\n%s", code, out)
+	}
+}
+
 func TestCheck_FailureShowsSummaryLogAndLast20Lines(t *testing.T) {
 	repo := checkRepo(t, `{"test":"seq 1 30; exit 1","lint":"no-such-tool-xyz"}`)
 	testutil.WriteFile(t, repo, "a.txt", "a\n")

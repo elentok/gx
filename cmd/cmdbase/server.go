@@ -71,10 +71,7 @@ func RunServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		if err := EncodeProvenance(w, res, ViaServer, CallerActor(os.Getwd)); err != nil {
-			return err
-		}
-		return JSONRefusalExit(res.Refused)
+		return EncodeProvenanceRefusal(w, res, res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

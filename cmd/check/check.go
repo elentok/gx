@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // Deps is what `gx check` reads from its surroundings.
@@ -137,18 +138,14 @@ func ticketBaseDefault(dir string) (check.Mode, string) {
 	if err != nil {
 		return 0, ""
 	}
-	rest, ok := strings.CutPrefix(branch, "ralph-loop/")
+	epic, _, ok := ticketgit.ParseIterationBranch(branch)
 	if !ok {
-		return 0, ""
-	}
-	i := strings.LastIndex(rest, "-item-")
-	if i < 0 {
 		return 0, ""
 	}
 	if dirty, err := git.UncommittedPaths(dir); err != nil || len(dirty) > 0 {
 		return 0, ""
 	}
-	base, err := git.MergeBase(dir, "HEAD", rest[:i])
+	base, err := git.MergeBase(dir, "HEAD", epic)
 	if err != nil {
 		return 0, ""
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -168,10 +167,7 @@ func runWorkspaceWrite(_ context.Context, w io.Writer, jsonOut bool, show func(i
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
-			return err
-		}
-		return cmdbase.JSONRefusalExit(res.Refused)
+		return cmdbase.EncodeProvenanceRefusal(w, res, res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

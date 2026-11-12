@@ -3,6 +3,7 @@ package cmdbase
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
@@ -17,6 +18,21 @@ func decodeJSON(t *testing.T, b []byte) map[string]any {
 		t.Fatalf("output %q is not a JSON object: %v", b, err)
 	}
 	return m
+}
+
+func TestEncodeProvenanceRefusal_ExitFollowsRefusedAndBodyStillPrints(t *testing.T) {
+	t.Parallel()
+	for _, refused := range []bool{true, false} {
+		var buf bytes.Buffer
+		err := EncodeProvenanceRefusal(&buf, wire.Explanation{}, refused)
+		var exit *ExitError
+		if refused != (errors.As(err, &exit) && exit.Code == 1) || (!refused && err != nil) {
+			t.Errorf("refused=%v: err = %v", refused, err)
+		}
+		if got := decodeJSON(t, buf.Bytes()); got["via"] != "server" {
+			t.Errorf("refused=%v: body not stamped: %s", refused, buf.Bytes())
+		}
+	}
 }
 
 // Read results that are JSON objects carry via/actor like writes do; a JSON

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -80,10 +79,7 @@ func runReportLimits(dial func() (*apiclient.Client, error), c *cobra.Command, p
 	}
 	w := c.OutOrStdout()
 	if jsonOut {
-		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
-			return err
-		}
-		return cmdbase.JSONRefusalExit(res.Refused)
+		return cmdbase.EncodeProvenanceRefusal(w, res, res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
