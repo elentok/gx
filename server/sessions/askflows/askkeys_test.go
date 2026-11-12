@@ -245,3 +245,21 @@ func TestAskKeys_DigitsActPerScreenKind(t *testing.T) {
 	f.keys(t, "1", "3", "down", "down", "down", "down", "enter")
 	d.endedWith(t, map[string]string{"Which sizes?": "S, L"})
 }
+
+func TestAskKeys_ReviewScreenShowsACardAndSubmitsOnAnswer(t *testing.T) {
+	t.Parallel()
+	f := startAskFixture(t, nil)
+	d := f.openDialog(t, 0, colorQ, nameQ)
+	f.waitCardTitle(t, "Which color?")
+	// Answered at the terminal, so gx's own submit never runs.
+	f.keys(t, "1", "2")
+	card := f.waitCardTitle(t, "Ready to submit your answers?")
+	q := card.Questions[0]
+	if len(q.Options) != 2 || q.Options[0].Label != "Submit answers" || !strings.Contains(q.Body, "red") {
+		t.Fatalf("review card = %+v", q)
+	}
+	if res := f.answerCard(t, card, wire.SessionAnswer{Choice: "1"}); res.Refused {
+		t.Fatalf("refused: %+v", res)
+	}
+	d.endedWith(t, map[string]string{"Which color?": "red", "Which name?": "Bob"})
+}

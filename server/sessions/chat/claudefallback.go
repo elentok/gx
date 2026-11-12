@@ -73,7 +73,7 @@ func (c *Chat) claudeFallbackCards(dir string, m Meta, snap Snapshot) []wire.Que
 		return nil
 	}
 	d, ok := claudeui.ParseAskDialog(rows)
-	if !ok || d.Review || c.src.AskReleased(m.ID, d.Question) {
+	if !ok || c.src.AskReleased(m.ID, d.Question) {
 		return nil
 	}
 	return ClaudeFallbackCard(d, personTurns(snap.Msgs))
@@ -85,6 +85,9 @@ func (c *Chat) claudeFallbackCards(dir string, m Meta, snap Snapshot) []wire.Que
 // block, is a new card. An option's id is its 1-based position.
 func ClaudeFallbackCard(d claudeui.AskDialog, turn int) []wire.QuestionCard {
 	q := wire.QuestionCardQuestion{Kind: "options", Title: d.Question}
+	if d.Review {
+		q.Body = reviewBody(d.ReviewItems)
+	}
 	if d.Multi {
 		q.Kind = "multi-select"
 	}
@@ -100,6 +103,9 @@ func ClaudeFallbackCard(d claudeui.AskDialog, turn int) []wire.QuestionCard {
 		q.Options = append(q.Options, opt)
 		hashed = append(hashed, o.Label, o.Description, strconv.FormatBool(o.Checked))
 	}
+	for _, it := range d.ReviewItems {
+		hashed = append(hashed, it.Question, it.Answer)
+	}
 	sum := sha256.Sum256([]byte(strings.Join(hashed, "\x00")))
 	return []wire.QuestionCard{{
 		Source:    wire.CardSourceClaudeDialog,
@@ -107,4 +113,13 @@ func ClaudeFallbackCard(d claudeui.AskDialog, turn int) []wire.QuestionCard {
 		Questions: []wire.QuestionCardQuestion{q},
 		Fallback:  true,
 	}}
+}
+
+// reviewBody lists the answers of the review screen, one per line.
+func reviewBody(items []claudeui.AskReviewItem) string {
+	lines := make([]string, len(items))
+	for i, it := range items {
+		lines[i] = "- " + it.Question + " → " + it.Answer
+	}
+	return strings.Join(lines, "\n")
 }

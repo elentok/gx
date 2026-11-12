@@ -72,7 +72,7 @@ func (k *keyDriver) run(req wire.SessionAnswerRequest) error {
 	}
 	k.rows = rows
 	d, ok := claudeui.ParseAskDialog(rows)
-	if !ok || d.Review || !strings.HasPrefix(req.CardID, d.ID+"-") {
+	if !ok || !strings.HasPrefix(req.CardID, d.ID+"-") {
 		return dialogMismatch("the dialog on screen is not the one the card shows")
 	}
 	k.id = d.ID
@@ -80,6 +80,9 @@ func (k *keyDriver) run(req wire.SessionAnswerRequest) error {
 	if !isClaudeAnswered(a) {
 		_, err := k.press("\x1b")
 		return err
+	}
+	if d.Review {
+		return k.review(d, a)
 	}
 	picks, text, err := dialogPicks(d, a)
 	if err != nil {
@@ -94,6 +97,18 @@ func (k *keyDriver) run(req wire.SessionAnswerRequest) error {
 		return err
 	}
 	return k.submitReview()
+}
+
+// review answers the review screen a card shows: "Submit answers" or "Cancel".
+func (k *keyDriver) review(d claudeui.AskDialog, a wire.SessionAnswer) error {
+	n, err := strconv.Atoi(a.Choice)
+	if err != nil || n < 1 || n > len(d.Options) || len(a.Choices) > 0 || strings.TrimSpace(a.Text) != "" {
+		return badAnswer("pick Submit answers or Cancel")
+	}
+	if _, err := k.moveTo(n - 1); err != nil {
+		return err
+	}
+	return k.enter()
 }
 
 // dialogPicks turns the answer into 0-based option rows. The Other row is the
@@ -262,7 +277,7 @@ func (k *keyDriver) read() (claudeui.AskDialog, error) {
 	switch {
 	case !ok:
 		return d, dialogMismatch("the screen is not a dialog gx can read")
-	case d.Review || d.ID != k.id:
+	case d.ID != k.id:
 		return d, dialogMismatch("the question on screen changed")
 	}
 	return d, nil
