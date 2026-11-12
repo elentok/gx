@@ -59,10 +59,7 @@ export function Composer({
   onRoundSent,
   onReview,
   autoMenu,
-  ceiling,
 }: {
-  /** The smart-zone ceiling from the snapshot; the badge needs it. */
-  ceiling?: number
   session: SessionInfo
   /** The id of the last chat message the page saw. */
   lastMessage?: string
@@ -240,7 +237,7 @@ export function Composer({
   )
 
   const hint = codexSkillHint(session.harness, text)
-  const footerLine = <FooterLine session={session} ceiling={ceiling} />
+  const footerLine = <FooterLine session={session} />
 
   return (
     <Box

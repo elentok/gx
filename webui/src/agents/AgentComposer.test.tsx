@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { MemoryRouter } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
+import { ConnectionContext, type Connection } from "../connection"
 import type { InterruptSession } from "../design/open"
 import type { PostPrompt } from "../design/prompt"
 import type { SessionInfo } from "../generated/server"
@@ -40,18 +41,23 @@ function render(
   } = {},
 ) {
   return renderThemed(
-    <MemoryRouter>
-      <WideContext.Provider value={over.wide ?? true}>
-        <AgentComposer
-          session={over.s ?? session()}
-          connected={over.connected ?? true}
-          post={over.post}
-          reason={over.reason}
-        />
-      </WideContext.Provider>
-    </MemoryRouter>,
+    <ConnectionContext.Provider value={conn}>
+      <MemoryRouter>
+        <WideContext.Provider value={over.wide ?? true}>
+          <AgentComposer
+            session={over.s ?? session()}
+            connected={over.connected ?? true}
+            post={over.post}
+            reason={over.reason}
+          />
+        </WideContext.Provider>
+      </MemoryRouter>
+    </ConnectionContext.Provider>,
   )
 }
+
+const connState = { snapshot: { context_ceiling: 200_000 }, connected: true }
+const conn = { getState: () => connState, subscribe: () => () => {} } as unknown as Connection
 
 const box = () => screen.getByRole("textbox", { name: "Message" })
 const send = () => screen.getByRole("button", { name: "Send" })
@@ -73,32 +79,8 @@ test("the footer shows the model, plus the badge once there is a count", () => {
   expect(screen.getByText("Claude Opus 4.7 · high")).toBeTruthy()
   expect(screen.queryByRole("button", { name: "Context" })).toBeNull()
   unmount()
-  renderThemed(
-    <MemoryRouter>
-      <WideContext.Provider value={true}>
-        <AgentComposer
-          session={{ ...session(), context_tokens: 70_000, context_level: "green" }}
-          connected
-          ceiling={200_000}
-        />
-      </WideContext.Provider>
-    </MemoryRouter>,
-  )
+  render({ s: { ...session(), context_tokens: 70_000, context_level: "green" } })
   expect(screen.getByRole("button", { name: "Context" }).textContent).toBe("70K")
-})
-
-test("a session without chat shows the model alone, never a badge", () => {
-  render({
-    s: {
-      ...session(),
-      harness: "other",
-      model: "claude-opus-4-7",
-      context_tokens: 70_000,
-      context_level: "green",
-    },
-  })
-  expect(screen.queryByRole("button", { name: "Context" })).toBeNull()
-  expect(screen.getByText("Claude Opus 4.7")).toBeTruthy()
 })
 
 test("Send is off while empty and on once there is text", () => {
@@ -119,11 +101,13 @@ test("Send is off when not connected, but the box stays editable", () => {
 test("a Working session swaps Send for Interrupt, posting the state token after a confirm; the box stays editable", async () => {
   const interrupt = vi.fn(async () => ({ ok: true })) as unknown as InterruptSession
   renderThemed(
-    <MemoryRouter>
-      <WideContext.Provider value={true}>
-        <AgentComposer session={session("working")} connected interrupt={interrupt} />
-      </WideContext.Provider>
-    </MemoryRouter>,
+    <ConnectionContext.Provider value={conn}>
+      <MemoryRouter>
+        <WideContext.Provider value={true}>
+          <AgentComposer session={session("working")} connected interrupt={interrupt} />
+        </WideContext.Provider>
+      </MemoryRouter>
+    </ConnectionContext.Provider>,
   )
   fireEvent.change(box(), { target: { value: "hi" } })
   expect((box() as HTMLTextAreaElement).value).toBe("hi")

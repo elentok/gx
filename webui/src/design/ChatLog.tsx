@@ -20,12 +20,6 @@ import { QuestionSheet } from "./QuestionSheet"
 import { isAnswered } from "../ui/question-sheet/round"
 import { type RoundDraft, useRoundDraft } from "./roundDraft"
 
-// The footer line where no composer is mounted; the ceiling comes from the snapshot.
-function SessionFooter({ session, modelOnly }: { session: SessionInfo; modelOnly?: boolean }) {
-  const { snapshot } = useConnectionState(useConnectionContext())
-  return <FooterLine session={session} ceiling={snapshot?.context_ceiling} modelOnly={modelOnly} />
-}
-
 // The sheet and the composer share the round's answers (see useRoundDraft: they survive a reload).
 function ChatTail({
   session,
@@ -61,7 +55,6 @@ function ChatTail({
   const [focus, setFocus] = useState<{ index: number }>()
   const failure = visibleFailure(session.failure, done)
   const round = roundOf(chat)
-  const { snapshot } = useConnectionState(useConnectionContext())
   return (
     // The bottom area: at most half the screen, so only the question body scrolls past that.
     // In the Questions view the cap is gone and the sheet takes the rest of the column.
@@ -99,10 +92,9 @@ function ChatTail({
         <GxStopped reason={session.actionable.reason} />
       )}
       {done || replacesComposer(failure) ? (
-        <SessionFooter session={session} />
+        <FooterLine session={session} />
       ) : (
         <Composer
-          ceiling={snapshot?.context_ceiling}
           session={session}
           lastMessage={chat.messages.at(-1)?.id}
           next={chat.next}
@@ -253,7 +245,10 @@ function ChatBody({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || document.querySelector(LAYERS)) return
       // Esc in a sheet text box only leaves the box (the sheet moves focus); it does not close the view.
-      if ((e.target as HTMLElement | null)?.closest?.("[aria-label=Questions] :is(textarea, input)")) return
+      if (
+        (e.target as HTMLElement | null)?.closest?.("[aria-label=Questions] :is(textarea, input)")
+      )
+        return
       onQuestions(false)
     }
     window.addEventListener("keydown", onKey, true)
@@ -404,7 +399,7 @@ export function DesignChat({
         <Text color="text.muted" fontSize="sm">
           Chat works for Claude and Codex sessions only. Open it in gx, Agents tab.
         </Text>
-        <SessionFooter session={session} modelOnly />
+        <FooterLine session={session} />
       </>
     )
   }

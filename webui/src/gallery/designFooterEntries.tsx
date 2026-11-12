@@ -7,7 +7,12 @@ import type { SessionInfo, SessionRoundCard } from "../generated/server"
 import { DeviceContext, WideContext, type Device } from "../useWide"
 import type { GalleryEntry } from "./registry"
 
-const connection = { refresh: () => {} } as Connection
+const state = { connected: true }
+const connection = {
+  refresh: () => {},
+  getState: () => state,
+  subscribe: () => () => {},
+} as unknown as Connection
 
 const round: SessionRoundCard[] = [
   {

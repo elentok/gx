@@ -195,7 +195,7 @@ export function SessionView({
   fetchScreen?: FetchScreen
 }) {
   const conn = useConnectionContext()
-  const { connected, snapshot } = useConnectionState(conn)
+  const { connected } = useConnectionState(conn)
   const chatty = hasChat(session.harness)
   const { kind, locked, unlock } = useComposerUnlock(session)
   const [confirming, setConfirming] = useState(false)
@@ -274,7 +274,6 @@ export function SessionView({
         session={session}
         connected={connected && chatty && !locked}
         lastMessage={chat?.messages.at(-1)?.id}
-        ceiling={snapshot?.context_ceiling}
         onStale={refetch}
         onSent={(sent, images) => {
           const echo = { text: stripChips(sent), images }

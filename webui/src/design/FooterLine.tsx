@@ -1,4 +1,5 @@
 import { Box, chakra } from "@chakra-ui/react"
+import { useConnectionContext, useConnectionState } from "../connection"
 import { InfoTip } from "../ui/info-tip/InfoTip"
 import type { Tone } from "../ui/tone"
 import { useWide } from "../useWide"
@@ -79,19 +80,13 @@ export function ContextBadge({
 }
 
 /** The line inside a composer's box: the model on the left, the context badge on the right. */
-export function FooterLine({
-  session,
-  ceiling,
-  modelOnly,
-}: {
-  session: SessionInfo
-  ceiling?: number
-  modelOnly?: boolean
-}) {
+export function FooterLine({ session }: { session: SessionInfo }) {
   const wide = useWide()
+  const ceiling = useConnectionState(useConnectionContext()).snapshot?.context_ceiling
   const { model, effort } = agentDetails(session)
   const text = wide && effort ? `${model} · ${effort}` : model
-  const showBadge = session.context_tokens != null && !!ceiling && !modelOnly
+  // The server sends no context_tokens for a harness other than Claude or Codex.
+  const showBadge = session.context_tokens != null && !!ceiling
   return (
     <Box
       data-testid="footer-line"

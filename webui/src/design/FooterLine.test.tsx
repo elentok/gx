@@ -1,5 +1,6 @@
 import { act, cleanup, screen } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
@@ -17,19 +18,20 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo =>
     ...over,
   }) as SessionInfo
 
-const render = (
-  s: SessionInfo,
-  o: { wide?: boolean; ceiling?: number; modelOnly?: boolean } = {},
-) =>
-  renderThemed(
-    <WideContext.Provider value={o.wide ?? true}>
-      <FooterLine
-        session={s}
-        ceiling={"ceiling" in o ? o.ceiling : 200_000}
-        modelOnly={o.modelOnly}
-      />
-    </WideContext.Provider>,
+const render = (s: SessionInfo, o: { wide?: boolean; ceiling?: number } = {}) => {
+  const state = {
+    snapshot: { context_ceiling: "ceiling" in o ? o.ceiling : 200_000 },
+    connected: true,
+  } as unknown as ConnectionState
+  const conn = { getState: () => state, subscribe: () => () => {} } as unknown as Connection
+  return renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <WideContext.Provider value={o.wide ?? true}>
+        <FooterLine session={s} />
+      </WideContext.Provider>
+    </ConnectionContext.Provider>,
   )
+}
 
 const badge = () => screen.queryByRole("button", { name: "Context" })
 const fill = () => Number(screen.getByTestId("context-ring").getAttribute("data-fill"))
@@ -72,12 +74,6 @@ test("the ring fills with the count and is full at or above the ceiling", () => 
   cleanup()
   render(session({ context_tokens: 250_000, context_level: "red" }))
   expect(fill()).toBe(1)
-})
-
-test("model only: no badge even with a count", () => {
-  render(session({ context_tokens: 70_000, context_level: "green" }), { modelOnly: true })
-  expect(badge()).toBeNull()
-  expect(screen.getByText("Claude Opus 4.7 · high")).toBeTruthy()
 })
 
 test("no ceiling, no badge", () => {
