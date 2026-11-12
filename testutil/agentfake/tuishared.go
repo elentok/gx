@@ -109,6 +109,10 @@ type AskCall struct {
 	// "input needed" once the hook ends without an answer (timeout or release).
 	TimeoutMs int      `json:"timeout_ms,omitempty"`
 	Dialog    []string `json:"dialog,omitempty"`
+	// ContinueTurn keeps the session busy once the hook has answered, as real
+	// claude does while it works on the tool result; a test ends the turn with
+	// ActionFinish. Without it the fake finishes the turn when the hook exits.
+	ContinueTurn bool `json:"continue_turn,omitempty"`
 }
 
 // AskQuestion is one question of an AskCall, in claude's own field names.

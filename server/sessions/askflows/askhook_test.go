@@ -147,6 +147,13 @@ func startAskFixtureAs(t *testing.T, create wire.CreateSessionRequest, link *wir
 // multi-select, through the hook.
 func (f askFixture) ask(t *testing.T) (hookOut string) {
 	t.Helper()
+	return f.askWith(t, false)
+}
+
+// askWith is ask; continueTurn keeps the session busy after the hook answers,
+// as real claude does while it works on the answer.
+func (f askFixture) askWith(t *testing.T, continueTurn bool) (hookOut string) {
+	t.Helper()
 	hookOut = filepath.Join(t.TempDir(), "hook.out")
 	opts := func(labels ...string) []agentfake.AskOption {
 		var out []agentfake.AskOption
@@ -155,7 +162,7 @@ func (f askFixture) ask(t *testing.T) (hookOut string) {
 		}
 		return out
 	}
-	call := &agentfake.AskCall{ToolUseID: "toolu_ask", OutFile: hookOut, Questions: []agentfake.AskQuestion{
+	call := &agentfake.AskCall{ToolUseID: "toolu_ask", OutFile: hookOut, ContinueTurn: continueTurn, Questions: []agentfake.AskQuestion{
 		{Header: "Color", Question: "Which color?", Options: opts("red", "blue")},
 		{Header: "Sizes", Question: "Which sizes?", MultiSelect: true, Options: opts("S", "M", "L")},
 		{Header: "Ship", Question: "Ship it?", Options: opts("yes", "no")},

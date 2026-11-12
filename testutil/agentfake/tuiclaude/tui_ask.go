@@ -65,6 +65,9 @@ func (t *tui) askQuestion(call *AskCall) error {
 			_ = SendControl(t.ctlPath, Control{Action: ActionBlock, WaitingFor: "input needed", Dialog: call.Dialog})
 			return
 		}
+		if call.ContinueTurn {
+			return
+		}
 		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 	}()
 	return t.setStatus(StatusBusy, "")

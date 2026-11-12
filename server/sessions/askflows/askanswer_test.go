@@ -143,3 +143,25 @@ func TestAskAnswer_StaleOrIncompleteSendsNothing(t *testing.T) {
 		t.Errorf("cards = %+v, want the card kept", cards)
 	}
 }
+
+// Claude keeps working on the answer after the hook exits, so the session must
+// leave Blocked for Working and the question card must go, with no Esc.
+func TestAskAnswer_SessionLeavesBlockedWhileClaudeKeepsWorking(t *testing.T) {
+	t.Parallel()
+	f := startAskFixture(t, nil)
+	f.askWith(t, true)
+	f.waitBlocked(t)
+	res := f.answer(t, wire.SessionAnswerRequest{Answers: []wire.SessionAnswer{{Choice: "1"}, {Choice: "1"}, {Choice: "1"}}})
+	if res.Refused {
+		t.Fatalf("answer refused: %+v", res)
+	}
+	servertest.WaitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool {
+		return s.Status.State == wire.SessionWorking
+	})
+	if info := f.info(t); info.Failure != nil && info.Failure.Kind == wire.FailureKindBlocked {
+		t.Errorf("failure = %+v, want no blocked banner after the answer", info.Failure)
+	}
+	if cards := f.cards(t); len(cards) != 0 {
+		t.Errorf("cards = %+v, want none after the answer", cards)
+	}
+}
