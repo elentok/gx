@@ -85,18 +85,8 @@ in the area you're touching.
 Look for opportunities to prefactor the code to make the implementation easier. "Make the change
 easy, then make the easy change."
 
-#### Prefactor tickets
-
-A prefactor or make-room ticket (move code out of a package, free N lines or files) states numbers
-and candidates, so check them before drafting. Never write them from recall.
-
-1. Measure current sizes with `sizeguard` or `wc`, not from memory or an older ticket.
-2. Check with gopls or `rg` that every named candidate still exists where you say it does, and that
-   the promised line or file count is reachable under the stated constraint. Count the lines that
-   are free to move, not the lines in the package.
-3. If a constraint (for example "do not export X") could make the goal unreachable, because the
-   large files are all methods on or users of X, put the export decision in the ticket, or ask the
-   person while authoring. Never leave it for the implementer to find out.
+If a ticket will move code out of a package or free N lines or files (a prefactor or make-room
+ticket), read [prefactor-tickets.md](prefactor-tickets.md) before drafting it.
 
 ### 3. Draft vertical slices
 
@@ -127,16 +117,9 @@ together, each on its own branch, and cherry-picks them back one by one. Two rul
   it beside them: it can't see code that isn't merged yet, so it ships incomplete and code review
   spawns a follow-up to wire it in.
 
-**Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical
-change — rename a column, retype a shared symbol — whose **blast radius** fans across the whole
-codebase, so a single edit breaks thousands of call sites at once and no vertical slice can stay
-green. Don't force it into a tracer bullet; sequence it as **expand–contract**. First expand: add
-the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by
-blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping
-CI green batch to batch because the old form still exists. Finally contract: delete the old form
-once no caller remains, in a ticket blocked by every migrate batch. When even the batches can't stay
-green alone, keep the sequence but let them share an integration branch that all block a final
-integrate-and-verify ticket — green is promised only there.
+**Wide refactors are the exception to vertical slicing.** When one mechanical change breaks so many
+call sites that no vertical slice can stay green, read [wide-refactors.md](wide-refactors.md)
+before drafting; it sequences the work as expand–contract.
 
 **Explore/implement split for foreseeably-wide test/e2e changes.** Trigger this whenever a ticket's
 Test Seams will fall in 3+ distinct existing test files (test-file fan-out, above) — not only when

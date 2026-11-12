@@ -10,10 +10,10 @@ import (
 )
 
 func TestToTicketsPrefactorChecks(t *testing.T) {
-	text := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	text := normalizeSpace(readFile(t, "gx-to-tickets/prefactor-tickets.md"))
 	for _, anchor := range []string{"#### Prefactor tickets", "`sizeguard`", "gopls", "the export decision"} {
 		if !strings.Contains(text, normalizeSpace(anchor)) {
-			t.Errorf("gx-to-tickets/SKILL.md is missing %q", anchor)
+			t.Errorf("gx-to-tickets/prefactor-tickets.md is missing %q", anchor)
 		}
 	}
 }
@@ -28,6 +28,21 @@ func TestCodeReviewFixTicketRules(t *testing.T) {
 	review := normalizeSpace(readFile(t, "gx-code-review/SKILL.md"))
 	if !strings.Contains(review, "(../gx-to-tickets/SKILL.md)") {
 		t.Error("gx-code-review/SKILL.md must link the fix-ticket rules in gx-to-tickets")
+	}
+}
+
+// Each rare-guidance file is linked once from SKILL.md and the link resolves.
+func TestToTicketsLinkedFiles(t *testing.T) {
+	skill := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	for _, name := range []string{"prefactor-tickets.md", "wide-refactors.md"} {
+		if got := strings.Count(skill, "]("+name+")"); got != 1 {
+			t.Errorf("gx-to-tickets/SKILL.md links %q %d times, want 1", name, got)
+		}
+		readFile(t, "gx-to-tickets/"+name) // fails the test if missing
+	}
+	wide := normalizeSpace(readFile(t, "gx-to-tickets/wide-refactors.md"))
+	if !strings.Contains(wide, "## Wide refactors: expand–contract") {
+		t.Error("wide-refactors.md is missing its heading")
 	}
 }
 
