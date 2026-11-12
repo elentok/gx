@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
 import canned from "../canned-detail.json"
 import type { TicketDetail } from "../generated/server"
@@ -163,6 +163,40 @@ test("a cut-off detail gets the toggle", () => {
     renderThemed(<AnswerResult detail={answered} sent={null} />)
     expect(screen.getByRole("button", { name: /Show more/ })).toBeTruthy()
   } finally {
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight
+  }
+})
+
+test("a resize that cuts the text off adds the toggle", () => {
+  let height = 40
+  let resized: () => void = () => {}
+  const original = globalThis.ResizeObserver
+  globalThis.ResizeObserver = class {
+    constructor(cb: ResizeObserverCallback) {
+      resized = () => cb([], this as unknown as ResizeObserver)
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+    configurable: true,
+    get: () => 100,
+  })
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+    configurable: true,
+    get: () => height,
+  })
+  try {
+    height = 100
+    renderThemed(<AnswerResult detail={answered} sent={null} />)
+    expect(screen.queryByRole("button")).toBeNull()
+    height = 40
+    act(() => resized())
+    expect(screen.getByRole("button", { name: /Show more/ })).toBeTruthy()
+  } finally {
+    globalThis.ResizeObserver = original
     delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight
     delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight
   }

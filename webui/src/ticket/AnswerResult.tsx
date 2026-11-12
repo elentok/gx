@@ -45,7 +45,14 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
   const body = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const el = body.current
-    if (el && !open) setCut(el.scrollHeight > el.clientHeight)
+    if (!el || open) return
+    const measure = () => setCut(el.scrollHeight > el.clientHeight)
+    measure()
+    // A rotation or width change moves the line count without touching the text.
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [latest?.text, open])
 
   // An adopted send records no answer, and the round it answered may no longer be the latest.
