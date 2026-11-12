@@ -800,9 +800,14 @@ The app-shell `Update` wrapper calls `AppendViewStateChanged` after every child 
 pre/post `ViewState` and emitting `ViewStateChanged` automatically when navigation is enabled.
 Explicit `ViewStateChanged` emissions remain supported for specialized timing needs.
 
-**Leader key** — the one key that, while an embedded terminal has focus, says the next key is a gx
-action, not input for the session. Pressing it twice sends it to the session.
+**Leader key** — the one key that says the next key is a gx action. In the TUI it works while an
+embedded terminal has focus, and pressing it twice sends it to the session. In the web UI it opens
+the **Chord box**, even while the person is typing in a text field.
 _Avoid_: prefix key, escape key.
+
+**Chord box** — the small box at the bottom right that lists the keys that may follow the **Leader
+key**, each with what it does. It lists only the chords that work on the open page.
+_Avoid_: which-key, hint popup.
 
 **Copy mode** — a mode of an embedded terminal where keys move a cursor through the session's
 scrollback and select text to copy, instead of going to the session. Scrolling back with the mouse
