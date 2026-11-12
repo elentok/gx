@@ -22,6 +22,9 @@ func SettingsScenario() scenario {
 			{"notes", "notes-epic", nil},
 			{"plain", "plain-epic", nil},
 		},
+		// Codex puts the fake codex on PATH so the default harness can be saved as
+		// codex; --hide-codex brings back the host without it.
+		Codex:         true,
 		NoCheckConfig: true,
 		ProjectExtra: map[string]string{
 			project: `,"max-agents":1,"evolve":false,` +

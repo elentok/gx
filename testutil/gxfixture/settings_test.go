@@ -107,3 +107,15 @@ func TestSettingsScenario(t *testing.T) {
 		t.Errorf("pending restart = %v, want [agent-runner]", page.PendingRestart)
 	}
 }
+
+func TestSettingsScenario_CodexOnPathUnlessHidden(t *testing.T) {
+	t.Parallel()
+	with := start(t, "settings")
+	if _, err := os.Stat(filepath.Join(with.Root(), "bin", "codex")); err != nil {
+		t.Errorf("settings: %v, want the fake codex on PATH", err)
+	}
+	hidden := startWith(t, "settings", nil, "--hide-codex")
+	if _, err := os.Stat(filepath.Join(hidden.Root(), "bin", "codex")); !os.IsNotExist(err) {
+		t.Errorf("settings --hide-codex: codex stat = %v, want not exist", err)
+	}
+}
