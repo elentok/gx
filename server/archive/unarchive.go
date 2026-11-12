@@ -116,19 +116,24 @@ func (a *Archive) restore(dir, project string, halves []half, name string, head 
 		archiveKey := archivekey.New(project+":"+h.epic, h.epic)
 		rekeyErrs = append(rekeyErrs, a.rekey(archivekey.Epic, archiveKey, project+":"+finals[i]))
 	}
-	a.placeInWorkspace(project+":"+finals[0], head.ArchivedWorkspace)
+	placeErr := a.placeInWorkspace(project+":"+finals[0], head.ArchivedWorkspace)
 	a.d.Events.Publish(wire.EventWorkspacesChanged, "")
-	if err := errors.Join(rekeyErrs...); err != nil {
+	if err := errors.Join(append(rekeyErrs, placeErr)...); err != nil {
 		return failure{err}
 	}
 	return nil
 }
 
 // placeInWorkspace puts key back in its stored workspace, or in Default when
-// none is stored or it no longer exists.
-func (a *Archive) placeInWorkspace(key, workspace string) {
-	if workspace != "" && workspace != workspaces.DefaultName && a.d.SetMember(key, workspace) == nil {
-		return
+// none is stored or it no longer exists. Any other SetMember error is returned,
+// leaving the row unplaced.
+func (a *Archive) placeInWorkspace(key, workspace string) error {
+	if workspace != "" && workspace != workspaces.DefaultName {
+		err := a.d.SetMember(key, workspace)
+		if !errors.Is(err, workspaces.ReasonUnknown) {
+			return err
+		}
 	}
 	_ = a.d.Remove(key)
+	return nil
 }
