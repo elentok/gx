@@ -165,6 +165,19 @@ test("an interrupted message renders as a Turn interrupted separator", async () 
   expect(screen.queryByText("Context compacted")).toBeNull()
 })
 
+test("the Turn interrupted separator is dim like the compacted one", async () => {
+  renderChat(
+    [session()],
+    okChat(chatOf([msg({ kind: "interrupted" }), msg({ kind: "compacted" })])),
+  )
+  const [interrupted, compacted] = await screen.findAllByRole("separator")
+  expect(interrupted.textContent).toBe("Turn interrupted")
+  const color = getComputedStyle(interrupted).color
+  expect(color).not.toBe("")
+  expect(color).toBe(getComputedStyle(compacted).color)
+  expect(interrupted.className).toBe(compacted.className)
+})
+
 test("an interrupted message in a Codex chat reads the same", async () => {
   renderChat([session({ harness: "codex" })], okChat(chatOf([msg({ kind: "interrupted" })])))
   const sep = await screen.findByRole("separator")

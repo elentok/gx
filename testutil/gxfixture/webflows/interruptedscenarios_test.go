@@ -21,11 +21,17 @@ func TestAgentsInterrupted_EachChatHoldsOneSeparator(t *testing.T) {
 	}
 	designs := 0
 	harnesses := map[string]int{}
+	kinds := map[string]int{}
 	for _, si := range list {
 		if si.Design {
 			designs++
 		}
 		harnesses[si.Harness]++
+		kind := si.Harness + " chat"
+		if si.Design {
+			kind = si.Harness + " design"
+		}
+		kinds[kind]++
 		var chat wire.SessionChatResponse
 		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", si.ID, "--json")), &chat); err != nil {
 			t.Fatal(err)
@@ -41,6 +47,11 @@ func TestAgentsInterrupted_EachChatHoldsOneSeparator(t *testing.T) {
 		}
 		if interrupted != 1 {
 			t.Errorf("session %s (%s): interrupted messages = %d, want 1", si.ID, si.Harness, interrupted)
+		}
+	}
+	for _, want := range []string{"claude chat", "codex chat", "claude design", "codex design"} {
+		if kinds[want] != 1 {
+			t.Errorf("session kinds = %v, want one %q", kinds, want)
 		}
 	}
 	if designs != 2 {
