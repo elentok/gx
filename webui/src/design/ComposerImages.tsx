@@ -2,7 +2,6 @@ import { Box } from "@chakra-ui/react"
 import { useRef, type ClipboardEvent, type DragEvent, type ReactNode } from "react"
 import { LuPaperclip } from "react-icons/lu"
 import { Button } from "../ui/button/Button"
-import { useDevice } from "../useWide"
 import { MAX_IMAGES, MSG_MAX_IMAGES } from "./imageLimits"
 import { ImageStrip } from "./ImageStrip"
 import type { ComposerImages as State } from "./useComposerImages"
@@ -23,8 +22,8 @@ function lineText(state: State): { text: string; red: boolean } | undefined {
   return undefined
 }
 
-/** The one attach rule: phone and tablet get an icon-only paperclip, desktop the labelled control. */
-export const useAttachIcon = (): boolean => useDevice() !== "desktop"
+/** The one attach rule: every device gets the icon-only paperclip. */
+export const useAttachIcon = (): boolean => true
 
 /** The attach button for `useAttachIcon`; the New Design sheet reuses it. */
 export function AttachButton({ onClick }: { onClick: () => void }) {

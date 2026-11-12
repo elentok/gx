@@ -80,7 +80,7 @@ test("the hidden input feeds the same attach function and has no capture", () =>
   const s = state([])
   render(s)
   const add = screen.getByRole("button", { name: "Add image" })
-  expect(add.textContent).toContain("Add")
+  expect(add.textContent).not.toContain("Add")
   expect(add.textContent).not.toContain("📎")
   expect(add.querySelector("svg")).not.toBeNull()
   const input = screen.getByTestId("image-input") as HTMLInputElement
@@ -95,7 +95,7 @@ test("the hidden input feeds the same attach function and has no capture", () =>
 test.each([
   ["phone", false],
   ["tablet", false],
-  ["desktop", true],
+  ["desktop", false],
 ] as const)("Add is %s: labelled is %s", (device, labelled) => {
   renderThemed(
     <DeviceContext.Provider value={device}>

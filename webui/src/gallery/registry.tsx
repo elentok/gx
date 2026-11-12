@@ -1109,18 +1109,18 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "DraftImages",
     cases: [
-      { label: "empty", node: <DraftImages state={draftImagesState([])} pick={() => {}} /> },
+      { label: "empty", node: <DraftImages state={draftImagesState([])} /> },
       {
         label: "ready",
-        node: <DraftImages state={draftImagesState(stripImages.slice(0, 1))} pick={() => {}} />,
+        node: <DraftImages state={draftImagesState(stripImages.slice(0, 1))} />,
       },
       {
         label: "uploading",
-        node: <DraftImages state={draftImagesState(stripImages.slice(0, 2))} pick={() => {}} />,
+        node: <DraftImages state={draftImagesState(stripImages.slice(0, 2))} />,
       },
       {
         label: "failed",
-        node: <DraftImages state={draftImagesState(stripImages)} pick={() => {}} />,
+        node: <DraftImages state={draftImagesState(stripImages)} />,
       },
     ],
   },

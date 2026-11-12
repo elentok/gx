@@ -1,5 +1,5 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Button } from "../ui/button/Button"
 import { BottomSheet } from "../ui/modal/BottomSheet"
 import type { DesignDraft } from "../generated/server"
@@ -34,6 +34,11 @@ import { saveUnsaved, type Restored } from "./unsaved"
 import { moveLegacyDraft } from "./legacyDraft"
 import { useDesignWrite } from "./SessionControls"
 import { useWide } from "../useWide"
+import { useViMode } from "../vimode"
+import { ModeText } from "../ui/expandable-text/ModeText"
+import type { ViMode } from "../ui/expandable-text/CodeEditor"
+
+const CodeEditor = lazy(() => import("../ui/expandable-text/CodeEditor"))
 import { useFocusFirstField } from "../ui/modal/useFocusFirstField"
 import { DraftSwitcher } from "./DraftSwitcher"
 import { DraftBanner } from "./DraftBanner"
@@ -230,6 +235,8 @@ function DraftForm({
   const { run, pending } = useDesignWrite()
   const fileInput = useRef<HTMLInputElement>(null)
   const attachIcon = useAttachIcon()
+  const viMode = useViMode()
+  const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
 
   const close = () => {
     autosave.flush()
@@ -407,28 +414,60 @@ function DraftForm({
         </Text>
       )}
       {banner && <DraftBanner kind={banner} actions={bannerActions} />}
-      <chakra.textarea
-        aria-label="Rough idea"
-        name="design-idea"
-        autoComplete="off"
-        {...field}
-        flex="1"
-        minH="0"
-        m="3"
-        resize="none"
-        px="4"
-        py="3"
-        lineHeight="1.6"
-        placeholder="What is the problem? Who hits it? What does done look like?"
-        value={draft.idea}
-        onChange={(e) => patch({ idea: e.target.value })}
-        onPaste={(e) => {
-          const files = imageFiles(e.clipboardData?.files)
-          if (files.length === 0) return
-          e.preventDefault()
-          void imgs.addFiles(files)
-        }}
-      />
+      {viMode ? (
+        <Box
+          flex="1"
+          minH="0"
+          m="3"
+          display="flex"
+          flexDirection="column"
+          gap="1"
+          onPaste={(e) => {
+            const files = imageFiles(e.clipboardData?.files)
+            if (files.length === 0) return
+            e.preventDefault()
+            void imgs.addFiles(files)
+          }}
+        >
+          <Suspense fallback={<Spinner />}>
+            <CodeEditor
+              label="Rough idea"
+              value={draft.idea}
+              onChange={(idea) => patch({ idea })}
+              placeholder="What is the problem? Who hits it? What does done look like?"
+              selection={{ start: draft.idea.length, end: draft.idea.length }}
+              onSelectionChange={() => {}}
+              viMode
+              onModeChange={setViModeNow}
+              autoFocus={false}
+            />
+          </Suspense>
+          <ModeText mode={viModeNow} />
+        </Box>
+      ) : (
+        <chakra.textarea
+          aria-label="Rough idea"
+          name="design-idea"
+          autoComplete="off"
+          {...field}
+          flex="1"
+          minH="0"
+          m="3"
+          resize="none"
+          px="4"
+          py="3"
+          lineHeight="1.6"
+          placeholder="What is the problem? Who hits it? What does done look like?"
+          value={draft.idea}
+          onChange={(e) => patch({ idea: e.target.value })}
+          onPaste={(e) => {
+            const files = imageFiles(e.clipboardData?.files)
+            if (files.length === 0) return
+            e.preventDefault()
+            void imgs.addFiles(files)
+          }}
+        />
+      )}
       <input
         ref={fileInput}
         type="file"
@@ -442,7 +481,7 @@ function DraftForm({
         }}
       />
       <Box flexShrink="0" px="3">
-        <DraftImages state={imgs} pick={() => fileInput.current?.click()} />
+        <DraftImages state={imgs} />
       </Box>
       {sheetMode && reason && !confirming && (
         <Text fontSize="12px" color="tone.waiting.fg" px="3" pb="2" flexShrink="0">

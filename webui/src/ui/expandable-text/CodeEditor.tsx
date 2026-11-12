@@ -107,6 +107,7 @@ export default function CodeEditor({
   onMenuKey,
   caret,
   handle,
+  autoFocus = true,
 }: {
   label: string
   value: string
@@ -130,6 +131,8 @@ export default function CodeEditor({
   /** Where the caret goes after the next outside edit, then cleared. */
   caret?: MutableRefObject<number | null>
   handle?: Ref<CodeEditorHandle>
+  /** Focus the editor when it mounts. Default true. */
+  autoFocus?: boolean
 }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
@@ -259,7 +262,7 @@ export default function CodeEditor({
     })
     view.current = v
     if (viMode) startVi(v)
-    v.focus()
+    if (autoFocus) v.focus()
     // The editor is created once; later props are applied by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => {

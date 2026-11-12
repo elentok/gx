@@ -1236,17 +1236,16 @@ test("pasting into the slug field adds nothing", async () => {
   pasteInto("Epic slug", png())
   await act(async () => {})
   expect(uploadImage).not.toHaveBeenCalled()
-  expect(screen.getByText(LIMITS)).toBeTruthy()
+  expect(screen.queryByText(/uploading|failed|of 10 images/)).toBeNull()
 })
 
 test("Add image picks files, and the line counts them", async () => {
   await mount({}, { slug: "x" })
-  expect(screen.getByText(LIMITS)).toBeTruthy()
   addImages(png("a.png"), png("b.png"))
   await waitFor(() => expect(screen.getByText("2 of 10 images")).toBeTruthy())
 })
 
-test.each(["phone", "tablet"] as const)(
+test.each(["phone", "tablet", "desktop"] as const)(
   "on %s the paperclip leads the footer; no tile, limits line or empty row",
   async (device) => {
     await mount({}, { slug: "x" }, "", device)
@@ -1275,14 +1274,6 @@ test.each(["phone", "tablet"] as const)(
     await screen.findByText("1 image failed. Remove it or retry before starting.")
   },
 )
-
-test("on desktop the tile and limits line stay and the footer has no paperclip", async () => {
-  await mount({}, { slug: "x" }, "", "desktop")
-  const footer = screen.getByRole("button", { name: "Discard" }).parentElement!
-  expect(footer.contains(screen.getByRole("button", { name: "Add image" }))).toBe(false)
-  expect(screen.getByLabelText("Images")).toBeTruthy()
-  expect(screen.getByText(LIMITS)).toBeTruthy()
-})
 
 test("a refused file is a failed tile with its reason and Remove, never retried or uploaded", async () => {
   const { uploadImage } = await mount({}, { slug: "x" })
