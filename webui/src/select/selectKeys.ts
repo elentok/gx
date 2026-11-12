@@ -27,3 +27,44 @@ export function selectIntent(e: SelectKey, selecting: boolean, guarded: boolean)
       return "none"
   }
 }
+
+/** The key event the dispatcher acts on; a KeyboardEvent satisfies it. */
+export type DispatchKey = SelectKey & { preventDefault(): void; stopPropagation(): void }
+
+export interface SelectKeyHandlers {
+  /** `s`: return false when there is nothing to select, so the key is left alone. */
+  enter: () => boolean | void
+  /** The select key of the focused item, or null when no item has focus. */
+  itemKey: string | null
+  toggle: (key: string) => void
+  /** Enter outside select mode. Omit when the surface has no open action. */
+  open?: (key: string) => void
+}
+
+/**
+ * Runs the enter, toggle and open intents for a surface and claims the event when it acts. Leave
+ * (Escape) is not handled here: useSelectApi owns it.
+ */
+export function dispatchSelectKey(
+  e: DispatchKey,
+  selecting: boolean,
+  guarded: boolean,
+  h: SelectKeyHandlers,
+) {
+  const intent = selectIntent(e, selecting, guarded)
+  if (intent === "enter-select") {
+    if (h.enter() === false) return
+    e.preventDefault()
+    return
+  }
+  if (!h.itemKey) return
+  if (intent === "toggle") {
+    e.preventDefault()
+    e.stopPropagation()
+    h.toggle(h.itemKey)
+  } else if (intent === "open" && h.open) {
+    e.preventDefault()
+    e.stopPropagation()
+    h.open(h.itemKey)
+  }
+}

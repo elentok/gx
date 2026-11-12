@@ -29,7 +29,7 @@ import {
   type SelectRow,
   type SelectState,
 } from "../select/selectModel"
-import { selectIntent } from "../select/selectKeys"
+import { dispatchSelectKey, selectIntent } from "../select/selectKeys"
 import type { SidebarRow } from "../workspaces/sidebarModel"
 import { showToast } from "../ui/toaster"
 import { isTextTarget } from "./keys"
@@ -156,25 +156,21 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
       // With nothing focused the key lands on the body: `s` then enters the sidebar's select mode.
       if (e.defaultPrevented || !sidebarOwnsKey(e.target)) return
       const { state, rows, enter, toggle } = ref.current
-      const intent = selectIntent(e, state.on, hasLayer() || isTextTarget(e.target))
-      if (intent === "enter-select") {
-        e.preventDefault()
-        enter()
-        return
-      }
-      if (intent !== "toggle" || !stop) return
-      const nav = stop.getAttribute(NAV_ATTR) ?? ""
+      const nav = stop?.getAttribute(NAV_ATTR) ?? ""
       const key = nav.startsWith("row:")
         ? nav.slice(4)
         : nav.startsWith("agent:")
           ? nav.slice(6)
           : ""
-      if (!key) return
-      e.preventDefault()
-      e.stopPropagation()
-      if (rows.find((r) => r.key === key)?.selectable === false)
-        showToast({ type: "info", title: QUEUE_REASON, id: "select-queue-agent" })
-      else toggle(key)
+      dispatchSelectKey(e, state.on, hasLayer() || isTextTarget(e.target), {
+        enter,
+        itemKey: key || null,
+        toggle: (k) => {
+          if (rows.find((r) => r.key === k)?.selectable === false)
+            showToast({ type: "info", title: QUEUE_REASON, id: "select-queue-agent" })
+          else toggle(k)
+        },
+      })
     }
     document.addEventListener("keydown", onKey, true)
     return () => document.removeEventListener("keydown", onKey, true)

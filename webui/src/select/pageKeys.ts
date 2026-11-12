@@ -3,7 +3,7 @@ import type { SelectApi } from "../shell/SidebarSelect"
 import { isTextTarget } from "../shell/keys"
 import { hasLayer } from "../ui/modal/layers"
 import { isMoveKey, moveInGrid } from "./gridNav"
-import { selectIntent } from "./selectKeys"
+import { dispatchSelectKey } from "./selectKeys"
 
 /** Marks a page's card or row; its value is the item's select key. The sidebar's roving focus uses data-nav, so the two never match each other. */
 export const PAGE_ATTR = "data-page-item"
@@ -44,23 +44,19 @@ export function usePageKeys(area: RefObject<HTMLElement | null>, select: SelectA
       const item = target.hasAttribute(PAGE_ATTR) ? target : null
       const sel = selectRef.current
       const all = itemsOf(el)
-      const intent = selectIntent(e, sel.state.on, guarded)
-      if (intent === "enter-select") {
-        if (all.length === 0) return
-        e.preventDefault()
-        sel.enter()
-        return
-      }
-      if (!item) return
-      if (intent === "toggle" || intent === "open") {
-        e.preventDefault()
-        e.stopPropagation()
-        const key = item.getAttribute(PAGE_ATTR) ?? ""
-        if (intent === "open")
-          (item.querySelector<HTMLElement>(`[${PAGE_OPEN_ATTR}]`) ?? item).click()
-        else if (sel.rows.find((r) => r.key === key)?.selectable !== false) sel.toggle(key)
-        return
-      }
+      dispatchSelectKey(e, sel.state.on, guarded, {
+        enter: () => {
+          if (all.length === 0) return false
+          sel.enter()
+        },
+        itemKey: item?.getAttribute(PAGE_ATTR) ?? null,
+        toggle: (key) => {
+          if (sel.rows.find((r) => r.key === key)?.selectable !== false) sel.toggle(key)
+        },
+        open: () => (item?.querySelector<HTMLElement>(`[${PAGE_OPEN_ATTR}]`) ?? item)?.click(),
+      })
+      // The select keys are not move keys, so a handled event ends here.
+      if (e.defaultPrevented || !item) return
       if (guarded || e.altKey || e.metaKey || e.ctrlKey || !isMoveKey(e.key)) return
       e.preventDefault()
       const points = all.map((it) => {
