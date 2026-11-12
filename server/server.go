@@ -381,7 +381,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.schedState = schedState
 	s.schedRunner = &schedules.Scheduler{
-		Store: schedrec.NewStore(cfg.TicketStore), State: schedState, Submit: s.oneOffs, TicketStore: cfg.TicketStore, Log: log,
+		Store: schedrec.NewStore(cfg.TicketStore), State: schedState, Submit: s.oneOffs, Notify: s.chat.Notify, TicketStore: cfg.TicketStore, Log: log,
 		Now: cfg.SchedulesClock, Interval: cfg.SchedulesInterval, Ready: s.migrator.StartupDone(),
 	}
 	s.harness.GiveLog(cfg.Runner)

@@ -2,6 +2,7 @@ package schedules
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -24,7 +25,9 @@ type Scheduler struct {
 	State  *State
 	Submit Submitter
 	// Cancel settles a queued previous run; the server sets it once its ticket operations exist.
-	Cancel      func(wire.QueueRequest) (wire.QueueResult, error)
+	Cancel func(wire.QueueRequest) (wire.QueueResult, error)
+	// Notify sends one error line to chat; it has no error result, so a failed send is the chat sink's to log.
+	Notify      func(text string)
 	TicketStore string
 	Log         *slog.Logger
 	Now         func() time.Time // nil means time.Now
@@ -65,9 +68,7 @@ func (sc *Scheduler) Check() {
 	}
 	now := sc.now()
 	for _, it := range items {
-		if it.Registered {
-			sc.checkOne(it.Schedule, now)
-		}
+		sc.checkOne(it.Schedule, it.Registered, now)
 	}
 }
 
@@ -78,7 +79,7 @@ func (sc *Scheduler) now() time.Time {
 	return time.Now()
 }
 
-func (sc *Scheduler) checkOne(s schedrec.Schedule, now time.Time) {
+func (sc *Scheduler) checkOne(s schedrec.Schedule, registered bool, now time.Time) {
 	k := Key{Project: s.Project, Slug: s.Slug}
 	if !sc.State.Enabled(k) {
 		return
@@ -102,12 +103,32 @@ func (sc *Scheduler) checkOne(s schedrec.Schedule, now time.Time) {
 		if !sc.record(sc.State.AppendSkip(k, sk), k) {
 			return
 		}
+	} else if !registered {
+		if !sc.skipMissingProject(s, k, due, now) {
+			return
+		}
 	} else if ok, retry := sc.prepare(k, due, now); retry {
 		return
 	} else if ok && !sc.start(s, due) {
 		return
 	}
 	sc.record(sc.State.SetBaseline(k, now), k)
+}
+
+// skipMissingProject logs the skip, then sends one message per set time. A
+// restart finds the log entry and sends nothing; a failed send is never retried.
+// false means the baseline must stay so a later check retries the log write.
+func (sc *Scheduler) skipMissingProject(s schedrec.Schedule, k Key, due, now time.Time) bool {
+	if sc.State.Logged(k, due, ReasonProjectNotFound) {
+		return true
+	}
+	if !sc.record(sc.State.AppendSkip(k, Skip{SetTime: due, Reason: ReasonProjectNotFound, LoggedAt: now}), k) {
+		return false
+	}
+	if sc.Notify != nil {
+		sc.Notify(fmt.Sprintf("%s: skipped the run for %s, project %q was not found.", s.Name, due.In(now.Location()).Format("15:04"), s.Project))
+	}
+	return true
 }
 
 // start queues the run; false means the baseline must stay so a later check retries.

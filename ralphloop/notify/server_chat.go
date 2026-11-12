@@ -368,6 +368,18 @@ func (c *ServerChat) Notice(n ServerNotice) {
 	}
 }
 
+// Notify sends one line of text to the global destination, through the same
+// gate as `gx notify`: source and kind are the CLI's, so its mutes apply.
+func (c *ServerChat) Notify(text string) {
+	if c == nil {
+		return
+	}
+	msg := chatMessage{subject: text, kind: notifyKindCLI, summaryWord: "Message"}
+	for _, s := range c.globalSinks() {
+		s.sendMessage(msg, "cli", "")
+	}
+}
+
 // notifyKindSessionAlert tags an interactive session's banner sent to chat in
 // AFK mode.
 const notifyKindSessionAlert = "session-alert"

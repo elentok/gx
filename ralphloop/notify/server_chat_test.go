@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -54,6 +55,32 @@ func TestServerChat_PausesInOneBatchEndEachWithTheirProjectLine(t *testing.T) {
 	}
 	if n := strings.Count(text, "\nbeta"); n != 1 {
 		t.Errorf("beta project line appears %d times, want 1:\n%s", n, text)
+	}
+}
+
+func TestServerChat_NotifyGoesThroughTheCLISourceGate(t *testing.T) {
+	srv, reqs := fakeSlackServer(t, 200)
+	gate := filepath.Join(t.TempDir(), "gate.json")
+	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: gate})
+
+	c.Notify("Weather check: skipped the run.")
+	c.Close()
+
+	got := reqs()
+	if len(got) != 1 || !strings.Contains(got[0].Text, "Weather check: skipped the run.") {
+		t.Fatalf("sends = %+v, want the one line", got)
+	}
+	st, err := loadNotificationStateAt(gate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sources []string
+	for _, e := range st.Transports["slack"].Events {
+		sources = append(sources, e.Source+"/"+e.EventType)
+	}
+	// The batcher asks the gate once more at flush, with its own event type.
+	if want := "cli/" + notifyKindCLI; !slices.Contains(sources, want) {
+		t.Errorf("gate events = %v, want %v among them", sources, want)
 	}
 }
 
