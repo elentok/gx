@@ -8,7 +8,7 @@ const STATUS: Record<string, { word: string; tone: Tone }> = {
   finished: { word: "Finished", tone: "done" },
   "ran-late": { word: "Ran late", tone: "paused" },
   skipped: { word: "Skipped", tone: "muted" },
-  "needs-answer": { word: "Needs answer", tone: "waiting" },
+  paused: { word: "Paused", tone: "waiting" },
   running: { word: "Running", tone: "running" },
   queued: { word: "Queued", tone: "muted" },
   cancelled: { word: "Cancelled", tone: "muted" },

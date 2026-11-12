@@ -190,11 +190,11 @@ test("203. Schedules journey", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/schedules$/)
   await expect(row("Evening note")).toHaveCount(0)
 
-  // needs-answer: the paused One-off opens its ticket page; Cancel there turns the row Cancelled.
-  await start("schedules", { shape: "needs-answer" })
+  // paused: the paused One-off opens its ticket page; Cancel there turns the row Cancelled.
+  await start("schedules", { shape: "paused" })
   await page.evaluate(() => (location.hash = "#/schedules/demo:weather-check"))
   await expect(runs).toHaveCount(5)
-  await expect(runs.nth(0)).toContainText("Needs answer")
+  await expect(runs.nth(0)).toContainText("Paused")
   await runs.nth(0).getByRole("link").click()
   await expect(page).toHaveURL(/one-offs/)
   await page.getByRole("button", { name: "Cancel", exact: true }).click()

@@ -6,13 +6,13 @@ type ScheduleRunStatus string
 // The closed set of Last runs statuses. The values are literals because tygo
 // cannot resolve constants from another package.
 const (
-	ScheduleRunQueued      ScheduleRunStatus = "queued"
-	ScheduleRunRunning     ScheduleRunStatus = "running"
-	ScheduleRunFinished    ScheduleRunStatus = "finished"
-	ScheduleRunRanLate     ScheduleRunStatus = "ran-late"
-	ScheduleRunNeedsAnswer ScheduleRunStatus = "needs-answer"
-	ScheduleRunCancelled   ScheduleRunStatus = "cancelled"
-	ScheduleRunSkipped     ScheduleRunStatus = "skipped"
+	ScheduleRunQueued    ScheduleRunStatus = "queued"
+	ScheduleRunRunning   ScheduleRunStatus = "running"
+	ScheduleRunFinished  ScheduleRunStatus = "finished"
+	ScheduleRunRanLate   ScheduleRunStatus = "ran-late"
+	ScheduleRunPaused    ScheduleRunStatus = "paused"
+	ScheduleRunCancelled ScheduleRunStatus = "cancelled"
+	ScheduleRunSkipped   ScheduleRunStatus = "skipped"
 )
 
 // ScheduleRun is one row of a Schedule's Last runs: a One-off, or a skipped set time.

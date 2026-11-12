@@ -84,7 +84,7 @@ func TestSchedulerDelete_CancelsOnlyQueuedRunsAndDropsState(t *testing.T) {
 	if s := r.statusOf(t, "91"); s != "claimed" {
 		t.Errorf("started run status = %q", s)
 	}
-	if s := r.statusOf(t, "92"); s != "paused" && s != "needs-answer" {
+	if s := r.statusOf(t, "92"); s != "paused" {
 		t.Errorf("paused run status = %q", s)
 	}
 	settle() // idempotent: a second check changes nothing

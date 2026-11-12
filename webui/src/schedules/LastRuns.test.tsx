@@ -23,7 +23,7 @@ test("every status renders its word", () => {
     finished: "Finished",
     "ran-late": "Ran late",
     skipped: "Skipped",
-    "needs-answer": "Needs answer",
+    paused: "Paused",
     running: "Running",
     queued: "Queued",
     cancelled: "Cancelled",

@@ -104,17 +104,17 @@ func oneOffRow(project, epic string, t tickets.Ticket) lastRow {
 }
 
 func oneOffStatus(t tickets.Ticket) wire.ScheduleRunStatus {
-	switch t.Status {
-	case "claimed":
+	switch t.RawStatus() {
+	case tickets.StatusClaimed:
 		return wire.ScheduleRunRunning
-	case "done":
+	case tickets.StatusDone:
 		if !t.ScheduledFor.IsZero() && t.CreatedAt.Sub(t.ScheduledFor) > lateAfter {
 			return wire.ScheduleRunRanLate
 		}
 		return wire.ScheduleRunFinished
-	case "paused", "needs-answer", "needs-repair":
-		return wire.ScheduleRunNeedsAnswer
-	case "cancelled":
+	case tickets.StatusPausedAnswer, tickets.StatusPausedRepair:
+		return wire.ScheduleRunPaused
+	case tickets.StatusCancelled:
 		return wire.ScheduleRunCancelled
 	default:
 		return wire.ScheduleRunQueued

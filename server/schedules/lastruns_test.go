@@ -47,9 +47,9 @@ func TestLastRuns_StatusTable(t *testing.T) {
 		{"05", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 1, 1)}, wire.ScheduleRunRanLate},
 		{"06", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, CreatedAt: ts(9, 30, 0)}, wire.ScheduleRunRunning},
 		{"07", "one-offs", servertest.TicketOpts{Status: "done"}, wire.ScheduleRunFinished},
-		{"08", "one-offs", servertest.TicketOpts{PauseReason: "question"}, wire.ScheduleRunNeedsAnswer},
-		{"09", "one-offs", servertest.TicketOpts{Status: "needs-answer"}, wire.ScheduleRunNeedsAnswer},
-		{"10", "one-offs", servertest.TicketOpts{Status: "needs-repair"}, wire.ScheduleRunNeedsAnswer},
+		{"08", "one-offs", servertest.TicketOpts{PauseReason: "question"}, wire.ScheduleRunPaused},
+		{"09", "one-offs", servertest.TicketOpts{Status: "needs-answer"}, wire.ScheduleRunPaused}, // oldword:ok legacy status input
+		{"10", "one-offs", servertest.TicketOpts{Status: "needs-repair"}, wire.ScheduleRunPaused}, // oldword:ok legacy status input
 		{"11", "one-offs-archived", servertest.TicketOpts{Status: "cancelled", CancelledAt: ts(9, 5, 0)}, wire.ScheduleRunCancelled},
 	}
 	// Ten rows is the cap, so the eleven cases go through two rigs.

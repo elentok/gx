@@ -85,7 +85,7 @@ func TestSchedulesRunNow_RefusalsStartNothingAndLogNoSkip(t *testing.T) {
 	}{
 		{"started", servertest.TicketOpts{Status: "claimed"}, schedules.ReasonPreviousRunStarted, false},
 		{"paused", servertest.TicketOpts{Status: "paused", PauseReason: "question"}, schedules.ReasonPreviousRunNeedsAttention, true},
-		{"needs-repair", servertest.TicketOpts{Status: "needs-repair"}, schedules.ReasonPreviousRunNeedsAttention, true},
+		{"legacy-repair-status", servertest.TicketOpts{Status: "needs-repair"}, schedules.ReasonPreviousRunNeedsAttention, true}, // oldword:ok legacy status input
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

@@ -29,7 +29,7 @@ type ScheduleSeed struct {
 }
 
 // SchedulesShapes are the --shape names of the schedules scenario.
-var SchedulesShapes = []string{"list", "all-off", "empty", "page", "needs-answer", "missing-project"}
+var SchedulesShapes = []string{"list", "all-off", "empty", "page", "paused", "missing-project"}
 
 var (
 	everyDay = []time.Weekday{time.Sunday, time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday}
@@ -61,9 +61,9 @@ func SchedulesScenario(shape string) (Scenario, bool) {
 	case "all-off":
 		sc.Schedules = three(false, false)
 	case "empty":
-	case "page", "needs-answer":
+	case "page", "paused":
 		sc.Schedules = []ScheduleSeed{weather}
-		sc.Epics, sc.EpicMeta, sc.Schedules[0].Skips = weatherRuns(now, shape == "needs-answer")
+		sc.Epics, sc.EpicMeta, sc.Schedules[0].Skips = weatherRuns(now, shape == "paused")
 	case "missing-project":
 		g := weather
 		g.Project = SchedulesGhost
@@ -75,7 +75,7 @@ func SchedulesScenario(shape string) (Scenario, bool) {
 }
 
 // weatherRuns is the Last runs of the page shape, newest first: Finished, Finished,
-// Ran late and a Skipped set time, with a paused One-off above them for needs-answer.
+// Ran late and a Skipped set time, with a paused One-off above them for paused.
 func weatherRuns(now time.Time, paused bool) ([]Epic, map[string]string, []schedules.Skip) {
 	key := schedules.DedupeKey(schedules.Key{Project: project, Slug: tickets.Slug("Weather check")}, SchedulesMachineID)
 	day := 24 * time.Hour

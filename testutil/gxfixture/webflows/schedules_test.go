@@ -38,7 +38,7 @@ func TestSchedulesScenario_EveryShapeSeedsWhatItNames(t *testing.T) {
 		{"all-off", []string{"Weather check", "Morning PR digest", "Weekly cleanup report"}, 0, true},
 		{"empty", nil, 0, true},
 		{"page", []string{"Weather check"}, 1, true},
-		{"needs-answer", []string{"Weather check"}, 1, true},
+		{"paused", []string{"Weather check"}, 1, true},
 		{"missing-project", []string{"Weather check"}, 1, false},
 	} {
 		t.Run(w.shape, func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestSchedulesScenario_PageShapesSeedLastRuns(t *testing.T) {
 		status []wire.ScheduleRunStatus
 	}{
 		{"page", []wire.ScheduleRunStatus{wire.ScheduleRunFinished, wire.ScheduleRunFinished, wire.ScheduleRunRanLate, wire.ScheduleRunSkipped}},
-		{"needs-answer", []wire.ScheduleRunStatus{wire.ScheduleRunNeedsAnswer, wire.ScheduleRunFinished, wire.ScheduleRunFinished, wire.ScheduleRunRanLate, wire.ScheduleRunSkipped}},
+		{"paused", []wire.ScheduleRunStatus{wire.ScheduleRunPaused, wire.ScheduleRunFinished, wire.ScheduleRunFinished, wire.ScheduleRunRanLate, wire.ScheduleRunSkipped}},
 	} {
 		t.Run(w.shape, func(t *testing.T) {
 			t.Parallel()
@@ -100,9 +100,9 @@ func TestSchedulesScenario_PageShapesSeedLastRuns(t *testing.T) {
 					if run.Result == "" || run.Address == "" {
 						t.Errorf("finished row without a Result line or address: %+v", run)
 					}
-				case wire.ScheduleRunNeedsAnswer:
+				case wire.ScheduleRunPaused:
 					if run.Address == "" {
-						t.Errorf("needs-answer row without a ticket address: %+v", run)
+						t.Errorf("paused row without a ticket address: %+v", run)
 					}
 				}
 			}
