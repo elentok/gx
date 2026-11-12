@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -279,7 +278,7 @@ type program struct {
 	dialog bool
 	escC   <-chan time.Time
 	// descendants is the process tree an ActionDescendants started.
-	descendants *exec.Cmd
+	descendants DescendantTree
 }
 
 func (p *program) run(in, ctl io.Reader) (int, error) {
@@ -488,9 +487,9 @@ func (p *program) control(c Control) error {
 		}
 		fmt.Fprintf(p.out, "size=%dx%d\r\n", cols, rows)
 	case ActionDescendants:
-		return SpawnDescendantsInto(&p.descendants, c.Count, c.Depth)
+		return p.descendants.Start(c.Count, c.Depth)
 	case ActionStopDescendants:
-		StopDescendantsIn(&p.descendants)
+		p.descendants.Stop()
 	default:
 		return fmt.Errorf("unknown program control action %q", c.Action)
 	}

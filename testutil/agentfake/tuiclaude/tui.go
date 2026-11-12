@@ -67,7 +67,7 @@ type tui struct {
 	images []string
 	paste  pasteState
 	// descendants is the process tree an ActionDescendants started.
-	descendants *exec.Cmd
+	descendants DescendantTree
 	// askHook is the AskUserQuestion hook an ActionAskQuestion started; Esc ends it.
 	askHook *exec.Cmd
 	// askUI is the AskUserQuestion dialog an ActionAskScreen opened; it takes

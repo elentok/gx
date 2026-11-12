@@ -354,13 +354,7 @@ func (r *Running) ProcessCounts(t *testing.T) (holders, agents int) {
 	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
-	psCmd := exec.Command("ps", "-axww", "-o", "command=")
-	psCmd.Env = r.Env
-	ps, err := psCmd.Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for line := range strings.SplitSeq(string(ps), "\n") {
+	for _, line := range testutil.PsLines(t, r.Env) {
 		for _, s := range list {
 			if !strings.Contains(line, s.ID) {
 				continue
@@ -380,14 +374,8 @@ func (r *Running) ProcessCounts(t *testing.T) (holders, agents int) {
 // tree would add to it.
 func (r *Running) Sleepers(t *testing.T) int {
 	t.Helper()
-	psCmd := exec.Command("ps", "-axww", "-o", "command=")
-	psCmd.Env = os.Environ()
-	out, err := psCmd.Output()
-	if err != nil {
-		t.Fatal(err)
-	}
 	n := 0
-	for line := range strings.SplitSeq(string(out), "\n") {
+	for _, line := range testutil.PsLines(t, os.Environ()) {
 		if strings.TrimSpace(line) == agentfake.SleeperCommand {
 			n++
 		}

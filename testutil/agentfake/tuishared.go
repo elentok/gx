@@ -229,20 +229,23 @@ func descendantLevel(count, depth int) string {
 // SpawnDescendants starts the tree under the calling process; it ends when
 // the caller does. A fixture uses it for a tree that gx did not launch.
 func SpawnDescendants(count, depth int) (pid int, err error) {
-	var cmd *exec.Cmd
-	if err := SpawnDescendantsInto(&cmd, count, depth); err != nil {
+	var tree DescendantTree
+	if err := tree.Start(count, depth); err != nil {
 		return 0, err
 	}
-	return cmd.Process.Pid, nil
+	return tree.cmd.Process.Pid, nil
 }
 
-// SpawnDescendantsInto starts the tree into *slot, which the fake keeps so it
-// can stop the tree later.
-func SpawnDescendantsInto(slot **exec.Cmd, count, depth int) error {
+// DescendantTree is a process tree of sleepers that the fake keeps so it can
+// stop the tree later. The zero value is an empty tree.
+type DescendantTree struct{ cmd *exec.Cmd }
+
+// Start launches the tree.
+func (d *DescendantTree) Start(count, depth int) error {
 	if count <= 0 {
 		return fmt.Errorf("descendants control needs a positive count, got %d", count)
 	}
-	if *slot != nil {
+	if d.cmd != nil {
 		return fmt.Errorf("descendants already running")
 	}
 	script := "sh -c " + shellQuote(descendantLevel(count, depth)) + " & " +
@@ -253,17 +256,18 @@ func SpawnDescendantsInto(slot **exec.Cmd, count, depth int) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	*slot = cmd
+	d.cmd = cmd
 	return nil
 }
 
-func StopDescendantsIn(slot **exec.Cmd) {
-	if *slot == nil {
+// Stop kills the tree; it does nothing when none runs.
+func (d *DescendantTree) Stop() {
+	if d.cmd == nil {
 		return
 	}
-	_ = syscall.Kill(-(*slot).Process.Pid, syscall.SIGKILL)
-	_ = (*slot).Wait()
-	*slot = nil
+	_ = syscall.Kill(-d.cmd.Process.Pid, syscall.SIGKILL)
+	_ = d.cmd.Wait()
+	d.cmd = nil
 }
 
 var imageMediaTypes = map[string]string{

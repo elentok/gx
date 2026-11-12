@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -20,14 +19,8 @@ import (
 // A fresh claim or a repair agent started after a restart has a new one.
 func (r *running) claudeSessions(t *testing.T) []string {
 	t.Helper()
-	psCmd := exec.Command("ps", "-axww", "-o", "command=")
-	psCmd.Env = r.Env
-	ps, err := psCmd.Output()
-	if err != nil {
-		t.Fatal(err)
-	}
 	var ids []string
-	for line := range strings.SplitSeq(string(ps), "\n") {
+	for _, line := range testutil.PsLines(t, r.Env) {
 		if !strings.HasPrefix(line, "claude ") || !strings.Contains(line, r.Root()) {
 			continue
 		}
@@ -89,16 +82,6 @@ func (r *running) wantNoneOf(t *testing.T, dead []string) {
 	}
 }
 
-func (r *running) deadRunTicketFile(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(r.StateDir, "..", "..", "data", "gx", "tickets", project, "dead-run-epic", "issues", "01-first.md")
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
-}
-
 func TestDeadRunEmptyReopens(t *testing.T) {
 	r := start(t, "dead-run-empty")
 	dead := r.killServerAndAgent(t)
@@ -117,7 +100,7 @@ func TestDeadRunWithWorkPauses(t *testing.T) {
 	dead := r.killServerAndAgent(t)
 	// A repair pause shows in the snapshot under its legacy label.
 	r.WaitStatus(t, spec.DeadRunTicket, "needs-repair")
-	if body := r.deadRunTicketFile(t); !strings.Contains(body, "pause_reason: iteration-error") {
+	if body := r.epicTicketFile(t, "dead-run-epic"); !strings.Contains(body, "pause_reason: iteration-error") {
 		t.Errorf("ticket is not paused iteration-error:\n%s", body)
 	}
 	r.wantNoneOf(t, dead)

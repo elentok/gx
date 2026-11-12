@@ -230,12 +230,12 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 			return askQuestion(cfg, address, askBody)
 		}
 	case BehaviourStorm:
-		var tree *exec.Cmd
-		if err := SpawnDescendantsInto(&tree, StormDescendants, 1); err != nil {
+		var tree DescendantTree
+		if err := tree.Start(StormDescendants, 1); err != nil {
 			return err
 		}
 		time.Sleep(stormHold)
-		StopDescendantsIn(&tree)
+		tree.Stop()
 		return nil
 	case BehaviourBackgroundTask:
 		return nil
