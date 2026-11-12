@@ -124,6 +124,21 @@ func LintClaims(entries, existing []LintEntry, env LintEnv) LintReport {
 	return r
 }
 
+// ClaimMisses returns one line for every path, test pattern or flow id in body
+// that env cannot find. Nothing counts as planned: a draft names existing things.
+func ClaimMisses(body string, env LintEnv) []string {
+	var out []string
+	for _, c := range ExtractClaims(body, env.TopDirs) {
+		if c.Kind == ClaimLineRef {
+			continue
+		}
+		for _, p := range claimProblems(c, env) {
+			out = append(out, p.text)
+		}
+	}
+	return out
+}
+
 func buildText(e LintEntry) string {
 	return schema.Section(e.Body, "What to build") + "\n" + schema.Section(e.Body, "Acceptance criteria")
 }

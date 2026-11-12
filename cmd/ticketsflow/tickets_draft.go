@@ -5,9 +5,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets/ticketspec"
 )
 
@@ -21,7 +24,11 @@ func newTicketsDraftCmd(d Deps) *cobra.Command {
 			if planPath == "" || manifestPath == "" {
 				return fmt.Errorf("draft needs --plan <plan.yaml> and --manifest <manifest.yaml>")
 			}
-			return runDraft(planPath, manifestPath, c.OutOrStdout())
+			cwd, err := d.Getwd()
+			if err != nil {
+				return err
+			}
+			return runDraft(cwd, d.Env.Env, planPath, manifestPath, c.OutOrStdout())
 		},
 	}
 	c.Flags().StringVar(&planPath, "plan", "", "the draft plan (YAML)")
@@ -31,7 +38,10 @@ func newTicketsDraftCmd(d Deps) *cobra.Command {
 
 // runDraft renders every ticket of the plan. A re-run keeps the agent's parts
 // of an existing body, and deletes the body file of a slug the plan dropped.
-func runDraft(planPath, manifestPath string, w io.Writer) error {
+// It then checks the plan's names against the checkout at cwd and exits
+// non-zero when any is missing; the files are written either way.
+func runDraft(cwd string, env []string, planPath, manifestPath string, w io.Writer) error {
+	start := time.Now()
 	data, err := os.ReadFile(planPath)
 	if err != nil {
 		return err
@@ -40,6 +50,15 @@ func runDraft(planPath, manifestPath string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	root, err := git.Toplevel(cwd)
+	if err != nil {
+		return err
+	}
+	commit, err := git.ShortHead(root)
+	if err != nil {
+		return err
+	}
+	misses := draftMisses(&plan, root, commit, env)
 	dir := filepath.Dir(manifestPath)
 	rows := make([]ticketspec.ManifestRow, 0, len(plan.Tickets))
 	bodies := map[string]string{}
@@ -75,6 +94,13 @@ func runDraft(planPath, manifestPath string, w io.Writer) error {
 	}
 	for _, r := range rows {
 		fmt.Fprintf(w, "%s: %s\n", r.Slug, r.Body)
+	}
+	for _, m := range misses {
+		fmt.Fprintf(w, "miss: %s\n", m)
+	}
+	fmt.Fprintf(w, "draft took %s\n", time.Since(start).Round(time.Millisecond))
+	if len(misses) > 0 {
+		return &cmdbase.ExitError{Code: 1}
 	}
 	return nil
 }

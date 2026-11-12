@@ -42,6 +42,10 @@ type DraftTicket struct {
 	MockStates     []string `yaml:"mock_states"`
 	ChangedSymbols []string `yaml:"changed_symbols"`
 	ChangedFields  []string `yaml:"changed_fields"`
+
+	// Callers maps an entry or changed symbol to its caller list, already
+	// labelled; `draft` fills it in, the plan file does not.
+	Callers map[string]string `yaml:"-"`
 }
 
 // BodyFileName is the body file written next to the manifest.
@@ -120,6 +124,9 @@ func RenderDraftBody(t DraftTicket, scenario, whatToBuild, acceptance string) st
 		fmt.Fprintf(&b, "- %s:\n", g.label)
 		for _, it := range g.items {
 			fmt.Fprintf(&b, "  - `%s`\n", EscapePlaceholders(it))
+			if c, ok := t.Callers[it]; ok {
+				fmt.Fprintf(&b, "    - callers (%s)\n", EscapePlaceholders(c))
+			}
 		}
 	}
 

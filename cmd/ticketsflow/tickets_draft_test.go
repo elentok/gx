@@ -1,7 +1,9 @@
 package ticketsflow
 
 import (
+	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,9 +34,61 @@ tickets:
     mock_states: ["$(gx tickets root)/demo/mocks/02.html, calm, 800px, parts: list"]
 `
 
+// draftFixture puts the files and symbols that draftPlan names into the repo.
+func draftFixture(t *testing.T, d Deps) {
+	t.Helper()
+	cwd, _ := d.Getwd()
+	if err := os.MkdirAll(filepath.Join(cwd, "cmd"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := "package cmd\n\nfunc runAlpha() {}\nfunc runBeta() {}\nfunc runGamma() {}\nfunc AlphaFn() {}\n\nfunc callerOfAlpha() { runAlpha() }\n"
+	files := map[string]string{"sym.go": src}
+	for _, n := range []string{"alpha", "beta", "gamma"} {
+		files[n+"_test.go"] = "package cmd\n\nimport \"testing\"\n\nfunc Test" + strings.ToUpper(n[:1]) + n[1:] + "(t *testing.T) {}\n"
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(cwd, "cmd", name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// onlyTools sets PATH to a directory holding just the named tools, plus a
+// fake gopls when fakeGopls is set.
+func onlyTools(t *testing.T, fakeGopls bool, tools ...string) {
+	t.Helper()
+	dir := t.TempDir()
+	for _, tool := range tools {
+		p, err := exec.LookPath(tool)
+		if err != nil {
+			t.Skipf("%s not on PATH", tool)
+		}
+		if err := os.Symlink(p, filepath.Join(dir, tool)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if fakeGopls {
+		script := "#!/bin/sh\necho \"$PWD/cmd/sym.go:8:22-30\"\n"
+		if err := os.WriteFile(filepath.Join(dir, "gopls"), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir)
+}
+
+func draftOut(t *testing.T, d Deps, plan, manifest string) (string, error) {
+	t.Helper()
+	var buf bytes.Buffer
+	d.Env.Stdout = &buf
+	err := execute(t, []string{"tickets", "draft", "mine:demo-impl", "--plan", plan, "--manifest", manifest}, d)
+	return buf.String(), err
+}
+
 func draftSetup(t *testing.T, plan string) (d Deps, planPath, manifest string) {
 	t.Helper()
 	d, _, manifest = setupPublish(t)
+	draftFixture(t, d)
+	onlyTools(t, false, "rg", "git") // never a real gopls: it takes seconds per run
 	planPath = filepath.Join(filepath.Dir(manifest), "plan.yaml")
 	if err := os.WriteFile(planPath, []byte(plan), 0o644); err != nil {
 		t.Fatal(err)
@@ -81,7 +135,7 @@ func TestTicketsDraft_RerunKeepsAgentTextAndDeletesRemovedSlug(t *testing.T) {
 	if err := os.WriteFile(alpha, []byte(edited), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	changed := strings.Replace(draftPlan, "runAlpha", "runAlpha2", 1)
+	changed := strings.Replace(draftPlan, "runAlpha", "runGamma", 1)
 	changed = changed[:strings.Index(changed, "  - slug: gamma")]
 	if err := os.WriteFile(plan, []byte(changed), 0o644); err != nil {
 		t.Fatal(err)
@@ -89,7 +143,7 @@ func TestTicketsDraft_RerunKeepsAgentTextAndDeletesRemovedSlug(t *testing.T) {
 	runDraftCmd(t, d, plan, manifest)
 
 	got := readManifestFile(t, alpha)
-	if !strings.Contains(got, "Build the alpha.") || !strings.Contains(got, "runAlpha2") || strings.Count(got, "<!-- TODO -->") != 1 {
+	if !strings.Contains(got, "Build the alpha.") || !strings.Contains(got, "runGamma") || strings.Count(got, "<!-- TODO -->") != 1 {
 		t.Errorf("alpha after re-run:\n%s", got)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "draft-body-gamma.md")); !os.IsNotExist(err) {
@@ -102,6 +156,8 @@ func TestTicketsDraft_RerunKeepsAgentTextAndDeletesRemovedSlug(t *testing.T) {
 
 func TestTicketsDraft_AppendKeepsVerifyEntries(t *testing.T) {
 	d, _, dir, vplan, _ := verifyRepo(t, smallPlan)
+	draftFixture(t, d)
+	onlyTools(t, false, "rg", "git")
 	m := filepath.Join(dir, "both.yaml")
 	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", vplan, "--manifest", m}, d); err != nil {
 		t.Fatalf("verify-plan: %v", err)
@@ -130,6 +186,60 @@ func TestTicketsDraft_BadPlanFails(t *testing.T) {
 	}
 	if err := execute(t, []string{"tickets", "draft", "mine:demo-impl", "--plan", plan}, d); err == nil {
 		t.Error("no --manifest: want error")
+	}
+}
+
+func TestTicketsDraft_MissingNamesFail(t *testing.T) {
+	for name, tc := range map[string]struct{ old, new, want string }{
+		"path":    {"cmd/alpha_test.go", "cmd/nope_test.go", "no such file"},
+		"symbol":  {"runBeta", "runMissing", "no such symbol"},
+		"pattern": {"calm, 1100px", "calm, 1100px, `-run 'TestNoSuch'`", "matches no Test function"},
+		"flow":    {"Alpha thing", "Alpha thing for flow 9999", "flow 9999"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			d, plan, manifest := draftSetup(t, strings.Replace(draftPlan, tc.old, tc.new, 1))
+			if name == "flow" {
+				cwd, _ := d.Getwd()
+				_ = os.MkdirAll(filepath.Join(cwd, "webui", "e2e"), 0o755)
+				_ = os.WriteFile(filepath.Join(cwd, "webui", "e2e", "CATALOG.md"), []byte("## 1. one\n"), 0o644)
+			}
+			out, err := draftOut(t, d, plan, manifest)
+			if err == nil || !strings.Contains(out, "miss: ") || !strings.Contains(out, tc.want) {
+				t.Errorf("err=%v out:\n%s", err, out)
+			}
+		})
+	}
+}
+
+func TestTicketsDraft_GoodPlanStampsCallersFromGopls(t *testing.T) {
+	d, plan, manifest := draftSetup(t, draftPlan)
+	onlyTools(t, true, "rg", "git")
+	out, err := draftOut(t, d, plan, manifest)
+	if err != nil {
+		t.Fatalf("draft: %v\n%s", err, out)
+	}
+	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-alpha.md"))
+	if !strings.Contains(body, "callers (verified at ") || !strings.Contains(body, "cmd/sym.go:8") {
+		t.Errorf("body:\n%s", body)
+	}
+	if !strings.Contains(out, "draft took ") {
+		t.Errorf("no wall-clock line:\n%s", out)
+	}
+}
+
+func TestTicketsDraft_NoGoplsFallsBackToRg(t *testing.T) {
+	d, plan, manifest := draftSetup(t, draftPlan)
+	onlyTools(t, false, "rg", "git")
+	out, err := draftOut(t, d, plan, manifest)
+	if err != nil {
+		t.Fatalf("draft: %v\n%s", err, out)
+	}
+	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-alpha.md"))
+	if !strings.Contains(body, "callers (rg result, not verified: ") || strings.Contains(body, "verified at ") {
+		t.Errorf("body:\n%s", body)
+	}
+	if strings.Contains(strings.ToLower(out), "judg") {
+		t.Errorf("output claims a judgment check:\n%s", out)
 	}
 }
 
