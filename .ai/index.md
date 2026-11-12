@@ -138,7 +138,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 
 - `cmd/` — CLI commands (`gx tickets`, `gx agent`, ...)
   - `cmd/` (root) — `Execute`, `newRootCmd`, `Deps` (embeds `cmdbase.Env`), the help groups, `gx recovery`, `gx version` and the `RoutePatterns` parity test (`server_parity_test.go`)
-  - `cmd/cmdbase` — what every command package shares: `Env`, `ExitError`, provenance and JSON output, server-client helpers, `NewTicketsAnswerCmd` (root and `server tickets answer`), `LogFollowInterval`, `WriteConfigBlock` and `SetupCodeLine` (shared with `gx server status`)
+  - `cmd/cmdbase` — what every command package shares: `Env`, `ExitError`, `JSONRefusalExit` (a `--json` command prints its refusal body, then exits 1), provenance and JSON output, server-client helpers, `NewTicketsAnswerCmd` (root and `server tickets answer`), `LogFollowInterval`, `WriteConfigBlock` and `SetupCodeLine` (shared with `gx server status`)
   - `cmd/cmdtest` — test plumbing for the cmd packages (imports `testing`): `EnvFor`/`TempEnv`, `Main`/`MainWithGx` for TestMain, `Run` (mini root), `SetWaitHook`, ticket-store/git/server fixtures (`fixtures.go`: `IsolateTicketStore`, `AddProject`, `WriteTicketFile`, `MergeTestRepo`, `ShortTempDir`, ...)
   - `cmd/brief` — `gx brief` (`New`, `Deps` with the `go-clean-cache` gate hooks)
   - `cmd/check` — `gx check` (`New`, `Deps` with the `LoadAvg` hook)

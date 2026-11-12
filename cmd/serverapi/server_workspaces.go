@@ -168,7 +168,10 @@ func runWorkspaceWrite(_ context.Context, w io.Writer, jsonOut bool, show func(i
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

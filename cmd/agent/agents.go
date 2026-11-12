@@ -526,7 +526,10 @@ func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err e
 		if err != nil {
 			return err
 		}
-		return writeJSON(w, stamped)
+		if err := writeJSON(w, stamped); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

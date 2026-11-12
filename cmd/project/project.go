@@ -158,7 +158,10 @@ func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string,
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -195,7 +198,10 @@ func runProjectAdd(ctx context.Context, cl *apiclient.Client, d Deps, w io.Write
 				out.ChecksMissing, out.OnboardCommand = missingKinds(*pc), onboardCommand(res.Name)
 			}
 		}
-		return cmdbase.EncodeProvenance(w, out, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+		if err := cmdbase.EncodeProvenance(w, out, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

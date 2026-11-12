@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -19,9 +20,7 @@ func TestAgentsPrompt_JSON(t *testing.T) {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
 	var out bytes.Buffer
-	if err := runAgentsPrompt(context.Background(), h.Client, &out, true, wire.SessionPromptRequest{ID: created.Session.ID, Continue: true}); err != nil {
-		t.Fatal(err)
-	}
+	cmdtest.RequireRefusalExit(t, runAgentsPrompt(context.Background(), h.Client, &out, true, wire.SessionPromptRequest{ID: created.Session.ID, Continue: true}))
 	var res wire.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 		t.Fatalf("output %q: %v", out.String(), err)

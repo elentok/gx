@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server/servertest"
@@ -24,9 +25,7 @@ func TestAgentsAutoAdvance_JSON(t *testing.T) {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
 	var out bytes.Buffer
-	if err := runAgentsAutoAdvance(context.Background(), h.Client, &out, true, created.Session.ID, false); err != nil {
-		t.Fatal(err)
-	}
+	cmdtest.RequireRefusalExit(t, runAgentsAutoAdvance(context.Background(), h.Client, &out, true, created.Session.ID, false))
 	var res wire.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 		t.Fatalf("output %q: %v", out.String(), err)
@@ -43,9 +42,7 @@ func TestAgentsAutoQueue_JSON(t *testing.T) {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
 	var out bytes.Buffer
-	if err := runAgentsAutoQueue(context.Background(), h.Client, &out, true, created.Session.ID, true); err != nil {
-		t.Fatal(err)
-	}
+	cmdtest.RequireRefusalExit(t, runAgentsAutoQueue(context.Background(), h.Client, &out, true, created.Session.ID, true))
 	var res wire.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 		t.Fatalf("output %q: %v", out.String(), err)
@@ -67,12 +64,11 @@ func TestAgentsAutoSwitchVerbs_AcceptARealIDAndOnOff(t *testing.T) {
 			t.Run(verb+" "+sw, func(t *testing.T) {
 				var out bytes.Buffer
 				c := newCmd(d)
+				c.SilenceUsage = true
 				c.SetArgs([]string{created.Session.ID, sw, "--json"})
 				c.SetOut(&out)
 				c.SetErr(&bytes.Buffer{})
-				if err := c.Execute(); err != nil {
-					t.Fatalf("%s %s %s: %v", verb, created.Session.ID, sw, err)
-				}
+				cmdtest.RequireRefusalExit(t, c.Execute())
 				var res wire.SessionResult
 				if err := json.Unmarshal(out.Bytes(), &res); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotDesign {
 					t.Errorf("output %q: %+v, %v; want refusal %s", out.String(), res, err, wire.ReasonSessionNotDesign)

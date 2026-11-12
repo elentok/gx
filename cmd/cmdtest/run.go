@@ -1,6 +1,7 @@
 package cmdtest
 
 import (
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -10,6 +11,16 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/projectlock"
 )
+
+// RequireRefusalExit fails unless err is the exit-1 error a --json command
+// returns after it printed a refusal body.
+func RequireRefusalExit(t *testing.T, err error) {
+	t.Helper()
+	var exit *cmdbase.ExitError
+	if !errors.As(err, &exit) || exit.Code != 1 {
+		t.Fatalf("err = %v; want exit status 1 after the refusal body", err)
+	}
+}
 
 // Run executes cmds under a mini gx root with the settings of the real root
 // (errors and usage silenced, explicit args, output on the Env writers). It

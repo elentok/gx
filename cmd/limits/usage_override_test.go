@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
@@ -26,9 +27,7 @@ func TestRunUsageOverride_RefusesWhenNothingGates(t *testing.T) {
 	}
 
 	out.Reset()
-	if err := runUsageOverride(dial, c, "", true); err != nil {
-		t.Fatal(err)
-	}
+	cmdtest.RequireRefusalExit(t, runUsageOverride(dial, c, "", true))
 	if !strings.Contains(out.String(), `"reason": "`+wire.ReasonNotGated+`"`) && !strings.Contains(out.String(), `"reason":"`+wire.ReasonNotGated+`"`) {
 		t.Errorf("json output %q lacks the refusal reason", out.String())
 	}

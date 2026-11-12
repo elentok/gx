@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -88,9 +89,7 @@ func TestServerWorkspaces_JSONMatchesTheRoute(t *testing.T) {
 	}
 
 	out, err = runWorkspaces(t, h, "create", "bugs", "--json")
-	if err != nil {
-		t.Fatalf("a refusal under --json is the output, got %v", err)
-	}
+	cmdtest.RequireRefusalExit(t, err)
 	var res wire.WorkspaceResult
 	if err := json.Unmarshal([]byte(out), &res); err != nil || !res.Refused || res.Reason != wire.ReasonWorkspaceNameTaken {
 		t.Errorf("--json refusal = %q (%v)", out, err)

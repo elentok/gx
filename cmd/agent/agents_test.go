@@ -53,9 +53,7 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 	}
 
 	out.Reset()
-	if err := runAgentsCreate(ctx, h.Client, &out, true, wire.CreateSessionRequest{Dir: dir}); err != nil {
-		t.Fatal(err)
-	}
+	cmdtest.RequireRefusalExit(t, runAgentsCreate(ctx, h.Client, &out, true, wire.CreateSessionRequest{Dir: dir}))
 	var refused wire.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &refused); err != nil || !refused.Refused || refused.Reason != wire.ReasonSessionBadRequest {
 		t.Errorf("create without project = %s, want refused %s", out.String(), wire.ReasonSessionBadRequest)

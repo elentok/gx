@@ -3,6 +3,7 @@ package serverapi
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -218,14 +219,9 @@ func TestServerEpicsMarkMerged_JSONRefusalPrintsTheReasonAndFails(t *testing.T) 
 	var out bytes.Buffer
 	err := cmdbase.RunServerQueueWrite(context.Background(), nil, &out, true,
 		func(context.Context, *apiclient.Client) (wire.QueueResult, error) { return refusal, nil })
-	if err != nil || !strings.Contains(out.String(), `"refused": true`) || !strings.Contains(out.String(), `"reason": "ticket-live"`) {
-		t.Errorf("out = %q, err = %v; want the refusal JSON", out.String(), err)
-	}
-	if err := jsonRefusalExit(true, refusal); err == nil {
-		t.Error("a --json refusal must exit non-zero")
-	}
-	if err := jsonRefusalExit(true, wire.QueueResult{}); err != nil {
-		t.Errorf("a success must exit zero, got %v", err)
+	var exit *cmdbase.ExitError
+	if !errors.As(err, &exit) || exit.Code != 1 || !strings.Contains(out.String(), `"refused": true`) || !strings.Contains(out.String(), `"reason": "ticket-live"`) {
+		t.Errorf("out = %q, err = %v; want the refusal JSON and exit 1", out.String(), err)
 	}
 }
 
@@ -243,8 +239,9 @@ func TestServerEpicsCreatePR_PrintsOutcomeAndRefusal(t *testing.T) {
 		func(context.Context, *apiclient.Client) (wire.QueueResult, error) {
 			return wire.QueueResult{Refused: true, Reason: wire.ReasonHasPR}, nil
 		})
-	if err != nil || !strings.Contains(out.String(), `"refused": true`) {
-		t.Errorf("json out = %q, err %v; want the refusal printed, as the other epic verbs do", out.String(), err)
+	cmdtest.RequireRefusalExit(t, err)
+	if !strings.Contains(out.String(), `"refused": true`) {
+		t.Errorf("json out = %q; want the refusal printed", out.String())
 	}
 }
 

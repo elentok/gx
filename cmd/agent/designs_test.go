@@ -70,7 +70,10 @@ func TestDesignsOpen_NewDesignJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 		var out bytes.Buffer
-		if err := runDesignsOpen(context.Background(), h.Client, &out, true, req); err != nil {
+		err = runDesignsOpen(context.Background(), h.Client, &out, true, req)
+		if tc.reason != "" {
+			cmdtest.RequireRefusalExit(t, err)
+		} else if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		var res wire.SessionResult

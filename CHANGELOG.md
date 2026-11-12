@@ -7,6 +7,7 @@
 - Changed Select to sit in the sidebar's workspace row. While selecting, the header shows the count, Select all and Done in place of the workspace picker.
 - Changed each usage tray bar to show the tighter of the 5h and weekly windows.
 - Fixed the first send after `/clear` being refused as stale.
+- Fixed `--json` commands that print a refusal exiting 0. They still print the result body, then exit 1, as `gx server settings-set --json` does.
 - Fixed the sidebar row focus ring so it covers the whole row.
 - Fixed the blocked banner showing in chat when the question sheet has its own Dismiss and terminal buttons.
 

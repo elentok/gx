@@ -115,7 +115,10 @@ func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		}
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		return enc.Encode(stamped)
+		if err := enc.Encode(stamped); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

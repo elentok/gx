@@ -63,7 +63,10 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 				return fmt.Errorf("server write failed: %w", err)
 			}
 			if openJSON {
-				return cmdbase.WriteStamped(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+				if err := cmdbase.WriteStamped(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
+					return err
+				}
+				return cmdbase.JSONRefusalExit(res.Refused)
 			}
 			if res.Refused {
 				return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -80,7 +83,10 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 
 	editOut := func(c *cobra.Command, res wire.TriageEditResult, asJSON bool) error {
 		if asJSON {
-			return cmdbase.WriteStamped(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+			if err := cmdbase.WriteStamped(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
+				return err
+			}
+			return cmdbase.JSONRefusalExit(res.Refused)
 		}
 		if res.Refused {
 			return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

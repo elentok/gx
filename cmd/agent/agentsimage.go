@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -116,7 +117,10 @@ func writeJSON(w io.Writer, v any) error {
 // error, or the image id.
 func printImageResult(w io.Writer, jsonOut bool, res wire.SessionImageResult) error {
 	if jsonOut {
-		return writeJSON(w, res)
+		if err := writeJSON(w, res); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

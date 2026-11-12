@@ -49,7 +49,10 @@ func runServerChecksSave(ctx context.Context, cl *apiclient.Client, w io.Writer,
 		return fmt.Errorf("server save failed: %w", err)
 	}
 	if jsonOut {
-		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	switch {
 	case res.Refused:

@@ -189,7 +189,10 @@ func printDraftResult(w io.Writer, jsonOut bool, res wire.DesignDraftSaveResult,
 		return fmt.Errorf("server call failed: %w", err)
 	}
 	if jsonOut {
-		return writeDraftJSON(w, res)
+		if err := writeDraftJSON(w, res); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s)", res.Reason)
