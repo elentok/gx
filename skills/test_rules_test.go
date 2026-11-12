@@ -80,6 +80,13 @@ func TestUnrelatedFlakyFlowRule(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md", "gx-playwright-e2es", "rerun the flow once")
 }
 
+func TestPlaywrightE2esRunsGuardBeforeFirstBrowserRun(t *testing.T) {
+	checkAnchors(t, "gx-playwright-e2es/SKILL.md",
+		"## Before the first browser run",
+		"`gx brief go-test ./playwrightguard`",
+	)
+}
+
 func TestFailingFlowReadsErrorContextFirst(t *testing.T) {
 	checkAnchors(t, "gx-playwright-e2es/SKILL.md",
 		"## A failing flow: read `error-context.md` before anything else",

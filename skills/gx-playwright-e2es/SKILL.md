@@ -50,6 +50,12 @@ read `evaluateAll` right after setting the hash and got `-1` on a slow run. A re
 **Fix:** put a web-first `expect(locator)` assertion on the same locator first, then read. Better,
 replace the read with a web-first assertion (`toHaveCSS`, `toHaveCount`, `toHaveText`) that retries.
 
+## Before the first browser run
+
+After you write or edit a flow, run `gx brief go-test ./playwrightguard` before any browser run.
+It checks the rules above (state read before an `expect`, flow budget) in seconds. A browser run
+takes 20-55 s, and `gx check` finds the same failures only at the end.
+
 ## Update the flow when the UI change was on purpose
 
 **Why:** flow 22 kept expecting a transparent background after the amber pill was accepted. It failed
