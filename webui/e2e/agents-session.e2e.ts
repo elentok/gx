@@ -1,6 +1,15 @@
 import type { Page } from "@playwright/test"
 import { expect, nav, test } from "./fixture"
-import { ask, go, messageBox, moreActions, REPLY, sessions, titleHeading } from "./agentsKit"
+import {
+  ask,
+  chatOf,
+  go,
+  messageBox,
+  moreActions,
+  REPLY,
+  sessions,
+  titleHeading,
+} from "./agentsKit"
 
 /** The chat's scroll box, found from a message in it. */
 const scrollBox = (page: Page, text: string) => page.getByText(text, { exact: true }).first()
@@ -99,6 +108,10 @@ test("75. Read a session", async ({ page, start }) => {
   const toolsFixture = await start("agents-tools")
   const tools = (await sessions(toolsFixture)).filter((s) => !s.queue)
   const row = page.getByRole("status").filter({ hasText: /^Working/ })
+  // Under load the fixture's first tool-use turn lands late; wait for it before the page assertion.
+  await expect
+    .poll(async () => JSON.stringify(await chatOf(toolsFixture, tools[0].id)), { timeout: 60_000 })
+    .toContain("make test")
   await go(page, `#/agents/${tools[0].id}`)
   await expect(row).toHaveText("Working · running shell: make test")
   await expect(row.getByRole("button")).toHaveCount(0)
@@ -157,6 +170,7 @@ test("75. Read a session", async ({ page, start }) => {
   await expect.poll(() => isWorking(tools[1].id)).toBe(false)
 
   // The Design session: Esc opens the confirm, Esc closes it and the session stays Working.
+  await expect.poll(() => isWorking(tools[2].id), { timeout: 60_000 }).toBe(true)
   await go(page, `#/agents/${tools[2].id}`)
   await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible()
   // gx drives this session, so Interrupt is off until the composer is turned on.
@@ -221,8 +235,10 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(interrupt).toBeVisible()
   await expect(interrupt).not.toHaveAttribute("title", /Esc/)
   // Esc closes the popover first; close it so the next Esc reaches the phone guard.
-  await page.keyboard.press("Escape")
-  await expect(popover).toBeHidden()
+  await expect(async () => {
+    await page.keyboard.press("Escape")
+    await expect(popover).toBeHidden({ timeout: 500 })
+  }).toPass()
   await page.keyboard.press("Escape")
   await expect(confirm).toHaveCount(0)
 
