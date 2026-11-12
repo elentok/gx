@@ -286,6 +286,13 @@ func (r *Row) AllQuestions() []Question {
 	return qs
 }
 
+// AskedQuestions is AllQuestions without the design ones. A design question
+// travels with its ticket into the map epic: the person is never asked it, and
+// it neither counts as open nor blocks Approve.
+func (r *Row) AskedQuestions() []Question {
+	return slices.DeleteFunc(r.AllQuestions(), func(q Question) bool { return q.Kind == QuestionDesign })
+}
+
 // applyAutoAnswers answers the plan's auto questions with their default. An
 // answer the person already gave stays.
 func applyAutoAnswers(row *Row, p PlanRow) {
@@ -347,7 +354,7 @@ func (r *Record) OpenQuestions() int {
 		if row.gone() {
 			continue
 		}
-		for _, q := range row.AllQuestions() {
+		for _, q := range row.AskedQuestions() {
 			if row.Person.Answers[q.ID] == "" {
 				n++
 			}
@@ -397,7 +404,7 @@ func (s *Store) SendBack(id string, revision int) (*Record, error) {
 			if row.gone() {
 				continue
 			}
-			for _, q := range row.AllQuestions() {
+			for _, q := range row.AskedQuestions() {
 				if a := strings.TrimSpace(row.Person.Answers[q.ID]); a != "" {
 					row.Earlier = append(row.Earlier, Answered{Text: q.Text, Answer: a})
 				}

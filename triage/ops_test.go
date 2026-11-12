@@ -436,6 +436,25 @@ func TestSendBack_KeepsTheAnswersAsEarlierRoundsAndReturnsToPlan(t *testing.T) {
 	}
 }
 
+func TestDesignQuestionsAreNotAskedAndDoNotBlockApprove(t *testing.T) {
+	s, rec := atPlan(t)
+	design := Question{ID: "d1", Text: "Which store?", Kind: QuestionDesign}
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "map", Questions: []Question{design}}, {RowID: rowB, Action: "close"}}, nil)
+	rec = must(t, rec, err)
+	if got := rec.Rows[0].AskedQuestions(); len(got) != 0 {
+		t.Fatalf("asked = %+v, want none", got)
+	}
+	if got := rec.Rows[0].AllQuestions(); len(got) != 1 {
+		t.Fatalf("all = %+v, want the design question kept for Write", got)
+	}
+	if rec.OpenQuestions() != 0 {
+		t.Fatalf("open = %d, want 0", rec.OpenQuestions())
+	}
+	if _, err := s.Approve(rec.ID, rec.Revision); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+}
+
 func TestSendBack_OnlyAtApprove(t *testing.T) {
 	s, rec := atPlan(t)
 	if _, err := s.SendBack(rec.ID, rec.Revision); err == nil {

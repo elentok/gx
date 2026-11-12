@@ -137,6 +137,22 @@ func TestView_RecordAtEachStep(t *testing.T) {
 	}
 }
 
+func TestView_DesignQuestionsTravelAndAreNotAsked(t *testing.T) {
+	f, s := startViewFixture(t)
+	rec := mustRec(s.Create())
+	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrA, Verdict: "relevant"}))
+	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "relevant"}))
+	design := triagerec.Question{ID: "d1", Text: "Which store?", Kind: triagerec.QuestionDesign}
+	mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
+		{RowID: addrA, Action: "map", Questions: []triagerec.Question{design}},
+		{RowID: addrB, Action: "close"},
+	}, nil))
+	v := show(t, f)
+	if v.OpenQuestions != 0 || len(v.Rows[0].Questions) != 0 || len(v.Rows[0].Travels) != 1 || v.Rows[0].Travels[0].ID != "d1" {
+		t.Fatalf("view = %+v", v.Rows[0])
+	}
+}
+
 func TestView_AbandonedIsShownAsLatest(t *testing.T) {
 	f, s := startViewFixture(t)
 	rec := mustRec(s.Create())

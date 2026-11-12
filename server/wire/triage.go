@@ -76,6 +76,8 @@ type TriageRow struct {
 	Evidence  string           `json:"evidence,omitempty"`
 	Files     []string         `json:"files,omitempty"`
 	Questions []TriageQuestion `json:"questions,omitempty"`
+	// Travels holds the design questions: never asked, they go into the map-epic ticket.
+	Travels []TriageQuestion `json:"travels,omitempty"`
 	// Answers maps a question id to the person's answer.
 	Answers map[string]string `json:"answers,omitempty"`
 	// Action and Destination are the plan's, replaced by the person's when set.

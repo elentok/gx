@@ -168,6 +168,12 @@ function EvidenceSheet({ row, onClose }: { row: TriageRow; onClose: () => void }
           <Text>none</Text>
         ),
       )}
+      {row.travels?.length
+        ? section(
+            "Travels with ticket",
+            row.travels.map((q) => <Text key={q.id}>{q.title}</Text>),
+          )
+        : null}
       {section("Suggested destination", <Text>{destination}</Text>)}
       <Button emphasis="secondary" size="sm" alignSelf="flex-end" onClick={onClose}>
         Close

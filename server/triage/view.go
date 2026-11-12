@@ -262,6 +262,10 @@ func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (wire.TriageRow
 	}
 	open := 0
 	for _, q := range r.AllQuestions() {
+		if q.Kind == triagerec.QuestionDesign {
+			row.Travels = append(row.Travels, wireQuestion(q))
+			continue
+		}
 		row.Questions = append(row.Questions, wireQuestion(q))
 		if !row.Gone && r.Person.Answers[q.ID] == "" {
 			open++

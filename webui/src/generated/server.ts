@@ -3649,6 +3649,10 @@ export interface TriageRow {
   files?: string[];
   questions?: TriageQuestion[];
   /**
+   * Travels holds the design questions: never asked, they go into the map-epic ticket.
+   */
+  travels?: TriageQuestion[];
+  /**
    * Answers maps a question id to the person's answer.
    */
   answers?: { [key: string]: string};
