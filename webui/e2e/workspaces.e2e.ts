@@ -379,6 +379,8 @@ test("Workspaces", async ({ page, start }) => {
   )
   await page.keyboard.press(".")
   await menuFocused()
+  // "." opens the menu with nothing highlighted: the first item is the Move submenu, then Take off hold.
+  await page.keyboard.press("ArrowDown")
   await page.keyboard.press("ArrowDown")
   await expect(page.getByRole("menuitem", nav("Take off hold"))).toHaveAttribute(
     "data-highlighted",
