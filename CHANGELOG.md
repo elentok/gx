@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.49.3 - 2026-11-12
+
+- Added Leader key chords to the web UI. A Keybindings section in settings has two Leader key settings. Pressing the Leader key opens the Chord box, where keys such as c, d and x run actions, and modifier keys keep the box open. Saving settings in the web UI now updates other open pages live.
+- Added a Triage session under "Other" in the sidebar, with an inbox icon that opens its page. The icon animates while the Triage works, and the Other section remembers whether it is open. Past Triages show under the Progress column.
+- Added a "Working" status in the sidebar for a Design while its agent session works.
+- Changed the Design composer to use the chat page's text box, spacing and hint line.
+- Changed every prompt box (chat, Design, question sheet, dialogs) to share one look: `ExpandableTextField` is now `PromptBox`, with a 1px inner hairline and a 2px inner focus ring. Nothing spills outside the box, so sheets no longer clip or tint their corners.
+- Changed Bedrock-style Claude model IDs to show as Claude Opus/Sonnet 5.5.
+- Fixed a dialog finished at the terminal leaving no card in the chat. The AskUserQuestion "Review your answers" screen now shows a card with Submit answers and Cancel.
+- Fixed modals being covered by the sidebar. Modal now renders in a portal on the body.
+- Fixed a Triage session showing only in the Default workspace. It now sits under Other.
+
 ## v0.49.2 - 2026-11-12
 
 - Added a configurable Vi escape sequence, and split the settings page into separate sections.
