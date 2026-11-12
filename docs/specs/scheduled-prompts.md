@@ -79,8 +79,9 @@ now. `gx schedules` CLI verbs mirror every action on the page.
     that a long queue wait does not turn a run into a skip.
 29. As a person, I want a new run to be skipped when the previous run of the same Schedule has
     started, is paused or has failed, so that two runs of one Schedule never work at once and a
-    broken run is not buried under later runs. A failed run's skip reason says "previous run needs
-    attention" and links its ticket.
+    broken run is not buried under later runs. A paused or failed run's skip reason says "previous
+    run needs attention" and links its ticket. A run that is only running gives "previous run
+    started".
 30. As a person, I want a new run to replace the previous run when that run is still queued and never
     started, so that the queue holds one run per Schedule.
 31. As a person, I want "Run now" on a Schedule page, so that I can test a prompt without waiting.
@@ -92,7 +93,7 @@ now. `gx schedules` CLI verbs mirror every action on the page.
     starts when a slot frees.
 35. As a person, I want the Schedule page to list the last 10 runs, each with its time, a link to its
     One-off ticket, a one-line Result and a status (Finished, Ran late, Skipped, Needs answer,
-    Running, Queued, Replaced), so that I can see what happened. A Run now row shows "Run now" in
+    Running, Queued, Cancelled), so that I can see what happened. A Run now row shows "Run now" in
     the time column.
 36. As a person, I want skipped runs to show without a ticket link and with their reason, so that I
     can tell a skip from a run.
@@ -150,14 +151,16 @@ now. `gx schedules` CLI verbs mirror every action on the page.
   Schedule's project, with the Schedule's harness. It is queued, counts against the one-off cap
   (ADR 0040) and the global and project caps (ADR 0032), waits on the usage gate, and ends by itself.
   A Scheduled run is not a new Chat session. No new pause kind is added.
-- **Intended time on the One-off.** The One-off request and the One-off ticket get one optional field,
-  `scheduled_for`: the set time the run was meant for. It is empty for Run now. Last runs reads it for
-  the time column, for "Ran late" and for Run now rows, across machines. The Dedupe key cannot hold it,
-  because the key is the same for every run of a Schedule. The implementer picks the exact name only
-  if `scheduled_for` clashes with an existing field.
+- **Intended time on the One-off.** The One-off ticket gets one optional field, `scheduled_for`: the
+  set time the run was meant for. It is empty for Run now. Only the scheduler sets it, through the
+  in-process submit path. `wire.OneOffRequest` and `gx server one-off` do not change, so an outside
+  caller cannot fake a Scheduled time. Last runs reads it for the time column, for "Ran late" and for
+  Run now rows, across machines. The Dedupe key cannot hold it, because the key is the same for every
+  run of a Schedule. The implementer picks the exact name only if `scheduled_for` clashes with an
+  existing field.
 - **Migration.** The new field is optional and absent means "not a Scheduled time". Tickets written
-  before it need no rewrite, so the migration step only adds `scheduled_for` to the One-off schema and
-  validation, and `gx tickets validate` accepts old and new tickets.
+  before it need no rewrite, so no Migration step is registered. The change is a schema and validation
+  update only, and `gx tickets validate` accepts tickets with and without the field.
 - **Harness.** The first option is "Default (<harness name>)", stored as unset and resolved on every
   run. Picking claude or codex pins it.
 - **Prompt.** The server sends the person's prompt followed by a note. The note says the run was
@@ -182,16 +185,18 @@ now. `gx schedules` CLI verbs mirror every action on the page.
   to `updated_at` when that is later, so a machine that was asleep during the edit also skips the
   earlier times.
 - **Late limit.** Lateness counts from the set time to the moment the run is queued. Queue wait does
-  not count. A run past the limit is skipped and logged. A run is "late" when the catch-up path
-  queued it after a sleep or restart. The regular once-a-minute check never makes a run late, even
-  though it queues a few seconds after the set time.
+  not count. A run past the limit is skipped and logged. A run is "late" when its One-off was created
+  more than one check interval (one minute) after `scheduled_for`. This comes from stored data, so
+  every machine that shares the store agrees. The regular once-a-minute check always queues within one
+  interval, so it never makes a run late. Only the catch-up path after a sleep or restart does.
 - **Dedupe.** Each run carries the Dedupe key `schedule:<project>/<slug>@<machine>`. The machine part
   is a stable id that differs between machines that share a ticket store. The implementer picks how
   it is made. If the previous run of this Schedule on this machine is still queued and never started,
   the new run replaces it. If it has started, the new run is skipped. A paused run counts as started.
-  A failed run also counts as started, because a failed One-off stays live under its Dedupe key. The
-  skip reason is "previous run needs attention" and links the ticket. Later runs skip until a person
-  closes the failed ticket.
+  A failed run also counts as started, because a failed One-off stays live under its Dedupe key. For a
+  paused or failed run the skip reason is "previous run needs attention" and links the ticket. For a
+  run that is only running it is "previous run started". Later runs skip until a person closes the
+  paused or failed ticket.
 - **Skip log.** Each machine keeps a skip log in its state directory with the newest 10 entries per
   Schedule, each with a time and a reason (past the Late limit, project not found, previous run
   started, previous run needs attention). The page merges it with the One-offs found by the key
@@ -205,9 +210,10 @@ now. `gx schedules` CLI verbs mirror every action on the page.
 - **Two machines with the switch on.** Each runs its own copy. The "previous run live" check and the
   replace rule are per machine.
 - **Run now.** It follows the timed rule. It replaces a queued never-started run. If the previous run
-  started or is paused, Run now is refused with a visible reason on the page and in the CLI, and no
-  skip is logged. If the Schedule's project is not found, Run now is refused with the reason
-  `project-not-found` and no skip is logged. A full one-off cap only queues the run. It works while
+  started, is paused or has failed, Run now is refused with a visible reason on the page and in the
+  CLI (the same reasons as the skip log, with the ticket link for "needs attention"), and no skip is
+  logged. If the Schedule's project is not found, Run now is refused with the existing One-off reason
+  `unknown-project` and no skip is logged. "project not found" stays as display text only. A full one-off cap only queues the run. It works while
   the switch is off on this machine, and the page says so.
 - **Delete.** Delete removes the file. Each machine's scheduler cancels only its own queued
   never-started runs, when it sees the Schedule file is gone, and removes its state-dir entries. Live
@@ -242,16 +248,18 @@ now. `gx schedules` CLI verbs mirror every action on the page.
     | --- | --- |
     | Queued, never started | Queued |
     | Started and running | Running |
-    | Finished, queued by the catch-up path | Ran late |
+    | Finished, created more than one minute after `scheduled_for` | Ran late |
     | Finished, any other | Finished |
     | Paused, or failed | Needs answer |
-    | Cancelled by the replace rule or by delete (in `one-offs-archived`) | Replaced |
+    | Cancelled for any reason (replace rule, delete or a person) | Cancelled |
     | No One-off (skip log entry) | Skipped |
 
     A late run that is still running shows Running. "Ran late" appears only once it finished.
 - **Pauses (ADR 0042).** A Scheduled run that pauses is an ordinary One-off pause. gx can already
   recover it from the web with the One-off's own buttons, and a Schedule adds no pause kind and no new
-  way into one.
+  way into one. A paused or failed run does stop later runs of its Schedule, but that is a skip, not a
+  pause. gx cannot judge a failed run, and an automatic retry would bury it. The existing close or
+  cancel button on the One-off ticket page ends the block, and the next set time then runs.
 - **Glossary.** The terms Schedule, Scheduled run, Late limit and Schedule switch are already in
   GLOSSARY.md under "Schedules". No new term is added.
 
@@ -334,24 +342,28 @@ switch, run-now, delete).
     state `schedule-page`.
 28. Story 28. New Go server test: a run queued on time and held by a full cap for longer than the
     Late limit is not skipped.
-29. Story 29. New Go server test: a started or paused previous run makes the next timed run skip,
-    with a skip-log entry and no new One-off. A failed previous run skips with "previous run needs
-    attention" and the ticket link, and keeps skipping until its ticket is closed.
+29. Story 29. New Go server test: a started (running) previous run makes the next timed run skip with
+    "previous run started", a skip-log entry and no new One-off. A paused or failed previous run skips
+    with "previous run needs attention" and the ticket link, and keeps skipping until its ticket is
+    closed. Closing the ticket through the web route lets the next set time queue a run.
 30. Story 30. New Go server test: a queued never-started previous run is cancelled and the new run is
     queued.
 31. Story 31. Flow `schedules` (new): click Run now, a Last runs row with a ticket link appears. CLI:
     the run-now verb prints the new One-off address, exit 0.
 32. Story 32. CLI: run-now twice while the first run is started exits non-zero with a refusal
-    `reason`, creates nothing and logs no skip. Run-now on a Schedule whose project is gone is refused
-    with `project-not-found` and logs no skip. Flow `schedules` (new): the page shows the refusal
+    `reason`, creates nothing and logs no skip. Run-now with a paused or failed previous run is refused
+    with "needs attention" and the ticket link. Run-now on a Schedule whose project is gone is refused
+    with `unknown-project` and logs no skip. Flow `schedules` (new): the page shows the refusal
     reason.
 33. Story 33. Flow `schedules` (new): with the switch off, Run now works and the page says it does.
 34. Story 34. New Go server test: with the one-off cap full, run-now queues a One-off and returns
     success.
 35. Story 35. Flow `schedules` (new) on shape `page`, mock state `schedule-page`: four rows, the three
     statuses Finished, Ran late and Skipped, and links to the One-off tickets. New vitest: Needs
-    answer, Running, Queued, Replaced and the "Run now" time label render. New Go server test: each
-    row of the status table maps from its One-off state, and only the last 10 rows come back. A
+    answer, Running, Queued, Cancelled and the "Run now" time label render. New Go server test: each
+    row of the status table maps from its One-off state (a One-off cancelled by a person shows
+    Cancelled, and one created more than a minute after `scheduled_for` shows Ran late once finished),
+    and only the last 10 rows come back. A
     One-off created with Run now has no `scheduled_for`, a timed one has it, and `gx tickets
     validate` accepts a One-off ticket without the field.
 36. Story 36. Flow `schedules` (new) on shape `page`: the Skipped row has no link and shows its
@@ -365,7 +377,8 @@ switch, run-now, delete).
 40. Story 40. New Go server test: a Schedule whose project is gone skips each run time with "project
     not found" and sends one error per skipped run time through the `gx notify` gate. Flow
     `schedules` (new) on shape `missing-project`: the list row shows "project not found" in place of
-    the next run. The mock has no state for it, so the row follows the `list` layout.
+    the next run, and the Schedule page shows it in the same place. The mock has no state for it, so
+    the row follows the `list` layout and the page follows `schedule-page`.
 41. Story 41. New Go server test: restart the scheduler with the skip log in place, no second error
     message for the same run time.
 42. Story 42. CLI: edit the name, show prints the new name and the same slug, the old runs still
@@ -382,8 +395,8 @@ switch, run-now, delete).
 47. Story 47. New Go server test: delete cancels a queued never-started run and leaves a started and
     a paused run alone. With two machine ids, each cancels only its own queued run. Turning the
     switch off leaves a queued run alone.
-48. Story 48. Flow `schedules` (new) on shape `needs-answer`: a Needs answer row links to the One-off ticket
-    page, which offers its existing button. New Go server test: a Scheduled run adds no pause kind
+48. Story 48. Flow `schedules` (new) on shape `needs-answer`, page follows mock state `schedule-page`:
+    a Needs answer row links to the One-off ticket page, which offers its existing button. New Go server test: a Scheduled run adds no pause kind
     (the pause-to-verb table test passes).
 49. Story 49. New Go server test: a time inside a spring-forward gap runs at the first valid moment
     after it.
@@ -405,10 +418,13 @@ New flows or scenarios to write (each becomes an implementation ticket):
 - New Go server tests with a controllable clock for stories 20, 24 to 30, 32, 34, 35, 37 to 41, 45,
   47 to 50 and 52.
 - New vitest files in `webui/src` for stories 10, 14, 15, 18 and 35.
-- Schema change: the optional `scheduled_for` field on the One-off request and ticket, with the
-  Migration decision above and a validation test.
+- Schema change: the optional `scheduled_for` field on the One-off ticket only (not the request), with
+  the Migration decision above (no Migration step) and a validation test.
 
 **Mock states**
+
+- The fixture shapes `needs-answer` and `missing-project` have no mock state of their own. They reuse
+  `list` and `schedule-page`.
 
 - `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`,
   state `list`, 900 px, scenario `schedules` shape `list`, parts: page-title, new-button,
