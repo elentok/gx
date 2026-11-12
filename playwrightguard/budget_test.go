@@ -38,7 +38,9 @@ import (
 // Bulk actions flow (+1): select, Move, Hold, Stop and the Archive confirm need a server round trip and real
 // layout (the menu above the bar, the footer's width) that vitest cannot see; the select model, bar and page
 // tests cover each rule alone.
-const maxFlows = 139
+// Chords flow (+1): split out of the Workspaces flow, which timed out at 120 s in the full run; both now fit
+// their time limits with margin.
+const maxFlows = 140
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
