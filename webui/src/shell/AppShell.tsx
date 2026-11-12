@@ -14,6 +14,7 @@ import { Strip } from "../ui/strip/Strip"
 import { useDevToast } from "../dev/useDevToast"
 import { useDevice, type Device } from "../useWide"
 import { isMac } from "../platform"
+import { ChordHost } from "./ChordHost"
 import { CommandPalette } from "./CommandPalette"
 import { JumpPalette } from "./JumpPalette"
 import { setJumpOpen } from "./jumpOpen"
@@ -367,6 +368,7 @@ export function AppShell({
         <CommandPalette />
         <NewItemHost />
         <RemoveConfirmHost />
+        <ChordHost />
       </Box>
     </ShellContext.Provider>
   )
