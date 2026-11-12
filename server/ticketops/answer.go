@@ -209,7 +209,11 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.Addr, err)
 			}
 			o.d.Index.Rescan()
-			return wire.QueueResult{Outcome: wire.OutcomeQueued}, nil
+			res := wire.QueueResult{Outcome: wire.OutcomeQueued}
+			if o.d.Queue != nil {
+				res.Queue = o.d.Queue.List()
+			}
+			return res, nil
 		}
 		if err := ticketops.Claim(ref.Ticket.Path); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("claim %s: %w", ref.Addr, err)

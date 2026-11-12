@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
@@ -46,6 +47,8 @@ type Deps struct {
 	Log         *slog.Logger
 	TicketStore string
 	Launch      Launch
+	// Queue is the run queue a queued answer reports back. Nil lists nothing.
+	Queue *queue.Queue
 }
 
 // Ops makes the ticket operations.

@@ -3,6 +3,8 @@ package ticketops_test
 import (
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/settings"
@@ -67,16 +70,28 @@ func TestAnswer_QueuedPathUsesTheLaunchFake(t *testing.T) {
 	idx := index.New(store, broker.New(8), log)
 	projs := projects.NewRegistry(func() projects.Env { return projects.Env{TicketStore: store} }, log, idx, set, nil, nil)
 	launch := &launchFake{budget: &wire.QueueResult{Refused: true, Reason: wire.ReasonBudgetLimit}}
+	stateDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(stateDir, projects.QueueFileName), []byte(`[{"address":"proj:other/01","agent":"claude"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	q, err := queue.OpenQueue(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ops := ticketops.New(ticketops.Deps{
 		Writer:   ticketwrite.New(ticketwrite.Deps{Log: log, Index: idx, Projects: projs, Registry: reg}),
 		Registry: reg,
 		Index:    idx,
 		Launch:   launch,
+		Queue:    q,
 	})
 
 	res, err := ops.Answer(wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Refused || res.Outcome != wire.OutcomeQueued {
 		t.Fatalf("answer = %+v, %v; want queued", res, err)
+	}
+	if len(res.Queue) != 1 || res.Queue[0].Address != "proj:other/01" {
+		t.Errorf("queue = %+v, want the full queue list", res.Queue)
 	}
 	if n := answerCount(t, ticketPath); n != 1 {
 		t.Errorf("pause.answer lines = %d, want 1", n)

@@ -16,6 +16,7 @@ func newTicketOps(s *Server) *ticketops.Ops {
 		Writer: s.writer, Harness: s.harness, Registry: s.registry, Index: s.idx,
 		Events: s.events, Epics: s.epics, Rec: s.rec, Landing: s.landing, Projects: s.projects,
 		Log: s.log, TicketStore: s.cfg.TicketStore, Launch: ticketOpsLaunch{s},
+		Queue: s.queue,
 	})
 }
 
