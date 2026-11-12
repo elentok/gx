@@ -11,12 +11,14 @@ import (
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 )
 
 type finishFixture struct {
 	wt, projectDir, ticket string
+	head                   string // Head stamped on records; empty for none
 }
 
 // newFinishFixture registers a bare repo as project p holding epic e (branch
@@ -54,7 +56,7 @@ func (f *finishFixture) record(t *testing.T, exit int, kindFilter string, failed
 func (f *finishFixture) recordTree(t *testing.T, tree string, exit int, kindFilter string, failed ...string) {
 	t.Helper()
 	rec := check.Record{
-		Run: "r", Exit: exit, KindFilter: kindFilter, Branch: "ralph-loop/e-item-01", TreeID: tree,
+		Run: "r", Head: f.head, Exit: exit, KindFilter: kindFilter, Branch: "ralph-loop/e-item-01", TreeID: tree,
 		Kinds: []check.KindRecord{{Kind: "test", Failed: failed}},
 	}
 	line, err := json.Marshal(rec)
@@ -214,6 +216,29 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		f.record(t, check.ExitFail, "", "TestA")
 		if err := f.finish(t); err == nil || strings.Contains(err.Error(), "--known-failures") {
 			t.Fatalf("one failure: want a refusal without the hint, got %v", err)
+		}
+	})
+
+	t.Run("failures already red on the base are waived", func(t *testing.T) {
+		f := newFinishFixture(t)
+		base, err := git.MergeBase(f.wt, "HEAD", "e")
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.head = base
+		f.recordTree(t, "base-tree", check.ExitFail, "", "TestA")
+		f.head = ""
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+		f.record(t, check.ExitFail, "", "TestA")
+		if err := f.finish(t); err != nil {
+			t.Fatalf("only the base's failure: %v", err)
+		}
+		f.record(t, check.ExitFail, "", "TestA", "TestB")
+		if err := f.finish(t); err == nil || !strings.Contains(err.Error(), "at least 1 follow-up") {
+			t.Fatalf("one new failure: want a refusal needing 1 address, got %v", err)
+		}
+		if err := f.finish(t, "--check-failures=02"); err != nil {
+			t.Fatalf("one address for the new failure: %v", err)
 		}
 	})
 

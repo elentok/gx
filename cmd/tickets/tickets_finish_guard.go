@@ -74,6 +74,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 	if err != nil {
 		return err
 	}
+	recs0 := recs
 	recs = slices.DeleteFunc(check.FilterRecords(recs, branch, tree), func(r check.Record) bool {
 		return r.KindFilter != ""
 	})
@@ -103,11 +104,27 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		return fmt.Errorf("%s: no passing `gx check` run for the current tree of %s; run `gx check` and fix it, or file follow-ups for flakes and pre-existing failures and finish with --check-failures <follow-up addrs>", label, branch)
 	}
 
+	// Tests already red on the base are waived: a ticket claimed on a red tree
+	// can still finish. Only a failure the base did not have needs a follow-up.
+	failedNow := failedTests(*failing)
+	preexisting := baselineFailures(recs0, base)
+	var fresh []string
+	for _, n := range failedNow {
+		if slices.Contains(preexisting, n) {
+			fmt.Fprintf(c.ErrOrStderr(), "pre-existing failure (red on the base, waived): %s\n", n)
+		} else {
+			fresh = append(fresh, n)
+		}
+	}
+	if len(failedNow) > 0 && len(fresh) == 0 {
+		return nil
+	}
+
 	// A known failure covers the whole failing set: one follow-up that tracks
 	// a pre-existing breakage (e.g. a broken test family) waives the one-per-test
 	// count, so a suite that is red on the base does not block every ticket.
 	known := splitAddrs(c, "known-failures")
-	need := max(1, len(failedTests(*failing)))
+	need := max(1, len(fresh))
 	if len(known) > 0 {
 		addrs, need = known, len(known)
 	}
@@ -126,6 +143,17 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 	for _, a := range addrs {
 		if _, _, err := ticketref.FindTicket(dirs, cwd, a); err != nil {
 			return fmt.Errorf("%s: --check-failures %s: %w", label, a, err)
+		}
+	}
+	return nil
+}
+
+// baselineFailures is the failing set of the latest full failed `gx check`
+// run whose HEAD was the base commit: what was already red before the ticket.
+func baselineFailures(recs []check.Record, base string) []string {
+	for _, r := range slices.Backward(recs) {
+		if r.Head == base && r.Exit == check.ExitFail && r.KindFilter == "" {
+			return failedTests(r)
 		}
 	}
 	return nil
