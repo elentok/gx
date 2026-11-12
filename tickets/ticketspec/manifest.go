@@ -33,6 +33,8 @@ type ManifestEntry struct {
 	BlockedBy             []string `yaml:"blocked_by"`
 	ExpectedContextWindow int      `yaml:"expected_context_window"`
 	BodyFile              string   `yaml:"body"`
+	// From is the follow-up address, or a list, this ticket promotes.
+	From schema.OriginalAddresses `yaml:"from"`
 
 	// Body is the raw body read from BodyFile.
 	Body string `yaml:"-"`

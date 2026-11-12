@@ -4,6 +4,7 @@
 package ticketsflow
 
 import (
+	"io"
 	"os"
 
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -18,6 +19,9 @@ type Deps struct {
 	// WriteFile writes ticket files in `tickets publish`; nil means
 	// os.WriteFile (tests inject a faulty one).
 	WriteFile func(path string, data []byte, perm os.FileMode) error
+	// CloseFollowUp archives a promoted follow-up in `tickets publish`; nil
+	// means `gx tickets close` (tests inject a failing one).
+	CloseFollowUp func(addr, reason, note string, w io.Writer) error
 	// CommandTree builds the gx command tree `lint-claims` checks command
 	// claims against. Root supplies it lazily: building the tree at
 	// construction would recurse.

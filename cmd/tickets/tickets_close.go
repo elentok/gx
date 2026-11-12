@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
@@ -19,7 +20,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var closeReasons = []string{"fixed", "obsolete", "duplicate", "not-worth-it"}
+var closeReasons = []string{"fixed", "obsolete", "duplicate", "not-worth-it", "promoted"}
+
+// ReasonPromoted is the close reason `gx tickets publish` records: the work
+// goes on in the tickets the follow-up was promoted to.
+const ReasonPromoted = "promoted"
+
+// CloseFollowUp is `gx tickets close <addr> --reason reason --note note`.
+func CloseFollowUp(env cmdbase.Env, addr, reason, note string, w io.Writer) error {
+	return runTicketsClose(Deps{Env: env}, addr, reason, note, w)
+}
 
 // runTicketsClose cancels one draft/open follow-up with a recorded reason and
 // moves it into the project's archive epic, in one step. Every refusal runs
@@ -163,7 +173,7 @@ func newTicketsCloseCmd(d Deps) *cobra.Command {
 	var reason, note string
 	var sweep, sweepDone bool
 	closeCmd := &cobra.Command{
-		Use:   "close <addr> --reason fixed|obsolete|duplicate|not-worth-it [--note ...]",
+		Use:   "close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted [--note ...]",
 		Short: "cancel a draft/open follow-up with a reason and archive it; --sweep moves done and cancelled follow-ups into the archive",
 		Args:  cobra.RangeArgs(0, 1),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -183,7 +193,7 @@ func newTicketsCloseCmd(d Deps) *cobra.Command {
 			return runTicketsClose(d, args[0], reason, note, c.OutOrStdout())
 		},
 	}
-	closeCmd.Flags().StringVar(&reason, "reason", "", "fixed, obsolete, duplicate or not-worth-it")
+	closeCmd.Flags().StringVar(&reason, "reason", "", "fixed, obsolete, duplicate, not-worth-it or promoted")
 	closeCmd.Flags().StringVar(&note, "note", "", "free text; for duplicate, the kept ticket's address")
 	closeCmd.Flags().BoolVar(&sweep, "sweep", false, "move every done or cancelled follow-up of the project (the optional argument, default the cwd's) into the archive")
 	// --done is the flag's old name, kept so existing skill text and habits work.

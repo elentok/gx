@@ -393,6 +393,9 @@ The manifest is a YAML list with one entry per ticket. Each entry has these fiel
 - `blocked_by`: the tickets it depends on. List slugs from this manifest, or a bare ID for a ticket
   that already exists. Never put a `/` in it. Leave it out when nothing gates the ticket.
 - `expected_context_window`: the estimate from step 4.
+- `from`: optional. A follow-up address, or a list, this ticket promotes. Publish checks every one
+  is a draft or open follow-up of the project, stamps them as the ticket's `original_address`, and
+  archives them last as `promoted`.
 - `body`: the ticket body, from the per-ticket template below.
 
 To refer to another ticket from a body, write `{{slug}}`. `publish` replaces it with that ticket's

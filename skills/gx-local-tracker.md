@@ -64,7 +64,8 @@ Fields:
   the loader rather than read as `open`, so a half-written file can never be handed to an agent. Only
   `open` is schedulable — `draft` is work its author set aside deliberately, neither offered to an agent
   nor counted as finished. `cancelled` is terminal like `done` but means the ticket was withdrawn,
-  not performed; it stops counting as outstanding. **Only `draft` and `open` can be written with
+  not performed (the exception is a follow-up closed as `promoted`: the work goes on in the new
+  tickets `gx tickets publish` wrote from it); it stops counting as outstanding. **Only `draft` and `open` can be written with
   `gx tickets set --status`** (plus `claimed` and `done` in a map epic). Every other status is an
   orchestration status, written by the gx server alone, except `cancelled` on a follow-up, which
   `gx tickets close` also writes (see "Who writes which status"). The UI also shows `blocked` and
@@ -177,7 +178,7 @@ conversation history.
   children, one queued or live on the server, and a map-epic source. A map-epic target is allowed.
   Prose mentions of the old address are not rewritten; the files that hold one are listed as
   warnings. Use `--dry-run` first.
-- **Close a follow-up**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it
+- **Close a follow-up**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted
   [--note ...]` — see "Follow-ups".
 - **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop --status
   draft|open [--body -]` creates the epic's `ticket.md` and refuses an existing epic. A frontmatter
@@ -317,11 +318,12 @@ here rather than restating it. The filing procedure lives in the
 - **Server recovery follow-ups** (filed from investigate reports) use the same format:
   `category: bug`, Source / Problem / Evidence / Suggested fix, and the same "seen again" entry for a
   repeat. gx-triage-follow-ups and `gx evolve export` then see one shape.
-- **Closing**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it [--note ...]`
+- **Closing**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted [--note ...]`
   works only on a `draft`/`open` ticket in a `follow-ups` epic. In one step it writes
   `status: cancelled`, a `## Resolution` with the reason, note and original address, and moves the
   ticket into `<project>:follow-ups-archived` (created `draft` if missing). For `duplicate`, the note
-  is the kept ticket's address. `gx tickets close --sweep [project]` moves every `done` and
+  is the kept ticket's address. `promoted` is what `gx tickets publish` writes for each `from:`
+  follow-up, with the new addresses as the note; the work goes on in those tickets. `gx tickets close --sweep [project]` moves every `done` and
   `cancelled` follow-up into the archive, keeping its status; a cancelled one with no `## Resolution`
   gets one recording its original address. Old run-log lines, trailers and branch names keep the
   old address; the Resolution records it.

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/ticketref"
 	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
@@ -45,6 +46,34 @@ type publishPlan struct {
 	EpicPath         string
 	Tickets          []plannedTicket
 	AllowCheckMisses bool
+	// Promoted maps each follow-up address the manifest names to the addresses
+	// of the new tickets that cite it, in the order the follow-ups first appear.
+	Promoted      map[string][]string
+	PromotedOrder []string
+}
+
+// resolveFrom turns a manifest `from:` address into its canonical form, or
+// refuses it when it is not a draft/open follow-up of the target's project.
+type resolveFrom func(addr string) (string, error)
+
+// followUpResolver is the resolveFrom of project: every address must name a
+// draft or open ticket in that project's follow-ups epic.
+func followUpResolver(d Deps, cwd, project string) resolveFrom {
+	return func(addr string) (string, error) {
+		a, t, err := ticketref.FindTicket(d.dirs(), cwd, addr)
+		if err != nil {
+			return "", fmt.Errorf("from %q: %w", addr, err)
+		}
+		switch {
+		case a.Project != project:
+			return "", fmt.Errorf("from %q: follow-up is in project %q, not %q", addr, a.Project, project)
+		case a.Epic != tickets.FollowUpsEpic:
+			return "", fmt.Errorf("from %q: not a ticket of a %s epic", addr, tickets.FollowUpsEpic)
+		case t.Status != string(schema.StatusDraft) && t.Status != string(schema.StatusOpen):
+			return "", fmt.Errorf("from %q: follow-up is %s; want draft or open", addr, t.Status)
+		}
+		return a.String(), nil
+	}
 }
 
 func (p *publishPlan) paths() []string {
@@ -114,7 +143,7 @@ func checkRenderedTickets(p *publishPlan) []error {
 // planPublish reads and checks the manifest against the epic's current tickets
 // and renders every ticket, assigning IDs in manifest order and stamping
 // {{commit}} with commit. Nothing is written.
-func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, epic tickets.Epic) (*publishPlan, error) {
+func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, epic tickets.Epic, resolve resolveFrom) (*publishPlan, error) {
 	var epicIDs []string
 	for _, t := range epic.Tickets {
 		epicIDs = append(epicIDs, t.Identifier)
@@ -142,7 +171,8 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 		bodyIDs[slug] = id
 	}
 
-	plan := &publishPlan{EpicPath: epicPath, AllowCheckMisses: allowCheckMisses}
+	plan := &publishPlan{EpicPath: epicPath, AllowCheckMisses: allowCheckMisses, Promoted: map[string][]string{}}
+	var fromErrs []error
 	now := time.Now().UTC()
 	for _, e := range m.Entries {
 		id := ids[e.Slug]
@@ -163,7 +193,23 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 			}
 			t.BlockedBy = append(t.BlockedBy, schema.TicketID(ref))
 		}
-		t.StampCreated(now, address.String())
+		origins := []string{address.String()}
+		if len(e.From) > 0 {
+			origins = origins[:0]
+			for _, raw := range e.From {
+				canon, err := resolve(raw)
+				if err != nil {
+					fromErrs = append(fromErrs, fmt.Errorf("%s: %w", e.Slug, err))
+					continue
+				}
+				if _, seen := plan.Promoted[canon]; !seen {
+					plan.PromotedOrder = append(plan.PromotedOrder, canon)
+				}
+				plan.Promoted[canon] = append(plan.Promoted[canon], address.String())
+				origins = append(origins, canon)
+			}
+		}
+		t.StampCreated(now, origins...)
 		rendered := ticketspec.RenderManifestBody(e.Body, bodyIDs)
 		text := "\n" + strings.Trim(rendered, "\n") + "\n"
 		draft, err := schema.MarshalTicket(t, text)
@@ -186,6 +232,9 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 		})
 	}
 
+	if err := errors.Join(fromErrs...); err != nil {
+		return nil, err
+	}
 	var errs []error
 	for _, check := range publishPreWriteChecks {
 		errs = append(errs, check(plan)...)
@@ -233,11 +282,14 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 	if err != nil {
 		return err
 	}
-	projectDir, _, name, err := resolveEpicTarget(d.dirs(), cwd, epicArg)
+	projectDir, project, name, err := resolveEpicTarget(d.dirs(), cwd, epicArg)
 	if err != nil {
 		return err
 	}
 	epicPath := filepath.Join(projectDir, name)
+	resolve := followUpResolver(d, cwd, project)
+	// A failed archive keeps the published tickets, so it must not roll them back.
+	keepTickets := false
 
 	info, statErr := os.Stat(epicPath)
 	epicExists := statErr == nil && info.IsDir()
@@ -250,10 +302,10 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 			return err
 		}
 		defer func() { unlock() }()
-		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic); err != nil {
+		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic, resolve); err != nil {
 			return err
 		}
-	} else if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, tickets.Epic{}); err != nil {
+	} else if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, tickets.Epic{}, resolve); err != nil {
 		return err
 	}
 
@@ -281,7 +333,7 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 		}
 		// Creating the epic may stamp a map's completion; that stamp stays on rollback.
 		defer func() {
-			if err != nil {
+			if err != nil && !keepTickets {
 				_ = os.RemoveAll(epicPath)
 			}
 		}()
@@ -290,14 +342,14 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 			return err
 		}
 		defer func() { unlock() }()
-		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic); err != nil {
+		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic, resolve); err != nil {
 			return err
 		}
 	}
 
 	write := d.fileWriter()
 	defer func() {
-		if err != nil {
+		if err != nil && !keepTickets {
 			for _, t := range plan.Tickets {
 				_ = os.Remove(t.Path)
 			}
@@ -319,7 +371,30 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 	for _, t := range plan.Tickets {
 		ticketscmd.PingServer(d.Env, t.Path)
 	}
-	return printPublished(w, plan.rows(), jsonOut)
+	if err = printPublished(w, plan.rows(), jsonOut); err != nil {
+		return err
+	}
+	// Follow-ups are archived last: a failure here leaves the tickets in place.
+	keepTickets = true
+	return d.archivePromoted(plan)
+}
+
+// archivePromoted closes each follow-up the plan promoted as `promoted`, noting
+// the new addresses. It stops at the first failure and names the follow-up.
+func (d Deps) archivePromoted(plan *publishPlan) error {
+	closeFn := d.CloseFollowUp
+	if closeFn == nil {
+		closeFn = func(addr, reason, note string, w io.Writer) error {
+			return ticketscmd.CloseFollowUp(d.Env, addr, reason, note, w)
+		}
+	}
+	for _, from := range plan.PromotedOrder {
+		note := "promoted to " + strings.Join(plan.Promoted[from], ", ")
+		if err := closeFn(from, ticketscmd.ReasonPromoted, note, io.Discard); err != nil {
+			return fmt.Errorf("tickets published, but archiving follow-up %s failed: %w", from, err)
+		}
+	}
+	return nil
 }
 
 // validateNewTickets is tickets.ValidateProject limited to the failures that

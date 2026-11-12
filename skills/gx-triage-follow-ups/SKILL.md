@@ -155,7 +155,7 @@ Per row, in this order:
 
 1. The answers: `gx tickets triage answers`.
 2. For a merge, the seen-again note: `gx tickets triage seen-again`.
-3. `gx tickets move <addr> <epic>` or `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it
+3. `gx tickets move <addr> <epic>` or `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted
    --note ...`. A move renumbers the ticket. Capture the printed address, use it for every later
    command and save it with `--new-address`.
 4. `gx tickets set <new-addr> --type ... --status open`. Only `implement` tickets go to the ready

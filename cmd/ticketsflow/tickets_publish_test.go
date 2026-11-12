@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -469,5 +470,112 @@ func TestPublishStampsCommit(t *testing.T) {
 	}
 	if !strings.Contains(publishOut(d), commit) {
 		t.Errorf("lint header lacks %s:\n%s", commit, publishOut(d))
+	}
+}
+
+// promoteFixture is setupPublish plus open follow-ups 01..03 and a manifest of
+// a (from fromA) and b (from fromB); an empty from omits the field.
+func promoteFixture(t *testing.T, fromA, fromB string) (d Deps, project, manifest string) {
+	t.Helper()
+	d, project, _ = setupPublish(t)
+	for _, id := range []string{"01", "02", "03"} {
+		writeEpicTicket(t, project, "follow-ups", id+"-f.md",
+			"---\nid: \""+id+"\"\nstatus: open\ntype: research\ncategory: bug\n---\n\n# Follow-up "+id+"\n")
+	}
+	return d, project, promoteManifest(t, map[string]string{"a": fromA, "b": fromB}, "a", "b")
+}
+
+// promoteManifest writes a manifest of implement tickets, one per slug in
+// order, each with its from (omitted when empty).
+func promoteManifest(t *testing.T, from map[string]string, slugs ...string) string {
+	t.Helper()
+	dir := t.TempDir()
+	var m strings.Builder
+	for _, slug := range slugs {
+		writeTicketFile(t, filepath.Join(dir, slug+".md"), "# "+slug+"\n"+shapeSections)
+		fmt.Fprintf(&m, "- slug: %s\n  type: implement\n  body: %s.md\n", slug, slug)
+		if from[slug] != "" {
+			fmt.Fprintf(&m, "  from: %s\n", from[slug])
+		}
+	}
+	return writeManifest(t, dir, m.String())
+}
+
+func archivedFollowUp(t *testing.T, project, name string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(project, "follow-ups-archived", "issues", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+func TestPublishFromStringAndListArchivesAsPromoted(t *testing.T) {
+	d, project, manifest := promoteFixture(t, "follow-ups/01", "[follow-ups/02, mine:follow-ups/03]")
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	for name, want := range map[string]string{"01-f.md": "mine:e/01", "02-f.md": "mine:e/02", "03-f.md": "mine:e/02"} {
+		raw := archivedFollowUp(t, project, name)
+		for _, w := range []string{"reason: promoted", "note: promoted to " + want} {
+			if !strings.Contains(raw, w) {
+				t.Errorf("%s missing %q:\n%s", name, w, raw)
+			}
+		}
+	}
+	if raw, _ := os.ReadFile(filepath.Join(project, "e", "issues", "01-a.md")); !strings.Contains(string(raw), "original_address: mine:follow-ups/01") {
+		t.Errorf("a's original_address:\n%s", raw)
+	}
+	raw, _ := os.ReadFile(filepath.Join(project, "e", "issues", "02-b.md"))
+	if !strings.Contains(string(raw), "mine:follow-ups/02") || !strings.Contains(string(raw), "mine:follow-ups/03") {
+		t.Errorf("b's original_address list:\n%s", raw)
+	}
+}
+
+func TestPublishInvalidFromWritesNothing(t *testing.T) {
+	for name, from := range map[string]string{
+		"archived":      "follow-ups-archived/01",
+		"other project": "theirs:follow-ups/01",
+		"missing":       "follow-ups/09",
+	} {
+		t.Run(name, func(t *testing.T) {
+			d, project, manifest := promoteFixture(t, "follow-ups/01", from)
+			if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
+				t.Fatal("want an error")
+			}
+			if names := issueNames(t, project, "e"); len(names) != 0 {
+				t.Errorf("wrote %v", names)
+			}
+			if got := issueNames(t, project, "follow-ups"); len(got) != 3 {
+				t.Errorf("follow-ups = %v, want all 3 still there", got)
+			}
+		})
+	}
+}
+
+func TestPublishArchiveFailureNamesFollowUpAndKeepsTickets(t *testing.T) {
+	d, project, manifest := promoteFixture(t, "follow-ups/01", "")
+	d.CloseFollowUp = func(addr, reason, note string, w io.Writer) error { return errors.New("boom") }
+	err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d)
+	if err == nil || !strings.Contains(err.Error(), "mine:follow-ups/01") {
+		t.Fatalf("err = %v, want one naming mine:follow-ups/01", err)
+	}
+	if got := strings.Join(issueNames(t, project, "e"), " "); got != "01-a.md 02-b.md" {
+		t.Errorf("issues = %s, want the tickets kept", got)
+	}
+}
+
+func TestPublishSecondRunSameDayJoinsExistingEpic(t *testing.T) {
+	d, project, manifest := promoteFixture(t, "follow-ups/01", "follow-ups/02")
+	epic := "mine:follow-ups-2026-11-12"
+	if err := execute(t, []string{"tickets", "publish", epic, "--manifest", manifest}, d); err != nil {
+		t.Fatal(err)
+	}
+	second := promoteManifest(t, map[string]string{"c": "follow-ups/03"}, "c")
+	if err := execute(t, []string{"tickets", "publish", epic, "--manifest", second}, d); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(issueNames(t, project, "follow-ups-2026-11-12"), " "); got != "01-a.md 02-b.md 03-c.md" {
+		t.Errorf("issues = %s", got)
 	}
 }

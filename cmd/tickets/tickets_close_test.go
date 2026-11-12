@@ -28,6 +28,7 @@ func TestExecute_TicketsClose_EachReasonArchivesWithResolution(t *testing.T) {
 		{"fixed", ""},
 		{"obsolete", "no longer relevant"},
 		{"not-worth-it", ""},
+		{"promoted", "promoted to mine:e/01"},
 		{"duplicate", "mine:follow-ups/02"},
 	} {
 		t.Run(tc.reason, func(t *testing.T) {
@@ -65,6 +66,17 @@ func TestExecute_TicketsClose_EachReasonArchivesWithResolution(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestExecute_TicketsClose_HelpListsPromoted(t *testing.T) {
+	f := setupCloseProject(t)
+	out, err := runIn(t, f.repo, "tickets", "close", "--help")
+	if err != nil {
+		t.Fatalf("help: %v", err)
+	}
+	if !strings.Contains(out, "promoted") {
+		t.Errorf("help does not list promoted:\n%s", out)
 	}
 }
 

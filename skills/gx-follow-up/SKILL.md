@@ -66,7 +66,7 @@ for that test name first. Judge each hit yourself, by title and `## Problem`: th
      only `--clear` blanks a section.
 - **An archived `fixed` ticket** → file a regression: a new follow-up whose `## Source` and
   `## Evidence` cite the archived address.
-- **Any other archived ticket** (`obsolete`, `duplicate`, `not-worth-it`) → drop it. File nothing;
+- **Any other archived ticket** (`obsolete`, `duplicate`, `not-worth-it`, `promoted`) → drop it. File nothing;
   report the archived address and its reason.
 
 ## 3. Fill and file
