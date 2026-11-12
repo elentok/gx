@@ -8,5 +8,8 @@ func TestResolvingMergeConflictsVerifiesKeptSide(t *testing.T) {
 		"--ours",
 		"stated goal",
 		"every package",
+		"`gx-verify` skill on every conflicted file",
+		"*.e2e.ts",
+		"before `git cherry-pick --continue`",
 	)
 }

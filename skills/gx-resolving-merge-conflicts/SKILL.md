@@ -22,7 +22,10 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
    `git show CHERRY_PICK_HEAD --stat` and confirm every file it changes still carries that
    commit's change in the resolved tree, including files that did not conflict.
 
-4. Run only the checks that touch the conflicted files: build and vet every package the
+4. Run only the checks that touch the conflicted files, with the `gx-verify` skill on every
+   conflicted file, e2e flows (`*.e2e.ts`) included. Rerun them before
+   `git cherry-pick --continue`, even when vitest, tsc and vet pass: a conflicted e2e flow still
+   needs its Playwright run. Build and vet every package the
    cherry-picked or merged commit touches (not only the conflicted files' packages), then
    targeted tests (`-run <pattern>`) for the code the conflict changed. Never run a whole package
    or the full suite for a small conflict. Skip checks the original ticket already passed. Fix
