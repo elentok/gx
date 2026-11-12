@@ -38,6 +38,9 @@ func write(t *testing.T, dir, name, body string) {
 	}
 }
 
+// quiet is the one place a test waits out a window to prove nothing happened.
+func quiet(d time.Duration) { time.Sleep(d) }
+
 func TestStart_CreatesRepoIfMissing(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "store")
 	l, err := Start(dir, time.Hour)
@@ -60,7 +63,7 @@ func TestEditsInsideDebounceWindowMakeOneSyncCommit(t *testing.T) {
 
 	for i, name := range []string{"a.md", "b.md", "c.md"} {
 		write(t, dir, name, "x")
-		time.Sleep(50 * time.Millisecond)
+		quiet(50 * time.Millisecond)
 		if got := logLines(t, dir); len(got) != 0 {
 			t.Fatalf("after edit %d committed early: %v", i, got)
 		}
@@ -82,10 +85,10 @@ func TestTouch_CommitsAfterQuietWithoutPolling(t *testing.T) {
 
 	write(t, dir, "a.md", "x")
 	l.Touch()
-	time.Sleep(100 * time.Millisecond)
+	quiet(100 * time.Millisecond)
 	write(t, dir, "b.md", "x")
 	l.Touch() // restarts the quiet period
-	time.Sleep(150 * time.Millisecond)
+	quiet(150 * time.Millisecond)
 	if got := logLines(t, dir); len(got) != 0 {
 		t.Fatalf("committed before the quiet period ended: %v", got)
 	}
@@ -102,7 +105,7 @@ func TestNoTouchNoFallback_RunsNoGit(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, dir, "a.md", "x")
-	time.Sleep(200 * time.Millisecond)
+	quiet(200 * time.Millisecond)
 	if got := logLines(t, dir); len(got) != 0 {
 		t.Fatalf("committed with no touch and no fallback tick: %v", got)
 	}
