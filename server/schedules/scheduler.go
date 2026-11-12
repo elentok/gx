@@ -70,6 +70,7 @@ func (sc *Scheduler) Check() {
 	for _, it := range items {
 		sc.checkOne(it.Schedule, it.Registered, now)
 	}
+	sc.sweepDeleted(items)
 }
 
 func (sc *Scheduler) now() time.Time {

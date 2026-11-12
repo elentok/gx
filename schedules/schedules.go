@@ -271,8 +271,11 @@ func (st *Store) List() ([]Item, error) {
 		}
 		pdir := filepath.Join(st.dir, e.Name())
 		files, err := os.ReadDir(filepath.Join(pdir, dirName))
-		if err != nil {
+		if os.IsNotExist(err) {
 			continue
+		}
+		if err != nil {
+			return nil, err
 		}
 		_, statErr := os.Stat(filepath.Join(pdir, "project.json"))
 		for _, f := range files {
