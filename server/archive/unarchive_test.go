@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -33,19 +34,24 @@ func (r rig) active(t *testing.T, name string) tickets.Epic {
 }
 
 // workspaceOf is the workspace the Epics list shows for the epic card at address.
+// It waits for the row: the store rescan after a move is asynchronous.
 func (r rig) workspaceOf(t *testing.T, address string) string {
 	t.Helper()
-	list, err := r.H.Client.Reads.Epics(r.Ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range list.Epics {
-		if e.Address == address {
-			return e.Workspace
+	var workspace string
+	testutil.WaitFor(t, 5*time.Second, "epic row "+address, func() bool {
+		list, err := r.H.Client.Reads.Epics(r.Ctx)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-	t.Fatalf("no epic row %s", address)
-	return ""
+		for _, e := range list.Epics {
+			if e.Address == address {
+				workspace = e.Workspace
+				return true
+			}
+		}
+		return false
+	})
+	return workspace
 }
 
 func (r rig) members(t *testing.T, workspace string) int {
