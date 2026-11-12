@@ -132,8 +132,11 @@ test("189. Send images, design composer round", async ({ page, start }) => {
 
   // The round's answers reach the agent with both images pasted before them.
   const conv = (await chatOf(fixture, design.id)).conversation_id
-  await expect.poll(async () => (await fixture.input(conv)).split("/images/").length - 1).toBe(2)
-  expect(await fixture.input(conv)).toContain("Q8 - Which store?")
+  // Images are pasted first and the answers follow, so wait for the answers before reading the order.
+  await expect.poll(async () => fixture.input(conv)).toContain("Q8 - Which store?")
+  const input = await fixture.input(conv)
+  expect(input.split("/images/").length - 1).toBe(2)
+  expect(input.lastIndexOf("/images/")).toBeLessThan(input.indexOf("Q8 - Which store?"))
 })
 
 test("191. Chat images on the agents-images scenario", async ({ page, start }) => {
