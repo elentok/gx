@@ -242,6 +242,12 @@ type Scenario struct {
 	// TriageShaped marks the triage scenario, whose whole content comes from the
 	// --shape value (TriageScenario).
 	TriageShaped bool
+	// Schedules seeds Schedules and their per-machine state before the server
+	// starts (see SchedulesScenario).
+	Schedules []ScheduleSeed
+	// SchedulesShaped marks the schedules scenario, whose whole content comes
+	// from the --shape value (SchedulesScenario).
+	SchedulesShaped bool
 	// DevMode seeds a Dev checkout and the fake pnpm in the state the --shape
 	// value names (default running); see DevModeShapes and devmode.go.
 	DevMode bool

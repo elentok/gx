@@ -38,7 +38,7 @@ func LastRuns(ticketStore string, st *State, k Key) ([]wire.ScheduleRun, error) 
 	if err != nil {
 		return nil, err
 	}
-	prefix := "schedule:" + k.Project + "/" + k.Slug + "@"
+	prefix := DedupeKey(k, "")
 	var rows []lastRow
 	for _, e := range []struct {
 		epic string

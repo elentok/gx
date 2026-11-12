@@ -24,6 +24,14 @@ question, five action groups, three rows changed), `writing` (session running, t
 (Done, two kept rows, a ready epic and a map epic), `stopped` (started from the CLI: no session, stopped at Plan). `journey` has
 follow-ups and no record, for the Triage journey flow. Records are written with the `triage` package; the `verify` and `writing`
 sessions are started with `gx server triage open`. Data: `testutil/gxfixture/spec/triage.go`.
+The `schedules` scenario seeds Schedules in the project `demo` (`start("schedules", { shape })`; default `list`). Set times are
+local, at least two hours ahead, and each switched-on Schedule's baseline is the start time, so no run starts by itself. `list`
+has three Schedules: "Weather check" (every day, two times) and "Morning PR digest" (weekdays) on, "Weekly cleanup report"
+(Sunday) off. `all-off` has the same three, all off. `empty` has none. `page` has "Weather check" on with four Last runs, newest
+first: Finished, Finished, Ran late and a Skipped set time (reason `late`); `needs-answer` adds a paused One-off above them.
+`missing-project` has one Schedule, on, in a store folder with no `project.json`. The machine id is fixed (`fixture1`) so the
+seeded One-offs carry the server's Dedupe key. Data: `testutil/gxfixture/spec/schedules.go`; the files and state are written by
+`testutil/gxfixture/seedschedules.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install

@@ -44,8 +44,11 @@ func Decide(prev *tickets.Ticket, address string) Decision {
 }
 
 // dedupeKey is the Dedupe key of this machine's runs of the Schedule.
-func (sc *Scheduler) dedupeKey(k Key) string {
-	return "schedule:" + k.Project + "/" + k.Slug + "@" + sc.State.MachineID()
+func (sc *Scheduler) dedupeKey(k Key) string { return DedupeKey(k, sc.State.MachineID()) }
+
+// DedupeKey is the Dedupe key of one machine's runs of the Schedule.
+func DedupeKey(k Key, machineID string) string {
+	return "schedule:" + k.String() + "@" + machineID
 }
 
 // previousRun finds the live one-off carrying the Schedule's Dedupe key.

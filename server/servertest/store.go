@@ -82,6 +82,8 @@ type TicketOpts struct {
 	ActualCost  float64
 	// Launch is the ticket's launch: stamps, omitted when empty.
 	Launch []schema.LaunchStamp
+	// Result is the body of a "## Result" section, omitted when empty.
+	Result string
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -182,5 +184,8 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 		}
 	}
 	fm += "---\n\n# " + slug + "\n"
+	if opts.Result != "" {
+		fm += "\n## Result\n\n" + opts.Result + "\n"
+	}
 	return os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644)
 }
