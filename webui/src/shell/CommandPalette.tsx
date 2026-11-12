@@ -64,7 +64,7 @@ export function useCommands(): Command[] {
   }, [navigate, shell, afk, next, count]);
 }
 
-/** Cmd+E on a Mac, Ctrl+E elsewhere, on every page, in text fields too. Same layout as the jump palette. */
+/** Cmd+P on a Mac, Ctrl+P elsewhere, on every page, in text fields too. Same layout as the jump palette. */
 export function CommandPalette() {
   const phone = !useWide();
   const open = useCommandOpen();
@@ -78,7 +78,7 @@ export function CommandPalette() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = isMac() ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
-      if (mod && e.key.toLowerCase() === "e") {
+      if (mod && e.key.toLowerCase() === "p") {
         e.preventDefault();
         if (open ? isTop() : !hasLayer()) setCommandOpen((o) => !o);
       }

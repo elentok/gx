@@ -41,14 +41,14 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   }
   await goto(page, "#/e/demo:running-epic");
 
-  // Cmd/Ctrl+E opens the Command palette on every page, a second press closes it, and the filter box has focus.
+  // Cmd/Ctrl+P opens the Command palette on every page, a second press closes it, and the filter box has focus.
   const palette = page.getByRole("dialog", nav("Commands"));
   for (const hash of ["#/epics", "#/e/demo:running-epic", "#/agents", "#/stats", "#/settings"]) {
     await goto(page, hash);
-    await page.keyboard.press("ControlOrMeta+e");
+    await page.keyboard.press("ControlOrMeta+p");
     await expect(palette).toBeVisible();
     await expect(palette.getByRole("combobox")).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+e");
+    await page.keyboard.press("ControlOrMeta+p");
     await expect(palette).toHaveCount(0);
   }
 
@@ -56,14 +56,14 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await goto(page, "#/d/demo:design-live");
   await page.getByRole("form", nav("Composer")).getByRole("button", nav("Note")).click();
   await expect(page.getByRole("textbox", nav("Message"))).toBeFocused();
-  await page.keyboard.press("ControlOrMeta+e");
+  await page.keyboard.press("ControlOrMeta+p");
   await expect(palette).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);
 
   // The palette is centered horizontally and lists the eight commands in order.
   await goto(page, "#/epics");
-  await page.keyboard.press("ControlOrMeta+e");
+  await page.keyboard.press("ControlOrMeta+p");
   await expect(palette).toBeVisible();
   const box = (await palette.boundingBox())!;
   const viewport = page.viewportSize()!;
@@ -78,7 +78,7 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
 
   // Toggle AFK, then the gear menu shows the AFK switch flipped.
   await goto(page, "#/epics");
-  await page.keyboard.press("ControlOrMeta+e");
+  await page.keyboard.press("ControlOrMeta+p");
   await expect(rows.filter({ hasText: "Toggle AFK" })).toContainText("AFK is off");
   await rows.filter({ hasText: "Toggle AFK" }).click();
   await expect(palette).toHaveCount(0);
@@ -95,7 +95,7 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await page.setViewportSize({ width: 375, height: 812 });
 
   // The Command palette is a full-screen sheet on the phone.
-  await page.keyboard.press("ControlOrMeta+e");
+  await page.keyboard.press("ControlOrMeta+p");
   await expect(palette).toBeVisible();
   await expect.poll(() => palette.boundingBox()).toMatchObject({ x: 0, y: 0, width: 375, height: 812 });
   await page.keyboard.press("Escape");

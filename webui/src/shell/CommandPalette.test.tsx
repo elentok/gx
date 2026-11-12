@@ -89,17 +89,17 @@ const names = () => screen.queryAllByRole("option").map((o) => within(o).getAllB
 const where = () => screen.getByTestId("where").textContent;
 const press = (init: KeyboardEventInit, target: Element | Window = window) => fireEvent.keyDown(target, init);
 
-test("Ctrl+E opens off a Mac, Cmd+E does nothing; the reverse on a Mac", () => {
+test("Ctrl+P opens off a Mac, Cmd+P does nothing; the reverse on a Mac", () => {
   setup();
-  press({ key: "e", metaKey: true });
+  press({ key: "p", metaKey: true });
   expect(palette()).toBeNull();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   expect(palette()).toBeTruthy();
   cleanup();
   setup({ mac: true });
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   expect(palette()).toBeNull();
-  press({ key: "e", metaKey: true });
+  press({ key: "p", metaKey: true });
   expect(palette()).toBeTruthy();
 });
 
@@ -107,10 +107,10 @@ test("opens from a focused text box with the filter focused, and a second press 
   setup();
   const field = screen.getByLabelText("field");
   field.focus();
-  press({ key: "e", ctrlKey: true, bubbles: true }, field);
+  press({ key: "p", ctrlKey: true, bubbles: true }, field);
   expect(palette()).toBeTruthy();
   expect(document.activeElement).toBe(screen.getByRole("combobox"));
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   expect(palette()).toBeNull();
 });
 
@@ -121,29 +121,29 @@ test("does nothing under a Modal", () => {
       body
     </Modal>,
   );
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   expect(palette()).toBeNull();
 });
 
 test("never stacks with Cmd+K, in either order", async () => {
   setup();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   press({ key: "k", ctrlKey: true });
   expect(palette()).toBeTruthy();
   expect(jump()).toBeNull();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   press({ key: "k", ctrlKey: true });
   expect(await screen.findByRole("dialog", { name: "Jump to" })).toBeTruthy();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   expect(palette()).toBeNull();
 });
 
 test("Escape and a click outside close without running anything", () => {
   setup();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   press({ key: "Escape" });
   expect(palette()).toBeNull();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   fireEvent.mouseDown(document.body);
   expect(palette()).toBeNull();
   expect(where()).toBe("/stats");
@@ -151,7 +151,7 @@ test("Escape and a click outside close without running anything", () => {
 
 test("rows are in fixed order, hold no epic or session rows, and filter fuzzily", () => {
   setup();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   expect(names()).toEqual(["New design", "New chat", "Next question", "Go to Epics", "Go to Agents", "Go to Stats", "Go to Settings", "Toggle AFK"]);
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "go ep" } });
   expect(names()[0]).toBe("Go to Epics");
@@ -170,7 +170,7 @@ test.each([
   ["nc", "/agents/s1", "gamma"],
 ])("typing %s then Enter on %s opens the form on %s over the same page", async (filter, path, project) => {
   setup({ path });
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   const box = screen.getByRole("combobox");
   fireEvent.change(box, { target: { value: filter } });
   fireEvent.keyDown(box, { key: "Enter" });
@@ -184,7 +184,7 @@ test.each([
 
 test("Down and Enter run the chosen command", () => {
   setup();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   const box = screen.getByRole("combobox");
   for (let i = 0; i < 4; i++) fireEvent.keyDown(box, { key: "ArrowDown" });
   fireEvent.keyDown(box, { key: "Enter" });
@@ -199,7 +199,7 @@ test.each([
   ["Go to Settings", "/settings"],
 ])("clicking %s navigates", (title, path) => {
   setup();
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   fireEvent.click(screen.getAllByRole("option").find((o) => o.textContent?.startsWith(title))!);
   expect(where()).toBe(path);
 });
@@ -209,7 +209,7 @@ test.each([
   [false, "AFK is off", true],
 ])("Toggle AFK with afk=%s says %s and posts on=%s once, then closes", async (afk, subtitle, on) => {
   setup({ afk });
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   const row = screen.getAllByRole("option").find((o) => o.textContent?.startsWith("Toggle AFK"))!;
   expect(row.textContent).toContain(subtitle);
   fireEvent.click(row);
@@ -231,7 +231,7 @@ const waiting = [
 test("Next question: from a plain page Enter opens the newest card's Answer link", async () => {
   setup({ epics: waiting });
   await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   await waitFor(() => expect(nextRow().textContent).toContain("new · 3 waiting"));
   const box = screen.getByRole("combobox");
   fireEvent.change(box, { target: { value: "needs you" } });
@@ -243,7 +243,7 @@ test("Next question: from a plain page Enter opens the newest card's Answer link
 
 test("Next question: from a card's page it goes to the next one, a plain card to its page", async () => {
   setup({ epics: waiting, path: "/e/p:mid" });
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   await waitFor(() => expect(nextRow().textContent).toContain("old · 3 waiting"));
   fireEvent.click(nextRow());
   expect(where()).toBe("/e/p:old");
@@ -254,13 +254,13 @@ test.each([
   ["a Follow-ups card", card("", 2, { card_kind: CardKindFollowUps, name: "", waiting_since: undefined }), "p · 1 waiting"],
 ])("Next question subtitle names %s", async (_n, row, subtitle) => {
   setup({ epics: [row], follow_ups: [{ project: "p", workspaces: ["Default"] }] });
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   await waitFor(() => expect(nextRow().textContent).toContain(subtitle));
 });
 
 test("Next question with nothing waiting stays in place and Enter leaves the route", async () => {
   setup({ epics: [card("away", 1, { workspace: "Work" })] });
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
   expect(nextRow().textContent).toContain("Nothing needs you");
   const box = screen.getByRole("combobox");
@@ -271,7 +271,7 @@ test("Next question with nothing waiting stays in place and Enter leaves the rou
 
 test("full screen at a phone width", () => {
   setup({ narrow: true });
-  press({ key: "e", ctrlKey: true });
+  press({ key: "p", ctrlKey: true });
   expect(palette()).toBeTruthy();
   fireEvent.mouseDown(document.body);
   expect(palette()).toBeTruthy();

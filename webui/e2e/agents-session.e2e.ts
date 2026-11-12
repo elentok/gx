@@ -115,7 +115,7 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(interrupt).toHaveAttribute("title", /Esc/);
 
   // Esc closes the command palette first; no confirm opens.
-  await page.keyboard.press("ControlOrMeta+e");
+  await page.keyboard.press("ControlOrMeta+p");
   const palette = page.getByRole("dialog", nav("Commands"));
   await expect(palette).toBeVisible();
   await page.keyboard.press("Escape");

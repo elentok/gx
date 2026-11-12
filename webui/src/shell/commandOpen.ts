@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-// Open state of the Command palette (Cmd/Ctrl+E), kept outside React state like jumpOpen.ts.
+// Open state of the Command palette (Cmd/Ctrl+P), kept outside React state like jumpOpen.ts.
 let open = false;
 const listeners = new Set<() => void>();
 
