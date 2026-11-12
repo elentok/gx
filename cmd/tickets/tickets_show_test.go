@@ -43,6 +43,35 @@ func TestExecute_TicketsList_IsHiddenAliasOfShow(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_PrintsAgentWhenSet(t *testing.T) {
+	repo, project := cmdtest.SetupShowProject(t)
+	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-pinned.md",
+		"---\nid: \"07\"\nstatus: open\ntype: implement\nagent: codex\n---\n\n# 07 — Pinned\n\nbody\n")
+
+	out, err := runIn(t, repo, "tickets", "show", "mine:epic/07")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "\nagent: codex\n") {
+		t.Errorf("text output has no agent line:\n%s", out)
+	}
+	out, err = runIn(t, repo, "tickets", "show", "mine:epic/07", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := cmdtest.DecodeJSON(t, []byte(out)); m["agent"] != "codex" {
+		t.Errorf("json agent = %v, want codex", m["agent"])
+	}
+
+	out, err = runIn(t, repo, "tickets", "show", "mine:epic/06")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "agent:") {
+		t.Errorf("ticket without agent printed an agent line:\n%s", out)
+	}
+}
+
 func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
 	repo, _ := cmdtest.SetupShowProject(t)
 

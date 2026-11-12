@@ -23,6 +23,7 @@ type ticketShowJSON struct {
 	Type      string   `json:"type"`
 	Status    string   `json:"status"`
 	Parent    *string  `json:"parent"`
+	Agent     string   `json:"agent,omitempty"`
 	BlockedBy []string `json:"blocked_by"`
 	Path      string   `json:"path"`
 	Body      string   `json:"body"`
@@ -212,13 +213,16 @@ func printTicket(a tickets.Address, t tickets.Ticket, jsonOut bool, w io.Writer)
 	if jsonOut {
 		return cmdbase.EncodeProvenance(w, ticketShowJSON{
 			Address: a.String(), Title: t.Title, Type: t.Type, Status: t.Status,
-			Parent: t.Parent, BlockedBy: blocked, Path: t.Path, Body: t.Body,
+			Parent: t.Parent, Agent: t.Agent, BlockedBy: blocked, Path: t.Path, Body: t.Body,
 		}, cmdbase.ViaDirect, cmdbase.CallerActor(os.Getwd))
 	}
 	fmt.Fprintf(w, "%s  %s\n", a, t.Title)
 	fmt.Fprintf(w, "status: %s\ntype: %s\n", t.Status, t.Type)
 	if t.Parent != nil {
 		fmt.Fprintf(w, "parent: %s\n", *t.Parent)
+	}
+	if t.Agent != "" {
+		fmt.Fprintf(w, "agent: %s\n", t.Agent)
 	}
 	if len(blocked) > 0 {
 		// JSON keeps the file's tokens; only the text form shows the widening.
