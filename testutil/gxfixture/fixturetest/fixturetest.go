@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -117,6 +118,29 @@ const startTimeout = 40 * time.Second
 // LaunchProc is launch without a test, so TestMain can start a shared fixture
 // outside every test's time limit.
 func LaunchProc(register func(func()), scenario string, env []string, flags ...string) (*Running, error) {
+	// Startup is the fork-heavy phase; a parallel test run starting every
+	// fixture at once exhausted the user's process limit.
+	launchSlots <- struct{}{}
+	defer func() { <-launchSlots }()
+	r, err := launchProc(register, scenario, env, flags...)
+	return r, explainStartErr(err)
+}
+
+// maxParallelLaunches caps the fixtures starting at once in one test binary.
+const maxParallelLaunches = 4
+
+var launchSlots = make(chan struct{}, maxParallelLaunches)
+
+// explainStartErr names the process limit when fork/exec hit it, so a mass
+// failure reads as one cause instead of many unrelated test failures.
+func explainStartErr(err error) error {
+	if errors.Is(err, syscall.EAGAIN) {
+		return fmt.Errorf("process limit hit (EAGAIN): the machine ran out of processes; lower test parallelism or close other work: %w", err)
+	}
+	return err
+}
+
+func launchProc(register func(func()), scenario string, env []string, flags ...string) (*Running, error) {
 	args := append([]string{"--gx", GxBin, "--fakeclaude", FakeBin, "--fakegh", FakeGHBin}, flags...)
 	cmd := exec.Command(FixtureBin, append(args, scenario)...)
 	cmd.Env = append(os.Environ(), env...)
