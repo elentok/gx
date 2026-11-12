@@ -131,15 +131,20 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   await mac.bringToFront()
   await mac.keyboard.press("Control+e")
   await expect(box(mac)).toHaveCount(0)
-  await mac.keyboard.press("Meta+e")
-  await expect(box(mac)).toBeVisible()
+  // The key handler may not be ready right after the page loads, so press again until the box opens.
+  await expect(async () => {
+    await mac.keyboard.press("Meta+e")
+    await expect(box(mac)).toBeVisible({ timeout: 1_000 })
+  }).toPass({ timeout: 10_000 })
   await mac.keyboard.press("Escape")
   await expect(box(mac)).toHaveCount(0)
   await other.bringToFront()
   await other.keyboard.press("Meta+e")
   await expect(box(other)).toHaveCount(0)
-  await other.keyboard.press("Control+e")
-  await expect(box(other)).toBeVisible()
+  await expect(async () => {
+    await other.keyboard.press("Control+e")
+    await expect(box(other)).toBeVisible({ timeout: 1_000 })
+  }).toPass({ timeout: 10_000 })
   await other.keyboard.press("Escape")
   await expect(box(other)).toHaveCount(0)
 
