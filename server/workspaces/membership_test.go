@@ -240,6 +240,18 @@ func TestStorePlace_QueueAndOneOffAgents(t *testing.T) {
 	}
 }
 
+func TestStorePlace_TriageSessionSitsUnderOther(t *testing.T) {
+	s, err := workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory { return fakeDir{} })
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.Place([]wire.SessionInfo{{ID: "t1", Flow: "triage", FlowKey: "proj"}})
+	want := []wire.SessionPlacement{{Session: "t1", Kind: wire.PlacementOther}}
+	if !slices.Equal(got, want) {
+		t.Errorf("placements = %+v, want %+v", got, want)
+	}
+}
+
 func TestStorePlace_ArchiveKeysPlaceAsEpicAndOthersAreUnchanged(t *testing.T) {
 	s, err := workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory {
 		return fakeDir{designs: map[string]bool{"proj:map": true}}

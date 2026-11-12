@@ -72,6 +72,10 @@ func (s *Store) Place(sessions []wire.SessionInfo) []wire.SessionPlacement {
 }
 
 func (s *Store) place(si wire.SessionInfo) wire.SessionPlacement {
+	// A Triage session has no ticket and belongs to no workspace: it sits under Other.
+	if si.Flow == string(tickets.FlowTriage) {
+		return wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementOther}
+	}
 	if !si.Design && !si.Queue && si.FixOf == "" {
 		return wire.SessionPlacement{Session: si.ID, Kind: wire.PlacementChat, Workspace: s.Workspace(si.ID)}
 	}
