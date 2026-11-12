@@ -2691,6 +2691,26 @@ export interface ScheduleEditRequest {
   harness?: string;
   late_limit_hours?: number /* float64 */;
 }
+/**
+ * ScheduleRunNowRequest is the body of POST /v1/schedules/run-now.
+ */
+export interface ScheduleRunNowRequest {
+  project: string;
+  slug: string;
+}
+/**
+ * ScheduleRunNowResult is the result of POST /v1/schedules/run-now. Address is
+ * the new One-off; a refusal carries Reason and Message, and AttentionAddress
+ * names the previous run's ticket when it needs attention.
+ */
+export interface ScheduleRunNowResult {
+  address: string;
+  status: string;
+  refused: boolean;
+  reason: string;
+  message: string;
+  attention_address: string;
+}
 
 //////////
 // source: sessions.go

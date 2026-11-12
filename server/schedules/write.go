@@ -22,6 +22,7 @@ func WriteRoutes(get func() *Schedules) []wire.Route {
 		{Pattern: "POST /v1/schedules/edit", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { writeHandler(w, r, get().edit) }},
 		{Pattern: "POST /v1/schedules/switch", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { writeHandler(w, r, get().switchTo) }},
 		{Pattern: "POST /v1/schedules/delete", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { writeHandler(w, r, get().remove) }},
+		{Pattern: "POST /v1/schedules/run-now", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { writeHandler(w, r, get().runNow) }},
 	}
 }
 
@@ -198,6 +199,22 @@ func (s *Schedules) remove(req wire.ScheduleDeleteRequest) (wire.ScheduleDeleteR
 	}
 	s.publish(req.Project, req.Slug)
 	return wire.ScheduleDeleteResult{}, nil
+}
+
+// runNow starts one run of the Schedule at once, whatever the switch says.
+func (s *Schedules) runNow(req wire.ScheduleRunNowRequest) (wire.ScheduleRunNowResult, error) {
+	sc, err := s.Store.Get(req.Project, req.Slug)
+	switch {
+	case errors.Is(err, schedrec.ErrNotFound):
+		return wire.ScheduleRunNowResult{Refused: true, Reason: wire.ScheduleReasonUnknown, Message: "no schedule " + req.Project + ":" + req.Slug}, nil
+	case err != nil:
+		return wire.ScheduleRunNowResult{}, err
+	}
+	res, err := s.RunNow(sc)
+	if err == nil && !res.Refused {
+		s.publish(sc.Project, sc.Slug)
+	}
+	return res, err
 }
 
 func (s *Schedules) publish(project, slug string) {

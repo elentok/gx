@@ -135,3 +135,21 @@ type ScheduleEditRequest struct {
 	Harness        *string  `json:"harness"`
 	LateLimitHours *float64 `json:"late_limit_hours"`
 }
+
+// ScheduleRunNowRequest is the body of POST /v1/schedules/run-now.
+type ScheduleRunNowRequest struct {
+	Project string `json:"project"`
+	Slug    string `json:"slug"`
+}
+
+// ScheduleRunNowResult is the result of POST /v1/schedules/run-now. Address is
+// the new One-off; a refusal carries Reason and Message, and AttentionAddress
+// names the previous run's ticket when it needs attention.
+type ScheduleRunNowResult struct {
+	Address          string `json:"address"`
+	Status           string `json:"status"`
+	Refused          bool   `json:"refused"`
+	Reason           string `json:"reason"`
+	Message          string `json:"message"`
+	AttentionAddress string `json:"attention_address"`
+}

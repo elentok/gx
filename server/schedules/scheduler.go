@@ -140,13 +140,7 @@ func (sc *Scheduler) skipMissingProject(s schedrec.Schedule, k Key, due, now tim
 
 // start queues the run; false means the baseline must stay so a later check retries.
 func (sc *Scheduler) start(s schedrec.Schedule, due time.Time) bool {
-	res, err := sc.Submit.SubmitScheduled(wire.OneOffRequest{
-		Prompt:  Prompt(s.Name, s.Prompt),
-		Project: s.Project,
-		Agent:   s.Harness,
-		Name:    s.Slug,
-		Unique:  sc.dedupeKey(Key{Project: s.Project, Slug: s.Slug}),
-	}, due)
+	res, err := sc.Submit.SubmitScheduled(sc.runRequest(s), due)
 	switch {
 	case err != nil:
 		sc.Log.Warn("starting a scheduled run failed", "schedule", s.Slug, "err", err)

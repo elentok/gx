@@ -24,7 +24,7 @@ type Deps struct {
 // New builds `gx schedules`.
 func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "schedules", Short: "list, show, create, edit, switch and delete Schedules (asks the server)"}
-	cmd.AddCommand(newList(d), newShow(d), newCreate(d), newEdit(d), newSwitch(d), newDelete(d))
+	cmd.AddCommand(newList(d), newShow(d), newCreate(d), newEdit(d), newSwitch(d), newDelete(d), newRunNow(d))
 	return cmd
 }
 

@@ -390,7 +390,7 @@ func New(cfg Config) (*Server, error) {
 		Now: cfg.SchedulesClock, Interval: cfg.SchedulesInterval, Ready: s.migrator.StartupDone(),
 	}
 	s.schedules = &schedules.Schedules{
-		Store: s.schedRunner.Store, State: schedState, TicketStore: cfg.TicketStore, Now: cfg.SchedulesClock, Events: events, Check: s.schedRunner.Check,
+		Store: s.schedRunner.Store, State: schedState, TicketStore: cfg.TicketStore, Now: cfg.SchedulesClock, Events: events, Check: s.schedRunner.Check, RunNow: s.schedRunner.RunNow,
 		Projects: func() ([]string, error) {
 			ps, err := idx.ListProjects()
 			names := make([]string, 0, len(ps))

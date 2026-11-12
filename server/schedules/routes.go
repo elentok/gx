@@ -26,6 +26,8 @@ type Schedules struct {
 	Events *broker.Broker
 	// Check runs one scheduler check; a delete uses it to tidy at once.
 	Check func()
+	// RunNow starts one run of a Schedule now.
+	RunNow func(schedrec.Schedule) (wire.ScheduleRunNowResult, error)
 }
 
 // Routes lists the read routes. The getter is called per request.

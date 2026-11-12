@@ -215,6 +215,36 @@ func newDelete(d Deps) *cobra.Command {
 	return cmd
 }
 
+func newRunNow(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "run-now <project:slug>",
+		Short: "start one run of a Schedule now, whatever its switch says",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			project, slug, err := parseAddress(args[0])
+			if err != nil {
+				return err
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Schedules.RunNow(ctx(c), wire.ScheduleRunNowRequest{Project: project, Slug: slug})
+			message := res.Message
+			if res.AttentionAddress != "" {
+				message += " (needs attention: " + res.AttentionAddress + ")"
+			}
+			return finish(c.OutOrStdout(), jsonOut, res, res.Refused, res.Reason, message, err, func(w io.Writer, res wire.ScheduleRunNowResult) error {
+				_, err := fmt.Fprintln(w, res.Address)
+				return err
+			})
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
 func printAddress(w io.Writer, res wire.ScheduleShowResult) error {
 	_, err := fmt.Fprintf(w, "%s:%s\n", res.Schedule.Project, res.Schedule.Slug)
 	return err
