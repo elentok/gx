@@ -203,10 +203,15 @@ export function SessionView({
   // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
   // Each sits right after the message that was last when it was sent, so replies that stream in land below it.
   const [echoed, setEchoed] = useState<
-    (EchoPrompt & { sessionId: string; seen: number; after?: string })[]
+    (EchoPrompt & { sessionId: string; conversationId: string; seen: number; after?: string })[]
   >([])
+  // An echo belongs to the conversation it was sent in: /clear starts a new one whose first message is its own /clear,
+  // so the old count would never be passed and the echo would stay.
   const waiting = echoed.filter(
-    (e) => e.sessionId === session.id && echoMatches(chat?.messages ?? [], e) <= e.seen,
+    (e) =>
+      e.sessionId === session.id &&
+      (e.conversationId === "" || e.conversationId === chat?.conversation_id) &&
+      echoMatches(chat?.messages ?? [], e) <= e.seen,
   )
   const shown =
     chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat
@@ -278,6 +283,7 @@ export function SessionView({
             {
               ...echo,
               sessionId: session.id,
+              conversationId: chat?.conversation_id ?? "",
               seen: echoMatches(chat?.messages ?? [], echo),
               after: chat?.messages.at(-1)?.id,
             },

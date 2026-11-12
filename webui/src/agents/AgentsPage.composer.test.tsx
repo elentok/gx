@@ -699,3 +699,21 @@ describe("completion menu", () => {
     })
   })
 })
+
+test("a /clear echo leaves with the old conversation, though the old one began with its own /clear", async () => {
+  stubPrompt(accepted)
+  const at = "2026-01-01T00:00:00Z"
+  const clear = (id: string) => ({ id, role: "person", kind: "command", text: "/clear", at })
+  let next = chat({ messages: [clear("o1")] as SessionChatResponse["messages"] })
+  const { emit } = render([session("s-1", "p")], "/agents/s-1", true, {
+    chat: async () => ({ kind: "ok", detail: next }),
+  })
+  await type("/clear")
+  fireEvent.click(sendButton())
+  // The echo waits: the old conversation shows one /clear of its own, and the sent one.
+  await vi.waitFor(() => expect(screen.getAllByText("/clear")).toHaveLength(2))
+  next = chat({ conversation_id: "c2", messages: [clear("n1")] as SessionChatResponse["messages"] })
+  emit("s-1")
+  await vi.waitFor(() => expect(screen.getAllByText("/clear")).toHaveLength(1))
+  expect(prompts.at(-1)?.text).toBe("/clear")
+})
