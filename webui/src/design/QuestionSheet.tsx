@@ -59,9 +59,75 @@ export function QuestionSheet({
   useEffect(() => {
     if (!toFocus) return
     row.current?.children[toFocus.index]
-      ?.querySelector<HTMLElement>("button[aria-pressed], textarea")
+      ?.querySelector<HTMLElement>("button[data-answer], textarea")
       ?.focus({ preventScroll: true })
   }, [toFocus])
+
+  const answersOf = (k: number) =>
+    Array.from(row.current?.children[k]?.querySelectorAll<HTMLElement>("button[data-answer]") ?? [])
+  // The selected answer of question k, else its first one.
+  const focusAnswer = (k: number) => {
+    const all = answersOf(k)
+    const el = all.find((b) => b.getAttribute("aria-pressed") === "true") ?? all[0]
+    el?.focus({ preventScroll: true })
+  }
+  const move = (to: number, first: boolean) => {
+    setOpen(true)
+    setIndex(to)
+    if (first) setToFocus({ index: to })
+    // Prev lands on the selected answer, which the focus effect's first-button rule would miss.
+    else requestAnimationFrame(() => focusAnswer(to))
+  }
+  const openNote = () => {
+    const q = row.current?.children[index]
+    const find = () => q?.querySelector<HTMLTextAreaElement>("textarea[name=question-note]")
+    if (!find()) q?.querySelector<HTMLElement>("button[data-note-toggle]")?.click()
+    requestAnimationFrame(() => find()?.focus({ preventScroll: true }))
+  }
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const t = e.target as HTMLElement
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      const send = document.querySelector<HTMLButtonElement>("button[data-send-answers]")
+      if (send && !send.disabled) {
+        e.preventDefault()
+        send.click()
+      }
+      return
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    if (t.closest("textarea, input")) {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        e.stopPropagation()
+        focusAnswer(index)
+      }
+      return
+    }
+    const nav = (to: number, first: boolean) => {
+      e.preventDefault()
+      if (to >= 0 && to < round.length) move(to, first)
+    }
+    switch (e.key) {
+      case "n":
+        return nav(index + 1, true)
+      case "p":
+        return nav(index - 1, false)
+      case "N":
+        e.preventDefault()
+        return openNote()
+      case "j":
+      case "k":
+      case "ArrowDown":
+      case "ArrowUp": {
+        const all = answersOf(index)
+        const at = all.indexOf(t)
+        const down = e.key === "j" || e.key === "ArrowDown"
+        e.preventDefault()
+        if (at < 0) focusAnswer(index)
+        else all[Math.max(0, Math.min(all.length - 1, at + (down ? 1 : -1)))]?.focus()
+      }
+    }
+  }
 
   // Keep the scroll position on the current question; scrolling by hand sets the question.
   useEffect(() => {
@@ -94,6 +160,7 @@ export function QuestionSheet({
     <Box
       role="group"
       aria-label="Questions"
+      onKeyDown={onKeyDown}
       borderWidth="1px"
       borderColor="tone.waiting.fg"
       borderRadius="12px"

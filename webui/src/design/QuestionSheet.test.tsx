@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, describe, expect, test } from "vitest"
 import type { SessionRoundCard } from "../generated/server"
@@ -287,5 +287,85 @@ describe("the Submit rule", () => {
     expect(allAnswered(cards, { ...base, "2": { choice: "change" } })).toBe(false)
     expect(allAnswered(cards, { ...base, "2": { choice: "change", text: "  " } })).toBe(false)
     expect(allAnswered(cards, { ...base, "2": { choice: "change", text: "shorter" } })).toBe(true)
+  })
+})
+
+describe("keyboard", () => {
+  const round = [
+    card({ label: "1", kind: "yes-no", title: "A" }),
+    card({ label: "2", kind: "yes-no", title: "B" }),
+  ]
+  function Harness({ initial = {} }: { initial?: Answers }) {
+    const [answers, setAnswers] = useState<Answers>(initial)
+    return (
+      <>
+        <QuestionSheet round={round} answers={answers} onAnswers={(u) => setAnswers(u)} />
+        <button data-send-answers="" onClick={() => document.body.setAttribute("data-sent", "1")}>
+          Send answers
+        </button>
+      </>
+    )
+  }
+  const q = (k: number) => document.querySelectorAll<HTMLElement>(`[role=group][aria-label$=" of 2"]`)[k]
+  const answer = (k: number, i: number) => q(k).querySelectorAll<HTMLElement>("[data-answer]")[i]
+  const key = (k: string, init: KeyboardEventInit = {}) =>
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: k, ...init })
+
+  test("n goes to the next question's first answer; p returns to the selected answer", async () => {
+    renderThemed(<Harness initial={{ "1": { choice: "no" } }} />)
+    answer(0, 0).focus()
+    key("n")
+    await waitFor(() => expect(document.activeElement).toBe(answer(1, 0)))
+    key("p")
+    await waitFor(() => expect(document.activeElement).toBe(answer(0, 1)))
+  })
+
+  test("p lands on the first answer when none is selected", async () => {
+    renderThemed(<Harness />)
+    answer(0, 0).focus()
+    key("n")
+    await waitFor(() => expect(document.activeElement).toBe(answer(1, 0)))
+    key("p")
+    await waitFor(() => expect(document.activeElement).toBe(answer(0, 0)))
+  })
+
+  test.each([
+    ["j", "k"],
+    ["ArrowDown", "ArrowUp"],
+  ])("%s / %s move between answers and stop at the ends", (down, up) => {
+    renderThemed(<Harness />)
+    answer(0, 0).focus()
+    // Yes, No and Huh?.
+    key(down)
+    key(down)
+    expect(document.activeElement).toBe(answer(0, 2))
+    key(down)
+    expect(document.activeElement).toBe(answer(0, 2))
+    key(up)
+    expect(document.activeElement).toBe(answer(0, 1))
+  })
+
+  test("N opens the note and focuses it; Esc leaves the box so keys work again", async () => {
+    renderThemed(<Harness />)
+    answer(0, 0).focus()
+    key("N")
+    const note = await screen.findByLabelText("Note text for question 1")
+    await waitFor(() => expect(document.activeElement).toBe(note))
+    key("n")
+    expect(document.activeElement).toBe(note)
+    key("Escape")
+    expect(document.activeElement).toBe(answer(0, 0))
+    key("N")
+    await waitFor(() => expect(document.activeElement).toBe(note))
+  })
+
+  test("Cmd+Enter presses Send answers, also from a text box", async () => {
+    renderThemed(<Harness />)
+    answer(0, 0).focus()
+    key("N")
+    await waitFor(() => expect(document.activeElement?.tagName).toBe("TEXTAREA"))
+    key("Enter", { metaKey: true })
+    expect(document.body.getAttribute("data-sent")).toBe("1")
+    document.body.removeAttribute("data-sent")
   })
 })

@@ -252,6 +252,8 @@ function ChatBody({
     // Capture phase: judge the layers as they were before this same Escape closes one of them.
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || document.querySelector(LAYERS)) return
+      // Esc in a sheet text box only leaves the box (the sheet moves focus); it does not close the view.
+      if ((e.target as HTMLElement | null)?.closest?.("[aria-label=Questions] :is(textarea, input)")) return
       onQuestions(false)
     }
     window.addEventListener("keydown", onKey, true)

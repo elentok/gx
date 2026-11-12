@@ -199,6 +199,7 @@ export function Composer({
     <>
       <Button
         ref={sendRef}
+        data-send-answers=""
         {...slot}
         disabled={!enabled || images.blocking || noAnswers}
         onClick={onSendRound}

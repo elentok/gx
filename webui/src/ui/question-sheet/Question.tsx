@@ -40,6 +40,7 @@ function Choice({
     <chakra.button
       type="button"
       aria-pressed={on}
+      data-answer=""
       aria-labelledby={`${uid}-label`}
       aria-describedby={consequence ? `${uid}-consequence` : undefined}
       display="flex"
@@ -251,6 +252,7 @@ export function Question({
             size="sm"
             aria-label={`Note on question ${card.label}`}
             aria-pressed={noteOpen}
+            data-note-toggle=""
             onClick={() => setNoteOpen((o) => !o)}
           >
             <svg
