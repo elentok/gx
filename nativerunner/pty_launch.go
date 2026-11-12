@@ -345,22 +345,6 @@ func (l ptyLauncher) holderExitedErr(dir string) error {
 	return fmt.Errorf("pty start: claude exited (code %s) before it turned idle", strings.TrimSpace(string(code)))
 }
 
-// watchExit closes ss.exited once an adopted holder is gone. It isn't the
-// server's child, so there is no Wait to block on.
-func (l ptyLauncher) watchExit(ss *ptySession, meta Meta) {
-	procs := orPS(l.procs)
-	ticker := time.NewTicker(l.poll)
-	defer ticker.Stop()
-	for range ticker.C {
-		// A failed lookup is retried rather than taken as an exit.
-		proc, ok, err := procs.Lookup(meta.HolderPID)
-		if err == nil && (!ok || proc.Start != meta.HolderPIDStart) {
-			close(ss.exited)
-			return
-		}
-	}
-}
-
 func (l ptyLauncher) startupScreen(ss *ptySession) (string, error) {
 	rows, scrolled, err := ss.holder.Screen(holder.StartupScrollback)
 	if err != nil {

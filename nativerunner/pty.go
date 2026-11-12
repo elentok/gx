@@ -49,6 +49,8 @@ type Pty struct {
 	StopGrace time.Duration
 	// Procs stamps pid start times; defaults to ps.
 	Procs ProcessTable
+	// exits watches every adopted holder with one poller.
+	exits exitWatcher
 	// BackgroundTasks reports whether the claude behind s still runs a
 	// background task. Nil reads the transcript under the HOME in Env, and
 	// means no gating without one.
@@ -571,6 +573,15 @@ func envValue(env []string, key string) string {
 		}
 	}
 	return v
+}
+
+// exitPollInterval is the slow holder-exit poll; a configured PollInterval
+// (tests) shrinks it too so they needn't wait a second.
+func (p *Pty) exitPollInterval() time.Duration {
+	if p.PollInterval > 0 {
+		return p.PollInterval
+	}
+	return exitPollInterval
 }
 
 func (p *Pty) pollInterval() time.Duration {
