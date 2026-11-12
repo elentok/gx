@@ -1,4 +1,9 @@
-import { createSystem, defaultConfig, defineConfig, type SystemStyleObject } from "@chakra-ui/react";
+import {
+  createSystem,
+  defaultConfig,
+  defineConfig,
+  type SystemStyleObject,
+} from "@chakra-ui/react";
 import { KINDS, TONES, type Kind, type Tone } from "./tone";
 
 // The only file allowed to hold raw colors and font names; see raw-style.test.ts.
@@ -14,7 +19,14 @@ const toneColors: Record<Tone, { fg: string; bg: string; text?: string }> = {
 const toneTokens = Object.fromEntries(
   TONES.map((t) => {
     const { fg, bg, text } = toneColors[t];
-    return [t, { fg: { value: fg }, bg: { value: bg }, ...(text && { text: { value: text } }) }];
+    return [
+      t,
+      {
+        fg: { value: fg },
+        bg: { value: bg },
+        ...(text && { text: { value: text } }),
+      },
+    ];
   }),
 );
 
@@ -26,7 +38,10 @@ const kindColors: Record<Kind, { fg: string; bg: string }> = {
 };
 
 const kindTokens = Object.fromEntries(
-  KINDS.map((k) => [k, { fg: { value: kindColors[k].fg }, bg: { value: kindColors[k].bg } }]),
+  KINDS.map((k) => [
+    k,
+    { fg: { value: kindColors[k].fg }, bg: { value: kindColors[k].bg } },
+  ]),
 );
 
 export const themeConfig = defineConfig({
@@ -46,28 +61,36 @@ export const themeConfig = defineConfig({
     // --gx-focus-gap to its own colour; full-width sidebar rows opt into the inset form.
     ":focus-visible": {
       outline: "none !important",
-      boxShadow: "0 0 0 2px var(--gx-focus-gap, {colors.surface}), 0 0 0 4px {colors.tone.running.fg} !important",
+      boxShadow:
+        "0 0 0 2px var(--gx-focus-gap, {colors.surface}), 0 0 0 4px {colors.tone.running.fg} !important",
     },
     // A menu holds focus itself and marks the keyboard-highlighted item, so the ring belongs to that item.
     "[role='menu']:focus-visible": { boxShadow: "none !important" },
     "[role='menu']:focus-visible [role='menuitem'][data-highlighted]": {
-      boxShadow: "0 0 0 2px {colors.surface.raised}, 0 0 0 4px {colors.tone.running.fg} !important",
+      boxShadow:
+        "0 0 0 2px {colors.surface.raised}, 0 0 0 4px {colors.tone.running.fg} !important",
     },
-    // A field whose box must line up with the content around it: the ring sits inside the border, radius kept.
-    "[data-focus-ring='inset-field']:focus-visible": {
-      boxShadow: "inset 0 0 0 2px {colors.tone.running.fg} !important",
-    },
+    // A field inside a box that draws the ring itself (ExpandableTextField): the field shows none.
+    "[data-focus-ring='none']:focus-visible": { boxShadow: "none !important" },
     "[data-focus-ring='inset']:focus-visible": {
       borderRadius: "8px",
       boxShadow: "inset 0 0 0 2px {colors.tone.running.fg} !important",
     },
     // Registered so the live Card's border gradient can animate its angle. The cast is because
     // Chakra types globalCss values as style objects, which @property's descriptors are not.
-    "@property --gx-orbit-angle": { syntax: "'<angle>'", inherits: "false", initialValue: "0deg" } as SystemStyleObject,
+    "@property --gx-orbit-angle": {
+      syntax: "'<angle>'",
+      inherits: "false",
+      initialValue: "0deg",
+    } as SystemStyleObject,
   },
   theme: {
     keyframes: {
       orbit: { to: { "--gx-orbit-angle": "360deg" } },
+      chatShimmer: {
+        from: { maskPosition: "100% 0" },
+        to: { maskPosition: "0% 0" },
+      },
     },
     // border is semantic so it replaces Chakra's built-in light/dark "border" token.
     semanticTokens: {
@@ -77,10 +100,21 @@ export const themeConfig = defineConfig({
     },
     tokens: {
       colors: {
-        surface: { DEFAULT: { value: "#0a0d11" }, raised: { value: "#141920" } },
-        sidebar: { DEFAULT: { value: "#11161d" }, hover: { value: "rgba(255, 255, 255, 0.06)" }, current: { value: "rgba(108, 180, 255, 0.14)" }, selected: { value: "rgba(108, 180, 255, 0.24)" } },
+        surface: {
+          DEFAULT: { value: "#0a0d11" },
+          raised: { value: "#141920" },
+        },
+        sidebar: {
+          DEFAULT: { value: "#11161d" },
+          hover: { value: "rgba(255, 255, 255, 0.06)" },
+          current: { value: "rgba(108, 180, 255, 0.14)" },
+          selected: { value: "rgba(108, 180, 255, 0.24)" },
+        },
         overlay: { value: "rgba(0, 0, 0, 0.7)" },
-        hairline: { DEFAULT: { value: "#252c36" }, folded: { value: "#1d232c" } },
+        hairline: {
+          DEFAULT: { value: "#252c36" },
+          folded: { value: "#1d232c" },
+        },
         text: {
           DEFAULT: { value: "#ffffff" },
           muted: { value: "#c9d0da" },

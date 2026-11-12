@@ -34,7 +34,7 @@ interface FieldProps {
   onSubmit?: () => void;
   size?: "sm" | "md";
   radius?: string;
-  /** Overrides the field's background (default: the raised surface). */
+  /** Overrides the box's background (default: the raised surface). */
   bg?: string;
   /** Opt in to the command completion menu in the inline textarea. */
   completion?: CompletionConfig;
@@ -42,7 +42,7 @@ interface FieldProps {
   note?: { text: string; red?: boolean } | null;
   /** A line inside the box, under the text and the note. */
   footer?: ReactNode;
-  /** Draws the focus ring inside the box, so its edge lines up with the content around it. */
+  /** Draws the focus ring inside the box, so its edge lines up with the content around it. The box has no border of its own then; the ring is its only outline. */
   insetRing?: boolean;
 }
 
@@ -99,11 +99,6 @@ function Field({
     menu!.pending.current = null;
     area.current?.setSelectionRange(at, at);
   }, [value, menu, selection]);
-  // The browser scrolls the caret into the textarea's padding box, which the note/footer strip covers. Typing at the end scrolls to the very end instead, which keeps the last line above the padding.
-  useLayoutEffect(() => {
-    const el = area.current;
-    if (el && document.activeElement === el && el.selectionStart === value.length) el.scrollTop = el.scrollHeight;
-  }, [value]);
   const open = () =>
     setSelection({
       start: area.current?.selectionStart ?? 0,
@@ -127,23 +122,36 @@ function Field({
     if (menu?.onKeyDown(e)) return;
     if (onSubmit) submitOnCmdEnter(e, onSubmit);
   };
-  // The note/footer strip stops short of the border, and of the inset ring too when there is one.
-  const ring = insetRing ? "2px" : "1px";
+  const raised = bg ?? "surface.raised";
+  // The box draws the border, background and focus ring; the textarea inside has none, and the note and footer sit under it in the flow.
+  const ringShadow = insetRing
+    ? "inset 0 0 0 2px {colors.tone.running.fg}"
+    : "0 0 0 2px var(--gx-focus-gap, {colors.surface}), 0 0 0 4px {colors.tone.running.fg}";
   return (
-    <Box position="relative">
+    <Box
+      position="relative"
+      display="flex"
+      flexDirection="column"
+      bg={raised}
+      borderRadius={radius}
+      borderColor="hairline"
+      borderWidth={insetRing ? "0" : "1px"}
+      css={{ "&:has(> textarea:focus-visible)": { boxShadow: `${ringShadow} !important` } }}
+    >
       <Textarea
         ref={area}
         {...fieldLook}
+        data-focus-ring="none"
         size={size}
-        borderRadius={radius}
-        {...(bg ? { bg } : {})}
+        bg="transparent"
+        borderWidth="0"
+        borderRadius="0"
         autoFocus={autoFocus}
-        {...(insetRing ? { "data-focus-ring": "inset-field" } : {})}
         rows={rows}
         lineHeight="1.5"
         display="block"
         pt="2.5"
-        pb={footer ? (note === undefined ? "8" : "12") : note === undefined ? "2.5" : "7"}
+        pb="2.5"
         ps="3"
         pe="46px"
         resize="none"
@@ -161,18 +169,7 @@ function Field({
         onKeyDown={onKeyDown}
       />
       {(note !== undefined || footer) && (
-        // Opaque, so text scrolling through the textarea's bottom padding does not show under the note or footer.
-        <Box
-          position="absolute"
-          bottom={ring}
-          left={ring}
-          right={ring}
-          px={`calc(var(--chakra-spacing-3) - ${ring})`}
-          pt="1"
-          pb="1.5"
-          bg={bg ?? "surface.raised"}
-          borderBottomRadius={`calc(${radius} - ${ring})`}
-        >
+        <Box px="3" pt="1" pb="1.5">
           {note !== undefined && (
             <Text
               fontSize="xs"
@@ -197,7 +194,7 @@ function Field({
         w="36px"
         h="36px"
         borderRadius="8px"
-        bg="surface.raised"
+        bg={raised}
         color="text.muted"
         display="flex"
         alignItems="center"
