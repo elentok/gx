@@ -3,6 +3,26 @@ package wire
 // EventWorkspacesChanged announces that a workspace, a membership or a hold mark changed.
 const EventWorkspacesChanged = "workspaces-changed"
 
+// ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
+// repo root, the dirs of its other worktrees and the model each tier runs under
+// for the chat harness (empty when that tier inherits the CLI's own setting).
+type ProjectWorktrees struct {
+	Project   string            `json:"project"`
+	Root      string            `json:"root"`
+	Worktrees []string          `json:"worktrees"`
+	Tiers     map[string]string `json:"tiers"`
+}
+
+// Tip is one entry of the tips page. Folders is filled by the call for tips
+// that point at the project worktree folders.
+type Tip struct {
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Body     string   `json:"body"`
+	Platform string   `json:"platform"` // GOOS value the tip applies to
+	Folders  []string `json:"folders,omitempty"`
+}
+
 // Workspace is one workspace as the list and the snapshot show it.
 type Workspace struct {
 	Name    string `json:"name"`

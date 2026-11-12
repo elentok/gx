@@ -4,6 +4,14 @@ import (
 	"time"
 )
 
+// QueueMode is the queue's mode, as reported in QueueResult.Mode.
+type QueueMode string
+
+const (
+	QueueModeRunning QueueMode = "running"
+	QueueModePaused  QueueMode = "paused"
+)
+
 // FinishedEpic is one entry of the snapshot's Recently finished list.
 type FinishedEpic struct {
 	Address     string    `json:"address"`

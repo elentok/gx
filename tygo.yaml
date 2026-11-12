@@ -19,8 +19,6 @@ packages:
       - limitburn.go
       - limitsstore.go
       - migrate.go
-      - pause.go
-      - projectworktrees.go
       - recentlyfinished.go
       - restart.go
       - sessions.go
@@ -28,7 +26,6 @@ packages:
       - settingspage.go
       - stats.go
       - targets.go
-      - tips.go
       - triage.go
       - usagesummary.go
       - verdicts.go
