@@ -186,18 +186,25 @@ func vitestText(msgs []string) string {
 }
 
 // RerunArgs drops any test-name filter of the caller and adds an anchored one
-// covering all failing tests.
+// covering all failing tests. `related <files>` is replaced by the files that
+// hold the failures, as the changed files may not be the failing ones.
 func (Vitest) RerunArgs(args []string, failures []Unit) []string {
-	var names []string
+	var names, files []string
 	for _, u := range failures {
 		if u.Kind == KindTest {
 			names = append(names, regexp.QuoteMeta(u.Name))
+			if !slices.Contains(files, u.Location) {
+				files = append(files, u.Location)
+			}
 		}
 	}
 	if len(names) == 0 {
 		return nil
 	}
 	re, _ := stripFlag(args, true, "t", "testNamePattern")
+	if len(re) > 0 && re[0] == "related" {
+		re = append(withoutPositionals(re[1:], nil), files...)
+	}
 	return append(re, "-t", "^("+strings.Join(names, "|")+")$")
 }
 

@@ -440,7 +440,7 @@ func TestBrief_GoTestFailures(t *testing.T) {
 			rerun = l
 		}
 	}
-	for _, want := range []string{"gx brief go-test -count=1 ./... -run '^(", "TestLong", "TestWide", "TestC", "TestG", ")$'"} {
+	for _, want := range []string{"gx brief go-test -count=1 example.com/tiny/a -run '^(", "TestLong", "TestWide", "TestC", "TestG", ")$'"} {
 		if !strings.Contains(rerun, want) {
 			t.Errorf("re-run line lacks %q: %q", want, rerun)
 		}
@@ -495,7 +495,7 @@ func TestBrief_GoTestRerunKeepsArgsAndC(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit = %d, out:\n%s", code, out)
 	}
-	want := "re-run only the failing tests: gx brief -C " + mod + " go-test -count=1 ./a -run '^(TestC|TestD)$'"
+	want := "re-run only the failing tests: gx brief -C " + mod + " go-test -count=1 example.com/tiny/a -run '^(TestC|TestD)$'"
 	if !strings.Contains(out, want) {
 		t.Errorf("want %q in:\n%s", want, out)
 	}

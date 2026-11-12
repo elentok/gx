@@ -217,10 +217,11 @@ func hasFailingSubtest(failed []string, name string) bool {
 	return slices.ContainsFunc(failed, func(t string) bool { return strings.HasPrefix(t, name+"/") })
 }
 
-// RerunArgs drops any -run of the caller and adds an anchored one covering the
+// RerunArgs keeps the caller's flags, replaces its packages with the ones that
+// hold failures, drops any -run and adds an anchored one covering the
 // top-level tests of all failures.
 func (GoTest) RerunArgs(args []string, failures []Unit) []string {
-	var names []string
+	var names, pkgs []string
 	for _, u := range failures {
 		if u.Kind != KindTest {
 			continue
@@ -229,6 +230,9 @@ func (GoTest) RerunArgs(args []string, failures []Unit) []string {
 		if !slices.Contains(names, top) {
 			names = append(names, top)
 		}
+		if !slices.Contains(pkgs, u.Location) {
+			pkgs = append(pkgs, u.Location)
+		}
 	}
 	if len(names) == 0 {
 		return nil
@@ -236,7 +240,38 @@ func (GoTest) RerunArgs(args []string, failures []Unit) []string {
 	for i, n := range names {
 		names[i] = regexp.QuoteMeta(n)
 	}
-	return withRunPattern(args, "^("+strings.Join(names, "|")+")$")
+	rest, tail := splitArgs(args)
+	rest = append(withoutPositionals(rest, goValueFlags), pkgs...)
+	return withRunPattern(append(rest, tail...), "^("+strings.Join(names, "|")+")$")
+}
+
+// goValueFlags are the go test flags that take their value as the next
+// argument when written without "=".
+var goValueFlags = []string{
+	"run", "skip", "count", "timeout", "parallel", "p", "cpu", "tags", "exec",
+	"bench", "benchtime", "mod", "o", "coverpkg", "covermode", "coverprofile",
+	"ldflags", "gcflags", "asmflags", "toolexec", "overlay", "shuffle", "vet", "fuzz",
+	"fuzztime", "fuzzminimizetime", "blockprofile", "cpuprofile", "memprofile", "mutexprofile",
+	"outputdir", "trace", "pkgdir", "modfile", "C",
+}
+
+// withoutPositionals drops the arguments that are not flags nor the value of a
+// flag in valueFlags: for go test, the packages.
+func withoutPositionals(args []string, valueFlags []string) []string {
+	var out []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			continue
+		}
+		out = append(out, a)
+		name, _, hasValue := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		if !hasValue && slices.Contains(valueFlags, name) && i+1 < len(args) {
+			i++
+			out = append(out, args[i])
+		}
+	}
+	return out
 }
 
 // goTestNameRe: a Go package path can hold dots, so the test name is found by
