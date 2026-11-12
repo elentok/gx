@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Connection } from "./connection"
 import { readPageCache, writePageCache } from "./pageCache"
 import { useRefetchOnEvents } from "./refetch"
@@ -54,6 +54,8 @@ export function useFetched<T>(
     return () => window.removeEventListener("focus", retry)
   }, [refetchOnFocus, retry])
 
-  const data = loaded?.id === id ? loaded.data : readPageCache<T>(key, id)
+  // Memoized: each read parses a fresh object, and a changing identity re-fires effects keyed on `data`.
+  const cached = useMemo(() => readPageCache<T>(key, id), [key, id])
+  const data = loaded?.id === id ? loaded.data : cached
   return { data, failed: failed && data === null, retry }
 }

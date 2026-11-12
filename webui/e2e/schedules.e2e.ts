@@ -90,6 +90,13 @@ test("203. Schedules journey", async ({ page, start }) => {
   )
   await expect(lateLimit).toHaveValue("2")
   await expect(prompt).toHaveValue(/Check the weather for tomorrow\./)
+  // Back from the Schedule page repaints the list (it once crashed with React error #185).
+  await page.evaluate(() => history.back())
+  await expect(page).toHaveURL(/#\/schedules$/)
+  await expect(row("Weather check")).toBeVisible()
+  await row("Weather check").click()
+  await expect(page).toHaveURL(/#\/schedules\/demo:weather-check$/)
+  await expect(name).toHaveValue("Weather check")
   const runs = page.locator('[data-mock-part="last-runs"] > li')
   await expect(runs).toHaveCount(4)
   await expect(runs.nth(0)).toContainText("Finished")
