@@ -358,8 +358,12 @@ func (a *Archive) write(target, dir string, halves []half, name string, cleanup 
 		}
 	}
 	var rekeyErrs []error
+	// Both halves carry archived_at and archived_workspace: the -impl half is an
+	// archived epic in its own right (the archived list and cleanupscan read it),
+	// so it gets the same values as the Design, never its own clock reading.
+	now := time.Now().UTC()
 	for i, m := range moves {
-		fields := map[string]any{"archived_at": time.Now().UTC()}
+		fields := map[string]any{"archived_at": now}
 		if m.workspace != workspaces.DefaultName {
 			fields["archived_workspace"] = m.workspace
 		}

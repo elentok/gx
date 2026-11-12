@@ -39,6 +39,10 @@ func TestArchiveDesign_PairArchivesAsOneRow(t *testing.T) {
 	if a := r.archived(t); !a["foo"] || !a["foo-impl"] {
 		t.Errorf("archived = %v, want foo and foo-impl", a)
 	}
+	design, impl := r.epic(t, "foo"), r.epic(t, "foo-impl")
+	if design.ArchivedAt.IsZero() || !design.ArchivedAt.Equal(impl.ArchivedAt) || design.ArchivedWorkspace != impl.ArchivedWorkspace {
+		t.Errorf("stamps design = %v %q, impl = %v %q, want identical", design.ArchivedAt, design.ArchivedWorkspace, impl.ArchivedAt, impl.ArchivedWorkspace)
+	}
 }
 
 func TestArchiveDesign_BeforeDoneIsNotFinished(t *testing.T) {
