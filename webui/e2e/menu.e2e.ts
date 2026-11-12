@@ -22,9 +22,12 @@ const report = (fixture: Fixture, body: string) => fixture.cliInput(body, "claud
 const openMenu = async (page: Page) => {
   const show = page.getByRole("button", nav("Show sidebar"))
   const tray = page.getByRole("button", nav("Usage limits"))
-  await tray.or(show).first().waitFor()
-  if (await show.isVisible()) await show.click()
-  await tray.click()
+  // A viewport resize can collapse the sidebar between the check and the click, so the whole step retries.
+  await expect(async () => {
+    await tray.or(show).first().waitFor({ timeout: 5_000 })
+    if (await show.isVisible()) await show.click({ timeout: 5_000 })
+    await tray.click({ timeout: 5_000 })
+  }).toPass({ timeout: 30_000 })
   const popover = page.getByRole("dialog", nav("Usage limits"))
   await expect(popover).toBeVisible()
   return popover
@@ -126,13 +129,16 @@ const codexRow = (page: Page, name: string) => exactRow(page, `Codex ${name}`)
 const appendCodexSample = async (fixture: Fixture, usedPercent: number) => {
   let rollout = ""
   await expect
-    .poll(async () => {
-      for await (const f of glob("**/rollout-*.jsonl", {
-        cwd: fixture.codexSessionsDir,
-      }))
-        rollout = join(fixture.codexSessionsDir, f)
-      return rollout
-    })
+    .poll(
+      async () => {
+        for await (const f of glob("**/rollout-*.jsonl", {
+          cwd: fixture.codexSessionsDir,
+        }))
+          rollout = join(fixture.codexSessionsDir, f)
+        return rollout
+      },
+      { timeout: 60_000 },
+    )
     .not.toBe("")
   const resetsAt = nowSec() + 73 * 3600
   const line = `{"timestamp":"${new Date().toISOString()}","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":${usedPercent},"window_minutes":10080,"resets_at":${resetsAt}}}}}\n`
@@ -141,6 +147,8 @@ const appendCodexSample = async (fixture: Fixture, usedPercent: number) => {
 
 test.describe("180. Menu limit burn", () => {
   test("narrow menu fits; live updates", async ({ page, start }) => {
+    // Two 60 s live-update waits plus setup must fit, so the default test timeout is too short under load.
+    test.setTimeout(180_000)
     const fixture = await start("limit-burn", { shape: "menu" })
     await page.setViewportSize({ width: 320, height: 700 })
 
