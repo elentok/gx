@@ -1032,6 +1032,22 @@ section`, under the `gx-one-off` skill). `--wait` prints it and `--notify` sends
 only the waiter: the ticket keeps running. On a duplicate-live refusal `--wait` follows the
 existing ticket.
 
+## Schedules
+
+**Schedule** — a prompt a person wrote, plus the days of the week and times of day it runs, in the
+machine's local time. It belongs to one project (`scratch` by default) and lives in the ticket
+store, so every machine that shares the store sees it. _Avoid_: cron job, timer, recurring task.
+
+**Scheduled run** — one One-off that a Schedule started, at a set time or from "Run now". Its agent
+may notify the person; nothing is sent unless it does. _Avoid_: job, execution.
+
+**Late limit** — how late a missed run of a Schedule may still start. Only the latest missed time
+runs, and only within this limit; past it, the run is skipped.
+
+**Schedule switch** — a Schedule's on/off state on one machine. Each machine keeps its own, so a
+Schedule runs only on the machines where it is on. A new Schedule is on only where it was created.
+_Avoid_: enabled flag (it is not a property of the Schedule file).
+
 ## Recovery
 
 When a ticket is Paused, the server tries to get it moving again without a person. Recovery repairs the
