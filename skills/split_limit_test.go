@@ -108,9 +108,10 @@ func TestToTicketsDraftWriters(t *testing.T) {
 	}
 }
 
-// Spec "Skill size": the skill stays below 528 lines.
+// Spec "Skill size": the skill stays below 560 lines (528 before main added
+// the code-review fix-ticket rules).
 func TestToTicketsSkillSize(t *testing.T) {
-	const limit = 528
+	const limit = 560
 	if got := strings.Count(readFile(t, "gx-to-tickets/SKILL.md"), "\n"); got >= limit {
 		t.Errorf("gx-to-tickets/SKILL.md has %d lines, want < %d", got, limit)
 	}
