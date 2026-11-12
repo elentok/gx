@@ -5,7 +5,6 @@ import type { ViMode } from "./CodeEditor"
 import { LargeEditor, type EditorMenu, type Selection } from "./LargeEditor"
 import { fieldLook } from "./look"
 import { isMac } from "../../platform"
-import { useViMode } from "../../vimode"
 
 /** Runs `submit` on Cmd/Ctrl+Enter; plain Enter stays a newline. */
 export function submitOnCmdEnter(e: KeyboardEvent<HTMLTextAreaElement>, submit: () => void) {
@@ -115,7 +114,6 @@ function Field({
       start: area.current?.selectionStart ?? 0,
       end: area.current?.selectionEnd ?? 0,
     })
-  const viMode = useViMode()
   // Focus and selection are set synchronously, inside the user's gesture and before the layer unmounts, so a phone keeps its keyboard.
   const close = (sel: Selection, refocus: boolean) => {
     if (refocus) {
@@ -126,7 +124,6 @@ function Field({
   }
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (
-      viMode &&
       !disabled &&
       e.key.toLowerCase() === "g" &&
       !e.altKey &&

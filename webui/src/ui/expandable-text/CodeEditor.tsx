@@ -1,6 +1,6 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
 import { Compartment, EditorState, Prec } from "@codemirror/state"
-import { EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view"
+import { drawSelection, EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view"
 import { getCM, vim, Vim } from "@replit/codemirror-vim"
 import { Box } from "@chakra-ui/react"
 import { useEffect, useImperativeHandle, useRef, type MutableRefObject, type Ref } from "react"
@@ -54,6 +54,7 @@ const theme = EditorView.theme({
     backgroundColor: "transparent",
   },
   "&.cm-focused": { outline: "none" },
+  ".cm-cursor": { borderLeftColor: "currentColor" },
   ".cm-scroller": { fontFamily: "inherit", lineHeight: "1.55", overflow: "auto" },
   ".cm-content": { padding: "12px" },
   ".cm-line": { padding: "0" },
@@ -213,6 +214,8 @@ export default function CodeEditor({
             }),
           ),
           viSlot.current.of(viMode ? vim() : []),
+          // Draws the caret itself (vim does the same), in the text color so it shows on a dark surface.
+          drawSelection(),
           history(),
           // No indentWithTab: Tab and Shift-Tab keep moving focus.
           keymap.of([...defaultKeymap, ...historyKeymap]),

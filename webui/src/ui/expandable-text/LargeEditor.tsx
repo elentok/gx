@@ -121,7 +121,7 @@ export function LargeEditor({
           handle={editor}
           onZZ={close}
           onSubmit={submit}
-          onToggle={viMode ? close : undefined}
+          onToggle={close}
         />
       </Suspense>
       {/* The menu sits directly above the footer. */}

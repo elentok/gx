@@ -239,10 +239,18 @@ test("Cmd-G on a Mac and Ctrl-G elsewhere open the editor and cancel the browser
   }
 })
 
-test("with vi mode off the key is not handled", () => {
+test("with vi mode off the key still opens the editor", async () => {
   stubPlatform("MacIntel")
   withVi(false, <Keys />)
-  expect(fireEvent.keyDown(field(), { key: "g", metaKey: true })).toBe(true)
+  expect(fireEvent.keyDown(field(), { key: "g", metaKey: true })).toBe(false)
+  await findLargeEditor(TITLE)
+})
+
+test("with vi mode off the open key inside the editor closes it", async () => {
+  withVi(false, <Keys />)
+  fireEvent.click(expand())
+  const editor = await findLargeEditor(TITLE)
+  expect(fireEvent.keyDown(editor, { key: "g", ctrlKey: true })).toBe(false)
   expect(screen.queryByRole("dialog")).toBeNull()
 })
 
