@@ -36,8 +36,8 @@ func NamesOriginal(body string, addr Address) bool {
 // original_address frontmatter field, or, for a ticket from before the field,
 // the Resolution line a move left behind.
 func IsOriginal(t Ticket, addr Address) bool {
-	if t.OriginalAddress != "" {
-		return t.OriginalAddress == addr.String()
+	if len(t.OriginalAddress) > 0 {
+		return t.OriginalAddress.Has(addr.String())
 	}
 	return NamesOriginal(t.Body, addr)
 }

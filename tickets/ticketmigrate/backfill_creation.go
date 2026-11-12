@@ -33,21 +33,21 @@ func BackfillTicketCreation(
 	dryRun bool,
 ) ([]tickets.MigrationChange, error) {
 	return backfillFromHistory(epics, storeRoot, origin, dryRun, backfillSpec{
-		skip: func(t tickets.Ticket) bool { return !t.CreatedAt.IsZero() && t.OriginalAddress != "" },
+		skip: func(t tickets.Ticket) bool { return !t.CreatedAt.IsZero() && len(t.OriginalAddress) > 0 },
 		plan: func(t tickets.Ticket, o TicketOrigin) (notes []string, apply func(*schema.Ticket)) {
 			original, hasOriginal := originalAddressOf(o.Path)
 			if t.CreatedAt.IsZero() {
 				notes = append(notes, "created_at backfilled from store history")
 			}
-			if t.OriginalAddress == "" && hasOriginal {
+			if len(t.OriginalAddress) == 0 && hasOriginal {
 				notes = append(notes, "original address backfilled from store history")
 			}
 			return notes, func(st *schema.Ticket) {
 				if st.CreatedAt.IsZero() {
 					st.CreatedAt = o.day()
 				}
-				if st.OriginalAddress == "" && hasOriginal {
-					st.OriginalAddress = original
+				if len(st.OriginalAddress) == 0 && hasOriginal {
+					st.OriginalAddress = schema.OriginalAddresses{original}
 				}
 			}
 		},

@@ -34,7 +34,7 @@ func TestExecute_TicketsFollowUpAdd_FilesDraftResearch(t *testing.T) {
 	if tk.Status != schema.StatusDraft || tk.Type != schema.TypeResearch || tk.Category != schema.CategoryBug {
 		t.Errorf("status/type/category = %s/%s/%s, want draft/research/bug", tk.Status, tk.Type, tk.Category)
 	}
-	if tk.OriginalAddress != "mine:follow-ups/01" || tk.CreatedAt.IsZero() {
+	if tk.OriginalAddress.String() != "mine:follow-ups/01" || tk.CreatedAt.IsZero() {
 		t.Errorf("created_at/original_address = %v/%q, want set/mine:follow-ups/01", tk.CreatedAt, tk.OriginalAddress)
 	}
 

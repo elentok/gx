@@ -375,7 +375,10 @@ func WebShare(endings map[string]int) *float64 {
 // originalEpic is the epic a ticket was first created in, wherever it lives
 // now: its original address, else the move's Resolution line, else its epic.
 func originalEpic(tk tickets.Ticket, current string) string {
-	raw := tk.OriginalAddress
+	var raw string
+	if len(tk.OriginalAddress) > 0 {
+		raw = tk.OriginalAddress[0] // a list is handled by the stats ticket
+	}
 	if raw == "" {
 		for line := range strings.SplitSeq(schema.Section(tk.Body, "Resolution"), "\n") {
 			if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "- original: "); ok {

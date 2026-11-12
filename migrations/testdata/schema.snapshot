@@ -34,7 +34,7 @@ struct schema.Ticket
   Category schema.Category 
   ExportedAt time.Time 
   CreatedAt time.Time 
-  OriginalAddress string 
+  OriginalAddress schema.OriginalAddresses 
   CancelledAt time.Time 
   TotalTokens *int64 
   HadCodex bool 

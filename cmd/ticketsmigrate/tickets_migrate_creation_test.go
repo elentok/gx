@@ -103,7 +103,7 @@ func TestExecute_TicketsMigrate_BackfillsCreationFromStoreHistory(t *testing.T) 
 	}
 	for _, c := range cases {
 		got := load(c.rel)
-		if !got.CreatedAt.Equal(c.created) || got.OriginalAddress != c.original {
+		if !got.CreatedAt.Equal(c.created) || got.OriginalAddress.String() != c.original {
 			t.Errorf("%s: created_at %v, original %q; want %v, %q", c.rel, got.CreatedAt, got.OriginalAddress, c.created, c.original)
 		}
 	}

@@ -101,7 +101,7 @@ func TestRunTicketsEnsureCodeReview_CreatesValidStubWhenNoneExists(t *testing.T)
 		t.Error("stub ticket has no created_at")
 	}
 	wantAddr := tickets.ProjectName(scratchDir) + ":widget-epic/04"
-	if ticket.OriginalAddress != wantAddr {
+	if ticket.OriginalAddress.String() != wantAddr {
 		t.Errorf("stub original_address = %q, want %q", ticket.OriginalAddress, wantAddr)
 	}
 }

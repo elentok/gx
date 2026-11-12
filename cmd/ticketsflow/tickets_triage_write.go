@@ -53,7 +53,7 @@ func locateRow(projectDir string, row *triage.Row) (located, error) {
 	var foundEpic string
 	for _, e := range epics {
 		for i, t := range e.Tickets {
-			atOrigin := e.Name == addr.Epic && t.Identifier == addr.ID && (t.OriginalAddress == "" || tickets.IsOriginal(t, addr))
+			atOrigin := e.Name == addr.Epic && t.Identifier == addr.ID && (len(t.OriginalAddress) == 0 || tickets.IsOriginal(t, addr))
 			if atOrigin || tickets.IsOriginal(t, addr) {
 				found, foundEpic = &e.Tickets[i], e.Name
 			}

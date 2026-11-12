@@ -86,6 +86,10 @@ func init() {
 	Default.Register(Step{Name: "pr-pause-kinds", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// original-address-list: original_address takes a string or a list; a string still parses and a single entry is written back as a string.
+	Default.Register(Step{Name: "original-address-list", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 	// epic-archive-fields: archived_at, archived_workspace and branch_name are optional; absent is the default.
 	Default.Register(Step{Name: "epic-archive-fields", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil

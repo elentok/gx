@@ -105,6 +105,9 @@ Fields:
 - **`pause_reason`** (enum) — why the ticket is paused (e.g. `blocked-pane`, `self-reported`,
   `zero-commit`). Machine-written alongside `status: paused`, cleared on claim; never set it by
   hand. The full closed enum is printed by `gx server events kinds`.
+- **`original_address`** (string or list) — gx-stamped at creation: the address the ticket was
+  created under or, for a promoted ticket, the follow-up address(es) it came from. A single entry is
+  a string, several are a YAML list. Kept when the ticket moves; never set it by hand.
 - **`actual_context_window`**, **`elapsed_time`**, **`resolved_base`**, **`mutes`** — read-only,
   gx-managed. The first two are stamped at merge time, `resolved_base` (ref + SHA) at every claim,
   `mutes` when a notification throttle trips; never set these by hand.

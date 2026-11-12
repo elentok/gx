@@ -28,7 +28,7 @@ func TestTicket_StatsFieldsRoundTrip(t *testing.T) {
 		Type:            TypeImplement,
 		CreatedAt:       time.Date(2026, 10, 1, 1, 2, 3, 0, time.UTC),
 		CancelledAt:     time.Date(2026, 10, 2, 1, 2, 3, 0, time.UTC),
-		OriginalAddress: "gx:epic/01",
+		OriginalAddress: OriginalAddresses{"gx:epic/01"},
 		TotalTokens:     &tokens,
 		ActualCost:      1.5,
 		HadCodex:        true,
@@ -90,7 +90,7 @@ func TestTicket_StampCreated(t *testing.T) {
 	now := time.Date(2026, 10, 1, 1, 2, 3, 0, time.UTC)
 	var tk Ticket
 	tk.StampCreated(now, "gx:epic/01")
-	if !tk.CreatedAt.Equal(now) || tk.OriginalAddress != "gx:epic/01" {
+	if !tk.CreatedAt.Equal(now) || tk.OriginalAddress.String() != "gx:epic/01" {
 		t.Errorf("StampCreated = %v %q", tk.CreatedAt, tk.OriginalAddress)
 	}
 }

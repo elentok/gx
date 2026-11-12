@@ -173,7 +173,7 @@ func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
 	if ticket.Status != schema.StatusDraft {
 		t.Errorf("stub ticket status = %q, want %q", ticket.Status, schema.StatusDraft)
 	}
-	if want := strings.TrimSpace(stdout.String()); ticket.OriginalAddress != want || ticket.CreatedAt.IsZero() {
+	if want := strings.TrimSpace(stdout.String()); ticket.OriginalAddress.String() != want || ticket.CreatedAt.IsZero() {
 		t.Errorf("stub created_at/original_address = %v/%q, want set/%q", ticket.CreatedAt, ticket.OriginalAddress, want)
 	}
 }
@@ -194,7 +194,7 @@ func TestRunTicketsAddBody_StampsCreatedAndOriginalAddress(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tk.OriginalAddress != printed || tk.CreatedAt.IsZero() {
+		if tk.OriginalAddress.String() != printed || tk.CreatedAt.IsZero() {
 			t.Errorf("parent %q: created_at/original_address = %v/%q, want set/%q", parent, tk.CreatedAt, tk.OriginalAddress, printed)
 		}
 	}

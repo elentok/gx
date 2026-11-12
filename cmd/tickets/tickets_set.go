@@ -82,7 +82,9 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
     a new claim
   exported_at (RFC3339 timestamp) — when gx exported the ticket
   created_at (RFC3339 timestamp) — when the ticket was created
-  original_address — the address the ticket was created under; kept when it moves
+  original_address — the address the ticket was created under or, for a promoted
+    ticket, the follow-up address(es) it came from; a string, or a list when several;
+    kept when it moves
   cancelled_at (RFC3339 timestamp) — when the ticket was cancelled
   total_tokens — input + output + cache writes + cache reads over every session; a
     stamped 0 is different from unset, and actual_cost is stamped whenever it is

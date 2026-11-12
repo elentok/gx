@@ -315,7 +315,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		t.Error("conflict-resolution child has no created_at")
 	}
 	wantAddr, _ := tickets.AddressOfPath(child.Path, child.Identifier)
-	if child.OriginalAddress != wantAddr.String() {
+	if child.OriginalAddress.String() != wantAddr.String() {
 		t.Errorf("child original address = %q, want %q", child.OriginalAddress, wantAddr.String())
 	}
 	parsed, err := schema.ParseTicket(child.Path)

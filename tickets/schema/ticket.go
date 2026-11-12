@@ -355,7 +355,7 @@ type Ticket struct {
 	// CreatedAt and OriginalAddress are stamped once, at creation, by
 	// StampCreated; OriginalAddress survives a move to another epic.
 	CreatedAt       time.Time
-	OriginalAddress string
+	OriginalAddress OriginalAddresses
 	// CancelledAt is when the ticket entered cancelled.
 	CancelledAt time.Time
 	// TotalTokens is input + output + cache writes + cache reads over every
@@ -371,9 +371,11 @@ type Ticket struct {
 	Launch []LaunchStamp
 }
 
-// StampCreated records when and under which address the ticket was created.
-// Every creation path calls it so the two fields never drift apart.
-func (t *Ticket) StampCreated(now time.Time, address string) {
+// StampCreated records when the ticket was created and its original address:
+// the address it was created under or, for a promoted ticket, the follow-up
+// address(es) it came from. Every creation path calls it so the two fields
+// never drift apart.
+func (t *Ticket) StampCreated(now time.Time, address ...string) {
 	t.CreatedAt = now
 	t.OriginalAddress = address
 }

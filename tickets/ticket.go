@@ -79,7 +79,7 @@ type Ticket struct {
 
 	// The stats fields mirror schema.Ticket's fields of the same name.
 	CreatedAt       time.Time
-	OriginalAddress string
+	OriginalAddress schema.OriginalAddresses
 	CancelledAt     time.Time
 	TotalTokens     *int64
 	HadCodex        bool
