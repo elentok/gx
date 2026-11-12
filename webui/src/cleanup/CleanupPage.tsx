@@ -125,9 +125,7 @@ export function CleanupPage({ fetchCleanup, fetchEpics, postCleanup = defaultPos
 
   return (
     <DetailPage title={{ kind: "Cleanup" }}>
-      <Box mt="4">
-        <PageHeader title="Cleanup" icon={<PageIcon kind="cleanup" />} subtitle={project} />
-      </Box>
+      <PageHeader title="Cleanup" icon={<PageIcon kind="cleanup" />} subtitle={project} />
       <Box mt="4">
         <chakra.select
           aria-label="Project"

@@ -184,24 +184,22 @@ export function EpicsPage({
   return (
     <DetailPage title={{ kind: "Epics" }}>
       <Box ref={area}>
-      <Box mt="4">
-        <PageHeader
-          title="Epics"
-          icon={<PageIcon kind="epics" />}
-          subtitle={list ? `${list.epics.length} ${list.epics.length === 1 ? "epic" : "epics"}` : undefined}
-          actions={
-            <>
-              <HeaderLink href={ARCHIVE_HREF}>Archive</HeaderLink>
-              {hasEpics && !select.state.on && (
-                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.enter}>
-                  Select
-                </Button>
-              )}
-              {hasEpics && newDesign}
-            </>
-          }
-        />
-      </Box>
+      <PageHeader
+        title="Epics"
+        icon={<PageIcon kind="epics" />}
+        subtitle={list ? `${list.epics.length} ${list.epics.length === 1 ? "epic" : "epics"}` : undefined}
+        actions={
+          <>
+            <HeaderLink href={ARCHIVE_HREF}>Archive</HeaderLink>
+            {hasEpics && !select.state.on && (
+              <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.enter}>
+                Select
+              </Button>
+            )}
+            {hasEpics && newDesign}
+          </>
+        }
+      />
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <Input
           type="search"

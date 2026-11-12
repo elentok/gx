@@ -206,9 +206,7 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
 
   return (
     <DetailPage title={{ kind: "Stats" }}>
-      <Box mt="4">
-        <PageHeader title="Stats" icon={<PageIcon kind="stats" />} subtitle={`${project || "All projects"} · last ${range} days`} />
-      </Box>
+      <PageHeader title="Stats" icon={<PageIcon kind="stats" />} subtitle={`${project || "All projects"} · last ${range} days`} />
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <chakra.select aria-label="Project" value={project} onChange={(e) => set("project", e.target.value)} {...selectProps}>
           <option value="">All projects</option>

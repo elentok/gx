@@ -409,39 +409,37 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list, readOn
         <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
       ) : detail ? (
         <>
-          <Box mt="4">
-            <PageHeader
-              title={name}
-              icon={<PageIcon kind="epic" />}
-              caret
-              subtitle={
-                <>
-                  <StatsLine detail={detail} now={now} designLive={designLive} />
-                  {detail.summary ? <DescriptionLine summary={detail.summary} /> : null}
-                </>
-              }
-              actions={
-                <>
-                  <EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "header" : "headerSm"} />
-                  {!readOnly && <EpicMenu address={address} card={card} />}
-                </>
-              }
-              meta={
-                readOnly ? (
-                  <ArchivedBar address={address} detail={detail} />
-                ) : (
-                  <EpicBar
-                    address={address}
-                    detail={detail}
-                    wide={wide}
-                    partner={partner}
-                    openDesign={openDesign}
-                    onChanged={refetch}
-                  />
-                )
-              }
-            />
-          </Box>
+          <PageHeader
+            title={name}
+            icon={<PageIcon kind="epic" />}
+            caret
+            subtitle={
+              <>
+                <StatsLine detail={detail} now={now} designLive={designLive} />
+                {detail.summary ? <DescriptionLine summary={detail.summary} /> : null}
+              </>
+            }
+            actions={
+              <>
+                <EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "header" : "headerSm"} />
+                {!readOnly && <EpicMenu address={address} card={card} />}
+              </>
+            }
+            meta={
+              readOnly ? (
+                <ArchivedBar address={address} detail={detail} />
+              ) : (
+                <EpicBar
+                  address={address}
+                  detail={detail}
+                  wide={wide}
+                  partner={partner}
+                  openDesign={openDesign}
+                  onChanged={refetch}
+                />
+              )
+            }
+          />
           <PrActivity entries={detail.pr_activity} />
           {detail.total === 0 ? (
             <Text mt="4" color="text.muted">

@@ -108,21 +108,19 @@ export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchAr
   return (
     <DetailPage title={{ kind: "Epics", name: "Archive" }}>
       <Box ref={area}>
-      <Box mt="4">
-        <PageHeader
-          title="Archive"
-          actions={
-            <>
-              <HeaderLink href={EPICS_HREF}>← Epics</HeaderLink>
-              {epics.length > 0 && !select.state.on && (
-                <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.enter}>
-                  Select
-                </Button>
-              )}
-            </>
-          }
-        />
-      </Box>
+      <PageHeader
+        title="Archive"
+        actions={
+          <>
+            <HeaderLink href={EPICS_HREF}>← Epics</HeaderLink>
+            {epics.length > 0 && !select.state.on && (
+              <Button emphasis="secondary" flexShrink="0" whiteSpace="nowrap" onClick={select.enter}>
+                Select
+              </Button>
+            )}
+          </>
+        }
+      />
       {select.state.on && (
         <SelectBar sel={select} sticky>
           <SidebarBulkActions sel={select} shown={ONLY_UNARCHIVE} onResults={left} />

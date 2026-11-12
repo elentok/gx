@@ -184,7 +184,7 @@ export function SteppedPage({
         <StepsSheet model={model} rows={ticketRows} stepRows={stepRows} ring={ring?.("compact")} onClose={() => setStepsOpen(false)} />
       )}
       {/* With the keyboard up the header would take most of the visible height; the question needs it. */}
-      <Box mt="4" mb="3" flex="none" display={compact ? "none" : undefined}>
+      <Box mb="3" flex="none" display={compact ? "none" : undefined}>
         <PageHeader
           title={title}
           icon={icon}

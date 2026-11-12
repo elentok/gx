@@ -4,7 +4,7 @@ import { MascotToggle } from "../shell/MascotToggle";
 import { useShell } from "../shell/ShellContext";
 import { useWide } from "../useWide";
 
-/** The one header every page uses: icon, title, subtitle, actions, then an optional meta bar. */
+/** The one header every page uses: icon, title, subtitle, actions, then an optional meta bar. It owns the room above it, since the page container has no top padding. */
 export function PageHeader({
   title,
   icon,
@@ -42,7 +42,7 @@ export function PageHeader({
   );
   const rich = icon || subtitle || actions || shell;
   return (
-    <Box>
+    <Box mt="4">
       {rich ? (
         <Box display="flex" flexWrap="wrap" alignItems={subtitle ? "flex-start" : "center"} gap={wide ? "14px" : "10px"}>
           <MascotToggle />

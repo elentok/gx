@@ -34,9 +34,7 @@ export function TipsPage({ fetchTips }: { fetchTips?: FetchTips }) {
   const { tips, failed, retry } = useTips(fetchTips, conn);
   return (
     <DetailPage title={{ kind: "Tips" }}>
-      <Box mt="4">
-        <PageHeader title="Tips" icon={<PageIcon kind="tips" />} />
-      </Box>
+      <PageHeader title="Tips" icon={<PageIcon kind="tips" />} />
       {failed ? (
         <Box mt="6" display="flex" alignItems="center" gap="3">
           <Text color="text.muted">Could not load tips</Text>
