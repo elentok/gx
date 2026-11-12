@@ -79,7 +79,11 @@ func coreEntries() []Entry {
 	add(SectionWebUI, Entry{Key: Key("server", "web", "totp"), Type: TypeBool, Risky: true, RiskyOffOnly: true,
 		ConfirmText: "Turning off the one-time code lets anyone who can reach the web page sign in.",
 		Description: "Ask for a one-time code when signing in to the web page."})
-	add(SectionWebUI, Entry{Key: Key("server", "web", "vi-escape"), Type: TypeString,
+	add(SectionKeybindings, Entry{Key: Key("server", "web", "leader-key-mac"), Type: TypeString, CheckString: checkLeaderKey,
+		Description: "The Leader key on a Mac, such as cmd+e. Press it to see the chords. Empty turns chords off."})
+	add(SectionKeybindings, Entry{Key: Key("server", "web", "leader-key"), Type: TypeString, CheckString: checkLeaderKey,
+		Description: "The Leader key on other platforms, such as ctrl+e. Press it to see the chords. Empty turns chords off."})
+	add(SectionKeybindings, Entry{Key: Key("server", "web", "vi-escape"), Type: TypeString,
 		Description: "A key sequence, such as \"jk\", that leaves insert mode in the web page's vi editors. Empty turns it off."})
 	add(SectionCPUWatchdog, Entry{Key: Key("cpu-watchdog", "enabled"), Type: TypeBool,
 		Description: "Watch the server's CPU use and capture a profile when it stays high."})

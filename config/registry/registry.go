@@ -28,6 +28,7 @@ const (
 	SectionNotifications
 	SectionServer
 	SectionWebUI
+	SectionKeybindings
 	SectionCPUWatchdog
 	SectionProcessWatchdog
 	SectionDiskSpace
@@ -42,7 +43,7 @@ const (
 
 var sectionNames = [...]string{
 	"Execution queue", "Budget", "Notifications", "Server", "Web UI",
-	"CPU watchdog", "Process watchdog", "Disk space", "Agents", "Models",
+	"Keybindings", "CPU watchdog", "Process watchdog", "Disk space", "Agents", "Models",
 	"Pull requests", "Evolve and recovery", "Ticket store", "Project", "Checks",
 }
 
@@ -88,7 +89,10 @@ type Entry struct {
 	Description string
 	Section     Section
 	Enum        []string // allowed values of a TypeEnum
-	Restart     bool     // startup-only: takes effect after a restart
+	// CheckString, when set, checks a TypeString value. It returns a short
+	// sentence the page shows after "Not saved: ", or nil.
+	CheckString func(string) error
+	Restart     bool // startup-only: takes effect after a restart
 	Risky       bool
 	ConfirmText string // shown before saving a risky entry
 	// RiskyOffOnly: only turning a bool off (or resetting a set value) is

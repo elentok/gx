@@ -15,6 +15,8 @@ var labels = map[string]string{
 	"server.web.dev-dir":               "Dev checkout path",
 	"server.web.totp":                  "Require one-time code",
 	"server.web.vi-escape":             "Vi escape sequence",
+	"server.web.leader-key-mac":        "Leader key (Mac)",
+	"server.web.leader-key":            "Leader key (other platforms)",
 	"cpu-watchdog.enabled":             "Watch CPU use",
 	"cpu-watchdog.threshold-percent":   "CPU threshold (% of one core)",
 	"cpu-watchdog.sustain":             "Sustain time",

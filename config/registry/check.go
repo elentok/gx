@@ -61,7 +61,13 @@ func CheckValue(e Entry, raw json.RawMessage, parseSize SizeParser) error {
 		return nil
 	case TypeString, TypeSecret:
 		var s string
-		return decode(raw, &s, "Not text.")
+		if err := decode(raw, &s, "Not text."); err != nil {
+			return err
+		}
+		if e.CheckString != nil {
+			return e.CheckString(s)
+		}
+		return nil
 	case TypeStringList:
 		var v []string
 		return decode(raw, &v, "Not a list of text values.")
@@ -81,6 +87,34 @@ func CheckValue(e Entry, raw json.RawMessage, parseSize SizeParser) error {
 		return decode(raw, &v, "Not an object.")
 	}
 	return fmt.Errorf("Unknown setting type.")
+}
+
+// checkLeaderKey accepts "" (chords off) or modifiers cmd, ctrl, alt, shift
+// joined with "+", then one lower-case letter or digit, with at least one of
+// cmd, ctrl or alt.
+func checkLeaderKey(s string) error {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, "+")
+	key := parts[len(parts)-1]
+	if len(key) != 1 || !(key[0] >= 'a' && key[0] <= 'z' || key[0] >= '0' && key[0] <= '9') {
+		return errors.New("Use modifiers and one letter or digit, for example cmd+e.")
+	}
+	strong := false
+	for _, m := range parts[:len(parts)-1] {
+		switch m {
+		case "cmd", "ctrl", "alt":
+			strong = true
+		case "shift":
+		default:
+			return errors.New("Use modifiers and one letter or digit, for example cmd+e.")
+		}
+	}
+	if !strong {
+		return errors.New("Include cmd, ctrl or alt, for example cmd+e.")
+	}
+	return nil
 }
 
 func decode(raw json.RawMessage, v any, reason string) error {

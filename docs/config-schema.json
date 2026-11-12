@@ -471,6 +471,16 @@
               "description": "Turn on Dev mode: gx runs its own Vite from the Dev checkout and serves the web UI from it.",
               "type": "boolean"
             },
+            "leader-key": {
+              "default": "ctrl+e",
+              "description": "The Leader key on other platforms, such as ctrl+e. Press it to see the chords. Empty turns chords off.",
+              "type": "string"
+            },
+            "leader-key-mac": {
+              "default": "cmd+e",
+              "description": "The Leader key on a Mac, such as cmd+e. Press it to see the chords. Empty turns chords off.",
+              "type": "string"
+            },
             "listen": {
               "default": "",
               "description": "The address the web page is served on.",

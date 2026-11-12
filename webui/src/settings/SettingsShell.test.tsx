@@ -96,6 +96,16 @@ describe("SettingsShellView", () => {
     expect(queryByRole("link", { name: /^Global/ })).toBeNull()
   })
 
+  it("lists Keybindings right after Web UI", () => {
+    const { getByRole } = renderShell()
+    const links = Array.from(getByRole("navigation").querySelectorAll("a")).map((a) =>
+      (a.textContent ?? "").trim(),
+    )
+    const webUI = links.findIndex((t) => t.startsWith("Web UI"))
+    expect(webUI).toBeGreaterThanOrEqual(0)
+    expect(links[webUI + 1]).toMatch(/^Keybindings/)
+  })
+
   it("shows a changed chip with the count of keys set in the file", () => {
     const { getByRole } = renderShell()
     expect(getByRole("link", { name: /^Execution queue\s*2$/ })).toBeTruthy()

@@ -1,6 +1,10 @@
 package registry
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 func TestCoreEntries(t *testing.T) {
 	r := New(coreEntries()...)
@@ -38,7 +42,9 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("server", "web", "dev-dir"), typ: TypeString, section: SectionWebUI},
 		{key: Key("server", "web", "allowed-hosts"), typ: TypeStringList, section: SectionWebUI, risky: true},
 		{key: Key("server", "web", "totp"), typ: TypeBool, section: SectionWebUI, risky: true},
-		{key: Key("server", "web", "vi-escape"), typ: TypeString, section: SectionWebUI},
+		{key: Key("server", "web", "vi-escape"), typ: TypeString, section: SectionKeybindings},
+		{key: Key("server", "web", "leader-key-mac"), typ: TypeString, section: SectionKeybindings},
+		{key: Key("server", "web", "leader-key"), typ: TypeString, section: SectionKeybindings},
 		{key: Key("cpu-watchdog", "enabled"), typ: TypeBool, section: SectionCPUWatchdog},
 		{key: Key("cpu-watchdog", "threshold-percent"), typ: TypeNumber, section: SectionCPUWatchdog},
 		{key: Key("cpu-watchdog", "sustain"), typ: TypeDuration, section: SectionCPUWatchdog},
@@ -69,5 +75,31 @@ func TestCoreEntries(t *testing.T) {
 		if e.Risky != (e.ConfirmText != "") {
 			t.Errorf("%v: risky and confirm text disagree", c.key)
 		}
+	}
+}
+
+func TestLeaderKeyEntries(t *testing.T) {
+	r := Default()
+	for _, key := range []string{"leader-key-mac", "leader-key"} {
+		e, ok := r.Lookup(Key("server", "web", key))
+		if !ok {
+			t.Fatalf("%s: missing", key)
+		}
+		if !strings.Contains(e.Description, "Press it to see the chords") {
+			t.Errorf("%s: description %q lacks the chords hint", key, e.Description)
+		}
+		for raw, ok := range map[string]bool{
+			`"cmd+e"`: true, `"alt+e"`: true, `"ctrl+shift+j"`: true, `"alt+7"`: true, `""`: true,
+			`"shift+e"`: false, `"e"`: false, `"cmd+E"`: false, `"cmd+"`: false, `"cmd+ee"`: false, `"meta+e"`: false, `5`: false,
+		} {
+			err := CheckValue(e, json.RawMessage(raw), nil)
+			if (err == nil) != ok {
+				t.Errorf("%s %s: err = %v, want ok=%v", key, raw, err, ok)
+			}
+		}
+	}
+	e, _ := r.Lookup(Key("server", "web", "leader-key"))
+	if err := CheckValue(e, json.RawMessage(`"shift+e"`), nil); err == nil || !strings.HasSuffix(err.Error(), ".") {
+		t.Errorf("refusal should be a short sentence, got %v", err)
 	}
 }

@@ -118,6 +118,10 @@ type WebConfig struct {
 	// ViEscape is a key sequence (like "jk") that leaves insert mode in the
 	// web UI's vi editors. Empty means off.
 	ViEscape string `json:"vi-escape"`
+	// LeaderKeyMac and LeaderKey are the chord Leader keys, such as "cmd+e",
+	// on Mac and on other platforms. Empty turns chords off.
+	LeaderKeyMac string `json:"leader-key-mac"`
+	LeaderKey    string `json:"leader-key"`
 }
 
 // DefaultRecentlyFinished is the RecentlyFinished when none is configured.
@@ -141,7 +145,7 @@ func defaultWith(dataDir func() (string, error)) Config {
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           ticketStoreConfigWith(dataDir),
-		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{TOTP: true}},
+		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{TOTP: true, LeaderKeyMac: "cmd+e", LeaderKey: "ctrl+e"}},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
 		Watchdog:              DefaultWatchdogConfig(),
@@ -412,6 +416,12 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.ViEscape != nil {
 		cfg.Server.Web.ViEscape = *raw.Server.Web.ViEscape
+	}
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.LeaderKeyMac != nil {
+		cfg.Server.Web.LeaderKeyMac = *raw.Server.Web.LeaderKeyMac
+	}
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.LeaderKey != nil {
+		cfg.Server.Web.LeaderKey = *raw.Server.Web.LeaderKey
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

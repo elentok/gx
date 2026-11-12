@@ -23,6 +23,7 @@ export const GLOBAL_SECTIONS = [
   "Notifications",
   "Server",
   "Web UI",
+  "Keybindings",
   "CPU watchdog",
   "Process watchdog",
   "Disk space",
