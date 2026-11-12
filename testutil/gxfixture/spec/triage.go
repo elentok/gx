@@ -127,7 +127,6 @@ func TriageScenario(shape string) (Scenario, bool) {
 				})
 				for i := range rec.Rows[:3] {
 					rec.Rows[i].Group = rec.Rows[0].Address
-					rec.Rows[i].Estimate = "10K"
 				}
 			}}}
 		})

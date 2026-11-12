@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -119,7 +118,13 @@ func newTriageRowCmd(d Deps) *cobra.Command {
 				}
 				t.ping(d)
 				fmt.Fprintln(c.OutOrStdout(), saved.Revision)
-				printChain(c.OutOrStdout(), rec, row)
+				lines, err := rec.ChainLines(row)
+				if err != nil {
+					return err
+				}
+				for _, l := range lines {
+					fmt.Fprintln(c.OutOrStdout(), l)
+				}
 				return nil
 			}
 			saved, err := t.store.SetPerson(rec.ID, revision, row, f)
@@ -141,21 +146,6 @@ func newTriageRowCmd(d Deps) *cobra.Command {
 	f.BoolVar(&ungroup, "ungroup", false, "undo the row's group; its members chain by overlapWith")
 	f.IntVar(&revision, "revision", 0, "required: refuse unless the record is at this revision")
 	return cmd
-}
-
-// printChain prints, for each member of the group the row was in, the rows it
-// now waits for (its overlapWith), so the person sees the chain an ungroup left.
-func printChain(w io.Writer, rec *triage.Record, row string) {
-	r, err := rec.Row(row)
-	if err != nil {
-		return
-	}
-	for _, addr := range rec.GroupMembers(r.Group) {
-		m, _ := rec.Row(addr)
-		if m.Plan != nil && len(m.Plan.OverlapWith) > 0 {
-			fmt.Fprintf(w, "%s blocked_by %s\n", addr, strings.Join(m.Plan.OverlapWith, ", "))
-		}
-	}
 }
 
 func newTriageApproveCmd(d Deps) *cobra.Command {
@@ -188,6 +178,9 @@ func newTriageApproveCmd(d Deps) *cobra.Command {
 			}
 			t.ping(d)
 			fmt.Fprintf(c.OutOrStdout(), "%d write\n", saved.Revision)
+			for _, l := range saved.GroupRows() {
+				fmt.Fprintln(c.OutOrStdout(), l)
+			}
 			return nil
 		},
 	}

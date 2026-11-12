@@ -121,14 +121,21 @@ Routing, first match wins:
 
 Group map-epic items by **area of code or tool**, not bug vs idea: 1–8 items per epic, a singleton is
 fine, plain descriptive slug. For the ready epic, record which items touch overlapping files
-(`overlapWith`); they get chained by `blocked_by` in Write.
+(`overlapWith`); they get chained by `blocked_by` in Write. Overlapping rows chain oldest first, by
+manifest slugs.
+
+Save an `estimate` (such as `10K`) for every ready-epic row, taken from `gx tickets verify-plan
+--table` evidence. Plan groups ready rows that overlap when their estimates sum to under 45K; a row
+without an estimate is never grouped. A map-epic row is never grouped. The approve output lists each
+group row.
 
 **Web mode** ends here: end with `✅ plan: ...` and a Next line pointing at the web plan view, where
 the person edits and approves.
 
 **Chat mode** continues in this session:
 
-1. Print the table.
+1. Print the table, with each group row. To undo a group, run `gx tickets triage row --row <address>
+   --ungroup --revision <n>`; its members chain instead.
 2. Ask every `quick` question of the ready-epic items in one message. Make each answerable on its
    own, grouped by ticket: its address and title, one or two lines on what the fix changes, then each
    question with the options and a default. Never ask a `design` question: it travels with its ticket
@@ -173,7 +180,8 @@ This skill never runs `epic add` for it and never queues it.
 
 Each manifest entry carries `from: <address of the follow-up>`, a string, or a list for a group. A group
 ticket has one acceptance-criteria group per follow-up and a `blocked_by` that is the union of its
-members' chain edges (the overlapping-files chain from Plan). `gx-to-tickets` has the final say on
+members' chain edges: the union of their `overlapWith` in `gx tickets triage show --json`, minus the
+members themselves. `gx-to-tickets` has the final say on
 slicing: a group too big at publish is split, and the splits chain by `blocked_by`.
 
 **Row loop.** Run `lint-claims` and `publish --dry-run`. Map each refusal to its row through the

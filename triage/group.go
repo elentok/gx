@@ -71,7 +71,7 @@ func (r *Record) assignGroups() {
 		}
 		total, all := 0, true
 		for _, i := range idx {
-			n, ok := parseEstimate(r.Rows[i].Estimate)
+			n, ok := parseEstimate(r.Rows[i].Plan.Estimate)
 			all = all && ok
 			total += n
 		}
@@ -85,9 +85,6 @@ func (r *Record) assignGroups() {
 	}
 }
 
-// Row finds a row by address.
-func (r *Record) Row(address string) (*Row, error) { return r.row(address) }
-
 // GroupMembers lists the addresses of the rows in a group.
 func (r *Record) GroupMembers(group string) []string {
 	var out []string
@@ -99,23 +96,48 @@ func (r *Record) GroupMembers(group string) []string {
 	return out
 }
 
-// GroupEdges are the chain edges of a group: the union of its members'
-// overlapWith, minus the members themselves.
-func (r *Record) GroupEdges(group string) []string {
-	members := r.GroupMembers(group)
+// GroupRows prints one line per group, "group <id>: <members>", in row order.
+func (r *Record) GroupRows() []string {
 	var out []string
+	seen := map[string]bool{}
 	for _, row := range r.Rows {
-		if row.Group != group || row.Plan == nil {
+		if row.Group == "" || seen[row.Group] {
 			continue
 		}
-		for _, o := range row.Plan.OverlapWith {
-			if !slices.Contains(members, o) && !slices.Contains(out, o) {
-				out = append(out, o)
-			}
+		seen[row.Group] = true
+		out = append(out, "group "+row.Group+": "+strings.Join(r.GroupMembers(row.Group), ", "))
+	}
+	return out
+}
+
+// ChainLines prints, for each member of the group the row is in, the rows it
+// waits for (its overlapWith).
+func (r *Record) ChainLines(address string) ([]string, error) {
+	row, err := r.row(address)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, addr := range r.GroupMembers(row.Group) {
+		m, err := r.row(addr)
+		if err != nil {
+			return nil, err
+		}
+		if m.Plan != nil && len(m.Plan.OverlapWith) > 0 {
+			out = append(out, addr+" blocked_by "+strings.Join(m.Plan.OverlapWith, ", "))
 		}
 	}
-	slices.Sort(out)
-	return out
+	return out, nil
+}
+
+// dissolveGroup clears the group of every row in it; its members go back to
+// chained rows by their overlapWith.
+func (r *Record) dissolveGroup(group string) {
+	for i := range r.Rows {
+		if r.Rows[i].Group == group {
+			r.Rows[i].Group = ""
+		}
+	}
 }
 
 // Ungroup undoes the group the row is in, at step approve. Its members go back
@@ -132,12 +154,7 @@ func (s *Store) Ungroup(id string, revision int, address string) (*Record, error
 		if row.Group == "" {
 			return phaseErr("row %s is not in a group", address)
 		}
-		group := row.Group
-		for i := range rec.Rows {
-			if rec.Rows[i].Group == group {
-				rec.Rows[i].Group = ""
-			}
-		}
+		rec.dissolveGroup(row.Group)
 		return nil
 	})
 }

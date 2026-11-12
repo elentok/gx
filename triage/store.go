@@ -119,8 +119,6 @@ type Row struct {
 	NewAddress   string   `json:"newAddress,omitempty"`
 	// Group marks the rows that were promoted into one ticket group.
 	Group string `json:"group,omitempty"`
-	// Estimate is the row's size estimate.
-	Estimate string `json:"estimate,omitempty"`
 	// Refusal is the text of the last refusal the write hit.
 	Refusal string `json:"refusal,omitempty"`
 }

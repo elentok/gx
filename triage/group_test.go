@@ -21,11 +21,31 @@ func TestSavePlan_SmallOverlappingReadyRowsBecomeOneGroup(t *testing.T) {
 	if rec.Rows[0].Group == "" || rec.Rows[0].Group != rec.Rows[1].Group {
 		t.Fatalf("groups = %q, %q, want one shared group", rec.Rows[0].Group, rec.Rows[1].Group)
 	}
-	if rec.Rows[0].Estimate != "10K" {
-		t.Errorf("estimate = %q, want 10K", rec.Rows[0].Estimate)
+	if got, want := rec.GroupRows(), []string{"group " + rowA + ": " + rowA + ", " + rowB}; !reflect.DeepEqual(got, want) {
+		t.Errorf("group rows = %v, want %v", got, want)
 	}
-	if got, want := rec.GroupEdges(rec.Rows[0].Group), []string{"other:x/1", "other:x/2"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("group edges = %v, want the union of the members' %v", got, want)
+}
+
+func TestSetPerson_GroupedRowSwitchedAwayFromReadyLeavesItsGroup(t *testing.T) {
+	for name, f := range map[string]PersonFields{
+		"map":            {Action: "map", Destination: "m"},
+		"keep for later": {KeepForLater: true},
+	} {
+		s, _ := atPlan(t)
+		rec, _ := s.LoadLive()
+		rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{
+			{RowID: rowA, Action: "ready", Estimate: "10K", OverlapWith: []string{rowB}},
+			{RowID: rowB, Action: "ready", Estimate: "10K", OverlapWith: []string{rowA}},
+		}, nil)
+		must(t, rec, err)
+		if rec.Rows[0].Group == "" {
+			t.Fatalf("%s: rows were not grouped", name)
+		}
+		rec, err = s.SetPerson(rec.ID, rec.Revision, rowA, f)
+		must(t, rec, err)
+		if rec.Rows[0].Group != "" || rec.Rows[1].Group != "" {
+			t.Errorf("%s: groups after switch = %q, %q, want none", name, rec.Rows[0].Group, rec.Rows[1].Group)
+		}
 	}
 }
 

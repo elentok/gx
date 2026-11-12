@@ -133,6 +133,26 @@ func TestSaveRow_UngroupUndoesAGroupLikeTheCLI(t *testing.T) {
 	}
 }
 
+func TestSaveRow_SwitchingAGroupedMemberToMapClearsItsGroup(t *testing.T) {
+	f, store := startViewFixture(t)
+	rec := mustRec(store.Create())
+	a, b := rec.Rows[0].Address, rec.Rows[1].Address
+	for _, addr := range []string{a, b} {
+		rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addr}))
+	}
+	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
+		{RowID: a, Action: "ready", Estimate: "10K", OverlapWith: []string{b}},
+		{RowID: b, Action: "ready", Estimate: "10K", OverlapWith: []string{a}},
+	}, nil))
+	if res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Action: "map", Destination: "e"}); res.Refused {
+		t.Fatalf("save = %+v", res)
+	}
+	got := mustRec(store.LoadLive())
+	if got.Rows[0].Group != "" || got.Rows[1].Group != "" {
+		t.Fatalf("groups after switch = %q, %q, want none", got.Rows[0].Group, got.Rows[1].Group)
+	}
+}
+
 func TestView_GroupMembersShareTheMarkerAndUngroupedRowsShowTheirChain(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec := mustRec(store.Create())

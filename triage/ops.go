@@ -246,7 +246,6 @@ func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string)
 			}
 			p := p
 			row.Plan = &p
-			row.Estimate = p.Estimate
 			applyAutoAnswers(row, p)
 		}
 		if !rec.planPending() {
@@ -280,6 +279,9 @@ func (s *Store) SetPerson(id string, revision int, address string, f PersonField
 				row.Person = prev
 				return err
 			}
+		}
+		if action, _ := row.Effective(); action != "ready" && row.Group != "" {
+			rec.dissolveGroup(row.Group)
 		}
 		return nil
 	})

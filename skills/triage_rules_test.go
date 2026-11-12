@@ -20,6 +20,15 @@ func TestTriageSkillAnchors(t *testing.T) {
 	}
 }
 
+func TestTriageSkillTeachesGrouping(t *testing.T) {
+	skill := collapseSpace(readFile(t, "gx-triage-follow-ups/SKILL.md"))
+	for _, want := range []string{"`estimate`", "--ungroup", "oldest first"} {
+		if n := strings.Count(skill, want); n != 1 {
+			t.Errorf("triage skill has %q %d times, want once", want, n)
+		}
+	}
+}
+
 func TestTriageWritePublishesThroughToTickets(t *testing.T) {
 	skill := collapseSpace(readFile(t, "gx-triage-follow-ups/SKILL.md"))
 	for _, want := range []string{

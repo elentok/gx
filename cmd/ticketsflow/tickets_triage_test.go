@@ -214,6 +214,33 @@ func TestTriage_RowUngroupUndoesAGroupAtApproveOnly(t *testing.T) {
 	}
 }
 
+func TestTriage_ApprovePrintsTheGroupRow(t *testing.T) {
+	repo := triageProject(t)
+	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
+		t.Fatal(err)
+	}
+	rows := triagePending(t, repo)
+	for _, addr := range rows {
+		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	plan := `[{"rowId":"` + rows[0] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[1] + `"]},` +
+		`{"rowId":"` + rows[1] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[0] + `"]}]`
+	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
+		t.Fatal(err)
+	}
+	s := triageShow(t, repo)
+	out, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "group " + s.Rows[0].Group + ": " + rows[0] + ", " + rows[1]
+	if !strings.Contains(out, want) {
+		t.Errorf("approve output %q lacks %q", out, want)
+	}
+}
+
 func TestTriage_ApproveTwiceSaysAlreadyApproved(t *testing.T) {
 	repo := triageProject(t)
 	s := triageAtApprove(t, repo, false)
