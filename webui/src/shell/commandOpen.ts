@@ -1,22 +1,7 @@
-import { useSyncExternalStore } from "react"
+import { createOpenStore } from "./externalStore"
 
 // Open state of the Command palette (Cmd/Ctrl+P), kept outside React state like jumpOpen.ts.
-let open = false
-const listeners = new Set<() => void>()
+const store = createOpenStore()
 
-export function setCommandOpen(next: boolean | ((o: boolean) => boolean)) {
-  const value = typeof next === "function" ? next(open) : next
-  if (value === open) return
-  open = value
-  listeners.forEach((l) => l())
-}
-
-export function useCommandOpen(): boolean {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => open,
-  )
-}
+export const setCommandOpen = store.set
+export const useCommandOpen = store.use

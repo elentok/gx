@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react"
 import { useState } from "react"
-import { postAfk as defaultPostAfk, toggleAfk } from "../afk"
+import { toggleAfk } from "../afk"
 import { useConnectionContext, useConnectionState } from "../connection"
 import {
   SortActivity,
@@ -29,7 +29,6 @@ import { InstallSheet } from "./InstallSheet"
 import { useShell } from "./ShellContext"
 
 interface Props {
-  postAfk?: (on: boolean) => Promise<void>
   postViMode?: (on: boolean) => Promise<void>
   postDevFrontend?: (on: boolean) => Promise<void>
   postSort?: (workspace: string, sort: string) => Promise<unknown>
@@ -60,7 +59,6 @@ function DotsIcon() {
 
 // The app menu: the old top bar's menu, opened from the sidebar footer.
 export function GearMenu({
-  postAfk = defaultPostAfk,
   postViMode = defaultPostViMode,
   postDevFrontend = defaultPostDevFrontend,
   postSort = defaultPostSort,
@@ -155,7 +153,7 @@ export function GearMenu({
           </FooterButton>
         }
         items={[
-          toggle("AFK", "afk", afk, () => toggleAfk(afk, postAfk)),
+          toggle("AFK", "afk", afk, () => toggleAfk(afk)),
           toggle("Vi mode", "vimode", viMode, () => guarded(postViMode(!viMode))),
           ...(dev.has_checkout
             ? [toggle("Dev mode", "devmode", devOn, () => guarded(postDevFrontend(!devOn)))]

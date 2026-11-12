@@ -14,8 +14,7 @@ import { inWorkspace } from "../workspaces/followUpsBadge"
 export interface NextQuestion {
   /** The card to open; undefined when nothing waits. */
   next?: EpicListRow
-  /** The waiting cards, newest first. */
-  cards: EpicListRow[]
+  /** How many cards wait. */
   count: number
 }
 
@@ -29,16 +28,11 @@ const pathOf = (href: string) => href.slice(1)
 const ownPath = (r: EpicListRow) =>
   pathOf(r.card_kind === CardKindDesign ? designHref(r.address) : titleHref(r))
 
-/**
- * The Needs you cards of the workspace, newest first, and the one after the
- * card whose page `pathname` is (wrapping). From any other page it is the
- * newest card. No workspace means every workspace.
- */
-export function nextQuestion(
+/** The Needs you cards of the workspace, newest first. No workspace means every workspace. */
+export function needsYouCards(
   list: Pick<EpicList, "epics" | "follow_ups">,
   workspace: string | undefined,
-  pathname: string,
-): NextQuestion {
+): EpicListRow[] {
   const projects = new Set(inWorkspace(list.follow_ups, workspace).map((c) => c.project))
   const inScope = (r: EpicListRow) => {
     if (r.card_kind === CardKindOneOff) return true
@@ -46,7 +40,7 @@ export function nextQuestion(
     return r.card_kind === CardKindFollowUps ? projects.has(r.project) : r.workspace === workspace
   }
   // Reverse first so ties, and the Follow-ups cards, keep the server's order reversed; the sort is stable.
-  const cards = list.epics
+  return list.epics
     .filter((r) => r.section === SectionNeedsYou && inScope(r))
     .reverse()
     .sort((a, b) => {
@@ -56,6 +50,19 @@ export function nextQuestion(
         return Number(ta === undefined) - Number(tb === undefined)
       return Date.parse(tb) - Date.parse(ta)
     })
+}
+
+/**
+ * The card after the one whose page `pathname` is, among the workspace's Needs you cards (wrapping).
+ * From any other page it is the newest card.
+ */
+export function nextQuestion(
+  list: Pick<EpicList, "epics" | "follow_ups">,
+  workspace: string | undefined,
+  pathname: string,
+): NextQuestion {
+  const cards = needsYouCards(list, workspace)
+  if (!cards.length) return { count: 0 }
   const at = cards.findIndex((r) => pathOf(jumpHref(r)) === pathname || ownPath(r) === pathname)
-  return { next: cards[(at + 1) % cards.length], cards, count: cards.length }
+  return { next: cards[(at + 1) % cards.length], count: cards.length }
 }

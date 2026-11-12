@@ -24,7 +24,7 @@ export interface Command {
 }
 
 /** The one command list, in display order. Insert a row at any position. */
-export function useCommands(): Command[] {
+function useCommands(): Command[] {
   const navigate = useNavigate()
   const shell = useShell()
   const afk = useConnectionState(useConnectionContext()).snapshot?.afk ?? false
@@ -87,7 +87,6 @@ export function CommandPalette() {
   const root = useRef<HTMLDivElement>(null)
   const close = useCallback(() => setCommandOpen(false), [])
   const { isTop, hasLayer } = useDismissLayer({ open, close, root, phone })
-  const commands = useCommands()
 
   useEffect(() => () => setCommandOpen(false), [])
 
@@ -103,6 +102,17 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey)
   }, [open, isTop, hasLayer])
 
+  if (!open) return null
+  return (
+    <Box ref={root} display="contents">
+      <CommandList phone={phone} onClose={close} />
+    </Box>
+  )
+}
+
+/** Rendered only while the palette is open, so the command list is not rebuilt on every epic change. */
+function CommandList({ phone, onClose }: { phone: boolean; onClose: () => void }) {
+  const commands = useCommands()
   const sections = useMemo<ListSection[]>(
     () => [
       {
@@ -121,17 +131,14 @@ export function CommandPalette() {
     [commands],
   )
 
-  if (!open) return null
   return (
-    <Box ref={root} display="contents">
-      <Menu
-        sections={sections}
-        label="Commands"
-        placeholder="Type a command…"
-        phone={phone}
-        floating
-        onClose={close}
-      />
-    </Box>
+    <Menu
+      sections={sections}
+      label="Commands"
+      placeholder="Type a command…"
+      phone={phone}
+      floating
+      onClose={onClose}
+    />
   )
 }

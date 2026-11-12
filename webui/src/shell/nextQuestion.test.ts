@@ -11,7 +11,7 @@ import {
   type EpicListRow,
   type FollowUpCount,
 } from "../generated/server"
-import { nextQuestion } from "./nextQuestion"
+import { needsYouCards, nextQuestion } from "./nextQuestion"
 
 const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow =>
   ({
@@ -38,7 +38,7 @@ const list = { epics: [a, b, c], follow_ups: [] as FollowUpCount[] }
 
 test("orders newest first and counts", () => {
   const r = nextQuestion(list, "Default", "/epics")
-  expect(names(r.cards)).toEqual(["c", "b", "a"])
+  expect(names(needsYouCards(list, "Default"))).toEqual(["c", "b", "a"])
   expect(r.count).toBe(3)
 })
 
@@ -79,7 +79,7 @@ test.each([
 test("a Follow-ups card on its triage page steps to the next", () => {
   const f = row("f", { card_kind: CardKindFollowUps, waiting_since: undefined })
   const l = { epics: [f, a], follow_ups: [followUps("p", ["Default"])] }
-  expect(names(nextQuestion(l, "Default", "/epics").cards)).toEqual(["a", "f"])
+  expect(names(needsYouCards(l, "Default"))).toEqual(["a", "f"])
   expect(nextQuestion(l, "Default", "/triage/p").next?.name).toBe("a")
 })
 
@@ -93,9 +93,7 @@ test("a Design card on its Design page and a one-off card on its ticket page ste
 
 test("cards of another workspace are skipped", () => {
   const far = row("far", { workspace: "Work", waiting_since: at(9) })
-  expect(
-    names(nextQuestion({ epics: [far, a], follow_ups: [] }, "Default", "/epics").cards),
-  ).toEqual(["a"])
+  expect(names(needsYouCards({ epics: [far, a], follow_ups: [] }, "Default"))).toEqual(["a"])
 })
 
 test("a Follow-ups card of a project outside the workspace is skipped", () => {
@@ -121,13 +119,11 @@ test("Follow-ups cards sort last, server order reversed among them", () => {
     epics: [f1, f2, a],
     follow_ups: [followUps("p", ["Default"]), followUps("q", ["Default"])],
   }
-  expect(names(nextQuestion(l, "Default", "/epics").cards)).toEqual(["a", "f2", "f1"])
+  expect(names(needsYouCards(l, "Default"))).toEqual(["a", "f2", "f1"])
 })
 
 test("no candidates gives none", () => {
   expect(nextQuestion({ epics: [], follow_ups: [] }, "Default", "/epics")).toEqual({
-    next: undefined,
-    cards: [],
     count: 0,
   })
 })

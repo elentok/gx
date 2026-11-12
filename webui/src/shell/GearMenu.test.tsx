@@ -33,6 +33,7 @@ const registration = vi.hoisted(() => ({
 vi.mock("../pwa/registerWorker", () => ({ useWorkerRegistration: () => registration.state }))
 
 afterEach(() => {
+  vi.unstubAllGlobals()
   registration.state = { state: "idle" }
   forceRefresh.mockClear()
   install.state = { mode: "none", desktopCaption: false }
@@ -116,13 +117,19 @@ test("one divider separates AFK, Vi mode and Sort from Restart server and More s
 })
 
 test("the AFK and Vi mode items post the opposite of the snapshot", async () => {
-  const postAfk = vi.fn(async () => {})
+  const postAfk = vi.fn(async () => new Response(null, { status: 200 }))
+  vi.stubGlobal("fetch", postAfk)
   const postViMode = vi.fn(async () => {})
-  setup({ afk: true, vi_mode: false }, { postAfk, postViMode })
+  setup({ afk: true, vi_mode: false }, { postViMode })
   const afk = await screen.findByRole("menuitemcheckbox", { name: "AFK" })
   expect(afk.getAttribute("aria-checked")).toBe("true")
   fireEvent.click(afk)
-  await waitFor(() => expect(postAfk).toHaveBeenCalledWith(false))
+  await waitFor(() =>
+    expect(postAfk).toHaveBeenCalledWith(
+      "/v1/afk",
+      expect.objectContaining({ body: '{"on":false}' }),
+    ),
+  )
   fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Vi mode" }))
   await waitFor(() => expect(postViMode).toHaveBeenCalledWith(true))
 })

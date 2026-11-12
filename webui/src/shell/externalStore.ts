@@ -33,3 +33,13 @@ export function createExternalStore<T>(initial: T, onFirst?: () => () => void): 
   }
   return { get, set, subscribe, use: () => useSyncExternalStore(subscribe, get, () => initial) }
 }
+
+/** An open/closed flag kept outside React; the setter also takes an updater like useState's. */
+export function createOpenStore() {
+  const store = createExternalStore(false)
+  return {
+    set: (next: boolean | ((open: boolean) => boolean)) =>
+      store.set(typeof next === "function" ? next(store.get()) : next),
+    use: store.use,
+  }
+}
