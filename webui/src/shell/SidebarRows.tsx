@@ -494,7 +494,7 @@ function Row({
         </chakra.a>
         <Box flex="none">
           <MenuSlot number={row.number}>
-            <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} />
+            <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} roving />
           </MenuSlot>
         </Box>
       </RowFrame>

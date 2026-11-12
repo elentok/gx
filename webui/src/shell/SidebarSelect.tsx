@@ -29,7 +29,7 @@ import {
   type SelectRow,
   type SelectState,
 } from "../select/selectModel"
-import { dispatchSelectKey, selectIntent } from "../select/selectKeys"
+import { dispatchSelectKey, openItemMenu, selectIntent } from "../select/selectKeys"
 import type { SidebarRow } from "../workspaces/sidebarModel"
 import { showToast } from "../ui/toaster"
 import { isTextTarget } from "./keys"
@@ -165,6 +165,8 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
       dispatchSelectKey(e, state.on, hasLayer() || isTextTarget(e.target), {
         enter,
         itemKey: key || null,
+        // The menu button is the anchor's sibling inside the row frame.
+        menu: () => openItemMenu(stop?.parentElement),
         toggle: (k) => {
           if (rows.find((r) => r.key === k)?.selectable === false)
             showToast({ type: "info", title: QUEUE_REASON, id: "select-queue-agent" })

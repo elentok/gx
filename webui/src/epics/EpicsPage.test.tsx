@@ -769,7 +769,8 @@ test("each area is one tab stop: Tab from the sidebar lands on the page cards on
   await within(sidebar).findAllByRole("link")
   await waitFor(() => expect(cards()).toHaveLength(3))
   const inSidebar = (el: Element | null) => !!el && sidebar.contains(el)
-  // Only the roving items count: the per-row "More actions" buttons are separate stops (see the ticket's Spec deviations).
+  // The per-row and per-card "More actions" buttons are not Tab stops.
+  expect(tabOrder().filter((el) => el.getAttribute("aria-label") === "More actions")).toEqual([])
   const rowStops = tabOrder().filter((el) => inSidebar(el) && el.hasAttribute("data-nav"))
   const cardStops = tabOrder().filter((el) => el.hasAttribute("data-page-item"))
   expect(rowStops).toHaveLength(1)
@@ -791,6 +792,18 @@ test("each area is one tab stop: Tab from the sidebar lands on the page cards on
   while (document.activeElement !== sidebarRow && steps++ < tabOrder().length) tab(true)
   expect(document.activeElement).toBe(sidebarRow)
   expect(steps).toBeLessThan(tabOrder().length)
+})
+
+test("`.` and Shift+F10 on a focused card open its item menu", async () => {
+  const list = listOf([row("a", { section: "implementing", workspace: "Default" })])
+  stubFetch(list)
+  renderEpics(async () => list, wsConn())
+  await waitFor(() => expect(cards()).toHaveLength(1))
+  const a = cardOf("a")
+  expect(a.querySelector<HTMLElement>(`button[aria-label="More actions"]`)?.tabIndex).toBe(-1)
+  a.focus()
+  fireEvent.keyDown(a, { key: "F10", shiftKey: true })
+  expect(await screen.findByRole("menu")).toBeTruthy()
 })
 
 test("a focused card carries the inset focus ring", async () => {

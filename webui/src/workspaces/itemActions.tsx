@@ -310,7 +310,10 @@ export function ItemMenu({
   writers,
   onRemoved,
   extra,
+  roving,
 }: {
+  /** True in an area with roving focus: the trigger leaves the Tab order and `.` opens the menu. */
+  roving?: boolean
   item: ItemRef
   workspaces: Workspace[]
   writers?: ItemWriters
@@ -323,7 +326,10 @@ export function ItemMenu({
   if (all.length === 0) return null
   return (
     <>
-      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(all)} />
+      <GxMenu
+        trigger={<MoreActionsButton tabIndex={roving ? -1 : undefined} />}
+        items={menuGroups(all)}
+      />
       {dialogs}
     </>
   )

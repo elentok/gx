@@ -372,7 +372,7 @@ export function EpicCard({
         </Box>
         {row.workspace && (
           <Box ml="auto" flex="none">
-            <ItemMenu item={itemOfCard(row)!} workspaces={workspaces} extra={extra} />
+            <ItemMenu item={itemOfCard(row)!} workspaces={workspaces} extra={extra} roving />
           </Box>
         )}
         {confirmMerged && (

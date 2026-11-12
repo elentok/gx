@@ -1,4 +1,14 @@
-export type SelectIntent = "enter-select" | "toggle" | "open" | "leave" | "none"
+export type SelectIntent = "enter-select" | "toggle" | "open" | "menu" | "leave" | "none"
+
+/** The item menu's trigger; roving areas take it out of the Tab order, so a key has to reach it. */
+export const MENU_TRIGGER = `button[aria-label="More actions"]`
+
+/** Opens the item menu inside `scope`, if it has one. */
+export function openItemMenu(scope: Element | null | undefined): boolean {
+  const btn = scope?.querySelector<HTMLElement>(MENU_TRIGGER)
+  btn?.click()
+  return !!btn
+}
 
 export interface SelectKey {
   key: string
@@ -23,6 +33,10 @@ export function selectIntent(e: SelectKey, selecting: boolean, guarded: boolean)
       return selecting ? "toggle" : "open"
     case "Escape":
       return selecting ? "leave" : "none"
+    case ".":
+      return "menu"
+    case "F10":
+      return e.shiftKey ? "menu" : "none"
     default:
       return "none"
   }
@@ -39,6 +53,8 @@ export interface SelectKeyHandlers {
   toggle: (key: string) => void
   /** Enter outside select mode. Omit when the surface has no open action. */
   open?: (key: string) => void
+  /** `.` or Shift+F10: open the focused item's menu. Return false when it has none, so the key is left alone. */
+  menu?: (key: string) => boolean | void
 }
 
 /**
@@ -66,5 +82,9 @@ export function dispatchSelectKey(
     e.preventDefault()
     e.stopPropagation()
     h.open(h.itemKey)
+  } else if (intent === "menu" && h.menu) {
+    if (h.menu(h.itemKey) === false) return
+    e.preventDefault()
+    e.stopPropagation()
   }
 }

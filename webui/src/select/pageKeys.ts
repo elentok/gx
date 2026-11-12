@@ -3,7 +3,7 @@ import type { SelectApi } from "../shell/SidebarSelect"
 import { isTextTarget } from "../shell/keys"
 import { hasLayer } from "../ui/modal/layers"
 import { isMoveKey, moveInGrid } from "./gridNav"
-import { dispatchSelectKey } from "./selectKeys"
+import { dispatchSelectKey, openItemMenu } from "./selectKeys"
 
 /** Marks a page's card or row; its value is the item's select key. The sidebar's roving focus uses data-nav, so the two never match each other. */
 export const PAGE_ATTR = "data-page-item"
@@ -54,6 +54,7 @@ export function usePageKeys(area: RefObject<HTMLElement | null>, select: SelectA
           if (sel.rows.find((r) => r.key === key)?.selectable !== false) sel.toggle(key)
         },
         open: () => (item?.querySelector<HTMLElement>(`[${PAGE_OPEN_ATTR}]`) ?? item)?.click(),
+        menu: () => openItemMenu(item),
       })
       // The select keys are not move keys, so a handled event ends here.
       if (e.defaultPrevented || !item) return

@@ -12,6 +12,8 @@ describe("selectIntent", () => {
     ["Enter", true, "toggle"],
     ["Escape", false, "none"],
     ["Escape", true, "leave"],
+    [".", false, "menu"],
+    [".", true, "menu"],
     ["x", true, "none"],
   ] as const)("%j with selecting=%s gives %s", (key, selecting, want) => {
     expect(selectIntent({ key }, selecting, false)).toBe(want)
@@ -22,6 +24,11 @@ describe("selectIntent", () => {
       for (const selecting of [false, true])
         expect(selectIntent({ key }, selecting, true)).toBe("none")
     }
+  })
+
+  it("opens the menu on Shift+F10 but not on a bare F10", () => {
+    expect(selectIntent({ key: "F10", shiftKey: true }, false, false)).toBe("menu")
+    expect(selectIntent({ key: "F10" }, false, false)).toBe("none")
   })
 
   it("ignores chords", () => {

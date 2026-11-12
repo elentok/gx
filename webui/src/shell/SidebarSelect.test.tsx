@@ -250,6 +250,16 @@ test("`s` with focus on a sidebar button that is not a row enters select mode", 
   expect(screen.getByTestId("select-count")).toBeTruthy()
 })
 
+test("`.` on a focused row opens its menu, and the menu button is not a Tab stop", async () => {
+  setup()
+  const link = await body().findByRole("link", { name: /Blog/ })
+  const btn = link.parentElement!.querySelector<HTMLElement>(`button[aria-label="More actions"]`)!
+  expect(btn.tabIndex).toBe(-1)
+  link.focus()
+  fireEvent.keyDown(link, { key: "." })
+  expect(await screen.findByRole("menu")).toBeTruthy()
+})
+
 test("Escape ends the mode", async () => {
   setup()
   await enterSelect()
