@@ -31,12 +31,13 @@ type (
 	storeChangedMsg    struct{ gen int }
 )
 
-// start watches dir (the ticket scratch directory); a no-op while running.
-func (w *storeWatch) start(dir string) tea.Cmd {
+// start watches the directory dir resolves to (the ticket scratch directory); a
+// no-op while running. dir runs git, so it is called only when a watch starts.
+func (w *storeWatch) start(dir func() string) tea.Cmd {
 	if w.running {
 		return nil
 	}
-	events, stop, err := tabapi.WatchStore(dir)
+	events, stop, err := tabapi.WatchStore(dir())
 	if err != nil {
 		// The poll alone still keeps the rows fresh.
 		events, stop = nil, nil
@@ -64,7 +65,7 @@ func (w *storeWatch) halt() {
 // update handles the watch's messages; ok is false for any other msg. changed
 // is true when the store may have changed, so the caller must tell the active
 // page; next is the command that keeps the watch going.
-func (w *storeWatch) update(msg tea.Msg, dir string) (next tea.Cmd, changed, ok bool) {
+func (w *storeWatch) update(msg tea.Msg, dir func() string) (next tea.Cmd, changed, ok bool) {
 	switch msg := msg.(type) {
 	case storeWatchStartMsg:
 		return w.start(dir), false, true
@@ -84,14 +85,19 @@ func (w *storeWatch) update(msg tea.Msg, dir string) (next tea.Cmd, changed, ok 
 	return nil, false, false
 }
 
-func (m Model) storeDir() string {
-	return tabapi.ScratchDir(m.settings.TicketStore, m.settings.ActiveWorktreePath)
+// storeDirFunc resolves the scratch directory on demand: the resolution runs
+// git, so it must not happen on every message.
+func (m Model) storeDirFunc() func() string {
+	settings := m.settings
+	return func() string {
+		return tabapi.ScratchDir(settings.TicketStore, settings.ActiveWorktreePath)
+	}
 }
 
 // updateStoreWatch routes the watch's messages and tells the active page when
 // the store changed.
 func (m Model) updateStoreWatch(msg tea.Msg) (Model, tea.Cmd, bool) {
-	next, changed, ok := m.store.update(msg, m.storeDir())
+	next, changed, ok := m.store.update(msg, m.storeDirFunc())
 	if !changed {
 		return m, next, ok
 	}

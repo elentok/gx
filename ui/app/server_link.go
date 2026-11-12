@@ -27,7 +27,7 @@ func newServerLink(deps *ServerDeps) serverLink {
 type linkEnv struct {
 	// store is the shell's down-mode store watch, started and halted by link changes.
 	store    *storeWatch
-	storeDir string
+	storeDir func() string
 	// cwdProject is looked up only when the first snapshot lands.
 	cwdProject func() string
 }
@@ -56,7 +56,7 @@ func (m *Model) linkEnv() linkEnv {
 	settings := m.settings
 	return linkEnv{
 		store:      &m.store,
-		storeDir:   m.storeDir(),
+		storeDir:   m.storeDirFunc(),
 		cwdProject: func() string { return cwdProjectName(settings.TicketStore, settings.ActiveWorktreePath) },
 	}
 }

@@ -172,3 +172,27 @@ func runCmds(cmd tea.Cmd) []string {
 	walk(cmd)
 	return out
 }
+
+func TestStoreWatch_UpdateResolvesDirOnlyWhenStarting(t *testing.T) {
+	calls := 0
+	dir := func() string {
+		calls++
+		return t.TempDir()
+	}
+	var w storeWatch
+	t.Cleanup(w.halt)
+
+	for range 20 {
+		w.update(tea.MouseMotionMsg{}, dir)
+		w.update(storePollMsg{gen: w.gen}, dir)
+	}
+	if calls != 0 {
+		t.Fatalf("dir resolved %d times for messages that start nothing, want 0", calls)
+	}
+
+	w.update(storeWatchStartMsg{}, dir)
+	w.update(storeWatchStartMsg{}, dir)
+	if calls != 1 {
+		t.Fatalf("dir resolved %d times across two starts of one watch, want 1", calls)
+	}
+}
