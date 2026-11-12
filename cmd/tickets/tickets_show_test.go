@@ -185,6 +185,33 @@ func TestExecute_TicketsShow_SectionPrintsOnlyMatchingSections(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_SectionTicketsFilterNarrowsEpic(t *testing.T) {
+	repo, project := cmdtest.SetupShowProject(t)
+	issues := filepath.Join(project, "epic", "issues")
+	for _, id := range []string{"07", "08", "09", "10"} {
+		testutil.WriteFile(t, issues, id+"-t"+id+".md",
+			"---\nid: \""+id+"\"\nstatus: done\ntype: implement\n---\n\n# "+id+" — T"+id+"\n\n## Spec deviations\n\n- note "+id+"\n")
+	}
+
+	out, err := runIn(t, repo, "tickets", "show", "epic", "--section", "Spec deviations", "--tickets", "8-9,10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "mine:epic/08  T08\n- note 08\n\nmine:epic/09  T09\n- note 09\n\nmine:epic/10  T10\n- note 10\n\n"
+	if out != want {
+		t.Errorf("printed\n%q\nwant\n%q", out, want)
+	}
+
+	for _, bad := range []string{"x", "9-8", "1-"} {
+		if _, err := runIn(t, repo, "tickets", "show", "epic", "--section", "Spec deviations", "--tickets", bad); err == nil {
+			t.Errorf("--tickets %q should refuse", bad)
+		}
+	}
+	if _, err := runIn(t, repo, "tickets", "show", "epic", "--tickets", "8"); err == nil {
+		t.Error("--tickets without --section should refuse")
+	}
+}
+
 func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {
 	repo, project := cmdtest.SetupShowProject(t)
 

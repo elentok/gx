@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -36,7 +37,14 @@ type ticketShowJSON struct {
 // of every ticket of an epic that has it, each under a line naming the ticket.
 // A single ticket without the section is an error; --section and --json are
 // kept apart by the command's flag definitions.
-func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut bool, section string, w io.Writer) error {
+func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut bool, section, only string, w io.Writer) error {
+	filter, err := parseTicketNumbers(only)
+	if err != nil {
+		return err
+	}
+	if filter != nil && section == "" {
+		return errors.New("--tickets needs --section")
+	}
 	a, t, err := ticketref.FindTicket(dirs, cwd, addr)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
@@ -45,13 +53,16 @@ func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut bool, section st
 				return &tickets.AddressError{Code: tickets.CodeEpicJSON, Msg: "--json is not supported for an epic address"}
 			}
 			if section != "" {
-				return showEpicSection(dirs, cwd, project, epic, section, w)
+				return showEpicSection(dirs, cwd, project, epic, section, filter, w)
 			}
 			return showEpic(dirs, cwd, project, epic, w)
 		}
 	}
 	if err != nil {
 		return err
+	}
+	if filter != nil {
+		return errors.New("--tickets only applies to an epic address")
 	}
 	if section != "" {
 		if t.ReadErr == "" && !schema.HasSection(t.Body, section) {
@@ -94,8 +105,33 @@ func resolveEpic(dirs config.Dirs, cwd, project, name string) (root, resolved, p
 	return root, project, path, nil
 }
 
-// showEpicSection prints the named section of each of the epic's tickets.
-func showEpicSection(dirs config.Dirs, cwd, project, name, section string, w io.Writer) error {
+// parseTicketNumbers parses a --tickets value such as "15-18,20" into a set of
+// ticket numbers. An empty value returns nil, meaning every ticket.
+func parseTicketNumbers(s string) (map[int]bool, error) {
+	if s == "" {
+		return nil, nil
+	}
+	set := map[int]bool{}
+	for part := range strings.SplitSeq(s, ",") {
+		lo, hi, isRange := strings.Cut(strings.TrimSpace(part), "-")
+		from, err := strconv.Atoi(lo)
+		to := from
+		if err == nil && isRange {
+			to, err = strconv.Atoi(hi)
+		}
+		if err != nil || from < 0 || to < from {
+			return nil, fmt.Errorf("--tickets: bad entry %q, want numbers or ranges like 15-18,20", part)
+		}
+		for n := from; n <= to; n++ {
+			set[n] = true
+		}
+	}
+	return set, nil
+}
+
+// showEpicSection prints the named section of each of the epic's tickets,
+// limited to the numbers in filter when it is non-nil.
+func showEpicSection(dirs config.Dirs, cwd, project, name, section string, filter map[int]bool, w io.Writer) error {
 	root, project, _, err := resolveEpic(dirs, cwd, project, name)
 	if err != nil {
 		return err
@@ -109,6 +145,9 @@ func showEpicSection(dirs config.Dirs, cwd, project, name, section string, w io.
 			continue
 		}
 		for _, t := range epic.Tickets {
+			if filter != nil && !filter[t.Number] {
+				continue
+			}
 			a := tickets.Address{Project: project, Epic: name, ID: t.Identifier}
 			if err := printTicketSection(a, t, section, w); err != nil {
 				return err
