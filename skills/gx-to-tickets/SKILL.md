@@ -334,9 +334,24 @@ agents pay for every wrong detail, so:
   one wins.
 - **Do not bundle unrelated fixes** into one ticket; split at the ticket size cap.
 
-### 5. Quiz the user
+### 5. Quiz the user (only when a trigger fires)
 
-Present the proposed breakdown as a numbered list. For each ticket, show:
+Skip the quiz unless one of these triggers fires:
+
+1. A ticket estimate is over 45K tokens.
+2. The breakdown has a prefactor or wide-refactor ticket.
+3. `publish --dry-run` prints a "consider splitting" line.
+4. The spec does not name the slices, so you guessed the split.
+
+Always skip it when running unattended (e.g. inside ralph-loop): publish the breakdown as drafted
+and let the tickets themselves carry the record of what was decided.
+
+After a skip, publish (step 6), print the breakdown table (title, blocked by, estimate, test seam
+files) and the epic Summary, then print `quiz skipped: no trigger fired` (or name the trigger that
+fired, if you ran the quiz). Open the epic; do not hold it as `draft`. The person corrects it in chat
+or in a fresh run before the Queue-tab launch, and you edit the tickets with `gx tickets` commands.
+
+When a trigger fires, present the proposed breakdown as a numbered list. For each ticket, show:
 
 - **Title**: short descriptive name
 - **Blocked by**: which other tickets (if any) must complete first
@@ -367,9 +382,7 @@ line, a `➡️` recommendation and a `gx-question` block per question. Only a l
 list goes unseen. Keep the Summary and the breakdown above the round, and make the round the last
 thing in the turn: no tool call, and no text, after it.
 
-Iterate until the user approves the breakdown. Skip this step when running unattended (e.g. inside
-ralph-loop) — publish the breakdown as drafted and let the tickets themselves carry the record of
-what was decided.
+Iterate until the user approves the breakdown.
 
 ### 6. Publish the tickets
 

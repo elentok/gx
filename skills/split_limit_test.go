@@ -31,6 +31,34 @@ func TestCodeReviewFixTicketRules(t *testing.T) {
 	}
 }
 
+func TestToTicketsQuizSkip(t *testing.T) {
+	text := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	for _, anchor := range []string{"### 5. Quiz the user (only when a trigger fires)", "`quiz skipped: no trigger fired`"} {
+		if got := strings.Count(text, normalizeSpace(anchor)); got != 1 {
+			t.Errorf("gx-to-tickets/SKILL.md has %d copies of %q, want 1", got, anchor)
+		}
+	}
+	// The trigger list is stated once: one "over 45K tokens" trigger.
+	if got := strings.Count(text, "over 45K tokens"); got != 1 {
+		t.Errorf("trigger list appears %d times, want 1", got)
+	}
+}
+
+func TestGxDesignStep7PassesNoQuizRule(t *testing.T) {
+	text := readFile(t, "gx-design/SKILL.md")
+	i := strings.Index(text, "\n7. **No `<epic>-impl` epic")
+	j := strings.Index(text, "\n8. **No `<epic>-impl` branch**")
+	if i < 0 || j < i {
+		t.Fatal("gx-design/SKILL.md step 7 not found")
+	}
+	step := strings.ToLower(text[i:j])
+	for _, bad := range []string{"quiz", "trigger"} {
+		if strings.Contains(step, bad) {
+			t.Errorf("gx-design step 7 mentions %q", bad)
+		}
+	}
+}
+
 // The split limit lives in two places: the skill text and the Go constant.
 // This test keeps them equal.
 func TestToTicketsSplitLimit(t *testing.T) {
