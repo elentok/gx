@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gitpkg "github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 )
 
 func git(dir string, args ...string) (string, error) { return runGit(dir, nil, args...) }
@@ -23,6 +24,11 @@ func logLines(t *testing.T, dir string) []string {
 		return nil
 	}
 	return strings.Split(out, "\n")
+}
+
+func waitForCommit(t *testing.T, dir string) {
+	t.Helper()
+	testutil.WaitFor(t, 5*time.Second, "a commit", func() bool { return len(logLines(t, dir)) > 0 })
 }
 
 func write(t *testing.T, dir, name, body string) {
@@ -59,10 +65,7 @@ func TestEditsInsideDebounceWindowMakeOneSyncCommit(t *testing.T) {
 			t.Fatalf("after edit %d committed early: %v", i, got)
 		}
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for len(logLines(t, dir)) == 0 && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
+	waitForCommit(t, dir)
 	got := logLines(t, dir)
 	if len(got) != 1 || got[0] != "sync: 3 files" {
 		t.Fatalf("log = %v, want one 'sync: 3 files'", got)
@@ -86,10 +89,7 @@ func TestTouch_CommitsAfterQuietWithoutPolling(t *testing.T) {
 	if got := logLines(t, dir); len(got) != 0 {
 		t.Fatalf("committed before the quiet period ended: %v", got)
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for len(logLines(t, dir)) == 0 && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
+	waitForCommit(t, dir)
 	if got := logLines(t, dir); len(got) != 1 || got[0] != "sync: 2 files" {
 		t.Fatalf("log = %v, want one 'sync: 2 files'", got)
 	}
@@ -201,10 +201,7 @@ func TestSetSettings_NextCommitUsesNewDebounceAndRemote(t *testing.T) {
 	l.SetSettings(100*time.Millisecond, remote)
 	write(t, dir, "a.md", "x")
 	l.Touch()
-	deadline := time.Now().Add(5 * time.Second)
-	for len(logLines(t, dir)) == 0 && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
+	waitForCommit(t, dir)
 	if got := logLines(t, dir); len(got) != 1 || got[0] != "sync: 1 files" {
 		t.Fatalf("log = %v, want one debounced sync commit", got)
 	}
