@@ -241,6 +241,7 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 	}
 	if cwd, err := os.Getwd(); err == nil {
 		res.BrowserSession = filepath.Base(cwd)
+		res.Worktree = cwd
 	}
 }
 

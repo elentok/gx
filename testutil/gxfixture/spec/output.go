@@ -70,6 +70,9 @@ type Output struct {
 	// worktree directory is unique per sibling session and stable across calls, so
 	// concurrent sessions never share a browser.
 	BrowserSession string `json:"browser_session,omitempty"`
+	// Worktree is the directory the fixture was started from, so an agent can tell
+	// its own fixture from a sibling worktree's.
+	Worktree string `json:"worktree,omitempty"`
 	// OutsideTreePID is the root of the process tree an OutsideTree scenario
 	// started outside gx; empty elsewhere.
 	OutsideTreePID int `json:"outside_tree_pid,omitempty"`
@@ -121,6 +124,9 @@ func (o Output) ShellEnv() string {
 	}
 	if o.BrowserSession != "" {
 		export("GXF_BROWSER_SESSION", o.BrowserSession)
+	}
+	if o.Worktree != "" {
+		export("GXF_WORKTREE", o.Worktree)
 	}
 	if o.FeatureWorktree != "" {
 		export("GXF_FEATURE_WORKTREE", o.FeatureWorktree)

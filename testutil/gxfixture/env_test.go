@@ -154,6 +154,25 @@ func TestStart_BrowserSessionIsTheWorktreeDirectoryName(t *testing.T) {
 	}
 }
 
+func TestStart_WorktreeIsTheOwningWorkingDirectory(t *testing.T) {
+	t.Parallel()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := start(t, "empty")
+	if r.Worktree != cwd {
+		t.Errorf("worktree = %q, want %q", r.Worktree, cwd)
+	}
+}
+
+func TestShellEnv_ExportsWorktreeWhenSet(t *testing.T) {
+	got := spec.Output{Worktree: "/w/wt-1"}.ShellEnv()
+	if want := "export GXF_WORKTREE='/w/wt-1'\n"; !strings.Contains(got, want) {
+		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
+	}
+}
+
 func TestShellEnv_ExportsBrowserSessionWhenSet(t *testing.T) {
 	got := spec.Output{BrowserSession: "wt-1"}.ShellEnv()
 	if want := "export GXF_BROWSER_SESSION='wt-1'\n"; !strings.Contains(got, want) {

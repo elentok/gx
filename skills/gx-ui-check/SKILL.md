@@ -77,6 +77,9 @@ The JSON line has these fields:
   `playwright-cli -s=<browser_session> ...`. The default session is shared by concurrent sessions,
   so another session's tabs would interfere. `--env` exports it as `GXF_BROWSER_SESSION`. If
   `open` fails to launch, see "Open parameters" in gx-playwright-cli (`--browser=chromium`).
+- `worktree`: the directory the fixture was started from. To tell your fixture from a sibling
+  worktree's, compare it with your own `pwd`; never kill one that names another worktree. `--env`
+  exports it as `GXF_WORKTREE`.
 - `log_file`: the server's combined stdout and stderr. A failed cleanup command shows up there as
   `disk cleanup command failed`, with the command's exit code and output tail. Read it when the UI
   shows a failure you cannot explain. `--env` exports it as `GXF_LOG_FILE`.
@@ -100,6 +103,21 @@ of that config whose `contextOptions.serviceWorkers` is `"allow"`:
 3. Never reload the page. The UI updates by itself, and a reload would hide a missing update. If a
    step needs a CLI call (flow 6 runs `gx server queue add`), run it with the `env` entries set.
 4. Compare the page with the flow's **Pass** lines. Report each line as seen or not seen.
+
+### `playwright-cli` gotchas
+
+- **Url and cookie:** after `source`-ing the `--env` output, use `$GXF_WEB_URL` and
+  `$GXF_WEB_COOKIE` (`name=value`). Do not parse the JSON line.
+- **Cookie flags:** `playwright-cli -s=$GXF_BROWSER_SESSION cookie-set <name> <value> --domain=127.0.0.1 --path=/ --secure`.
+  `--url ... --secure` ends on a 404. Set the cookie, then `goto` the page.
+- **Routes use the hash:** the page is `$GXF_WEB_URL#/settings`, not `/settings`.
+- **Framed refs carry a prefix:** a ref in an iframe is `f1e270`, not `e270`. Copy the ref exactly from
+  the snapshot. A ref from an older snapshot fails with "Ref ... not found": take a new snapshot.
+- **Role locators:** when a CSS selector or ref fails, use `run-code` with
+  `page.getByRole('button', { name: /Dev mode/ }).click()`.
+- **Verbs:** run `playwright-cli --help` once and read the verb list (`open`, `goto`, `snapshot`,
+  `click`, `select`, `resize`, `screenshot`, `cookie-set`, `run-code`, `eval`, `close`). Do not
+  grep the help per verb.
 
 ## 3. Stop the fixture
 
