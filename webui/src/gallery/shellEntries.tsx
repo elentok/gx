@@ -13,6 +13,8 @@ import {
 } from "../generated/server"
 import { ListRow, type ListRowData } from "../nav/JumpMenu"
 import { AppShell } from "../shell/AppShell"
+import { ChordBox } from "../shell/ChordBox"
+import { chordTable } from "../shell/chords"
 import { buildPalette } from "../shell/JumpPalette"
 import { ManageWorkspaces } from "../shell/ManageWorkspaces"
 import { useShell } from "../shell/ShellContext"
@@ -151,6 +153,36 @@ const Frame = ({ w, h, children }: { w: string; h: string; children: ReactNode }
   </Box>
 )
 
+const chordCtx = { path: "/agents/s1", session: session("s1", "builder") }
+
+// The Chord box is position:fixed; the Frame's transform makes it sit in the frame's corner.
+const chordBoxEntry: GalleryEntry = {
+  name: "ChordBox",
+  cases: [
+    {
+      label: "chat page (Remove chat available)",
+      node: (
+        <Frame w="1040px" h="230px">
+          <ChordBox
+            leader="cmd+e"
+            ctx={chordCtx}
+            chords={chordTable(() => {})}
+            onClose={() => {}}
+          />
+        </Frame>
+      ),
+    },
+    {
+      label: "other page",
+      node: (
+        <Frame w="1040px" h="230px">
+          <ChordBox leader="cmd+e" ctx={{ path: "/" }} onClose={() => {}} />
+        </Frame>
+      ),
+    },
+  ],
+}
+
 // Slides the sidebar open once mounted; the docked desktop sidebar is already open.
 const OpenSidebar = () => {
   const shell = useShell()
@@ -270,6 +302,7 @@ const manageCase = (label: string, step: (root: HTMLElement) => boolean) => ({
 })
 
 export const shellEntries: GalleryEntry[] = [
+  chordBoxEntry,
   {
     name: "JumpMenuRows",
     cases: [
