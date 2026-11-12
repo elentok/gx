@@ -31,9 +31,14 @@ type rig struct {
 // the given set times and a switch that is on from 08:00.
 func start(t *testing.T, late float64, times ...string) *rig {
 	t.Helper()
-	clock := rigs.NewSchedulesClock(at(8, 0))
+	return startOn(t, rigs.NewSchedulesClock(at(8, 0)), late, times...)
+}
+
+// startOn is start on a clock the caller made, so it may read in another zone.
+func startOn(t *testing.T, clock *rigs.SchedulesClock, late float64, times ...string) *rig {
+	t.Helper()
 	h, _ := rigs.StartSchedulesHarness(t, clock)
-	s, err := schedrec.NewStore(h.TicketStore).Create("proj", schedrec.Schedule{
+	s, err := schedrec.NewStore(h.TicketStore).WithClock(clock.Now).Create("proj", schedrec.Schedule{
 		Name: "Nightly", Prompt: "check the logs", Days: allDays(), Times: times, LateLimitHours: late,
 	})
 	if err != nil {

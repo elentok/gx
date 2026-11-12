@@ -36,8 +36,13 @@ const SchedulesInterval = 20 * time.Millisecond
 // short check interval. The queue is paused, so started runs stay queued.
 func StartSchedulesHarness(t *testing.T, clock *SchedulesClock) (*servertest.Harness, string) {
 	t.Helper()
-	return StartOneOffHarness(t, func(c *server.Config) {
+	return StartOneOffHarness(t, WithSchedulesClock(clock))
+}
+
+// WithSchedulesClock runs the scheduler on clock with a short check interval.
+func WithSchedulesClock(clock *SchedulesClock) func(*server.Config) {
+	return func(c *server.Config) {
 		c.SchedulesClock = clock.Now
 		c.SchedulesInterval = SchedulesInterval
-	})
+	}
 }

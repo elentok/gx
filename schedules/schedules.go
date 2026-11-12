@@ -164,6 +164,12 @@ func NewStore(dir string) *Store {
 	return &Store{dir: dir, now: time.Now}
 }
 
+// WithClock sets the clock that stamps created_at and updated_at.
+func (st *Store) WithClock(now func() time.Time) *Store {
+	st.now = now
+	return st
+}
+
 // ProjectNameOf is the project name for a project directory.
 func ProjectNameOf(dir string) string { return tickets.ProjectName(dir) }
 
