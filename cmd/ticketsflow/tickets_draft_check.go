@@ -16,7 +16,7 @@ import (
 const (
 	maxCallerLines = 12
 	// A slow gopls falls back to rg rather than stalling the draft.
-	goplsTimeout = 20 * time.Second
+	goplsTimeout = 8 * time.Second
 )
 
 // draftMisses is one line per path, test pattern, flow id or symbol the plan
@@ -84,6 +84,7 @@ type callerFinder struct {
 	root, commit string
 	env          []string
 	gopls        bool
+	noRemote     bool
 }
 
 func newCallerFinder(root, commit string, env []string) *callerFinder {
@@ -105,11 +106,8 @@ func (f *callerFinder) callers(symbol string) (string, bool) {
 	name := symbol[strings.LastIndex(symbol, ".")+1:]
 	if f.gopls {
 		if pos, ok := f.goDefinition(name); ok {
-			ctx, cancel := context.WithTimeout(context.Background(), goplsTimeout)
-			out, err := f.command(ctx, "gopls", "-remote=auto", "references", pos).CombinedOutput()
-			cancel()
-			if err == nil {
-				return fmt.Sprintf("verified at %s: %s", f.commit, f.summarize(refLines(string(out)))), true
+			if out, err := f.goplsReferences(pos); err == nil {
+				return fmt.Sprintf("verified at %s: %s", f.commit, f.summarize(refLines(out))), true
 			}
 		}
 	}
@@ -118,6 +116,26 @@ func (f *callerFinder) callers(symbol string) (string, bool) {
 		return "", false
 	}
 	return "rg result, not verified: " + f.summarize(lines), true
+}
+
+// goplsReferences prefers the shared daemon. When the daemon cannot be dialed
+// (seen even unsandboxed) it runs in-process and stays there for the rest of
+// the run, so the dial failure is paid once.
+func (f *callerFinder) goplsReferences(pos string) (string, error) {
+	run := func(args ...string) (string, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), goplsTimeout)
+		defer cancel()
+		out, err := f.command(ctx, "gopls", args...).CombinedOutput()
+		return string(out), err
+	}
+	if !f.noRemote {
+		out, err := run("-remote=auto", "references", pos)
+		if err == nil {
+			return out, nil
+		}
+		f.noRemote = true
+	}
+	return run("references", pos)
 }
 
 func defRe(name string) *regexp.Regexp {

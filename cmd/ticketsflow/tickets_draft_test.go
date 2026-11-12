@@ -320,6 +320,29 @@ func TestTicketsDraft_VerifiedAtCallers(t *testing.T) {
 	}
 }
 
+func TestTicketsDraft_VerifiedAtAfterDaemonDialError(t *testing.T) {
+	d, plan, manifest := draftSetup(t, factsPlan)
+	factsFixture(t, d)
+	onlyTools(t, true, "rg", "git")
+	gopls, err := exec.LookPath("gopls")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/sh\n" +
+		"if [ \"$1\" = -remote=auto ]; then echo 'dialing remote: connect: no such file or directory'; exit 1; fi\n" +
+		"echo \"$PWD/cmd/sym.go:8:22-30\"\n"
+	if err := os.WriteFile(gopls, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := draftOut(t, d, plan, manifest); err != nil {
+		t.Fatalf("draft: %v\n%s", err, out)
+	}
+	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
+	if !strings.Contains(body, "callers (verified at ") {
+		t.Errorf("body:\n%s", body)
+	}
+}
+
 func TestTicketsDraft_MissingMakeTargetAndAnchoredPatternFail(t *testing.T) {
 	plan := strings.Replace(factsPlan, "[web-types]", "[no-such-target]", 1)
 	plan = strings.Replace(plan, `"Seven"`, `"^7"`, 1)
