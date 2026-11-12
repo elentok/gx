@@ -197,8 +197,9 @@ the ticket title during `resolve-tickets`.
 6b. **Unchecked findings in `## Re-review findings`** → set `--design-step grill-findings`, then run
    one `gx-grilling` round on them, resident in this same run, checking each off as in step 6. Then
    continue to step 7, even if this round changes stories again. Never run a third review.
-7. **No `<epic>-impl` epic, and neither findings section has an unchecked finding** → follow [gx-to-tickets](../gx-to-tickets/SKILL.md) on the amended
-   spec (its subagents use the model from `gx agent model worker`), publishing into `<epic>-impl`. Never publish into the map epic: its tickets are
+7. **No `<epic>-impl` epic, and neither findings section has an unchecked finding** → follow [gx-to-tickets](../gx-to-tickets/SKILL.md) inline on the amended
+   spec (no separate explore or draft subagent: the main agent writes the plan and the writers
+   explore; `gx-to-tickets` names the draft command), publishing into `<epic>-impl`. Never publish into the map epic: its tickets are
    hand-resolved decisions, and implementation tickets belong to ralph-loop. Set
    `--design-step create-tickets` before publishing, then continue to step 8 in the same run.
 8. **No `<epic>-impl` branch** (`git -C <worktree> rev-parse --verify refs/heads/<epic>-impl` fails) →

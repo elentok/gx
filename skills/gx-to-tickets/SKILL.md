@@ -82,6 +82,8 @@ If you have not already explored the codebase, do so to understand the current s
 Ticket titles and descriptions should use the project's domain glossary vocabulary, and respect ADRs
 in the area you're touching.
 
+Use no separate explore or draft subagent: you write the plan, and the writers (step 4d) explore.
+
 Look for opportunities to prefactor the code to make the implementation easier. "Make the change
 easy, then make the easy change."
 
@@ -232,8 +234,9 @@ context overrun) rediscovering it, then misses shared fixtures and fails the ful
 ### 4c. Check every claim against the code
 
 A ticket that states something the code contradicts costs the implementing agent a deviation and
-several runs. Before writing a ticket, check each of these against the code with `rg` or `fd`, and
-cite the file (`file:func`) in the ticket next to the claim:
+several runs. `gx tickets draft` checks the paths and symbols a plan names and stamps the caller
+lists (see 4d). The judgment checks below stay yours. Cite the file (`file:func`) in the ticket next
+to each claim:
 
 - **Current behaviour**: every sentence of the form "X shows / allows / hides / does Y". Read the
   function that decides it (e.g. an `isMergeable` or `isExpanded` predicate), not just the label.
@@ -317,6 +320,31 @@ agents pay for every wrong detail, so:
   one wins.
 - **Do not bundle unrelated fixes** into one ticket; split at the ticket size cap.
 
+### 4d. Draft the bodies
+
+Write a plan (slugs, titles, `blocked_by`, window, one-line scope) and run:
+
+```sh
+gx tickets draft <project:epic> --plan <plan.yaml> --manifest <manifest.yaml>
+```
+
+It writes the manifest and a body skeleton per ticket, checks the paths and symbols the plan names,
+and prints the environment facts. Each skeleton has two TODO parts: "What to build" and the
+acceptance criteria. Verify tickets do not count as agent-written.
+
+- **Under 4 agent-written tickets** (bodies with TODO markers): write all bodies yourself in one pass.
+- **4 or more**: start min(3, ticket count) writer subagents in one wave, with the tickets split
+  evenly in manifest order. Use the model from `gx agent model worker`, on Claude and Codex alike
+  (see [Skill conventions](../gx-local-tracker.md#skill-conventions)).
+- **A writer** fills the two TODO parts of its bodies and explores the code it needs. It never edits
+  slugs or `blocked_by`. It reports any missing plan fact (an edge, entry symbol, test file, mock
+  state) to you instead.
+- **After all writers finish**, edit the plan and re-run `draft` once. A re-run keeps the writers'
+  parts.
+- **Progress**: print a start line that lists each writer's tickets, then a line as each writer
+  finishes. Each writer appends one-line progress notes to `<manifest>.<writer>.log` next to the
+  manifest.
+
 ### 5. Quiz the user (only when a trigger fires)
 
 Skip the quiz unless one of these triggers fires:
@@ -393,7 +421,7 @@ The manifest is a YAML list with one entry per ticket. Each entry has these fiel
 - `blocked_by`: the tickets it depends on. List slugs from this manifest, or a bare ID for a ticket
   that already exists. Never put a `/` in it. Leave it out when nothing gates the ticket.
 - `expected_context_window`: the estimate from step 4.
-- `from`: optional. A follow-up address, or a list, this ticket promotes. Publish checks every one
+- `from`: optional. The address (or a list of addresses) of the follow-ups this ticket promotes. Publish checks every one
   is a draft or open follow-up of the project, stamps them as the ticket's `original_address`, and
   archives them last as `promoted`.
 - `body`: the ticket body, from the per-ticket template below.

@@ -74,6 +74,40 @@ func TestGxDesignStep7PassesNoQuizRule(t *testing.T) {
 	}
 }
 
+func TestToTicketsDraftWriters(t *testing.T) {
+	text := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	i := strings.Index(text, "### 4c.")
+	j := strings.Index(text, "### 4d.")
+	k := strings.Index(text, "### 5.")
+	if i < 0 || j < i || k < j {
+		t.Fatal("gx-to-tickets/SKILL.md steps 4c, 4d, 5 not found in order")
+	}
+	if !strings.Contains(text[i:j], "gx tickets draft") {
+		t.Error("step 4c does not point at `gx tickets draft`")
+	}
+	if strings.Contains(text[i:j], "with `rg` or `fd`") {
+		t.Error("step 4c still lists a per-claim rg check")
+	}
+	for _, anchor := range []string{"4 or more", "min(3, ticket count)", "never edits slugs or `blocked_by`", "gx agent model worker"} {
+		if got := strings.Count(text, normalizeSpace(anchor)); got != 1 {
+			t.Errorf("gx-to-tickets/SKILL.md has %d copies of %q, want 1", got, anchor)
+		}
+	}
+	const rule = "no separate explore or draft subagent"
+	step2 := text[strings.Index(text, "### 2."):strings.Index(text, "### 3.")]
+	if !strings.Contains(step2, rule) {
+		t.Error("step 2 lacks the no separate explore or draft subagent rule")
+	}
+	design := normalizeSpace(readFile(t, "gx-design/SKILL.md"))
+	s7 := design[strings.Index(design, "7. **No `<epic>-impl` epic"):strings.Index(design, "8. **No `<epic>-impl` branch**")]
+	if !strings.Contains(s7, rule) || !strings.Contains(s7, "follow [gx-to-tickets]") || !strings.Contains(s7, "inline") {
+		t.Error("gx-design step 7 must run gx-to-tickets inline and carry the no-subagent rule")
+	}
+	if strings.Contains(s7, "gx tickets draft") {
+		t.Error("gx-design step 7 names the draft command directly")
+	}
+}
+
 // The split limit lives in two places: the skill text and the Go constant.
 // This test keeps them equal.
 func TestToTicketsSplitLimit(t *testing.T) {
