@@ -300,6 +300,137 @@ test("Workspaces", async ({ page, start }) => {
   ])
     await expect.poll(() => shown(button)).toBe(1)
   await phone.close()
+
+  // Chords: the Leader key opens the Chord box, any other key closes it, and open layers keep it shut.
+  const chordBox = page.getByRole("menu", nav("Chords"))
+  const leader = "ControlOrMeta+e"
+  // The chip follows the platform: a Mac context reads ⌘E and Meta+E opens the box, any other reads Ctrl+E.
+  for (const [platform, chip, key] of [
+    ["MacIntel", "⌘E", "Meta+e"],
+    ["Linux x86_64", "Ctrl+E", "Control+e"],
+  ] as const) {
+    const tab = await page.context().newPage()
+    // isMac() reads userAgentData.platform before navigator.platform, so set both.
+    await tab.addInitScript((p) => {
+      Object.defineProperty(navigator, "platform", { get: () => p })
+      Object.defineProperty(navigator, "userAgentData", { get: () => ({ platform: p }) })
+    }, platform)
+    await tab.goto(page.url())
+    await expect(tab.getByRole("complementary", nav("Sidebar"))).toBeVisible()
+    await expect(async () => {
+      await tab.keyboard.press(key)
+      await expect(tab.getByRole("menu", nav("Chords"))).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 10_000 })
+    await expect(
+      tab.getByRole("menu", nav("Chords")).getByText(chip, { exact: true }),
+    ).toBeVisible()
+    await tab.close()
+  }
+  // The Leader key opens the box at the bottom right.
+  await goto(page, "#/epics")
+  await expect(page).toHaveURL(/#\/epics$/)
+  await expect(async () => {
+    await page.keyboard.press(leader)
+    await expect(chordBox).toBeVisible({ timeout: 1_000 })
+  }).toPass({ timeout: 10_000 })
+  const viewport = page.viewportSize()!
+  const chordRect = (await chordBox.boundingBox())!
+  expect(chordRect.x + chordRect.width).toBeGreaterThan(viewport.width / 2)
+  expect(chordRect.y + chordRect.height).toBeGreaterThan(viewport.height / 2)
+  // A mouse move leaves it open (no timer closes it).
+  await page.mouse.move(300, 300)
+  await expect(chordBox).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(chordBox).toHaveCount(0)
+
+  // In the Message box the Leader key opens the box and the draft stays; Esc and an unknown key close it and change nothing.
+  await chatRow.click()
+  await expect(prompt).toBeVisible()
+  await prompt.fill("draft text")
+  const chatUrl = page.url()
+  await page.keyboard.press(leader)
+  await expect(chordBox).toBeVisible()
+  await expect(prompt).toHaveValue("draft text")
+  await page.keyboard.press("Escape")
+  await expect(chordBox).toHaveCount(0)
+  await page.keyboard.press(leader)
+  await expect(chordBox).toBeVisible()
+  await page.keyboard.press("z")
+  await expect(chordBox).toHaveCount(0)
+  await expect(prompt).toHaveValue("draft text")
+  expect(page.url()).toBe(chatUrl)
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  // Leader then c runs New chat and types no c; a modal open then keeps the Leader key shut.
+  await page.keyboard.press(leader)
+  await expect(chordBox).toBeVisible()
+  await page.keyboard.press("c")
+  const chordDialog = page.getByRole("dialog")
+  await expect(chordDialog).toBeVisible()
+  await expect(chordBox).toHaveCount(0)
+  await page.keyboard.press(leader)
+  await expect(chordDialog).toBeVisible()
+  await expect(chordBox).toHaveCount(0)
+  await expect(async () => {
+    await page.keyboard.press("Escape")
+    await expect(chordDialog).toHaveCount(0, { timeout: 1_000 })
+  }).toPass({ timeout: 10_000 })
+  await expect(prompt).toHaveValue("draft text")
+  // With the command palette open the Leader key opens no box; the shell's own keys still work when closed.
+  const chordPalette = page.getByRole("dialog", nav("Commands"))
+  await page.keyboard.press("ControlOrMeta+p")
+  await expect(chordPalette).toBeVisible()
+  await page.keyboard.press(leader)
+  await expect(chordPalette).toBeVisible()
+  await expect(chordBox).toHaveCount(0)
+  await page.keyboard.press("ControlOrMeta+p")
+  await expect(chordPalette).toHaveCount(0)
+  // With the box open, Cmd/Ctrl+K and Cmd/Ctrl+P close it and open nothing.
+  for (const key of ["ControlOrMeta+k", "ControlOrMeta+p"]) {
+    await page.keyboard.press(leader)
+    await expect(chordBox).toBeVisible()
+    await page.keyboard.press(key)
+    await expect(chordBox).toHaveCount(0)
+    await expect(page.getByRole("dialog")).toHaveCount(0)
+  }
+  // The large editor sheet keeps the Leader key: no box, and its text is unchanged.
+  await prompt.click()
+  await page
+    .getByRole("form", nav("Composer"))
+    .getByRole("button", nav("Open the note in a large editor"))
+    .click()
+  const sheet = page.getByRole("dialog", { name: /^Message to / })
+  const sheetText = sheet.getByRole("textbox", { name: /text$/ })
+  await expect(sheetText).toBeFocused()
+  await expect(sheetText).toHaveText("draft text")
+  await page.keyboard.press(leader)
+  await expect(sheet).toBeVisible()
+  await expect(chordBox).toHaveCount(0)
+  await expect(sheetText).toHaveText("draft text")
+  await sheet.getByRole("button", nav("Done")).click()
+  await expect(sheet).toHaveCount(0)
+  // On a Working chat the box takes the Esc: it closes and no interrupt confirm opens.
+  await working.click()
+  await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible()
+  await page.getByRole("form", nav("Composer")).getByRole("textbox").click()
+  await page.keyboard.press(leader)
+  await expect(chordBox).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(chordBox).toHaveCount(0)
+  await expect(page.getByRole("alertdialog", nav("Interrupt the agent?"))).toHaveCount(0)
+  // In the Questions view the Esc closes only the box: the view stays on Questions.
+  await goto(page, "#/d/demo:design-new")
+  await page.getByRole("button", nav("Start design session")).click()
+  await expect(page.getByRole("group", nav("Questions"))).toBeVisible()
+  await page.keyboard.press(leader)
+  await expect(chordBox).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(chordBox).toHaveCount(0)
+  await expect(page.getByRole("group", nav("Questions"))).toBeVisible()
+  await expect(
+    page.getByRole("group", nav("View")).getByRole("button", { name: /^Questions/ }),
+  ).toHaveAttribute("aria-pressed", "true")
+  await goto(page, "#/epics")
+
   // The nested menu: Agent block, Stop while live, Remove; Remove asks first, then the row leaves and so does the session.
   const agentId = (await working.getAttribute("href"))!.split("/agents/")[1]
   expect(await sessionRows(fx, agentId)).toHaveLength(1)

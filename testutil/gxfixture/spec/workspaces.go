@@ -91,8 +91,12 @@ func WorkspacesScenario() scenario {
 			project + ":design-new":      string(tickets.StepChart),
 			sideProject + ":side-design": string(tickets.StepChart),
 		},
-		OwnRepos:    []string{sideProject},
-		DesignByMap: map[string][]string{liveDesign: {agentfake.DesignTurnPlain}},
+		OwnRepos: []string{sideProject},
+		// design-new is not open at start: a flow starts it from its page and its first turn asks a round.
+		DesignByMap: map[string][]string{
+			liveDesign:              {agentfake.DesignTurnPlain},
+			project + ":design-new": {agentfake.DesignTurnRound},
+		},
 		OpenDesigns: []string{liveDesign},
 		Hold:        true,
 		Chat:        true,

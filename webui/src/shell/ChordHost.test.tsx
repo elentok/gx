@@ -121,6 +121,19 @@ test("a taken key never reaches another window listener", () => {
   expect(other).not.toHaveBeenCalled()
 })
 
+test("a bare modifier keydown leaves the box open, so Cmd+K still finds it open", () => {
+  const other = vi.fn()
+  setup([chord("a", () => {})])
+  leaderKey()
+  fireEvent.keyDown(window, { code: "ControlLeft", key: "Control", ctrlKey: true })
+  expect(box()).toBeTruthy()
+  window.addEventListener("keydown", other)
+  press("KeyK", { ctrlKey: true })
+  window.removeEventListener("keydown", other)
+  expect(box()).toBeNull()
+  expect(other).not.toHaveBeenCalled()
+})
+
 test("with a layer open the Leader key opens nothing", () => {
   setup(
     [chord("a", () => {})],

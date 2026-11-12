@@ -7,6 +7,7 @@ import { ChordBox } from "./ChordBox"
 import { chordTable, letterOf, matchesKey, type Chord } from "./chords"
 import { openRemoveConfirm } from "./removeConfirmOpen"
 
+const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift"])
 const BOX = '[role="menu"][aria-label="Chords"]'
 
 /**
@@ -56,6 +57,8 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
         setOpen(true)
         return
       }
+      // Cmd+K sends a bare Cmd keydown first. Closing on it would let the K reach the Jump menu.
+      if (MODIFIER_KEYS.has(e.key)) return
       e.preventDefault()
       e.stopImmediatePropagation()
       const letter = e.metaKey || e.ctrlKey || e.altKey || e.shiftKey ? null : letterOf(e)
