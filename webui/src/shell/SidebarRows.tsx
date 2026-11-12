@@ -21,15 +21,6 @@ import { GROUP_ON_HOLD, GROUP_OTHER } from "../select/selectModel"
 import { SelectBox, useSidebarSelect } from "./SidebarSelect"
 import { useAltHeld } from "./useShortcuts"
 
-/** The epic address of the open page, or "". */
-export function currentAddress(pathname: string): string {
-  const [, kind, ...rest] = pathname.split("/")
-  const id = decodeURIComponent(rest.join("/"))
-  if (kind === "d" || kind === "e") return id
-  if (kind === "t") return id.replace(/\/[^/]*$/, "")
-  return ""
-}
-
 const rowStyle = {
   display: "flex",
   alignItems: "center",

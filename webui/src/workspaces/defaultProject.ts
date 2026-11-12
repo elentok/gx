@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react"
 import { useLocation } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
-import { getLastProject } from "../design/drafts"
-import type { DraftsClient } from "../design/NewDesignForm"
+import { getLastProject, type DraftsClient } from "../design/drafts"
 import { activeProjectFilter, readStoredProjects } from "../epics/storedProjects"
 import type { SessionInfo } from "../generated/server"
-import { currentAddress } from "../shell/SidebarRows"
+import { currentAddress } from "../hrefs"
 
 /** The project of the open page, or undefined: an epic, Design or ticket address, or a chat's session. */
 export function pageProject(
@@ -45,7 +44,7 @@ export function defaultProject({
 
 const realLast = { getLastProject }
 
-/** `defaultProject` for the current route and snapshot; the last project arrives once the server answers. */
+/** `defaultProject` for the current route and snapshot; the last project arrives once the server answers. `drafts` is injected for tests. */
 export function useDefaultProject(
   projects: string[],
   drafts: Pick<DraftsClient, "getLastProject"> = realLast,

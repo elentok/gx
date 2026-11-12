@@ -20,12 +20,11 @@ import {
   type Workspace,
 } from "../generated/server"
 import { ItemMenu, itemOfCard, type ItemRef } from "../workspaces/itemActions"
-import { agentHref } from "../hrefs"
+import { agentHref, currentAddress } from "../hrefs"
 import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMenu"
 import { useWide } from "../useWide"
 import { cardStatus, sessionStatus, type SidebarStatus } from "../workspaces/sidebarModel"
 import { setJumpOpen, useJumpOpen } from "./jumpOpen"
-import { currentAddress } from "./SidebarRows"
 import { useDismissLayer } from "./useDismissLayer"
 
 const isCard = (r: EpicListRow) =>

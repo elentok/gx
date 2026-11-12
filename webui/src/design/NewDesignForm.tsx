@@ -12,19 +12,9 @@ import {
   readDraft,
   saveDraft,
   setLastProject,
-  type DeleteDraft,
-  type GetLastProject,
-  type ListDrafts,
-  type ReadDraft,
-  type SaveDraft,
-  type SetLastProject,
+  type DraftsClient,
 } from "./drafts"
-import {
-  removeDraftImage,
-  uploadDraftImage,
-  type RemoveDraftImage,
-  type UploadDraftImage,
-} from "./draftImageApi"
+import { removeDraftImage, uploadDraftImage } from "./draftImageApi"
 import { DraftImages } from "./DraftImages"
 import { AttachButton, imageFiles, useAttachIcon } from "./ComposerImages"
 import { DraftSlots, type DraftImages as DraftImagesState, type ImageSlot } from "./useDraftImages"
@@ -45,18 +35,6 @@ import { DraftBanner } from "./DraftBanner"
 import { hasText, type Fields } from "./draftFields"
 import { useDraftAutosave } from "./useDraftAutosave"
 import { useDraftSwitching, type SwitchDraft } from "./useDraftSwitching"
-
-/** The draft calls the form makes; the prop defaults to the real ones. */
-export interface DraftsClient {
-  list: ListDrafts
-  read: ReadDraft
-  save: SaveDraft
-  remove: DeleteDraft
-  getLastProject: GetLastProject
-  setLastProject: SetLastProject
-  uploadImage: UploadDraftImage
-  removeImage: RemoveDraftImage
-}
 
 const realDrafts: DraftsClient = {
   list: listDrafts,

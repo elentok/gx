@@ -9,6 +9,7 @@ import {
   type DesignLastProject,
 } from "../generated/server"
 import { WriteError } from "../useWrite"
+import type { RemoveDraftImage, UploadDraftImage } from "./draftImageApi"
 
 /** What a draft call came to. A refusal is a value the form branches on; transport failures throw. */
 export type DraftResult =
@@ -23,6 +24,18 @@ export type SaveDraft = (body: DesignDraftSaveRequest) => Promise<DraftResult>
 export type DeleteDraft = (id: string) => Promise<DraftResult>
 export type GetLastProject = () => Promise<string>
 export type SetLastProject = (project: string) => Promise<void>
+
+/** The draft calls the form makes; the prop defaults to the real ones. */
+export interface DraftsClient {
+  list: ListDrafts
+  read: ReadDraft
+  save: SaveDraft
+  remove: DeleteDraft
+  getLastProject: GetLastProject
+  setLastProject: SetLastProject
+  uploadImage: UploadDraftImage
+  removeImage: RemoveDraftImage
+}
 
 const BASE = "/v1/designs/drafts"
 

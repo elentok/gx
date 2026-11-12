@@ -21,11 +21,8 @@ import {
 } from "./newSession"
 import { trimmed, useNewSessionDraft, type NewSessionDraft } from "./useNewSessionDraft"
 import { baseName, WorktreePicker, type Option } from "./WorktreePicker"
-import { getLastProject, setLastProject } from "../design/drafts"
-import type { DraftsClient } from "../design/NewDesignForm"
+import { setLastProject, type DraftsClient } from "../design/drafts"
 import { useDefaultProject } from "../workspaces/defaultProject"
-
-const realDrafts = { getLastProject, setLastProject }
 
 // The picker is Claude-only and a tier reads as the family: "Worker (Claude Sonnet)".
 const tierModel = (id: string) => modelName(id, "claude")
@@ -94,7 +91,7 @@ function PromptField({
 
 /** The New session form: Project, one Worktree picker, Name and First prompt. The draft lives in localStorage until create or discard. */
 export function NewSessionForm({
-  drafts = realDrafts,
+  drafts,
   fetchTrees = fetchWorktrees,
   create = postCreateSession,
   fetchCommands,
@@ -173,7 +170,8 @@ export function NewSessionForm({
       {
         onDone: (res) => {
           clear()
-          drafts.setLastProject(project).catch(() => {})
+          const save = drafts?.setLastProject ?? setLastProject
+          save(project).catch(() => {})
           onCreated(res.session!.id)
         },
       },

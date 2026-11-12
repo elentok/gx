@@ -1,5 +1,5 @@
 import type { DesignDraft } from "../generated/server"
-import type { DraftsClient } from "./NewDesignForm"
+import type { DraftsClient } from "./drafts"
 import { openLatest } from "./drafts"
 import type { DraftAutosave } from "./useDraftAutosave"
 

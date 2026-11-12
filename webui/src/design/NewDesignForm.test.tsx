@@ -10,7 +10,8 @@ import { WriteError } from "../useWrite"
 import type { DraftResult } from "./drafts"
 import { ShellContext, type Shell } from "../shell/ShellContext"
 import type { OpenDesign } from "./open"
-import { NewDesignForm, type DraftsClient } from "./NewDesignForm"
+import { NewDesignForm } from "./NewDesignForm"
+import type { DraftsClient } from "./drafts"
 
 afterEach(() => {
   cleanup()

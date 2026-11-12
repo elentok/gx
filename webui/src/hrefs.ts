@@ -10,6 +10,15 @@ export const designHref = (address: string) => `#/d/${address}`
 /** A Triage is its project's, so the address is the project name. */
 export const triageHref = (project: string) => `#/triage/${project}`
 
+/** The epic address of the open page, or "". */
+export function currentAddress(pathname: string): string {
+  const [, kind, ...rest] = pathname.split("/")
+  const id = decodeURIComponent(rest.join("/"))
+  if (kind === "d" || kind === "e") return id
+  if (kind === "t") return id.replace(/\/[^/]*$/, "")
+  return ""
+}
+
 export const EPICS_HREF = "#/epics"
 
 export const ARCHIVE_HREF = "#/archive"
