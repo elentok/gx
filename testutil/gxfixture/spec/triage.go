@@ -28,7 +28,7 @@ type TriageSeed struct {
 var TriageShapes = []string{
 	"c-zero", "c-few", "c-many", "c-live", "c-named",
 	"verify", "b-questions", "b-review", "writing", "result", "stopped",
-	"journey",
+	"journey", "b-group",
 }
 
 // TriageScenario is the triage scenario in the given shape. Each shape is its
@@ -108,6 +108,27 @@ func TriageScenario(shape string) (Scenario, bool) {
 				rec.Rows[1].Person.Action = "close"
 				rec.Rows[3].Person.Action = "ready"
 				rec.Rows[5].Person.Action = "keep"
+			}}}
+		})
+	case "b-group":
+		// The first three rows are one group; ungrouped they chain, each after the one before.
+		return with(func(sc *Scenario) {
+			sc.Epics = []Epic{followUps(project, 4, 0)}
+			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
+				atApprove(rec, func(i int, p *triage.PlanRow) {
+					if i >= 3 {
+						p.Action, p.Destination = "keep", ""
+						return
+					}
+					p.Estimate = "10K"
+					if i > 0 {
+						p.OverlapWith = []string{rec.Rows[i-1].Address}
+					}
+				})
+				for i := range rec.Rows[:3] {
+					rec.Rows[i].Group = rec.Rows[0].Address
+					rec.Rows[i].Estimate = "10K"
+				}
 			}}}
 		})
 	case "writing":

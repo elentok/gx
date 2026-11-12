@@ -99,6 +99,54 @@ test("Set all changes every row of its group in one run of saves and one refetch
   ])
 })
 
+const grouped = () =>
+  viewOf({
+    rows: [
+      rowOf(1, "ready", { group: "gx:follow-ups/1" }),
+      rowOf(2, "ready", { group: "gx:follow-ups/1" }),
+      rowOf(3, "ready"),
+    ],
+  })
+
+test("a group shows as one row listing its members, with an Ungroup action", () => {
+  render(<ReviewView project="gx" view={grouped()} refetch={() => {}} save={vi.fn()} />)
+  expect(document.querySelectorAll('[data-part="group-row"]')).toHaveLength(1)
+  const group = document.querySelector('[data-part="group-row"]') as HTMLElement
+  expect(group.textContent).toContain("row 1")
+  expect(group.textContent).toContain("row 2")
+  expect(group.textContent).not.toContain("row 3")
+  expect(screen.queryByRole("button", { name: "Action for row 1" })).toBeNull()
+  screen.getByRole("button", { name: "Action for row 3" })
+})
+
+test("Ungroup posts the row edit with ungroup on the current revision, then refetches", async () => {
+  const save = vi.fn().mockResolvedValue({ revision: 5 })
+  const refetch = vi.fn()
+  render(<ReviewView project="gx" view={grouped()} refetch={refetch} save={save} />)
+  fireEvent.click(screen.getByRole("button", { name: /^Ungroup/ }))
+  await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1))
+  expect(save).toHaveBeenCalledWith({
+    project: "gx",
+    revision: 4,
+    address: "gx:follow-ups/1",
+    ungroup: true,
+  })
+})
+
+test("ungrouped members show their chain order", () => {
+  const view = viewOf({
+    rows: [
+      rowOf(1, "ready"),
+      rowOf(2, "ready", { overlap_with: ["gx:follow-ups/1"] }),
+      rowOf(3, "ready", { overlap_with: ["gx:follow-ups/2"] }),
+    ],
+  })
+  render(<ReviewView project="gx" view={view} refetch={() => {}} save={vi.fn()} />)
+  expect(document.querySelectorAll('[data-part="group-row"]')).toHaveLength(0)
+  const chains = [...document.querySelectorAll('[data-part="chain"]')].map((e) => e.textContent)
+  expect(chains).toEqual(["after row 1", "after row 2"])
+})
+
 test("keep saves as keep_for_later", async () => {
   const save = vi.fn().mockResolvedValue({ revision: 5 })
   render(<ReviewView project="gx" view={viewOf()} refetch={() => {}} save={save} />)

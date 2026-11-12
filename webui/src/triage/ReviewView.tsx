@@ -1,7 +1,7 @@
 import { Box, Text, chakra } from "@chakra-ui/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { postSaveTriageRow, type SaveTriageRow } from "./api"
-import type { TriageRow, TriageView } from "../generated/server"
+import type { TriageRow, TriageRowRequest, TriageView } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu"
 import { Modal } from "../ui/modal/Modal"
@@ -40,11 +40,10 @@ function useRowEdits(project: string, view: TriageView, refetch: () => void, sav
     setDrafts({})
   }, [view.revision])
 
-  const edit = (changes: [TriageRow, Edit][]) => {
-    setDrafts((d) => ({ ...d, ...Object.fromEntries(changes.map(([r, e]) => [r.address, e])) }))
+  const enqueue = (bodies: ((revision: number) => TriageRowRequest)[]) => {
     queue.current = queue.current.then(async () => {
-      for (const [row, e] of changes) {
-        const res = await save(saveBody(project, revision.current, row, e))
+      for (const body of bodies) {
+        const res = await save(body(revision.current))
         if (res.refused) {
           showToast(
             res.reason === REASON_STALE
@@ -60,7 +59,21 @@ function useRowEdits(project: string, view: TriageView, refetch: () => void, sav
       refetch()
     })
   }
-  return { drafts, edit }
+
+  const edit = (changes: [TriageRow, Edit][]) => {
+    setDrafts((d) => ({ ...d, ...Object.fromEntries(changes.map(([r, e]) => [r.address, e])) }))
+    enqueue(
+      changes.map(
+        ([row, e]) =>
+          (rev) =>
+            saveBody(project, rev, row, e),
+      ),
+    )
+  }
+  /** Undoes the group the row is in: the same record operation as `triage row --ungroup`. */
+  const ungroup = (row: TriageRow) =>
+    enqueue([(rev) => ({ project, revision: rev, address: row.address, ungroup: true })])
+  return { drafts, edit, ungroup }
 }
 
 /** What a row becomes when its action changes: an epic destination survives a ready/map switch, any other starts empty. */
@@ -253,6 +266,14 @@ function RowItem({
       >
         {row.title}
       </Text>
+      {!row.group && !!row.overlap_with?.length && (
+        <Text data-part="chain" fontSize="sm" color="text.muted" flex="1 1 100%">
+          after{" "}
+          {row.overlap_with
+            .map((a) => view.rows.find((r) => r.address === a)?.title ?? a)
+            .join(", ")}
+        </Text>
+      )}
       <Button
         emphasis="secondary"
         size="sm"
@@ -305,6 +326,46 @@ function RowItem({
   )
 }
 
+/** Rows Plan proposed to promote as one ticket: one row listing its members, with an ungroup action. */
+function GroupRow({ members, onUngroup }: { members: TriageRow[]; onUngroup: () => void }) {
+  return (
+    <Box
+      data-part="group-row"
+      display="flex"
+      alignItems="center"
+      flexWrap="wrap"
+      gap="2"
+      px="3"
+      py="2"
+      borderTopWidth="1px"
+      borderColor="border"
+    >
+      <Box flex="1" minW="0">
+        <Text fontSize="sm" fontWeight="700">
+          Group of {members.length}: one ticket
+        </Text>
+        <Box as="ul" listStyleType="none" fontSize="sm">
+          {members.map((m) => (
+            <li key={m.address}>{m.title}</li>
+          ))}
+        </Box>
+      </Box>
+      <Button
+        emphasis="secondary"
+        size="sm"
+        h="28px"
+        px="2"
+        fontSize="sm"
+        flexShrink={0}
+        aria-label={`Ungroup ${members.map((m) => m.title).join(", ")}`}
+        onClick={onUngroup}
+      >
+        Ungroup
+      </Button>
+    </Box>
+  )
+}
+
 function Group({
   action,
   name,
@@ -313,6 +374,7 @@ function Group({
   open,
   onToggle,
   onEdit,
+  onUngroup,
 }: {
   action: ReviewAction
   name: string
@@ -321,6 +383,7 @@ function Group({
   open: boolean
   onToggle: () => void
   onEdit: (changes: [TriageRow, Edit][]) => void
+  onUngroup: (row: TriageRow) => void
 }) {
   const setAll: MenuEntry[] = GROUPS.filter((g) => g.action !== action).map((g) => ({
     value: g.action,
@@ -362,9 +425,13 @@ function Group({
         {rows.length > 0 && <Dropdown name={`Set all in ${name}`} label="Set all" items={setAll} />}
       </Box>
       {open &&
-        rows.map((r) => (
-          <RowItem key={r.address} row={r} view={view} onEdit={(e) => onEdit([[r, e]])} />
-        ))}
+        rows.map((r) => {
+          if (!r.group)
+            return <RowItem key={r.address} row={r} view={view} onEdit={(e) => onEdit([[r, e]])} />
+          const members = rows.filter((m) => m.group === r.group)
+          if (members[0] !== r) return null
+          return <GroupRow key={r.group} members={members} onUngroup={() => onUngroup(r)} />
+        })}
     </Box>
   )
 }
@@ -381,7 +448,7 @@ export function ReviewView({
   refetch: () => void
   save?: SaveTriageRow
 }) {
-  const { drafts, edit } = useRowEdits(project, view, refetch, save)
+  const { drafts, edit, ungroup } = useRowEdits(project, view, refetch, save)
   const [open, setOpen] = useState<Record<string, boolean>>({ ready: true })
   const rows = view.rows
     .filter((r) => !r.gone && r.action)
@@ -402,6 +469,7 @@ export function ReviewView({
           open={!!open[g.action]}
           onToggle={() => setOpen((o) => ({ ...o, [g.action]: !o[g.action] }))}
           onEdit={edit}
+          onUngroup={ungroup}
         />
       ))}
     </Box>

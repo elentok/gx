@@ -133,6 +133,30 @@ func TestSaveRow_UngroupUndoesAGroupLikeTheCLI(t *testing.T) {
 	}
 }
 
+func TestView_GroupMembersShareTheMarkerAndUngroupedRowsShowTheirChain(t *testing.T) {
+	f, store := startViewFixture(t)
+	rec := mustRec(store.Create())
+	a, b := rec.Rows[0].Address, rec.Rows[1].Address
+	for _, addr := range []string{a, b} {
+		rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addr}))
+	}
+	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
+		{RowID: a, Action: "ready", Estimate: "10K", OverlapWith: []string{b}},
+		{RowID: b, Action: "ready", Estimate: "10K", OverlapWith: []string{a}},
+	}, nil))
+	v := show(t, f)
+	if rowOf(v, a).Group == "" || rowOf(v, a).Group != rowOf(v, b).Group {
+		t.Fatalf("groups = %q, %q, want one shared marker", rowOf(v, a).Group, rowOf(v, b).Group)
+	}
+	if res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Ungroup: true}); res.Refused {
+		t.Fatalf("ungroup = %+v", res)
+	}
+	v = show(t, f)
+	if rowOf(v, a).Group != "" || len(rowOf(v, a).OverlapWith) != 1 || rowOf(v, a).OverlapWith[0] != b {
+		t.Fatalf("row a after ungroup = %+v", rowOf(v, a))
+	}
+}
+
 func TestRow_KeepForLaterSaves(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec, a, _ := toApprove(t, store)

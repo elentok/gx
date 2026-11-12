@@ -259,7 +259,9 @@ func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (wire.TriageRow
 	}
 	if r.Plan != nil {
 		row.Action, row.Destination = r.Plan.Action, r.Plan.Destination
+		row.OverlapWith = r.Plan.OverlapWith
 	}
+	row.Group = r.Group
 	open := 0
 	for _, q := range r.AllQuestions() {
 		if q.Kind == triagerec.QuestionDesign {

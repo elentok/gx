@@ -93,6 +93,11 @@ type TriageRow struct {
 	// MergeOrphan marks a row set to merge into a row that is no longer a
 	// ready or map epic; approve stays refused until it is re-pointed.
 	MergeOrphan bool `json:"merge_orphan,omitempty"`
+	// Group is set on every member of a group Plan proposed to promote as one
+	// ticket; members share its value. OverlapWith lists the rows this row
+	// waits for when it is not grouped.
+	Group       string   `json:"group,omitempty"`
+	OverlapWith []string `json:"overlap_with,omitempty"`
 }
 
 // TriageRowRequest is the body of POST /v1/triage/row. It replaces the row's

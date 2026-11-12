@@ -3800,6 +3800,13 @@ export interface TriageRow {
    * ready or map epic; approve stays refused until it is re-pointed.
    */
   merge_orphan?: boolean;
+  /**
+   * Group is set on every member of a group Plan proposed to promote as one
+   * ticket; members share its value. OverlapWith lists the rows this row
+   * waits for when it is not grouped.
+   */
+  group?: string;
+  overlap_with?: string[];
 }
 /**
  * TriageRowRequest is the body of POST /v1/triage/row. It replaces the row's
