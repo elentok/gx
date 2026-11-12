@@ -2,6 +2,8 @@ package schedules_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -112,6 +114,27 @@ func TestSchedulesRunNow_UnregisteredProjectPassesTheSubmitRefusalThrough(t *tes
 	res := m.runNow(t)
 	if !res.Refused || res.Reason != wire.ReasonUnknownProj {
 		t.Fatalf("run-now = %+v", res)
+	}
+	if n := len(m.h.Server.Schedules().Skips(m.key)); n != 0 {
+		t.Errorf("skips = %d, want 0", n)
+	}
+}
+
+func TestSchedulesRunNow_UnregisteredProjectKeepsTheQueuedPreviousRun(t *testing.T) {
+	t.Parallel()
+	m := startMissing(t)
+	m.writePrevious(t, servertest.TicketOpts{Status: "open"})
+	// Writing a ticket recreates project.json; the project must be gone again.
+	if err := os.Remove(filepath.Join(m.h.TicketStore, "proj", "project.json")); err != nil {
+		t.Fatal(err)
+	}
+	res := m.runNow(t)
+	if !res.Refused || res.Reason != wire.ReasonUnknownProject {
+		t.Fatalf("run-now = %+v", res)
+	}
+	runs := m.runs(t)
+	if len(runs) != 1 || runs[0].Status != "open" {
+		t.Errorf("one-offs = %+v, want the previous run still open", runs)
 	}
 	if n := len(m.h.Server.Schedules().Skips(m.key)); n != 0 {
 		t.Errorf("skips = %d, want 0", n)

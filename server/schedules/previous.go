@@ -1,6 +1,7 @@
 package schedules
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -51,18 +52,38 @@ func DedupeKey(k Key, machineID string) string {
 	return "schedule:" + k.String() + "@" + machineID
 }
 
+// oneOff is a live One-off with its address.
+type oneOff struct {
+	Ticket  tickets.Ticket
+	Address string
+}
+
+// oneOffsOf lists this machine's live One-offs carrying the Schedule's Dedupe key.
+func (sc *Scheduler) oneOffsOf(k Key) ([]oneOff, error) {
+	live, _, err := tickets.LoadOneOffs(filepath.Join(sc.TicketStore, k.Project))
+	if err != nil {
+		return nil, err
+	}
+	key := sc.dedupeKey(k)
+	var out []oneOff
+	for _, t := range live.Tickets {
+		if t.Unique == key {
+			addr := tickets.Address{Project: k.Project, Epic: tickets.OneOffsEpic, ID: t.DisplayNumber()}.String()
+			out = append(out, oneOff{Ticket: t, Address: addr})
+		}
+	}
+	return out, nil
+}
+
 // previousRun finds the live one-off carrying the Schedule's Dedupe key.
 func (sc *Scheduler) previousRun(k Key) (*tickets.Ticket, string, error) {
-	live, _, err := tickets.LoadOneOffs(filepath.Join(sc.TicketStore, k.Project))
+	runs, err := sc.oneOffsOf(k)
 	if err != nil {
 		return nil, "", err
 	}
-	key := sc.dedupeKey(k)
-	for i := range live.Tickets {
-		t := live.Tickets[i]
-		if t.Unique == key && !tickets.IsTerminalStatus(t.Status) {
-			addr := tickets.Address{Project: k.Project, Epic: tickets.OneOffsEpic, ID: t.DisplayNumber()}.String()
-			return &t, addr, nil
+	for i := range runs {
+		if !tickets.IsTerminalStatus(runs[i].Ticket.Status) {
+			return &runs[i].Ticket, runs[i].Address, nil
 		}
 	}
 	return nil, "", nil
@@ -77,26 +98,38 @@ func (sc *Scheduler) Decision(k Key) (Decision, error) {
 	return Decide(prev, addr), nil
 }
 
-// prepare applies the decision for a timed run: it cancels a replaceable
-// run and reports whether the run may start. A skip is logged here.
-// retry means the baseline must stay.
-func (sc *Scheduler) prepare(k Key, due, now time.Time) (ok, retry bool) {
+// settlePrevious decides what a run does about the previous run and cancels a
+// replaceable one. The result is ActionStart or ActionSkip; an error means the
+// previous run could not be found or cancelled.
+func (sc *Scheduler) settlePrevious(k Key) (Decision, error) {
 	d, err := sc.Decision(k)
-	if err != nil {
-		sc.Log.Warn("finding the previous run failed", "schedule", k.String(), "err", err)
-		return false, true
+	if err != nil || d.Action != ActionReplace {
+		return d, err
 	}
-	if d.Action == ActionReplace {
-		res, err := sc.Cancel(wire.QueueRequest{Address: d.Address, Stop: true})
-		if err != nil || res.Refused {
-			// It may have started in between; look again and skip if so.
-			if d, err = sc.Decision(k); err != nil || d.Action != ActionSkip {
-				sc.Log.Warn("cancelling the previous run failed", "schedule", k.String(), "err", err)
-				return false, true
-			}
-		} else {
-			return true, false
-		}
+	res, cerr := sc.Cancel(wire.QueueRequest{Address: d.Address, Stop: true})
+	if cerr == nil && !res.Refused {
+		return Decision{Action: ActionStart}, nil
+	}
+	// It may have started in between; look again.
+	if d, err = sc.Decision(k); err != nil {
+		return Decision{}, err
+	}
+	if d.Action == ActionSkip {
+		return d, nil
+	}
+	if cerr == nil {
+		cerr = fmt.Errorf("cancelling the previous run was refused (%s): %s", res.Reason, res.Message)
+	}
+	return Decision{}, cerr
+}
+
+// prepare applies the decision for a timed run and reports whether the run
+// may start. A skip is logged here. retry means the baseline must stay.
+func (sc *Scheduler) prepare(k Key, due, now time.Time) (ok, retry bool) {
+	d, err := sc.settlePrevious(k)
+	if err != nil {
+		sc.Log.Warn("settling the previous run failed", "schedule", k.String(), "err", err)
+		return false, true
 	}
 	if d.Action == ActionSkip {
 		sk := Skip{SetTime: due, Reason: d.Reason, LoggedAt: now}

@@ -1,11 +1,8 @@
 package schedules
 
 import (
-	"path/filepath"
-
 	schedrec "github.com/elentok/gx/schedules"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 )
 
 // sweepDeleted tidies this machine's side of every Schedule that has state but
@@ -29,21 +26,19 @@ func (sc *Scheduler) sweepDeleted(items []schedrec.Item) {
 // cancelQueued cancels this machine's queued never-started runs of the Schedule.
 // false means a cancel failed and the state entries must stay for the next check.
 func (sc *Scheduler) cancelQueued(k Key) bool {
-	live, _, err := tickets.LoadOneOffs(filepath.Join(sc.TicketStore, k.Project))
+	runs, err := sc.oneOffsOf(k)
 	if err != nil {
 		sc.Log.Warn("finding a deleted schedule's runs failed", "schedule", k.String(), "err", err)
 		return false
 	}
-	key := sc.dedupeKey(k)
 	ok := true
-	for _, t := range live.Tickets {
-		if t.Unique != key || t.Status != "open" || !t.ClaimedAt.IsZero() {
+	for _, r := range runs {
+		if r.Ticket.Status != "open" || !r.Ticket.ClaimedAt.IsZero() {
 			continue
 		}
-		addr := tickets.Address{Project: k.Project, Epic: tickets.OneOffsEpic, ID: t.DisplayNumber()}.String()
-		res, err := sc.Cancel(wire.QueueRequest{Address: addr, Stop: true})
+		res, err := sc.Cancel(wire.QueueRequest{Address: r.Address, Stop: true})
 		if err != nil || res.Refused {
-			sc.Log.Warn("cancelling a deleted schedule's run failed", "schedule", k.String(), "address", addr, "err", err)
+			sc.Log.Warn("cancelling a deleted schedule's run failed", "schedule", k.String(), "address", r.Address, "err", err)
 			ok = false
 		}
 	}

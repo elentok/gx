@@ -104,22 +104,25 @@ func (sc *Scheduler) checkOne(s schedrec.Schedule, registered bool, now time.Tim
 	if due.IsZero() {
 		return
 	}
-	limit := time.Duration(s.LateLimitHours * float64(time.Hour))
-	if now.Sub(due) >= limit {
-		sk := Skip{SetTime: due, Reason: ReasonLate, LoggedAt: now}
-		if !sc.record(sc.State.AppendSkip(k, sk), k) {
-			return
-		}
-	} else if !registered {
-		if !sc.skipMissingProject(s, k, due, now) {
-			return
-		}
-	} else if ok, retry := sc.prepare(k, due, now); retry {
-		return
-	} else if ok && !sc.start(s, due) {
-		return
+	if sc.handleDue(s, k, registered, due, now) {
+		sc.record(sc.State.SetBaseline(k, now), k)
 	}
-	sc.record(sc.State.SetBaseline(k, now), k)
+}
+
+// handleDue deals with the latest due time. false means keep the baseline so
+// a later check retries. A missing project comes before the Late limit.
+func (sc *Scheduler) handleDue(s schedrec.Schedule, k Key, registered bool, due, now time.Time) bool {
+	if !registered {
+		return sc.skipMissingProject(s, k, due, now)
+	}
+	if limit := time.Duration(s.LateLimitHours * float64(time.Hour)); now.Sub(due) >= limit {
+		return sc.record(sc.State.AppendSkip(k, Skip{SetTime: due, Reason: ReasonLate, LoggedAt: now}), k)
+	}
+	ok, retry := sc.prepare(k, due, now)
+	if retry {
+		return false
+	}
+	return !ok || sc.start(s, due)
 }
 
 // skipMissingProject logs the skip, then sends one message per set time. A

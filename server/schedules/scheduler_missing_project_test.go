@@ -81,6 +81,23 @@ func TestSchedulerMissingProject_SkipsLogsOnceAndSendsOneMessage(t *testing.T) {
 	}
 }
 
+func TestSchedulerMissingProject_PastTheLateLimitStillLogsProjectNotFound(t *testing.T) {
+	t.Parallel()
+	m := startMissing(t)
+	from := m.hook.WaitStarted(t)
+	m.clock.Set(at(9, 0).Add(3 * time.Hour)) // late limit is 2h
+
+	skips := m.waitSkips(t, 1)
+	if skips[0].Reason != schedules.ReasonProjectNotFound {
+		t.Errorf("skip = %+v, want project-not-found", skips[0])
+	}
+	servertest.WaitFor(t, 10*time.Second, "the error message in chat", func() bool { return m.messages(from) > 0 })
+	settle()
+	if n := m.messages(from); n != 1 {
+		t.Errorf("messages = %d, want 1", n)
+	}
+}
+
 func TestSchedulerMissingProject_RestartSendsNothingAgain(t *testing.T) {
 	t.Parallel()
 	m := startMissing(t)

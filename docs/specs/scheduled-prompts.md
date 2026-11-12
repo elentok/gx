@@ -208,7 +208,8 @@ now. `gx schedules` CLI verbs mirror every action on the page.
 - **Missing project.** The run is skipped, the list row and the Schedule page read "project not
   found" in place of the next run, and the server sends one error message per skipped run time
   through the existing `gx notify` gate (source `cli`, with its mutes), to Telegram or Slack. The
-  skip log stops a repeat of the same run time after a restart.
+  skip log stops a repeat of the same run time after a restart. Project not found takes priority
+  over the Late limit.
 - **Two machines with the switch on.** Each runs its own copy. The "previous run live" check and the
   replace rule are per machine.
 - **Run now.** It follows the timed rule. It replaces a queued never-started run. If the previous run

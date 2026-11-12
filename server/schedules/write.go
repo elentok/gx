@@ -210,7 +210,11 @@ func (s *Schedules) runNow(req wire.ScheduleRunNowRequest) (wire.ScheduleRunNowR
 	case err != nil:
 		return wire.ScheduleRunNowResult{}, err
 	}
-	res, err := s.RunNow(sc)
+	registered, err := s.registered(sc)
+	if err != nil {
+		return wire.ScheduleRunNowResult{}, err
+	}
+	res, err := s.RunNow(sc, registered)
 	if err == nil && !res.Refused {
 		s.publish(sc.Project, sc.Slug)
 	}

@@ -1,7 +1,6 @@
 package schedules
 
 import (
-	"fmt"
 	"time"
 
 	schedrec "github.com/elentok/gx/schedules"
@@ -26,28 +25,17 @@ func runNowRefusal(reason, message, attention string) wire.ScheduleRunNowResult 
 // RunNow starts one run now, under the timed rule: a queued never-started
 // previous run is replaced, any other live one refuses. A refusal logs no
 // skip. It ignores the switch and leaves the baseline alone.
-func (sc *Scheduler) RunNow(s schedrec.Schedule) (wire.ScheduleRunNowResult, error) {
+//
+// A missing project refuses first, so no queued run is cancelled for nothing.
+func (sc *Scheduler) RunNow(s schedrec.Schedule, registered bool) (wire.ScheduleRunNowResult, error) {
 	sc.checkMu.Lock()
 	defer sc.checkMu.Unlock()
-	k := Key{Project: s.Project, Slug: s.Slug}
-	d, err := sc.Decision(k)
+	if !registered {
+		return runNowRefusal(wire.ReasonUnknownProject, "no project "+s.Project+" in the ticket store", ""), nil
+	}
+	d, err := sc.settlePrevious(Key{Project: s.Project, Slug: s.Slug})
 	if err != nil {
 		return wire.ScheduleRunNowResult{}, err
-	}
-	if d.Action == ActionReplace {
-		res, cerr := sc.Cancel(wire.QueueRequest{Address: d.Address, Stop: true})
-		if cerr != nil || res.Refused {
-			// It may have started in between; look again.
-			if d, err = sc.Decision(k); err != nil {
-				return wire.ScheduleRunNowResult{}, err
-			}
-			if d.Action != ActionSkip {
-				if cerr == nil {
-					cerr = fmt.Errorf("cancelling the previous run was refused (%s): %s", res.Reason, res.Message)
-				}
-				return wire.ScheduleRunNowResult{}, cerr
-			}
-		}
 	}
 	if d.Action == ActionSkip {
 		res := runNowRefusal(d.Reason, "the previous run of "+s.Name+" is live: "+d.Address, "")
