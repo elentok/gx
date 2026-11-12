@@ -122,6 +122,11 @@ type Snapshot struct {
 	// ViEscape is config server.web.vi-escape, the key sequence that leaves
 	// insert mode in vi editors; filled in by the handler. Empty means off.
 	ViEscape string `json:"vi_escape,omitempty"`
+	// LeaderKeyMac and LeaderKey are config server.web.leader-key-mac and
+	// server.web.leader-key, the chord Leader keys per platform; filled in by
+	// the handler. Empty means chords are off.
+	LeaderKeyMac string `json:"leader_key_mac,omitempty"`
+	LeaderKey    string `json:"leader_key,omitempty"`
 	// Dev is the Dev mode block; filled in by the handler.
 	Dev DevStatus `json:"dev"`
 	// Workspaces are the ordered workspaces; filled in by the handler.

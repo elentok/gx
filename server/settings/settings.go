@@ -126,6 +126,10 @@ type Settings struct {
 	// WebViEscape is config server.web.vi-escape: the key sequence that leaves
 	// insert mode in the web UI's vi editors. Empty means off.
 	WebViEscape string
+	// WebLeaderKeyMac and WebLeaderKey are config server.web.leader-key-mac
+	// and server.web.leader-key. Empty means chords are off.
+	WebLeaderKeyMac string
+	WebLeaderKey    string
 
 	// WebDevFrontend is config server.web.dev-frontend (Dev mode on).
 	WebDevFrontend bool
@@ -194,6 +198,8 @@ func FromConfig(cfg config.Config) Settings {
 		WebAllowedHosts:             cfg.Server.Web.AllowedHosts,
 		WebTOTPOff:                  !cfg.Server.Web.TOTP,
 		WebViEscape:                 cfg.Server.Web.ViEscape,
+		WebLeaderKeyMac:             cfg.Server.Web.LeaderKeyMac,
+		WebLeaderKey:                cfg.Server.Web.LeaderKey,
 		WebDevFrontend:              cfg.Server.Web.DevFrontend,
 		WebDevDir:                   cfg.Server.Web.DevDir,
 	}

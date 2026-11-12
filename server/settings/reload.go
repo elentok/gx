@@ -152,6 +152,8 @@ func changedKeys(old, next Settings) []string {
 		{"server.web.allowed-hosts", old.WebAllowedHosts, next.WebAllowedHosts},
 		{"server.web.totp", old.WebTOTPOff, next.WebTOTPOff},
 		{"server.web.vi-escape", old.WebViEscape, next.WebViEscape},
+		{"server.web.leader-key-mac", old.WebLeaderKeyMac, next.WebLeaderKeyMac},
+		{"server.web.leader-key", old.WebLeaderKey, next.WebLeaderKey},
 		{"evolve", old.Evolve, next.Evolve},
 		{"recovery.enabled", old.RecoverySettings.Enabled, next.RecoverySettings.Enabled},
 		{"recovery.disabled", old.RecoverySettings.Disabled, next.RecoverySettings.Disabled},

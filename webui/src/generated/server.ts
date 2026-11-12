@@ -2020,6 +2020,13 @@ export interface Snapshot {
    */
   vi_escape?: string;
   /**
+   * LeaderKeyMac and LeaderKey are config server.web.leader-key-mac and
+   * server.web.leader-key, the chord Leader keys per platform; filled in by
+   * the handler. Empty means chords are off.
+   */
+  leader_key_mac?: string;
+  leader_key?: string;
+  /**
    * Dev is the Dev mode block; filled in by the handler.
    */
   dev: DevStatus;
