@@ -129,38 +129,24 @@ func (f *fixture) queueAll(ctx context.Context, sc scenario) error {
 	return nil
 }
 
-// controlFIFOs lists the control FIFOs of the TUI fakes started so far.
-func controlFIFOs(root string) []string {
-	paths, _ := filepath.Glob(agentfake.TUIControlPath(filepath.Join(root, "home"), "*"))
-	return paths
-}
-
-// awaitNewFIFO waits for a control FIFO outside before, i.e. for the fake the
-// last launch started. It gives up silently after 30s; the callers then behave as before.
-func awaitNewFIFO(root string, before []string) {
-	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
-		for _, p := range controlFIFOs(root) {
-			if !slices.Contains(before, p) {
-				return
-			}
-		}
-	}
-}
-
-// workFixAgent makes the Fix agent of session id read Working. Nothing maps a
-// session to its fake's control FIFO, so it arms every fake that started after
-// the FIFOs in before (the Fix agent's among them), then types a slash prompt;
-// the armed fake answers with a turn that never ends. The server refuses the
-// prompt until the agent is Idle, so the whole step is retried.
-func workFixAgent(ctx context.Context, root string, cl *apiclient.Client, id string, before []string) error {
+// workFixAgent makes the Fix agent of session id read Working. The fake's
+// control FIFO is named by the session's conversation id, so only this
+// session's fake is armed; then it types a slash prompt and the armed fake
+// answers with a turn that never ends. The server refuses the prompt until
+// the agent is Idle, so the whole step is retried.
+func workFixAgent(ctx context.Context, root string, cl *apiclient.Client, id string) error {
 	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
-		for _, p := range controlFIFOs(root) {
-			if slices.Contains(before, p) {
-				continue
-			}
-			if err := agentfake.SendControl(p, agentfake.Control{Action: agentfake.ActionBusy}); err != nil {
-				return err
-			}
+		tr, err := cl.Sessions.Transcript(ctx, id)
+		if err != nil {
+			return err
+		}
+		// Until the fake starts its FIFO is missing; the loop retries.
+		p := agentfake.TUIControlPath(filepath.Join(root, "home"), tr.ConversationID)
+		if _, err := os.Stat(p); err != nil {
+			continue
+		}
+		if err := agentfake.SendControl(p, agentfake.Control{Action: agentfake.ActionBusy}); err != nil {
+			return err
 		}
 		// The armed fake may already have taken the server's own launch prompt as
 		// the turn that never ends; then it is Working and the prompt is refused.
@@ -203,7 +189,6 @@ func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
 		reqs = append(reqs, wire.FixAgentRequest{Project: sc.FailedMigration})
 	}
 	for _, req := range reqs {
-		before := controlFIFOs(f.root)
 		res, err := cl.Sessions.FixAgent(ctx, req)
 		if err != nil {
 			return fmt.Errorf("fix agent %v: %w", req, err)
@@ -212,12 +197,9 @@ func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
 			return fmt.Errorf("fix agent %v refused: %s", req, res.Message)
 		}
 		if !slices.Contains(sc.WorkingFixAgents, req.Address) {
-			// Its fake may start late; until its FIFO exists, the next Fix agent's
-			// "every new fake" arming would take it for its own and turn this one Working.
-			awaitNewFIFO(f.root, before)
 			continue
 		}
-		if err := workFixAgent(ctx, f.root, cl, res.Session.ID, before); err != nil {
+		if err := workFixAgent(ctx, f.root, cl, res.Session.ID); err != nil {
 			return fmt.Errorf("work fix agent %s: %w", req.Address, err)
 		}
 	}
