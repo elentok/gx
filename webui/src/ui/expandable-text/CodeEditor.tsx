@@ -6,6 +6,7 @@ import { Box } from "@chakra-ui/react"
 import { useEffect, useImperativeHandle, useRef, type MutableRefObject, type Ref } from "react"
 import type { MenuKey } from "../../commands/useCompletion"
 import type { Selection } from "./LargeEditor"
+import { useViEscape } from "../../vimode"
 import { fieldLook } from "./look"
 
 export type ViMode = "INSERT" | "NORMAL" | "VISUAL"
@@ -39,6 +40,16 @@ function mapOnce() {
   }
   Vim.defineAction("closeEditor", (cm: object) => closers.get(cm)?.())
   Vim.mapCommand("ZZ", "action", "closeEditor", {}, { context: "normal" })
+}
+
+// The vim registry is global, so the configured escape sequence is too: remap only when it changes.
+let escapeKeys = ""
+
+function mapEscape(keys: string) {
+  if (keys === escapeKeys) return
+  if (escapeKeys) Vim.unmap(escapeKeys, "insert")
+  escapeKeys = keys
+  if (keys) Vim.map(keys, "<Esc>", "insert")
 }
 
 function modeOf(mode: string): ViMode {
@@ -154,6 +165,8 @@ export default function CodeEditor({
     onToggle,
     onMenuKey,
   }
+  const viEscape = useViEscape()
+  mapEscape(viEscape)
   const external = useRef(false)
   const viSlot = useRef(new Compartment())
   const stopVi = useRef<(() => void) | null>(null)

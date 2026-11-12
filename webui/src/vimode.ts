@@ -16,6 +16,13 @@ export async function postViMode(on: boolean): Promise<void> {
     throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`)
 }
 
+// Reads the key sequence (like "jk") that leaves insert mode; empty means off.
+export function useViEscape(): string {
+  const conn = useContext(ConnectionContext)
+  const state = useSyncExternalStore(conn?.subscribe ?? noopSubscribe, conn?.getState ?? noState)
+  return state?.snapshot?.vi_escape ?? ""
+}
+
 // Sets Vi mode to the opposite of what the last snapshot showed. A failed write leaves the toggle as it was.
 export function toggleViMode(current: boolean | undefined): void {
   void postViMode(!current).catch((err) =>

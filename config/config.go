@@ -115,6 +115,9 @@ type WebConfig struct {
 	AllowedHosts []string `json:"allowed-hosts"`
 	// TOTP is whether web login asks for a TOTP code. True when absent.
 	TOTP bool `json:"totp"`
+	// ViEscape is a key sequence (like "jk") that leaves insert mode in the
+	// web UI's vi editors. Empty means off.
+	ViEscape string `json:"vi-escape"`
 }
 
 // DefaultRecentlyFinished is the RecentlyFinished when none is configured.
@@ -406,6 +409,9 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.TOTP != nil {
 		cfg.Server.Web.TOTP = *raw.Server.Web.TOTP
+	}
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.ViEscape != nil {
+		cfg.Server.Web.ViEscape = *raw.Server.Web.ViEscape
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

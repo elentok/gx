@@ -21,6 +21,7 @@ func agentsEntries() []Entry {
 	var out []Entry
 	add := func(s Section, e Entry) {
 		e.Section = s
+		e.Label = labelFor(e)
 		out = append(out, e)
 	}
 
@@ -38,9 +39,9 @@ func agentsEntries() []Entry {
 		}
 		for _, t := range tiers {
 			base := append([]string{"agents", agent}, t.path...)
-			add(a, Entry{Key: Key(append(base[:len(base):len(base)], "model")...), Type: TypeString, ProjectOverridable: true,
+			add(SectionModels, Entry{Key: Key(append(base[:len(base):len(base)], "model")...), Type: TypeString, ProjectOverridable: true,
 				Description: "The model " + agent + " uses for " + t.desc + ". Empty keeps the agent's own setting."})
-			add(a, Entry{Key: Key(append(base[:len(base):len(base)], "effort")...), Type: TypeString, ProjectOverridable: true,
+			add(SectionModels, Entry{Key: Key(append(base[:len(base):len(base)], "effort")...), Type: TypeString, ProjectOverridable: true,
 				Description: "The effort level " + agent + " uses for " + t.desc + ". Empty keeps the agent's own setting."})
 		}
 	}
@@ -63,15 +64,15 @@ func agentsEntries() []Entry {
 	add(a, Entry{Key: Key("runner-wait"), Type: TypeDuration, Restart: true,
 		Description: "How long an agent runner waits on its guards before giving up."})
 
-	add(a, Entry{Key: Key("skills", "ci-fix"), Type: TypeStringList, ProjectOverridable: true,
+	add(SectionPullRequests, Entry{Key: Key("skills", "ci-fix"), Type: TypeStringList, ProjectOverridable: true,
 		Description: "The skills a ci-fix ticket runs, in order. Empty uses the bundled gx-ci-fix."})
-	add(a, Entry{Key: Key("skills", "pr-text"), Type: TypeString, ProjectOverridable: true,
+	add(SectionPullRequests, Entry{Key: Key("skills", "pr-text"), Type: TypeString, ProjectOverridable: true,
 		Description: "The skill that writes the pull request title and body. Empty uses the bundled gx-pr-text."})
-	add(a, Entry{Key: Key("pr", "ci-fix-attempts-per-check"), Type: TypeNumber, Min: minOf(1), Integer: true,
+	add(SectionPullRequests, Entry{Key: Key("pr", "ci-fix-attempts-per-check"), Type: TypeNumber, Min: minOf(1), Integer: true,
 		Description: "The most ci-fix tickets gx files for one failing check. Default: 3."})
-	add(a, Entry{Key: Key("pr", "ci-fix-attempts-per-pr"), Type: TypeNumber, Min: minOf(1), Integer: true,
+	add(SectionPullRequests, Entry{Key: Key("pr", "ci-fix-attempts-per-pr"), Type: TypeNumber, Min: minOf(1), Integer: true,
 		Description: "The most ci-fix tickets gx files for one pull request. Default: 10."})
-	add(a, Entry{Key: Key("pr", "no-checks-grace"), Type: TypeDuration,
+	add(SectionPullRequests, Entry{Key: Key("pr", "no-checks-grace"), Type: TypeDuration,
 		Description: "How long a pull request with no checks waits before it counts as green. Default: 2m."})
 
 	e := SectionEvolveRecovery

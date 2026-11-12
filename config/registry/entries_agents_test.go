@@ -27,11 +27,11 @@ func TestAgentsEntries(t *testing.T) {
 		{key: Key("agents", "fix-agent-remote-control"), typ: TypeBool, section: a},
 		{key: Key("agent-runner"), typ: TypeEnum, section: a, restart: true},
 		{key: Key("runner-wait"), typ: TypeDuration, section: a, restart: true},
-		{key: Key("skills", "ci-fix"), typ: TypeStringList, section: a, projectOv: true},
-		{key: Key("skills", "pr-text"), typ: TypeString, section: a, projectOv: true},
-		{key: Key("pr", "ci-fix-attempts-per-check"), typ: TypeNumber, section: a},
-		{key: Key("pr", "ci-fix-attempts-per-pr"), typ: TypeNumber, section: a},
-		{key: Key("pr", "no-checks-grace"), typ: TypeDuration, section: a},
+		{key: Key("skills", "ci-fix"), typ: TypeStringList, section: SectionPullRequests, projectOv: true},
+		{key: Key("skills", "pr-text"), typ: TypeString, section: SectionPullRequests, projectOv: true},
+		{key: Key("pr", "ci-fix-attempts-per-check"), typ: TypeNumber, section: SectionPullRequests},
+		{key: Key("pr", "ci-fix-attempts-per-pr"), typ: TypeNumber, section: SectionPullRequests},
+		{key: Key("pr", "no-checks-grace"), typ: TypeDuration, section: SectionPullRequests},
 		{key: Key("evolve"), typ: TypeEnum, section: ev},
 		{key: Key("recovery", "enabled"), typ: TypeBool, section: ev},
 		{key: Key("recovery", "disabled"), typ: TypeStringList, section: ev},
@@ -45,7 +45,7 @@ func TestAgentsEntries(t *testing.T) {
 		for _, tier := range [][]string{nil, {"light"}, {"strongest"}} {
 			for _, knob := range []string{"model", "effort"} {
 				parts := append(append([]string{"agents", agent}, tier...), knob)
-				cases = append(cases, want{key: Key(parts...), typ: TypeString, section: a, projectOv: true})
+				cases = append(cases, want{key: Key(parts...), typ: TypeString, section: SectionModels, projectOv: true})
 			}
 		}
 	}

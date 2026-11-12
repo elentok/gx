@@ -27,7 +27,13 @@ const (
 	SectionBudget
 	SectionNotifications
 	SectionServer
+	SectionWebUI
+	SectionCPUWatchdog
+	SectionProcessWatchdog
+	SectionDiskSpace
 	SectionAgents
+	SectionModels
+	SectionPullRequests
 	SectionEvolveRecovery
 	SectionTicketStore
 	SectionProject
@@ -35,8 +41,9 @@ const (
 )
 
 var sectionNames = [...]string{
-	"Execution queue", "Budget", "Notifications", "Server", "Agents",
-	"Evolve and recovery", "Ticket store", "Project", "Checks",
+	"Execution queue", "Budget", "Notifications", "Server", "Web UI",
+	"CPU watchdog", "Process watchdog", "Disk space", "Agents", "Models",
+	"Pull requests", "Evolve and recovery", "Ticket store", "Project", "Checks",
 }
 
 func (s Section) String() string {
@@ -46,7 +53,7 @@ func (s Section) String() string {
 	return sectionNames[s]
 }
 
-// IsGlobal reports whether the section is one of the seven global sections.
+// IsGlobal reports whether the section is one of the global sections.
 func (s Section) IsGlobal() bool { return s >= SectionExecutionQueue && s <= SectionTicketStore }
 
 // Sections returns every section in order.

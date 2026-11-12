@@ -91,6 +91,7 @@ type rawConfig struct {
 
 			AllowedHosts []string `json:"allowed-hosts"`
 			TOTP         *bool    `json:"totp"`
+			ViEscape     *string  `json:"vi-escape"`
 		} `json:"web"`
 	} `json:"server"`
 	AgentRunner       *string `json:"agent-runner"`

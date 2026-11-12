@@ -8,7 +8,7 @@ func TestProjectView(t *testing.T) {
 	for _, ps := range view {
 		order = append(order, ps.Section)
 	}
-	want := []Section{SectionProject, SectionExecutionQueue, SectionServer, SectionAgents, SectionEvolveRecovery, SectionChecks}
+	want := []Section{SectionProject, SectionExecutionQueue, SectionDiskSpace, SectionAgents, SectionModels, SectionPullRequests, SectionEvolveRecovery, SectionChecks}
 	if len(order) != len(want) {
 		t.Fatalf("sections = %v, want %v", order, want)
 	}

@@ -81,6 +81,7 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Mode = s.queue.Mode()
 	snap.AFK = s.afk.IsOn()
 	snap.ViMode = s.viMode.IsOn()
+	snap.ViEscape = s.settings.Load().WebViEscape
 	snap.Dev = devHost{s}.devStatus()
 	snap.Workspaces, snap.NeedsYouTotal = s.workspacesWithNeedsYou()
 	snap.Held = s.workspaces.HeldKeys()

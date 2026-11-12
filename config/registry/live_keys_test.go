@@ -17,7 +17,7 @@ budget.soft-limit budget.hard-limit budget.long-ticket-turns
 subscription.suppress-extra-usage-warning
 notifications.telegram.bot-token notifications.telegram.chat-id notifications.slack.webhook-url
 server.tab-env server.log-retention server.watch-config server.recently-finished
-server.web.allowed-hosts server.web.totp server.web.dev-frontend server.web.dev-dir
+server.web.allowed-hosts server.web.totp server.web.vi-escape server.web.dev-frontend server.web.dev-dir
 cpu-watchdog.enabled cpu-watchdog.threshold-percent cpu-watchdog.sustain cpu-watchdog.cooldown
 watchdog.max-tree-processes watchdog.interval watchdog.ulimit-headroom
 disk-space.warn-below disk-space.clean-below disk-space.cleanup-command

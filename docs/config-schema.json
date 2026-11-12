@@ -480,6 +480,11 @@
               "default": true,
               "description": "Ask for a one-time code when signing in to the web page.",
               "type": "boolean"
+            },
+            "vi-escape": {
+              "default": "",
+              "description": "A key sequence, such as \"jk\", that leaves insert mode in the web page's vi editors. Empty turns it off.",
+              "type": "string"
             }
           },
           "type": "object"

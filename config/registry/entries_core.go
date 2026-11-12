@@ -8,6 +8,7 @@ func coreEntries() []Entry {
 	var out []Entry
 	add := func(s Section, e Entry) {
 		e.Section = s
+		e.Label = labelFor(e)
 		out = append(out, e)
 	}
 	queueInt := func(key, desc string) Entry {
@@ -63,37 +64,39 @@ func coreEntries() []Entry {
 	add(s, dur(Key("server", "log-retention"), "How long server logs are kept before they are deleted."))
 	add(s, Entry{Key: Key("server", "watch-config"), Type: TypeBool,
 		Description: "Reload the config automatically when config.json changes."})
-	add(s, Entry{Key: Key("server", "recently-finished"), Type: TypeNumber, Min: minOf(0), Integer: true,
+	add(SectionWebUI, Entry{Key: Key("server", "recently-finished"), Type: TypeNumber, Min: minOf(0), Integer: true,
 		Description: "How many recently finished tickets stay listed. 0 hides them."})
-	add(s, risky(Entry{Key: Key("server", "web", "listen"), Type: TypeString, Restart: true,
+	add(SectionWebUI, risky(Entry{Key: Key("server", "web", "listen"), Type: TypeString, Restart: true,
 		Description: "The address the web page is served on."},
 		"Changing the address can expose the web page to other machines or lock you out of it."))
-	add(s, Entry{Key: Key("server", "web", "dev-frontend"), Type: TypeBool,
+	add(SectionWebUI, Entry{Key: Key("server", "web", "dev-frontend"), Type: TypeBool,
 		Description: "Turn on Dev mode: gx runs its own Vite from the Dev checkout and serves the web UI from it."})
-	add(s, Entry{Key: Key("server", "web", "dev-dir"), Type: TypeString,
+	add(SectionWebUI, Entry{Key: Key("server", "web", "dev-dir"), Type: TypeString,
 		Description: "The Dev checkout path, overriding the one stamped into the binary. A leading ~ is expanded; otherwise it must be absolute."})
-	add(s, risky(Entry{Key: Key("server", "web", "allowed-hosts"), Type: TypeStringList,
+	add(SectionWebUI, risky(Entry{Key: Key("server", "web", "allowed-hosts"), Type: TypeStringList,
 		Description: "Host names the web page accepts requests for."},
 		"A wrong list can lock you out of the web page, and a broad one lets other sites reach it."))
-	add(s, Entry{Key: Key("server", "web", "totp"), Type: TypeBool, Risky: true, RiskyOffOnly: true,
+	add(SectionWebUI, Entry{Key: Key("server", "web", "totp"), Type: TypeBool, Risky: true, RiskyOffOnly: true,
 		ConfirmText: "Turning off the one-time code lets anyone who can reach the web page sign in.",
 		Description: "Ask for a one-time code when signing in to the web page."})
-	add(s, Entry{Key: Key("cpu-watchdog", "enabled"), Type: TypeBool,
+	add(SectionWebUI, Entry{Key: Key("server", "web", "vi-escape"), Type: TypeString,
+		Description: "A key sequence, such as \"jk\", that leaves insert mode in the web page's vi editors. Empty turns it off."})
+	add(SectionCPUWatchdog, Entry{Key: Key("cpu-watchdog", "enabled"), Type: TypeBool,
 		Description: "Watch the server's CPU use and capture a profile when it stays high."})
-	add(s, Entry{Key: Key("cpu-watchdog", "threshold-percent"), Type: TypeNumber, Min: minOf(1),
+	add(SectionCPUWatchdog, Entry{Key: Key("cpu-watchdog", "threshold-percent"), Type: TypeNumber, Min: minOf(1),
 		Description: "CPU use, in percent of one core, that counts as high."})
-	add(s, dur(Key("cpu-watchdog", "sustain"), "How long CPU use must stay high before the watchdog acts."))
-	add(s, dur(Key("cpu-watchdog", "cooldown"), "The least time between two CPU captures."))
-	add(s, Entry{Key: Key("watchdog", "max-tree-processes"), Type: TypeNumber, Min: minOf(1), Integer: true,
+	add(SectionCPUWatchdog, dur(Key("cpu-watchdog", "sustain"), "How long CPU use must stay high before the watchdog acts."))
+	add(SectionCPUWatchdog, dur(Key("cpu-watchdog", "cooldown"), "The least time between two CPU captures."))
+	add(SectionProcessWatchdog, Entry{Key: Key("watchdog", "max-tree-processes"), Type: TypeNumber, Min: minOf(1), Integer: true,
 		Description: "The most processes one agent's tree may hold before the watchdog stops the agent."})
-	add(s, dur(Key("watchdog", "interval"), "How often the watchdog counts each agent's processes. Default: 1s."))
-	add(s, Entry{Key: Key("watchdog", "ulimit-headroom"), Type: TypeNumber, Min: minOf(1), Integer: true,
+	add(SectionProcessWatchdog, dur(Key("watchdog", "interval"), "How often the watchdog counts each agent's processes. Default: 1s."))
+	add(SectionProcessWatchdog, Entry{Key: Key("watchdog", "ulimit-headroom"), Type: TypeNumber, Min: minOf(1), Integer: true,
 		Description: "How many processes above your current count an agent may start. The cap is fixed when an agent launches, so restart the agent if legitimate forks start failing."})
-	add(s, Entry{Key: Key("disk-space", "warn-below"), Type: TypeSize,
+	add(SectionDiskSpace, Entry{Key: Key("disk-space", "warn-below"), Type: TypeSize,
 		Description: "Warn when free disk space drops below this size. 0 turns it off."})
-	add(s, Entry{Key: Key("disk-space", "clean-below"), Type: TypeSize,
+	add(SectionDiskSpace, Entry{Key: Key("disk-space", "clean-below"), Type: TypeSize,
 		Description: "Run the cleanup command when free disk space drops below this size. 0 turns it off."})
-	add(s, Entry{Key: Key("disk-space", "cleanup-command"), Type: TypeStringList, ProjectOverridable: true,
+	add(SectionDiskSpace, Entry{Key: Key("disk-space", "cleanup-command"), Type: TypeStringList, ProjectOverridable: true,
 		Description: "The command, with its arguments, that frees disk space."})
 	return out
 }

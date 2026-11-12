@@ -16,13 +16,19 @@ import { SettingsRow, type WriteSetting } from "./SettingsRow"
 import { ChecksEditor } from "./ChecksEditor"
 import { CHECKS_KEY } from "./checks"
 
-/** The seven global sections, in sidebar order. */
+/** The global sections, in sidebar order. */
 export const GLOBAL_SECTIONS = [
   "Execution queue",
   "Budget",
   "Notifications",
   "Server",
+  "Web UI",
+  "CPU watchdog",
+  "Process watchdog",
+  "Disk space",
   "Agents",
+  "Models",
+  "Pull requests",
   "Evolve and recovery",
   "Ticket store",
 ] as const

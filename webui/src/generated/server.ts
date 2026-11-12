@@ -2015,6 +2015,11 @@ export interface Snapshot {
    */
   vi_mode?: boolean;
   /**
+   * ViEscape is config server.web.vi-escape, the key sequence that leaves
+   * insert mode in vi editors; filled in by the handler. Empty means off.
+   */
+  vi_escape?: string;
+  /**
    * Dev is the Dev mode block; filled in by the handler.
    */
   dev: DevStatus;

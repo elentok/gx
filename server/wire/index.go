@@ -119,6 +119,9 @@ type Snapshot struct {
 	// ViMode is set while the web UI's vi mode is on; filled in by the handler.
 	// Missing means off.
 	ViMode bool `json:"vi_mode,omitempty"`
+	// ViEscape is config server.web.vi-escape, the key sequence that leaves
+	// insert mode in vi editors; filled in by the handler. Empty means off.
+	ViEscape string `json:"vi_escape,omitempty"`
 	// Dev is the Dev mode block; filled in by the handler.
 	Dev DevStatus `json:"dev"`
 	// Workspaces are the ordered workspaces; filled in by the handler.

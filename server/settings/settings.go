@@ -123,6 +123,9 @@ type Settings struct {
 	// WebTOTPOff is config server.web.totp turned off. Inverted so a zero
 	// Settings keeps TOTP on.
 	WebTOTPOff bool
+	// WebViEscape is config server.web.vi-escape: the key sequence that leaves
+	// insert mode in the web UI's vi editors. Empty means off.
+	WebViEscape string
 
 	// WebDevFrontend is config server.web.dev-frontend (Dev mode on).
 	WebDevFrontend bool
@@ -190,6 +193,7 @@ func FromConfig(cfg config.Config) Settings {
 		AgentsDefaultHarness:        cfg.Agents.DefaultHarness,
 		WebAllowedHosts:             cfg.Server.Web.AllowedHosts,
 		WebTOTPOff:                  !cfg.Server.Web.TOTP,
+		WebViEscape:                 cfg.Server.Web.ViEscape,
 		WebDevFrontend:              cfg.Server.Web.DevFrontend,
 		WebDevDir:                   cfg.Server.Web.DevDir,
 	}
