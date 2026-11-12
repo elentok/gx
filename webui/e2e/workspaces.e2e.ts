@@ -367,14 +367,17 @@ test("Workspaces", async ({ page, start }) => {
   await fx.cli("server", "workspaces", "sort", "Default workspace", "needs-you")
   await goto(page, "#/epics")
 
-  // A row menu opens from the keyboard: Tab from the row to its menu button, Enter, arrow to an item, Enter.
+  // A row menu opens from the keyboard: press "." on the focused row, arrow to an item, Enter.
   const heldBefore = Number(/\d+/.exec((await onHold.textContent())!)![0])
   const held = onHold.locator("xpath=following::a[1]")
   if ((await onHold.getAttribute("aria-expanded")) === "false") await onHold.click()
   await held.focus()
-  await page.keyboard.press("Tab")
-  await expect(held.locator("xpath=..").getByRole("button", nav("More actions"))).toBeFocused()
-  await page.keyboard.press("Enter")
+  // The menu button is not a Tab stop (item 80); "." opens the focused row's menu.
+  await expect(held.locator("xpath=..").getByRole("button", nav("More actions"))).toHaveAttribute(
+    "tabindex",
+    "-1",
+  )
+  await page.keyboard.press(".")
   await menuFocused()
   await page.keyboard.press("ArrowDown")
   await expect(page.getByRole("menuitem", nav("Take off hold"))).toHaveAttribute(
