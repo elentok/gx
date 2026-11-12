@@ -1,7 +1,7 @@
 import { useContext, useSyncExternalStore } from "react"
 import { apiFetch } from "./apiFetch"
 import { ConnectionContext, type ConnectionState } from "./connection"
-import { showToast } from "./ui/toaster"
+import { guarded } from "./ui/reportWriteFailure"
 import { WriteError } from "./useWrite"
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
@@ -25,12 +25,7 @@ export function useViEscape(): string {
 
 // Sets Vi mode to the opposite of what the last snapshot showed. A failed write leaves the toggle as it was.
 export function toggleViMode(current: boolean | undefined): void {
-  void postViMode(!current).catch((err) =>
-    showToast({
-      type: "error",
-      title: err instanceof WriteError ? err.message : "Could not reach gx. Try again.",
-    }),
-  )
+  guarded(postViMode(!current))
 }
 
 const noopSubscribe = () => () => {}

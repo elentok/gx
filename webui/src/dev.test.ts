@@ -1,9 +1,9 @@
-import { renderHook, screen } from "@testing-library/react"
+import { renderHook } from "@testing-library/react"
 import { createElement } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { ConnectionContext, type Connection } from "./connection"
 import { postDevFrontend, postDevRestart, useDev } from "./dev"
-import { renderThemed } from "./ui/render"
+import { WriteError } from "./useWrite"
 
 describe("useDev", () => {
   const conn = (dev?: object) => {
@@ -41,15 +41,14 @@ describe("postDevFrontend", () => {
   it("writes the key through the settings route", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }))
     vi.stubGlobal("fetch", fetchMock)
-    postDevFrontend(true)
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await postDevFrontend(true)
     expect(fetchMock.mock.calls[0][0]).toBe("/v1/settings")
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
       changes: [{ key: "server.web.dev-frontend", value: true }],
     })
   })
 
-  it("shows an error toast when the write is refused", async () => {
+  it("throws a WriteError when the write is refused", async () => {
     vi.stubGlobal(
       "fetch",
       vi
@@ -58,32 +57,28 @@ describe("postDevFrontend", () => {
           new Response('{"refused":true,"reason":"Dev is locked"}', { status: 200 }),
         ),
     )
-    renderThemed(createElement("div"))
-    postDevFrontend(true)
-    expect(await screen.findByText("Dev is locked")).toBeTruthy()
+    const err = await postDevFrontend(true).catch((e) => e)
+    expect(err).toBeInstanceOf(WriteError)
+    expect(err.message).toBe("Dev is locked")
   })
 
-  it("shows an error toast when the request fails", async () => {
+  it("rejects when the request fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 500 })))
-    renderThemed(createElement("div"))
-    postDevFrontend(false)
-    expect(await screen.findByText("Request failed (HTTP 500).")).toBeTruthy()
+    await expect(postDevFrontend(false)).rejects.toThrow("Request failed (HTTP 500).")
   })
 })
 
 describe("postDevRestart", () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it("posts to the restart route and toasts a refusal", async () => {
+  it("posts to the restart route and throws a WriteError on a refusal", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
         new Response('{"refused":true,"message":"Vite is running"}', { status: 200 }),
       )
     vi.stubGlobal("fetch", fetchMock)
-    renderThemed(createElement("div"))
-    postDevRestart()
-    expect(await screen.findByText("Vite is running")).toBeTruthy()
+    await expect(postDevRestart()).rejects.toThrow("Vite is running")
     expect(fetchMock.mock.calls[0][0]).toBe("/v1/dev/restart")
   })
 })

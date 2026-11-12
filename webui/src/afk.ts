@@ -1,5 +1,5 @@
 import { apiFetch } from "./apiFetch"
-import { showToast } from "./ui/toaster"
+import { guarded } from "./ui/reportWriteFailure"
 import { WriteError } from "./useWrite"
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
@@ -19,10 +19,5 @@ export function toggleAfk(
   current: boolean | undefined,
   post: (on: boolean) => Promise<void> = postAfk,
 ): void {
-  void post(!current).catch((err) =>
-    showToast({
-      type: "error",
-      title: err instanceof WriteError ? err.message : "Could not reach gx. Try again.",
-    }),
-  )
+  guarded(post(!current))
 }

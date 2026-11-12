@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { postDevRestart as defaultPostDevRestart } from "../dev"
 import type { DevState } from "../generated/server"
+import { guarded } from "../ui/reportWriteFailure"
 import { showToast } from "../ui/toaster"
 
 /**
@@ -11,7 +12,7 @@ import { showToast } from "../ui/toaster"
 export function useDevToast({
   postDevRestart = defaultPostDevRestart,
 }: {
-  postDevRestart?: () => void
+  postDevRestart?: () => Promise<void>
 } = {}) {
   const state: DevState | undefined = useConnectionState(useConnectionContext()).snapshot?.dev
     ?.state
@@ -22,7 +23,7 @@ export function useDevToast({
       showToast({
         type: "error",
         title: "Vite is down. gx serves the built files.",
-        actions: [{ label: "Restart Vite", onClick: postDevRestart }],
+        actions: [{ label: "Restart Vite", onClick: () => guarded(postDevRestart()) }],
       })
     }
     prev.current = state

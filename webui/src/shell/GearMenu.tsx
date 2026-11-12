@@ -18,12 +18,11 @@ import { useInstall } from "../pwa/install"
 import { useWorkerRegistration } from "../pwa/registerWorker"
 import { RestartDialog } from "../restart/RestartDialog"
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu"
-import { showToast } from "../ui/toaster"
+import { guarded } from "../ui/reportWriteFailure"
 import { postDevFrontend as defaultPostDevFrontend, useDev } from "../dev"
 import { DevDetails } from "../dev/DevPopover"
 import { DEV_LOOK } from "../dev/DevPill"
 import { postViMode as defaultPostViMode } from "../vimode"
-import { WriteError } from "../useWrite"
 import { postWorkspace } from "../workspaces/postWorkspace"
 import { FooterButton, interactiveStyle } from "./FooterButton"
 import { InstallSheet } from "./InstallSheet"
@@ -32,7 +31,7 @@ import { useShell } from "./ShellContext"
 interface Props {
   postAfk?: (on: boolean) => Promise<void>
   postViMode?: (on: boolean) => Promise<void>
-  postDevFrontend?: (on: boolean) => void
+  postDevFrontend?: (on: boolean) => Promise<void>
   postSort?: (workspace: string, sort: string) => Promise<unknown>
   /** The active workspace once it resolves; Sort stays disabled until then. */
   activeWorkspace?: Workspace
@@ -48,16 +47,6 @@ const SORT_OPTIONS = [
 
 const defaultPostSort = (workspace: string, sort: string) =>
   postWorkspace("sort", { name: workspace, sort })
-
-// A failed write leaves the control as the last snapshot showed it.
-function guarded(write: Promise<unknown>) {
-  void write.catch((err) =>
-    showToast({
-      type: "error",
-      title: err instanceof WriteError ? err.message : "Could not reach gx. Try again.",
-    }),
-  )
-}
 
 function DotsIcon() {
   return (
@@ -169,7 +158,7 @@ export function GearMenu({
           toggle("AFK", "afk", afk, () => toggleAfk(afk, postAfk)),
           toggle("Vi mode", "vimode", viMode, () => guarded(postViMode(!viMode))),
           ...(dev.has_checkout
-            ? [toggle("Dev mode", "devmode", devOn, () => postDevFrontend(!devOn))]
+            ? [toggle("Dev mode", "devmode", devOn, () => guarded(postDevFrontend(!devOn)))]
             : []),
           ...(devOn ? [devDetails] : []),
           sort,

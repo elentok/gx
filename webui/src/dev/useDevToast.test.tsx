@@ -15,7 +15,7 @@ afterEach(() => {
 const TITLE = "Vite is down. gx serves the built files."
 
 function setup(first: DevState) {
-  const postDevRestart = vi.fn()
+  const postDevRestart = vi.fn().mockResolvedValue(undefined)
   let state = { snapshot: { dev: { state: first } }, connected: true } as unknown as ConnectionState
   const subs = new Set<() => void>()
   const conn = {

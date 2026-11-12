@@ -39,7 +39,7 @@ const dev = (state: DevState, extra: Partial<DevStatus> = {}): DevStatus => ({
 
 async function open(
   d: DevStatus,
-  props: { off?: (on: boolean) => void; restart?: () => void } = {},
+  props: { off?: (on: boolean) => Promise<void>; restart?: () => Promise<void> } = {},
 ) {
   renderThemed(<DevPopover dev={d} postDevFrontend={props.off} postDevRestart={props.restart} />)
   fireEvent.click(screen.getByRole("button"))
@@ -69,8 +69,8 @@ test.each(cases)("%s shows status, reason, log lines and path", async (state, st
 test.each(cases)(
   "%s: Restart Vite only while down; Turn off always writes false",
   async (state) => {
-    const off = vi.fn()
-    const restart = vi.fn()
+    const off = vi.fn().mockResolvedValue(undefined)
+    const restart = vi.fn().mockResolvedValue(undefined)
     await open(dev(state), { off, restart })
     expect(!!screen.queryByText("Restart Vite")).toBe(state === "down")
     if (state === "down") {

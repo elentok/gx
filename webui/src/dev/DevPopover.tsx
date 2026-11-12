@@ -6,12 +6,13 @@ import {
 } from "../dev"
 import type { DevStatus } from "../generated/server"
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu"
+import { guarded } from "../ui/reportWriteFailure"
 import { DEV_LOOK, DevPill } from "./DevPill"
 
 interface Props {
   dev: DevStatus
-  postDevFrontend?: (on: boolean) => void
-  postDevRestart?: () => void
+  postDevFrontend?: (on: boolean) => Promise<void>
+  postDevRestart?: () => Promise<void>
 }
 
 /** Status, reason, last Vite log lines, checkout path and actions; nothing while Dev mode is off. */
@@ -103,13 +104,13 @@ export function DevDetails({
             size="sm"
             emphasis="secondary"
             borderColor="tone.running.fg"
-            onClick={postDevRestart}
+            onClick={() => guarded(postDevRestart())}
           >
             Restart Vite
           </Button>
         )}
         {showOff && (
-          <Button size="sm" emphasis="secondary" onClick={() => postDevFrontend(false)}>
+          <Button size="sm" emphasis="secondary" onClick={() => guarded(postDevFrontend(false))}>
             Turn off Dev mode
           </Button>
         )}

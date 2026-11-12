@@ -133,7 +133,7 @@ const menuItems = () =>
   )
 
 test("with a Dev checkout the Dev mode row sits under Vi mode, follows the Dev state and posts the opposite", async () => {
-  const postDevFrontend = vi.fn()
+  const postDevFrontend = vi.fn().mockResolvedValue(undefined)
   setup({ dev: { state: "running", has_checkout: true } }, { postDevFrontend })
   const row = await screen.findByRole("menuitemcheckbox", { name: "Dev mode" })
   expect(menuItems()?.slice(0, 3)).toEqual(["AFK", "Vi mode", "Dev mode"])
@@ -160,7 +160,7 @@ test("on a phone the Dev mode row keeps its place and the same drawn switch as V
 })
 
 test("an off Dev state shows the row unchecked and flipping it posts true", async () => {
-  const postDevFrontend = vi.fn()
+  const postDevFrontend = vi.fn().mockResolvedValue(undefined)
   setup({ dev: { state: "off", has_checkout: true } }, { postDevFrontend })
   const row = await screen.findByRole("menuitemcheckbox", { name: "Dev mode" })
   expect(row.getAttribute("aria-checked")).toBe("false")
