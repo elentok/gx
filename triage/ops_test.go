@@ -2,8 +2,12 @@ package triage
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/elentok/gx/tickets/tickettest"
 )
 
 const (
@@ -205,21 +209,21 @@ func TestApprove_RaceFirstWinsSecondAlreadyApproved(t *testing.T) {
 
 func TestWriteState(t *testing.T) {
 	s, rec := atApprove(t)
-	if _, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, "", ""); err == nil {
+	if _, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, nil, ""); err == nil {
 		t.Fatal("write state accepted before write")
 	}
 	rec, _ = s.Approve(rec.ID, rec.Revision)
-	rec, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteFailed, "", "server-not-running")
+	rec, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteFailed, nil, "server-not-running")
 	must(t, rec, err)
 	if rec.Rows[0].Refusal != "server-not-running" {
 		t.Fatalf("row = %+v", rec.Rows[0])
 	}
-	rec, err = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, "proj:map/01", "")
+	rec, err = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, []string{"proj:map/01"}, "")
 	must(t, rec, err)
-	if rec.Rows[0].Refusal != "" || rec.Rows[0].NewAddress != "proj:map/01" {
+	if rec.Rows[0].Refusal != "" || rec.Rows[0].FirstAddress() != "proj:map/01" {
 		t.Fatalf("a successful rerun should clear the refusal: %+v", rec.Rows[0])
 	}
-	if _, err := s.WriteRow(rec.ID, rec.Revision, rowA, "bogus", "", ""); err == nil {
+	if _, err := s.WriteRow(rec.ID, rec.Revision, rowA, "bogus", nil, ""); err == nil {
 		t.Fatal("unknown state accepted")
 	}
 }
@@ -236,7 +240,7 @@ func TestRetryAndKeepForLater(t *testing.T) {
 	if _, err := s.Retry(rec.ID, rec.Revision, rowA); err == nil {
 		t.Fatal("retry of a pending row accepted")
 	}
-	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteFailed, "", "boom")
+	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteFailed, nil, "boom")
 	rec, err := s.Retry(rec.ID, rec.Revision, rowA)
 	must(t, rec, err)
 	if rec.Rows[0].Write != WritePending {
@@ -244,12 +248,12 @@ func TestRetryAndKeepForLater(t *testing.T) {
 	}
 
 	// failed after a move: Keep for later refused
-	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteFailed, "proj:map/01", "boom")
+	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteFailed, []string{"proj:map/01"}, "boom")
 	if _, err := s.KeepForLater(rec.ID, rec.Revision, rowA); err == nil {
 		t.Fatal("keep accepted after a move")
 	}
 	// failed in follow-ups: accepted
-	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteFailed, "", "boom")
+	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteFailed, nil, "boom")
 	rec, err = s.KeepForLater(rec.ID, rec.Revision, rowB)
 	must(t, rec, err)
 	if !rec.Rows[1].Person.KeepForLater || rec.Rows[1].Write != WriteFailed {
@@ -260,8 +264,8 @@ func TestRetryAndKeepForLater(t *testing.T) {
 func TestDoneRule(t *testing.T) {
 	t.Run("gone during Write", func(t *testing.T) {
 		s, rec := atWrite(t)
-		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, "", "")
-		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteGone, "", "")
+		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, nil, "")
+		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteGone, nil, "")
 		if rec.State != StateLive {
 			t.Fatal("done before the last pass")
 		}
@@ -275,7 +279,7 @@ func TestDoneRule(t *testing.T) {
 		rec, _ = s.SaveVerdict(rec.ID, rec.Revision, Verdict{Address: rowB})
 		rec, _ = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowB, Action: "ready"}}, nil)
 		rec, _ = s.Approve(rec.ID, rec.Revision)
-		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteFailed, "", "boom")
+		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteFailed, nil, "boom")
 		rec, _ = s.SetLastPass(rec.ID, rec.Revision, true)
 		if rec.State != StateLive {
 			t.Fatal("failed row should not be done")
@@ -286,8 +290,8 @@ func TestDoneRule(t *testing.T) {
 	})
 	t.Run("flag unset", func(t *testing.T) {
 		s, rec := atWrite(t)
-		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, "", "")
-		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteDone, "", "")
+		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, nil, "")
+		rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteDone, nil, "")
 		if rec.State != StateLive || rec.Step != "write" {
 			t.Fatalf("crash before the last pass must leave it not done: %+v", rec)
 		}
@@ -295,6 +299,65 @@ func TestDoneRule(t *testing.T) {
 			t.Fatal("marker released early")
 		}
 	})
+}
+
+func TestWriteRow_ListNeedsEveryTicketAndTheArchivedFollowUp(t *testing.T) {
+	s, rec := atWrite(t)
+	rec, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, []string{"proj:map-x/01", "proj:map-x/02"}, "")
+	must(t, rec, err)
+	if got := rec.Rows[0].NewAddresses; len(got) != 2 {
+		t.Fatalf("stored list = %v", got)
+	}
+	rec, err = s.WriteRow(rec.ID, rec.Revision, rowB, WriteGone, nil, "")
+	must(t, rec, err)
+
+	newTicket := func(id string) {
+		tickettest.WriteFile(t, filepath.Join(s.ProjectDir(), "map-x", "issues", id+"-t.md"),
+			"---\nid: \""+id+"\"\nstatus: open\ntype: implement\n---\n\n# T\n")
+	}
+	settle := func() *Record {
+		cur, err := s.Load(rec.ID)
+		must(t, cur, err)
+		got, err := s.SetLastPass(cur.ID, cur.Revision, true)
+		must(t, got, err)
+		return got
+	}
+
+	newTicket("01")
+	if got := settle(); got.State != StateLive {
+		t.Fatal("done with only one of two tickets")
+	}
+	newTicket("02")
+	if got := settle(); got.State != StateLive {
+		t.Fatal("done while the follow-up is still in follow-ups")
+	}
+	archived := filepath.Join(s.ProjectDir(), "follow-ups-archived", "issues")
+	if err := os.MkdirAll(archived, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(s.ProjectDir(), "follow-ups", "issues", "01-a.md"), filepath.Join(archived, "01-a.md")); err != nil {
+		t.Fatal(err)
+	}
+	assertDone(t, s, settle())
+}
+
+func TestOldSingleNewAddressStillFinishes(t *testing.T) {
+	s, rec := atWrite(t)
+	rec.Rows[0].Write, rec.Rows[0].NewAddress = WriteDone, "proj:map/01"
+	rec.Rows[1].Write = WriteGone
+	if err := s.Save(rec); err != nil {
+		t.Fatal(err)
+	}
+	live, _ := s.LoadLive()
+	if got := live.Rows[0].Addresses(); len(got) != 1 || got[0] != "proj:map/01" {
+		t.Fatalf("old address not read: %+v", live.Rows[0])
+	}
+	rec, err := s.SetLastPass(live.ID, live.Revision, true)
+	must(t, rec, err)
+	assertDone(t, s, rec)
+	if rec.Version != Version {
+		t.Fatalf("version = %d", rec.Version)
+	}
 }
 
 func assertDone(t *testing.T, s *Store, rec *Record) {

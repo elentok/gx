@@ -192,7 +192,7 @@ func (b *statsBuilder) collectPromoted(project string, e tickets.Epic) {
 		return
 	}
 	for _, tk := range e.Tickets {
-		if !isPromoted(tk) {
+		if !tickets.IsPromoted(tk) {
 			continue
 		}
 		key := tickets.Address{Project: project, Epic: followUpsEpic, ID: tk.Identifier}.String()
@@ -206,20 +206,11 @@ func (b *statsBuilder) collectPromoted(project string, e tickets.Epic) {
 	}
 }
 
-func isPromoted(tk tickets.Ticket) bool {
-	for line := range strings.SplitSeq(schema.Section(tk.Body, "Resolution"), "\n") {
-		if strings.TrimSpace(line) == "- reason: promoted" {
-			return true
-		}
-	}
-	return false
-}
-
 // addPromoted reports whether tk is a promoted follow-up or a ticket made from
 // one. Neither adds to the follow-up series here: the follow-up was counted as
 // created already and finishes in finishPromoted.
 func (b *statsBuilder) addPromoted(tk tickets.Ticket) bool {
-	if isPromoted(tk) && tk.Status == string(schema.StatusCancelled) {
+	if tickets.IsPromoted(tk) && tk.Status == string(schema.StatusCancelled) {
 		return true
 	}
 	found := false

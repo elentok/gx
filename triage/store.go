@@ -111,8 +111,14 @@ type Row struct {
 	// back to the agent, the answers move here and the row is asked afresh.
 	Earlier []Answered `json:"earlier,omitempty"`
 	Write   WriteState `json:"write,omitempty"`
-	// NewAddress is the ticket's address after a move.
-	NewAddress string `json:"newAddress,omitempty"`
+	// NewAddresses are the tickets the row became. NewAddress is the single
+	// address an older record stored; it is only read, never written.
+	NewAddresses []string `json:"newAddresses,omitempty"`
+	NewAddress   string   `json:"newAddress,omitempty"`
+	// Group marks the rows that were promoted into one ticket group.
+	Group string `json:"group,omitempty"`
+	// Estimate is the row's size estimate.
+	Estimate string `json:"estimate,omitempty"`
 	// Refusal is the text of the last refusal the write hit.
 	Refusal string `json:"refusal,omitempty"`
 }

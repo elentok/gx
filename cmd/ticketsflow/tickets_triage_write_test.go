@@ -28,10 +28,11 @@ func triageAtWrite(t *testing.T) (repo, project string, s triageShown) {
 }
 
 type locateOut struct {
-	Position   string `json:"position"`
-	Address    string `json:"address"`
-	HasAnswers bool   `json:"hasAnswers"`
-	SeenAgain  bool   `json:"seenAgain"`
+	Position     string   `json:"position"`
+	Address      string   `json:"address"`
+	NewAddresses []string `json:"newAddresses"`
+	HasAnswers   bool     `json:"hasAnswers"`
+	SeenAgain    bool     `json:"seenAgain"`
 }
 
 func triageLocate(t *testing.T, repo string, args ...string) locateOut {
@@ -91,6 +92,39 @@ func TestTriageLocate_ReportsEachPosition(t *testing.T) {
 	}
 	if got := triageLocate(t, repo, "--row", row); got.Position != "missing" {
 		t.Errorf("after delete = %+v", got)
+	}
+}
+
+func TestTriageLocate_PromotedArchiveReportsNewAddresses(t *testing.T) {
+	repo, project, s := triageAtWrite(t)
+	row := s.Rows[0].Address
+	for _, n := range []string{"05", "06"} {
+		writeEpicTicket(t, project, "ready-x", n+"-f.md",
+			"---\nid: \""+n+"\"\nstatus: open\ntype: research\noriginal_address: \""+row+"\"\n---\n\n# New "+n+"\n")
+	}
+	writeEpicTicket(t, project, tickets.ArchivedFollowUpsEpic, "01-f.md",
+		"---\nid: \"01\"\nstatus: cancelled\ntype: research\n---\n\n# Follow-up 01\n\n## Resolution\n\n- reason: promoted\n"+tickets.OriginalLine(mustAddr(t, row))+"\n")
+	if err := os.Remove(followUpFile(project)); err != nil {
+		t.Fatal(err)
+	}
+	got := triageLocate(t, repo, "--row", row)
+	if got.Position != "archived" || !strings.HasSuffix(got.Address, tickets.ArchivedFollowUpsEpic+"/01") ||
+		len(got.NewAddresses) != 2 || !strings.HasSuffix(got.NewAddresses[0], "ready-x/05") || !strings.HasSuffix(got.NewAddresses[1], "ready-x/06") {
+		t.Errorf("promoted archive = %+v", got)
+	}
+}
+
+func TestTriageLocate_MovedMapEpicFollowUpStaysMoved(t *testing.T) {
+	repo, project, s := triageAtWrite(t)
+	row := s.Rows[0].Address
+	writeEpicTicket(t, project, "map-x", "05-f.md",
+		"---\nid: \"05\"\nstatus: open\ntype: research\noriginal_address: \""+row+"\"\n---\n\n# Moved\n")
+	if err := os.Remove(followUpFile(project)); err != nil {
+		t.Fatal(err)
+	}
+	got := triageLocate(t, repo, "--row", row)
+	if got.Position != "moved" || len(got.NewAddresses) != 0 {
+		t.Errorf("moved map-epic follow-up = %+v", got)
 	}
 }
 
@@ -210,19 +244,19 @@ func TestTriageWriteState_FailedKeepsRefusalAndRerunClearsIt(t *testing.T) {
 	if got := rowWrite(t, repo, row); got.Write != "failed" || got.Refusal != "server-not-running" {
 		t.Fatalf("failed row = %+v", got)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "write-state", "--row", row, "--state", "done", "--new-address", "p:ready-x/05"); err != nil {
+	if _, err := runIn(t, repo, "tickets", "triage", "write-state", "--row", row, "--state", "done", "--new-address", "p:ready-x/05,p:ready-x/06"); err != nil {
 		t.Fatal(err)
 	}
-	if got := rowWrite(t, repo, row); got.Write != "done" || got.Refusal != "" || got.NewAddress != "p:ready-x/05" {
+	if got := rowWrite(t, repo, row); got.Write != "done" || got.Refusal != "" || strings.Join(got.NewAddresses, " ") != "p:ready-x/05 p:ready-x/06" {
 		t.Errorf("rerun row = %+v", got)
 	}
 }
 
 type rowState struct {
-	Address    string `json:"address"`
-	Write      string `json:"write"`
-	Refusal    string `json:"refusal"`
-	NewAddress string `json:"newAddress"`
+	Address      string   `json:"address"`
+	Write        string   `json:"write"`
+	Refusal      string   `json:"refusal"`
+	NewAddresses []string `json:"newAddresses"`
 }
 
 func rowWrite(t *testing.T, repo, address string) rowState {

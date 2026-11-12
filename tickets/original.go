@@ -42,6 +42,17 @@ func IsOriginal(t Ticket, addr Address) bool {
 	return NamesOriginal(t.Body, addr)
 }
 
+// IsPromoted reports whether a closed follow-up's Resolution gives "promoted"
+// as its reason.
+func IsPromoted(t Ticket) bool {
+	for line := range strings.SplitSeq(schema.Section(t.Body, "Resolution"), "\n") {
+		if strings.TrimSpace(line) == "- reason: promoted" {
+			return true
+		}
+	}
+	return false
+}
+
 // IsTerminalStatus reports whether a raw ticket status is done or cancelled.
 func IsTerminalStatus(status string) bool {
 	return status == string(schema.StatusDone) || status == string(schema.StatusCancelled)

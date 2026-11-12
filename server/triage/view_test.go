@@ -118,8 +118,8 @@ func TestView_RecordAtEachStep(t *testing.T) {
 		t.Fatalf("write: %+v", v)
 	}
 
-	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrB, triagerec.WriteDone, "", ""))
-	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrA, triagerec.WriteDone, "", ""))
+	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrB, triagerec.WriteDone, nil, ""))
+	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrA, triagerec.WriteDone, nil, ""))
 	rec = mustRec(s.SetLastPass(rec.ID, rec.Revision, true))
 	v = show(t, f)
 	if v.State != wire.TriageDone || stepStates(v) != "ddddd" || v.RingPercent != 100 || v.Result == nil || v.CanAbandon {
@@ -191,8 +191,8 @@ func TestView_FailedRowsOfferKeepAndRetry(t *testing.T) {
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB}))
 	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{{RowID: addrA, Action: "ready"}, {RowID: addrB, Action: "ready"}}, nil))
 	rec = mustRec(s.Approve(rec.ID, rec.Revision))
-	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrA, triagerec.WriteFailed, "", "refused"))
-	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrB, triagerec.WriteFailed, "proj:ready/01", "set failed"))
+	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrA, triagerec.WriteFailed, nil, "refused"))
+	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrB, triagerec.WriteFailed, []string{"proj:ready/01"}, "set failed"))
 	v := show(t, f)
 	a, b := v.Rows[0], v.Rows[1]
 	if !a.CanKeep || !a.CanRetry || a.Refusal != "refused" {

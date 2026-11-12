@@ -74,7 +74,7 @@ func (s *Store) modify(id string, revision int, fn func(*Record) error) (*Record
 	if rec.Revision != revision {
 		return nil, ErrStaleRevision
 	}
-	finishIfDone(rec)
+	finishIfDone(rec, s.projectDir)
 	if err := s.saveLocked(rec); err != nil {
 		return nil, err
 	}
@@ -91,6 +91,66 @@ func (r *Record) row(address string) (*Row, error) {
 }
 
 func (r *Row) gone() bool { return r.Write == WriteGone }
+
+// Addresses are the tickets the row became, whether the record stored a list
+// or an older single address.
+func (r *Row) Addresses() []string {
+	if len(r.NewAddresses) > 0 {
+		return r.NewAddresses
+	}
+	if r.NewAddress != "" {
+		return []string{r.NewAddress}
+	}
+	return nil
+}
+
+// FirstAddress is the first ticket the row became, or "".
+func (r *Row) FirstAddress() string {
+	if a := r.Addresses(); len(a) > 0 {
+		return a[0]
+	}
+	return ""
+}
+
+// complete reports whether every ticket of a row that stored a list exists and
+// its follow-up has left follow-ups (archived or moved). Older single-address
+// rows and rows without tickets are complete as written.
+func (r *Row) complete(projectDir string) bool {
+	if len(r.NewAddresses) == 0 {
+		return true
+	}
+	from, err := tickets.ParseAddress(r.Address, tickets.AddressContext{})
+	if err != nil {
+		return true
+	}
+	epics, err := tickets.Load(projectDir)
+	if err != nil {
+		return false
+	}
+	exists := func(a tickets.Address) bool {
+		for _, e := range epics {
+			if e.Name != a.Epic {
+				continue
+			}
+			for _, t := range e.Tickets {
+				if t.Identifier == a.ID {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if exists(from) {
+		return false
+	}
+	for _, s := range r.NewAddresses {
+		a, err := tickets.ParseAddress(s, tickets.AddressContext{})
+		if err != nil || !exists(a) {
+			return false
+		}
+	}
+	return true
+}
 
 func requireStep(rec *Record, what string, steps ...string) error {
 	if !slices.Contains(steps, rec.Step) {
@@ -421,7 +481,7 @@ func (s *Store) SendBack(id string, revision int) (*Record, error) {
 
 // WriteRow stores per-row write state during Write. A successful state clears
 // the refusal text.
-func (s *Store) WriteRow(id string, revision int, address string, state WriteState, newAddress, refusal string) (*Record, error) {
+func (s *Store) WriteRow(id string, revision int, address string, state WriteState, newAddresses []string, refusal string) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
 		if err := requireStep(rec, "write state", tickets.StepWrite); err != nil {
 			return err
@@ -436,8 +496,10 @@ func (s *Store) WriteRow(id string, revision int, address string, state WriteSta
 			return phaseErr("unknown write state %q", state)
 		}
 		row.Write = state
-		if newAddress != "" {
-			row.NewAddress = newAddress
+		for _, a := range newAddresses {
+			if a != "" && !slices.Contains(row.NewAddresses, a) {
+				row.NewAddresses = append(row.NewAddresses, a)
+			}
 		}
 		row.Refusal = ""
 		if state == WriteFailed {
@@ -513,8 +575,8 @@ func (s *Store) KeepForLater(id string, revision int, address string) (*Record, 
 		if row.Write != WriteFailed {
 			return phaseErr("row %s is %s, not failed", address, row.Write)
 		}
-		if row.NewAddress != "" {
-			return phaseErr("row %s already moved to %s", address, row.NewAddress)
+		if moved := row.Addresses(); len(moved) > 0 {
+			return phaseErr("row %s already moved to %s", address, strings.Join(moved, ", "))
 		}
 		row.Person.KeepForLater = true
 		return nil
@@ -535,12 +597,15 @@ func (s *Store) Abandon(id string, revision int) (*Record, error) {
 
 // finishIfDone makes a live record done when every row is done, kept or gone
 // and the last pass is complete.
-func finishIfDone(rec *Record) {
+func finishIfDone(rec *Record, projectDir string) {
 	if rec.State != StateLive || rec.Step != tickets.StepWrite || !rec.LastPassComplete {
 		return
 	}
 	for _, row := range rec.Rows {
 		if row.Write != WriteDone && !row.Person.KeepForLater && !row.gone() {
+			return
+		}
+		if row.Write == WriteDone && !row.complete(projectDir) {
 			return
 		}
 	}

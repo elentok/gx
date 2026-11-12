@@ -30,7 +30,7 @@ var flowSteps = []struct {
 // follow-up is still in follow-ups.
 func CanKeep(live bool, step string, r triagerec.Row) bool {
 	return live && step == tickets.StepWrite && r.Write == triagerec.WriteFailed &&
-		r.NewAddress == "" && !r.Person.KeepForLater
+		len(r.Addresses()) == 0 && !r.Person.KeepForLater
 }
 
 // CanRetry is whether a row offers Retry: any failed row at write, including
@@ -254,7 +254,7 @@ func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (wire.TriageRow
 		Address: r.Address, Title: r.Title, Category: r.Category,
 		Verdict: r.Verdict, Evidence: r.Evidence, Files: r.Files,
 		Answers: r.Person.Answers, Gone: r.Write == triagerec.WriteGone,
-		WriteState: string(r.Write), NewAddress: r.NewAddress, Refusal: r.Refusal,
+		WriteState: string(r.Write), NewAddress: r.FirstAddress(), Refusal: r.Refusal,
 		CanKeep: CanKeep(live, rec.Step, r), CanRetry: CanRetry(live, rec.Step, r),
 	}
 	if r.Plan != nil {
@@ -307,7 +307,7 @@ func resultOf(rec *triagerec.Record) wire.TriageResult {
 		item := wire.TriageResultItem{Address: r.Address, Title: r.Title}
 		switch row.Action {
 		case "ready", "map":
-			item.Target = epicOf(r.NewAddress)
+			item.Target = epicOf(r.FirstAddress())
 			if row.Action == "ready" && res.ReadyEpic == "" {
 				res.ReadyEpic = item.Target
 			}

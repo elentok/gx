@@ -28,11 +28,13 @@ const (
 
 // located is where a row's ticket is and what is already written into it.
 type located struct {
-	Position   string `json:"position"`
-	Address    string `json:"address,omitempty"`
-	Path       string `json:"path,omitempty"`
-	HasAnswers bool   `json:"hasAnswers"`
-	SeenAgain  bool   `json:"seenAgain"`
+	Position string `json:"position"`
+	Address  string `json:"address,omitempty"`
+	Path     string `json:"path,omitempty"`
+	// NewAddresses are the tickets a promoted follow-up became.
+	NewAddresses []string `json:"newAddresses,omitempty"`
+	HasAnswers   bool     `json:"hasAnswers"`
+	SeenAgain    bool     `json:"seenAgain"`
 
 	body string
 }
@@ -51,11 +53,20 @@ func locateRow(projectDir string, row *triage.Row) (located, error) {
 	}
 	var found *tickets.Ticket
 	var foundEpic string
+	var promoted *tickets.Ticket // the archived copy, closed as promoted
+	var others []string          // matches outside the archive
 	for _, e := range epics {
 		for i, t := range e.Tickets {
 			atOrigin := e.Name == addr.Epic && t.Identifier == addr.ID && (len(t.OriginalAddress) == 0 || tickets.IsOriginal(t, addr))
 			if atOrigin || tickets.IsOriginal(t, addr) {
 				found, foundEpic = &e.Tickets[i], e.Name
+				if e.Name == tickets.ArchivedFollowUpsEpic {
+					if tickets.IsPromoted(t) {
+						promoted = &e.Tickets[i]
+					}
+				} else {
+					others = append(others, tickets.Address{Project: addr.Project, Epic: e.Name, ID: t.Identifier}.String())
+				}
 			}
 			if atOrigin {
 				break
@@ -65,11 +76,18 @@ func locateRow(projectDir string, row *triage.Row) (located, error) {
 	if found == nil {
 		return located{Position: posMissing}, nil
 	}
+	if promoted != nil && len(others) > 0 {
+		found, foundEpic = promoted, tickets.ArchivedFollowUpsEpic
+	} else {
+		others = nil
+	}
 	loc := located{
 		Position: posMoved,
 		Address:  tickets.Address{Project: addr.Project, Epic: foundEpic, ID: found.Identifier}.String(),
 		Path:     found.FilePath(),
 		body:     found.Body,
+
+		NewAddresses: others,
 	}
 	switch foundEpic {
 	case tickets.FollowUpsEpic:
@@ -295,7 +313,8 @@ func newTriageSeenAgainCmd(d Deps) *cobra.Command {
 }
 
 func newTriageWriteStateCmd(d Deps) *cobra.Command {
-	var project, row, state, newAddress, refusal string
+	var project, row, state, refusal string
+	var newAddresses []string
 	var revision int
 	cmd := &cobra.Command{
 		Use:   "write-state",
@@ -310,7 +329,7 @@ func newTriageWriteStateCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			saved, err := t.store.WriteRow(rec.ID, currentRevision(c, rec, revision), row, triage.WriteState(state), newAddress, refusal)
+			saved, err := t.store.WriteRow(rec.ID, currentRevision(c, rec, revision), row, triage.WriteState(state), newAddresses, refusal)
 			if err != nil {
 				return err
 			}
@@ -323,7 +342,7 @@ func newTriageWriteStateCmd(d Deps) *cobra.Command {
 	f.StringVar(&project, "project", "", "project (default: the cwd's)")
 	f.StringVar(&row, "row", "", "the row's follow-up address")
 	f.StringVar(&state, "state", "", "done, failed, gone or pending")
-	f.StringVar(&newAddress, "new-address", "", "the ticket's address after a move")
+	f.StringSliceVar(&newAddresses, "new-address", nil, "an address of a ticket the row became (repeat or comma-separate)")
 	f.StringVar(&refusal, "refusal", "", "the refusing verb's own text (state failed)")
 	f.IntVar(&revision, "revision", 0, "refuse unless the record is at this revision")
 	return cmd

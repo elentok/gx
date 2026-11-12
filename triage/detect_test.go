@@ -31,8 +31,8 @@ func TestNext(t *testing.T) {
 	if got := Next(rec); got != BranchWrite {
 		t.Fatalf("approved = %s", got)
 	}
-	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, "", "")
-	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteDone, "", "")
+	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, nil, "")
+	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteDone, nil, "")
 	rec, _ = s.SetLastPass(rec.ID, rec.Revision, true)
 	if got := Next(rec); got != BranchDone {
 		t.Fatalf("done = %s", got)

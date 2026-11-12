@@ -28,7 +28,7 @@ func atWrite(t *testing.T, store *triagerec.Store) (*triagerec.Record, string, s
 	rec, a, b := toApprove(t, store)
 	rec = mustRec(store.Approve(rec.ID, rec.Revision))
 	for _, addr := range []string{a, b} {
-		rec = mustRec(store.WriteRow(rec.ID, rec.Revision, addr, triagerec.WriteFailed, "", "boom"))
+		rec = mustRec(store.WriteRow(rec.ID, rec.Revision, addr, triagerec.WriteFailed, nil, "boom"))
 	}
 	return rec, a, b
 }
@@ -157,7 +157,7 @@ func TestRetry_SetsPendingAndLaunchesOneWriteSession(t *testing.T) {
 func TestKeep_RefusedAfterMoveAcceptedBefore(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec, a, b := atWrite(t, store)
-	rec = mustRec(store.WriteRow(rec.ID, rec.Revision, a, triagerec.WriteFailed, "other/01-x", "boom"))
+	rec = mustRec(store.WriteRow(rec.ID, rec.Revision, a, triagerec.WriteFailed, []string{"other/01-x"}, "boom"))
 	res := rowAction(t, f, true, rec, a)
 	if !res.Refused || res.Reason != wire.ReasonTriagePhase {
 		t.Fatalf("keep after move = %+v, want refused", res)
@@ -170,7 +170,7 @@ func TestKeep_RefusedAfterMoveAcceptedBefore(t *testing.T) {
 func TestKeep_LastOpenRowWithLastPassCompleteMakesTheTriageDone(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec, a, b := atWrite(t, store)
-	rec = mustRec(store.WriteRow(rec.ID, rec.Revision, a, triagerec.WriteDone, "", ""))
+	rec = mustRec(store.WriteRow(rec.ID, rec.Revision, a, triagerec.WriteDone, nil, ""))
 	rec = mustRec(store.SetLastPass(rec.ID, rec.Revision, true))
 	if res := rowAction(t, f, true, rec, b); res.Refused {
 		t.Fatalf("keep = %+v", res)
