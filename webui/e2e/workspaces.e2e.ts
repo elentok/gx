@@ -59,7 +59,8 @@ test("Workspaces", async ({ page, start }) => {
   const blue = "rgb(108, 180, 255)"
   const ring = new RegExp(`${blue.replace(/[()]/g, "\\$&")} 0px 0px 0px 4px`)
   await row("ready-epic").focus()
-  await expect(row("ready-epic")).toHaveCSS(
+  // RowFrame draws the ring around the whole row, so it sits on the link's parent.
+  await expect(row("ready-epic").locator("xpath=..")).toHaveCSS(
     "box-shadow",
     new RegExp(`${blue.replace(/[()]/g, "\\$&")} 0px 0px 0px 2px inset`),
   )
@@ -502,12 +503,12 @@ test("Workspaces", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/agents$/)
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chordChat.id)
 
-  // Design page, Queue and a Queue agent: the box has c and d only, and x does nothing.
+  // Design page, Queue and a Queue agent: the box has c, d and s only, and x does nothing.
   const queueAgentHash = (await queueAgent.getAttribute("href"))!
   for (const hash of ["#/d/side:side-design", queueAgentHash]) {
     await goto(page, hash)
     await openBox()
-    await expect(chordBox.getByRole("menuitem")).toHaveCount(2)
+    await expect(chordBox.getByRole("menuitem")).toHaveCount(3)
     await expect(chordBox.getByRole("menuitem", { name: /^x/ })).toHaveCount(0)
     await page.keyboard.press("x")
     await expect(page.getByRole("dialog")).toHaveCount(0)
@@ -724,7 +725,8 @@ test("Workspaces", async ({ page, start }) => {
   await expect(onHold).toHaveText("On hold (2)")
   if ((await onHold.getAttribute("aria-expanded")) === "false") await onHold.click()
   await expect(row("ws-design")).toBeVisible()
-  await expect(onHold.locator("xpath=following::a[1]")).toContainText("ws-design")
+  // Another held Design (held-design) may sort first, so look for the row anywhere below the header.
+  await expect(onHold.locator("xpath=following::a").filter({ hasText: "ws-design" })).toHaveCount(1)
 
   // Other sits below On hold and is the same in every workspace. Its Fix agents have a menu without Move or Hold; the Queue agent has none.
   const other = sidebar.getByRole("button", nav("Other"))
@@ -827,6 +829,8 @@ test("Workspaces", async ({ page, start }) => {
     "Needs you first, then by name",
     "By last activity, newest first",
     "Alphabetically by name",
+    "By project, then by name",
+    "By status, then by name",
   ])
   await expect(sortOptions.nth(0)).toHaveAttribute("aria-checked", "true")
   await sortOptions.nth(1).click()
@@ -862,7 +866,7 @@ test("Workspaces", async ({ page, start }) => {
   // A row menu opens from the keyboard: Tab from the row to its menu button, Enter, arrow to an item, Enter.
   const heldBefore = Number(/\d+/.exec((await onHold.textContent())!)![0])
   const held = onHold.locator("xpath=following::a[1]")
-  await onHold.click()
+  if ((await onHold.getAttribute("aria-expanded")) === "false") await onHold.click()
   await held.focus()
   await page.keyboard.press("Tab")
   await expect(held.locator("xpath=..").getByRole("button", nav("More actions"))).toBeFocused()
@@ -1151,13 +1155,9 @@ test("Workspaces", async ({ page, start }) => {
   await expect(epicsBox).toHaveCSS("width", "25px")
   expect(await checkBoxes()).toBe(25)
   expect(await badgeOf(epicsBox)).toEqual(await badgeOf(followUpsBox))
-  // The burger icon is three horizontal paths and no circle.
-  await expect(gearBox.locator("svg path")).toHaveCount(3)
-  await expect(gearBox.locator("svg circle")).toHaveCount(0)
-  for (const d of await gearBox
-    .locator("svg path")
-    .evaluateAll((ps) => ps.map((p) => p.getAttribute("d")!)))
-    expect(d).toMatch(/^M[\d.]+ [\d.]+h[\d.]+$/)
+  // The Menu icon is three dots and no path.
+  await expect(gearBox.locator("svg circle")).toHaveCount(3)
+  await expect(gearBox.locator("svg path")).toHaveCount(0)
 
   // With the health warning, paused and offline indicators all shown, no box shrinks and nothing overflows the sidebar.
   const width = await checkBoxes()
