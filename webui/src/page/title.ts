@@ -12,6 +12,7 @@ export type PageTitle = {
     | "Settings"
     | "Cleanup"
     | "Tips"
+    | "Scheduled prompts"
   name?: string
 }
 

@@ -90,6 +90,19 @@ test("the Epics icon opens a menu with Epics and Archive, and Archive navigates 
   await waitFor(() => expect(router.state.location.pathname).toBe("/archive"))
 })
 
+test("the Epics menu lists Scheduled prompts after a separator, and it navigates to /schedules", async () => {
+  const router = setupWithRouter()
+  fireEvent.click(screen.getByRole("button", { name: "Epics" }))
+  const menu = await screen.findByRole("menu")
+  await waitFor(() => expect(menu.querySelectorAll('[role="separator"]').length).toBe(1))
+  const names = Array.from(menu.querySelectorAll('[role="menuitem"],[role="separator"]')).map(
+    (el) => (el.getAttribute("role") === "separator" ? "---" : el.textContent?.replace(/\d+$/, "")),
+  )
+  expect(names).toEqual(["Epics", "Archive", "---", "Scheduled prompts"])
+  fireEvent.click(screen.getByRole("menuitem", { name: "Scheduled prompts" }))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/schedules"))
+})
+
 test("the Epics menu entry shows the epic count", async () => {
   const epics = [{ address: "gx:a" }, { address: "gx:b" }, { address: "gx:c" }]
   vi.stubGlobal(

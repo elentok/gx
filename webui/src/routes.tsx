@@ -1,3 +1,4 @@
+import { Text } from "@chakra-ui/react"
 import {
   createHashRouter,
   Navigate,
@@ -37,6 +38,8 @@ import type { SaveChecks } from "./checks/setup"
 import type { FetchChecksStatus } from "./checks/status"
 import type { FetchArchived } from "./archive/archive"
 import { ArchivePage } from "./archive/ArchivePage"
+import type { FetchSchedules, PostSwitch } from "./schedules/schedules"
+import { SchedulesPage } from "./schedules/SchedulesPage"
 import { EpicsPage } from "./epics/EpicsPage"
 import type { FetchEpicList } from "./epics/list"
 import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup"
@@ -152,6 +155,8 @@ export interface RouteFetchers {
   epic?: FetchEpicDetail
   epicList?: FetchEpicList
   archived?: FetchArchived
+  schedules?: FetchSchedules
+  switchSchedule?: PostSwitch
   archivedEpic?: FetchEpicDetail
   checksStatus?: FetchChecksStatus
   saveChecks?: SaveChecks
@@ -224,6 +229,11 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
         />
       ),
     },
+    {
+      path: "/schedules",
+      element: <SchedulesPage fetchList={fetchers.schedules} post={fetchers.switchSchedule} />,
+    },
+    { path: "/schedules/*", element: <Text p="6">Not built yet</Text> },
     { path: "/tips", element: <TipsPage fetchTips={fetchers.tips} /> },
     { path: "/settings", element: settingsPage },
     { path: "/settings/s/:section", element: settingsPage },

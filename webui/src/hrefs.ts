@@ -26,6 +26,8 @@ export const ARCHIVE_HREF = "#/archive"
 /** An archived epic's read-only page; the address is the archive address. */
 export const archiveHref = (address: string) => `${ARCHIVE_HREF}/${address}`
 
+export const SCHEDULES_HREF = "#/schedules"
+
 export const STATS_HREF = "#/stats"
 
 export const CLEANUP_HREF = "#/cleanup"
