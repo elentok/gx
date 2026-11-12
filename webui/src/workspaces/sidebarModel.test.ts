@@ -43,6 +43,17 @@ const place = (
 ): SessionPlacement => ({ session, kind, ...extra })
 
 describe("buildSidebar", () => {
+  it("a Design row reads Working while its own session works", () => {
+    const rows = [row("p:d", { card_kind: CardKindDesign, section: SectionDesigning })]
+    const working = session("d1", "p", { status: { state: "working" } } as never)
+    const placements = [place("d1", "epic", { epic: "p:d" })]
+    const s = buildSidebar({ ...base, rows, sessions: [working], placements })
+    expect(s.rows[0].status).toEqual({ words: "Working", tone: "running" })
+    const idle = session("d1", "p", { status: { state: "idle" } } as never)
+    const s2 = buildSidebar({ ...base, rows, sessions: [idle], placements })
+    expect(s2.rows[0].status.tone).not.toBe("running")
+  })
+
   it("makes one row per Design and epic, with a joined card as the Design row", () => {
     const rows = [
       row("p:a", {

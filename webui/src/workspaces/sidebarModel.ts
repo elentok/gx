@@ -99,6 +99,14 @@ export function sessionStatus(s: SessionInfo): SidebarStatus {
   return { words: stateLabel(s), tone: "muted" }
 }
 
+/** A Design's agent works in its own session, not the queue: a working session reads as Working. */
+function designStatus(r: EpicListRow, sessions: SessionInfo[]): SidebarStatus {
+  const status = cardStatus(r)
+  if (status.tone === "waiting" || status.tone === "running") return status
+  const working = sessions.some((s) => s.status.state === SessionWorking && !s.status.background)
+  return working ? { words: WORKING, tone: "running" } : status
+}
+
 const agentRow = (s: SessionInfo): SidebarAgent => ({
   id: s.id,
   label: s.name || s.ticket || s.id,
@@ -108,14 +116,19 @@ const agentRow = (s: SessionInfo): SidebarAgent => ({
   session: s,
 })
 
-function cardRow(r: EpicListRow, agents: SidebarAgent[], held: boolean): SidebarRow {
+function cardRow(
+  r: EpicListRow,
+  agents: SidebarAgent[],
+  held: boolean,
+  sessions: SessionInfo[] = [],
+): SidebarRow {
   const kind = RING_KIND[r.card_kind ?? CardKindImplementation]
   return {
     key: r.address,
     kind,
     title: r.name,
     href: kind === "design" ? designHref(r.address) : titleHref(r),
-    status: cardStatus(r),
+    status: kind === "design" ? designStatus(r, sessions) : cardStatus(r),
     ring: ringProgress(r),
     ...(held ? { held: true } : {}),
     ...(r.queued ? { queued: true } : {}),
@@ -215,7 +228,7 @@ export function buildSidebar({
     )
   const cardEntry = (r: EpicListRow, held: boolean): Sortable<SidebarRow> => {
     const ss = sessionsOf(r)
-    const row = cardRow(r, held ? [] : sortAgents(ss), held)
+    const row = cardRow(r, held ? [] : sortAgents(ss), held, ss)
     return {
       item: row,
       name: r.name,
