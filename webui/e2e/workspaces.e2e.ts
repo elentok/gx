@@ -721,8 +721,10 @@ test("Workspaces", async ({ page, start }) => {
   await rowMenu("ws-design").click()
   await page.getByRole("menuitem", nav("Hold")).click()
   await holding.getByRole("button", nav("Hold and end sessions")).click()
-  await expect(row("ws-design")).toHaveCount(0)
-  await expect(onHold).toBeVisible()
+  await expect(onHold).toHaveText("On hold (2)")
+  if ((await onHold.getAttribute("aria-expanded")) === "false") await onHold.click()
+  await expect(row("ws-design")).toBeVisible()
+  await expect(onHold.locator("xpath=following::a[1]")).toContainText("ws-design")
 
   // Other sits below On hold and is the same in every workspace. Its Fix agents have a menu without Move or Hold; the Queue agent has none.
   const other = sidebar.getByRole("button", nav("Other"))
