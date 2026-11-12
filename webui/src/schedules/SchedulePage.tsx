@@ -314,7 +314,15 @@ function Editor({
           ← Scheduled prompts
         </chakra.a>
       </Box>
-      <Box display="flex" alignItems="flex-start" gap="4" mt="4">
+      <Box
+        display="flex"
+        alignItems="flex-start"
+        gap="4"
+        mt="4"
+        pb="1"
+        borderBottomWidth="1px"
+        borderColor="hairline"
+      >
         <Box data-mock-part="name" flex="1" minW="0">
           <chakra.input
             aria-label="Name"
@@ -328,8 +336,6 @@ function Editor({
             fontSize="24px"
             fontWeight="600"
             color="text"
-            borderBottomWidth="1px"
-            borderColor="hairline"
             py="1"
           />
           {inline("name") && (
