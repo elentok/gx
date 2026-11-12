@@ -246,9 +246,11 @@ func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string)
 			}
 			p := p
 			row.Plan = &p
+			row.Estimate = p.Estimate
 			applyAutoAnswers(row, p)
 		}
 		if !rec.planPending() {
+			rec.assignGroups()
 			rec.Step = tickets.StepApprove
 		}
 		return nil

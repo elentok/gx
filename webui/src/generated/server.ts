@@ -3814,6 +3814,10 @@ export interface TriageRowRequest {
   destination?: string;
   answers?: { [key: string]: string};
   keep_for_later?: boolean;
+  /**
+   * Ungroup undoes the group the row is in; the other fields are ignored.
+   */
+  ungroup?: boolean;
 }
 /**
  * TriageApproveRequest is the body of POST /v1/triage/approve.

@@ -40,6 +40,7 @@ type triageShown struct {
 		Address string `json:"address"`
 		Verdict string `json:"verdict"`
 		Write   string `json:"write"`
+		Group   string `json:"group"`
 		Plan    *struct {
 			Action string `json:"action"`
 		} `json:"plan"`
@@ -174,6 +175,42 @@ func TestTriage_RowRefusals(t *testing.T) {
 	out, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "map", "--revision", rev)
 	if err != nil || strings.TrimSpace(out) != strconv.Itoa(s.Revision+1) {
 		t.Fatalf("row save = %q, %v, want revision %d", out, err, s.Revision+1)
+	}
+}
+
+func TestTriage_RowUngroupUndoesAGroupAtApproveOnly(t *testing.T) {
+	repo := triageProject(t)
+	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
+		t.Fatal(err)
+	}
+	rows := triagePending(t, repo)
+	for _, addr := range rows {
+		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rev := strconv.Itoa(triageShow(t, repo).Revision)
+	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", rows[0], "--ungroup", "--revision", rev); err == nil {
+		t.Fatal("ungroup accepted outside step approve")
+	}
+	plan := `[{"rowId":"` + rows[0] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[1] + `"]},` +
+		`{"rowId":"` + rows[1] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[0] + `"]}]`
+	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
+		t.Fatal(err)
+	}
+	s := triageShow(t, repo)
+	if s.Rows[0].Group == "" || s.Rows[0].Group != s.Rows[1].Group {
+		t.Fatalf("groups = %q, %q, want one group", s.Rows[0].Group, s.Rows[1].Group)
+	}
+	out, err := runIn(t, repo, "tickets", "triage", "row", "--row", rows[0], "--ungroup", "--revision", strconv.Itoa(s.Revision))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, rows[0]+" blocked_by "+rows[1]) || !strings.Contains(out, rows[1]+" blocked_by "+rows[0]) {
+		t.Errorf("output %q does not print the chain", out)
+	}
+	if after := triageShow(t, repo); after.Rows[0].Group != "" || after.Rows[1].Group != "" {
+		t.Errorf("rows still grouped: %q, %q", after.Rows[0].Group, after.Rows[1].Group)
 	}
 }
 

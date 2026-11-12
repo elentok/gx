@@ -110,6 +110,29 @@ func TestRow_EditSavesAndTheViewShowsItChanged(t *testing.T) {
 	}
 }
 
+func TestSaveRow_UngroupUndoesAGroupLikeTheCLI(t *testing.T) {
+	f, store := startViewFixture(t)
+	rec := mustRec(store.Create())
+	a, b := rec.Rows[0].Address, rec.Rows[1].Address
+	for _, addr := range []string{a, b} {
+		rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addr}))
+	}
+	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
+		{RowID: a, Action: "ready", Estimate: "10K", OverlapWith: []string{b}},
+		{RowID: b, Action: "ready", Estimate: "10K", OverlapWith: []string{a}},
+	}, nil))
+	if rec.Rows[0].Group == "" {
+		t.Fatal("rows were not grouped")
+	}
+	if res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Ungroup: true}); res.Refused {
+		t.Fatalf("ungroup = %+v", res)
+	}
+	got := mustRec(store.LoadLive())
+	if got.Rows[0].Group != "" || got.Rows[1].Group != "" || len(got.Rows[0].Plan.OverlapWith) != 1 {
+		t.Fatalf("rows after ungroup = %+v", got.Rows)
+	}
+}
+
 func TestRow_KeepForLaterSaves(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec, a, _ := toApprove(t, store)

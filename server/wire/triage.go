@@ -106,6 +106,8 @@ type TriageRowRequest struct {
 	Destination  string            `json:"destination,omitempty"`
 	Answers      map[string]string `json:"answers,omitempty"`
 	KeepForLater bool              `json:"keep_for_later,omitempty"`
+	// Ungroup undoes the group the row is in; the other fields are ignored.
+	Ungroup bool `json:"ungroup,omitempty"`
 }
 
 // TriageApproveRequest is the body of POST /v1/triage/approve.

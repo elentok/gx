@@ -13,6 +13,9 @@ import (
 // saveRow stores a row's person fields on the record revision the caller read.
 func (t *Triage) saveRow(req wire.TriageRowRequest) (wire.TriageEditResult, error) {
 	return t.edit(req.Project, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
+		if req.Ungroup {
+			return store.Ungroup(rec.ID, req.Revision, req.Address)
+		}
 		if msg := badAnswer(rec, req); msg != "" {
 			return nil, refusal(wire.ReasonTriageAnswer, msg)
 		}

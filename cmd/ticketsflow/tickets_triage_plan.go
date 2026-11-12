@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -30,7 +31,9 @@ func newTriagePlanCmd(d Deps) *cobra.Command {
 		Short: "save the plan rows read as JSON on stdin and print the new revision",
 		Long: "Usage: gx tickets triage plan [--gone <address>]... [--revision <n>] [--project <p>]\n\n" +
 			"Read a JSON array of plan rows on stdin: [{\"rowId\", \"action\", \"destination\", \"questions\":\n" +
-			"[{\"id\", \"text\", \"kind\", \"options\", \"default\"}], \"overlapWith\"}]. A quick question needs 2 to 4\n" +
+			"[{\"id\", \"text\", \"kind\", \"options\", \"default\"}], \"overlapWith\", \"estimate\"}]. Small ready rows\n" +
+			"that overlap, each with an estimate (such as \"12K\") and under 45K combined, are saved as one group.\n" +
+			"A quick question needs 2 to 4\n" +
 			"options and a default that is one of them (the recommended one); a design question needs neither. Every\n" +
 			"verdict question comes back here under its id, worded as the final question. Rows named by --gone are\n" +
 			"marked gone and their plan rows are left out. When every other row has a plan the stored step moves to approve.",
@@ -72,7 +75,7 @@ func newTriageRowCmd(d Deps) *cobra.Command {
 	var (
 		project, row, action, destination string
 		answers                           []string
-		keep                              bool
+		keep, ungroup                     bool
 		revision                          int
 	)
 	cmd := &cobra.Command{
@@ -109,6 +112,16 @@ func newTriageRowCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if ungroup {
+				saved, err := t.store.Ungroup(rec.ID, revision, row)
+				if err != nil {
+					return err
+				}
+				t.ping(d)
+				fmt.Fprintln(c.OutOrStdout(), saved.Revision)
+				printChain(c.OutOrStdout(), rec, row)
+				return nil
+			}
 			saved, err := t.store.SetPerson(rec.ID, revision, row, f)
 			if err != nil {
 				return err
@@ -125,8 +138,24 @@ func newTriageRowCmd(d Deps) *cobra.Command {
 	f.StringVar(&destination, "destination", "", "the person's destination")
 	f.StringArrayVar(&answers, "answer", nil, "an answer, <question-id>=<text> (repeatable)")
 	f.BoolVar(&keep, "keep-for-later", false, "keep the follow-up where it is")
+	f.BoolVar(&ungroup, "ungroup", false, "undo the row's group; its members chain by overlapWith")
 	f.IntVar(&revision, "revision", 0, "required: refuse unless the record is at this revision")
 	return cmd
+}
+
+// printChain prints, for each member of the group the row was in, the rows it
+// now waits for (its overlapWith), so the person sees the chain an ungroup left.
+func printChain(w io.Writer, rec *triage.Record, row string) {
+	r, err := rec.Row(row)
+	if err != nil {
+		return
+	}
+	for _, addr := range rec.GroupMembers(r.Group) {
+		m, _ := rec.Row(addr)
+		if m.Plan != nil && len(m.Plan.OverlapWith) > 0 {
+			fmt.Fprintf(w, "%s blocked_by %s\n", addr, strings.Join(m.Plan.OverlapWith, ", "))
+		}
+	}
 }
 
 func newTriageApproveCmd(d Deps) *cobra.Command {

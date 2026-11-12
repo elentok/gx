@@ -83,6 +83,8 @@ type PlanRow struct {
 	Destination string     `json:"destination,omitempty"`
 	Questions   []Question `json:"questions,omitempty"`
 	OverlapWith []string   `json:"overlapWith,omitempty"`
+	// Estimate is the row's size estimate for a ready row, such as "12K".
+	Estimate string `json:"estimate,omitempty"`
 }
 
 // PersonFields are what the person decided for a row.
