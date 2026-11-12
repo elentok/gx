@@ -341,8 +341,14 @@ func pendingMerge(e tickets.Epic, t tickets.Ticket) bool {
 // ensureFeatureWorktree recreates the epic's feature worktree from its branch
 // when a person removed it. The post-merge removal (removeMergedWorktree) is the
 // one place the server removes it again.
+//
+// Another creator (the ralph loop's own feature setup) can add the worktree
+// between the stat and the add, so a failed add is re-checked: if the path now
+// exists, someone else won the race and that is the outcome we wanted.
 func (s *Merger) ensureFeatureWorktree(project, epic, repo string) error {
 	path := filepath.Join(s.projects.WorktreeDir(project), epic)
+	unlock := worktreeLocks.lock(path)
+	defer unlock()
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
@@ -350,7 +356,24 @@ func (s *Merger) ensureFeatureWorktree(project, epic, repo string) error {
 	if err != nil {
 		return err
 	}
-	return git.AddWorktreeOnBranch(info.Repo, epic, path)
+	if err := git.AddWorktreeOnBranch(info.Repo, epic, path); err != nil {
+		if _, statErr := os.Stat(path); statErr == nil {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// worktreeLocks serialises ensureFeatureWorktree per worktree path.
+var worktreeLocks pathLocks
+
+type pathLocks struct{ m sync.Map }
+
+func (p *pathLocks) lock(path string) func() {
+	mu, _ := p.m.LoadOrStore(path, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	return mu.(*sync.Mutex).Unlock
 }
 
 // EnsureQueued queues ticketID of root unless the root is queued, so a ticket
