@@ -57,9 +57,10 @@ type Holder struct {
 	mu       sync.Mutex
 	appliers Appliers
 	history  history
-	// commits is nil until the store commit loop starts; guarded by mu so a
-	// reload racing the start is never lost.
-	commits *storecommit.Loop
+	// commits is nil until the store commit loop starts; stored under mu so a
+	// reload racing the start is never lost. Atomic so the store watch can
+	// touch it without waiting for a reload.
+	commits atomic.Pointer[storecommit.Loop]
 	// watch runs the config watcher; guarded by mu, so a reload toggling
 	// server.watch-config only ever cancels a context.
 	watch watch
@@ -120,7 +121,7 @@ func (h *Holder) StartStoreCommits() (stop func(), err error) {
 		OnError:    func(err error) { h.opts.Log.Warn("store push failed", "err", err) },
 		Env:        h.opts.Env,
 	})
-	h.commits = loop
+	h.commits.Store(loop)
 	h.mu.Unlock()
 	if err != nil {
 		return nil, err
@@ -131,10 +132,17 @@ func (h *Holder) StartStoreCommits() (stop func(), err error) {
 	return loop.Stop, nil
 }
 
+// TouchStoreCommits tells the commit loop the store changed.
+func (h *Holder) TouchStoreCommits() {
+	if loop := h.commits.Load(); loop != nil {
+		loop.Touch()
+	}
+}
+
 // ApplyStoreCommits is the reload step that retunes the running commit loop.
 func (h *Holder) ApplyStoreCommits(old, next Settings) func() {
-	if h.commits != nil && (next.StoreCommitDebounce != old.StoreCommitDebounce || next.StorePushRemote != old.StorePushRemote) {
-		h.commits.SetSettings(next.storeCommitDebounce(), next.StorePushRemote)
+	if loop := h.commits.Load(); loop != nil && (next.StoreCommitDebounce != old.StoreCommitDebounce || next.StorePushRemote != old.StorePushRemote) {
+		loop.SetSettings(next.storeCommitDebounce(), next.StorePushRemote)
 	}
 	return nil
 }

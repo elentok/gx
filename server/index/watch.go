@@ -33,6 +33,9 @@ type WatchConfig struct {
 	// Start runs once after the watch is armed, or at once when there is no
 	// store. It reports false when ctx ended first, which ends KeepFresh.
 	Start func(ctx context.Context) bool
+	// OnStoreChange runs for every watch event outside .git, relevant to the
+	// index or not: the store commit loop wants them all.
+	OnStoreChange func()
 }
 
 // KeepFresh rescans the store on every poll tick and, unless the watch is
@@ -86,6 +89,9 @@ func (i *Index) KeepFresh(ctx context.Context, cfg WatchConfig) {
 		case <-ticker.C:
 			i.Rescan()
 		case ev := <-events:
+			if cfg.OnStoreChange != nil && !inGitDir(ev.Name) {
+				cfg.OnStoreChange()
+			}
 			relevant, dir := storeEventKind(ev)
 			if !relevant {
 				continue

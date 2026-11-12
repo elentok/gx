@@ -69,6 +69,46 @@ func TestEditsInsideDebounceWindowMakeOneSyncCommit(t *testing.T) {
 	}
 }
 
+func TestTouch_CommitsAfterQuietWithoutPolling(t *testing.T) {
+	dir := t.TempDir()
+	l, err := start(dir, 200*time.Millisecond, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Stop()
+
+	write(t, dir, "a.md", "x")
+	l.Touch()
+	time.Sleep(100 * time.Millisecond)
+	write(t, dir, "b.md", "x")
+	l.Touch() // restarts the quiet period
+	time.Sleep(150 * time.Millisecond)
+	if got := logLines(t, dir); len(got) != 0 {
+		t.Fatalf("committed before the quiet period ended: %v", got)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for len(logLines(t, dir)) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if got := logLines(t, dir); len(got) != 1 || got[0] != "sync: 2 files" {
+		t.Fatalf("log = %v, want one 'sync: 2 files'", got)
+	}
+}
+
+func TestNoTouchNoFallback_RunsNoGit(t *testing.T) {
+	dir := t.TempDir()
+	l, err := start(dir, 20*time.Millisecond, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, dir, "a.md", "x")
+	time.Sleep(200 * time.Millisecond)
+	if got := logLines(t, dir); len(got) != 0 {
+		t.Fatalf("committed with no touch and no fallback tick: %v", got)
+	}
+	l.Stop()
+}
+
 func TestImmediate_CommitsWithMessageInsideStore(t *testing.T) {
 	dir := t.TempDir()
 	l, err := start(dir, time.Hour, time.Hour)
@@ -160,6 +200,7 @@ func TestSetSettings_NextCommitUsesNewDebounceAndRemote(t *testing.T) {
 	}
 	l.SetSettings(100*time.Millisecond, remote)
 	write(t, dir, "a.md", "x")
+	l.Touch()
 	deadline := time.Now().Add(5 * time.Second)
 	for len(logLines(t, dir)) == 0 && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)

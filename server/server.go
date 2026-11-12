@@ -630,9 +630,10 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() {
 		defer close(freshDone)
 		s.idx.KeepFresh(freshCtx, index.WatchConfig{
-			PollInterval: s.cfg.PollInterval,
-			DisableWatch: s.cfg.DisableWatch,
-			Start:        s.startup.AfterMigrations,
+			PollInterval:  s.cfg.PollInterval,
+			DisableWatch:  s.cfg.DisableWatch,
+			Start:         s.startup.AfterMigrations,
+			OnStoreChange: s.settings.TouchStoreCommits,
 		})
 	}()
 	herdrDone := make(chan struct{})
