@@ -21,11 +21,13 @@ const text = (page: Page, label: string) => page.getByRole("textbox", { name: la
 async function saveText(page: Page, label: string, value: string) {
   await text(page, label).fill(value)
   await save(page).click()
-  // Each row keeps its own "Saved" note for a moment, so two can show together; the Save button
-  // turning off means this row's value is stored.
-  await expect(page.getByRole("status").filter({ hasText: "Saved" }).first()).toBeVisible()
+  // The Save button turning off means this row's value is stored.
+  await expect(saved(page)).toBeVisible()
   await expect(save(page)).toHaveCount(0)
 }
+
+// Rows keep their own "Saved" note for a moment, so more than one can show at once.
+const saved = (page: Page) => page.getByRole("status").filter({ hasText: "Saved" }).first()
 
 const noSideScroll = async (page: Page) => {
   await expect
@@ -69,7 +71,7 @@ test("200. Settings page, global journey", async ({ page, start }) => {
     .getByRole("button", { name: /^Reset to default/ })
     .first()
     .click()
-  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible()
+  await expect(saved(page)).toBeVisible()
   const reset = await fixture.globalConfig()
   expect(reset["execution-queue"]["waiting-slot-grace"]).toBeUndefined()
   expect(reset["execution-queue"]["max-released-agents"]).toBe(5)
@@ -217,7 +219,7 @@ test("201. Settings page, project journey", async ({ page, start }) => {
 
   // Override a cap for the project, then go back to the global value.
   await page.getByRole("button", { name: "Override for demo" }).first().click()
-  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible()
+  await expect(saved(page)).toBeVisible()
   const overridden = await fixture.projectConfig("demo")
   expect(overridden["execution-queue"]).toBeDefined()
   await page
@@ -238,7 +240,7 @@ test("201. Settings page, project journey", async ({ page, start }) => {
   // A hand-written notifications block survives saving another key.
   await go(page, projectHash("notes", "execution-queue"), "Execution queue")
   await page.getByRole("button", { name: "Override for notes" }).first().click()
-  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible()
+  await expect(saved(page)).toBeVisible()
   const notes = await fixture.projectConfig("notes")
   expect(notes.notifications.telegram["bot-token"]).toBe("notes-token")
 
