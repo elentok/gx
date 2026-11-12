@@ -485,12 +485,24 @@ func (s *Store) WriteRow(id string, revision int, address string, state WriteSta
 		default:
 			return phaseErr("unknown write state %q", state)
 		}
-		row.Write = state
+		next := *row
+		next.NewAddresses = slices.Clone(row.NewAddresses)
 		for _, a := range newAddresses {
-			if a != "" && !slices.Contains(row.NewAddresses, a) {
-				row.NewAddresses = append(row.NewAddresses, a)
+			if a != "" && !slices.Contains(next.NewAddresses, a) {
+				next.NewAddresses = append(next.NewAddresses, a)
 			}
 		}
+		if state == WriteDone && len(next.NewAddresses) > 0 {
+			epics, err := tickets.Load(s.projectDir)
+			if err != nil {
+				return err
+			}
+			if !next.complete(epics) {
+				return phaseErr("row %s is not done: every new ticket must exist and its follow-up must be archived", address)
+			}
+		}
+		row.Write = state
+		row.NewAddresses = next.NewAddresses
 		row.Refusal = ""
 		if state == WriteFailed {
 			row.Refusal = refusal

@@ -192,7 +192,8 @@ error, a plan error, or a failure after the dry-run passed) saves every pending 
 text and stops the loop with no retry.
 
 After `publish`, save each published row's new address with `gx tickets triage write-state
---new-address` (a list for a split or group).
+--new-address` (a list for a split or group). `write-state --state done` is refused unless every new ticket exists
+and the follow-up is archived: check `gx tickets triage locate` first, and save `failed` instead.
 
 Area map epics are `gx tickets epic add <project>:<slug> --kind map
 --status open --body -`, the body opening with a frontmatter block carrying

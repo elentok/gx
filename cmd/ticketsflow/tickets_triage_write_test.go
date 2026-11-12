@@ -236,7 +236,7 @@ func TestTriageRerunAfterCrash_WritesNoSecondMoveNoteOrAnswers(t *testing.T) {
 }
 
 func TestTriageWriteState_FailedKeepsRefusalAndRerunClearsIt(t *testing.T) {
-	repo, _, s := triageAtWrite(t)
+	repo, project, s := triageAtWrite(t)
 	row := s.Rows[0].Address
 	if _, err := runIn(t, repo, "tickets", "triage", "write-state", "--row", row, "--state", "failed", "--refusal", "server-not-running"); err != nil {
 		t.Fatal(err)
@@ -244,7 +244,23 @@ func TestTriageWriteState_FailedKeepsRefusalAndRerunClearsIt(t *testing.T) {
 	if got := rowWrite(t, repo, row); got.Write != "failed" || got.Refusal != "server-not-running" {
 		t.Fatalf("failed row = %+v", got)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "write-state", "--row", row, "--state", "done", "--new-address", "p:ready-x/05,p:ready-x/06"); err != nil {
+	done := []string{"tickets", "triage", "write-state", "--row", row, "--state", "done", "--new-address", "p:ready-x/05,p:ready-x/06"}
+	if _, err := runIn(t, repo, done...); err == nil {
+		t.Fatal("done accepted with the new tickets missing")
+	}
+	writeEpicTicket(t, project, "ready-x", "05-a.md", "---\nid: \"05\"\nstatus: open\ntype: research\n---\n\n# A\n")
+	writeEpicTicket(t, project, "ready-x", "06-b.md", "---\nid: \"06\"\nstatus: open\ntype: research\n---\n\n# B\n")
+	if _, err := runIn(t, repo, done...); err == nil {
+		t.Fatal("done accepted with the follow-up still open")
+	}
+	archived := filepath.Join(project, tickets.ArchivedFollowUpsEpic, "issues")
+	if err := os.MkdirAll(archived, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(followUpFile(project), filepath.Join(archived, "01-f.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runIn(t, repo, done...); err != nil {
 		t.Fatal(err)
 	}
 	if got := rowWrite(t, repo, row); got.Write != "done" || got.Refusal != "" || strings.Join(got.NewAddresses, " ") != "p:ready-x/05 p:ready-x/06" {

@@ -207,6 +207,37 @@ func TestApprove_RaceFirstWinsSecondAlreadyApproved(t *testing.T) {
 	}
 }
 
+func addTicket(t *testing.T, s *Store, epic, id string) {
+	t.Helper()
+	tickettest.WriteFile(t, filepath.Join(s.ProjectDir(), epic, "issues", id+"-t.md"),
+		"---\nid: \""+id+"\"\nstatus: open\ntype: implement\n---\n\n# T\n")
+}
+
+func archiveFollowUp(t *testing.T, s *Store) {
+	t.Helper()
+	archived := filepath.Join(s.ProjectDir(), "follow-ups-archived", "issues")
+	if err := os.MkdirAll(archived, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(s.ProjectDir(), "follow-ups", "issues", "01-a.md"), filepath.Join(archived, "01-a.md")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// saveDoneRow stores row A as done directly, bypassing WriteRow's gate, so
+// the record-level check can be tested on its own.
+func saveDoneRow(t *testing.T, s *Store, rec *Record, addrs ...string) *Record {
+	t.Helper()
+	rec.Rows[0].Write, rec.Rows[0].NewAddresses = WriteDone, addrs
+	rec.Rows[1].Write = WriteGone
+	if err := s.Save(rec); err != nil {
+		t.Fatal(err)
+	}
+	cur, err := s.Load(rec.ID)
+	must(t, cur, err)
+	return cur
+}
+
 func TestWriteState(t *testing.T) {
 	s, rec := atApprove(t)
 	if _, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, nil, ""); err == nil {
@@ -218,6 +249,14 @@ func TestWriteState(t *testing.T) {
 	if rec.Rows[0].Refusal != "server-not-running" {
 		t.Fatalf("row = %+v", rec.Rows[0])
 	}
+	if _, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, []string{"proj:map/01"}, ""); err == nil {
+		t.Fatal("done accepted though the new ticket is missing")
+	}
+	addTicket(t, s, "map", "01")
+	if _, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, []string{"proj:map/01"}, ""); err == nil {
+		t.Fatal("done accepted though the follow-up is still open")
+	}
+	archiveFollowUp(t, s)
 	rec, err = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, []string{"proj:map/01"}, "")
 	must(t, rec, err)
 	if rec.Rows[0].Refusal != "" || rec.Rows[0].FirstAddress() != "proj:map/01" {
@@ -303,18 +342,8 @@ func TestDoneRule(t *testing.T) {
 
 func TestWriteRow_ListNeedsEveryTicketAndTheArchivedFollowUp(t *testing.T) {
 	s, rec := atWrite(t)
-	rec, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, []string{"proj:map-x/01", "proj:map-x/02"}, "")
-	must(t, rec, err)
-	if got := rec.Rows[0].NewAddresses; len(got) != 2 {
-		t.Fatalf("stored list = %v", got)
-	}
-	rec, err = s.WriteRow(rec.ID, rec.Revision, rowB, WriteGone, nil, "")
-	must(t, rec, err)
-
-	newTicket := func(id string) {
-		tickettest.WriteFile(t, filepath.Join(s.ProjectDir(), "map-x", "issues", id+"-t.md"),
-			"---\nid: \""+id+"\"\nstatus: open\ntype: implement\n---\n\n# T\n")
-	}
+	rec = saveDoneRow(t, s, rec, "proj:map-x/01", "proj:map-x/02")
+	newTicket := func(id string) { addTicket(t, s, "map-x", id) }
 	settle := func() *Record {
 		cur, err := s.Load(rec.ID)
 		must(t, cur, err)
@@ -331,24 +360,14 @@ func TestWriteRow_ListNeedsEveryTicketAndTheArchivedFollowUp(t *testing.T) {
 	if got := settle(); got.State != StateLive {
 		t.Fatal("done while the follow-up is still in follow-ups")
 	}
-	archived := filepath.Join(s.ProjectDir(), "follow-ups-archived", "issues")
-	if err := os.MkdirAll(archived, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Rename(filepath.Join(s.ProjectDir(), "follow-ups", "issues", "01-a.md"), filepath.Join(archived, "01-a.md")); err != nil {
-		t.Fatal(err)
-	}
+	archiveFollowUp(t, s)
 	assertDone(t, s, settle())
 }
 
 func TestWriteRow_FollowUpMovedButNotArchivedIsNotDone(t *testing.T) {
 	s, rec := atWrite(t)
-	rec, err := s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, []string{"proj:map-x/01"}, "")
-	must(t, rec, err)
-	rec, err = s.WriteRow(rec.ID, rec.Revision, rowB, WriteGone, nil, "")
-	must(t, rec, err)
-	tickettest.WriteFile(t, filepath.Join(s.ProjectDir(), "map-x", "issues", "01-t.md"),
-		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# T\n")
+	rec = saveDoneRow(t, s, rec, "proj:map-x/01")
+	addTicket(t, s, "map-x", "01")
 	elsewhere := filepath.Join(s.ProjectDir(), "elsewhere", "issues")
 	if err := os.MkdirAll(elsewhere, 0o755); err != nil {
 		t.Fatal(err)
