@@ -291,6 +291,7 @@ test.describe("14. Working row", () => {
     await page.evaluate((sid) => (location.hash = `#/agents/${sid}`), id)
     await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible()
     // gx drives this session, so Interrupt is off until the composer is turned on.
+    // The first click opens a confirm modal; the last button is the modal's confirm.
     await page.getByRole("button", { name: "Turn on composer" }).click()
     await page.getByRole("button", { name: "Turn on composer" }).last().click()
     await expect(page.getByRole("button", { name: "Interrupt", exact: true })).toBeEnabled()

@@ -161,6 +161,7 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible()
   // gx drives this session, so Interrupt is off until the composer is turned on.
   await expect(interrupt).toBeDisabled()
+  // The first click opens a confirm modal; the last button is the modal's confirm.
   await page.getByRole("button", { name: "Turn on composer" }).click()
   await page.getByRole("button", { name: "Turn on composer" }).last().click()
   await expect(interrupt).toBeEnabled()
@@ -210,6 +211,9 @@ test("75. Read a session", async ({ page, start }) => {
   // A phone has no key: the tooltip does not name Esc and Esc opens nothing.
   await expect(interrupt).toBeVisible()
   await expect(interrupt).not.toHaveAttribute("title", /Esc/)
+  // Esc closes the popover first; close it so the next Esc reaches the phone guard.
+  await page.keyboard.press("Escape")
+  await expect(popover).toBeHidden()
   await page.keyboard.press("Escape")
   await expect(confirm).toHaveCount(0)
 
