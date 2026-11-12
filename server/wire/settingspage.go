@@ -44,6 +44,8 @@ type SettingsEntry struct {
 	Risky       bool     `json:"risky,omitempty"`
 	ConfirmText string   `json:"confirm_text,omitempty"`
 	ReadOnly    bool     `json:"read_only,omitempty"`
+	// Identity marks an entry that names the project (name, repo, vcs).
+	Identity bool `json:"identity,omitempty"`
 	// Label replaces the name derived from the key path.
 	Label string `json:"label,omitempty"`
 	// RiskyOffOnly: only turning the value off (or resetting it) asks to confirm.

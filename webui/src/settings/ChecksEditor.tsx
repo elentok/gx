@@ -15,25 +15,15 @@ import {
   type CheckMode,
   type ChecksModel,
 } from "./checks"
+import { ChangedDot, inputProps, SaveStatus, Segmented, TagChip } from "./parts"
 import type { WriteSetting } from "./SettingsRow"
 
-const MODES: { mode: CheckMode; label: string }[] = [
-  { mode: "default", label: "default" },
-  { mode: "off", label: "off" },
-  { mode: "one", label: "one command" },
-  { mode: "pair", label: "changed + full" },
+const MODES: { value: CheckMode; label: string }[] = [
+  { value: "default", label: "default" },
+  { value: "off", label: "off" },
+  { value: "one", label: "one command" },
+  { value: "pair", label: "changed + full" },
 ]
-
-const inputProps = {
-  h: "36px",
-  px: "3",
-  minW: "0",
-  borderWidth: "1px",
-  borderColor: "border",
-  borderRadius: "8px",
-  bg: "surface",
-  color: "text",
-} as const
 
 const TextInput = ({
   label,
@@ -52,6 +42,7 @@ const TextInput = ({
     value={value}
     w={wide ? "100%" : "90px"}
     onChange={(e) => onChange(e.currentTarget.value)}
+    borderColor="border"
     {...inputProps}
   />
 )
@@ -78,29 +69,7 @@ function AlwaysList({
         Also run on every non-full run:
       </Text>
       {items.map((item, i) => (
-        <Box
-          key={i}
-          display="inline-flex"
-          alignItems="center"
-          gap="1.5"
-          px="2.5"
-          py="0.5"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="full"
-          fontFamily="mono"
-          fontSize="12.5px"
-        >
-          {item}
-          <chakra.button
-            type="button"
-            aria-label={`Remove ${item}`}
-            onClick={() => onChange(items.filter((_, j) => j !== i))}
-            color="text.dim"
-          >
-            ×
-          </chakra.button>
-        </Box>
+        <TagChip key={i} label={item} onRemove={() => onChange(items.filter((_, j) => j !== i))} />
       ))}
       <chakra.input
         type="text"
@@ -208,32 +177,12 @@ function KindCard({
           />
         )}
       </Box>
-      <Box
-        display="flex"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="8px"
-        overflow="hidden"
-        role="group"
-        aria-label={`${kind} mode`}
-      >
-        {MODES.map(({ mode, label }) => (
-          <chakra.button
-            key={mode}
-            type="button"
-            aria-pressed={form.mode === mode}
-            onClick={() => onChange({ mode })}
-            px="3"
-            py="1.5"
-            fontWeight="600"
-            color="text.muted"
-            _notFirst={{ borderLeftWidth: "1px", borderLeftColor: "border" }}
-            _pressed={{ bg: "tone.running.bg", color: "tone.running.fg" }}
-          >
-            {label}
-          </chakra.button>
-        ))}
-      </Box>
+      <Segmented
+        label={`${kind} mode`}
+        options={MODES}
+        value={form.mode}
+        onChange={(mode) => onChange({ mode })}
+      />
       {form.mode === "default" && (
         <Text fontSize="13px" color="text.dim">
           Uses the gx default for {kind}.
@@ -317,15 +266,7 @@ export function ChecksEditor({
     >
       <Box display="flex" gap="2" alignItems="center">
         <Text fontWeight="600">Checks</Text>
-        {entry?.set && (
-          <Box
-            title="Changed from default"
-            w="7px"
-            h="7px"
-            borderRadius="full"
-            bg="tone.running.fg"
-          />
-        )}
+        {entry?.set && <ChangedDot />}
       </Box>
       <Text fontSize="13px" color="text.muted" maxW="62ch">
         {entry?.description ?? "Commands `gx check` runs."} A .gx/checks.json in the repo wins over
@@ -378,16 +319,7 @@ export function ChecksEditor({
           </Button>
         )}
       </Box>
-      {errorText && (
-        <Text role="alert" fontSize="xs" color="tone.deadlocked.fg">
-          {errorText}
-        </Text>
-      )}
-      {saved && !errorText && (
-        <Text role="status" fontSize="xs" color="tone.done.fg">
-          <span aria-hidden>✓ </span>Saved
-        </Text>
-      )}
+      <SaveStatus errorText={errorText || undefined} saved={saved} />
       <Text fontFamily="mono" fontSize="11px" color="text.dim">
         {CHECKS_KEY}
       </Text>

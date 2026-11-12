@@ -63,7 +63,7 @@ func buildEntry(e registry.Entry, project bool, targetDoc, globalDoc []byte) wir
 	out := wire.SettingsEntry{
 		Key: e.Key.String(), Path: e.Key, Type: typeName(e.Type), Section: e.Section.String(),
 		Description: e.Description, Enum: e.Enum, Min: e.Min, Integer: e.Integer,
-		Restart: e.Restart, Risky: e.Risky, ConfirmText: e.ConfirmText, ReadOnly: e.ReadOnly,
+		Restart: e.Restart, Risky: e.Risky, ConfirmText: e.ConfirmText, ReadOnly: e.ReadOnly, Identity: e.Identity,
 		Label: e.Label, RiskyOffOnly: e.RiskyOffOnly, Override: string(e.Override),
 	}
 	raw, set := lookup(targetDoc, path)

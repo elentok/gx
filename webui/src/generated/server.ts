@@ -3250,6 +3250,10 @@ export interface SettingsEntry {
   confirm_text?: string;
   read_only?: boolean;
   /**
+   * Identity marks an entry that names the project (name, repo, vcs).
+   */
+  identity?: boolean;
+  /**
    * Label replaces the name derived from the key path.
    */
   label?: string;

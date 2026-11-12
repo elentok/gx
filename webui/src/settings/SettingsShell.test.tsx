@@ -194,9 +194,14 @@ describe("SettingsShellView in a project", () => {
   const p = (key: string, section: string, over: Partial<SettingsEntry> = {}) =>
     entry({ key, path: [key], section, description: `About ${key}.`, type: "string", ...over })
   const projectEntries = [
-    p("name", "Project", { read_only: true, value: "gx" }),
-    p("repo", "Project", { read_only: true, value: "/Users/david/dev/gx" }),
-    p("vcs", "Project", { read_only: true, value: "git" }),
+    p("name", "Project", { read_only: true, identity: true, value: "gx" }),
+    p("repo", "Project", {
+      read_only: true,
+      identity: true,
+      label: "Repository",
+      value: "/Users/david/dev/gx",
+    }),
+    p("vcs", "Project", { read_only: true, identity: true, label: "VCS", value: "git" }),
     p("trunk", "Project", { set: true, value: "main" }),
     p("landing", "Project", {
       type: "enum",

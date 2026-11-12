@@ -5,7 +5,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState"
 import type { FetchEpicList } from "../epics/list"
 import { useEpicList } from "../epics/list"
 import { useDevice } from "../useWide"
-import type { SettingsEntry } from "../generated/server"
+import type { SettingsEntry, SettingsReadResponse } from "../generated/server"
 import {
   GLOBAL_SECTIONS,
   projectPath,
@@ -34,7 +34,7 @@ import { PageIcon } from "../page/PageIcon"
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import { Spinner } from "../ui/spinner/Spinner"
-import { useFetched } from "../useFetched"
+import { useFetched, type FetchedState } from "../useFetched"
 import { useWrite } from "../useWrite"
 import {
   endsInDays,
@@ -47,7 +47,8 @@ import {
   type LoginWrite,
   type WebLoginEntry,
 } from "./logins"
-import { BackLink, Frame, Group, rowProps } from "./parts"
+import { BackLink, Frame, Group, rowProps, SearchBox } from "./parts"
+import type { WriteSetting } from "./SettingsRow"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const LOGINS_HREF = `${SETTINGS_HREF}/logins`
@@ -140,23 +141,7 @@ export function SettingsHomeView({
     <Frame>
       <Box data-mock-part="page">
         <PageHeader title="Settings" icon={<PageIcon kind="settings" />} />
-        <chakra.input
-          data-mock-part="search"
-          type="text"
-          aria-label="Search settings"
-          placeholder="Search all settings"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          mt="2"
-          w="100%"
-          h="40px"
-          px="3.5"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="10px"
-          bg="surface.raised"
-          color="text"
-        />
+        <SearchBox value={query} onChange={setQuery} />
         {searching ? (
           <>
             <HitRows entries={entries} query={query} />
@@ -247,7 +232,9 @@ export function ProjectSectionsView({
               key={g.section}
               href={sectionHref(g.section, project)}
               label={g.section}
-              detail={g.section === "Project" ? undefined : changedText(g.changed, "overridden")}
+              detail={
+                g.entries.some((e) => e.identity) ? undefined : changedText(g.changed, "overridden")
+              }
             />
           ))}
         </Group>
@@ -448,81 +435,189 @@ export function CertificatePage({
   )
 }
 
-/** `/settings` and `/settings/s/:section`: the sidebar shell from 640px up; on a phone the home, a project's section list and one section page. */
-export function SettingsPage({
-  fetchAuth = fetchAuthState,
-  fetchList = fetchLogins,
-  fetchSettings,
-  fetchEpics,
-  postChanges = postSettings,
-  signOut = signOutThisDevice,
-}: {
+interface SettingsPageProps {
   postChanges?: PostSettings
   fetchAuth?: () => Promise<AuthState>
   fetchList?: FetchLogins
   fetchSettings?: FetchSettings
   fetchEpics?: FetchEpicList
   signOut?: () => void | Promise<void>
-}) {
-  const auth = useFetched("settings-auth", fetchAuth)
-  const logins = useFetched("settings-logins", fetchList)
-  const { project, section: slug } = useParams()
+}
+
+type Settings = FetchedState<SettingsReadResponse>
+
+/** What both pages read: the target's settings, the project names and a write that refreshes the settings. */
+function useSettingsTarget(
+  project: string | undefined,
+  { fetchSettings, fetchEpics, postChanges = postSettings }: SettingsPageProps,
+) {
   const target = project ?? GLOBAL_TARGET
   const settings = useSettings(target, undefined, fetchSettings)
   const { list } = useEpicList(fetchEpics)
-  const wide = useDevice() !== "phone"
+  const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort()
+  const onWrite: WriteSetting = async (changes) => {
+    const res = await postChanges(target, changes)
+    if (!res.refused) settings.retry()
+    return res
+  }
+  return { settings, projects, onWrite }
+}
+
+/** The phone page of one section. */
+function SectionPage({
+  project,
+  section,
+  settings,
+  onWrite,
+}: {
+  project?: string
+  section: string
+  settings: Settings
+  onWrite: WriteSetting
+}) {
+  return (
+    <DetailPage title={{ kind: "Settings", name: section }}>
+      {settings.data ? (
+        <Frame>
+          <Box data-mock-part="page">
+            <BackLink
+              href={project === undefined ? SETTINGS_HREF : `#${projectPath(project)}`}
+              label={project ?? "Settings"}
+            />
+            <PageHeader title={section} icon={<PageIcon kind="settings" />} />
+            <SectionBody
+              entries={settings.data.entries}
+              project={project}
+              section={section}
+              pendingRestart={settings.data.pending_restart}
+              repoChecksFile={settings.data.project?.repo_checks_file}
+              onWrite={onWrite}
+            />
+          </Box>
+        </Frame>
+      ) : (
+        <Spinner label="Loading" />
+      )}
+    </DetailPage>
+  )
+}
+
+/** The sidebar shell, from 640px up. */
+function ShellPage({
+  project,
+  slug,
+  section,
+  settings,
+  projects,
+  onWrite,
+  auth,
+  signOut = signOutThisDevice,
+}: {
+  project?: string
+  slug?: string
+  section?: string
+  settings: Settings
+  projects: string[]
+  onWrite: WriteSetting
+  auth?: AuthState | null
+  signOut?: () => void | Promise<void>
+}) {
   const navigate = useNavigate()
-  const sections =
-    project === undefined
-      ? GLOBAL_SECTIONS
-      : settings.data
-        ? projectSections(settings.data.entries)
-        : []
+  return (
+    <DetailPage title={{ kind: "Settings", name: section }}>
+      {auth && settings.data ? (
+        <SettingsShellView
+          entries={settings.data.entries}
+          projects={projects}
+          project={project}
+          onScope={(next) =>
+            navigate(
+              sectionPath(slug ?? GLOBAL_SECTIONS[0], next === GLOBAL_TARGET ? undefined : next),
+            )
+          }
+          section={section}
+          totpOn={auth.totp_on}
+          authenticatorMissing={auth.setup_code_required}
+          onSignOut={() => void signOut()}
+          pendingRestart={settings.data.pending_restart}
+          repoChecksFile={settings.data.project?.repo_checks_file}
+          onWrite={onWrite}
+        />
+      ) : (
+        <Spinner label="Loading" />
+      )}
+    </DetailPage>
+  )
+}
+
+/** `/settings` and `/settings/s/:section`: the shell on wide screens; on a phone the home and one section page. */
+function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string }) {
+  const { fetchAuth = fetchAuthState, fetchList = fetchLogins, signOut = signOutThisDevice } = props
+  const auth = useFetched("settings-auth", fetchAuth)
+  const logins = useFetched("settings-logins", fetchList)
+  const { settings, projects, onWrite } = useSettingsTarget(undefined, props)
+  const wide = useDevice() !== "phone"
+  const section = sectionFromSlug(slug)
+  if (wide && !section) return <Navigate to={sectionPath(GLOBAL_SECTIONS[0])} replace />
+  if (!wide && section)
+    return <SectionPage section={section} settings={settings} onWrite={onWrite} />
+  if (wide) {
+    return (
+      <ShellPage
+        slug={slug}
+        section={section}
+        settings={settings}
+        projects={projects}
+        onWrite={onWrite}
+        auth={auth.data}
+        signOut={signOut}
+      />
+    )
+  }
+  return (
+    <DetailPage title={{ kind: "Settings" }}>
+      {auth.data ? (
+        <SettingsHomeView
+          loginCount={logins.data?.length}
+          entries={settings.data?.entries}
+          projects={projects}
+          fetchSettings={props.fetchSettings}
+          totpOn={auth.data.totp_on}
+          authenticatorMissing={auth.data.setup_code_required}
+          onSignOut={() => void signOut()}
+        />
+      ) : (
+        <Spinner label="Loading" />
+      )}
+    </DetailPage>
+  )
+}
+
+/** `/settings/p/:project` and its sections: the shell on wide screens; on a phone the section list and one section page. */
+function ProjectPage({
+  project,
+  slug,
+  ...props
+}: SettingsPageProps & { project: string; slug?: string }) {
+  const { fetchAuth = fetchAuthState, signOut = signOutThisDevice } = props
+  const auth = useFetched("settings-auth", fetchAuth)
+  const { settings, projects, onWrite } = useSettingsTarget(project, props)
+  const wide = useDevice() !== "phone"
+  const sections = settings.data ? projectSections(settings.data.entries) : []
   const section = sectionFromSlug(slug, sections)
-  if (wide && project === undefined && !section)
-    return <Navigate to={sectionPath(GLOBAL_SECTIONS[0])} replace />
-  if (wide && project !== undefined && settings.data && !section)
+  if (wide && settings.data && !section)
     return <Navigate to={sectionPath(sections[0], project)} replace />
-  if (project !== undefined && settings.failed) {
+  if (settings.failed) {
     return (
       <DetailPage title={{ kind: "Settings" }}>
         <EmptyState title="Project not found">There is no project named “{project}”.</EmptyState>
       </DetailPage>
     )
   }
-  const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort()
   if (!wide && section) {
-    return (
-      <DetailPage title={{ kind: "Settings", name: section }}>
-        {settings.data ? (
-          <Frame>
-            <Box data-mock-part="page">
-              <BackLink
-                href={project === undefined ? SETTINGS_HREF : `#${projectPath(project)}`}
-                label={project ?? "Settings"}
-              />
-              <PageHeader title={section} icon={<PageIcon kind="settings" />} />
-              <SectionBody
-                entries={settings.data.entries}
-                project={project}
-                section={section}
-                pendingRestart={settings.data.pending_restart}
-                repoChecksFile={settings.data.project?.repo_checks_file}
-                onWrite={async (changes) => {
-                  const res = await postChanges(target, changes)
-                  if (!res.refused) settings.retry()
-                  return res
-                }}
-              />
-            </Box>
-          </Frame>
-        ) : (
-          <Spinner label="Loading" />
-        )}
-      </DetailPage>
-    )
+    return <SectionPage project={project} section={section} settings={settings} onWrite={onWrite} />
   }
-  if (!wide && project !== undefined) {
+  if (!wide) {
     return (
       <DetailPage title={{ kind: "Settings", name: project }}>
         {settings.data ? (
@@ -533,53 +628,26 @@ export function SettingsPage({
       </DetailPage>
     )
   }
-  if (wide) {
-    return (
-      <DetailPage title={{ kind: "Settings", name: section }}>
-        {auth.data && settings.data ? (
-          <SettingsShellView
-            entries={settings.data.entries}
-            projects={projects}
-            project={project}
-            onScope={(next) =>
-              navigate(
-                sectionPath(slug ?? GLOBAL_SECTIONS[0], next === GLOBAL_TARGET ? undefined : next),
-              )
-            }
-            section={section}
-            totpOn={auth.data.totp_on}
-            authenticatorMissing={auth.data.setup_code_required}
-            onSignOut={() => void signOut()}
-            pendingRestart={settings.data.pending_restart}
-            repoChecksFile={settings.data.project?.repo_checks_file}
-            onWrite={async (changes) => {
-              const res = await postChanges(target, changes)
-              if (!res.refused) settings.retry()
-              return res
-            }}
-          />
-        ) : (
-          <Spinner label="Loading" />
-        )}
-      </DetailPage>
-    )
-  }
   return (
-    <DetailPage title={{ kind: "Settings" }}>
-      {auth.data ? (
-        <SettingsHomeView
-          loginCount={logins.data?.length}
-          entries={settings.data?.entries}
-          projects={projects}
-          fetchSettings={fetchSettings}
-          totpOn={auth.data.totp_on}
-          authenticatorMissing={auth.data.setup_code_required}
-          onSignOut={() => void signOut()}
-        />
-      ) : (
-        <Spinner label="Loading" />
-      )}
-    </DetailPage>
+    <ShellPage
+      project={project}
+      slug={slug}
+      section={section}
+      settings={settings}
+      projects={projects}
+      onWrite={onWrite}
+      auth={auth.data}
+      signOut={signOut}
+    />
+  )
+}
+
+export function SettingsPage(props: SettingsPageProps) {
+  const { project, section: slug } = useParams()
+  return project === undefined ? (
+    <GlobalHomePage slug={slug} {...props} />
+  ) : (
+    <ProjectPage project={project} slug={slug} {...props} />
   )
 }
 
@@ -636,7 +704,9 @@ export function WebLoginPage({
           now={now()}
           pending={write.pending}
           onRename={(name) =>
-            void write.run(() => rename(login.id, name), { onDone: logins.retry })
+            void write.run(() => rename(login.id, name), {
+              onDone: logins.retry,
+            })
           }
           onSignOut={() =>
             login.this_device

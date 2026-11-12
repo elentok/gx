@@ -9,7 +9,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState"
 import { useDevice } from "../useWide"
 import { Chip } from "../ui/chip/Chip"
 import { entryLabel, groupBySection, searchEntries } from "./settingsApi"
-import { Group } from "./parts"
+import { Group, SearchBox } from "./parts"
 import { DEV_FRONTEND_KEY } from "../dev"
 import { DevFrontendRow } from "./DevFrontendRow"
 import { SettingsRow, type WriteSetting } from "./SettingsRow"
@@ -49,8 +49,6 @@ export const sectionFromSlug = (
 /** A project's sidebar sections in the order the server sent them: Project, the overridable ones, Checks. */
 export const projectSections = (entries: SettingsEntry[]) =>
   groupBySection(entries).map((g) => g.section)
-
-const IDENTITY_KEYS = ["name", "repo", "vcs"]
 
 const NavLink = chakra(Link)
 
@@ -153,23 +151,7 @@ function Sidebar({
           </option>
         ))}
       </chakra.select>
-      <chakra.input
-        data-mock-part="search"
-        type="text"
-        aria-label="Search settings"
-        placeholder="Search all settings"
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-        mt="2"
-        w="100%"
-        h="40px"
-        px="3.5"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="10px"
-        bg="surface.raised"
-        color="text"
-      />
+      <SearchBox value={query} onChange={onQuery} />
       <GroupLabel>{project ?? "Global"}</GroupLabel>
       {sections.map((s) => (
         <NavLink
@@ -177,7 +159,10 @@ function Sidebar({
           to={sectionPath(s, project)}
           {...navLink}
           aria-current={s === section ? "page" : undefined}
-          {...(s === section && { bg: "tone.running.bg", color: "tone.running.fg" })}
+          {...(s === section && {
+            bg: "tone.running.bg",
+            color: "tone.running.fg",
+          })}
         >
           {s}
           {(changed.get(s) ?? 0) > 0 && <CountChip n={changed.get(s) ?? 0} />}
@@ -229,7 +214,7 @@ const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
     _notFirst={{ borderTopWidth: "1px", borderTopColor: "hairline" }}
   >
     <Text fontWeight="600" color="text.muted">
-      {entry.key === "repo" ? "Repository" : entry.key === "vcs" ? "VCS" : entryLabel(entry)}
+      {entryLabel(entry)}
     </Text>
     <Text fontWeight="700" overflowWrap="anywhere" minW="0">
       {String(entry.value ?? entry.default ?? "")}
@@ -238,24 +223,23 @@ const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
   </Box>
 )
 
-/** One row; the dev-frontend key gets its wrapper, which supplies the lock reason. */
-function settingsRow(
-  e: SettingsEntry,
-  pendingRestart: string[] | undefined,
-  onWrite: WriteSetting,
-  project: string | undefined,
-) {
-  const Row = e.key === DEV_FRONTEND_KEY ? DevFrontendRow : SettingsRow
-  return (
-    <Row
-      key={e.key}
-      entry={e}
-      pendingRestart={pendingRestart?.includes(e.key) ?? false}
-      onWrite={onWrite}
-      project={project}
-    />
-  )
-}
+type RowProps = Pick<ShellProps, "project" | "pendingRestart" | "onWrite">
+
+/** Builds one row per entry; the dev-frontend key gets its wrapper, which supplies the lock reason. */
+const rowBuilder =
+  ({ pendingRestart, onWrite, project }: RowProps) =>
+  (e: SettingsEntry) => {
+    const Row = e.key === DEV_FRONTEND_KEY ? DevFrontendRow : SettingsRow
+    return (
+      <Row
+        key={e.key}
+        entry={e}
+        pendingRestart={pendingRestart?.includes(e.key) ?? false}
+        onWrite={onWrite}
+        project={project}
+      />
+    )
+  }
 
 type SectionBodyProps = Pick<
   ShellProps,
@@ -271,25 +255,23 @@ export function SectionBody({
   onWrite,
   repoChecksFile,
 }: SectionBodyProps) {
-  const row = (e: SettingsEntry) => settingsRow(e, pendingRestart, onWrite, project)
+  const row = rowBuilder({ pendingRestart, onWrite, project })
   const sectionEntries = entries.filter((e) => e.section === section)
-  if (project !== undefined && section === "Project") {
+  if (project !== undefined && sectionEntries.some((e) => e.identity)) {
     return (
       <>
         <Group label="Identity">
           {sectionEntries
-            .filter((e) => IDENTITY_KEYS.includes(e.key))
+            .filter((e) => e.identity)
             .map((e) => (
               <IdentityRow key={e.key} entry={e} />
             ))}
         </Group>
-        <Group label="Merging">
-          {sectionEntries.filter((e) => !IDENTITY_KEYS.includes(e.key)).map(row)}
-        </Group>
+        <Group label="Merging">{sectionEntries.filter((e) => !e.identity).map(row)}</Group>
       </>
     )
   }
-  if (project !== undefined && section === "Checks") {
+  if (project !== undefined && sectionEntries.some((e) => e.key === CHECKS_KEY)) {
     return (
       <ChecksEditor
         key={JSON.stringify(sectionEntries[0]?.value ?? null)}
@@ -303,14 +285,13 @@ export function SectionBody({
 }
 
 export function SettingsShellView(props: ShellProps) {
-  const { pendingRestart, onWrite } = props
   const device = useDevice()
   const [query, setQuery] = useState("")
   const searching = query.trim() !== ""
   const section =
     props.section ??
     (props.project === undefined ? GLOBAL_SECTIONS[0] : projectSections(props.entries)[0])
-  const row = (e: SettingsEntry) => settingsRow(e, pendingRestart, onWrite, props.project)
+  const row = rowBuilder(props)
   const hits = searchEntries(props.entries, query)
   const scopeName = props.project === undefined ? "global settings" : `project ${props.project}`
   return (

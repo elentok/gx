@@ -176,6 +176,24 @@ func TestReadProjectUnsetVCSFallsBackToGit(t *testing.T) {
 	}
 }
 
+func TestReadProjectMarksIdentityEntries(t *testing.T) {
+	t.Parallel()
+	w, _ := readFixture(t, `{}`, `{"name":"proj","repo":"REPO"}`)
+	resp, err := w.Read(Target{Project: "proj"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range resp.Entries {
+		want := e.Key == "name" || e.Key == "repo" || e.Key == "vcs"
+		if e.Identity != want {
+			t.Errorf("%s identity = %v, want %v", e.Key, e.Identity, want)
+		}
+	}
+	if got := entryByKey(t, resp, "repo").Label; got != "Repository" {
+		t.Errorf("repo label = %q", got)
+	}
+}
+
 func TestReadProjectChecksRepoFileFlag(t *testing.T) {
 	t.Parallel()
 	w, repo := readFixture(t, `{}`, `{"name":"proj","repo":"REPO"}`)

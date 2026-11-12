@@ -6,11 +6,13 @@ package registry
 func projectEntries() []Entry {
 	p := SectionProject
 	return []Entry{
-		{Key: Key("name"), Type: TypeString, Section: p, ProjectOnly: true, ReadOnly: true,
+		{Key: Key("name"), Type: TypeString, Section: p, ProjectOnly: true, ReadOnly: true, Identity: true,
 			Description: "The project's name."},
-		{Key: Key("repo"), Type: TypeString, Section: p, ProjectOnly: true, ReadOnly: true,
+		{Key: Key("repo"), Type: TypeString, Section: p, ProjectOnly: true, ReadOnly: true, Identity: true,
+			Label:       "Repository",
 			Description: "The repository directory of the project."},
-		{Key: Key("vcs"), Type: TypeString, Section: p, ProjectOnly: true, ReadOnly: true,
+		{Key: Key("vcs"), Type: TypeString, Section: p, ProjectOnly: true, ReadOnly: true, Identity: true,
+			Label:       "VCS",
 			Description: "The version control system of the project. none means the project has no repository."},
 		{Key: Key("trunk"), Type: TypeString, Section: p, ProjectOnly: true,
 			Description: "The branch that finished work lands on."},

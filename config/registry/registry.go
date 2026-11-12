@@ -114,6 +114,9 @@ type Entry struct {
 	GlobalKey KeyPath
 	// ReadOnly: shown but never written by the page.
 	ReadOnly bool
+	// Identity marks the entries that say which project this is; the page
+	// shows them as a header, not as rows.
+	Identity bool
 }
 
 // ProjectPath is the key path in project.json.

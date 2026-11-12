@@ -6,6 +6,7 @@ import { Chip } from "../ui/chip/Chip"
 import { Modal } from "../ui/modal/Modal"
 import { refusalText, useWrite } from "../useWrite"
 import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi"
+import { ChangedDot, inputProps, SaveStatus, Segmented, TagChip } from "./parts"
 
 function valueText(e: SettingsEntry): string {
   if (e.type === "secret") return e.set ? "Set" : "Not set"
@@ -35,18 +36,12 @@ interface ControlProps {
   remove: () => void
 }
 
-const HINTS: Record<string, string> = { duration: "e.g. 30s, 5m, 2h", size: "e.g. 50G" }
+const HINTS: Record<string, string> = {
+  duration: "e.g. 30s, 5m, 2h",
+  size: "e.g. 50G",
+}
 
-const inputProps = {
-  h: "36px",
-  px: "3",
-  minW: "0",
-  maxW: "220px",
-  borderWidth: "1px",
-  borderRadius: "8px",
-  bg: "surface",
-  color: "text",
-} as const
+const rowInput = { ...inputProps, maxW: "220px" } as const
 
 // The browser sends text for a number; a draft that is not one goes as typed so the server refuses it with its reason.
 const draftValue = (type: string, draft: string): unknown => {
@@ -65,7 +60,7 @@ function TextControl({ entry, draft, dirty, invalid, pending, setDraft, save }: 
         inputMode={entry.type === "number" ? "decimal" : undefined}
         borderColor={invalid ? "tone.deadlocked.fg" : "border"}
         onChange={(e) => setDraft(e.currentTarget.value)}
-        {...inputProps}
+        {...rowInput}
       />
       {HINTS[entry.type] && (
         <Text fontSize="xs" color="text.dim">
@@ -119,33 +114,13 @@ function BoolControl({ entry, draft, pending, locked, save }: ControlProps) {
 
 function EnumControl({ entry, draft, pending, save }: ControlProps) {
   return (
-    <Box
-      display="inline-flex"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="8px"
-      overflow="hidden"
-      role="group"
-      aria-label={entryLabel(entry)}
-    >
-      {(entry.enum ?? []).map((option) => (
-        <chakra.button
-          key={option}
-          type="button"
-          aria-pressed={option === draft}
-          disabled={pending}
-          onClick={() => option !== draft && save(option)}
-          px="3"
-          py="1.5"
-          fontWeight="600"
-          color="text.muted"
-          _notFirst={{ borderLeftWidth: "1px", borderLeftColor: "border" }}
-          _pressed={{ bg: "tone.running.bg", color: "tone.running.fg" }}
-        >
-          {option}
-        </chakra.button>
-      ))}
-    </Box>
+    <Segmented
+      label={entryLabel(entry)}
+      options={(entry.enum ?? []).map((o) => ({ value: o, label: o }))}
+      value={draft}
+      disabled={pending}
+      onChange={(option) => option !== draft && save(option)}
+    />
   )
 }
 
@@ -181,30 +156,12 @@ function ListControl({ entry, pending, save }: ControlProps) {
           </Text>
         )}
         {items.map((item, i) => (
-          <Box
+          <TagChip
             key={i}
-            display="inline-flex"
-            alignItems="center"
-            gap="1.5"
-            px="2.5"
-            py="0.5"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="full"
-            fontFamily="mono"
-            fontSize="12.5px"
-          >
-            {String(item)}
-            <chakra.button
-              type="button"
-              aria-label={`Remove ${String(item)}`}
-              disabled={pending}
-              onClick={() => save(items.filter((_, j) => j !== i))}
-              color="text.dim"
-            >
-              ×
-            </chakra.button>
-          </Box>
+            label={String(item)}
+            disabled={pending}
+            onRemove={() => save(items.filter((_, j) => j !== i))}
+          />
         ))}
       </Box>
       <Box display="flex" gap="2" alignItems="center" flexWrap="wrap">
@@ -216,7 +173,7 @@ function ListControl({ entry, pending, save }: ControlProps) {
           borderColor={problem ? "tone.deadlocked.fg" : "border"}
           onChange={(e) => setText(e.currentTarget.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
-          {...inputProps}
+          {...rowInput}
         />
         <Button size="sm" disabled={pending || text.trim() === ""} onClick={add}>
           Add
@@ -251,7 +208,7 @@ function SecretControl({ entry, pending, save, remove }: ControlProps) {
             value={text}
             onChange={(e) => setText(e.currentTarget.value)}
             borderColor="border"
-            {...inputProps}
+            {...rowInput}
           />
           <Button
             size="sm"
@@ -425,16 +382,7 @@ export function SettingsRow({
         <Text fontWeight="600" minW="0">
           {entryLabel(entry)}
         </Text>
-        {entry.set && entry.type !== "secret" && (
-          <Box
-            title="Changed from default"
-            w="7px"
-            h="7px"
-            flexShrink="0"
-            borderRadius="full"
-            bg="tone.running.fg"
-          />
-        )}
+        {entry.set && entry.type !== "secret" && <ChangedDot />}
         {entry.risky && <Chip tone="waiting">Careful</Chip>}
         {entry.restart && (
           <Box data-mock-part="restart-badge">
@@ -512,16 +460,7 @@ export function SettingsRow({
           {lockReason}
         </Text>
       )}
-      {errorText && (
-        <Text data-mock-part="error-message" role="alert" fontSize="xs" color="tone.deadlocked.fg">
-          {errorText}
-        </Text>
-      )}
-      {saved && !errorText && (
-        <Text data-mock-part="saved-message" role="status" fontSize="xs" color="tone.done.fg">
-          <span aria-hidden>✓ </span>Saved
-        </Text>
-      )}
+      <SaveStatus errorText={errorText || undefined} saved={saved} />
       {notices.map((n) => (
         <Text
           key={n}
