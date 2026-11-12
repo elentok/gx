@@ -3,10 +3,12 @@ import { InfoTip } from "../ui/info-tip/InfoTip"
 import type { Tone } from "../ui/tone"
 import { useWide } from "../useWide"
 import type { SessionInfo } from "../generated/server"
+
+type ContextLevel = NonNullable<SessionInfo["context_level"]>
 import { agentDetails } from "./agentDetails"
 
 // The server decides the level from the count; the web only picks a colour for it.
-const LEVEL_TONE: Record<string, Tone> = {
+const LEVEL_TONE: Record<ContextLevel, Tone> = {
   green: "done",
   yellow: "waiting",
   orange: "paused",
@@ -55,10 +57,10 @@ export function ContextBadge({
   ceiling,
 }: {
   tokens: number
-  level?: string
+  level: ContextLevel
   ceiling: number
 }) {
-  const tone = LEVEL_TONE[level ?? ""] ?? "muted"
+  const tone = LEVEL_TONE[level]
   const fill = Math.min(1, Math.max(0, tokens / ceiling))
   return (
     <InfoTip
@@ -104,7 +106,7 @@ export function FooterLine({
       {showBadge && (
         <ContextBadge
           tokens={session.context_tokens!}
-          level={session.context_level}
+          level={session.context_level!}
           ceiling={ceiling!}
         />
       )}

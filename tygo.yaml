@@ -37,4 +37,6 @@ packages:
     type_mappings:
       time.Time: "string"
       json.RawMessage: "unknown"
+      agent.ContextLevel: '"green" | "yellow" | "orange" | "red"'
+      agent.Tier: '"light" | "worker" | "strongest"'
     enum_style: "union"

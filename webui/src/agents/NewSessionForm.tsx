@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { useCompletion } from "../commands/useCompletion"
 import type { CommandTarget, FetchCommands } from "../commands/useCommandList"
 import { modelName } from "../modelName"
-import { TIERS } from "../tiers"
+import { TIERS, type TierId } from "../tiers"
 import { useWide } from "../useWide"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { ProjectWorktrees } from "../generated/server"
@@ -112,7 +112,7 @@ export function NewSessionForm({
   const [trees, setTrees] = useState<ProjectWorktrees[]>()
   const focusFirst = useFocusFirstField()
   const [loadError, setLoadError] = useState(false)
-  const [tier, setTier] = useState("worker")
+  const [tier, setTier] = useState<TierId>("worker")
   const { draft, update, clear } = useNewSessionDraft()
   const { connected } = useConnectionState(useConnectionContext())
   const { run, pending, refusal, error } = useWrite()
@@ -272,7 +272,7 @@ export function NewSessionForm({
               <chakra.select
                 aria-label="Tier"
                 value={tier}
-                onChange={(e) => setTier(e.target.value)}
+                onChange={(e) => setTier(e.target.value as TierId)}
                 {...field}
                 h="40px"
                 appearance="none"

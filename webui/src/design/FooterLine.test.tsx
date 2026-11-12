@@ -52,16 +52,15 @@ test("the badge shows whole thousands and a tooltip against the ceiling on focus
   expect(await screen.findByText("70K of 200K smart zone")).toBeTruthy()
 })
 
-test("each level maps to its own colour, and unknown ones are muted", () => {
-  const tone = (level: string) => {
+test("each level maps to its own colour", () => {
+  const tone = (level: "green" | "yellow" | "orange" | "red") => {
     render(session({ context_tokens: 1000, context_level: level }))
     const t = document.querySelector("[data-tone]")!.getAttribute("data-tone")
     cleanup()
     return t
   }
-  const tones = ["green", "yellow", "orange", "red"].map(tone)
+  const tones = (["green", "yellow", "orange", "red"] as const).map(tone)
   expect(tones).toEqual(["done", "waiting", "paused", "deadlocked"])
-  expect(tone("mauve")).toBe("muted")
 })
 
 test("the ring fills with the count and is full at or above the ceiling", () => {

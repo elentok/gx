@@ -3014,7 +3014,7 @@ export interface SessionInfo {
    * Tier, Model and Effort are what the session launched under. For a Claude
    * session Model is the one its newest reply reports, once there is a reply.
    */
-  tier?: any /* agent.Tier */;
+  tier?: "light" | "worker" | "strongest";
   model?: string;
   effort?: string;
   /**
@@ -3028,7 +3028,7 @@ export interface SessionInfo {
    * while there is no reading.
    */
   context_tokens?: number /* int */;
-  context_level?: any /* agent.ContextLevel */;
+  context_level?: "green" | "yellow" | "orange" | "red";
 }
 /**
  * SessionStatus is a Session status.
@@ -3165,7 +3165,7 @@ export interface CreateSessionRequest {
   /**
    * Tier is the model tier; empty means worker.
    */
-  tier?: any /* agent.Tier */;
+  tier?: "light" | "worker" | "strongest";
 }
 /**
  * SessionResult is a session write's outcome: the session, or a refusal.
