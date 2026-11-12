@@ -2652,6 +2652,30 @@ export interface ScheduleCreateRequest {
   late_limit_hours?: number /* float64 */;
 }
 /**
+ * ScheduleSwitchRequest is the body of POST /v1/schedules/switch. The result is
+ * the Schedule's show payload.
+ */
+export interface ScheduleSwitchRequest {
+  project: string;
+  slug: string;
+  on: boolean;
+}
+/**
+ * ScheduleDeleteRequest is the body of POST /v1/schedules/delete.
+ */
+export interface ScheduleDeleteRequest {
+  project: string;
+  slug: string;
+}
+/**
+ * ScheduleDeleteResult is the result of POST /v1/schedules/delete.
+ */
+export interface ScheduleDeleteResult {
+  refused: boolean;
+  reason: string;
+  message: string;
+}
+/**
  * ScheduleEditRequest is the body of POST /v1/schedules/edit. Project and
  * Slug name the Schedule; a nil field is left as it is. NewProject exists
  * only so a project change can be refused.

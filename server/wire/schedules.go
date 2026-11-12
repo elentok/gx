@@ -100,6 +100,27 @@ type ScheduleCreateRequest struct {
 	LateLimitHours *float64 `json:"late_limit_hours"`
 }
 
+// ScheduleSwitchRequest is the body of POST /v1/schedules/switch. The result is
+// the Schedule's show payload.
+type ScheduleSwitchRequest struct {
+	Project string `json:"project"`
+	Slug    string `json:"slug"`
+	On      bool   `json:"on"`
+}
+
+// ScheduleDeleteRequest is the body of POST /v1/schedules/delete.
+type ScheduleDeleteRequest struct {
+	Project string `json:"project"`
+	Slug    string `json:"slug"`
+}
+
+// ScheduleDeleteResult is the result of POST /v1/schedules/delete.
+type ScheduleDeleteResult struct {
+	Refused bool   `json:"refused"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
+}
+
 // ScheduleEditRequest is the body of POST /v1/schedules/edit. Project and
 // Slug name the Schedule; a nil field is left as it is. NewProject exists
 // only so a project change can be refused.

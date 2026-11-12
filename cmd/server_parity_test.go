@@ -176,6 +176,8 @@ var routeVerbs = map[string]string{
 	"GET /v1/schedules/show":                    "schedules show",
 	"POST /v1/schedules/create":                 "schedules create",
 	"POST /v1/schedules/edit":                   "schedules edit",
+	"POST /v1/schedules/switch":                 "schedules switch",
+	"POST /v1/schedules/delete":                 "schedules delete",
 }
 
 func TestRouteTableHasCLIVerbs(t *testing.T) {

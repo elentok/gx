@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	schedrec "github.com/elentok/gx/schedules"
@@ -34,6 +35,8 @@ type Scheduler struct {
 	Interval    time.Duration    // zero means DefaultInterval
 	// Ready is closed once the server may queue runs.
 	Ready <-chan struct{}
+
+	checkMu sync.Mutex
 }
 
 // Run waits for Ready, checks once, then on each tick until ctx ends.
@@ -59,8 +62,11 @@ func (sc *Scheduler) Run(ctx context.Context) {
 	}
 }
 
-// Check reads the Schedules fresh and starts or skips each due one.
+// Check reads the Schedules fresh and starts or skips each due one. It is
+// serialized because a delete runs one beside the timer's.
 func (sc *Scheduler) Check() {
+	sc.checkMu.Lock()
+	defer sc.checkMu.Unlock()
 	items, err := sc.Store.List()
 	if err != nil {
 		sc.Log.Warn("listing schedules failed", "err", err)

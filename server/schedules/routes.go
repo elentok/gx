@@ -24,6 +24,8 @@ type Schedules struct {
 	Now            func() time.Time // nil means time.Now
 	// Events publishes schedules-changed after a write.
 	Events *broker.Broker
+	// Check runs one scheduler check; a delete uses it to tidy at once.
+	Check func()
 }
 
 // Routes lists the read routes. The getter is called per request.

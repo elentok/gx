@@ -33,6 +33,20 @@ func (s *Schedules) Edit(ctx context.Context, req wire.ScheduleEditRequest) (wir
 	return res, err
 }
 
+// Switch turns a Schedule on or off on this machine. A refusal is a result.
+func (s *Schedules) Switch(ctx context.Context, req wire.ScheduleSwitchRequest) (wire.ScheduleShowResult, error) {
+	var res wire.ScheduleShowResult
+	err := s.t.post(ctx, "/v1/schedules/switch", req, &res)
+	return res, err
+}
+
+// Delete removes a Schedule. A refusal is a result.
+func (s *Schedules) Delete(ctx context.Context, req wire.ScheduleDeleteRequest) (wire.ScheduleDeleteResult, error) {
+	var res wire.ScheduleDeleteResult
+	err := s.t.post(ctx, "/v1/schedules/delete", req, &res)
+	return res, err
+}
+
 // Show returns one Schedule with its prompt and Last runs. An unknown one is a
 // refusal result, not an error.
 func (s *Schedules) Show(ctx context.Context, project, slug string) (wire.ScheduleShowResult, error) {

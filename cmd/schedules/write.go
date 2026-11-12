@@ -153,6 +153,68 @@ func newEdit(d Deps) *cobra.Command {
 	return cmd
 }
 
+// parseAddress splits <project:slug>.
+func parseAddress(arg string) (project, slug string, err error) {
+	project, slug, ok := strings.Cut(arg, ":")
+	if !ok || project == "" || slug == "" {
+		return "", "", fmt.Errorf("want <project:slug>, got %q", arg)
+	}
+	return project, slug, nil
+}
+
+func newSwitch(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:       "switch <project:slug> on|off",
+		Short:     "turn a Schedule on or off on this machine",
+		Args:      cobra.ExactArgs(2),
+		ValidArgs: []string{"on", "off"},
+		RunE: func(c *cobra.Command, args []string) error {
+			project, slug, err := parseAddress(args[0])
+			if err != nil {
+				return err
+			}
+			if args[1] != "on" && args[1] != "off" {
+				return fmt.Errorf("want on or off, got %q", args[1])
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Schedules.Switch(ctx(c), wire.ScheduleSwitchRequest{Project: project, Slug: slug, On: args[1] == "on"})
+			return finish(c.OutOrStdout(), jsonOut, res, res.Refused, res.Reason, res.Message, err, printAddress)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+func newDelete(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "delete <project:slug>",
+		Short: "delete a Schedule; its queued runs that never started are cancelled",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			project, slug, err := parseAddress(args[0])
+			if err != nil {
+				return err
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Schedules.Delete(ctx(c), wire.ScheduleDeleteRequest{Project: project, Slug: slug})
+			return finish(c.OutOrStdout(), jsonOut, res, res.Refused, res.Reason, res.Message, err, func(w io.Writer, _ wire.ScheduleDeleteResult) error {
+				_, err := fmt.Fprintf(w, "%s:%s\n", project, slug)
+				return err
+			})
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
 func printAddress(w io.Writer, res wire.ScheduleShowResult) error {
 	_, err := fmt.Fprintf(w, "%s:%s\n", res.Schedule.Project, res.Schedule.Slug)
 	return err

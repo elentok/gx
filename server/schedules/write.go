@@ -15,15 +15,17 @@ import (
 
 var dayNames = []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
 
-// WriteRoutes lists the create and edit routes. The getter is called per request.
+// WriteRoutes lists the write routes. The getter is called per request.
 func WriteRoutes(get func() *Schedules) []wire.Route {
 	return []wire.Route{
 		{Pattern: "POST /v1/schedules/create", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { writeHandler(w, r, get().create) }},
 		{Pattern: "POST /v1/schedules/edit", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { writeHandler(w, r, get().edit) }},
+		{Pattern: "POST /v1/schedules/switch", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { writeHandler(w, r, get().switchTo) }},
+		{Pattern: "POST /v1/schedules/delete", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) { writeHandler(w, r, get().remove) }},
 	}
 }
 
-func writeHandler[Req any](w http.ResponseWriter, r *http.Request, fn func(Req) (wire.ScheduleShowResult, error)) {
+func writeHandler[Req, Res any](w http.ResponseWriter, r *http.Request, fn func(Req) (Res, error)) {
 	var req Req
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -152,11 +154,61 @@ func (s *Schedules) edit(req wire.ScheduleEditRequest) (wire.ScheduleShowResult,
 	return s.written(updated)
 }
 
+// switchTo writes only this machine's state, never the Schedule file. Turning
+// on sets the baseline to now, so time spent off never runs; turning off
+// leaves a queued run alone.
+func (s *Schedules) switchTo(req wire.ScheduleSwitchRequest) (wire.ScheduleShowResult, error) {
+	sc, err := s.Store.Get(req.Project, req.Slug)
+	switch {
+	case errors.Is(err, schedrec.ErrNotFound):
+		return refusedShow(wire.ScheduleReasonUnknown, "no schedule "+req.Project+":"+req.Slug), nil
+	case err != nil:
+		if res, handled := refusalOf(err); handled {
+			return res, nil
+		}
+		return wire.ScheduleShowResult{}, err
+	}
+	k := Key{Project: sc.Project, Slug: sc.Slug}
+	if req.On {
+		err = s.State.Enable(k, s.now())
+	} else {
+		err = s.State.Disable(k)
+	}
+	if err != nil {
+		return wire.ScheduleShowResult{}, err
+	}
+	return s.written(sc)
+}
+
+// remove deletes the Schedule file, then runs one check so this machine's own
+// queued runs are cancelled and its state dropped without waiting for a tick.
+func (s *Schedules) remove(req wire.ScheduleDeleteRequest) (wire.ScheduleDeleteResult, error) {
+	err := s.Store.Delete(req.Project, req.Slug)
+	switch {
+	case errors.Is(err, schedrec.ErrNotFound):
+		return wire.ScheduleDeleteResult{Refused: true, Reason: wire.ScheduleReasonUnknown, Message: "no schedule " + req.Project + ":" + req.Slug}, nil
+	case err != nil:
+		if reason := schedrec.ReasonOf(err); reason != "" {
+			return wire.ScheduleDeleteResult{Refused: true, Reason: reason, Message: err.Error()}, nil
+		}
+		return wire.ScheduleDeleteResult{}, err
+	}
+	if s.Check != nil {
+		s.Check()
+	}
+	s.publish(req.Project, req.Slug)
+	return wire.ScheduleDeleteResult{}, nil
+}
+
+func (s *Schedules) publish(project, slug string) {
+	if s.Events != nil {
+		s.Events.Publish(wire.EventSchedulesChanged, project+":"+slug)
+	}
+}
+
 // written publishes schedules-changed and returns the Schedule's show payload.
 func (s *Schedules) written(sc schedrec.Schedule) (wire.ScheduleShowResult, error) {
-	if s.Events != nil {
-		s.Events.Publish(wire.EventSchedulesChanged, sc.Project+":"+sc.Slug)
-	}
+	s.publish(sc.Project, sc.Slug)
 	registered, err := s.registered(sc)
 	if err != nil {
 		return wire.ScheduleShowResult{}, err

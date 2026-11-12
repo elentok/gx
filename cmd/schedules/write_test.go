@@ -118,6 +118,61 @@ func TestEdit_ChangesOnlyTheFlagsGiven(t *testing.T) {
 	}
 }
 
+func TestSwitch_OnAndOffWithJSONChangeOnlyTheSwitch(t *testing.T) {
+	s := startSession(t)
+	if _, err := s.run("", "schedules", "create", "--name", "Nightly", "--prompt", "check", "--day", "mon", "--time", "09:00", "--project", "proj"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.run("", "schedules", "switch", "proj:nightly", "off")
+	if err != nil || strings.TrimSpace(out) != "proj:nightly" {
+		t.Fatalf("out = %q err = %v", out, err)
+	}
+	res, err := s.h.Client.Schedules.Show(context.Background(), "proj", "nightly")
+	if err != nil || res.Schedule.Switch || res.Schedule.Name != "Nightly" {
+		t.Fatalf("show after off = %+v err = %v", res, err)
+	}
+	out, err = s.run("", "schedules", "switch", "proj:nightly", "on", "--json")
+	if err != nil || !strings.Contains(out, `"via"`) {
+		t.Fatalf("json = %q err = %v", out, err)
+	}
+	res, err = s.h.Client.Schedules.Show(context.Background(), "proj", "nightly")
+	if err != nil || !res.Schedule.Switch {
+		t.Errorf("show after on = %+v err = %v", res, err)
+	}
+}
+
+func TestSwitch_RefusalsExitNonZero(t *testing.T) {
+	s := startSession(t)
+	out, err := s.run("", "schedules", "switch", "proj:nope", "on", "--json")
+	cmdtest.RequireRefusalExit(t, err)
+	if !strings.Contains(out, `"unknown-schedule"`) {
+		t.Errorf("json = %q", out)
+	}
+	if _, err := s.run("", "schedules", "switch", "proj:nope", "maybe"); err == nil {
+		t.Error("a bad on|off argument was accepted")
+	}
+}
+
+func TestDelete_RemovesTheScheduleAndRefusesAnUnknownOne(t *testing.T) {
+	s := startSession(t)
+	if _, err := s.run("", "schedules", "create", "--name", "Nightly", "--prompt", "check", "--day", "mon", "--time", "09:00", "--project", "proj"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.run("", "schedules", "delete", "proj:nightly", "--json")
+	if err != nil || !strings.Contains(out, `"refused": false`) && !strings.Contains(out, `"refused":false`) {
+		t.Fatalf("json = %q err = %v", out, err)
+	}
+	res, err := s.h.Client.Schedules.Show(context.Background(), "proj", "nightly")
+	if err != nil || !res.Refused {
+		t.Errorf("show after delete = %+v err = %v", res, err)
+	}
+	out, err = s.run("", "schedules", "delete", "proj:nightly", "--json")
+	cmdtest.RequireRefusalExit(t, err)
+	if !strings.Contains(out, `"unknown-schedule"`) {
+		t.Errorf("json = %q", out)
+	}
+}
+
 func TestEdit_ProjectChangeIsRefused(t *testing.T) {
 	s := startSession(t)
 	if _, err := s.run("", "schedules", "create", "--name", "Nightly", "--prompt", "check", "--day", "mon", "--time", "09:00", "--project", "proj"); err != nil {
