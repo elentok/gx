@@ -541,7 +541,7 @@ test("the detail is fetched once on mount and once more when a session starts or
   const epic = vi.fn(async () => ({ kind: "ok" as const, detail: deletable }))
   const router = render([map("a")], [], "/d/gx:a", deletable, { epic })
   await screen.findByRole("button", { name: "More actions" })
-  expect(epic).toHaveBeenCalledTimes(1)
+  await waitFor(() => expect(epic).toHaveBeenCalledTimes(1))
   router.setSessions([session("a")])
   await waitFor(() => expect(epic).toHaveBeenCalledTimes(2))
   router.setSessions([session("a", { status: { state: "exited" } })])
