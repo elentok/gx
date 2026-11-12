@@ -114,6 +114,10 @@ type Outcome struct {
 	// Listing holds one line per test of a list-only run. It is printed in
 	// place of "no tests ran".
 	Listing []string
+	// Unhandled describes errors outside any test (vitest's unhandled errors)
+	// that fail a run whose tests all passed: a count line, then the first
+	// message and frame. Empty when there are none.
+	Unhandled string
 }
 
 // Options configure one run.
@@ -367,7 +371,10 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 	dur := (time.Duration(e.DurationMS) * time.Millisecond).Round(10 * time.Millisecond)
 	switch {
 	case e.Exit != 0:
-		if len(outcome.Failures) == 0 {
+		if len(outcome.Failures) == 0 && outcome.Unhandled != "" {
+			count, detail, _ := strings.Cut(outcome.Unhandled, "\n")
+			fmt.Fprintf(o.Out, "FAIL %s: tests passed, %s in %s\n%s\n", tool.Name(), count, dur, detail)
+		} else if len(outcome.Failures) == 0 {
 			fmt.Fprintf(o.Out, "FAIL %s: exit %d in %s\n", tool.Name(), e.Exit, dur)
 			rawHead(o.Out, out)
 		} else {

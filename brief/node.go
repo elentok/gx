@@ -115,7 +115,7 @@ func (Vitest) Plan(_ []string, dir string, args []string) (Invocation, error) {
 // Parse reads the test count and the failing tests from the JSON report. The
 // report may follow other output; a report that does not decode (a crashed
 // reporter) yields an empty Outcome.
-func (Vitest) Parse(out []byte, _ int) Outcome {
+func (Vitest) Parse(out []byte, exit int) Outcome {
 	i := bytes.Index(out, []byte(`{"numTotalTestSuites"`))
 	if i < 0 {
 		return Outcome{}
@@ -161,14 +161,65 @@ func (Vitest) Parse(out []byte, _ int) Outcome {
 			failures = append(failures, Unit{Location: f.Name, Name: f.Name, Text: vitestText([]string{f.Message}), Kind: KindFileFailed})
 		}
 	}
+	unhandled := ""
+	if exit != 0 && len(failures) == 0 {
+		unhandled = vitestUnhandled(out)
+	}
 	return Outcome{
-		Units:    rep.NumTotalTests,
-		Summary:  fmt.Sprintf("%d tests", rep.NumTotalTests),
-		Failures: failures,
-		Tests:    ran,
+		Units:     rep.NumTotalTests,
+		Summary:   fmt.Sprintf("%d tests", rep.NumTotalTests),
+		Failures:  failures,
+		Tests:     ran,
+		Unhandled: unhandled,
 
 		TestDurations: durations,
 	}
+}
+
+var vitestCaughtRe = regexp.MustCompile(`caught (\d+) unhandled errors?`)
+
+// vitestUnhandled reads vitest's "Unhandled Errors" block, which follows the
+// JSON report: "N unhandled errors", the first message and its first frame.
+func vitestUnhandled(out []byte) string {
+	s := string(out)
+	i := strings.Index(s, "Unhandled Errors")
+	if i < 0 {
+		return ""
+	}
+	s = s[i:]
+	count := "unhandled errors"
+	if m := vitestCaughtRe.FindStringSubmatch(s); m != nil {
+		count = m[1] + " unhandled errors"
+		if m[1] == "1" {
+			count = "1 unhandled error"
+		}
+	}
+	lines := strings.Split(s, "\n")
+	out2 := []string{count}
+	start := -1
+	for j, l := range lines {
+		if j > 0 && strings.Contains(l, "⎯ Unhandled") {
+			start = j + 1
+			break
+		}
+	}
+	if start < 0 {
+		return count
+	}
+	for _, l := range lines[start:] {
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, "⎯") {
+			break
+		}
+		if t == "" {
+			continue
+		}
+		out2 = append(out2, l)
+		if strings.HasPrefix(t, "❯") {
+			break
+		}
+	}
+	return strings.Join(out2, "\n")
 }
 
 // vitestText joins failure messages and drops the stack frames, which would
