@@ -14,7 +14,7 @@ import (
 // their switch, baseline and skip log with the server's state API, so the server
 // reads what its own writes would have made. The machine id is fixed first so the
 // seeded One-offs' Dedupe keys match the server's.
-func (f *fixture) seedSchedules(sc scenario) error {
+func seedSchedules(f *fixture, sc scenario) error {
 	if len(sc.Schedules) == 0 {
 		return nil
 	}

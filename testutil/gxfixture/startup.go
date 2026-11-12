@@ -284,7 +284,7 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 	if err := seedTriage(f.store, sc); err != nil {
 		return fmt.Errorf("seed triage: %w", err)
 	}
-	if err := f.seedSchedules(sc); err != nil {
+	if err := seedSchedules(f, sc); err != nil {
 		return fmt.Errorf("seed schedules: %w", err)
 	}
 	if sc.PromptGrace != "" {

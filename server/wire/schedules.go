@@ -17,47 +17,38 @@ const (
 
 // ScheduleRun is one row of a Schedule's Last runs: a One-off, or a skipped set time.
 type ScheduleRun struct {
-	// ScheduledFor is RFC 3339; empty for a Run now.
-	ScheduledFor string `json:"scheduled_for"`
-	CreatedAt    string `json:"created_at"`
-	// Address is the One-off's address; empty for a skip.
-	Address string            `json:"address"`
-	Status  ScheduleRunStatus `json:"status"`
-	// Result is the first non-empty line of the One-off's Result section.
-	Result string `json:"result"`
-	// Reason and ReasonText describe a skip only.
-	Reason     string `json:"reason"`
-	ReasonText string `json:"reason_text"`
-	// AttentionAddress is the blocking ticket of a needs-attention skip.
-	AttentionAddress string `json:"attention_address"`
+	ScheduledFor     string            `json:"scheduled_for"` // RFC 3339; empty for a Run now
+	CreatedAt        string            `json:"created_at"`
+	Address          string            `json:"address"` // the One-off's; empty for a skip
+	Status           ScheduleRunStatus `json:"status"`
+	Result           string            `json:"result"`            // first non-empty line of the One-off's Result section
+	Reason           string            `json:"reason"`            // skip only
+	ReasonText       string            `json:"reason_text"`       // skip only
+	AttentionAddress string            `json:"attention_address"` // blocking ticket of a needs-attention skip
 }
 
-// Reasons a Schedule read is refused.
+// Reasons a Schedule read or edit is refused. ProjectReadOnly refuses an edit
+// that changes the project.
 const (
-	ScheduleReasonUnknown        = "unknown-schedule"
-	ScheduleReasonInvalidProject = "invalid-project"
+	ScheduleReasonUnknown         = "unknown-schedule"
+	ScheduleReasonInvalidProject  = "invalid-project"
+	ScheduleReasonProjectReadOnly = "project-read-only"
 )
 
 // ScheduleInfo is one Schedule as the list and show results carry it.
 type ScheduleInfo struct {
-	Name    string `json:"name"`
-	Slug    string `json:"slug"`
-	Project string `json:"project"`
-	// Days are lowercase three-letter day names in week order.
-	Days []string `json:"days"`
-	// Times are HH:MM local times.
-	Times []string `json:"times"`
-	// Harness is empty when the Schedule follows the Default.
-	Harness string `json:"harness"`
-	// DefaultHarness is the name the Default resolves to for the project.
-	DefaultHarness string  `json:"default_harness"`
-	LateLimitHours float64 `json:"late_limit_hours"`
-	// Switch is the on/off switch of this machine.
-	Switch       bool `json:"switch"`
-	ProjectFound bool `json:"project_found"`
-	// NextRun is RFC 3339; empty when the switch is off or the project is missing.
-	NextRun   string `json:"next_run"`
-	UpdatedAt string `json:"updated_at"`
+	Name           string   `json:"name"`
+	Slug           string   `json:"slug"`
+	Project        string   `json:"project"`
+	Days           []string `json:"days"`            // lowercase three-letter names in week order
+	Times          []string `json:"times"`           // HH:MM local
+	Harness        string   `json:"harness"`         // empty when the Schedule follows the Default
+	DefaultHarness string   `json:"default_harness"` // what the Default resolves to for the project
+	LateLimitHours float64  `json:"late_limit_hours"`
+	Switch         bool     `json:"switch"` // the on/off switch of this machine
+	ProjectFound   bool     `json:"project_found"`
+	NextRun        string   `json:"next_run"` // RFC 3339; empty when the switch is off or the project is missing
+	UpdatedAt      string   `json:"updated_at"`
 }
 
 // SchedulesResult is the list of Schedules. A refusal is a result.
@@ -66,8 +57,7 @@ type SchedulesResult struct {
 	Reason    string         `json:"reason"`
 	Message   string         `json:"message"`
 	Schedules []ScheduleInfo `json:"schedules"`
-	// Projects are the registered project names, for the Project select.
-	Projects []string `json:"projects"`
+	Projects  []string       `json:"projects"` // registered project names, for the Project select
 }
 
 // ScheduleShowResult is one Schedule with its prompt and Last runs.
@@ -80,12 +70,8 @@ type ScheduleShowResult struct {
 	LastRuns []ScheduleRun `json:"last_runs"`
 }
 
-// EventSchedulesChanged is emitted with "<project>:<slug>" as its address
-// after a Schedule is written, so open pages refetch.
+// EventSchedulesChanged is emitted with "<project>:<slug>" after a Schedule is written.
 const EventSchedulesChanged = "schedules-changed"
-
-// ScheduleReasonProjectReadOnly refuses an edit that changes the project.
-const ScheduleReasonProjectReadOnly = "project-read-only"
 
 // ScheduleCreateRequest is the body of POST /v1/schedules/create. Days are
 // lowercase three-letter names. An empty Project means scratch, an empty
@@ -100,8 +86,7 @@ type ScheduleCreateRequest struct {
 	LateLimitHours *float64 `json:"late_limit_hours"`
 }
 
-// ScheduleSwitchRequest is the body of POST /v1/schedules/switch. The result is
-// the Schedule's show payload.
+// ScheduleSwitchRequest is the body of POST /v1/schedules/switch (result: show payload).
 type ScheduleSwitchRequest struct {
 	Project string `json:"project"`
 	Slug    string `json:"slug"`
