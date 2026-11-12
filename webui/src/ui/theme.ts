@@ -87,6 +87,7 @@ export const themeConfig = defineConfig({
   theme: {
     keyframes: {
       orbit: { to: { "--gx-orbit-angle": "360deg" } },
+      chatDot: { "0%, 60%, 100%": { transform: "translateY(0)", opacity: 0.5 }, "30%": { transform: "translateY(-2px)", opacity: 1 } },
       chatShimmer: {
         from: { maskPosition: "100% 0" },
         to: { maskPosition: "0% 0" },

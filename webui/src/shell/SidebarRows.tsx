@@ -47,11 +47,31 @@ function Status({ status, dim }: { status: SidebarStatus; dim?: boolean }) {
   );
 }
 
-function ChatIcon() {
+/** The chat icon. While working, three dots inside the bubble bounce in turn (still under reduced motion). */
+function ChatIcon({ working }: { working?: boolean }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="var(--chakra-colors-chat)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label="Chat" role="img">
-      <path d="M5 7.5a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 21 7.5v7a2.5 2.5 0 0 1-2.5 2.5H12l-4 3.5V17h-.5A2.5 2.5 0 0 1 5 14.5v-7z" />
-    </svg>
+    <Box
+      as="span"
+      display="grid"
+      data-working={working ? "" : undefined}
+      css={{
+        "& circle": { transformBox: "fill-box", transformOrigin: "center", animation: "chatDot 1.2s ease-in-out infinite" },
+        "& circle:nth-of-type(2)": { animationDelay: "0.15s" },
+        "& circle:nth-of-type(3)": { animationDelay: "0.3s" },
+        "@media (prefers-reduced-motion: reduce)": { "& circle": { animation: "none" } },
+      }}
+    >
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="var(--chakra-colors-chat)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label="Chat" role="img">
+        <path d="M5 7.5a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 21 7.5v7a2.5 2.5 0 0 1-2.5 2.5H12l-4 3.5V17h-.5A2.5 2.5 0 0 1 5 14.5v-7z" />
+        {working && (
+          <g data-testid="chat-dots" fill="var(--chakra-colors-chat)" stroke="none">
+            <circle cx="9.5" cy="11" r="1.3" />
+            <circle cx="13" cy="11" r="1.3" />
+            <circle cx="16.5" cy="11" r="1.3" />
+          </g>
+        )}
+      </svg>
+    </Box>
   );
 }
 
@@ -218,7 +238,7 @@ function Row({ row, current, active, workspaces }: { row: SidebarRow; current: b
         <chakra.a href={row.href} {...{ [NAV_ATTR]: `row:${row.key}`, ...(row.kind === "chat" ? { [CHAT_ATTR]: "" } : {}) }} aria-current={current ? "page" : undefined} {...rowStyle} flex="1" minW="0" px="0">
           <IconSlot>
             {row.kind === "chat" ? (
-              <ChatIcon />
+              <ChatIcon working={row.status.tone === "running"} />
             ) : (
               <Box position="relative" flex="none">
                 <ProgressRing progress={row.ring ?? 0} kind={row.kind} size="sidebar" tone={row.status.tone} live={row.status.tone === "running"} />
