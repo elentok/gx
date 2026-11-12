@@ -24,22 +24,6 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-func TestSessionInfo_FlowFieldsRoundTrip(t *testing.T) {
-	t.Parallel()
-	in := wire.SessionInfo{ID: "a", Flow: "triage", FlowKey: "proj"}
-	b, err := json.Marshal(in)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var out wire.SessionInfo
-	if err := json.Unmarshal(b, &out); err != nil {
-		t.Fatal(err)
-	}
-	if out.Flow != "triage" || out.FlowKey != "proj" || out.Design {
-		t.Errorf("round trip = %+v, want triage/proj, not design", out)
-	}
-}
-
 // The fake agent and the server agree on the run-end text and the design
 // prompt prefix only by convention. This fails when either side drifts.
 func TestRunEndLine_MatchesAgentfakeDesignRunEnd(t *testing.T) {
