@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -32,6 +33,9 @@ func New(d Deps) *cobra.Command {
 		Long: `Run the commands in .gx/checks.json (or the checks key of the project's
 project.json) on the files changed against HEAD plus untracked files, and print
 one line per kind plus the path of the summary and logs.
+
+In a clean ralph-loop ticket worktree the default is --since <merge-base with
+the epic branch>, so a run after committing still has files to check.
 
 --staged selects the staged files, --since <ref> the files changed in
 <ref>...HEAD, --full runs each kind's full command on every tracked file. They
@@ -96,6 +100,9 @@ func runCheck(c *cobra.Command, d Deps, staged, full bool, since, kinds string) 
 		return err
 	}
 	opts.Dir = dir
+	if modes == 0 {
+		opts.Mode, opts.Since = ticketBaseDefault(dir)
+	}
 	opts.Env = d.Env.Env
 	opts.Wait = c.ErrOrStderr()
 	opts.LoadAvg = d.LoadAvg
@@ -120,6 +127,32 @@ func runCheck(c *cobra.Command, d Deps, staged, full bool, since, kinds string) 
 		return &cmdbase.ExitError{Code: res.Exit}
 	}
 	return nil
+}
+
+// ticketBaseDefault makes a bare `gx check` in a clean ticket worktree check
+// the files changed since the epic branch, so a run after committing still
+// has files. Anywhere else it returns the zero mode (the changed-files default).
+func ticketBaseDefault(dir string) (check.Mode, string) {
+	branch, err := git.CurrentBranch(dir)
+	if err != nil {
+		return 0, ""
+	}
+	rest, ok := strings.CutPrefix(branch, "ralph-loop/")
+	if !ok {
+		return 0, ""
+	}
+	i := strings.LastIndex(rest, "-item-")
+	if i < 0 {
+		return 0, ""
+	}
+	if dirty, err := git.UncommittedPaths(dir); err != nil || len(dirty) > 0 {
+		return 0, ""
+	}
+	base, err := git.MergeBase(dir, "HEAD", rest[:i])
+	if err != nil {
+		return 0, ""
+	}
+	return check.ModeSince, base
 }
 
 // projectChecks is the checks key of the ticket store's project.json for the
