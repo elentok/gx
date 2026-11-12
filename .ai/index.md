@@ -378,6 +378,11 @@ Web checks:
   `type_mappings` (a wire type used by a `server` type needs an `import type` in the `server`
   entry's `frontmatter` too). Check `git diff` for `any`. During the wire split,
   `scripts/webtypes-diff.sh <base-sha>` compares the output with the base.
+  `tygo.yaml` lists wire files, so moving a type to another file drops it from the generated
+  TypeScript silently. `TestTygoCoversWireTypes` (`server/wire/tygo_test.go`) fails when a listed
+  file is gone or has no exported types, or an exported type sits in an unlisted file and is not in
+  its `notGenerated` list. A sizeguard split of `server/wire` ends with "tygo.yaml still covers the
+  moved types" and a clean `make web-types` diff.
 - Run e2e with `make web-e2e`. It rebuilds the web bundle first. `pnpm e2e` does not rebuild.
 
 ## UI

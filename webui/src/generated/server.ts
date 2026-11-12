@@ -3474,9 +3474,14 @@ export const TargetRefused = "refused";
  */
 export const TargetFits = "fits";
 /**
+ * TargetFailed is a target whose write hit an internal error part-way. Its
+ * Message says what; the other targets' results still stand.
+ */
+export const TargetFailed = "failed";
+/**
  * Status values of a TargetResult.
  */
-export type Target = typeof TargetDone | typeof TargetRefused | typeof TargetFits;
+export type Target = typeof TargetDone | typeof TargetRefused | typeof TargetFits | typeof TargetFailed;
 /**
  * TargetResult is what one target of a many-target write came to. A refusal is
  * a result, not an error (ADR 0028), and blocks no other target.
@@ -3533,6 +3538,11 @@ export type ReasonArchive = typeof ReasonArchiveNotFinished | typeof ReasonArchi
  */
 export interface TargetsResult {
   results: TargetResult[];
+  /**
+   * Held is set only by hold and unhold: the held keys after the request.
+   * A target that needs Yes is refused ReasonNeedsYes and lists its sessions.
+   */
+  held?: string[];
 }
 /**
  * ReasonNeedsYes refuses a target whose write stops live Sessions and came without yes.
@@ -4074,15 +4084,6 @@ export interface HoldRequest {
   dry_run?: boolean;
 }
 /**
- * HoldResult is a hold or unhold: one result per target and the held keys
- * after the request. A target that needs Yes is refused ReasonNeedsYes and
- * lists the sessions in its Sessions.
- */
-export interface HoldResult {
-  results: TargetResult[];
-  held: string[];
-}
-/**
  * Refusal reasons of hold. The queued text is asserted by the web.
  */
 export const ReasonHoldQueued = "hold-queued";
@@ -4094,6 +4095,10 @@ export const ReasonHoldNotHoldable = "hold-not-holdable";
  * Refusal reasons of hold. The queued text is asserted by the web.
  */
 export const ReasonHoldUnknown = "hold-unknown";
+/**
+ * Refusal reasons of hold. The queued text is asserted by the web.
+ */
+export const ReasonNotOnHold = "not-on-hold";
 /**
  * Refusal reasons of hold. The queued text is asserted by the web.
  */

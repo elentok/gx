@@ -26,7 +26,6 @@ packages:
       - sessions.go
       - sessiontypes.go
       - settingspage.go
-      - settingswrite.go
       - stats.go
       - targets.go
       - tips.go
