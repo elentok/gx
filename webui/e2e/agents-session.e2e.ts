@@ -97,7 +97,7 @@ test("75. Read a session", async ({ page, start }) => {
 
   // Tools in flight: the Working row names the newest call and counts the rest.
   const toolsFixture = await start("agents-tools")
-  const tools = await sessions(toolsFixture)
+  const tools = (await sessions(toolsFixture)).filter((s) => !s.queue)
   const row = page.getByRole("status").filter({ hasText: /^Working/ })
   await go(page, `#/agents/${tools[0].id}`)
   await expect(row).toHaveText("Working · running shell: make test")
@@ -198,8 +198,17 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(confirm).toHaveCount(0)
   await expect(interrupt).toHaveCount(0)
 
+  // gx drives a Queue agent, so a Working one has Interrupt off and Esc opens no confirm.
+  const findQueueAgent = async () => (await sessions(toolsFixture)).find((s) => s.queue)
+  await expect.poll(findQueueAgent).toBeDefined()
+  await go(page, `#/agents/${(await findQueueAgent())!.id}`)
+  await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible()
+  await expect(interrupt).toBeDisabled()
+  await page.keyboard.press("Escape")
+  await expect(confirm).toHaveCount(0)
+
   // The interrupts above ended the turns; the phone steps need fresh Working sessions.
-  const fresh = await sessions(await start("agents-tools"))
+  const fresh = (await sessions(await start("agents-tools"))).filter((s) => !s.queue)
   await go(page, `#/agents/${fresh[1].id}`)
   await expect(more).toBeVisible()
   // A tap opens it at the phone width.
