@@ -12,7 +12,7 @@ export const stillMotion = (page: Page) =>
 export const frameButton = (link: Locator) =>
   link.locator("xpath=..").getByRole("button", nav("More actions"))
 
-// Sidebar helpers shared by the Workspaces and Sidebar rows flows.
+// Sidebar helpers shared by the Workspaces, Workspaces touch and Sidebar rows flows.
 export const sidebarKit = (page: Page) => {
   const sidebar = page.getByRole("complementary", nav("Sidebar"))
   // A Fix agent's link is named "Fix agent <name>": its wrench icon carries the label.
@@ -36,5 +36,39 @@ export const sidebarKit = (page: Page) => {
     // The closing menu keeps covering the sidebar, and its items answer later queries, until it is gone.
     await expect(page.getByRole("menu")).toHaveCount(0)
   }
-  return { sidebar, row, itemOf, nestedLinks, switcher, menuFocused, closeMenus, pick }
+  const rowMenu = (title: string) =>
+    row(title).locator("xpath=..").getByRole("button", nav("More actions"))
+  // Hover opens a submenu and a click on its trigger toggles it, so hover first and click only when the hover did not open it.
+  const openSubmenu = async (trigger: Locator, child: Locator) => {
+    await trigger.hover()
+    await expect(async () => {
+      if (!(await child.isVisible())) await trigger.click({ timeout: 2_000 })
+      await expect(child).toBeVisible({ timeout: 1_500 })
+    }).toPass({ timeout: 15_000 })
+  }
+  const moveTo = async (menu: Locator, to: string) => {
+    await menu.click()
+    await menuFocused()
+    await openSubmenu(
+      page.getByRole("menuitem", nav("Move to workspace")),
+      page.getByRole("menuitem", nav(to)),
+    )
+    await page.getByRole("menuitem", nav(to)).click()
+    await expect(page.getByRole("menu")).toHaveCount(0)
+  }
+  const jump = page.getByRole("dialog", nav("Jump to"))
+  return {
+    sidebar,
+    row,
+    itemOf,
+    nestedLinks,
+    switcher,
+    menuFocused,
+    closeMenus,
+    pick,
+    rowMenu,
+    openSubmenu,
+    moveTo,
+    jump,
+  }
 }

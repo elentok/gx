@@ -42,7 +42,9 @@ import (
 // their time limits with margin.
 // Sidebar rows flow (+1): the Workspaces flow was still 64 s alone after the Chords split, over the
 // 45 s slow limit; its self-contained sidebar-row block runs as its own flow.
-const maxFlows = 141
+// Workspaces touch flow (+1): Workspaces was still 58 s alone after the Sidebar rows split, so its narrow-width
+// and footer half (swipes, 744px and 390px, New chat and New design, footer sizes) runs as its own flow.
+const maxFlows = 142
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
