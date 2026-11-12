@@ -425,22 +425,6 @@ func TestChangedCheckoutStopsTheOldChildAndStartsAgain(t *testing.T) {
 	}
 }
 
-func TestSupervisorsPickDifferentPorts(t *testing.T) {
-	// Both launchers hand out the same port first; the second supervisor
-	// must notice the first one holds it.
-	a, b := newRig(t, nil), newRig(t, nil)
-	a.l.ports = []int{41111, 41112}
-	b.l.ports = []int{41111, 41113}
-	a.checkout(t, true, false)
-	b.checkout(t, true, false)
-	a.turnOnReady(t)
-	b.turnOnReady(t)
-	pa, pb := a.sup.Snapshot().Port, b.sup.Snapshot().Port
-	if pa == pb {
-		t.Fatalf("both supervisors use port %d", pa)
-	}
-}
-
 func TestObserverSeesChangesNotLogLines(t *testing.T) {
 	r := newRig(t, nil)
 	r.checkout(t, true, false)

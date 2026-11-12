@@ -7,8 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/wire"
 )
+
+// WebUI is the server's web listener, for the external tests that switch what
+// it serves (UseViteProxy, UseBuiltUI).
+func WebUI(s *Server) *web.Web { return s.web }
 
 func tagHandler(tag string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tag)) }

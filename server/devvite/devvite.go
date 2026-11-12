@@ -237,12 +237,11 @@ func (s *Supervisor) turnOn(ctx context.Context, root string) {
 			return
 		}
 	}
-	port, release, err := claimPort(s.l)
+	port, err := s.l.FreePort()
 	if err != nil {
 		s.down("Could not find a free port for Vite: %v", err)
 		return
 	}
-	defer release()
 	s.set(StateStarting, "Starting Vite", port)
 	proc, err := s.l.Start(ctx, webui, port, s.logs)
 	if ctx.Err() != nil {
@@ -340,34 +339,4 @@ func needsInstall(webui string) bool {
 		return false
 	}
 	return lock.ModTime().After(nm.ModTime())
-}
-
-// claimedPorts keeps two supervisors in one process off the same port between
-// FreePort returning it and Vite binding it.
-var (
-	claimedMu    sync.Mutex
-	claimedPorts = map[int]bool{}
-)
-
-func claimPort(l Launcher) (int, func(), error) {
-	for range 8 {
-		port, err := l.FreePort()
-		if err != nil {
-			return 0, nil, err
-		}
-		claimedMu.Lock()
-		taken := claimedPorts[port]
-		if !taken {
-			claimedPorts[port] = true
-		}
-		claimedMu.Unlock()
-		if !taken {
-			return port, func() {
-				claimedMu.Lock()
-				delete(claimedPorts, port)
-				claimedMu.Unlock()
-			}, nil
-		}
-	}
-	return 0, nil, errors.New("every port tried was already taken")
 }

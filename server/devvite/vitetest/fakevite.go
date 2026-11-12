@@ -2,6 +2,7 @@ package vitetest
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -113,13 +114,32 @@ func (f *FakeVite) Dirs() []string {
 	return append([]string(nil), f.dirs...)
 }
 
+// reservedPorts keeps two fakes in one test process off the same port between
+// FreePort returning it and Start binding it.
+var (
+	reservedMu    sync.Mutex
+	reservedPorts = map[int]bool{}
+)
+
+// FreePort returns a loopback port no other FreePort call in this process has
+// returned.
 func (f *FakeVite) FreePort() (int, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
+	for range 8 {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return 0, err
+		}
+		port := ln.Addr().(*net.TCPAddr).Port
+		ln.Close()
+		reservedMu.Lock()
+		taken := reservedPorts[port]
+		reservedPorts[port] = true
+		reservedMu.Unlock()
+		if !taken {
+			return port, nil
+		}
 	}
-	defer ln.Close()
-	return ln.Addr().(*net.TCPAddr).Port, nil
+	return 0, errors.New("vitetest: every port tried was already reserved")
 }
 
 // HoldInstall makes Install wait until the returned release func is called, so
