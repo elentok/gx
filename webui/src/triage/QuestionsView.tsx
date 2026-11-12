@@ -12,7 +12,16 @@ import { Button } from "../ui/button/Button"
 import type { Answers } from "../ui/question-sheet/round"
 import { showToast } from "../ui/toaster"
 import { refusalText, useWrite } from "../useWrite"
-import { answersOf, changedRows, roundOf, rowAnswers } from "./questions"
+import {
+  agreeWithRecommendations,
+  answerText,
+  answersOf,
+  changedRows,
+  decidedOf,
+  hasUnansweredRecommendations,
+  roundOf,
+  rowAnswers,
+} from "./questions"
 
 // The wire's refusal for an out-of-date revision (server/wire ReasonStale); the generated types carry no constant for it.
 const REASON_STALE = "stale"
@@ -52,7 +61,10 @@ export function QuestionsView({
   save?: SaveTriageRow
   sendBack?: SendBackTriage
 }) {
-  const round = useMemo(() => roundOf(view.rows), [view.rows])
+  // Decided questions the person reopened to change: they move into the sheet and stay there.
+  const [reopened, setReopened] = useState<ReadonlySet<string>>(new Set())
+  const round = useMemo(() => roundOf(view.rows, reopened), [view.rows, reopened])
+  const decided = useMemo(() => decidedOf(view.rows, reopened), [view.rows, reopened])
   const [answers, setAnswers] = useState<Answers>(() => answersOf(view.rows))
   // The revisions our own saves produced: a view at any other revision changed elsewhere, so it replaces the draft.
   const ownRevisions = useRef(new Set([view.revision]))
@@ -141,17 +153,30 @@ export function QuestionsView({
       return res
     })
 
-  if (round.length === 0) return <Text color="text.muted">No open questions.</Text>
+  if (round.length === 0 && decided.length === 0)
+    return <Text color="text.muted">No open questions.</Text>
   return (
     <Box display="flex" flexDirection="column" gap="2">
-      <QuestionSheet
-        key={view.rows.length}
-        round={round}
-        answers={answers}
-        onAnswers={onAnswers}
-        questions
-      />
+      {round.length === 0 ? (
+        <Text color="text.muted">No questions for you. Check the decided ones below.</Text>
+      ) : (
+        <QuestionSheet
+          key={`${view.rows.length}:${reopened.size}`}
+          round={round}
+          answers={answers}
+          onAnswers={onAnswers}
+          questions
+        />
+      )}
       <Box display="flex" alignItems="center" flexWrap="wrap" gap="3">
+        <Button
+          emphasis="main"
+          size="sm"
+          disabled={!hasUnansweredRecommendations(round, answers)}
+          onClick={() => onAnswers((all) => agreeWithRecommendations(round, all))}
+        >
+          Agree with all recommendations
+        </Button>
         <Button
           emphasis="ghost"
           tone="muted"
@@ -167,6 +192,49 @@ export function QuestionsView({
             : "The agent reads your answers and notes and asks again. Your answers stay."}
         </Text>
       </Box>
+      {decided.length > 0 && (
+        <Box
+          as="section"
+          aria-label="Decided unless you object"
+          display="flex"
+          flexDirection="column"
+          gap="1"
+        >
+          <Text fontWeight="semibold" fontSize="sm">
+            Decided unless you object
+          </Text>
+          {decided.map((c) => (
+            <Box
+              key={c.label}
+              display="flex"
+              alignItems="baseline"
+              flexWrap="wrap"
+              gap="2"
+              fontSize="sm"
+            >
+              <Text as="span" color="text.dim">
+                {c.label}
+              </Text>
+              <Text as="span">
+                {c.title}: <b>{answerText(answers[c.label])}</b>
+              </Text>
+              {c.context && (
+                <Text as="span" color="text.dim" fontSize="xs">
+                  {c.context}
+                </Text>
+              )}
+              <Button
+                emphasis="ghost"
+                tone="muted"
+                size="sm"
+                onClick={() => setReopened((s) => new Set(s).add(c.label))}
+              >
+                Change {c.label}
+              </Button>
+            </Box>
+          ))}
+        </Box>
+      )}
       <Text fontSize="xs" color="text.dim">
         Answers go into each ticket body when the Write step runs.
       </Text>

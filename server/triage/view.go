@@ -285,7 +285,7 @@ func wireQuestion(q triagerec.Question) wire.TriageQuestion {
 	title, body, _ := strings.Cut(q.Text, "\n")
 	return wire.TriageQuestion{
 		ID: q.ID, Title: title, Body: strings.TrimSpace(body), Kind: string(q.Kind),
-		Options: q.Options, Recommended: q.Default,
+		Options: q.Options, Recommended: q.Default, Auto: q.Auto,
 	}
 }
 

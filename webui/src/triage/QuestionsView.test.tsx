@@ -262,3 +262,42 @@ test("a refused send back says why and reloads", async () => {
   await waitFor(() => expect(refetch).toHaveBeenCalled())
   expect(sendBack).toHaveBeenCalledWith({ project: "gx", revision: 4 })
 })
+
+test("Agree with all recommendations answers every open question that has one and saves it", async () => {
+  const save = vi.fn().mockResolvedValue({ revision: 5 })
+  render(<QuestionsView project="gx" view={viewOf()} refetch={vi.fn()} save={save} />)
+  fireEvent.click(screen.getByRole("button", { name: "Agree with all recommendations" }))
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ answers: { "1": "yes" } })),
+  )
+  screen.getByText("1 of 1 answered")
+  expect(
+    (screen.getByRole("button", { name: "Agree with all recommendations" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true)
+})
+
+const withAuto = (): TriageView => {
+  const v = viewOf({ open_questions: 1 })
+  v.rows[0].questions = [
+    { id: "1", title: "Ship it?", kind: "yes-no", recommended: "yes" },
+    { id: "2", title: "Keep the flag?", kind: "yes-no", recommended: "no", auto: true },
+  ]
+  v.rows[0].answers = { "2": "no" }
+  return v
+}
+
+test("a decided question is listed under Decided unless you object, not asked as a card", () => {
+  render(<QuestionsView project="gx" view={withAuto()} refetch={vi.fn()} save={vi.fn()} />)
+  screen.getByText("0 of 1 answered")
+  const decided = screen.getByRole("region", { name: "Decided unless you object" })
+  expect(decided.textContent).toContain("Keep the flag?")
+  expect(decided.textContent).toContain("no")
+})
+
+test("Change moves a decided question into the sheet with its answer kept", () => {
+  render(<QuestionsView project="gx" view={withAuto()} refetch={vi.fn()} save={vi.fn()} />)
+  fireEvent.click(screen.getByRole("button", { name: "Change 1.2" }))
+  screen.getByText("1 of 2 answered")
+  expect(screen.queryByRole("region", { name: "Decided unless you object" })).toBeNull()
+})

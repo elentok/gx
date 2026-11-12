@@ -11,7 +11,12 @@ const NOTE_MARK = "\nNote: "
 const askedRows = (rows: TriageRow[]) => rows.filter((r) => !r.gone)
 
 /** A card the shared question component shows: the server's round card plus what the question is about. */
-export type TriageCard = SessionRoundCard & { context?: string; contextHref?: string }
+export type TriageCard = SessionRoundCard & {
+  context?: string
+  contextHref?: string
+  /** The agent decided this low-risk question: it shows under "Decided unless you object", not as a card. */
+  auto?: boolean
+}
 
 /**
  * Each asked row's number, in row order: the digits that end its address ("gx:follow-ups/01" is "1"), or its
@@ -57,11 +62,12 @@ export function cardOf(
   if (contextHref) card.contextHref = contextHref
   if (kind === "options") card.options = (q.options ?? []).map((o) => ({ id: o, label: o }))
   if (q.recommended) card.recommended = q.recommended
+  if (q.auto) card.auto = true
   return card
 }
 
-/** The open questions' cards across the rows, in row order. */
-export function roundOf(rows: TriageRow[]): TriageCard[] {
+/** Every question's card across the rows, in row order. */
+const allCards = (rows: TriageRow[]): TriageCard[] => {
   const nums = rowNumbers(rows)
   return askedRows(rows).flatMap((r) =>
     (r.questions ?? []).map((q) =>
@@ -69,6 +75,21 @@ export function roundOf(rows: TriageRow[]): TriageCard[] {
     ),
   )
 }
+
+/** The cards the person answers: every question except the decided ones, which they have reopened to change. */
+export const roundOf = (
+  rows: TriageRow[],
+  reopened: ReadonlySet<string> = new Set(),
+): TriageCard[] => allCards(rows).filter((c) => !c.auto || reopened.has(c.label))
+
+/** The decided cards still standing: auto questions the person has not reopened. */
+export const decidedOf = (
+  rows: TriageRow[],
+  reopened: ReadonlySet<string> = new Set(),
+): TriageCard[] => allCards(rows).filter((c) => c.auto && !reopened.has(c.label))
+
+/** The answer as one line of text: the pick, or what was typed. */
+export const answerText = (a: Answer | undefined) => a?.choice ?? a?.text?.trim() ?? ""
 
 /** The saved answers as the component holds them: a picked choice, Huh?, or typed text, plus the note. */
 export function answersOf(rows: TriageRow[]): Answers {
@@ -125,3 +146,17 @@ export function changedRows(rows: TriageRow[], before: Answers, after: Answers) 
     }),
   )
 }
+
+/** The answers after agreeing with every recommendation: each unanswered card that has one takes it. Given answers stay. */
+export function agreeWithRecommendations(round: TriageCard[], answers: Answers): Answers {
+  const out: Answers = { ...answers }
+  for (const card of round) {
+    if (card.recommended && !isAnswered(out[card.label]))
+      out[card.label] = { choice: card.recommended }
+  }
+  return out
+}
+
+/** Whether agreeing would answer anything. */
+export const hasUnansweredRecommendations = (round: TriageCard[], answers: Answers) =>
+  round.some((c) => c.recommended && !isAnswered(answers[c.label]))

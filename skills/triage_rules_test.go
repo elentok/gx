@@ -12,7 +12,7 @@ func TestTriageSkillAnchors(t *testing.T) {
 		"## 4. Write", "## 5. Done", "## Prefer the correct fix",
 		"gx agent link --triage", "gx agent step", "gx agent model worker", "--fits",
 		"`✅ <step>: <what was done>. Next: <what runs next>`",
-		"never grills", "(../gx-local-tracker.md)",
+		"never grills", `"auto": true`, "cheap to reverse", "(../gx-local-tracker.md)",
 	} {
 		if !strings.Contains(strings.ToLower(skill), strings.ToLower(want)) {
 			t.Errorf("triage skill lacks %q", want)

@@ -3,9 +3,11 @@ import { expect, test } from "vitest"
 import type { TriageRow } from "../generated/server"
 import {
   HUH_MESSAGE,
+  agreeWithRecommendations,
   answersOf,
   cardOf,
   changedRows,
+  decidedOf,
   encodeAnswer,
   roundOf,
   rowAnswers,
@@ -170,4 +172,29 @@ test("a quick question with options is a choice card with its default recommende
     },
   ]
   expect(answersOf(row)).toEqual({ "1.1": { choice: "y" } })
+})
+
+test("agreeWithRecommendations fills unanswered cards with a recommendation and keeps given answers", () => {
+  const round = roundOf(rows)
+  const given = { "1.2": { choice: "ready" } }
+  const out = agreeWithRecommendations(round, given)
+  expect(out["1.1"]).toEqual({ choice: "no" })
+  expect(out["1.2"]).toEqual({ choice: "ready" })
+})
+
+test("auto questions leave the round for the decided list until reopened", () => {
+  const auto: TriageRow[] = [
+    {
+      address: "gx:follow-ups/3",
+      title: "c",
+      questions: [
+        { id: "q1", title: "Ask?", kind: "yes-no", recommended: "yes" },
+        { id: "q2", title: "Decided?", kind: "yes-no", recommended: "no", auto: true },
+      ],
+    },
+  ]
+  expect(roundOf(auto).map((c) => c.label)).toEqual(["3.1"])
+  expect(decidedOf(auto).map((c) => c.label)).toEqual(["3.2"])
+  expect(roundOf(auto, new Set(["3.2"])).map((c) => c.label)).toEqual(["3.1", "3.2"])
+  expect(decidedOf(auto, new Set(["3.2"]))).toEqual([])
 })

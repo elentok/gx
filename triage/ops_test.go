@@ -385,6 +385,20 @@ func TestPlan_EveryVerdictQuestionComesBackInThePlan(t *testing.T) {
 	}
 }
 
+func TestPlan_AutoQuestionsAreAnsweredWithTheirDefault(t *testing.T) {
+	s, rec := atPlan(t)
+	auto := Question{ID: "q1", Text: "Keep the old flag?", Kind: QuestionQuick, Options: []string{"yes", "no"}, Default: "no", Auto: true}
+	ask := Question{ID: "q2", Text: "Fix it where?", Kind: QuestionQuick, Options: []string{"parser", "caller"}, Default: "parser"}
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{auto, ask}}, {RowID: rowB, Action: "close"}}, nil)
+	rec = must(t, rec, err)
+	if got := rec.Rows[0].Person.Answers; len(got) != 1 || got["q1"] != "no" {
+		t.Fatalf("answers = %v, want only q1=no", got)
+	}
+	if rec.OpenQuestions() != 1 {
+		t.Fatalf("open = %d, want 1", rec.OpenQuestions())
+	}
+}
+
 func TestSendBack_KeepsTheAnswersAsEarlierRoundsAndReturnsToPlan(t *testing.T) {
 	s, rec := atPlan(t)
 	q := Question{ID: "q1", Text: "Fix it where?", Kind: QuestionQuick, Options: []string{"parser", "caller"}, Default: "parser"}

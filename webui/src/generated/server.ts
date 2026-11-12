@@ -3632,6 +3632,10 @@ export interface TriageQuestion {
   kind: string;
   options?: string[];
   recommended?: string;
+  /**
+   * Auto marks a low-risk question the agent decided: it holds its default as the answer until the person changes it.
+   */
+  auto?: boolean;
 }
 /**
  * TriageRow is one follow-up with everything the Triage learned about it.

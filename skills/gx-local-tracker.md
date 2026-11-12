@@ -340,7 +340,8 @@ says where the run is, so a `/clear`ed or a web session continues the same recor
   - `create`, `show [--json]`, `pending [--json]`: start, read, and list the rows with no verdict.
   - `verdict --row <addr> [--verdict relevant|fixed|obsolete] [--evidence ..] [--file ..] [--question ..]
     [--destination ..] | --gone`: save one verdict.
-  - `plan [--gone <addr>]` (rows as JSON on stdin), `row --row <addr> --revision <n> ...` (the person's
+  - `plan [--gone <addr>]` (rows as JSON on stdin; a quick question with `"auto": true` is saved answered
+    with its default), `row --row <addr> --revision <n> ...` (the person's
     edits, step approve only), `approve --revision <n>`, `abandon`.
   - `locate --row <addr> [--seen-from <addr>]`: where the follow-up is now and what is already written.
   - `answers`, `seen-again`, `epics`, `write-state`, `last-pass`: the idempotent write-step verbs.

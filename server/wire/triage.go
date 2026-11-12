@@ -63,6 +63,8 @@ type TriageQuestion struct {
 	Kind        string   `json:"kind"`
 	Options     []string `json:"options,omitempty"`
 	Recommended string   `json:"recommended,omitempty"`
+	// Auto marks a low-risk question the agent decided: it holds its default as the answer until the person changes it.
+	Auto bool `json:"auto,omitempty"`
 }
 
 // TriageRow is one follow-up with everything the Triage learned about it.

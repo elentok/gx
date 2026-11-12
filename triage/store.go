@@ -65,6 +65,9 @@ type Question struct {
 	Kind    QuestionKind `json:"kind"`
 	Options []string     `json:"options,omitempty"`
 	Default string       `json:"default,omitempty"`
+	// Auto marks a low-risk quick question the agent decided: Plan saves it
+	// answered with Default, and the person can still change the answer.
+	Auto bool `json:"auto,omitempty"`
 }
 
 // Answered is a question the person answered in an earlier round, as asked.

@@ -186,6 +186,7 @@ func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string)
 			}
 			p := p
 			row.Plan = &p
+			applyAutoAnswers(row, p)
 		}
 		if !rec.planPending() {
 			rec.Step = tickets.StepApprove
@@ -283,6 +284,20 @@ func (r *Row) AllQuestions() []Question {
 		}
 	}
 	return qs
+}
+
+// applyAutoAnswers answers the plan's auto questions with their default. An
+// answer the person already gave stays.
+func applyAutoAnswers(row *Row, p PlanRow) {
+	for _, q := range p.Questions {
+		if !q.Auto || q.Kind != QuestionQuick || row.Person.Answers[q.ID] != "" {
+			continue
+		}
+		if row.Person.Answers == nil {
+			row.Person.Answers = map[string]string{}
+		}
+		row.Person.Answers[q.ID] = q.Default
+	}
 }
 
 // Question option limits: a quick question is a pick from a short list.

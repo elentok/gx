@@ -98,6 +98,11 @@ findings. In the plan, every one comes back under the same id as the final quest
   is the question; further lines say what the fix changes, so it can be answered without opening the
   ticket.
 - A `design` question needs no options or default.
+- A low-risk `quick` question is decided, not asked: add `"auto": true` to it. Plan saves it
+  answered with its `default`, and the person can still change it in the Questions view. It is
+  low-risk only when all of these hold: its answer changes no scope and no destination of the row
+  (a ready epic stays ready), it is cheap to reverse, and it has one clear answer. When in doubt,
+  leave `auto` off. A `design` question is never auto.
 - `gx tickets triage plan` refuses a quick question without options and a default, and a verdict
   question that is missing from the plan.
 
