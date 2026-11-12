@@ -68,6 +68,20 @@ func TestCheck_RecordHasEveryField(t *testing.T) {
 	}
 }
 
+func TestCheck_RecordsNoTreeWhenTreeChangesDuringRun(t *testing.T) {
+	repo, data := registeredCheckRepo(t, `{"test":"echo edit >> edited.txt"}`)
+	if out, code := runCheckCmd(t, repo, "--full", "--kind", "test"); code != 0 {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+	recs, err := check.ReadRecords(data, "p")
+	if err != nil || len(recs) != 1 {
+		t.Fatalf("records = %+v, err %v", recs, err)
+	}
+	if rec := recs[0]; rec.TreeID != "" || rec.TreeError != "tree changed during run" {
+		t.Errorf("TreeID = %q, TreeError = %q", rec.TreeID, rec.TreeError)
+	}
+}
+
 const slowSuite = `{"test":{"full":"sleep 3","changed":"sleep 3","limits":{"suite":"1s"}}}`
 
 func TestCheck_SuiteLimitFailsFullRun(t *testing.T) {

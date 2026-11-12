@@ -173,6 +173,15 @@ func Run(opts Options) (Result, error) {
 		}
 	}
 	wg.Wait()
+	// An edit made while the kinds ran means treeID no longer describes what
+	// was checked, so record no tree rather than a misleading one.
+	if r.treeErr == "" {
+		if after, err := history.TreeID(root); err != nil {
+			r.treeID, r.treeErr = "", err.Error()
+		} else if after != r.treeID {
+			r.treeID, r.treeErr = "", "tree changed during run"
+		}
+	}
 	r.loadEnd = r.loadAvg()
 
 	res := Result{Summary: filepath.Join(runDir, "summary.txt"), Kinds: results, Exit: exitCode(results)}
