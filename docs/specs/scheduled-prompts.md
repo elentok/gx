@@ -121,7 +121,7 @@ now. `gx schedules` CLI verbs mirror every action on the page.
 47. As a person, I want delete to cancel queued runs that never started and let live and paused runs
     continue, so that delete stops future work without killing work in progress.
 48. As a person, I want a Scheduled run that pauses or needs an answer to show as "Needs answer" and
-    be recoverable from the existing One-off ticket page, so that a Schedule adds no new pause kind.
+    be recoverable, or cancellable, from the One-off ticket page, so that a Schedule adds no new pause kind.
 49. As a person, I want a time that does not exist because of a daylight saving change to run at the
     first valid moment after the gap, so that the run is not lost.
 50. As a person, I want a time that happens twice on a daylight saving change to run once, so that I
@@ -141,7 +141,7 @@ now. `gx schedules` CLI verbs mirror every action on the page.
   that shares the store sees it. The implementer picks the file layout and the slug function. The
   store's existing scans (ticket listing, epic listing, migrations, archive moves) must ignore the new
   files. The Schedule file is a new kind of file, not a ticket or epic schema change, so it needs no
-  Migration step.
+  Migration step of its own.
 - **Slug and project are fixed at creation.** Rename changes only the display name. A name whose slug
   already exists in that project is refused. The project is read-only on an existing Schedule.
 - **Schedule switch.** The switch is per machine and lives in that machine's state directory, not in
@@ -159,7 +159,9 @@ now. `gx schedules` CLI verbs mirror every action on the page.
   run of a Schedule. The implementer picks the exact name only if `scheduled_for` clashes with an
   existing field.
 - **Migration.** The new field is optional and absent means "not a Scheduled time". Tickets written
-  before it need no rewrite, so no Migration step is registered. The change is a schema and validation
+  before it need no rewrite, so the step rewrites nothing. A no-op named Migration step is still
+  registered for `scheduled_for`, because `TestSchemaSnapshot` fails for any ticket schema field change
+  until a named step exists and the schema snapshot is updated. The change is a schema and validation
   update only, and `gx tickets validate` accepts tickets with and without the field.
 - **Harness.** The first option is "Default (<harness name>)", stored as unset and resolved on every
   run. Picking claude or codex pins it.
@@ -257,9 +259,10 @@ now. `gx schedules` CLI verbs mirror every action on the page.
     A late run that is still running shows Running. "Ran late" appears only once it finished.
 - **Pauses (ADR 0042).** A Scheduled run that pauses is an ordinary One-off pause. gx can already
   recover it from the web with the One-off's own buttons, and a Schedule adds no pause kind and no new
-  way into one. A paused or failed run does stop later runs of its Schedule, but that is a skip, not a
-  pause. gx cannot judge a failed run, and an automatic retry would bury it. The existing close or
-  cancel button on the One-off ticket page ends the block, and the next set time then runs.
+  way into one. The One-off ticket page has no web way to close a One-off today (the cancel route is
+  socket-only), so this epic adds a web Cancel button for One-off tickets and the route behind it. A paused or failed run does stop later runs of its Schedule, but that is a skip, not a
+  pause. gx cannot judge a failed run, and an automatic retry would bury it. The Cancel button on the One-off ticket
+  page (added by this epic) ends the block, and the next set time then runs.
 - **Glossary.** The terms Schedule, Scheduled run, Late limit and Schedule switch are already in
   GLOSSARY.md under "Schedules". No new term is added.
 
@@ -345,7 +348,9 @@ switch, run-now, delete).
 29. Story 29. New Go server test: a started (running) previous run makes the next timed run skip with
     "previous run started", a skip-log entry and no new One-off. A paused or failed previous run skips
     with "previous run needs attention" and the ticket link, and keeps skipping until its ticket is
-    closed. Closing the ticket through the web route lets the next set time queue a run.
+    closed. Cancelling the ticket with the new Cancel button on its One-off ticket page (a web route, added
+    by this epic) lets the next set time queue a run. New Go web test: the web cancel route cancels a
+    queued One-off with no state token and refuses a ticket outside the `one-offs` epic.
 30. Story 30. New Go server test: a queued never-started previous run is cancelled and the new run is
     queued.
 31. Story 31. Flow `schedules` (new): click Run now, a Last runs row with a ticket link appears. CLI:
@@ -396,7 +401,7 @@ switch, run-now, delete).
     a paused run alone. With two machine ids, each cancels only its own queued run. Turning the
     switch off leaves a queued run alone.
 48. Story 48. Flow `schedules` (new) on shape `needs-answer`, page follows mock state `schedule-page`:
-    a Needs answer row links to the One-off ticket page, which offers its existing button. New Go server test: a Scheduled run adds no pause kind
+    a Needs answer row links to the One-off ticket page, which offers its existing recovery buttons and the new Cancel button. New Go server test: a Scheduled run adds no pause kind
     (the pause-to-verb table test passes).
 49. Story 49. New Go server test: a time inside a spring-forward gap runs at the first valid moment
     after it.
@@ -416,35 +421,32 @@ New flows or scenarios to write (each becomes an implementation ticket):
 - Flow `schedules` in `webui/e2e/schedules.e2e.ts`, one journey across the shapes above. Raise
   `maxFlows` by one and add its entry to `CATALOG.md`.
 - New Go server tests with a controllable clock for stories 20, 24 to 30, 32, 34, 35, 37 to 41, 45,
-  47 to 50 and 52.
+  47 to 50 and 52, and the web cancel route test (story 29).
 - New vitest files in `webui/src` for stories 10, 14, 15, 18 and 35.
 - Schema change: the optional `scheduled_for` field on the One-off ticket only (not the request), with
-  the Migration decision above (no Migration step) and a validation test.
+  the Migration decision above (a no-op named Migration step and the updated schema snapshot) and a
+  validation test.
+- Web Cancel for One-off tickets: make the cancel route a web write and add a Cancel button to the
+  One-off ticket page (stories 29 and 48), with a vitest and a web route test.
 
 **Mock states**
 
 - The fixture shapes `needs-answer` and `missing-project` have no mock state of their own. They reuse
   `list` and `schedule-page`.
 
-- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`,
-  state `list`, 900 px, scenario `schedules` shape `list`, parts: page-title, new-button,
+- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`, `list`, 900 px, scenario `schedules` shape `list`, parts: page-title, new-button,
   schedule-rows, schedule-name, schedule-when, next-run, switch.
-- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`,
-  state `list-switch-off`, 900 px, scenario `schedules` shape `all-off`, parts: page-title,
+- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`, `list-switch-off`, 900 px, scenario `schedules` shape `all-off`, parts: page-title,
   new-button, off-banner, schedule-rows, schedule-name, schedule-when, next-run, switch.
-- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`,
-  state `list-empty`, 900 px, scenario `schedules` shape `empty`, parts: page-title, new-button,
+- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`, `list-empty`, 900 px, scenario `schedules` shape `empty`, parts: page-title, new-button,
   empty-text.
-- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`,
-  state `schedule-page`, 900 px, scenario `schedules` shape `page`, parts: back-link, name, run-now,
+- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`, `schedule-page`, 900 px, scenario `schedules` shape `page`, parts: back-link, name, run-now,
   switch, row-days, days, row-times, times, row-project, row-harness, row-late-limit, row-prompt,
   prompt-box, row-last-runs, last-runs, delete-link. Known differences from the mock, where the spec
   wins: the Harness select starts with "Default (<name>)", and the Project field is read-only.
-- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`,
-  state `schedule-page-unsaved`, 900 px, scenario `schedules` shape `page` after one field is edited,
+- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`, `schedule-page-unsaved`, 900 px, scenario `schedules` shape `page` after one field is edited,
   parts: the parts of `schedule-page` plus save-bar. Same known differences as `schedule-page`.
-- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`,
-  state `schedule-page-new`, 900 px, scenario `schedules` shape `empty` at the new-Schedule route,
+- `/Users/david/.local/share/gx/tickets/gx/scheduled-prompts/mocks/03-schedules-page-prototype.html`, `schedule-page-new`, 900 px, scenario `schedules` shape `empty` at the new-Schedule route,
   parts: back-link, name, row-days, days, row-times, times, row-project, row-harness, row-late-limit,
   row-prompt, prompt-box, save-bar. Known difference from the mock, where the spec wins: the Harness
   select starts with "Default (<name>)". The Project select is editable here, as in the mock, since
