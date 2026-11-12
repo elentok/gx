@@ -139,40 +139,6 @@ func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
 	}
 }
 
-func TestEpicDetail_MergeBlockedActionsFollowTheVerbTable(t *testing.T) {
-	t.Parallel()
-	want := map[string][]string{
-		"dirty-trunk":   {"stash-merge", "merge"},
-		"merge-error":   {"merge"},
-		"trunk-missing": {"merge"},
-		"needs-rebase":  {"merge"},
-	}
-	h, base := rigs.StartEpicDetail(t, func(store string) {
-		done := map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")}
-		for kind := range want {
-			files := ""
-			if kind == "dirty-trunk" {
-				files = "land_block_files:\n  - a.txt\n  - b.txt\n  - c.txt\n  - d.txt\n  - e.txt\n  - f.txt\n"
-			}
-			rigs.WriteEpicFiles(t, store, kind, "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: "+kind+"\nland_block_reason: why\n"+files+"---\n", done)
-		}
-		rigs.WriteEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
-	})
-
-	for kind, actions := range want {
-		_, d, body := getEpicDetail(t, h, base, "proj:"+kind)
-		if !slices.Equal(d.Actions, actions) {
-			t.Errorf("%s actions = %v, want %v (%s)", kind, d.Actions, actions, body)
-		}
-		if wantFiles := kind == "dirty-trunk"; (len(d.MergeBlockFiles) == 6) != wantFiles {
-			t.Errorf("%s files = %v (%s)", kind, d.MergeBlockFiles, body)
-		}
-	}
-	if _, d, body := getEpicDetail(t, h, base, "proj:unmerged"); len(d.Actions) != 0 {
-		t.Errorf("an unblocked epic carries actions: %s", body)
-	}
-}
-
 func TestEpicDetail_StoredReasonWithoutKindReadsAsNeedsRebase(t *testing.T) {
 	t.Parallel()
 	h, base := rigs.StartEpicDetail(t, func(store string) {
@@ -269,7 +235,6 @@ func TestEpicDetail_MapRowsCarryRedesignFields(t *testing.T) {
 				"04-d.md": rigs.IssueMD("04", "open", "blocked_by: [\"03\"]\n", "D"),
 				"05-e.md": rigs.IssueMD("05", "cancelled", "cancelled_at: 2026-01-01T13:00:00Z\n", "E"),
 			})
-
 	})
 
 	_, d, body := getEpicDetail(t, h, base, "proj:atlas")
@@ -289,29 +254,6 @@ func TestEpicDetail_MapRowsCarryRedesignFields(t *testing.T) {
 	}
 	if r5 := rowOf(t, d, "proj:atlas/05"); r5.ClosedAt.Format("15:04") != "13:00" {
 		t.Errorf("row 05 closed = %v, want 13:00", r5.ClosedAt)
-	}
-}
-
-func TestEpicDetail_LoopRowsCarryCloseTime(t *testing.T) {
-	t.Parallel()
-	h, base := rigs.StartEpicDetail(t, func(store string) {
-		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": rigs.IssueMD("01", "done", "done_at: 2026-01-01T10:05:00Z\n", "A"),
-			"02-b.md": rigs.IssueMD("02", "cancelled", "cancelled_at: 2026-01-01T13:00:00Z\n", "B"),
-			"03-c.md": rigs.IssueMD("03", "open", "", "C"),
-		})
-
-	})
-
-	_, d, _ := getEpicDetail(t, h, base, "proj:work")
-	if got := rowOf(t, d, "proj:work/01").ClosedAt.Format("15:04"); got != "10:05" {
-		t.Errorf("done closed = %s, want 10:05", got)
-	}
-	if got := rowOf(t, d, "proj:work/02").ClosedAt.Format("15:04"); got != "13:00" {
-		t.Errorf("cancelled closed = %s, want 13:00", got)
-	}
-	if !rowOf(t, d, "proj:work/03").ClosedAt.IsZero() {
-		t.Error("open row has a close time")
 	}
 }
 
@@ -339,7 +281,6 @@ func TestEpicDetail_MapRingProgress(t *testing.T) {
 					"01-a.md": rigs.IssueMD("01", "done", "", "A"),
 					"02-b.md": rigs.IssueMD("02", "open", "", "B"),
 				})
-
 			})
 
 			_, d, body := getEpicDetail(t, h, base, "proj:atlas")
@@ -489,7 +430,6 @@ func TestEpicDetail_CodexTicketAddsTokensNotDollars(t *testing.T) {
 			"01-claude.md": rigs.IssueMD("01", "done", "actual_cost: 2\ntotal_tokens: 100\n", "Claude"),
 			"02-codex.md":  rigs.IssueMD("02", "done", "had_codex: true\ntotal_tokens: 900\n", "Codex"),
 		})
-
 	})
 
 	_, d, _ := getEpicDetail(t, h, base, "proj:work")

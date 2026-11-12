@@ -111,7 +111,6 @@ func TestEpicList_RowFields(t *testing.T) {
 
 		rigs.WriteEpicFiles(t, store, "merged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nmerged_at: 2026-01-02T11:00:00Z\n---\n",
 			map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")})
-
 	})
 
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")

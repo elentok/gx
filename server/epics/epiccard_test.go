@@ -97,7 +97,6 @@ func TestEpicList_QueuedOneOffSortsBySlotAndReadsQueuedN(t *testing.T) {
 			"01-a.md": rigs.IssueMD("01", "open", "", "Queued one"),
 			"02-b.md": rigs.IssueMD("02", "open", "", "Idle one"),
 		})
-
 	})
 
 	for _, addr := range []string{"proj:q-first", "proj:one-offs/01", "proj:q-last"} {
