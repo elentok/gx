@@ -1,5 +1,5 @@
 interface:
-  display_name: "Verify Epic"
-  short_description: "Verify an epic's finished work end to end"
+  display_name: "CI Fix"
+  short_description: "Fix one failed CI run on an epic's pull request branch"
 policy:
   allow_implicit_invocation: false

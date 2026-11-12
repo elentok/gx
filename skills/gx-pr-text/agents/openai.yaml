@@ -1,5 +1,5 @@
 interface:
-  display_name: "Verify Epic"
-  short_description: "Verify an epic's finished work end to end"
+  display_name: "PR Text"
+  short_description: "Write the title and body of an epic's pull request"
 policy:
   allow_implicit_invocation: false
