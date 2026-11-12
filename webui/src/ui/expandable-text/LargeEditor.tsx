@@ -86,7 +86,7 @@ export function LargeEditor({
       followViewport={wide && coarse}
       closeOnEscape={false}
       closeOnNarrowBackdrop={false}
-      desktop={{ borderRadius: "12px", w: "860px", h: "680px", p: "5" }}
+      desktop={{ borderRadius: "12px", w: "860px", h: "680px", p: "3" }}
       bg="surface.raised"
       borderColor="border"
       p="4"

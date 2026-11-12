@@ -294,6 +294,9 @@ export type EchoPrompt = { text: string; images: string[] }
 // The transcript text carries "[Image #N]" chips the sent text does not, and stores it trimmed, so both sides drop the chips and the edges.
 const stripChips = (text: string) => text.replace(/\[Image #\d+\]/g, "").trim()
 
+// Whitespace runs collapse for matching only: the transcript can store "2.  x" as "2. x", and an echo that misses its message shows twice.
+const sameText = (a: string, b: string) => a.replace(/\s+/g, " ") === b.replace(/\s+/g, " ")
+
 // How many transcript messages are this prompt. A slash command shows up as a "command" message, so it counts too. An images-only prompt has
 // no text to match, so it matches the images-only prompts with the same image count.
 export function echoMatches(
@@ -305,7 +308,7 @@ export function echoMatches(
     const text = stripChips(m.text ?? "")
     return e.text === "" && e.images.length > 0
       ? text === "" && (m.images?.length ?? 0) === e.images.length
-      : text === e.text
+      : sameText(text, e.text)
   }).length
 }
 

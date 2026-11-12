@@ -55,6 +55,22 @@ const theme = EditorView.theme({
   },
   "&.cm-focused": { outline: "none" },
   ".cm-cursor": { borderLeftColor: "currentColor" },
+  // CodeMirror's defaults are light (lavender selection, white panel), which hides the light text. Use the theme tokens.
+  ".cm-selectionBackground": { background: "var(--chakra-colors-sidebar-current)" },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
+    background: "var(--chakra-colors-sidebar-selected)",
+  },
+  ".cm-content ::selection": { background: "var(--chakra-colors-sidebar-selected)" },
+  // The vim message and command line under the text: a quiet status line, never the error red.
+  ".cm-panels": {
+    backgroundColor: "var(--chakra-colors-surface-raised)",
+    color: "var(--chakra-colors-text-dim)",
+    border: "none",
+  },
+  ".cm-panels-bottom": { borderTop: "none" },
+  ".cm-vim-panel": { fontFamily: "inherit", fontSize: "12px" },
+  ".cm-vim-panel, .cm-vim-panel *": { color: "var(--chakra-colors-text-dim) !important" },
+  ".cm-vim-panel input": { backgroundColor: "transparent" },
   ".cm-scroller": { fontFamily: "inherit", lineHeight: "1.55", overflow: "auto" },
   ".cm-content": { padding: "12px" },
   ".cm-line": { padding: "0" },

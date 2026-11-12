@@ -66,3 +66,8 @@ test("an echo sent into an empty chat goes first; one whose anchor is gone goes 
   )
   expect(ids(out)).toEqual(["echo-0", "a", "echo-1"])
 })
+
+test("the echo match ignores whitespace runs inside the text", () => {
+  const e = { text: "1. a\n2.  b", images: [] }
+  expect(echoMatches([prompt("1. a\n2. b")], e)).toBe(1)
+})
