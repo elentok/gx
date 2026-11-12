@@ -1,6 +1,7 @@
 import { canManage } from "../agents/sessionWrites"
 import type { SessionInfo } from "../generated/server"
 import { isMac } from "../platform"
+import { focusSidebar } from "./focusSidebar"
 import { openNewAgent, openNewDesign } from "./newItemOpen"
 
 type Modifier = "cmd" | "ctrl" | "alt" | "shift"
@@ -86,6 +87,7 @@ export function chordTable(remove: () => void): Chord[] {
   return [
     { key: "c", label: () => "New chat", run: openNewAgent, available: () => true },
     { key: "d", label: () => "New design", run: openNewDesign, available: () => true },
+    { key: "s", label: () => "Focus sidebar", run: focusSidebar, available: () => true },
     {
       key: "x",
       label: ({ session: s }) => (s && (s.ticket || s.fix_of || s.flow) ? "Remove" : "Remove chat"),

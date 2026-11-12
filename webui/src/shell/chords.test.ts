@@ -135,6 +135,7 @@ describe("chord table c and d", () => {
     expect(t.map((c) => [c.key, c.label({ path: "/" }), c.available({ path: "/" })])).toEqual([
       ["c", "New chat", true],
       ["d", "New design", true],
+      ["s", "Focus sidebar", true],
       ["x", "Remove chat", false],
     ])
   })

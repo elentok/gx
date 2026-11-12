@@ -39,7 +39,8 @@ const rowStyle = {
   textDecoration: "none",
   color: "inherit",
   _hover: { bg: "sidebar.hover" },
-  "data-focus-ring": "inset",
+  // The ring is drawn by RowFrame so it covers the whole row, not just this link.
+  "data-focus-ring": "none",
 } as const
 
 const statusColor = (status: SidebarStatus, dim?: boolean) =>
@@ -244,6 +245,11 @@ function RowFrame({
       borderLeftWidth="3px"
       borderLeftColor={current ? "tone.running.fg" : "transparent"}
       borderRadius="6px"
+      css={{
+        "&:has([data-nav]:focus-visible)": {
+          boxShadow: "inset 0 0 0 2px {colors.tone.running.fg} !important",
+        },
+      }}
     >
       {children}
     </Box>

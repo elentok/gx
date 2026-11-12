@@ -3,6 +3,7 @@ import { useNavigate, type NavigateFunction } from "react-router"
 import { FOCUS_PROMPT_STATE } from "../agents/promptFocus"
 import { isTextTarget } from "./keys"
 import { hasLayer } from "../ui/modal/layers"
+import { FOCUS_SIDEBAR_EVENT } from "./focusSidebar"
 import type { Shell } from "./ShellContext"
 
 /** Marks every sidebar row anchor and section header: the stops of the roving focus. */
@@ -129,11 +130,26 @@ export function useSidebarKeys(aside: RefObject<HTMLElement | null>, shell: Shel
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [sidebarOpen, toggle])
+  const focusStop = () => {
+    const all = aside.current ? items(aside.current) : []
+    ;(all.find((i) => i.tabIndex === 0) ?? all[0])?.focus()
+  }
   useEffect(() => {
     if (!focusOnOpen.current || !sidebarOpen) return
     focusOnOpen.current = false
-    const all = aside.current ? items(aside.current) : []
-    ;(all.find((i) => i.tabIndex === 0) ?? all[0])?.focus()
+    focusStop()
   }, [sidebarOpen, aside])
+  // The `s` chord: focus the sidebar, opening it first when it is closed.
+  const onFocusRequest = useRef(() => {})
+  onFocusRequest.current = () => {
+    if (sidebarOpen) return focusStop()
+    focusOnOpen.current = true
+    toggle()
+  }
+  useEffect(() => {
+    const h = () => onFocusRequest.current()
+    window.addEventListener(FOCUS_SIDEBAR_EVENT, h)
+    return () => window.removeEventListener(FOCUS_SIDEBAR_EVENT, h)
+  }, [])
   return (e: ReactKeyboardEvent) => aside.current && onSidebarKey(aside.current, e, navigate)
 }
