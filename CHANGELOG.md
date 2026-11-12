@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.49.2 - 2026-11-12
+
+- Added a configurable Vi escape sequence, and split the settings page into separate sections.
+- Added Biome for webui formatting. gx's format default now prefers it.
+- Added By project and By status sidebar sorts.
+- Added Cmd-G to open the large editor without Vi mode, with its cursor drawn. The large editor's selection and message line are themed, its padding is tighter, and echoes match across whitespace runs.
+- Added the Vi editor to the New Design idea box, and an icon-only attach button on desktop.
+- Added bouncing typing dots on the sidebar icon of a working chat.
+- Changed the Command palette shortcut to Cmd/Ctrl+P (was Cmd/Ctrl+E).
+- Changed the chat textbox to align with its content, with tighter composer spacing. The text field's border and focus ring now sit on a wrapper, with the note and footer in the flow.
+- Changed the top spacing to live in PageHeader, so the chat header matches other pages.
+- Changed the sort menu indicator and the footer hover to be consistent.
+- Fixed Safari tabbing: every button is now a tab stop, and dialogs trap Tab with focus sentinels so focus cannot leave them.
+- Fixed a sent prompt's echo not being dropped when `/clear` starts a new conversation.
+
 ## v0.49.1 - 2026-11-11
 
 - Added Archive to the item menu, and a persistent "Archiving" toast for bulk archive. The archive logs how long each phase takes to the server log.
